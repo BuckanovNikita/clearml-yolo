@@ -17,3 +17,7 @@ digital-metrics/
 report-generator/
 
 clearml.conf
+
+# coco8 test fixtures
+augmentations.json
+ground_truth.csv

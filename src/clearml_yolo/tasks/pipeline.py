@@ -7,6 +7,7 @@ from typing import Any
 
 from hydra_zen import instantiate
 from loguru import logger
+from omegaconf import OmegaConf
 
 from clearml_yolo.clearml_session import ClearMLConfig, init_task
 from clearml_yolo.tasks.metrics import compute_metrics
@@ -16,8 +17,18 @@ from clearml_yolo.tasks.train import train as run_training
 
 
 def _as_dict(config: Any) -> dict[str, Any]:
+    """Resolve a stage sub-config, leaving no OmegaConf containers behind.
+
+    Nested containers must become plain dicts and lists: ultralytics stores whatever
+    it receives into trainer.args and pickles that when saving a checkpoint, and a
+    DictConfig backed by a generated dataclass cannot be pickled.
+    """
     resolved = instantiate(config)
-    return dict(resolved) if not isinstance(resolved, dict) else resolved
+    values = dict(resolved) if not isinstance(resolved, dict) else resolved
+    return {
+        key: OmegaConf.to_object(value) if OmegaConf.is_config(value) else value
+        for key, value in values.items()
+    }
 
 
 def run_pipeline(
