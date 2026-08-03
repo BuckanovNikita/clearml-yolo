@@ -1,0 +1,71 @@
+[project]
+name = "clearml-yolo"
+version = "0.1.0"
+description = "Composable hydra-zen apps for YOLO training, inference, metrics and model comparison reports"
+readme = "README.md"
+authors = [
+    { name = "Buckanov Nikita", email = "buckanov.nikita@yandex.ru" }
+]
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "ultralytics>=8.4",
+    "albumentations>=2.0,<3",
+    "hydra-core>=1.3",
+    "hydra-zen>=0.16",
+    "clearml>=1.13",
+    "pydantic>=2",
+    "loguru>=0.7",
+    "pandas>=2.0",
+    "openpyxl>=3.1",
+    "nvidia-ml-py",
+    "digital-metrics",
+    "report-generator",
+]
+
+[project.scripts]
+cy = "clearml_yolo.apps.pipeline:main"
+cy-train = "clearml_yolo.apps.train:main"
+cy-predict = "clearml_yolo.apps.predict:main"
+cy-metrics = "clearml_yolo.apps.metrics:main"
+cy-report = "clearml_yolo.apps.report:main"
+
+[build-system]
+requires = ["uv_build>=0.11.32,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+digital-metrics = { git = "https://github.com/Wasilkas/digital-metrics" }
+report-generator = { git = "https://github.com/Wasilkas/report-generator" }
+
+[dependency-groups]
+dev = [
+    "mypy>=1.11",
+    "pandas-stubs",
+    "pytest>=8.0",
+    "ruff>=0.6",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "BLE", "C4", "SIM", "RET", "PTH", "T20"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]
+# `import albumentations as A` is that library's universal convention.
+"src/clearml_yolo/augment.py" = ["N812"]
+"tests/test_augment.py" = ["N812"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+module = ["ultralytics.*", "clearml.*", "digital_metrics.*", "report_generator.*", "pynvml.*", "albumentations.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
