@@ -216,6 +216,27 @@ def test_nothing_comparable_is_an_error_rather_than_an_empty_report() -> None:
         )
 
 
+def test_comparing_a_model_against_itself_is_refused(tmp_path: Path) -> None:
+    """Two lookups can land on one task; every delta is then zero, which reads as a result."""
+    from clearml_yolo.clearml_session import ClearMLConfig
+    from clearml_yolo.tasks.compare import InferenceConfig, ModelRef, compare
+
+    checkpoint = tmp_path / "best.pt"
+    checkpoint.write_bytes(b"")
+    same = ModelRef(source="local", weights=checkpoint, thresholds={"car": 0.4})
+    (tmp_path / "gt.csv").write_text("image_name,split\na.png,test\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="same checkpoint"):
+        compare(
+            baseline_model=same,
+            candidate_model=same.model_copy(),
+            ground_truth=tmp_path / "gt.csv",
+            output_dir=tmp_path / "out",
+            clearml=ClearMLConfig(enabled=False),
+            inference=InferenceConfig(device="cpu"),
+        )
+
+
 def test_thresholds_are_carried_through_per_model() -> None:
     tables = _tables({"car": 20, "van": 20}, {"car": 30, "van": 20})
     rows = tables.rows

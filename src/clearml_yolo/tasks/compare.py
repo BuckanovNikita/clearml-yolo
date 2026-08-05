@@ -197,6 +197,15 @@ def compare(
     project = clearml.project_name if clearml.enabled else None
     baseline_weights, thresholds_baseline = _resolve_model(baseline_model, split, project)
     candidate_weights, thresholds_candidate = _resolve_model(candidate_model, split, project)
+    if baseline_weights == candidate_weights:
+        # Two lookups can land on one task — both sides searching a project by tag, say.
+        # Every delta is then exactly zero, which reads as "the new model changed nothing"
+        # rather than as the configuration mistake it is.
+        raise ValueError(
+            f"Both sides of the comparison resolved to the same checkpoint "
+            f"({candidate_weights}), so there is nothing to compare. Name the two models "
+            "explicitly with baseline_model.task_id and candidate_model.task_id."
+        )
 
     evaluation = {"iou_threshold": iou_threshold, "matching_strategy": matching_strategy}
     classes = sorted({str(label) for label in truth[truth["split"] == split]["instance_label"]})

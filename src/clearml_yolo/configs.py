@@ -26,7 +26,11 @@ ClearMLConf = builds(ClearMLConfig, populate_full_signature=True)
 EvaluationConf = builds(EvaluationConfig, populate_full_signature=True)
 InferenceConf = builds(InferenceConfig, populate_full_signature=True)
 
-ModelClearMLConf = builds(ModelRef, source="clearml", populate_full_signature=True)
+BaselineModelConf = builds(ModelRef, source="clearml", populate_full_signature=True)
+# The candidate is the model under test, which by definition has not been promoted yet,
+# so it must not inherit the baseline's prod tag — both sides would resolve to the same
+# task and the comparison would report a model as identical to itself.
+CandidateModelConf = builds(ModelRef, source="clearml", tags=[], populate_full_signature=True)
 ModelLocalConf = builds(ModelRef, source="local", populate_full_signature=True)
 
 # Every stage inside the pipeline points at the top-level block, so one
@@ -196,9 +200,12 @@ def register_configs() -> None:
     store(report_config(PipelineStageClearMLConf), group="report", name="default")
 
     for stage in ("", "compare/"):
-        for group in ("baseline_model", "candidate_model"):
+        for group, clearml_conf in (
+            ("baseline_model", BaselineModelConf),
+            ("candidate_model", CandidateModelConf),
+        ):
             model_store = store(group=f"{stage}{group}")
-            model_store(ModelClearMLConf, name="clearml")
+            model_store(clearml_conf, name="clearml")
             model_store(ModelLocalConf, name="local")
     store(compare_config(ClearMLConf), name="compare")
     store(compare_config(PipelineStageClearMLConf), group="compare", name="default")
