@@ -1,12 +1,20 @@
-"""Automatic GPU selection and VRAM-aware batch sizing.
+"""Automatic GPU selection, admission control and VRAM-aware batch sizing.
 
 GPUs are surveyed through NVML rather than torch because NVML needs no CUDA context:
 ``torch.cuda.mem_get_info`` allocates roughly half a gigabyte on every device it probes,
 which would occupy the very memory the survey is trying to measure.
+
+A run does not merely pick devices, it waits for them: starting training on a host whose
+cards are busy either crashes or evicts someone else's inference. Two policies express
+that. ``reserve_gpus`` leaves cards behind for other runs to infer on, and the wait loop
+holds the run at the door until enough cards are free.
 """
 
 from __future__ import annotations
 
+import os
+import time
+from collections.abc import Callable, Sequence
 from typing import Any
 
 from loguru import logger
@@ -28,6 +36,21 @@ class AutoGpuConfig(BaseModel):
     max_gpus: int | None = None
     scale_to_vram: bool = True
     round_to_power_of_two: bool = True
+    # Cards left untouched so inference belonging to other runs keeps somewhere to go.
+    # Clamped during selection: a host with one GPU would otherwise never train.
+    reserve_gpus: int = Field(default=1, ge=0)
+    min_devices: int = Field(default=1, ge=1)
+    # Foreign compute processes tolerated per card. Processes belonging to this run are
+    # never counted here, so a stage that follows training on the same device is not
+    # locked out by training's own leftover context.
+    max_compute_processes: int = Field(default=0, ge=0)
+    wait_for_free: bool = True
+    wait_poll_seconds: float = Field(default=30.0, gt=0)
+    wait_timeout_seconds: float = Field(default=3600.0, gt=0)
+    # CPU is never the way out of a wait: a transient NVML failure would otherwise turn
+    # a GPU run into a silent hundredfold slowdown. Hosts with no CUDA at all still fall
+    # back to CPU regardless of this flag.
+    cpu_fallback_on_nvml_failure: bool = False
 
 
 class GpuInfo(BaseModel):
@@ -38,11 +61,30 @@ class GpuInfo(BaseModel):
     uuid: str
     total_vram_gb: float
     free_vram_gb: float
-    compute_process_count: int
+    foreign_process_count: int
+    own_vram_gb: float = 0.0
+
+    @property
+    def effective_free_vram_gb(self) -> float:
+        """Free VRAM, counting what this run itself already holds as available."""
+        return self.free_vram_gb + self.own_vram_gb
 
     @property
     def used_fraction(self) -> float:
-        return 1.0 - self.free_vram_gb / self.total_vram_gb
+        return 1.0 - self.effective_free_vram_gb / self.total_vram_gb
+
+
+class GpuSurvey(BaseModel):
+    """One NVML sweep, keeping the reason an empty result is empty.
+
+    Collapsing "this host has no CUDA" and "NVML could not be reached" into an empty
+    list would make a transient probe failure indistinguishable from a CPU-only
+    machine, and the wait loop would exit into CPU training on both.
+    """
+
+    cuda_available: bool
+    nvml_available: bool
+    gpus: list[GpuInfo] = Field(default_factory=list)
 
 
 class DeviceSelection(BaseModel):
@@ -70,7 +112,44 @@ def _nvml_handles_by_uuid(pynvml: Any) -> dict[str, Any]:
     return handles
 
 
-def probe_gpus() -> list[GpuInfo]:
+def _own_process_group() -> int | None:
+    try:
+        return os.getpgrp()
+    except OSError:
+        return None
+
+
+def _belongs_to_this_run(pid: int, own_group: int | None) -> bool:
+    """Whether a compute process is this process or one of its DDP children."""
+    if pid == os.getpid():
+        return True
+    if own_group is None:
+        return False
+    try:
+        return os.getpgid(pid) == own_group
+    except (ProcessLookupError, PermissionError):
+        return False
+
+
+def _split_occupancy(processes: Sequence[Any], own_group: int | None) -> tuple[int, float]:
+    """Count foreign compute processes and total the VRAM this run already holds.
+
+    NVML reports the calling process among the compute processes of the card it is
+    using. Counting it would make a run consider its own device busy the moment it
+    probes a second time — which is exactly what the predict stage does after training.
+    """
+    foreign = 0
+    own_bytes = 0
+    for process in processes:
+        if _belongs_to_this_run(int(process.pid), own_group):
+            # NVML reports None for processes whose per-process usage it cannot read.
+            own_bytes += int(process.usedGpuMemory or 0)
+        else:
+            foreign += 1
+    return foreign, own_bytes / BYTES_PER_GIB
+
+
+def probe_gpus() -> GpuSurvey:
     """Describe every GPU torch can see, reading live memory figures from NVML.
 
     Devices are matched by UUID because NVML ignores ``CUDA_VISIBLE_DEVICES`` while
@@ -80,20 +159,21 @@ def probe_gpus() -> list[GpuInfo]:
 
     if not torch.cuda.is_available():
         logger.warning("CUDA is unavailable; no GPUs to probe")
-        return []
+        return GpuSurvey(cuda_available=False, nvml_available=False)
 
     try:
         import pynvml
     except ImportError:
         logger.warning("nvidia-ml-py is not installed; cannot inspect GPU memory")
-        return []
+        return GpuSurvey(cuda_available=True, nvml_available=False)
 
     try:
         pynvml.nvmlInit()
     except pynvml.NVMLError as error:
         logger.warning("NVML initialisation failed ({}); cannot inspect GPU memory", error)
-        return []
+        return GpuSurvey(cuda_available=True, nvml_available=False)
 
+    own_group = _own_process_group()
     try:
         by_uuid = _nvml_handles_by_uuid(pynvml)
         gpus: list[GpuInfo] = []
@@ -109,6 +189,9 @@ def probe_gpus() -> list[GpuInfo]:
                 )
                 continue
             memory = pynvml.nvmlDeviceGetMemoryInfo(handle)
+            foreign, own_vram_gb = _split_occupancy(
+                pynvml.nvmlDeviceGetComputeRunningProcesses(handle), own_group
+            )
             gpus.append(
                 GpuInfo(
                     torch_index=torch_index,
@@ -116,35 +199,37 @@ def probe_gpus() -> list[GpuInfo]:
                     uuid=bare_uuid,
                     total_vram_gb=memory.total / BYTES_PER_GIB,
                     free_vram_gb=memory.free / BYTES_PER_GIB,
-                    compute_process_count=len(pynvml.nvmlDeviceGetComputeRunningProcesses(handle)),
+                    foreign_process_count=foreign,
+                    own_vram_gb=own_vram_gb,
                 )
             )
-        return gpus
+        return GpuSurvey(cuda_available=True, nvml_available=True, gpus=gpus)
     finally:
         pynvml.nvmlShutdown()
 
 
 def _is_available(gpu: GpuInfo, config: AutoGpuConfig) -> bool:
-    if gpu.compute_process_count > 0:
+    if gpu.foreign_process_count > config.max_compute_processes:
         logger.info(
-            "Skipping GPU {} ({}): {} compute process(es) already running",
+            "GPU {} ({}) is busy: {} foreign compute process(es), limit {}",
             gpu.torch_index,
             gpu.name,
-            gpu.compute_process_count,
+            gpu.foreign_process_count,
+            config.max_compute_processes,
         )
         return False
-    if gpu.free_vram_gb < config.min_free_vram_gb:
+    if gpu.effective_free_vram_gb < config.min_free_vram_gb:
         logger.info(
-            "Skipping GPU {} ({}): {:.1f} GiB free, need {:.1f}",
+            "GPU {} ({}) is full: {:.1f} GiB free, need {:.1f}",
             gpu.torch_index,
             gpu.name,
-            gpu.free_vram_gb,
+            gpu.effective_free_vram_gb,
             config.min_free_vram_gb,
         )
         return False
     if gpu.used_fraction > config.max_used_fraction:
         logger.info(
-            "Skipping GPU {} ({}): {:.1%} of VRAM already used, limit {:.1%}",
+            "GPU {} ({}) is full: {:.1%} of VRAM already used, limit {:.1%}",
             gpu.torch_index,
             gpu.name,
             gpu.used_fraction,
@@ -152,6 +237,105 @@ def _is_available(gpu: GpuInfo, config: AutoGpuConfig) -> bool:
         )
         return False
     return True
+
+
+def _apply_reserve(available: list[GpuInfo], config: AutoGpuConfig) -> list[GpuInfo]:
+    """Take the freest cards, leaving ``reserve_gpus`` behind for other runs.
+
+    ``max_gpus`` is a ceiling ("use at most N") and the reserve is a floor on what is
+    left over ("leave at least N"), so both fold into one slice. The reserve is clamped
+    to keep at least one device: taken literally on a single-GPU host it would leave
+    every run with nothing, forever.
+    """
+    if not available:
+        return []
+
+    ceiling = config.max_gpus if config.max_gpus is not None else len(available)
+    after_reserve = len(available) - config.reserve_gpus
+    keep = min(ceiling, max(1, after_reserve))
+    if config.reserve_gpus and keep > after_reserve:
+        logger.warning(
+            "reserve_gpus={} would leave this run no device among {} free card(s); "
+            "taking {} and reserving none",
+            config.reserve_gpus,
+            len(available),
+            keep,
+        )
+
+    freest_first = sorted(available, key=lambda gpu: gpu.free_vram_gb, reverse=True)
+    return sorted(freest_first[:keep], key=lambda gpu: gpu.torch_index)
+
+
+def _selectable(survey: GpuSurvey, config: AutoGpuConfig) -> list[GpuInfo]:
+    return _apply_reserve([gpu for gpu in survey.gpus if _is_available(gpu, config)], config)
+
+
+def _no_device_message(config: AutoGpuConfig, total: int, waited: float | None) -> str:
+    preamble = (
+        f"Waited {waited:.0f}s and still found"
+        if waited is not None
+        else "Auto GPU mode found"
+    )
+    return (
+        f"{preamble} fewer than {config.min_devices} usable device(s) among {total} GPU(s): "
+        f"every card is busy, holds less than {config.min_free_vram_gb} GiB free, or is "
+        f"held back by reserve_gpus={config.reserve_gpus}. Lower auto_gpu.min_free_vram_gb, "
+        "raise auto_gpu.max_used_fraction or auto_gpu.max_compute_processes, drop "
+        "auto_gpu.reserve_gpus, extend auto_gpu.wait_timeout_seconds, or set an explicit device."
+    )
+
+
+def wait_for_devices(
+    config: AutoGpuConfig,
+    *,
+    probe: Callable[[], GpuSurvey] = probe_gpus,
+    sleep: Callable[[float], None] = time.sleep,
+    monotonic: Callable[[], float] = time.monotonic,
+) -> list[GpuInfo]:
+    """Block until ``min_devices`` cards are free, then return the ones to use.
+
+    An empty list means the host has no usable GPU at all and the caller should run on
+    CPU. Every other outcome raises: a wait must never end by quietly downgrading the
+    run to CPU, which is a hundredfold slowdown that looks exactly like success.
+
+    ``probe``, ``sleep`` and ``monotonic`` are injected so the whole policy is testable
+    without a GPU and without real time passing.
+    """
+    started = monotonic()
+    while True:
+        survey = probe()
+        if not survey.cuda_available:
+            return []
+        if not survey.nvml_available:
+            if config.cpu_fallback_on_nvml_failure:
+                logger.warning("NVML is unreachable; falling back to CPU as configured")
+                return []
+            raise RuntimeError(
+                "NVML is unreachable, so GPU occupancy cannot be measured and this run "
+                "would silently train on CPU. Install nvidia-ml-py, or set "
+                "auto_gpu.cpu_fallback_on_nvml_failure=true to accept that."
+            )
+
+        selectable = _selectable(survey, config)
+        if len(selectable) >= config.min_devices:
+            return selectable
+
+        elapsed = monotonic() - started
+        if not config.wait_for_free:
+            raise RuntimeError(_no_device_message(config, len(survey.gpus), waited=None))
+        remaining = config.wait_timeout_seconds - elapsed
+        if remaining <= 0:
+            raise RuntimeError(_no_device_message(config, len(survey.gpus), waited=elapsed))
+
+        logger.info(
+            "Waiting for {} free GPU(s): {} of {} usable, {:.0f}s elapsed, {:.0f}s before timeout",
+            config.min_devices,
+            len(selectable),
+            len(survey.gpus),
+            elapsed,
+            remaining,
+        )
+        sleep(min(config.wait_poll_seconds, remaining))
 
 
 def _floor_power_of_two(value: int) -> int:
@@ -190,32 +374,22 @@ def select_devices(config: AutoGpuConfig) -> DeviceSelection:
     ``batch`` as the total across ranks and floor-divides it by world size without
     checking divisibility, silently shrinking the effective batch otherwise.
     """
-    gpus = probe_gpus()
-    if not gpus:
-        logger.warning("Falling back to CPU with batch {}", config.batch_per_gpu)
+    chosen = wait_for_devices(config)
+    if not chosen:
+        logger.warning(
+            "No GPU on this host; falling back to CPU with batch {}", config.batch_per_gpu
+        )
         return DeviceSelection(
             devices="cpu", batch=config.batch_per_gpu, batch_per_gpu=config.batch_per_gpu
         )
 
-    available = [gpu for gpu in gpus if _is_available(gpu, config)]
-    if not available:
-        raise RuntimeError(
-            f"Auto GPU mode found no free device among {len(gpus)}: every GPU is busy or "
-            f"has less than {config.min_free_vram_gb} GiB free. Lower auto_gpu."
-            "min_free_vram_gb, raise auto_gpu.max_used_fraction, or set an explicit device."
-        )
-
-    if config.max_gpus is not None:
-        available = sorted(available, key=lambda gpu: gpu.free_vram_gb, reverse=True)
-        available = sorted(available[: config.max_gpus], key=lambda gpu: gpu.torch_index)
-
-    batch_per_gpu = scale_batch_per_gpu(config, available)
-    devices = [gpu.torch_index for gpu in available]
+    batch_per_gpu = scale_batch_per_gpu(config, chosen)
+    devices = [gpu.torch_index for gpu in chosen]
     selection = DeviceSelection(
         devices=devices,
         batch=batch_per_gpu * len(devices),
         batch_per_gpu=batch_per_gpu,
-        gpus=available,
+        gpus=chosen,
     )
     logger.info(
         "Auto GPU selected devices {} — {} x {} = total batch {}",
@@ -225,6 +399,23 @@ def select_devices(config: AutoGpuConfig) -> DeviceSelection:
         selection.batch,
     )
     return selection
+
+
+def resolve_inference_device(config: AutoGpuConfig) -> str:
+    """Wait for one card and name it the way ultralytics expects (``"0"``, ``"cpu"``).
+
+    Inference cannot go through :func:`resolve_devices`: digital-metrics takes a single
+    device string, not a device list. It also ignores ``reserve_gpus`` deliberately —
+    the reserve exists so that inference has somewhere to run, so honouring it here
+    would leave a single-GPU host unable to infer at all.
+    """
+    single = config.model_copy(update={"reserve_gpus": 0, "min_devices": 1, "max_gpus": 1})
+    chosen = wait_for_devices(single)
+    if not chosen:
+        logger.warning("No GPU on this host; running inference on CPU")
+        return "cpu"
+    logger.info("Inference device: GPU {} ({})", chosen[0].torch_index, chosen[0].name)
+    return str(chosen[0].torch_index)
 
 
 def resolve_devices(
