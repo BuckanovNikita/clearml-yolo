@@ -123,15 +123,16 @@ def _headline_values(
 ) -> dict[str, float]:
     """Reduce the comparison to the handful of numbers that answer "did it get better?".
 
-    Insertion order is the reporting order, and degradation goes first: a reviewer
-    skimming the ClearML scalar panel must hit the bad news before the good news.
+    Degradation goes first: a reviewer skimming the ClearML scalar panel must hit the bad
+    news before the good news. The names lead with the direction rather than the metric so
+    that holds whether the panel keeps the reporting order or sorts by name.
     """
     values: dict[str, float] = {}
 
     for metric, verdict in verdicts.items():
-        values[f"{metric}_degraded"] = float(verdict.eq(DEGRADED_VERDICT).fillna(False).sum())
+        values[f"degraded_{metric}"] = float(verdict.eq(DEGRADED_VERDICT).fillna(False).sum())
     for metric, verdict in verdicts.items():
-        values[f"{metric}_improved"] = float(verdict.eq(IMPROVED_VERDICT).fillna(False).sum())
+        values[f"improved_{metric}"] = float(verdict.eq(IMPROVED_VERDICT).fillna(False).sum())
 
     if ADJUSTED_P_COLUMN in per_class.columns:
         tested = float(pd.to_numeric(per_class[ADJUSTED_P_COLUMN], errors="coerce").notna().sum())

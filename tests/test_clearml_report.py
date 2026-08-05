@@ -173,13 +173,13 @@ def test_headline_values_count_verdicts_of_per_class_rows_only(warnings_log: lis
 
     report_comparison(task, "test", _comparison_rows(), _METHODOLOGY)
 
-    # The pooled row carries verdicts too: counting it would make precision_improved 2
-    # and recall_degraded 2.
+    # The pooled row carries verdicts too: counting it would make improved_precision 2
+    # and degraded_recall 2.
     assert task.get_logger().single_values == {
-        "test/precision_degraded": 1.0,
-        "test/recall_degraded": 1.0,
-        "test/precision_improved": 1.0,
-        "test/recall_improved": 0.0,
+        "test/degraded_precision": 1.0,
+        "test/degraded_recall": 1.0,
+        "test/improved_precision": 1.0,
+        "test/improved_recall": 0.0,
         "test/classes_tested": 3.0,
         "test/classes_excluded": 1.0,
         "test/pooled_delta_precision": pytest.approx(0.03),
@@ -194,8 +194,8 @@ def test_degradation_is_reported_before_improvement() -> None:
     report_comparison(task, "test", _comparison_rows(), _METHODOLOGY)
 
     reported = list(task.get_logger().single_values)
-    assert reported[:2] == ["test/precision_degraded", "test/recall_degraded"]
-    assert reported.index("test/precision_improved") > reported.index("test/recall_degraded")
+    assert reported[:2] == ["test/degraded_precision", "test/degraded_recall"]
+    assert reported.index("test/improved_precision") > reported.index("test/degraded_recall")
 
 
 def test_class_labels_may_live_in_the_index() -> None:
@@ -205,8 +205,8 @@ def test_class_labels_may_live_in_the_index() -> None:
     report_comparison(task, "val", rows, _METHODOLOGY)
 
     single_values = task.get_logger().single_values
-    assert single_values["val/precision_degraded"] == 1.0
-    assert single_values["val/precision_improved"] == 1.0
+    assert single_values["val/degraded_precision"] == 1.0
+    assert single_values["val/improved_precision"] == 1.0
     assert single_values["val/classes_tested"] == 3.0
 
 
@@ -222,7 +222,7 @@ def test_missing_columns_are_warned_about_and_skipped(warnings_log: list[str]) -
     assert "'p_adjusted'" in warnings
 
     single_values = task.get_logger().single_values
-    assert single_values["test/precision_degraded"] == 1.0
+    assert single_values["test/degraded_precision"] == 1.0
     assert not [name for name in single_values if "recall" in name]
     assert "test/classes_tested" not in single_values
     # The tables are still published: reporting never fails on a partial frame.
@@ -289,4 +289,4 @@ def test_rows_without_a_pooled_row_are_warned_about(warnings_log: list[str]) -> 
     single_values = task.get_logger().single_values
     assert not [name for name in single_values if name.startswith("test/pooled_delta")]
     # The per-class headline is unaffected by the absent pooled row.
-    assert single_values["test/precision_degraded"] == 1.0
+    assert single_values["test/degraded_precision"] == 1.0
