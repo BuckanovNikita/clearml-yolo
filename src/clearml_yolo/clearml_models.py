@@ -10,6 +10,7 @@ full-precision threshold table.
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +37,38 @@ def _task(task_id: str) -> Any:
     if task is None:
         raise ValueError(f"No ClearML task with id {task_id!r}")
     return task
+
+
+def latest_completed_task_id(
+    project_name: str,
+    task_name: str | None = None,
+    tags: Sequence[str] | None = None,
+) -> str | None:
+    """The most recently finished task of a project carrying every one of ``tags``.
+
+    ``task_name`` is matched the way ClearML matches it — as a partial expression, not an
+    exact name — so anchor it with ``^…$`` when a project holds names that contain one
+    another.
+    """
+    from clearml import Task
+
+    tasks: list[Any] = Task.get_tasks(
+        project_name=project_name,
+        task_name=task_name,
+        tags=list(tags) if tags else None,
+        task_filter={"status": ["completed", "published"], "order_by": ["-last_update"]},
+    )
+    if not tasks:
+        return None
+    logger.info(
+        "Latest completed task in {!r} tagged {}: {} ({})",
+        project_name,
+        list(tags) if tags else "(any)",
+        tasks[0].id,
+        tasks[0].name,
+    )
+    task_id: str = tasks[0].id
+    return task_id
 
 
 def _checkpoint_from_models(task: Any) -> str | None:

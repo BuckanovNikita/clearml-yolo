@@ -16,7 +16,11 @@ import pandas as pd
 from loguru import logger
 from pydantic import BaseModel, Field
 
-from clearml_yolo.clearml_models import fetch_best_confidences, resolve_task_weights
+from clearml_yolo.clearml_models import (
+    fetch_best_confidences,
+    latest_completed_task_id,
+    resolve_task_weights,
+)
 from clearml_yolo.clearml_report import report_comparison
 from clearml_yolo.clearml_session import ClearMLConfig, init_task
 from clearml_yolo.comparison.assemble import ComparisonTables, build_comparison_rows
@@ -28,34 +32,76 @@ from clearml_yolo.gpu import AutoGpuConfig, resolve_inference_device
 ModelSource = Literal["clearml", "local"]
 
 
+class NoBaselineModelError(LookupError):
+    """There is no previous model to compare against — a first run, not a mistake.
+
+    Distinct from the ValueError a misconfigured ModelRef raises, so a pipeline can skip
+    the comparison on the former without swallowing the latter.
+    """
+
+
 class ModelRef(BaseModel):
-    """One side of the comparison: a ClearML task, or a checkpoint already on disk."""
+    """One side of the comparison: a ClearML task, or a checkpoint already on disk.
+
+    With ``source='clearml'`` and no ``task_id``, the most recently finished task tagged
+    ``prod`` is used, so a pipeline run compares itself against what is actually in
+    production rather than against whatever ran last — which is as likely to be a failed
+    experiment as a released model. Tag a run with ``clearml.tags=[prod]`` to promote it.
+    """
 
     source: ModelSource = "clearml"
     task_id: str | None = None
+    project_name: str | None = None
+    task_name: str | None = None
+    tags: list[str] = Field(default_factory=lambda: ["prod"])
     weights: Path | None = None
     # Thresholds are read from the task that calibrated them. Setting them here instead
     # is for models whose metrics stage never ran.
     thresholds: dict[str, float] | None = None
 
-    def checkpoint(self) -> Path:
-        if self.source == "local":
-            if self.weights is None:
-                raise ValueError("source='local' needs weights=/path/to/best.pt")
-            return self.weights
-        if not self.task_id:
-            raise ValueError("source='clearml' needs task_id=<clearml task id>")
-        return resolve_task_weights(self.task_id)
 
-    def frozen_thresholds(self, split: str) -> dict[str, float]:
-        if self.thresholds is not None:
-            return self.thresholds
-        if self.source == "clearml" and self.task_id:
-            return fetch_best_confidences(self.task_id, split)
-        raise ValueError(
-            "A local model carries no calibrated thresholds; set thresholds={class: conf} "
-            "or point at the ClearML task whose metrics stage calibrated them."
+def _resolved_task_id(model: ModelRef, fallback_project: str | None) -> str:
+    if model.task_id:
+        return model.task_id
+    project = model.project_name or fallback_project
+    if not project:
+        raise ValueError("source='clearml' needs task_id=<id> or a project to search")
+    found = latest_completed_task_id(project, model.task_name, model.tags)
+    if found is None:
+        tagged = f" tagged {model.tags}" if model.tags else ""
+        raise NoBaselineModelError(
+            f"No completed ClearML task in project {project!r}{tagged} to compare against. "
+            "Promote a run with clearml.tags=[prod], name one with "
+            "compare.baseline_model.task_id=<id>, or clear compare.baseline_model.tags=[] "
+            "to fall back to the last finished run."
         )
+    return found
+
+
+def _resolve_model(
+    model: ModelRef, split: str, fallback_project: str | None
+) -> tuple[Path, dict[str, float]]:
+    """Locate one side's checkpoint and the thresholds it was calibrated at.
+
+    The task is looked up once for both, so a project-wide search cannot resolve the
+    weights of one run and the thresholds of another.
+    """
+    if model.source == "local":
+        if model.weights is None:
+            raise ValueError("source='local' needs weights=/path/to/best.pt")
+        if model.thresholds is None:
+            raise ValueError(
+                "A local model carries no calibrated thresholds; set "
+                "thresholds={class: conf} or point at the ClearML task whose metrics "
+                "stage calibrated them."
+            )
+        return model.weights, model.thresholds
+
+    task_id = _resolved_task_id(model, fallback_project)
+    thresholds = (
+        model.thresholds if model.thresholds is not None else fetch_best_confidences(task_id, split)
+    )
+    return resolve_task_weights(task_id), thresholds
 
 
 class InferenceConfig(BaseModel):
@@ -148,10 +194,9 @@ def compare(
         inference = inference.model_copy(update={"device": resolve_inference_device(auto_gpu)})
 
     truth = pd.read_csv(ground_truth)
-    baseline_weights = baseline_model.checkpoint()
-    candidate_weights = candidate_model.checkpoint()
-    thresholds_baseline = baseline_model.frozen_thresholds(split)
-    thresholds_candidate = candidate_model.frozen_thresholds(split)
+    project = clearml.project_name if clearml.enabled else None
+    baseline_weights, thresholds_baseline = _resolve_model(baseline_model, split, project)
+    candidate_weights, thresholds_candidate = _resolve_model(candidate_model, split, project)
 
     evaluation = {"iou_threshold": iou_threshold, "matching_strategy": matching_strategy}
     classes = sorted({str(label) for label in truth[truth["split"] == split]["instance_label"]})

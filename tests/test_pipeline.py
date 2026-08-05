@@ -14,10 +14,11 @@ import clearml_yolo.configs  # noqa: F401  registers every config
 from clearml_yolo.clearml_session import ClearMLConfig
 from clearml_yolo.gpu import DeviceSelection
 from clearml_yolo.tasks import pipeline as pipeline_module
-from clearml_yolo.tasks.pipeline import _as_dict, run_predict_stage
+from clearml_yolo.tasks.compare import ModelRef, NoBaselineModelError
+from clearml_yolo.tasks.pipeline import _as_dict, run_compare_stage, run_predict_stage
 from clearml_yolo.tasks.train import _inference_device
 
-STAGES = ["train", "predict", "metrics", "report"]
+STAGES = ["train", "predict", "metrics", "report", "compare"]
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -73,6 +74,64 @@ def test_inference_reuses_the_card_training_just_used(monkeypatch: pytest.Monkey
     run_predict_stage(_stage_config("predict"), "best.pt", ClearMLConfig(enabled=False), "1")
 
     assert seen["device"] == "1"
+
+
+def test_comparison_scores_the_model_this_run_just_built(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The candidate comes from the run, not from config, which could name another model."""
+    seen: dict[str, object] = {}
+    monkeypatch.setattr(pipeline_module, "run_comparison", lambda **kwargs: seen.update(kwargs))
+
+    run_compare_stage(
+        _stage_config("compare"),
+        "runs/detect/train/weights/best.pt",
+        {"test": {"car": 0.4}},
+        "gt.csv",
+        ClearMLConfig(enabled=False),
+    )
+
+    candidate = seen["candidate_model"]
+    assert isinstance(candidate, ModelRef)
+    assert candidate.source == "local"
+    assert candidate.weights == Path("runs/detect/train/weights/best.pt")
+    assert candidate.thresholds == {"car": 0.4}
+    # The ground truth follows the metrics stage so the two cannot drift apart.
+    assert seen["ground_truth"] == "gt.csv"
+
+
+def test_a_run_without_calibrated_thresholds_skips_rather_than_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Skipping metrics leaves no thresholds; that must not fail a run with valid results."""
+    monkeypatch.setattr(
+        pipeline_module, "run_comparison", lambda **kwargs: pytest.fail("should not run")
+    )
+
+    assert (
+        run_compare_stage(
+            _stage_config("compare"), "best.pt", {}, "gt.csv", ClearMLConfig(enabled=False)
+        )
+        is None
+    )
+
+
+def test_a_first_run_with_nothing_to_compare_against_skips(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An empty project is the normal first-run case, not an error."""
+
+    def _no_baseline(**_: object) -> None:
+        raise NoBaselineModelError("No completed task tagged ['prod'] in project 'fresh'")
+
+    monkeypatch.setattr(pipeline_module, "run_comparison", _no_baseline)
+
+    assert (
+        run_compare_stage(
+            _stage_config("compare"),
+            "best.pt",
+            {"test": {"car": 0.4}},
+            "gt.csv",
+            ClearMLConfig(enabled=False),
+        )
+        is None
+    )
 
 
 def test_an_explicit_device_still_wins_over_training(monkeypatch: pytest.MonkeyPatch) -> None:

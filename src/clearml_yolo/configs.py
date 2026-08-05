@@ -154,16 +154,19 @@ PipelineConf = make_config(
         {"predict": "default"},
         {"metrics": "default"},
         {"report": "default"},
+        {"compare": "default"},
     ],
     train=None,
     predict=None,
     metrics=None,
     report=None,
+    compare=None,
     clearml=ClearMLConf,
     skip_train=False,
     skip_predict=False,
     skip_metrics=False,
     skip_report=False,
+    skip_compare=False,
 )
 
 STAGE_CONFIG_FACTORIES = {
@@ -192,11 +195,13 @@ def register_configs() -> None:
     store(report_config(ClearMLConf), name="report")
     store(report_config(PipelineStageClearMLConf), group="report", name="default")
 
-    for group in ("baseline_model", "candidate_model"):
-        model_store = store(group=group)
-        model_store(ModelClearMLConf, name="clearml")
-        model_store(ModelLocalConf, name="local")
+    for stage in ("", "compare/"):
+        for group in ("baseline_model", "candidate_model"):
+            model_store = store(group=f"{stage}{group}")
+            model_store(ModelClearMLConf, name="clearml")
+            model_store(ModelLocalConf, name="local")
     store(compare_config(ClearMLConf), name="compare")
+    store(compare_config(PipelineStageClearMLConf), group="compare", name="default")
 
     store(GroundTruthConf, name="ground_truth")
     store(PipelineConf, name="pipeline")

@@ -8,6 +8,7 @@ from typing import Any, Literal
 from loguru import logger
 from pydantic import BaseModel, Field
 
+from clearml_yolo.clearml_models import latest_completed_task_id
 from clearml_yolo.clearml_session import ClearMLConfig, init_task
 from clearml_yolo.tasks.metrics import DASHBOARD_PREFIX
 
@@ -15,12 +16,19 @@ BaselineSource = Literal["clearml", "local", "none"]
 
 
 class BaselineConfig(BaseModel):
-    """Where the previous model's dashboards come from."""
+    """Where the previous model's dashboards come from.
+
+    Without a ``task_id`` the latest finished run tagged ``prod`` is used, the same
+    promotion marker the comparison stage reads — the business report calls this side
+    "прод модель", and the last run to finish is as likely to be a failed experiment.
+    Clear ``tags`` to fall back to the most recent finished run whatever it is.
+    """
 
     source: BaselineSource = "clearml"
     project_name: str | None = None
     task_id: str | None = None
     task_name: str | None = None
+    tags: list[str] = Field(default_factory=lambda: ["prod"])
     directory: Path | None = None
     artifact_prefix: str = "dashboard_full"
 
@@ -40,16 +48,16 @@ def _latest_baseline_task(config: BaselineConfig, fallback_project: str) -> Any 
         return Task.get_task(task_id=config.task_id)
 
     project = config.project_name or fallback_project
-    tasks: list[Any] = Task.get_tasks(
-        project_name=project,
-        task_name=config.task_name,
-        task_filter={"status": ["completed", "published"], "order_by": ["-last_update"]},
-    )
-    if not tasks:
-        logger.warning("No completed ClearML task found in project {!r}", project)
+    task_id = latest_completed_task_id(project, config.task_name, config.tags)
+    if task_id is None:
+        logger.warning(
+            "No completed ClearML task tagged {} found in project {!r}; promote one with "
+            "clearml.tags=[prod], or clear baseline.tags to use the last finished run",
+            config.tags or "(any)",
+            project,
+        )
         return None
-    logger.info("Baseline task: {} ({})", tasks[0].id, tasks[0].name)
-    return tasks[0]
+    return Task.get_task(task_id=task_id)
 
 
 def _baseline_from_clearml(

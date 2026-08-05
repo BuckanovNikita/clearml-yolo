@@ -10,6 +10,8 @@ from loguru import logger
 from omegaconf import OmegaConf
 
 from clearml_yolo.clearml_session import ClearMLConfig, init_task
+from clearml_yolo.tasks.compare import CompareResult, ModelRef, NoBaselineModelError
+from clearml_yolo.tasks.compare import compare as run_comparison
 from clearml_yolo.tasks.metrics import compute_metrics
 from clearml_yolo.tasks.predict import predict as run_prediction
 from clearml_yolo.tasks.report import build_reports, discover_dashboards
@@ -37,11 +39,13 @@ def run_pipeline(
     predict: Any,
     metrics: Any,
     report: Any,
+    compare: Any,
     clearml: ClearMLConfig,
     skip_train: bool = False,
     skip_predict: bool = False,
     skip_metrics: bool = False,
     skip_report: bool = False,
+    skip_compare: bool = False,
 ) -> dict[str, Any]:
     """Thread each stage's output into the next, sharing one ClearML task."""
     # Created once here so every stage attaches to the same experiment rather than
@@ -76,12 +80,14 @@ def run_pipeline(
 
     metrics_dir = Path(metrics_cfg["output_dir"])
     dashboards: dict[str, Path] = {}
+    thresholds: dict[str, dict[str, float]] = {}
     if skip_metrics:
         logger.info("Skipping metrics; reading dashboards from {}", metrics_dir)
         dashboards = discover_dashboards(metrics_dir, list(metrics_cfg["splits"]))
     else:
         metrics_result = run_metrics_stage(metrics_cfg, predictions, clearml)
         dashboards = metrics_result.dashboards
+        thresholds = metrics_result.best_confidences
         results["dashboards"] = dashboards
 
     if skip_report:
@@ -94,6 +100,15 @@ def run_pipeline(
             report_cfg["baseline"],
             report_cfg.get("report_config_path"),
         )
+
+    if skip_compare:
+        logger.info("Skipping comparison stage")
+    else:
+        comparison = run_compare_stage(
+            _as_dict(compare), weights, thresholds, metrics_cfg["ground_truth"], clearml
+        )
+        if comparison is not None:
+            results["comparison"] = comparison
 
     return results
 
@@ -135,6 +150,55 @@ def run_predict_stage(
         image_name=config["image_name"],
         predict_kwargs=config["predict_kwargs"],
     )
+
+
+def run_compare_stage(
+    config: dict[str, Any],
+    weights: str | Path,
+    thresholds: dict[str, dict[str, float]],
+    ground_truth: str | Path,
+    clearml: ClearMLConfig,
+) -> CompareResult | None:
+    """Compare the model this run just trained against the previous one.
+
+    The candidate side is filled in from what the run already has — the checkpoint from
+    training and the thresholds the metrics stage calibrated — rather than from config,
+    which could otherwise name a different model than the one just built. The baseline
+    side stays configurable and defaults to the last finished task of the project.
+
+    Returns None instead of raising when there is nothing to compare against: a first run
+    in an empty project, or a run whose metrics stage was skipped and so has no
+    thresholds. Reporting must not fail a run that already produced valid results.
+    """
+    split = config["split"]
+    if split not in thresholds:
+        logger.warning(
+            "No calibrated thresholds for split {!r}, so the new model cannot be scored at "
+            "its own production thresholds; skipping the comparison",
+            split,
+        )
+        return None
+
+    candidate = ModelRef(source="local", weights=Path(weights), thresholds=thresholds[split])
+    try:
+        return run_comparison(
+            baseline_model=config["baseline_model"],
+            candidate_model=candidate,
+            ground_truth=ground_truth,
+            output_dir=config["output_dir"],
+            clearml=clearml,
+            inference=config["inference"],
+            auto_gpu=config["auto_gpu"],
+            split=split,
+            iou_threshold=config["iou_threshold"],
+            matching_strategy=config["matching_strategy"],
+            q=config["q"],
+            bootstrap_iterations=config["bootstrap_iterations"],
+            seed=config["seed"],
+        )
+    except NoBaselineModelError as error:
+        logger.warning("Nothing to compare against: {}", error)
+        return None
 
 
 def run_metrics_stage(

@@ -12,6 +12,7 @@ import pytest
 
 from clearml_yolo.clearml_models import (
     fetch_best_confidences,
+    latest_completed_task_id,
     looks_like_task_id,
     resolve_task_weights,
     resolve_weights,
@@ -65,6 +66,28 @@ def patch_clearml(monkeypatch: pytest.MonkeyPatch) -> Any:
         monkeypatch.setitem(sys.modules, "clearml", module)
 
     return _patch
+
+
+def test_the_baseline_lookup_asks_clearml_for_the_tag(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The default baseline is the promoted model, not merely the last run to finish."""
+    asked: dict[str, Any] = {}
+    module = types.ModuleType("clearml")
+    module.Task = types.SimpleNamespace(  # type: ignore[attr-defined]
+        get_tasks=lambda **kwargs: asked.update(kwargs) or [FakeTask()]
+    )
+    monkeypatch.setitem(sys.modules, "clearml", module)
+
+    assert latest_completed_task_id("detection", tags=["prod"]) == TASK_ID
+    assert asked["tags"] == ["prod"]
+    assert asked["task_filter"]["status"] == ["completed", "published"]
+
+
+def test_no_promoted_model_is_reported_as_absent(monkeypatch: pytest.MonkeyPatch) -> None:
+    module = types.ModuleType("clearml")
+    module.Task = types.SimpleNamespace(get_tasks=lambda **_: [])  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "clearml", module)
+
+    assert latest_completed_task_id("detection", tags=["prod"]) is None
 
 
 def test_task_ids_are_told_apart_from_checkpoint_names() -> None:

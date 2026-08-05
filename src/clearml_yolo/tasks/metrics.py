@@ -30,10 +30,17 @@ class EvaluationConfig(BaseModel):
 
 
 class MetricsResult(BaseModel):
-    """Where each split's dashboard workbook ended up."""
+    """Where each split's dashboard workbook ended up, and at what thresholds.
+
+    ``best_confidences`` carries the per-class thresholds each split was calibrated at,
+    keyed by split. They are the numbers a later comparison has to score this model at,
+    and they are returned rather than read back from ClearML so the comparison works at
+    full precision and with tracking switched off.
+    """
 
     output_dir: Path
     dashboards: dict[str, Path] = Field(default_factory=dict)
+    best_confidences: dict[str, dict[str, float]] = Field(default_factory=dict)
 
 
 def _log_split_scalars(task: Any, split: str, summary: dict[str, float]) -> None:
@@ -52,8 +59,12 @@ def _evaluate_split(
     calibration_split: str | None,
     output_dir: Path,
     task: Any,
-) -> Path | None:
-    """Score one split and upload its artifacts. Returns the dashboard workbook path."""
+) -> tuple[Path, dict[str, float]] | None:
+    """Score one split and upload its artifacts.
+
+    Returns the dashboard workbook and the thresholds the split was scored at, or None
+    when the split produced no metrics at all.
+    """
     from digital_metrics import Evaluation, summarize_metrics
 
     # A fresh Evaluation per split: calling an existing one again overwrites metrics,
@@ -119,7 +130,11 @@ def _evaluate_split(
         summary.get("mean_f1_score", float("nan")),
         dashboard,
     )
-    return dashboard
+    thresholds = {
+        str(class_name): float(confidence)
+        for class_name, confidence in dict(evaluation.best_confidences).items()
+    }
+    return dashboard, thresholds
 
 
 def compute_metrics(
@@ -152,7 +167,7 @@ def compute_metrics(
 
     result = MetricsResult(output_dir=destination)
     for split in splits:
-        dashboard = _evaluate_split(
+        scored = _evaluate_split(
             split,
             preds_frame,
             ground_truth_frame,
@@ -161,8 +176,8 @@ def compute_metrics(
             destination,
             task,
         )
-        if dashboard is not None:
-            result.dashboards[split] = dashboard
+        if scored is not None:
+            result.dashboards[split], result.best_confidences[split] = scored
 
     if not result.dashboards:
         raise RuntimeError(
