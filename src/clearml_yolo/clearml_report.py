@@ -20,7 +20,8 @@ columns this module reads out of it.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from numbers import Real
+from typing import Any, NamedTuple
 
 import pandas as pd
 from loguru import logger
@@ -44,11 +45,18 @@ EXCLUDED_VALUE_NAME = "classes_excluded"
 DEGRADED_VERDICT = "degraded"
 IMPROVED_VERDICT = "improved"
 
-# (metric, per-class delta column, per-class verdict column) for every metric whose
-# per-class change is tested. One entry per metric that carries a test.
+
+class ComparedMetric(NamedTuple):
+    """Where one tested metric's change lives in the comparison frame."""
+
+    name: str
+    delta_column: str
+    verdict_column: str
+
+
 COMPARED_METRICS = (
-    ("precision", "delta_precision", "precision_verdict"),
-    ("recall", "delta_recall", "recall_verdict"),
+    ComparedMetric("precision", "delta_precision", "precision_verdict"),
+    ComparedMetric("recall", "delta_recall", "recall_verdict"),
 )
 
 
@@ -86,14 +94,14 @@ def _class_labels(rows: pd.DataFrame) -> pd.Series[Any] | None:
 def _verdicts(per_class: pd.DataFrame) -> dict[str, pd.Series[Any]]:
     """The verdict column of every compared metric the frame actually carries."""
     found: dict[str, pd.Series[Any]] = {}
-    for metric, _, verdict_column in COMPARED_METRICS:
-        if verdict_column in per_class.columns:
-            found[metric] = per_class[verdict_column]
+    for metric in COMPARED_METRICS:
+        if metric.verdict_column in per_class.columns:
+            found[metric.name] = per_class[metric.verdict_column]
         else:
             logger.warning(
                 "Comparison rows have no {!r} column; skipping the {} verdict counts",
-                verdict_column,
-                metric,
+                metric.verdict_column,
+                metric.name,
             )
     return found
 
@@ -106,7 +114,7 @@ def _degraded_classes(
         return per_class.iloc[:0]
     is_degraded = pd.Series(False, index=per_class.index)
     for verdict in verdicts.values():
-        is_degraded |= verdict.eq(DEGRADED_VERDICT)
+        is_degraded |= verdict.eq(DEGRADED_VERDICT).fillna(False).astype(bool)
     return per_class[is_degraded]
 
 
@@ -121,9 +129,9 @@ def _headline_values(
     values: dict[str, float] = {}
 
     for metric, verdict in verdicts.items():
-        values[f"{metric}_degraded"] = float(verdict.eq(DEGRADED_VERDICT).sum())
+        values[f"{metric}_degraded"] = float(verdict.eq(DEGRADED_VERDICT).fillna(False).sum())
     for metric, verdict in verdicts.items():
-        values[f"{metric}_improved"] = float(verdict.eq(IMPROVED_VERDICT).sum())
+        values[f"{metric}_improved"] = float(verdict.eq(IMPROVED_VERDICT).fillna(False).sum())
 
     if ADJUSTED_P_COLUMN in per_class.columns:
         tested = float(pd.to_numeric(per_class[ADJUSTED_P_COLUMN], errors="coerce").notna().sum())
@@ -136,16 +144,20 @@ def _headline_values(
             ADJUSTED_P_COLUMN,
         )
 
-    for metric, delta_column, _ in COMPARED_METRICS:
-        if delta_column not in per_class.columns:
+    for compared in COMPARED_METRICS:
+        if compared.delta_column not in per_class.columns:
             logger.warning(
                 "Comparison rows have no {!r} column; skipping the pooled {} delta",
-                delta_column,
-                metric,
+                compared.delta_column,
+                compared.name,
             )
         elif not pooled.empty:
-            pooled_delta = pd.to_numeric(pooled[delta_column], errors="coerce")
-            values[f"pooled_delta_{metric}"] = float(pooled_delta.iloc[0])
+            # A nullable dtype yields pd.NA here, which float() refuses; the headline is
+            # reported as NaN rather than taking the whole report down with it.
+            pooled_delta = pd.to_numeric(pooled[compared.delta_column], errors="coerce").iloc[0]
+            values[f"pooled_delta_{compared.name}"] = (
+                float("nan") if pd.isna(pooled_delta) else float(pooled_delta)
+            )
 
     return values
 
@@ -189,6 +201,14 @@ def report_comparison(
 
     is_pooled = labels == POOLED_CLASS_LABEL
     per_class = rows[~is_pooled]
+    pooled = rows[is_pooled]
+    if pooled.empty:
+        logger.warning(
+            "Comparison rows for split {!r} have no pooled {!r} row; the pooled deltas are "
+            "not reported",
+            split,
+            POOLED_CLASS_LABEL,
+        )
     verdicts = _verdicts(per_class)
 
     degraded = _degraded_classes(per_class, verdicts)
@@ -196,12 +216,13 @@ def report_comparison(
     if not degraded.empty:
         logger.warning("Split {!r}: {} class(es) significantly degraded", split, len(degraded))
 
-    headline = _headline_values(per_class, rows[is_pooled], verdicts)
+    headline = _headline_values(per_class, pooled, verdicts)
 
+    # Real covers numpy's scalars too, which a count computed upstream easily is.
     declared_family_size = methodology.get(FAMILY_SIZE_KEY)
     tested = headline.get(TESTED_VALUE_NAME)
     if (
-        isinstance(declared_family_size, int | float)
+        isinstance(declared_family_size, Real)
         and tested is not None
         and float(declared_family_size) != tested
     ):

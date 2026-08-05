@@ -7,6 +7,7 @@ ClearML server or the SDK.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterator
 from typing import Any
 
@@ -263,3 +264,29 @@ def test_family_size_disagreeing_with_the_rows_is_warned_about(warnings_log: lis
 
     assert "family size of 4" in "\n".join(warnings_log)
     assert task.get_logger().single_values["test/classes_tested"] == 3.0
+
+
+def test_a_missing_pooled_delta_is_reported_as_nan() -> None:
+    task = _FakeTask()
+    rows = _comparison_rows()
+    # A nullable dtype carries pd.NA rather than NaN, and float(pd.NA) raises.
+    rows["delta_precision"] = pd.array([0.10, -0.08, 0.05, 0.02, None], dtype="Float64")
+
+    report_comparison(task, "test", rows, _METHODOLOGY)
+
+    single_values = task.get_logger().single_values
+    assert math.isnan(single_values["test/pooled_delta_precision"])
+    assert single_values["test/pooled_delta_recall"] == pytest.approx(-0.02)
+
+
+def test_rows_without_a_pooled_row_are_warned_about(warnings_log: list[str]) -> None:
+    task = _FakeTask()
+    rows = _comparison_rows().query("`class` != 'Итого'")
+
+    report_comparison(task, "test", rows, _METHODOLOGY)
+
+    assert "Итого" in "\n".join(warnings_log)
+    single_values = task.get_logger().single_values
+    assert not [name for name in single_values if name.startswith("test/pooled_delta")]
+    # The per-class headline is unaffected by the absent pooled row.
+    assert single_values["test/precision_degraded"] == 1.0
