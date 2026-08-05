@@ -56,7 +56,9 @@ select = ["E", "F", "I", "N", "UP", "B", "BLE", "C4", "SIM", "RET", "PTH", "T20"
 "tests/*" = ["S101"]
 # `import albumentations as A` is that library's universal convention.
 "src/clearml_yolo/augment.py" = ["N812"]
+"src/clearml_yolo/ultralytics_patch.py" = ["N812"]
 "tests/test_augment.py" = ["N812"]
+"tests/test_ultralytics_patch.py" = ["N812"]
 
 [tool.mypy]
 python_version = "3.12"

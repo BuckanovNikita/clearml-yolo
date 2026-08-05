@@ -3,6 +3,8 @@
 Ultralytics accepts a *list* of transforms rather than a Compose: it wraps them in its
 own ``A.Compose`` with ``bbox_params=A.BboxParams(format="yolo", label_fields=["class_labels"])``.
 Passing a Compose would nest one inside the other and detach the bbox handling.
+Which transforms it considers worth a ``bbox_params`` is corrected in
+:mod:`clearml_yolo.ultralytics_patch`.
 
 ``v8_transforms`` places that Compose in the middle of its own augmentation stack::
 
@@ -17,58 +19,10 @@ hyperparameters off and rejects the combinations that cannot be made to agree.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
 from loguru import logger
-
-# Ultralytics attaches bbox_params only when a transform's class name appears in this
-# set, so a spatial transform outside it moves the image while leaving boxes behind.
-ULTRALYTICS_SPATIAL_TRANSFORMS = frozenset(
-    {
-        "Affine",
-        "BBoxSafeRandomCrop",
-        "CenterCrop",
-        "CoarseDropout",
-        "Crop",
-        "CropAndPad",
-        "CropNonEmptyMaskIfExists",
-        "D4",
-        "ElasticTransform",
-        "Flip",
-        "GridDistortion",
-        "GridDropout",
-        "HorizontalFlip",
-        "Lambda",
-        "LongestMaxSize",
-        "MaskDropout",
-        "Morphological",
-        "NoOp",
-        "OpticalDistortion",
-        "PadIfNeeded",
-        "Perspective",
-        "PiecewiseAffine",
-        "PixelDropout",
-        "RandomCrop",
-        "RandomCropFromBorders",
-        "RandomGridShuffle",
-        "RandomResizedCrop",
-        "RandomRotate90",
-        "RandomScale",
-        "RandomSizedBBoxSafeCrop",
-        "RandomSizedCrop",
-        "Resize",
-        "Rotate",
-        "SafeRotate",
-        "ShiftScaleRotate",
-        "SmallestMaxSize",
-        "Transpose",
-        "VerticalFlip",
-        "XYMasking",
-    }
-)
-
 
 # Ultralytics runs these around the custom pipeline — RandomPerspective before it, the
 # bgr swap at load time, RandomHSV and RandomFlip after — so leaving them enabled applies
@@ -118,38 +72,6 @@ def _is_enabled(value: Any) -> bool:
     if isinstance(value, (int, float)):
         return bool(value)
     return True
-
-
-def _reject_transforms_ultralytics_cannot_track(transforms: list[Any]) -> None:
-    """Fail when the boxes would silently stop following the pixels.
-
-    Ultralytics attaches bbox_params only if some *top-level* transform's class name is
-    in its hardcoded spatial set. A geometric transform hidden inside a OneOf, or one
-    ultralytics has never heard of, therefore moves the image while the labels stay put —
-    a corruption nothing downstream can detect.
-    """
-    import albumentations as A
-
-    def flatten(items: list[Any]) -> Iterator[Any]:
-        for item in items:
-            yield item
-            if isinstance(item, A.BaseCompose):
-                yield from flatten(list(item.transforms))
-
-    top_level = {type(transform).__name__ for transform in transforms}
-    if top_level & ULTRALYTICS_SPATIAL_TRANSFORMS:
-        return
-
-    geometric = sorted(
-        {type(item).__name__ for item in flatten(transforms) if isinstance(item, A.DualTransform)}
-    )
-    if geometric:
-        raise ValueError(
-            f"{geometric} move pixels, but ultralytics recognises no spatial transform at the "
-            "top level of this pipeline, so it composes without bbox_params and the boxes stay "
-            "behind. Lift a recognised spatial transform (HorizontalFlip, Affine, Rotate, ...) "
-            "out of any OneOf/Sequential wrapper to the top level of the JSON."
-        )
 
 
 def resolve_train_augmentations(
@@ -238,7 +160,6 @@ def load_augmentations(path: str | Path | None) -> list[Any] | None:
         logger.warning("Albumentations pipeline {} is empty", augmentation_path)
         return None
 
-    _reject_transforms_ultralytics_cannot_track(transforms)
     logger.info(
         "Loaded {} albumentations transform(s) from {}: {}",
         len(transforms),

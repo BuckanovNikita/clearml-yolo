@@ -73,25 +73,18 @@ def test_pixel_only_pipeline_still_loads(tmp_path: Path) -> None:
     assert [type(t).__name__ for t in transforms] == ["RandomBrightnessContrast"]
 
 
-def test_geometry_hidden_in_a_oneof_is_rejected(tmp_path: Path) -> None:
-    """OneOf is not in ultralytics' spatial set, so it would compose without bbox_params
-    and rotate the image while the boxes stay put."""
+def test_nested_transforms_round_trip(tmp_path: Path) -> None:
+    """Ultralytics cannot see geometry inside a OneOf; clearml_yolo.ultralytics_patch
+    teaches it to, so loading one has to keep the wrapper intact."""
     pipeline = A.Compose([A.OneOf([A.Rotate(p=1.0), A.Affine(p=1.0)], p=1.0)])
     destination = tmp_path / "nested.json"
     A.save(pipeline, str(destination), data_format="json")
 
-    with pytest.raises(ValueError, match="boxes stay behind"):
-        load_augmentations(destination)
+    transforms = load_augmentations(destination)
 
-
-def test_geometry_in_a_oneof_is_allowed_beside_a_recognised_transform(tmp_path: Path) -> None:
-    """One top-level HorizontalFlip is enough to make ultralytics attach bbox_params,
-    after which every nested transform gets its boxes handled too."""
-    pipeline = A.Compose([A.HorizontalFlip(p=0.5), A.OneOf([A.Rotate(p=1.0)], p=1.0)])
-    destination = tmp_path / "nested_ok.json"
-    A.save(pipeline, str(destination), data_format="json")
-
-    assert load_augmentations(destination) is not None
+    assert transforms is not None
+    assert [type(t).__name__ for t in transforms] == ["OneOf"]
+    assert len(transforms[0].transforms) == 2
 
 
 def test_no_pipeline_leaves_train_kwargs_untouched() -> None:
