@@ -292,23 +292,67 @@ def test_this_runs_own_process_does_not_make_a_card_busy(patch_modules: Any) -> 
     assert select_devices(AutoGpuConfig(batch_per_gpu=8)).devices == [0]
 
 
-def test_a_blind_process_view_is_announced(patch_modules: Any, monkeypatch: Any) -> None:
-    """Under WSL, NVML names no process however busy the card is.
-
-    max_compute_processes then admits every GPU silently, so the run must say that the
-    VRAM thresholds are the only thing left guarding it.
-    """
-    monkeypatch.setattr(gpu_module, "_warned_about_blind_process_view", False)
-    patch_modules([FakeHandle("aaa", 24.0, 6.0, processes=0)], ["aaa"])
-    warnings: list[str] = []
-    handle = logger.add(lambda message: warnings.append(str(message)), level="WARNING")
-
+def _warnings_from(action: Any) -> list[str]:
+    collected: list[str] = []
+    handle = logger.add(lambda message: collected.append(str(message)), level="WARNING")
     try:
-        probe_gpus()
+        action()
     finally:
         logger.remove(handle)
+    return collected
 
-    assert any("process-level occupancy is unavailable" in warning for warning in warnings)
+
+def test_memory_no_local_process_can_explain_is_announced(
+    patch_modules: Any, monkeypatch: Any
+) -> None:
+    """On WSL the occupier is often the Windows host, which this Linux cannot see."""
+    monkeypatch.setattr(gpu_module, "_warned_about_blind_process_view", False)
+    monkeypatch.setattr(gpu_module, "_wsl_foreign_gpu_processes", lambda _: 0)
+    patch_modules([FakeHandle("aaa", 24.0, 6.0, processes=0)], ["aaa"])
+
+    warnings = _warnings_from(probe_gpus)
+
+    assert any("No process on this machine accounts for" in warning for warning in warnings)
+
+
+def test_wsl_occupancy_comes_from_the_kernel_when_nvml_names_nobody(
+    patch_modules: Any, monkeypatch: Any
+) -> None:
+    """NVML lists no process under WSL, which left max_compute_processes unenforceable."""
+    monkeypatch.setattr(gpu_module, "_wsl_foreign_gpu_processes", lambda _: 1)
+    patch_modules([FakeHandle("aaa", 24.0, 23.0, processes=0)], ["aaa"])
+
+    survey = probe_gpus()
+
+    assert survey.gpus[0].foreign_process_count == 1
+    with pytest.raises(RuntimeError, match="fewer than 1 usable device"):
+        select_devices(AutoGpuConfig(wait_for_free=False))
+
+
+def test_nvmls_own_count_is_never_overridden(patch_modules: Any, monkeypatch: Any) -> None:
+    """Where NVML works it is per-card; /dev/dxg is one device shared by every GPU."""
+    monkeypatch.setattr(gpu_module, "_wsl_foreign_gpu_processes", lambda _: 7)
+    patch_modules([FakeHandle("aaa", 24.0, 23.0, processes=2)], ["aaa"])
+
+    assert probe_gpus().gpus[0].foreign_process_count == 2
+
+
+def test_this_runs_own_processes_are_not_counted_through_the_wsl_device(
+    monkeypatch: Any, tmp_path: Any
+) -> None:
+    """Otherwise a stage would see its own predecessor and wait for a card it owns."""
+    monkeypatch.setattr(gpu_module, "WSL_GPU_DEVICE", tmp_path / "dxg")
+    (tmp_path / "dxg").write_bytes(b"")
+    monkeypatch.setattr(gpu_module, "_holds_the_wsl_gpu_device", lambda _: True)
+
+    # Every visible pid "holds" the device; only the ones outside this run may count.
+    assert gpu_module._wsl_foreign_gpu_processes(os.getpgrp()) is not None
+
+
+def test_a_host_without_the_wsl_device_is_left_to_nvml(monkeypatch: Any, tmp_path: Any) -> None:
+    monkeypatch.setattr(gpu_module, "WSL_GPU_DEVICE", tmp_path / "absent")
+
+    assert gpu_module._wsl_foreign_gpu_processes(None) is None
 
 
 def test_an_idle_card_is_not_accused_of_hiding_processes(

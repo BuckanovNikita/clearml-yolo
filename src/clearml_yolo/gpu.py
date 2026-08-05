@@ -15,6 +15,7 @@ from __future__ import annotations
 import os
 import time
 from collections.abc import Callable, Sequence
+from pathlib import Path
 from typing import Any
 
 from loguru import logger
@@ -208,6 +209,7 @@ def probe_gpus() -> GpuSurvey:
                     own_vram_gb=own_vram_gb,
                 )
             )
+        _count_processes_the_way_wsl_allows(gpus, own_group)
         _warn_if_process_view_is_blind(gpus)
         return GpuSurvey(cuda_available=True, nvml_available=True, gpus=gpus)
     finally:
@@ -216,17 +218,74 @@ def probe_gpus() -> GpuSurvey:
 
 # Display and compositor allocations sit well under this; a training run does not.
 BLIND_PROCESS_VIEW_GIB = 1.0
+# WSL routes every GPU client through this one paravirtualisation device, so a process
+# holding it open is a process using the GPU.
+WSL_GPU_DEVICE = Path("/dev/dxg")
 _warned_about_blind_process_view = False
 
 
-def _warn_if_process_view_is_blind(gpus: list[GpuInfo]) -> None:
-    """Say so when NVML will not name the processes occupying a card.
+def _holds_the_wsl_gpu_device(pid: int) -> bool:
+    try:
+        return any(
+            descriptor.readlink() == WSL_GPU_DEVICE
+            for descriptor in Path(f"/proc/{pid}/fd").iterdir()
+        )
+    except OSError:
+        # The process exited mid-scan, or belongs to another user whose descriptors are
+        # not ours to read. Either way it cannot be counted.
+        return False
 
-    Under WSL (and inside some containers) ``nvmlDeviceGetComputeRunningProcesses``
-    returns an empty list however busy the GPU is. ``max_compute_processes`` then admits
-    every card, silently: a user who set it to zero believes shared cards are excluded
-    and they are not. Only the VRAM thresholds guard the run there, so the difference has
-    to be visible rather than inferred from a run that went wrong.
+
+def _wsl_foreign_gpu_processes(own_group: int | None) -> int | None:
+    """Count GPU-using processes the way WSL still allows, or None when not on WSL.
+
+    NVML returns an empty process list under WSL however busy the card is, which makes
+    ``max_compute_processes`` silently unenforceable — a user who asks for an exclusive
+    card gets whatever is free by VRAM alone. The kernel still knows: every WSL GPU
+    client holds ``/dev/dxg`` open.
+    """
+    if not WSL_GPU_DEVICE.exists():
+        return None
+    foreign = 0
+    for entry in Path("/proc").iterdir():
+        if not entry.name.isdigit():
+            continue
+        pid = int(entry.name)
+        if not _belongs_to_this_run(pid, own_group) and _holds_the_wsl_gpu_device(pid):
+            foreign += 1
+    return foreign
+
+
+def _count_processes_the_way_wsl_allows(gpus: list[GpuInfo], own_group: int | None) -> None:
+    """Fill in occupancy from the kernel when NVML named nobody at all.
+
+    Only when NVML named nobody: where it works, it is per-card and authoritative, while
+    ``/dev/dxg`` is one device shared by every GPU, so the count it yields cannot be
+    attributed to a particular card.
+    """
+    if any(gpu.foreign_process_count for gpu in gpus):
+        return
+    foreign = _wsl_foreign_gpu_processes(own_group)
+    if not foreign:
+        return
+    if len(gpus) > 1:
+        logger.warning(
+            "{} GPU process(es) found through {} but WSL shares one device across all "
+            "{} cards, so every card is treated as occupied",
+            foreign,
+            WSL_GPU_DEVICE,
+            len(gpus),
+        )
+    for gpu in gpus:
+        gpu.foreign_process_count = foreign
+
+
+def _warn_if_process_view_is_blind(gpus: list[GpuInfo]) -> None:
+    """Say so when nothing can account for the memory a card is holding.
+
+    On WSL the occupied memory is usually the Windows host's — a desktop, a browser, a
+    game — which no process inside this Linux has a handle on. That is unknowable from
+    here, so the VRAM thresholds are what stands between the run and a shared card.
     """
     global _warned_about_blind_process_view
     if _warned_about_blind_process_view:
@@ -240,12 +299,12 @@ def _warn_if_process_view_is_blind(gpus: list[GpuInfo]) -> None:
         return
     _warned_about_blind_process_view = True
     logger.warning(
-        "NVML names no compute process on GPU(s) {} although {} is in use by something "
-        "other than this run — process-level occupancy is unavailable here (usual under "
-        "WSL and in some containers), so auto_gpu.max_compute_processes cannot see a "
-        "neighbour. Only min_free_vram_gb and max_used_fraction guard against sharing a card.",
-        [gpu.torch_index for gpu in blind],
+        "No process on this machine accounts for the {} in use on GPU(s) {} — it belongs "
+        "to another user, or to the host outside WSL. auto_gpu.max_compute_processes "
+        "cannot see such a neighbour; min_free_vram_gb and max_used_fraction are what "
+        "guard against sharing the card.",
         ", ".join(f"{gpu.unattributed_vram_gb:.1f} GiB" for gpu in blind),
+        [gpu.torch_index for gpu in blind],
     )
 
 
