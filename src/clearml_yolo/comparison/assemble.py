@@ -38,6 +38,7 @@ NO_GROUND_TRUTH = "Нет разметки в сплите"
 NO_PREDICTIONS = "Ни одна модель не предсказала класс"
 UNKNOWN_TO_BASELINE = "Только в новой модели"
 UNKNOWN_TO_CANDIDATE = "Только в прод модели"
+UNKNOWN_TO_BOTH = "Нет ни в одной модели"
 
 
 @dataclass(frozen=True)
@@ -120,9 +121,16 @@ def _exclusion_reason(
     candidate_classes: set[str],
 ) -> str | None:
     """Why a class carries no usable comparison, or None when it does."""
-    if class_name not in baseline_classes:
+    in_baseline = class_name in baseline_classes
+    in_candidate = class_name in candidate_classes
+    if not in_baseline and not in_candidate:
+        # Neither model knows the class, which is a labelling gap rather than a
+        # difference between the two — calling it "only in the new model" would send a
+        # reader looking for a change that no model made.
+        return UNKNOWN_TO_BOTH
+    if not in_baseline:
         return UNKNOWN_TO_BASELINE
-    if class_name not in candidate_classes:
+    if not in_candidate:
         return UNKNOWN_TO_CANDIDATE
     if not (baseline_counts.tp + baseline_counts.fn or candidate_counts.tp + candidate_counts.fn):
         return NO_GROUND_TRUTH
@@ -265,6 +273,11 @@ def build_comparison_rows(
         pooled_recall,
         is_pooled=True,
     )
+    # The pooled row is one hypothesis, not a family, so it is judged on its own raw
+    # p-value. Leaving it at "not significant" because it has no adjusted p-value would
+    # print that verdict beside a delta the per-class rows just called a degradation.
+    pooled["precision_verdict"] = _verdict(pooled_precision.delta, pooled_precision.p_value, q)
+    pooled["recall_verdict"] = _verdict(pooled_recall.delta, pooled_recall.p_value, q)
     frame = pd.concat([frame, pd.DataFrame([pooled])], ignore_index=True)
 
     methodology: dict[str, object] = {

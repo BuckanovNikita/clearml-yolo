@@ -155,7 +155,8 @@ def reinfer_split(
     vocabulary = _vocabulary_report(class_names(weights), split_rows["instance_label"])
     if vocabulary.unknown_to_model:
         logger.warning(
-            "Baseline checkpoint cannot predict {} class(es) present in split {!r}: {}",
+            "Checkpoint {} cannot predict {} class(es) present in split {!r}: {}",
+            Path(weights).name,
             len(vocabulary.unknown_to_model),
             split,
             vocabulary.unknown_to_model,

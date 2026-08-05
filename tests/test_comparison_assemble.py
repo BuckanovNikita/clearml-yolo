@@ -19,6 +19,7 @@ from clearml_yolo.comparison.assemble import (
     IMPROVED,
     NOT_SIGNIFICANT,
     UNKNOWN_TO_BASELINE,
+    UNKNOWN_TO_BOTH,
     ComparisonTables,
     build_comparison_rows,
 )
@@ -181,6 +182,28 @@ def test_a_class_the_baseline_cannot_predict_is_excluded_not_scored() -> None:
     assert list(excluded["class_name"]) == ["van"]
     assert list(excluded["reason"]) == [UNKNOWN_TO_BASELINE]
     assert "van" not in set(tables.rows["class_name"])
+
+
+def test_a_class_neither_model_knows_is_not_blamed_on_the_new_one() -> None:
+    """A labelling gap is not a difference between the models; saying so misdirects."""
+    tables = _tables(
+        {"car": 20, "van": 20},
+        {"car": 20, "van": 20},
+        baseline_classes={"car"},
+        candidate_classes={"car"},
+    )
+
+    assert list(tables.excluded["reason"]) == [UNKNOWN_TO_BOTH]
+
+
+def test_the_pooled_row_is_judged_on_its_own_p_value() -> None:
+    """It sits outside the BH family, but "not significant" beside a large delta lies."""
+    tables = _tables({"car": 4, "van": 4}, {"car": 36, "van": 36})
+    rows = tables.rows
+
+    pooled = rows[rows[POOLED_COLUMN].astype(bool)].iloc[0]
+    assert pooled["recall_delta"] > 0
+    assert pooled["recall_verdict"] == IMPROVED
 
 
 def test_nothing_comparable_is_an_error_rather_than_an_empty_report() -> None:
