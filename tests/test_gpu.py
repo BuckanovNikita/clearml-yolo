@@ -8,7 +8,9 @@ import types
 from typing import Any
 
 import pytest
+from loguru import logger
 
+from clearml_yolo import gpu as gpu_module
 from clearml_yolo.gpu import (
     AutoGpuConfig,
     GpuInfo,
@@ -288,6 +290,42 @@ def test_this_runs_own_process_does_not_make_a_card_busy(patch_modules: Any) -> 
     assert survey.gpus[0].own_vram_gb == pytest.approx(18.0)
     assert survey.gpus[0].effective_free_vram_gb == pytest.approx(23.0)
     assert select_devices(AutoGpuConfig(batch_per_gpu=8)).devices == [0]
+
+
+def test_a_blind_process_view_is_announced(patch_modules: Any, monkeypatch: Any) -> None:
+    """Under WSL, NVML names no process however busy the card is.
+
+    max_compute_processes then admits every GPU silently, so the run must say that the
+    VRAM thresholds are the only thing left guarding it.
+    """
+    monkeypatch.setattr(gpu_module, "_warned_about_blind_process_view", False)
+    patch_modules([FakeHandle("aaa", 24.0, 6.0, processes=0)], ["aaa"])
+    warnings: list[str] = []
+    handle = logger.add(lambda message: warnings.append(str(message)), level="WARNING")
+
+    try:
+        probe_gpus()
+    finally:
+        logger.remove(handle)
+
+    assert any("process-level occupancy is unavailable" in warning for warning in warnings)
+
+
+def test_an_idle_card_is_not_accused_of_hiding_processes(
+    patch_modules: Any, monkeypatch: Any
+) -> None:
+    """A display allocation is not a neighbour, and warning about it would cry wolf."""
+    monkeypatch.setattr(gpu_module, "_warned_about_blind_process_view", False)
+    patch_modules([FakeHandle("aaa", 24.0, 23.5, processes=0)], ["aaa"])
+    warnings: list[str] = []
+    handle = logger.add(lambda message: warnings.append(str(message)), level="WARNING")
+
+    try:
+        probe_gpus()
+    finally:
+        logger.remove(handle)
+
+    assert not any("process-level occupancy" in warning for warning in warnings)
 
 
 def test_tolerated_foreign_processes_do_not_block(patch_modules: Any) -> None:

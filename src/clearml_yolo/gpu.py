@@ -73,6 +73,11 @@ class GpuInfo(BaseModel):
     def used_fraction(self) -> float:
         return 1.0 - self.effective_free_vram_gb / self.total_vram_gb
 
+    @property
+    def unattributed_vram_gb(self) -> float:
+        """VRAM in use that belongs to no compute process NVML is willing to name."""
+        return max(0.0, self.total_vram_gb - self.free_vram_gb - self.own_vram_gb)
+
 
 class GpuSurvey(BaseModel):
     """One NVML sweep, keeping the reason an empty result is empty.
@@ -203,9 +208,45 @@ def probe_gpus() -> GpuSurvey:
                     own_vram_gb=own_vram_gb,
                 )
             )
+        _warn_if_process_view_is_blind(gpus)
         return GpuSurvey(cuda_available=True, nvml_available=True, gpus=gpus)
     finally:
         pynvml.nvmlShutdown()
+
+
+# Display and compositor allocations sit well under this; a training run does not.
+BLIND_PROCESS_VIEW_GIB = 1.0
+_warned_about_blind_process_view = False
+
+
+def _warn_if_process_view_is_blind(gpus: list[GpuInfo]) -> None:
+    """Say so when NVML will not name the processes occupying a card.
+
+    Under WSL (and inside some containers) ``nvmlDeviceGetComputeRunningProcesses``
+    returns an empty list however busy the GPU is. ``max_compute_processes`` then admits
+    every card, silently: a user who set it to zero believes shared cards are excluded
+    and they are not. Only the VRAM thresholds guard the run there, so the difference has
+    to be visible rather than inferred from a run that went wrong.
+    """
+    global _warned_about_blind_process_view
+    if _warned_about_blind_process_view:
+        return
+    blind = [
+        gpu
+        for gpu in gpus
+        if not gpu.foreign_process_count and gpu.unattributed_vram_gb > BLIND_PROCESS_VIEW_GIB
+    ]
+    if not blind:
+        return
+    _warned_about_blind_process_view = True
+    logger.warning(
+        "NVML names no compute process on GPU(s) {} although {} is in use by something "
+        "other than this run — process-level occupancy is unavailable here (usual under "
+        "WSL and in some containers), so auto_gpu.max_compute_processes cannot see a "
+        "neighbour. Only min_free_vram_gb and max_used_fraction guard against sharing a card.",
+        [gpu.torch_index for gpu in blind],
+        ", ".join(f"{gpu.unattributed_vram_gb:.1f} GiB" for gpu in blind),
+    )
 
 
 def _is_available(gpu: GpuInfo, config: AutoGpuConfig) -> bool:
