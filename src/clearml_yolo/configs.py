@@ -17,12 +17,17 @@ from hydra_zen import builds, make_config, store
 
 from clearml_yolo.clearml_session import ClearMLConfig
 from clearml_yolo.gpu import AutoGpuConfig
+from clearml_yolo.tasks.compare import InferenceConfig, ModelRef
 from clearml_yolo.tasks.metrics import EvaluationConfig
 from clearml_yolo.tasks.report import BaselineConfig
 
 AutoGpuConf = builds(AutoGpuConfig, populate_full_signature=True)
 ClearMLConf = builds(ClearMLConfig, populate_full_signature=True)
 EvaluationConf = builds(EvaluationConfig, populate_full_signature=True)
+InferenceConf = builds(InferenceConfig, populate_full_signature=True)
+
+ModelClearMLConf = builds(ModelRef, source="clearml", populate_full_signature=True)
+ModelLocalConf = builds(ModelRef, source="local", populate_full_signature=True)
 
 # Every stage inside the pipeline points at the top-level block, so one
 # clearml.project_name / clearml.task_name override names the whole run.
@@ -108,6 +113,40 @@ def report_config(clearml: Any) -> Any:
     )
 
 
+def compare_config(clearml: Any) -> Any:
+    return make_config(
+        hydra_defaults=[
+            "_self_",
+            {"baseline_model": "clearml"},
+            {"candidate_model": "clearml"},
+        ],
+        baseline_model=None,
+        candidate_model=None,
+        ground_truth="ground_truth.csv",
+        output_dir="runs/comparison",
+        # Thresholds are calibrated on val and must be reported on images val never saw.
+        split="test",
+        inference=InferenceConf,
+        auto_gpu=AutoGpuConf,
+        iou_threshold=0.5,
+        matching_strategy="iou_prior",
+        q=0.05,
+        bootstrap_iterations=10000,
+        seed=0,
+        clearml=clearml,
+    )
+
+
+GroundTruthConf = make_config(
+    data_yaml="data.yaml",
+    output="ground_truth.csv",
+    # Datasets that ship only train and val get a test split carved out of val, because
+    # thresholds are calibrated on val and must be reported on images val never saw.
+    test_fraction=0.5,
+    seed=0,
+)
+
+
 PipelineConf = make_config(
     hydra_defaults=[
         "_self_",
@@ -153,6 +192,13 @@ def register_configs() -> None:
     store(report_config(ClearMLConf), name="report")
     store(report_config(PipelineStageClearMLConf), group="report", name="default")
 
+    for group in ("baseline_model", "candidate_model"):
+        model_store = store(group=group)
+        model_store(ModelClearMLConf, name="clearml")
+        model_store(ModelLocalConf, name="local")
+    store(compare_config(ClearMLConf), name="compare")
+
+    store(GroundTruthConf, name="ground_truth")
     store(PipelineConf, name="pipeline")
 
 

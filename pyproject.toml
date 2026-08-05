@@ -31,6 +31,9 @@ cy-train = "clearml_yolo.apps.train:main"
 cy-predict = "clearml_yolo.apps.predict:main"
 cy-metrics = "clearml_yolo.apps.metrics:main"
 cy-report = "clearml_yolo.apps.report:main"
+cy-compare = "clearml_yolo.apps.compare:main"
+cy-ground-truth = "clearml_yolo.apps.ground_truth:main"
+cy-init-config = "clearml_yolo.apps.config_tree:main"
 
 [build-system]
 requires = ["uv_build>=0.11.32,<0.12.0"]
