@@ -6,6 +6,7 @@ stakeholders; they are data, not documentation.
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 from typing import Any
 
@@ -89,7 +90,7 @@ def _comparison_sheet(rows: pd.DataFrame) -> pd.DataFrame:
         raise ValueError(f"Comparison rows are missing required columns: {missing}")
 
     verdicts = set(rows[_VERDICT_SOURCES[0]]) | set(rows[_VERDICT_SOURCES[1]])
-    unknown = sorted(verdicts - set(VERDICT_LABELS))
+    unknown = sorted(str(verdict) for verdict in verdicts - set(VERDICT_LABELS))
     if unknown:
         raise ValueError(f"Comparison rows carry unknown verdicts: {unknown}")
 
@@ -127,6 +128,13 @@ def _style_sheet(worksheet: Any, frame: pd.DataFrame, bold_last_row: bool) -> No
             cell.font = _BOLD
 
 
+def _rendered(value: object) -> str:
+    """Stringify a methodology value without ever spelling a missing one as ``nan``."""
+    if value is None or (isinstance(value, float) and math.isnan(value)):
+        return MISSING_VALUE
+    return str(value)
+
+
 def _paint_verdicts(worksheet: Any, frame: pd.DataFrame) -> None:
     """Fill improved cells green and degraded cells red so regressions cannot be missed."""
     headers = list(frame.columns)
@@ -158,7 +166,7 @@ def write_comparison_workbook(
     methodology_sheet = pd.DataFrame(
         {
             "Параметр": [str(key) for key in methodology],
-            "Значение": [str(value) for value in methodology.values()],
+            "Значение": [_rendered(value) for value in methodology.values()],
         }
     )
 

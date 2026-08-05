@@ -198,9 +198,26 @@ def test_unknown_verdict_is_rejected(
 ) -> None:
     broken = rows.copy()
     broken.loc[0, "recall_verdict"] = "maybe"
+    broken.loc[1, "precision_verdict"] = float("nan")
 
     with pytest.raises(ValueError, match="maybe"):
         write_comparison_workbook(broken, excluded, methodology, tmp_path / "broken.xlsx")
+
+
+def test_missing_methodology_values_render_as_a_dash(
+    tmp_path: Path, rows: pd.DataFrame, excluded: pd.DataFrame
+) -> None:
+    methodology: dict[str, object] = {
+        "Источник весов": None,
+        "Зерно ГПСЧ": float("nan"),
+        "Изображений": 500,
+    }
+
+    destination = tmp_path / "methodology.xlsx"
+    write_comparison_workbook(rows, excluded, methodology, destination)
+    dump = load_workbook(destination)["Методика"]
+
+    assert [dump.cell(row=number, column=2).value for number in (2, 3, 4)] == ["—", "—", "500"]
 
 
 def test_missing_values_never_render_as_nan_text(
