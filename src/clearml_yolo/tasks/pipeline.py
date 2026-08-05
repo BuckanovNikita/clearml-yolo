@@ -103,8 +103,6 @@ def run_train_stage(config: dict[str, Any], clearml: ClearMLConfig) -> Path:
         auto_gpu=config["auto_gpu"],
         clearml=clearml,
         device=config["device"],
-        augmentations=config["augmentations"],
-        keep_default_augmentations=config["keep_default_augmentations"],
         train_kwargs=config["train_kwargs"],
     )
 

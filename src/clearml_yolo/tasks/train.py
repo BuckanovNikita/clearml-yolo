@@ -1,4 +1,4 @@
-"""Train a YOLO model with DDP, ClearML tracking and optional custom augmentations."""
+"""Train a YOLO model with DDP and ClearML tracking."""
 
 from __future__ import annotations
 
@@ -7,10 +7,8 @@ from typing import Any
 
 from loguru import logger
 
-from clearml_yolo.augment import resolve_train_augmentations
 from clearml_yolo.clearml_session import ClearMLConfig, init_task
 from clearml_yolo.gpu import AutoGpuConfig, resolve_devices
-from clearml_yolo.ultralytics_patch import apply_patches
 
 
 def train(
@@ -24,9 +22,7 @@ def train(
     auto_gpu: AutoGpuConfig,
     clearml: ClearMLConfig,
     device: list[int] | int | str | None = None,
-    augmentations: list[Any] | None = None,
     train_kwargs: dict[str, Any] | None = None,
-    keep_default_augmentations: bool = False,
 ) -> Path:
     """Run training and return the path to the best checkpoint.
 
@@ -36,12 +32,6 @@ def train(
     """
     from ultralytics.models import YOLO
 
-    # Ultralytics only recognises spatial transforms by class name, which misses anything
-    # nested or unfamiliar and silently leaves the boxes behind.
-    apply_patches()
-    # Validates before anything expensive starts, so a conflicting config fails in the
-    # first second rather than an hour into a run.
-    extra = resolve_train_augmentations(train_kwargs, augmentations, keep_default_augmentations)
     # Only the task identity is ours. Ultralytics' own ClearML callback connects the
     # hyperparameters, logs losses and metrics, and uploads best.pt on its own.
     init_task(clearml, stage="train")
@@ -69,7 +59,7 @@ def train(
         project=str(Path(project).resolve()),
         name=name,
         exist_ok=True,
-        **extra,
+        **(train_kwargs or {}),
     )
 
     # Read the run directory from the trainer rather than rebuilding it: ultralytics

@@ -15,7 +15,6 @@ from typing import Any
 from hydra.conf import HydraConf, JobConf
 from hydra_zen import builds, make_config, store
 
-from clearml_yolo.augment import load_augmentations
 from clearml_yolo.clearml_session import ClearMLConfig
 from clearml_yolo.gpu import AutoGpuConfig
 from clearml_yolo.tasks.metrics import EvaluationConfig
@@ -24,7 +23,6 @@ from clearml_yolo.tasks.report import BaselineConfig
 AutoGpuConf = builds(AutoGpuConfig, populate_full_signature=True)
 ClearMLConf = builds(ClearMLConfig, populate_full_signature=True)
 EvaluationConf = builds(EvaluationConfig, populate_full_signature=True)
-AugmentationsConf = builds(load_augmentations, path=None)
 
 # Every stage inside the pipeline points at the top-level block, so one
 # clearml.project_name / clearml.task_name override names the whole run.
@@ -62,8 +60,6 @@ def train_config(clearml: Any) -> Any:
         device=None,
         auto_gpu=AutoGpuConf,
         clearml=clearml,
-        augmentations=AugmentationsConf,
-        keep_default_augmentations=False,
         train_kwargs={},
     )
 

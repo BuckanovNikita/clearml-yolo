@@ -54,13 +54,6 @@ def test_baseline_group_swaps_inside_pipeline(source: str) -> None:
     assert instantiate(config.report.baseline).source == source
 
 
-def test_augmentations_instantiate_to_none_by_default() -> None:
-    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
-        config = compose(config_name="train")
-
-    assert instantiate(config.augmentations) is None
-
-
 def test_auto_gpu_defaults_are_valid() -> None:
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
         config = compose(config_name="train")
