@@ -33,9 +33,7 @@ DEGRADED_TABLE_TITLE = "comparison_degraded"
 METHODOLOGY_TABLE_TITLE = "comparison_methodology"
 ITERATION = 0
 
-CLASS_COLUMN = "class"
-POOLED_CLASS_LABEL = "Итого"
-ADJUSTED_P_COLUMN = "p_adjusted"
+POOLED_COLUMN = "is_pooled"
 FAMILY_SIZE_KEY = "family_size"
 TESTED_VALUE_NAME = "classes_tested"
 EXCLUDED_VALUE_NAME = "classes_excluded"
@@ -51,12 +49,15 @@ class ComparedMetric(NamedTuple):
 
     name: str
     delta_column: str
+    adjusted_p_column: str
     verdict_column: str
 
 
+# Every class contributes one hypothesis per metric to the BH family, so the adjusted
+# p-value is per (class, metric) rather than per class.
 COMPARED_METRICS = (
-    ComparedMetric("precision", "delta_precision", "precision_verdict"),
-    ComparedMetric("recall", "delta_recall", "recall_verdict"),
+    ComparedMetric("precision", "precision_delta", "precision_p_bh", "precision_verdict"),
+    ComparedMetric("recall", "recall_delta", "recall_p_bh", "recall_verdict"),
 )
 
 
@@ -82,13 +83,24 @@ def report_scalars(task: Task, title: str, values: Mapping[str, float]) -> None:
     logger.debug("Reported {} scalars under {}", len(values), title)
 
 
-def _class_labels(rows: pd.DataFrame) -> pd.Series[Any] | None:
-    """Per-row class labels, whether they live in a column or in the index."""
-    if CLASS_COLUMN in rows.columns:
-        return rows[CLASS_COLUMN]
-    if POOLED_CLASS_LABEL in rows.index:
-        return rows.index.to_series()
-    return None
+def _tested_hypotheses(per_class: pd.DataFrame) -> pd.DataFrame:
+    """Which (class, metric) hypotheses carry a BH-adjusted p-value, one column per metric.
+
+    A class can be tested on one metric and not the other: a class with ground truth but no
+    predictions from either model has a defined recall test and an undefined precision one.
+    """
+    tested: dict[str, pd.Series[Any]] = {}
+    for metric in COMPARED_METRICS:
+        if metric.adjusted_p_column in per_class.columns:
+            adjusted = pd.to_numeric(per_class[metric.adjusted_p_column], errors="coerce")
+            tested[metric.name] = adjusted.notna()
+        else:
+            logger.warning(
+                "Comparison rows have no {!r} column; the {} hypotheses are not counted",
+                metric.adjusted_p_column,
+                metric.name,
+            )
+    return pd.DataFrame(tested, index=per_class.index)
 
 
 def _verdicts(per_class: pd.DataFrame) -> dict[str, pd.Series[Any]]:
@@ -119,7 +131,10 @@ def _degraded_classes(
 
 
 def _headline_values(
-    per_class: pd.DataFrame, pooled: pd.DataFrame, verdicts: Mapping[str, pd.Series[Any]]
+    per_class: pd.DataFrame,
+    pooled: pd.DataFrame,
+    verdicts: Mapping[str, pd.Series[Any]],
+    tested_hypotheses: pd.DataFrame,
 ) -> dict[str, float]:
     """Reduce the comparison to the handful of numbers that answer "did it get better?".
 
@@ -134,16 +149,11 @@ def _headline_values(
     for metric, verdict in verdicts.items():
         values[f"improved_{metric}"] = float(verdict.eq(IMPROVED_VERDICT).fillna(False).sum())
 
-    if ADJUSTED_P_COLUMN in per_class.columns:
-        tested = float(pd.to_numeric(per_class[ADJUSTED_P_COLUMN], errors="coerce").notna().sum())
+    if not tested_hypotheses.columns.empty:
+        # A class counts as tested once either of its two hypotheses entered the family.
+        tested = float(tested_hypotheses.any(axis=1).sum())
         values[TESTED_VALUE_NAME] = tested
         values[EXCLUDED_VALUE_NAME] = float(len(per_class)) - tested
-    else:
-        logger.warning(
-            "Comparison rows have no {!r} column; the tested/excluded class counts are "
-            "not reported",
-            ADJUSTED_P_COLUMN,
-        )
 
     for compared in COMPARED_METRICS:
         if compared.delta_column not in per_class.columns:
@@ -168,11 +178,11 @@ def report_comparison(
 ) -> None:
     """Publish one split's comparison: the tables, the headline numbers and the method.
 
-    ``rows`` is the per-class comparison frame (one row per class plus the pooled
-    ``Итого`` row); ``methodology`` records how the comparison was decided (tests used,
-    BH family size, q, seed, threshold and weights sources, counts). Three tables are
-    published — the full comparison, the classes that significantly degraded, and the
-    methodology — alongside the headline single values.
+    ``rows`` is the per-class comparison frame — one row per class plus the pooled row,
+    which is the one flagged by ``is_pooled``; ``methodology`` records how the comparison
+    was decided (tests used, BH family size, q, seed, threshold and weights sources,
+    counts). Three tables are published — the full comparison, the classes that
+    significantly degraded, and the methodology — alongside the headline single values.
     """
     if task is None:
         return
@@ -190,25 +200,22 @@ def report_comparison(
         ),
     )
 
-    labels = _class_labels(rows)
-    if labels is None:
+    if POOLED_COLUMN not in rows.columns:
         logger.warning(
-            "Comparison rows have no {!r} column and no pooled {!r} index entry; "
-            "skipping the headline values",
-            CLASS_COLUMN,
-            POOLED_CLASS_LABEL,
+            "Comparison rows have no {!r} column, so the pooled row cannot be told apart "
+            "from the per-class ones; skipping the headline values",
+            POOLED_COLUMN,
         )
         return
 
-    is_pooled = labels == POOLED_CLASS_LABEL
+    is_pooled = rows[POOLED_COLUMN].eq(True).fillna(False).astype(bool)
     per_class = rows[~is_pooled]
     pooled = rows[is_pooled]
     if pooled.empty:
         logger.warning(
-            "Comparison rows for split {!r} have no pooled {!r} row; the pooled deltas are "
-            "not reported",
+            "No comparison row for split {!r} is flagged {!r}; the pooled deltas are not reported",
             split,
-            POOLED_CLASS_LABEL,
+            POOLED_COLUMN,
         )
     verdicts = _verdicts(per_class)
 
@@ -217,21 +224,24 @@ def report_comparison(
     if not degraded.empty:
         logger.warning("Split {!r}: {} class(es) significantly degraded", split, len(degraded))
 
-    headline = _headline_values(per_class, pooled, verdicts)
+    tested_hypotheses = _tested_hypotheses(per_class)
+    headline = _headline_values(per_class, pooled, verdicts, tested_hypotheses)
 
+    # The BH family is the set of hypotheses, two per class, so the declared family size is
+    # compared against the adjusted p-values themselves rather than against a class count.
     # Real covers numpy's scalars too, which a count computed upstream easily is.
     declared_family_size = methodology.get(FAMILY_SIZE_KEY)
-    tested = headline.get(TESTED_VALUE_NAME)
+    hypotheses = float(tested_hypotheses.to_numpy().sum())
     if (
         isinstance(declared_family_size, Real)
-        and tested is not None
-        and float(declared_family_size) != tested
+        and not tested_hypotheses.columns.empty
+        and float(declared_family_size) != hypotheses
     ):
         logger.warning(
-            "Methodology declares a family size of {} but {:.0f} classes carry an adjusted "
-            "p-value in the comparison rows",
+            "Methodology declares a BH family size of {} but the comparison rows carry "
+            "{:.0f} adjusted p-value(s)",
             declared_family_size,
-            tested,
+            hypotheses,
         )
 
     task_logger = task.get_logger()
