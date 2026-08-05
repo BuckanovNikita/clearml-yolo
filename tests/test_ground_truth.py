@@ -187,7 +187,27 @@ def test_image_name_shared_between_splits_is_rejected(dataset_yaml: Path, tmp_pa
     _write_image(root / "images" / "val" / "train_a.jpg", VAL_IMAGE_SIZE)
     (root / "labels" / "val" / "train_a.txt").write_text(VAL_LABEL)
 
-    with pytest.raises(ValueError, match="more than one split"):
+    with pytest.raises(ValueError, match="more than one file"):
+        build_ground_truth(dataset_yaml, tmp_path / "gt.csv")
+
+
+def test_image_name_repeated_within_a_split_is_rejected(dataset_yaml: Path, tmp_path: Path) -> None:
+    root = dataset_yaml.parent
+    nested = root / "images" / "train" / "camera_b"
+    nested.mkdir()
+    _write_image(nested / "train_a.jpg", TRAIN_IMAGE_SIZE)
+    (root / "labels" / "train" / "camera_b").mkdir()
+    (root / "labels" / "train" / "camera_b" / "train_a.txt").write_text(VAL_LABEL)
+
+    with pytest.raises(ValueError, match="more than one file"):
+        build_ground_truth(dataset_yaml, tmp_path / "gt.csv")
+
+
+def test_non_positive_box_size_is_rejected(dataset_yaml: Path, tmp_path: Path) -> None:
+    label = dataset_yaml.parent / "labels" / "train" / "train_a.txt"
+    label.write_text("0 0.5 0.5 -0.2 0.4\n")
+
+    with pytest.raises(ValueError, match="non-positive box size"):
         build_ground_truth(dataset_yaml, tmp_path / "gt.csv")
 
 

@@ -83,15 +83,20 @@ def _parse_label_file(label_path: Path, names: dict[int, str]) -> list[YoloBox]:
             )
         try:
             class_index = int(fields[0])
-            center_x, center_y, width, height = (float(field) for field in fields[1:])
+            center_x, center_y, box_width, box_height = (float(field) for field in fields[1:])
         except ValueError as error:
             raise ValueError(f"{label_path}:{number} is not a YOLO label: {line!r}") from error
+        if box_width <= 0 or box_height <= 0:
+            raise ValueError(
+                f"{label_path}:{number} has a non-positive box size ({box_width} x "
+                f"{box_height}); such a box has no top-left/bottom-right corner"
+            )
         if class_index not in names:
             raise ValueError(
                 f"{label_path}:{number} references class {class_index}, but the dataset "
                 f"defines classes {min(names)}..{max(names)}"
             )
-        boxes.append((names[class_index], center_x, center_y, width, height))
+        boxes.append((names[class_index], center_x, center_y, box_width, box_height))
     return boxes
 
 
@@ -163,18 +168,24 @@ def _carve_test_split(
     return kept, moved
 
 
-def _reject_cross_split_duplicates(images: dict[str, list[Path]]) -> None:
-    split_of_name: dict[str, str] = {}
+def _reject_duplicate_image_names(images: dict[str, list[Path]]) -> None:
+    """Refuse datasets where one file name stands for more than one image.
+
+    digital-metrics keys everything on ``image_name``: two files sharing a name have
+    their annotations merged inside a split, and across splits the CSV is rejected
+    outright as calibration leaking into evaluation.
+    """
+    path_of_name: dict[str, Path] = {}
     collisions: list[str] = []
-    for split, paths in images.items():
+    for paths in images.values():
         for path in paths:
-            owner = split_of_name.setdefault(path.name, split)
-            if owner != split:
-                collisions.append(f"{path.name} ({owner} and {split})")
+            owner = path_of_name.setdefault(path.name, path)
+            if owner != path:
+                collisions.append(f"{path.name} ({owner} and {path})")
     if collisions:
         raise ValueError(
-            f"{len(collisions)} image name(s) appear in more than one split, which "
-            f"digital-metrics rejects as calibration leakage: {', '.join(collisions[:5])}"
+            f"{len(collisions)} image name(s) refer to more than one file, which "
+            f"digital-metrics cannot tell apart: {', '.join(collisions[:5])}"
         )
 
 
@@ -210,11 +221,13 @@ def build_ground_truth(
     if "test" in images:
         logger.info("Dataset already defines a test split, leaving the val split untouched")
     elif "val" in images:
+        if dataset.get("test"):
+            logger.warning("The declared test split holds no images; carving one out of val")
         images["val"], carved = _carve_test_split(images["val"], test_fraction, seed)
         if carved:
             images["test"] = carved
 
-    _reject_cross_split_duplicates(images)
+    _reject_duplicate_image_names(images)
 
     rows: list[GroundTruthRow] = []
     background_images = 0
