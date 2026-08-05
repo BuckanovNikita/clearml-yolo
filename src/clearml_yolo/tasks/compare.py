@@ -9,6 +9,7 @@ see, and differences between image sets read exactly like differences between mo
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from typing import Any, Literal
 
@@ -125,6 +126,23 @@ class CompareResult(BaseModel):
     degraded_classes: list[str] = Field(default_factory=list)
 
 
+def _prediction_cache(destination: Path, role: str, split: str, weights: Path) -> Path:
+    """Name a re-inference cache after the checkpoint that filled it.
+
+    Keyed on the role alone, a second comparison in the same output directory reused the
+    first one's predictions for whatever model it was now given — scoring one checkpoint's
+    detections under another's name, which is precisely the substitution this whole
+    comparison exists to remove. Size and modification time are part of the key so a
+    retrained ``best.pt`` at an unchanged path is not mistaken for the old one.
+    """
+    identity = str(weights.resolve())
+    if weights.is_file():
+        stat = weights.stat()
+        identity = f"{identity}:{stat.st_size}:{stat.st_mtime_ns}"
+    digest = hashlib.sha256(identity.encode()).hexdigest()[:12]
+    return destination / f"{role}_predictions_{split}_{digest}.csv"
+
+
 def _scored(
     weights: Path,
     ground_truth: pd.DataFrame,
@@ -214,7 +232,7 @@ def compare(
         baseline_weights,
         truth,
         split,
-        destination / f"baseline_predictions_{split}.csv",
+        _prediction_cache(destination, "baseline", split, baseline_weights),
         inference,
         thresholds_baseline,
         classes,
@@ -224,7 +242,7 @@ def compare(
         candidate_weights,
         truth,
         split,
-        destination / f"candidate_predictions_{split}.csv",
+        _prediction_cache(destination, "candidate", split, candidate_weights),
         inference,
         thresholds_candidate,
         classes,

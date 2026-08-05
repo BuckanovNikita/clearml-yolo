@@ -39,6 +39,14 @@ def _task(task_id: str) -> Any:
     return task
 
 
+def _anchored(task_name: str | None) -> str | None:
+    """Pin a name to the whole task name, leaving an already-anchored pattern alone."""
+    if not task_name:
+        return None
+    start = task_name if task_name.startswith("^") else f"^{task_name}"
+    return start if start.endswith("$") else f"{start}$"
+
+
 def latest_completed_task_id(
     project_name: str,
     task_name: str | None = None,
@@ -46,15 +54,17 @@ def latest_completed_task_id(
 ) -> str | None:
     """The most recently finished task of a project carrying every one of ``tags``.
 
-    ``task_name`` is matched the way ClearML matches it — as a partial expression, not an
-    exact name — so anchor it with ``^…$`` when a project holds names that contain one
-    another.
+    ``task_name`` is anchored before it is sent. ClearML matches it as a regular
+    expression against any part of the name, so an unanchored ``yolo-v1`` also matches
+    ``yolo-v10`` — and since the newest match wins, asking for one model can silently
+    return a different one. Anchoring leaves deliberate patterns working: pass
+    ``yolo-v1.*`` to get the old behaviour back.
     """
     from clearml import Task
 
     tasks: list[Any] = Task.get_tasks(
         project_name=project_name,
-        task_name=task_name,
+        task_name=_anchored(task_name),
         tags=list(tags) if tags else None,
         task_filter={"status": ["completed", "published"], "order_by": ["-last_update"]},
     )

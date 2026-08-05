@@ -216,6 +216,32 @@ def test_nothing_comparable_is_an_error_rather_than_an_empty_report() -> None:
         )
 
 
+def test_each_checkpoint_gets_its_own_prediction_cache(tmp_path: Path) -> None:
+    """Two comparisons in one directory must not score each other's detections.
+
+    Keyed on the role alone, a rerun reused the previous run's predictions for whatever
+    checkpoint it was now given.
+    """
+    from clearml_yolo.tasks.compare import _prediction_cache
+
+    first = tmp_path / "a.pt"
+    second = tmp_path / "b.pt"
+    first.write_bytes(b"one")
+    second.write_bytes(b"two-different-length")
+
+    assert _prediction_cache(tmp_path, "baseline", "test", first) != _prediction_cache(
+        tmp_path, "baseline", "test", second
+    )
+    # The same checkpoint must still hit its cache, or nothing is ever reused.
+    assert _prediction_cache(tmp_path, "baseline", "test", first) == _prediction_cache(
+        tmp_path, "baseline", "test", first
+    )
+    # A retrained checkpoint at an unchanged path is a different model.
+    before = _prediction_cache(tmp_path, "baseline", "test", first)
+    first.write_bytes(b"retrained, quite different")
+    assert _prediction_cache(tmp_path, "baseline", "test", first) != before
+
+
 def test_comparing_a_model_against_itself_is_refused(tmp_path: Path) -> None:
     """Two lookups can land on one task; every delta is then zero, which reads as a result."""
     from clearml_yolo.clearml_session import ClearMLConfig

@@ -82,6 +82,27 @@ def test_the_baseline_lookup_asks_clearml_for_the_tag(monkeypatch: pytest.Monkey
     assert asked["task_filter"]["status"] == ["completed", "published"]
 
 
+def test_a_task_name_matches_the_whole_name(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Unanchored, 'yolo-v1' also matches 'yolo-v10', and the newest match would win."""
+    asked: dict[str, Any] = {}
+    module = types.ModuleType("clearml")
+    module.Task = types.SimpleNamespace(  # type: ignore[attr-defined]
+        get_tasks=lambda **kwargs: asked.update(kwargs) or [FakeTask()]
+    )
+    monkeypatch.setitem(sys.modules, "clearml", module)
+
+    latest_completed_task_id("detection", task_name="yolo-v1")
+    assert asked["task_name"] == "^yolo-v1$"
+
+    # A deliberate pattern still works, and an anchored one is not anchored twice.
+    latest_completed_task_id("detection", task_name="yolo-v1.*")
+    assert asked["task_name"] == "^yolo-v1.*$"
+    latest_completed_task_id("detection", task_name="^exact$")
+    assert asked["task_name"] == "^exact$"
+    latest_completed_task_id("detection")
+    assert asked["task_name"] is None
+
+
 def test_no_promoted_model_is_reported_as_absent(monkeypatch: pytest.MonkeyPatch) -> None:
     module = types.ModuleType("clearml")
     module.Task = types.SimpleNamespace(get_tasks=lambda **_: [])  # type: ignore[attr-defined]
