@@ -146,6 +146,7 @@ def test_class_rows_are_rounded_and_flags_are_readable(
     assert cat["Δ CI низ (P)"] == pytest.approx(-0.0123)
     assert cat["p BH (P)"] == pytest.approx(0.02)
     assert cat["TP новая"] == 12
+    assert cat["p (P)"] == pytest.approx(0.0312345678)
 
 
 def test_pooled_row_is_last_and_outside_the_bh_family(
@@ -157,7 +158,7 @@ def test_pooled_row_is_last_and_outside_the_bh_family(
     pooled = sheet.iloc[-1]
     assert pooled["p BH (P)"] == "не применимо"
     assert pooled["p BH (R)"] == "не применимо"
-    assert pooled["p (P)"] == pytest.approx(0.0312)
+    assert pooled["p (P)"] == pytest.approx(0.0312345678)
     assert pooled["Вердикт (P)"] == "улучшение"
 
 
@@ -188,6 +189,7 @@ def test_degraded_and_improved_verdicts_are_visually_distinct(
     assert improved.fill.fill_type == "solid"
     assert degraded.fill.fill_type == "solid"
     assert not_significant.fill.fill_type is None
+    assert sheet.cell(row=len(rows) + 1, column=verdict_column).fill.fill_type == "solid"
     assert sheet.freeze_panes == "B2"
     assert sheet.cell(row=1, column=1).font.bold
     assert sheet.cell(row=len(rows) + 1, column=1).font.bold
@@ -243,13 +245,39 @@ def test_excluded_and_methodology_round_trip(
     assert list(dump["Значение"].astype(str)) == [str(value) for value in methodology.values()]
 
 
+@pytest.mark.parametrize(
+    "empty", [pd.DataFrame(), pd.DataFrame(columns=["class_name", "reason"])], ids=["bare", "typed"]
+)
 def test_empty_excluded_frame_still_gets_a_headed_sheet(
-    tmp_path: Path, rows: pd.DataFrame, methodology: dict[str, object]
+    tmp_path: Path, rows: pd.DataFrame, methodology: dict[str, object], empty: pd.DataFrame
 ) -> None:
-    sheet = _write(tmp_path, rows, pd.DataFrame(), methodology)["Исключённые классы"]
+    sheet = _write(tmp_path, rows, empty, methodology)["Исключённые классы"]
 
     assert list(sheet.columns) == ["Класс", "Причина"]
     assert sheet.empty
+
+
+def test_excluded_frame_with_wrong_columns_is_rejected(
+    tmp_path: Path, rows: pd.DataFrame, methodology: dict[str, object]
+) -> None:
+    drifted = pd.DataFrame([{"name": "ferret", "reason": "нет GT-объектов в сплите"}])
+
+    with pytest.raises(ValueError, match="class_name"):
+        write_comparison_workbook(rows, drifted, methodology, tmp_path / "broken.xlsx")
+
+
+def test_tiny_p_values_survive_display_rounding(
+    tmp_path: Path, rows: pd.DataFrame, excluded: pd.DataFrame, methodology: dict[str, object]
+) -> None:
+    strong = rows.copy()
+    strong.loc[1, "precision_p_value"] = 1e-9
+    strong.loc[1, "precision_p_bh"] = 3e-9
+
+    sheet = _write(tmp_path, strong, excluded, methodology)["Сравнение"]
+    cat = sheet.loc[sheet["Класс"] == "cat"].iloc[0]
+
+    assert cat["p (P)"] == pytest.approx(1e-9)
+    assert cat["p BH (P)"] == pytest.approx(3e-9)
 
 
 def test_inputs_are_not_mutated(

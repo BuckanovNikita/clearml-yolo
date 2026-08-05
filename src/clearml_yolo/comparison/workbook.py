@@ -75,6 +75,8 @@ EXCLUDED_COLUMNS: tuple[tuple[str, str], ...] = (
 _VERDICT_SOURCES = ("precision_verdict", "recall_verdict")
 _VERDICT_HEADERS = ("Вердикт (P)", "Вердикт (R)")
 _BH_HEADERS = ("p BH (P)", "p BH (R)")
+# p-values span orders of magnitude, so display rounding would turn a strong result into 0.
+_FULL_PRECISION_HEADERS = ("p (P)", "p (R)", *_BH_HEADERS)
 
 _BOLD = Font(bold=True)
 _VERDICT_FILLS = {
@@ -99,7 +101,9 @@ def _comparison_sheet(rows: pd.DataFrame) -> pd.DataFrame:
     frame = ordered.loc[:, [name for name, _ in COMPARISON_COLUMNS]].rename(
         columns=dict(COMPARISON_COLUMNS)
     )
-    frame = frame.reset_index(drop=True).round(DISPLAY_DECIMALS)
+    frame = frame.reset_index(drop=True)
+    rounded = [header for header in frame.columns if header not in _FULL_PRECISION_HEADERS]
+    frame[rounded] = frame[rounded].round(DISPLAY_DECIMALS)
 
     frame.loc[pooled, "Класс"] = POOLED_LABEL
     for header in _VERDICT_HEADERS:
@@ -160,6 +164,9 @@ def write_comparison_workbook(
     frame is modified.
     """
     comparison = _comparison_sheet(rows)
+    unnamed = [name for name, _ in EXCLUDED_COLUMNS if name not in excluded.columns]
+    if len(excluded) and unnamed:
+        raise ValueError(f"Excluded classes are missing required columns: {unnamed}")
     excluded_sheet = excluded.reindex(columns=[name for name, _ in EXCLUDED_COLUMNS]).rename(
         columns=dict(EXCLUDED_COLUMNS)
     )
