@@ -18,6 +18,7 @@ dependencies = [
     "pydantic>=2",
     "loguru>=0.7",
     "pandas>=2.0",
+    "scipy>=1.11",
     "openpyxl>=3.1",
     "nvidia-ml-py",
     "digital-metrics",
@@ -66,7 +67,14 @@ warn_unreachable = true
 exclude = ["^(digital-metrics|report-generator)/"]
 
 [[tool.mypy.overrides]]
-module = ["ultralytics.*", "clearml.*", "digital_metrics.*", "report_generator.*", "pynvml.*"]
+module = [
+    "ultralytics.*",
+    "clearml.*",
+    "digital_metrics.*",
+    "report_generator.*",
+    "pynvml.*",
+    "scipy.*",
+]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

@@ -160,6 +160,7 @@ dependencies = [
     { name = "pandas" },
     { name = "pydantic" },
     { name = "report-generator" },
+    { name = "scipy" },
     { name = "ultralytics" },
 ]
 
@@ -184,6 +185,7 @@ requires-dist = [
     { name = "pandas", specifier = ">=2.0" },
     { name = "pydantic", specifier = ">=2" },
     { name = "report-generator", git = "https://github.com/Wasilkas/report-generator" },
+    { name = "scipy", specifier = ">=1.11" },
     { name = "ultralytics", specifier = ">=8.4" },
 ]
 
