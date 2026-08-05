@@ -133,10 +133,10 @@ def modest_difference_frames() -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
 
 
 def test_bootstrap_flags_a_planted_precision_drop_just_as_loudly() -> None:
-    better, worse, images = modest_difference_frames()
+    weaker, stronger, images = modest_difference_frames()
 
-    improved = bootstrap_precision_delta(better, worse, images, iterations=500, seed=5)
-    degraded = bootstrap_precision_delta(worse, better, images, iterations=500, seed=5)
+    improved = bootstrap_precision_delta(weaker, stronger, images, iterations=500, seed=5)
+    degraded = bootstrap_precision_delta(stronger, weaker, images, iterations=500, seed=5)
 
     # A floored p-value would compare equal whatever the tails did, so stay off the floor.
     assert improved.p_value > 1 / 500
