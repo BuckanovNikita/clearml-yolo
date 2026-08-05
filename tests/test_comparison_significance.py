@@ -12,6 +12,7 @@ import pytest
 from clearml_yolo.comparison.significance import (
     adjust_benjamini_hochberg,
     bootstrap_precision_delta,
+    bootstrap_recall_delta,
     mcnemar_recall,
 )
 
@@ -39,6 +40,20 @@ def prediction_frame(image_true_positives: dict[str, Sequence[bool]]) -> pd.Data
         for position, is_tp in enumerate(flags)
     ]
     return pd.DataFrame(rows, columns=["pred_index", "image_name", "instance_label", "is_tp"])
+
+
+def ground_truth_frame(image_detections: dict[str, Sequence[bool]]) -> pd.DataFrame:
+    rows = [
+        {
+            "gt_index": f"{image}-{position}",
+            "image_name": image,
+            "instance_label": "car",
+            "detected": detected,
+        }
+        for image, flags in image_detections.items()
+        for position, detected in enumerate(flags)
+    ]
+    return pd.DataFrame(rows, columns=["gt_index", "image_name", "instance_label", "detected"])
 
 
 def test_mcnemar_matches_hand_computed_exact_binomial() -> None:
@@ -224,6 +239,96 @@ def test_bootstrap_without_baseline_predictions_is_undefined() -> None:
     assert result.ci_lower is None
     assert result.n_baseline == 0
     assert result.n_candidate == 4
+
+
+def recall_frames() -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
+    """The same ground-truth boxes seen by both models, the candidate detecting more."""
+    rng = np.random.default_rng(23)
+    images = [f"img{index}" for index in range(60)]
+    baseline = ground_truth_frame({image: rng.random(4) < 0.5 for image in images})
+    candidate = ground_truth_frame({image: rng.random(4) < 0.75 for image in images})
+    return baseline, candidate, images
+
+
+def test_recall_bootstrap_brackets_a_planted_gain_and_withholds_a_p_value() -> None:
+    baseline, candidate, images = recall_frames()
+
+    result = bootstrap_recall_delta(baseline, candidate, images, iterations=500, seed=1)
+
+    expected = candidate["detected"].sum() / len(candidate) - baseline["detected"].sum() / len(
+        baseline
+    )
+    assert result.delta == pytest.approx(expected)
+    assert result.delta > 0
+    assert result.ci_lower is not None
+    assert result.ci_upper is not None
+    assert result.ci_lower > 0.0
+    assert result.ci_upper > result.ci_lower
+    # McNemar owns the recall p-value; this function must not offer a second one.
+    assert math.isnan(result.p_value)
+    assert result.n_baseline == 240
+    assert result.n_candidate == 240
+
+
+def test_recall_bootstrap_brackets_a_planted_drop_below_zero() -> None:
+    weaker, stronger, images = recall_frames()
+
+    improved = bootstrap_recall_delta(weaker, stronger, images, iterations=500, seed=1)
+    degraded = bootstrap_recall_delta(stronger, weaker, images, iterations=500, seed=1)
+
+    assert degraded.delta == pytest.approx(-improved.delta)
+    assert degraded.ci_upper is not None
+    assert degraded.ci_upper < 0.0
+    assert math.isnan(degraded.p_value)
+
+
+def test_recall_bootstrap_is_reproducible_for_one_seed() -> None:
+    baseline, candidate, images = recall_frames()
+
+    first = bootstrap_recall_delta(baseline, candidate, images, iterations=300, seed=13)
+    second = bootstrap_recall_delta(baseline, candidate, images, iterations=300, seed=13)
+    other_seed = bootstrap_recall_delta(baseline, candidate, images, iterations=300, seed=14)
+
+    # A NaN p_value is never equal to itself, so compare the fields the bootstrap defines.
+    assert first.model_dump(exclude={"p_value"}) == second.model_dump(exclude={"p_value"})
+    assert math.isnan(first.p_value)
+    assert first.ci_lower != other_seed.ci_lower
+
+
+def test_recall_bootstrap_straddles_zero_for_two_equally_good_models() -> None:
+    rng = np.random.default_rng(34)
+    images = [f"img{index}" for index in range(60)]
+    baseline = ground_truth_frame({image: rng.random(4) < 0.6 for image in images})
+    candidate = ground_truth_frame({image: rng.random(4) < 0.6 for image in images})
+
+    result = bootstrap_recall_delta(baseline, candidate, images, iterations=500, seed=6)
+
+    assert result.ci_lower is not None
+    assert result.ci_upper is not None
+    assert result.ci_lower < 0.0 < result.ci_upper
+
+
+def test_recall_bootstrap_without_baseline_boxes_is_undefined() -> None:
+    images = [f"img{index}" for index in range(4)]
+    empty = ground_truth_frame({})
+    candidate = ground_truth_frame({image: [True] for image in images})
+
+    result = bootstrap_recall_delta(empty, candidate, images, iterations=50, seed=0)
+
+    assert math.isnan(result.delta)
+    assert math.isnan(result.p_value)
+    assert result.ci_lower is None
+    assert result.n_baseline == 0
+
+
+def test_precision_bootstrap_still_reports_its_own_p_value() -> None:
+    """The shared bootstrap core must not withhold precision's p-value too."""
+    weaker, stronger, images = modest_difference_frames()
+
+    result = bootstrap_precision_delta(weaker, stronger, images, iterations=500, seed=5)
+
+    assert math.isfinite(result.p_value)
+    assert 0.0 < result.p_value <= 1.0
 
 
 def test_bootstrap_rejects_degenerate_arguments() -> None:

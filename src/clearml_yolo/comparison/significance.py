@@ -1,10 +1,15 @@
 """Significance tests for per-class metric deltas between a baseline and a candidate model.
 
 Every delta is ``candidate - baseline``, so a positive delta is an improvement and a
-negative one a degradation. Both tests are two-sided: the p-value answers "did this
-class change at all", the sign of ``delta`` answers "in which direction". Benjamini-
-Hochberg then controls the false discovery rate over that two-sided family, and the
-direction of each surviving change is still read off the sign of its delta.
+negative one a degradation. Every test is two-sided: the p-value answers "did this class
+change at all", the sign of ``delta`` answers "in which direction". Benjamini-Hochberg
+then controls the false discovery rate over that two-sided family, and the direction of
+each surviving change is still read off the sign of its delta.
+
+One hypothesis gets exactly one p-value. Recall's comes from :func:`mcnemar_recall` and
+precision's from :func:`bootstrap_precision_delta`; :func:`bootstrap_recall_delta`
+supplies recall's confidence interval only and deliberately returns a NaN p-value, so
+the recall hypothesis cannot be counted twice in the Benjamini-Hochberg family.
 """
 
 from __future__ import annotations
@@ -19,12 +24,15 @@ from scipy.stats import binomtest, false_discovery_control
 
 
 class TestResult(BaseModel):
-    """One hypothesis test: the observed delta, its p-value and its sample sizes.
+    """The observed delta, its p-value, its interval and its sample sizes.
 
-    ``ci_lower``/``ci_upper`` are ``None`` when the test does not produce an interval
-    (McNemar) or when no resample was usable. ``n_baseline``/``n_candidate`` count
-    aligned ground-truth boxes for the recall test and prediction rows for the
-    precision test.
+    ``ci_lower``/``ci_upper`` are ``None`` when the producer yields no interval
+    (McNemar) or when no resample was usable. ``p_value`` is NaN when the producer
+    yields no p-value (the recall bootstrap) or when the test is undefined.
+
+    ``n_baseline``/``n_candidate`` count aligned ground-truth boxes for McNemar,
+    prediction rows for the precision bootstrap and ground-truth rows for the recall
+    bootstrap.
     """
 
     delta: float
@@ -82,56 +90,61 @@ def mcnemar_recall(baseline_detected: pd.Series, candidate_detected: pd.Series) 
 
 
 def _per_image_counts(
-    pred_status: pd.DataFrame, images: Sequence[str], model: str
+    status: pd.DataFrame, images: Sequence[str], flag_column: str, description: str
 ) -> tuple[np.ndarray, np.ndarray]:
-    """True-positive and prediction counts per image, in the order of ``images``."""
+    """Successes and row counts per image, in the order of ``images``."""
     split_images = pd.Index(images)
-    grouped = pred_status.groupby("image_name")["is_tp"]
-    true_positives = grouped.sum().reindex(split_images, fill_value=0).to_numpy(dtype=float)
+    grouped = status.groupby("image_name")[flag_column]
+    successes = grouped.sum().reindex(split_images, fill_value=0).to_numpy(dtype=float)
     totals = grouped.size().reindex(split_images, fill_value=0).to_numpy(dtype=float)
-    dropped = len(pred_status) - int(totals.sum())
+    dropped = len(status) - int(totals.sum())
     if dropped:
         logger.warning(
-            "{} predictions of the {} model reference images outside the split and were dropped",
-            dropped,
-            model,
+            "{} {} rows reference images outside the split and were dropped", dropped, description
         )
-    return true_positives, totals
+    return successes, totals
 
 
-def bootstrap_precision_delta(
-    baseline_pred_status: pd.DataFrame,
-    candidate_pred_status: pd.DataFrame,
+def _bootstrap_rate_delta(
+    baseline_status: pd.DataFrame,
+    candidate_status: pd.DataFrame,
     images: Sequence[str],
     *,
-    iterations: int = 10_000,
-    seed: int = 0,
+    flag_column: str,
+    metric: str,
+    iterations: int,
+    seed: int,
 ) -> TestResult:
-    """Bootstrap the candidate-minus-baseline precision delta by resampling images.
+    """Resample images to bootstrap the candidate-minus-baseline delta of a pooled rate.
 
-    Precision cannot be paired at box level because the two models emit different
-    numbers of predictions. Images are resampled rather than predictions because boxes
-    cluster within images and resampling boxes would understate the variance. A draw in
-    which either model emits no prediction leaves precision undefined and is skipped;
-    the p-value averages over the usable draws only, but its floor stays ``1 /
-    iterations`` because that is the resolution the bootstrap was asked for.
+    Both precision and recall are a success count over a row count that differs between
+    the two models, so neither pairs at row level and both share this machinery. Images
+    are resampled rather than rows because boxes cluster within images and resampling
+    rows would understate the variance. A draw in which either model contributes no row
+    leaves its rate undefined and is skipped.
 
     The p-value compares absolute deviations against the H0-centred distribution, which
-    makes it two-sided - a precision drop is as significant as an equal-sized gain. Do
-    not narrow that comparison to one tail.
+    makes it two-sided - a drop is as significant as an equal-sized gain. Do not narrow
+    that comparison to one tail. It averages over the usable draws only, but its floor
+    stays ``1 / iterations`` because that is the resolution the bootstrap was asked for.
     """
     if iterations <= 0:
         raise ValueError(f"iterations must be positive, got {iterations}")
     if len(images) == 0:
         raise ValueError("images must not be empty")
 
-    baseline_tp, baseline_totals = _per_image_counts(baseline_pred_status, images, "baseline")
-    candidate_tp, candidate_totals = _per_image_counts(candidate_pred_status, images, "candidate")
+    baseline_hits, baseline_totals = _per_image_counts(
+        baseline_status, images, flag_column, f"baseline {metric}"
+    )
+    candidate_hits, candidate_totals = _per_image_counts(
+        candidate_status, images, flag_column, f"candidate {metric}"
+    )
     n_baseline = int(baseline_totals.sum())
     n_candidate = int(candidate_totals.sum())
     if n_baseline == 0 or n_candidate == 0:
         logger.warning(
-            "Precision bootstrap needs predictions from both models, got {} and {}",
+            "The {} bootstrap needs rows from both models, got {} and {}",
+            metric,
             n_baseline,
             n_candidate,
         )
@@ -142,26 +155,26 @@ def bootstrap_precision_delta(
             n_candidate=n_candidate,
         )
 
-    observed = candidate_tp.sum() / n_candidate - baseline_tp.sum() / n_baseline
+    observed = candidate_hits.sum() / n_candidate - baseline_hits.sum() / n_baseline
 
     rng = np.random.default_rng(seed)
     image_count = len(images)
     resampled = np.empty(iterations, dtype=float)
     for iteration in range(iterations):
         sampled = rng.integers(0, image_count, image_count)
-        baseline_predictions = baseline_totals[sampled].sum()
-        candidate_predictions = candidate_totals[sampled].sum()
-        if baseline_predictions == 0 or candidate_predictions == 0:
+        baseline_rows = baseline_totals[sampled].sum()
+        candidate_rows = candidate_totals[sampled].sum()
+        if baseline_rows == 0 or candidate_rows == 0:
             resampled[iteration] = np.nan
             continue
         resampled[iteration] = (
-            candidate_tp[sampled].sum() / candidate_predictions
-            - baseline_tp[sampled].sum() / baseline_predictions
+            candidate_hits[sampled].sum() / candidate_rows
+            - baseline_hits[sampled].sum() / baseline_rows
         )
 
     usable = resampled[np.isfinite(resampled)]
     if usable.size == 0:
-        logger.warning("Every precision bootstrap draw was degenerate; p-value is undefined")
+        logger.warning("Every {} bootstrap draw was degenerate; the interval is undefined", metric)
         return TestResult(
             delta=float(observed),
             p_value=float("nan"),
@@ -181,6 +194,60 @@ def bootstrap_precision_delta(
         n_baseline=n_baseline,
         n_candidate=n_candidate,
     )
+
+
+def bootstrap_precision_delta(
+    baseline_pred_status: pd.DataFrame,
+    candidate_pred_status: pd.DataFrame,
+    images: Sequence[str],
+    *,
+    iterations: int = 10_000,
+    seed: int = 0,
+) -> TestResult:
+    """Bootstrap the precision delta from ``pred_index, image_name, instance_label, is_tp``.
+
+    This is the authoritative precision test: it supplies both the interval and the
+    p-value, because precision has no exact paired counterpart the way recall has
+    McNemar.
+    """
+    return _bootstrap_rate_delta(
+        baseline_pred_status,
+        candidate_pred_status,
+        images,
+        flag_column="is_tp",
+        metric="precision",
+        iterations=iterations,
+        seed=seed,
+    )
+
+
+def bootstrap_recall_delta(
+    baseline_gt_status: pd.DataFrame,
+    candidate_gt_status: pd.DataFrame,
+    images: Sequence[str],
+    *,
+    iterations: int = 10_000,
+    seed: int = 0,
+) -> TestResult:
+    """Bootstrap a recall-delta interval from ``gt_index, image_name, instance_label, detected``.
+
+    This contributes the INTERVAL ONLY. ``p_value`` is always NaN by design: the
+    authoritative recall p-value is :func:`mcnemar_recall`, which is exact and stays
+    trustworthy at the per-class counts this report hits (a rare class can have well
+    under twenty boxes in a split, where a bootstrap p-value is unreliable). Returning a
+    second recall p-value here would invite a downstream reader to count one hypothesis
+    twice, so it is withheld rather than computed and ignored.
+    """
+    interval = _bootstrap_rate_delta(
+        baseline_gt_status,
+        candidate_gt_status,
+        images,
+        flag_column="detected",
+        metric="recall",
+        iterations=iterations,
+        seed=seed,
+    )
+    return interval.model_copy(update={"p_value": float("nan")})
 
 
 def adjust_benjamini_hochberg(p_values: Sequence[float], q: float = 0.05) -> BHResult:
