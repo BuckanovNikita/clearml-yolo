@@ -8,7 +8,7 @@ import pytest
 from clearml_yolo.comparison.scoring import ClassCounts, score_split
 
 GT_COLUMNS = ["image_name", "instance_label", "bbox_x_tl", "bbox_y_tl", "bbox_x_br", "bbox_y_br"]
-GtRow = tuple[str, str, float, float, float, float]
+GtRow = tuple[str, str | None, float, float, float, float]
 PredRow = tuple[str, str, float, float, float, float, float]
 
 
@@ -20,10 +20,6 @@ def _gt_frame(rows: list[GtRow], index: list[int]) -> pd.DataFrame:
 
 def _pred_frame(rows: list[PredRow], index: list[int]) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=[*GT_COLUMNS, "confidence"], index=pd.Index(index))
-
-
-def _empty_pred_frame() -> pd.DataFrame:
-    return _pred_frame([], [])
 
 
 def test_hits_and_background_false_positive_join_back_by_index_label() -> None:
@@ -110,7 +106,7 @@ def test_empty_predictions_leave_every_ground_truth_box_undetected() -> None:
 
     outcome = score_split(
         gt,
-        _empty_pred_frame(),
+        _pred_frame([], []),
         ["cat", "dog"],
         {"cat": 0.5, "dog": 0.5},
         iou_threshold=0.5,
@@ -181,21 +177,43 @@ def test_cross_class_false_positive_does_not_mark_its_ground_truth_detected() ->
     assert outcome.pred_status["is_tp"].tolist() == [False]
 
 
-def test_duplicate_index_labels_are_rejected() -> None:
+@pytest.mark.parametrize(
+    ("index", "message"),
+    [([0, 0], "duplicate labels"), ([-1, 1], "negative labels")],
+)
+def test_indexes_that_cannot_carry_the_join_are_rejected(index: list[int], message: str) -> None:
     gt = _gt_frame(
         [
             ("img1.jpg", "cat", 0.0, 0.0, 10.0, 10.0),
             ("img2.jpg", "cat", 0.0, 0.0, 10.0, 10.0),
         ],
-        index=[0, 0],
+        index=index,
     )
 
-    with pytest.raises(ValueError, match="duplicate labels"):
+    with pytest.raises(ValueError, match=message):
         score_split(
             gt,
-            _empty_pred_frame(),
+            _pred_frame([], []),
             ["cat"],
             {"cat": 0.5},
             iou_threshold=0.5,
             matching_strategy="iou_prior",
         )
+
+
+def test_labels_outside_the_scored_classes_are_excluded_without_crashing() -> None:
+    gt = _gt_frame(
+        [
+            ("img1.jpg", "cat", 0.0, 0.0, 10.0, 10.0),
+            ("img2.jpg", "bird", 20.0, 20.0, 30.0, 30.0),
+            ("img3.jpg", None, 40.0, 40.0, 50.0, 50.0),
+        ],
+        index=[0, 1, 2],
+    )
+
+    outcome = score_split(
+        gt, _pred_frame([], []), ["cat"], {}, iou_threshold=0.5, matching_strategy="iou_prior"
+    )
+
+    assert outcome.counts == {"cat": ClassCounts(tp=0, fp=0, fn=1)}
+    assert outcome.gt_status["gt_index"].tolist() == [0]

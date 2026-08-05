@@ -74,10 +74,16 @@ def score_split(
     false positive also carries a ``gt_index``, but that box's real status is
     recorded by its own TP or FN record.
     """
-    if not gt_df.index.is_unique:
-        raise ValueError("Ground-truth index has duplicate labels, so match records cannot join.")
-    if not preds_df.index.is_unique:
-        raise ValueError("Prediction index has duplicate labels, so match records cannot join.")
+    for frame_name, frame in (("Ground-truth", gt_df), ("Prediction", preds_df)):
+        if not frame.index.is_unique:
+            raise ValueError(
+                f"{frame_name} index has duplicate labels, so match records cannot join back."
+            )
+        if (frame.index < 0).any():
+            raise ValueError(
+                f"{frame_name} index has negative labels, which collide with the -1 that match "
+                "records use for 'no associated box'."
+            )
 
     # Placeholder rows for empty images (no label, no bbox) must stay in the image
     # list so predictions on those images are still counted as false positives.
@@ -111,7 +117,7 @@ def score_split(
         counts[class_name] = tally
 
     scored_gt = gt_df.dropna(subset=BBOX_COLUMNS)
-    unknown_labels = sorted(set(scored_gt["instance_label"]) - set(classes))
+    unknown_labels = sorted(set(scored_gt["instance_label"]) - set(classes), key=str)
     if unknown_labels:
         logger.warning(
             "Ground truth carries label(s) {} outside the scored classes {}; "
@@ -126,7 +132,7 @@ def score_split(
             "gt_index": scored_gt.index.to_numpy(),
             "image_name": scored_gt["image_name"].to_numpy(),
             "instance_label": scored_gt["instance_label"].to_numpy(),
-            "detected": scored_gt.index.isin(sorted(detected_gt_indices)),
+            "detected": scored_gt.index.isin(list(detected_gt_indices)),
         }
     ).astype({"gt_index": int, "detected": bool})
 
