@@ -62,6 +62,9 @@ select = ["E", "F", "I", "N", "UP", "B", "BLE", "C4", "SIM", "RET", "PTH", "T20"
 python_version = "3.12"
 strict = true
 warn_unreachable = true
+# Both upstream repos are cloned into this tree for reference but consumed as installed
+# packages, so they are not ours to type-check.
+exclude = ["^(digital-metrics|report-generator)/"]
 
 [[tool.mypy.overrides]]
 module = ["ultralytics.*", "clearml.*", "digital_metrics.*", "report_generator.*", "pynvml.*", "albumentations.*"]

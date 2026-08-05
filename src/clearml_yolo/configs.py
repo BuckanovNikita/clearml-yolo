@@ -63,6 +63,7 @@ def train_config(clearml: Any) -> Any:
         auto_gpu=AutoGpuConf,
         clearml=clearml,
         augmentations=AugmentationsConf,
+        keep_default_augmentations=False,
         train_kwargs={},
     )
 

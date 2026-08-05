@@ -1,12 +1,23 @@
-"""Load a user-supplied albumentations pipeline from JSON.
+"""Load a user-supplied albumentations pipeline from JSON and fit it into YOLO training.
 
 Ultralytics accepts a *list* of transforms rather than a Compose: it wraps them in its
 own ``A.Compose`` with ``bbox_params=A.BboxParams(format="yolo", label_fields=["class_labels"])``.
 Passing a Compose would nest one inside the other and detach the bbox handling.
+
+``v8_transforms`` places that Compose in the middle of its own augmentation stack::
+
+    Mosaic -> CopyPaste -> RandomPerspective -> MixUp -> CutMix
+        -> Albumentations(custom)
+        -> RandomHSV -> RandomFlip(vertical) -> RandomFlip(horizontal)
+
+so a custom pipeline does not replace anything by default — ultralytics keeps rotating,
+scaling, hue-shifting and flipping on top of it. This module switches the duplicated
+hyperparameters off and rejects the combinations that cannot be made to agree.
 """
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -59,16 +70,151 @@ ULTRALYTICS_SPATIAL_TRANSFORMS = frozenset(
 )
 
 
-def _warn_about_unknown_spatial_transforms(transforms: list[Any]) -> None:
-    names = {type(transform).__name__ for transform in transforms}
-    unknown = sorted(names - ULTRALYTICS_SPATIAL_TRANSFORMS)
-    if unknown and not (names & ULTRALYTICS_SPATIAL_TRANSFORMS):
-        logger.warning(
-            "None of {} is a spatial transform ultralytics recognises, so it will build "
-            "the pipeline without bbox_params. If any of these move pixels around, boxes "
-            "will not follow and labels will be wrong.",
-            unknown,
+# Ultralytics runs these around the custom pipeline — RandomPerspective before it, the
+# bgr swap at load time, RandomHSV and RandomFlip after — so leaving them enabled applies
+# a second, unrequested augmentation to every image the JSON pipeline already produced.
+REPLACED_BY_CUSTOM_PIPELINE = (
+    "hsv_h",
+    "hsv_s",
+    "hsv_v",
+    "bgr",
+    "degrees",
+    "translate",
+    "shear",
+    "perspective",
+    "flipud",
+    "fliplr",
+)
+
+# RandomPerspective is also what resamples the double-sized mosaic canvas back down to
+# imgsz, and `scale` is the zoom it uses to do it. Zeroing it while mosaic runs would
+# quietly demote mosaic to a centre crop, so it only counts as duplicated once mosaic is
+# off.
+MOSAIC_DEPENDENT_HYPERPARAMETER = "scale"
+
+# Ultralytics closes mosaic for the last N epochs by rebuilding the transforms with
+# mosaic at zero and every other hyperparameter untouched. `scale` would survive that
+# rebuild as a plain random zoom stacked on the custom pipeline, so the schedule has to
+# go for the augmentation regime to hold for the whole run.
+MOSAIC_SCHEDULE_HYPERPARAMETER = "close_mosaic"
+
+# Mosaic and friends stitch several images together before the custom pipeline ever sees
+# a sample, and no albumentations transform can express that, so they stay as configured.
+KEPT_WITH_CUSTOM_PIPELINE = (
+    "mosaic",
+    "mixup",
+    "cutmix",
+    "copy_paste",
+    "copy_paste_mode",
+)
+
+ULTRALYTICS_DEFAULT_MOSAIC = 1.0
+
+
+def _is_enabled(value: Any) -> bool:
+    """Ultralytics treats a zero probability or gain as "off"; anything else is on."""
+    if value is None:
+        return False
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return True
+
+
+def _reject_transforms_ultralytics_cannot_track(transforms: list[Any]) -> None:
+    """Fail when the boxes would silently stop following the pixels.
+
+    Ultralytics attaches bbox_params only if some *top-level* transform's class name is
+    in its hardcoded spatial set. A geometric transform hidden inside a OneOf, or one
+    ultralytics has never heard of, therefore moves the image while the labels stay put —
+    a corruption nothing downstream can detect.
+    """
+    import albumentations as A
+
+    def flatten(items: list[Any]) -> Iterator[Any]:
+        for item in items:
+            yield item
+            if isinstance(item, A.BaseCompose):
+                yield from flatten(list(item.transforms))
+
+    top_level = {type(transform).__name__ for transform in transforms}
+    if top_level & ULTRALYTICS_SPATIAL_TRANSFORMS:
+        return
+
+    geometric = sorted(
+        {type(item).__name__ for item in flatten(transforms) if isinstance(item, A.DualTransform)}
+    )
+    if geometric:
+        raise ValueError(
+            f"{geometric} move pixels, but ultralytics recognises no spatial transform at the "
+            "top level of this pipeline, so it composes without bbox_params and the boxes stay "
+            "behind. Lift a recognised spatial transform (HorizontalFlip, Affine, Rotate, ...) "
+            "out of any OneOf/Sequential wrapper to the top level of the JSON."
         )
+
+
+def resolve_train_augmentations(
+    train_kwargs: dict[str, Any] | None,
+    augmentations: list[Any] | None,
+    keep_default_augmentations: bool = False,
+) -> dict[str, Any]:
+    """Build the extra ``model.train()`` kwargs for a custom albumentations pipeline.
+
+    Without a pipeline nothing changes. With one, ultralytics' own image-level
+    augmentations are switched off so the JSON is the single source of truth, and any
+    that the caller asked for explicitly are rejected rather than silently overruled.
+    """
+    extra = dict(train_kwargs or {})
+    if "augmentations" in extra:
+        raise ValueError(
+            "train_kwargs.augmentations collides with the augmentations config field, which "
+            "would win and discard it. Point augmentations.path at the JSON instead."
+        )
+    if augmentations is None:
+        return extra
+
+    extra["augmentations"] = augmentations
+    if keep_default_augmentations:
+        logger.warning(
+            "keep_default_augmentations is set: ultralytics' own augmentations {} keep running "
+            "on top of the custom pipeline.",
+            list(REPLACED_BY_CUSTOM_PIPELINE),
+        )
+        return extra
+
+    disabled: dict[str, float] = dict.fromkeys(REPLACED_BY_CUSTOM_PIPELINE, 0.0)
+    mosaic = extra.get("mosaic", ULTRALYTICS_DEFAULT_MOSAIC)
+    if _is_enabled(mosaic):
+        disabled[MOSAIC_SCHEDULE_HYPERPARAMETER] = 0
+        logger.info(
+            "Keeping ultralytics' scale hyperparameter because mosaic={} needs it to resample "
+            "the mosaic canvas back to imgsz, and dropping the close_mosaic schedule so it stays "
+            "load-bearing for the whole run.",
+            mosaic,
+        )
+    else:
+        disabled[MOSAIC_DEPENDENT_HYPERPARAMETER] = 0.0
+
+    if "cfg" in extra:
+        logger.warning(
+            "train_kwargs.cfg={} is loaded before the explicit kwargs, so any augmentation it "
+            "sets is overruled here rather than rejected. Move augmentations out of it.",
+            extra["cfg"],
+        )
+
+    requested = sorted(name for name in disabled if _is_enabled(extra.get(name)))
+    if requested:
+        raise ValueError(
+            f"train_kwargs enables {requested} alongside a custom albumentations pipeline, and "
+            "each of those would augment images the pipeline has already augmented. Express them "
+            "in the JSON instead, or set keep_default_augmentations=true to run both stacks."
+        )
+
+    logger.info(
+        "Custom pipeline replaces ultralytics' augmentations {}; {} still apply.",
+        sorted(disabled),
+        list(KEPT_WITH_CUSTOM_PIPELINE),
+    )
+    return {**disabled, **extra}
 
 
 def load_augmentations(path: str | Path | None) -> list[Any] | None:
@@ -92,7 +238,7 @@ def load_augmentations(path: str | Path | None) -> list[Any] | None:
         logger.warning("Albumentations pipeline {} is empty", augmentation_path)
         return None
 
-    _warn_about_unknown_spatial_transforms(transforms)
+    _reject_transforms_ultralytics_cannot_track(transforms)
     logger.info(
         "Loaded {} albumentations transform(s) from {}: {}",
         len(transforms),

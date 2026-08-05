@@ -7,6 +7,7 @@ from typing import Any
 
 from loguru import logger
 
+from clearml_yolo.augment import resolve_train_augmentations
 from clearml_yolo.clearml_session import ClearMLConfig, init_task
 from clearml_yolo.gpu import AutoGpuConfig, resolve_devices
 
@@ -24,6 +25,7 @@ def train(
     device: list[int] | int | str | None = None,
     augmentations: list[Any] | None = None,
     train_kwargs: dict[str, Any] | None = None,
+    keep_default_augmentations: bool = False,
 ) -> Path:
     """Run training and return the path to the best checkpoint.
 
@@ -33,6 +35,9 @@ def train(
     """
     from ultralytics.models import YOLO
 
+    # Both of these validate before anything expensive starts, so a conflicting config
+    # fails in the first second rather than an hour into a run.
+    extra = resolve_train_augmentations(train_kwargs, augmentations, keep_default_augmentations)
     # Only the task identity is ours. Ultralytics' own ClearML callback connects the
     # hyperparameters, logs losses and metrics, and uploads best.pt on its own.
     init_task(clearml, stage="train")
@@ -47,10 +52,6 @@ def train(
         selection.batch,
         selection.batch_per_gpu,
     )
-
-    extra = dict(train_kwargs or {})
-    if augmentations is not None:
-        extra["augmentations"] = augmentations
 
     yolo = YOLO(model)
     yolo.train(
