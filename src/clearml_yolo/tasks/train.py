@@ -6,9 +6,29 @@ from pathlib import Path
 from typing import Any
 
 from loguru import logger
+from pydantic import BaseModel
 
 from clearml_yolo.clearml_session import ClearMLConfig, init_task
-from clearml_yolo.gpu import AutoGpuConfig, resolve_devices
+from clearml_yolo.gpu import AutoGpuConfig, DeviceSelection, resolve_devices
+
+
+class TrainResult(BaseModel):
+    """The checkpoint plus the device it was produced on.
+
+    The device travels with the result so a stage that follows training in the same
+    process can reuse it instead of surveying again: training still holds the card's
+    memory at that point, so a fresh survey would wait for a device this very run owns.
+    """
+
+    weights: Path
+    inference_device: str | None = None
+
+
+def _inference_device(selection: DeviceSelection) -> str | None:
+    """Name training's device the way inference expects it, or None for CPU."""
+    if isinstance(selection.devices, list) and selection.devices:
+        return str(selection.devices[0])
+    return None
 
 
 def train(
@@ -23,8 +43,8 @@ def train(
     clearml: ClearMLConfig,
     device: list[int] | int | str | None = None,
     train_kwargs: dict[str, Any] | None = None,
-) -> Path:
-    """Run training and return the path to the best checkpoint.
+) -> TrainResult:
+    """Run training and return the best checkpoint with the device that produced it.
 
     The checkpoint path is derived from project/name rather than from the return value
     of ``model.train()``: under DDP the parent process never runs a validator, so
@@ -73,4 +93,4 @@ def train(
             f"Training finished but {best} does not exist. Check the run directory {save_dir}."
         )
     logger.info("Best checkpoint: {}", best)
-    return best
+    return TrainResult(weights=best, inference_device=_inference_device(selection))

@@ -13,6 +13,7 @@ from clearml_yolo.clearml_session import ClearMLConfig, init_task
 from clearml_yolo.tasks.metrics import compute_metrics
 from clearml_yolo.tasks.predict import predict as run_prediction
 from clearml_yolo.tasks.report import build_reports, discover_dashboards
+from clearml_yolo.tasks.train import TrainResult
 from clearml_yolo.tasks.train import train as run_training
 
 
@@ -54,17 +55,23 @@ def run_pipeline(
     report_cfg = _as_dict(report)
 
     weights = predict_cfg["weights"]
+    # Inference after training must reuse training's own card rather than survey again:
+    # this process is still holding that card's memory, so a fresh survey would wait for
+    # a device the run already owns.
+    trained_device: str | None = None
     if skip_train:
         logger.info("Skipping training; using weights {}", weights)
     else:
-        weights = run_train_stage(train_cfg, clearml)
-        results["weights"] = weights
+        trained = run_train_stage(train_cfg, clearml)
+        weights = trained.weights
+        trained_device = trained.inference_device
+        results["weights"] = trained.weights
 
     predictions = Path(predict_cfg["output"])
     if skip_predict:
         logger.info("Skipping inference; using predictions {}", predictions)
     else:
-        predictions = run_predict_stage(predict_cfg, weights, clearml)
+        predictions = run_predict_stage(predict_cfg, weights, clearml, trained_device)
         results["predictions"] = predictions
 
     metrics_dir = Path(metrics_cfg["output_dir"])
@@ -91,7 +98,7 @@ def run_pipeline(
     return results
 
 
-def run_train_stage(config: dict[str, Any], clearml: ClearMLConfig) -> Path:
+def run_train_stage(config: dict[str, Any], clearml: ClearMLConfig) -> TrainResult:
     return run_training(
         model=config["model"],
         data=config["data"],
@@ -107,17 +114,23 @@ def run_train_stage(config: dict[str, Any], clearml: ClearMLConfig) -> Path:
     )
 
 
-def run_predict_stage(config: dict[str, Any], weights: str | Path, clearml: ClearMLConfig) -> Path:
+def run_predict_stage(
+    config: dict[str, Any],
+    weights: str | Path,
+    clearml: ClearMLConfig,
+    trained_device: str | None = None,
+) -> Path:
     return run_prediction(
         weights=weights,
         ground_truth=config["ground_truth"],
         output=config["output"],
         clearml=clearml,
+        auto_gpu=config["auto_gpu"],
         conf=config["conf"],
         iou=config["iou"],
         imgsz=config["imgsz"],
         batch=config["batch"],
-        device=config["device"],
+        device=config["device"] or trained_device,
         splits=config["splits"],
         image_name=config["image_name"],
         predict_kwargs=config["predict_kwargs"],

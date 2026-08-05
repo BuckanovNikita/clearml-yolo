@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pickle
+from pathlib import Path
 
 import pytest
 from hydra import compose, initialize_config_module
@@ -10,7 +11,11 @@ from hydra_zen import store
 from omegaconf import OmegaConf
 
 import clearml_yolo.configs  # noqa: F401  registers every config
-from clearml_yolo.tasks.pipeline import _as_dict
+from clearml_yolo.clearml_session import ClearMLConfig
+from clearml_yolo.gpu import DeviceSelection
+from clearml_yolo.tasks import pipeline as pipeline_module
+from clearml_yolo.tasks.pipeline import _as_dict, run_predict_stage
+from clearml_yolo.tasks.train import _inference_device
 
 STAGES = ["train", "predict", "metrics", "report"]
 
@@ -48,3 +53,35 @@ def test_whole_stage_config_is_picklable(stage: str) -> None:
     plain = {k: v for k, v in config.items() if not hasattr(v, "model_dump")}
 
     pickle.loads(pickle.dumps(plain))
+
+
+def test_training_names_its_first_device_for_inference() -> None:
+    on_gpus = DeviceSelection(devices=[2, 3], batch=32, batch_per_gpu=16)
+    on_cpu = DeviceSelection(devices="cpu", batch=16, batch_per_gpu=16)
+
+    assert _inference_device(on_gpus) == "2"
+    assert _inference_device(on_cpu) is None
+
+
+def test_inference_reuses_the_card_training_just_used(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Re-surveying here would wait for a device this very process still holds."""
+    seen: dict[str, object] = {}
+    monkeypatch.setattr(
+        pipeline_module, "run_prediction", lambda **kwargs: seen.update(kwargs) or Path("out.csv")
+    )
+
+    run_predict_stage(_stage_config("predict"), "best.pt", ClearMLConfig(enabled=False), "1")
+
+    assert seen["device"] == "1"
+
+
+def test_an_explicit_device_still_wins_over_training(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, object] = {}
+    monkeypatch.setattr(
+        pipeline_module, "run_prediction", lambda **kwargs: seen.update(kwargs) or Path("out.csv")
+    )
+    config = _stage_config("predict") | {"device": "0"}
+
+    run_predict_stage(config, "best.pt", ClearMLConfig(enabled=False), "1")
+
+    assert seen["device"] == "0"

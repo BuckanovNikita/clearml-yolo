@@ -69,6 +69,7 @@ def predict_config(clearml: Any) -> Any:
         weights="runs/detect/train/weights/best.pt",
         ground_truth="ground_truth.csv",
         output="runs/predictions.csv",
+        auto_gpu=AutoGpuConf,
         conf=0.001,
         iou=0.7,
         imgsz=640,
