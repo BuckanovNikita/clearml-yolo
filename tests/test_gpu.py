@@ -99,6 +99,18 @@ def make_fake_torch(visible_uuids: list[str]) -> types.ModuleType:
     return module
 
 
+@pytest.fixture(autouse=True)
+def off_wsl(monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory) -> None:
+    """Hide the WSL GPU device from every test unless the test asks for it.
+
+    The fallback that counts /dev/dxg holders reads the real machine. Left visible, a
+    test whose fake NVML reports an idle card would consult whatever is running on the
+    developer's GPU — and, finding it busy, sit in the wait loop until the real process
+    exited or the hour-long timeout expired.
+    """
+    monkeypatch.setattr(gpu_module, "WSL_GPU_DEVICE", tmp_path_factory.mktemp("nodxg") / "dxg")
+
+
 @pytest.fixture
 def patch_modules(monkeypatch: pytest.MonkeyPatch) -> Any:
     def _patch(handles: list[FakeHandle], visible_uuids: list[str]) -> None:
@@ -353,6 +365,20 @@ def test_a_host_without_the_wsl_device_is_left_to_nvml(monkeypatch: Any, tmp_pat
     monkeypatch.setattr(gpu_module, "WSL_GPU_DEVICE", tmp_path / "absent")
 
     assert gpu_module._wsl_foreign_gpu_processes(None) is None
+
+
+def test_on_linux_an_idle_card_stays_idle(patch_modules: Any) -> None:
+    """Where NVML works, a zero process count is the truth and must not be second-guessed.
+
+    The off_wsl fixture hides the device from the whole suite, so every other test here
+    already asserts native-Linux behaviour; this one says so out loud.
+    """
+    patch_modules([FakeHandle("aaa", 48.0, 47.0, processes=0)], ["aaa"])
+
+    survey = probe_gpus()
+
+    assert survey.gpus[0].foreign_process_count == 0
+    assert select_devices(AutoGpuConfig(batch_per_gpu=8)).devices == [0]
 
 
 def test_an_idle_card_is_not_accused_of_hiding_processes(
