@@ -52,6 +52,7 @@ def test_hits_and_background_false_positive_join_back_by_index_label() -> None:
         "cat": ClassCounts(tp=1, fp=0, fn=0),
         "dog": ClassCounts(tp=1, fp=1, fn=0),
     }
+    assert len(outcome.gt_status) == sum(tally.tp + tally.fn for tally in outcome.counts.values())
     assert outcome.gt_status["gt_index"].tolist() == [100, 101]
     assert outcome.gt_status["image_name"].tolist() == ["img1.jpg", "img2.jpg"]
     assert outcome.gt_status["detected"].tolist() == [True, True]
