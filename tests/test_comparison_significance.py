@@ -86,6 +86,14 @@ def test_mcnemar_scores_only_the_shared_boxes() -> None:
     assert result.p_value == 1.0
 
 
+def test_mcnemar_refuses_missing_detection_flags() -> None:
+    baseline = pd.Series([True, float("nan"), False], index=[0, 1, 2])
+    candidate = pd.Series([True, True, False], index=[0, 1, 2])
+
+    with pytest.raises(ValueError, match="missing values"):
+        mcnemar_recall(baseline, candidate)
+
+
 def test_mcnemar_without_shared_boxes_is_undefined() -> None:
     baseline = pd.Series([True], index=[0])
     candidate = pd.Series([True], index=[1])
@@ -160,6 +168,22 @@ def test_bootstrap_on_identical_inputs_finds_nothing() -> None:
     assert result.ci_lower is not None
     assert result.ci_upper is not None
     assert result.ci_lower <= 0.0 <= result.ci_upper
+
+
+def test_bootstrap_finds_nothing_between_two_equally_good_models() -> None:
+    """The null case that is not true by construction: different rows, one shared rate."""
+    rng = np.random.default_rng(8)
+    images = [f"img{index}" for index in range(60)]
+    baseline = prediction_frame({image: rng.random(3) < 0.55 for image in images})
+    candidate = prediction_frame({image: rng.random(3) < 0.55 for image in images})
+
+    result = bootstrap_precision_delta(baseline, candidate, images, iterations=500, seed=2)
+
+    assert result.delta != 0.0
+    assert result.p_value > 0.2
+    assert result.ci_lower is not None
+    assert result.ci_upper is not None
+    assert result.ci_lower < 0.0 < result.ci_upper
 
 
 def test_bootstrap_is_reproducible_for_one_seed() -> None:

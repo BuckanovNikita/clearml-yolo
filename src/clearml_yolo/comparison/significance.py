@@ -56,8 +56,14 @@ def mcnemar_recall(baseline_detected: pd.Series, candidate_detected: pd.Series) 
         logger.warning("McNemar test got no overlapping ground-truth boxes")
         return TestResult(delta=float("nan"), p_value=float("nan"), n_baseline=0, n_candidate=0)
 
-    baseline = baseline_detected.loc[shared].astype(bool)
-    candidate = candidate_detected.loc[shared].astype(bool)
+    baseline = baseline_detected.loc[shared]
+    candidate = candidate_detected.loc[shared]
+    if baseline.isna().any() or candidate.isna().any():
+        # astype(bool) maps a missing flag to True, which would silently inflate recall.
+        raise ValueError("Detection flags must not contain missing values")
+
+    baseline = baseline.astype(bool)
+    candidate = candidate.astype(bool)
     baseline_only = int((baseline & ~candidate).sum())
     candidate_only = int((~baseline & candidate).sum())
     discordant = baseline_only + candidate_only
