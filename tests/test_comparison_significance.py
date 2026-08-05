@@ -123,15 +123,29 @@ def test_bootstrap_detects_a_planted_precision_gap() -> None:
     assert result.p_value == pytest.approx(1 / 500)
 
 
+def modest_difference_frames() -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
+    """A gap small enough that the p-value lands off its 1 / iterations floor."""
+    rng = np.random.default_rng(19)
+    images = [f"img{index}" for index in range(60)]
+    baseline = prediction_frame({image: rng.random(3) < 0.5 for image in images})
+    candidate = prediction_frame({image: rng.random(3) < 0.6 for image in images})
+    return baseline, candidate, images
+
+
 def test_bootstrap_flags_a_planted_precision_drop_just_as_loudly() -> None:
-    better, worse, images = planted_difference_frames()
+    better, worse, images = modest_difference_frames()
 
-    improved = bootstrap_precision_delta(better, worse, images, iterations=500, seed=0)
-    degraded = bootstrap_precision_delta(worse, better, images, iterations=500, seed=0)
+    improved = bootstrap_precision_delta(better, worse, images, iterations=500, seed=5)
+    degraded = bootstrap_precision_delta(worse, better, images, iterations=500, seed=5)
 
-    assert degraded.delta == pytest.approx(-improved.delta)
+    # A floored p-value would compare equal whatever the tails did, so stay off the floor.
+    assert improved.p_value > 1 / 500
+    assert improved.p_value < 0.5
     assert degraded.p_value == pytest.approx(improved.p_value)
+    assert degraded.delta == pytest.approx(-improved.delta)
+    assert improved.ci_lower is not None
     assert degraded.ci_upper is not None
+    assert improved.ci_lower > 0.0
     assert degraded.ci_upper < 0.0
 
 
@@ -222,16 +236,15 @@ def test_benjamini_hochberg_excludes_undefined_tests_from_the_family() -> None:
     assert kept == pytest.approx(without_nan.adjusted_p_values)
 
 
-def test_benjamini_hochberg_ignores_the_direction_of_each_change() -> None:
+def test_benjamini_hochberg_selects_on_p_value_not_on_the_size_or_sign_of_the_delta() -> None:
     deltas = [-0.4, 0.01, 0.3, -0.2, 0.5]
     p_values = [0.001, 0.01, 0.3, 0.4, 0.5]
 
     result = adjust_benjamini_hochberg(p_values)
 
-    assert result.rejected == [True, True, False, False, False]
     rejected_deltas = [delta for delta, keep in zip(deltas, result.rejected, strict=True) if keep]
-    # The largest delta (0.5) survives on its weak p-value while a degradation is caught.
     assert rejected_deltas == [-0.4, 0.01]
+    assert max(deltas) not in rejected_deltas
 
 
 def test_benjamini_hochberg_never_lowers_a_p_value() -> None:
