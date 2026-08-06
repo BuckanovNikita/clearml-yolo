@@ -306,7 +306,7 @@ uv run cy-compare \
 ```bash
 uv run cy ... clearml.tags=[prod]                 # пометить сразу
 uv run cy ... report.baseline.task_id=<id>        # явная прод-модель
-uv run cy ... 'report.baseline.tags=[]'           # любая последняя завершённая
+uv run cy ... 'report.baseline.tags=[]'           # любая последняя, в обоих отчётах
 uv run cy ... skip_compare=true                   # без сравнения
 ```
 

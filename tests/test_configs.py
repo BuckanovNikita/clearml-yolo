@@ -175,13 +175,16 @@ def test_promoting_a_different_tag_moves_both_sides_of_the_baseline() -> None:
 
 
 @pytest.mark.parametrize("source", ["clearml", "local", "none"])
-def test_the_comparison_still_resolves_when_the_report_baseline_is_swapped(source: str) -> None:
-    """The two share a task identity but not a source: "local" means a folder of workbooks
-    to the report and a checkpoint to the comparison."""
-    stages = _pipeline_stages([f"report/baseline={source}"])
+def test_the_baseline_can_be_pinned_whichever_report_the_run_asks_for(source: str) -> None:
+    """Wanting a comparison against a named prod model but no dashboard report is an
+    ordinary ask, so the key that pins it must stay reachable when the report's own
+    baseline is switched off. The two share a task identity but not a source: "local"
+    means a folder of workbooks to the report and a checkpoint to the comparison."""
+    stages = _pipeline_stages([f"report/baseline={source}", "report.baseline.task_id=abc123"])
 
     baseline_model = stages["compare"]["baseline_model"]
     assert isinstance(baseline_model, ModelRef)
+    assert baseline_model.task_id == "abc123"
     assert baseline_model.source == "clearml"
 
 
