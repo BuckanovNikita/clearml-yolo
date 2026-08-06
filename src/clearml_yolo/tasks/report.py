@@ -87,22 +87,14 @@ def _baseline_from_clearml(
     return resolved
 
 
-def _baseline_from_local(config: BaselineConfig, splits: list[str]) -> dict[str, Path]:
-    if config.directory is None:
-        raise ValueError("report.baseline.source='local' requires baseline.directory")
-
-    resolved: dict[str, Path] = {}
-    for split in splits:
-        candidate = config.directory / f"{DASHBOARD_PREFIX}_{split}.xlsx"
-        if candidate.is_file():
-            resolved[split] = candidate
-        else:
-            logger.warning("No baseline workbook at {}", candidate)
-    return resolved
-
-
 def discover_dashboards(metrics_dir: str | Path, splits: list[str]) -> dict[str, Path]:
-    """Find the dashboard workbook digital-metrics wrote for each split."""
+    """Find the dashboard workbook digital-metrics wrote for each split.
+
+    Both sides of the report are found this way: the new model's workbooks in the metrics
+    stage's output directory, and a local baseline's in whatever directory it names. They
+    are the same files under the same naming convention, so looking them up twice is how
+    that convention would come to be spelled two ways.
+    """
     directory = Path(metrics_dir)
     found: dict[str, Path] = {}
     for split in splits:
@@ -164,8 +156,10 @@ def build_reports(
 
     if baseline.source == "clearml":
         baselines = _baseline_from_clearml(baseline, splits, clearml.project_name, destination)
+    elif baseline.directory is None:
+        raise ValueError("report.baseline.source='local' requires baseline.directory")
     else:
-        baselines = _baseline_from_local(baseline, splits)
+        baselines = discover_dashboards(baseline.directory, splits)
 
     if not baselines:
         logger.warning("No baseline dashboards resolved; nothing to compare against")
