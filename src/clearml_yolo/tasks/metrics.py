@@ -48,15 +48,6 @@ class MetricsResult(BaseModel):
     best_confidences: dict[str, dict[str, float]] = Field(default_factory=dict)
 
 
-def _split_scalar_title(split: str) -> str:
-    """One scalar card per split, rather than every split crowded onto one graph.
-
-    ClearML groups scalars by title, so a single "metrics" title with ``{split}/{metric}``
-    series puts three splits' worth of unrelated lines on one plot.
-    """
-    return f"{artifact_names.METRICS_SECTION}_{split}"
-
-
 def _evaluate_split(
     split: str,
     preds: pd.DataFrame,
@@ -119,7 +110,9 @@ def _evaluate_split(
     # The same per-class table again as a plot, so the splits of a run read as one
     # collapsible section instead of as unrelated files in the artifacts list.
     report_table(task, artifact_names.METRICS_SECTION, split, per_class)
-    report_scalars(task, _split_scalar_title(split), summary)
+    # ClearML groups scalars by title, so one "metrics" title with {split}/{metric} series
+    # crowds three splits of unrelated lines onto one graph; a title per split is a card each.
+    report_scalars(task, f"{artifact_names.METRICS_SECTION}_{split}", summary)
 
     if task is not None:
         task.upload_artifact(

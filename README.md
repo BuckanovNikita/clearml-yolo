@@ -47,10 +47,9 @@ uv run cy-ground-truth data_yaml=data.yaml output=ground_truth.csv
 uv run cy \
     clearml.project_name=detection \
     clearml.task_name=yolo11n-v3 \
+    ground_truth=ground_truth.csv \
     train.data=data.yaml \
-    train.epochs=300 \
-    predict.ground_truth=ground_truth.csv \
-    metrics.ground_truth=ground_truth.csv
+    train.epochs=300
 
 # только метрики по готовым предсказаниям
 uv run cy-metrics predictions=runs/predictions.csv ground_truth=ground_truth.csv
@@ -59,14 +58,55 @@ uv run cy-metrics predictions=runs/predictions.csv ground_truth=ground_truth.csv
 Обратите внимание: у отдельных приложений ключи задаются без префикса
 (`cy-train epochs=1`), а в конвейере — с префиксом этапа (`cy train.epochs=1`).
 
-## Именование эксперимента
+## Общие ключи конвейера
 
-`clearml.project_name` и `clearml.task_name` задаются один раз на верхнем уровне и
-попадают во все четыре этапа — конвейер создаёт один эксперимент, к которому
-подключаются все стадии. При самостоятельном запуске этап добавляет свой суффикс
-(`yolo11n-v3/metrics`).
+Значения, которые нужны нескольким этапам, задаются один раз на верхнем уровне, а этапы
+ссылаются на них интерполяцией. Дублировать их под разными именами не нужно — и, что
+важнее, нельзя изменить одному этапу и молча забыть про другой:
+
+| Ключ | Куда попадает |
+|---|---|
+| `clearml.project_name`, `clearml.task_name` | все этапы; `task_name` заодно становится `train.name`, то есть именем папки запуска |
+| `ground_truth` | `predict`, `metrics`, `compare` |
+| `splits` | `predict`, `metrics`, `report` |
+| `auto_gpu.*` | `train`, `predict`, `compare` |
+
+Так же связаны и цепочки «продюсер → потребитель»: `metrics.predictions` указывает на
+`predict.output`, `report.metrics_dir` — на `metrics.output_dir`, настройки инференса
+сравнения (`conf`, `iou`, `imgsz`, `batch`) — на соответствующие ключи `predict`, а
+`compare.iou_threshold`/`matching_strategy` — на `metrics.evaluation.*`, чтобы сравнение
+считалось на том же IoU, на котором калибровались пороги.
+
+Конвейер создаёт один эксперимент, к которому подключаются все стадии. При
+самостоятельном запуске этап добавляет свой суффикс (`yolo11n-v3/metrics`), и ключи там
+задаются без префикса: `cy-metrics ground_truth=...`.
+
+Кандидата сравнения в конвейере задать нельзя: он всегда собирается из чекпоинта, который
+этот запуск обучил, и порогов, которые откалибровал этап метрик. Группа
+`candidate_model` есть только у отдельного `cy-compare`.
 
 Отключить трекинг целиком: `clearml.enabled=false`.
+
+## Инференс
+
+`predict.batch` — это и размер батча, и главный рычаг по памяти: столько изображений
+одновременно декодируется и уходит в сеть. Уменьшайте его (или `imgsz`), чтобы влезть в
+карту поменьше.
+
+Изображения декодируются в отдельных потоках, на батч вперёд, потому что ultralytics
+делает это по одному прямо в основном потоке и карта простаивает. На 748 изображениях
+KITTI и дообученной yolo11 на RTX 5090 это 4.4 с → 2.4 с при полностью совпадающем
+результате.
+
+Половинной точности по умолчанию нет: на этой задаче сеть занимает меньше десятой доли
+времени (препроцессинг 1.31 мс/изобр., инференс 0.53 мс, постпроцессинг 0.93 мс,
+декодирование ~0.9 мс), поэтому `half=True` измеримо медленнее, а рамки при этом
+сдвигает — то есть сдвигает и все откалиброванные пороги. Для модели, которая
+действительно упирается в GPU, включается явно и требует перекалибровки:
+
+```bash
+uv run cy-predict 'predict_kwargs={half:true}'
+```
 
 ## Авто-выбор GPU
 
@@ -149,9 +189,29 @@ uv run cy-train auto_gpu.enabled=false device=[0,1] batch=32
 калибруются на `calibration_split=val`. Для самого `val` пороги подбираются по нему же,
 так как калибровать сплит по себе нельзя.
 
-В ClearML загружаются: `predictions`, а для каждого сплита — `dashboard_full_*`,
-`dashboard_dtrk_*`, `matches_gt_*`, `matches_preds_*`, `metrics_summary_*`,
-`metrics_raw_*`, `best_confidences_*`, плюс средние значения как скаляры.
+Имя каждого артефакта начинается с этапа, который его создал. Вкладка ARTIFACTS в
+ClearML своей группировки не имеет (там четыре фиксированных раздела, пользовательские
+артефакты попадают в OTHER и сортируются по алфавиту), так что префикс — единственное,
+что собирает артефакты одного запуска рядом:
+
+| Этап | Артефакты |
+|---|---|
+| `predict` | `predict_predictions` |
+| `metrics` | на каждый сплит: `metrics_dashboard_full_*`, `metrics_dashboard_dtrk_*`, `metrics_matches_gt_*`, `metrics_matches_preds_*`, `metrics_summary_*`, `metrics_raw_*`, `metrics_best_confidences_*` |
+| `report` | `report_dev_*`, `report_business_*` |
+| `compare` | `compare_workbook_*` |
+
+Настоящие сворачиваемые разделы есть на вкладках PLOTS и SCALARS. В PLOTS появляются
+разделы `metrics` (таблица метрик по классам, по одной серии на сплит), `report`
+(метрики прод-модели, с которой шло сравнение — на диске они лежат во временном файле и
+раньше в UI не попадали) и `comparison` / `comparison_degraded` /
+`comparison_methodology`. В SCALARS — по одной карточке на сплит (`metrics_test`,
+`metrics_val`, …) со средними значениями.
+
+Имена изменились в этом релизе без обратной совместимости: `report.baseline` и
+`cy-compare` читают артефакты **прошлых** задач, поэтому задача, созданная до
+обновления, своих дашбордов уже не найдёт. Папку `conf/`, выгруженную старым
+`cy-init-config`, нужно перегенерировать — в ней остался `artifact_prefix: dashboard_full`.
 
 ## Сравнение с предыдущей моделью
 
@@ -228,7 +288,7 @@ uv run cy-compare baseline_model=local candidate_model=local \
     'candidate_model.thresholds={car:0.35,truck:0.40}'
 ```
 
-На выходе — `comparison_{split}.xlsx` с тремя листами (сравнение по классам, исключённые
+На выходе — `compare_workbook_{split}.xlsx` с тремя листами (сравнение по классам, исключённые
 классы, методика) и таблицы в ClearML. Precision проверяется бутстрэпом по изображениям,
 recall — точным тестом Макнемара; все гипотезы сплита (две на класс) корректируются
 Benjamini-Hochberg разом. Строка «Итого» в семью не входит: это сводка тех же данных, и

@@ -195,13 +195,12 @@ def build_reports(
         result.business_reports[split] = business_path
         logger.info("Split {!r}: {} and {}", split, dev_path.name, business_path.name)
 
-        # The baseline is the one side of the comparison that never reaches ClearML: it
-        # lands in a throwaway workbook here and is discarded, so "which numbers was this
-        # compared against?" cannot be answered from the UI. Publishing it as a table puts
-        # every split of the report into one collapsible section.
-        report_table(task, artifact_names.REPORT_SECTION, split, baseline_reader.read())
-
         if task is not None:
+            # The baseline is the one side of the comparison that never reaches ClearML: it
+            # lands in a throwaway workbook here and is discarded, so "which numbers was
+            # this compared against?" cannot be answered from the UI. Publishing it as a
+            # table puts every split of the report into one collapsible section.
+            report_table(task, artifact_names.REPORT_SECTION, split, baseline_reader.read())
             task.upload_artifact(
                 name=artifact_names.per_split(artifact_names.REPORT_DEV_PREFIX, split),
                 artifact_object=dev_path,
