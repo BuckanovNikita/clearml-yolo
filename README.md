@@ -347,5 +347,17 @@ uv run cy-train --config-dir ./conf --config-name cy-train
 ```bash
 uv run pytest
 uv run ruff check .
-uv run mypy src/
+uv run mypy .
+uv run lint-imports
 ```
+
+`uv run pre-commit install` ставит хук, который выполняет ровно эти четыре команды —
+через `uv run`, из той же заблокированной группы `dev`, так что версия линтера в хуке и
+в терминале не расходятся.
+
+`lint-imports` проверяет контракты импорта из `pyproject.toml`. Пакет уложен слоями —
+`apps` → `config_tree` → `configs` → `tasks` → `comparison` → предметные модули, — и
+слой ниже не имеет права знать о слое выше. Отдельные контракты держат SDK по местам:
+`clearml` виден только адаптерам `clearml_*` и задачам, hydra не доходит до предметных
+модулей, а `ultralytics` и `torch` грузятся лишь там, где действительно нужны веса.
+`configs` стоит выше `tasks`, а не ниже: он собирает конфиги из сигнатур самих задач.

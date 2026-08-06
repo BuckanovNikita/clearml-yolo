@@ -287,7 +287,7 @@ def _warn_if_process_view_is_blind(gpus: list[GpuInfo]) -> None:
     game — which no process inside this Linux has a handle on. That is unknowable from
     here, so the VRAM thresholds are what stands between the run and a shared card.
     """
-    global _warned_about_blind_process_view
+    global _warned_about_blind_process_view  # noqa: PLW0603  warn once per process
     if _warned_about_blind_process_view:
         return
     blind = [

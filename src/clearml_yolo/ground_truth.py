@@ -29,6 +29,7 @@ GROUND_TRUTH_COLUMNS = [
     "split",
 ]
 SPLITS = ("train", "val", "test")
+DETECTION_LABEL_FIELDS = 5
 
 GroundTruthRow = dict[str, str | float]
 YoloBox = tuple[str, float, float, float, float]
@@ -78,10 +79,10 @@ def _parse_label_file(label_path: Path, names: dict[int, str]) -> list[YoloBox]:
         fields = line.split()
         if not fields:
             continue
-        if len(fields) != 5:
+        if len(fields) != DETECTION_LABEL_FIELDS:
             raise ValueError(
-                f"{label_path}:{number} has {len(fields)} fields, expected 5 "
-                "(class cx cy w h); segment labels are not supported"
+                f"{label_path}:{number} has {len(fields)} fields, expected "
+                f"{DETECTION_LABEL_FIELDS} (class cx cy w h); segment labels are not supported"
             )
         try:
             class_index = int(fields[0])

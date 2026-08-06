@@ -41,7 +41,7 @@ def test_dumped_files_explain_how_to_use_them(tmp_path: Path) -> None:
     assert "--config-dir" in (tmp_path / "cy-train.yaml").read_text(encoding="utf-8")
 
 
-@pytest.mark.parametrize("config_name,command", sorted(COMMAND_OF_CONFIG.items()))
+@pytest.mark.parametrize(("config_name", "command"), sorted(COMMAND_OF_CONFIG.items()))
 def test_folder_composes_back_to_the_built_in_defaults(
     tmp_path: Path, config_name: str, command: str
 ) -> None:

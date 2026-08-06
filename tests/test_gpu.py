@@ -42,7 +42,7 @@ class FakeProcess:
 
     def __init__(self, pid: int, used_gb: float = 1.0) -> None:
         self.pid = pid
-        self.usedGpuMemory = int(used_gb * GIB)  # noqa: N815  NVML's own spelling
+        self.usedGpuMemory = int(used_gb * GIB)  # NVML's own spelling
 
 
 class FakeHandle:
@@ -132,7 +132,8 @@ def test_probe_maps_by_uuid_not_index(patch_modules: Any) -> None:
 
     survey = probe_gpus()
 
-    assert survey.cuda_available and survey.nvml_available
+    assert survey.cuda_available
+    assert survey.nvml_available
     assert [gpu.uuid for gpu in survey.gpus] == ["ccc", "ddd"]
     assert [gpu.torch_index for gpu in survey.gpus] == [0, 1]
     assert survey.gpus[0].total_vram_gb == pytest.approx(40.0)

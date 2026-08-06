@@ -1,0 +1,48 @@
+# Every check runs the project's own tools through `uv run`, so a hook and the command
+# you type by hand are the same command against the same locked versions. Nothing here
+# pins a second copy of ruff or mypy that could drift from the `dev` dependency group.
+default_install_hook_types: [pre-commit]
+fail_fast: false
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+        args: [--maxkb=512]
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
+  - repo: local
+    hooks:
+      - id: ruff
+        name: uv run ruff check .
+        entry: uv run ruff check .
+        language: system
+        types_or: [python, pyi, toml]
+        pass_filenames: false
+
+      - id: mypy
+        name: uv run mypy .
+        entry: uv run mypy .
+        language: system
+        types_or: [python, pyi, toml]
+        pass_filenames: false
+        require_serial: true
+
+      - id: lint-imports
+        name: uv run lint-imports
+        entry: uv run lint-imports
+        language: system
+        types_or: [python, toml]
+        pass_filenames: false
+
+      - id: pytest
+        name: uv run pytest
+        entry: uv run pytest
+        language: system
+        types_or: [python, toml]
+        pass_filenames: false

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pickle
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -24,6 +25,16 @@ STAGES = ["train", "predict", "metrics", "report", "compare"]
 @pytest.fixture(scope="module", autouse=True)
 def hydra_store() -> None:
     store.add_to_hydra_store(overwrite_ok=True)
+
+
+def _recording_prediction(seen: dict[str, object]) -> Callable[..., Path]:
+    """Stand in for the predict task, keeping the keyword arguments it was called with."""
+
+    def run_prediction(**kwargs: object) -> Path:
+        seen.update(kwargs)
+        return Path("out.csv")
+
+    return run_prediction
 
 
 def _stage_config(stage: str) -> dict:  # type: ignore[type-arg]
@@ -67,9 +78,7 @@ def test_training_names_its_first_device_for_inference() -> None:
 def test_inference_reuses_the_card_training_just_used(monkeypatch: pytest.MonkeyPatch) -> None:
     """Re-surveying here would wait for a device this very process still holds."""
     seen: dict[str, object] = {}
-    monkeypatch.setattr(
-        pipeline_module, "run_prediction", lambda **kwargs: seen.update(kwargs) or Path("out.csv")
-    )
+    monkeypatch.setattr(pipeline_module, "run_prediction", _recording_prediction(seen))
 
     run_predict_stage(_stage_config("predict"), "best.pt", ClearMLConfig(enabled=False), "1")
 
@@ -135,9 +144,7 @@ def test_a_first_run_with_nothing_to_compare_against_skips(monkeypatch: pytest.M
 
 def test_an_explicit_device_still_wins_over_training(monkeypatch: pytest.MonkeyPatch) -> None:
     seen: dict[str, object] = {}
-    monkeypatch.setattr(
-        pipeline_module, "run_prediction", lambda **kwargs: seen.update(kwargs) or Path("out.csv")
-    )
+    monkeypatch.setattr(pipeline_module, "run_prediction", _recording_prediction(seen))
     config = _stage_config("predict") | {"device": "0"}
 
     run_predict_stage(config, "best.pt", ClearMLConfig(enabled=False), "1")

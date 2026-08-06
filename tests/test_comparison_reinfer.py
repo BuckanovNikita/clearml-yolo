@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 import pandas as pd
 import pytest
@@ -51,6 +51,7 @@ class RecordingPredictor:
 class NumericNamePredictor(RecordingPredictor):
     """Emits COCO-style numeric stems, which a naive CSV reload turns into integers."""
 
+    @override
     def __call__(self, weights: Any, image_paths: list[str], **kwargs: Any) -> pd.DataFrame:
         frame = super().__call__(weights, image_paths, **kwargs)
         return frame.assign(image_name=["000000000009", "000000000025"][: len(frame)])

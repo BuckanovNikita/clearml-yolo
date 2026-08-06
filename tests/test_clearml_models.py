@@ -69,14 +69,22 @@ def patch_clearml(monkeypatch: pytest.MonkeyPatch) -> Any:
     return _patch
 
 
+def _recording_clearml_module(asked: dict[str, Any]) -> types.ModuleType:
+    """A stand-in ``clearml`` whose ``Task.get_tasks`` records the query it was handed."""
+
+    def get_tasks(**kwargs: Any) -> list[FakeTask]:
+        asked.update(kwargs)
+        return [FakeTask()]
+
+    module = types.ModuleType("clearml")
+    module.Task = types.SimpleNamespace(get_tasks=get_tasks)  # type: ignore[attr-defined]
+    return module
+
+
 def test_the_baseline_lookup_asks_clearml_for_the_tag(monkeypatch: pytest.MonkeyPatch) -> None:
     """The default baseline is the promoted model, not merely the last run to finish."""
     asked: dict[str, Any] = {}
-    module = types.ModuleType("clearml")
-    module.Task = types.SimpleNamespace(  # type: ignore[attr-defined]
-        get_tasks=lambda **kwargs: asked.update(kwargs) or [FakeTask()]
-    )
-    monkeypatch.setitem(sys.modules, "clearml", module)
+    monkeypatch.setitem(sys.modules, "clearml", _recording_clearml_module(asked))
 
     assert latest_completed_task_id("detection", tags=["prod"]) == TASK_ID
     assert asked["tags"] == ["prod"]
@@ -86,11 +94,7 @@ def test_the_baseline_lookup_asks_clearml_for_the_tag(monkeypatch: pytest.Monkey
 def test_a_task_name_matches_the_whole_name(monkeypatch: pytest.MonkeyPatch) -> None:
     """Unanchored, 'yolo-v1' also matches 'yolo-v10', and the newest match would win."""
     asked: dict[str, Any] = {}
-    module = types.ModuleType("clearml")
-    module.Task = types.SimpleNamespace(  # type: ignore[attr-defined]
-        get_tasks=lambda **kwargs: asked.update(kwargs) or [FakeTask()]
-    )
-    monkeypatch.setitem(sys.modules, "clearml", module)
+    monkeypatch.setitem(sys.modules, "clearml", _recording_clearml_module(asked))
 
     latest_completed_task_id("detection", task_name="yolo-v1")
     assert asked["task_name"] == "^yolo-v1$"
