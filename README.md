@@ -71,11 +71,23 @@ uv run cy-metrics predictions=runs/predictions.csv ground_truth=ground_truth.csv
 | `splits` | `predict`, `metrics`, `report` |
 | `auto_gpu.*` | `train`, `predict`, `compare` |
 
-Так же связаны и цепочки «продюсер → потребитель»: `metrics.predictions` указывает на
-`predict.output`, `report.metrics_dir` — на `metrics.output_dir`, настройки инференса
-сравнения (`conf`, `iou`, `imgsz`, `batch`) — на соответствующие ключи `predict`, а
-`compare.iou_threshold`/`matching_strategy` — на `metrics.evaluation.*`, чтобы сравнение
-считалось на том же IoU, на котором калибровались пороги.
+Так же связаны и цепочки «продюсер → потребитель»: `predict.weights` указывает на
+чекпоинт, который соберут `train.project`/`train.name`, `metrics.predictions` — на
+`predict.output`, `report.metrics_dir` — на `metrics.output_dir`, `predict.imgsz` — на
+`train.imgsz` (модель инференсится в том разрешении, в котором обучалась), настройки
+инференса сравнения (`conf`, `iou`, `imgsz`, `batch`) — на соответствующие ключи
+`predict`, а `compare.iou_threshold`/`matching_strategy` — на `metrics.evaluation.*`,
+чтобы сравнение считалось на том же IoU, на котором калибровались пороги.
+
+Прод-модель в конвейере тоже называется один раз — ключами `report.baseline.*`
+(`task_id`, `project_name`, `task_name`, `tags`): `compare.baseline_model` ссылается на
+них. Иначе отчёт и сравнение ищут прод-модель в проекте независимо и могут найти разные
+запуски — отчёт против одной модели рядом со сравнением против другой. Не общий у них
+только `source`: для отчёта `local` — это папка с дашбордами, для сравнения — чекпоинт.
+
+Единственное, чего интерполяция выразить не может, — что этап, выбирающий *один* сплит из
+общего списка (`metrics.calibration_split`, `compare.split`), должен выбрать тот, который
+в этом списке есть. Это проверяется до обучения, а не после него.
 
 Конвейер создаёт один эксперимент, к которому подключаются все стадии. При
 самостоятельном запуске этап добавляет свой суффикс (`yolo11n-v3/metrics`), и ключи там
@@ -292,14 +304,16 @@ uv run cy-compare \
 эксперимент. Модель повышается тегом при запуске или уже после него:
 
 ```bash
-uv run cy ... clearml.tags=[prod]                   # пометить сразу
-uv run cy ... compare.baseline_model.task_id=<id>   # явная прод-модель
-uv run cy ... 'compare.baseline_model.tags=[]'      # любая последняя завершённая
-uv run cy ... skip_compare=true                     # без сравнения
+uv run cy ... clearml.tags=[prod]                 # пометить сразу
+uv run cy ... report.baseline.task_id=<id>        # явная прод-модель
+uv run cy ... 'report.baseline.tags=[]'           # любая последняя завершённая
+uv run cy ... skip_compare=true                   # без сравнения
 ```
 
-Тот же тег читает и `cy-report` (`report.baseline.tags`) — «прод модель» в обоих отчётах
-означает одно и то же.
+Ключ один на оба отчёта: `compare.baseline_model` ссылается на `report.baseline`, так что
+«прод модель» в отчёте и в сравнении — гарантированно одна и та же задача, а не два
+одинаково настроенных поиска. У отдельного `cy-compare` группа своя —
+`baseline_model.task_id=<id>`.
 
 Если сравнивать не с чем — первый запуск в пустом проекте или пропущенный этап метрик, —
 этап пишет предупреждение и пропускается: отчётность не должна ронять запуск, который уже
