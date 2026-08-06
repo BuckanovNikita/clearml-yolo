@@ -30,7 +30,6 @@ from clearml_yolo.comparison.reinfer import VocabularyReport, reinfer_split
 from clearml_yolo.comparison.scoring import score_split
 from clearml_yolo.comparison.workbook import write_comparison_workbook
 from clearml_yolo.gpu import AutoGpuConfig, resolve_inference_device
-from clearml_yolo.inference import uses_half_precision
 
 ModelSource = Literal["clearml", "local"]
 
@@ -138,17 +137,14 @@ def _prediction_cache(
     detections under another's name, which is precisely the substitution this whole
     comparison exists to remove. Size and modification time are part of the key so a
     retrained ``best.pt`` at an unchanged path is not mistaken for the old one, and the
-    inference settings are part of it so predictions taken at one confidence, resolution or
-    numeric precision are never compared against predictions taken at another.
+    inference settings are part of it so predictions taken at one confidence or resolution
+    are never compared against predictions taken at another.
     """
     identity = str(weights.resolve())
     if weights.is_file():
         stat = weights.stat()
         identity = f"{identity}:{stat.st_size}:{stat.st_mtime_ns}"
-    identity = (
-        f"{identity}:conf={inference.conf}:iou={inference.iou}:imgsz={inference.imgsz}"
-        f":half={uses_half_precision(inference.device)}"
-    )
+    identity = f"{identity}:conf={inference.conf}:iou={inference.iou}:imgsz={inference.imgsz}"
     digest = hashlib.sha256(identity.encode()).hexdigest()[:12]
     return destination / f"{role}_predictions_{split}_{digest}.csv"
 
