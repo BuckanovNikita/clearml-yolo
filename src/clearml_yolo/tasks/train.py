@@ -68,19 +68,31 @@ def train(
     )
 
     yolo = YOLO(model)
-    yolo.train(
-        data=data,
-        epochs=epochs,
-        imgsz=imgsz,
-        batch=selection.batch,
-        device=selection.devices,
+    on_gpu = isinstance(selection.devices, list) and bool(selection.devices)
+    settings: dict[str, Any] = {
+        "data": data,
+        "epochs": epochs,
+        "imgsz": imgsz,
+        "batch": selection.batch,
+        "device": selection.devices,
+        # Training's half precision is AMP, not the `quantize` flag inference takes: that
+        # one casts the weights outright, which training cannot do. Ultralytics already
+        # defaults amp=True, but a run's numeric precision is not something to leave to a
+        # dependency's default.
+        "amp": on_gpu,
+        # Unlike inference, training runs long enough to earn the one-off compilation back
+        # many times over — it is paid once and amortised across every epoch.
+        "compile": on_gpu,
         # Relative projects are resolved against ultralytics' configured runs_dir, which
         # is rarely the working directory, so anchor it here instead.
-        project=str(Path(project).resolve()),
-        name=name,
-        exist_ok=True,
+        "project": str(Path(project).resolve()),
+        "name": name,
+        "exist_ok": True,
+        # Last, so a run reproducing older numbers can turn either of the two above back
+        # off — as keyword arguments they would collide instead.
         **(train_kwargs or {}),
-    )
+    }
+    yolo.train(**settings)
 
     # Read the run directory from the trainer rather than rebuilding it: ultralytics
     # may deduplicate the name, and only it knows where the checkpoint actually went.

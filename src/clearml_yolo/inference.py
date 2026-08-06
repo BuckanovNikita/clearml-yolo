@@ -117,6 +117,20 @@ def _detection_rows(path: str, boxes: Any, names: dict[int, str], mode: ImageNam
     ]
 
 
+def _precision(accelerated: bool, model_kwargs: dict[str, Any]) -> dict[str, Any]:
+    """Ask for FP16 on a card, unless the caller already said something about precision.
+
+    Ultralytics 8.4 deprecated ``half`` in favour of ``quantize`` (16 for FP16, 32 for
+    FP32) and forwards the old name onto the new one — but only when ``quantize`` is
+    absent. So passing ``quantize`` here unconditionally would make a caller's
+    ``half=False`` silently do nothing, which is the sort of override that looks like it
+    worked. Naming either one hands the whole decision back.
+    """
+    if {"half", "quantize"} & model_kwargs.keys():
+        return {}
+    return {"quantize": 16 if accelerated else 32}
+
+
 def _read_image(path: str) -> npt.NDArray[Any]:
     """Decode one image the way ultralytics does for a directory source and for training.
 
@@ -187,9 +201,9 @@ def predict_on_images(
     come back, so thresholds calibrated without them do not carry over — recalibrate rather
     than mixing. See the module docstring for what each measured on a small model.
 
-    ``model_kwargs`` reach ``model.predict`` untouched, so ``half=False`` and
-    ``compile=False`` are how to turn either back off for a run that has to reproduce
-    numbers taken before these defaults.
+    ``model_kwargs`` reach ``model.predict`` untouched, so ``quantize=32`` (or the
+    deprecated ``half=False``) and ``compile=False`` turn either back off for a run that has
+    to reproduce numbers taken before these defaults.
     """
     if batch < 1:
         raise ValueError(f"batch must be >= 1, got {batch}")
@@ -205,8 +219,8 @@ def predict_on_images(
         "iou": iou,
         "imgsz": imgsz,
         "device": device,
-        "half": accelerated,
         "compile": accelerated,
+        **_precision(accelerated, model_kwargs),
         **model_kwargs,
     }
     logger.info(

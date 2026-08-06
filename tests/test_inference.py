@@ -173,13 +173,29 @@ def test_inference_settings_reach_ultralytics() -> None:
 
 
 def test_half_precision_follows_the_device() -> None:
-    """FP16 by default on a card, and never where it is unsupported."""
+    """FP16 by default on a card, and never where it is unsupported.
+
+    Spelled `quantize`, not `half`: ultralytics 8.4 deprecated the latter.
+    """
     DETECTIONS[0] = _boxes(([1, 2, 3, 4], 0.9, 0))
     predict_on_images("best.pt", ["a.png"], device="0")
-    assert FakeYolo.last.calls[0]["half"] is True  # type: ignore[union-attr]
+    assert FakeYolo.last.calls[0]["quantize"] == 16  # type: ignore[union-attr]
 
     predict_on_images("best.pt", ["a.png"], device="cpu")
-    assert FakeYolo.last.calls[0]["half"] is False  # type: ignore[union-attr]
+    assert FakeYolo.last.calls[0]["quantize"] == 32  # type: ignore[union-attr]
+
+
+@pytest.mark.parametrize("named", [{"half": False}, {"quantize": 32}])
+def test_naming_either_precision_flag_hands_the_decision_over(named: dict[str, Any]) -> None:
+    """Ultralytics forwards a deprecated `half` onto `quantize` only when `quantize` is
+    absent, so injecting ours unconditionally would make `half=False` silently do nothing."""
+    DETECTIONS[0] = _boxes(([1, 2, 3, 4], 0.9, 0))
+
+    predict_on_images("best.pt", ["a.png"], device="0", **named)
+
+    call = FakeYolo.last.calls[0]  # type: ignore[union-attr]
+    assert call.get("quantize") != 16
+    assert {key: call[key] for key in named} == named
 
 
 def test_torch_compile_follows_the_device() -> None:
@@ -192,15 +208,13 @@ def test_torch_compile_follows_the_device() -> None:
     assert FakeYolo.last.calls[0]["compile"] is False  # type: ignore[union-attr]
 
 
-@pytest.mark.parametrize("setting", ["half", "compile"])
-def test_either_gpu_default_can_be_forced_back_off(setting: str) -> None:
-    """Both change which boxes come back, so a run reproducing older numbers must opt out."""
+def test_compilation_can_be_forced_back_off() -> None:
+    """It changes which boxes come back, so a run reproducing older numbers must opt out."""
     DETECTIONS[0] = _boxes(([1, 2, 3, 4], 0.9, 0))
-    overrides: dict[str, Any] = {setting: False}
 
-    predict_on_images("best.pt", ["a.png"], device="0", **overrides)
+    predict_on_images("best.pt", ["a.png"], device="0", compile=False)
 
-    assert FakeYolo.last.calls[0][setting] is False  # type: ignore[union-attr]
+    assert FakeYolo.last.calls[0]["compile"] is False  # type: ignore[union-attr]
 
 
 @pytest.mark.parametrize(
