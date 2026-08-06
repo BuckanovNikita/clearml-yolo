@@ -23,12 +23,38 @@ from clearml_yolo.tasks.compare import InferenceConfig, ModelRef
 from clearml_yolo.tasks.metrics import EvaluationConfig
 from clearml_yolo.tasks.report import BaselineConfig
 
+IMAGE_SIZE = 640
+TRAIN_PROJECT = "runs/detect"
+RUN_NAME = "train"
+PREDICTIONS_CSV = "runs/predictions.csv"
+METRICS_DIR = "runs/metrics"
+# Ultralytics decides where a run's checkpoint lands, so its layout is named once here:
+# the standalone predict app has to find that file without a training stage in the run,
+# and inside the pipeline the same template follows whatever project/name the run used.
+CHECKPOINT = "{project}/{name}/weights/best.pt"
+DEFAULT_CHECKPOINT = CHECKPOINT.format(project=TRAIN_PROJECT, name=RUN_NAME)
+
 AutoGpuConf = builds(AutoGpuConfig, populate_full_signature=True)
 ClearMLConf = builds(ClearMLConfig, populate_full_signature=True)
 EvaluationConf = builds(EvaluationConfig, populate_full_signature=True)
 InferenceConf = builds(InferenceConfig, populate_full_signature=True)
 
 BaselineModelConf = builds(ModelRef, source="clearml", populate_full_signature=True)
+# Inside the pipeline the two stages that look a baseline up must land on the same task:
+# the report reads its stored dashboards while the comparison re-infers its checkpoint,
+# and two independent searches of one project can answer with two different runs — a
+# report against last month's model next to a comparison against last week's. `source` is
+# deliberately not shared: "local" means a folder of workbooks to the report and a
+# checkpoint path to the comparison.
+PipelineBaselineModelConf = builds(
+    ModelRef,
+    source="clearml",
+    task_id="${report.baseline.task_id}",
+    project_name="${report.baseline.project_name}",
+    task_name="${report.baseline.task_name}",
+    tags="${report.baseline.tags}",
+    populate_full_signature=True,
+)
 # The candidate is the model under test, which by definition has not been promoted yet,
 # so it must not inherit the baseline's prod tag — both sides would resolve to the same
 # task and the comparison would report a model as identical to itself.
@@ -92,10 +118,13 @@ class SharedKeys:
     # Standalone inference has no downstream split list to honour, so it scores every image
     # in the ground truth; inside the pipeline it scores exactly what metrics will read.
     predict_splits: Any = None
-    run_name: Any = "train"
-    weights: Any = "runs/detect/train/weights/best.pt"
-    predictions: Any = "runs/predictions.csv"
-    metrics_dir: Any = "runs/metrics"
+    run_name: Any = RUN_NAME
+    weights: Any = DEFAULT_CHECKPOINT
+    predictions: Any = PREDICTIONS_CSV
+    metrics_dir: Any = METRICS_DIR
+    # Inference belongs at the resolution the weights were trained at, so the pipeline
+    # takes it from the training stage rather than asking for the number a second time.
+    imgsz: Any = IMAGE_SIZE
     inference: Any = InferenceConf
     iou_threshold: Any = 0.5
     matching_strategy: Any = "iou_prior"
@@ -112,9 +141,10 @@ PIPELINE = SharedKeys(
     splits="${splits}",
     predict_splits="${splits}",
     run_name="${clearml.task_name}",
-    weights="${train.project}/${train.name}/weights/best.pt",
+    weights=CHECKPOINT.format(project="${train.project}", name="${train.name}"),
     predictions="${predict.output}",
     metrics_dir="${metrics.output_dir}",
+    imgsz="${train.imgsz}",
     inference=PipelineInferenceConf,
     iou_threshold="${metrics.evaluation.iou_threshold}",
     matching_strategy="${metrics.evaluation.matching_strategy}",
@@ -127,9 +157,9 @@ def train_config(shared: SharedKeys) -> Any:
         model="yolo11n.pt",
         data="coco8.yaml",
         epochs=100,
-        imgsz=640,
+        imgsz=IMAGE_SIZE,
         batch=16,
-        project="runs/detect",
+        project=TRAIN_PROJECT,
         name=shared.run_name,
         device=None,
         auto_gpu=shared.auto_gpu,
@@ -142,11 +172,11 @@ def predict_config(shared: SharedKeys) -> Any:
     return make_config(
         weights=shared.weights,
         ground_truth=shared.ground_truth,
-        output="runs/predictions.csv",
+        output=PREDICTIONS_CSV,
         auto_gpu=shared.auto_gpu,
         conf=0.001,
         iou=0.7,
-        imgsz=640,
+        imgsz=shared.imgsz,
         batch=16,
         device=None,
         splits=shared.predict_splits,
@@ -160,7 +190,7 @@ def metrics_config(shared: SharedKeys) -> Any:
     return make_config(
         predictions=shared.predictions,
         ground_truth=shared.ground_truth,
-        output_dir="runs/metrics",
+        output_dir=METRICS_DIR,
         splits=shared.splits,
         calibration_split="val",
         evaluation=EvaluationConf,
@@ -269,7 +299,7 @@ def register_configs() -> None:
     for group, model_conf in (
         ("baseline_model", BaselineModelConf),
         ("candidate_model", CandidateModelConf),
-        ("compare/baseline_model", BaselineModelConf),
+        ("compare/baseline_model", PipelineBaselineModelConf),
     ):
         model_store = store(group=group)
         model_store(model_conf, name="clearml")

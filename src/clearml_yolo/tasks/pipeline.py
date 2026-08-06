@@ -15,12 +15,16 @@ from clearml_yolo.tasks.compare import compare as run_comparison
 from clearml_yolo.tasks.metrics import compute_metrics
 from clearml_yolo.tasks.predict import predict as run_prediction
 from clearml_yolo.tasks.report import build_reports, discover_dashboards
-from clearml_yolo.tasks.train import TrainResult
 from clearml_yolo.tasks.train import train as run_training
 
 
 def _as_dict(config: Any) -> dict[str, Any]:
-    """Resolve a stage sub-config, leaving no OmegaConf containers behind.
+    """Resolve a stage sub-config into the keyword arguments its task takes.
+
+    Every key is a parameter of that task and every parameter is a key, so each stage is
+    called by forwarding the whole block rather than by naming its settings a second time
+    here — a list that used to drift, leaving a configured value quietly unread.
+    ``test_every_stage_config_key_is_a_parameter_of_its_task`` holds the two in step.
 
     Nested containers must become plain dicts and lists: ultralytics stores whatever
     it receives into trainer.args and pickles that when saving a checkpoint, and a
@@ -32,6 +36,24 @@ def _as_dict(config: Any) -> dict[str, Any]:
         key: OmegaConf.to_object(value) if OmegaConf.is_config(value) else value
         for key, value in values.items()
     }
+
+
+def _check_split_choices(splits: list[str], choices: dict[str, str | None]) -> None:
+    """Reject a stage that singles out a split the run never scores.
+
+    Interpolation keeps the split *list* identical everywhere, but it cannot express that
+    the stages picking one split out of that list have to pick one that is in it. Checked
+    before training rather than at the stage itself, so an hour of it is not spent to
+    arrive at a comparison that has no thresholds to score against.
+    """
+    unavailable = {
+        key: value for key, value in choices.items() if value is not None and value not in splits
+    }
+    if unavailable:
+        raise ValueError(
+            f"{unavailable} name split(s) this run never scores, because splits={splits}. "
+            "Add them to splits, or point those stages at a split that is in it."
+        )
 
 
 def run_pipeline(
@@ -57,6 +79,15 @@ def run_pipeline(
     predict_cfg = _as_dict(predict)
     metrics_cfg = _as_dict(metrics)
     report_cfg = _as_dict(report)
+    compare_cfg = _as_dict(compare)
+
+    _check_split_choices(
+        list(metrics_cfg["splits"]),
+        {
+            "metrics.calibration_split": None if skip_metrics else metrics_cfg["calibration_split"],
+            "compare.split": None if skip_compare else compare_cfg["split"],
+        },
+    )
 
     weights = predict_cfg["weights"]
     # Inference after training must reuse training's own card rather than survey again:
@@ -66,7 +97,7 @@ def run_pipeline(
     if skip_train:
         logger.info("Skipping training; using weights {}", weights)
     else:
-        trained = run_train_stage(train_cfg, clearml)
+        trained = run_training(**{**train_cfg, "clearml": clearml})
         weights = trained.weights
         trained_device = trained.inference_device
         results["weights"] = trained.weights
@@ -82,7 +113,7 @@ def run_pipeline(
         logger.info("Skipping metrics; reading dashboards from {}", report_cfg["metrics_dir"])
         dashboards = discover_dashboards(report_cfg["metrics_dir"], list(report_cfg["splits"]))
     else:
-        metrics_result = run_metrics_stage(metrics_cfg, clearml)
+        metrics_result = compute_metrics(**{**metrics_cfg, "clearml": clearml})
         dashboards = metrics_result.dashboards
         thresholds = metrics_result.best_confidences
         results["dashboards"] = dashboards
@@ -95,33 +126,17 @@ def run_pipeline(
             report_cfg["output_dir"],
             clearml,
             report_cfg["baseline"],
-            report_cfg.get("report_config_path"),
+            report_cfg["report_config_path"],
         )
 
     if skip_compare:
         logger.info("Skipping comparison stage")
     else:
-        comparison = run_compare_stage(_as_dict(compare), weights, thresholds, clearml)
+        comparison = run_compare_stage(compare_cfg, weights, thresholds, clearml, trained_device)
         if comparison is not None:
             results["comparison"] = comparison
 
     return results
-
-
-def run_train_stage(config: dict[str, Any], clearml: ClearMLConfig) -> TrainResult:
-    return run_training(
-        model=config["model"],
-        data=config["data"],
-        epochs=config["epochs"],
-        imgsz=config["imgsz"],
-        batch=config["batch"],
-        project=config["project"],
-        name=config["name"],
-        auto_gpu=config["auto_gpu"],
-        clearml=clearml,
-        device=config["device"],
-        train_kwargs=config["train_kwargs"],
-    )
 
 
 def run_predict_stage(
@@ -130,20 +145,14 @@ def run_predict_stage(
     clearml: ClearMLConfig,
     trained_device: str | None = None,
 ) -> Path:
+    """Infer with the checkpoint this run produced, on the card that produced it."""
     return run_prediction(
-        weights=weights,
-        ground_truth=config["ground_truth"],
-        output=config["output"],
-        clearml=clearml,
-        auto_gpu=config["auto_gpu"],
-        conf=config["conf"],
-        iou=config["iou"],
-        imgsz=config["imgsz"],
-        batch=config["batch"],
-        device=config["device"] or trained_device,
-        splits=config["splits"],
-        image_name=config["image_name"],
-        predict_kwargs=config["predict_kwargs"],
+        **{
+            **config,
+            "clearml": clearml,
+            "weights": weights,
+            "device": config["device"] or trained_device,
+        }
     )
 
 
@@ -152,6 +161,7 @@ def run_compare_stage(
     weights: str | Path,
     thresholds: dict[str, dict[str, float]],
     clearml: ClearMLConfig,
+    trained_device: str | None = None,
 ) -> CompareResult | None:
     """Compare the model this run just trained against the previous one.
 
@@ -174,34 +184,20 @@ def run_compare_stage(
         return None
 
     candidate = ModelRef(source="local", weights=Path(weights), thresholds=thresholds[split])
+    # Both models still go on one card — the comparison sets that itself — but after
+    # training it is this run's own card, for the reason the predict stage documents.
+    inference = config["inference"]
+    if inference.device is None and trained_device is not None:
+        inference = inference.model_copy(update={"device": trained_device})
     try:
         return run_comparison(
-            baseline_model=config["baseline_model"],
-            candidate_model=candidate,
-            ground_truth=config["ground_truth"],
-            output_dir=config["output_dir"],
-            clearml=clearml,
-            inference=config["inference"],
-            auto_gpu=config["auto_gpu"],
-            split=split,
-            iou_threshold=config["iou_threshold"],
-            matching_strategy=config["matching_strategy"],
-            q=config["q"],
-            bootstrap_iterations=config["bootstrap_iterations"],
-            seed=config["seed"],
+            **{
+                **config,
+                "clearml": clearml,
+                "candidate_model": candidate,
+                "inference": inference,
+            }
         )
     except NoBaselineModelError as error:
         logger.warning("Nothing to compare against: {}", error)
         return None
-
-
-def run_metrics_stage(config: dict[str, Any], clearml: ClearMLConfig) -> Any:
-    return compute_metrics(
-        predictions=config["predictions"],
-        ground_truth=config["ground_truth"],
-        output_dir=config["output_dir"],
-        clearml=clearml,
-        evaluation=config["evaluation"],
-        splits=list(config["splits"]),
-        calibration_split=config["calibration_split"],
-    )

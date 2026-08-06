@@ -8,15 +8,20 @@ from pathlib import Path
 
 import pytest
 from hydra import compose, initialize_config_module
-from hydra_zen import store
+from hydra_zen import store, zen
 from omegaconf import OmegaConf
 
 import clearml_yolo.configs  # noqa: F401  registers every config
 from clearml_yolo.clearml_session import ClearMLConfig
 from clearml_yolo.gpu import DeviceSelection
 from clearml_yolo.tasks import pipeline as pipeline_module
-from clearml_yolo.tasks.compare import ModelRef, NoBaselineModelError
-from clearml_yolo.tasks.pipeline import _as_dict, run_compare_stage, run_predict_stage
+from clearml_yolo.tasks.compare import InferenceConfig, ModelRef, NoBaselineModelError
+from clearml_yolo.tasks.pipeline import (
+    _as_dict,
+    run_compare_stage,
+    run_pipeline,
+    run_predict_stage,
+)
 from clearml_yolo.tasks.train import _inference_device
 
 STAGES = ["train", "predict", "metrics", "report", "compare"]
@@ -105,6 +110,44 @@ def test_comparison_scores_the_model_this_run_just_built(monkeypatch: pytest.Mon
     # The comparison reads its own ground-truth key, which interpolates the one top-level
     # value every stage points at, so the three cannot drift apart.
     assert seen["ground_truth"] == "ground_truth.csv"
+
+
+def test_the_comparison_reuses_the_card_training_just_used(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Same hazard the predict stage documents: surveying here would wait on a card this
+    very process still holds. Both models still go on one card, which is the whole point
+    of the comparison leaving inference.device out of its interpolations."""
+    seen: dict[str, object] = {}
+    monkeypatch.setattr(pipeline_module, "run_comparison", lambda **kwargs: seen.update(kwargs))
+
+    run_compare_stage(
+        _stage_config("compare"),
+        "best.pt",
+        {"test": {"car": 0.4}},
+        ClearMLConfig(enabled=False),
+        "1",
+    )
+
+    inference = seen["inference"]
+    assert isinstance(inference, InferenceConfig)
+    assert inference.device == "1"
+
+
+def test_a_split_no_stage_scores_is_rejected_before_training_starts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The split list is shared by interpolation, but singling one out of it is not, so
+    this is the one cross-stage mismatch config alone cannot rule out."""
+    monkeypatch.setattr(pipeline_module, "run_training", lambda **kwargs: pytest.fail("trained"))
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        config = compose(
+            config_name="pipeline",
+            overrides=["splits=[train,val]", "clearml.enabled=false"],
+        )
+
+    with pytest.raises(ValueError, match=r"compare\.split"):
+        zen(run_pipeline)(config)
 
 
 def test_a_run_without_calibrated_thresholds_skips_rather_than_fails(
