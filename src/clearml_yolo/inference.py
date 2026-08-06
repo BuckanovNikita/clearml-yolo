@@ -1,45 +1,42 @@
 """Run a checkpoint over a list of images, returning detections in digital-metrics' schema.
 
-This is digital-metrics' ``predict_on_images`` made faster and given a progress signal. It
-lives here rather than upstream because digital-metrics is consumed as a released package.
+This is digital-metrics' ``predict_on_images`` given a progress signal and GPU-side
+defaults. It lives here rather than upstream because digital-metrics is consumed as a
+released package.
 
-**Where the time actually goes.** Measured on 748 KITTI images with a fine-tuned yolo11 on
-an RTX 5090: preprocess 1.31 ms/img, GPU inference 0.53 ms/img, postprocess 0.93 ms/img,
-image decode ~0.9 ms/img. The network being a minority of that is why a bigger batch buys
-nothing here, and why the two GPU-side defaults are worth little on a model this small —
-they pay off as the model grows. What buys the most on any model is decoding off the main
-thread: ultralytics decodes a list source inline, one image at a time, so the card idles
-through it. Decoding the next chunk while the current one is on the GPU took the same 748
-images from 4.4 s to 2.4 s, box for box.
+**The source is a manifest, and that is the whole trick.** Ultralytics routes a *list*
+source through ``autocast_list`` into ``LoadPilAndNumpy``, which sets ``bs = len(list)``
+and never consults the ``batch`` argument, so the whole list becomes one forward pass —
+on 748 images that is ~40% slower and 18 GB of VRAM instead of 3 GB. The same loader names
+images from PIL's ``filename``, which is lost through ``ImageOps.exif_transpose``'s copy,
+so ``Results.path`` comes back as ``image0.jpg``. Both problems belong to the list form
+alone. A ``.txt`` of paths goes to ``LoadImagesAndVideos`` instead, which honours
+``batch``, reports the real file, and decodes with the same OpenCV call training uses — so
+no EXIF rotation appears between training and inference. One ``predict`` call therefore
+does the whole run, and every box is attributed by path rather than by position.
 
-On that same small model, ``half`` measured ~5% slower and ``compile`` cost about 12 s of
-one-off compilation per process against a ~5% steady-state gain — the split finishes before
-either repays. Both are still on by default because both scale with model size, and both
-are one ``predict_kwargs`` entry away from off.
+Two consequences of that loader are handled here. It absolutises every manifest entry and
+sorts the file list, so results arrive neither spelled nor ordered as the caller wrote
+them; the join back is keyed on the same absolutisation. And it *skips* an image OpenCV
+cannot decode, logging a warning, which would quietly shrink the scored set and surface
+downstream as a recall drop that reads like a model regression — so every requested image
+is accounted for before returning.
 
-**Two ultralytics behaviours are load-bearing, and both are the opposite of what the API
-suggests.** A *list* source is not read like a directory: ``check_source`` hands it to
-``autocast_list`` and the resulting ``LoadPilAndNumpy`` sets ``bs = len(list)``, so the whole
-list becomes one forward pass and the ``batch`` predict argument is never consulted.
-Chunking is therefore the only way to choose a batch size, and the chunk length *is* the
-batch. Passing all 748 images at once costs both ways: ~40% slower and 18 GB of VRAM
-instead of 3 GB.
-
-And ``Results.path`` cannot be trusted for a list source — ``LoadPilAndNumpy`` names images
-from PIL's ``filename``, which is lost through ``ImageOps.exif_transpose``'s copy, so paths
-come back as ``image0.jpg``. Order *is* input order (nothing sorts a list source), so pairing
-positionally is both correct and the only option; ``strict=True`` turns any future
-divergence into an exception rather than silently mislabelled detections.
+On CUDA, half precision and ``torch.compile`` are both on by default. Measured on 748
+KITTI images with a fine-tuned yolo11 on an RTX 5090, neither buys much on a model that
+small — preprocess 1.31 ms/img, GPU inference 0.53 ms/img, postprocess 0.93 ms/img, so the
+network is a minority of the time, ``half`` measured ~5% slower and ``compile`` costs a
+one-off compilation against a ~5% steady-state gain. Both are still on because both scale
+with model size, and both are one ``predict_kwargs`` entry away from off.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Sequence
-from concurrent.futures import ThreadPoolExecutor
+from collections.abc import Sequence
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any, Literal
 
-import numpy.typing as npt
 import pandas as pd
 from loguru import logger
 
@@ -58,14 +55,11 @@ PREDICTION_COLUMNS = [
     "bbox_y_br",
 ]
 
-# Decoding is what the card waits on, and it is I/O plus a GIL-releasing OpenCV call, so
-# threads are enough. Four saturated the measurement; eight added nothing, so this is not
-# exposed as a config key that would then have to be kept in step with three others.
-DECODE_WORKERS = 4
-
 # Everything ultralytics accepts that is not one of these is a CUDA ordinal ("0", "0,1")
 # or an explicit cuda device ("cuda:0").
 NON_CUDA_DEVICES = frozenset({"cpu", "mps"})
+
+_MAX_REPORTED_PATHS = 5
 
 
 def is_cuda_device(device: str | None) -> bool:
@@ -131,48 +125,38 @@ def _precision(accelerated: bool, model_kwargs: dict[str, Any]) -> dict[str, Any
     return {"quantize": 16 if accelerated else 32}
 
 
-def _read_image(path: str) -> npt.NDArray[Any]:
-    """Decode one image the way ultralytics does for a directory source and for training.
+def _write_manifest(paths: list[str], directory: Path) -> tuple[str, dict[str, str]]:
+    """Write the file list ultralytics will read, and the map from what it reports back.
 
-    OpenCV rather than PIL, so inference sees the same pixels training did. The difference
-    that matters is EXIF orientation, which OpenCV ignores and PIL applies; ultralytics'
-    own file loaders ignore it too, so this follows them rather than the list-source path.
+    Entries are absolute so the loader's relative-to-the-manifest branch never runs, and
+    the returned map is keyed by the same ``Path.absolute()`` the loader applies — the
+    identical, deliberately non-normalising transform on both sides is what makes the keys
+    meet. The map's values are the caller's own spelling, which ``image_name="path"``
+    writes into the join key.
     """
-    import cv2
-
-    image: npt.NDArray[Any] | None = cv2.imread(path)
-    if image is None:
-        raise ValueError(f"Cannot decode {path} as an image")
-    return image
+    by_absolute = {str(Path(path).absolute()): path for path in paths}
+    manifest = directory / "images.txt"
+    manifest.write_text("\n".join(by_absolute.keys()))
+    return str(manifest), by_absolute
 
 
-def _decoded_chunks(
-    paths: list[str], batch: int, workers: int
-) -> Iterator[tuple[list[str], list[npt.NDArray[Any]]]]:
-    """Yield each chunk already decoded, having decoded it while the previous one ran.
+def _refuse_unscored(by_absolute: dict[str, str], scored: set[str]) -> None:
+    """Refuse to return detections for fewer images than were asked for.
 
-    Ultralytics decodes a list source inline, so without this the card sits idle for the
-    ~0.9 ms per image that decoding costs — comparable to everything else put together.
+    ``LoadImagesAndVideos`` logs a warning and moves on when OpenCV cannot decode a file,
+    and drops anything whose suffix it does not recognise as an image without saying
+    anything at all. Both leave a smaller scored set behind, which reads downstream as
+    missing detections rather than as missing images.
     """
-    chunks = [paths[start : start + batch] for start in range(0, len(paths), batch)]
-    if not chunks:
+    missing = [path for absolute, path in by_absolute.items() if absolute not in scored]
+    if not missing:
         return
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        pending = [pool.submit(_read_image, path) for path in chunks[0]]
-        for index, chunk in enumerate(chunks):
-            images = [future.result() for future in pending]
-            if index + 1 < len(chunks):
-                pending = [pool.submit(_read_image, path) for path in chunks[index + 1]]
-            yield chunk, images
-
-
-def _scored_images(
-    model: Any, paths: list[str], batch: int, settings: dict[str, Any]
-) -> Iterator[tuple[str, Any]]:
-    """Yield ``(path, result)`` for every image, one ``predict`` call per ``batch`` of them."""
-    for chunk, images in _decoded_chunks(paths, batch, DECODE_WORKERS):
-        results = model.predict(source=images, stream=True, verbose=False, **settings)
-        yield from zip(chunk, results, strict=True)
+    shown = missing[:_MAX_REPORTED_PATHS]
+    suffix = "" if len(missing) <= _MAX_REPORTED_PATHS else f" (+{len(missing) - len(shown)})"
+    raise ValueError(
+        f"Ultralytics returned no result for {len(missing)} of {len(by_absolute)} images; "
+        f"they are undecodable or not a recognised image format: {shown}{suffix}"
+    )
 
 
 def predict_on_images(
@@ -189,9 +173,9 @@ def predict_on_images(
 ) -> pd.DataFrame:
     """Score ``image_paths`` with ``weights`` and return the detections as a DataFrame.
 
-    ``batch`` is both the throughput knob and the memory knob: it is how many images go
-    through the network at once and how many are held decoded at once, so peak RAM and VRAM
-    are both proportional to it. Lower it (or ``imgsz``) to fit a smaller card.
+    ``batch`` is mainly the memory knob: it is how many images go through the network at
+    once and how many are held decoded at once, so peak RAM and VRAM are both proportional
+    to it. Lower it (or ``imgsz``) to fit a smaller card.
 
     ``conf`` defaults to near zero because per-class thresholds are calibrated downstream,
     and filtering here would discard the detections that calibration needs.
@@ -204,13 +188,21 @@ def predict_on_images(
     ``model_kwargs`` reach ``model.predict`` untouched, so ``quantize=32`` (or the
     deprecated ``half=False``) and ``compile=False`` turn either back off for a run that has
     to reproduce numbers taken before these defaults.
+
+    Raises:
+        ValueError: If ``batch`` is below one, or if any requested image came back
+            unscored because ultralytics could not read it.
     """
     if batch < 1:
         raise ValueError(f"batch must be >= 1, got {batch}")
 
+    paths = [str(path) for path in image_paths]
+    if not paths:
+        logger.info("Predicted 0 boxes over 0 images")
+        return pd.DataFrame(columns=PREDICTION_COLUMNS)
+
     from ultralytics.models import YOLO
 
-    paths = [str(path) for path in image_paths]
     model = YOLO(str(weights))
     names: dict[int, str] = model.names
     accelerated = is_cuda_device(device)
@@ -218,28 +210,32 @@ def predict_on_images(
         "conf": conf,
         "iou": iou,
         "imgsz": imgsz,
+        "batch": batch,
         "device": device,
         "compile": accelerated,
         **_precision(accelerated, model_kwargs),
         **model_kwargs,
     }
     logger.info(
-        "Predicting on {} images with {} (batch={}, {})",
+        "Predicting on {} images with {} ({})",
         len(paths),
         Path(weights).name,
-        batch,
         ", ".join(f"{key}={value}" for key, value in settings.items()),
     )
 
     rows: list[dict[str, Any]] = []
-    scored = 0
-    for path, result in track(
-        _scored_images(model, paths, batch, settings), "Inference", total=len(paths), unit="img"
-    ):
-        scored += 1
-        boxes = result.boxes
-        if boxes is not None and len(boxes) > 0:
-            rows.extend(_detection_rows(path, boxes, names, image_name))
+    scored: set[str] = set()
+    with TemporaryDirectory() as workspace:
+        manifest, by_absolute = _write_manifest(paths, Path(workspace))
+        # Ultralytics types predict as returning `list[Results] | Tensor` regardless of
+        # `stream`, so the annotation has to be widened rather than narrowed.
+        results: Any = model.predict(source=manifest, stream=True, verbose=False, **settings)
+        for result in track(results, "Inference", total=len(paths), unit="img"):
+            scored.add(result.path)
+            boxes = result.boxes
+            if boxes is not None and len(boxes) > 0:
+                rows.extend(_detection_rows(by_absolute[result.path], boxes, names, image_name))
 
-    logger.info("Predicted {} boxes over {} images", len(rows), scored)
+    _refuse_unscored(by_absolute, scored)
+    logger.info("Predicted {} boxes over {} images", len(rows), len(scored))
     return pd.DataFrame(rows, columns=PREDICTION_COLUMNS)
