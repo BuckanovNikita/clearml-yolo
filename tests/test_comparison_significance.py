@@ -150,8 +150,8 @@ def modest_difference_frames() -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
     """A gap small enough that the p-value lands off its 1 / iterations floor."""
     rng = np.random.default_rng(19)
     images = [f"img{index}" for index in range(60)]
-    baseline = prediction_frame({image: rng.random(3) < 0.5 for image in images})
-    candidate = prediction_frame({image: rng.random(3) < 0.6 for image in images})
+    baseline = prediction_frame({image: list(rng.random(3) < 0.5) for image in images})
+    candidate = prediction_frame({image: list(rng.random(3) < 0.6) for image in images})
     return baseline, candidate, images
 
 
@@ -189,8 +189,8 @@ def test_bootstrap_finds_nothing_between_two_equally_good_models() -> None:
     """The null case that is not true by construction: different rows, one shared rate."""
     rng = np.random.default_rng(8)
     images = [f"img{index}" for index in range(60)]
-    baseline = prediction_frame({image: rng.random(3) < 0.55 for image in images})
-    candidate = prediction_frame({image: rng.random(3) < 0.55 for image in images})
+    baseline = prediction_frame({image: list(rng.random(3) < 0.55) for image in images})
+    candidate = prediction_frame({image: list(rng.random(3) < 0.55) for image in images})
 
     result = bootstrap_precision_delta(baseline, candidate, images, iterations=500, seed=2)
 
@@ -245,8 +245,8 @@ def recall_frames() -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
     """The same ground-truth boxes seen by both models, the candidate detecting more."""
     rng = np.random.default_rng(23)
     images = [f"img{index}" for index in range(60)]
-    baseline = ground_truth_frame({image: rng.random(4) < 0.5 for image in images})
-    candidate = ground_truth_frame({image: rng.random(4) < 0.75 for image in images})
+    baseline = ground_truth_frame({image: list(rng.random(4) < 0.5) for image in images})
+    candidate = ground_truth_frame({image: list(rng.random(4) < 0.75) for image in images})
     return baseline, candidate, images
 
 
@@ -298,8 +298,8 @@ def test_recall_bootstrap_is_reproducible_for_one_seed() -> None:
 def test_recall_bootstrap_straddles_zero_for_two_equally_good_models() -> None:
     rng = np.random.default_rng(34)
     images = [f"img{index}" for index in range(60)]
-    baseline = ground_truth_frame({image: rng.random(4) < 0.6 for image in images})
-    candidate = ground_truth_frame({image: rng.random(4) < 0.6 for image in images})
+    baseline = ground_truth_frame({image: list(rng.random(4) < 0.6) for image in images})
+    candidate = ground_truth_frame({image: list(rng.random(4) < 0.6) for image in images})
 
     result = bootstrap_recall_delta(baseline, candidate, images, iterations=500, seed=6)
 

@@ -17,7 +17,8 @@ from typing import Any
 import pandas as pd
 from loguru import logger
 
-BEST_CONFIDENCES_PREFIX = "best_confidences"
+from clearml_yolo.artifact_names import BEST_CONFIDENCES_PREFIX, per_split
+
 # ClearML ids are 32 lowercase hex characters. Recognising them by shape is what lets
 # `weights=` accept either a checkpoint on disk or a task, without a second config key
 # that could contradict the first.
@@ -156,7 +157,7 @@ def fetch_best_confidences(task_id: str, split: str) -> dict[str, float]:
     silently rescores every class and shows up as a model difference that is not one.
     """
     task = _task(task_id)
-    name = f"{BEST_CONFIDENCES_PREFIX}_{split}"
+    name = per_split(BEST_CONFIDENCES_PREFIX, split)
     artifact = task.artifacts.get(name)
     if artifact is None:
         raise ValueError(

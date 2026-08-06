@@ -3,13 +3,15 @@
 The store is global mutable state and rejects duplicate names, so all registrations
 live here and each app imports this one module.
 
-Each stage is registered twice: at the top level under its own name, so it runs as a
-standalone app with its own ClearML settings, and under a group with an interpolated
-ClearML block, so the pipeline names one experiment for all four stages at once.
+Each stage is registered twice, from one factory: at the top level under its own name, so
+it runs as a standalone app with its own settings, and under a group whose shared values
+are interpolations, so a full pipeline run names each of them exactly once. Which values
+those are is spelled out in :class:`SharedKeys`.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import Any
 
 from hydra.conf import HydraConf, JobConf
@@ -47,6 +49,20 @@ PipelineStageClearMLConf = builds(
     reuse_last_task_id="${clearml.reuse_last_task_id}",
 )
 
+# The comparison must re-run both checkpoints exactly as the candidate was predicted, so
+# inside the pipeline its inference settings are the predict stage's. `device` is left out
+# on purpose: the compare stage resolves one card for both models itself, and inheriting a
+# device would put a hardware difference inside a comparison meant to isolate the model.
+PipelineInferenceConf = builds(
+    InferenceConfig,
+    conf="${predict.conf}",
+    iou="${predict.iou}",
+    imgsz="${predict.imgsz}",
+    batch="${predict.batch}",
+    image_name="${predict.image_name}",
+    populate_full_signature=True,
+)
+
 BaselineClearMLConf = builds(BaselineConfig, source="clearml", populate_full_signature=True)
 BaselineLocalConf = builds(
     BaselineConfig,
@@ -57,7 +73,56 @@ BaselineLocalConf = builds(
 BaselineNoneConf = builds(BaselineConfig, source="none", populate_full_signature=True)
 
 
-def train_config(clearml: Any) -> Any:
+@dataclass(frozen=True)
+class SharedKeys:
+    """Every value more than one stage needs, and what each stage should point at for it.
+
+    A stage config is built twice from the same factory. Standalone it gets the literal
+    defaults below, because there is no other stage to agree with. Inside the pipeline it
+    gets ``${...}`` interpolations into one top-level key, so ``ground_truth=`` on the
+    command line reaches inference, scoring and the comparison at once instead of having to
+    be repeated under three names — and, more importantly, cannot be changed for one stage
+    and silently left stale for another.
+    """
+
+    clearml: Any
+    auto_gpu: Any = AutoGpuConf
+    ground_truth: Any = "ground_truth.csv"
+    splits: Any = field(default_factory=lambda: ["train", "val", "test"])
+    # Standalone inference has no downstream split list to honour, so it scores every image
+    # in the ground truth; inside the pipeline it scores exactly what metrics will read.
+    predict_splits: Any = None
+    run_name: Any = "train"
+    weights: Any = "runs/detect/train/weights/best.pt"
+    predictions: Any = "runs/predictions.csv"
+    metrics_dir: Any = "runs/metrics"
+    inference: Any = InferenceConf
+    iou_threshold: Any = 0.5
+    matching_strategy: Any = "iou_prior"
+    # The pipeline fills the candidate side in from the model it just trained, so offering
+    # the key would only let a run name a different model than the one under test.
+    candidate_model_group: bool = True
+
+
+STANDALONE = SharedKeys(clearml=ClearMLConf)
+PIPELINE = SharedKeys(
+    clearml=PipelineStageClearMLConf,
+    auto_gpu="${auto_gpu}",
+    ground_truth="${ground_truth}",
+    splits="${splits}",
+    predict_splits="${splits}",
+    run_name="${clearml.task_name}",
+    weights="${train.project}/${train.name}/weights/best.pt",
+    predictions="${predict.output}",
+    metrics_dir="${metrics.output_dir}",
+    inference=PipelineInferenceConf,
+    iou_threshold="${metrics.evaluation.iou_threshold}",
+    matching_strategy="${metrics.evaluation.matching_strategy}",
+    candidate_model_group=False,
+)
+
+
+def train_config(shared: SharedKeys) -> Any:
     return make_config(
         model="yolo11n.pt",
         data="coco8.yaml",
@@ -65,79 +130,80 @@ def train_config(clearml: Any) -> Any:
         imgsz=640,
         batch=16,
         project="runs/detect",
-        name="train",
+        name=shared.run_name,
         device=None,
-        auto_gpu=AutoGpuConf,
-        clearml=clearml,
+        auto_gpu=shared.auto_gpu,
+        clearml=shared.clearml,
         train_kwargs={},
     )
 
 
-def predict_config(clearml: Any) -> Any:
+def predict_config(shared: SharedKeys) -> Any:
     return make_config(
-        weights="runs/detect/train/weights/best.pt",
-        ground_truth="ground_truth.csv",
+        weights=shared.weights,
+        ground_truth=shared.ground_truth,
         output="runs/predictions.csv",
-        auto_gpu=AutoGpuConf,
+        auto_gpu=shared.auto_gpu,
         conf=0.001,
         iou=0.7,
         imgsz=640,
         batch=16,
         device=None,
-        splits=None,
+        splits=shared.predict_splits,
         image_name="name",
-        clearml=clearml,
+        clearml=shared.clearml,
         predict_kwargs={},
     )
 
 
-def metrics_config(clearml: Any) -> Any:
+def metrics_config(shared: SharedKeys) -> Any:
     return make_config(
-        predictions="runs/predictions.csv",
-        ground_truth="ground_truth.csv",
+        predictions=shared.predictions,
+        ground_truth=shared.ground_truth,
         output_dir="runs/metrics",
-        splits=["train", "val", "test"],
+        splits=shared.splits,
         calibration_split="val",
         evaluation=EvaluationConf,
-        clearml=clearml,
+        clearml=shared.clearml,
     )
 
 
-def report_config(clearml: Any) -> Any:
+def report_config(shared: SharedKeys) -> Any:
     # The group is named relatively: standalone it resolves to "baseline", and inside
     # the pipeline Hydra prefixes it to "report/baseline" on its own.
     return make_config(
         hydra_defaults=["_self_", {"baseline": "clearml"}],
-        metrics_dir="runs/metrics",
+        metrics_dir=shared.metrics_dir,
         output_dir="runs/reports",
-        splits=["train", "val", "test"],
+        splits=shared.splits,
         report_config_path=None,
         baseline=None,
-        clearml=clearml,
+        clearml=shared.clearml,
     )
 
 
-def compare_config(clearml: Any) -> Any:
+def compare_config(shared: SharedKeys) -> Any:
+    defaults: list[Any] = ["_self_", {"baseline_model": "clearml"}]
+    candidate: dict[str, Any] = {}
+    if shared.candidate_model_group:
+        defaults.append({"candidate_model": "clearml"})
+        candidate["candidate_model"] = None
     return make_config(
-        hydra_defaults=[
-            "_self_",
-            {"baseline_model": "clearml"},
-            {"candidate_model": "clearml"},
-        ],
+        hydra_defaults=defaults,
         baseline_model=None,
-        candidate_model=None,
-        ground_truth="ground_truth.csv",
+        **candidate,
+        ground_truth=shared.ground_truth,
         output_dir="runs/comparison",
         # Thresholds are calibrated on val and must be reported on images val never saw.
         split="test",
-        inference=InferenceConf,
-        auto_gpu=AutoGpuConf,
-        iou_threshold=0.5,
-        matching_strategy="iou_prior",
+        inference=shared.inference,
+        auto_gpu=shared.auto_gpu,
+        iou_threshold=shared.iou_threshold,
+        matching_strategy=shared.matching_strategy,
         q=0.05,
         bootstrap_iterations=10000,
         seed=0,
-        clearml=clearml,
+        clearml=shared.clearml,
     )
 
 
@@ -166,6 +232,10 @@ PipelineConf = make_config(
     report=None,
     compare=None,
     clearml=ClearMLConf,
+    # The values every stage below points at. Overriding one of these names the whole run.
+    auto_gpu=AutoGpuConf,
+    ground_truth="ground_truth.csv",
+    splits=["train", "val", "test"],
     skip_train=False,
     skip_predict=False,
     skip_metrics=False,
@@ -177,6 +247,8 @@ STAGE_CONFIG_FACTORIES = {
     "train": train_config,
     "predict": predict_config,
     "metrics": metrics_config,
+    "report": report_config,
+    "compare": compare_config,
 }
 
 
@@ -192,23 +264,20 @@ def register_configs() -> None:
         baseline_store(BaselineLocalConf, name="local")
         baseline_store(BaselineNoneConf, name="none")
 
+    # The pipeline fills its candidate side in from the model it just trained, so only the
+    # standalone comparison offers a candidate_model group.
+    for group, model_conf in (
+        ("baseline_model", BaselineModelConf),
+        ("candidate_model", CandidateModelConf),
+        ("compare/baseline_model", BaselineModelConf),
+    ):
+        model_store = store(group=group)
+        model_store(model_conf, name="clearml")
+        model_store(ModelLocalConf, name="local")
+
     for stage, factory in STAGE_CONFIG_FACTORIES.items():
-        store(factory(ClearMLConf), name=stage)
-        store(factory(PipelineStageClearMLConf), group=stage, name="default")
-
-    store(report_config(ClearMLConf), name="report")
-    store(report_config(PipelineStageClearMLConf), group="report", name="default")
-
-    for stage in ("", "compare/"):
-        for group, clearml_conf in (
-            ("baseline_model", BaselineModelConf),
-            ("candidate_model", CandidateModelConf),
-        ):
-            model_store = store(group=f"{stage}{group}")
-            model_store(clearml_conf, name="clearml")
-            model_store(ModelLocalConf, name="local")
-    store(compare_config(ClearMLConf), name="compare")
-    store(compare_config(PipelineStageClearMLConf), group="compare", name="default")
+        store(factory(STANDALONE), name=stage)
+        store(factory(PIPELINE), group=stage, name="default")
 
     store(GroundTruthConf, name="ground_truth")
     store(PipelineConf, name="pipeline")

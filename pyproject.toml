@@ -21,6 +21,7 @@ dependencies = [
     "scipy>=1.11",
     "openpyxl>=3.1",
     "nvidia-ml-py",
+    "tqdm>=4.66",
     "digital-metrics",
     "report-generator",
 ]
@@ -77,6 +78,7 @@ module = [
     "report_generator.*",
     "pynvml.*",
     "scipy.*",
+    "tqdm.*",
 ]
 ignore_missing_imports = true
 

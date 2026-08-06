@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
-from openpyxl import load_workbook
+from openpyxl import load_workbook  # type: ignore[import-untyped]
 
 from clearml_yolo.comparison.workbook import write_comparison_workbook
 

@@ -71,21 +71,18 @@ def run_pipeline(
         trained_device = trained.inference_device
         results["weights"] = trained.weights
 
-    predictions = Path(predict_cfg["output"])
     if skip_predict:
-        logger.info("Skipping inference; using predictions {}", predictions)
+        logger.info("Skipping inference; using predictions {}", metrics_cfg["predictions"])
     else:
-        predictions = run_predict_stage(predict_cfg, weights, clearml, trained_device)
-        results["predictions"] = predictions
+        results["predictions"] = run_predict_stage(predict_cfg, weights, clearml, trained_device)
 
-    metrics_dir = Path(metrics_cfg["output_dir"])
     dashboards: dict[str, Path] = {}
     thresholds: dict[str, dict[str, float]] = {}
     if skip_metrics:
-        logger.info("Skipping metrics; reading dashboards from {}", metrics_dir)
-        dashboards = discover_dashboards(metrics_dir, list(metrics_cfg["splits"]))
+        logger.info("Skipping metrics; reading dashboards from {}", report_cfg["metrics_dir"])
+        dashboards = discover_dashboards(report_cfg["metrics_dir"], list(report_cfg["splits"]))
     else:
-        metrics_result = run_metrics_stage(metrics_cfg, predictions, clearml)
+        metrics_result = run_metrics_stage(metrics_cfg, clearml)
         dashboards = metrics_result.dashboards
         thresholds = metrics_result.best_confidences
         results["dashboards"] = dashboards
@@ -104,9 +101,7 @@ def run_pipeline(
     if skip_compare:
         logger.info("Skipping comparison stage")
     else:
-        comparison = run_compare_stage(
-            _as_dict(compare), weights, thresholds, metrics_cfg["ground_truth"], clearml
-        )
+        comparison = run_compare_stage(_as_dict(compare), weights, thresholds, clearml)
         if comparison is not None:
             results["comparison"] = comparison
 
@@ -156,7 +151,6 @@ def run_compare_stage(
     config: dict[str, Any],
     weights: str | Path,
     thresholds: dict[str, dict[str, float]],
-    ground_truth: str | Path,
     clearml: ClearMLConfig,
 ) -> CompareResult | None:
     """Compare the model this run just trained against the previous one.
@@ -184,7 +178,7 @@ def run_compare_stage(
         return run_comparison(
             baseline_model=config["baseline_model"],
             candidate_model=candidate,
-            ground_truth=ground_truth,
+            ground_truth=config["ground_truth"],
             output_dir=config["output_dir"],
             clearml=clearml,
             inference=config["inference"],
@@ -201,11 +195,9 @@ def run_compare_stage(
         return None
 
 
-def run_metrics_stage(
-    config: dict[str, Any], predictions: str | Path, clearml: ClearMLConfig
-) -> Any:
+def run_metrics_stage(config: dict[str, Any], clearml: ClearMLConfig) -> Any:
     return compute_metrics(
-        predictions=predictions,
+        predictions=config["predictions"],
         ground_truth=config["ground_truth"],
         output_dir=config["output_dir"],
         clearml=clearml,

@@ -10,6 +10,7 @@ from typing import Any
 import pandas as pd
 import pytest
 
+from clearml_yolo.artifact_names import BEST_CONFIDENCES_PREFIX, per_split
 from clearml_yolo.clearml_models import (
     fetch_best_confidences,
     latest_completed_task_id,
@@ -169,14 +170,22 @@ def test_bare_model_names_are_left_for_ultralytics_to_download() -> None:
 
 def test_thresholds_come_back_as_plain_floats(patch_clearml: Any) -> None:
     frame = pd.DataFrame({"confidence": [0.31, 0.47]}, index=["car", "van"])
-    patch_clearml(FakeTask(artifacts={"best_confidences_test": FakeArtifact(payload=frame)}))
+    patch_clearml(
+        FakeTask(
+            artifacts={per_split(BEST_CONFIDENCES_PREFIX, "test"): FakeArtifact(payload=frame)}
+        )
+    )
 
     assert fetch_best_confidences(TASK_ID, "test") == pytest.approx({"car": 0.31, "van": 0.47})
 
 
 def test_thresholds_survive_a_json_encoded_artifact(patch_clearml: Any) -> None:
     patch_clearml(
-        FakeTask(artifacts={"best_confidences_val": FakeArtifact(payload='{"car": 0.25}')})
+        FakeTask(
+            artifacts={
+                per_split(BEST_CONFIDENCES_PREFIX, "val"): FakeArtifact(payload='{"car": 0.25}')
+            }
+        )
     )
 
     assert fetch_best_confidences(TASK_ID, "val") == pytest.approx({"car": 0.25})
@@ -185,5 +194,5 @@ def test_thresholds_survive_a_json_encoded_artifact(patch_clearml: Any) -> None:
 def test_a_missing_threshold_artifact_names_the_split(patch_clearml: Any) -> None:
     patch_clearml(FakeTask())
 
-    with pytest.raises(ValueError, match="best_confidences_test"):
+    with pytest.raises(ValueError, match=per_split(BEST_CONFIDENCES_PREFIX, "test")):
         fetch_best_confidences(TASK_ID, "test")

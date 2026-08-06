@@ -85,7 +85,6 @@ def test_comparison_scores_the_model_this_run_just_built(monkeypatch: pytest.Mon
         _stage_config("compare"),
         "runs/detect/train/weights/best.pt",
         {"test": {"car": 0.4}},
-        "gt.csv",
         ClearMLConfig(enabled=False),
     )
 
@@ -94,8 +93,9 @@ def test_comparison_scores_the_model_this_run_just_built(monkeypatch: pytest.Mon
     assert candidate.source == "local"
     assert candidate.weights == Path("runs/detect/train/weights/best.pt")
     assert candidate.thresholds == {"car": 0.4}
-    # The ground truth follows the metrics stage so the two cannot drift apart.
-    assert seen["ground_truth"] == "gt.csv"
+    # The comparison reads its own ground-truth key, which interpolates the one top-level
+    # value every stage points at, so the three cannot drift apart.
+    assert seen["ground_truth"] == "ground_truth.csv"
 
 
 def test_a_run_without_calibrated_thresholds_skips_rather_than_fails(
@@ -108,7 +108,7 @@ def test_a_run_without_calibrated_thresholds_skips_rather_than_fails(
 
     assert (
         run_compare_stage(
-            _stage_config("compare"), "best.pt", {}, "gt.csv", ClearMLConfig(enabled=False)
+            _stage_config("compare"), "best.pt", {}, ClearMLConfig(enabled=False)
         )
         is None
     )
@@ -127,7 +127,6 @@ def test_a_first_run_with_nothing_to_compare_against_skips(monkeypatch: pytest.M
             _stage_config("compare"),
             "best.pt",
             {"test": {"car": 0.4}},
-            "gt.csv",
             ClearMLConfig(enabled=False),
         )
         is None

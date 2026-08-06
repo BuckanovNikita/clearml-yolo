@@ -9,8 +9,13 @@ import pandas as pd
 from loguru import logger
 from pydantic import BaseModel, Field
 
+from clearml_yolo import artifact_names
+from clearml_yolo.clearml_report import report_scalars, report_table
 from clearml_yolo.clearml_session import ClearMLConfig, init_task, upload_dataframe
+from clearml_yolo.progress import track
 
+# The workbook file name is written by digital-metrics' get_dashboards, not by us, so it
+# stays as it is while the artifact carrying it is named by artifact_names.
 DASHBOARD_PREFIX = "full_dashboard"
 
 
@@ -43,12 +48,13 @@ class MetricsResult(BaseModel):
     best_confidences: dict[str, dict[str, float]] = Field(default_factory=dict)
 
 
-def _log_split_scalars(task: Any, split: str, summary: dict[str, float]) -> None:
-    if task is None:
-        return
-    logger_ = task.get_logger()
-    for metric, value in summary.items():
-        logger_.report_scalar(title="metrics", series=f"{split}/{metric}", value=value, iteration=0)
+def _split_scalar_title(split: str) -> str:
+    """One scalar card per split, rather than every split crowded onto one graph.
+
+    ClearML groups scalars by title, so a single "metrics" title with ``{split}/{metric}``
+    series puts three splits' worth of unrelated lines on one plot.
+    """
+    return f"{artifact_names.METRICS_SECTION}_{split}"
 
 
 def _evaluate_split(
@@ -98,28 +104,33 @@ def _evaluate_split(
         return None
 
     devs, dtrk = evaluation.get_dashboards(save_to_excel=True, path=str(output_dir))
-    upload_dataframe(task, f"dashboard_full_{split}", devs)
-    upload_dataframe(task, f"dashboard_dtrk_{split}", dtrk)
+    name = artifact_names.per_split
+    upload_dataframe(task, name(artifact_names.DASHBOARD_FULL_PREFIX, split), devs)
+    upload_dataframe(task, name(artifact_names.DASHBOARD_DTRK_PREFIX, split), dtrk)
 
     # Thresholds were already solved during the call above; re-solving them here would
     # cost another sweep and could drift from the ones the dashboards were built with.
     visualization_gt, visualization_preds = evaluation.get_dfs_visualization(find_best_confs=False)
-    upload_dataframe(task, f"matches_gt_{split}", visualization_gt)
-    upload_dataframe(task, f"matches_preds_{split}", visualization_preds)
+    upload_dataframe(task, name(artifact_names.MATCHES_GT_PREFIX, split), visualization_gt)
+    upload_dataframe(task, name(artifact_names.MATCHES_PREDS_PREFIX, split), visualization_preds)
 
     per_class, summary = summarize_metrics(evaluation.metrics)
-    upload_dataframe(task, f"metrics_summary_{split}", per_class)
-    _log_split_scalars(task, split, summary)
+    upload_dataframe(task, name(artifact_names.METRICS_SUMMARY_PREFIX, split), per_class)
+    # The same per-class table again as a plot, so the splits of a run read as one
+    # collapsible section instead of as unrelated files in the artifacts list.
+    report_table(task, artifact_names.METRICS_SECTION, split, per_class)
+    report_scalars(task, _split_scalar_title(split), summary)
 
     if task is not None:
         task.upload_artifact(
-            name=f"metrics_raw_{split}",
+            name=name(artifact_names.METRICS_RAW_PREFIX, split),
             artifact_object={
                 class_name: metric.model_dump() for class_name, metric in evaluation.metrics.items()
             },
         )
         task.upload_artifact(
-            name=f"best_confidences_{split}", artifact_object=evaluation.best_confidences
+            name=name(artifact_names.BEST_CONFIDENCES_PREFIX, split),
+            artifact_object=evaluation.best_confidences,
         )
 
     dashboard = output_dir / f"{DASHBOARD_PREFIX}_{split}.xlsx"
@@ -166,7 +177,7 @@ def compute_metrics(
     destination.mkdir(parents=True, exist_ok=True)
 
     result = MetricsResult(output_dir=destination)
-    for split in splits:
+    for split in track(splits, "Scoring splits", unit="split"):
         scored = _evaluate_split(
             split,
             preds_frame,

@@ -28,6 +28,7 @@ from clearml_yolo.comparison.significance import (
     bootstrap_recall_delta,
     mcnemar_recall,
 )
+from clearml_yolo.progress import track
 
 POOLED_FLAG = "is_pooled"
 IMPROVED = "improved"
@@ -238,7 +239,7 @@ def build_comparison_rows(
         )
 
     rows: list[dict[str, object]] = []
-    for class_name in compared:
+    for class_name in track(compared, "Testing classes", unit="class"):
         precision, recall_interval, recall_test = _test_pair(
             baseline, candidate, class_name, images, iterations=iterations, seed=seed
         )

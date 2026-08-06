@@ -8,8 +8,11 @@ from typing import Any, Literal
 from loguru import logger
 from pydantic import BaseModel, Field
 
+from clearml_yolo import artifact_names
 from clearml_yolo.clearml_models import latest_completed_task_id
+from clearml_yolo.clearml_report import report_table
 from clearml_yolo.clearml_session import ClearMLConfig, init_task
+from clearml_yolo.progress import track
 from clearml_yolo.tasks.metrics import DASHBOARD_PREFIX
 
 BaselineSource = Literal["clearml", "local", "none"]
@@ -30,7 +33,7 @@ class BaselineConfig(BaseModel):
     task_name: str | None = None
     tags: list[str] = Field(default_factory=lambda: ["prod"])
     directory: Path | None = None
-    artifact_prefix: str = "dashboard_full"
+    artifact_prefix: str = artifact_names.DASHBOARD_FULL_PREFIX
 
 
 class ReportResult(BaseModel):
@@ -70,8 +73,8 @@ def _baseline_from_clearml(
     import pandas as pd
 
     resolved: dict[str, Path] = {}
-    for split in splits:
-        artifact = task.artifacts.get(f"{config.artifact_prefix}_{split}")
+    for split in track(splits, "Downloading baseline dashboards", unit="split"):
+        artifact = task.artifacts.get(artifact_names.per_split(config.artifact_prefix, split))
         if artifact is None:
             logger.warning("Baseline task {} has no artifact for split {!r}", task.id, split)
             continue
@@ -171,20 +174,20 @@ def build_reports(
 
     config = Config.load(report_config_path) if report_config_path else Config.load()
 
-    for split, new_dashboard in dashboards.items():
+    for split in track(list(dashboards), "Building reports", unit="split"):
+        new_dashboard = dashboards[split]
         previous = baselines.get(split)
         if previous is None:
             logger.warning("Skipping split {!r}: no baseline dashboard", split)
             result.skipped_splits.append(split)
             continue
 
-        dev_path = destination / f"report_dev_{split}.xlsx"
-        business_path = destination / f"report_business_{split}.xlsx"
+        dev_path = destination / f"{artifact_names.REPORT_DEV_PREFIX}_{split}.xlsx"
+        business_path = destination / f"{artifact_names.REPORT_BUSINESS_PREFIX}_{split}.xlsx"
 
-        DevReportBuilder(MetricsReader(new_dashboard), MetricsReader(previous), config).build(
-            dev_path
-        )
-        BusinessReportBuilder(MetricsReader(new_dashboard), MetricsReader(previous), config).build(
+        baseline_reader = MetricsReader(previous)
+        DevReportBuilder(MetricsReader(new_dashboard), baseline_reader, config).build(dev_path)
+        BusinessReportBuilder(MetricsReader(new_dashboard), baseline_reader, config).build(
             business_path
         )
 
@@ -192,8 +195,20 @@ def build_reports(
         result.business_reports[split] = business_path
         logger.info("Split {!r}: {} and {}", split, dev_path.name, business_path.name)
 
+        # The baseline is the one side of the comparison that never reaches ClearML: it
+        # lands in a throwaway workbook here and is discarded, so "which numbers was this
+        # compared against?" cannot be answered from the UI. Publishing it as a table puts
+        # every split of the report into one collapsible section.
+        report_table(task, artifact_names.REPORT_SECTION, split, baseline_reader.read())
+
         if task is not None:
-            task.upload_artifact(name=f"report_dev_{split}", artifact_object=dev_path)
-            task.upload_artifact(name=f"report_business_{split}", artifact_object=business_path)
+            task.upload_artifact(
+                name=artifact_names.per_split(artifact_names.REPORT_DEV_PREFIX, split),
+                artifact_object=dev_path,
+            )
+            task.upload_artifact(
+                name=artifact_names.per_split(artifact_names.REPORT_BUSINESS_PREFIX, split),
+                artifact_object=business_path,
+            )
 
     return result

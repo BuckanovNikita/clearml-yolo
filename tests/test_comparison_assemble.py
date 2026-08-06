@@ -222,24 +222,48 @@ def test_each_checkpoint_gets_its_own_prediction_cache(tmp_path: Path) -> None:
     Keyed on the role alone, a rerun reused the previous run's predictions for whatever
     checkpoint it was now given.
     """
-    from clearml_yolo.tasks.compare import _prediction_cache
+    from clearml_yolo.tasks.compare import InferenceConfig, _prediction_cache
 
+    settings = InferenceConfig(device="0")
     first = tmp_path / "a.pt"
     second = tmp_path / "b.pt"
     first.write_bytes(b"one")
     second.write_bytes(b"two-different-length")
 
-    assert _prediction_cache(tmp_path, "baseline", "test", first) != _prediction_cache(
-        tmp_path, "baseline", "test", second
-    )
+    def cache(weights: Path, inference: InferenceConfig = settings) -> Path:
+        return _prediction_cache(tmp_path, "baseline", "test", weights, inference)
+
+    assert cache(first) != cache(second)
     # The same checkpoint must still hit its cache, or nothing is ever reused.
-    assert _prediction_cache(tmp_path, "baseline", "test", first) == _prediction_cache(
-        tmp_path, "baseline", "test", first
-    )
+    assert cache(first) == cache(first)
     # A retrained checkpoint at an unchanged path is a different model.
-    before = _prediction_cache(tmp_path, "baseline", "test", first)
+    before = cache(first)
     first.write_bytes(b"retrained, quite different")
-    assert _prediction_cache(tmp_path, "baseline", "test", first) != before
+    assert cache(first) != before
+
+
+def test_a_cache_is_not_reused_across_inference_settings(tmp_path: Path) -> None:
+    """Predictions taken at one confidence or precision are not the same detections.
+
+    The cache survives a rerun, so without the settings in its key a comparison could score
+    one model's FP16 predictions against the other's FP32 ones.
+    """
+    from clearml_yolo.tasks.compare import InferenceConfig, _prediction_cache
+
+    checkpoint = tmp_path / "best.pt"
+    checkpoint.write_bytes(b"weights")
+    # A device is named so the FP16 decision does not depend on the test machine's cards.
+    baseline = InferenceConfig(device="0")
+
+    for changed in (
+        baseline.model_copy(update={"conf": 0.25}),
+        baseline.model_copy(update={"iou": 0.5}),
+        baseline.model_copy(update={"imgsz": 1280}),
+        baseline.model_copy(update={"device": "cpu"}),
+    ):
+        assert _prediction_cache(tmp_path, "baseline", "test", checkpoint, changed) != (
+            _prediction_cache(tmp_path, "baseline", "test", checkpoint, baseline)
+        )
 
 
 def test_comparing_a_model_against_itself_is_refused(tmp_path: Path) -> None:

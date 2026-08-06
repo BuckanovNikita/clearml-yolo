@@ -3,7 +3,7 @@
 Comparing a new model against the baseline's stored dashboards compares numbers
 computed on a different set of images; the only apples-to-apples baseline is the
 old checkpoint scored on today's images, by the same inference code the new model
-went through (``digital_metrics.inference.predict_on_images``, which the predict
+went through (``clearml_yolo.inference.predict_on_images``, which the predict
 stage also calls).
 """
 
@@ -13,9 +13,10 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pandas as pd
-from digital_metrics.inference import predict_on_images
 from loguru import logger
 from pydantic import BaseModel
+
+from clearml_yolo.inference import predict_on_images
 
 Predictor = Callable[..., pd.DataFrame]
 ClassNameLoader = Callable[[str | Path], dict[int, str]]

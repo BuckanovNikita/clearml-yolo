@@ -17,6 +17,7 @@ import pandas as pd
 from loguru import logger
 from pydantic import BaseModel, Field
 
+from clearml_yolo import artifact_names
 from clearml_yolo.clearml_models import (
     fetch_best_confidences,
     latest_completed_task_id,
@@ -29,6 +30,7 @@ from clearml_yolo.comparison.reinfer import VocabularyReport, reinfer_split
 from clearml_yolo.comparison.scoring import score_split
 from clearml_yolo.comparison.workbook import write_comparison_workbook
 from clearml_yolo.gpu import AutoGpuConfig, resolve_inference_device
+from clearml_yolo.inference import uses_half_precision
 
 ModelSource = Literal["clearml", "local"]
 
@@ -126,19 +128,27 @@ class CompareResult(BaseModel):
     degraded_classes: list[str] = Field(default_factory=list)
 
 
-def _prediction_cache(destination: Path, role: str, split: str, weights: Path) -> Path:
-    """Name a re-inference cache after the checkpoint that filled it.
+def _prediction_cache(
+    destination: Path, role: str, split: str, weights: Path, inference: InferenceConfig
+) -> Path:
+    """Name a re-inference cache after the checkpoint and the settings that filled it.
 
     Keyed on the role alone, a second comparison in the same output directory reused the
     first one's predictions for whatever model it was now given — scoring one checkpoint's
     detections under another's name, which is precisely the substitution this whole
     comparison exists to remove. Size and modification time are part of the key so a
-    retrained ``best.pt`` at an unchanged path is not mistaken for the old one.
+    retrained ``best.pt`` at an unchanged path is not mistaken for the old one, and the
+    inference settings are part of it so predictions taken at one confidence, resolution or
+    numeric precision are never compared against predictions taken at another.
     """
     identity = str(weights.resolve())
     if weights.is_file():
         stat = weights.stat()
         identity = f"{identity}:{stat.st_size}:{stat.st_mtime_ns}"
+    identity = (
+        f"{identity}:conf={inference.conf}:iou={inference.iou}:imgsz={inference.imgsz}"
+        f":half={uses_half_precision(inference.device)}"
+    )
     digest = hashlib.sha256(identity.encode()).hexdigest()[:12]
     return destination / f"{role}_predictions_{split}_{digest}.csv"
 
@@ -232,7 +242,7 @@ def compare(
         baseline_weights,
         truth,
         split,
-        _prediction_cache(destination, "baseline", split, baseline_weights),
+        _prediction_cache(destination, "baseline", split, baseline_weights, inference),
         inference,
         thresholds_baseline,
         classes,
@@ -242,7 +252,7 @@ def compare(
         candidate_weights,
         truth,
         split,
-        _prediction_cache(destination, "candidate", split, candidate_weights),
+        _prediction_cache(destination, "candidate", split, candidate_weights, inference),
         inference,
         thresholds_candidate,
         classes,
@@ -268,11 +278,14 @@ def compare(
     tables.methodology["iou_threshold"] = iou_threshold
     tables.methodology["matching_strategy"] = matching_strategy
 
-    workbook = destination / f"comparison_{split}.xlsx"
+    workbook = destination / f"{artifact_names.COMPARISON_WORKBOOK_PREFIX}_{split}.xlsx"
     write_comparison_workbook(tables.rows, tables.excluded, tables.methodology, workbook)
     report_comparison(task, split, tables.rows, tables.methodology)
     if task is not None:
-        task.upload_artifact(name=f"comparison_{split}", artifact_object=workbook)
+        task.upload_artifact(
+            name=artifact_names.per_split(artifact_names.COMPARISON_WORKBOOK_PREFIX, split),
+            artifact_object=workbook,
+        )
 
     degraded = _degraded(tables)
     logger.info(

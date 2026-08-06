@@ -16,6 +16,8 @@ from loguru import logger
 from PIL import Image
 from ultralytics.data.utils import IMG_FORMATS, check_det_dataset, img2label_paths
 
+from clearml_yolo.progress import track
+
 GROUND_TRUTH_COLUMNS = [
     "image_name",
     "image_path",
@@ -115,7 +117,10 @@ def _split_rows(
     """Build the CSV rows of one split, counting images that carry no annotation."""
     rows: list[GroundTruthRow] = []
     background_images = 0
-    for image, label in zip(images, img2label_paths([str(image) for image in images]), strict=True):
+    labels = img2label_paths([str(image) for image in images])
+    for image, label in track(
+        list(zip(images, labels, strict=True)), f"Reading split {split!r}", unit="img"
+    ):
         label_path = Path(label)
         boxes = _parse_label_file(label_path, names) if label_path.is_file() else []
         if not boxes:
