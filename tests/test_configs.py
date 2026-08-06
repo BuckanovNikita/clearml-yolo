@@ -7,8 +7,12 @@ from hydra import compose, initialize_config_module
 from hydra_zen import instantiate, store
 
 import clearml_yolo.configs  # noqa: F401  registers every config
+from clearml_yolo.gpu import AutoGpuConfig
+from clearml_yolo.tasks.compare import InferenceConfig
+from clearml_yolo.tasks.pipeline import _as_dict
 
 STAGES = ["train", "predict", "metrics", "report"]
+ALL_STAGES = [*STAGES, "compare"]
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -36,6 +40,101 @@ def test_clearml_name_reaches_every_pipeline_stage() -> None:
     for stage in STAGES:
         assert config[stage].clearml.project_name == "my-proj", stage
         assert config[stage].clearml.task_name == "exp-42", stage
+
+
+def _pipeline_stages(overrides: list[str]) -> dict[str, dict[str, object]]:
+    """Compose the pipeline and resolve each stage the way run_pipeline does.
+
+    Composing alone is not enough to prove an interpolation works: it leaves the ``${...}``
+    unresolved, and a node interpolation only turns back into a real config object when
+    ``_as_dict`` instantiates it.
+    """
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        config = compose(config_name="pipeline", overrides=overrides)
+    return {stage: _as_dict(config[stage]) for stage in ALL_STAGES}
+
+
+def test_one_ground_truth_reaches_inference_scoring_and_comparison() -> None:
+    """Three stages read the same CSV; naming it three times is how they drift apart."""
+    stages = _pipeline_stages(["ground_truth=runs/kitti_gt.csv"])
+
+    for stage in ("predict", "metrics", "compare"):
+        assert stages[stage]["ground_truth"] == "runs/kitti_gt.csv", stage
+
+
+def test_one_split_list_reaches_every_stage_that_reads_one() -> None:
+    stages = _pipeline_stages(["splits=[val,test]"])
+
+    for stage in ("predict", "metrics", "report"):
+        assert stages[stage]["splits"] == ["val", "test"], stage
+
+
+def test_the_gpu_policy_is_named_once_for_all_three_stages() -> None:
+    """A whole config node is interpolated here, not a string, so it must survive instantiate."""
+    stages = _pipeline_stages(["auto_gpu.wait_timeout_seconds=120.0"])
+
+    for stage in ("train", "predict", "compare"):
+        auto_gpu = stages[stage]["auto_gpu"]
+        assert isinstance(auto_gpu, AutoGpuConfig), stage
+        assert auto_gpu.wait_timeout_seconds == 120.0, stage
+
+
+def test_the_run_name_follows_the_experiment_name() -> None:
+    """train.name is the run directory, and having to repeat the task name is how the two
+    stopped matching."""
+    stages = _pipeline_stages(["clearml.task_name=kitti-candidate"])
+
+    assert stages["train"]["name"] == "kitti-candidate"
+    assert stages["predict"]["weights"] == "runs/detect/kitti-candidate/weights/best.pt"
+
+
+def test_each_stage_reads_what_the_previous_one_wrote() -> None:
+    """These keys were dead before: the pipeline read the producing stage's key instead,
+    so changing metrics.output_dir left report.metrics_dir silently stale."""
+    stages = _pipeline_stages(
+        ["predict.output=runs/kitti_preds.csv", "metrics.output_dir=runs/kitti_metrics"]
+    )
+
+    assert stages["metrics"]["predictions"] == "runs/kitti_preds.csv"
+    assert stages["report"]["metrics_dir"] == "runs/kitti_metrics"
+
+
+def test_the_comparison_re_infers_exactly_as_the_predict_stage_did() -> None:
+    """Both models must be scored the way the candidate was, or the diff is not the model."""
+    stages = _pipeline_stages(["predict.conf=0.005", "predict.imgsz=1280", "predict.batch=8"])
+
+    inference = stages["compare"]["inference"]
+    assert isinstance(inference, InferenceConfig)
+    assert (inference.conf, inference.imgsz, inference.batch) == (0.005, 1280, 8)
+    # The card stays the comparison's own: inheriting it would let the two models be
+    # re-inferred on different hardware, which is the one thing this must not compare.
+    assert inference.device is None
+
+
+def test_the_comparison_scores_at_the_iou_its_thresholds_were_calibrated_at() -> None:
+    stages = _pipeline_stages(
+        ["metrics.evaluation.iou_threshold=0.35", "metrics.evaluation.matching_strategy=greedy"]
+    )
+
+    assert stages["compare"]["iou_threshold"] == 0.35
+    assert stages["compare"]["matching_strategy"] == "greedy"
+
+
+def test_the_pipeline_offers_no_candidate_model_to_set() -> None:
+    """The pipeline fills the candidate in from the model it just trained, so offering the
+    key would only let a run name a different model than the one under test."""
+    stages = _pipeline_stages([])
+
+    assert "candidate_model" not in stages["compare"]
+    assert "baseline_model" in stages["compare"]
+
+
+def test_the_standalone_comparison_still_names_both_sides() -> None:
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        config = compose(config_name="compare")
+
+    assert config.candidate_model is not None
+    assert config.baseline_model is not None
 
 
 @pytest.mark.parametrize("source", ["clearml", "local", "none"])
