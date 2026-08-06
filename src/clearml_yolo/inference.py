@@ -22,12 +22,19 @@ cannot decode, logging a warning, which would quietly shrink the scored set and 
 downstream as a recall drop that reads like a model regression — so every requested image
 is accounted for before returning.
 
-On CUDA, half precision and ``torch.compile`` are both on by default. Measured on 748
-KITTI images with a fine-tuned yolo11 on an RTX 5090, neither buys much on a model that
-small — preprocess 1.31 ms/img, GPU inference 0.53 ms/img, postprocess 0.93 ms/img, so the
-network is a minority of the time, ``half`` measured ~5% slower and ``compile`` costs a
-one-off compilation against a ~5% steady-state gain. Both are still on because both scale
-with model size, and both are one ``predict_kwargs`` entry away from off.
+Throughput came out level with the chunked-and-threaded version this replaces: 748 KITTI
+images with a fine-tuned yolo11 on an RTX 5090 took 16.3 s before and 15.5 s after, box
+for box identical. Ultralytics decodes inline, so the ~0.9 ms/img that decoding off the
+main thread used to hide is paid again — and it is repaid by not setting a source up 47
+times. Both figures are dominated by ~9 s of one-off ``torch.compile`` work for the final
+partial batch's shape; a warm process scores the same 748 images in 4.8 s.
+
+On CUDA, half precision and ``torch.compile`` are both on by default. Neither buys much on
+a model this small — preprocess 1.31 ms/img, GPU inference 0.53 ms/img, postprocess
+0.93 ms/img, so the network is a minority of the time, ``half`` measured ~5% slower and
+``compile`` costs that one-off compilation against a ~5% steady-state gain. Both are still
+on because both scale with model size, and both are one ``predict_kwargs`` entry away from
+off.
 """
 
 from __future__ import annotations
