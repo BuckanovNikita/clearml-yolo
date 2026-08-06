@@ -243,21 +243,24 @@ def test_each_checkpoint_gets_its_own_prediction_cache(tmp_path: Path) -> None:
 
 
 def test_a_cache_is_not_reused_across_inference_settings(tmp_path: Path) -> None:
-    """Predictions taken at one confidence or resolution are not the same detections.
+    """Predictions taken at one confidence, resolution or precision are not the same boxes.
 
     The cache survives a rerun, so without the settings in its key a comparison could score
-    one model's detections against the other's taken at a different operating point.
+    one model's detections against the other's taken at a different operating point — a
+    warm FP32 cache against fresh FP16 detections, say.
     """
     from clearml_yolo.tasks.compare import InferenceConfig, _prediction_cache
 
     checkpoint = tmp_path / "best.pt"
     checkpoint.write_bytes(b"weights")
-    baseline = InferenceConfig()
+    # A device is named so the FP16 decision does not depend on the test machine's cards.
+    baseline = InferenceConfig(device="0")
 
     for changed in (
         baseline.model_copy(update={"conf": 0.25}),
         baseline.model_copy(update={"iou": 0.5}),
         baseline.model_copy(update={"imgsz": 1280}),
+        baseline.model_copy(update={"device": "cpu"}),
     ):
         assert _prediction_cache(tmp_path, "baseline", "test", checkpoint, changed) != (
             _prediction_cache(tmp_path, "baseline", "test", checkpoint, baseline)

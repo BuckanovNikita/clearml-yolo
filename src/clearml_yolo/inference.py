@@ -5,11 +5,17 @@ lives here rather than upstream because digital-metrics is consumed as a release
 
 **Where the time actually goes.** Measured on 748 KITTI images with a fine-tuned yolo11 on
 an RTX 5090: preprocess 1.31 ms/img, GPU inference 0.53 ms/img, postprocess 0.93 ms/img,
-image decode ~0.9 ms/img. The network is under a tenth of the wall clock, so neither a
-bigger batch nor half precision buys anything — both measured *slower*. What does buy
-something is decoding off the main thread: ultralytics decodes a list source inline, one
-image at a time, so the card idles through it. Decoding the next chunk while the current
-one is on the GPU took the same 748 images from 3.9 s to 1.7 s, to the box.
+image decode ~0.9 ms/img. The network being a minority of that is why a bigger batch buys
+nothing here, and why the two GPU-side defaults are worth little on a model this small —
+they pay off as the model grows. What buys the most on any model is decoding off the main
+thread: ultralytics decodes a list source inline, one image at a time, so the card idles
+through it. Decoding the next chunk while the current one is on the GPU took the same 748
+images from 4.4 s to 2.4 s, box for box.
+
+On that same small model, ``half`` measured ~5% slower and ``compile`` cost about 12 s of
+one-off compilation per process against a ~5% steady-state gain — the split finishes before
+either repays. Both are still on by default because both scale with model size, and both
+are one ``predict_kwargs`` entry away from off.
 
 **Two ultralytics behaviours are load-bearing, and both are the opposite of what the API
 suggests.** A *list* source is not read like a directory: ``check_source`` hands it to
@@ -56,6 +62,28 @@ PREDICTION_COLUMNS = [
 # threads are enough. Four saturated the measurement; eight added nothing, so this is not
 # exposed as a config key that would then have to be kept in step with three others.
 DECODE_WORKERS = 4
+
+# Everything ultralytics accepts that is not one of these is a CUDA ordinal ("0", "0,1")
+# or an explicit cuda device ("cuda:0").
+NON_CUDA_DEVICES = frozenset({"cpu", "mps"})
+
+
+def is_cuda_device(device: str | None) -> bool:
+    """Whether inference will run on a CUDA card.
+
+    Two defaults hang off this — half precision and ``torch.compile`` — because neither is
+    available anywhere else. It also has to reach anything that caches or compares
+    predictions, since both change which boxes come back: an FP32 cache scored against
+    fresh FP16 detections is a model difference that is not one.
+
+    With no device named, ultralytics picks the card itself, so the question is only
+    whether this machine has one.
+    """
+    if not device:
+        from torch.cuda import is_available
+
+        return bool(is_available())
+    return not any(part.strip().lower() in NON_CUDA_DEVICES for part in str(device).split(","))
 
 
 def _image_id(path: str, mode: ImageNameMode) -> str:
@@ -154,11 +182,14 @@ def predict_on_images(
     ``conf`` defaults to near zero because per-class thresholds are calibrated downstream,
     and filtering here would discard the detections that calibration needs.
 
-    ``model_kwargs`` reach ``model.predict`` untouched, so ``half=True`` is how to ask for
-    FP16. It is not the default: the network is under a tenth of this loop's wall clock, so
-    half precision measured *slower* here while still shifting confidences enough to move
-    calibrated thresholds. Turn it on only for a model heavy enough to be GPU-bound, and
-    re-calibrate afterwards.
+    Half precision and ``torch.compile`` are both on by default wherever the device supports
+    them. Both pay off on a model heavy enough to be GPU-bound, and both change which boxes
+    come back, so thresholds calibrated without them do not carry over — recalibrate rather
+    than mixing. See the module docstring for what each measured on a small model.
+
+    ``model_kwargs`` reach ``model.predict`` untouched, so ``half=False`` and
+    ``compile=False`` are how to turn either back off for a run that has to reproduce
+    numbers taken before these defaults.
     """
     if batch < 1:
         raise ValueError(f"batch must be >= 1, got {batch}")
@@ -168,11 +199,14 @@ def predict_on_images(
     paths = [str(path) for path in image_paths]
     model = YOLO(str(weights))
     names: dict[int, str] = model.names
+    accelerated = is_cuda_device(device)
     settings: dict[str, Any] = {
         "conf": conf,
         "iou": iou,
         "imgsz": imgsz,
         "device": device,
+        "half": accelerated,
+        "compile": accelerated,
         **model_kwargs,
     }
     logger.info(

@@ -17,7 +17,7 @@ import pytest
 from loguru import logger
 
 from clearml_yolo import inference as inference_module
-from clearml_yolo.inference import PREDICTION_COLUMNS, predict_on_images
+from clearml_yolo.inference import PREDICTION_COLUMNS, is_cuda_device, predict_on_images
 from clearml_yolo.inference import _read_image as read_image  # bound before the stub lands
 
 NAMES = {0: "person", 1: "dog"}
@@ -170,17 +170,45 @@ def test_inference_settings_reach_ultralytics() -> None:
     call = FakeYolo.last.calls[0]  # type: ignore[union-attr]
     assert (call["conf"], call["iou"], call["imgsz"], call["device"]) == (0.25, 0.5, 1280, "0")
     assert call["stream"] is True
-    # Half precision is off unless asked for: the network is a tenth of the wall clock here,
-    # so FP16 measured slower while still moving every calibrated threshold.
-    assert "half" not in call
 
 
-def test_half_precision_can_still_be_asked_for() -> None:
+def test_half_precision_follows_the_device() -> None:
+    """FP16 by default on a card, and never where it is unsupported."""
     DETECTIONS[0] = _boxes(([1, 2, 3, 4], 0.9, 0))
-
-    predict_on_images("best.pt", ["a.png"], device="0", half=True)
-
+    predict_on_images("best.pt", ["a.png"], device="0")
     assert FakeYolo.last.calls[0]["half"] is True  # type: ignore[union-attr]
+
+    predict_on_images("best.pt", ["a.png"], device="cpu")
+    assert FakeYolo.last.calls[0]["half"] is False  # type: ignore[union-attr]
+
+
+def test_torch_compile_follows_the_device() -> None:
+    """Compilation is a CUDA-only default, and costs a one-off per process to earn back."""
+    DETECTIONS[0] = _boxes(([1, 2, 3, 4], 0.9, 0))
+    predict_on_images("best.pt", ["a.png"], device="0")
+    assert FakeYolo.last.calls[0]["compile"] is True  # type: ignore[union-attr]
+
+    predict_on_images("best.pt", ["a.png"], device="cpu")
+    assert FakeYolo.last.calls[0]["compile"] is False  # type: ignore[union-attr]
+
+
+@pytest.mark.parametrize("setting", ["half", "compile"])
+def test_either_gpu_default_can_be_forced_back_off(setting: str) -> None:
+    """Both change which boxes come back, so a run reproducing older numbers must opt out."""
+    DETECTIONS[0] = _boxes(([1, 2, 3, 4], 0.9, 0))
+    overrides: dict[str, Any] = {setting: False}
+
+    predict_on_images("best.pt", ["a.png"], device="0", **overrides)
+
+    assert FakeYolo.last.calls[0][setting] is False  # type: ignore[union-attr]
+
+
+@pytest.mark.parametrize(
+    ("device", "expected"),
+    [("0", True), ("0,1", True), ("cuda:0", True), ("cpu", False), ("mps", False)],
+)
+def test_which_devices_get_the_gpu_defaults(device: str, expected: bool) -> None:
+    assert is_cuda_device(device) is expected
 
 
 def test_a_batch_below_one_is_refused() -> None:
