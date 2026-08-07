@@ -22,16 +22,13 @@ from clearml_yolo.gpu import AutoGpuConfig
 from clearml_yolo.tasks.compare import InferenceConfig, ModelRef
 from clearml_yolo.tasks.metrics import EvaluationConfig
 from clearml_yolo.tasks.report import BaselineConfig
+from clearml_yolo.tasks.train import CHECKPOINT
 
 IMAGE_SIZE = 640
 TRAIN_PROJECT = "runs/detect"
 RUN_NAME = "train"
 PREDICTIONS_CSV = "runs/predictions.csv"
 METRICS_DIR = "runs/metrics"
-# Ultralytics decides where a run's checkpoint lands, so its layout is named once here:
-# the standalone predict app has to find that file without a training stage in the run,
-# and inside the pipeline the same template follows whatever project/name the run used.
-CHECKPOINT = "{project}/{name}/weights/best.pt"
 DEFAULT_CHECKPOINT = CHECKPOINT.format(project=TRAIN_PROJECT, name=RUN_NAME)
 
 AutoGpuConf = builds(AutoGpuConfig, populate_full_signature=True)

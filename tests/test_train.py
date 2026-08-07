@@ -16,7 +16,7 @@ import pytest
 
 from clearml_yolo.clearml_session import ClearMLConfig
 from clearml_yolo.gpu import AutoGpuConfig, DeviceSelection
-from clearml_yolo.tasks.train import train
+from clearml_yolo.tasks.train import CHECKPOINT, train
 
 DISABLED = ClearMLConfig(enabled=False)
 
@@ -121,3 +121,27 @@ def test_the_checkpoint_comes_from_the_trainer_not_the_requested_name(tmp_path: 
 
     assert result["name"] == "run"
     assert FakeYolo.last.trainer is not None  # type: ignore[union-attr]
+
+
+def test_the_checkpoint_template_names_the_file_training_writes(tmp_path: Path) -> None:
+    """The pipeline predicts this path when training is skipped, so a template that drifts
+    from the layout training uses would point a skipped run at a file nobody wrote."""
+    selection = DeviceSelection(devices=[0], batch=16, batch_per_gpu=16)
+    project = str(tmp_path / "runs")
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(
+            "clearml_yolo.tasks.train.resolve_devices", lambda *_args, **_kwargs: selection
+        )
+        result = train(
+            model="yolo11n.pt",
+            data="data.yaml",
+            epochs=1,
+            imgsz=640,
+            batch=16,
+            project=project,
+            name="run",
+            auto_gpu=AutoGpuConfig(),
+            clearml=DISABLED,
+        )
+
+    assert str(result.weights) == CHECKPOINT.format(project=project, name="run")
