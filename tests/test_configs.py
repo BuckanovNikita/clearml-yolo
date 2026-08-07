@@ -272,6 +272,22 @@ def test_baseline_group_swaps_inside_pipeline(source: str) -> None:
     assert instantiate(config.report.baseline).source == source
 
 
+@pytest.mark.parametrize("stage", ALL_STAGES)
+def test_a_pipeline_stage_declares_nothing_the_run_fills_in(stage: str) -> None:
+    """A key that is both declared and filled is a setting a run can change with no effect."""
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        config = compose(config_name="pipeline")
+
+    assert not set(config[stage]) & PIPELINE_FILLED_KEYS[stage]
+
+
+def test_a_named_checkpoint_wins_over_the_one_training_would_have_written() -> None:
+    """Which is the whole point of the key: skip_train with weights from somewhere else."""
+    stages = _pipeline_stages(["skip_train=true", "weights=runs/old/best.pt"])
+
+    assert stages["predict"]["weights"] == "runs/old/best.pt"
+
+
 def test_auto_gpu_defaults_are_valid() -> None:
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
         config = compose(config_name="train")

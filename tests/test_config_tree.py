@@ -12,8 +12,6 @@ from omegaconf import OmegaConf
 import clearml_yolo.configs  # noqa: F401  registers every config
 from clearml_yolo.config_tree import COMMAND_OF_CONFIG, dump_config_tree
 
-INTERPOLATED = "${clearml.project_name}"
-
 
 @pytest.fixture(scope="module", autouse=True)
 def hydra_store() -> None:
@@ -28,11 +26,12 @@ def test_one_file_per_command(tmp_path: Path) -> None:
     }
 
 
-def test_interpolations_are_dumped_unresolved(tmp_path: Path) -> None:
-    """Resolving them would freeze today's project name and break one-name-per-run."""
+def test_the_pipeline_file_has_nothing_left_to_resolve(tmp_path: Path) -> None:
+    """Shared values are named once at the top level and handed to stages by run_pipeline,
+    so a stage block pointing at another key would be a reference nothing keeps true."""
     dump_config_tree(tmp_path)
 
-    assert INTERPOLATED in (tmp_path / "cy.yaml").read_text(encoding="utf-8")
+    assert "${" not in (tmp_path / "cy.yaml").read_text(encoding="utf-8")
 
 
 def test_dumped_files_explain_how_to_use_them(tmp_path: Path) -> None:

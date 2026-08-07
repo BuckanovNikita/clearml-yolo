@@ -204,6 +204,7 @@ def run_pipeline(
     auto_gpu: AutoGpuConfig,
     ground_truth: str,
     splits: list[str],
+    weights: str | Path | None = None,
     skip_train: bool = False,
     skip_predict: bool = False,
     skip_metrics: bool = False,
@@ -226,7 +227,7 @@ def run_pipeline(
         auto_gpu=auto_gpu,
         ground_truth=ground_truth,
         splits=splits,
-        weights=None,
+        weights=weights,
     )
     train_cfg = configs["train"]
     predict_cfg = configs["predict"]

@@ -119,7 +119,10 @@ def test_comparison_scores_the_model_this_run_just_built(monkeypatch: pytest.Mon
     seen: dict[str, object] = {}
     monkeypatch.setattr(pipeline_module, "run_comparison", lambda **kwargs: seen.update(kwargs))
 
-    config = _stage_config("compare") | {"clearml": ClearMLConfig(enabled=False)}
+    # run_compare_stage is only ever called with a block that has gone through
+    # stage_configs, so this is what its caller actually hands it — not a bare composed
+    # stage block, which no longer carries ground_truth at all.
+    config = _stage_configs()["compare"] | {"clearml": ClearMLConfig(enabled=False)}
     run_compare_stage(config, "runs/detect/train/weights/best.pt", {"test": {"car": 0.4}})
 
     candidate = seen["candidate_model"]
@@ -127,8 +130,8 @@ def test_comparison_scores_the_model_this_run_just_built(monkeypatch: pytest.Mon
     assert candidate.source == "local"
     assert candidate.weights == Path("runs/detect/train/weights/best.pt")
     assert candidate.thresholds == {"car": 0.4}
-    # The comparison reads its own ground-truth key, which interpolates the one top-level
-    # value every stage points at, so the three cannot drift apart.
+    # The comparison reads the ground truth the run handed every stage, so the three
+    # cannot drift apart.
     assert seen["ground_truth"] == "ground_truth.csv"
 
 
