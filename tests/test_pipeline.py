@@ -66,7 +66,7 @@ def _stage_configs() -> dict[str, dict[str, object]]:
         clearml=instantiate(config.clearml),
         auto_gpu=instantiate(config.auto_gpu),
         ground_truth=config.ground_truth,
-        splits=list(config.splits),
+        splits=config.splits,
         weights=config.get("weights"),
     )
 
@@ -165,6 +165,23 @@ def test_a_split_no_stage_scores_is_rejected_before_training_starts(
         )
 
     with pytest.raises(ValueError, match=r"compare\.split"):
+        zen(run_pipeline)(config)
+
+
+def test_a_named_checkpoint_without_skip_train_is_rejected_before_training_starts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """weights names a checkpoint for a run that is about to train its own; training would
+    silently overwrite it with the model it just built, so the mismatch must be caught
+    before an hour of training rather than after."""
+    monkeypatch.setattr(pipeline_module, "run_training", lambda **kwargs: pytest.fail("trained"))
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        config = compose(
+            config_name="pipeline",
+            overrides=["weights=runs/old/best.pt", "clearml.enabled=false"],
+        )
+
+    with pytest.raises(ValueError, match="weights"):
         zen(run_pipeline)(config)
 
 

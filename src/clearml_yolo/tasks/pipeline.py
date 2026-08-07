@@ -194,6 +194,20 @@ def _check_split_choices(splits: list[str], choices: dict[str, str | None]) -> N
         )
 
 
+def _check_weights_choice(weights: str | Path | None, skip_train: bool) -> None:
+    """Reject a named checkpoint that training is about to overwrite.
+
+    Training's starting point is ``train.model``, not ``weights``: a run that trains has
+    no use for a checkpoint named on the side, and letting it through means an hour of
+    training runs only to discard the value the caller asked for, silently.
+    """
+    if weights is not None and not skip_train:
+        raise ValueError(
+            f"weights={weights} names a checkpoint for a run that is going to train its "
+            "own; set skip_train=true, or drop weights."
+        )
+
+
 def run_pipeline(
     train: Any,
     predict: Any,
@@ -212,6 +226,8 @@ def run_pipeline(
     skip_compare: bool = False,
 ) -> dict[str, Any]:
     """Thread each stage's output into the next, sharing one ClearML task."""
+    _check_weights_choice(weights, skip_train)
+
     # Created once here so every stage attaches to the same experiment rather than
     # opening its own.
     init_task(clearml, stage="pipeline")
@@ -243,23 +259,23 @@ def run_pipeline(
         },
     )
 
-    weights = predict_cfg["weights"]
+    checkpoint = predict_cfg["weights"]
     # Inference after training must reuse training's own card rather than survey again:
     # this process is still holding that card's memory, so a fresh survey would wait for
     # a device the run already owns.
     trained_device: str | None = None
     if skip_train:
-        logger.info("Skipping training; using weights {}", weights)
+        logger.info("Skipping training; using weights {}", checkpoint)
     else:
         trained = run_training(**train_cfg)
-        weights = trained.weights
+        checkpoint = trained.weights
         trained_device = trained.inference_device
         results["weights"] = trained.weights
 
     if skip_predict:
         logger.info("Skipping inference; using predictions {}", metrics_cfg["predictions"])
     else:
-        results["predictions"] = run_predict_stage(predict_cfg, weights, trained_device)
+        results["predictions"] = run_predict_stage(predict_cfg, checkpoint, trained_device)
 
     dashboards: dict[str, Path] = {}
     thresholds: dict[str, dict[str, float]] = {}
@@ -286,7 +302,7 @@ def run_pipeline(
     if skip_compare:
         logger.info("Skipping comparison stage")
     else:
-        comparison = run_compare_stage(compare_cfg, weights, thresholds, trained_device)
+        comparison = run_compare_stage(compare_cfg, checkpoint, thresholds, trained_device)
         if comparison is not None:
             results["comparison"] = comparison
 
