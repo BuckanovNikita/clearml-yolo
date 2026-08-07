@@ -649,12 +649,36 @@ def test_inference_falls_back_to_cpu_without_cuda(monkeypatch: pytest.MonkeyPatc
     assert resolve_inference(AutoGpuConfig(), None, None).device_name == "cpu"
 
 
-def test_a_named_card_is_left_alone_and_still_gets_a_batch() -> None:
-    """Naming a device skips the survey, so the batch cannot be sized — but must exist."""
-    selection = resolve_inference(AutoGpuConfig(batch_per_gpu=12), "0", None)
+def test_a_named_card_is_still_sized_by_the_policy(patch_modules: Any) -> None:
+    """The path the pipeline always takes: predict is handed training's own card rather
+    than surveying for one, and used to skip the whole batch policy because of it — so a
+    table written for this hardware went unread exactly where it was wanted."""
+    handles = [FakeHandle(name, 24.0, 23.0, 0) for name in ("aaa", "bbb")]
+    patch_modules(handles, ["aaa", "bbb"])
+    config = AutoGpuConfig(batch_per_gpu=12, batch_table={"yolo11m": {"GPU1": 20}})
 
-    assert selection.device_name == "0"
+    selection = resolve_inference(config, "1", None, model="yolo11m.pt")
+
+    assert selection.device_name == "1"
+    assert selection.batch == 20
+    # The card is described, so a run that finishes on it can still be remembered.
+    assert [gpu.torch_index for gpu in selection.gpus] == [1]
+
+
+def test_a_card_that_cannot_be_described_still_gets_a_batch() -> None:
+    """No survey means nothing to size against, but inference still needs a number."""
+    selection = resolve_inference(AutoGpuConfig(batch_per_gpu=12), "cpu", None)
+
+    assert selection.device_name == "cpu"
     assert selection.batch == 12
+
+
+def test_a_card_whose_name_is_digits_is_still_a_name() -> None:
+    """Hydra reads an unquoted {5090: 20} key as an integer, and its grammar offers no
+    quoting that survives there — so the table has to take the key however it arrives."""
+    config = AutoGpuConfig.model_validate({"batch_table": {"yolo11m": {5090: 20}}})
+
+    assert config.batch_table == {"yolo11m": {"5090": 20}}
 
 
 def test_inference_leaves_an_unnamed_card_to_ultralytics_when_the_policy_is_off() -> None:

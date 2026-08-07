@@ -23,13 +23,13 @@ from __future__ import annotations
 import json
 import os
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any
 
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 BYTES_PER_GIB = 1 << 30
 
@@ -61,6 +61,27 @@ class AutoGpuConfig(BaseModel):
     batch_table: BatchTable = Field(default_factory=dict)
     # Whether a batch that ran to completion is written down and read back next time.
     remember_batch: bool = True
+
+    @field_validator("batch_table", "model_batch_per_gpu", mode="before")
+    @classmethod
+    def _a_card_called_5090_is_a_name(cls, table: Any) -> Any:
+        """Take the model and card keys as names however they were spelled.
+
+        Hydra reads an unquoted ``{5090: 20}`` key as an integer, and its override grammar
+        accepts no quoting that survives in that position — so without this the table
+        would be refused for exactly those cards whose names are digits.
+
+        Mapping rather than dict, because a table that came through Hydra arrives as an
+        omegaconf node: it behaves like a mapping and is not one by type.
+        """
+        if not isinstance(table, Mapping):
+            return table
+        return {
+            str(model): {str(card): batch for card, batch in by_card.items()}
+            if isinstance(by_card, Mapping)
+            else by_card
+            for model, by_card in table.items()
+        }
     min_free_vram_gb: float = Field(default=8.0, ge=0)
     # Workstations with an attached display idle around 10% VRAM before any training
     # starts, so a stricter threshold would reject every local GPU.
@@ -693,6 +714,21 @@ def select_devices(
     )
 
 
+def _card_behind(device: str) -> list[GpuInfo]:
+    """Describe the card a device string names, without waiting for it.
+
+    A stage that follows training in one process is handed training's own card rather
+    than surveying for one, because this process still holds that card's memory and a
+    survey would wait for a device the run already owns. The card still has to be
+    described — otherwise the whole batch policy stops at the one path the pipeline
+    always takes, and a table written for this hardware would go unread there.
+    """
+    index = device.removeprefix("cuda:")
+    if not index.isdigit():
+        return []
+    return [gpu for gpu in probe_gpus().gpus if gpu.torch_index == int(index)]
+
+
 def resolve_inference(
     auto_gpu: AutoGpuConfig | None,
     device: str | None,
@@ -707,13 +743,23 @@ def resolve_inference(
     the reserve exists so that inference has somewhere to run, so honouring it here
     would leave a single-GPU host unable to infer at all.
 
-    With a card already named, or no policy to consult, there is no survey to size a
-    batch against, so a batch that was not given falls back to the configured anchor
-    rather than being guessed at.
+    With no policy to consult, or a card that cannot be described, there is nothing to
+    size a batch against, so a batch that was not given falls back to the configured
+    anchor rather than being guessed at.
     """
-    if auto_gpu is not None and auto_gpu.enabled and device is None:
-        single = auto_gpu.model_copy(update={"reserve_gpus": 0, "min_devices": 1, "max_gpus": 1})
-        return select_devices(single, model=model, stage=stage, batch=batch)
+    if auto_gpu is not None and auto_gpu.enabled:
+        if device is None:
+            single = auto_gpu.model_copy(
+                update={"reserve_gpus": 0, "min_devices": 1, "max_gpus": 1}
+            )
+            return select_devices(single, model=model, stage=stage, batch=batch)
+        named = _card_behind(device) if batch is None else []
+        if named:
+            per_gpu = select_batch_per_gpu(auto_gpu, model, named, stage)
+            logger.info("Inferring on GPU {} at batch {}", device, per_gpu)
+            return DeviceSelection(
+                devices=device, batch=per_gpu, batch_per_gpu=per_gpu, gpus=named
+            )
 
     if batch is None:
         batch = DEFAULT_BATCH if auto_gpu is None else auto_gpu.batch_per_gpu
