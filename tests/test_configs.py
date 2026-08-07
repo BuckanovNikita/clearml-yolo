@@ -11,10 +11,11 @@ from hydra import compose, initialize_config_module
 from hydra_zen import instantiate, store
 
 import clearml_yolo.configs  # noqa: F401  registers every config
+from clearml_yolo.clearml_session import ClearMLConfig
 from clearml_yolo.gpu import AutoGpuConfig
 from clearml_yolo.tasks.compare import InferenceConfig, ModelRef, compare
 from clearml_yolo.tasks.metrics import compute_metrics
-from clearml_yolo.tasks.pipeline import _as_dict
+from clearml_yolo.tasks.pipeline import PIPELINE_FILLED_KEYS, stage_configs
 from clearml_yolo.tasks.predict import predict
 from clearml_yolo.tasks.report import report
 from clearml_yolo.tasks.train import train
@@ -29,9 +30,6 @@ TASK_OF_STAGE: dict[str, Callable[..., Any]] = {
     "report": report,
     "compare": compare,
 }
-# What the pipeline fills in from the run itself rather than from config: the candidate is
-# the model it just trained, which no config key may name.
-FILLED_IN_AT_RUNTIME = {"compare": {"candidate_model"}}
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -47,44 +45,72 @@ def test_app_config_composes(app: str) -> None:
     assert config is not None
 
 
-def test_clearml_name_reaches_every_pipeline_stage() -> None:
-    """One override must name the whole experiment, not just the top-level block."""
-    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
-        config = compose(
-            config_name="pipeline",
-            overrides=["clearml.project_name=my-proj", "clearml.task_name=exp-42"],
-        )
-
-    assert config.clearml.project_name == "my-proj"
-    for stage in STAGES:
-        assert config[stage].clearml.project_name == "my-proj", stage
-        assert config[stage].clearml.task_name == "exp-42", stage
-
-
 def _pipeline_stages(overrides: list[str]) -> dict[str, dict[str, object]]:
-    """Compose the pipeline and resolve each stage the way run_pipeline does.
+    """Compose the pipeline and build each stage's kwargs the way run_pipeline does.
 
-    Composing alone is not enough to prove an interpolation works: it leaves the ``${...}``
-    unresolved, and a node interpolation only turns back into a real config object when
-    ``_as_dict`` instantiates it.
+    Composing alone proves nothing about what a stage receives: the shared values are not
+    in the stage blocks at all, they are handed over by ``stage_configs``.
     """
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
         config = compose(config_name="pipeline", overrides=overrides)
-    return {stage: _as_dict(config[stage]) for stage in ALL_STAGES}
+    return stage_configs(
+        train=config.train,
+        predict=config.predict,
+        metrics=config.metrics,
+        report=config.report,
+        compare=config.compare,
+        clearml=instantiate(config.clearml),
+        auto_gpu=instantiate(config.auto_gpu),
+        ground_truth=config.ground_truth,
+        splits=config.splits,
+        weights=config.get("weights"),
+    )
+
+
+def test_clearml_name_reaches_every_pipeline_stage() -> None:
+    """One override must name the whole experiment, not just the top-level block."""
+    stages = _pipeline_stages(["clearml.project_name=my-proj", "clearml.task_name=exp-42"])
+
+    for stage in ALL_STAGES:
+        clearml = stages[stage]["clearml"]
+        assert isinstance(clearml, ClearMLConfig)
+        assert clearml.project_name == "my-proj", stage
+        assert clearml.task_name == "exp-42", stage
 
 
 @pytest.mark.parametrize("stage", ALL_STAGES)
 def test_every_stage_config_key_is_a_parameter_of_its_task(stage: str) -> None:
-    """The pipeline forwards a stage's whole config block as keyword arguments.
+    """The pipeline calls a stage with its whole block plus what the run filled in.
 
     A key that is not a parameter is a setting the run accepts and silently ignores; a
-    parameter that is not a key is a TypeError raised an hour into a run. Neither is
-    visible to the type checker once the block is a dict, so it is checked here.
+    parameter that is neither a key nor filled in is a TypeError raised an hour into a run.
+    Neither is visible to the type checker once the block is a dict, so it is checked here.
+
+    The union alone would also pass a key that ``PIPELINE_FILLED_KEYS`` names but
+    ``stage_configs`` never actually fills — that key is a config key silently omitted with
+    nothing supplying it, the same TypeError an hour into a run. The second assertion pins
+    every filled key to one ``stage_configs`` actually produces, except ``candidate_model``:
+    ``run_compare_stage`` fills that one from the model this run just trained, not
+    ``stage_configs``, and
+    ``tests/test_pipeline.py::test_comparison_scores_the_model_this_run_just_built`` covers it.
     """
-    supplied = FILLED_IN_AT_RUNTIME.get(stage, set())
-    keys = set(_pipeline_stages([])[stage]) | supplied
+    stage_kwargs = set(_pipeline_stages([])[stage])
+    keys = stage_kwargs | PIPELINE_FILLED_KEYS[stage]
 
     assert keys == set(inspect.signature(TASK_OF_STAGE[stage]).parameters)
+    assert PIPELINE_FILLED_KEYS[stage] - {"candidate_model"} <= stage_kwargs
+
+
+def test_the_comparison_declares_only_the_inference_it_owns() -> None:
+    """Every other inference setting comes from the predict stage, merged in by
+    ``stage_configs``. Declaring one here would be a key a run can set in ``compare.inference``
+    that a pipeline run then silently overwrites — the same defect class this branch removes
+    everywhere else, and it would slip in unnoticed the moment ``ComparisonInferenceConf``
+    gains ``populate_full_signature=True`` like every other ``builds(...)`` in configs.py."""
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        config = compose(config_name="pipeline")
+
+    assert set(config.compare.inference) - {"_target_"} == {"device", "reuse_existing"}
 
 
 def test_one_ground_truth_reaches_inference_scoring_and_comparison() -> None:
@@ -103,7 +129,8 @@ def test_one_split_list_reaches_every_stage_that_reads_one() -> None:
 
 
 def test_the_gpu_policy_is_named_once_for_all_three_stages() -> None:
-    """A whole config node is interpolated here, not a string, so it must survive instantiate."""
+    """auto_gpu reaches every stage as the AutoGpuConfig instance stage_configs was given,
+    not resolved down to a string or a stripped dict."""
     stages = _pipeline_stages(["auto_gpu.wait_timeout_seconds=120.0"])
 
     for stage in ("train", "predict", "compare"):
@@ -121,6 +148,14 @@ def test_the_run_name_follows_the_experiment_name() -> None:
     assert stages["predict"]["weights"] == "runs/detect/kitti-candidate/weights/best.pt"
 
 
+def test_a_skipped_training_stage_predicts_where_training_would_have_written() -> None:
+    """Nothing produced a checkpoint this run, so the path has to be built from the run's
+    own project and name — the same two values training would have used."""
+    stages = _pipeline_stages(["skip_train=true", "clearml.task_name=kitti-candidate"])
+
+    assert stages["predict"]["weights"] == "runs/detect/kitti-candidate/weights/best.pt"
+
+
 def test_each_stage_reads_what_the_previous_one_wrote() -> None:
     """These keys were dead before: the pipeline read the producing stage's key instead,
     so changing metrics.output_dir left report.metrics_dir silently stale."""
@@ -134,7 +169,7 @@ def test_each_stage_reads_what_the_previous_one_wrote() -> None:
 
 def test_the_comparison_re_infers_exactly_as_the_predict_stage_did() -> None:
     """Both models must be scored the way the candidate was, or the diff is not the model."""
-    stages = _pipeline_stages(["predict.conf=0.005", "predict.imgsz=1280", "predict.batch=8"])
+    stages = _pipeline_stages(["predict.conf=0.005", "train.imgsz=1280", "predict.batch=8"])
 
     inference = stages["compare"]["inference"]
     assert isinstance(inference, InferenceConfig)
@@ -142,6 +177,17 @@ def test_the_comparison_re_infers_exactly_as_the_predict_stage_did() -> None:
     # The card stays the comparison's own: inheriting it would let the two models be
     # re-inferred on different hardware, which is the one thing this must not compare.
     assert inference.device is None
+
+
+def test_the_comparison_keeps_the_inference_settings_it_owns() -> None:
+    """Everything else about inference is the predict stage's, merged in over these two."""
+    stages = _pipeline_stages(["compare.inference.reuse_existing=false", "predict.conf=0.02"])
+
+    inference = stages["compare"]["inference"]
+    assert isinstance(inference, InferenceConfig)
+    assert inference.reuse_existing is False
+    assert inference.device is None
+    assert inference.conf == 0.02
 
 
 def test_inference_runs_at_the_resolution_the_model_was_trained_at() -> None:
@@ -247,6 +293,22 @@ def test_baseline_group_swaps_inside_pipeline(source: str) -> None:
         config = compose(config_name="pipeline", overrides=[f"report/baseline={source}"])
 
     assert instantiate(config.report.baseline).source == source
+
+
+@pytest.mark.parametrize("stage", ALL_STAGES)
+def test_a_pipeline_stage_declares_nothing_the_run_fills_in(stage: str) -> None:
+    """A key that is both declared and filled is a setting a run can change with no effect."""
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        config = compose(config_name="pipeline")
+
+    assert not set(config[stage]) & PIPELINE_FILLED_KEYS[stage]
+
+
+def test_a_named_checkpoint_wins_over_the_one_training_would_have_written() -> None:
+    """Which is the whole point of the key: skip_train with weights from somewhere else."""
+    stages = _pipeline_stages(["skip_train=true", "weights=runs/old/best.pt"])
+
+    assert stages["predict"]["weights"] == "runs/old/best.pt"
 
 
 def test_auto_gpu_defaults_are_valid() -> None:

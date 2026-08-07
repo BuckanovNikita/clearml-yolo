@@ -95,7 +95,11 @@ two consumers:
   not import `configs`, so the direction adds no cycle.)
 - `test_every_stage_config_key_is_a_parameter_of_its_task` asserts
   `block keys | filled keys == task signature`, so a key dropped from a config without
-  being filled by code, or filled without being dropped, fails the suite.
+  being filled by code, or filled without being dropped, fails the suite. A second
+  assertion pins `filled keys` to keys `stage_configs` actually produces — the union alone
+  would let a key named in `PIPELINE_FILLED_KEYS` but never filled slip through — except
+  `candidate_model`, which `run_compare_stage` fills from the model this run just trained,
+  not `stage_configs`.
 
 `FILLED_IN_AT_RUNTIME` in `test_configs.py` is subsumed by it: `compare.candidate_model`
 is simply another key the pipeline fills.

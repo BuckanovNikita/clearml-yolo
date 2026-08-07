@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 from hydra import compose, initialize_config_module
-from hydra_zen import store, zen
+from hydra_zen import instantiate, store, zen
 from omegaconf import OmegaConf
 
 import clearml_yolo.configs  # noqa: F401  registers every config
@@ -21,6 +21,7 @@ from clearml_yolo.tasks.pipeline import (
     run_compare_stage,
     run_pipeline,
     run_predict_stage,
+    stage_configs,
 )
 from clearml_yolo.tasks.train import _inference_device
 
@@ -48,9 +49,31 @@ def _stage_config(stage: str) -> dict:  # type: ignore[type-arg]
     return _as_dict(config[stage])
 
 
+def _stage_configs() -> dict[str, dict[str, object]]:
+    """Compose the pipeline and build each stage's kwargs the way run_pipeline does.
+
+    Composing alone proves nothing about what a stage receives: the shared values are not
+    in the stage blocks at all, they are handed over by ``stage_configs``.
+    """
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        config = compose(config_name="pipeline")
+    return stage_configs(
+        train=config.train,
+        predict=config.predict,
+        metrics=config.metrics,
+        report=config.report,
+        compare=config.compare,
+        clearml=instantiate(config.clearml),
+        auto_gpu=instantiate(config.auto_gpu),
+        ground_truth=config.ground_truth,
+        splits=config.splits,
+        weights=config.get("weights"),
+    )
+
+
 @pytest.mark.parametrize("stage", STAGES)
 def test_no_omegaconf_containers_survive(stage: str) -> None:
-    for key, value in _stage_config(stage).items():
+    for key, value in _stage_configs()[stage].items():
         assert not OmegaConf.is_config(value), f"{stage}.{key} is still {type(value)}"
 
 
@@ -65,7 +88,7 @@ def test_train_kwargs_are_picklable() -> None:
 
 @pytest.mark.parametrize("stage", STAGES)
 def test_whole_stage_config_is_picklable(stage: str) -> None:
-    config = _stage_config(stage)
+    config = _stage_configs()[stage]
     # The pydantic sub-configs are ours and pickle fine; this guards the rest.
     plain = {k: v for k, v in config.items() if not hasattr(v, "model_dump")}
 
@@ -85,7 +108,8 @@ def test_inference_reuses_the_card_training_just_used(monkeypatch: pytest.Monkey
     seen: dict[str, object] = {}
     monkeypatch.setattr(pipeline_module, "run_prediction", _recording_prediction(seen))
 
-    run_predict_stage(_stage_config("predict"), "best.pt", ClearMLConfig(enabled=False), "1")
+    config = _stage_config("predict") | {"clearml": ClearMLConfig(enabled=False)}
+    run_predict_stage(config, "best.pt", "1")
 
     assert seen["device"] == "1"
 
@@ -95,20 +119,19 @@ def test_comparison_scores_the_model_this_run_just_built(monkeypatch: pytest.Mon
     seen: dict[str, object] = {}
     monkeypatch.setattr(pipeline_module, "run_comparison", lambda **kwargs: seen.update(kwargs))
 
-    run_compare_stage(
-        _stage_config("compare"),
-        "runs/detect/train/weights/best.pt",
-        {"test": {"car": 0.4}},
-        ClearMLConfig(enabled=False),
-    )
+    # run_compare_stage is only ever called with a block that has gone through
+    # stage_configs, so this is what its caller actually hands it — not a bare composed
+    # stage block, which no longer carries ground_truth at all.
+    config = _stage_configs()["compare"] | {"clearml": ClearMLConfig(enabled=False)}
+    run_compare_stage(config, "runs/detect/train/weights/best.pt", {"test": {"car": 0.4}})
 
     candidate = seen["candidate_model"]
     assert isinstance(candidate, ModelRef)
     assert candidate.source == "local"
     assert candidate.weights == Path("runs/detect/train/weights/best.pt")
     assert candidate.thresholds == {"car": 0.4}
-    # The comparison reads its own ground-truth key, which interpolates the one top-level
-    # value every stage points at, so the three cannot drift apart.
+    # The comparison reads the ground truth the run handed every stage, so the three
+    # cannot drift apart.
     assert seen["ground_truth"] == "ground_truth.csv"
 
 
@@ -116,18 +139,13 @@ def test_the_comparison_reuses_the_card_training_just_used(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Same hazard the predict stage documents: surveying here would wait on a card this
-    very process still holds. Both models still go on one card, which is the whole point
-    of the comparison leaving inference.device out of its interpolations."""
+    very process still holds. Both models still go on one card, which is why
+    `_comparison_inference` never copies `device` from the predict stage."""
     seen: dict[str, object] = {}
     monkeypatch.setattr(pipeline_module, "run_comparison", lambda **kwargs: seen.update(kwargs))
 
-    run_compare_stage(
-        _stage_config("compare"),
-        "best.pt",
-        {"test": {"car": 0.4}},
-        ClearMLConfig(enabled=False),
-        "1",
-    )
+    config = _stage_config("compare") | {"clearml": ClearMLConfig(enabled=False)}
+    run_compare_stage(config, "best.pt", {"test": {"car": 0.4}}, "1")
 
     inference = seen["inference"]
     assert isinstance(inference, InferenceConfig)
@@ -137,8 +155,8 @@ def test_the_comparison_reuses_the_card_training_just_used(
 def test_a_split_no_stage_scores_is_rejected_before_training_starts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The split list is shared by interpolation, but singling one out of it is not, so
-    this is the one cross-stage mismatch config alone cannot rule out."""
+    """The split list reaches every stage from the run, but singling one out of it is not,
+    so this is the one cross-stage mismatch config alone cannot rule out."""
     monkeypatch.setattr(pipeline_module, "run_training", lambda **kwargs: pytest.fail("trained"))
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
         config = compose(
@@ -150,6 +168,23 @@ def test_a_split_no_stage_scores_is_rejected_before_training_starts(
         zen(run_pipeline)(config)
 
 
+def test_a_named_checkpoint_without_skip_train_is_rejected_before_training_starts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """weights names a checkpoint for a run that is about to train its own; training would
+    silently overwrite it with the model it just built, so the mismatch must be caught
+    before an hour of training rather than after."""
+    monkeypatch.setattr(pipeline_module, "run_training", lambda **kwargs: pytest.fail("trained"))
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        config = compose(
+            config_name="pipeline",
+            overrides=["weights=runs/old/best.pt", "clearml.enabled=false"],
+        )
+
+    with pytest.raises(ValueError, match="weights"):
+        zen(run_pipeline)(config)
+
+
 def test_a_run_without_calibrated_thresholds_skips_rather_than_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -158,12 +193,8 @@ def test_a_run_without_calibrated_thresholds_skips_rather_than_fails(
         pipeline_module, "run_comparison", lambda **kwargs: pytest.fail("should not run")
     )
 
-    assert (
-        run_compare_stage(
-            _stage_config("compare"), "best.pt", {}, ClearMLConfig(enabled=False)
-        )
-        is None
-    )
+    config = _stage_config("compare") | {"clearml": ClearMLConfig(enabled=False)}
+    assert run_compare_stage(config, "best.pt", {}) is None
 
 
 def test_a_first_run_with_nothing_to_compare_against_skips(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -174,22 +205,15 @@ def test_a_first_run_with_nothing_to_compare_against_skips(monkeypatch: pytest.M
 
     monkeypatch.setattr(pipeline_module, "run_comparison", _no_baseline)
 
-    assert (
-        run_compare_stage(
-            _stage_config("compare"),
-            "best.pt",
-            {"test": {"car": 0.4}},
-            ClearMLConfig(enabled=False),
-        )
-        is None
-    )
+    config = _stage_config("compare") | {"clearml": ClearMLConfig(enabled=False)}
+    assert run_compare_stage(config, "best.pt", {"test": {"car": 0.4}}) is None
 
 
 def test_an_explicit_device_still_wins_over_training(monkeypatch: pytest.MonkeyPatch) -> None:
     seen: dict[str, object] = {}
     monkeypatch.setattr(pipeline_module, "run_prediction", _recording_prediction(seen))
-    config = _stage_config("predict") | {"device": "0"}
+    config = _stage_config("predict") | {"device": "0", "clearml": ClearMLConfig(enabled=False)}
 
-    run_predict_stage(config, "best.pt", ClearMLConfig(enabled=False), "1")
+    run_predict_stage(config, "best.pt", "1")
 
     assert seen["device"] == "0"

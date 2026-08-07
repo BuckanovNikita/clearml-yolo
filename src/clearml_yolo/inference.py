@@ -124,9 +124,9 @@ def resolution_of(weights: str | Path, imgsz: int | None) -> int:
 
     A model is shown images at one scale and generalises to that scale, so inferring at
     another scores it on images unlike anything it ever saw. The pipeline keeps the two in
-    step by interpolation, but a checkpoint reached any other way — a ClearML task, a file
-    handed over — carries no such link, and 640 is a plausible enough number to be wrong
-    without ever looking wrong.
+    step itself, handing predict the resolution train just used, but a checkpoint reached
+    any other way — a ClearML task, a file handed over — carries no such link, and 640 is
+    a plausible enough number to be wrong without ever looking wrong.
     """
     recorded = trained_imgsz(weights)
     if imgsz is None:

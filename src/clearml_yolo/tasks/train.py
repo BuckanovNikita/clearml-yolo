@@ -11,6 +11,11 @@ from pydantic import BaseModel
 from clearml_yolo.clearml_session import ClearMLConfig, init_task
 from clearml_yolo.gpu import AutoGpuConfig, DeviceSelection, remember_batch, resolve_devices
 
+# Where ultralytics puts a run's checkpoint. Named here because two other places have to
+# predict this path without a trainer to ask: the standalone predict default, and the
+# pipeline when training is skipped.
+CHECKPOINT = "{project}/{name}/weights/best.pt"
+
 
 class TrainResult(BaseModel):
     """The checkpoint plus the device it was produced on.
