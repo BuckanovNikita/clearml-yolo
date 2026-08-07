@@ -77,9 +77,9 @@ uv run cy-metrics predictions=runs/predictions.csv ground_truth=ground_truth.csv
 не ссылка на чужой ключ: чекпоинт, который допишет `train` (или `weights`, если обучение
 пропущено), уходит в `predict.weights`, `predict.output` — в `metrics.predictions`,
 `metrics.output_dir` — в `report.metrics_dir`, `train.imgsz`/`train.model` — в
-`predict.imgsz`/`predict.model` (модель инференсится в том разрешении и по той
-архитектуре, в которой обучалась — по ней же подбирается батч), настройки инференса
-сравнения (`conf`, `iou`, `imgsz`, `batch`, `model`) — из уже посчитанного `predict`, а
+`predict.imgsz`/`predict.model` (модель инференсится в том разрешении, в котором
+обучалась, и по той архитектуре, которой обучена — по ней же подбирается батч), настройки
+инференса сравнения (`conf`, `iou`, `imgsz`, `batch`, `model`) — из уже посчитанного `predict`, а
 `metrics.evaluation.iou_threshold`/`matching_strategy` — в
 `compare.iou_threshold`/`matching_strategy`, чтобы сравнение считалось на том же IoU, на
 котором калибровались пороги. Внутри конвейера ни один из этих ключей не задать в блоке
@@ -483,6 +483,10 @@ uv run cy-train --config-dir ./conf --config-name cy-train
 Папку, выгруженную до появления авто-подбора батча, нужно выгрузить заново: в ней
 `batch: 16` записан числом, а теперь число означает «использовать ровно это» и отключает
 подбор.
+
+Папку, выгруженную до того, как конвейер стал раздавать общие ключи сам, тоже нужно
+выгрузить заново: в ней остались `predict.imgsz`, `predict.weights`, `compare.iou_threshold`
+и прочие ключи этапов, которые запуск теперь пересчитывает и молча перезаписывает.
 
 ## Разработка
 
