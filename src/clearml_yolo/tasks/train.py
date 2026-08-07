@@ -9,7 +9,7 @@ from loguru import logger
 from pydantic import BaseModel
 
 from clearml_yolo.clearml_session import ClearMLConfig, init_task
-from clearml_yolo.gpu import AutoGpuConfig, DeviceSelection, resolve_devices
+from clearml_yolo.gpu import AutoGpuConfig, DeviceSelection, remember_batch, resolve_devices
 
 
 class TrainResult(BaseModel):
@@ -36,7 +36,7 @@ def train(
     data: str,
     epochs: int,
     imgsz: int,
-    batch: int,
+    batch: int | None,
     project: str,
     name: str,
     auto_gpu: AutoGpuConfig,
@@ -49,13 +49,16 @@ def train(
     The checkpoint path is derived from project/name rather than from the return value
     of ``model.train()``: under DDP the parent process never runs a validator, so
     ultralytics returns no metrics there.
+
+    ``batch`` left unset hands the decision to ``auto_gpu``, which sizes it to the model
+    and the cards this run was given; a number set here is used as it stands.
     """
     from ultralytics.models import YOLO
 
     # Only the task identity is ours. Ultralytics' own ClearML callback connects the
     # hyperparameters, logs losses and metrics, and uploads best.pt on its own.
     init_task(clearml, stage="train")
-    selection = resolve_devices(auto_gpu, device, batch)
+    selection = resolve_devices(auto_gpu, device, batch, model=model, stage="train")
 
     logger.info(
         "Training {} on {} for {} epochs — devices={} batch={} (per GPU {})",
@@ -105,4 +108,7 @@ def train(
             f"Training finished but {best} does not exist. Check the run directory {save_dir}."
         )
     logger.info("Best checkpoint: {}", best)
+    # Only now is this batch known to fit: it survived every epoch, including the
+    # validation pass, which is where a batch that trains but does not validate fails.
+    remember_batch(auto_gpu, "train", model, selection)
     return TrainResult(weights=best, inference_device=_inference_device(selection))

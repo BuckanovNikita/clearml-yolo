@@ -29,6 +29,15 @@ main thread used to hide is paid again — and it is repaid by not setting a sou
 times. Both figures are dominated by ~9 s of one-off ``torch.compile`` work for the final
 partial batch's shape; a warm process scores the same 748 images in 4.8 s.
 
+**``batch`` is not only a memory knob, it moves the boxes.** Ultralytics letterboxes with
+``auto=same_shapes and rect``, and ``same_shapes`` is computed over the images of *one
+batch* (``engine/predictor.py``). ``rect`` defaults to True for predict, so a batch whose
+images happen to share a shape is padded to the smallest rectangle that fits them, while a
+batch of mixed shapes is padded to a full square — different input, different detections,
+for the same image. Change ``batch`` and some images cross that line. Anything that caches
+or compares predictions has to key on it, and thresholds do not carry across a change of
+it any more than they carry across a change of ``imgsz``.
+
 On CUDA, half precision and ``torch.compile`` are both on by default. Neither buys much on
 a model this small — preprocess 1.31 ms/img, GPU inference 0.53 ms/img, postprocess
 0.93 ms/img, so the network is a minority of the time, ``half`` measured ~5% slower and
@@ -85,6 +94,62 @@ def is_cuda_device(device: str | None) -> bool:
 
         return bool(is_available())
     return not any(part.strip().lower() in NON_CUDA_DEVICES for part in str(device).split(","))
+
+
+def trained_imgsz(weights: str | Path) -> int | None:
+    """The resolution these weights were trained at, or None if the file does not say.
+
+    Ultralytics writes the whole training configuration into every checkpoint it saves,
+    so the number does not have to be carried alongside the file and cannot go stale
+    against it. A stage handed a checkpoint and no resolution asks it here rather than
+    falling back to a library default, which is how a model trained at 1280 came to be
+    scored at 640 without anything saying so.
+    """
+    from ultralytics.nn.tasks import torch_safe_load
+
+    checkpoint, _ = torch_safe_load(str(weights))  # type: ignore[no-untyped-call]
+    recorded = checkpoint.get("train_args", {}).get("imgsz")
+    if isinstance(recorded, int):
+        return recorded
+    logger.warning(
+        "{} records imgsz={!r}, which is not one resolution this can infer at",
+        Path(weights).name,
+        recorded,
+    )
+    return None
+
+
+def resolution_of(weights: str | Path, imgsz: int | None) -> int:
+    """The resolution to infer at: the one asked for, or the one the weights were trained at.
+
+    A model is shown images at one scale and generalises to that scale, so inferring at
+    another scores it on images unlike anything it ever saw. The pipeline keeps the two in
+    step by interpolation, but a checkpoint reached any other way — a ClearML task, a file
+    handed over — carries no such link, and 640 is a plausible enough number to be wrong
+    without ever looking wrong.
+    """
+    recorded = trained_imgsz(weights)
+    if imgsz is None:
+        if recorded is None:
+            raise ValueError(
+                f"{Path(weights).name} does not record the resolution it was trained at, "
+                "so there is nothing to infer imgsz from. Set imgsz explicitly."
+            )
+        logger.info(
+            "Inferring at imgsz {}, the resolution {} was trained at",
+            recorded,
+            Path(weights).name,
+        )
+        return recorded
+    if recorded is not None and recorded != imgsz:
+        logger.warning(
+            "Inferring at imgsz {} on weights trained at {}: the model was never shown "
+            "images at this scale, and thresholds calibrated here do not carry back to {}",
+            imgsz,
+            recorded,
+            recorded,
+        )
+    return imgsz
 
 
 def _image_id(path: str, mode: ImageNameMode) -> str:
@@ -180,9 +245,10 @@ def predict_on_images(
 ) -> pd.DataFrame:
     """Score ``image_paths`` with ``weights`` and return the detections as a DataFrame.
 
-    ``batch`` is mainly the memory knob: it is how many images go through the network at
-    once and how many are held decoded at once, so peak RAM and VRAM are both proportional
-    to it. Lower it (or ``imgsz``) to fit a smaller card.
+    ``batch`` is the memory knob: it is how many images go through the network at once and
+    how many are held decoded at once, so peak RAM and VRAM are both proportional to it.
+    Lower it (or ``imgsz``) to fit a smaller card. It also decides how images are grouped
+    for letterboxing, and so which boxes come back at all — see the module docstring.
 
     ``conf`` defaults to near zero because per-class thresholds are calibrated downstream,
     and filtering here would discard the detections that calibration needs.
@@ -220,6 +286,10 @@ def predict_on_images(
         "batch": batch,
         "device": device,
         "compile": accelerated,
+        # Ultralytics' own default for predict, named here because it decides the shape
+        # the network actually sees and therefore belongs in the log line beside imgsz.
+        # See the module docstring for what it costs.
+        "rect": True,
         **_precision(accelerated, model_kwargs),
         **model_kwargs,
     }

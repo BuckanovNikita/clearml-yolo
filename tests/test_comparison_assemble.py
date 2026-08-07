@@ -26,6 +26,22 @@ from clearml_yolo.comparison.assemble import (
 from clearml_yolo.comparison.scoring import ClassCounts, SplitOutcome
 from clearml_yolo.comparison.workbook import COMPARISON_COLUMNS, write_comparison_workbook
 
+
+def _settled(**overrides: Any) -> Any:
+    """Inference settings with every "decide this for me" already decided."""
+    from clearml_yolo.tasks.compare import SettledInference
+
+    return SettledInference(
+        conf=0.001,
+        iou=0.7,
+        imgsz=640,
+        batch=16,
+        device=None,
+        image_name="name",
+        reuse_existing=True,
+    ).model_copy(update=overrides)
+
+
 CLASSES = ["car", "van"]
 IMAGES = [f"img{index}.png" for index in range(40)]
 
@@ -222,15 +238,15 @@ def test_each_checkpoint_gets_its_own_prediction_cache(tmp_path: Path) -> None:
     Keyed on the role alone, a rerun reused the previous run's predictions for whatever
     checkpoint it was now given.
     """
-    from clearml_yolo.tasks.compare import InferenceConfig, _prediction_cache
+    from clearml_yolo.tasks.compare import SettledInference, _prediction_cache
 
-    settings = InferenceConfig(device="0")
+    settings = _settled(device="0")
     first = tmp_path / "a.pt"
     second = tmp_path / "b.pt"
     first.write_bytes(b"one")
     second.write_bytes(b"two-different-length")
 
-    def cache(weights: Path, inference: InferenceConfig = settings) -> Path:
+    def cache(weights: Path, inference: SettledInference = settings) -> Path:
         return _prediction_cache(tmp_path, "baseline", "test", weights, inference)
 
     assert cache(first) != cache(second)
@@ -249,18 +265,21 @@ def test_a_cache_is_not_reused_across_inference_settings(tmp_path: Path) -> None
     one model's detections against the other's taken at a different operating point — a
     warm FP32 cache against fresh FP16 detections, say.
     """
-    from clearml_yolo.tasks.compare import InferenceConfig, _prediction_cache
+    from clearml_yolo.tasks.compare import _prediction_cache
 
     checkpoint = tmp_path / "best.pt"
     checkpoint.write_bytes(b"weights")
     # A device is named so the FP16 decision does not depend on the test machine's cards.
-    baseline = InferenceConfig(device="0")
+    baseline = _settled(device="0")
 
     for changed in (
         baseline.model_copy(update={"conf": 0.25}),
         baseline.model_copy(update={"iou": 0.5}),
         baseline.model_copy(update={"imgsz": 1280}),
         baseline.model_copy(update={"device": "cpu"}),
+        # Ultralytics letterboxes per batch according to whether that batch's images
+        # share a shape, so which batch an image travelled in decides its geometry.
+        baseline.model_copy(update={"batch": 32}),
     ):
         assert _prediction_cache(tmp_path, "baseline", "test", checkpoint, changed) != (
             _prediction_cache(tmp_path, "baseline", "test", checkpoint, baseline)

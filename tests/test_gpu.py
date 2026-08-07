@@ -12,12 +12,13 @@ from loguru import logger
 
 from clearml_yolo import gpu as gpu_module
 from clearml_yolo.gpu import (
+    BATCH_TABLE_ENV_VAR,
     AutoGpuConfig,
     GpuInfo,
     GpuSurvey,
     probe_gpus,
     resolve_devices,
-    resolve_inference_device,
+    resolve_inference,
     scale_batch_per_gpu,
     select_devices,
     wait_for_devices,
@@ -109,6 +110,17 @@ def off_wsl(monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFa
     exited or the hour-long timeout expired.
     """
     monkeypatch.setattr(gpu_module, "WSL_GPU_DEVICE", tmp_path_factory.mktemp("nodxg") / "dxg")
+
+
+@pytest.fixture(autouse=True)
+def unremembered(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
+    """Point the remembered-batch table at a scratch file for every test.
+
+    Left alone it is a real file in the developer's cache, so a batch some earlier run of
+    theirs happened to finish at would answer before the rung under test did — and the
+    suite would pass or fail according to what the machine had done that week.
+    """
+    monkeypatch.setenv(BATCH_TABLE_ENV_VAR, str(tmp_path / "batch_table.json"))
 
 
 @pytest.fixture
@@ -213,7 +225,7 @@ def test_max_gpus_limits_selection(patch_modules: Any) -> None:
 
     selection = select_devices(AutoGpuConfig(batch_per_gpu=8, max_gpus=2, reserve_gpus=NO_RESERVE))
 
-    assert len(selection.devices) == 2
+    assert selection.world_size == 2
     assert selection.batch == 16
 
 
@@ -257,7 +269,7 @@ def test_reserve_leaves_a_card_for_other_runs(patch_modules: Any) -> None:
 
     selection = select_devices(AutoGpuConfig(batch_per_gpu=8, reserve_gpus=1))
 
-    assert len(selection.devices) == 2
+    assert selection.world_size == 2
     assert selection.batch == 16
 
 
@@ -284,8 +296,8 @@ def test_max_gpus_and_reserve_compose(patch_modules: Any) -> None:
     handles = [FakeHandle(name, 24.0, 23.0, 0) for name in ("aaa", "bbb", "ccc", "ddd")]
     patch_modules(handles, ["aaa", "bbb", "ccc", "ddd"])
 
-    assert len(select_devices(AutoGpuConfig(max_gpus=2, reserve_gpus=1)).devices) == 2
-    assert len(select_devices(AutoGpuConfig(max_gpus=3, reserve_gpus=2)).devices) == 2
+    assert select_devices(AutoGpuConfig(max_gpus=2, reserve_gpus=1)).world_size == 2
+    assert select_devices(AutoGpuConfig(max_gpus=3, reserve_gpus=2)).world_size == 2
 
 
 def test_this_runs_own_process_does_not_make_a_card_busy(patch_modules: Any) -> None:
@@ -465,7 +477,7 @@ def test_inference_may_use_the_reserved_card(patch_modules: Any) -> None:
     """The reserve exists to protect inference, so inference itself must ignore it."""
     patch_modules([FakeHandle("aaa", 24.0, 23.0, 0)], ["aaa"])
 
-    assert resolve_inference_device(AutoGpuConfig(reserve_gpus=1)) == "0"
+    assert resolve_inference(AutoGpuConfig(reserve_gpus=1), None, None).device_name == "0"
 
 
 def test_inference_falls_back_to_cpu_without_cuda(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -473,4 +485,21 @@ def test_inference_falls_back_to_cpu_without_cuda(monkeypatch: pytest.MonkeyPatc
     module.cuda = types.SimpleNamespace(is_available=lambda: False)  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "torch", module)
 
-    assert resolve_inference_device(AutoGpuConfig()) == "cpu"
+    assert resolve_inference(AutoGpuConfig(), None, None).device_name == "cpu"
+
+
+def test_a_named_card_is_left_alone_and_still_gets_a_batch() -> None:
+    """Naming a device skips the survey, so the batch cannot be sized — but must exist."""
+    selection = resolve_inference(AutoGpuConfig(batch_per_gpu=12), "0", None)
+
+    assert selection.device_name == "0"
+    assert selection.batch == 12
+
+
+def test_inference_leaves_an_unnamed_card_to_ultralytics_when_the_policy_is_off() -> None:
+    """None is not "cpu": with nothing surveyed, the choice stays with ultralytics rather
+    than silently becoming the hundredfold slowdown that looks exactly like success."""
+    selection = resolve_inference(AutoGpuConfig(enabled=False), None, 8)
+
+    assert selection.device_name is None
+    assert selection.batch == 8

@@ -1,4 +1,4 @@
-"""Automatic GPU selection, admission control and VRAM-aware batch sizing.
+"""Automatic GPU selection, admission control and model-aware batch sizing.
 
 GPUs are surveyed through NVML rather than torch because NVML needs no CUDA context:
 ``torch.cuda.mem_get_info`` allocates roughly half a gigabyte on every device it probes,
@@ -8,20 +8,43 @@ A run does not merely pick devices, it waits for them: starting training on a ho
 cards are busy either crashes or evicts someone else's inference. Two policies express
 that. ``reserve_gpus`` leaves cards behind for other runs to infer on, and the wait loop
 holds the run at the door until enough cards are free.
+
+The batch a run lands on comes from the first of five sources that can answer, and which
+one did is always logged, because a number arrived at silently is a number nobody can
+correct. In order: the batch the stage was given outright, the ``batch_table`` this
+hardware was measured into, the batch a previous run of this stage was seen to finish at
+(:func:`remember_batch`), a per-model anchor scaled by the card's VRAM, and finally the
+one global anchor scaled the same way. The first three are measurements and are used as
+they stand; the last two are a batch at a reference card, so both go through the ratio.
 """
 
 from __future__ import annotations
 
+import json
 import os
 import time
 from collections.abc import Callable, Sequence
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from typing import Any
 
 from loguru import logger
 from pydantic import BaseModel, Field
 
 BYTES_PER_GIB = 1 << 30
+
+# Where a batch that ran to completion is written down. An absolute path in the
+# environment wins, so a shared machine can keep one table per user or per project.
+BATCH_TABLE_ENV_VAR = "CLEARML_YOLO_BATCH_TABLE"
+DEFAULT_BATCH_TABLE = Path.home() / ".cache" / "clearml-yolo" / "batch_table.json"
+# What a stage falls back to when nothing surveyed the hardware: no card was named, so
+# there is nothing to size a batch against.
+DEFAULT_BATCH = 16
+
+# ``model -> card -> batch``, where the batch is either one number for any device count
+# or a mapping from device count to number. Written by hand into ``batch_table``, and by
+# :func:`remember_batch` into the file above under one further key naming the stage.
+BatchTable = dict[str, dict[str, int | dict[int, int]]]
 
 
 class AutoGpuConfig(BaseModel):
@@ -30,6 +53,14 @@ class AutoGpuConfig(BaseModel):
     enabled: bool = True
     batch_per_gpu: int = Field(default=16, ge=1)
     reference_vram_gb: float = Field(default=24.0, gt=0)
+    # The same anchor as above, but per model, because a yolo11x and a yolo11n do not fit
+    # the same card the same way. Keyed by the name of the weights without their suffix.
+    model_batch_per_gpu: dict[str, int] = Field(default_factory=dict)
+    # Batches measured on this hardware rather than estimated from it, so they are used
+    # exactly as written — neither scaled to VRAM nor rounded to a power of two.
+    batch_table: BatchTable = Field(default_factory=dict)
+    # Whether a batch that ran to completion is written down and read back next time.
+    remember_batch: bool = True
     min_free_vram_gb: float = Field(default=8.0, ge=0)
     # Workstations with an attached display idle around 10% VRAM before any training
     # starts, so a stricter threshold would reject every local GPU.
@@ -94,9 +125,13 @@ class GpuSurvey(BaseModel):
 
 
 class DeviceSelection(BaseModel):
-    """What the training run should be handed: devices plus a divisible batch."""
+    """What the run should be handed: devices plus a divisible batch.
 
-    devices: list[int] | str
+    ``devices`` is None when nothing chose one, which is not the same as ``"cpu"``: it
+    leaves the choice with ultralytics, as a stage that surveyed no hardware must.
+    """
+
+    devices: list[int] | str | None
     batch: int
     batch_per_gpu: int
     gpus: list[GpuInfo] = Field(default_factory=list)
@@ -104,6 +139,13 @@ class DeviceSelection(BaseModel):
     @property
     def world_size(self) -> int:
         return len(self.devices) if isinstance(self.devices, list) else 1
+
+    @property
+    def device_name(self) -> str | None:
+        """The single device string ultralytics takes for inference: ``"0"``, ``"cpu"``."""
+        if not isinstance(self.devices, list):
+            return self.devices
+        return str(self.devices[0]) if self.devices else "cpu"
 
 
 def _decode(value: Any) -> str:
@@ -442,24 +484,28 @@ def _floor_power_of_two(value: int) -> int:
     return 1 << (value.bit_length() - 1) if value > 0 else 1
 
 
-def scale_batch_per_gpu(config: AutoGpuConfig, gpus: list[GpuInfo]) -> int:
-    """Fit the configured per-GPU batch to the smallest selected card.
+def scale_batch_per_gpu(
+    config: AutoGpuConfig, gpus: list[GpuInfo], anchor: int | None = None
+) -> int:
+    """Fit a per-GPU batch measured at ``reference_vram_gb`` to the smallest selected card.
 
     DDP splits the total batch evenly, so the weakest device sets the ceiling for
-    every device.
+    every device. ``anchor`` names the batch to scale, which is the model's own when the
+    config gives one for it and the global ``batch_per_gpu`` otherwise.
     """
+    reference = config.batch_per_gpu if anchor is None else anchor
     if not config.scale_to_vram or not gpus:
-        return config.batch_per_gpu
+        return reference
 
     smallest_vram = min(gpu.total_vram_gb for gpu in gpus)
-    scaled = int(config.batch_per_gpu * smallest_vram / config.reference_vram_gb)
+    scaled = int(reference * smallest_vram / config.reference_vram_gb)
     if config.round_to_power_of_two:
         scaled = _floor_power_of_two(scaled)
     scaled = max(1, scaled)
-    if scaled != config.batch_per_gpu:
+    if scaled != reference:
         logger.info(
             "Scaled batch per GPU {} -> {} ({:.1f} GiB smallest card vs {:.1f} GiB reference)",
-            config.batch_per_gpu,
+            reference,
             scaled,
             smallest_vram,
             config.reference_vram_gb,
@@ -467,65 +513,226 @@ def scale_batch_per_gpu(config: AutoGpuConfig, gpus: list[GpuInfo]) -> int:
     return scaled
 
 
-def select_devices(config: AutoGpuConfig) -> DeviceSelection:
-    """Choose the devices to train on and the total batch size to pass to YOLO.
+def _normalised(text: str) -> str:
+    return " ".join(text.split()).lower()
+
+
+def model_key(model: str | None) -> str | None:
+    """The name a batch table is keyed by: ``weights/yolo11m.pt`` becomes ``yolo11m``."""
+    if not model:
+        return None
+    return _normalised(Path(model).stem)
+
+
+def _entry_for_card(by_card: dict[str, Any], card: str) -> Any:
+    """The entry whose key names this card, taking the most specific key that matches.
+
+    Keys match as substrings of the name the driver reports, so ``5090`` and ``rtx 5090``
+    both find ``NVIDIA GeForce RTX 5090``. Reproducing a driver string exactly is not
+    something a config should have to do, and getting it subtly wrong would look from the
+    outside exactly like having set no table at all.
+    """
+    reported = _normalised(card)
+    matching = [key for key in by_card if _normalised(key) in reported]
+    if not matching:
+        return None
+    return by_card[max(matching, key=lambda key: len(_normalised(key)))]
+
+
+def table_batch(table: dict[str, Any], model: str | None, card: str, world_size: int) -> int | None:
+    """Look a per-GPU batch up in ``model -> card -> device count``.
+
+    The device count may be left out, written as a bare number against the card, which
+    means the batch holds however many devices the run gets.
+    """
+    by_card = table.get(model) if model else None
+    if not by_card:
+        return None
+    entry = _entry_for_card(by_card, card)
+    if entry is None:
+        return None
+    if isinstance(entry, int):
+        return entry
+    by_count = {int(count): int(batch) for count, batch in entry.items()}
+    if world_size not in by_count:
+        logger.info(
+            "A batch table names {} on {} but not for {} device(s); looking further down",
+            model,
+            card,
+            world_size,
+        )
+        return None
+    return by_count[world_size]
+
+
+def batch_table_path() -> Path:
+    return Path(os.environ.get(BATCH_TABLE_ENV_VAR) or DEFAULT_BATCH_TABLE)
+
+
+def _remembered_batches() -> dict[str, Any]:
+    """Every batch previously seen to finish, keyed by stage. Empty if there are none."""
+    path = batch_table_path()
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {}
+    except (OSError, ValueError) as error:
+        logger.warning("Cannot read the remembered batch table {} ({}); ignoring it", path, error)
+        return {}
+    return loaded if isinstance(loaded, dict) else {}
+
+
+def select_batch_per_gpu(
+    config: AutoGpuConfig, model: str | None, gpus: list[GpuInfo], stage: str
+) -> int:
+    """The per-GPU batch for this model on these cards, saying which source answered."""
+    smallest = min(gpus, key=lambda gpu: gpu.total_vram_gb)
+    key = model_key(model)
+    world_size = len(gpus)
+
+    measured = table_batch(config.batch_table, key, smallest.name, world_size)
+    if measured is not None:
+        logger.info(
+            "Batch per GPU {} from auto_gpu.batch_table for {} on {} x {}",
+            measured,
+            key,
+            world_size,
+            smallest.name,
+        )
+        return measured
+
+    if config.remember_batch:
+        finished = table_batch(
+            _remembered_batches().get(stage, {}), key, smallest.name, world_size
+        )
+        if finished is not None:
+            logger.info(
+                "Batch per GPU {} remembered from a {} run of {} that finished on {} x {}",
+                finished,
+                stage,
+                key,
+                world_size,
+                smallest.name,
+            )
+            return finished
+
+    anchor = config.model_batch_per_gpu.get(key) if key else None
+    if anchor is not None:
+        logger.info(
+            "Batch per GPU anchored at {} for {} by auto_gpu.model_batch_per_gpu", anchor, key
+        )
+    return scale_batch_per_gpu(config, gpus, anchor)
+
+
+def _refuse_indivisible_batch(batch: int, world_size: int, *, chosen_here: bool) -> None:
+    """Reject a total batch that DDP would silently shrink.
+
+    Ultralytics floor-divides the total across ranks without checking, so an indivisible
+    batch trains on fewer images per step than the run asked for — a quiet difference
+    between the experiment that was configured and the one that ran.
+    """
+    if world_size <= 1:
+        return
+    remedy = (
+        f"Cap the run with auto_gpu.max_gpus, or give a batch that is a multiple of {world_size}"
+        if chosen_here
+        else f"Set an explicit batch that is a multiple of {world_size}, or enable auto_gpu"
+    )
+    if batch < 1:
+        raise ValueError(
+            f"batch={batch} requests ultralytics AutoBatch, which is single-GPU only, but "
+            f"{world_size} devices were given. {remedy}."
+        )
+    if batch % world_size:
+        raise ValueError(
+            f"batch={batch} is not divisible by {world_size} devices; ultralytics would "
+            f"silently train on {batch // world_size * world_size} images per step. {remedy}."
+        )
+
+
+def select_devices(
+    config: AutoGpuConfig,
+    model: str | None = None,
+    stage: str = "train",
+    batch: int | None = None,
+) -> DeviceSelection:
+    """Choose the devices to run on and the total batch size to pass to YOLO.
 
     The returned batch is always a multiple of the device count: ultralytics treats
     ``batch`` as the total across ranks and floor-divides it by world size without
     checking divisibility, silently shrinking the effective batch otherwise.
+
+    A ``batch`` given here is honoured rather than discarded. Waiting for free cards and
+    picking a batch are separate decisions, and folding them together is what left the
+    configured ``batch`` unread on the one path almost every run takes.
     """
     chosen = wait_for_devices(config)
     if not chosen:
-        logger.warning(
-            "No GPU on this host; falling back to CPU with batch {}", config.batch_per_gpu
-        )
-        return DeviceSelection(
-            devices="cpu", batch=config.batch_per_gpu, batch_per_gpu=config.batch_per_gpu
-        )
+        on_cpu = config.batch_per_gpu if batch is None else batch
+        logger.warning("No GPU on this host; falling back to CPU with batch {}", on_cpu)
+        return DeviceSelection(devices="cpu", batch=on_cpu, batch_per_gpu=on_cpu)
 
-    batch_per_gpu = scale_batch_per_gpu(config, chosen)
     devices = [gpu.torch_index for gpu in chosen]
-    selection = DeviceSelection(
-        devices=devices,
-        batch=batch_per_gpu * len(devices),
-        batch_per_gpu=batch_per_gpu,
-        gpus=chosen,
-    )
+    if batch is None:
+        batch_per_gpu = select_batch_per_gpu(config, model, chosen, stage)
+        total = batch_per_gpu * len(devices)
+    else:
+        _refuse_indivisible_batch(batch, len(devices), chosen_here=True)
+        total = batch
+        batch_per_gpu = batch // len(devices) if batch > 0 else batch
+
     logger.info(
         "Auto GPU selected devices {} — {} x {} = total batch {}",
         devices,
         len(devices),
         batch_per_gpu,
-        selection.batch,
+        total,
     )
-    return selection
+    return DeviceSelection(
+        devices=devices, batch=total, batch_per_gpu=batch_per_gpu, gpus=chosen
+    )
 
 
-def resolve_inference_device(config: AutoGpuConfig) -> str:
-    """Wait for one card and name it the way ultralytics expects (``"0"``, ``"cpu"``).
+def resolve_inference(
+    auto_gpu: AutoGpuConfig | None,
+    device: str | None,
+    batch: int | None,
+    model: str | None = None,
+    stage: str = "predict",
+) -> DeviceSelection:
+    """Name the one card a stage infers on and the batch it infers at.
 
     Inference cannot go through :func:`resolve_devices`: digital-metrics takes a single
     device string, not a device list. It also ignores ``reserve_gpus`` deliberately —
     the reserve exists so that inference has somewhere to run, so honouring it here
     would leave a single-GPU host unable to infer at all.
+
+    With a card already named, or no policy to consult, there is no survey to size a
+    batch against, so a batch that was not given falls back to the configured anchor
+    rather than being guessed at.
     """
-    single = config.model_copy(update={"reserve_gpus": 0, "min_devices": 1, "max_gpus": 1})
-    chosen = wait_for_devices(single)
-    if not chosen:
-        logger.warning("No GPU on this host; running inference on CPU")
-        return "cpu"
-    logger.info("Inference device: GPU {} ({})", chosen[0].torch_index, chosen[0].name)
-    return str(chosen[0].torch_index)
+    if auto_gpu is not None and auto_gpu.enabled and device is None:
+        single = auto_gpu.model_copy(update={"reserve_gpus": 0, "min_devices": 1, "max_gpus": 1})
+        return select_devices(single, model=model, stage=stage, batch=batch)
+
+    if batch is None:
+        batch = DEFAULT_BATCH if auto_gpu is None else auto_gpu.batch_per_gpu
+        logger.info("No GPU survey to size a batch against; inferring at batch {}", batch)
+    return DeviceSelection(devices=device, batch=batch, batch_per_gpu=batch)
 
 
 def resolve_devices(
-    auto_gpu: AutoGpuConfig, device: list[int] | int | str | None, batch: int
+    auto_gpu: AutoGpuConfig,
+    device: list[int] | int | str | None,
+    batch: int | None,
+    model: str | None = None,
+    stage: str = "train",
 ) -> DeviceSelection:
     """Pick devices automatically or validate an explicitly requested configuration."""
     if auto_gpu.enabled:
         if device is not None:
             logger.warning("auto_gpu is enabled; ignoring explicit device={}", device)
-        return select_devices(auto_gpu)
+        return select_devices(auto_gpu, model=model, stage=stage, batch=batch)
 
     devices: list[int] | str
     if device is None:
@@ -536,17 +743,60 @@ def resolve_devices(
         devices = device
 
     world_size = len(devices) if isinstance(devices, list) else 1
-    if batch < 1 and world_size > 1:
-        raise ValueError(
-            f"batch={batch} requests ultralytics AutoBatch, which is single-GPU only, but "
-            f"{world_size} devices were given. Set an explicit batch that is a multiple of "
-            f"{world_size}, or enable auto_gpu."
-        )
-    if world_size > 1 and batch % world_size:
-        raise ValueError(
-            f"batch={batch} is not divisible by {world_size} devices; ultralytics would "
-            f"silently train on {batch // world_size * world_size} images per step."
-        )
+    if batch is None:
+        batch = auto_gpu.batch_per_gpu * world_size
+        logger.info("auto_gpu is disabled and no batch was given; running at batch {}", batch)
+    _refuse_indivisible_batch(batch, world_size, chosen_here=False)
 
     per_gpu = batch // world_size if batch > 0 else batch
     return DeviceSelection(devices=devices, batch=batch, batch_per_gpu=per_gpu)
+
+
+def _write_remembered(path: Path, table: dict[str, Any]) -> None:
+    """Replace the file in one step, because several runs share this machine."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with NamedTemporaryFile("w", dir=path.parent, delete=False, encoding="utf-8") as handle:
+        json.dump(table, handle, indent=2, sort_keys=True)
+        written = Path(handle.name)
+    written.replace(path)
+
+
+def remember_batch(
+    config: AutoGpuConfig, stage: str, model: str | None, selection: DeviceSelection
+) -> None:
+    """Write down a batch that ran to completion, so it need not be found again.
+
+    Only a run that finished is evidence, and of those only the largest is worth keeping:
+    that a small batch fits says nothing about a larger one, while a large batch that
+    finished proves every smaller one would have. A run whose cards were never surveyed
+    cannot be recorded at all — there is no card to file the number under.
+    """
+    key = model_key(model)
+    if not config.remember_batch or key is None or not selection.gpus:
+        return
+    if selection.batch_per_gpu < 1:
+        logger.info("Batch {} is ultralytics' own to choose; not remembering it", selection.batch)
+        return
+
+    card = _normalised(min(selection.gpus, key=lambda gpu: gpu.total_vram_gb).name)
+    count = str(selection.world_size)
+    remembered = _remembered_batches()
+    by_count = remembered.setdefault(stage, {}).setdefault(key, {}).setdefault(card, {})
+    if not isinstance(by_count, dict) or selection.batch_per_gpu <= int(by_count.get(count, 0)):
+        return
+
+    by_count[count] = selection.batch_per_gpu
+    path = batch_table_path()
+    try:
+        _write_remembered(path, remembered)
+    except OSError as error:
+        logger.warning("Cannot write the remembered batch table {} ({})", path, error)
+        return
+    logger.info(
+        "Remembered batch {} per GPU for {} on {} x {} in {}",
+        selection.batch_per_gpu,
+        key,
+        count,
+        card,
+        path,
+    )

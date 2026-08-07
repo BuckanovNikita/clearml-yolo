@@ -85,6 +85,7 @@ PipelineInferenceConf = builds(
     iou="${predict.iou}",
     imgsz="${predict.imgsz}",
     batch="${predict.batch}",
+    model="${predict.model}",
     image_name="${predict.image_name}",
     populate_full_signature=True,
 )
@@ -124,7 +125,12 @@ class SharedKeys:
     metrics_dir: Any = METRICS_DIR
     # Inference belongs at the resolution the weights were trained at, so the pipeline
     # takes it from the training stage rather than asking for the number a second time.
-    imgsz: Any = IMAGE_SIZE
+    # Standalone there is no training stage to ask, so None means "read it out of the
+    # checkpoint" — the one source that cannot disagree with the weights it describes.
+    imgsz: Any = None
+    # Which architecture the weights are of. A batch table is keyed by it, and inside the
+    # pipeline it is the model that was just trained; nothing is loaded from it.
+    model: Any = None
     inference: Any = InferenceConf
     iou_threshold: Any = 0.5
     matching_strategy: Any = "iou_prior"
@@ -145,6 +151,7 @@ PIPELINE = SharedKeys(
     predictions="${predict.output}",
     metrics_dir="${metrics.output_dir}",
     imgsz="${train.imgsz}",
+    model="${train.model}",
     inference=PipelineInferenceConf,
     iou_threshold="${metrics.evaluation.iou_threshold}",
     matching_strategy="${metrics.evaluation.matching_strategy}",
@@ -158,7 +165,9 @@ def train_config(shared: SharedKeys) -> Any:
         data="coco8.yaml",
         epochs=100,
         imgsz=IMAGE_SIZE,
-        batch=16,
+        # Unset, so auto_gpu sizes the batch to this model on these cards. A number here
+        # is used as it stands, on the auto path too.
+        batch=None,
         project=TRAIN_PROJECT,
         name=shared.run_name,
         device=None,
@@ -174,10 +183,11 @@ def predict_config(shared: SharedKeys) -> Any:
         ground_truth=shared.ground_truth,
         output=PREDICTIONS_CSV,
         auto_gpu=shared.auto_gpu,
+        model=shared.model,
         conf=0.001,
         iou=0.7,
         imgsz=shared.imgsz,
-        batch=16,
+        batch=None,
         device=None,
         splits=shared.predict_splits,
         image_name="name",

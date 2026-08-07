@@ -29,8 +29,8 @@ from clearml_yolo.comparison.assemble import ComparisonTables, build_comparison_
 from clearml_yolo.comparison.reinfer import VocabularyReport, reinfer_split
 from clearml_yolo.comparison.scoring import score_split
 from clearml_yolo.comparison.workbook import write_comparison_workbook
-from clearml_yolo.gpu import AutoGpuConfig, resolve_inference_device
-from clearml_yolo.inference import is_cuda_device
+from clearml_yolo.gpu import AutoGpuConfig, resolve_inference
+from clearml_yolo.inference import is_cuda_device, resolution_of, trained_imgsz
 
 ModelSource = Literal["clearml", "local"]
 
@@ -108,15 +108,39 @@ def _resolve_model(
 
 
 class InferenceConfig(BaseModel):
-    """How both checkpoints are re-run. Identical for the two, by construction."""
+    """How both checkpoints are re-run. Identical for the two, by construction.
+
+    ``imgsz`` unset is read from the checkpoints themselves, and ``batch`` unset is sized
+    by the GPU policy. ``model`` names the architecture under test, which is what a batch
+    table is keyed by; the baseline may be a heavier model than the candidate, and if so
+    the batch that suits it has to be set here by hand.
+    """
 
     conf: float = 0.001
     iou: float = 0.7
-    imgsz: int = 640
-    batch: int = 16
+    imgsz: int | None = None
+    batch: int | None = None
+    model: str | None = None
     device: str | None = None
     image_name: str = "name"
     reuse_existing: bool = True
+
+
+class SettledInference(BaseModel):
+    """The same settings once every "work this out for me" has been worked out.
+
+    A type of its own rather than the config with narrower fields, because the difference
+    is load-bearing: the prediction cache is named after these values, so everything that
+    reads them has to run after they are decided and nothing may run before.
+    """
+
+    conf: float
+    iou: float
+    imgsz: int
+    batch: int
+    device: str | None
+    image_name: str
+    reuse_existing: bool
 
 
 class CompareResult(BaseModel):
@@ -129,7 +153,7 @@ class CompareResult(BaseModel):
 
 
 def _prediction_cache(
-    destination: Path, role: str, split: str, weights: Path, inference: InferenceConfig
+    destination: Path, role: str, split: str, weights: Path, inference: SettledInference
 ) -> Path:
     """Name a re-inference cache after the checkpoint and the settings that filled it.
 
@@ -142,6 +166,11 @@ def _prediction_cache(
     numeric precision are never compared against predictions taken at another. Precision
     matters here because the cache outlives a run: a warm FP32 cache from before half
     precision became the default would otherwise be scored against fresh FP16 detections.
+
+    ``batch`` is among those settings, contrary to the intuition that it is only a memory
+    knob. Ultralytics letterboxes each batch according to whether its images happen to
+    share a shape, so the batch an image travelled in decides the geometry it was seen at
+    — see the inference module's docstring.
     """
     identity = str(weights.resolve())
     if weights.is_file():
@@ -149,7 +178,7 @@ def _prediction_cache(
         identity = f"{identity}:{stat.st_size}:{stat.st_mtime_ns}"
     identity = (
         f"{identity}:conf={inference.conf}:iou={inference.iou}:imgsz={inference.imgsz}"
-        f":accelerated={is_cuda_device(inference.device)}"
+        f":batch={inference.batch}:accelerated={is_cuda_device(inference.device)}"
     )
     digest = hashlib.sha256(identity.encode()).hexdigest()[:12]
     return destination / f"{role}_predictions_{split}_{digest}.csv"
@@ -160,7 +189,7 @@ def _scored(
     ground_truth: pd.DataFrame,
     split: str,
     output: Path,
-    inference: InferenceConfig,
+    inference: SettledInference,
     thresholds: dict[str, float],
     classes: list[str],
     evaluation: dict[str, Any],
@@ -188,6 +217,43 @@ def _scored(
         matching_strategy=evaluation["matching_strategy"],
     )
     return outcome, vocabulary
+
+
+def _settled(
+    inference: InferenceConfig,
+    auto_gpu: AutoGpuConfig | None,
+    candidate: Path,
+    baseline: Path,
+) -> SettledInference:
+    """Fill in every setting the two models are re-run under, once, for both of them.
+
+    The card is resolved here rather than per model, because re-inferring the two on
+    different hardware would put exactly the kind of difference this comparison exists to
+    remove inside its own measurement. The resolution comes from the candidate, the model
+    under test; if the baseline was trained at another one then no single number is fair
+    to both, and that is said out loud rather than chosen silently.
+    """
+    selection = resolve_inference(
+        auto_gpu, inference.device, inference.batch, model=inference.model, stage="predict"
+    )
+    imgsz = resolution_of(candidate, inference.imgsz)
+    was_baseline_trained_at = trained_imgsz(baseline)
+    if was_baseline_trained_at is not None and was_baseline_trained_at != imgsz:
+        logger.warning(
+            "The baseline was trained at imgsz {} and the candidate at {}; both are being "
+            "re-inferred at {}, so part of any difference between them is the resolution",
+            was_baseline_trained_at,
+            imgsz,
+            imgsz,
+        )
+    return SettledInference(
+        **{
+            **inference.model_dump(exclude={"model"}),
+            "device": selection.device_name,
+            "batch": selection.batch,
+            "imgsz": imgsz,
+        }
+    )
 
 
 def _degraded(tables: ComparisonTables) -> list[str]:
@@ -218,11 +284,6 @@ def compare(
     destination = Path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
 
-    if inference.device is None and auto_gpu is not None and auto_gpu.enabled:
-        # Resolved once for both models: re-inferring them on different devices would put
-        # a hardware difference inside a comparison that is meant to isolate the model.
-        inference = inference.model_copy(update={"device": resolve_inference_device(auto_gpu)})
-
     truth = pd.read_csv(ground_truth)
     project = clearml.project_name if clearml.enabled else None
     baseline_weights, thresholds_baseline = _resolve_model(baseline_model, split, project)
@@ -237,6 +298,7 @@ def compare(
             "explicitly with baseline_model.task_id and candidate_model.task_id."
         )
 
+    settled = _settled(inference, auto_gpu, candidate_weights, baseline_weights)
     evaluation = {"iou_threshold": iou_threshold, "matching_strategy": matching_strategy}
     classes = sorted({str(label) for label in truth[truth["split"] == split]["instance_label"]})
 
@@ -244,8 +306,8 @@ def compare(
         baseline_weights,
         truth,
         split,
-        _prediction_cache(destination, "baseline", split, baseline_weights, inference),
-        inference,
+        _prediction_cache(destination, "baseline", split, baseline_weights, settled),
+        settled,
         thresholds_baseline,
         classes,
         evaluation,
@@ -254,8 +316,8 @@ def compare(
         candidate_weights,
         truth,
         split,
-        _prediction_cache(destination, "candidate", split, candidate_weights, inference),
-        inference,
+        _prediction_cache(destination, "candidate", split, candidate_weights, settled),
+        settled,
         thresholds_candidate,
         classes,
         evaluation,

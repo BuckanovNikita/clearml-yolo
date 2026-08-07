@@ -57,7 +57,9 @@ def fake_ultralytics(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
 def _train(devices: list[int] | str, tmp_path: Path) -> dict[str, Any]:
     selection = DeviceSelection(devices=devices, batch=16, batch_per_gpu=16)
     with pytest.MonkeyPatch.context() as patch:
-        patch.setattr("clearml_yolo.tasks.train.resolve_devices", lambda *_: selection)
+        patch.setattr(
+            "clearml_yolo.tasks.train.resolve_devices", lambda *_args, **_kwargs: selection
+        )
         train(
             model="yolo11n.pt",
             data="data.yaml",
@@ -92,7 +94,9 @@ def test_train_kwargs_win_over_the_defaults(tmp_path: Path) -> None:
     """Both change the numbers a run produces, so reproducing an older run must opt out."""
     selection = DeviceSelection(devices=[0], batch=16, batch_per_gpu=16)
     with pytest.MonkeyPatch.context() as patch:
-        patch.setattr("clearml_yolo.tasks.train.resolve_devices", lambda *_: selection)
+        patch.setattr(
+            "clearml_yolo.tasks.train.resolve_devices", lambda *_args, **_kwargs: selection
+        )
         train(
             model="yolo11n.pt",
             data="data.yaml",

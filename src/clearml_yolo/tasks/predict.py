@@ -11,8 +11,8 @@ from loguru import logger
 from clearml_yolo import artifact_names
 from clearml_yolo.clearml_models import resolve_weights
 from clearml_yolo.clearml_session import ClearMLConfig, init_task, upload_dataframe
-from clearml_yolo.gpu import AutoGpuConfig, resolve_inference_device
-from clearml_yolo.inference import ImageNameMode, predict_on_images
+from clearml_yolo.gpu import AutoGpuConfig, remember_batch, resolve_inference
+from clearml_yolo.inference import ImageNameMode, predict_on_images, resolution_of
 
 
 def images_to_score(ground_truth: pd.DataFrame, splits: list[str] | None) -> list[str]:
@@ -45,10 +45,11 @@ def predict(
     output: str | Path,
     clearml: ClearMLConfig,
     auto_gpu: AutoGpuConfig | None = None,
+    model: str | None = None,
     conf: float = 0.001,
     iou: float = 0.7,
-    imgsz: int = 640,
-    batch: int = 16,
+    imgsz: int | None = None,
+    batch: int | None = None,
     device: str | None = None,
     splits: list[str] | None = None,
     image_name: ImageNameMode = "name",
@@ -64,20 +65,24 @@ def predict(
     against a previously trained model without that model's files on hand. When no
     ``device`` is given the run waits for a free card rather than letting ultralytics
     grab whichever one it likes.
+
+    ``imgsz`` and ``batch`` left unset are answered by the checkpoint and by ``auto_gpu``
+    respectively, so neither has to be repeated from the training that produced the
+    weights. ``model`` names the architecture those weights are of — it is what a batch
+    table is keyed by, and nothing is loaded from it.
     """
     task = init_task(clearml, stage="predict")
     checkpoint = resolve_weights(weights)
-    if device is None and auto_gpu is not None and auto_gpu.enabled:
-        device = resolve_inference_device(auto_gpu)
+    selection = resolve_inference(auto_gpu, device, batch, model=model, stage="predict")
 
     frame = predict_on_images(
         checkpoint,
         images_to_score(pd.read_csv(ground_truth), splits),
         conf=conf,
         iou=iou,
-        imgsz=imgsz,
-        batch=batch,
-        device=device,
+        imgsz=resolution_of(checkpoint, imgsz),
+        batch=selection.batch,
+        device=selection.device_name,
         image_name=image_name,
         **(predict_kwargs or {}),
     )
@@ -87,5 +92,7 @@ def predict(
     frame.to_csv(output_path, index=False)
     logger.info("Wrote {} predictions to {}", len(frame), output_path)
 
+    if auto_gpu is not None:
+        remember_batch(auto_gpu, "predict", model, selection)
     upload_dataframe(task, artifact_names.PREDICTIONS, frame)
     return output_path
