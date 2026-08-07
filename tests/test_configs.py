@@ -62,7 +62,7 @@ def _pipeline_stages(overrides: list[str]) -> dict[str, dict[str, object]]:
         clearml=instantiate(config.clearml),
         auto_gpu=instantiate(config.auto_gpu),
         ground_truth=config.ground_truth,
-        splits=list(config.splits),
+        splits=config.splits,
         weights=config.get("weights"),
     )
 
@@ -85,10 +85,32 @@ def test_every_stage_config_key_is_a_parameter_of_its_task(stage: str) -> None:
     A key that is not a parameter is a setting the run accepts and silently ignores; a
     parameter that is neither a key nor filled in is a TypeError raised an hour into a run.
     Neither is visible to the type checker once the block is a dict, so it is checked here.
+
+    The union alone would also pass a key that ``PIPELINE_FILLED_KEYS`` names but
+    ``stage_configs`` never actually fills — that key is a config key silently omitted with
+    nothing supplying it, the same TypeError an hour into a run. The second assertion pins
+    every filled key to one ``stage_configs`` actually produces, except ``candidate_model``:
+    ``run_compare_stage`` fills that one from the model this run just trained, not
+    ``stage_configs``, and
+    ``tests/test_pipeline.py::test_comparison_scores_the_model_this_run_just_built`` covers it.
     """
-    keys = set(_pipeline_stages([])[stage]) | PIPELINE_FILLED_KEYS[stage]
+    stage_kwargs = set(_pipeline_stages([])[stage])
+    keys = stage_kwargs | PIPELINE_FILLED_KEYS[stage]
 
     assert keys == set(inspect.signature(TASK_OF_STAGE[stage]).parameters)
+    assert PIPELINE_FILLED_KEYS[stage] - {"candidate_model"} <= stage_kwargs
+
+
+def test_the_comparison_declares_only_the_inference_it_owns() -> None:
+    """Every other inference setting comes from the predict stage, merged in by
+    ``stage_configs``. Declaring one here would be a key a run can set in ``compare.inference``
+    that a pipeline run then silently overwrites — the same defect class this branch removes
+    everywhere else, and it would slip in unnoticed the moment ``ComparisonInferenceConf``
+    gains ``populate_full_signature=True`` like every other ``builds(...)`` in configs.py."""
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        config = compose(config_name="pipeline")
+
+    assert set(config.compare.inference) - {"_target_"} == {"device", "reuse_existing"}
 
 
 def test_one_ground_truth_reaches_inference_scoring_and_comparison() -> None:
