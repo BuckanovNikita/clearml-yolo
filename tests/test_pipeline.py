@@ -139,8 +139,8 @@ def test_the_comparison_reuses_the_card_training_just_used(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Same hazard the predict stage documents: surveying here would wait on a card this
-    very process still holds. Both models still go on one card, which is the whole point
-    of the comparison leaving inference.device out of its interpolations."""
+    very process still holds. Both models still go on one card, which is why
+    `_comparison_inference` never copies `device` from the predict stage."""
     seen: dict[str, object] = {}
     monkeypatch.setattr(pipeline_module, "run_comparison", lambda **kwargs: seen.update(kwargs))
 
@@ -155,8 +155,8 @@ def test_the_comparison_reuses_the_card_training_just_used(
 def test_a_split_no_stage_scores_is_rejected_before_training_starts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The split list is shared by interpolation, but singling one out of it is not, so
-    this is the one cross-stage mismatch config alone cannot rule out."""
+    """The split list reaches every stage from the run, but singling one out of it is not,
+    so this is the one cross-stage mismatch config alone cannot rule out."""
     monkeypatch.setattr(pipeline_module, "run_training", lambda **kwargs: pytest.fail("trained"))
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
         config = compose(

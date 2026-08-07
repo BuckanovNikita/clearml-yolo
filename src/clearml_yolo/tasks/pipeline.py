@@ -179,10 +179,10 @@ def _comparison_inference(
 def _check_split_choices(splits: list[str], choices: dict[str, str | None]) -> None:
     """Reject a stage that singles out a split the run never scores.
 
-    Interpolation keeps the split *list* identical everywhere, but it cannot express that
-    the stages picking one split out of that list have to pick one that is in it. Checked
-    before training rather than at the stage itself, so an hour of it is not spent to
-    arrive at a comparison that has no thresholds to score against.
+    The pipeline hands every stage the same split list, but that alone cannot express
+    that the stages picking one split out of that list have to pick one that is in it.
+    Checked before training rather than at the stage itself, so an hour of it is not
+    spent to arrive at a comparison that has no thresholds to score against.
     """
     unavailable = {
         key: value for key, value in choices.items() if value is not None and value not in splits

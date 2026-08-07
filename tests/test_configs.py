@@ -107,7 +107,8 @@ def test_one_split_list_reaches_every_stage_that_reads_one() -> None:
 
 
 def test_the_gpu_policy_is_named_once_for_all_three_stages() -> None:
-    """A whole config node is interpolated here, not a string, so it must survive instantiate."""
+    """auto_gpu reaches every stage as the AutoGpuConfig instance stage_configs was given,
+    not resolved down to a string or a stripped dict."""
     stages = _pipeline_stages(["auto_gpu.wait_timeout_seconds=120.0"])
 
     for stage in ("train", "predict", "compare"):

@@ -209,7 +209,8 @@ PipelineConf = make_config(
     report=None,
     compare=None,
     clearml=ClearMLConf,
-    # The values every stage below points at. Overriding one of these names the whole run.
+    # run_pipeline hands each of these to every stage that needs it. Overriding one of
+    # these names the whole run; no stage block below declares it on its own.
     auto_gpu=AutoGpuConf,
     ground_truth="ground_truth.csv",
     splits=["train", "val", "test"],
