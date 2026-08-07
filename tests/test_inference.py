@@ -16,7 +16,12 @@ import numpy as np
 import pytest
 from loguru import logger
 
-from clearml_yolo.inference import PREDICTION_COLUMNS, is_cuda_device, predict_on_images
+from clearml_yolo.inference import (
+    PREDICTION_COLUMNS,
+    is_cuda_device,
+    predict_on_images,
+    resolution_of,
+)
 
 NAMES = {0: "person", 1: "dog"}
 
@@ -106,6 +111,47 @@ def fake_ultralytics(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def _boxes(*detections: tuple[list[float], float, int]) -> FakeBoxes:
     return FakeBoxes(list(detections))
+
+
+@pytest.fixture
+def checkpoint_recording(monkeypatch: pytest.MonkeyPatch) -> Any:
+    """Stand in for the checkpoint reader, which would otherwise need a real .pt file."""
+
+    def _record(train_args: dict[str, Any]) -> None:
+        import sys
+        import types
+
+        module = types.ModuleType("ultralytics.nn.tasks")
+        module.torch_safe_load = lambda path: ({"train_args": train_args}, path)  # type: ignore[attr-defined]
+        monkeypatch.setitem(sys.modules, "ultralytics.nn.tasks", module)
+
+    return _record
+
+
+def test_inference_takes_the_resolution_out_of_the_checkpoint(checkpoint_recording: Any) -> None:
+    """The one source that cannot go stale against the weights it describes."""
+    checkpoint_recording({"imgsz": 1280})
+
+    assert resolution_of("best.pt", None) == 1280
+
+
+def test_a_named_resolution_wins_but_is_answered_for(
+    checkpoint_recording: Any, logs: list[str]
+) -> None:
+    """Scoring a model at a scale it was never shown is a real thing to want and a common
+    thing to do by accident, so it happens but never quietly."""
+    checkpoint_recording({"imgsz": 1280})
+
+    assert resolution_of("best.pt", 640) == 640
+    assert any("trained at 1280" in message for message in logs)
+
+
+def test_a_checkpoint_that_names_no_resolution_is_refused(checkpoint_recording: Any) -> None:
+    """640 is a plausible enough number to be wrong without ever looking wrong."""
+    checkpoint_recording({})
+
+    with pytest.raises(ValueError, match="Set imgsz explicitly"):
+        resolution_of("best.pt", None)
 
 
 def test_each_box_is_attributed_by_path_not_by_position() -> None:
@@ -224,6 +270,17 @@ def test_torch_compile_follows_the_device() -> None:
 
     predict_on_images("best.pt", ["a.png"], device="cpu")
     assert FakeYolo.last.calls[0]["compile"] is False  # type: ignore[union-attr]
+
+
+def test_the_letterbox_shape_is_named_rather_than_inherited() -> None:
+    """`rect` decides the shape the network actually sees, so it is a decision of this
+    run's rather than whatever the installed ultralytics happens to default to."""
+    DETECTIONS["a.png"] = _boxes(([1, 2, 3, 4], 0.9, 0))
+    predict_on_images("best.pt", ["a.png"], device="0")
+    assert FakeYolo.last.calls[0]["rect"] is True  # type: ignore[union-attr]
+
+    predict_on_images("best.pt", ["a.png"], device="0", rect=False)
+    assert FakeYolo.last.calls[0]["rect"] is False  # type: ignore[union-attr]
 
 
 def test_compilation_can_be_forced_back_off() -> None:

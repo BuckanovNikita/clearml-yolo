@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import sys
 import types
 from typing import Any
@@ -14,9 +15,11 @@ from clearml_yolo import gpu as gpu_module
 from clearml_yolo.gpu import (
     BATCH_TABLE_ENV_VAR,
     AutoGpuConfig,
+    DeviceSelection,
     GpuInfo,
     GpuSurvey,
     probe_gpus,
+    remember_batch,
     resolve_devices,
     resolve_inference,
     scale_batch_per_gpu,
@@ -260,6 +263,164 @@ def test_autobatch_allowed_on_single_gpu() -> None:
 
     assert selection.devices == [0]
     assert selection.batch == -1
+
+
+def test_an_explicit_batch_survives_automatic_device_selection(patch_modules: Any) -> None:
+    """Waiting for a free card and choosing a batch are separate decisions.
+
+    Folding them together is what left `train.batch` unread on the one path almost every
+    run takes: auto_gpu is on by default, and it used to discard the number outright.
+    """
+    handles = [FakeHandle(name, 24.0, 23.0, 0) for name in ("aaa", "bbb")]
+    patch_modules(handles, ["aaa", "bbb"])
+
+    selection = select_devices(AutoGpuConfig(reserve_gpus=NO_RESERVE), batch=48)
+
+    assert selection.devices == [0, 1]
+    assert selection.batch == 48
+    assert selection.batch_per_gpu == 24
+
+
+def test_an_explicit_batch_must_still_divide_by_the_cards_chosen_here(patch_modules: Any) -> None:
+    """The count was not the user's to know, so the error has to say how to bound it."""
+    handles = [FakeHandle(name, 24.0, 23.0, 0) for name in ("aaa", "bbb", "ccc")]
+    patch_modules(handles, ["aaa", "bbb", "ccc"])
+
+    with pytest.raises(ValueError, match=re.escape("auto_gpu.max_gpus")):
+        select_devices(AutoGpuConfig(reserve_gpus=NO_RESERVE), batch=10)
+
+
+def test_autobatch_is_rejected_against_cards_chosen_here_too(patch_modules: Any) -> None:
+    handles = [FakeHandle(name, 24.0, 23.0, 0) for name in ("aaa", "bbb")]
+    patch_modules(handles, ["aaa", "bbb"])
+
+    with pytest.raises(ValueError, match="single-GPU only"):
+        select_devices(AutoGpuConfig(reserve_gpus=NO_RESERVE), batch=-1)
+
+
+def test_a_model_of_its_own_size_gets_a_batch_of_its_own(patch_modules: Any) -> None:
+    """The global anchor cannot be right for a yolo11n and a yolo11x at once."""
+    patch_modules([FakeHandle("aaa", 24.0, 23.0, 0)], ["aaa"])
+    config = AutoGpuConfig(
+        batch_per_gpu=32, reference_vram_gb=24.0, model_batch_per_gpu={"yolo11x": 8}
+    )
+
+    assert select_devices(config, model="yolo11x.pt").batch == 8
+    assert select_devices(config, model="yolo11n.pt").batch == 32
+
+
+def test_a_measured_batch_is_used_as_measured(patch_modules: Any) -> None:
+    """A table entry is a number seen to fit, so it is neither scaled nor rounded down.
+
+    80 GiB against a 24 GiB reference would otherwise multiply it, and the power-of-two
+    floor would then round the answer away from what was actually measured.
+    """
+    patch_modules([FakeHandle("aaa", 80.0, 79.0, 0)], ["aaa"])
+    config = AutoGpuConfig(
+        batch_per_gpu=16, reference_vram_gb=24.0, batch_table={"yolo11m": {"GPU0": 20}}
+    )
+
+    assert select_devices(config, model="yolo11m.pt").batch == 20
+
+
+def test_a_card_is_named_by_any_part_of_what_the_driver_calls_it(patch_modules: Any) -> None:
+    """Reproducing a driver string exactly is not something a config should have to do,
+    and getting it subtly wrong would look from the outside like having set no table."""
+    patch_modules([FakeHandle("aaa", 24.0, 23.0, 0)], ["aaa"])
+    config = AutoGpuConfig(batch_table={"yolo11m": {"gpu0": 20, "0": 7}})
+
+    # Both keys match "GPU0"; the longer one is the more specific and wins.
+    assert select_devices(config, model="yolo11m.pt").batch == 20
+
+
+def test_a_table_that_does_not_cover_this_many_cards_falls_through(patch_modules: Any) -> None:
+    """Guessing across device counts is exactly what the count level exists to prevent."""
+    handles = [FakeHandle(name, 24.0, 23.0, 0) for name in ("aaa", "bbb")]
+    patch_modules(handles, ["aaa", "bbb"])
+    config = AutoGpuConfig(
+        batch_per_gpu=4,
+        reference_vram_gb=24.0,
+        reserve_gpus=NO_RESERVE,
+        batch_table={"yolo11m": {"GPU0": {1: 20}}},
+    )
+
+    assert select_devices(config, model="yolo11m.pt", stage="train").batch == 8
+
+
+def test_a_batch_that_finished_is_remembered_and_read_back(patch_modules: Any) -> None:
+    """The point of the file: a number found once by hand is never typed again."""
+    patch_modules([FakeHandle("aaa", 24.0, 23.0, 0)], ["aaa"])
+    config = AutoGpuConfig(batch_per_gpu=4, reference_vram_gb=24.0)
+
+    pinned = select_devices(config, model="yolo11m.pt", batch=48)
+    remember_batch(config, "train", "yolo11m.pt", pinned)
+
+    assert select_devices(config, model="yolo11m.pt", stage="train").batch == 48
+    # Another stage's evidence is not this one's: inference and training do not hold the
+    # same memory, so what one finished at says nothing about the other.
+    assert select_devices(config, model="yolo11m.pt", stage="predict").batch == 4
+
+
+def test_only_the_largest_batch_that_finished_is_kept(patch_modules: Any) -> None:
+    """That a small batch fits says nothing; that a large one finished proves the rest."""
+    patch_modules([FakeHandle("aaa", 24.0, 23.0, 0)], ["aaa"])
+    config = AutoGpuConfig(batch_per_gpu=4, reference_vram_gb=24.0)
+
+    for batch in (48, 16):
+        remember_batch(
+            config, "train", "yolo11m.pt", select_devices(config, model="yolo11m.pt", batch=batch)
+        )
+
+    assert select_devices(config, model="yolo11m.pt", stage="train").batch == 48
+
+
+def test_a_hand_written_table_outranks_what_was_remembered(patch_modules: Any) -> None:
+    """The file is a cache; a number the user typed is the authority over it."""
+    patch_modules([FakeHandle("aaa", 24.0, 23.0, 0)], ["aaa"])
+    config = AutoGpuConfig(batch_per_gpu=4, batch_table={"yolo11m": {"GPU0": 12}})
+
+    remember_batch(
+        config, "train", "yolo11m.pt", select_devices(config, model="yolo11m.pt", batch=48)
+    )
+
+    assert select_devices(config, model="yolo11m.pt", stage="train").batch == 12
+
+
+def test_nothing_is_remembered_from_a_run_that_surveyed_no_hardware() -> None:
+    """A batch with no card to file it under would be read back on a different machine."""
+    config = AutoGpuConfig(batch_per_gpu=4)
+    unsurveyed = DeviceSelection(devices=[0], batch=64, batch_per_gpu=64)
+
+    remember_batch(config, "train", "yolo11m.pt", unsurveyed)
+
+    assert not gpu_module.batch_table_path().exists()
+
+
+def test_ultralytics_own_choice_of_batch_is_not_remembered(patch_modules: Any) -> None:
+    """batch=-1 is a request, not a measurement; the number it settles on is never seen here."""
+    patch_modules([FakeHandle("aaa", 24.0, 23.0, 0)], ["aaa"])
+    config = AutoGpuConfig()
+
+    remember_batch(
+        config, "train", "yolo11m.pt", select_devices(config, model="yolo11m.pt", batch=-1)
+    )
+
+    assert not gpu_module.batch_table_path().exists()
+
+
+def test_remembering_can_be_turned_off_in_both_directions(patch_modules: Any) -> None:
+    patch_modules([FakeHandle("aaa", 24.0, 23.0, 0)], ["aaa"])
+    remembering = AutoGpuConfig(batch_per_gpu=4, reference_vram_gb=24.0)
+    forgetful = remembering.model_copy(update={"remember_batch": False})
+
+    remember_batch(
+        forgetful, "train", "yolo11m.pt", select_devices(forgetful, model="yolo11m.pt", batch=48)
+    )
+    assert not gpu_module.batch_table_path().exists()
+
+    pinned = select_devices(remembering, model="yolo11m.pt", batch=48)
+    remember_batch(remembering, "train", "yolo11m.pt", pinned)
+    assert select_devices(forgetful, model="yolo11m.pt", stage="train").batch == 4
 
 
 def test_reserve_leaves_a_card_for_other_runs(patch_modules: Any) -> None:

@@ -155,6 +155,25 @@ def test_inference_runs_at_the_resolution_the_model_was_trained_at() -> None:
     assert inference.imgsz == 1280
 
 
+def test_the_model_under_test_is_named_once_for_the_whole_run() -> None:
+    """Batch sizing is keyed by it, and inference and the comparison would otherwise have
+    to be told a second and third time which model they are running."""
+    stages = _pipeline_stages(["train.model=yolo11x.pt"])
+
+    assert stages["predict"]["model"] == "yolo11x.pt"
+    inference = stages["compare"]["inference"]
+    assert isinstance(inference, InferenceConfig)
+    assert inference.model == "yolo11x.pt"
+
+
+@pytest.mark.parametrize("stage", ["train", "predict"])
+def test_no_stage_pins_a_batch_the_hardware_never_saw(stage: str) -> None:
+    """Unset is what hands the decision to auto_gpu, so a default number here would be a
+    pin — and a pin that reached the run without anyone choosing it is how the configured
+    batch came to be ignored in the first place."""
+    assert _pipeline_stages([])[stage]["batch"] is None
+
+
 def test_the_report_and_the_comparison_resolve_the_same_baseline() -> None:
     """Both look a baseline up in the same project by the same tag, so two independent
     searches can answer with two different runs: a report against one model next to a
