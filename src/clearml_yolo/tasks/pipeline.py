@@ -218,6 +218,41 @@ def _check_split_choices(splits: list[str], choices: dict[str, str | None]) -> N
         )
 
 
+def _check_ground_truth(ground_truth: str, readers: list[str]) -> None:
+    """Reject a ground-truth CSV that is not there, before training rather than after it.
+
+    Every stage that scores anything reads this file, and the first of them runs once
+    training is done, so a path that does not exist costs the whole training run before
+    pandas reports it — and reports it as a bare filename, naming neither the key that
+    set it nor the command that writes it.
+    """
+    if not readers or Path(ground_truth).is_file():
+        return
+    raise FileNotFoundError(
+        f"ground_truth={ground_truth} does not exist, and the {', '.join(readers)} "
+        f"stage(s) read it. Write it first with `cy-ground-truth data_yaml=<your "
+        f"data.yaml> output={ground_truth}`."
+    )
+
+
+def _check_comparison_baseline(baseline: ModelRef, clearml: ClearMLConfig) -> None:
+    """Reject a comparison with no way to reach its baseline, before training.
+
+    Inside the pipeline the baseline is always a ClearML task, so a run with tracking off
+    has nowhere to look one up unless the task or its project is named outright. The
+    comparison is the last stage, so without this the run trains, predicts, scores and
+    reports, and only then fails on a lookup that could never have succeeded.
+    """
+    if baseline.task_id or baseline.project_name or clearml.enabled:
+        return
+    raise ValueError(
+        "The comparison stage resolves its baseline out of ClearML, but "
+        "clearml.enabled=false leaves it no project to search. Pass skip_compare=true to "
+        "run without the comparison, or name the baseline task outright with "
+        "report.baseline.task_id=<id>."
+    )
+
+
 def _check_weights_choice(weights: str | Path | None, skip_train: bool) -> None:
     """Reject a named checkpoint that training is about to overwrite.
 
@@ -282,6 +317,20 @@ def run_pipeline(
             "compare.split": None if skip_compare else compare_cfg["split"],
         },
     )
+    _check_ground_truth(
+        ground_truth,
+        [
+            stage
+            for stage, skipped in (
+                ("predict", skip_predict),
+                ("metrics", skip_metrics),
+                ("compare", skip_compare),
+            )
+            if not skipped
+        ],
+    )
+    if not skip_compare:
+        _check_comparison_baseline(compare_cfg["baseline_model"], clearml)
 
     checkpoint = predict_cfg["weights"]
     # Inference after training must reuse training's own card rather than survey again:

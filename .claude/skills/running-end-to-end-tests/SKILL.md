@@ -55,11 +55,14 @@ Add `train.ultralytics.project=`, `predict.output=`, `metrics.output_dir=`, `rep
 into your scratchpad to keep `runs/` clean.
 
 Two overrides here are load-bearing, not decoration. `skip_compare=true` is required whenever
-`clearml.enabled=false`: the comparison resolves its baseline out of ClearML, finds no project to search,
-and raises `ValueError: source='clearml' needs task_id=<id> or a project to search` — *after* train,
-predict, metrics and report have all succeeded. And `report/baseline=none` is a group override that
-composes only against the packaged config; from a `cy-init-config` folder it is
+`clearml.enabled=false`: the comparison resolves its baseline out of ClearML and has no project to
+search, which `_check_comparison_baseline` rejects before training starts. And `report/baseline=none` is
+a group override that composes only against the packaged config; from a `cy-init-config` folder it is
 `report.baseline.source=none`.
+
+The run also refuses to start if `ground_truth` does not point at an existing CSV and any of predict,
+metrics or compare will run. Both refusals happen before training, so a mis-specified run costs seconds
+rather than a full training pass.
 
 **Expected end state:** `metrics.output_dir` holds `full_dashboard_{train,val,test}.xlsx`,
 `matrix_*.xlsx`, `метрики_дтрк_*.xlsx` and four `*_confidence_intervals.png`; the predictions CSV has a

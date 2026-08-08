@@ -68,7 +68,15 @@ def _resolved_task_id(model: ModelRef, fallback_project: str | None) -> str:
         return model.task_id
     project = model.project_name or fallback_project
     if not project:
-        raise ValueError("source='clearml' needs task_id=<id> or a project to search")
+        # The fallback project is the run's own, and it is only offered while tracking is
+        # on — so this is what a source='clearml' model looks like with clearml.enabled
+        # false and nothing named in its place.
+        raise ValueError(
+            "source='clearml' has no task to resolve: no task_id, no project_name, and no "
+            "project from the run (clearml.enabled is false). Name the task with "
+            "task_id=<id>, name the project with project_name=<name>, or compare a "
+            "checkpoint on disk with source='local' and weights=<path>."
+        )
     found = latest_completed_task_id(project, model.task_name, model.tags)
     if found is None:
         tagged = f" tagged {model.tags}" if model.tags else ""

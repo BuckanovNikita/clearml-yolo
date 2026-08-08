@@ -28,6 +28,20 @@ from clearml_yolo.tasks.train import _inference_device
 STAGES = ["train", "predict", "metrics", "report", "compare"]
 
 
+class _ReachedTrainingError(Exception):
+    """Raised in place of training, so a test can assert a run got past every check.
+
+    A pre-flight check that exempts a config is only proven by the run reaching the work
+    it guards. Asserting some other check's error instead proves nothing: the checks run
+    in order, and an earlier one raising would satisfy that assertion whether or not the
+    check under test was ever reached.
+    """
+
+
+def _reached_training(**_: object) -> None:
+    raise _ReachedTrainingError
+
+
 @pytest.fixture(scope="module", autouse=True)
 def hydra_store() -> None:
     store.add_to_hydra_store(overwrite_ok=True)
@@ -213,6 +227,96 @@ def test_a_named_checkpoint_without_skip_train_is_rejected_before_training_start
         )
 
     with pytest.raises(ValueError, match="weights"):
+        zen(run_pipeline)(config)
+
+
+def test_a_missing_ground_truth_is_rejected_before_training_starts(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Every stage that scores anything reads this CSV, but the first of them runs after
+    training, so a path that does not exist costs the whole training run before pandas
+    reports it — as a bare filename, with no hint that `cy-ground-truth` writes it."""
+    monkeypatch.setattr(pipeline_module, "run_training", lambda **kwargs: pytest.fail("trained"))
+    missing = tmp_path / "nowhere.csv"
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        config = compose(
+            config_name="pipeline",
+            overrides=[
+                f"ground_truth={missing}",
+                "skip_compare=true",
+                "clearml.enabled=false",
+            ],
+        )
+
+    with pytest.raises(FileNotFoundError, match="cy-ground-truth"):
+        zen(run_pipeline)(config)
+
+
+def test_a_run_that_scores_nothing_needs_no_ground_truth(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Training alone never opens the CSV, so requiring it would reject a valid run.
+
+    Reaching training is the assertion: every pre-flight check has to have passed for the
+    run to get that far, so a check that rejected this config could not hide behind an
+    earlier one raising first.
+    """
+    monkeypatch.setattr(pipeline_module, "run_training", _reached_training)
+    missing = tmp_path / "nowhere.csv"
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        config = compose(
+            config_name="pipeline",
+            overrides=[
+                f"ground_truth={missing}",
+                "skip_predict=true",
+                "skip_metrics=true",
+                "skip_compare=true",
+                "clearml.enabled=false",
+            ],
+        )
+
+    with pytest.raises(_ReachedTrainingError):
+        zen(run_pipeline)(config)
+
+
+def test_a_comparison_that_cannot_reach_its_baseline_is_rejected_before_training_starts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Inside the pipeline the baseline is always a ClearML task, so tracking turned off
+    leaves the lookup nothing to search. The comparison is the last stage, so without this
+    the run trains, predicts, scores and reports before failing on a lookup that could
+    never have succeeded."""
+    monkeypatch.setattr(pipeline_module, "run_training", lambda **kwargs: pytest.fail("trained"))
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        config = compose(config_name="pipeline", overrides=["clearml.enabled=false"])
+
+    with pytest.raises(ValueError, match="skip_compare"):
+        zen(run_pipeline)(config)
+
+
+def test_a_baseline_named_outright_survives_tracking_being_off(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A task id needs no project to search, so it is not the case this check rejects.
+
+    The ground truth is written rather than left to the default: the repo's own
+    `ground_truth.csv` is untracked, so a test that leaned on it would pass here and fail
+    on a fresh clone.
+    """
+    monkeypatch.setattr(pipeline_module, "run_training", _reached_training)
+    truth = tmp_path / "ground_truth.csv"
+    truth.write_text("image_name,image_path,instance_label,split\n")
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        config = compose(
+            config_name="pipeline",
+            overrides=[
+                "clearml.enabled=false",
+                "report.baseline.task_id=" + "a" * 32,
+                f"ground_truth={truth}",
+            ],
+        )
+
+    with pytest.raises(_ReachedTrainingError):
         zen(run_pipeline)(config)
 
 
