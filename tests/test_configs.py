@@ -194,12 +194,16 @@ def test_the_comparison_re_infers_exactly_as_the_predict_stage_did() -> None:
             "predict.ultralytics.conf=0.005",
             "predict.ultralytics.imgsz=1280",
             "predict.ultralytics.batch=8",
+            "predict.ultralytics.quantize=32",
         ]
     )
 
     inference = stages["compare"]["inference"]
     assert isinstance(inference, InferenceConfig)
     assert (inference.conf, inference.imgsz, inference.batch) == (0.005, 1280, 8)
+    # A run that pinned FP32 to reproduce older numbers must not have the comparison
+    # silently score both models at FP16 instead.
+    assert inference.quantize == 32
     # The card stays the comparison's own: inheriting it would let the two models be
     # re-inferred on different hardware, which is the one thing this must not compare.
     assert inference.device is None

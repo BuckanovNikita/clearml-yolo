@@ -179,7 +179,10 @@ def _comparison_inference(
     predict_params = predict_cfg["ultralytics"]
     return inference.model_copy(
         update={
-            **{key: predict_params[key] for key in ("conf", "iou", "imgsz", "batch")},
+            **{
+                key: predict_params[key]
+                for key in ("conf", "iou", "imgsz", "batch", "quantize")
+            },
             **{key: predict_cfg[key] for key in ("model", "image_name")},
         }
     )

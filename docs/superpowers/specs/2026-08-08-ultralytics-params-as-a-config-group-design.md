@@ -346,16 +346,53 @@ real console scripts rather than through `compose`:
 
 ## Corrections made while implementing
 
-- **`_precision` survives** rather than dissolving into the null rule. The comparison
-  calls `predict_on_images` without an ultralytics block of its own — it is driven by
-  `InferenceConfig`, which stays closed — so the FP16-on-a-card default still has to live
-  there for that caller. The predict stage now always names `quantize` and `compile`, so
-  the default only ever answers the comparison. What did go is the `half` half of it.
-- **`batch` and `device` do not go through `fill_unset`.** `resolve_devices` and
-  `resolve_inference` already implement the same rule for them, honouring a number that
-  was asked for and sizing one that was not, and they have to run anyway to survey the
-  cards. Routing them through a second precedence step would have given the file's value
-  two chances to win and the survey's none — `resolve_devices` deliberately *ignores* an
-  explicit `device` when `auto_gpu` is enabled, and `fill_unset` would have put it back.
 - **The parameter files carry a fourth deviation from upstream**, `exist_ok: true`, which
   training set unconditionally before and is now visible like everything else.
+- **`batch` and `device` do not go through `fill_unset`**, because `resolve_devices` and
+  `resolve_inference` already implement the rule for them and have to run anyway to survey
+  the cards. What they return is also normalised — `device: 0,1` from a config file becomes
+  the `[0, 1]` ultralytics wants — so it is their answer that goes on, not the file's
+  spelling of the question.
+
+## Follow-up: the same rule at every stage
+
+Writing the two files exposed a disagreement they made visible for the first time. With
+`auto_gpu` enabled, `resolve_devices` warned and **discarded** a named `device`, while
+`resolve_inference` honoured one and sized only the batch for it. So `device` in a config
+file meant two different things depending on which stage read it, and the file's own
+promise — *a value written here is used verbatim* — was false at the train stage.
+
+`resolve_devices` now follows the predict stage's rule, which is the one `select_devices`
+already documents for `batch`: naming a card and naming a batch are separate decisions.
+A named device is honoured, `auto_gpu` sizes the batch for those cards, and only an unset
+device is surveyed for. `"0,1"`, `"cuda:1"`, `0` and `[0, 1]` all normalise to the list
+form. A card NVML cannot describe falls back to the configured anchor rather than to a
+number guessed from hardware nobody looked at. The old behaviour had no test; the new one
+has six.
+
+## Follow-up: precision is named, not inferred
+
+`_precision` — which asked whether the caller had already mentioned `half` or `quantize`
+and injected FP16 if not — is gone. It was the last rule stated only at its point of use,
+and it existed because the comparison called `predict_on_images` without naming a
+precision.
+
+`InferenceConfig` and `SettledInference` now carry `quantize`, unset meaning *follow the
+card this comparison resolved for itself*, and `_settled` resolves it before anything
+reads it. `predict_on_images` takes `quantize` as a named parameter whose unset value means
+the same thing it means in the config file, applied through `fill_unset` — so the whole
+change now has exactly one precedence rule in exactly one function.
+
+The prediction cache keys on `quantize` **and** on whether the run is on a card. The
+second is no longer a proxy for the first: `torch.compile` still follows the device by
+itself, and compiled kernels need not return bit-identical boxes. Dropping it was caught
+by `test_a_cache_is_not_reused_across_inference_settings`, which is exactly what that test
+is for.
+
+One residue is left deliberately. `compile` is not threaded from the predict stage into
+the comparison the way `quantize` now is, so a run that pins `compile: false` in
+`predict.yaml` still has the comparison compile if it lands on a card. Both models within
+one comparison are always treated alike — they share the resolved device — so the
+comparison itself stays fair; only a cross-run reproduction is affected. Threading it
+would mean a `compile=` parameter on two functions, which ruff rejects as shadowing a
+builtin, for a narrower gap than the lint noise is worth.

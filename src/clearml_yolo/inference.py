@@ -57,6 +57,7 @@ import pandas as pd
 from loguru import logger
 
 from clearml_yolo.progress import track
+from clearml_yolo.ultralytics_params import fill_unset
 
 ImageNameMode = Literal["name", "stem", "path"]
 
@@ -183,20 +184,6 @@ def _detection_rows(path: str, boxes: Any, names: dict[int, str], mode: ImageNam
     ]
 
 
-def _precision(accelerated: bool, model_kwargs: dict[str, Any]) -> dict[str, Any]:
-    """Ask for FP16 on a card, unless the caller already named a precision.
-
-    ``quantize`` is 16 for FP16 and 32 for FP32; ultralytics 8.4 dropped ``half`` in
-    favour of it. Naming it hands the whole decision back, which is how the predict stage
-    passes on whatever ``conf/ultralytics/predict.yaml`` says. The comparison names
-    nothing and gets the default, so a warm FP32 cache from before this default is never
-    scored against fresh FP16 detections.
-    """
-    if "quantize" in model_kwargs:
-        return {}
-    return {"quantize": 16 if accelerated else 32}
-
-
 def _write_manifest(paths: list[str], directory: Path) -> tuple[str, dict[str, str]]:
     """Write the file list ultralytics will read, and the map from what it reports back.
 
@@ -240,6 +227,7 @@ def predict_on_images(
     imgsz: int = 640,
     batch: int = 16,
     device: str | None = None,
+    quantize: int | str | None = None,
     image_name: ImageNameMode = "name",
     **model_kwargs: Any,
 ) -> pd.DataFrame:
@@ -253,16 +241,19 @@ def predict_on_images(
     ``conf`` defaults to near zero because per-class thresholds are calibrated downstream,
     and filtering here would discard the detections that calibration needs.
 
-    Half precision and ``torch.compile`` are both on by default wherever the device supports
-    them. Both pay off on a model heavy enough to be GPU-bound, and both change which boxes
-    come back, so thresholds calibrated without them do not carry over — recalibrate rather
-    than mixing. See the module docstring for what each measured on a small model.
+    ``quantize`` and ``compile`` left unset follow the device: FP16 and compilation on a
+    CUDA card, neither anywhere else. Both pay off on a model heavy enough to be GPU-bound,
+    and both change which boxes come back, so thresholds calibrated without them do not
+    carry over — recalibrate rather than mixing. See the module docstring for what each
+    measured on a small model.
 
-    ``model_kwargs`` reach ``model.predict`` untouched, so ``quantize=32`` and
-    ``compile=False`` turn either back off for a run that has to reproduce numbers taken
-    before these defaults. The predict stage passes the whole of
-    ``conf/ultralytics/predict.yaml`` this way; the comparison passes nothing and takes
-    the defaults.
+    Unset means the same thing here as it does in ``conf/ultralytics/predict.yaml``: this
+    decides it. A value passed in is used as it stands, which is how the predict stage
+    hands over whatever its config file says, and how the comparison names the precision
+    its prediction cache is keyed on.
+
+    ``model_kwargs`` reach ``model.predict`` untouched, so any other ultralytics parameter
+    goes through as well.
 
     Raises:
         ValueError: If ``batch`` is below one, or if any requested image came back
@@ -281,20 +272,23 @@ def predict_on_images(
     model = YOLO(str(weights))
     names: dict[int, str] = model.names
     accelerated = is_cuda_device(device)
-    settings: dict[str, Any] = {
-        "conf": conf,
-        "iou": iou,
-        "imgsz": imgsz,
-        "batch": batch,
-        "device": device,
-        "compile": accelerated,
-        # Ultralytics' own default for predict, named here because it decides the shape
-        # the network actually sees and therefore belongs in the log line beside imgsz.
-        # See the module docstring for what it costs.
-        "rect": True,
-        **_precision(accelerated, model_kwargs),
-        **model_kwargs,
-    }
+    settings: dict[str, Any] = fill_unset(
+        {
+            "conf": conf,
+            "iou": iou,
+            "imgsz": imgsz,
+            "batch": batch,
+            "device": device,
+            "quantize": quantize,
+            # Ultralytics' own default for predict, named here because it decides the shape
+            # the network actually sees and therefore belongs in the log line beside imgsz.
+            # See the module docstring for what it costs.
+            "rect": True,
+            **model_kwargs,
+        },
+        quantize=16 if accelerated else 32,
+        compile=accelerated,
+    )
     logger.info(
         "Predicting on {} images with {} ({})",
         len(paths),

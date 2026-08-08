@@ -101,6 +101,7 @@ def reinfer_split(
     imgsz: int,
     batch: int,
     device: str | None,
+    quantize: int | str,
     image_name: str,
     reuse_existing: bool = True,
     predictor: Predictor = predict_on_images,
@@ -141,6 +142,7 @@ def reinfer_split(
             imgsz=imgsz,
             batch=batch,
             device=device,
+            quantize=quantize,
             image_name=image_name,
         )
         output.parent.mkdir(parents=True, exist_ok=True)

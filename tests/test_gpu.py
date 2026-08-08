@@ -281,6 +281,68 @@ def test_an_explicit_batch_survives_automatic_device_selection(patch_modules: An
     assert selection.batch_per_gpu == 24
 
 
+def test_a_named_device_survives_automatic_batch_selection(patch_modules: Any) -> None:
+    """Naming a card and naming a batch are separate decisions, the same way naming a
+    batch and letting the cards be surveyed already are.
+
+    Training used to warn and discard a named device whenever auto_gpu was on, while the
+    predict stage honoured one — so `device` in a config file meant two different things
+    depending on which stage read it, and neither said so.
+    """
+    handles = [FakeHandle(name, 24.0, 23.0, 0) for name in ("aaa", "bbb", "ccc")]
+    patch_modules(handles, ["aaa", "bbb", "ccc"])
+
+    selection = resolve_devices(AutoGpuConfig(batch_per_gpu=16), [1, 2], batch=None)
+
+    assert selection.devices == [1, 2]
+    assert selection.batch == 32
+    assert selection.batch_per_gpu == 16
+
+
+def test_a_named_device_is_spelled_the_way_ultralytics_takes_it(patch_modules: Any) -> None:
+    """`device=0,1` is how it arrives from the command line and `[0, 1]` is how DDP wants
+    it, so both have to resolve to one request."""
+    handles = [FakeHandle(name, 24.0, 23.0, 0) for name in ("aaa", "bbb")]
+    patch_modules(handles, ["aaa", "bbb"])
+
+    assert resolve_devices(AutoGpuConfig(), "0,1", batch=None).devices == [0, 1]
+    assert resolve_devices(AutoGpuConfig(), "cuda:1", batch=None).devices == [1]
+    assert resolve_devices(AutoGpuConfig(), 0, batch=None).devices == [0]
+    assert resolve_devices(AutoGpuConfig(), "cpu", batch=None).devices == "cpu"
+
+
+def test_a_named_device_and_a_named_batch_are_both_taken_as_given(patch_modules: Any) -> None:
+    handles = [FakeHandle(name, 24.0, 23.0, 0) for name in ("aaa", "bbb")]
+    patch_modules(handles, ["aaa", "bbb"])
+
+    selection = resolve_devices(AutoGpuConfig(), [0, 1], batch=48)
+
+    assert (selection.devices, selection.batch, selection.batch_per_gpu) == ([0, 1], 48, 24)
+
+
+def test_a_named_device_nvml_cannot_describe_falls_back_to_the_anchor(
+    patch_modules: Any,
+) -> None:
+    """There is no card to size against, so the configured anchor answers rather than a
+    number guessed from hardware nobody looked at."""
+    patch_modules([FakeHandle("aaa", 24.0, 23.0, 0)], ["aaa"])
+
+    selection = resolve_devices(AutoGpuConfig(batch_per_gpu=8), [7], batch=None)
+
+    assert selection.devices == [7]
+    assert selection.batch == 8
+
+
+def test_an_unset_device_is_still_surveyed_for(patch_modules: Any) -> None:
+    """Only a named device is honoured; unset is what hands the choice to the survey."""
+    handles = [FakeHandle(name, 24.0, 23.0, 0) for name in ("aaa", "bbb")]
+    patch_modules(handles, ["aaa", "bbb"])
+
+    selection = resolve_devices(AutoGpuConfig(reserve_gpus=NO_RESERVE), None, batch=None)
+
+    assert selection.devices == [0, 1]
+
+
 def test_an_explicit_batch_must_still_divide_by_the_cards_chosen_here(patch_modules: Any) -> None:
     """The count was not the user's to know, so the error has to say how to bound it."""
     handles = [FakeHandle(name, 24.0, 23.0, 0) for name in ("aaa", "bbb", "ccc")]

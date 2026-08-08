@@ -122,6 +122,9 @@ class InferenceConfig(BaseModel):
     batch: int | None = None
     model: str | None = None
     device: str | None = None
+    # Unset follows the card this comparison resolves for itself: FP16 on CUDA, FP32
+    # otherwise. Set it to score both models at a precision a run has to reproduce.
+    quantize: int | str | None = None
     image_name: str = "name"
     reuse_existing: bool = True
 
@@ -139,6 +142,7 @@ class SettledInference(BaseModel):
     imgsz: int
     batch: int
     device: str | None
+    quantize: int | str
     image_name: str
     reuse_existing: bool
 
@@ -164,8 +168,12 @@ def _prediction_cache(
     retrained ``best.pt`` at an unchanged path is not mistaken for the old one, and the
     inference settings are part of it so predictions taken at one confidence, resolution or
     numeric precision are never compared against predictions taken at another. Precision
-    matters here because the cache outlives a run: a warm FP32 cache from before half
-    precision became the default would otherwise be scored against fresh FP16 detections.
+    matters here because the cache outlives a run: a warm FP32 cache from before FP16
+    became the default would otherwise be scored against fresh FP16 detections.
+
+    ``quantize`` names that precision outright. Whether the run is on a card is keyed
+    alongside it rather than as a proxy for it, because ``torch.compile`` still follows the
+    device on its own and compiled kernels do not have to return bit-identical boxes.
 
     ``batch`` is among those settings, contrary to the intuition that it is only a memory
     knob. Ultralytics letterboxes each batch according to whether its images happen to
@@ -178,7 +186,8 @@ def _prediction_cache(
         identity = f"{identity}:{stat.st_size}:{stat.st_mtime_ns}"
     identity = (
         f"{identity}:conf={inference.conf}:iou={inference.iou}:imgsz={inference.imgsz}"
-        f":batch={inference.batch}:accelerated={is_cuda_device(inference.device)}"
+        f":batch={inference.batch}:quantize={inference.quantize}"
+        f":accelerated={is_cuda_device(inference.device)}"
     )
     digest = hashlib.sha256(identity.encode()).hexdigest()[:12]
     return destination / f"{role}_predictions_{split}_{digest}.csv"
@@ -204,6 +213,7 @@ def _scored(
         imgsz=inference.imgsz,
         batch=inference.batch,
         device=inference.device,
+        quantize=inference.quantize,
         image_name=inference.image_name,
         reuse_existing=inference.reuse_existing,
     )
@@ -246,12 +256,16 @@ def _settled(
             imgsz,
             imgsz,
         )
+    accelerated = is_cuda_device(selection.device_name)
     return SettledInference(
         **{
             **inference.model_dump(exclude={"model"}),
             "device": selection.device_name,
             "batch": selection.batch,
             "imgsz": imgsz,
+            # Named here rather than left to the inference helper's default, so the one
+            # value the prediction cache is keyed on is the one that was passed.
+            "quantize": inference.quantize or (16 if accelerated else 32),
         }
     )
 

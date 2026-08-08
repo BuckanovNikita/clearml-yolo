@@ -132,6 +132,7 @@ def _reinfer(
         imgsz=640,
         batch=16,
         device=None,
+        quantize=32,
         image_name="name",
         reuse_existing=reuse_existing,
         predictor=predictor,
@@ -161,6 +162,9 @@ def test_forwards_the_inference_settings(ground_truth: pd.DataFrame, tmp_path: P
         "imgsz": 640,
         "batch": 16,
         "device": None,
+        # Named rather than left to the inference default, so the precision the cache is
+        # keyed on is the precision that was passed.
+        "quantize": 32,
         "image_name": "name",
     }
 

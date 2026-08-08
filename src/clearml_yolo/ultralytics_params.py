@@ -12,10 +12,13 @@ side asked separately whether the caller had already named a precision. Both wer
 precedence stated at the point of use, where the person editing the config could not see
 it. Now it is stated once, here, and again beside every key it governs.
 
-``batch`` and ``device`` are not filled here even though they follow the same rule: the
-GPU policy in :mod:`clearml_yolo.gpu` already implements it for them, honouring a number
-that was asked for and sizing one that was not, and it has to run anyway to survey the
-cards. Passing them through a second precedence step would only give them two.
+``batch`` and ``device`` follow the same rule but are not filled here, because
+:mod:`clearml_yolo.gpu` already implements it for them and has to run anyway to survey the
+cards: :func:`~clearml_yolo.gpu.resolve_devices` and
+:func:`~clearml_yolo.gpu.resolve_inference` honour a card and a batch that were asked for
+and work out only the ones that were not. What they return is also *normalised* —
+``device: 0,1`` from a config file becomes the ``[0, 1]`` ultralytics wants — so it is
+their answer that goes on, not the file's spelling of the question.
 """
 
 from __future__ import annotations

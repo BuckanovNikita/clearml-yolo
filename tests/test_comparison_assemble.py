@@ -37,6 +37,7 @@ def _settled(**overrides: Any) -> Any:
         imgsz=640,
         batch=16,
         device=None,
+        quantize=32,
         image_name="name",
         reuse_existing=True,
     ).model_copy(update=overrides)

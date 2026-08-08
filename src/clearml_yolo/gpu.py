@@ -729,6 +729,33 @@ def _card_behind(device: str) -> list[GpuInfo]:
     return [gpu for gpu in probe_gpus().gpus if gpu.torch_index == int(index)]
 
 
+def _named_devices(device: list[int] | int | str) -> list[int] | str:
+    """Spell a requested device the way ultralytics and torch both take it.
+
+    ``"0"`` and ``"0,1"`` are how a device reaches this from the command line, and
+    ``[0, 1]`` is how ultralytics wants a multi-GPU run named, so the two are the same
+    request written differently and have to resolve to one thing. Anything that is not a
+    list of CUDA ordinals — ``"cpu"``, ``"mps"`` — is passed through as it stands.
+    """
+    if isinstance(device, int):
+        return [device]
+    if isinstance(device, list):
+        return device
+    parts = [part.strip().removeprefix("cuda:") for part in device.split(",")]
+    if parts and all(part.isdigit() for part in parts):
+        return [int(part) for part in parts]
+    return device
+
+
+def _cards_behind(devices: list[int] | str) -> list[GpuInfo]:
+    """Describe every card a requested device list names, without waiting for any."""
+    if not isinstance(devices, list):
+        return []
+    by_index = {gpu.torch_index: gpu for gpu in probe_gpus().gpus}
+    found = [by_index[index] for index in devices if index in by_index]
+    return found if len(found) == len(devices) else []
+
+
 def resolve_inference(
     auto_gpu: AutoGpuConfig | None,
     device: str | None,
@@ -743,9 +770,10 @@ def resolve_inference(
     the reserve exists so that inference has somewhere to run, so honouring it here
     would leave a single-GPU host unable to infer at all.
 
-    With no policy to consult, or a card that cannot be described, there is nothing to
-    size a batch against, so a batch that was not given falls back to the configured
-    anchor rather than being guessed at.
+    A named device is honoured and only the batch is sized for it, which is the same rule
+    :func:`resolve_devices` follows for training. With no policy to consult, or a card that
+    cannot be described, there is nothing to size a batch against, so a batch that was not
+    given falls back to the configured anchor rather than being guessed at.
     """
     if auto_gpu is not None and auto_gpu.enabled:
         if device is None:
@@ -774,26 +802,56 @@ def resolve_devices(
     model: str | None = None,
     stage: str = "train",
 ) -> DeviceSelection:
-    """Pick devices automatically or validate an explicitly requested configuration."""
-    if auto_gpu.enabled:
-        if device is not None:
-            logger.warning("auto_gpu is enabled; ignoring explicit device={}", device)
-        return select_devices(auto_gpu, model=model, stage=stage, batch=batch)
+    """Pick the devices to train on and the batch to train at.
 
-    devices: list[int] | str
+    Naming a device and naming a batch are separate decisions, the same way
+    :func:`select_devices` already treats a batch that was asked for. A run that names its
+    cards gets those cards — ``auto_gpu`` then only sizes the batch for them, which is
+    what :func:`resolve_inference` has always done for the predict stage. Overriding a
+    named device instead meant one word in the config file meant two different things
+    depending on which stage read it.
+
+    Only an unset device is surveyed for, and only an unset batch is derived. With
+    ``auto_gpu`` off and no device named there is nothing to survey, so the run falls back
+    to CPU as before.
+    """
     if device is None:
-        devices = "cpu"
-    elif isinstance(device, int):
-        devices = [device]
-    else:
-        devices = device
+        if auto_gpu.enabled:
+            return select_devices(auto_gpu, model=model, stage=stage, batch=batch)
+        logger.info("auto_gpu is disabled and no device was named; running on CPU")
+        return _sized_by_anchor(auto_gpu, "cpu", batch)
 
+    devices = _named_devices(device)
+    named = _cards_behind(devices) if batch is None and auto_gpu.enabled else []
+    if not named:
+        return _sized_by_anchor(auto_gpu, devices, batch)
+
+    per_gpu = select_batch_per_gpu(auto_gpu, model, named, stage)
+    total = per_gpu * len(named)
+    logger.info(
+        "Training on the requested devices {} — {} x {} = total batch {}",
+        devices,
+        len(named),
+        per_gpu,
+        total,
+    )
+    return DeviceSelection(devices=devices, batch=total, batch_per_gpu=per_gpu, gpus=named)
+
+
+def _sized_by_anchor(
+    auto_gpu: AutoGpuConfig, devices: list[int] | str, batch: int | None
+) -> DeviceSelection:
+    """Run on ``devices`` at the batch given, or at the configured anchor per card.
+
+    The fallback for every path with no card survey behind it: ``auto_gpu`` disabled, or a
+    device named that NVML cannot describe. There is nothing to size against, so the
+    anchor is used rather than a number guessed from hardware nobody looked at.
+    """
     world_size = len(devices) if isinstance(devices, list) else 1
     if batch is None:
         batch = auto_gpu.batch_per_gpu * world_size
-        logger.info("auto_gpu is disabled and no batch was given; running at batch {}", batch)
+        logger.info("No survey to size a batch against; running at batch {}", batch)
     _refuse_indivisible_batch(batch, world_size, chosen_here=False)
-
     per_gpu = batch // world_size if batch > 0 else batch
     return DeviceSelection(devices=devices, batch=batch, batch_per_gpu=per_gpu)
 
