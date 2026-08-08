@@ -103,8 +103,8 @@ once at the top level and **handed to each stage by the run itself**, in code, n
 stage block holds only what that stage alone decides. A config folder dumped before this change still
 carries per-stage copies (`predict.weights`, `compare.iou_threshold`, …) that a run now recomputes and
 silently overwrites — re-dump it. `predict.imgsz` is **not** one of them: it is deliberately absent from
-`PIPELINE_FILLED_KEYS` (the reason is written out at `tasks/pipeline.py:66-71`), so a stale copy fails
-composition instead of being overwritten.
+`PIPELINE_FILLED_KEYS` (the reason is written out in the comment above that constant in
+`tasks/pipeline.py`), so a stale copy fails composition instead of being overwritten.
 
 Every ultralytics parameter lives in `src/clearml_yolo/conf/ultralytics/`, one file per stage, each
 listing the whole of ultralytics' configuration. `null` there means "leave ultralytics' own default
