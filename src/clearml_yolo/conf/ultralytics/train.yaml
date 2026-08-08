@@ -7,6 +7,12 @@
 #
 # A `null` below is a key this run works out for itself. Write a value and it is
 # passed to ultralytics verbatim, and nothing here overrides it.
+#
+# Two values here are NOT ultralytics' own. On a GPU this project trains with `amp: true`
+# and `compile: true`; upstream defaults `compile` to false. A run's numeric precision and
+# its kernels are not things to leave to a dependency's default, and both change the
+# numbers a run produces — so thresholds calibrated with them do not carry over to a run
+# without them. Write `false` against either to reproduce older numbers.
 
 # ---- read by detection training ----
 model: yolo11n.pt  # (str, optional) path to model file, i.e. yolo26n.pt or yolo26n.yaml
@@ -34,12 +40,14 @@ single_cls: false  # (bool) treat all classes as a single class
 rect: false  # (bool) rectangular batches for train; rectangular batching for val when mode='val'
 cos_lr: false  # (bool) cosine learning rate scheduler
 close_mosaic: 10  # (int) disable mosaic augmentation for final N epochs (0 to keep enabled)
-amp: null  # null -> on iff this run is on a GPU
+amp: null  # null -> TRUE on a GPU, false on CPU. Training's half precision is AMP, not
+           # `quantize`: that one casts the weights outright, which training cannot do.
 fraction: 1.0  # (float) fraction of training dataset to use (>0.0, 1.0 = all)
 profile: false  # (bool) profile ONNX/TensorRT speeds during training for loggers
 freeze:  # (int | list, optional) freeze first N layers (int) or specific layer indices (list)
 multi_scale: 0.0  # (float) multi-scale range as a fraction of imgsz; sizes are rounded to stride multiples
-compile: null  # null -> on iff this run is on a GPU
+compile: null  # null -> TRUE on a GPU, false on CPU. Upstream defaults this off; a run
+               # is long enough that the one-off compilation is amortised over every epoch.
 channels_last: false  # (bool) use channels_last (NHWC) memory format for conv train/inference; CUDA-only, speeds up Tensor-Core GPUs
 val: true  # (bool) run validation/testing during training
 split: val  # (str) dataset split to evaluate: 'val', 'test' or 'train'

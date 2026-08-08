@@ -7,18 +7,25 @@
 #
 # A `null` below is a key this run works out for itself. Write a value and it is
 # passed to ultralytics verbatim, and nothing here overrides it.
+#
+# Three values here are NOT ultralytics' own. On a CUDA card this project infers with
+# `compile: true` and `quantize: 16` (FP16) — upstream defaults compilation off and FP32 —
+# and `conf` is near zero rather than 0.25. Both accelerations change which boxes come
+# back, so thresholds calibrated with them do not carry over to a run without them:
+# recalibrate rather than mixing. Write `compile: false` / `quantize: 32` to reproduce
+# numbers taken before them.
 
 # ---- read by detection prediction ----
 batch: null  # null -> auto_gpu sizes it to this model on these cards
 imgsz: null  # null -> the resolution recorded in the checkpoint
 device: null  # null -> auto_gpu picks the cards
 rect: true  # ultralytics' own predict default, named here because it decides the shape the network sees
-compile: null  # null -> on iff this run is on a GPU
+compile: null  # null -> TRUE on a CUDA card, false otherwise (upstream defaults it off)
 channels_last: false  # (bool) use channels_last (NHWC) memory format for conv train/inference; CUDA-only, speeds up Tensor-Core GPUs
 conf: 0.001  # near zero on purpose: per-class thresholds are calibrated downstream, and filtering here discards the detections calibration needs
 iou: 0.7  # (float) IoU threshold used for NMS
 max_det: 300  # (int) maximum number of detections per image
-quantize: null  # null -> 16 on a CUDA card, 32 otherwise
+quantize: null  # null -> 16 (FP16) on a CUDA card, 32 otherwise. Upstream defaults FP32.
 dnn: false  # (bool) use OpenCV DNN for ONNX inference
 end2end:  # (bool, optional) whether to use end2end head (YOLO26, YOLOv10) for predict/val/export
 augment: false  # (bool) apply test-time augmentation during prediction
