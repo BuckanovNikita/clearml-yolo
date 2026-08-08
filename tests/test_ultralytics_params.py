@@ -92,6 +92,15 @@ def test_the_keys_the_run_decides_are_left_for_it_to_decide(stem: str) -> None:
     assert {key: written[key] for key in RUN_DECIDES[stem]} == dict.fromkeys(RUN_DECIDES[stem])
 
 
+def test_the_prediction_file_never_names_what_the_inference_call_sets_itself() -> None:
+    """`predict_on_images` passes these three itself — the manifest it wrote, and the
+    streaming and logging it needs — so a live key here would arrive twice and raise a
+    TypeError inside the run rather than at composition time."""
+    written = _written("predict")
+
+    assert not {"source", "stream", "verbose"} & set(written)
+
+
 def test_a_value_written_in_the_file_is_never_overridden() -> None:
     """The whole rule: null means the run decides, a value means it does not get to."""
     written = {"amp": False, "batch": 8, "compile": False, "quantize": 32, "name": None}

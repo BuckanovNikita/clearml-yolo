@@ -213,7 +213,12 @@ Training's own validation pass is real, so `val`, `split`, `conf`, `iou`, `plots
 `predict_on_images` returns a DataFrame and saves nothing, so those keys would write
 files no stage reads.
 
-`half` is commented in both, superseded by `quantize`.
+`quantize` is commented in `train.yaml`: training's precision is AMP, and `quantize`
+casts the weights outright, which training cannot do.
+
+`half` appears in neither. It is not a key of ultralytics 8.4.115's `default.yaml` at all
+— `quantize` replaced it and only the deprecation shim still answers to the old name — so
+listing it, even commented, would fail the key-union test below.
 
 ### Where clearml-yolo's values deliberately differ from upstream's
 
@@ -326,17 +331,31 @@ calls ultralytics.
   `YOLO(model)` constructor rather than also spreading it into `yolo.train(**settings)`,
   where it would win over the constructor and make the loaded weights ambiguous.
 
-## Mechanics still to verify, before any code is written
+## Mechanics verified during implementation
 
-Two forms this design depends on were never exercised. Both are cheap, and both fail
-loudly rather than subtly if they do not work — but the first one fails *silently* for a
-user, which is why it goes first.
+Both forms the design depended on and had not exercised now work, checked through the
+real console scripts rather than through `compose`:
 
-1. **`--config-dir conf` must shadow `pkg://clearml_yolo.conf`.** `cy-train --config-dir
-   conf` with `conf/ultralytics/train.yaml` present in both the user's folder and the
-   package must compose the user's copy. If the package copy wins, `cy-init-config` dumps
-   a file the user edits and the run ignores, which is the whole feature failing quietly.
-   Only `hydra.searchpath=[file://...]`, which *replaces* the search path, was tested.
-2. **`- /ultralytics@train.ultralytics: train` as a defaults-list entry in a primary
-   config.** This is the form the dumped `cy.yaml` needs. The nested-group form and the
-   CLI-override form were both verified; this third one was not.
+1. **`--config-dir conf` shadows `pkg://clearml_yolo.conf`.** With
+   `conf/ultralytics/train.yaml` present in both the user's folder and the package,
+   `cy-train --config-dir conf` composes the user's copy, and an edit to it changes the
+   run. Had the package copy won, `cy-init-config` would dump a file the user edits and
+   the run ignores.
+2. **`- /ultralytics@train.ultralytics: train` works as a defaults-list entry in the
+   dumped `cy.yaml`**, alongside `- /ultralytics@ultralytics: train` in `cy-train.yaml`.
+
+## Corrections made while implementing
+
+- **`_precision` survives** rather than dissolving into the null rule. The comparison
+  calls `predict_on_images` without an ultralytics block of its own — it is driven by
+  `InferenceConfig`, which stays closed — so the FP16-on-a-card default still has to live
+  there for that caller. The predict stage now always names `quantize` and `compile`, so
+  the default only ever answers the comparison. What did go is the `half` half of it.
+- **`batch` and `device` do not go through `fill_unset`.** `resolve_devices` and
+  `resolve_inference` already implement the same rule for them, honouring a number that
+  was asked for and sizing one that was not, and they have to run anyway to survey the
+  cards. Routing them through a second precedence step would have given the file's value
+  two chances to win and the survey's none — `resolve_devices` deliberately *ignores* an
+  explicit `device` when `auto_gpu` is enabled, and `fill_unset` would have put it back.
+- **The parameter files carry a fourth deviation from upstream**, `exist_ok: true`, which
+  training set unconditionally before and is now visible like everything else.
