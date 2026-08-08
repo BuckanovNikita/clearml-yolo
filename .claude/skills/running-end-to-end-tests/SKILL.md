@@ -31,8 +31,8 @@ four through the same locked `dev` group.
 
 ## 2. Offline pipeline run — no server needed
 
-Proves train → predict → metrics → report wiring on coco8 in about a minute. Run this first: if it
-fails, ClearML is not your problem.
+Proves train → predict → metrics → report wiring on coco8. Run this first: if it fails, ClearML is not
+your problem.
 
 ```bash
 uv run cy \
@@ -62,7 +62,7 @@ directory as a failure.
 
 **REQUIRED SUB-SKILL:** confirm the server is up *and authenticated* first — use `running-clearml-server`.
 `./scripts/check_env.sh` is the check that matters; a reachable server with stale `~/clearml.conf`
-credentials fails ~30 s into the run with `LoginError ... 401`.
+credentials fails partway into the run with `LoginError ... 401`.
 
 ```bash
 uv run cy \
@@ -81,8 +81,8 @@ become the baseline for real `clearml-yolo` runs. Never point a verification run
 to get a baseline.
 
 **Expected end state:** the task reaches `completed` under `cy-verify` carrying the `prod` tag, registers
-one output model, and holds 22 artifacts — among them `metrics_dashboard_full_{train,val,test}` and
-`metrics_best_confidences_{train,val,test}`. The last lines warn that no `prod`-tagged task was found to
+one output model, and holds `metrics_dashboard_full_{train,val,test}` and
+`metrics_best_confidences_{train,val,test}` among its artifacts. The last lines warn that no `prod`-tagged task was found to
 compare against; on a fresh project that is the correct first-run result.
 
 A task that appears but registers **no output model** means training uploaded nothing, which the
@@ -106,7 +106,7 @@ comparisons, not for proving the wiring.
 
 **Expected end state of run 2:** `compare.output_dir` holds `compare_workbook_<split>.xlsx` plus the
 re-inferred `baseline_predictions_*` / `candidate_predictions_*` CSVs, and the log ends with
-`Comparison of split '<split>': N classes compared, 0 excluded, 0 degraded`. Because the report stage now
+`Comparison of split '<split>': <n> classes compared, <n> excluded, <n> degraded`. Because the report stage now
 resolves a baseline, `report.output_dir` also fills with `report_dev_*`, `report_business_*` and
 `baseline_*` workbooks per split — the contrast with run 1's empty report directory is the check that the
 baseline actually resolved.
