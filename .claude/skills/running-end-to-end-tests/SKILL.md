@@ -11,9 +11,12 @@ description: |
 
 # Running clearml-yolo end to end
 
-`uv run pytest` is **fully mocked** — no server, no GPU, no ultralytics. It cannot catch a broken
-pipeline wiring, a stage that mis-handles a device, or a ClearML artifact that never uploads. Those need a
-real `cy` run. Both layers are part of "the full tests"; neither substitutes for the other.
+`uv run pytest` needs **no server and no GPU** — `clearml`, `ultralytics` and `torch` are stubbed per
+test, in the tests that touch them. (`tests/test_ultralytics_params.py` deliberately imports the real
+`ultralytics.cfg`: its job is to check the vendored parameter files against the installed package.) It
+cannot catch a broken pipeline wiring, a stage that mis-handles a device, or a ClearML artifact that never
+uploads. Those need a real `cy` run. Both layers are part of "the full tests"; neither substitutes for the
+other.
 
 ## 1. Static checks first — all four
 
@@ -26,8 +29,10 @@ uv run lint-imports
 
 `lint-imports` is not optional and is the one most often forgotten: it enforces the layering contracts in
 `pyproject.toml` (`apps` → `config_tree` → `configs` → `tasks` → `comparison` → domain), including that
-`clearml` stays behind the `clearml_*` adapters. `uv run pre-commit run --all-files` runs exactly these
-four through the same locked `dev` group.
+`clearml` stays behind the `clearml_*` adapters. `uv run pre-commit run --all-files` runs these four
+through the same locked `dev` group, after the upstream `pre-commit-hooks` set (`check-yaml`,
+`check-toml`, merge conflicts, file size, whitespace, end-of-file), which lives in pre-commit's own
+environment rather than in `dev`.
 
 ## 2. Offline pipeline run — no server needed
 
@@ -48,6 +53,13 @@ uv run cy \
 
 Add `train.ultralytics.project=`, `predict.output=`, `metrics.output_dir=`, `report.output_dir=` pointing
 into your scratchpad to keep `runs/` clean.
+
+Two overrides here are load-bearing, not decoration. `skip_compare=true` is required whenever
+`clearml.enabled=false`: the comparison resolves its baseline out of ClearML, finds no project to search,
+and raises `ValueError: source='clearml' needs task_id=<id> or a project to search` — *after* train,
+predict, metrics and report have all succeeded. And `report/baseline=none` is a group override that
+composes only against the packaged config; from a `cy-init-config` folder it is
+`report.baseline.source=none`.
 
 **Expected end state:** `metrics.output_dir` holds `full_dashboard_{train,val,test}.xlsx`,
 `matrix_*.xlsx`, `метрики_дтрк_*.xlsx` and four `*_confidence_intervals.png`; the predictions CSV has a
@@ -125,7 +137,7 @@ holds the card.
 
 | Mistake | Reality |
 |---|---|
-| "`uv run pytest` passed, so the pipeline works" | The suite is fully mocked. It never runs a stage for real. |
+| "`uv run pytest` passed, so the pipeline works" | The suite mocks the SDKs and never runs a stage for real. |
 | Skipping `lint-imports` | It is the only check that catches a layering violation, and pre-commit will reject the commit. |
 | Reading an empty `report.output_dir` as failure | Expected with `report/baseline=none`. |
 | First ClearML run warning "no completed task tagged prod" | Expected on a fresh project; compare needs a prior run. |

@@ -32,25 +32,31 @@ All tools run via `uv run`:
 
 ```bash
 # The full static suite — all four, in this order
-uv run pytest              # fully mocked: no server, no GPU, no ultralytics
+uv run pytest              # mocked: no server, no GPU
 uv run ruff check .        # lint (add --fix to auto-fix)
 uv run mypy .              # type check, strict
 uv run lint-imports        # architecture contracts from pyproject.toml
 
-uv run pre-commit run --all-files   # the same four, through the same locked dev group
+uv run pre-commit run --all-files   # the same four, plus the generic file hooks
 ```
 
-`uv run pre-commit install` installs the hook. Every check runs the project's own tools through
-`uv run`, so a hook and a hand-typed command are the same command against the same locked versions.
+`uv run pre-commit install` installs the hook. These four run through `uv run` out of the locked `dev`
+group, so a hook and a hand-typed command are the same command against the same locked versions. The
+hook also runs the upstream `pre-commit-hooks` set first (`check-yaml`, `check-toml`, merge conflicts,
+file size, whitespace, end-of-file) — those come from a pinned remote repo in pre-commit's own
+environment, not from `dev`.
 
 **`lint-imports` is part of the suite**, not an extra. It is the check most often skipped and the only
 one that catches a layering violation; pre-commit rejects the commit either way.
 
 ## Testing
 
-The pytest suite is **fully mocked** — it stubs `clearml`, `ultralytics` and `torch`. It cannot catch a
-broken pipeline wiring, a stage that mis-handles a device, or an artifact that never uploads. "The full
-tests" for this project means the static suite **and** a real `cy` run.
+The pytest suite needs **no server and no GPU** — it stubs `clearml`, `ultralytics` and `torch` per test,
+in the tests that touch them. The one exception is deliberate: `tests/test_ultralytics_params.py` imports
+the real `ultralytics.cfg`, because its job is to check the vendored parameter files against the
+installed package. Either way the suite cannot catch a broken pipeline wiring, a stage that mis-handles a
+device, or an artifact that never uploads. "The full tests" for this project means the static suite
+**and** a real `cy` run.
 
 **REQUIRED SKILL:** use `running-end-to-end-tests` for the real runs — it holds the verified offline
 smoke command, the ClearML-backed command, how to exercise the compare stage, and what to check
@@ -64,9 +70,15 @@ uv run cy clearml.enabled=false train.ultralytics.data=coco8.yaml train.ultralyt
 ```
 
 `auto_gpu.scale_to_vram=false` pins the batch to the 24 GB `reference_vram_gb` rather than scaling to the
-5090's 32 GB. The GPU is shared with CVAT and the ClearML server — verification runs must not claim the
-whole card. Do not raise `reference_vram_gb` to 32 to match the hardware; it sizes batches, it is not a
-memory cap.
+5090's 32 GB. At the shipped defaults it is defensive rather than load-bearing — `round_to_power_of_two`
+floors the scaled batch back to the same number — but it holds if a run raises the anchor. The GPU is
+shared with CVAT and the ClearML server; verification runs must not claim the whole card. Do not raise
+`reference_vram_gb` to 32 to match the hardware; it is the denominator that sizes batches, not a memory
+cap, so raising it *shrinks* the batch.
+
+`report/baseline=none` is a group override, and it composes only against the packaged config. From a
+`cy-init-config` folder the group is gone from the defaults list and the same thing is spelled
+`report.baseline.source=none`.
 
 ## Architecture
 
@@ -89,11 +101,15 @@ Hydra/hydra-zen. `cy-init-config` dumps a starting config tree; `uv run cy --con
 Values more than one stage needs — `clearml`, `auto_gpu`, `ground_truth`, `splits`, `weights` — are named
 once at the top level and **handed to each stage by the run itself**, in code, not by interpolation. A
 stage block holds only what that stage alone decides. A config folder dumped before this change still
-carries per-stage copies (`predict.imgsz`, `compare.iou_threshold`, …) that a run now recomputes and
-silently overwrites — re-dump it.
+carries per-stage copies (`predict.weights`, `compare.iou_threshold`, …) that a run now recomputes and
+silently overwrites — re-dump it. `predict.imgsz` is **not** one of them: it is deliberately absent from
+`PIPELINE_FILLED_KEYS` (the reason is written out at `tasks/pipeline.py:66-71`), so a stale copy fails
+composition instead of being overwritten.
 
-Every ultralytics parameter lives in `conf/ultralytics/`, one file per stage, each listing the whole of
-ultralytics' configuration. `null` there means "leave ultralytics' own default alone".
+Every ultralytics parameter lives in `src/clearml_yolo/conf/ultralytics/`, one file per stage, each
+listing the whole of ultralytics' configuration. `null` there means "leave ultralytics' own default
+alone". A `cy-init-config` dump copies these to `<dir>/ultralytics/`; repo-root `conf/` is such a dump
+and is untracked.
 
 ## ClearML
 
@@ -105,8 +121,9 @@ Two facts that have cost time before:
 
 - **ClearML model metadata carries no label enumeration.** Class names must come from the checkpoint, not
   from ClearML metadata.
-- **Dashboard thresholds are rounded.** For exact per-class thresholds read the `best_confidences`
-  artifact, not the dashboard.
+- **Dashboard thresholds are rounded.** For exact per-class thresholds read the
+  `metrics_best_confidences_<split>` artifact, not the dashboard. (`best_confidences` is the in-process
+  field name; the artifact names are all built in `artifact_names.py`.)
 
 ## Important Files
 

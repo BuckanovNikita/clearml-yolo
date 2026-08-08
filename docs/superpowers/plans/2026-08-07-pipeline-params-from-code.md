@@ -1,5 +1,12 @@
 # Pipeline Params From Code Implementation Plan
 
+> **STATUS: LANDED — historical record, do not execute.** The work shipped; `PIPELINE_FILLED_KEYS` and
+> `stage_configs()` are in `src/clearml_yolo/tasks/pipeline.py`. The unchecked boxes below are how the
+> plan was written, not work outstanding. Parts of it were superseded before landing — notably the
+> `train.name` and `predict.imgsz` fills, retired in
+> `docs/superpowers/specs/2026-08-08-ultralytics-params-as-a-config-group-design.md`. Read that spec,
+> and the code, for current behaviour.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Every value more than one pipeline stage needs is handed to that stage by `run_pipeline` in Python, so no `${...}` interpolation survives in the `cy.yaml` that `cy-init-config` writes.

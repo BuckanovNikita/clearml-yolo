@@ -7,7 +7,8 @@ released package.
 **The source is a manifest, and that is the whole trick.** Ultralytics routes a *list*
 source through ``autocast_list`` into ``LoadPilAndNumpy``, which sets ``bs = len(list)``
 and never consults the ``batch`` argument, so the whole list becomes one forward pass —
-on 748 images that is ~40% slower and 18 GB of VRAM instead of 3 GB. The same loader names
+slower than a batched run, and with VRAM that grows with the size of the split rather than
+with ``batch``. The same loader names
 images from PIL's ``filename``, which is lost through ``ImageOps.exif_transpose``'s copy,
 so ``Results.path`` comes back as ``image0.jpg``. Both problems belong to the list form
 alone. A ``.txt`` of paths goes to ``LoadImagesAndVideos`` instead, which honours
@@ -22,12 +23,11 @@ cannot decode, logging a warning, which would quietly shrink the scored set and 
 downstream as a recall drop that reads like a model regression — so every requested image
 is accounted for before returning.
 
-Throughput came out level with the chunked-and-threaded version this replaces: 748 KITTI
-images with a fine-tuned yolo11 on an RTX 5090 took 16.3 s before and 15.5 s after, box
-for box identical. Ultralytics decodes inline, so the ~0.9 ms/img that decoding off the
-main thread used to hide is paid again — and it is repaid by not setting a source up 47
-times. Both figures are dominated by ~9 s of one-off ``torch.compile`` work for the final
-partial batch's shape; a warm process scores the same 748 images in 4.8 s.
+Throughput came out level with the chunked-and-threaded version this replaces, box for box
+identical. Ultralytics decodes inline, so the per-image cost that decoding off the main
+thread used to hide is paid again — and it is repaid by not setting a source up once per
+chunk. Both are dominated by one-off ``torch.compile`` work for the final partial batch's
+shape; a warm process scores the same split in a fraction of the time.
 
 **``batch`` is not only a memory knob, it moves the boxes.** Ultralytics letterboxes with
 ``auto=same_shapes and rect``, and ``same_shapes`` is computed over the images of *one
@@ -39,11 +39,11 @@ or compares predictions has to key on it, and thresholds do not carry across a c
 it any more than they carry across a change of ``imgsz``.
 
 On CUDA, half precision and ``torch.compile`` are both on by default. Neither buys much on
-a model this small — preprocess 1.31 ms/img, GPU inference 0.53 ms/img, postprocess
-0.93 ms/img, so the network is a minority of the time, FP16 measured ~5% slower and
-``compile`` costs that one-off compilation against a ~5% steady-state gain. Both are still
-on because both scale with model size, and both are one line of
-``conf/ultralytics/predict.yaml`` away from off.
+a model this small: preprocessing, postprocessing and decoding together outweigh the
+network, so speeding the network up has little left to win — FP16 measured slower, and
+``compile`` charges its one-off compilation against a steady-state gain a small split
+never repays. Both are still on because both scale with model size, and both are one line
+of ``conf/ultralytics/predict.yaml`` away from off.
 """
 
 from __future__ import annotations
