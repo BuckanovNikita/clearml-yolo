@@ -25,12 +25,26 @@ from clearml_yolo.tasks.pipeline import PIPELINE_FILLED_KEYS
 from clearml_yolo.tasks.report import BaselineConfig
 from clearml_yolo.tasks.train import CHECKPOINT
 
-IMAGE_SIZE = 640
 TRAIN_PROJECT = "runs/detect"
-RUN_NAME = "train"
 PREDICTIONS_CSV = "runs/predictions.csv"
 METRICS_DIR = "runs/metrics"
-DEFAULT_CHECKPOINT = CHECKPOINT.format(project=TRAIN_PROJECT, name=RUN_NAME)
+
+# Hydra composes the ultralytics parameter sets from files inside the installed package,
+# because their comments are the point and a store entry cannot carry any. The path is
+# declared per primary config: `hydra.searchpath` is resolved before the `hydra/config`
+# store entry is composed, so setting it there is too late and the group is not found.
+PACKAGE_CONF = {"searchpath": ["pkg://clearml_yolo.conf"]}
+
+# The group reference is absolute, so one `ultralytics/` directory serves both the
+# standalone apps and the stage blocks nested inside the pipeline. Written relatively,
+# Hydra would look for `train/ultralytics/` and `predict/ultralytics/` as well, and the
+# same file would have to exist three times.
+ULTRALYTICS_GROUP = "/ultralytics@ultralytics"
+
+# Where a standalone `cy-predict` looks with no weights named. Training writes into the
+# ClearML experiment's own name, so this is built from that rather than from a second
+# constant that would drift from it the first time either was changed.
+DEFAULT_CHECKPOINT = CHECKPOINT.format(project=TRAIN_PROJECT, name=ClearMLConfig().task_name)
 
 AutoGpuConf = builds(AutoGpuConfig, populate_full_signature=True)
 ClearMLConf = builds(ClearMLConfig, populate_full_signature=True)
@@ -56,43 +70,33 @@ BaselineNoneConf = builds(BaselineConfig, source="none", populate_full_signature
 
 def _train_fields() -> dict[str, Any]:
     return {
-        "model": "yolo11n.pt",
-        "data": "coco8.yaml",
-        "epochs": 100,
-        "imgsz": IMAGE_SIZE,
-        # Unset, so auto_gpu sizes the batch to this model on these cards. A number here
-        # is used as it stands, on the auto path too.
-        "batch": None,
-        "project": TRAIN_PROJECT,
-        "name": RUN_NAME,
-        "device": None,
+        "hydra_defaults": ["_self_", {ULTRALYTICS_GROUP: "train"}],
+        "hydra": PACKAGE_CONF,
+        # Filled by the group above; declared so the composed config has somewhere to put
+        # it, which a structured config otherwise refuses.
+        "ultralytics": None,
         "auto_gpu": AutoGpuConf,
         "clearml": ClearMLConf,
-        "train_kwargs": {},
     }
 
 
 def _predict_fields() -> dict[str, Any]:
     return {
+        "hydra_defaults": ["_self_", {ULTRALYTICS_GROUP: "predict"}],
+        "hydra": PACKAGE_CONF,
+        "ultralytics": None,
         "weights": DEFAULT_CHECKPOINT,
         "ground_truth": "ground_truth.csv",
         "output": PREDICTIONS_CSV,
         "auto_gpu": AutoGpuConf,
-        # Which architecture the weights are of: a batch table is keyed by it. Unset, the
-        # checkpoint is not asked — nothing is loaded from this name.
+        # Which architecture the weights are of: a batch table is keyed by it. Not an
+        # ultralytics parameter — nothing is loaded from this name, so it stays out of
+        # that block. Unset, the checkpoint is not asked.
         "model": None,
-        "conf": 0.001,
-        "iou": 0.7,
-        # Unset means "read it out of the checkpoint" — the one source that cannot
-        # disagree with the weights it describes. There is no training stage to ask here.
-        "imgsz": None,
-        "batch": None,
-        "device": None,
         # No downstream split list to honour, so every image in the ground truth is scored.
         "splits": None,
         "image_name": "name",
         "clearml": ClearMLConf,
-        "predict_kwargs": {},
     }
 
 
@@ -175,6 +179,10 @@ def _stage_config(stage: str, *, in_pipeline: bool) -> Any:
     fields = {key: value for key, value in STAGE_FIELDS[stage]().items() if key not in filled}
     if in_pipeline:
         fields.update(PIPELINE_FIELD_OVERRIDES.get(stage, {}))
+        # `hydra` is the run's own node, and the pipeline declares it once at the top.
+        # Left here it would become a `train.hydra` field: a stage keyword argument no
+        # task takes, and no search path at all.
+        fields.pop("hydra", None)
     defaults = fields.pop("hydra_defaults", None)
     if defaults is not None:
         # A group whose key the pipeline fills has nothing left to select.
@@ -195,6 +203,7 @@ GroundTruthConf = make_config(
 
 
 PipelineConf = make_config(
+    hydra=PACKAGE_CONF,
     hydra_defaults=[
         "_self_",
         {"train": "default"},

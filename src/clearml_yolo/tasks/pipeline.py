@@ -51,11 +51,15 @@ def _as_dict(config: Any) -> dict[str, Any]:
 # dropped without being filled, or filled while still declared, fails the suite.
 # `compare.inference` is deliberately absent: the comparison declares the two fields it
 # owns and the predict stage's settings are merged over them.
+# `train.name` and `predict.imgsz` are deliberately absent, though the run does decide
+# both. They live inside the shared `ultralytics` group file, which is one file for the
+# standalone app and the pipeline alike, so a key cannot be dropped from it here — and
+# overwriting it instead would make it a key a run can set and the pipeline silently
+# discards. Both are `null` there and answered by a source that cannot go stale: the
+# ClearML task name, and the resolution recorded in the checkpoint.
 PIPELINE_FILLED_KEYS: dict[str, frozenset[str]] = {
-    "train": frozenset({"clearml", "auto_gpu", "name"}),
-    "predict": frozenset(
-        {"clearml", "auto_gpu", "ground_truth", "splits", "weights", "imgsz", "model"}
-    ),
+    "train": frozenset({"clearml", "auto_gpu"}),
+    "predict": frozenset({"clearml", "auto_gpu", "ground_truth", "splits", "weights", "model"}),
     "metrics": frozenset({"clearml", "ground_truth", "splits", "predictions"}),
     "report": frozenset({"clearml", "splits", "metrics_dir"}),
     "compare": frozenset(
@@ -93,24 +97,26 @@ def stage_configs(
     was supposed to match it.
     """
     shared_splits = list(splits)
-    train_cfg = _as_dict(train) | {
-        "clearml": clearml,
-        "auto_gpu": auto_gpu,
-        "name": clearml.task_name,
-    }
+    train_cfg = _as_dict(train) | {"clearml": clearml, "auto_gpu": auto_gpu}
+    train_params = train_cfg["ultralytics"]
     predict_cfg = _as_dict(predict) | {
         "clearml": clearml,
         "auto_gpu": auto_gpu,
         "ground_truth": ground_truth,
         "splits": shared_splits,
-        # Inference belongs at the resolution the weights were trained at, on the model
-        # the run trained: a batch table is keyed by the architecture.
-        "imgsz": train_cfg["imgsz"],
-        "model": train_cfg["model"],
+        # The model the run trained: a batch table is keyed by the architecture. The
+        # resolution is not passed across — the predict block leaves it null and the
+        # checkpoint answers it, which is the same number from a source that cannot
+        # disagree with the weights it describes.
+        "model": train_params["model"],
         # Training overwrites this with the checkpoint it produced. The template is what a
-        # run with skip_train has instead: where training would have written.
+        # run with skip_train has instead: where training would have written. `name` is
+        # null in the config and resolved to the experiment's name by the train task, so
+        # it is resolved the same way here rather than read back out of the block.
         "weights": weights
-        or CHECKPOINT.format(project=train_cfg["project"], name=train_cfg["name"]),
+        or CHECKPOINT.format(
+            project=train_params["project"], name=train_params["name"] or clearml.task_name
+        ),
     }
     metrics_cfg = _as_dict(metrics) | {
         "clearml": clearml,
@@ -164,14 +170,17 @@ def _comparison_inference(
 ) -> InferenceConfig:
     """Re-run both checkpoints exactly as the candidate was predicted.
 
-    `device` and `reuse_existing` stay the comparison's own: it resolves one card for both
-    models itself, and inheriting a device would put a hardware difference inside a
+    Most of what the comparison needs is an ultralytics parameter and comes out of the
+    predict stage's block; `model` and `image_name` are this project's own and sit beside
+    it. `device` and `reuse_existing` stay the comparison's own: it resolves one card for
+    both models itself, and inheriting a device would put a hardware difference inside a
     comparison meant to isolate the model.
     """
+    predict_params = predict_cfg["ultralytics"]
     return inference.model_copy(
         update={
-            key: predict_cfg[key]
-            for key in ("conf", "iou", "imgsz", "batch", "model", "image_name")
+            **{key: predict_params[key] for key in ("conf", "iou", "imgsz", "batch")},
+            **{key: predict_cfg[key] for key in ("model", "image_name")},
         }
     )
 
@@ -315,11 +324,12 @@ def run_predict_stage(
     trained_device: str | None = None,
 ) -> Path:
     """Infer with the checkpoint this run produced, on the card that produced it."""
+    params = config["ultralytics"]
     return run_prediction(
         **{
             **config,
             "weights": weights,
-            "device": config["device"] or trained_device,
+            "ultralytics": params | {"device": params["device"] or trained_device},
         }
     )
 

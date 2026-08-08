@@ -40,10 +40,10 @@ it any more than they carry across a change of ``imgsz``.
 
 On CUDA, half precision and ``torch.compile`` are both on by default. Neither buys much on
 a model this small — preprocess 1.31 ms/img, GPU inference 0.53 ms/img, postprocess
-0.93 ms/img, so the network is a minority of the time, ``half`` measured ~5% slower and
+0.93 ms/img, so the network is a minority of the time, FP16 measured ~5% slower and
 ``compile`` costs that one-off compilation against a ~5% steady-state gain. Both are still
-on because both scale with model size, and both are one ``predict_kwargs`` entry away from
-off.
+on because both scale with model size, and both are one line of
+``conf/ultralytics/predict.yaml`` away from off.
 """
 
 from __future__ import annotations
@@ -184,15 +184,15 @@ def _detection_rows(path: str, boxes: Any, names: dict[int, str], mode: ImageNam
 
 
 def _precision(accelerated: bool, model_kwargs: dict[str, Any]) -> dict[str, Any]:
-    """Ask for FP16 on a card, unless the caller already said something about precision.
+    """Ask for FP16 on a card, unless the caller already named a precision.
 
-    Ultralytics 8.4 deprecated ``half`` in favour of ``quantize`` (16 for FP16, 32 for
-    FP32) and forwards the old name onto the new one — but only when ``quantize`` is
-    absent. So passing ``quantize`` here unconditionally would make a caller's
-    ``half=False`` silently do nothing, which is the sort of override that looks like it
-    worked. Naming either one hands the whole decision back.
+    ``quantize`` is 16 for FP16 and 32 for FP32; ultralytics 8.4 dropped ``half`` in
+    favour of it. Naming it hands the whole decision back, which is how the predict stage
+    passes on whatever ``conf/ultralytics/predict.yaml`` says. The comparison names
+    nothing and gets the default, so a warm FP32 cache from before this default is never
+    scored against fresh FP16 detections.
     """
-    if {"half", "quantize"} & model_kwargs.keys():
+    if "quantize" in model_kwargs:
         return {}
     return {"quantize": 16 if accelerated else 32}
 
@@ -258,9 +258,11 @@ def predict_on_images(
     come back, so thresholds calibrated without them do not carry over — recalibrate rather
     than mixing. See the module docstring for what each measured on a small model.
 
-    ``model_kwargs`` reach ``model.predict`` untouched, so ``quantize=32`` (or the
-    deprecated ``half=False``) and ``compile=False`` turn either back off for a run that has
-    to reproduce numbers taken before these defaults.
+    ``model_kwargs`` reach ``model.predict`` untouched, so ``quantize=32`` and
+    ``compile=False`` turn either back off for a run that has to reproduce numbers taken
+    before these defaults. The predict stage passes the whole of
+    ``conf/ultralytics/predict.yaml`` this way; the comparison passes nothing and takes
+    the defaults.
 
     Raises:
         ValueError: If ``batch`` is below one, or if any requested image came back

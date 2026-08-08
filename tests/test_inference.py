@@ -249,10 +249,10 @@ def test_half_precision_follows_the_device() -> None:
     assert FakeYolo.last.calls[0]["quantize"] == 32  # type: ignore[union-attr]
 
 
-@pytest.mark.parametrize("named", [{"half": False}, {"quantize": 32}])
-def test_naming_either_precision_flag_hands_the_decision_over(named: dict[str, Any]) -> None:
-    """Ultralytics forwards a deprecated `half` onto `quantize` only when `quantize` is
-    absent, so injecting ours unconditionally would make `half=False` silently do nothing."""
+@pytest.mark.parametrize("named", [{"quantize": 32}, {"quantize": "fp32"}])
+def test_naming_the_precision_hands_the_decision_over(named: dict[str, Any]) -> None:
+    """This is how the predict stage passes on whatever its config file says, and how a
+    run reproducing numbers taken before FP16 became the default opts back out."""
     DETECTIONS["a.png"] = _boxes(([1, 2, 3, 4], 0.9, 0))
 
     predict_on_images("best.pt", ["a.png"], device="0", **named)

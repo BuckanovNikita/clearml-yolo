@@ -12,7 +12,13 @@ from clearml_yolo import artifact_names
 from clearml_yolo.clearml_models import resolve_weights
 from clearml_yolo.clearml_session import ClearMLConfig, init_task, upload_dataframe
 from clearml_yolo.gpu import AutoGpuConfig, remember_batch, resolve_inference
-from clearml_yolo.inference import ImageNameMode, predict_on_images, resolution_of
+from clearml_yolo.inference import (
+    ImageNameMode,
+    is_cuda_device,
+    predict_on_images,
+    resolution_of,
+)
+from clearml_yolo.ultralytics_params import fill_unset
 
 
 def images_to_score(ground_truth: pd.DataFrame, splits: list[str] | None) -> list[str]:
@@ -44,47 +50,53 @@ def predict(
     ground_truth: str | Path,
     output: str | Path,
     clearml: ClearMLConfig,
+    ultralytics: dict[str, Any],
     auto_gpu: AutoGpuConfig | None = None,
     model: str | None = None,
-    conf: float = 0.001,
-    iou: float = 0.7,
-    imgsz: int | None = None,
-    batch: int | None = None,
-    device: str | None = None,
     splits: list[str] | None = None,
     image_name: ImageNameMode = "name",
-    predict_kwargs: dict[str, Any] | None = None,
 ) -> Path:
     """Infer over the dataset images and write a predictions CSV.
 
-    The default ``conf`` is deliberately near zero: per-class thresholds are chosen
-    later during evaluation, so filtering here would discard the detections that
-    calibration needs.
+    ``ultralytics`` is the whole of ``conf/ultralytics/predict.yaml``: every parameter
+    ultralytics accepts for detection prediction. Its ``conf`` is deliberately near zero,
+    because per-class thresholds are chosen later during evaluation and filtering here
+    would discard the detections that calibration needs.
 
     ``weights`` may be a local checkpoint or a ClearML task id, so inference can be run
-    against a previously trained model without that model's files on hand. When no
-    ``device`` is given the run waits for a free card rather than letting ultralytics
+    against a previously trained model without that model's files on hand. With
+    ``device`` left unset the run waits for a free card rather than letting ultralytics
     grab whichever one it likes.
 
     ``imgsz`` and ``batch`` left unset are answered by the checkpoint and by ``auto_gpu``
     respectively, so neither has to be repeated from the training that produced the
-    weights. ``model`` names the architecture those weights are of — it is what a batch
-    table is keyed by, and nothing is loaded from it.
+    weights. ``model`` is not an ultralytics parameter and stays out of that block: it
+    names the architecture those weights are of, which is what a batch table is keyed by,
+    and nothing is loaded from it.
     """
     task = init_task(clearml, stage="predict")
     checkpoint = resolve_weights(weights)
-    selection = resolve_inference(auto_gpu, device, batch, model=model, stage="predict")
+    selection = resolve_inference(
+        auto_gpu, ultralytics.get("device"), ultralytics.get("batch"), model=model, stage="predict"
+    )
+    accelerated = is_cuda_device(selection.device_name)
+
+    settings = fill_unset(
+        ultralytics,
+        # Both scale with model size and both change which boxes come back, so thresholds
+        # calibrated with them do not carry over to a run without them.
+        quantize=16 if accelerated else 32,
+        compile=accelerated,
+    )
+    settings["batch"] = selection.batch
+    settings["device"] = selection.device_name
+    settings["imgsz"] = resolution_of(checkpoint, ultralytics.get("imgsz"))
 
     frame = predict_on_images(
         checkpoint,
         images_to_score(pd.read_csv(ground_truth), splits),
-        conf=conf,
-        iou=iou,
-        imgsz=resolution_of(checkpoint, imgsz),
-        batch=selection.batch,
-        device=selection.device_name,
         image_name=image_name,
-        **(predict_kwargs or {}),
+        **settings,
     )
 
     output_path = Path(output)

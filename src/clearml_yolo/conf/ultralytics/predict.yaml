@@ -1,0 +1,131 @@
+# Every ultralytics parameter, for detection prediction.
+#
+# Generated from ultralytics 8.4.115's own cfg/default.yaml, comments and all.
+# Copy it, edit the copy, and select it by file name: a `highlr.yaml` beside this
+# one is reached with `ultralytics=highlr`. One key alone is
+# `ultralytics.<key>=<value>` — or `<stage>.ultralytics.<key>=<value>` under `cy`.
+#
+# A `null` below is a key this run works out for itself. Write a value and it is
+# passed to ultralytics verbatim, and nothing here overrides it.
+
+# ---- read by detection prediction ----
+batch: null  # null -> auto_gpu sizes it to this model on these cards
+imgsz: null  # null -> the resolution recorded in the checkpoint
+device: null  # null -> auto_gpu picks the cards
+rect: true  # ultralytics' own predict default, named here because it decides the shape the network sees
+compile: null  # null -> on iff this run is on a GPU
+channels_last: false  # (bool) use channels_last (NHWC) memory format for conv train/inference; CUDA-only, speeds up Tensor-Core GPUs
+conf: 0.001  # near zero on purpose: per-class thresholds are calibrated downstream, and filtering here discards the detections calibration needs
+iou: 0.7  # (float) IoU threshold used for NMS
+max_det: 300  # (int) maximum number of detections per image
+quantize: null  # null -> 16 on a CUDA card, 32 otherwise
+dnn: false  # (bool) use OpenCV DNN for ONNX inference
+end2end:  # (bool, optional) whether to use end2end head (YOLO26, YOLOv10) for predict/val/export
+augment: false  # (bool) apply test-time augmentation during prediction
+agnostic_nms: false  # (bool) class-agnostic NMS
+classes:  # (int | list[int], optional) filter by class id(s), e.g. 0 or [0,2,3]
+
+# ---- ignored by detection prediction ----
+# Ultralytics accepts every key below, but this stage never reads one. They are
+# listed so this file is the whole of ultralytics' configuration, not a subset of
+# it you have to guess the rest of.
+# task: detect  # (str) YOLO task, i.e. detect, segment, semantic, depth, classify, pose, obb
+# mode: train  # (str) YOLO mode, i.e. train, val, predict, export, track, benchmark
+# model:  # (str, optional) path to model file, i.e. yolo26n.pt or yolo26n.yaml
+# data:  # (str, optional) path to data file, i.e. coco8.yaml
+# epochs: 100  # (int) number of epochs to train for
+# time:  # (float, optional) max hours to train; overrides epochs if set
+# patience: 100  # (int) early stop after N epochs without val improvement
+# save: true  # (bool) save train checkpoints and predict results
+# save_period: -1  # (int) save checkpoint every N epochs; disabled if < 1
+# cache: false  # (bool | str) cache images in RAM (True/'ram') or on 'disk' to speed dataloading; False disables
+# workers: 8  # (int) dataloader workers (per RANK if DDP)
+# project:  # (str, optional) project name for results root
+# name:  # (str, optional) experiment name; results in 'project/name'
+# exist_ok: false  # (bool) overwrite existing 'project/name' if True
+# pretrained: true  # (bool | str) use pretrained weights (bool) or load weights from path (str)
+# cls_remap: true  # (bool) when fine-tuning across datasets, remap pretrained cls head rows by class-name match
+# optimizer: auto  # (str) optimizer: SGD, MuSGD, Adam, Adamax, AdamW, NAdam, RAdam, RMSProp, or auto
+# verbose: true  # (bool) print verbose logs during training/val
+# seed: 0  # (int) random seed for reproducibility
+# deterministic: true  # (bool) enable deterministic ops; reproducible but may be slower
+# single_cls: false  # (bool) treat all classes as a single class
+# cos_lr: false  # (bool) cosine learning rate scheduler
+# close_mosaic: 10  # (int) disable mosaic augmentation for final N epochs (0 to keep enabled)
+# resume: false  # (bool) resume training from last checkpoint in the run dir
+# amp: true  # (bool) Automatic Mixed Precision (AMP) training; True runs AMP capability check
+# fraction: 1.0  # (float) fraction of training dataset to use (>0.0, 1.0 = all)
+# profile: false  # (bool) profile ONNX/TensorRT speeds during training for loggers
+# freeze:  # (int | list, optional) freeze first N layers (int) or specific layer indices (list)
+# multi_scale: 0.0  # (float) multi-scale range as a fraction of imgsz; sizes are rounded to stride multiples
+# overlap_mask: true  # (bool) merge instance masks into one mask during training (segment only)
+# mask_ratio: 4  # (int) mask downsample ratio (segment only)
+# dropout: 0.0  # (float) dropout for classification head (classify only)
+# val: true  # (bool) run validation/testing during training
+# split: val  # (str) dataset split to evaluate: 'val', 'test' or 'train'
+# save_json: false  # (bool) save results to COCO JSON (detect/segment/pose) or PNG masks (semantic) for external evaluation
+# plots: true  # (bool) save plots and images during train/val
+# source:  # (str, optional) path/dir/URL/stream for images or videos; e.g. 'ultralytics/assets' or '0' for webcam
+# vid_stride: 1  # (int) read every Nth frame for video sources
+# stream_buffer: false  # (bool) True buffers all frames; False keeps the most recent frame for low-latency streams
+# visualize: false  # (bool) save class activation heatmaps (predict) or visualize TP/FP/FN confusion (val)
+# retina_masks: false  # (bool) use high-resolution segmentation masks (segment)
+# embed:  # (list[int], optional) return feature embeddings from given layer indices
+# show: false  # (bool) show images/videos in a window if supported
+# save_frames: false  # (bool) save individual frames from video predictions
+# save_txt: false  # (bool) save results as .txt files (xywh format)
+# save_conf: false  # (bool) save confidence scores with results
+# save_crop: false  # (bool) save cropped prediction regions to files
+# show_labels: true  # (bool) draw class labels on images, e.g. 'person'
+# show_conf: true  # (bool) draw confidence values on images, e.g. '0.99'
+# show_boxes: true  # (bool) draw bounding boxes on images
+# line_width:  # (int, optional) line width of boxes; auto-scales with image size if not set
+# format: torchscript  # (str) target format, e.g. torchscript|onnx|openvino|engine|coreml|saved_model|pb|edgetpu|paddle|mnn|ncnn|imx|rknn|executorch|axelera|deepx|qnn|litert|hailo|ascend
+# keras: false  # (bool) TF SavedModel only (format=saved_model); enable Keras layers during export
+# optimize: false  # (bool) DEEPX only; higher compiler optimization (slower compile, faster inference)
+# dynamic: false  # (bool) dynamic shapes for torchscript, onnx, openvino, engine, coreml; enable variable image sizes
+# simplify: true  # (bool) supported ONNX-based exports (see export table); simplify intermediate ONNX graph
+# opset:  # (int, optional) supported ONNX-based exports (see export table); intermediate ONNX opset version
+# workspace:  # (float, optional) engine (TensorRT) only; workspace size in GiB, e.g. 4
+# nms: false  # (bool) fuse NMS into exported model when backend supports; if True, conf/iou apply (agnostic_nms except coreml)
+# lr0: 0.01  # (float) initial learning rate (SGD=1e-2, Adam/AdamW=1e-3)
+# lrf: 0.01  # (float) final LR fraction; final LR = lr0 * lrf
+# momentum: 0.937  # (float) SGD momentum or Adam beta1
+# weight_decay: 0.0005  # (float) weight decay (L2 regularization)
+# warmup_epochs: 3.0  # (float) warmup epochs (fractions allowed)
+# warmup_momentum: 0.8  # (float) initial momentum during warmup
+# warmup_bias_lr: 0.1  # (float) bias learning rate during warmup
+# distill_model:  # (str, optional) path to teacher model for knowledge distillation
+# dis: 6.0  # (float) distillation loss weight
+# box: 7.5  # (float) box loss gain
+# cls: 0.5  # (float) classification loss gain
+# cls_pw: 0.0  # (float) class weights power for handling class imbalance (0.0=disable, 1.0=full inverse frequency)
+# dfl: 1.5  # (float) distribution focal loss gain
+# pose: 12.0  # (float) pose loss gain (pose tasks)
+# kobj: 1.0  # (float) keypoint objectness loss gain (pose tasks)
+# rle: 1.0  # (float) rle loss gain (pose tasks)
+# angle: 1.0  # (float) oriented angle loss gain (obb tasks)
+# dlog: 1.0  # (float) depth log (SILog) loss gain (depth tasks)
+# dgrad: 0.5  # (float) depth gradient loss gain (depth tasks)
+# dlam: 1.0  # (float) depth SILog variance focus: 1.0=scale-invariant, 0.0=log-RMSE (depth tasks)
+# nbs: 64  # (int) nominal batch size used for loss normalization
+# hsv_h: 0.015  # (float) HSV hue augmentation fraction
+# hsv_s: 0.7  # (float) HSV saturation augmentation fraction
+# hsv_v: 0.4  # (float) HSV value (brightness) augmentation fraction
+# degrees: 0.0  # (float) rotation degrees (+/-)
+# translate: 0.1  # (float) translation fraction (+/-)
+# scale: 0.5  # (float | tuple) scale gain (+/-) as float, or explicit (min, max) tuple
+# shear: 0.0  # (float) shear degrees (+/-)
+# perspective: 0.0  # (float) perspective fraction (0–0.001 typical)
+# flipud: 0.0  # (float) vertical flip probability
+# fliplr: 0.5  # (float) horizontal flip probability
+# bgr: 0.0  # (float) RGB↔BGR channel swap probability
+# mosaic: 1.0  # (float) mosaic augmentation probability
+# mixup: 0.0  # (float) MixUp augmentation probability
+# cutmix: 0.0  # (float) CutMix augmentation probability
+# copy_paste: 0.0  # (float) segmentation copy-paste probability
+# copy_paste_mode: flip  # (str) copy-paste strategy for segmentation: flip or mixup
+# auto_augment: randaugment  # (str) classification auto augmentation policy: randaugment, autoaugment, augmix
+# erasing: 0.4  # (float) random erasing probability for classification (0.0–1.0)
+# cfg:  # (str, optional) path to a config.yaml that overrides defaults
+# tracker: tracktrack.yaml  # (str) tracker config: botsort.yaml, bytetrack.yaml, ocsort.yaml, deepocsort.yaml, fasttrack.yaml, tracktrack.yaml

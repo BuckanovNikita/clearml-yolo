@@ -67,6 +67,12 @@ def _pipeline_stages(overrides: list[str]) -> dict[str, dict[str, object]]:
     )
 
 
+def _ultralytics(overrides: list[str], stage: str) -> dict[str, Any]:
+    """One stage's ultralytics block, as the task would be handed it."""
+    params: dict[str, Any] = _pipeline_stages(overrides)[stage]["ultralytics"]  # type: ignore[assignment]
+    return params
+
+
 def test_clearml_name_reaches_every_pipeline_stage() -> None:
     """One override must name the whole experiment, not just the top-level block."""
     stages = _pipeline_stages(["clearml.project_name=my-proj", "clearml.task_name=exp-42"])
@@ -142,10 +148,24 @@ def test_the_gpu_policy_is_named_once_for_all_three_stages() -> None:
 def test_the_run_name_follows_the_experiment_name() -> None:
     """train.name is the run directory, and having to repeat the task name is how the two
     stopped matching."""
-    stages = _pipeline_stages(["clearml.task_name=kitti-candidate"])
+    named = ["clearml.task_name=kitti-candidate"]
 
-    assert stages["train"]["name"] == "kitti-candidate"
-    assert stages["predict"]["weights"] == "runs/detect/kitti-candidate/weights/best.pt"
+    # `train.ultralytics.name` stays null: the train task resolves it, and the pipeline
+    # builds the same path here rather than writing into a key a run may have set.
+    assert _ultralytics(named, "train")["name"] is None
+    assert _pipeline_stages(named)["predict"]["weights"] == (
+        "runs/detect/kitti-candidate/weights/best.pt"
+    )
+
+
+def test_a_named_run_directory_wins_over_the_experiment_name() -> None:
+    """A run that says where its checkpoints go must be predicted at that path, or a
+    skipped training stage looks for a file training never wrote."""
+    stages = _pipeline_stages(
+        ["clearml.task_name=kitti-candidate", "train.ultralytics.name=sweep-07"]
+    )
+
+    assert stages["predict"]["weights"] == "runs/detect/sweep-07/weights/best.pt"
 
 
 def test_a_skipped_training_stage_predicts_where_training_would_have_written() -> None:
@@ -169,7 +189,13 @@ def test_each_stage_reads_what_the_previous_one_wrote() -> None:
 
 def test_the_comparison_re_infers_exactly_as_the_predict_stage_did() -> None:
     """Both models must be scored the way the candidate was, or the diff is not the model."""
-    stages = _pipeline_stages(["predict.conf=0.005", "train.imgsz=1280", "predict.batch=8"])
+    stages = _pipeline_stages(
+        [
+            "predict.ultralytics.conf=0.005",
+            "predict.ultralytics.imgsz=1280",
+            "predict.ultralytics.batch=8",
+        ]
+    )
 
     inference = stages["compare"]["inference"]
     assert isinstance(inference, InferenceConfig)
@@ -181,7 +207,9 @@ def test_the_comparison_re_infers_exactly_as_the_predict_stage_did() -> None:
 
 def test_the_comparison_keeps_the_inference_settings_it_owns() -> None:
     """Everything else about inference is the predict stage's, merged in over these two."""
-    stages = _pipeline_stages(["compare.inference.reuse_existing=false", "predict.conf=0.02"])
+    stages = _pipeline_stages(
+        ["compare.inference.reuse_existing=false", "predict.ultralytics.conf=0.02"]
+    )
 
     inference = stages["compare"]["inference"]
     assert isinstance(inference, InferenceConfig)
@@ -190,21 +218,23 @@ def test_the_comparison_keeps_the_inference_settings_it_owns() -> None:
     assert inference.conf == 0.02
 
 
-def test_inference_runs_at_the_resolution_the_model_was_trained_at() -> None:
+def test_inference_asks_the_checkpoint_what_resolution_to_run_at() -> None:
     """A model trained at 1280 and inferred at 640 is scored on images it never saw the
-    like of, and the number would otherwise have to be given to two stages by hand."""
-    stages = _pipeline_stages(["train.imgsz=1280"])
+    like of. The number is not copied across from the train block: the checkpoint records
+    it, and that is the one source that cannot disagree with the weights it describes —
+    including for a run that skipped training and was handed somebody else's model."""
+    stages = _pipeline_stages(["train.ultralytics.imgsz=1280"])
 
-    assert stages["predict"]["imgsz"] == 1280
+    assert _ultralytics(["train.ultralytics.imgsz=1280"], "predict")["imgsz"] is None
     inference = stages["compare"]["inference"]
     assert isinstance(inference, InferenceConfig)
-    assert inference.imgsz == 1280
+    assert inference.imgsz is None
 
 
 def test_the_model_under_test_is_named_once_for_the_whole_run() -> None:
     """Batch sizing is keyed by it, and inference and the comparison would otherwise have
     to be told a second and third time which model they are running."""
-    stages = _pipeline_stages(["train.model=yolo11x.pt"])
+    stages = _pipeline_stages(["train.ultralytics.model=yolo11x.pt"])
 
     assert stages["predict"]["model"] == "yolo11x.pt"
     inference = stages["compare"]["inference"]
@@ -217,7 +247,19 @@ def test_no_stage_pins_a_batch_the_hardware_never_saw(stage: str) -> None:
     """Unset is what hands the decision to auto_gpu, so a default number here would be a
     pin — and a pin that reached the run without anyone choosing it is how the configured
     batch came to be ignored in the first place."""
-    assert _pipeline_stages([])[stage]["batch"] is None
+    assert _ultralytics([], stage)["batch"] is None
+
+
+@pytest.mark.parametrize("stage", ["train", "predict"])
+def test_no_stage_pins_a_card_the_run_did_not_survey(stage: str) -> None:
+    assert _ultralytics([], stage)["device"] is None
+
+
+def test_prediction_keeps_every_detection_calibration_needs() -> None:
+    """Ultralytics' own predict default is 0.25, which would drop the low-confidence
+    detections the per-class thresholds are chosen from — a recall collapse that reads as
+    a model regression. The key-union test cannot see a wrong value, so it is pinned here."""
+    assert _ultralytics([], "predict")["conf"] < 0.01
 
 
 def test_the_report_and_the_comparison_resolve_the_same_baseline() -> None:

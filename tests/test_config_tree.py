@@ -21,9 +21,36 @@ def hydra_store() -> None:
 def test_one_file_per_command(tmp_path: Path) -> None:
     written = dump_config_tree(tmp_path)
 
-    assert {path.name for path in written} == {
+    assert {path.name for path in written if path.parent == tmp_path} == {
         f"{command}.yaml" for command in COMMAND_OF_CONFIG.values()
     }
+
+
+def test_the_ultralytics_parameters_are_a_folder_of_their_own(tmp_path: Path) -> None:
+    """One file per stage, selectable by name, rather than a block inlined into every
+    command that has one — which would be the same hundred and fifteen keys in three
+    places, any two of which could disagree."""
+    dump_config_tree(tmp_path)
+
+    assert {path.name for path in (tmp_path / "ultralytics").glob("*.yaml")} == {
+        "train.yaml",
+        "predict.yaml",
+    }
+    assert "- /ultralytics@ultralytics: train" in (tmp_path / "cy-train.yaml").read_text(
+        encoding="utf-8"
+    )
+
+
+def test_the_copied_parameters_keep_the_documentation_that_makes_them_legible(
+    tmp_path: Path,
+) -> None:
+    """They are copied byte for byte rather than rendered: every key carries ultralytics'
+    own one-line explanation, and OmegaConf would drop all of them."""
+    dump_config_tree(tmp_path)
+    text = (tmp_path / "ultralytics" / "train.yaml").read_text(encoding="utf-8")
+
+    assert "# (float) initial learning rate" in text
+    assert "# ---- ignored by detection training ----" in text
 
 
 def test_the_pipeline_file_has_nothing_left_to_resolve(tmp_path: Path) -> None:
@@ -44,7 +71,13 @@ def test_dumped_files_explain_how_to_use_them(tmp_path: Path) -> None:
 def test_folder_composes_back_to_the_built_in_defaults(
     tmp_path: Path, config_name: str, command: str
 ) -> None:
-    """A dumped-then-loaded config is the config, or the folder is a lie."""
+    """A dumped-then-loaded config is the config, or the folder is a lie.
+
+    Compared as containers rather than as rendered YAML: the ultralytics block is lifted
+    out into a defaults list, and a key that arrives through one lands at the end of the
+    file rather than where it was declared. That is a difference in key order and in
+    nothing else, which is not a difference in the configuration.
+    """
     dump_config_tree(tmp_path)
 
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
@@ -52,7 +85,7 @@ def test_folder_composes_back_to_the_built_in_defaults(
     with initialize_config_dir(config_dir=str(tmp_path), version_base="1.3"):
         from_folder = compose(config_name=command)
 
-    assert OmegaConf.to_yaml(from_store, resolve=False) == OmegaConf.to_yaml(
+    assert OmegaConf.to_container(from_store, resolve=False) == OmegaConf.to_container(
         from_folder, resolve=False
     )
 

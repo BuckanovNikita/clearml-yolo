@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from clearml_yolo.clearml_session import ClearMLConfig, init_task
 from clearml_yolo.gpu import AutoGpuConfig, DeviceSelection, remember_batch, resolve_devices
+from clearml_yolo.ultralytics_params import fill_unset
 
 # Where ultralytics puts a run's checkpoint. Named here because two other places have to
 # predict this path without a trainer to ask: the standalone predict default, and the
@@ -37,69 +38,68 @@ def _inference_device(selection: DeviceSelection) -> str | None:
 
 
 def train(
-    model: str,
-    data: str,
-    epochs: int,
-    imgsz: int,
-    batch: int | None,
-    project: str,
-    name: str,
+    ultralytics: dict[str, Any],
     auto_gpu: AutoGpuConfig,
     clearml: ClearMLConfig,
-    device: list[int] | int | str | None = None,
-    train_kwargs: dict[str, Any] | None = None,
 ) -> TrainResult:
     """Run training and return the best checkpoint with the device that produced it.
+
+    ``ultralytics`` is the whole of ``conf/ultralytics/train.yaml``: every parameter
+    ultralytics accepts for detection training, passed on as it stands. The keys left
+    ``null`` there are the ones decided here — the batch and cards from ``auto_gpu``, AMP
+    and ``torch.compile`` from whether this run is on a GPU at all, and the run's name
+    from the ClearML experiment, so the run directory always matches the experiment.
 
     The checkpoint path is derived from project/name rather than from the return value
     of ``model.train()``: under DDP the parent process never runs a validator, so
     ultralytics returns no metrics there.
-
-    ``batch`` left unset hands the decision to ``auto_gpu``, which sizes it to the model
-    and the cards this run was given; a number set here is used as it stands.
     """
     from ultralytics.models import YOLO
 
     # Only the task identity is ours. Ultralytics' own ClearML callback connects the
     # hyperparameters, logs losses and metrics, and uploads best.pt on its own.
     init_task(clearml, stage="train")
-    selection = resolve_devices(auto_gpu, device, batch, model=model, stage="train")
+    architecture = ultralytics["model"]
+    selection = resolve_devices(
+        auto_gpu,
+        ultralytics.get("device"),
+        ultralytics.get("batch"),
+        model=architecture,
+        stage="train",
+    )
+    on_gpu = isinstance(selection.devices, list) and bool(selection.devices)
+
+    settings = fill_unset(
+        ultralytics,
+        # Training's half precision is AMP, not the `quantize` flag inference takes: that
+        # one casts the weights outright, which training cannot do.
+        amp=on_gpu,
+        # Unlike inference, training runs long enough to earn the one-off compilation back
+        # many times over — it is paid once and amortised across every epoch.
+        compile=on_gpu,
+        name=clearml.task_name,
+    )
+    settings["batch"] = selection.batch
+    settings["device"] = selection.devices
+    # Relative projects are resolved against ultralytics' configured runs_dir, which is
+    # rarely the working directory, so anchor it here instead.
+    settings["project"] = str(Path(settings["project"]).resolve())
+    # `model` names the weights YOLO() is built from. Left in as well, it would reach
+    # train() as a keyword argument, which ultralytics lets win over the constructor —
+    # two ways to say which model this is, and no rule for which of them means it.
+    del settings["model"]
 
     logger.info(
         "Training {} on {} for {} epochs — devices={} batch={} (per GPU {})",
-        model,
-        data,
-        epochs,
+        architecture,
+        settings["data"],
+        settings["epochs"],
         selection.devices,
         selection.batch,
         selection.batch_per_gpu,
     )
 
-    yolo = YOLO(model)
-    on_gpu = isinstance(selection.devices, list) and bool(selection.devices)
-    settings: dict[str, Any] = {
-        "data": data,
-        "epochs": epochs,
-        "imgsz": imgsz,
-        "batch": selection.batch,
-        "device": selection.devices,
-        # Training's half precision is AMP, not the `quantize` flag inference takes: that
-        # one casts the weights outright, which training cannot do. Ultralytics already
-        # defaults amp=True, but a run's numeric precision is not something to leave to a
-        # dependency's default.
-        "amp": on_gpu,
-        # Unlike inference, training runs long enough to earn the one-off compilation back
-        # many times over — it is paid once and amortised across every epoch.
-        "compile": on_gpu,
-        # Relative projects are resolved against ultralytics' configured runs_dir, which
-        # is rarely the working directory, so anchor it here instead.
-        "project": str(Path(project).resolve()),
-        "name": name,
-        "exist_ok": True,
-        # Last, so a run reproducing older numbers can turn either of the two above back
-        # off — as keyword arguments they would collide instead.
-        **(train_kwargs or {}),
-    }
+    yolo = YOLO(architecture)
     yolo.train(**settings)
 
     # Read the run directory from the trainer rather than rebuilding it: ultralytics
@@ -115,5 +115,5 @@ def train(
     logger.info("Best checkpoint: {}", best)
     # Only now is this batch known to fit: it survived every epoch, including the
     # validation pass, which is where a batch that trains but does not validate fails.
-    remember_batch(auto_gpu, "train", model, selection)
+    remember_batch(auto_gpu, "train", architecture, selection)
     return TrainResult(weights=best, inference_device=_inference_device(selection))

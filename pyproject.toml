@@ -154,7 +154,7 @@ layers = [
     "clearml_yolo.tasks",
     "clearml_yolo.comparison",
     "clearml_yolo.inference | clearml_yolo.ground_truth | clearml_yolo.clearml_models | clearml_yolo.clearml_report",
-    "clearml_yolo.clearml_session | clearml_yolo.gpu | clearml_yolo.progress | clearml_yolo.artifact_names",
+    "clearml_yolo.clearml_session | clearml_yolo.gpu | clearml_yolo.progress | clearml_yolo.artifact_names | clearml_yolo.ultralytics_params",
 ]
 
 [[tool.importlinter.contracts]]
@@ -196,6 +196,7 @@ source_modules = [
     "clearml_yolo.gpu",
     "clearml_yolo.progress",
     "clearml_yolo.artifact_names",
+    "clearml_yolo.ultralytics_params",
 ]
 forbidden_modules = ["clearml"]
 allow_indirect_imports = true
@@ -213,6 +214,7 @@ source_modules = [
     "clearml_yolo.clearml_session",
     "clearml_yolo.clearml_models",
     "clearml_yolo.clearml_report",
+    "clearml_yolo.ultralytics_params",
 ]
 forbidden_modules = ["hydra", "hydra_zen", "omegaconf"]
 allow_indirect_imports = true
@@ -232,6 +234,9 @@ source_modules = [
     "clearml_yolo.tasks.pipeline",
     "clearml_yolo.tasks.metrics",
     "clearml_yolo.tasks.report",
+    # The rule that decides what reaches ultralytics must not itself need ultralytics:
+    # importing it here would put torch on the critical path of every CLI start.
+    "clearml_yolo.ultralytics_params",
 ]
 forbidden_modules = ["ultralytics", "torch"]
 allow_indirect_imports = true

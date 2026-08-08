@@ -77,13 +77,13 @@ def test_no_omegaconf_containers_survive(stage: str) -> None:
         assert not OmegaConf.is_config(value), f"{stage}.{key} is still {type(value)}"
 
 
-def test_train_kwargs_are_picklable() -> None:
-    """Ultralytics pickles trainer.args when saving a checkpoint, so anything passed
-    into train_kwargs must survive pickling — a DictConfig does not."""
-    train_kwargs = _stage_config("train")["train_kwargs"]
+def test_ultralytics_params_are_picklable() -> None:
+    """Ultralytics pickles trainer.args when saving a checkpoint, so the whole parameter
+    block must survive pickling — a DictConfig backed by a generated dataclass does not."""
+    params = _stage_config("train")["ultralytics"]
 
-    assert isinstance(train_kwargs, dict)
-    pickle.loads(pickle.dumps(train_kwargs))
+    assert isinstance(params, dict)
+    pickle.loads(pickle.dumps(params))
 
 
 @pytest.mark.parametrize("stage", STAGES)
@@ -111,7 +111,21 @@ def test_inference_reuses_the_card_training_just_used(monkeypatch: pytest.Monkey
     config = _stage_config("predict") | {"clearml": ClearMLConfig(enabled=False)}
     run_predict_stage(config, "best.pt", "1")
 
-    assert seen["device"] == "1"
+    assert seen["ultralytics"]["device"] == "1"  # type: ignore[index]
+
+
+def test_a_card_named_in_the_config_still_wins_over_training(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Reusing training's card is what an unset device means, not what it overrides."""
+    seen: dict[str, object] = {}
+    monkeypatch.setattr(pipeline_module, "run_prediction", _recording_prediction(seen))
+
+    config = _stage_config("predict") | {"clearml": ClearMLConfig(enabled=False)}
+    config["ultralytics"] = {**_stage_config("predict")["ultralytics"], "device": "3"}
+    run_predict_stage(config, "best.pt", "1")
+
+    assert seen["ultralytics"]["device"] == "3"  # type: ignore[index]
 
 
 def test_comparison_scores_the_model_this_run_just_built(monkeypatch: pytest.MonkeyPatch) -> None:

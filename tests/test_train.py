@@ -54,20 +54,30 @@ def fake_ultralytics(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     FakeYolo.save_root = tmp_path / "runs"
 
 
-def _train(devices: list[int] | str, tmp_path: Path) -> dict[str, Any]:
+def _params(tmp_path: Path, **overrides: Any) -> dict[str, Any]:
+    """A train.yaml-shaped block: the keys the run decides are null unless overridden."""
+    return {
+        "model": "yolo11n.pt",
+        "data": "data.yaml",
+        "epochs": 1,
+        "imgsz": 640,
+        "batch": 16,
+        "project": str(tmp_path / "runs"),
+        "name": "run",
+        "amp": None,
+        "compile": None,
+        **overrides,
+    }
+
+
+def _train(devices: list[int] | str, tmp_path: Path, **overrides: Any) -> dict[str, Any]:
     selection = DeviceSelection(devices=devices, batch=16, batch_per_gpu=16)
     with pytest.MonkeyPatch.context() as patch:
         patch.setattr(
             "clearml_yolo.tasks.train.resolve_devices", lambda *_args, **_kwargs: selection
         )
         train(
-            model="yolo11n.pt",
-            data="data.yaml",
-            epochs=1,
-            imgsz=640,
-            batch=16,
-            project=str(tmp_path / "runs"),
-            name="run",
+            ultralytics=_params(tmp_path, **overrides),
             auto_gpu=AutoGpuConfig(),
             clearml=DISABLED,
         )
@@ -90,29 +100,47 @@ def test_a_cpu_run_asks_for_neither(tmp_path: Path) -> None:
     assert kwargs["compile"] is False
 
 
-def test_train_kwargs_win_over_the_defaults(tmp_path: Path) -> None:
+def test_a_value_in_the_config_wins_over_the_defaults(tmp_path: Path) -> None:
     """Both change the numbers a run produces, so reproducing an older run must opt out."""
-    selection = DeviceSelection(devices=[0], batch=16, batch_per_gpu=16)
-    with pytest.MonkeyPatch.context() as patch:
-        patch.setattr(
-            "clearml_yolo.tasks.train.resolve_devices", lambda *_args, **_kwargs: selection
-        )
-        train(
-            model="yolo11n.pt",
-            data="data.yaml",
-            epochs=1,
-            imgsz=640,
-            batch=16,
-            project=str(tmp_path / "runs"),
-            name="run",
-            auto_gpu=AutoGpuConfig(),
-            clearml=DISABLED,
-            train_kwargs={"amp": False, "compile": False},
-        )
+    kwargs = _train([0], tmp_path, amp=False, compile=False)
 
-    kwargs = FakeYolo.last.kwargs  # type: ignore[union-attr]
     assert kwargs["amp"] is False
     assert kwargs["compile"] is False
+
+
+def test_every_other_ultralytics_param_reaches_the_trainer_untouched(tmp_path: Path) -> None:
+    """The block is the whole of ultralytics' configuration, not a list this stage knows."""
+    kwargs = _train([0], tmp_path, lr0=0.5, mosaic=0.0, optimizer="AdamW", patience=3)
+
+    assert kwargs["lr0"] == 0.5
+    assert kwargs["mosaic"] == 0.0
+    assert kwargs["optimizer"] == "AdamW"
+    assert kwargs["patience"] == 3
+
+
+def test_the_model_reaches_the_constructor_and_not_the_training_call(tmp_path: Path) -> None:
+    """Ultralytics lets a `model=` keyword win over the object it was asked to build, so
+    passing it both ways is two answers to which checkpoint this run started from."""
+    kwargs = _train([0], tmp_path)
+
+    assert "model" not in kwargs
+    assert FakeYolo.last.model == "yolo11n.pt"  # type: ignore[union-attr]
+
+
+def test_an_unnamed_run_lands_in_the_experiment_it_belongs_to(tmp_path: Path) -> None:
+    """`name` unset means the ClearML task name, so the run directory always says which
+    experiment produced it rather than saying `train` for every one of them."""
+    kwargs = _train([0], tmp_path, name=None)
+
+    assert kwargs["name"] == DISABLED.task_name
+
+
+def test_the_project_is_anchored_to_the_working_directory(tmp_path: Path) -> None:
+    """A relative project is otherwise resolved against ultralytics' own runs_dir."""
+    kwargs = _train([0], tmp_path, project="runs/detect")
+
+    assert Path(kwargs["project"]).is_absolute()
+    assert kwargs["project"].endswith("runs/detect")
 
 
 def test_the_checkpoint_comes_from_the_trainer_not_the_requested_name(tmp_path: Path) -> None:
@@ -133,13 +161,7 @@ def test_the_checkpoint_template_names_the_file_training_writes(tmp_path: Path) 
             "clearml_yolo.tasks.train.resolve_devices", lambda *_args, **_kwargs: selection
         )
         result = train(
-            model="yolo11n.pt",
-            data="data.yaml",
-            epochs=1,
-            imgsz=640,
-            batch=16,
-            project=project,
-            name="run",
+            ultralytics=_params(tmp_path, project=project),
             auto_gpu=AutoGpuConfig(),
             clearml=DISABLED,
         )
