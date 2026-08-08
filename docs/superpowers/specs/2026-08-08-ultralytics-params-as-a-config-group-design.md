@@ -215,6 +215,23 @@ files no stage reads.
 
 `half` is commented in both, superseded by `quantize`.
 
+### Where clearml-yolo's values deliberately differ from upstream's
+
+The files carry ultralytics' *keys*, not its *values*. Three predict values are
+clearml-yolo's and each says why in a comment beside it:
+
+| key | ultralytics | here | why |
+|---|---|---|---|
+| `conf` | `null`, which is 0.25 at predict time | `0.001` | per-class thresholds are calibrated downstream, and filtering here discards the detections calibration needs |
+| `iou` | `0.7` | `0.7` | same, named explicitly because it decides which boxes NMS keeps |
+| `rect` | `False` | `true` | ultralytics' own predict default, named here because it decides the shape the network sees |
+
+`conf` is the dangerous one. Generating `predict.yaml` by carrying `default.yaml`'s
+values across would write `conf: null`, ultralytics would read that as 0.25, and every
+detection below 0.25 would vanish before calibration ever saw it — a recall collapse that
+looks like a model regression. The key-union test does not catch this, so it is a
+guarantee of its own below.
+
 ## Guarantees that must survive unchanged
 
 - `clearml.task_name=exp-42` still names the whole run, including the training run
@@ -223,6 +240,8 @@ files no stage reads.
   and still logs what it chose.
 - Inference still runs at the resolution the weights were trained at, and still warns
   when asked for another one.
+- Predict's `conf` is still near zero, so calibration still sees the detections it needs
+  to choose per-class thresholds from.
 - Half precision and `torch.compile` are still on by default on a CUDA card and still
   turn off from config — now by writing `false` in the file rather than by an entry in
   `predict_kwargs`.
@@ -262,6 +281,8 @@ building the wheel and listing it, not assumed.
   forbids it in `configs` and `config_tree`.
 - **`test_every_live_param_is_one_ultralytics_accepts`** — each file, with its `null`s
   filled the way `fill_unset` fills them, passes `get_cfg` without raising.
+- **`test_predict_keeps_every_detection_calibration_needs`** — `predict.yaml` sets `conf`
+  below 0.01. Pins the one value the key-union test cannot see.
 - **`test_a_value_written_in_the_file_is_never_overridden`** — `fill_unset` leaves
   `amp: false`, `batch: 8`, `compile: false` and `quantize: 32` alone.
 - **`test_ultralytics_params_are_picklable`** — replaces
@@ -301,3 +322,21 @@ calls ultralytics.
 - `get_cfg` accepts the train file once `batch` and `compile` are filled, and rejects it
   while either is `null`.
 - `Model.train` loads `cfg=` as overrides and lets explicit keyword arguments win over it.
+  A consequence for the implementation: `train()` must pop `model` out of the dict for the
+  `YOLO(model)` constructor rather than also spreading it into `yolo.train(**settings)`,
+  where it would win over the constructor and make the loaded weights ambiguous.
+
+## Mechanics still to verify, before any code is written
+
+Two forms this design depends on were never exercised. Both are cheap, and both fail
+loudly rather than subtly if they do not work — but the first one fails *silently* for a
+user, which is why it goes first.
+
+1. **`--config-dir conf` must shadow `pkg://clearml_yolo.conf`.** `cy-train --config-dir
+   conf` with `conf/ultralytics/train.yaml` present in both the user's folder and the
+   package must compose the user's copy. If the package copy wins, `cy-init-config` dumps
+   a file the user edits and the run ignores, which is the whole feature failing quietly.
+   Only `hydra.searchpath=[file://...]`, which *replaces* the search path, was tested.
+2. **`- /ultralytics@train.ultralytics: train` as a defaults-list entry in a primary
+   config.** This is the form the dumped `cy.yaml` needs. The nested-group form and the
+   CLI-override form were both verified; this third one was not.
