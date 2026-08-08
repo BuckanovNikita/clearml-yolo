@@ -48,15 +48,16 @@ uv run cy \
     clearml.project_name=detection \
     clearml.task_name=yolo11n-v3 \
     ground_truth=ground_truth.csv \
-    train.data=data.yaml \
-    train.epochs=300
+    train.ultralytics.data=data.yaml \
+    train.ultralytics.epochs=300
 
 # только метрики по готовым предсказаниям
 uv run cy-metrics predictions=runs/predictions.csv ground_truth=ground_truth.csv
 ```
 
 Обратите внимание: у отдельных приложений ключи задаются без префикса
-(`cy-train epochs=1`), а в конвейере — с префиксом этапа (`cy train.epochs=1`).
+(`cy-train ultralytics.epochs=1`), а в конвейере — с префиксом этапа
+(`cy train.ultralytics.epochs=1`).
 
 ## Общие ключи конвейера
 
@@ -67,7 +68,7 @@ uv run cy-metrics predictions=runs/predictions.csv ground_truth=ground_truth.csv
 
 | Ключ | Куда попадает |
 |---|---|
-| `clearml.project_name`, `clearml.task_name` | все этапы; `task_name` заодно становится `train.name`, то есть именем папки запуска |
+| `clearml.project_name`, `clearml.task_name` | все этапы; `task_name` заодно становится именем папки запуска, если `train.ultralytics.name` не задан |
 | `ground_truth` | `predict`, `metrics`, `compare` |
 | `splits` | `predict`, `metrics`, `report` |
 | `auto_gpu.*` | `train`, `predict`, `compare` |
@@ -76,20 +77,20 @@ uv run cy-metrics predictions=runs/predictions.csv ground_truth=ground_truth.csv
 Так же связаны и цепочки «продюсер → потребитель», только теперь их несёт конвейер, а
 не ссылка на чужой ключ: чекпоинт, который допишет `train` (или `weights`, если обучение
 пропущено), уходит в `predict.weights`, `predict.output` — в `metrics.predictions`,
-`metrics.output_dir` — в `report.metrics_dir`, `train.imgsz`/`train.model` — в
-`predict.imgsz`/`predict.model` (модель инференсится в том разрешении, в котором
-обучалась, и по той архитектуре, которой обучена — по ней же подбирается батч), настройки
+`metrics.output_dir` — в `report.metrics_dir`, `train.ultralytics.model` — в
+`predict.model` (батч подбирается по той архитектуре, которой обучена модель), настройки
 инференса сравнения (`conf`, `iou`, `imgsz`, `batch`, `model`) — из уже посчитанного `predict`, а
 `metrics.evaluation.iou_threshold`/`matching_strategy` — в
 `compare.iou_threshold`/`matching_strategy`, чтобы сравнение считалось на том же IoU, на
 котором калибровались пороги. Внутри конвейера ни один из этих ключей не задать в блоке
 своего этапа — их подставляет сам запуск, а не файл конфига.
 
-Вне конвейера `imgsz` брать неоткуда — этапа обучения в запуске нет. Поэтому у
-`cy-predict` и `cy-compare` он не задан по умолчанию и читается из самого чекпоинта:
-ultralytics записывает всю конфигурацию обучения в каждый `.pt`, и это единственный
-источник, который не может разойтись с весами, которые описывает. Заданное явно число
-побеждает, но в лог уходит предупреждение, если оно расходится с чекпоинтом.
+Разрешение инференса конвейер не передаёт: `predict.ultralytics.imgsz` не задан, и его
+читает сам чекпоинт. Ultralytics записывает всю конфигурацию обучения в каждый `.pt`, и
+это единственный источник, который не может разойтись с весами, которые описывает — в
+том числе для запуска, который обучение пропустил и получил чужую модель. Так же ведут
+себя `cy-predict` и `cy-compare` вне конвейера. Заданное явно число побеждает, но в лог
+уходит предупреждение, если оно расходится с чекпоинтом.
 
 Прод-модель в конвейере тоже называется один раз — ключами `report.baseline.*`
 (`task_id`, `project_name`, `task_name`, `tags`): именно эту задачу конвейер передаёт
@@ -119,9 +120,53 @@ uv run cy skip_train=true weights=runs/detect/prev/weights/best.pt
 
 Отключить трекинг целиком: `clearml.enabled=false`.
 
+## Параметры ultralytics
+
+Все параметры ultralytics видны в конфиге — не через словарь-«прочее», а отдельным
+файлом на этап:
+
+```
+conf/ultralytics/train.yaml     # всё, что читает обучение детекции
+conf/ultralytics/predict.yaml   # всё, что читает предсказание
+```
+
+Файлы собраны из `cfg/default.yaml` самого ultralytics вместе с его комментариями, так
+что каждый ключ объясняет себя сам. Ключи, которые этот этап не читает — экспорт,
+сегментация, поза, obb, глубина, трекер, отрисовка, — не выброшены, а перенесены под
+заголовок `# ---- ignored by detection ... ----` и закомментированы. Тест сверяет
+объединение живых и закомментированных ключей с установленным `default.yaml`, поэтому
+обновление ultralytics, добавившее параметр, роняет прогон тестов, а не прячет ключ.
+
+`null` в файле означает «решает запуск»:
+
+| Ключ | Чем заполняется |
+|---|---|
+| `batch`, `device` | `auto_gpu` — см. «Авто-выбор GPU» |
+| `amp`, `compile`, `quantize` | включены, только если запуск идёт на GPU |
+| `name` (обучение) | имя эксперимента ClearML, так что папка запуска всегда совпадает с ним |
+| `imgsz` (предсказание) | разрешение, записанное в чекпоинте |
+
+Записанное значение уходит в ultralytics как есть, и код его не перекрывает. Правило
+одно на всё: `train_kwargs`/`predict_kwargs` и отдельная развилка `half`/`quantize`
+больше не нужны.
+
+Набор выбирается целиком по имени файла, а один ключ — точкой:
+
+```bash
+uv run cy-train ultralytics=highlr            # conf/ultralytics/highlr.yaml
+uv run cy-train ultralytics.lr0=0.02
+uv run cy ultralytics@train.ultralytics=highlr
+uv run cy train.ultralytics.epochs=5 predict.ultralytics.conf=0.005
+```
+
+Файл — конфиг этого проекта, а не готовый вход для `yolo train cfg=...`: ultralytics
+отвергает `batch: null` и `compile: null`. Чтобы повторить запуск голым ultralytics,
+берите `runs/detect/<name>/args.yaml` — его пишет сам ultralytics со всеми
+подставленными значениями.
+
 ## Инференс
 
-`predict.batch` — это и размер батча, и главный рычаг по памяти: столько изображений
+`predict.ultralytics.batch` — это и размер батча, и главный рычаг по памяти: столько изображений
 одновременно декодируется и уходит в сеть. Уменьшайте его (или `imgsz`), чтобы влезть в
 карту поменьше. Не задан — размер подберёт `auto_gpu` (см. «Авто-выбор GPU»).
 
@@ -132,7 +177,7 @@ uv run cy skip_train=true weights=runs/detect/prev/weights/best.pt
 разных — до полного квадрата: другой вход, другие детекции у одного и того же
 изображения. Поэтому батч входит в ключ кэша предсказаний сравнения, а пороги переносятся
 через смену батча не лучше, чем через смену `imgsz`. Прямоугольный леттербокс
-выключается: `predict_kwargs={rect:false}`.
+выключается: `predict.ultralytics.rect=false`.
 
 Список изображений уходит в ultralytics файлом-манифестом `.txt`, а не списком в памяти.
 Только так `batch` вообще учитывается (список целиком становится одним проходом сети — это
@@ -153,15 +198,15 @@ OpenCV, что и при обучении, без разворота по EXIF. 
 второй модели те же 748 изображений обходятся в 4.8 с против 15.5 с у первой.
 
 Половинная точность передаётся как `quantize=16`, а не `half`: в ultralytics 8.4 `half`
-объявлен устаревшим и лишь пересылается на `quantize`. Достаточно назвать любой из двух
-ключей, чтобы решение перешло к вам целиком.
+объявлен устаревшим и в `default.yaml` его больше нет. Достаточно записать `quantize` в
+конфиге, чтобы решение перешло к вам целиком.
 
 Важно: обе настройки меняют сами рамки, то есть меняют и все откалиброванные пороги.
 Пороги, посчитанные без них, не переносятся — нужна перекалибровка, а не смешивание.
 Выключаются по отдельности:
 
 ```bash
-uv run cy-predict 'predict_kwargs={quantize:32,compile:false}'
+uv run cy-predict ultralytics.quantize=32 ultralytics.compile=false
 ```
 
 ## Обучение
@@ -170,10 +215,11 @@ uv run cy-predict 'predict_kwargs={quantize:32,compile:false}'
 окупается заведомо, потому что оплачивается один раз и размазывается по всем эпохам.
 Половинная точность обучения — это именно AMP, а не `quantize`: тот приводит сами веса,
 чего обучение делать не может. Обе настройки задаются явно, а не оставляются на умолчание
-зависимости, и перекрываются через `train_kwargs`:
+зависимости, и перекрываются записью в `conf/ultralytics/train.yaml` или с командной
+строки:
 
 ```bash
-uv run cy-train 'train_kwargs={amp:false,compile:false}'
+uv run cy-train ultralytics.amp=false ultralytics.compile=false
 ```
 
 ## Авто-выбор GPU
@@ -250,8 +296,8 @@ uv run cy-train +auto_gpu.batch_table.yolo11x.5090=6
 оттуда. Так число, найденное однажды вручную, больше не приходится вводить:
 
 ```bash
-uv run cy-train train.batch=48   # прошло — значит запомнено
-uv run cy-train                  # батч 48 и без указания
+uv run cy-train ultralytics.batch=48   # прошло — значит запомнено
+uv run cy-train                        # батч 48 и без указания
 ```
 
 Путь — `$CLEARML_YOLO_BATCH_TABLE`, по умолчанию `~/.cache/clearml-yolo/batch_table.json`.
@@ -459,7 +505,8 @@ recall: модель, не знающая класса, не «плохо его
 
 ## Своя папка с конфигами
 
-`cy-init-config` выгружает все настройки по умолчанию — по одному файлу на команду:
+`cy-init-config` выгружает все настройки по умолчанию — по одному файлу на команду плюс
+папку `ultralytics/` с параметрами ultralytics (см. «Параметры ultralytics»):
 
 ```bash
 uv run cy-init-config ./conf
@@ -479,6 +526,11 @@ uv run cy-train --config-dir ./conf --config-name cy-train
 запуск пересчитает заново и перезапишет, а как оверрайд командной строки такой ключ
 вообще не пройдёт компоновку — `predict.weights=...` падает с `Key 'weights' not in
 'Config'`. Единственное место для такого значения — самый верхний уровень: `weights=...`.
+
+Папку, выгруженную до того, как параметры ultralytics стали отдельными файлами, нужно
+выгрузить заново: в ней остались `train_kwargs`/`predict_kwargs` и десяток ключей
+ultralytics в блоках этапов, а папки `ultralytics/` нет вовсе — запуск возьмёт параметры
+из установленного пакета и ваших правок не увидит.
 
 Папку, выгруженную до появления авто-подбора батча, нужно выгрузить заново: в ней
 `batch: 16` записан числом, а теперь число означает «использовать ровно это» и отключает
