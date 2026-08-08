@@ -44,9 +44,15 @@ def _recording_prediction(seen: dict[str, object]) -> Callable[..., Path]:
 
 
 def _stage_config(stage: str) -> dict:  # type: ignore[type-arg]
+    """One stage's kwargs, from the shape ``zen`` hands ``run_pipeline``.
+
+    ``instantiate`` first, because that is what the CLI does: the block arrives as the
+    generated dataclass rather than as a ``DictConfig``, and the two differ in whether
+    Hydra's ``defaults`` key is still present.
+    """
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
         config = compose(config_name="pipeline")
-    return _as_dict(config[stage])
+    return _as_dict(instantiate(config[stage]))
 
 
 def _stage_configs() -> dict[str, dict[str, object]]:
@@ -58,17 +64,28 @@ def _stage_configs() -> dict[str, dict[str, object]]:
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
         config = compose(config_name="pipeline")
     return stage_configs(
-        train=config.train,
-        predict=config.predict,
-        metrics=config.metrics,
-        report=config.report,
-        compare=config.compare,
+        train=instantiate(config.train),
+        predict=instantiate(config.predict),
+        metrics=instantiate(config.metrics),
+        report=instantiate(config.report),
+        compare=instantiate(config.compare),
         clearml=instantiate(config.clearml),
         auto_gpu=instantiate(config.auto_gpu),
         ground_truth=config.ground_truth,
         splits=config.splits,
         weights=config.get("weights"),
     )
+
+
+@pytest.mark.parametrize("stage", STAGES)
+def test_no_composition_key_reaches_a_task(stage: str) -> None:
+    """Hydra's `defaults` is composition metadata, not a setting any task takes.
+
+    It is absent from the composed DictConfig and present on the instantiated dataclass,
+    so it reaches a task only on the path the CLI actually takes — where it arrives as an
+    unexpected keyword argument minutes into a run.
+    """
+    assert "defaults" not in _stage_configs()[stage]
 
 
 @pytest.mark.parametrize("stage", STAGES)

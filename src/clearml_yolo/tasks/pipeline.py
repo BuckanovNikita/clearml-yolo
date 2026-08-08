@@ -24,6 +24,14 @@ from clearml_yolo.tasks.report import BaselineConfig, build_reports, discover_da
 from clearml_yolo.tasks.train import CHECKPOINT
 from clearml_yolo.tasks.train import train as run_training
 
+# Hydra's own key for a config's defaults list, not a setting any task takes. Hydra
+# consumes it during composition and it is gone from the composed DictConfig — but `zen`
+# hands each top-level field over already instantiated, as the generated dataclass, and
+# that dataclass declares `defaults` as an ordinary field. So it comes back as data on
+# exactly the path the CLI takes and no other, which is why it has to be dropped here
+# rather than trusted to have been consumed.
+COMPOSITION_ONLY_KEYS = frozenset({"defaults"})
+
 
 def _as_dict(config: Any) -> dict[str, Any]:
     """Resolve a stage sub-config into the keyword arguments its task takes.
@@ -38,10 +46,14 @@ def _as_dict(config: Any) -> dict[str, Any]:
     DictConfig backed by a generated dataclass cannot be pickled.
     """
     resolved = instantiate(config)
+    if not isinstance(resolved, dict) and not OmegaConf.is_config(resolved):
+        # A dataclass instance, which is what `zen` passes: read its fields back out.
+        resolved = OmegaConf.structured(resolved)
     values = dict(resolved) if not isinstance(resolved, dict) else resolved
     return {
         key: OmegaConf.to_object(value) if OmegaConf.is_config(value) else value
         for key, value in values.items()
+        if key not in COMPOSITION_ONLY_KEYS
     }
 
 

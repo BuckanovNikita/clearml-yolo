@@ -50,15 +50,22 @@ def _pipeline_stages(overrides: list[str]) -> dict[str, dict[str, object]]:
 
     Composing alone proves nothing about what a stage receives: the shared values are not
     in the stage blocks at all, they are handed over by ``stage_configs``.
+
+    Each block is instantiated first, because that is what ``zen`` does before calling
+    ``run_pipeline`` and the shape differs: a composed block is a ``DictConfig`` with
+    Hydra's ``defaults`` key already consumed, while an instantiated one is the generated
+    dataclass, which declares ``defaults`` as an ordinary field and hands it back as data.
+    Passing the ``DictConfig`` here tested a shape the CLI never produces, and a stray
+    ``defaults`` reaching a task as a keyword argument went unnoticed until a run.
     """
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
         config = compose(config_name="pipeline", overrides=overrides)
     return stage_configs(
-        train=config.train,
-        predict=config.predict,
-        metrics=config.metrics,
-        report=config.report,
-        compare=config.compare,
+        train=instantiate(config.train),
+        predict=instantiate(config.predict),
+        metrics=instantiate(config.metrics),
+        report=instantiate(config.report),
+        compare=instantiate(config.compare),
         clearml=instantiate(config.clearml),
         auto_gpu=instantiate(config.auto_gpu),
         ground_truth=config.ground_truth,
