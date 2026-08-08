@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/scripts/check_env.sh --json",
+            "timeout": 30,
+            "statusMessage": "Checking ClearML, uv, GPU and docker"
+          }
+        ]
+      }
+    ]
+  }
+}
