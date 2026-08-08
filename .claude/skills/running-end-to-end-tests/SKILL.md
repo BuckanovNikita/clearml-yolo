@@ -80,10 +80,14 @@ Use a throwaway `clearml.project_name`. The baseline lookup is **scoped to the r
 become the baseline for real `clearml-yolo` runs. Never point a verification run at the real project just
 to get a baseline.
 
-**Verify afterwards** at http://localhost:8580 — the task exists under `cy-verify`, carries the `prod`
-tag, registered an output model, and uploaded the `metrics_dashboard_full*` and `best_confidences*`
-artifacts. A task that appears but registered no output model means training uploaded nothing, which the
-downstream `weights=<task-id>` path depends on.
+**Expected end state:** the task reaches `completed` under `cy-verify` carrying the `prod` tag, registers
+one output model, and holds 22 artifacts — among them `metrics_dashboard_full_{train,val,test}` and
+`metrics_best_confidences_{train,val,test}`. The last lines warn that no `prod`-tagged task was found to
+compare against; on a fresh project that is the correct first-run result.
+
+A task that appears but registers **no output model** means training uploaded nothing, which the
+downstream `weights=<task-id>` path depends on. Check it in the UI at http://localhost:8580, or read it
+back with `Task.get_task(task_id=...).get_models()["output"]`.
 
 ## 4. Exercising compare
 
@@ -93,8 +97,19 @@ that warning is the expected first-run result, not a bug.
 
 ```bash
 uv run cy clearml.project_name=cy-verify clearml.task_name=baseline clearml.tags=[prod] ...   # run 1
-uv run cy clearml.project_name=cy-verify clearml.task_name=candidate ...                      # run 2
+uv run cy clearml.project_name=cy-verify clearml.task_name=candidate \
+  compare.bootstrap_iterations=200 ...                                                        # run 2
 ```
+
+`compare.bootstrap_iterations=200` keeps a verification run quick; the default 10000 is for real
+comparisons, not for proving the wiring.
+
+**Expected end state of run 2:** `compare.output_dir` holds `compare_workbook_<split>.xlsx` plus the
+re-inferred `baseline_predictions_*` / `candidate_predictions_*` CSVs, and the log ends with
+`Comparison of split '<split>': N classes compared, 0 excluded, 0 degraded`. Because the report stage now
+resolves a baseline, `report.output_dir` also fills with `report_dev_*`, `report_business_*` and
+`baseline_*` workbooks per split — the contrast with run 1's empty report directory is the check that the
+baseline actually resolved.
 
 ## Overrides that matter on this box
 
