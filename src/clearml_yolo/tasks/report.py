@@ -12,10 +12,16 @@ from clearml_yolo import artifact_names
 from clearml_yolo.clearml_models import latest_completed_task_id
 from clearml_yolo.clearml_report import report_table
 from clearml_yolo.clearml_session import ClearMLConfig, init_task
+from clearml_yolo.inference import ScoredResolution
 from clearml_yolo.progress import track
 from clearml_yolo.tasks.metrics import DASHBOARD_PREFIX
 
 BaselineSource = Literal["clearml", "local", "none"]
+
+# The sheet appended to the dev workbook naming the scale its numbers were measured at. The
+# business report does not get one: it is written for a reader who is being told whether the
+# model got better, not how it was inferred.
+RESOLUTION_SHEET = "inference_resolution"
 
 
 class BaselineConfig(BaseModel):
@@ -106,6 +112,35 @@ def discover_dashboards(metrics_dir: str | Path, splits: list[str]) -> dict[str,
     return found
 
 
+def _append_resolution_sheet(workbook: Path, resolution: ScoredResolution) -> None:
+    """Record on the dev workbook what scale its numbers were measured at.
+
+    The workbook itself is built by report-generator, a released package this repo consumes
+    rather than owns, so the fact is added to the file afterwards instead of to a builder.
+    Appending in ``mode="a"`` leaves every sheet that package wrote untouched.
+
+    A failure here must not take down a report that is otherwise complete and correct: the
+    resolution is context for numbers that are already on disk, not one of them.
+    """
+    import pandas as pd
+
+    try:
+        with pd.ExcelWriter(workbook, engine="openpyxl", mode="a") as writer:
+            resolution.as_table().to_excel(writer, sheet_name=RESOLUTION_SHEET, index=False)
+    except (OSError, ValueError) as error:
+        logger.warning(
+            "Could not append the {!r} sheet to {}: {}", RESOLUTION_SHEET, workbook, error
+        )
+        return
+    if resolution.was_trained_elsewhere:
+        logger.warning(
+            "{} reports a model trained at imgsz {} but scored at {}",
+            workbook.name,
+            resolution.trained_at,
+            resolution.scored_at,
+        )
+
+
 def report(
     metrics_dir: str | Path,
     output_dir: str | Path,
@@ -131,11 +166,18 @@ def build_reports(
     clearml: ClearMLConfig,
     baseline: BaselineConfig,
     report_config_path: str | Path | None = None,
+    resolution: ScoredResolution | None = None,
 ) -> ReportResult:
     """Produce dev and business comparison workbooks for every split with a baseline.
 
     Comparison is always new minus previous, so argument order into the builders is
     load-bearing.
+
+    ``resolution`` is the scale the numbers being reported were measured at, known only when
+    this process ran the inference that produced them. Left None — a standalone ``cy-report``
+    reading dashboards off disk, or a run with ``skip_predict`` — the sheet naming it is
+    omitted rather than filled with a guess, because the workbook is the artefact a reviewer
+    trusts months later and a wrong resolution there is worse than an absent one.
     """
     from report_generator.config import Config
     from report_generator.core.reader import MetricsReader
@@ -184,7 +226,10 @@ def build_reports(
         BusinessReportBuilder(MetricsReader(new_dashboard), baseline_reader, config).build(
             business_path
         )
-
+        # Before the upload below, or ClearML stores the copy without the sheet — and the
+        # stored copy is the one anyone reads later.
+        if resolution is not None:
+            _append_resolution_sheet(dev_path, resolution)
         result.dev_reports[split] = dev_path
         result.business_reports[split] = business_path
         logger.info("Split {!r}: {} and {}", split, dev_path.name, business_path.name)

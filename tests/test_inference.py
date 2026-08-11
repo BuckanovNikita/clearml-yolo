@@ -132,7 +132,10 @@ def test_inference_takes_the_resolution_out_of_the_checkpoint(checkpoint_recordi
     """The one source that cannot go stale against the weights it describes."""
     checkpoint_recording({"imgsz": 1280})
 
-    assert resolution_of("best.pt", None) == 1280
+    resolution = resolution_of("best.pt", None)
+
+    assert (resolution.scored_at, resolution.trained_at) == (1280, 1280)
+    assert not resolution.was_trained_elsewhere
 
 
 def test_a_named_resolution_wins_but_is_answered_for(
@@ -142,8 +145,40 @@ def test_a_named_resolution_wins_but_is_answered_for(
     thing to do by accident, so it happens but never quietly."""
     checkpoint_recording({"imgsz": 1280})
 
-    assert resolution_of("best.pt", 640) == 640
+    resolution = resolution_of("best.pt", 640)
+
+    assert (resolution.scored_at, resolution.trained_at) == (640, 1280)
+    assert resolution.was_trained_elsewhere
     assert any("trained at 1280" in message for message in logs)
+
+
+def test_the_resolution_pair_carries_both_numbers_into_the_run_record(
+    checkpoint_recording: Any,
+) -> None:
+    """The two places that keep the pair — ClearML and the dev workbook — must say the same
+    thing, so the table both render is built once."""
+    checkpoint_recording({"imgsz": 1280})
+
+    rows = resolution_of("best.pt", 640).as_table()
+
+    assert dict(zip(rows["parameter"], rows["value"], strict=True)) == {
+        "trained at imgsz": "1280",
+        "scored at imgsz": "640",
+        "same resolution?": "NO — scored at a scale this model was never shown",
+    }
+
+
+def test_a_checkpoint_that_names_no_resolution_does_not_read_as_agreement(
+    checkpoint_recording: Any,
+) -> None:
+    """Nothing recorded is not the same as the same number, and must not report as one."""
+    checkpoint_recording({})
+
+    resolution = resolution_of("best.pt", 640)
+
+    assert resolution.trained_at is None
+    assert not resolution.was_trained_elsewhere
+    assert "unknown" in resolution.as_table()["value"].iloc[-1]
 
 
 def test_a_checkpoint_that_names_no_resolution_is_refused(checkpoint_recording: Any) -> None:

@@ -11,6 +11,7 @@ from omegaconf import OmegaConf
 
 from clearml_yolo.clearml_session import ClearMLConfig, init_task
 from clearml_yolo.gpu import AutoGpuConfig
+from clearml_yolo.inference import ScoredResolution
 from clearml_yolo.tasks.compare import (
     CompareResult,
     InferenceConfig,
@@ -19,6 +20,7 @@ from clearml_yolo.tasks.compare import (
 )
 from clearml_yolo.tasks.compare import compare as run_comparison
 from clearml_yolo.tasks.metrics import compute_metrics
+from clearml_yolo.tasks.predict import PredictResult
 from clearml_yolo.tasks.predict import predict as run_prediction
 from clearml_yolo.tasks.report import BaselineConfig, build_reports, discover_dashboards
 from clearml_yolo.tasks.train import CHECKPOINT
@@ -253,6 +255,40 @@ def _check_comparison_baseline(baseline: ModelRef, clearml: ClearMLConfig) -> No
     )
 
 
+def _check_resolution_choice(
+    train_params: dict[str, Any], predict_params: dict[str, Any], has_reader: bool
+) -> None:
+    """Reject scoring this run's own model at a scale it is not being trained at.
+
+    A model generalises to the scale it was shown, so training at one resolution and
+    inferring at another measures it on images unlike anything it ever saw. Off-resolution
+    inference is a real thing to want — the predict stage warns and proceeds — but wanting
+    it *of the model this same run is about to train* is not a thing anyone wants, and
+    finding out costs the whole training run, because the checkpoint the warning compares
+    against does not exist until training has finished.
+
+    ``predict.imgsz`` left null is the answer, not the problem: it is filled from the
+    checkpoint, which cannot disagree with the weights it describes. Only a resolution named
+    outright can conflict. Both values must be ints to be compared at all — the ultralytics
+    files note that predict and export may take ``[h, w]``, and a shape this cannot read is
+    left to the stage that understands it rather than guessed at here.
+    """
+    trained_at = train_params.get("imgsz")
+    scored_at = predict_params.get("imgsz")
+    if not has_reader or scored_at is None:
+        return
+    if not isinstance(trained_at, int) or not isinstance(scored_at, int):
+        return
+    if trained_at == scored_at:
+        return
+    raise ValueError(
+        f"This run trains at imgsz={trained_at} and would score at imgsz={scored_at}, so it "
+        "would measure the model it just built on images at a scale it was never shown. "
+        "Leave predict.ultralytics.imgsz null and the checkpoint answers it, or train at "
+        f"imgsz={scored_at}."
+    )
+
+
 def _check_weights_choice(weights: str | Path | None, skip_train: bool) -> None:
     """Reject a named checkpoint that training is about to overwrite.
 
@@ -265,6 +301,49 @@ def _check_weights_choice(weights: str | Path | None, skip_train: bool) -> None:
             f"weights={weights} names a checkpoint for a run that is going to train its "
             "own; set skip_train=true, or drop weights."
         )
+
+
+def _preflight(
+    configs: dict[str, dict[str, Any]],
+    clearml: ClearMLConfig,
+    ground_truth: str,
+    splits: list[str],
+    skipped: dict[str, bool],
+) -> None:
+    """Everything that has to hold, checked while checking it is still free.
+
+    Every one of these is a cross-stage mismatch that config alone cannot express, and every
+    one of them would otherwise surface after training — the most expensive moment to learn
+    that the run was never going to produce what was asked for. They are grouped rather than
+    spelled out in the run so that "what is checked up front" is one list, and a new check
+    lands in it rather than wherever there was room.
+    """
+    metrics_cfg = configs["metrics"]
+    compare_cfg = configs["compare"]
+
+    _check_split_choices(
+        splits,
+        {
+            "metrics.calibration_split": (
+                None if skipped["metrics"] else metrics_cfg["calibration_split"]
+            ),
+            "compare.split": None if skipped["compare"] else compare_cfg["split"],
+        },
+    )
+    _check_resolution_choice(
+        configs["train"]["ultralytics"],
+        configs["predict"]["ultralytics"],
+        # The comparison is the second reader of the predict block's resolution — see
+        # `_comparison_inference` — so a run that skips inference but still compares would
+        # otherwise hit the same mismatch, an hour later, on the checkpoint it just trained.
+        has_reader=not skipped["train"] and not (skipped["predict"] and skipped["compare"]),
+    )
+    _check_ground_truth(
+        ground_truth,
+        [stage for stage in ("predict", "metrics", "compare") if not skipped[stage]],
+    )
+    if not skipped["compare"]:
+        _check_comparison_baseline(compare_cfg["baseline_model"], clearml)
 
 
 def run_pipeline(
@@ -310,27 +389,18 @@ def run_pipeline(
     report_cfg = configs["report"]
     compare_cfg = configs["compare"]
 
-    _check_split_choices(
+    _preflight(
+        configs,
+        clearml,
+        ground_truth,
         list(splits),
         {
-            "metrics.calibration_split": None if skip_metrics else metrics_cfg["calibration_split"],
-            "compare.split": None if skip_compare else compare_cfg["split"],
+            "train": skip_train,
+            "predict": skip_predict,
+            "metrics": skip_metrics,
+            "compare": skip_compare,
         },
     )
-    _check_ground_truth(
-        ground_truth,
-        [
-            stage
-            for stage, skipped in (
-                ("predict", skip_predict),
-                ("metrics", skip_metrics),
-                ("compare", skip_compare),
-            )
-            if not skipped
-        ],
-    )
-    if not skip_compare:
-        _check_comparison_baseline(compare_cfg["baseline_model"], clearml)
 
     checkpoint = predict_cfg["weights"]
     # Inference after training must reuse training's own card rather than survey again:
@@ -345,10 +415,14 @@ def run_pipeline(
         trained_device = trained.inference_device
         results["weights"] = trained.weights
 
+    # Known only when this run inferred: the scale the numbers downstream were measured at.
+    resolution: ScoredResolution | None = None
     if skip_predict:
         logger.info("Skipping inference; using predictions {}", metrics_cfg["predictions"])
     else:
-        results["predictions"] = run_predict_stage(predict_cfg, checkpoint, trained_device)
+        predicted = run_predict_stage(predict_cfg, checkpoint, trained_device)
+        resolution = predicted.resolution
+        results["predictions"] = predicted.predictions
 
     dashboards: dict[str, Path] = {}
     thresholds: dict[str, dict[str, float]] = {}
@@ -370,6 +444,7 @@ def run_pipeline(
             clearml,
             report_cfg["baseline"],
             report_cfg["report_config_path"],
+            resolution,
         )
 
     if skip_compare:
@@ -386,7 +461,7 @@ def run_predict_stage(
     config: dict[str, Any],
     weights: str | Path,
     trained_device: str | None = None,
-) -> Path:
+) -> PredictResult:
     """Infer with the checkpoint this run produced, on the card that produced it."""
     params = config["ultralytics"]
     return run_prediction(

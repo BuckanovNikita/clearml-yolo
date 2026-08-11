@@ -254,7 +254,7 @@ def _settled(
     selection = resolve_inference(
         auto_gpu, inference.device, inference.batch, model=inference.model, stage="predict"
     )
-    imgsz = resolution_of(candidate, inference.imgsz)
+    imgsz = resolution_of(candidate, inference.imgsz).scored_at
     was_baseline_trained_at = trained_imgsz(baseline)
     if was_baseline_trained_at is not None and was_baseline_trained_at != imgsz:
         logger.warning(

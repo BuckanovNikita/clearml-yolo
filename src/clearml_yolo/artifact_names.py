@@ -34,6 +34,12 @@ COMPARISON_WORKBOOK_PREFIX = "compare_workbook"
 # owns three more of its own, declared next to the report that writes them.
 METRICS_SECTION = "metrics"
 REPORT_SECTION = "report"
+PREDICT_SECTION = "predict"
+
+# The one series under PREDICT_SECTION. A stage that scores every split writes its section
+# once per split; inference resolves its resolution once for the whole run, so the series
+# names what the table is about rather than which split it belongs to.
+RESOLUTION_SERIES = "resolution"
 
 
 def per_split(prefix: str, split: str) -> str:

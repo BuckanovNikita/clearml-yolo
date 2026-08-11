@@ -55,6 +55,7 @@ from typing import Any, Literal
 
 import pandas as pd
 from loguru import logger
+from pydantic import BaseModel
 
 from clearml_yolo.progress import track
 from clearml_yolo.ultralytics_params import fill_unset
@@ -97,6 +98,47 @@ def is_cuda_device(device: str | None) -> bool:
     return not any(part.strip().lower() in NON_CUDA_DEVICES for part in str(device).split(","))
 
 
+class ScoredResolution(BaseModel):
+    """The scale a checkpoint was trained at, beside the one it is being scored at.
+
+    The two travel together because the second is only meaningful next to the first: 640 on
+    its own says nothing, and 640 against weights trained at 1280 says the numbers that
+    follow were measured on images unlike anything the model ever saw. ``trained_at`` is
+    None when the checkpoint does not record it, which is not the same as agreeing.
+    """
+
+    trained_at: int | None
+    scored_at: int
+
+    @property
+    def was_trained_elsewhere(self) -> bool:
+        """Whether the model is being scored at a scale it was never shown."""
+        return self.trained_at is not None and self.trained_at != self.scored_at
+
+    def as_table(self) -> pd.DataFrame:
+        """The pair as a two-column table, for the run record rather than for the log.
+
+        Rendered once here because both places that keep it — the ClearML plots tab and the
+        sheet appended to the dev workbook — have to say the same thing, and a reader who
+        finds one of them and not the other must not get two different answers. The verdict
+        is spelled out rather than left as two numbers to compare, since the whole point is
+        that a reader skimming for it should not have to notice they differ.
+        """
+        trained = "not recorded in the checkpoint" if self.trained_at is None else self.trained_at
+        if self.trained_at is None:
+            verdict = "unknown: the checkpoint does not say what it was trained at"
+        elif self.was_trained_elsewhere:
+            verdict = "NO — scored at a scale this model was never shown"
+        else:
+            verdict = "yes"
+        return pd.DataFrame(
+            {
+                "parameter": ["trained at imgsz", "scored at imgsz", "same resolution?"],
+                "value": [str(trained), str(self.scored_at), verdict],
+            }
+        )
+
+
 def trained_imgsz(weights: str | Path) -> int | None:
     """The resolution these weights were trained at, or None if the file does not say.
 
@@ -120,7 +162,7 @@ def trained_imgsz(weights: str | Path) -> int | None:
     return None
 
 
-def resolution_of(weights: str | Path, imgsz: int | None) -> int:
+def resolution_of(weights: str | Path, imgsz: int | None) -> ScoredResolution:
     """The resolution to infer at: the one asked for, or the one the weights were trained at.
 
     A model is shown images at one scale and generalises to that scale, so inferring at
@@ -128,6 +170,10 @@ def resolution_of(weights: str | Path, imgsz: int | None) -> int:
     step itself, handing predict the resolution train just used, but a checkpoint reached
     any other way — a ClearML task, a file handed over — carries no such link, and 640 is
     a plausible enough number to be wrong without ever looking wrong.
+
+    Both numbers come back rather than only the one inference needs. The checkpoint is read
+    here either way, and a caller that reports how a result was produced would otherwise
+    have to open it a second time to say what the model was built for.
     """
     recorded = trained_imgsz(weights)
     if imgsz is None:
@@ -141,7 +187,7 @@ def resolution_of(weights: str | Path, imgsz: int | None) -> int:
             recorded,
             Path(weights).name,
         )
-        return recorded
+        return ScoredResolution(trained_at=recorded, scored_at=recorded)
     if recorded is not None and recorded != imgsz:
         logger.warning(
             "Inferring at imgsz {} on weights trained at {}: the model was never shown "
@@ -150,7 +196,7 @@ def resolution_of(weights: str | Path, imgsz: int | None) -> int:
             recorded,
             recorded,
         )
-    return imgsz
+    return ScoredResolution(trained_at=recorded, scored_at=imgsz)
 
 
 def _image_id(path: str, mode: ImageNameMode) -> str:

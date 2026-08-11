@@ -230,6 +230,86 @@ def test_a_named_checkpoint_without_skip_train_is_rejected_before_training_start
         zen(run_pipeline)(config)
 
 
+def test_scoring_at_a_resolution_this_run_does_not_train_at_is_rejected_before_training(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The checkpoint the predict stage's own warning compares against does not exist until
+    training has finished, so without this the mismatch costs the whole training run — and
+    a model measured at a scale it was never shown is not a measurement of that model."""
+    monkeypatch.setattr(pipeline_module, "run_training", lambda **kwargs: pytest.fail("trained"))
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        config = compose(
+            config_name="pipeline",
+            overrides=[
+                "train.ultralytics.imgsz=640",
+                "predict.ultralytics.imgsz=1280",
+                "clearml.enabled=false",
+            ],
+        )
+
+    with pytest.raises(ValueError, match="imgsz=1280"):
+        zen(run_pipeline)(config)
+
+
+def test_a_run_that_only_compares_still_reaches_the_resolution_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`_comparison_inference` copies the predict block's resolution, so the comparison is
+    the second stage that can score this run's own checkpoint at the wrong scale — and it
+    runs last, which is the most expensive place to find out."""
+    monkeypatch.setattr(pipeline_module, "run_training", lambda **kwargs: pytest.fail("trained"))
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        config = compose(
+            config_name="pipeline",
+            overrides=[
+                "train.ultralytics.imgsz=640",
+                "predict.ultralytics.imgsz=1280",
+                "skip_predict=true",
+                "skip_metrics=true",
+                "report.baseline.task_id=abc123",
+                "clearml.enabled=false",
+            ],
+        )
+
+    with pytest.raises(ValueError, match="imgsz=1280"):
+        zen(run_pipeline)(config)
+
+
+@pytest.mark.parametrize(
+    "resolutions",
+    [
+        pytest.param([], id="predict_reads_it_from_the_checkpoint"),
+        pytest.param(["predict.ultralytics.imgsz=640"], id="named_and_agreeing"),
+    ],
+)
+def test_a_resolution_that_cannot_disagree_reaches_training(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, resolutions: list[str]
+) -> None:
+    """Null is the answer rather than the problem — it is filled from the checkpoint, which
+    cannot disagree with the weights it describes — and a named resolution matching the one
+    being trained is the case this check exists to leave alone.
+
+    Reaching training is the assertion, for the reason `_ReachedTrainingError` documents.
+    """
+    monkeypatch.setattr(pipeline_module, "run_training", _reached_training)
+    truth = tmp_path / "ground_truth.csv"
+    truth.write_text("image_path,split\na.png,test\n")
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        config = compose(
+            config_name="pipeline",
+            overrides=[
+                "train.ultralytics.imgsz=640",
+                f"ground_truth={truth}",
+                "skip_compare=true",
+                "clearml.enabled=false",
+                *resolutions,
+            ],
+        )
+
+    with pytest.raises(_ReachedTrainingError):
+        zen(run_pipeline)(config)
+
+
 def test_a_missing_ground_truth_is_rejected_before_training_starts(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

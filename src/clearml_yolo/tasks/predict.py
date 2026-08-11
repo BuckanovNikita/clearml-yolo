@@ -7,18 +7,34 @@ from typing import Any
 
 import pandas as pd
 from loguru import logger
+from pydantic import BaseModel
 
 from clearml_yolo import artifact_names
 from clearml_yolo.clearml_models import resolve_weights
+from clearml_yolo.clearml_report import report_table
 from clearml_yolo.clearml_session import ClearMLConfig, init_task, upload_dataframe
 from clearml_yolo.gpu import AutoGpuConfig, remember_batch, resolve_inference
 from clearml_yolo.inference import (
     ImageNameMode,
+    ScoredResolution,
     is_cuda_device,
     predict_on_images,
     resolution_of,
 )
 from clearml_yolo.ultralytics_params import fill_unset
+
+
+class PredictResult(BaseModel):
+    """The predictions table, plus the scale it was produced at.
+
+    The resolution travels with the result for the same reason training's device does: a
+    stage that follows inference in the same process would otherwise have to reopen the
+    checkpoint to learn what the model was built for. The report stage is the one that
+    needs it — the numbers it publishes were measured at ``scored_at``.
+    """
+
+    predictions: Path
+    resolution: ScoredResolution
 
 
 def images_to_score(ground_truth: pd.DataFrame, splits: list[str] | None) -> list[str]:
@@ -55,7 +71,7 @@ def predict(
     model: str | None = None,
     splits: list[str] | None = None,
     image_name: ImageNameMode = "name",
-) -> Path:
+) -> PredictResult:
     """Infer over the dataset images and write a predictions CSV.
 
     ``ultralytics`` is the whole of ``conf/ultralytics/predict.yaml``: every parameter
@@ -90,7 +106,16 @@ def predict(
     )
     settings["batch"] = selection.batch
     settings["device"] = selection.device_name
-    settings["imgsz"] = resolution_of(checkpoint, ultralytics.get("imgsz"))
+    resolution = resolution_of(checkpoint, ultralytics.get("imgsz"))
+    settings["imgsz"] = resolution.scored_at
+    # Published before inference rather than after it, so a run killed part way through
+    # still records the scale its partial predictions were produced at.
+    report_table(
+        task,
+        artifact_names.PREDICT_SECTION,
+        artifact_names.RESOLUTION_SERIES,
+        resolution.as_table(),
+    )
 
     frame = predict_on_images(
         checkpoint,
@@ -107,4 +132,4 @@ def predict(
     if auto_gpu is not None:
         remember_batch(auto_gpu, "predict", model, selection)
     upload_dataframe(task, artifact_names.PREDICTIONS, frame)
-    return output_path
+    return PredictResult(predictions=output_path, resolution=resolution)
