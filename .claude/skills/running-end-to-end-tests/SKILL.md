@@ -61,8 +61,10 @@ a group override that composes only against the packaged config; from a `cy-init
 `report.baseline.source=none`.
 
 The run also refuses to start if `ground_truth` does not point at an existing CSV and any of predict,
-metrics or compare will run. Both refusals happen before training, so a mis-specified run costs seconds
-rather than a full training pass.
+metrics or compare will run. It refuses too if a run that trains names `predict.ultralytics.imgsz`
+outright and that resolution is not the one `train.ultralytics.imgsz` is training at — leave predict's
+null and the checkpoint answers it. All three refusals happen before training, so a mis-specified run
+costs seconds rather than a full training pass.
 
 **Expected end state:** `metrics.output_dir` holds `full_dashboard_{train,val,test}.xlsx`,
 `matrix_*.xlsx`, `метрики_дтрк_*.xlsx` and four `*_confidence_intervals.png`; the predictions CSV has a
