@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-The machine-wide conventions in `/home/nkt/CLAUDE.md` (commit style, secure shell use, code style) still
+The machine-wide conventions in `/home/nkt/CLAUDE.md` (commit style, code style) still
 apply; this file adds only what is specific to `clearml-yolo`.
 
 ## Project Overview
