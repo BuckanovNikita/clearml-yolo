@@ -28,6 +28,11 @@ from loguru import logger
 # documented habits stay one directory away: ``ls runs/latest/metrics``.
 LATEST_LINK_NAME = "latest"
 
+# The directory the run directories and that link live in. A run that was not told where
+# to write names itself one under here, whether it is the whole pipeline or a single
+# standalone app.
+RUNS_ROOT = Path("runs")
+
 
 def _host_and_pid() -> tuple[str, int]:
     """The two facts that separate concurrent runs, behind one seam.
@@ -66,20 +71,35 @@ def point_latest_at(root: Path, run_dir: Path) -> None:
 
     The replacement goes through a second symlink renamed over the first, so a reader
     following the link concurrently sees the old target or the new one and never a gap.
-    Everything that can go wrong here — a filesystem without symlinks, a directory nobody
-    may write, something that is not a symlink already sitting at the path — costs a
-    convenience shortcut and nothing else, so it is logged rather than raised.
+
+    Anything that is not a symlink sitting at the name is moved aside rather than written
+    over or left in place. A standalone stage whose default output path runs *through* the
+    link creates the name as an ordinary directory the first time it is used in a fresh
+    workspace, and leaving that alone would freeze the link for every later run while
+    nothing ever wrote into what it holds; deleting it would take a directory a user may
+    have put there on purpose. The move keeps the contents, names the run that displaced
+    them, and lets the next run take the name back on its own.
+
+    A filesystem without symlinks, a directory nobody may write, a displaced name already
+    taken — each costs a convenience shortcut and nothing else, so it is logged rather than
+    raised, and the next run tries again under a different pid.
     """
     latest = root / LATEST_LINK_NAME
-    if latest.exists() and not latest.is_symlink():
-        logger.warning(
-            "Leaving {} alone because it is not a symlink; this run is at {}", latest, run_dir
-        )
-        return
     host, pid = _host_and_pid()
     pending = root / f".{LATEST_LINK_NAME}-{host}-{pid}"
+    displaced = root / f"{LATEST_LINK_NAME}-displaced-{host}-{pid}"
     try:
         root.mkdir(parents=True, exist_ok=True)
+        if latest.exists() and not latest.is_symlink():
+            latest.rename(displaced)
+            logger.warning(
+                "Moved {} to {} because it was not a symlink, and kept everything it held;"
+                " {} now points at {}",
+                latest,
+                displaced,
+                latest,
+                run_dir,
+            )
         pending.unlink(missing_ok=True)
         pending.symlink_to(run_dir)
         pending.replace(latest)

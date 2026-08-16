@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -10,12 +11,18 @@ from pydantic import BaseModel
 
 from clearml_yolo.clearml_session import ClearMLConfig, init_task
 from clearml_yolo.gpu import AutoGpuConfig, DeviceSelection, remember_batch, resolve_devices
+from clearml_yolo.run_identity import RUNS_ROOT, point_latest_at, resolve_run_dir, resolve_run_id
 from clearml_yolo.ultralytics_params import fill_unset
 
 # Where ultralytics puts a run's checkpoint. Named here because two other places have to
 # predict this path without a trainer to ask: the standalone predict default, and the
 # pipeline when training is skipped.
 CHECKPOINT = "{project}/{name}/weights/best.pt"
+
+# What training's own directory is called inside the run directory. `detect` is what it
+# was called when every run shared one of them, and it is still what ultralytics' own
+# layout calls a detection project.
+TRAIN_DIR = "detect"
 
 
 class TrainResult(BaseModel):
@@ -37,6 +44,33 @@ def _inference_device(selection: DeviceSelection) -> str | None:
     return None
 
 
+def _project_of_this_run(project: str | None, task_name: str) -> Path:
+    """Where training writes, absolute, and — when it decided that itself — what ``latest`` names.
+
+    A project written against the key is honoured exactly as written. That is how the
+    pipeline hands this stage the one directory the whole run writes into, and how a
+    caller redirects training somewhere else entirely. It is resolved because ultralytics
+    resolves a relative project against its own configured ``runs_dir`` rather than the
+    working directory, which is rarely the same place.
+
+    Left unset, this run is a run of its own and names one, exactly as the pipeline names
+    one for its stages: two ``cy-train`` started in the same folder used to share
+    ``runs/detect/<task name>`` with ``exist_ok`` set, which is not a merge but a deletion
+    — the DDP launcher clears the save directory before it spawns its children. ``latest``
+    is repointed at the new directory, because that link is how the standalone stages that
+    score this model find the run that produced it.
+    """
+    if project is not None:
+        return Path(project).resolve()
+    run_dir = resolve_run_dir(
+        RUNS_ROOT, resolve_run_id(task_name, None, datetime.now(tz=UTC)), None
+    )
+    run_dir.mkdir(parents=True, exist_ok=True)
+    point_latest_at(RUNS_ROOT, run_dir)
+    logger.info("Training run {} writes everything it produces to {}", run_dir.name, run_dir)
+    return run_dir / TRAIN_DIR
+
+
 def train(
     ultralytics: dict[str, Any],
     auto_gpu: AutoGpuConfig,
@@ -47,8 +81,9 @@ def train(
     ``ultralytics`` is the whole of ``conf/ultralytics/train.yaml``: every parameter
     ultralytics accepts for detection training, passed on as it stands. The keys left
     ``null`` there are the ones decided here — the batch and cards from ``auto_gpu``, AMP
-    and ``torch.compile`` from whether this run is on a GPU at all, and the run's name
-    from the ClearML experiment, so the run directory always matches the experiment.
+    and ``torch.compile`` from whether this run is on a GPU at all, the run's name from the
+    ClearML experiment, so the run directory always matches the experiment, and the project
+    from the identity this run takes when nobody handed it one.
 
     The checkpoint path is derived from project/name rather than from the return value
     of ``model.train()``: under DDP the parent process never runs a validator, so
@@ -81,9 +116,7 @@ def train(
     )
     settings["batch"] = selection.batch
     settings["device"] = selection.devices
-    # Relative projects are resolved against ultralytics' configured runs_dir, which is
-    # rarely the working directory, so anchor it here instead.
-    settings["project"] = str(Path(settings["project"]).resolve())
+    settings["project"] = str(_project_of_this_run(settings.get("project"), clearml.task_name))
     # `model` names the weights YOLO() is built from. Left in as well, it would reach
     # train() as a keyword argument, which ultralytics lets win over the constructor —
     # two ways to say which model this is, and no rule for which of them means it.

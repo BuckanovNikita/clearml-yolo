@@ -143,6 +143,50 @@ def test_the_project_is_anchored_to_the_working_directory(tmp_path: Path) -> Non
     assert kwargs["project"].endswith("runs/detect")
 
 
+def test_a_run_nobody_gave_a_directory_names_one_after_itself(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`cy-train` is a run of its own, and two of them in one folder trained into the same
+    `runs/detect/<task name>` — with `exist_ok` set, the second start deletes the first
+    run's checkpoints rather than landing beside them. So an unset project is a directory
+    named after the experiment, the machine and the moment, exactly as `cy` names one."""
+    monkeypatch.chdir(tmp_path)
+
+    project = Path(_train([0], tmp_path, project=None)["project"])
+
+    assert project.name == "detect"
+    assert project.parent.parent == (tmp_path / "runs").resolve()
+    assert project.parent.name.startswith(DISABLED.task_name)
+
+
+def test_a_run_that_names_its_own_directory_repoints_latest_at_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The link is how every later standalone command finds this run: `cy-predict` loads
+    `runs/latest/detect/<task name>/weights/best.pt` with no weights named, and before the
+    training stage moved the link that path was the pipeline's last run — so inference
+    silently scored a model this command never trained."""
+    monkeypatch.chdir(tmp_path)
+
+    project = Path(_train([0], tmp_path, project=None)["project"])
+
+    assert (tmp_path / "runs" / "latest").is_symlink()
+    assert (tmp_path / "runs" / "latest").resolve() == project.parent
+
+
+def test_a_run_told_where_to_write_moves_no_link(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Which is what the pipeline does to every stage: one directory for the whole run,
+    named once by the run and not again by each stage. A stage that repointed `latest`
+    from inside a run would name the run's training directory as the run itself."""
+    monkeypatch.chdir(tmp_path)
+
+    _train([0], tmp_path, project=str(tmp_path / "elsewhere"))
+
+    assert not (tmp_path / "runs" / "latest").exists()
+
+
 def test_the_checkpoint_comes_from_the_trainer_not_the_requested_name(tmp_path: Path) -> None:
     """Ultralytics may deduplicate the run name, and only it knows where the file went."""
     result = _train([0], tmp_path)

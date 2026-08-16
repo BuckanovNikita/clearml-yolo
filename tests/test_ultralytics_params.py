@@ -16,7 +16,6 @@ import pytest
 from ultralytics.cfg import get_cfg
 from ultralytics.utils import DEFAULT_CFG_DICT, YAML
 
-from clearml_yolo.configs import TRAIN_PROJECT
 from clearml_yolo.ultralytics_params import fill_unset
 
 PARAMS_DIR = Path(__file__).resolve().parents[1] / "src" / "clearml_yolo" / "conf" / "ultralytics"
@@ -30,7 +29,14 @@ COMMENTED_KEY = re.compile(r"^# ([a-z_0-9]+):")
 # `batch` or `compile` outright — so they are filled before the acceptance check, exactly
 # as the tasks fill them.
 RUN_DECIDES: dict[str, dict[str, Any]] = {
-    "train": {"batch": 16, "device": [0], "name": "yolo-run", "amp": True, "compile": True},
+    "train": {
+        "batch": 16,
+        "device": [0],
+        "name": "yolo-run",
+        "project": "runs/yolo-run-host-20260101-000000-1/detect",
+        "amp": True,
+        "compile": True,
+    },
     "predict": {"batch": 16, "device": "0", "imgsz": 640, "quantize": 16, "compile": True},
 }
 
@@ -91,15 +97,6 @@ def test_the_keys_the_run_decides_are_left_for_it_to_decide(stem: str) -> None:
     written = _written(stem)
 
     assert {key: written[key] for key in RUN_DECIDES[stem]} == dict.fromkeys(RUN_DECIDES[stem])
-
-
-def test_the_run_directory_is_the_one_a_skipped_training_stage_is_pointed_at() -> None:
-    """`project` is written in the parameter file and read again by `DEFAULT_CHECKPOINT`,
-    which is where a standalone `cy-predict` looks with no weights named. Two copies of one
-    path: edit the file alone and inference quietly reads a directory training never wrote
-    to. `name` has no such pair — it is single-sourced from the ClearML task name.
-    """
-    assert _written("train")["project"] == TRAIN_PROJECT
 
 
 def test_the_prediction_file_never_names_what_the_inference_call_sets_itself() -> None:

@@ -22,16 +22,30 @@ from omegaconf import OmegaConf
 
 from clearml_yolo.clearml_session import ClearMLConfig
 from clearml_yolo.gpu import AutoGpuConfig
-from clearml_yolo.run_identity import LATEST_LINK_NAME
+from clearml_yolo.run_identity import LATEST_LINK_NAME, RUNS_ROOT
 from clearml_yolo.tasks.compare import InferenceConfig, ModelRef
 from clearml_yolo.tasks.metrics import EvaluationConfig
-from clearml_yolo.tasks.pipeline import PIPELINE_FILLED_KEYS, RUNS_ROOT, TRAIN_DIR
+from clearml_yolo.tasks.pipeline import (
+    COMPARISON_DIR,
+    METRICS_DIR,
+    PIPELINE_FILLED_KEYS,
+    PREDICTIONS_NAME,
+    REPORTS_DIR,
+)
 from clearml_yolo.tasks.report import BaselineConfig
-from clearml_yolo.tasks.train import CHECKPOINT
 
-TRAIN_PROJECT = f"{RUNS_ROOT}/{TRAIN_DIR}"
-PREDICTIONS_CSV = "runs/predictions.csv"
-METRICS_DIR = "runs/metrics"
+# Where a standalone app writes, and where the next one reads. `cy` gives a run one
+# directory and hands every stage a path inside it; a standalone app is handed nothing, so
+# it works from the link training repointed when it named its own run. The four commands
+# therefore fill in one directory between them, laid out exactly as a `cy` run lays its
+# own out, and each of them reads what the one before it wrote there rather than a second
+# path built the same way. A fixed `runs/predictions.csv` was the collision this removes:
+# it belonged to no run, so the next `cy-train` in the folder overwrote it.
+LATEST_RUN = f"{RUNS_ROOT}/{LATEST_LINK_NAME}"
+PREDICTIONS_CSV = f"{LATEST_RUN}/{PREDICTIONS_NAME}"
+DASHBOARDS_DIR = f"{LATEST_RUN}/{METRICS_DIR}"
+REPORTS_OUTPUT_DIR = f"{LATEST_RUN}/{REPORTS_DIR}"
+COMPARISON_OUTPUT_DIR = f"{LATEST_RUN}/{COMPARISON_DIR}"
 
 # Hydra picks its own output directory before any of this project's code runs, so the run
 # id resolved inside the pipeline cannot name it. Host and pid are what is available that
@@ -51,15 +65,6 @@ PACKAGE_CONF = {"searchpath": ["pkg://clearml_yolo.conf"]}
 # Hydra would look for `train/ultralytics/` and `predict/ultralytics/` as well, and the
 # same file would have to exist three times.
 ULTRALYTICS_GROUP = "/ultralytics@ultralytics"
-
-# Where a standalone `cy-predict` looks with no weights named. Training writes into the
-# ClearML experiment's own name, so this is built from that rather than from a second
-# constant that would drift from it the first time either was changed. It reads through
-# `latest` because a run's checkpoints live in a directory named after that run: the fixed
-# path a peer could overwrite is exactly what the run directory removed.
-DEFAULT_CHECKPOINT = CHECKPOINT.format(
-    project=f"{RUNS_ROOT}/{LATEST_LINK_NAME}/{TRAIN_DIR}", name=ClearMLConfig().task_name
-)
 
 AutoGpuConf = builds(AutoGpuConfig, populate_full_signature=True)
 ClearMLConf = builds(ClearMLConfig, populate_full_signature=True)
@@ -100,7 +105,12 @@ def _predict_fields() -> dict[str, Any]:
         "hydra_defaults": ["_self_", {ULTRALYTICS_GROUP: "predict"}],
         "hydra": PACKAGE_CONF,
         "ultralytics": None,
-        "weights": DEFAULT_CHECKPOINT,
+        # Unset means the model the last training run in this folder left behind, which the
+        # predict task resolves from the experiment this run was named after. A path built
+        # here instead is built once, at import, from the *default* experiment name — so
+        # `cy-train clearml.task_name=foo` and a bare `cy-predict` after it looked in two
+        # different directories.
+        "weights": None,
         "ground_truth": "ground_truth.csv",
         "output": PREDICTIONS_CSV,
         "auto_gpu": AutoGpuConf,
@@ -119,7 +129,7 @@ def _metrics_fields() -> dict[str, Any]:
     return {
         "predictions": PREDICTIONS_CSV,
         "ground_truth": "ground_truth.csv",
-        "output_dir": METRICS_DIR,
+        "output_dir": DASHBOARDS_DIR,
         "splits": ["train", "val", "test"],
         "calibration_split": "val",
         "evaluation": EvaluationConf,
@@ -132,8 +142,8 @@ def _report_fields() -> dict[str, Any]:
     # the pipeline Hydra prefixes it to "report/baseline" on its own.
     return {
         "hydra_defaults": ["_self_", {"baseline": "clearml"}],
-        "metrics_dir": METRICS_DIR,
-        "output_dir": "runs/reports",
+        "metrics_dir": DASHBOARDS_DIR,
+        "output_dir": REPORTS_OUTPUT_DIR,
         "splits": ["train", "val", "test"],
         "report_config_path": None,
         "baseline": None,
@@ -151,7 +161,7 @@ def _compare_fields() -> dict[str, Any]:
         "baseline_model": None,
         "candidate_model": None,
         "ground_truth": "ground_truth.csv",
-        "output_dir": "runs/comparison",
+        "output_dir": COMPARISON_OUTPUT_DIR,
         # Thresholds are calibrated on val and must be reported on images val never saw.
         "split": "test",
         "inference": InferenceConf,

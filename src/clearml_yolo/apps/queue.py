@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import re
 import select
 import sys
 import termios
@@ -33,6 +32,7 @@ from clearml_yolo.queue_view import QueueState, RunningRow, WaitingRow, render
 from clearml_yolo.run_queue import (
     NO_PID,
     UNKNOWN_HOLDER,
+    UNKNOWN_START,
     Entry,
     Lease,
     QueueConfig,
@@ -41,31 +41,7 @@ from clearml_yolo.run_queue import (
 
 KEY_HELP = "j/k select  t pin to top  J/K move down/up  u unpin  c cancel  r reclaim  q quit"
 
-# The stamp ``run_identity`` puts in every run id, which is the only record anywhere of when
-# a run began.
-RUN_ID_STAMP = re.compile(r"-(\d{8}-\d{6})-\d+$")
-RUN_ID_STAMP_FORMAT = "%Y%m%d-%H%M%S"
-
 LEASE_PREFIX = "gpu-"
-
-
-def run_started_at(run_id: str) -> float | None:
-    """When the run behind a lease began, read out of the id it gave itself.
-
-    Nothing in the queue records the moment a card was taken: a lease file is created once
-    and touched from then on, and a touch moves every timestamp the filesystem keeps, so
-    its age is the age of the last heartbeat and not of the run. The id carries the stamp
-    of the run's own start, and the queue is per machine, so that stamp and the clock read
-    here are two readings of one clock. An id from anywhere else has no elapsed time to
-    show, which is reported as such rather than guessed.
-    """
-    stamped = RUN_ID_STAMP.search(run_id)
-    if stamped is None:
-        return None
-    try:
-        return time.mktime(time.strptime(stamped.group(1), RUN_ID_STAMP_FORMAT))
-    except ValueError:
-        return None
 
 
 def _lease_files(queue: RunQueue) -> dict[int, Path]:
@@ -101,9 +77,23 @@ def _abandoned_lease(path: Path, gpu_index: int) -> Lease:
         )
 
 
-def running_rows(queue: RunQueue, now: float) -> list[RunningRow]:
-    """One row per run holding cards, however many cards it holds, expired ones marked."""
+def running_rows(queue: RunQueue) -> list[RunningRow]:
+    """One row per run holding cards, however many cards it holds, expired ones marked.
+
+    How long a run has held its cards is the lease's own ``started_at`` subtracted from the
+    queue's clock, and never from this process's: the two readings have to come from the
+    same clock the stamp was taken from, or a viewer on a workstation out of step with the
+    file server draws an elapsed time that is out with it — hours off, or negative. That
+    clock is ``RunQueue``'s, as the field's own documentation says, and reaching for it is
+    what the private access below buys. It is read after the leases so that a card claimed
+    during the redraw reads as just started rather than as unknown.
+
+    A lease claimed but not yet written, and one written before the queue recorded starts
+    at all, carry ``UNKNOWN_START``; those rows show no time rather than an age counted
+    from the epoch.
+    """
     live = {lease.gpu_index: lease for lease in queue.live_leases()}
+    moment = queue._now()  # noqa: SLF001
     rows: dict[tuple[str, bool], RunningRow] = {}
     for gpu_index, path in sorted(_lease_files(queue).items()):
         held = live.get(gpu_index)
@@ -111,11 +101,11 @@ def running_rows(queue: RunQueue, now: float) -> list[RunningRow]:
         lease = held if held is not None else _abandoned_lease(path, gpu_index)
         row = rows.get((lease.run_id, expired))
         if row is None:
-            started = run_started_at(lease.run_id)
+            unknown_start = lease.started_at == UNKNOWN_START
             row = RunningRow(
                 user=lease.user,
                 run_id=lease.run_id,
-                elapsed_seconds=None if started is None else now - started,
+                elapsed_seconds=None if unknown_start else moment - lease.started_at,
                 expired=expired,
             )
             rows[(lease.run_id, expired)] = row
@@ -131,7 +121,23 @@ def _repin(queue: RunQueue, entry: Entry, priority: int | None) -> str:
     run, it would raise a ghost: a freshly heartbeated entry belonging to nobody, sitting
     at the head of the queue if it was pinned there, with every real waiter behind it
     seeing someone else at the head until the ghost ages out.
+
+    The two checks below **narrow that window; they do not close it.** Publishing an entry
+    is a rename, which recreates the path whatever became of it in between, so a run that
+    deletes its entry after the checks and before the rename is resurrected anyway. Closing
+    it would mean writing entries in place, where a reader can catch a half-written one —
+    and an entry that will not parse is silently skipped, which makes a live waiter briefly
+    invisible and lets the run behind it jump the queue. A ghost is the better failure, and
+    it is visible and curable: it is a row nobody is behind for long, ``c`` removes it at
+    once, and left alone it ages out after ``stale_after_seconds``.
+
+    A run that already holds live leases is refused outright rather than narrowly: it is
+    running, so it cannot also be waiting, and its entry file is the one the queue is about
+    to delete.
     """
+    holders = {lease.run_id for lease in queue.live_leases()}
+    if entry.run_id in holders:
+        return f"{entry.run_id} has already taken its cards; it is running, not waiting."
     if not queue.entry_path(entry).exists():
         return f"{entry.run_id} is no longer waiting; it has started or been cancelled."
     queue.write_entry(entry.model_copy(update={"priority": priority}))
@@ -249,14 +255,21 @@ def _pressed_key(stream: TextIO, timeout: float) -> str | None:
 
 
 def watch(queue: RunQueue, *, console: Console, refresh_seconds: float) -> None:
-    """Draw the queue until the user quits, applying every key to it as it is pressed."""
+    """Draw the queue until the user quits, applying every key to it as it is pressed.
+
+    Each of the two times on screen is subtracted from the clock its stamp was taken from,
+    and they are not the same clock. A lease's start is stamped from the queue's own, which
+    ``running_rows`` reads for itself; an entry stamps ``enqueued_at`` from the wall clock
+    of the run that wrote it, so the wait below is what this process's wall clock makes of
+    it. Crossing the two would draw a wait that is out by whatever the two disagree by.
+    """
     selected = 0
     message = KEY_HELP
     live_table = Live(console=console, screen=True, auto_refresh=False)
     with single_keypresses(sys.stdin), live_table as live:
         while True:
             now = time.time()
-            running = running_rows(queue, now)
+            running = running_rows(queue)
             entries = queue.dispatch_order()
             selected = min(selected, max(len(running) + len(entries) - 1, 0))
             state = QueueState(

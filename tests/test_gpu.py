@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import re
+import socket
 import sys
 import types
 from collections.abc import Iterator
@@ -19,6 +20,7 @@ from typing import Any
 
 import pytest
 from loguru import logger
+from omegaconf import OmegaConf
 
 from clearml_yolo import gpu as gpu_module
 from clearml_yolo.gpu import (
@@ -1020,6 +1022,152 @@ def test_a_cancelled_entry_stops_the_run_instead_of_starting_it(tmp_path: Path) 
             sleep=cancel_from_the_viewer,
             queue=mine,
         )
+
+
+def test_a_request_for_more_cards_than_exist_never_reaches_the_queue(tmp_path: Path) -> None:
+    """Two cards and a request for four: the selection can never yield the fourth, the
+    queued wait reads no deadline and heartbeats its entry every poll, so the run would sit
+    at the head of the order for ever with every other run on the machine behind it."""
+    mine = queue_for(tmp_path)
+
+    with pytest.raises(RuntimeError, match=r"auto_gpu\.num_gpus=4"):
+        wait_for_devices(
+            AutoGpuConfig(num_gpus=4),
+            probe=lambda: _survey(2),
+            sleep=lambda _: None,
+            queue=mine,
+        )
+
+    assert mine.live_entries() == []
+    assert mine.live_leases() == []
+
+    with pytest.raises(RuntimeError, match=r"auto_gpu\.min_devices=4"):
+        wait_for_devices(
+            AutoGpuConfig(min_devices=4), probe=lambda: _survey(2), sleep=lambda _: None
+        )
+
+
+def named_device_queue(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> AutoGpuConfig:
+    """Put the machine's queue back for a test about a named device, in ``tmp_path``.
+
+    The ``unqueued`` fixture switches the queue off for everything else; a named device is
+    exactly the path that used to take no lease at all, so it has to be looked at with one.
+    """
+    monkeypatch.setattr(gpu_module, "queue_active", lambda _: True)
+    return AutoGpuConfig(queue=QueueConfig(dir=tmp_path / "queue"))
+
+
+def this_process_in(tmp_path: Path) -> RunQueue:
+    """The queue under the name ``_queue_for`` gives this very process.
+
+    A lease taken through it is one an earlier stage of this same run left behind, which is
+    what the pipeline hands predict and compare when it hands them training's card.
+    """
+    return RunQueue(
+        QueueConfig(dir=tmp_path / "queue"),
+        run_id=f"{socket.gethostname()}-{os.getpid()}",
+    )
+
+
+def test_a_named_device_takes_a_lease_on_exactly_the_cards_it_names(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The bypass: a run that named its cards wrote nothing anybody else could read, so a
+    queued peer saw them free through the minutes before the first CUDA allocation."""
+    config = named_device_queue(monkeypatch, tmp_path)
+
+    selection = resolve_devices(config, "0,2", batch=16)
+
+    assert selection.devices == [0, 2]
+    reader = queue_for(tmp_path, run_id="reader", user="bob", pid=4243)
+    assert [lease.gpu_index for lease in reader.live_leases()] == [0, 2]
+
+    assert resolve_inference(config, "3", batch=8).device_name == "3"
+    assert [lease.gpu_index for lease in reader.live_leases()] == [0, 2, 3]
+
+
+def test_a_named_device_a_peer_holds_is_refused_rather_than_trained_on_top_of(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """No timing window needed: the peer is already training, its lease says so, and the
+    named device used to read no lease at all before starting on the same card."""
+    config = named_device_queue(monkeypatch, tmp_path)
+    peer = queue_for(tmp_path, run_id="run-b", user="bob", pid=4243)
+    assert peer.claim_lease(0) is not None
+
+    with pytest.raises(RuntimeError, match="GPU 0 held by bob:run-b"):
+        resolve_devices(config, "0", batch=16)
+
+    with pytest.raises(RuntimeError, match="GPU 0 held by bob:run-b"):
+        resolve_inference(config, "0", batch=16)
+
+    assert [lease.run_id for lease in peer.live_leases()] == ["run-b"]
+
+
+def test_a_card_this_process_already_leased_is_not_claimed_a_second_time(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Inside the pipeline predict and compare are handed the card training chose, and the
+    lease on it is this same process's — a run that refused itself there, or queued behind
+    itself, would deadlock on a card it already owns."""
+    config = named_device_queue(monkeypatch, tmp_path)
+    training = this_process_in(tmp_path)
+    assert training.claim_lease(1) is not None
+
+    assert resolve_inference(config, "1", batch=8).device_name == "1"
+    assert resolve_devices(config, "1", batch=8).devices == [1]
+
+    assert [(lease.gpu_index, lease.run_id) for lease in training.live_leases()] == [
+        (1, training.run_id)
+    ]
+
+
+@pytest.mark.parametrize("spelling", [0, [0], OmegaConf.create([0]), "0", "cuda:0"])
+def test_every_spelling_hydra_makes_of_a_named_card_names_the_same_card(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, spelling: Any
+) -> None:
+    """`device=0` and `device=[0]` reach a stage as an int and as a list, and the list is
+    the spelling the README recommends on WSL — both used to reach a string method."""
+    config = named_device_queue(monkeypatch, tmp_path)
+
+    assert resolve_inference(config, spelling, batch=8).device_name == "0"
+    assert resolve_devices(config, spelling, batch=8).devices == [0]
+
+    reader = queue_for(tmp_path, run_id="reader", user="bob", pid=4243)
+    assert [lease.gpu_index for lease in reader.live_leases()] == [0]
+
+
+@pytest.mark.parametrize("spelling", [1, [1], "1"])
+def test_a_named_card_is_sized_by_the_policy_however_it_was_spelled(
+    patch_modules: Any, spelling: Any
+) -> None:
+    """With no batch given the card behind the name is described, which is where an int or
+    a list used to crash the run rather than have its batch sized."""
+    handles = [FakeHandle(name, 24.0, 23.0, 0) for name in ("aaa", "bbb")]
+    patch_modules(handles, ["aaa", "bbb"])
+    config = AutoGpuConfig(batch_table={"yolo11m": {"GPU1": 20}})
+
+    selection = resolve_inference(config, spelling, None, model="yolo11m.pt")
+
+    assert selection.device_name == "1"
+    assert selection.batch == 20
+    assert [gpu.torch_index for gpu in selection.gpus] == [1]
+
+
+@pytest.mark.parametrize("spelling", [1.5, ["cpu"], []])
+def test_a_device_naming_no_card_is_refused_by_name_before_a_lease_is_taken(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, spelling: Any
+) -> None:
+    """A word this cannot read is a mistake in the config, and saying so is the whole of
+    the fix — raising it from inside a string method instead cost the run a held lease,
+    because the named cards are claimed before the name is read."""
+    config = named_device_queue(monkeypatch, tmp_path)
+
+    with pytest.raises(RuntimeError, match=re.escape(f"device={spelling!r} names nothing")):
+        resolve_inference(config, spelling, batch=8)
+
+    reader = queue_for(tmp_path, run_id="reader", user="bob", pid=4243)
+    assert reader.live_leases() == []
 
 
 def test_inference_may_use_the_reserved_card(patch_modules: Any) -> None:

@@ -21,7 +21,14 @@ from clearml_yolo.inference import (
     predict_on_images,
     resolution_of,
 )
+from clearml_yolo.run_identity import LATEST_LINK_NAME, RUNS_ROOT
 from clearml_yolo.ultralytics_params import fill_unset
+
+# Where training leaves a checkpoint inside the run directory, relative to that directory.
+# The training task spells the same path out of `TRAIN_DIR` and `CHECKPOINT`, and it is a
+# sibling this module may not import, so `tests/test_configs.py` holds the two spellings in
+# step instead — a shared constant would have to live in a layer neither of them owns.
+TRAINED_CHECKPOINT = "detect/{name}/weights/best.pt"
 
 
 class PredictResult(BaseModel):
@@ -61,8 +68,33 @@ def images_to_score(ground_truth: pd.DataFrame, splits: list[str] | None) -> lis
     return [str(path) for path in rows["image_path"].unique()]
 
 
+def checkpoint_of_last_training(task_name: str) -> Path:
+    """The model the last training run of this experiment left, for a run handed no weights.
+
+    Every training run repoints ``runs/latest`` at its own directory, whether it ran as a
+    stage of a pipeline or as a standalone ``cy-train``, and writes its checkpoint under the
+    ClearML experiment's name. Resolved here, from the name this run was actually given,
+    rather than frozen into the config: built once at import it carries the *default*
+    experiment name, so ``cy-train clearml.task_name=foo`` followed by a bare ``cy-predict``
+    sent the two commands to two different directories.
+
+    Refused rather than passed on, because this path is one this project built and not one
+    anybody asked for: unnamed weights that are not there reach ultralytics as a failed
+    download of a pretrained model, naming neither the link nor the experiment it looked
+    under.
+    """
+    checkpoint = RUNS_ROOT / LATEST_LINK_NAME / TRAINED_CHECKPOINT.format(name=task_name)
+    if checkpoint.is_file():
+        return checkpoint
+    raise FileNotFoundError(
+        f"No checkpoint at {checkpoint}, where training of experiment {task_name!r} would "
+        f"have left one. Train first with `cy-train clearml.task_name={task_name}`, or name "
+        "the model outright with `weights=<path/to/best.pt>`."
+    )
+
+
 def predict(
-    weights: str | Path,
+    weights: str | Path | None,
     ground_truth: str | Path,
     output: str | Path,
     clearml: ClearMLConfig,
@@ -80,9 +112,10 @@ def predict(
     would discard the detections that calibration needs.
 
     ``weights`` may be a local checkpoint or a ClearML task id, so inference can be run
-    against a previously trained model without that model's files on hand. With
-    ``device`` left unset the run waits for a free card rather than letting ultralytics
-    grab whichever one it likes.
+    against a previously trained model without that model's files on hand. Left unset it is
+    the checkpoint the last training run of this experiment wrote, which is how the
+    standalone commands fill one run directory between them. With ``device`` left unset the
+    run waits for a free card rather than letting ultralytics grab whichever one it likes.
 
     ``imgsz`` and ``batch`` left unset are answered by the checkpoint and by ``auto_gpu``
     respectively, so neither has to be repeated from the training that produced the
@@ -90,8 +123,14 @@ def predict(
     names the architecture those weights are of, which is what a batch table is keyed by,
     and nothing is loaded from it.
     """
+    # Before the experiment is opened: a run with nothing to load must refuse rather than
+    # leave a ClearML task behind that never scored anything.
+    checkpoint = (
+        resolve_weights(weights)
+        if weights is not None
+        else checkpoint_of_last_training(clearml.task_name)
+    )
     task = init_task(clearml, stage="predict")
-    checkpoint = resolve_weights(weights)
     selection = resolve_inference(
         auto_gpu, ultralytics.get("device"), ultralytics.get("batch"), model=model, stage="predict"
     )

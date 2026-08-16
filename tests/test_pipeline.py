@@ -16,11 +16,15 @@ import clearml_yolo.configs  # noqa: F401  registers every config
 from clearml_yolo import run_identity
 from clearml_yolo.clearml_session import ClearMLConfig
 from clearml_yolo.gpu import DeviceSelection
-from clearml_yolo.run_identity import LATEST_LINK_NAME
+from clearml_yolo.run_identity import LATEST_LINK_NAME, RUNS_ROOT
 from clearml_yolo.tasks import pipeline as pipeline_module
 from clearml_yolo.tasks.compare import InferenceConfig, ModelRef, NoBaselineModelError
+from clearml_yolo.tasks.metrics import DASHBOARD_PREFIX
 from clearml_yolo.tasks.pipeline import (
+    METRICS_DIR,
+    PREDICTIONS_NAME,
     _as_dict,
+    _resolve_run_directories,
     run_compare_stage,
     run_pipeline,
     run_predict_stage,
@@ -29,6 +33,8 @@ from clearml_yolo.tasks.pipeline import (
 from clearml_yolo.tasks.train import _inference_device
 
 STAGES = ["train", "predict", "metrics", "report", "compare"]
+RUN_DIR = Path("runs/exp-here")
+PREVIOUS_RUN_DIR = Path("runs/exp-before")
 
 
 class _ReachedTrainingError(Exception):
@@ -87,11 +93,16 @@ def _stage_config(stage: str) -> dict:  # type: ignore[type-arg]
     return _as_dict(instantiate(config[stage]))
 
 
-def _stage_configs() -> dict[str, dict[str, object]]:
+def _stage_configs(
+    skip_predict: bool = False, skip_metrics: bool = False
+) -> dict[str, dict[str, object]]:
     """Compose the pipeline and build each stage's kwargs the way run_pipeline does.
 
     Composing alone proves nothing about what a stage receives: the shared values are not
     in the stage blocks at all, they are handed over by ``stage_configs``.
+
+    The skip flags are part of that: a stage this run does not run wrote nothing into this
+    run's directory, so what its consumer is handed depends on them.
     """
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
         config = compose(config_name="pipeline")
@@ -106,8 +117,10 @@ def _stage_configs() -> dict[str, dict[str, object]]:
         ground_truth=config.ground_truth,
         splits=config.splits,
         weights=config.get("weights"),
-        run_dir=Path("runs/exp-here"),
-        previous_run_dir=Path("runs/exp-before"),
+        run_dir=RUN_DIR,
+        previous_run_dir=PREVIOUS_RUN_DIR,
+        skip_predict=skip_predict,
+        skip_metrics=skip_metrics,
     )
 
 
@@ -372,6 +385,11 @@ def test_a_run_that_scores_nothing_needs_no_ground_truth(
                 f"ground_truth={missing}",
                 "skip_predict=true",
                 "skip_metrics=true",
+                # The report is skipped as well because a run that scores nothing has no
+                # dashboard of its own to report on, which is a different refusal than the
+                # one under test here — see
+                # `test_a_run_that_skips_scoring_with_no_dashboards_is_refused_up_front`.
+                "skip_report=true",
                 "skip_compare=true",
                 "clearml.enabled=false",
             ],
@@ -498,6 +516,202 @@ def test_a_run_that_skips_training_with_nothing_to_load_is_refused_up_front(
 
     with pytest.raises(FileNotFoundError, match=r"latest/detect/.*/weights/best\.pt"):
         _run_alone(["skip_train=true", "skip_predict=false", f"ground_truth={truth}"])
+
+
+def _previous_run(root: Path) -> Path:
+    """A finished run for ``latest`` to name, which is where a skipped stage's input is.
+
+    Built through ``point_latest_at`` rather than by writing a symlink here, because the
+    link is the mechanism under test on the reading side too: a run reads it before it
+    repoints it.
+    """
+    directory = (root / RUNS_ROOT / "before").resolve()
+    directory.mkdir(parents=True, exist_ok=True)
+    run_identity.point_latest_at(RUNS_ROOT, directory)
+    return directory
+
+
+def test_a_run_that_skips_inference_scores_what_the_run_before_it_wrote() -> None:
+    """This run's directory is minted empty, so the only thing that could ever write the
+    predictions inside it is the inference stage the flag just skipped — and the metrics
+    stage opens that path unguarded. Skipping inference means scoring the last run's."""
+    own = _stage_configs()["metrics"]["predictions"]
+    inherited = _stage_configs(skip_predict=True)["metrics"]["predictions"]
+
+    assert own == str(RUN_DIR / PREDICTIONS_NAME)
+    assert inherited == str(PREVIOUS_RUN_DIR / PREDICTIONS_NAME)
+
+
+def test_a_run_that_skips_scoring_reports_on_what_the_run_before_it_wrote() -> None:
+    """Same directory, same reason: pointed at this run's own empty metrics directory the
+    report finds no dashboard, and builds nothing while exiting 0."""
+    own = _stage_configs()["report"]["metrics_dir"]
+    inherited = _stage_configs(skip_metrics=True)["report"]["metrics_dir"]
+
+    assert own == str(RUN_DIR / METRICS_DIR)
+    assert inherited == str(PREVIOUS_RUN_DIR / METRICS_DIR)
+
+
+def test_a_run_that_skips_inference_with_nothing_to_score_is_refused_up_front(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Reached through ``latest``, the predictions of a folder where no run has inferred are
+    a path to nothing, and the metrics stage runs after training: left to pandas the run
+    trains for its whole duration to arrive at a bare filename that names neither the flag
+    that redirected it nor the run that was supposed to have written it."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(pipeline_module, "run_training", lambda **kwargs: pytest.fail("trained"))
+    truth = tmp_path / "ground_truth.csv"
+    truth.write_text("image_name,image_path,instance_label,split\n")
+
+    with pytest.raises(FileNotFoundError, match="skip_predict=true"):
+        _run_alone(["skip_metrics=false", f"ground_truth={truth}"])
+
+
+def test_a_run_that_skips_inference_scores_the_previous_predictions_when_they_are_there(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The case the flag exists for, and the one a refusal must leave alone.
+
+    Reaching training is the assertion, for the reason ``_ReachedTrainingError`` documents.
+    """
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(pipeline_module, "run_training", _reached_training)
+    (_previous_run(tmp_path) / PREDICTIONS_NAME).write_text("image_name,label,score\n")
+    truth = tmp_path / "ground_truth.csv"
+    truth.write_text("image_name,image_path,instance_label,split\n")
+
+    with pytest.raises(_ReachedTrainingError):
+        _run_alone(["skip_metrics=false", f"ground_truth={truth}"])
+
+
+def test_a_run_that_skips_scoring_with_no_dashboards_is_refused_up_front(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The silent one: with no dashboard to read, ``build_reports`` has no split to resolve
+    a baseline for and warns about the baseline instead — a cause that is not the one — then
+    returns an empty result and lets the run exit 0 having written no workbook."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(pipeline_module, "run_training", lambda **kwargs: pytest.fail("trained"))
+
+    with pytest.raises(FileNotFoundError, match="skip_metrics=true"):
+        _run_alone(["skip_report=false"])
+
+
+def test_a_run_that_skips_scoring_reports_the_previous_dashboards_when_they_are_there(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """One split's dashboard is enough to have something to report on, which is the same
+    bar ``discover_dashboards`` sets for the run itself."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(pipeline_module, "run_training", _reached_training)
+    dashboards = _previous_run(tmp_path) / METRICS_DIR
+    dashboards.mkdir()
+    (dashboards / f"{DASHBOARD_PREFIX}_test.xlsx").write_bytes(b"")
+
+    with pytest.raises(_ReachedTrainingError):
+        _run_alone(["skip_report=false"])
+
+
+@pytest.mark.parametrize(
+    ("run_id", "run_dir", "reads"),
+    [
+        (None, "sweeps/07", Path("sweeps/07")),
+        ("sweep-07", None, RUNS_ROOT / "sweep-07"),
+    ],
+)
+def test_a_run_told_which_run_it_is_reads_its_own_directory(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    run_id: str | None,
+    run_dir: str | None,
+    reads: Path,
+) -> None:
+    """A caller who names the directory or the id is re-entering a run that already exists
+    — rebuilding its report, rescoring the predictions it wrote earlier — so the stages it
+    skips have that same directory's own outputs to read.
+
+    Read through ``latest`` instead, those stages take whichever run finished last, and the
+    result is written into the named directory as if it were that run's own: a report built
+    from another model's dashboards, silently, because the other run's files do exist.
+    """
+    monkeypatch.chdir(tmp_path)
+    _previous_run(tmp_path)
+
+    directory, previous = _resolve_run_directories(ClearMLConfig(enabled=False), run_id, run_dir)
+
+    assert directory == (tmp_path / reads).resolve()
+    assert previous == directory
+
+
+def test_a_run_that_was_not_told_which_run_it_is_reads_the_run_before_it(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The default run's own directory is minted empty, so the only outputs a stage it
+    skips can read are the last finished run's, and ``latest`` is what names that run."""
+    monkeypatch.chdir(tmp_path)
+    previous_run = _previous_run(tmp_path)
+
+    directory, previous = _resolve_run_directories(ClearMLConfig(enabled=False), None, None)
+
+    assert previous == previous_run
+    assert directory != previous
+
+
+def test_a_named_directory_is_not_rescued_by_another_runs_predictions(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The refusal has to fire on the path the run actually scores. With the check reading
+    ``latest`` while the run reads its own directory, a peer run's CSV passes a check for a
+    file the named run never wrote."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(pipeline_module, "run_training", lambda **kwargs: pytest.fail("trained"))
+    (_previous_run(tmp_path) / PREDICTIONS_NAME).write_text("image_name,label,score\n")
+    named = tmp_path / "sweeps" / "07"
+    truth = tmp_path / "ground_truth.csv"
+    truth.write_text("image_name,image_path,instance_label,split\n")
+
+    with pytest.raises(FileNotFoundError, match=r"sweeps/07/predictions\.csv"):
+        _run_alone([f"run_dir={named}", "skip_metrics=false", f"ground_truth={truth}"])
+
+
+def test_a_named_directory_scores_the_predictions_it_holds_itself(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The case the naming exists for: re-entering a directory to score what it holds, with
+    ``latest`` pointing at some other run that has nothing to offer it."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(pipeline_module, "run_training", _reached_training)
+    _previous_run(tmp_path)
+    named = tmp_path / "sweeps" / "07"
+    named.mkdir(parents=True)
+    (named / PREDICTIONS_NAME).write_text("image_name,label,score\n")
+    truth = tmp_path / "ground_truth.csv"
+    truth.write_text("image_name,image_path,instance_label,split\n")
+
+    with pytest.raises(_ReachedTrainingError):
+        _run_alone([f"run_dir={named}", "skip_metrics=false", f"ground_truth={truth}"])
+
+
+def test_a_refused_run_leaves_latest_naming_the_run_before_it(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A run that refuses writes nothing, so it must not have moved the link either: every
+    default that reads what the last run produced — the checkpoint, the predictions, the
+    dashboards — follows ``latest``, and a refusing run that repointed it at its own empty
+    directory would take the next run down with it."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(pipeline_module, "run_training", lambda **kwargs: pytest.fail("trained"))
+    previous = _previous_run(tmp_path)
+    truth = tmp_path / "ground_truth.csv"
+    truth.write_text("image_name,image_path,instance_label,split\n")
+
+    with pytest.raises(FileNotFoundError, match="skip_predict=true"):
+        _run_alone(["skip_metrics=false", f"ground_truth={truth}"])
+
+    root = tmp_path / RUNS_ROOT
+    assert (root / LATEST_LINK_NAME).resolve() == previous
+    assert [entry.name for entry in root.iterdir() if not entry.is_symlink()] == [previous.name]
 
 
 def test_a_run_without_calibrated_thresholds_skips_rather_than_fails(

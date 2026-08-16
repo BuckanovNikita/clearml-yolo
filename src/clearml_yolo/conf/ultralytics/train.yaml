@@ -27,7 +27,7 @@ save_period: -1  # (int) save checkpoint every N epochs; disabled if < 1
 cache: false  # (bool | str) cache images in RAM (True/'ram') or on 'disk' to speed dataloading; False disables
 device: null  # null -> auto_gpu picks the cards
 workers: 8  # (int) dataloader workers (per RANK if DDP)
-project: runs/detect  # (str, optional) project name for results root
+project: null  # null -> runs/<run id>/detect, a directory only this run writes into
 name: null  # null -> the ClearML task name, so the run directory matches the experiment
 exist_ok: true  # (bool) overwrite existing 'project/name' if True
 pretrained: true  # (bool | str) use pretrained weights (bool) or load weights from path (str)

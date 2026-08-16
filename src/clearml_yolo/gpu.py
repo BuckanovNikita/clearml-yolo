@@ -12,7 +12,9 @@ the wait loop holds the run at the door until enough cards are free, and a lease
 taken through :mod:`clearml_yolo.run_queue` is what closes the window between the two.
 With the queue in front of the cards the wait also becomes a queue: entries are read
 before the survey, only the head of the order may claim, and a run that has taken its
-place in line waits for its turn however long that is.
+place in line waits for its turn however long that is. A named ``device`` is exempt from
+the survey and not from the leases: it claims exactly the cards it names, and refuses the
+ones a peer's lease covers rather than starting on top of them.
 
 The batch a run lands on comes from the first of five sources that can answer, and which
 one did is always logged, because a number arrived at silently is a number nobody can
@@ -35,7 +37,7 @@ from contextlib import ExitStack, contextmanager
 from itertools import takewhile
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Any
+from typing import Any, NoReturn
 
 from loguru import logger
 from pydantic import BaseModel, Field, field_validator
@@ -630,6 +632,26 @@ def _surveyed(config: AutoGpuConfig, probe: Callable[[], GpuSurvey]) -> GpuSurve
     )
 
 
+def _refuse_more_cards_than_the_machine_has(config: AutoGpuConfig, survey: GpuSurvey) -> None:
+    """Reject a request no wait could satisfy, before this run takes a place in line.
+
+    Selection can only ever yield cards the machine has, so a run asking for more of them
+    than exist never leaves the wait. Queued, that is not merely its own hour lost: the
+    queued wait reads no deadline and the entry is heartbeated every poll, so it stays at
+    the head of the order for ever and every other run on the machine waits behind it.
+    """
+    needed = _requested_devices(config)
+    if needed <= len(survey.gpus):
+        return
+    key = "auto_gpu.min_devices" if config.num_gpus is None else "auto_gpu.num_gpus"
+    raise RuntimeError(
+        f"{key}={needed} asks for more GPU(s) than this machine has ({len(survey.gpus)}), "
+        f"so no wait can ever satisfy it and every run queued behind this one would wait "
+        f"with it. Lower {key} to at most {len(survey.gpus)}, or run this where there are "
+        f"that many cards."
+    )
+
+
 def _wait_alone(
     config: AutoGpuConfig,
     *,
@@ -648,6 +670,7 @@ def _wait_alone(
         survey = _surveyed(config, probe)
         if survey is None:
             return []
+        _refuse_more_cards_than_the_machine_has(config, survey)
 
         needed = _requested_devices(config)
         selectable = _selectable(survey, config, wanted=needed)
@@ -765,6 +788,7 @@ def _wait_in_turn(
             survey = _surveyed(config, probe)
             if survey is None:
                 return []
+            _refuse_more_cards_than_the_machine_has(config, survey)
 
             mine = frozenset(
                 lease.gpu_index for lease in leases if lease.run_id == queue.run_id
@@ -1021,41 +1045,46 @@ def select_devices(
     )
 
 
-def _card_behind(device: str) -> list[GpuInfo]:
-    """Describe the card a device string names, without waiting for it.
-
-    A stage that follows training in one process is handed training's own card rather
-    than surveying for one, because this process still holds that card's memory and a
-    survey would wait for a device the run already owns. The card still has to be
-    described — otherwise the whole batch policy stops at the one path the pipeline
-    always takes, and a table written for this hardware would go unread there.
-    """
-    index = device.removeprefix("cuda:")
-    if not index.isdigit():
-        return []
-    return [gpu for gpu in probe_gpus().gpus if gpu.torch_index == int(index)]
-
-
-def _named_devices(device: list[int] | int | str) -> list[int] | str:
+def _named_devices(device: object) -> list[int] | str:
     """Spell a requested device the way ultralytics and torch both take it.
 
-    ``"0"`` and ``"0,1"`` are how a device reaches this from the command line, and
-    ``[0, 1]`` is how ultralytics wants a multi-GPU run named, so the two are the same
-    request written differently and have to resolve to one thing. Anything that is not a
-    list of CUDA ordinals — ``"cpu"``, ``"mps"`` — is passed through as it stands.
+    ``"0"`` and ``"0,1"`` are how a device reaches this from a config file, ``0`` and
+    ``[0, 1]`` are what hydra makes of the same words written unquoted on the command
+    line, and a list is how ultralytics wants a multi-GPU run named — one request written
+    four ways, which have to resolve to one thing. A string that is not a list of CUDA
+    ordinals — ``"cpu"``, ``"mps"`` — is ultralytics' to interpret and passes through as
+    it stands. Anything else names no card anybody here can find, and is refused by name
+    rather than carried on until it surfaces as an attribute error from inside a string
+    method, halfway through a run that has already taken leases.
+
+    A sequence rather than a list, because the value arrives through hydra and an
+    ``omegaconf`` container is a sequence that is not a ``list``.
     """
-    if isinstance(device, int):
-        return [device]
-    if isinstance(device, list):
+    parts = device.split(",") if isinstance(device, str) else device
+    if isinstance(parts, int):
+        parts = [parts]
+    if isinstance(parts, Sequence) and not isinstance(parts, str | bytes):
+        ordinals = [str(part).strip().removeprefix("cuda:") for part in parts]
+        if ordinals and all(ordinal.isdigit() for ordinal in ordinals):
+            return [int(ordinal) for ordinal in ordinals]
+    if isinstance(device, str):
         return device
-    parts = [part.strip().removeprefix("cuda:") for part in device.split(",")]
-    if parts and all(part.isdigit() for part in parts):
-        return [int(part) for part in parts]
-    return device
+    raise RuntimeError(
+        f"device={device!r} names nothing this run can resolve to a card. Name a CUDA "
+        f'ordinal (0), a list of them ([0, 1]), either of those as a string ("0", "0,1", '
+        f'"cuda:0"), or "cpu"; leave it unset to be given free cards in turn.'
+    )
 
 
 def _cards_behind(devices: list[int] | str) -> list[GpuInfo]:
-    """Describe every card a requested device list names, without waiting for any."""
+    """Describe every card a requested device list names, without waiting for any.
+
+    A stage that follows training in one process is handed training's own card rather
+    than surveying for one, because this process still holds that card's memory and a
+    survey would wait for a device the run already owns. The cards still have to be
+    described — otherwise the whole batch policy stops at the one path the pipeline
+    always takes, and a table written for this hardware would go unread there.
+    """
     if not isinstance(devices, list):
         return []
     by_index = {gpu.torch_index: gpu for gpu in probe_gpus().gpus}
@@ -1063,9 +1092,81 @@ def _cards_behind(devices: list[int] | str) -> list[GpuInfo]:
     return found if len(found) == len(devices) else []
 
 
+def _peer_leases_on(
+    leases: Sequence[Lease], devices: Sequence[int], own_run_id: str
+) -> list[Lease]:
+    """The leases some run other than this one holds on the cards this run named."""
+    named = set(devices)
+    return [
+        lease for lease in leases if lease.gpu_index in named and lease.run_id != own_run_id
+    ]
+
+
+def _refuse_the_named_cards(devices: Sequence[int], held: Sequence[Lease]) -> NoReturn:
+    """Say which named card is not this run's to take, and how to get past it.
+
+    Refusing rather than waiting, because a named device is a request for those cards and
+    no others: there is no card the queue could offer instead, and nothing to queue behind
+    but one particular run. ``held`` is empty when the claim was lost in the moment between
+    reading the leases and taking them, so there is no holder to name yet.
+    """
+    holders = (
+        ", ".join(
+            f"GPU {lease.gpu_index} held by {lease.user}:{lease.run_id} (pid {lease.pid})"
+            for lease in held
+        )
+        or "another run took them between reading the leases and claiming them"
+    )
+    raise RuntimeError(
+        f"device={list(devices)} names GPU(s) this machine's queue says are taken: "
+        f"{holders}. Leave the device unset to be given free cards in turn, wait for that "
+        f"run to finish (`cy-queue` lists it), or set auto_gpu.queue.enabled=false to "
+        f"share the card deliberately."
+    )
+
+
+def _lease_the_named_cards(config: AutoGpuConfig, devices: list[int] | str) -> None:
+    """Hold a lease on every card this run named, or refuse because a peer holds one.
+
+    A named device skips the availability survey deliberately — that is the escape hatch
+    from the WSL blanket process count — but it used to skip the leases with it, and those
+    are two different things. Without a lease a run named onto a card trains straight on
+    top of the peer already training there, and writes nothing that would stop a queued run
+    taking the same card during the minutes before its first CUDA allocation. What NVML
+    says about the card is still nobody's business here: this arbitrates between our own
+    runs and nothing more.
+
+    Exactly the named indices are claimed, never a substitute and never re-ordered. Leases
+    this process already holds are left as they are, because that is the pipeline's own
+    later stage arriving on the card training chose, and re-claiming would refuse itself.
+    """
+    if not isinstance(devices, list):
+        return
+    queue = _queue_for(config)
+    if queue is None:
+        return
+    leases = queue.live_leases()
+    held_elsewhere = _peer_leases_on(leases, devices, queue.run_id)
+    if held_elsewhere:
+        _refuse_the_named_cards(devices, held_elsewhere)
+
+    already_mine = {lease.gpu_index for lease in leases if lease.run_id == queue.run_id}
+    wanted = [index for index in devices if index not in already_mine]
+    if not wanted:
+        logger.info("Reusing the lease(s) this run already holds on GPU(s) {}", devices)
+        return
+    taken = queue.claim_leases(wanted)
+    if not taken:
+        _refuse_the_named_cards(
+            devices, _peer_leases_on(queue.live_leases(), wanted, queue.run_id)
+        )
+    _LEASE_HOLD.enter_context(queue.holding([lease.gpu_index for lease in taken]))
+    logger.info("Holding the named GPU(s) {} against the other runs on this machine", wanted)
+
+
 def resolve_inference(
     auto_gpu: AutoGpuConfig | None,
-    device: str | None,
+    device: list[int] | int | str | None,
     batch: int | None,
     model: str | None = None,
     stage: str = "predict",
@@ -1081,9 +1182,19 @@ def resolve_inference(
     :func:`resolve_devices` follows for training. With no policy to consult, or a card that
     cannot be described, there is nothing to size a batch against, so a batch that was not
     given falls back to the configured anchor rather than being guessed at.
+
+    A named card is leased before it is inferred on, the same way :func:`resolve_devices`
+    leases one — inside the pipeline that card is training's own, and the lease this
+    process already holds on it is recognised rather than claimed a second time. Which
+    card was named is read through :func:`_named_devices` here as it is there, so that
+    every spelling hydra can make of the same card means the same card in both, and one
+    it cannot read is refused before any lease is taken rather than after.
     """
+    named_device = None if device is None else _named_devices(device)
+    if auto_gpu is not None and named_device is not None:
+        _lease_the_named_cards(auto_gpu, named_device)
     if auto_gpu is not None and auto_gpu.enabled:
-        if device is None:
+        if named_device is None:
             single = auto_gpu.model_copy(
                 update={
                     "reserve_gpus": 0,
@@ -1094,18 +1205,18 @@ def resolve_inference(
                 }
             )
             return select_devices(single, model=model, stage=stage, batch=batch)
-        named = _card_behind(device) if batch is None else []
-        if named:
-            per_gpu = select_batch_per_gpu(auto_gpu, model, named, stage)
-            logger.info("Inferring on GPU {} at batch {}", device, per_gpu)
+        cards = _cards_behind(named_device) if batch is None else []
+        if cards:
+            per_gpu = select_batch_per_gpu(auto_gpu, model, cards, stage)
+            logger.info("Inferring on GPU {} at batch {}", named_device, per_gpu)
             return DeviceSelection(
-                devices=device, batch=per_gpu, batch_per_gpu=per_gpu, gpus=named
+                devices=named_device, batch=per_gpu, batch_per_gpu=per_gpu, gpus=cards
             )
 
     if batch is None:
         batch = DEFAULT_BATCH if auto_gpu is None else auto_gpu.batch_per_gpu
         logger.info("No GPU survey to size a batch against; inferring at batch {}", batch)
-    return DeviceSelection(devices=device, batch=batch, batch_per_gpu=batch)
+    return DeviceSelection(devices=named_device, batch=batch, batch_per_gpu=batch)
 
 
 def resolve_devices(
@@ -1122,7 +1233,9 @@ def resolve_devices(
     cards gets those cards — ``auto_gpu`` then only sizes the batch for them, which is
     what :func:`resolve_inference` has always done for the predict stage. Overriding a
     named device instead meant one word in the config file meant two different things
-    depending on which stage read it.
+    depending on which stage read it. Getting those cards is not the same as taking them
+    from a peer: the named indices are leased before anything runs on them, and a card a
+    peer's live lease covers is refused rather than trained on top of.
 
     Only an unset device is surveyed for, and only an unset batch is derived. With
     ``auto_gpu`` off and no device named there is nothing to survey, so the run falls back
@@ -1135,6 +1248,7 @@ def resolve_devices(
         return _sized_by_anchor(auto_gpu, "cpu", batch)
 
     devices = _named_devices(device)
+    _lease_the_named_cards(auto_gpu, devices)
     named = _cards_behind(devices) if batch is None and auto_gpu.enabled else []
     if not named:
         return _sized_by_anchor(auto_gpu, devices, batch)

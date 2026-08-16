@@ -117,20 +117,73 @@ def test_no_temporary_link_is_left_beside_the_run_dirs(tmp_path: Path) -> None:
     assert sorted(entry.name for entry in tmp_path.iterdir()) == [LATEST_LINK_NAME, "run-a"]
 
 
+DISPLACED_NAME = f"{LATEST_LINK_NAME}-displaced-{HOST}-{PID}"
+
+
 @pytest.mark.usefixtures("fixed_identity")
-def test_a_regular_file_named_latest_is_left_untouched_and_reported(tmp_path: Path) -> None:
-    """Renaming a symlink over a plain file succeeds on Linux, so only an explicit refusal
-    keeps a run from destroying whatever a user put at that name."""
+def test_a_regular_file_named_latest_is_moved_aside_rather_than_written_over(
+    tmp_path: Path,
+) -> None:
+    """Renaming a symlink over a plain file succeeds on Linux, so whatever a user put at
+    that name survives only because the run moves it instead of replacing it."""
     occupied = tmp_path / LATEST_LINK_NAME
     occupied.write_text("mine", encoding="utf-8")
     run_dir = tmp_path / "run-a"
     run_dir.mkdir()
 
+    point_latest_at(tmp_path, run_dir)
+
+    assert (tmp_path / DISPLACED_NAME).read_text(encoding="utf-8") == "mine"
+    assert (tmp_path / LATEST_LINK_NAME).resolve() == run_dir.resolve()
+
+
+@pytest.mark.usefixtures("fixed_identity")
+def test_a_directory_left_at_latest_is_moved_aside_so_the_link_can_be_taken_back(
+    tmp_path: Path,
+) -> None:
+    """A standalone stage in a fresh workspace writes *through* the name and so creates it
+    as an ordinary directory; leaving that alone would freeze the link for every run after."""
+    (tmp_path / LATEST_LINK_NAME).mkdir()
+    run_dir = tmp_path / "run-a"
+    run_dir.mkdir()
+
+    point_latest_at(tmp_path, run_dir)
+
+    assert (tmp_path / LATEST_LINK_NAME).is_symlink()
+    assert (tmp_path / LATEST_LINK_NAME).resolve() == run_dir.resolve()
+    assert (tmp_path / DISPLACED_NAME).is_dir()
+
+
+@pytest.mark.usefixtures("fixed_identity")
+def test_a_stage_output_under_latest_survives_the_move_intact(tmp_path: Path) -> None:
+    """The directory that gets moved is one a stage already wrote into, so the move has to
+    carry what it holds rather than merely free the name."""
+    written = tmp_path / LATEST_LINK_NAME / "reports" / "report.html"
+    written.parent.mkdir(parents=True)
+    written.write_text("mine", encoding="utf-8")
+    run_dir = tmp_path / "run-a"
+    run_dir.mkdir()
+
+    point_latest_at(tmp_path, run_dir)
+
+    assert (tmp_path / DISPLACED_NAME / "reports" / "report.html").read_text(
+        encoding="utf-8"
+    ) == "mine"
+
+
+@pytest.mark.usefixtures("fixed_identity")
+def test_moving_a_directory_off_latest_reports_what_moved_and_where(tmp_path: Path) -> None:
+    """Nothing else tells the user their outputs are now under another name."""
+    (tmp_path / LATEST_LINK_NAME).mkdir()
+    run_dir = tmp_path / "run-a"
+    run_dir.mkdir()
+
     warnings = _warnings_from(lambda: point_latest_at(tmp_path, run_dir))
 
-    assert not occupied.is_symlink()
-    assert occupied.read_text(encoding="utf-8") == "mine"
-    assert any(LATEST_LINK_NAME in warning for warning in warnings)
+    assert any(
+        str(tmp_path / LATEST_LINK_NAME) in warning and str(tmp_path / DISPLACED_NAME) in warning
+        for warning in warnings
+    )
 
 
 @pytest.mark.usefixtures("fixed_identity")

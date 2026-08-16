@@ -15,6 +15,7 @@ from clearml_yolo.gpu import AutoGpuConfig
 from clearml_yolo.inference import ScoredResolution
 from clearml_yolo.run_identity import (
     LATEST_LINK_NAME,
+    RUNS_ROOT,
     point_latest_at,
     resolve_run_dir,
     resolve_run_id,
@@ -30,7 +31,7 @@ from clearml_yolo.tasks.metrics import compute_metrics
 from clearml_yolo.tasks.predict import PredictResult
 from clearml_yolo.tasks.predict import predict as run_prediction
 from clearml_yolo.tasks.report import BaselineConfig, build_reports, discover_dashboards
-from clearml_yolo.tasks.train import CHECKPOINT
+from clearml_yolo.tasks.train import CHECKPOINT, TRAIN_DIR
 from clearml_yolo.tasks.train import train as run_training
 
 # Hydra's own key for a config's defaults list, not a setting any task takes. Hydra
@@ -41,13 +42,13 @@ from clearml_yolo.tasks.train import train as run_training
 # rather than trusted to have been consumed.
 COMPOSITION_ONLY_KEYS = frozenset({"defaults"})
 
-# Every path a run writes hangs off one directory of its own, under this root. Two runs
+# Every path a run writes hangs off one directory of its own, under `RUNS_ROOT`. Two runs
 # started in the same folder used to share `runs/detect/<task_name>` with ultralytics'
 # `exist_ok` set, which is not a merge but a deletion: the DDP launcher clears the save
-# directory before spawning its children. The leaf names are what each directory was
-# called when they all sat directly under the root.
-RUNS_ROOT = Path("runs")
-TRAIN_DIR = "detect"
+# directory before spawning its children. The leaf names below are what each directory was
+# called when they all sat directly under the root. The root itself and training's own leaf
+# are named where the code that creates them lives — a standalone `cy-train` names a run
+# directory too, so neither of those two can belong to the pipeline alone.
 PREDICTIONS_NAME = "predictions.csv"
 METRICS_DIR = "metrics"
 REPORTS_DIR = "reports"
@@ -128,6 +129,8 @@ def stage_configs(
     weights: str | Path | None,
     run_dir: Path,
     previous_run_dir: Path,
+    skip_predict: bool = False,
+    skip_metrics: bool = False,
 ) -> dict[str, dict[str, Any]]:
     """Give every stage its own block plus everything the run decided for it.
 
@@ -140,8 +143,14 @@ def stage_configs(
     Every path a stage writes is one of those values, because none of them is really a
     stage's own choice: they are one directory, named after the run, and a stage allowed
     to leave it would put this run's output back where a peer run overwrites it.
-    ``previous_run_dir`` is the one path pointing outside, and it is read rather than
-    written: a run that skips training loads the checkpoint the run before it produced.
+    ``previous_run_dir`` is the one directory this run reads rather than writes: a stage
+    this run skips produced nothing this run could read, so its consumer is pointed at the
+    run that did produce it — the checkpoint a skipped training stage would have written,
+    the predictions a skipped inference stage would have written, the dashboards a skipped
+    metrics stage would have written. Which run that is, ``_resolve_run_directories``
+    decides: the run before this one, or the earlier run of this very directory when the
+    caller named the directory. Pointing a consumer at a path only the stage this run just
+    skipped could have written is what the skip flags exist to do without.
     """
     shared_splits = list(splits)
     train_cfg = _as_dict(train) | {"clearml": clearml, "auto_gpu": auto_gpu}
@@ -159,8 +168,8 @@ def stage_configs(
         # disagree with the weights it describes.
         "model": train_params["model"],
         # Training overwrites this with the checkpoint it produced. The template is what a
-        # run with skip_train has instead: where training last wrote. That is the previous
-        # run's directory, never this one's, which is empty until this run trains. `name`
+        # run with skip_train has instead: where training last wrote, which is the directory
+        # this run reads from and never the one a default run mints empty for itself. `name`
         # is null in the config and resolved to the experiment's name by the train task, so
         # it is resolved the same way here rather than read back out of the block.
         "weights": weights
@@ -172,13 +181,17 @@ def stage_configs(
         "clearml": clearml,
         "ground_truth": ground_truth,
         "splits": shared_splits,
-        "predictions": predict_cfg["output"],
+        "predictions": (
+            str(previous_run_dir / PREDICTIONS_NAME) if skip_predict else predict_cfg["output"]
+        ),
         "output_dir": str(run_dir / METRICS_DIR),
     }
     report_cfg = _as_dict(report) | {
         "clearml": clearml,
         "splits": shared_splits,
-        "metrics_dir": metrics_cfg["output_dir"],
+        "metrics_dir": (
+            str(previous_run_dir / METRICS_DIR) if skip_metrics else metrics_cfg["output_dir"]
+        ),
         "output_dir": str(run_dir / REPORTS_DIR),
     }
     compare_cfg = _as_dict(compare)
@@ -346,8 +359,9 @@ def _check_checkpoint(weights: str | Path, readers: list[str]) -> None:
     """Reject a run that skips training with no checkpoint to skip it with.
 
     A run writes into a directory of its own now, so the model a previous run trained is
-    reached through the ``latest`` link rather than through a fixed path — and in a folder
-    no run has finished in yet, that link is not there. Without this the run reaches
+    reached through the directory this run reads from rather than through a fixed path —
+    and in a folder no run has finished in yet, there is nothing there. Without this the run
+    reaches
     ultralytics with a path to nothing, which reports it as a failed download of a
     pretrained model and names neither the link nor the key that would have set it.
     """
@@ -357,6 +371,42 @@ def _check_checkpoint(weights: str | Path, readers: list[str]) -> None:
         f"skip_train=true, but {weights} does not exist and the {', '.join(readers)} "
         f"stage(s) load it. Name the checkpoint outright with weights=<path/to/best.pt>, "
         f"or drop skip_train and let this run train its own."
+    )
+
+
+def _check_predictions(predictions: str | Path) -> None:
+    """Reject a run that skips inference with no predictions for the metrics stage to score.
+
+    The CSV comes from the directory this run reads from — the run before this one, or this
+    run's own when the caller named it — and in a folder where nothing has inferred yet
+    there is no such file. Left to the metrics stage it surfaces as a bare
+    ``FileNotFoundError`` out of pandas — after training, in the case that still trains —
+    naming neither the flag that redirected the path nor the run that was supposed to have
+    written it.
+    """
+    if Path(predictions).is_file():
+        return
+    raise FileNotFoundError(
+        f"skip_predict=true, but {predictions} does not exist and the metrics stage scores "
+        f"it. Drop skip_predict and let this run infer its own, or name the directory of a "
+        f"run that inferred with run_dir=<path>."
+    )
+
+
+def _check_dashboards(metrics_dir: str | Path, splits: list[str]) -> None:
+    """Reject a run that skips scoring with no dashboards for the report stage to read.
+
+    Standalone ``report`` refuses this outright; the pipeline's inline path degraded quietly
+    instead, because ``build_reports`` takes the empty mapping, has no split left to resolve
+    a baseline for, and warns about the baseline — naming a cause that is not the one. The
+    run then exits 0 having written no workbook at all, which is worse than failing.
+    """
+    if discover_dashboards(metrics_dir, splits):
+        return
+    raise FileNotFoundError(
+        f"skip_metrics=true, but {metrics_dir} holds no dashboard workbook for any of "
+        f"{splits} and the report stage reads them. Drop skip_metrics and let this run score "
+        f"its own, or name the directory of a run that scored with run_dir=<path>."
     )
 
 
@@ -404,6 +454,10 @@ def _preflight(
             configs["predict"]["weights"],
             [stage for stage in ("predict", "compare") if not skipped[stage]],
         )
+    if skipped["predict"] and not skipped["metrics"]:
+        _check_predictions(metrics_cfg["predictions"])
+    if skipped["metrics"] and not skipped["report"]:
+        _check_dashboards(configs["report"]["metrics_dir"], list(configs["report"]["splits"]))
     if not skipped["compare"]:
         _check_comparison_baseline(compare_cfg["baseline_model"], clearml)
 
@@ -411,16 +465,28 @@ def _preflight(
 def _resolve_run_directories(
     clearml: ClearMLConfig, run_id: str | None, run_dir: str | Path | None
 ) -> tuple[Path, Path]:
-    """Name this run, and read where the previous one left its model.
+    """Name this run, and name the directory a stage it skips reads its input from.
 
-    The two come from here together because their order is the whole point: ``latest``
-    still names the run before this one until this run repoints it, and that is where a
-    run with ``skip_train`` and no ``weights`` finds a checkpoint. Resolved once, so the
-    path survives the link moving on.
+    The two come from here together because reading depends on naming. A ``run_id`` or a
+    ``run_dir`` from the caller says *which run this is*: the caller is re-entering a
+    directory that is already this run's own — rebuilding its report, scoring predictions
+    it wrote earlier — so a stage it skips reads what that same directory holds. Reading
+    ``latest`` there would score whichever run happened to finish last and write the answer
+    into the named directory as if it were that run's own.
+
+    ``latest`` answers for a run that was not told which directory it belongs to, and that
+    is the case it is right for: there the run's own directory is minted empty, so the only
+    input a skipped stage can have is the run before this one's. It is resolved here, before
+    this run repoints the link, so the path survives the move.
+
+    The condition follows what the two resolvers themselves do with these arguments, or the
+    directory read could disagree with the directory chosen: ``resolve_run_id`` ignores an
+    empty id, ``resolve_run_dir`` honours any path at all.
     """
     identity = resolve_run_id(clearml.task_name, run_id, datetime.now(tz=UTC))
     directory = resolve_run_dir(RUNS_ROOT, identity, Path(run_dir) if run_dir is not None else None)
-    previous = (RUNS_ROOT / LATEST_LINK_NAME).resolve()
+    named_by_the_caller = bool(run_id) or run_dir is not None
+    previous = directory if named_by_the_caller else (RUNS_ROOT / LATEST_LINK_NAME).resolve()
     logger.info("Run {} writes everything it produces to {}", identity, directory)
     return directory, previous
 
@@ -467,6 +533,8 @@ def run_pipeline(
         weights=weights,
         run_dir=directory,
         previous_run_dir=previous,
+        skip_predict=skip_predict,
+        skip_metrics=skip_metrics,
     )
     train_cfg = configs["train"]
     predict_cfg = configs["predict"]
@@ -483,6 +551,7 @@ def run_pipeline(
             "train": skip_train,
             "predict": skip_predict,
             "metrics": skip_metrics,
+            "report": skip_report,
             "compare": skip_compare,
         },
     )

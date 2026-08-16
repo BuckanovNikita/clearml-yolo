@@ -14,12 +14,13 @@ from hydra_zen import instantiate, store
 import clearml_yolo.configs  # noqa: F401  registers every config
 from clearml_yolo.clearml_session import ClearMLConfig
 from clearml_yolo.gpu import AutoGpuConfig
+from clearml_yolo.run_identity import LATEST_LINK_NAME, RUNS_ROOT
 from clearml_yolo.tasks.compare import InferenceConfig, ModelRef, compare
 from clearml_yolo.tasks.metrics import compute_metrics
 from clearml_yolo.tasks.pipeline import PIPELINE_FILLED_KEYS, stage_configs
-from clearml_yolo.tasks.predict import predict
+from clearml_yolo.tasks.predict import checkpoint_of_last_training, predict
 from clearml_yolo.tasks.report import report
-from clearml_yolo.tasks.train import train
+from clearml_yolo.tasks.train import CHECKPOINT, TRAIN_DIR, train
 
 STAGES = ["train", "predict", "metrics", "report"]
 ALL_STAGES = [*STAGES, "compare"]
@@ -369,6 +370,90 @@ def test_the_standalone_comparison_still_names_both_sides() -> None:
 
     assert config.candidate_model is not None
     assert config.baseline_model is not None
+
+
+def _standalone(app: str) -> Any:
+    """One app's config exactly as its console script composes it, nothing overridden."""
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        return compose(config_name=app)
+
+
+def test_a_standalone_training_run_names_a_directory_of_its_own() -> None:
+    """`cy-train` is a run, not a stage of one, so nothing hands it a directory to write
+    into and unset is what makes the train task name one after this experiment and this
+    process. A path written here instead is shared by every `cy-train` started in the
+    folder, and with ultralytics' `exist_ok` set that is not a merge but a deletion: the
+    DDP launcher clears the save directory before it spawns its children."""
+    assert _standalone("train").ultralytics.project is None
+
+
+def test_every_standalone_app_works_inside_the_run_training_named() -> None:
+    """`cy-train` then `cy-predict` is the documented standalone flow, and each command
+    after the first has to find the run the one before it wrote into. `runs/latest` is
+    that run — training repoints it — so the whole chain is anchored to one link instead
+    of to fixed paths that belong to no run and that the next `cy-train` overwrites.
+
+    Inference is the one of them that reads no path at all: the checkpoint sits under the
+    experiment's own name, which a config built at import can only guess at, so it is left
+    unset here and resolved by the task from the name this run was given."""
+    assert _standalone("predict").weights is None
+    assert _standalone("metrics").predictions == "runs/latest/predictions.csv"
+    assert _standalone("report").metrics_dir == "runs/latest/metrics"
+
+
+@pytest.mark.parametrize("task_name", ["yolo-run", "kitti-candidate"])
+def test_a_standalone_prediction_loads_what_training_wrote_under_the_same_experiment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, task_name: str
+) -> None:
+    """Training writes into the experiment's name, so a checkpoint frozen into the config at
+    import carries the *default* experiment and no other: `cy-train clearml.task_name=foo`
+    repointed `latest` at a directory a bare `cy-predict` then never looked in.
+
+    Built here from the training task's own constants rather than from a second copy of the
+    path, because the predict task may not import that sibling and spells the tail of it out
+    itself — which is exactly the drift this pins."""
+    monkeypatch.chdir(tmp_path)
+    expected = Path(
+        CHECKPOINT.format(project=f"{RUNS_ROOT}/{LATEST_LINK_NAME}/{TRAIN_DIR}", name=task_name)
+    )
+    expected.parent.mkdir(parents=True)
+    expected.touch()
+
+    assert checkpoint_of_last_training(task_name) == expected
+
+
+def test_a_standalone_prediction_refuses_when_no_training_has_happened_here(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """This path is one the project built, not one anybody asked for, so passing it on
+    reaches ultralytics as a failed download of a pretrained model — naming neither the link
+    it followed nor the experiment it looked under."""
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(FileNotFoundError, match=r"cy-train clearml\.task_name=yolo-run"):
+        checkpoint_of_last_training("yolo-run")
+
+
+def test_each_standalone_app_reads_the_path_the_previous_one_writes() -> None:
+    """Producer and consumer are one path named once, or `cy-metrics` scores a CSV
+    `cy-predict` never wrote to."""
+    assert _standalone("predict").output == _standalone("metrics").predictions
+    assert _standalone("metrics").output_dir == _standalone("report").metrics_dir
+
+
+def test_no_standalone_app_writes_outside_the_run_directory() -> None:
+    """The same rule the pipeline's stages follow: one run, one directory. A standalone
+    app is handed no run directory, so it writes into the one `runs/latest` names — and
+    a fixed `runs/predictions.csv` beside it would belong to no run at all."""
+    written = {
+        "predict": _standalone("predict").output,
+        "metrics": _standalone("metrics").output_dir,
+        "report": _standalone("report").output_dir,
+        "compare": _standalone("compare").output_dir,
+    }
+
+    for stage, path in written.items():
+        assert Path(str(path)).is_relative_to("runs/latest"), f"{stage} writes to {path}"
 
 
 @pytest.mark.parametrize("source", ["clearml", "local", "none"])

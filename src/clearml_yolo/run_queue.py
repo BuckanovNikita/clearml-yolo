@@ -19,6 +19,7 @@ the head of the queue forever and the rotation would keep skipping to a user who
 The tree, one per machine::
 
     <queue_dir>/leases/gpu-<index>          one file per card; the file IS the lock
+    <queue_dir>/leases/.reclaim-gpu-<index>-<inode>-<mtime>  a reclaim of that exact lease
     <queue_dir>/entries/<seq>-<run_id>.json one file per waiting run
     <queue_dir>/served/<user>               mtime = when that user last started a run
     <queue_dir>/seq/<n>                     one file per number handed out
@@ -34,6 +35,7 @@ import threading
 import time
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
+from enum import StrEnum
 from itertools import zip_longest
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -71,6 +73,15 @@ _TASK_ID_AT_IMPORT = os.environ.get(AGENT_TASK_ID_ENV_VAR)
 
 # A user nobody has ever served sorts ahead of one who ran a moment ago.
 NEVER_SERVED = float("-inf")
+
+# The name of a reclaim in progress starts with this and then names the exact lease file it
+# is replacing, so no reader of ``leases/`` can take one for a held card.
+RECLAIM_MARKER_PREFIX = ".reclaim-"
+NANOSECONDS_PER_SECOND = 1_000_000_000
+
+# A lease written before ``started_at`` existed, and one claimed but not yet written, carry
+# no start; a reader shows no elapsed time for those rather than an age since the epoch.
+UNKNOWN_START = 0.0
 
 
 def running_under_agent() -> bool:
@@ -162,6 +173,12 @@ class Lease(BaseModel):
     ``pid`` is what makes a peer's VRAM and its ``/dev/dxg`` handles attributable, so a
     reader may subtract the holder's whole process group. ``NO_PID`` means the file was
     claimed but not yet written and there is no process to name.
+
+    ``started_at`` is when the card was taken, read from the filesystem's clock at the
+    moment of the claim: the file's own timestamps cannot answer that, because every
+    heartbeat moves all of them and the age of a lease file is the age of its last beat.
+    A reader turns it into an elapsed time against that same clock — ``RunQueue._now()`` —
+    and shows none at all for ``UNKNOWN_START``.
     """
 
     gpu_index: int
@@ -169,6 +186,7 @@ class Lease(BaseModel):
     user: str
     host: str
     pid: int
+    started_at: float = UNKNOWN_START
 
 
 def order(entries: Sequence[Entry], served: Mapping[str, float]) -> list[Entry]:
@@ -243,13 +261,32 @@ def _read_payload(path: Path) -> dict[str, Any] | None:
     return loaded if isinstance(loaded, dict) else None
 
 
-def _touch(path: Path) -> bool:
-    """Heartbeat the file, reporting False when it is gone — cancelled, or reclaimed."""
+class _BeatResult(StrEnum):
+    """What one heartbeat did: it landed, the file was gone, or the write was refused."""
+
+    LANDED = "landed"
+    GONE = "gone"
+    REFUSED = "refused"
+
+
+def _touch(path: Path) -> _BeatResult:
+    """Heartbeat the file, telling apart a file that is gone from a write that was refused.
+
+    A refusal never reaches the caller as an exception, because one of the callers is the
+    heartbeat thread: an error escaping there would end the beat for every other lease the
+    same run holds, and a dead daemon thread announces nothing — the join in ``holding``
+    returns instantly and the run trains on cards its peers are about to reclaim. The
+    module is written for a shared mount, where ESTALE and EIO from a single ``utime`` are
+    expected rather than exceptional, so the refusal is logged and handed back as a value.
+    """
     try:
         os.utime(path, None)
     except FileNotFoundError:
-        return False
-    return True
+        return _BeatResult.GONE
+    except OSError as error:
+        logger.warning("The heartbeat on {} did not land ({})", path, error)
+        return _BeatResult.REFUSED
+    return _BeatResult.LANDED
 
 
 class RunQueue:
@@ -356,13 +393,12 @@ class RunQueue:
             user=self.user,
             host=self.host,
             pid=self.pid,
+            started_at=self._now(),
         )
         payload = lease.model_dump_json()
         if _create_exclusive(path, payload):
             return lease
-        if not self._reclaim_if_stale(path):
-            return None
-        return lease if _create_exclusive(path, payload) else None
+        return lease if self._take_over_a_stale_lease(path, payload) else None
 
     def claim_leases(self, gpu_indices: Sequence[int]) -> list[Lease]:
         """Take every one of these cards or none of them.
@@ -380,25 +416,82 @@ class RunQueue:
             taken.append(lease)
         return taken
 
-    def _reclaim_if_stale(self, path: Path) -> bool:
-        """Remove a lease nobody has heartbeated for ``stale_after_seconds``.
+    def _take_over_a_stale_lease(self, path: Path, payload: str) -> bool:
+        """Replace a lease nobody has heartbeated for ``stale_after_seconds``, or refuse.
 
-        Unlink first and create second, never the reverse: two runs may both unlink, but
-        only one of them can then create the file. The window in which this could remove a
-        lease that revived between the check and the unlink is bounded by the gap between
-        the heartbeat and the timeout, which is why the two are set an order of magnitude
-        apart — and a holder whose lease is taken anyway finds out at its next beat.
+        Unlinking decides nothing on its own, because the unlink and the create that
+        follows it are two steps: two runs that both read the same dead lease would unlink
+        it in turn, and the second would delete the brand-new claim the first had already
+        put there. Both would then be training on one card, and neither would be told —
+        the loser's heartbeat finds the winner's file and succeeds.
+
+        What decides is the *generation*: the inode and the heartbeat of the very file that
+        was read as stale, written into the name of a marker created with ``O_EXCL``. Every
+        run that saw that file computes the same name, so exactly one of them may act on
+        it; a run that saw an older one is turned away by the re-check under the marker,
+        and the plain claim above cannot slip in while a lease file exists. The window in
+        which a lease that revived between the read and the unlink is taken anyway is
+        bounded by the gap between the heartbeat and the timeout, which is why the two are
+        set an order of magnitude apart, and its holder finds out at its next beat.
+
+        What the marker is **not** is an airtight mutex, and the aged drop below is where it
+        gives way. Removing a marker is a decision and then an unlink, always two calls, and
+        no name on a POSIX filesystem joins them — a tomb, a second marker or a liveness
+        check on the owner all reproduce this one level down. So: a reclaimer killed between
+        creating its marker and replacing the lease leaves an aged marker; two later runs may
+        both read it as aged; one unlink lands, a third run creates the marker afresh and
+        enters the section below, and the other run's delayed unlink takes *that* marker
+        away, letting a fourth run in on the same generation. Both then replace the lease and
+        both believe they hold the card. The loser is told only when its next beat is
+        refused, which is to say only across users; between two runs of one user the beat
+        lands on the winner's file and the double hold is silent until the two trainings
+        collide in VRAM. Reaching it needs a kill inside the sub-millisecond gap between two
+        adjacent syscalls, an unlink delayed past a whole second reclaim, and two further
+        runs racing that same dead generation.
         """
-        if self._live(path, self._now()):
+        observed = _generation_of(path)
+        if observed is None:
+            return _create_exclusive(path, payload)
+        _, heartbeat = observed
+        if self._now() - heartbeat / NANOSECONDS_PER_SECOND < self.config.stale_after_seconds:
             return False
-        logger.warning(
-            "Reclaiming {}: nothing has heartbeated it for {}s (it was held by {})",
-            path.name,
-            self.config.stale_after_seconds,
-            _read_payload(path),
-        )
-        path.unlink(missing_ok=True)
-        return True
+        marker = _reclaim_marker_of(path, observed)
+        if not _create_exclusive(marker, self.run_id):
+            self._drop_a_marker_its_reclaimer_died_holding(marker)
+            return False
+        try:
+            if _generation_of(path) != observed:
+                return False
+            logger.warning(
+                "Reclaiming {}: nothing has heartbeated it for {}s (it was held by {})",
+                path.name,
+                self.config.stale_after_seconds,
+                _read_payload(path),
+            )
+            path.unlink(missing_ok=True)
+            return _create_exclusive(path, payload)
+        finally:
+            marker.unlink(missing_ok=True)
+
+    def _drop_a_marker_its_reclaimer_died_holding(self, marker: Path) -> None:
+        """Take away a marker nobody has heartbeated, so the card is not wedged for good.
+
+        The generation is read again immediately before the unlink, and that re-read is the
+        whole of the protection: a run that decided seconds ago and only now reaches the
+        unlink finds a different inode or a moved heartbeat under the same name, and leaves
+        the live reclaimer's marker alone. It shrinks the gap between deciding and removing
+        to the adjacency of one stat and one unlink; it does not close it — a cached
+        attribute on a shared mount can still answer the re-read from before the change, and
+        the caller's docstring says what follows when it does.
+        """
+        aged = _generation_of(marker)
+        if aged is None:
+            return
+        _, heartbeat = aged
+        if self._now() - heartbeat / NANOSECONDS_PER_SECOND < self.config.stale_after_seconds:
+            return
+        if _generation_of(marker) == aged:
+            marker.unlink(missing_ok=True)
 
     def release_lease(self, gpu_index: int) -> None:
         """Give the card back, unless the file stopped being this run's lease.
@@ -447,14 +540,49 @@ class RunQueue:
             self.release_leases(gpu_indices)
 
     def _beat_until(self, gpu_indices: list[int], stop: threading.Event) -> None:
-        while not stop.wait(self.config.heartbeat_seconds):
-            for index in gpu_indices:
-                if not _touch(self._lease_path(index)):
-                    logger.warning(
-                        "The lease on GPU {} is gone while this run is still using it; "
-                        "another run has reclaimed the card",
-                        index,
-                    )
+        """Beat every lease this run holds, for as long as any of them is still its own.
+
+        The list shrinks rather than the loop ending: one card the filesystem will not
+        write to must not stop the beat on the others, because the others are still under
+        training and would be reclaimed by a peer once they aged out.
+        """
+        beating = list(gpu_indices)
+        while beating and not stop.wait(self.config.heartbeat_seconds):
+            beating = [index for index in beating if self._beat_one_lease(index)]
+
+    def _beat_one_lease(self, gpu_index: int) -> bool:
+        """Heartbeat one lease, saying whether it is still this run's to heartbeat.
+
+        A card is dropped from the beat only on positive evidence that it stopped being
+        this run's: the file is gone, or the write was refused *and* the payload names
+        another run. Everything else — a refusal on a lease that still reads as this run's,
+        or on one whose payload cannot be read at all — is taken for the transient failure
+        it usually is and tried again at the next beat. That asymmetry is deliberate:
+        dropping a card this run still holds recreates the very harm the beat exists to
+        prevent, while beating a card that is really lost costs one warning per beat.
+        """
+        path = self._lease_path(gpu_index)
+        beat = _touch(path)
+        if beat is _BeatResult.LANDED:
+            return True
+        if beat is _BeatResult.GONE:
+            logger.warning(
+                "The lease on GPU {} is gone while this run is still using it; another run "
+                "has reclaimed the card, and this run stops heartbeating it",
+                gpu_index,
+            )
+            return False
+        payload = _read_payload(path)
+        holder = payload.get("run_id") if payload else None
+        if holder is None or holder == self.run_id:
+            return True
+        logger.warning(
+            "The lease on GPU {} says {} holds the card now and this run may not write to "
+            "it; the beat stops on that card and goes on for the rest",
+            gpu_index,
+            holder,
+        )
+        return False
 
     def next_sequence(self) -> int:
         """Hand out a number no other run can also be holding.
@@ -507,8 +635,14 @@ class RunQueue:
 
         Waiters heartbeat for the same reason holders do: one that died without deleting
         its file would keep the head of the queue and stall everybody behind it.
+
+        Only a missing file cancels: a refused write is reported as still waiting, because
+        calling a transient ESTALE a cancellation would stop a run nobody asked to stop.
+        A filesystem that goes on refusing instead ages this entry out of the order while
+        the run keeps waiting behind it — loudly, one warning per poll, and recoverable by
+        cancelling from ``cy-queue``.
         """
-        return _touch(self.entry_path(entry))
+        return _touch(self.entry_path(entry)) is not _BeatResult.GONE
 
     def remove_entry(self, entry: Entry) -> None:
         """Take the entry out of the queue — either it got its cards, or it was cancelled."""
@@ -555,8 +689,32 @@ class RunQueue:
         return order(self.live_entries(), self.served_mtimes())
 
 
+def _generation_of(path: Path) -> tuple[int, int] | None:
+    """Which incarnation of a lease this file is, or None because there is no file.
+
+    Two files under one name are not one lease, and one file heartbeated again is not one
+    generation of it, so an inode and an mtime together name what a reclaim observed
+    closely enough that acting on it later cannot act on something else.
+    """
+    try:
+        stamped = path.stat()
+    except FileNotFoundError:
+        return None
+    return stamped.st_ino, stamped.st_mtime_ns
+
+
+def _reclaim_marker_of(path: Path, generation: tuple[int, int]) -> Path:
+    """The one name every run that read this exact lease file computes for its reclaim."""
+    inode, heartbeat = generation
+    return path.with_name(f"{RECLAIM_MARKER_PREFIX}{path.name}-{inode}-{heartbeat}")
+
+
 def _gpu_index_of(name: str) -> int | None:
-    """The card a lease file names, or None for anything else living in ``leases/``."""
+    """The card a lease file names, or None for anything else living in ``leases/``.
+
+    A reclaim marker is the anything else that matters: it lives beside the leases and a
+    reader that took one for a held card would hide a free one.
+    """
     index = name.removeprefix("gpu-")
     return int(index) if name.startswith("gpu-") and index.isdigit() else None
 
