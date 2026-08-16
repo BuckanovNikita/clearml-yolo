@@ -127,6 +127,16 @@ output key that still composes is `train.ultralytics.project`: it lives in the s
 so cannot be dropped, and the run overwrites it with `<run_dir>/detect` (the comment above
 `PIPELINE_FILLED_KEYS` says why). To redirect a whole run, set `run_dir=`, never a stage's own path.
 
+`run_id`/`run_dir` also decide which directory a *skipped* stage's consumer reads:
+`_resolve_run_directories` hands `stage_configs` this run's own directory when the caller named either
+key, and `runs/latest` (resolved before the run repoints it) only when it named neither. Naming a
+directory means re-entering it, so `run_dir=<path> skip_metrics=true` reports against the dashboards
+that path holds and refuses naming it when there are none. The standalone default checkpoint is the
+matching case one layer out: `_predict_fields()["weights"]` is `None`, and `predict.checkpoint_of_last_training`
+resolves it at run time from **this** run's `clearml.task_name` under `runs/latest`, refusing before
+`init_task` when nothing trained there. A dump that predates that still carries the literal path, which
+composes, reads as a caller-named checkpoint and silently restores the old behaviour — re-dump.
+
 Every ultralytics parameter lives in `src/clearml_yolo/conf/ultralytics/`, one file per stage, each
 listing the whole of ultralytics' configuration. `null` there means "leave ultralytics' own default
 alone". A `cy-init-config` dump copies these to `<dir>/ultralytics/`; repo-root `conf/` is such a dump
@@ -165,13 +175,50 @@ the ladder. Verify with a real run — the mocked suite cannot see a device it n
 **Change the queue or the run directory**: `run_queue.py` owns the lease and entry files and the pure
 `order()`; `gpu._wait_in_turn` is the whole scheduler (there is no daemon — the waiting `cy` process is
 it), and it reads the entries **before** the survey, which is what stops a fresh run jumping the line the
-instant a card frees. `run_identity.py` names the run and repoints `runs/latest`; `tasks/pipeline.py`
-hands `run_dir` to every writing stage. `tests/test_run_queue.py`, `tests/test_run_identity.py`,
-`tests/test_queue_view.py` and `tests/test_gpu.py` cover more of this than usual, because the queue is
+instant a card frees. `run_identity.py` names the run and repoints `runs/latest`, moving anything at
+that name that is not a symlink to `runs/latest-displaced-<host>-<pid>` with its contents rather than
+freezing the workspace on it or deleting it; `tasks/pipeline.py`
+hands `run_dir` to every writing stage, and `tasks/train.py` mints the same identity for a standalone
+`cy-train`, which is why the other standalone apps compose their paths through `runs/latest`.
+`tests/test_run_queue.py`, `tests/test_run_identity.py`, `tests/test_queue_view.py`,
+`tests/test_queue_app.py` and `tests/test_gpu.py` cover more of this than usual, because the queue is
 pure filesystem and points at `tmp_path`. What they still cannot see is two processes racing one card, so
 verify with the two-terminal run in `running-end-to-end-tests`. Settings nest as `auto_gpu.queue.*`
 rather than sitting beside `auto_gpu`, so the three stages already handed `auto_gpu` need no new
 parameter and neither parity test gains an entry.
+
+`leases/` holds two kinds of file. `gpu-<index>` is a lease — the file **is** the lock. `.reclaim-gpu-<index>-<inode>-<mtime_ns>` is a
+transient marker naming the exact lease generation a run is taking over, created with `O_EXCL` so that of
+everyone who read the same stale lease exactly one may replace it. A marker is not a held card and not a
+leak: `_gpu_index_of` and `apps/queue.py::_lease_files` both filter it out by prefix, a reclaim removes
+its own on every exit path, and one orphaned by a killed reclaimer is dropped by the next reclaim once it
+is older than `stale_after_seconds` — so an aged marker is the recovery working, not a stuck card. Never
+count one as a lease, never clear one by hand, and never sweep `leases/` of anything but `gpu-*`.
+
+**The marker is not an airtight mutex, and the aged drop is where it gives way.** Read
+`_take_over_a_stale_lease` before touching either. Removing a marker is a decision and then an unlink,
+two calls no name on a POSIX filesystem joins — a tomb, a second marker, or a liveness check on the
+owner each reproduce the same gap one level down, which is why the primitive is not rebuilt. The
+sequence: a reclaimer killed between creating its marker and replacing the lease leaves an aged marker;
+two later runs both read it as aged; one unlink lands, a third run creates the marker afresh and enters
+the critical section, and the other run's delayed unlink takes *that* marker away, admitting a fourth
+reclaimer of the same generation. Both replace the lease and both believe they hold the card. Across
+users the loser is told, at its next refused beat; **between two runs of one user the beat lands on the
+winner's file and the double hold is silent** until the two trainings collide in VRAM. Reaching it needs
+a kill inside the gap between two adjacent syscalls, an unlink delayed past a whole second reclaim, and
+two further runs racing that same dead generation.
+`_drop_a_marker_its_reclaimer_died_holding` re-reads the generation immediately before the unlink and
+only unlinks the inode and heartbeat it judged aged, which narrows the decision-to-removal gap to one
+stat and one unlink — it does not close it, because a cached attribute on a shared mount can answer the
+re-read from before the change.
+
+The heartbeat is per card, and a refused beat on one lease no longer ends the beat for the rest: a card
+is dropped from `_beat_until`'s list only on positive evidence it stopped being this run's — the file is
+gone, or the write was refused *and* the payload names another run. Any other refusal keeps the card in
+the beat and warns once per beat, because dropping a card the run still holds is the harm the beat
+exists to prevent, while beating a card that really is lost costs a log line. `heartbeat_entry` follows
+the same rule: only a missing file means cancelled, so a refused write leaves the waiter waiting rather
+than reporting a cancellation nobody asked for.
 
 **Change what ClearML stores**: the adapters are `clearml_session.py`, `clearml_models.py`,
 `clearml_report.py`; nothing else may import `clearml`. Verify against the server and confirm the

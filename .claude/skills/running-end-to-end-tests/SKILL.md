@@ -68,8 +68,19 @@ a group override that composes only against the packaged config; from a `cy-init
 The run also refuses to start if `ground_truth` does not point at an existing CSV and any of predict,
 metrics or compare will run. It refuses too if a run that trains names `predict.ultralytics.imgsz`
 outright and that resolution is not the one `train.ultralytics.imgsz` is training at — leave predict's
-null and the checkpoint answers it. All three refusals happen before training, so a mis-specified run
-costs seconds rather than a full training pass.
+null and the checkpoint answers it. And a skipped stage whose consumer still runs is checked the same
+way: `skip_predict` without a `predictions.csv`, or `skip_metrics` without a dashboard workbook under
+`metrics/`, is refused rather than discovered inside pandas or, worse, as an empty report and exit
+code 0. Every one of these refusals happens before training, so a mis-specified run costs seconds rather
+than a full training pass.
+
+**Which directory those inputs are looked for in is not always `runs/latest`.** A run told which run it
+is — `run_id=` or `run_dir=`, which is exactly what the scratchpad advice above does — reads its **own**
+directory, because naming a directory means re-entering it. So `run_dir=<scratchpad>/cy-verify
+skip_predict=true` scores the CSV in that scratchpad directory and refuses naming that path when it is
+not there; only a run that named neither key falls back to `runs/latest`, resolved before the run
+repoints the link. Exercising the skip flags against a *previous* run therefore means leaving both keys
+unset, or pointing `run_dir=` at the directory that previous run actually wrote.
 
 **Expected end state:** everything is under one run directory — `runs/<task_name>-<host>-<stamp>-<pid>/`,
 with `runs/latest` symlinked to it, or under `run_dir` if you named one. `<run_dir>/metrics` holds
@@ -77,8 +88,17 @@ with `runs/latest` symlinked to it, or under `run_dir` if you named one. `<run_d
 `*_confidence_intervals.png`; `<run_dir>/predictions.csv` has a row per detection;
 `<run_dir>/detect/<name>/weights/best.pt` is the checkpoint. The last log lines are `Baseline disabled;
 publishing new metrics without comparison` and `Skipping comparison stage`. Check `runs/latest` resolves
-to this run: it is what `skip_train=true` without `weights`, and a standalone `cy-predict` with no
-weights, read the checkpoint through.
+to this run: it is what `skip_train=true` without `weights` reads the checkpoint through, and what a
+standalone `cy-predict` with no `weights` resolves against.
+
+A standalone `cy-predict` resolves that checkpoint under its **own** `clearml.task_name` —
+`runs/latest/detect/<clearml.task_name>/weights/best.pt` — never under `train.ultralytics.name` and
+never under whatever trained last. The command above trains as `verify-1ep` while leaving the experiment
+name at its default, so a bare `cy-predict` after it refuses by name (`No checkpoint at …`) before it
+opens a ClearML task, and that refusal is the behaviour working: the path used to reach ultralytics as a
+failed download of a pretrained model. Chain the two by name (`cy-train clearml.task_name=X` then
+`cy-predict clearml.task_name=X`), or name the model outright with
+`weights=<run_dir>/detect/verify-1ep/weights/best.pt`.
 
 **`<run_dir>/reports` is empty, and that is correct.** With `report/baseline=none` there is nothing to
 compare against, so the report stage publishes metrics without writing workbooks. Do not read the empty
@@ -148,7 +168,10 @@ terminals.
 **This box has one GPU**, so the 4+4 split the queue exists for is not verifiable here. The observable
 equivalent is two runs each asking for one card: the second must queue behind the first rather than
 collide with it or hang. Keep `auto_gpu.queue.enabled` at its default here — switching it off is what
-the other sections do, and it is the very thing under test.
+the other sections do, and it is the very thing under test. Do not reach for `auto_gpu.num_gpus=2` to
+simulate the split: a request for more cards than the machine has is refused right after the first
+survey, before anything is enqueued, naming `auto_gpu.num_gpus` (or `auto_gpu.min_devices` when that is
+what asked). That refusal is itself worth exercising once — `entries/` must stay empty afterwards.
 
 ```bash
 # terminal 1
@@ -178,11 +201,14 @@ Checks, in order:
    `wait_timeout_seconds`. A's pid is now subtracted from that count along with its whole process group.
 2. **`cy-queue` shows A holding a card above B waiting.** Both are named `<host>-<pid>` there, not
    `par-a`/`par-b`: the queue identifies the *process* (stable across stages so predict recognises the
-   lease train took), while the run directory is named after the experiment. That id carries no stamp,
-   so the elapsed column reads `-`. Pin (`t`), cancel (`c`) and reclaim (`r`) each
+   lease train took), while the run directory is named after the experiment. A's elapsed time counts up
+   from the moment its lease was claimed, which the lease records for itself; `-` there means a lease
+   claimed but not yet written, or one written before the queue recorded starts at all. Pin (`t`),
+   cancel (`c`) and reclaim (`r`) each
    take effect within one poll interval. A cancelled run says so and stops — it does not start.
    Pressing `r` on a live holder must refuse: the claim is taken and given straight back, so a running
-   training cannot be evicted from the viewer.
+   training cannot be evicted from the viewer. Pressing `t` on a run that already holds cards must
+   refuse too — it is running, not waiting.
 3. **B starts after A releases**, and `served/<user>` under the queue directory gains an entry. Start a
    third run C while B is still queued: C must land *behind* B even at the instant A releases its card.
    Entries are read before the survey precisely so a newcomer cannot jump the line, and that is the one
@@ -194,7 +220,10 @@ Checks, in order:
    checkpoints, because ultralytics' DDP launcher clears the save directory before spawning children.
 5. **`SIGKILL` a run mid-training.** Its lease and entry survive briefly and then a waiter reclaims them
    after `auto_gpu.queue.stale_after_seconds` (120.0), with no human intervening. `cy-queue` shows the
-   lease as `expired` in the meantime.
+   lease as `expired` in the meantime. The beat is per card: a run whose heartbeat is refused on one
+   lease goes on beating the rest, so one unwritable file no longer ages that run's other cards out
+   from under a live training. Only a lease that is gone, or one whose payload names another run,
+   drops out of the beat.
 6. **Both hydra output directories exist separately**, as `outputs/<date>/<HH-MM-SS>-<host>-<pid>`, each
    with its own log. Hydra resolves that path before any of this project's code runs, which is why the
    token is host-and-pid rather than the run id.
@@ -225,7 +254,12 @@ where the queue is the subject.
 | Reading an empty `<run_dir>/reports` as failure | Expected with `report/baseline=none`. |
 | `wait_timeout_seconds=120` on its own to bound a run | Unread at the shipped defaults; a queued run has no deadline. Add `auto_gpu.queue.enabled=false`. |
 | `predict.output=` / `metrics.output_dir=` to redirect a `cy` run | They no longer compose. Use `run_dir=`. |
-| Expecting a standalone `cy-train` to isolate itself | Only `cy` resolves a run directory. Two standalone `cy-train` queue for cards but still share `runs/detect/<name>`. |
+| `ultralytics.device=[0]` to get past a queued peer | A named device skips the *survey*, not the queue: it leases exactly the indices it names and refuses one a live peer lease covers. Deliberate sharing is `auto_gpu.queue.enabled=false`, and `auto_gpu.enabled=false` does not switch the leases off either. |
+| Reaching for one blessed device spelling | `0`, `[0]`, `"0"`, `"0,1"` and `"cuda:0"` normalise to the same card, once, before any lease is taken, so the lease and the batch can no longer disagree about which card was meant. A spelling that names no card (`1.5`, `["cpu"]`, an empty list, a negative index) is refused by name with nothing leased. |
+| `skip_predict=true` / `skip_metrics=true` to reuse a previous run's work in a fresh folder | Their consumers read the directory this run reads from: `runs/latest` when neither `run_id=` nor `run_dir=` was named, that named directory itself when either was. With the input absent the run refuses before training, naming the path. |
+| Redirecting a standalone stage with `ultralytics.project=` and expecting `cy-predict` to follow | A `cy-train` told where to write moves no `latest` link, and the stages after it read that link. Leave `project` null and the run names its own directory. |
+| A real directory sitting at `runs/latest` after `cy-metrics`/`cy-report` in a fresh folder | The next run moves it to `runs/latest-displaced-<host>-<pid>`, contents intact, and takes the name back as a symlink. Nothing to clear by hand, and nothing is deleted. |
+| Running from a `conf/` dumped before `cy-predict`'s `weights` default became `null` | `cy-predict.yaml`'s `weights` is `null` now, meaning "the checkpoint this experiment's last training left". An old dump holds a literal `runs/latest/detect/yolo-run/…` that still composes, reads as a caller-named checkpoint and silently restores the old behaviour. Re-dump with `cy-init-config <dir> --force`. |
 | First ClearML run warning "no completed task tagged prod" | Expected on a fresh project; compare needs a prior run. |
 | Verifying against the real `clearml-yolo` project | Pollutes the `prod` baseline other runs resolve against. Use a throwaway project. |
 | Treating `debug.ping` as proof ClearML works | It answers unauthenticated. Use `./scripts/check_env.sh`. |
