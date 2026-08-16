@@ -11,6 +11,7 @@ from omegaconf import OmegaConf
 
 import clearml_yolo.configs  # noqa: F401  registers every config
 from clearml_yolo.config_tree import COMMAND_OF_CONFIG, dump_config_tree
+from clearml_yolo.tasks.pipeline import PIPELINE_FILLED_KEYS
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -59,6 +60,25 @@ def test_the_pipeline_file_has_nothing_left_to_resolve(tmp_path: Path) -> None:
     dump_config_tree(tmp_path)
 
     assert "${" not in (tmp_path / "cy.yaml").read_text(encoding="utf-8")
+
+
+def test_the_dumped_pipeline_leaves_the_run_to_decide_what_the_run_decides(
+    tmp_path: Path,
+) -> None:
+    """A dumped folder outlives the code, and a stage block in it that still carries a key
+    the run now fills is not merely stale — the run overwrites it, so the value a user
+    edited is silently discarded, and composition fails outright once the key is gone from
+    the stage's config. The output paths are the newest of these: every one of them is
+    part of the run directory now.
+    """
+    dump_config_tree(tmp_path)
+    with initialize_config_dir(config_dir=str(tmp_path), version_base="1.3"):
+        dumped = compose(config_name="cy")
+
+    for stage, filled in PIPELINE_FILLED_KEYS.items():
+        assert not set(dumped[stage]) & filled, stage
+    assert dumped.run_dir is None
+    assert dumped.run_id is None
 
 
 def test_dumped_files_explain_how_to_use_them(tmp_path: Path) -> None:

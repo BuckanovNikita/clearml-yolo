@@ -4,10 +4,15 @@ GPUs are surveyed through NVML rather than torch because NVML needs no CUDA cont
 ``torch.cuda.mem_get_info`` allocates roughly half a gigabyte on every device it probes,
 which would occupy the very memory the survey is trying to measure.
 
-A run does not merely pick devices, it waits for them: starting training on a host whose
-cards are busy either crashes or evicts someone else's inference. Two policies express
-that. ``reserve_gpus`` leaves cards behind for other runs to infer on, and the wait loop
-holds the run at the door until enough cards are free.
+A run does not merely pick devices, it waits for them and then claims them: starting
+training on a host whose cards are busy either crashes or evicts someone else's inference,
+and a card that was merely *seen* free is one a peer may take in the minutes before the
+memory is actually held. ``reserve_gpus`` leaves cards behind for other runs to infer on,
+the wait loop holds the run at the door until enough cards are free, and a lease file
+taken through :mod:`clearml_yolo.run_queue` is what closes the window between the two.
+With the queue in front of the cards the wait also becomes a queue: entries are read
+before the survey, only the head of the order may claim, and a run that has taken its
+place in line waits for its turn however long that is.
 
 The batch a run lands on comes from the first of five sources that can answer, and which
 one did is always logged, because a number arrived at silently is a number nobody can
@@ -20,16 +25,32 @@ they stand; the last two are a batch at a reference card, so both go through the
 
 from __future__ import annotations
 
+import atexit
 import json
 import os
+import socket
 import time
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import ExitStack, contextmanager
+from itertools import takewhile
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any
 
 from loguru import logger
 from pydantic import BaseModel, Field, field_validator
+
+from clearml_yolo.run_queue import (
+    NO_PID,
+    Entry,
+    Lease,
+    QueueConfig,
+    RunQueue,
+    _create_exclusive,
+    order,
+    queue_active,
+    queue_dir,
+)
 
 BYTES_PER_GIB = 1 << 30
 
@@ -87,6 +108,12 @@ class AutoGpuConfig(BaseModel):
     # starts, so a stricter threshold would reject every local GPU.
     max_used_fraction: float = Field(default=0.25, ge=0, le=1)
     max_gpus: int | None = None
+    # "Give this run N cards and let the queue say which" — an exact count, so it overrides
+    # both the min_devices floor and the max_gpus ceiling, and reserve_gpus stops applying:
+    # holding cards back for other runs is the queue's job once there is a queue, and it is
+    # precisely reserve_gpus=1 that makes a 4+4 split of eight cards impossible. Left unset,
+    # the min_devices/max_gpus/reserve_gpus ladder decides exactly as it did before.
+    num_gpus: int | None = Field(default=None, ge=1)
     scale_to_vram: bool = True
     round_to_power_of_two: bool = True
     # Cards left untouched so inference belonging to other runs keeps somewhere to go.
@@ -99,7 +126,16 @@ class AutoGpuConfig(BaseModel):
     max_compute_processes: int = Field(default=0, ge=0)
     wait_for_free: bool = True
     wait_poll_seconds: float = Field(default=30.0, gt=0)
+    # The deadline of a run waiting with no queue in front of it, where a card still busy
+    # after an hour is held by something nobody is going to hand over. A queued run has no
+    # deadline at all: queue it behind a three-hour training and this would kill it at the
+    # one-hour mark, which is the opposite of waiting for a turn.
     wait_timeout_seconds: float = Field(default=3600.0, gt=0)
+    # Where this run takes its place in line, and how it is recognised as still alive.
+    # Nested here rather than beside auto_gpu because the wait is where it is read, and the
+    # wait is reached from train, predict and compare — all three of which are already
+    # handed auto_gpu by the pipeline.
+    queue: QueueConfig = Field(default_factory=QueueConfig)
     # CPU is never the way out of a wait: a transient NVML failure would otherwise turn
     # a GPU run into a silent hundredfold slowdown. Hosts with no CUDA at all still fall
     # back to CPU regardless of this flag.
@@ -188,10 +224,50 @@ def _own_process_group() -> int | None:
         return None
 
 
+class PeerProcesses(BaseModel):
+    """The processes of the runs holding the other cards, as their leases name them.
+
+    A process group used to be the whole answer to "is this one of mine", and it is the
+    wrong answer twice: two runs launched from one shell script share a group, so each
+    counted the other's VRAM as its own and both piled onto the same card. A lease names
+    the pid that took it, which is what separates them.
+    """
+
+    pids: frozenset[int] = frozenset()
+    # The peer's DDP children, reached through the group rather than named one by one,
+    # because each of them holds VRAM and a WSL device handle of its own. This run's own
+    # group is deliberately never in here: in the shared-shell case it *is* the peer's
+    # group, and disowning our own children would lock this run out of its own card.
+    groups: frozenset[int] = frozenset()
+
+    def covers(self, pid: int) -> bool:
+        """Whether this process belongs to a run that holds a lease on another card."""
+        if pid in self.pids:
+            return True
+        if not self.groups:
+            return False
+        try:
+            return os.getpgid(pid) in self.groups
+        except (ProcessLookupError, PermissionError):
+            return False
+
+
+# The survey is reached through a zero-argument seam, so what the queue knows about its
+# peers is left here for the survey to read rather than threaded down through it. Empty
+# whenever the queue is off, which is what leaves an unqueued run's behaviour untouched.
+_peers = PeerProcesses()
+
+
 def _belongs_to_this_run(pid: int, own_group: int | None) -> bool:
-    """Whether a compute process is this process or one of its DDP children."""
+    """Whether a compute process is this process or one of its DDP children.
+
+    A process some peer's lease accounts for is that peer's however it was launched: the
+    process group cannot tell two runs started from one shell apart, and a lease can.
+    """
     if pid == os.getpid():
         return True
+    if _peers.covers(pid):
+        return False
     if own_group is None:
         return False
     try:
@@ -306,6 +382,11 @@ def _wsl_foreign_gpu_processes(own_group: int | None) -> int | None:
     ``max_compute_processes`` silently unenforceable — a user who asks for an exclusive
     card gets whatever is free by VRAM alone. The kernel still knows: every WSL GPU
     client holds ``/dev/dxg`` open.
+
+    A run whose lease is known is subtracted here, whole process group and all, because the
+    count that comes back is spread across every card: leaving a peer in it would mark the
+    cards the queue has just cleared for this run as occupied too, which is the hour-long
+    hang a second run on this box used to sit through.
     """
     if not WSL_GPU_DEVICE.exists():
         return None
@@ -314,7 +395,9 @@ def _wsl_foreign_gpu_processes(own_group: int | None) -> int | None:
         if not entry.name.isdigit():
             continue
         pid = int(entry.name)
-        if not _belongs_to_this_run(pid, own_group) and _holds_the_wsl_gpu_device(pid):
+        if _belongs_to_this_run(pid, own_group) or _peers.covers(pid):
+            continue
+        if _holds_the_wsl_gpu_device(pid):
             foreign += 1
     return foreign
 
@@ -429,8 +512,34 @@ def _apply_reserve(available: list[GpuInfo], config: AutoGpuConfig) -> list[GpuI
     return sorted(freest_first[:keep], key=lambda gpu: gpu.torch_index)
 
 
-def _selectable(survey: GpuSurvey, config: AutoGpuConfig) -> list[GpuInfo]:
-    return _apply_reserve([gpu for gpu in survey.gpus if _is_available(gpu, config)], config)
+def _requested_devices(config: AutoGpuConfig) -> int:
+    """How many cards this run has to hold before it may start."""
+    return config.min_devices if config.num_gpus is None else config.num_gpus
+
+
+def _selectable(
+    survey: GpuSurvey,
+    config: AutoGpuConfig,
+    *,
+    wanted: int,
+    unavailable: frozenset[int] = frozenset(),
+) -> list[GpuInfo]:
+    """The cards this run may take: usable, not under a lease, and no more than it asked.
+
+    ``num_gpus`` is an exact request, so it decides the count outright and the reserve and
+    the ceiling stop applying. Without it ``wanted`` is not consulted at all, because
+    ``min_devices`` is a floor on what is enough rather than a cap on what is taken and a
+    four-card host still trains on all four.
+    """
+    available = [
+        gpu
+        for gpu in survey.gpus
+        if gpu.torch_index not in unavailable and _is_available(gpu, config)
+    ]
+    if config.num_gpus is None:
+        return _apply_reserve(available, config)
+    freest_first = sorted(available, key=lambda gpu: gpu.free_vram_gb, reverse=True)
+    return sorted(freest_first[:wanted], key=lambda gpu: gpu.torch_index)
 
 
 def _no_device_message(config: AutoGpuConfig, total: int, waited: float | None) -> str:
@@ -440,12 +549,21 @@ def _no_device_message(config: AutoGpuConfig, total: int, waited: float | None) 
         else "Auto GPU mode found"
     )
     return (
-        f"{preamble} fewer than {config.min_devices} usable device(s) among {total} GPU(s): "
+        f"{preamble} fewer than {_requested_devices(config)} usable device(s) among "
+        f"{total} GPU(s): "
         f"every card is busy, holds less than {config.min_free_vram_gb} GiB free, or is "
         f"held back by reserve_gpus={config.reserve_gpus}. Lower auto_gpu.min_free_vram_gb, "
         "raise auto_gpu.max_used_fraction or auto_gpu.max_compute_processes, drop "
         "auto_gpu.reserve_gpus, extend auto_gpu.wait_timeout_seconds, or set an explicit device."
     )
+
+
+# Cards are held for as long as the process lives rather than for one stage: predict runs
+# on the card training has just used, and a lease given back in between is a lease a peer
+# takes. Closing the stack releases every one of them; the heartbeat inside ``holding`` is
+# what lets a peer recover them when the process is killed before it can.
+_LEASE_HOLD = ExitStack()
+atexit.register(_LEASE_HOLD.close)
 
 
 def wait_for_devices(
@@ -454,33 +572,86 @@ def wait_for_devices(
     probe: Callable[[], GpuSurvey] = probe_gpus,
     sleep: Callable[[float], None] = time.sleep,
     monotonic: Callable[[], float] = time.monotonic,
+    queue: RunQueue | None = None,
 ) -> list[GpuInfo]:
-    """Block until ``min_devices`` cards are free, then return the ones to use.
+    """Block until this run may hold the cards it asked for, and claim them before returning.
 
     An empty list means the host has no usable GPU at all and the caller should run on
     CPU. Every other outcome raises: a wait must never end by quietly downgrading the
     run to CPU, which is a hundredfold slowdown that looks exactly like success.
 
-    ``probe``, ``sleep`` and ``monotonic`` are injected so the whole policy is testable
-    without a GPU and without real time passing.
+    With the queue on, the wait is a place in line and the cards come back claimed; with it
+    off, it is the deadline-bounded poll it has always been. ``probe``, ``sleep``,
+    ``monotonic`` and ``queue`` are injected so the whole policy is testable without a GPU,
+    without real time passing and without a queue directory on this machine.
+    """
+    waiting_room = queue if queue is not None else _queue_for(config)
+    if waiting_room is None:
+        return _wait_alone(config, probe=probe, sleep=sleep, monotonic=monotonic)
+    return _wait_in_turn(config, waiting_room, probe=probe, sleep=sleep)
+
+
+def _queue_for(config: AutoGpuConfig) -> RunQueue | None:
+    """This machine's queue, or None when this run is not to take a place in it.
+
+    A queue directory that cannot be built is worth a warning and not a dead run: the
+    selection that happens without one is the one every release so far has shipped.
+    """
+    if not queue_active(config.queue):
+        return None
+    try:
+        # The run's name here has to be stable for the whole process, so that a later stage
+        # recognises the leases an earlier one took, and unique among the runs alive on the
+        # machine, which host and pid together are.
+        return RunQueue(config.queue, run_id=f"{socket.gethostname()}-{os.getpid()}")
+    except OSError as error:
+        logger.warning(
+            "Cannot use the run queue at {} ({}); this run picks its cards without one",
+            queue_dir(config.queue),
+            error,
+        )
+        return None
+
+
+def _surveyed(config: AutoGpuConfig, probe: Callable[[], GpuSurvey]) -> GpuSurvey | None:
+    """One sweep of the hardware, or None when this run is to fall back to CPU."""
+    survey = probe()
+    if not survey.cuda_available:
+        return None
+    if survey.nvml_available:
+        return survey
+    if config.cpu_fallback_on_nvml_failure:
+        logger.warning("NVML is unreachable; falling back to CPU as configured")
+        return None
+    raise RuntimeError(
+        "NVML is unreachable, so GPU occupancy cannot be measured and this run "
+        "would silently train on CPU. Install nvidia-ml-py, or set "
+        "auto_gpu.cpu_fallback_on_nvml_failure=true to accept that."
+    )
+
+
+def _wait_alone(
+    config: AutoGpuConfig,
+    *,
+    probe: Callable[[], GpuSurvey],
+    sleep: Callable[[float], None],
+    monotonic: Callable[[], float],
+) -> list[GpuInfo]:
+    """Wait for cards with nobody keeping the order, on ``wait_timeout_seconds``.
+
+    The deadline means something here that it cannot mean for a queued run: with no queue
+    behind this run, a card still busy after an hour is held by something that is not going
+    to hand it over, and saying so beats waiting for ever.
     """
     started = monotonic()
     while True:
-        survey = probe()
-        if not survey.cuda_available:
+        survey = _surveyed(config, probe)
+        if survey is None:
             return []
-        if not survey.nvml_available:
-            if config.cpu_fallback_on_nvml_failure:
-                logger.warning("NVML is unreachable; falling back to CPU as configured")
-                return []
-            raise RuntimeError(
-                "NVML is unreachable, so GPU occupancy cannot be measured and this run "
-                "would silently train on CPU. Install nvidia-ml-py, or set "
-                "auto_gpu.cpu_fallback_on_nvml_failure=true to accept that."
-            )
 
-        selectable = _selectable(survey, config)
-        if len(selectable) >= config.min_devices:
+        needed = _requested_devices(config)
+        selectable = _selectable(survey, config, wanted=needed)
+        if len(selectable) >= needed:
             return selectable
 
         elapsed = monotonic() - started
@@ -492,13 +663,149 @@ def wait_for_devices(
 
         logger.info(
             "Waiting for {} free GPU(s): {} of {} usable, {:.0f}s elapsed, {:.0f}s before timeout",
-            config.min_devices,
+            needed,
             len(selectable),
             len(survey.gpus),
             elapsed,
             remaining,
         )
         sleep(min(config.wait_poll_seconds, remaining))
+
+
+def _peer_processes(leases: Sequence[Lease], own_run_id: str) -> PeerProcesses:
+    """The pids and process groups of the runs holding the other cards.
+
+    ``NO_PID`` is skipped rather than looked up: it is what a lease that has been claimed
+    but not yet written says, and ``os.getpgid(0)`` answers with this run's own group,
+    which would make every process on the machine look like somebody else's.
+    """
+    pids = {
+        lease.pid for lease in leases if lease.run_id != own_run_id and lease.pid != NO_PID
+    }
+    own_group = _own_process_group()
+    groups = set()
+    for pid in pids:
+        try:
+            group = os.getpgid(pid)
+        except (ProcessLookupError, PermissionError):
+            continue
+        if group != own_group:
+            groups.add(group)
+    return PeerProcesses(pids=frozenset(pids), groups=frozenset(groups))
+
+
+def _at_the_head(entry: Entry | None, waiting: Sequence[Entry], queue: RunQueue) -> bool:
+    """Whether it is this run's turn: nobody is queueing at all, or the order starts here.
+
+    Ranking the entries that were read *before* the survey is the whole point of reading
+    them first. A run not yet in the queue may only go straight through when the queue is
+    empty — never because the cards happen to look free, which is how a run started a
+    second ago would take a card off everybody who has been waiting for one.
+    """
+    if entry is None:
+        return not waiting
+    ranked = order(waiting, queue.served_mtimes())
+    return bool(ranked) and ranked[0].run_id == entry.run_id
+
+
+def _claimed(queue: RunQueue, held: list[GpuInfo], wanted: list[GpuInfo]) -> list[GpuInfo]:
+    """Take leases on the cards that are not this run's yet, or come back empty-handed.
+
+    The lease file is the arbiter of a race and the survey is not: two runs that both saw
+    the same card free are separated here, and the loser gives back whatever it took and
+    surveys again rather than starting on a card somebody else now holds.
+    """
+    taken = queue.claim_leases([gpu.torch_index for gpu in wanted])
+    if not taken:
+        logger.info("Another run claimed a card first; looking again")
+        return []
+    _LEASE_HOLD.enter_context(queue.holding([lease.gpu_index for lease in taken]))
+    queue.mark_served()
+    return sorted(held + wanted, key=lambda gpu: gpu.torch_index)
+
+
+def _announce_position(entry: Entry, waiting: Sequence[Entry], queue: RunQueue) -> None:
+    ranked = order(waiting, queue.served_mtimes())
+    ahead = [
+        f"{other.user}:{other.run_id} ({other.num_gpus} GPU)"
+        for other in takewhile(lambda other: other.run_id != entry.run_id, ranked)
+    ]
+    logger.info(
+        "Queued for {} GPU(s) at position {} of {}; ahead of this run: {}",
+        entry.num_gpus,
+        len(ahead) + 1,
+        len(ranked),
+        ", ".join(ahead) or "nobody — every card is busy",
+    )
+
+
+def _wait_in_turn(
+    config: AutoGpuConfig,
+    queue: RunQueue,
+    *,
+    probe: Callable[[], GpuSurvey],
+    sleep: Callable[[float], None],
+) -> list[GpuInfo]:
+    """Take a place in line, wait for the head of it, and claim the cards on arriving there.
+
+    There is no deadline: a run queued behind a three-hour training waits three hours, and
+    ``cy-queue`` cancelling its entry is the way out. The cards this run already holds are
+    answered with before anything else, because a stage that queued for a card its own
+    process is holding would wait for a peer that can never get past it.
+    """
+    global _peers  # noqa: PLW0603  the survey seam below takes nothing to pass this through
+
+    needed = _requested_devices(config)
+    entry: Entry | None = None
+    try:
+        while True:
+            waiting = queue.live_entries()
+            leases = queue.live_leases()
+            _peers = _peer_processes(leases, queue.run_id)
+            survey = _surveyed(config, probe)
+            if survey is None:
+                return []
+
+            mine = frozenset(
+                lease.gpu_index for lease in leases if lease.run_id == queue.run_id
+            )
+            held = [gpu for gpu in survey.gpus if gpu.torch_index in mine]
+            if len(held) >= needed:
+                logger.info("Reusing GPU(s) this run already holds a lease on: {}", sorted(mine))
+                return held[:needed]
+
+            under_lease = frozenset(lease.gpu_index for lease in leases)
+            free = _selectable(
+                survey, config, wanted=needed - len(held), unavailable=under_lease
+            )
+            if _at_the_head(entry, waiting, queue) and len(held) + len(free) >= needed:
+                cards = _claimed(queue, held, free)
+                if cards:
+                    return cards
+
+            if not config.wait_for_free:
+                # "Do not wait" has to mean not taking a place in line either, or the one
+                # setting that promises a fast failure becomes the slowest wait of all.
+                raise RuntimeError(_no_device_message(config, len(survey.gpus), waited=None))
+            if entry is None:
+                entry = queue.enqueue(needed)
+                logger.info(
+                    "Taking a place in the queue at {} as entry {} for {} GPU(s)",
+                    queue.dir,
+                    entry.seq,
+                    needed,
+                )
+                continue
+            if not queue.heartbeat_entry(entry):
+                raise RuntimeError(
+                    f"This run's queue entry {entry.seq} is gone, so it was cancelled from "
+                    "cy-queue while it waited for GPU(s). Nothing was started."
+                )
+            _announce_position(entry, waiting, queue)
+            sleep(queue.config.poll_seconds)
+    finally:
+        if entry is not None:
+            queue.remove_entry(entry)
 
 
 def _floor_power_of_two(value: int) -> int:
@@ -778,7 +1085,13 @@ def resolve_inference(
     if auto_gpu is not None and auto_gpu.enabled:
         if device is None:
             single = auto_gpu.model_copy(
-                update={"reserve_gpus": 0, "min_devices": 1, "max_gpus": 1}
+                update={
+                    "reserve_gpus": 0,
+                    "min_devices": 1,
+                    "max_gpus": 1,
+                    # A run asking the queue for four cards to train on still infers on one.
+                    "num_gpus": None if auto_gpu.num_gpus is None else 1,
+                }
             )
             return select_devices(single, model=model, stage=stage, batch=batch)
         named = _card_behind(device) if batch is None else []
@@ -865,6 +1178,61 @@ def _write_remembered(path: Path, table: dict[str, Any]) -> None:
     written.replace(path)
 
 
+# The remembered table is one file for the whole machine, and the read and the write around
+# a batch are two steps: two stages finishing at the same moment each read the table before
+# either wrote it, and whichever wrote second erased the other's number. Both go through the
+# queue's own claim primitive here, so there is one O_EXCL create in this codebase and not
+# two spellings of it.
+BATCH_TABLE_LOCK_SUFFIX = ".lock"
+# A read-modify-write of this file is milliseconds, so a lock this old is one whose owner
+# died holding it. Both times are the local machine's, which is where the cache lives.
+ABANDONED_LOCK_SECONDS = 60.0
+LOCK_POLL_SECONDS = 0.1
+LOCK_WAIT_SECONDS = 10.0
+
+
+@contextmanager
+def _exclusively(lock: Path) -> Iterator[bool]:
+    """Hold the lock file for the block, yielding False when it could not be taken.
+
+    Not taking it means skipping the write rather than forcing it: a forced write is
+    exactly the lost update this exists to prevent, and a batch left unrecorded costs
+    nothing beyond the next run having to find it again.
+    """
+    deadline = time.monotonic() + LOCK_WAIT_SECONDS
+    while not _create_exclusive(lock, str(os.getpid())):
+        if _is_abandoned(lock):
+            logger.warning("Removing {}, which no live run has released", lock)
+            lock.unlink(missing_ok=True)
+            continue
+        if time.monotonic() >= deadline:
+            yield False
+            return
+        time.sleep(LOCK_POLL_SECONDS)
+    try:
+        yield True
+    finally:
+        lock.unlink(missing_ok=True)
+
+
+def _is_abandoned(lock: Path) -> bool:
+    try:
+        return time.time() - lock.stat().st_mtime > ABANDONED_LOCK_SECONDS
+    except FileNotFoundError:
+        return False
+
+
+def _record_batch(
+    remembered: dict[str, Any], stage: str, key: str, card: str, count: str, batch: int
+) -> bool:
+    """Put the batch in the table where it belongs, saying whether it was worth keeping."""
+    by_count = remembered.setdefault(stage, {}).setdefault(key, {}).setdefault(card, {})
+    if not isinstance(by_count, dict) or batch <= int(by_count.get(count, 0)):
+        return False
+    by_count[count] = batch
+    return True
+
+
 def remember_batch(
     config: AutoGpuConfig, stage: str, model: str | None, selection: DeviceSelection
 ) -> None:
@@ -874,6 +1242,9 @@ def remember_batch(
     that a small batch fits says nothing about a larger one, while a large batch that
     finished proves every smaller one would have. A run whose cards were never surveyed
     cannot be recorded at all — there is no card to file the number under.
+
+    The table is re-read inside the lock and not before it: what another run wrote while
+    this one was training is part of what this number has to beat.
     """
     key = model_key(model)
     if not config.remember_batch or key is None or not selection.gpus:
@@ -884,15 +1255,23 @@ def remember_batch(
 
     card = _normalised(min(selection.gpus, key=lambda gpu: gpu.total_vram_gb).name)
     count = str(selection.world_size)
-    remembered = _remembered_batches()
-    by_count = remembered.setdefault(stage, {}).setdefault(key, {}).setdefault(card, {})
-    if not isinstance(by_count, dict) or selection.batch_per_gpu <= int(by_count.get(count, 0)):
-        return
-
-    by_count[count] = selection.batch_per_gpu
     path = batch_table_path()
     try:
-        _write_remembered(path, remembered)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with _exclusively(path.with_name(path.name + BATCH_TABLE_LOCK_SUFFIX)) as alone:
+            if not alone:
+                logger.warning(
+                    "Another run is rewriting the remembered batch table {}; leaving batch "
+                    "{} for {} unrecorded rather than overwriting theirs",
+                    path,
+                    selection.batch_per_gpu,
+                    key,
+                )
+                return
+            remembered = _remembered_batches()
+            if not _record_batch(remembered, stage, key, card, count, selection.batch_per_gpu):
+                return
+            _write_remembered(path, remembered)
     except OSError as error:
         logger.warning("Cannot write the remembered batch table {} ({})", path, error)
         return

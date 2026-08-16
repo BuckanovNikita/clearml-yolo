@@ -1,4 +1,10 @@
-"""GPU selection: NVML/torch index mapping, admission control, VRAM scaling, batching."""
+"""GPU selection: NVML/torch index mapping, admission control, VRAM scaling, batching.
+
+The queue is on by default, so every test here that is not about it says so through the
+``unqueued`` fixture below — otherwise a test with a fake NVML behind it would take real
+leases in the machine's queue directory, and a test whose cards never free up would wait
+there without a deadline for the rest of the developer's afternoon.
+"""
 
 from __future__ import annotations
 
@@ -6,6 +12,9 @@ import os
 import re
 import sys
 import types
+from collections.abc import Iterator
+from contextlib import ExitStack
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -18,6 +27,7 @@ from clearml_yolo.gpu import (
     DeviceSelection,
     GpuInfo,
     GpuSurvey,
+    PeerProcesses,
     probe_gpus,
     remember_batch,
     resolve_devices,
@@ -26,6 +36,7 @@ from clearml_yolo.gpu import (
     select_devices,
     wait_for_devices,
 )
+from clearml_yolo.run_queue import QUEUE_DIR_ENV_VAR, QueueConfig, RunQueue
 
 GIB = 1 << 30
 
@@ -124,6 +135,44 @@ def unremembered(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
     suite would pass or fail according to what the machine had done that week.
     """
     monkeypatch.setenv(BATCH_TABLE_ENV_VAR, str(tmp_path / "batch_table.json"))
+
+
+@pytest.fixture(autouse=True)
+def unqueued(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[None]:
+    """Keep the machine's real queue out of every test that does not ask for one.
+
+    ``auto_gpu.queue.enabled`` defaults to true, so without this a test whose fake cards
+    are all busy would enqueue in ``/tmp/clearml-yolo`` and wait there with no deadline —
+    the queued path has none, deliberately — and a test whose cards are free would leave a
+    lease behind for the next developer's run to trip over. Tests about the queue inject
+    their own, which goes past the switch this turns off.
+    """
+    monkeypatch.setattr(gpu_module, "queue_active", lambda _: False)
+    monkeypatch.setenv(QUEUE_DIR_ENV_VAR, str(tmp_path / "unused-queue"))
+    monkeypatch.setattr(gpu_module, "_peers", PeerProcesses())
+    holding_nothing = ExitStack()
+    monkeypatch.setattr(gpu_module, "_LEASE_HOLD", holding_nothing)
+    yield
+    # Restoring the attribute would leave the leases taken during the test held, and their
+    # heartbeat threads beating against a directory pytest is about to delete.
+    holding_nothing.close()
+
+
+def queue_for(
+    tmp_path: Path, run_id: str = "run-a", user: str = "ann", pid: int = 4242
+) -> RunQueue:
+    """A queue of this run's own in ``tmp_path``, standing in for the machine's.
+
+    ``pid`` is named rather than read so a lease can claim to be held by a process that is
+    not this one, which is what every peer in these tests is.
+    """
+    return RunQueue(
+        QueueConfig(dir=tmp_path / "queue", poll_seconds=1.0),
+        run_id=run_id,
+        user=user,
+        host="box",
+        pid=pid,
+    )
 
 
 @pytest.fixture
@@ -485,6 +534,44 @@ def test_remembering_can_be_turned_off_in_both_directions(patch_modules: Any) ->
     assert select_devices(forgetful, model="yolo11m.pt", stage="train").batch == 4
 
 
+def _lock_beside_the_table() -> Path:
+    table = gpu_module.batch_table_path()
+    return table.with_name(table.name + gpu_module.BATCH_TABLE_LOCK_SUFFIX)
+
+
+def _finished_on_one_card() -> DeviceSelection:
+    return DeviceSelection(devices=[0], batch=16, batch_per_gpu=16, gpus=_survey(1).gpus[:1])
+
+
+def test_a_batch_is_left_unrecorded_while_another_run_rewrites_the_table(
+    monkeypatch: Any,
+) -> None:
+    """The read and the write are two steps and the table is one file for the machine, so
+    two stages finishing together each read it before either wrote — and the second write
+    erased the first one's number. Waiting the other run out and then forcing the write
+    would be that same lost update; skipping costs one run's worth of measurement."""
+    monkeypatch.setattr(gpu_module, "LOCK_WAIT_SECONDS", 0.0)
+    _lock_beside_the_table().write_text("another run", encoding="utf-8")
+
+    remember_batch(AutoGpuConfig(), "train", "yolo11m.pt", _finished_on_one_card())
+
+    assert not gpu_module.batch_table_path().exists()
+
+
+def test_a_lock_no_live_run_ever_released_is_taken_anyway(monkeypatch: Any) -> None:
+    """A run killed between claiming the lock and writing the table would otherwise stop
+    this machine remembering anything at all until somebody deleted the file by hand."""
+    monkeypatch.setattr(gpu_module, "LOCK_WAIT_SECONDS", 0.0)
+    lock = _lock_beside_the_table()
+    lock.write_text("a run that died holding it", encoding="utf-8")
+    os.utime(lock, (0, 0))
+
+    remember_batch(AutoGpuConfig(), "train", "yolo11m.pt", _finished_on_one_card())
+
+    assert gpu_module.batch_table_path().exists()
+    assert not lock.exists()
+
+
 def test_reserve_leaves_a_card_for_other_runs(patch_modules: Any) -> None:
     """Three idle cards, reserve one: training takes two and someone else can still infer."""
     handles = [FakeHandle(name, 24.0, 23.0, 0) for name in ("aaa", "bbb", "ccc")]
@@ -521,6 +608,39 @@ def test_max_gpus_and_reserve_compose(patch_modules: Any) -> None:
 
     assert select_devices(AutoGpuConfig(max_gpus=2, reserve_gpus=1)).world_size == 2
     assert select_devices(AutoGpuConfig(max_gpus=3, reserve_gpus=2)).world_size == 2
+
+
+def test_an_exact_request_overrides_the_floor_and_the_ceiling_alike(patch_modules: Any) -> None:
+    """num_gpus is "give this run N cards", not "at least N" or "at most N".
+
+    min_devices is a floor that would let the run start on fewer and max_gpus a ceiling it
+    would sit under; an exact request has to mean the same thing on both sides.
+    """
+    handles = [FakeHandle(name, 24.0, 23.0, 0) for name in ("aaa", "bbb", "ccc", "ddd")]
+    patch_modules(handles, ["aaa", "bbb", "ccc", "ddd"])
+
+    assert select_devices(AutoGpuConfig(num_gpus=2, min_devices=1, max_gpus=4)).devices == [0, 1]
+    assert select_devices(AutoGpuConfig(num_gpus=3, min_devices=4, max_gpus=1)).devices == [0, 1, 2]
+
+
+def test_an_exact_request_waits_rather_than_starting_on_fewer_cards(patch_modules: Any) -> None:
+    """Half of a two-card run is not a smaller run, it is a differently configured one."""
+    handles = [FakeHandle("aaa", 24.0, 23.0, 0), FakeHandle("bbb", 24.0, 1.0, 0)]
+    patch_modules(handles, ["aaa", "bbb"])
+
+    with pytest.raises(RuntimeError, match="fewer than 2 usable"):
+        select_devices(AutoGpuConfig(num_gpus=2, wait_for_free=False))
+
+
+def test_the_reserve_steps_aside_for_an_exact_request(patch_modules: Any) -> None:
+    """reserve_gpus=1 is exactly why a 4+4 split of eight cards cannot happen today: the
+    first run takes N-1 of N. Once a queue is what holds cards back for other runs, holding
+    one back again inside the request would make the number the run asked for unreachable."""
+    handles = [FakeHandle(name, 24.0, 23.0, 0) for name in ("aaa", "bbb")]
+    patch_modules(handles, ["aaa", "bbb"])
+
+    assert select_devices(AutoGpuConfig(reserve_gpus=1)).devices == [0]
+    assert select_devices(AutoGpuConfig(reserve_gpus=1, num_gpus=2)).devices == [0, 1]
 
 
 def test_this_runs_own_process_does_not_make_a_card_busy(patch_modules: Any) -> None:
@@ -601,6 +721,71 @@ def test_a_host_without_the_wsl_device_is_left_to_nvml(monkeypatch: Any, tmp_pat
     monkeypatch.setattr(gpu_module, "WSL_GPU_DEVICE", tmp_path / "absent")
 
     assert gpu_module._wsl_foreign_gpu_processes(None) is None
+
+
+def _pids_the_proc_filesystem_lists() -> list[int]:
+    """Two pids that really are in /proc, which the WSL count walks for itself.
+
+    This process' own pid is left out: it is this run's by definition and would never be
+    counted, so it could not tell the two halves of the test apart.
+    """
+    listed = sorted(
+        int(entry.name)
+        for entry in Path("/proc").iterdir()
+        if entry.name.isdigit() and int(entry.name) != os.getpid()
+    )
+    return listed[:2]
+
+
+PEER_GROUP = 90001
+OWN_GROUP = 90002
+
+
+def test_a_peers_process_group_is_subtracted_from_the_wsl_device_count(
+    monkeypatch: Any, tmp_path: Path
+) -> None:
+    """/dev/dxg is one device for every card, so whatever it counts is spread over all of
+    them: a peer left in that count marks the very cards the queue has just cleared for
+    this run as occupied, which is the hour-long hang a second run on this box sits through.
+    The whole group and not the lease's pid alone, because a peer's DDP children each hold
+    the device too."""
+    monkeypatch.setattr(gpu_module, "WSL_GPU_DEVICE", tmp_path / "dxg")
+    (tmp_path / "dxg").write_bytes(b"")
+    peer_and_its_child = _pids_the_proc_filesystem_lists()
+    monkeypatch.setattr(
+        gpu_module, "_holds_the_wsl_gpu_device", lambda pid: pid in peer_and_its_child
+    )
+    monkeypatch.setattr(
+        os, "getpgid", lambda pid: PEER_GROUP if pid in peer_and_its_child else OWN_GROUP
+    )
+
+    assert gpu_module._wsl_foreign_gpu_processes(OWN_GROUP) == len(peer_and_its_child)
+
+    monkeypatch.setattr(gpu_module, "_peers", PeerProcesses(groups=frozenset({PEER_GROUP})))
+
+    assert gpu_module._wsl_foreign_gpu_processes(OWN_GROUP) == 0
+
+
+def test_a_pid_a_peer_lease_names_is_foreign_inside_this_runs_own_group(monkeypatch: Any) -> None:
+    """Two runs launched from one shell script share a process group, so each counted the
+    other's VRAM as its own and both piled onto the same card. A lease names the pid, which
+    is the only thing that tells them apart — and the group rule still has its real job,
+    which is not locking a run out of the card its own DDP children already hold."""
+    shared_group = 90003
+    peer = 90004
+    own_child = 90005
+    monkeypatch.setattr(os, "getpgid", lambda pid: shared_group)
+
+    counted_as_ours = gpu_module._split_occupancy([FakeProcess(peer, 18.0)], shared_group)
+    assert counted_as_ours[0] == 0
+    assert counted_as_ours[1] == pytest.approx(18.0)
+
+    monkeypatch.setattr(gpu_module, "_peers", PeerProcesses(pids=frozenset({peer})))
+
+    assert gpu_module._split_occupancy([FakeProcess(peer, 18.0)], shared_group) == (1, 0.0)
+    still_ours = gpu_module._split_occupancy([FakeProcess(own_child, 3.0)], shared_group)
+    assert still_ours[0] == 0
+    assert still_ours[1] == pytest.approx(3.0)
 
 
 def test_on_linux_an_idle_card_stays_idle(patch_modules: Any) -> None:
@@ -694,6 +879,147 @@ def test_unreachable_nvml_raises_instead_of_silently_using_cpu() -> None:
     assert wait_for_devices(
         AutoGpuConfig(cpu_fallback_on_nvml_failure=True), probe=lambda: unreachable
     ) == []
+
+
+def test_a_queued_run_outlives_the_deadline_an_unqueued_one_would_have_had(
+    tmp_path: Path,
+) -> None:
+    """Queue a run behind a three-hour training and an hour-long timeout kills it at the
+    one-hour mark, which is the opposite of waiting for a turn. The timeout keeps its
+    meaning where it still has one: a wait with nobody keeping the order."""
+    config = AutoGpuConfig(reserve_gpus=NO_RESERVE, wait_timeout_seconds=1.0)
+    busy_then_free = [_survey(0)] * 20 + [_survey(1)]
+    slept: list[float] = []
+
+    chosen = wait_for_devices(
+        config,
+        probe=lambda: busy_then_free.pop(0),
+        sleep=slept.append,
+        queue=queue_for(tmp_path),
+    )
+
+    assert [gpu.torch_index for gpu in chosen] == [0]
+    assert sum(slept) > config.wait_timeout_seconds
+
+    ticks = iter([0.0, 2.0])
+    with pytest.raises(RuntimeError, match="Waited"):
+        wait_for_devices(
+            config,
+            probe=lambda: _survey(0),
+            sleep=lambda _: None,
+            monotonic=lambda: next(ticks),
+        )
+
+
+def test_a_run_arriving_as_a_card_frees_lands_behind_the_ones_already_waiting(
+    tmp_path: Path,
+) -> None:
+    """The queue-jumping hole, and the reason the entries are read before the cards: the
+    instant a run releases its card, a run started a second ago sees a free card, never
+    enqueues, and takes it in front of everybody who has been waiting for one."""
+    peer = queue_for(tmp_path, run_id="run-b", user="bob", pid=4243)
+    already_waiting = peer.enqueue(1)
+    mine = queue_for(tmp_path)
+    slept: list[float] = []
+
+    def let_the_queue_move(seconds: float) -> None:
+        slept.append(seconds)
+        peer.remove_entry(already_waiting)
+
+    chosen = wait_for_devices(
+        AutoGpuConfig(reserve_gpus=NO_RESERVE),
+        probe=lambda: _survey(1),
+        sleep=let_the_queue_move,
+        queue=mine,
+    )
+
+    assert [gpu.torch_index for gpu in chosen] == [0]
+    # The card was free on the very first survey, and this run still waited its turn.
+    assert slept
+    assert mine.live_entries() == []
+
+
+def test_a_card_this_run_already_holds_is_not_queued_for_a_second_time(tmp_path: Path) -> None:
+    """The predict stage re-enters the wait holding the card training took. Queued behind a
+    peer who can never get past that lease, the run would be waiting for itself."""
+    mine = queue_for(tmp_path)
+    assert mine.claim_lease(0) is not None
+    peer = queue_for(tmp_path, run_id="run-b", user="bob", pid=4243)
+    peer.enqueue(1)
+    slept: list[float] = []
+
+    chosen = wait_for_devices(
+        AutoGpuConfig(reserve_gpus=NO_RESERVE),
+        probe=lambda: _survey(0),
+        sleep=slept.append,
+        queue=mine,
+    )
+
+    assert [gpu.torch_index for gpu in chosen] == [0]
+    assert slept == []
+    assert [entry.run_id for entry in mine.live_entries()] == ["run-b"]
+
+
+def test_the_lease_file_decides_a_claim_race_and_the_survey_does_not(tmp_path: Path) -> None:
+    """Both runs saw the same card free — the window between the survey and the memory
+    actually being held is minutes long, which is why the claim is what settles it."""
+    mine = queue_for(tmp_path)
+    peer = queue_for(tmp_path, run_id="run-b", user="bob", pid=4243)
+    surveys = 0
+
+    def probe_while_the_peer_claims() -> GpuSurvey:
+        nonlocal surveys
+        surveys += 1
+        if surveys == 1:
+            peer.claim_lease(0)
+        if surveys == 2:
+            peer.release_lease(0)
+        return _survey(1)
+
+    chosen = wait_for_devices(
+        AutoGpuConfig(reserve_gpus=NO_RESERVE),
+        probe=probe_while_the_peer_claims,
+        sleep=lambda _: None,
+        queue=mine,
+    )
+
+    assert [gpu.torch_index for gpu in chosen] == [0]
+    assert mine.live_entries() == []
+    # The wait selects *and* claims: the card comes back with this run's lease published on
+    # it, which is what closes the minutes-long window a survey on its own leaves open.
+    assert [(lease.gpu_index, lease.run_id) for lease in mine.live_leases()] == [(0, "run-a")]
+
+
+def test_a_run_that_refuses_to_wait_does_not_take_a_place_in_the_queue_either(
+    tmp_path: Path,
+) -> None:
+    """wait_for_free=false is the setting that promises a fast failure, and a queue with no
+    deadline in it would turn that same setting into the longest wait of all."""
+    mine = queue_for(tmp_path)
+
+    with pytest.raises(RuntimeError, match="Auto GPU mode found"):
+        wait_for_devices(
+            AutoGpuConfig(wait_for_free=False), probe=lambda: _survey(0), queue=mine
+        )
+
+    assert mine.live_entries() == []
+
+
+def test_a_cancelled_entry_stops_the_run_instead_of_starting_it(tmp_path: Path) -> None:
+    """A wait with no deadline needs one way out, and cancelling from cy-queue is it."""
+    mine = queue_for(tmp_path)
+
+    def cancel_from_the_viewer(seconds: float) -> None:
+        for entry in mine.live_entries():
+            mine.remove_entry(entry)
+
+    with pytest.raises(RuntimeError, match="cancelled"):
+        wait_for_devices(
+            AutoGpuConfig(),
+            probe=lambda: _survey(0),
+            sleep=cancel_from_the_viewer,
+            queue=mine,
+        )
 
 
 def test_inference_may_use_the_reserved_card(patch_modules: Any) -> None:

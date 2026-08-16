@@ -11,23 +11,34 @@ are is :data:`clearml_yolo.tasks.pipeline.PIPELINE_FILLED_KEYS`.
 
 from __future__ import annotations
 
+import os
+import socket
 from collections.abc import Callable
 from typing import Any
 
-from hydra.conf import HydraConf, JobConf
+from hydra.conf import HydraConf, JobConf, RunDir
 from hydra_zen import builds, make_config, store
+from omegaconf import OmegaConf
 
 from clearml_yolo.clearml_session import ClearMLConfig
 from clearml_yolo.gpu import AutoGpuConfig
+from clearml_yolo.run_identity import LATEST_LINK_NAME
 from clearml_yolo.tasks.compare import InferenceConfig, ModelRef
 from clearml_yolo.tasks.metrics import EvaluationConfig
-from clearml_yolo.tasks.pipeline import PIPELINE_FILLED_KEYS
+from clearml_yolo.tasks.pipeline import PIPELINE_FILLED_KEYS, RUNS_ROOT, TRAIN_DIR
 from clearml_yolo.tasks.report import BaselineConfig
 from clearml_yolo.tasks.train import CHECKPOINT
 
-TRAIN_PROJECT = "runs/detect"
+TRAIN_PROJECT = f"{RUNS_ROOT}/{TRAIN_DIR}"
 PREDICTIONS_CSV = "runs/predictions.csv"
 METRICS_DIR = "runs/metrics"
+
+# Hydra picks its own output directory before any of this project's code runs, so the run
+# id resolved inside the pipeline cannot name it. Host and pid are what is available that
+# early and they are enough: the date and the second are already in the path, and two runs
+# started in the same second on one machine differ by pid.
+RUN_STAMP_RESOLVER = "cy_run_token"
+HYDRA_RUN_DIR = "outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}-${" + RUN_STAMP_RESOLVER + ":}"
 
 # Hydra composes the ultralytics parameter sets from files inside the installed package,
 # because their comments are the point and a store entry cannot carry any. The path is
@@ -43,8 +54,12 @@ ULTRALYTICS_GROUP = "/ultralytics@ultralytics"
 
 # Where a standalone `cy-predict` looks with no weights named. Training writes into the
 # ClearML experiment's own name, so this is built from that rather than from a second
-# constant that would drift from it the first time either was changed.
-DEFAULT_CHECKPOINT = CHECKPOINT.format(project=TRAIN_PROJECT, name=ClearMLConfig().task_name)
+# constant that would drift from it the first time either was changed. It reads through
+# `latest` because a run's checkpoints live in a directory named after that run: the fixed
+# path a peer could overwrite is exactly what the run directory removed.
+DEFAULT_CHECKPOINT = CHECKPOINT.format(
+    project=f"{RUNS_ROOT}/{LATEST_LINK_NAME}/{TRAIN_DIR}", name=ClearMLConfig().task_name
+)
 
 AutoGpuConf = builds(AutoGpuConfig, populate_full_signature=True)
 ClearMLConf = builds(ClearMLConfig, populate_full_signature=True)
@@ -223,6 +238,11 @@ PipelineConf = make_config(
     auto_gpu=AutoGpuConf,
     ground_truth="ground_truth.csv",
     splits=["train", "val", "test"],
+    # Unset means the run names itself, after the experiment and the machine and the
+    # moment it started, and writes everything under a directory of that name. Set either
+    # of these to put two runs in one directory on purpose.
+    run_id=None,
+    run_dir=None,
     # Unset means the checkpoint this run's training stage writes. Set it when skip_train
     # points the run at a model somebody else trained.
     weights=None,
@@ -234,11 +254,21 @@ PipelineConf = make_config(
 )
 
 
+def _run_token() -> str:
+    """Tell two runs of the same second apart, before any config has been composed."""
+    return f"{socket.gethostname()}-{os.getpid()}"
+
+
 def register_configs() -> None:
     """Populate the hydra-zen store. Safe to call more than once."""
+    # `replace` because this module registers at import and the tests import it repeatedly;
+    # a second registration is the same resolver, not a competing one.
+    OmegaConf.register_new_resolver(RUN_STAMP_RESOLVER, _run_token, replace=True)
     # Hydra's auto-chdir would invalidate every relative path in the config, and
-    # ultralytics already manages its own run directories.
-    store(HydraConf(job=JobConf(chdir=False)))
+    # ultralytics already manages its own run directories — which also means Hydra's own
+    # output directory isolates nothing on its own, and two runs started in the same
+    # second shared it until the token was added to it.
+    store(HydraConf(job=JobConf(chdir=False), run=RunDir(dir=HYDRA_RUN_DIR)))
 
     for group in ("baseline", "report/baseline"):
         baseline_store = store(group=group)

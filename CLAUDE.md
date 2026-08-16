@@ -8,7 +8,8 @@ apply; this file adds only what is specific to `clearml-yolo`.
 
 **clearml-yolo** is a set of composable hydra-zen apps for YOLO training, inference, metrics and model
 comparison, tracked in ClearML. `cy` runs the whole pipeline; `cy-train`, `cy-predict`, `cy-metrics`,
-`cy-report`, `cy-compare`, `cy-ground-truth` and `cy-init-config` run the stages alone.
+`cy-report`, `cy-compare`, `cy-ground-truth` and `cy-init-config` run the stages alone. `cy-queue` is
+the odd one out — an argparse `rich` TUI over the machine's run queue, composing no config at all.
 
 **Language**: Python 3.12, Russian documentation (README.md only).
 
@@ -66,8 +67,14 @@ Shortest honest verification of a pipeline change, no server needed:
 
 ```bash
 uv run cy clearml.enabled=false train.ultralytics.data=coco8.yaml train.ultralytics.epochs=1 \
-  report/baseline=none skip_compare=true auto_gpu.scale_to_vram=false auto_gpu.wait_timeout_seconds=120
+  report/baseline=none skip_compare=true auto_gpu.scale_to_vram=false \
+  auto_gpu.queue.enabled=false auto_gpu.wait_timeout_seconds=120
 ```
+
+`auto_gpu.queue.enabled=false` is what makes `wait_timeout_seconds` mean anything. At the shipped
+defaults the run takes a place in this machine's queue instead, and a queued run waits **without a
+deadline** — the timeout is read only on the no-queue path. Leave the queue on when the point of the run
+is the queue; switch it off whenever the run must fail rather than sit behind CVAT holding the card.
 
 `auto_gpu.scale_to_vram=false` pins the batch to the 24 GB `reference_vram_gb` rather than scaling to the
 5090's 32 GB. At the shipped defaults it is defensive rather than load-bearing — `round_to_power_of_two`
@@ -85,7 +92,7 @@ cap, so raising it *shrinks* the batch.
 **Layered**, enforced by import-linter (contracts in `pyproject.toml`):
 
 ```
-apps → config_tree → configs → tasks → comparison → domain modules
+apps → config_tree → configs → tasks → comparison → domain modules → run_queue | run_identity
 ```
 
 A lower layer never knows about a higher one. `configs` sits **above** `tasks`, not below: it builds
@@ -93,18 +100,32 @@ configs from the task signatures themselves. Separate contracts keep the SDKs in
 visible only to the `clearml_*` adapters and to tasks, hydra never reaches the domain modules, and
 `ultralytics`/`torch` load only where weights are genuinely needed.
 
+`run_queue` and `run_identity` are the **bottom** layer, beneath `gpu` — pure filesystem, no NVML, no
+ultralytics, no ClearML, no hydra. `gpu.wait_for_devices` imports `run_queue` and so cannot be imported
+by it; siblings in one layer may not import each other either, which is why `run_identity` never reaches
+for the queue. `queue_view` (the pure `render(state) -> Table`) sits one layer up beside `gpu`, and
+`apps/queue.py` joins the "every app entrypoint stands alone" contract like the other entry points.
+
 ## Configuration
 
 Hydra/hydra-zen. `cy-init-config` dumps a starting config tree; `uv run cy --config-dir conf
 --config-name cy` runs from it. Without `--config-dir`, `cy` uses the packaged `pipeline` config.
 
-Values more than one stage needs — `clearml`, `auto_gpu`, `ground_truth`, `splits`, `weights` — are named
-once at the top level and **handed to each stage by the run itself**, in code, not by interpolation. A
-stage block holds only what that stage alone decides. A config folder dumped before this change still
-carries per-stage copies (`predict.weights`, `compare.iou_threshold`, …) that a run now recomputes and
-silently overwrites — re-dump it. `predict.imgsz` is **not** one of them: it is deliberately absent from
-`PIPELINE_FILLED_KEYS` (the reason is written out in the comment above that constant in
-`tasks/pipeline.py`), so a stale copy fails composition instead of being overwritten.
+Values more than one stage needs — `clearml`, `auto_gpu`, `ground_truth`, `splits`, `weights`, `run_id`,
+`run_dir` — are named once at the top level and **handed to each stage by the run itself**, in code, not
+by interpolation. A stage block holds only what that stage alone decides. A config folder dumped before
+this change still carries per-stage copies (`predict.weights`, `compare.iou_threshold`, …) that a run now
+recomputes and silently overwrites — re-dump it. `predict.imgsz` is **not** one of them: it is
+deliberately absent from `PIPELINE_FILLED_KEYS` (the reason is written out in the comment above that
+constant in `tasks/pipeline.py`), so a stale copy fails composition instead of being overwritten.
+
+`run_id`/`run_dir` are the same kind of value and they moved every output path with them: `predict.output`,
+`metrics.output_dir`, `report.output_dir` and `compare.output_dir` joined `PIPELINE_FILLED_KEYS`, so a
+dump that predates them **fails composition** (`Key 'output' not in 'Config'`) rather than being silently
+overwritten — re-dump with `cy-init-config <dir> --force` after any change to that constant. The one
+output key that still composes is `train.ultralytics.project`: it lives in the shared ultralytics file and
+so cannot be dropped, and the run overwrites it with `<run_dir>/detect` (the comment above
+`PIPELINE_FILLED_KEYS` says why). To redirect a whole run, set `run_dir=`, never a stage's own path.
 
 Every ultralytics parameter lives in `src/clearml_yolo/conf/ultralytics/`, one file per stage, each
 listing the whole of ultralytics' configuration. `null` there means "leave ultralytics' own default
@@ -140,6 +161,17 @@ hands it the shared values. Add the parity case to `tests/test_configs.py`.
 
 **Change GPU/batch behaviour**: `gpu.py` decides devices and batch; `tests/test_gpu.py` pins each rung of
 the ladder. Verify with a real run — the mocked suite cannot see a device it never allocates.
+
+**Change the queue or the run directory**: `run_queue.py` owns the lease and entry files and the pure
+`order()`; `gpu._wait_in_turn` is the whole scheduler (there is no daemon — the waiting `cy` process is
+it), and it reads the entries **before** the survey, which is what stops a fresh run jumping the line the
+instant a card frees. `run_identity.py` names the run and repoints `runs/latest`; `tasks/pipeline.py`
+hands `run_dir` to every writing stage. `tests/test_run_queue.py`, `tests/test_run_identity.py`,
+`tests/test_queue_view.py` and `tests/test_gpu.py` cover more of this than usual, because the queue is
+pure filesystem and points at `tmp_path`. What they still cannot see is two processes racing one card, so
+verify with the two-terminal run in `running-end-to-end-tests`. Settings nest as `auto_gpu.queue.*`
+rather than sitting beside `auto_gpu`, so the three stages already handed `auto_gpu` need no new
+parameter and neither parity test gains an entry.
 
 **Change what ClearML stores**: the adapters are `clearml_session.py`, `clearml_models.py`,
 `clearml_report.py`; nothing else may import `clearml`. Verify against the server and confirm the

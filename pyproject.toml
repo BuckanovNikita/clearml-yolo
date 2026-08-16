@@ -22,6 +22,9 @@ dependencies = [
     "openpyxl>=3.1",
     "nvidia-ml-py",
     "tqdm>=4.66",
+    # The cy-queue TUI draws with it. Ultralytics happens to pull it in today, which is not
+    # a promise we can build on.
+    "rich>=13",
     "digital-metrics",
     "report-generator",
 ]
@@ -35,6 +38,7 @@ cy-report = "clearml_yolo.apps.report:main"
 cy-compare = "clearml_yolo.apps.compare:main"
 cy-ground-truth = "clearml_yolo.apps.ground_truth:main"
 cy-init-config = "clearml_yolo.apps.config_tree:main"
+cy-queue = "clearml_yolo.apps.queue:main"
 
 [build-system]
 requires = ["uv_build>=0.11.32,<0.12.0"]
@@ -154,7 +158,8 @@ layers = [
     "clearml_yolo.tasks",
     "clearml_yolo.comparison",
     "clearml_yolo.inference | clearml_yolo.ground_truth | clearml_yolo.clearml_models | clearml_yolo.clearml_report",
-    "clearml_yolo.clearml_session | clearml_yolo.gpu | clearml_yolo.progress | clearml_yolo.artifact_names | clearml_yolo.ultralytics_params",
+    "clearml_yolo.clearml_session | clearml_yolo.gpu | clearml_yolo.progress | clearml_yolo.artifact_names | clearml_yolo.ultralytics_params | clearml_yolo.queue_view",
+    "clearml_yolo.run_queue | clearml_yolo.run_identity",
 ]
 
 [[tool.importlinter.contracts]]
@@ -179,6 +184,7 @@ modules = [
     "clearml_yolo.apps.metrics",
     "clearml_yolo.apps.pipeline",
     "clearml_yolo.apps.predict",
+    "clearml_yolo.apps.queue",
     "clearml_yolo.apps.report",
     "clearml_yolo.apps.train",
 ]
@@ -197,6 +203,9 @@ source_modules = [
     "clearml_yolo.progress",
     "clearml_yolo.artifact_names",
     "clearml_yolo.ultralytics_params",
+    "clearml_yolo.run_queue",
+    "clearml_yolo.run_identity",
+    "clearml_yolo.queue_view",
 ]
 forbidden_modules = ["clearml"]
 allow_indirect_imports = true
@@ -215,6 +224,9 @@ source_modules = [
     "clearml_yolo.clearml_models",
     "clearml_yolo.clearml_report",
     "clearml_yolo.ultralytics_params",
+    "clearml_yolo.run_queue",
+    "clearml_yolo.run_identity",
+    "clearml_yolo.queue_view",
 ]
 forbidden_modules = ["hydra", "hydra_zen", "omegaconf"]
 allow_indirect_imports = true
@@ -237,6 +249,9 @@ source_modules = [
     # The rule that decides what reaches ultralytics must not itself need ultralytics:
     # importing it here would put torch on the critical path of every CLI start.
     "clearml_yolo.ultralytics_params",
+    "clearml_yolo.run_queue",
+    "clearml_yolo.run_identity",
+    "clearml_yolo.queue_view",
 ]
 forbidden_modules = ["ultralytics", "torch"]
 allow_indirect_imports = true

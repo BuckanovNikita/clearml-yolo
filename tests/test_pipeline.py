@@ -5,6 +5,7 @@ from __future__ import annotations
 import pickle
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 from hydra import compose, initialize_config_module
@@ -12,8 +13,10 @@ from hydra_zen import instantiate, store, zen
 from omegaconf import OmegaConf
 
 import clearml_yolo.configs  # noqa: F401  registers every config
+from clearml_yolo import run_identity
 from clearml_yolo.clearml_session import ClearMLConfig
 from clearml_yolo.gpu import DeviceSelection
+from clearml_yolo.run_identity import LATEST_LINK_NAME
 from clearml_yolo.tasks import pipeline as pipeline_module
 from clearml_yolo.tasks.compare import InferenceConfig, ModelRef, NoBaselineModelError
 from clearml_yolo.tasks.pipeline import (
@@ -40,6 +43,21 @@ class _ReachedTrainingError(Exception):
 
 def _reached_training(**_: object) -> None:
     raise _ReachedTrainingError
+
+
+def _recording_training(seen: list[dict[str, object]]) -> Callable[..., None]:
+    """Keep what training was asked to do, then stand in for doing it."""
+
+    def run_training(**kwargs: object) -> None:
+        seen.append(kwargs)
+        raise _ReachedTrainingError
+
+    return run_training
+
+
+def _train_project(kwargs: dict[str, object]) -> str:
+    params: dict[str, Any] = kwargs["ultralytics"]  # type: ignore[assignment]
+    return str(params["project"])
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -88,6 +106,8 @@ def _stage_configs() -> dict[str, dict[str, object]]:
         ground_truth=config.ground_truth,
         splits=config.splits,
         weights=config.get("weights"),
+        run_dir=Path("runs/exp-here"),
+        previous_run_dir=Path("runs/exp-before"),
     )
 
 
@@ -291,6 +311,7 @@ def test_a_resolution_that_cannot_disagree_reaches_training(
 
     Reaching training is the assertion, for the reason `_ReachedTrainingError` documents.
     """
+    monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(pipeline_module, "run_training", _reached_training)
     truth = tmp_path / "ground_truth.csv"
     truth.write_text("image_path,split\na.png,test\n")
@@ -341,6 +362,7 @@ def test_a_run_that_scores_nothing_needs_no_ground_truth(
     run to get that far, so a check that rejected this config could not hide behind an
     earlier one raising first.
     """
+    monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(pipeline_module, "run_training", _reached_training)
     missing = tmp_path / "nowhere.csv"
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
@@ -383,6 +405,7 @@ def test_a_baseline_named_outright_survives_tracking_being_off(
     `ground_truth.csv` is untracked, so a test that leaned on it would pass here and fail
     on a fresh clone.
     """
+    monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(pipeline_module, "run_training", _reached_training)
     truth = tmp_path / "ground_truth.csv"
     truth.write_text("image_name,image_path,instance_label,split\n")
@@ -398,6 +421,83 @@ def test_a_baseline_named_outright_survives_tracking_being_off(
 
     with pytest.raises(_ReachedTrainingError):
         zen(run_pipeline)(config)
+
+
+def _run_alone(overrides: list[str]) -> None:
+    """Compose and run the pipeline the way the CLI does, up to training."""
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        config = compose(
+            config_name="pipeline",
+            overrides=[
+                "clearml.enabled=false",
+                "skip_predict=true",
+                "skip_metrics=true",
+                "skip_report=true",
+                "skip_compare=true",
+                *overrides,
+            ],
+        )
+    zen(run_pipeline)(config)
+
+
+def test_two_runs_in_one_folder_never_train_into_the_same_directory(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """This is the destructive case, not merely a confusing one: both runs used to train
+    into `runs/detect/<task_name>` with ultralytics' `exist_ok` set, and its DDP launcher
+    clears that directory before spawning its children — so starting the second run
+    deletes the first one's checkpoints.
+
+    Both runs are started in the same second, so the pid is the only thing separating
+    them here, which is exactly the case a stamp alone would not cover.
+    """
+    monkeypatch.chdir(tmp_path)
+    seen: list[dict[str, object]] = []
+    monkeypatch.setattr(pipeline_module, "run_training", _recording_training(seen))
+    pid = {"value": 4001}
+    monkeypatch.setattr(run_identity, "_host_and_pid", lambda: ("box", pid["value"]))
+
+    for value in (4001, 4002):
+        pid["value"] = value
+        with pytest.raises(_ReachedTrainingError):
+            _run_alone(["clearml.task_name=kitti"])
+
+    first, second = (_train_project(kwargs) for kwargs in seen)
+    assert first != second
+    # The link names the run that started last, so `ls runs/latest/metrics` keeps working.
+    assert str((tmp_path / "runs" / LATEST_LINK_NAME).resolve()) == str(Path(second).parent)
+
+
+def test_a_named_run_directory_is_where_everything_that_run_writes_goes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Naming it is how two runs share a directory on purpose — a rerun landing beside an
+    earlier one — and it has to move the whole run, not the checkpoints alone."""
+    monkeypatch.chdir(tmp_path)
+    seen: list[dict[str, object]] = []
+    monkeypatch.setattr(pipeline_module, "run_training", _recording_training(seen))
+    chosen = tmp_path / "sweeps" / "07"
+
+    with pytest.raises(_ReachedTrainingError):
+        _run_alone([f"run_dir={chosen}"])
+
+    assert _train_project(seen[0]) == str(chosen / "detect")
+
+
+def test_a_run_that_skips_training_with_nothing_to_load_is_refused_up_front(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """In a folder no run has finished in, `runs/latest` is not there, so the checkpoint a
+    skipped training stage would load is a path to nothing. Left to ultralytics it reads
+    as a failed download of a pretrained model, naming neither the link nor the key that
+    would have pointed the run at a real one."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(pipeline_module, "run_prediction", lambda **kwargs: pytest.fail("ran"))
+    truth = tmp_path / "ground_truth.csv"
+    truth.write_text("image_name,image_path,instance_label,split\n")
+
+    with pytest.raises(FileNotFoundError, match=r"latest/detect/.*/weights/best\.pt"):
+        _run_alone(["skip_train=true", "skip_predict=false", f"ground_truth={truth}"])
 
 
 def test_a_run_without_calibrated_thresholds_skips_rather_than_fails(

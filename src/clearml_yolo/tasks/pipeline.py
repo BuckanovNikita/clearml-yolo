@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,12 @@ from omegaconf import OmegaConf
 from clearml_yolo.clearml_session import ClearMLConfig, init_task
 from clearml_yolo.gpu import AutoGpuConfig
 from clearml_yolo.inference import ScoredResolution
+from clearml_yolo.run_identity import (
+    LATEST_LINK_NAME,
+    point_latest_at,
+    resolve_run_dir,
+    resolve_run_id,
+)
 from clearml_yolo.tasks.compare import (
     CompareResult,
     InferenceConfig,
@@ -33,6 +40,18 @@ from clearml_yolo.tasks.train import train as run_training
 # exactly the path the CLI takes and no other, which is why it has to be dropped here
 # rather than trusted to have been consumed.
 COMPOSITION_ONLY_KEYS = frozenset({"defaults"})
+
+# Every path a run writes hangs off one directory of its own, under this root. Two runs
+# started in the same folder used to share `runs/detect/<task_name>` with ultralytics'
+# `exist_ok` set, which is not a merge but a deletion: the DDP launcher clears the save
+# directory before spawning its children. The leaf names are what each directory was
+# called when they all sat directly under the root.
+RUNS_ROOT = Path("runs")
+TRAIN_DIR = "detect"
+PREDICTIONS_NAME = "predictions.csv"
+METRICS_DIR = "metrics"
+REPORTS_DIR = "reports"
+COMPARISON_DIR = "comparison"
 
 
 def _as_dict(config: Any) -> dict[str, Any]:
@@ -71,11 +90,16 @@ def _as_dict(config: Any) -> dict[str, Any]:
 # overwriting it instead would make it a key a run can set and the pipeline silently
 # discards. Both are `null` there and answered by a source that cannot go stale: the
 # ClearML task name, and the resolution recorded in the checkpoint.
+# `train.ultralytics.project` lives in that same shared file and so cannot be dropped
+# either, but unlike those two the run does overwrite it: a run directory a stage could
+# opt out of would isolate nothing, and `run_dir` is the key that moves it.
 PIPELINE_FILLED_KEYS: dict[str, frozenset[str]] = {
     "train": frozenset({"clearml", "auto_gpu"}),
-    "predict": frozenset({"clearml", "auto_gpu", "ground_truth", "splits", "weights", "model"}),
-    "metrics": frozenset({"clearml", "ground_truth", "splits", "predictions"}),
-    "report": frozenset({"clearml", "splits", "metrics_dir"}),
+    "predict": frozenset(
+        {"clearml", "auto_gpu", "ground_truth", "splits", "weights", "model", "output"}
+    ),
+    "metrics": frozenset({"clearml", "ground_truth", "splits", "predictions", "output_dir"}),
+    "report": frozenset({"clearml", "splits", "metrics_dir", "output_dir"}),
     "compare": frozenset(
         {
             "clearml",
@@ -84,6 +108,7 @@ PIPELINE_FILLED_KEYS: dict[str, frozenset[str]] = {
             "baseline_model",
             "candidate_model",
             "iou_threshold",
+            "output_dir",
             "matching_strategy",
         }
     ),
@@ -101,6 +126,8 @@ def stage_configs(
     ground_truth: str,
     splits: list[str],
     weights: str | Path | None,
+    run_dir: Path,
+    previous_run_dir: Path,
 ) -> dict[str, dict[str, Any]]:
     """Give every stage its own block plus everything the run decided for it.
 
@@ -109,27 +136,36 @@ def stage_configs(
     for one stage and silently left stale for another. Producer-to-consumer keys work the
     same way: the metrics stage is told the CSV inference wrote, not a second path that
     was supposed to match it.
+
+    Every path a stage writes is one of those values, because none of them is really a
+    stage's own choice: they are one directory, named after the run, and a stage allowed
+    to leave it would put this run's output back where a peer run overwrites it.
+    ``previous_run_dir`` is the one path pointing outside, and it is read rather than
+    written: a run that skips training loads the checkpoint the run before it produced.
     """
     shared_splits = list(splits)
     train_cfg = _as_dict(train) | {"clearml": clearml, "auto_gpu": auto_gpu}
-    train_params = train_cfg["ultralytics"]
+    train_params = train_cfg["ultralytics"] | {"project": str(run_dir / TRAIN_DIR)}
+    train_cfg["ultralytics"] = train_params
     predict_cfg = _as_dict(predict) | {
         "clearml": clearml,
         "auto_gpu": auto_gpu,
         "ground_truth": ground_truth,
         "splits": shared_splits,
+        "output": str(run_dir / PREDICTIONS_NAME),
         # The model the run trained: a batch table is keyed by the architecture. The
         # resolution is not passed across — the predict block leaves it null and the
         # checkpoint answers it, which is the same number from a source that cannot
         # disagree with the weights it describes.
         "model": train_params["model"],
         # Training overwrites this with the checkpoint it produced. The template is what a
-        # run with skip_train has instead: where training would have written. `name` is
-        # null in the config and resolved to the experiment's name by the train task, so
+        # run with skip_train has instead: where training last wrote. That is the previous
+        # run's directory, never this one's, which is empty until this run trains. `name`
+        # is null in the config and resolved to the experiment's name by the train task, so
         # it is resolved the same way here rather than read back out of the block.
         "weights": weights
         or CHECKPOINT.format(
-            project=train_params["project"], name=train_params["name"] or clearml.task_name
+            project=previous_run_dir / TRAIN_DIR, name=train_params["name"] or clearml.task_name
         ),
     }
     metrics_cfg = _as_dict(metrics) | {
@@ -137,11 +173,13 @@ def stage_configs(
         "ground_truth": ground_truth,
         "splits": shared_splits,
         "predictions": predict_cfg["output"],
+        "output_dir": str(run_dir / METRICS_DIR),
     }
     report_cfg = _as_dict(report) | {
         "clearml": clearml,
         "splits": shared_splits,
         "metrics_dir": metrics_cfg["output_dir"],
+        "output_dir": str(run_dir / REPORTS_DIR),
     }
     compare_cfg = _as_dict(compare)
     return {
@@ -154,6 +192,7 @@ def stage_configs(
             "clearml": clearml,
             "auto_gpu": auto_gpu,
             "ground_truth": ground_truth,
+            "output_dir": str(run_dir / COMPARISON_DIR),
             # The report reads the baseline's stored dashboards while the comparison
             # re-infers its checkpoint, and two independent searches of one project can
             # answer with two different runs. `source` is not shared: "local" means a folder
@@ -303,6 +342,24 @@ def _check_weights_choice(weights: str | Path | None, skip_train: bool) -> None:
         )
 
 
+def _check_checkpoint(weights: str | Path, readers: list[str]) -> None:
+    """Reject a run that skips training with no checkpoint to skip it with.
+
+    A run writes into a directory of its own now, so the model a previous run trained is
+    reached through the ``latest`` link rather than through a fixed path — and in a folder
+    no run has finished in yet, that link is not there. Without this the run reaches
+    ultralytics with a path to nothing, which reports it as a failed download of a
+    pretrained model and names neither the link nor the key that would have set it.
+    """
+    if not readers or Path(weights).is_file():
+        return
+    raise FileNotFoundError(
+        f"skip_train=true, but {weights} does not exist and the {', '.join(readers)} "
+        f"stage(s) load it. Name the checkpoint outright with weights=<path/to/best.pt>, "
+        f"or drop skip_train and let this run train its own."
+    )
+
+
 def _preflight(
     configs: dict[str, dict[str, Any]],
     clearml: ClearMLConfig,
@@ -342,8 +399,30 @@ def _preflight(
         ground_truth,
         [stage for stage in ("predict", "metrics", "compare") if not skipped[stage]],
     )
+    if skipped["train"]:
+        _check_checkpoint(
+            configs["predict"]["weights"],
+            [stage for stage in ("predict", "compare") if not skipped[stage]],
+        )
     if not skipped["compare"]:
         _check_comparison_baseline(compare_cfg["baseline_model"], clearml)
+
+
+def _resolve_run_directories(
+    clearml: ClearMLConfig, run_id: str | None, run_dir: str | Path | None
+) -> tuple[Path, Path]:
+    """Name this run, and read where the previous one left its model.
+
+    The two come from here together because their order is the whole point: ``latest``
+    still names the run before this one until this run repoints it, and that is where a
+    run with ``skip_train`` and no ``weights`` finds a checkpoint. Resolved once, so the
+    path survives the link moving on.
+    """
+    identity = resolve_run_id(clearml.task_name, run_id, datetime.now(tz=UTC))
+    directory = resolve_run_dir(RUNS_ROOT, identity, Path(run_dir) if run_dir is not None else None)
+    previous = (RUNS_ROOT / LATEST_LINK_NAME).resolve()
+    logger.info("Run {} writes everything it produces to {}", identity, directory)
+    return directory, previous
 
 
 def run_pipeline(
@@ -356,6 +435,8 @@ def run_pipeline(
     auto_gpu: AutoGpuConfig,
     ground_truth: str,
     splits: list[str],
+    run_id: str | None = None,
+    run_dir: str | Path | None = None,
     weights: str | Path | None = None,
     skip_train: bool = False,
     skip_predict: bool = False,
@@ -370,6 +451,8 @@ def run_pipeline(
     # opening its own.
     init_task(clearml, stage="pipeline")
 
+    directory, previous = _resolve_run_directories(clearml, run_id, run_dir)
+
     results: dict[str, Any] = {}
     configs = stage_configs(
         train=train,
@@ -382,6 +465,8 @@ def run_pipeline(
         ground_truth=ground_truth,
         splits=splits,
         weights=weights,
+        run_dir=directory,
+        previous_run_dir=previous,
     )
     train_cfg = configs["train"]
     predict_cfg = configs["predict"]
@@ -401,6 +486,11 @@ def run_pipeline(
             "compare": skip_compare,
         },
     )
+
+    # Only now, with every pre-flight check passed: a run that refuses writes nothing, and
+    # pointing the link at its empty directory would hide the last run that did.
+    directory.mkdir(parents=True, exist_ok=True)
+    point_latest_at(RUNS_ROOT, directory)
 
     checkpoint = predict_cfg["weights"]
     # Inference after training must reuse training's own card rather than survey again:

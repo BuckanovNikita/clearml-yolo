@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 import pandas as pd
 from loguru import logger
@@ -90,6 +91,21 @@ def _vocabulary_report(
     )
 
 
+def _write_cache(predictions: pd.DataFrame, output: Path) -> None:
+    """Publish the cache in one step, because a peer run may be reading it.
+
+    This file is keyed by the baseline's hash rather than by the run, so two runs
+    comparing against the same model share it. Written in place, a reader's ``is_file()``
+    is satisfied by a file still being appended to, and the short prediction set it gets
+    back does not fail — it scores as a recall drop, which reads as a model regression.
+    """
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with NamedTemporaryFile("w", dir=output.parent, delete=False, encoding="utf-8") as handle:
+        predictions.to_csv(handle, index=False)
+        written = Path(handle.name)
+    written.replace(output)
+
+
 def reinfer_split(
     weights: str | Path,
     ground_truth: pd.DataFrame,
@@ -145,8 +161,7 @@ def reinfer_split(
             quantize=quantize,
             image_name=image_name,
         )
-        output.parent.mkdir(parents=True, exist_ok=True)
-        predictions.to_csv(output, index=False)
+        _write_cache(predictions, output)
         logger.info(
             "Re-inferred {} baseline predictions over {} images of split {!r} into {}",
             len(predictions),

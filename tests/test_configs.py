@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -45,11 +46,20 @@ def test_app_config_composes(app: str) -> None:
     assert config is not None
 
 
-def _pipeline_stages(overrides: list[str]) -> dict[str, dict[str, object]]:
+RUN_DIR = Path("runs/exp-here")
+PREVIOUS_RUN_DIR = Path("runs/exp-before")
+
+
+def _pipeline_stages(
+    overrides: list[str], run_dir: Path = RUN_DIR
+) -> dict[str, dict[str, object]]:
     """Compose the pipeline and build each stage's kwargs the way run_pipeline does.
 
     Composing alone proves nothing about what a stage receives: the shared values are not
     in the stage blocks at all, they are handed over by ``stage_configs``.
+
+    The two directories are named here rather than resolved, because ``run_pipeline``
+    names them too: what a run decides cannot be read back out of the composed config.
 
     Each block is instantiated first, because that is what ``zen`` does before calling
     ``run_pipeline`` and the shape differs: a composed block is a ``DictConfig`` with
@@ -71,12 +81,14 @@ def _pipeline_stages(overrides: list[str]) -> dict[str, dict[str, object]]:
         ground_truth=config.ground_truth,
         splits=config.splits,
         weights=config.get("weights"),
+        run_dir=run_dir,
+        previous_run_dir=PREVIOUS_RUN_DIR,
     )
 
 
-def _ultralytics(overrides: list[str], stage: str) -> dict[str, Any]:
+def _ultralytics(overrides: list[str], stage: str, run_dir: Path = RUN_DIR) -> dict[str, Any]:
     """One stage's ultralytics block, as the task would be handed it."""
-    params: dict[str, Any] = _pipeline_stages(overrides)[stage]["ultralytics"]  # type: ignore[assignment]
+    params: dict[str, Any] = _pipeline_stages(overrides, run_dir)[stage]["ultralytics"]  # type: ignore[assignment]
     return params
 
 
@@ -161,7 +173,7 @@ def test_the_run_name_follows_the_experiment_name() -> None:
     # builds the same path here rather than writing into a key a run may have set.
     assert _ultralytics(named, "train")["name"] is None
     assert _pipeline_stages(named)["predict"]["weights"] == (
-        "runs/detect/kitti-candidate/weights/best.pt"
+        "runs/exp-before/detect/kitti-candidate/weights/best.pt"
     )
 
 
@@ -172,26 +184,53 @@ def test_a_named_run_directory_wins_over_the_experiment_name() -> None:
         ["clearml.task_name=kitti-candidate", "train.ultralytics.name=sweep-07"]
     )
 
-    assert stages["predict"]["weights"] == "runs/detect/sweep-07/weights/best.pt"
+    assert stages["predict"]["weights"] == "runs/exp-before/detect/sweep-07/weights/best.pt"
 
 
-def test_a_skipped_training_stage_predicts_where_training_would_have_written() -> None:
-    """Nothing produced a checkpoint this run, so the path has to be built from the run's
-    own project and name — the same two values training would have used."""
+def test_a_skipped_training_stage_reads_the_checkpoint_the_last_run_wrote() -> None:
+    """Nothing produced a checkpoint this run, and this run's own directory is empty by
+    construction — every run writes into one of its own now. The model to load is the one
+    the previous run left behind, which is what `runs/latest` points at."""
     stages = _pipeline_stages(["skip_train=true", "clearml.task_name=kitti-candidate"])
 
-    assert stages["predict"]["weights"] == "runs/detect/kitti-candidate/weights/best.pt"
+    assert stages["predict"]["weights"] == (
+        "runs/exp-before/detect/kitti-candidate/weights/best.pt"
+    )
+
+
+@pytest.mark.parametrize("run_dir", [RUN_DIR, Path("/data/yolo/exp-elsewhere")])
+def test_no_stage_writes_outside_the_run_directory(run_dir: Path) -> None:
+    """One run, one directory, and a directory the run alone names.
+
+    A stage keeping a fixed path of its own is the collision this exists to remove: two
+    runs started in the same folder wrote into the same `runs/detect/<task_name>`, and
+    with ultralytics' `exist_ok` set that is not a merge but a deletion. So it is not
+    enough that the paths differ from each other — every one of them has to be inside the
+    directory this run was given, wherever that was pointed.
+    """
+    stages = _pipeline_stages([], run_dir=run_dir)
+    written = {
+        "train": _ultralytics([], "train", run_dir=run_dir)["project"],
+        "predict": stages["predict"]["output"],
+        "metrics": stages["metrics"]["output_dir"],
+        "report": stages["report"]["output_dir"],
+        "compare": stages["compare"]["output_dir"],
+    }
+
+    for stage, path in written.items():
+        assert Path(str(path)).is_relative_to(run_dir), f"{stage} writes to {path}"
 
 
 def test_each_stage_reads_what_the_previous_one_wrote() -> None:
     """These keys were dead before: the pipeline read the producing stage's key instead,
-    so changing metrics.output_dir left report.metrics_dir silently stale."""
-    stages = _pipeline_stages(
-        ["predict.output=runs/kitti_preds.csv", "metrics.output_dir=runs/kitti_metrics"]
-    )
+    so changing metrics.output_dir left report.metrics_dir silently stale. Now that both
+    ends of each pair are the run's own decision there is nothing left to leave stale, and
+    what has to hold is that the consumer is handed the producer's path and not a second
+    one built the same way."""
+    stages = _pipeline_stages([])
 
-    assert stages["metrics"]["predictions"] == "runs/kitti_preds.csv"
-    assert stages["report"]["metrics_dir"] == "runs/kitti_metrics"
+    assert stages["metrics"]["predictions"] == stages["predict"]["output"]
+    assert stages["report"]["metrics_dir"] == stages["metrics"]["output_dir"]
 
 
 def test_the_comparison_re_infers_exactly_as_the_predict_stage_did() -> None:

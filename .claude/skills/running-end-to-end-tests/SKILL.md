@@ -28,9 +28,9 @@ uv run lint-imports
 ```
 
 `lint-imports` is not optional and is the one most often forgotten: it enforces the layering contracts in
-`pyproject.toml` (`apps` → `config_tree` → `configs` → `tasks` → `comparison` → domain), including that
-`clearml` stays behind the `clearml_*` adapters. `uv run pre-commit run --all-files` runs these four
-through the same locked `dev` group, after the upstream `pre-commit-hooks` set (`check-yaml`,
+`pyproject.toml` (`apps` → `config_tree` → `configs` → `tasks` → `comparison` → domain →
+`run_queue`/`run_identity`), including that `clearml` stays behind the `clearml_*` adapters.
+`uv run pre-commit run --all-files` runs these four through the same locked `dev` group, after the upstream `pre-commit-hooks` set (`check-yaml`,
 `check-toml`, merge conflicts, file size, whitespace, end-of-file), which lives in pre-commit's own
 environment rather than in `dev`.
 
@@ -48,11 +48,16 @@ uv run cy \
   report/baseline=none \
   skip_compare=true \
   auto_gpu.scale_to_vram=false \
+  auto_gpu.queue.enabled=false \
   auto_gpu.wait_timeout_seconds=120
 ```
 
-Add `train.ultralytics.project=`, `predict.output=`, `metrics.output_dir=`, `report.output_dir=` pointing
-into your scratchpad to keep `runs/` clean.
+Add `run_dir=<scratchpad>/cy-verify` to keep `runs/` clean. That is now the **only** way to redirect
+output: the per-stage keys that used to do it — `predict.output=`, `metrics.output_dir=`,
+`report.output_dir=`, `compare.output_dir=` — no longer compose inside `cy` (`Key 'output' not in
+'Config'`), because the run hands each stage a path under `run_dir`. `train.ultralytics.project=` still
+composes but the run overwrites it, which is worse than a refusal: the override looks accepted and does
+nothing.
 
 Two overrides here are load-bearing, not decoration. `skip_compare=true` is required whenever
 `clearml.enabled=false`: the comparison resolves its baseline out of ClearML and has no project to
@@ -66,12 +71,16 @@ outright and that resolution is not the one `train.ultralytics.imgsz` is trainin
 null and the checkpoint answers it. All three refusals happen before training, so a mis-specified run
 costs seconds rather than a full training pass.
 
-**Expected end state:** `metrics.output_dir` holds `full_dashboard_{train,val,test}.xlsx`,
-`matrix_*.xlsx`, `метрики_дтрк_*.xlsx` and four `*_confidence_intervals.png`; the predictions CSV has a
-row per detection; the last log lines are `Baseline disabled; publishing new metrics without comparison`
-and `Skipping comparison stage`.
+**Expected end state:** everything is under one run directory — `runs/<task_name>-<host>-<stamp>-<pid>/`,
+with `runs/latest` symlinked to it, or under `run_dir` if you named one. `<run_dir>/metrics` holds
+`full_dashboard_{train,val,test}.xlsx`, `matrix_*.xlsx`, `метрики_дтрк_*.xlsx` and four
+`*_confidence_intervals.png`; `<run_dir>/predictions.csv` has a row per detection;
+`<run_dir>/detect/<name>/weights/best.pt` is the checkpoint. The last log lines are `Baseline disabled;
+publishing new metrics without comparison` and `Skipping comparison stage`. Check `runs/latest` resolves
+to this run: it is what `skip_train=true` without `weights`, and a standalone `cy-predict` with no
+weights, read the checkpoint through.
 
-**`report.output_dir` is empty, and that is correct.** With `report/baseline=none` there is nothing to
+**`<run_dir>/reports` is empty, and that is correct.** With `report/baseline=none` there is nothing to
 compare against, so the report stage publishes metrics without writing workbooks. Do not read the empty
 directory as a failure.
 
@@ -89,6 +98,7 @@ uv run cy \
   train.ultralytics.data=coco8.yaml \
   train.ultralytics.epochs=1 \
   auto_gpu.scale_to_vram=false \
+  auto_gpu.queue.enabled=false \
   auto_gpu.wait_timeout_seconds=120
 ```
 
@@ -121,12 +131,76 @@ uv run cy clearml.project_name=cy-verify clearml.task_name=candidate \
 `compare.bootstrap_iterations=200` keeps a verification run quick; the default 10000 is for real
 comparisons, not for proving the wiring.
 
-**Expected end state of run 2:** `compare.output_dir` holds `compare_workbook_<split>.xlsx` plus the
+**Expected end state of run 2:** `<run_dir>/comparison` holds `compare_workbook_<split>.xlsx` plus the
 re-inferred `baseline_predictions_*` / `candidate_predictions_*` CSVs, and the log ends with
 `Comparison of split '<split>': <n> classes compared, <n> excluded, <n> degraded`. Because the report stage now
-resolves a baseline, `report.output_dir` also fills with `report_dev_*`, `report_business_*` and
+resolves a baseline, `<run_dir>/reports` also fills with `report_dev_*`, `report_business_*` and
 `baseline_*` workbooks per split — the contrast with run 1's empty report directory is the check that the
-baseline actually resolved.
+baseline actually resolved. Both runs have their **own** run directory: run 2's comparison must not be
+sitting in run 1's.
+
+## 5. Two runs at once — the queue and the run directory
+
+The mocked suite covers the queue unusually well (it is pure filesystem, pointed at `tmp_path`), but it
+cannot see two processes racing one card, an NVML survey, or a `runs/latest` symlink. That needs two
+terminals.
+
+**This box has one GPU**, so the 4+4 split the queue exists for is not verifiable here. The observable
+equivalent is two runs each asking for one card: the second must queue behind the first rather than
+collide with it or hang. Keep `auto_gpu.queue.enabled` at its default here — switching it off is what
+the other sections do, and it is the very thing under test.
+
+```bash
+# terminal 1
+uv run cy clearml.enabled=false train.ultralytics.data=coco8.yaml train.ultralytics.epochs=1 \
+  clearml.task_name=par-a report/baseline=none skip_compare=true \
+  auto_gpu.scale_to_vram=false auto_gpu.num_gpus=1
+
+# terminal 2, started while the first is training
+uv run cy clearml.enabled=false train.ultralytics.data=coco8.yaml train.ultralytics.epochs=1 \
+  clearml.task_name=par-b report/baseline=none skip_compare=true \
+  auto_gpu.scale_to_vram=false auto_gpu.num_gpus=1
+
+# terminal 3
+uv run cy-queue
+```
+
+`cy-queue` needs a real terminal — it draws a live table and reads single keypresses, so it refuses with
+exit code 2 when stdin or stdout is a pipe. Watching a queue somewhere else is `cy-queue --dir <path>`;
+the default is `/tmp/clearml-yolo/<hostname>`, also settable per-run with `auto_gpu.queue.dir` or
+`$CLEARML_YOLO_QUEUE_DIR`.
+
+Checks, in order:
+
+1. **Run B logs its queue position**, naming who is ahead of it, rather than colliding or hanging. On
+   this WSL box that line is the whole point: `/dev/dxg` is one device for every card, so before leases
+   a peer run marked *all* cards occupied and the second run sat in the wait loop for the full
+   `wait_timeout_seconds`. A's pid is now subtracted from that count along with its whole process group.
+2. **`cy-queue` shows A holding a card above B waiting.** Both are named `<host>-<pid>` there, not
+   `par-a`/`par-b`: the queue identifies the *process* (stable across stages so predict recognises the
+   lease train took), while the run directory is named after the experiment. That id carries no stamp,
+   so the elapsed column reads `-`. Pin (`t`), cancel (`c`) and reclaim (`r`) each
+   take effect within one poll interval. A cancelled run says so and stops — it does not start.
+   Pressing `r` on a live holder must refuse: the claim is taken and given straight back, so a running
+   training cannot be evicted from the viewer.
+3. **B starts after A releases**, and `served/<user>` under the queue directory gains an entry. Start a
+   third run C while B is still queued: C must land *behind* B even at the instant A releases its card.
+   Entries are read before the survey precisely so a newcomer cannot jump the line, and that is the one
+   failure a casual test will not show.
+4. **Each run has its own directory.** `runs/par-a-<host>-<stamp>-<pid>/` and `runs/par-b-…/` each hold
+   their own `detect/`, `predictions.csv` and `metrics/`; neither contains the other's; `runs/latest`
+   points at whichever run *started* last — the link is repointed after the pre-flight checks pass, not
+   at the end — so here it is B, still training. Before run directories, B's start *deleted* A's in-flight
+   checkpoints, because ultralytics' DDP launcher clears the save directory before spawning children.
+5. **`SIGKILL` a run mid-training.** Its lease and entry survive briefly and then a waiter reclaims them
+   after `auto_gpu.queue.stale_after_seconds` (120.0), with no human intervening. `cy-queue` shows the
+   lease as `expired` in the meantime.
+6. **Both hydra output directories exist separately**, as `outputs/<date>/<HH-MM-SS>-<host>-<pid>`, each
+   with its own log. Hydra resolves that path before any of this project's code runs, which is why the
+   token is host-and-pid rather than the run id.
+
+Then re-run sections 3 and 4 unchanged, to confirm `run_dir` broke neither artifact upload nor baseline
+resolution.
 
 ## Overrides that matter on this box
 
@@ -135,8 +209,12 @@ to the 5090's 32 GB. The GPU is shared with CVAT and the ClearML server, so veri
 claim the full card. Do **not** raise `reference_vram_gb` to 32 to "match the hardware" — that is a
 batch-sizing knob, not a memory cap.
 
-`auto_gpu.wait_timeout_seconds=120` stops a run from blocking for the default hour when another process
-holds the card.
+`auto_gpu.wait_timeout_seconds=120` stops a run from blocking for the default 3600 s when another process
+holds the card — **but only together with `auto_gpu.queue.enabled=false`**. At the shipped defaults the
+run takes a place in the machine's queue instead, and a queued run waits with no deadline at all: the
+timeout is read only on the no-queue path, so on its own it now buys nothing. Any verification run that
+must fail rather than sit behind CVAT holding the card needs both overrides. The exception is section 5,
+where the queue is the subject.
 
 ## Common mistakes
 
@@ -144,7 +222,10 @@ holds the card.
 |---|---|
 | "`uv run pytest` passed, so the pipeline works" | The suite mocks the SDKs and never runs a stage for real. |
 | Skipping `lint-imports` | It is the only check that catches a layering violation, and pre-commit will reject the commit. |
-| Reading an empty `report.output_dir` as failure | Expected with `report/baseline=none`. |
+| Reading an empty `<run_dir>/reports` as failure | Expected with `report/baseline=none`. |
+| `wait_timeout_seconds=120` on its own to bound a run | Unread at the shipped defaults; a queued run has no deadline. Add `auto_gpu.queue.enabled=false`. |
+| `predict.output=` / `metrics.output_dir=` to redirect a `cy` run | They no longer compose. Use `run_dir=`. |
+| Expecting a standalone `cy-train` to isolate itself | Only `cy` resolves a run directory. Two standalone `cy-train` queue for cards but still share `runs/detect/<name>`. |
 | First ClearML run warning "no completed task tagged prod" | Expected on a fresh project; compare needs a prior run. |
 | Verifying against the real `clearml-yolo` project | Pollutes the `prod` baseline other runs resolve against. Use a throwaway project. |
 | Treating `debug.ping` as proof ClearML works | It answers unauthenticated. Use `./scripts/check_env.sh`. |
