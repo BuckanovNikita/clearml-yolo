@@ -10,7 +10,13 @@ from loguru import logger
 from pydantic import BaseModel
 
 from clearml_yolo.clearml_session import ClearMLConfig, init_task
-from clearml_yolo.gpu import AutoGpuConfig, DeviceSelection, remember_batch, resolve_devices
+from clearml_yolo.gpu import (
+    AutoGpuConfig,
+    DeviceSelection,
+    release_gpus_except,
+    remember_batch,
+    resolve_devices,
+)
 from clearml_yolo.run_identity import RUNS_ROOT, point_latest_at, resolve_run_dir, resolve_run_id
 from clearml_yolo.ultralytics_params import fill_unset
 
@@ -148,5 +154,9 @@ def train(
     logger.info("Best checkpoint: {}", best)
     # Only now is this batch known to fit: it survived every epoch, including the
     # validation pass, which is where a batch that trains but does not validate fails.
-    remember_batch(auto_gpu, "train", architecture, selection)
+    remember_batch("train", architecture, selection)
+    # Training was the only stage that wanted more than one card. Everything after it in
+    # this process — inference here, or the rest of the pipeline — runs on a single device,
+    # so the others go back to the machine now rather than at exit.
+    release_gpus_except(selection.devices[:1] if isinstance(selection.devices, list) else [])
     return TrainResult(weights=best, inference_device=_inference_device(selection))

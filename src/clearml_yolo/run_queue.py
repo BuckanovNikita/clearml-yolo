@@ -249,6 +249,21 @@ def _create_exclusive(path: Path, text: str) -> bool:
     return True
 
 
+def _replace_with_payload(path: Path, text: str) -> None:
+    """Put ``text`` where ``path`` is, in one step, whatever was there before.
+
+    The deliberate opposite of :func:`_create_exclusive`: it decides nothing and refuses
+    nothing. Only ``--force-gpu`` reaches it, and the rename is what keeps a peer reading
+    the directory from ever seeing half a lease.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with NamedTemporaryFile("w", dir=path.parent, delete=False, encoding="utf-8") as handle:
+        handle.write(text)
+        written = Path(handle.name)
+    _open_up(written, SHARED_FILE_MODE)
+    written.replace(path)
+
+
 def _read_payload(path: Path) -> dict[str, Any] | None:
     """The JSON in a lease or entry file, or None when there is nothing usable to read."""
     try:
@@ -415,6 +430,42 @@ class RunQueue:
                 return []
             taken.append(lease)
         return taken
+
+    def seize_leases(self, gpu_indices: Sequence[int]) -> list[Lease]:
+        """Take these cards whoever holds them, naming everyone they were taken from.
+
+        The claim primitive above is an ``O_EXCL`` create precisely so that one card has one
+        holder; this writes over the file instead, which is the one thing the rest of this
+        module exists to prevent. It is reached only from ``--force-gpu``, where a person
+        has said so outright.
+
+        The write is a temp file renamed over the lease, so a peer reading the directory
+        sees the old holder or the new one and never a half-written file. Reclaim markers
+        are left alone: a marker is somebody's reclaim in flight, and this is not one.
+        """
+        seized: list[Lease] = []
+        for index in gpu_indices:
+            path = self._lease_path(index)
+            displaced = _read_payload(path)
+            if displaced is not None and displaced.get("run_id") != self.run_id:
+                logger.warning(
+                    "Seizing GPU {} from {}:{} (pid {}), which has not finished with it",
+                    index,
+                    displaced.get("user", UNKNOWN_HOLDER),
+                    displaced.get("run_id", UNKNOWN_HOLDER),
+                    displaced.get("pid", NO_PID),
+                )
+            lease = Lease(
+                gpu_index=index,
+                run_id=self.run_id,
+                user=self.user,
+                host=self.host,
+                pid=self.pid,
+                started_at=self._now(),
+            )
+            _replace_with_payload(path, lease.model_dump_json())
+            seized.append(lease)
+        return seized
 
     def _take_over_a_stale_lease(self, path: Path, payload: str) -> bool:
         """Replace a lease nobody has heartbeated for ``stale_after_seconds``, or refuse.

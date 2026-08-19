@@ -7,22 +7,27 @@ which would occupy the very memory the survey is trying to measure.
 A run does not merely pick devices, it waits for them and then claims them: starting
 training on a host whose cards are busy either crashes or evicts someone else's inference,
 and a card that was merely *seen* free is one a peer may take in the minutes before the
-memory is actually held. ``reserve_gpus`` leaves cards behind for other runs to infer on,
-the wait loop holds the run at the door until enough cards are free, and a lease file
-taken through :mod:`clearml_yolo.run_queue` is what closes the window between the two.
-With the queue in front of the cards the wait also becomes a queue: entries are read
-before the survey, only the head of the order may claim, and a run that has taken its
-place in line waits for its turn however long that is. A named ``device`` is exempt from
-the survey and not from the leases: it claims exactly the cards it names, and refuses the
-ones a peer's lease covers rather than starting on top of them.
+memory is actually held. The wait loop holds the run at the door until enough cards are
+free, and a lease file taken through :mod:`clearml_yolo.run_queue` is what closes the
+window between the two. With the queue in front of the cards the wait also becomes a
+queue: entries are read before the survey, only the head of the order may claim, and a run
+that has taken its place in line waits for its turn however long that is. A named
+``device`` is exempt from the survey and not from the leases: it claims exactly the cards
+it names, and refuses the ones a peer's lease covers rather than starting on top of them.
 
-The batch a run lands on comes from the first of five sources that can answer, and which
+How many cards a run takes is ``min_gpus`` at the bottom and ``max_gpus`` at the top. With
+no ceiling named a run takes every free card, less what the runs already waiting in line
+asked for — which is what lets a second run start beside a first instead of behind it.
+``force`` is the way past all of it, leases included, and it can put two trainings on one
+card.
+
+The batch a run lands on comes from the first of three sources that can answer, and which
 one did is always logged, because a number arrived at silently is a number nobody can
-correct. In order: the batch the stage was given outright, the ``batch_table`` this
-hardware was measured into, the batch a previous run of this stage was seen to finish at
-(:func:`remember_batch`), a per-model anchor scaled by the card's VRAM, and finally the
-one global anchor scaled the same way. The first three are measurements and are used as
-they stand; the last two are a batch at a reference card, so both go through the ratio.
+correct. In order: the batch the stage was given outright, the largest batch a previous run
+of this stage was seen to *finish* at on this hardware (:func:`remember_batch`), and
+failing both :data:`DEFAULT_BATCH`. Every one of them is a measurement or an explicit
+instruction; nothing here estimates a batch from a card's VRAM, because the estimate was
+always the rung that was wrong.
 """
 
 from __future__ import annotations
@@ -32,7 +37,7 @@ import json
 import os
 import socket
 import time
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import ExitStack, contextmanager
 from itertools import takewhile
 from pathlib import Path
@@ -40,7 +45,7 @@ from tempfile import NamedTemporaryFile
 from typing import Any, NoReturn
 
 from loguru import logger
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, model_validator
 
 from clearml_yolo.run_queue import (
     NO_PID,
@@ -60,73 +65,38 @@ BYTES_PER_GIB = 1 << 30
 # environment wins, so a shared machine can keep one table per user or per project.
 BATCH_TABLE_ENV_VAR = "CLEARML_YOLO_BATCH_TABLE"
 DEFAULT_BATCH_TABLE = Path.home() / ".cache" / "clearml-yolo" / "batch_table.json"
-# What a stage falls back to when nothing surveyed the hardware: no card was named, so
-# there is nothing to size a batch against.
+# What a stage falls back to when no run of it has ever finished on this hardware and
+# nobody named a batch. Small enough to fit the cards this project is run on.
 DEFAULT_BATCH = 16
-
-# ``model -> card -> batch``, where the batch is either one number for any device count
-# or a mapping from device count to number. Written by hand into ``batch_table``, and by
-# :func:`remember_batch` into the file above under one further key naming the stage.
-BatchTable = dict[str, dict[str, int | dict[int, int]]]
 
 
 class AutoGpuConfig(BaseModel):
     """Policy for picking devices and deriving a total batch size from them."""
 
     enabled: bool = True
-    batch_per_gpu: int = Field(default=16, ge=1)
-    reference_vram_gb: float = Field(default=24.0, gt=0)
-    # The same anchor as above, but per model, because a yolo11x and a yolo11n do not fit
-    # the same card the same way. Keyed by the name of the weights without their suffix.
-    model_batch_per_gpu: dict[str, int] = Field(default_factory=dict)
-    # Batches measured on this hardware rather than estimated from it, so they are used
-    # exactly as written — neither scaled to VRAM nor rounded to a power of two.
-    batch_table: BatchTable = Field(default_factory=dict)
-    # Whether a batch that ran to completion is written down and read back next time.
-    remember_batch: bool = True
-
-    @field_validator("batch_table", "model_batch_per_gpu", mode="before")
-    @classmethod
-    def _a_card_called_5090_is_a_name(cls, table: Any) -> Any:
-        """Take the model and card keys as names however they were spelled.
-
-        Hydra reads an unquoted ``{5090: 20}`` key as an integer, and its override grammar
-        accepts no quoting that survives in that position — so without this the table
-        would be refused for exactly those cards whose names are digits.
-
-        Mapping rather than dict, because a table that came through Hydra arrives as an
-        omegaconf node: it behaves like a mapping and is not one by type.
-        """
-        if not isinstance(table, Mapping):
-            return table
-        return {
-            str(model): {str(card): batch for card, batch in by_card.items()}
-            if isinstance(by_card, Mapping)
-            else by_card
-            for model, by_card in table.items()
-        }
-    min_free_vram_gb: float = Field(default=8.0, ge=0)
-    # Workstations with an attached display idle around 10% VRAM before any training
-    # starts, so a stricter threshold would reject every local GPU.
-    max_used_fraction: float = Field(default=0.25, ge=0, le=1)
-    max_gpus: int | None = None
-    # "Give this run N cards and let the queue say which" — an exact count, so it overrides
-    # both the min_devices floor and the max_gpus ceiling, and reserve_gpus stops applying:
-    # holding cards back for other runs is the queue's job once there is a queue, and it is
-    # precisely reserve_gpus=1 that makes a 4+4 split of eight cards impossible. Left unset,
-    # the min_devices/max_gpus/reserve_gpus ladder decides exactly as it did before.
-    num_gpus: int | None = Field(default=None, ge=1)
-    scale_to_vram: bool = True
-    round_to_power_of_two: bool = True
-    # Cards left untouched so inference belonging to other runs keeps somewhere to go.
-    # Clamped during selection: a host with one GPU would otherwise never train.
-    reserve_gpus: int = Field(default=1, ge=0)
-    min_devices: int = Field(default=1, ge=1)
+    # The floor: this run does not start on fewer cards than this, however long it waits.
+    min_gpus: int = Field(default=1, ge=1)
+    # The ceiling. Unset means "every free card", which the queue then caps by what the
+    # runs already waiting asked for — see :func:`_how_many_to_take`. Naming it is how two
+    # runs split a machine deterministically: `auto_gpu.max_gpus=3` on each of them.
+    max_gpus: int | None = Field(default=None, ge=1)
+    # The batch **per GPU**; the total handed to ultralytics is this times the card count.
+    # Unset means the largest batch a run of this stage was seen to finish at on this
+    # model and this card, and failing that DEFAULT_BATCH.
+    batch_size: int | None = Field(default=None, ge=1)
+    # Start regardless: no queue, no wait, no thresholds, and other runs' leases taken
+    # from under them. Two trainings can land on one card and both die of it, so this is
+    # only ever a person's deliberate choice at the command line.
+    force: bool = False
+    # The three guards below are unset by default, which means not checked at all. Between
+    # runs of this project the leases arbitrate; these exist for the memory no lease covers
+    # — CVAT, a ClearML server, another user, a Windows host outside WSL.
+    min_free_vram_gb: float | None = Field(default=None, ge=0)
+    max_used_fraction: float | None = Field(default=None, ge=0, le=1)
     # Foreign compute processes tolerated per card. Processes belonging to this run are
     # never counted here, so a stage that follows training on the same device is not
     # locked out by training's own leftover context.
-    max_compute_processes: int = Field(default=0, ge=0)
-    wait_for_free: bool = True
+    max_compute_processes: int | None = Field(default=None, ge=0)
     wait_poll_seconds: float = Field(default=30.0, gt=0)
     # The deadline of a run waiting with no queue in front of it, where a card still busy
     # after an hour is held by something nobody is going to hand over. A queued run has no
@@ -138,10 +108,15 @@ class AutoGpuConfig(BaseModel):
     # wait is reached from train, predict and compare — all three of which are already
     # handed auto_gpu by the pipeline.
     queue: QueueConfig = Field(default_factory=QueueConfig)
-    # CPU is never the way out of a wait: a transient NVML failure would otherwise turn
-    # a GPU run into a silent hundredfold slowdown. Hosts with no CUDA at all still fall
-    # back to CPU regardless of this flag.
-    cpu_fallback_on_nvml_failure: bool = False
+
+    @model_validator(mode="after")
+    def _a_ceiling_below_the_floor_can_never_be_met(self) -> AutoGpuConfig:
+        if self.max_gpus is not None and self.max_gpus < self.min_gpus:
+            raise ValueError(
+                f"auto_gpu.max_gpus={self.max_gpus} is below auto_gpu.min_gpus="
+                f"{self.min_gpus}, so no number of cards would ever satisfy both."
+            )
+        return self
 
 
 class GpuInfo(BaseModel):
@@ -457,7 +432,16 @@ def _warn_if_process_view_is_blind(gpus: list[GpuInfo]) -> None:
 
 
 def _is_available(gpu: GpuInfo, config: AutoGpuConfig) -> bool:
-    if gpu.foreign_process_count > config.max_compute_processes:
+    """Whether a guard this run set says the card is somebody else's.
+
+    Every guard is off unless named, so by default this answers yes for every card and the
+    leases are the whole arbitration. That is deliberate: between runs of this project a
+    lease is exact where a memory threshold is a guess, and the memory a threshold catches
+    is the memory *no* lease covers — another user, or the Windows host outside WSL.
+    """
+    if config.max_compute_processes is not None and (
+        gpu.foreign_process_count > config.max_compute_processes
+    ):
         logger.info(
             "GPU {} ({}) is busy: {} foreign compute process(es), limit {}",
             gpu.torch_index,
@@ -466,7 +450,9 @@ def _is_available(gpu: GpuInfo, config: AutoGpuConfig) -> bool:
             config.max_compute_processes,
         )
         return False
-    if gpu.effective_free_vram_gb < config.min_free_vram_gb:
+    if config.min_free_vram_gb is not None and (
+        gpu.effective_free_vram_gb < config.min_free_vram_gb
+    ):
         logger.info(
             "GPU {} ({}) is full: {:.1f} GiB free, need {:.1f}",
             gpu.torch_index,
@@ -475,7 +461,7 @@ def _is_available(gpu: GpuInfo, config: AutoGpuConfig) -> bool:
             config.min_free_vram_gb,
         )
         return False
-    if gpu.used_fraction > config.max_used_fraction:
+    if config.max_used_fraction is not None and gpu.used_fraction > config.max_used_fraction:
         logger.info(
             "GPU {} ({}) is full: {:.1%} of VRAM already used, limit {:.1%}",
             gpu.torch_index,
@@ -487,61 +473,55 @@ def _is_available(gpu: GpuInfo, config: AutoGpuConfig) -> bool:
     return True
 
 
-def _apply_reserve(available: list[GpuInfo], config: AutoGpuConfig) -> list[GpuInfo]:
-    """Take the freest cards, leaving ``reserve_gpus`` behind for other runs.
+def _how_many_to_take(free: int, config: AutoGpuConfig, waiting_others: Sequence[Entry]) -> int:
+    """How many of the free cards this run may take, given who else is already in line.
 
-    ``max_gpus`` is a ceiling ("use at most N") and the reserve is a floor on what is
-    left over ("leave at least N"), so both fold into one slice. The reserve is clamped
-    to keep at least one device: taken literally on a single-GPU host it would leave
-    every run with nothing, forever.
+    A named ``max_gpus`` is the whole answer: the run asked for a number and gets it, which
+    is how a machine is split deterministically. Without one the run is greedy, and greed
+    is what made the first run on an eight-card machine swallow it and every run after it
+    queue. So the cards the queue has already promised elsewhere come off the top — never
+    below ``min_gpus``, because a run that cannot start is not a run that has yielded.
     """
-    if not available:
-        return []
-
-    ceiling = config.max_gpus if config.max_gpus is not None else len(available)
-    after_reserve = len(available) - config.reserve_gpus
-    keep = min(ceiling, max(1, after_reserve))
-    if config.reserve_gpus and keep > after_reserve:
-        logger.warning(
-            "reserve_gpus={} would leave this run no device among {} free card(s); "
-            "taking {} and reserving none",
-            config.reserve_gpus,
-            len(available),
-            keep,
+    if config.max_gpus is not None:
+        return min(free, config.max_gpus)
+    promised = sum(entry.num_gpus for entry in waiting_others)
+    if promised:
+        logger.info(
+            "Taking at most {} of {} free card(s): {} promised to the {} run(s) already "
+            "waiting. Name auto_gpu.max_gpus to split the machine exactly.",
+            max(config.min_gpus, free - promised),
+            free,
+            promised,
+            len(waiting_others),
         )
-
-    freest_first = sorted(available, key=lambda gpu: gpu.free_vram_gb, reverse=True)
-    return sorted(freest_first[:keep], key=lambda gpu: gpu.torch_index)
+    return max(config.min_gpus, free - promised)
 
 
 def _requested_devices(config: AutoGpuConfig) -> int:
     """How many cards this run has to hold before it may start."""
-    return config.min_devices if config.num_gpus is None else config.num_gpus
+    return config.min_gpus
 
 
 def _selectable(
     survey: GpuSurvey,
     config: AutoGpuConfig,
     *,
-    wanted: int,
     unavailable: frozenset[int] = frozenset(),
+    waiting_others: Sequence[Entry] = (),
 ) -> list[GpuInfo]:
-    """The cards this run may take: usable, not under a lease, and no more than it asked.
+    """The cards this run may take: usable, not under a lease, and no more than its share.
 
-    ``num_gpus`` is an exact request, so it decides the count outright and the reserve and
-    the ceiling stop applying. Without it ``wanted`` is not consulted at all, because
-    ``min_devices`` is a floor on what is enough rather than a cap on what is taken and a
-    four-card host still trains on all four.
+    ``waiting_others`` is empty for every caller with no queue behind it, which makes the
+    share "everything free" and is the behaviour an unqueued run has always had.
     """
     available = [
         gpu
         for gpu in survey.gpus
         if gpu.torch_index not in unavailable and _is_available(gpu, config)
     ]
-    if config.num_gpus is None:
-        return _apply_reserve(available, config)
+    keep = _how_many_to_take(len(available), config, waiting_others)
     freest_first = sorted(available, key=lambda gpu: gpu.free_vram_gb, reverse=True)
-    return sorted(freest_first[:wanted], key=lambda gpu: gpu.torch_index)
+    return sorted(freest_first[:keep], key=lambda gpu: gpu.torch_index)
 
 
 def _no_device_message(config: AutoGpuConfig, total: int, waited: float | None) -> str:
@@ -551,21 +531,64 @@ def _no_device_message(config: AutoGpuConfig, total: int, waited: float | None) 
         else "Auto GPU mode found"
     )
     return (
-        f"{preamble} fewer than {_requested_devices(config)} usable device(s) among "
-        f"{total} GPU(s): "
-        f"every card is busy, holds less than {config.min_free_vram_gb} GiB free, or is "
-        f"held back by reserve_gpus={config.reserve_gpus}. Lower auto_gpu.min_free_vram_gb, "
-        "raise auto_gpu.max_used_fraction or auto_gpu.max_compute_processes, drop "
-        "auto_gpu.reserve_gpus, extend auto_gpu.wait_timeout_seconds, or set an explicit device."
+        f"{preamble} fewer than {config.min_gpus} usable device(s) among {total} GPU(s): "
+        f"every card is busy, is held by another run's lease, or fails a guard this run "
+        f"set. Lower auto_gpu.min_gpus, relax auto_gpu.min_free_vram_gb, "
+        "auto_gpu.max_used_fraction or auto_gpu.max_compute_processes, extend "
+        "auto_gpu.wait_timeout_seconds, set an explicit device, or start regardless with "
+        "--force-gpu."
     )
 
 
 # Cards are held for as long as the process lives rather than for one stage: predict runs
 # on the card training has just used, and a lease given back in between is a lease a peer
-# takes. Closing the stack releases every one of them; the heartbeat inside ``holding`` is
-# what lets a peer recover them when the process is killed before it can.
-_LEASE_HOLD = ExitStack()
-atexit.register(_LEASE_HOLD.close)
+# takes. One stack per card rather than one per claim, so that the surplus can be handed
+# back the moment training is over and inference is down to a single device — see
+# :func:`release_gpus_except`. The heartbeat inside ``holding`` is what lets a peer recover
+# a card when the process is killed before any of these close.
+_HELD: dict[int, ExitStack] = {}
+
+
+def _hold(queue: RunQueue, gpu_indices: Sequence[int]) -> None:
+    for index in gpu_indices:
+        card = ExitStack()
+        card.enter_context(queue.holding([index]))
+        _HELD[index] = card
+
+
+def _release_every_card() -> None:
+    for index in list(_HELD):
+        _HELD.pop(index).close()
+
+
+atexit.register(_release_every_card)
+
+
+def release_gpus_except(keep: Sequence[int]) -> None:
+    """Give back every card this run holds but the ones named, and say which.
+
+    Training is the only stage that ever wants more than one card: inference, metrics and
+    the report that follow it in the same process run on one. Holding the rest to the end
+    of the pipeline is a card a neighbour cannot have for no reason at all — the reason
+    the leases outlive a stage is only that predict follows train onto *its* card.
+
+    Closing a card's stack stops that card's heartbeat and releases the lease, and
+    ``release_lease`` already refuses to unlink a file that has stopped being this run's,
+    so a card reclaimed from under this run is left alone rather than taken from its new
+    holder.
+    """
+    kept = set(keep)
+    given_back = sorted(index for index in _HELD if index not in kept)
+    if not given_back:
+        return
+    for index in given_back:
+        _HELD.pop(index).close()
+    logger.info(
+        "Released GPU(s) {} now that only {} is still in use; the rest of this run needs "
+        "one card",
+        given_back,
+        sorted(kept & set(_HELD)) or "no card",
+    )
 
 
 def wait_for_devices(
@@ -588,9 +611,43 @@ def wait_for_devices(
     without real time passing and without a queue directory on this machine.
     """
     waiting_room = queue if queue is not None else _queue_for(config)
+    if config.force:
+        return _seized(config, waiting_room, probe=probe)
     if waiting_room is None:
         return _wait_alone(config, probe=probe, sleep=sleep, monotonic=monotonic)
     return _wait_in_turn(config, waiting_room, probe=probe, sleep=sleep)
+
+
+def _seized(
+    config: AutoGpuConfig, queue: RunQueue | None, *, probe: Callable[[], GpuSurvey]
+) -> list[GpuInfo]:
+    """Take the freest cards this instant, over every guard and every other run's lease.
+
+    ``--force-gpu`` is a person at a keyboard saying they know better than the queue, so
+    nothing here waits and nothing refuses: not the VRAM guards, not the order, not a peer
+    already training on the card. What it cannot do is make the card bigger — two trainings
+    seized onto one GPU is two runs dying of the same out-of-memory — so every card taken
+    from somebody is named in a warning, and so is the risk.
+    """
+    survey = _surveyed(probe)
+    if survey is None:
+        return []
+    _refuse_more_cards_than_the_machine_has(config, survey)
+
+    wanted = config.max_gpus if config.max_gpus is not None else config.min_gpus
+    freest_first = sorted(survey.gpus, key=lambda gpu: gpu.free_vram_gb, reverse=True)
+    cards = sorted(freest_first[:wanted], key=lambda gpu: gpu.torch_index)
+    logger.warning(
+        "--force-gpu: taking GPU(s) {} without queueing and without checking whether they "
+        "are free. A card already training something will now run two trainings and both "
+        "may die of it.",
+        [gpu.torch_index for gpu in cards],
+    )
+    if queue is not None:
+        _hold(queue, [lease.gpu_index for lease in queue.seize_leases(
+            [gpu.torch_index for gpu in cards]
+        )])
+    return cards
 
 
 def _queue_for(config: AutoGpuConfig) -> RunQueue | None:
@@ -615,20 +672,17 @@ def _queue_for(config: AutoGpuConfig) -> RunQueue | None:
         return None
 
 
-def _surveyed(config: AutoGpuConfig, probe: Callable[[], GpuSurvey]) -> GpuSurvey | None:
+def _surveyed(probe: Callable[[], GpuSurvey]) -> GpuSurvey | None:
     """One sweep of the hardware, or None when this run is to fall back to CPU."""
     survey = probe()
     if not survey.cuda_available:
         return None
     if survey.nvml_available:
         return survey
-    if config.cpu_fallback_on_nvml_failure:
-        logger.warning("NVML is unreachable; falling back to CPU as configured")
-        return None
     raise RuntimeError(
-        "NVML is unreachable, so GPU occupancy cannot be measured and this run "
-        "would silently train on CPU. Install nvidia-ml-py, or set "
-        "auto_gpu.cpu_fallback_on_nvml_failure=true to accept that."
+        "NVML is unreachable, so GPU occupancy cannot be measured and this run would "
+        "silently train on CPU — a hundredfold slowdown that looks exactly like success. "
+        "Install nvidia-ml-py, or name a device explicitly to skip the survey."
     )
 
 
@@ -643,12 +697,11 @@ def _refuse_more_cards_than_the_machine_has(config: AutoGpuConfig, survey: GpuSu
     needed = _requested_devices(config)
     if needed <= len(survey.gpus):
         return
-    key = "auto_gpu.min_devices" if config.num_gpus is None else "auto_gpu.num_gpus"
     raise RuntimeError(
-        f"{key}={needed} asks for more GPU(s) than this machine has ({len(survey.gpus)}), "
-        f"so no wait can ever satisfy it and every run queued behind this one would wait "
-        f"with it. Lower {key} to at most {len(survey.gpus)}, or run this where there are "
-        f"that many cards."
+        f"auto_gpu.min_gpus={needed} asks for more GPU(s) than this machine has "
+        f"({len(survey.gpus)}), so no wait can ever satisfy it and every run queued behind "
+        f"this one would wait with it. Lower auto_gpu.min_gpus to at most "
+        f"{len(survey.gpus)}, or run this where there are that many cards."
     )
 
 
@@ -667,19 +720,17 @@ def _wait_alone(
     """
     started = monotonic()
     while True:
-        survey = _surveyed(config, probe)
+        survey = _surveyed(probe)
         if survey is None:
             return []
         _refuse_more_cards_than_the_machine_has(config, survey)
 
         needed = _requested_devices(config)
-        selectable = _selectable(survey, config, wanted=needed)
+        selectable = _selectable(survey, config)
         if len(selectable) >= needed:
             return selectable
 
         elapsed = monotonic() - started
-        if not config.wait_for_free:
-            raise RuntimeError(_no_device_message(config, len(survey.gpus), waited=None))
         remaining = config.wait_timeout_seconds - elapsed
         if remaining <= 0:
             raise RuntimeError(_no_device_message(config, len(survey.gpus), waited=elapsed))
@@ -731,6 +782,22 @@ def _at_the_head(entry: Entry | None, waiting: Sequence[Entry], queue: RunQueue)
     return bool(ranked) and ranked[0].run_id == entry.run_id
 
 
+def _taking_more_than_it_asked_for(config: AutoGpuConfig, free: int) -> bool:
+    """Whether this run is about to take cards it never named a number for.
+
+    A run with no entry yet may claim outright whenever the queue is empty, so two runs
+    started seconds apart never see each other: the first takes the machine and the second
+    waits for it. A run in this state instead enqueues, sleeps one poll and decides on the
+    pass after, by which time a neighbour that started inside the window is in the order and
+    :func:`_how_many_to_take` can leave it its share.
+
+    One poll is the whole cost, it is paid once, and only by a run taking more than it
+    asked for. A run that named ``max_gpus`` is exact about its share already and goes
+    straight through.
+    """
+    return config.max_gpus is None and free > config.min_gpus
+
+
 def _claimed(queue: RunQueue, held: list[GpuInfo], wanted: list[GpuInfo]) -> list[GpuInfo]:
     """Take leases on the cards that are not this run's yet, or come back empty-handed.
 
@@ -742,7 +809,7 @@ def _claimed(queue: RunQueue, held: list[GpuInfo], wanted: list[GpuInfo]) -> lis
     if not taken:
         logger.info("Another run claimed a card first; looking again")
         return []
-    _LEASE_HOLD.enter_context(queue.holding([lease.gpu_index for lease in taken]))
+    _hold(queue, [lease.gpu_index for lease in taken])
     queue.mark_served()
     return sorted(held + wanted, key=lambda gpu: gpu.torch_index)
 
@@ -785,7 +852,7 @@ def _wait_in_turn(
             waiting = queue.live_entries()
             leases = queue.live_leases()
             _peers = _peer_processes(leases, queue.run_id)
-            survey = _surveyed(config, probe)
+            survey = _surveyed(probe)
             if survey is None:
                 return []
             _refuse_more_cards_than_the_machine_has(config, survey)
@@ -799,18 +866,17 @@ def _wait_in_turn(
                 return held[:needed]
 
             under_lease = frozenset(lease.gpu_index for lease in leases)
+            others = [other for other in waiting if other.run_id != queue.run_id]
             free = _selectable(
-                survey, config, wanted=needed - len(held), unavailable=under_lease
+                survey, config, unavailable=under_lease, waiting_others=others
             )
-            if _at_the_head(entry, waiting, queue) and len(held) + len(free) >= needed:
+            settling = entry is None and _taking_more_than_it_asked_for(config, len(free))
+            enough = len(held) + len(free) >= needed
+            if enough and not settling and _at_the_head(entry, waiting, queue):
                 cards = _claimed(queue, held, free)
                 if cards:
                     return cards
 
-            if not config.wait_for_free:
-                # "Do not wait" has to mean not taking a place in line either, or the one
-                # setting that promises a fast failure becomes the slowest wait of all.
-                raise RuntimeError(_no_device_message(config, len(survey.gpus), waited=None))
             if entry is None:
                 entry = queue.enqueue(needed)
                 logger.info(
@@ -819,6 +885,14 @@ def _wait_in_turn(
                     entry.seq,
                     needed,
                 )
+                if not settling:
+                    continue
+                logger.info(
+                    "{} card(s) are free and this run named no auto_gpu.max_gpus; waiting "
+                    "one poll before claiming, so that a run starting right now gets a share",
+                    len(free),
+                )
+                sleep(queue.config.poll_seconds)
                 continue
             if not queue.heartbeat_entry(entry):
                 raise RuntimeError(
@@ -830,39 +904,6 @@ def _wait_in_turn(
     finally:
         if entry is not None:
             queue.remove_entry(entry)
-
-
-def _floor_power_of_two(value: int) -> int:
-    return 1 << (value.bit_length() - 1) if value > 0 else 1
-
-
-def scale_batch_per_gpu(
-    config: AutoGpuConfig, gpus: list[GpuInfo], anchor: int | None = None
-) -> int:
-    """Fit a per-GPU batch measured at ``reference_vram_gb`` to the smallest selected card.
-
-    DDP splits the total batch evenly, so the weakest device sets the ceiling for
-    every device. ``anchor`` names the batch to scale, which is the model's own when the
-    config gives one for it and the global ``batch_per_gpu`` otherwise.
-    """
-    reference = config.batch_per_gpu if anchor is None else anchor
-    if not config.scale_to_vram or not gpus:
-        return reference
-
-    smallest_vram = min(gpu.total_vram_gb for gpu in gpus)
-    scaled = int(reference * smallest_vram / config.reference_vram_gb)
-    if config.round_to_power_of_two:
-        scaled = _floor_power_of_two(scaled)
-    scaled = max(1, scaled)
-    if scaled != reference:
-        logger.info(
-            "Scaled batch per GPU {} -> {} ({:.1f} GiB smallest card vs {:.1f} GiB reference)",
-            reference,
-            scaled,
-            smallest_vram,
-            config.reference_vram_gb,
-        )
-    return scaled
 
 
 def _normalised(text: str) -> str:
@@ -937,43 +978,40 @@ def _remembered_batches() -> dict[str, Any]:
 def select_batch_per_gpu(
     config: AutoGpuConfig, model: str | None, gpus: list[GpuInfo], stage: str
 ) -> int:
-    """The per-GPU batch for this model on these cards, saying which source answered."""
+    """The per-GPU batch for this model on these cards, saying which source answered.
+
+    The smallest card decides, because DDP splits the total evenly and the weakest device
+    is the one that runs out of memory first.
+    """
+    if config.batch_size is not None:
+        logger.info("Batch per GPU {} from auto_gpu.batch_size", config.batch_size)
+        return config.batch_size
+
     smallest = min(gpus, key=lambda gpu: gpu.total_vram_gb)
     key = model_key(model)
     world_size = len(gpus)
-
-    measured = table_batch(config.batch_table, key, smallest.name, world_size)
-    if measured is not None:
+    finished = table_batch(_remembered_batches().get(stage, {}), key, smallest.name, world_size)
+    if finished is not None:
         logger.info(
-            "Batch per GPU {} from auto_gpu.batch_table for {} on {} x {}",
-            measured,
+            "Batch per GPU {} remembered from a {} run of {} that finished on {} x {}",
+            finished,
+            stage,
             key,
             world_size,
             smallest.name,
         )
-        return measured
+        return finished
 
-    if config.remember_batch:
-        finished = table_batch(
-            _remembered_batches().get(stage, {}), key, smallest.name, world_size
-        )
-        if finished is not None:
-            logger.info(
-                "Batch per GPU {} remembered from a {} run of {} that finished on {} x {}",
-                finished,
-                stage,
-                key,
-                world_size,
-                smallest.name,
-            )
-            return finished
-
-    anchor = config.model_batch_per_gpu.get(key) if key else None
-    if anchor is not None:
-        logger.info(
-            "Batch per GPU anchored at {} for {} by auto_gpu.model_batch_per_gpu", anchor, key
-        )
-    return scale_batch_per_gpu(config, gpus, anchor)
+    logger.info(
+        "No {} run of {} has finished on {} x {} yet; starting from batch {} per GPU and "
+        "remembering it if it works",
+        stage,
+        key,
+        world_size,
+        smallest.name,
+        DEFAULT_BATCH,
+    )
+    return DEFAULT_BATCH
 
 
 def _refuse_indivisible_batch(batch: int, world_size: int, *, chosen_here: bool) -> None:
@@ -1020,7 +1058,9 @@ def select_devices(
     """
     chosen = wait_for_devices(config)
     if not chosen:
-        on_cpu = config.batch_per_gpu if batch is None else batch
+        if batch is None:
+            batch = config.batch_size if config.batch_size is not None else DEFAULT_BATCH
+        on_cpu = batch
         logger.warning("No GPU on this host; falling back to CPU with batch {}", on_cpu)
         return DeviceSelection(devices="cpu", batch=on_cpu, batch_per_gpu=on_cpu)
 
@@ -1160,7 +1200,7 @@ def _lease_the_named_cards(config: AutoGpuConfig, devices: list[int] | str) -> N
         _refuse_the_named_cards(
             devices, _peer_leases_on(queue.live_leases(), wanted, queue.run_id)
         )
-    _LEASE_HOLD.enter_context(queue.holding([lease.gpu_index for lease in taken]))
+    _hold(queue, [lease.gpu_index for lease in taken])
     logger.info("Holding the named GPU(s) {} against the other runs on this machine", wanted)
 
 
@@ -1195,15 +1235,8 @@ def resolve_inference(
         _lease_the_named_cards(auto_gpu, named_device)
     if auto_gpu is not None and auto_gpu.enabled:
         if named_device is None:
-            single = auto_gpu.model_copy(
-                update={
-                    "reserve_gpus": 0,
-                    "min_devices": 1,
-                    "max_gpus": 1,
-                    # A run asking the queue for four cards to train on still infers on one.
-                    "num_gpus": None if auto_gpu.num_gpus is None else 1,
-                }
-            )
+            # A run asking the queue for four cards to train on still infers on one.
+            single = auto_gpu.model_copy(update={"min_gpus": 1, "max_gpus": 1})
             return select_devices(single, model=model, stage=stage, batch=batch)
         cards = _cards_behind(named_device) if batch is None else []
         if cards:
@@ -1214,7 +1247,8 @@ def resolve_inference(
             )
 
     if batch is None:
-        batch = DEFAULT_BATCH if auto_gpu is None else auto_gpu.batch_per_gpu
+        configured = None if auto_gpu is None else auto_gpu.batch_size
+        batch = DEFAULT_BATCH if configured is None else configured
         logger.info("No GPU survey to size a batch against; inferring at batch {}", batch)
     return DeviceSelection(devices=named_device, batch=batch, batch_per_gpu=batch)
 
@@ -1245,13 +1279,13 @@ def resolve_devices(
         if auto_gpu.enabled:
             return select_devices(auto_gpu, model=model, stage=stage, batch=batch)
         logger.info("auto_gpu is disabled and no device was named; running on CPU")
-        return _sized_by_anchor(auto_gpu, "cpu", batch)
+        return _sized_without_a_survey(auto_gpu, "cpu", batch)
 
     devices = _named_devices(device)
     _lease_the_named_cards(auto_gpu, devices)
     named = _cards_behind(devices) if batch is None and auto_gpu.enabled else []
     if not named:
-        return _sized_by_anchor(auto_gpu, devices, batch)
+        return _sized_without_a_survey(auto_gpu, devices, batch)
 
     per_gpu = select_batch_per_gpu(auto_gpu, model, named, stage)
     total = per_gpu * len(named)
@@ -1265,18 +1299,19 @@ def resolve_devices(
     return DeviceSelection(devices=devices, batch=total, batch_per_gpu=per_gpu, gpus=named)
 
 
-def _sized_by_anchor(
+def _sized_without_a_survey(
     auto_gpu: AutoGpuConfig, devices: list[int] | str, batch: int | None
 ) -> DeviceSelection:
-    """Run on ``devices`` at the batch given, or at the configured anchor per card.
+    """Run on ``devices`` at the batch given, or at the configured one per card.
 
     The fallback for every path with no card survey behind it: ``auto_gpu`` disabled, or a
-    device named that NVML cannot describe. There is nothing to size against, so the
-    anchor is used rather than a number guessed from hardware nobody looked at.
+    device named that NVML cannot describe. There is no card to look a remembered batch up
+    against, so ``batch_size`` answers and :data:`DEFAULT_BATCH` answers after it.
     """
     world_size = len(devices) if isinstance(devices, list) else 1
     if batch is None:
-        batch = auto_gpu.batch_per_gpu * world_size
+        per_card = auto_gpu.batch_size if auto_gpu.batch_size is not None else DEFAULT_BATCH
+        batch = per_card * world_size
         logger.info("No survey to size a batch against; running at batch {}", batch)
     _refuse_indivisible_batch(batch, world_size, chosen_here=False)
     per_gpu = batch // world_size if batch > 0 else batch
@@ -1347,9 +1382,7 @@ def _record_batch(
     return True
 
 
-def remember_batch(
-    config: AutoGpuConfig, stage: str, model: str | None, selection: DeviceSelection
-) -> None:
+def remember_batch(stage: str, model: str | None, selection: DeviceSelection) -> None:
     """Write down a batch that ran to completion, so it need not be found again.
 
     Only a run that finished is evidence, and of those only the largest is worth keeping:
@@ -1361,7 +1394,7 @@ def remember_batch(
     this one was training is part of what this number has to beat.
     """
     key = model_key(model)
-    if not config.remember_batch or key is None or not selection.gpus:
+    if key is None or not selection.gpus:
         return
     if selection.batch_per_gpu < 1:
         logger.info("Batch {} is ultralytics' own to choose; not remembering it", selection.batch)

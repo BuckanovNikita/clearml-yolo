@@ -494,5 +494,10 @@ def test_auto_gpu_defaults_are_valid() -> None:
 
     auto_gpu = instantiate(config.auto_gpu)
     assert auto_gpu.enabled is True
-    assert auto_gpu.batch_per_gpu >= 1
-    assert auto_gpu.reference_vram_gb > 0
+    assert auto_gpu.min_gpus >= 1
+    # Unset all three: the ceiling is "every free card", the batch is whatever finished
+    # here last time, and no guard rejects a card until someone names one.
+    assert auto_gpu.max_gpus is None
+    assert auto_gpu.batch_size is None
+    assert auto_gpu.min_free_vram_gb is None
+    assert auto_gpu.force is False

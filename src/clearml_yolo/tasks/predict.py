@@ -169,6 +169,6 @@ def predict(
     logger.info("Wrote {} predictions to {}", len(frame), output_path)
 
     if auto_gpu is not None:
-        remember_batch(auto_gpu, "predict", model, selection)
+        remember_batch("predict", model, selection)
     upload_dataframe(task, artifact_names.PREDICTIONS, frame)
     return PredictResult(predictions=output_path, resolution=resolution)

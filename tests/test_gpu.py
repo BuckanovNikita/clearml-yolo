@@ -1,4 +1,4 @@
-"""GPU selection: NVML/torch index mapping, admission control, VRAM scaling, batching.
+"""GPU selection: NVML/torch index mapping, admission control, sharing, batching.
 
 The queue is on by default, so every test here that is not about it says so through the
 ``unqueued`` fixture below — otherwise a test with a fake NVML behind it would take real
@@ -8,13 +8,13 @@ there without a deadline for the rest of the developer's afternoon.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import socket
 import sys
 import types
 from collections.abc import Iterator
-from contextlib import ExitStack
 from pathlib import Path
 from typing import Any
 
@@ -34,17 +34,24 @@ from clearml_yolo.gpu import (
     remember_batch,
     resolve_devices,
     resolve_inference,
-    scale_batch_per_gpu,
     select_devices,
     wait_for_devices,
 )
-from clearml_yolo.run_queue import QUEUE_DIR_ENV_VAR, QueueConfig, RunQueue
+from clearml_yolo.run_queue import QUEUE_DIR_ENV_VAR, Entry, QueueConfig, RunQueue
 
 GIB = 1 << 30
 
-# The reserve is a release default, not a property of the selection maths, so tests that
-# assert on device counts or batch sizes opt out of it explicitly.
-NO_RESERVE = 0
+def guarded(**overrides: Any) -> AutoGpuConfig:
+    """A policy that treats the fake busy cards below as busy.
+
+    Every guard is off by default now — between runs of this project the leases arbitrate,
+    and a memory threshold only ever spoke about the memory no lease covers. So a test
+    about a card being *skipped* has to name the guard that skips it, and these three are
+    what the release before this one applied to everybody.
+    """
+    return AutoGpuConfig(
+        min_free_vram_gb=8.0, max_used_fraction=0.25, max_compute_processes=0, **overrides
+    )
 
 
 class FakeMemory:
@@ -152,12 +159,12 @@ def unqueued(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[None]:
     monkeypatch.setattr(gpu_module, "queue_active", lambda _: False)
     monkeypatch.setenv(QUEUE_DIR_ENV_VAR, str(tmp_path / "unused-queue"))
     monkeypatch.setattr(gpu_module, "_peers", PeerProcesses())
-    holding_nothing = ExitStack()
-    monkeypatch.setattr(gpu_module, "_LEASE_HOLD", holding_nothing)
+    monkeypatch.setattr(gpu_module, "_HELD", {})
     yield
     # Restoring the attribute would leave the leases taken during the test held, and their
     # heartbeat threads beating against a directory pytest is about to delete.
-    holding_nothing.close()
+    for card in list(gpu_module._HELD.values()):
+        card.close()
 
 
 def queue_for(
@@ -214,9 +221,7 @@ def test_busy_gpus_are_skipped(patch_modules: Any) -> None:
     ]
     patch_modules(handles, ["aaa", "bbb", "ccc"])
 
-    selection = select_devices(
-        AutoGpuConfig(batch_per_gpu=16, reference_vram_gb=24.0, reserve_gpus=NO_RESERVE)
-    )
+    selection = select_devices(guarded())
 
     assert selection.devices == [0]
 
@@ -225,10 +230,10 @@ def test_all_gpus_busy_raises(patch_modules: Any) -> None:
     patch_modules([FakeHandle("aaa", 24.0, 23.0, 1)], ["aaa"])
 
     with pytest.raises(RuntimeError, match="fewer than 1 usable device"):
-        select_devices(AutoGpuConfig(wait_for_free=False))
+        select_devices(guarded(wait_timeout_seconds=0.001))
 
 
-def test_batch_scales_to_smallest_card(patch_modules: Any) -> None:
+def test_the_batch_is_the_same_per_card_however_uneven_the_pair(patch_modules: Any) -> None:
     """A heterogeneous pair is limited by the smaller card, since DDP splits evenly."""
     handles = [
         FakeHandle("aaa", 48.0, 47.0, 0),
@@ -236,51 +241,41 @@ def test_batch_scales_to_smallest_card(patch_modules: Any) -> None:
     ]
     patch_modules(handles, ["aaa", "bbb"])
 
-    selection = select_devices(
-        AutoGpuConfig(batch_per_gpu=16, reference_vram_gb=24.0, reserve_gpus=NO_RESERVE)
-    )
+    selection = select_devices(AutoGpuConfig(batch_size=16))
 
     assert selection.batch_per_gpu == 16
     assert selection.batch == 32
     assert selection.batch % selection.world_size == 0
 
 
-def test_batch_scales_up_on_larger_cards(patch_modules: Any) -> None:
+def test_a_big_card_does_not_win_a_bigger_batch_on_its_own(patch_modules: Any) -> None:
+    """The batch is measured or asked for, never inferred from how much VRAM a card has.
+
+    An 80 GB card used to be handed twice the batch of a 24 GB one by arithmetic alone.
+    Nothing on this machine had ever run that batch; it was a guess wearing a number.
+    """
     handles = [FakeHandle("aaa", 80.0, 79.0, 0), FakeHandle("bbb", 80.0, 79.0, 0)]
     patch_modules(handles, ["aaa", "bbb"])
 
-    selection = select_devices(
-        AutoGpuConfig(batch_per_gpu=16, reference_vram_gb=24.0, reserve_gpus=NO_RESERVE)
-    )
+    selection = select_devices(AutoGpuConfig())
 
-    # 16 * 80/24 = 53 -> floored to the power of two below it
-    assert selection.batch_per_gpu == 32
-    assert selection.batch == 64
-
-
-def test_scaling_never_drops_below_one() -> None:
-    tiny = [
-        GpuInfo(
-            torch_index=0,
-            name="t",
-            uuid="u",
-            total_vram_gb=2.0,
-            free_vram_gb=2.0,
-            foreign_process_count=0,
-        )
-    ]
-
-    assert scale_batch_per_gpu(AutoGpuConfig(batch_per_gpu=4, reference_vram_gb=80.0), tiny) == 1
+    assert selection.batch_per_gpu == gpu_module.DEFAULT_BATCH
+    assert selection.batch == gpu_module.DEFAULT_BATCH * 2
 
 
 def test_max_gpus_limits_selection(patch_modules: Any) -> None:
     handles = [FakeHandle(name, 24.0, 23.0, 0) for name in ("aaa", "bbb", "ccc", "ddd")]
     patch_modules(handles, ["aaa", "bbb", "ccc", "ddd"])
 
-    selection = select_devices(AutoGpuConfig(batch_per_gpu=8, max_gpus=2, reserve_gpus=NO_RESERVE))
+    selection = select_devices(AutoGpuConfig(batch_size=8, max_gpus=2))
 
     assert selection.world_size == 2
     assert selection.batch == 16
+
+
+def test_a_ceiling_below_the_floor_is_refused_where_it_is_written() -> None:
+    with pytest.raises(ValueError, match=re.escape("below auto_gpu.min_gpus")):
+        AutoGpuConfig(min_gpus=4, max_gpus=2)
 
 
 def test_falls_back_to_cpu_without_cuda(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -288,7 +283,7 @@ def test_falls_back_to_cpu_without_cuda(monkeypatch: pytest.MonkeyPatch) -> None
     module.cuda = types.SimpleNamespace(is_available=lambda: False)  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "torch", module)
 
-    selection = select_devices(AutoGpuConfig(batch_per_gpu=8))
+    selection = select_devices(AutoGpuConfig(batch_size=8))
 
     assert selection.devices == "cpu"
     assert selection.batch == 8
@@ -325,7 +320,7 @@ def test_an_explicit_batch_survives_automatic_device_selection(patch_modules: An
     handles = [FakeHandle(name, 24.0, 23.0, 0) for name in ("aaa", "bbb")]
     patch_modules(handles, ["aaa", "bbb"])
 
-    selection = select_devices(AutoGpuConfig(reserve_gpus=NO_RESERVE), batch=48)
+    selection = select_devices(AutoGpuConfig(), batch=48)
 
     assert selection.devices == [0, 1]
     assert selection.batch == 48
@@ -343,7 +338,7 @@ def test_a_named_device_survives_automatic_batch_selection(patch_modules: Any) -
     handles = [FakeHandle(name, 24.0, 23.0, 0) for name in ("aaa", "bbb", "ccc")]
     patch_modules(handles, ["aaa", "bbb", "ccc"])
 
-    selection = resolve_devices(AutoGpuConfig(batch_per_gpu=16), [1, 2], batch=None)
+    selection = resolve_devices(AutoGpuConfig(batch_size=16), [1, 2], batch=None)
 
     assert selection.devices == [1, 2]
     assert selection.batch == 32
@@ -371,14 +366,13 @@ def test_a_named_device_and_a_named_batch_are_both_taken_as_given(patch_modules:
     assert (selection.devices, selection.batch, selection.batch_per_gpu) == ([0, 1], 48, 24)
 
 
-def test_a_named_device_nvml_cannot_describe_falls_back_to_the_anchor(
+def test_a_named_device_nvml_cannot_describe_still_gets_the_configured_batch(
     patch_modules: Any,
 ) -> None:
-    """There is no card to size against, so the configured anchor answers rather than a
-    number guessed from hardware nobody looked at."""
+    """There is no card to look a remembered batch up against, so batch_size answers."""
     patch_modules([FakeHandle("aaa", 24.0, 23.0, 0)], ["aaa"])
 
-    selection = resolve_devices(AutoGpuConfig(batch_per_gpu=8), [7], batch=None)
+    selection = resolve_devices(AutoGpuConfig(batch_size=8), [7], batch=None)
 
     assert selection.devices == [7]
     assert selection.batch == 8
@@ -389,7 +383,7 @@ def test_an_unset_device_is_still_surveyed_for(patch_modules: Any) -> None:
     handles = [FakeHandle(name, 24.0, 23.0, 0) for name in ("aaa", "bbb")]
     patch_modules(handles, ["aaa", "bbb"])
 
-    selection = resolve_devices(AutoGpuConfig(reserve_gpus=NO_RESERVE), None, batch=None)
+    selection = resolve_devices(AutoGpuConfig(), None, batch=None)
 
     assert selection.devices == [0, 1]
 
@@ -400,7 +394,7 @@ def test_an_explicit_batch_must_still_divide_by_the_cards_chosen_here(patch_modu
     patch_modules(handles, ["aaa", "bbb", "ccc"])
 
     with pytest.raises(ValueError, match=re.escape("auto_gpu.max_gpus")):
-        select_devices(AutoGpuConfig(reserve_gpus=NO_RESERVE), batch=10)
+        select_devices(AutoGpuConfig(), batch=10)
 
 
 def test_autobatch_is_rejected_against_cards_chosen_here_too(patch_modules: Any) -> None:
@@ -408,103 +402,74 @@ def test_autobatch_is_rejected_against_cards_chosen_here_too(patch_modules: Any)
     patch_modules(handles, ["aaa", "bbb"])
 
     with pytest.raises(ValueError, match="single-GPU only"):
-        select_devices(AutoGpuConfig(reserve_gpus=NO_RESERVE), batch=-1)
+        select_devices(AutoGpuConfig(), batch=-1)
 
 
-def test_a_model_of_its_own_size_gets_a_batch_of_its_own(patch_modules: Any) -> None:
-    """The global anchor cannot be right for a yolo11n and a yolo11x at once."""
+def test_a_batch_size_that_was_named_beats_anything_remembered(patch_modules: Any) -> None:
+    """The file is a cache; a number the user typed is the authority over it."""
     patch_modules([FakeHandle("aaa", 24.0, 23.0, 0)], ["aaa"])
-    config = AutoGpuConfig(
-        batch_per_gpu=32, reference_vram_gb=24.0, model_batch_per_gpu={"yolo11x": 8}
-    )
+    config = AutoGpuConfig(batch_size=12)
 
-    assert select_devices(config, model="yolo11x.pt").batch == 8
-    assert select_devices(config, model="yolo11n.pt").batch == 32
+    remember_batch("train", "yolo11m.pt", select_devices(config, model="yolo11m.pt", batch=48))
 
-
-def test_a_measured_batch_is_used_as_measured(patch_modules: Any) -> None:
-    """A table entry is a number seen to fit, so it is neither scaled nor rounded down.
-
-    80 GiB against a 24 GiB reference would otherwise multiply it, and the power-of-two
-    floor would then round the answer away from what was actually measured.
-    """
-    patch_modules([FakeHandle("aaa", 80.0, 79.0, 0)], ["aaa"])
-    config = AutoGpuConfig(
-        batch_per_gpu=16, reference_vram_gb=24.0, batch_table={"yolo11m": {"GPU0": 20}}
-    )
-
-    assert select_devices(config, model="yolo11m.pt").batch == 20
+    assert select_devices(config, model="yolo11m.pt", stage="train").batch == 12
 
 
 def test_a_card_is_named_by_any_part_of_what_the_driver_calls_it(patch_modules: Any) -> None:
-    """Reproducing a driver string exactly is not something a config should have to do,
-    and getting it subtly wrong would look from the outside like having set no table."""
+    """Reproducing a driver string exactly is not something a reader should have to do,
+    and getting it subtly wrong would look from the outside like an empty table."""
     patch_modules([FakeHandle("aaa", 24.0, 23.0, 0)], ["aaa"])
-    config = AutoGpuConfig(batch_table={"yolo11m": {"gpu0": 20, "0": 7}})
+    write_remembered({"train": {"yolo11m": {"gpu0": {"1": 20}, "0": {"1": 7}}}})
 
     # Both keys match "GPU0"; the longer one is the more specific and wins.
-    assert select_devices(config, model="yolo11m.pt").batch == 20
+    assert select_devices(AutoGpuConfig(), model="yolo11m.pt", stage="train").batch == 20
 
 
 def test_a_table_that_does_not_cover_this_many_cards_falls_through(patch_modules: Any) -> None:
     """Guessing across device counts is exactly what the count level exists to prevent."""
     handles = [FakeHandle(name, 24.0, 23.0, 0) for name in ("aaa", "bbb")]
     patch_modules(handles, ["aaa", "bbb"])
-    config = AutoGpuConfig(
-        batch_per_gpu=4,
-        reference_vram_gb=24.0,
-        reserve_gpus=NO_RESERVE,
-        batch_table={"yolo11m": {"GPU0": {1: 20}}},
-    )
+    write_remembered({"train": {"yolo11m": {"GPU0": {"1": 20}}}})
 
-    assert select_devices(config, model="yolo11m.pt", stage="train").batch == 8
+    selection = select_devices(AutoGpuConfig(), model="yolo11m.pt", stage="train")
+
+    assert selection.batch == gpu_module.DEFAULT_BATCH * 2
 
 
 def test_a_batch_that_finished_is_remembered_and_read_back(patch_modules: Any) -> None:
     """The point of the file: a number found once by hand is never typed again."""
     patch_modules([FakeHandle("aaa", 24.0, 23.0, 0)], ["aaa"])
-    config = AutoGpuConfig(batch_per_gpu=4, reference_vram_gb=24.0)
+    config = AutoGpuConfig()
 
     pinned = select_devices(config, model="yolo11m.pt", batch=48)
-    remember_batch(config, "train", "yolo11m.pt", pinned)
+    remember_batch("train", "yolo11m.pt", pinned)
 
     assert select_devices(config, model="yolo11m.pt", stage="train").batch == 48
     # Another stage's evidence is not this one's: inference and training do not hold the
     # same memory, so what one finished at says nothing about the other.
-    assert select_devices(config, model="yolo11m.pt", stage="predict").batch == 4
+    assert select_devices(config, model="yolo11m.pt", stage="predict").batch == (
+        gpu_module.DEFAULT_BATCH
+    )
 
 
 def test_only_the_largest_batch_that_finished_is_kept(patch_modules: Any) -> None:
     """That a small batch fits says nothing; that a large one finished proves the rest."""
     patch_modules([FakeHandle("aaa", 24.0, 23.0, 0)], ["aaa"])
-    config = AutoGpuConfig(batch_per_gpu=4, reference_vram_gb=24.0)
+    config = AutoGpuConfig()
 
     for batch in (48, 16):
         remember_batch(
-            config, "train", "yolo11m.pt", select_devices(config, model="yolo11m.pt", batch=batch)
+            "train", "yolo11m.pt", select_devices(config, model="yolo11m.pt", batch=batch)
         )
 
     assert select_devices(config, model="yolo11m.pt", stage="train").batch == 48
 
 
-def test_a_hand_written_table_outranks_what_was_remembered(patch_modules: Any) -> None:
-    """The file is a cache; a number the user typed is the authority over it."""
-    patch_modules([FakeHandle("aaa", 24.0, 23.0, 0)], ["aaa"])
-    config = AutoGpuConfig(batch_per_gpu=4, batch_table={"yolo11m": {"GPU0": 12}})
-
-    remember_batch(
-        config, "train", "yolo11m.pt", select_devices(config, model="yolo11m.pt", batch=48)
-    )
-
-    assert select_devices(config, model="yolo11m.pt", stage="train").batch == 12
-
-
 def test_nothing_is_remembered_from_a_run_that_surveyed_no_hardware() -> None:
     """A batch with no card to file it under would be read back on a different machine."""
-    config = AutoGpuConfig(batch_per_gpu=4)
     unsurveyed = DeviceSelection(devices=[0], batch=64, batch_per_gpu=64)
 
-    remember_batch(config, "train", "yolo11m.pt", unsurveyed)
+    remember_batch("train", "yolo11m.pt", unsurveyed)
 
     assert not gpu_module.batch_table_path().exists()
 
@@ -514,26 +479,20 @@ def test_ultralytics_own_choice_of_batch_is_not_remembered(patch_modules: Any) -
     patch_modules([FakeHandle("aaa", 24.0, 23.0, 0)], ["aaa"])
     config = AutoGpuConfig()
 
-    remember_batch(
-        config, "train", "yolo11m.pt", select_devices(config, model="yolo11m.pt", batch=-1)
-    )
+    remember_batch("train", "yolo11m.pt", select_devices(config, model="yolo11m.pt", batch=-1))
 
     assert not gpu_module.batch_table_path().exists()
 
 
-def test_remembering_can_be_turned_off_in_both_directions(patch_modules: Any) -> None:
-    patch_modules([FakeHandle("aaa", 24.0, 23.0, 0)], ["aaa"])
-    remembering = AutoGpuConfig(batch_per_gpu=4, reference_vram_gb=24.0)
-    forgetful = remembering.model_copy(update={"remember_batch": False})
+def write_remembered(table: dict[str, Any]) -> None:
+    """Put a remembered-batch table where a run would have left one behind.
 
-    remember_batch(
-        forgetful, "train", "yolo11m.pt", select_devices(forgetful, model="yolo11m.pt", batch=48)
-    )
-    assert not gpu_module.batch_table_path().exists()
-
-    pinned = select_devices(remembering, model="yolo11m.pt", batch=48)
-    remember_batch(remembering, "train", "yolo11m.pt", pinned)
-    assert select_devices(forgetful, model="yolo11m.pt", stage="train").batch == 4
+    Standing in for a previous run rather than performing one: what is under test is the
+    read, and a real run's write is covered by the tests above it.
+    """
+    path = gpu_module.batch_table_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(table), encoding="utf-8")
 
 
 def _lock_beside_the_table() -> Path:
@@ -555,7 +514,7 @@ def test_a_batch_is_left_unrecorded_while_another_run_rewrites_the_table(
     monkeypatch.setattr(gpu_module, "LOCK_WAIT_SECONDS", 0.0)
     _lock_beside_the_table().write_text("another run", encoding="utf-8")
 
-    remember_batch(AutoGpuConfig(), "train", "yolo11m.pt", _finished_on_one_card())
+    remember_batch("train", "yolo11m.pt", _finished_on_one_card())
 
     assert not gpu_module.batch_table_path().exists()
 
@@ -568,81 +527,78 @@ def test_a_lock_no_live_run_ever_released_is_taken_anyway(monkeypatch: Any) -> N
     lock.write_text("a run that died holding it", encoding="utf-8")
     os.utime(lock, (0, 0))
 
-    remember_batch(AutoGpuConfig(), "train", "yolo11m.pt", _finished_on_one_card())
+    remember_batch("train", "yolo11m.pt", _finished_on_one_card())
 
     assert gpu_module.batch_table_path().exists()
     assert not lock.exists()
 
 
-def test_reserve_leaves_a_card_for_other_runs(patch_modules: Any) -> None:
-    """Three idle cards, reserve one: training takes two and someone else can still infer."""
+def test_a_run_that_named_no_ceiling_takes_every_free_card(patch_modules: Any) -> None:
+    """Three idle cards and nobody waiting: there is no one to leave a card for.
+
+    The reserve this replaces held one card back unconditionally, which is what made the
+    first run on an eight-card machine take seven and every run after it queue.
+    """
     handles = [FakeHandle(name, 24.0, 23.0, 0) for name in ("aaa", "bbb", "ccc")]
     patch_modules(handles, ["aaa", "bbb", "ccc"])
 
-    selection = select_devices(AutoGpuConfig(batch_per_gpu=8, reserve_gpus=1))
+    selection = select_devices(AutoGpuConfig(batch_size=8))
 
-    assert selection.world_size == 2
-    assert selection.batch == 16
-
-
-def test_reserve_clamps_on_a_single_gpu_host(patch_modules: Any) -> None:
-    """The literal policy would leave a one-GPU host unable to ever train."""
-    patch_modules([FakeHandle("aaa", 24.0, 23.0, 0)], ["aaa"])
-
-    selection = select_devices(AutoGpuConfig(batch_per_gpu=8, reserve_gpus=1))
-
-    assert selection.devices == [0]
+    assert selection.world_size == 3
+    assert selection.batch == 24
 
 
-def test_reserve_never_starves_the_run_even_when_larger_than_the_host(patch_modules: Any) -> None:
-    handles = [FakeHandle(name, 24.0, 23.0, 0) for name in ("aaa", "bbb")]
-    patch_modules(handles, ["aaa", "bbb"])
+def test_a_ceiling_is_what_splits_a_machine_deterministically(patch_modules: Any) -> None:
+    """Two runs each naming three cards is how eight cards become 3+3 with 2 to spare."""
+    handles = [FakeHandle(str(index), 24.0, 23.0, 0) for index in range(8)]
+    patch_modules(handles, [str(index) for index in range(8)])
 
-    selection = select_devices(AutoGpuConfig(batch_per_gpu=8, reserve_gpus=99))
-
-    assert selection.devices == [0]
-
-
-def test_max_gpus_and_reserve_compose(patch_modules: Any) -> None:
-    """max_gpus is a ceiling and the reserve a floor on the leftovers; the tighter wins."""
-    handles = [FakeHandle(name, 24.0, 23.0, 0) for name in ("aaa", "bbb", "ccc", "ddd")]
-    patch_modules(handles, ["aaa", "bbb", "ccc", "ddd"])
-
-    assert select_devices(AutoGpuConfig(max_gpus=2, reserve_gpus=1)).world_size == 2
-    assert select_devices(AutoGpuConfig(max_gpus=3, reserve_gpus=2)).world_size == 2
+    assert select_devices(AutoGpuConfig(max_gpus=3)).devices == [0, 1, 2]
 
 
-def test_an_exact_request_overrides_the_floor_and_the_ceiling_alike(patch_modules: Any) -> None:
-    """num_gpus is "give this run N cards", not "at least N" or "at most N".
-
-    min_devices is a floor that would let the run start on fewer and max_gpus a ceiling it
-    would sit under; an exact request has to mean the same thing on both sides.
-    """
-    handles = [FakeHandle(name, 24.0, 23.0, 0) for name in ("aaa", "bbb", "ccc", "ddd")]
-    patch_modules(handles, ["aaa", "bbb", "ccc", "ddd"])
-
-    assert select_devices(AutoGpuConfig(num_gpus=2, min_devices=1, max_gpus=4)).devices == [0, 1]
-    assert select_devices(AutoGpuConfig(num_gpus=3, min_devices=4, max_gpus=1)).devices == [0, 1, 2]
-
-
-def test_an_exact_request_waits_rather_than_starting_on_fewer_cards(patch_modules: Any) -> None:
+def test_the_floor_waits_rather_than_starting_on_fewer_cards(patch_modules: Any) -> None:
     """Half of a two-card run is not a smaller run, it is a differently configured one."""
     handles = [FakeHandle("aaa", 24.0, 23.0, 0), FakeHandle("bbb", 24.0, 1.0, 0)]
     patch_modules(handles, ["aaa", "bbb"])
 
     with pytest.raises(RuntimeError, match="fewer than 2 usable"):
-        select_devices(AutoGpuConfig(num_gpus=2, wait_for_free=False))
+        select_devices(guarded(min_gpus=2, wait_timeout_seconds=0.001))
 
 
-def test_the_reserve_steps_aside_for_an_exact_request(patch_modules: Any) -> None:
-    """reserve_gpus=1 is exactly why a 4+4 split of eight cards cannot happen today: the
-    first run takes N-1 of N. Once a queue is what holds cards back for other runs, holding
-    one back again inside the request would make the number the run asked for unreachable."""
-    handles = [FakeHandle(name, 24.0, 23.0, 0) for name in ("aaa", "bbb")]
-    patch_modules(handles, ["aaa", "bbb"])
+def test_a_greedy_run_leaves_the_runs_already_in_line_their_share(patch_modules: Any) -> None:
+    """The cap that makes a second run start beside the first instead of behind it.
 
-    assert select_devices(AutoGpuConfig(reserve_gpus=1)).devices == [0]
-    assert select_devices(AutoGpuConfig(reserve_gpus=1, num_gpus=2)).devices == [0, 1]
+    Eight free cards and two runs already waiting for three each: this run may have two,
+    not eight. Without the cap it would take all eight and the two waiting would sit there
+    until it finished.
+    """
+    handles = [FakeHandle(str(index), 24.0, 23.0, 0) for index in range(8)]
+    patch_modules(handles, [str(index) for index in range(8)])
+    waiting = [_waiting_for(3, "run-b"), _waiting_for(3, "run-c")]
+
+    chosen = gpu_module._selectable(_survey(8, 8), AutoGpuConfig(), waiting_others=waiting)
+
+    assert [gpu.torch_index for gpu in chosen] == [0, 1]
+
+
+def test_the_cap_never_takes_a_run_below_its_own_floor(patch_modules: Any) -> None:
+    """A run that yields until it cannot start has not yielded, it has deadlocked."""
+    waiting = [_waiting_for(8, "run-b")]
+
+    chosen = gpu_module._selectable(_survey(2, 2), AutoGpuConfig(), waiting_others=waiting)
+
+    assert [gpu.torch_index for gpu in chosen] == [0]
+
+
+def test_a_named_ceiling_ignores_who_else_is_waiting(patch_modules: Any) -> None:
+    """The run said how many it wants; yielding on top of that would be a second policy."""
+    waiting = [_waiting_for(3, "run-b")]
+
+    chosen = gpu_module._selectable(
+        _survey(4, 4), AutoGpuConfig(max_gpus=3), waiting_others=waiting
+    )
+
+    assert [gpu.torch_index for gpu in chosen] == [0, 1, 2]
 
 
 def test_this_runs_own_process_does_not_make_a_card_busy(patch_modules: Any) -> None:
@@ -659,7 +615,7 @@ def test_this_runs_own_process_does_not_make_a_card_busy(patch_modules: Any) -> 
     assert survey.gpus[0].foreign_process_count == 0
     assert survey.gpus[0].own_vram_gb == pytest.approx(18.0)
     assert survey.gpus[0].effective_free_vram_gb == pytest.approx(23.0)
-    assert select_devices(AutoGpuConfig(batch_per_gpu=8)).devices == [0]
+    assert select_devices(AutoGpuConfig(batch_size=8)).devices == [0]
 
 
 def _warnings_from(action: Any) -> list[str]:
@@ -696,7 +652,7 @@ def test_wsl_occupancy_comes_from_the_kernel_when_nvml_names_nobody(
 
     assert survey.gpus[0].foreign_process_count == 1
     with pytest.raises(RuntimeError, match="fewer than 1 usable device"):
-        select_devices(AutoGpuConfig(wait_for_free=False))
+        select_devices(guarded(wait_timeout_seconds=0.001))
 
 
 def test_nvmls_own_count_is_never_overridden(patch_modules: Any, monkeypatch: Any) -> None:
@@ -801,7 +757,7 @@ def test_on_linux_an_idle_card_stays_idle(patch_modules: Any) -> None:
     survey = probe_gpus()
 
     assert survey.gpus[0].foreign_process_count == 0
-    assert select_devices(AutoGpuConfig(batch_per_gpu=8)).devices == [0]
+    assert select_devices(AutoGpuConfig(batch_size=8)).devices == [0]
 
 
 def test_an_idle_card_is_not_accused_of_hiding_processes(
@@ -827,7 +783,14 @@ def test_tolerated_foreign_processes_do_not_block(patch_modules: Any) -> None:
     assert select_devices(AutoGpuConfig(max_compute_processes=1)).devices == [0]
 
 
-def _survey(free_cards: int) -> GpuSurvey:
+def _survey(free_cards: int, cards: int = 2) -> GpuSurvey:
+    """A machine of ``cards`` GPUs of which the first ``free_cards`` are idle.
+
+    A busy card carries a foreign compute process, so a config that names
+    ``max_compute_processes`` — every wait test below, through :func:`guarded` — sees it as
+    taken. With the guards at their defaults nothing is checked and every card is free,
+    which is what the tests about the *share* of a machine want.
+    """
     return GpuSurvey(
         cuda_available=True,
         nvml_available=True,
@@ -840,9 +803,14 @@ def _survey(free_cards: int) -> GpuSurvey:
                 free_vram_gb=23.0,
                 foreign_process_count=0 if index < free_cards else 1,
             )
-            for index in range(2)
+            for index in range(max(cards, free_cards))
         ],
     )
+
+
+def _waiting_for(cards: int, run_id: str) -> Entry:
+    """One other run's queue entry, as the cap reads it: a run id and a number of cards."""
+    return Entry(seq=1, run_id=run_id, user="bob", host="box", pid=99, num_gpus=cards)
 
 
 def test_wait_returns_once_a_card_frees_up() -> None:
@@ -850,7 +818,7 @@ def test_wait_returns_once_a_card_frees_up() -> None:
     slept: list[float] = []
 
     chosen = wait_for_devices(
-        AutoGpuConfig(reserve_gpus=NO_RESERVE, wait_poll_seconds=5.0),
+        guarded(wait_poll_seconds=5.0),
         probe=lambda: surveys.pop(0),
         sleep=slept.append,
         monotonic=lambda: float(len(slept)),
@@ -865,7 +833,7 @@ def test_wait_raises_rather_than_downgrading_to_cpu() -> None:
 
     with pytest.raises(RuntimeError, match="Waited"):
         wait_for_devices(
-            AutoGpuConfig(wait_poll_seconds=5.0, wait_timeout_seconds=15.0),
+            guarded(wait_poll_seconds=5.0, wait_timeout_seconds=15.0),
             probe=lambda: _survey(0),
             sleep=lambda _: None,
             monotonic=lambda: next(clock),
@@ -878,10 +846,6 @@ def test_unreachable_nvml_raises_instead_of_silently_using_cpu() -> None:
     with pytest.raises(RuntimeError, match="NVML is unreachable"):
         wait_for_devices(AutoGpuConfig(), probe=lambda: unreachable)
 
-    assert wait_for_devices(
-        AutoGpuConfig(cpu_fallback_on_nvml_failure=True), probe=lambda: unreachable
-    ) == []
-
 
 def test_a_queued_run_outlives_the_deadline_an_unqueued_one_would_have_had(
     tmp_path: Path,
@@ -889,7 +853,7 @@ def test_a_queued_run_outlives_the_deadline_an_unqueued_one_would_have_had(
     """Queue a run behind a three-hour training and an hour-long timeout kills it at the
     one-hour mark, which is the opposite of waiting for a turn. The timeout keeps its
     meaning where it still has one: a wait with nobody keeping the order."""
-    config = AutoGpuConfig(reserve_gpus=NO_RESERVE, wait_timeout_seconds=1.0)
+    config = guarded(wait_timeout_seconds=1.0)
     busy_then_free = [_survey(0)] * 20 + [_survey(1)]
     slept: list[float] = []
 
@@ -929,7 +893,7 @@ def test_a_run_arriving_as_a_card_frees_lands_behind_the_ones_already_waiting(
         peer.remove_entry(already_waiting)
 
     chosen = wait_for_devices(
-        AutoGpuConfig(reserve_gpus=NO_RESERVE),
+        guarded(),
         probe=lambda: _survey(1),
         sleep=let_the_queue_move,
         queue=mine,
@@ -951,7 +915,7 @@ def test_a_card_this_run_already_holds_is_not_queued_for_a_second_time(tmp_path:
     slept: list[float] = []
 
     chosen = wait_for_devices(
-        AutoGpuConfig(reserve_gpus=NO_RESERVE),
+        guarded(),
         probe=lambda: _survey(0),
         sleep=slept.append,
         queue=mine,
@@ -979,7 +943,7 @@ def test_the_lease_file_decides_a_claim_race_and_the_survey_does_not(tmp_path: P
         return _survey(1)
 
     chosen = wait_for_devices(
-        AutoGpuConfig(reserve_gpus=NO_RESERVE),
+        guarded(),
         probe=probe_while_the_peer_claims,
         sleep=lambda _: None,
         queue=mine,
@@ -992,18 +956,31 @@ def test_the_lease_file_decides_a_claim_race_and_the_survey_does_not(tmp_path: P
     assert [(lease.gpu_index, lease.run_id) for lease in mine.live_leases()] == [(0, "run-a")]
 
 
-def test_a_run_that_refuses_to_wait_does_not_take_a_place_in_the_queue_either(
+def test_a_forced_run_takes_the_card_a_peer_is_holding_and_says_whose_it_was(
     tmp_path: Path,
 ) -> None:
-    """wait_for_free=false is the setting that promises a fast failure, and a queue with no
-    deadline in it would turn that same setting into the longest wait of all."""
+    """--force-gpu is a person overruling the queue, so nothing here waits or refuses.
+
+    What it cannot do is make the card bigger, which is why the card and its previous
+    holder are both named in the warning.
+    """
     mine = queue_for(tmp_path)
+    peer = queue_for(tmp_path, run_id="run-b", user="bob", pid=4243)
+    assert peer.claim_lease(0) is not None
 
-    with pytest.raises(RuntimeError, match="Auto GPU mode found"):
-        wait_for_devices(
-            AutoGpuConfig(wait_for_free=False), probe=lambda: _survey(0), queue=mine
+    chosen: list[Any] = []
+    warnings = _warnings_from(
+        lambda: chosen.extend(
+            wait_for_devices(
+                guarded(force=True), probe=lambda: _survey(0), queue=mine
+            )
         )
+    )
 
+    assert [gpu.torch_index for gpu in chosen] == [0]
+    assert any("Seizing GPU 0 from bob:run-b" in warning for warning in warnings)
+    assert [(lease.gpu_index, lease.run_id) for lease in mine.live_leases()] == [(0, "run-a")]
+    # Nothing queued and nothing waited: the whole point of the flag.
     assert mine.live_entries() == []
 
 
@@ -1017,7 +994,7 @@ def test_a_cancelled_entry_stops_the_run_instead_of_starting_it(tmp_path: Path) 
 
     with pytest.raises(RuntimeError, match="cancelled"):
         wait_for_devices(
-            AutoGpuConfig(),
+            guarded(),
             probe=lambda: _survey(0),
             sleep=cancel_from_the_viewer,
             queue=mine,
@@ -1030,9 +1007,9 @@ def test_a_request_for_more_cards_than_exist_never_reaches_the_queue(tmp_path: P
     at the head of the order for ever with every other run on the machine behind it."""
     mine = queue_for(tmp_path)
 
-    with pytest.raises(RuntimeError, match=r"auto_gpu\.num_gpus=4"):
+    with pytest.raises(RuntimeError, match=r"auto_gpu\.min_gpus=4"):
         wait_for_devices(
-            AutoGpuConfig(num_gpus=4),
+            AutoGpuConfig(min_gpus=4),
             probe=lambda: _survey(2),
             sleep=lambda _: None,
             queue=mine,
@@ -1041,9 +1018,9 @@ def test_a_request_for_more_cards_than_exist_never_reaches_the_queue(tmp_path: P
     assert mine.live_entries() == []
     assert mine.live_leases() == []
 
-    with pytest.raises(RuntimeError, match=r"auto_gpu\.min_devices=4"):
+    with pytest.raises(RuntimeError, match=r"auto_gpu\.min_gpus=4"):
         wait_for_devices(
-            AutoGpuConfig(min_devices=4), probe=lambda: _survey(2), sleep=lambda _: None
+            AutoGpuConfig(min_gpus=4), probe=lambda: _survey(2), sleep=lambda _: None
         )
 
 
@@ -1145,9 +1122,9 @@ def test_a_named_card_is_sized_by_the_policy_however_it_was_spelled(
     a list used to crash the run rather than have its batch sized."""
     handles = [FakeHandle(name, 24.0, 23.0, 0) for name in ("aaa", "bbb")]
     patch_modules(handles, ["aaa", "bbb"])
-    config = AutoGpuConfig(batch_table={"yolo11m": {"GPU1": 20}})
+    write_remembered({"predict": {"yolo11m": {"GPU1": {"1": 20}}}})
 
-    selection = resolve_inference(config, spelling, None, model="yolo11m.pt")
+    selection = resolve_inference(AutoGpuConfig(), spelling, None, model="yolo11m.pt")
 
     assert selection.device_name == "1"
     assert selection.batch == 20
@@ -1170,11 +1147,12 @@ def test_a_device_naming_no_card_is_refused_by_name_before_a_lease_is_taken(
     assert reader.live_leases() == []
 
 
-def test_inference_may_use_the_reserved_card(patch_modules: Any) -> None:
-    """The reserve exists to protect inference, so inference itself must ignore it."""
-    patch_modules([FakeHandle("aaa", 24.0, 23.0, 0)], ["aaa"])
+def test_inference_takes_one_card_however_many_training_asked_for(patch_modules: Any) -> None:
+    """A run queued for four cards to train on still infers on one of them."""
+    handles = [FakeHandle(name, 24.0, 23.0, 0) for name in ("aaa", "bbb", "ccc", "ddd")]
+    patch_modules(handles, ["aaa", "bbb", "ccc", "ddd"])
 
-    assert resolve_inference(AutoGpuConfig(reserve_gpus=1), None, None).device_name == "0"
+    assert resolve_inference(AutoGpuConfig(max_gpus=4), None, None).device_name == "0"
 
 
 def test_inference_falls_back_to_cpu_without_cuda(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1191,9 +1169,9 @@ def test_a_named_card_is_still_sized_by_the_policy(patch_modules: Any) -> None:
     table written for this hardware went unread exactly where it was wanted."""
     handles = [FakeHandle(name, 24.0, 23.0, 0) for name in ("aaa", "bbb")]
     patch_modules(handles, ["aaa", "bbb"])
-    config = AutoGpuConfig(batch_per_gpu=12, batch_table={"yolo11m": {"GPU1": 20}})
+    write_remembered({"predict": {"yolo11m": {"GPU1": {"1": 20}}}})
 
-    selection = resolve_inference(config, "1", None, model="yolo11m.pt")
+    selection = resolve_inference(AutoGpuConfig(), "1", None, model="yolo11m.pt")
 
     assert selection.device_name == "1"
     assert selection.batch == 20
@@ -1203,18 +1181,10 @@ def test_a_named_card_is_still_sized_by_the_policy(patch_modules: Any) -> None:
 
 def test_a_card_that_cannot_be_described_still_gets_a_batch() -> None:
     """No survey means nothing to size against, but inference still needs a number."""
-    selection = resolve_inference(AutoGpuConfig(batch_per_gpu=12), "cpu", None)
+    selection = resolve_inference(AutoGpuConfig(batch_size=12), "cpu", None)
 
     assert selection.device_name == "cpu"
     assert selection.batch == 12
-
-
-def test_a_card_whose_name_is_digits_is_still_a_name() -> None:
-    """Hydra reads an unquoted {5090: 20} key as an integer, and its grammar offers no
-    quoting that survives there — so the table has to take the key however it arrives."""
-    config = AutoGpuConfig.model_validate({"batch_table": {"yolo11m": {5090: 20}}})
-
-    assert config.batch_table == {"yolo11m": {"5090": 20}}
 
 
 def test_inference_leaves_an_unnamed_card_to_ultralytics_when_the_policy_is_off() -> None:

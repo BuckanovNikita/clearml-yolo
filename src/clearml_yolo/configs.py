@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 import socket
+import sys
 from collections.abc import Callable
 from typing import Any
 
@@ -86,6 +87,31 @@ BaselineLocalConf = builds(
     populate_full_signature=True,
 )
 BaselineNoneConf = builds(BaselineConfig, source="none", populate_full_signature=True)
+
+
+FORCE_GPU_FLAG = "--force-gpu"
+FORCE_GPU_OVERRIDE = "auto_gpu.force=true"
+
+
+def absorb_force_gpu_flag(argv: list[str] | None = None) -> None:
+    """Let ``--force-gpu`` be written as a flag on a command Hydra parses as overrides.
+
+    Every ``cy*`` command but the two argparse ones is a Hydra app, and Hydra takes
+    ``key=value`` and nothing else — a bare ``--force-gpu`` is an unrecognised argument and
+    the run dies before any of this project's code sees it. Rewriting it in ``sys.argv``
+    here is what makes the two spellings one thing: the flag is what a person types when a
+    card must be taken *now*, and ``auto_gpu.force=true`` is what a config file holds.
+
+    Repeating the flag is not an error and naming the override as well is not either;
+    either way the override ends up in the list exactly once.
+    """
+    arguments = sys.argv if argv is None else argv
+    if FORCE_GPU_FLAG not in arguments:
+        return
+    while FORCE_GPU_FLAG in arguments:
+        arguments.remove(FORCE_GPU_FLAG)
+    if FORCE_GPU_OVERRIDE not in arguments:
+        arguments.append(FORCE_GPU_OVERRIDE)
 
 
 def _train_fields() -> dict[str, Any]:
