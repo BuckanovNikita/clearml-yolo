@@ -1194,3 +1194,109 @@ def test_inference_leaves_an_unnamed_card_to_ultralytics_when_the_policy_is_off(
 
     assert selection.device_name is None
     assert selection.batch == 8
+
+
+def test_a_greedy_run_shows_itself_in_the_queue_before_it_claims(tmp_path: Path) -> None:
+    """The settling pass, and the back-to-back window it closes.
+
+    A run with no entry yet may claim outright whenever the queue is empty, so two runs
+    started seconds apart never saw each other. One taking more cards than it named a
+    number for now enqueues, sleeps a poll and decides on the pass after.
+    """
+    mine = queue_for(tmp_path)
+    slept: list[float] = []
+
+    chosen = wait_for_devices(
+        guarded(), probe=lambda: _survey(4, 4), sleep=slept.append, queue=mine
+    )
+
+    assert [gpu.torch_index for gpu in chosen] == [0, 1, 2, 3]
+    assert slept == [mine.config.poll_seconds]
+    assert mine.live_entries() == []
+
+
+def test_a_run_that_named_its_ceiling_pays_nothing_for_the_settling_pass(
+    tmp_path: Path,
+) -> None:
+    """It said how many cards it wants, so there is nothing for a poll to tell it."""
+    mine = queue_for(tmp_path)
+    slept: list[float] = []
+
+    chosen = wait_for_devices(
+        guarded(max_gpus=2), probe=lambda: _survey(4, 4), sleep=slept.append, queue=mine
+    )
+
+    assert [gpu.torch_index for gpu in chosen] == [0, 1]
+    assert slept == []
+
+
+def test_three_runs_of_three_split_eight_cards_and_the_third_waits(tmp_path: Path) -> None:
+    """The case this machine cannot show: 3+3 of eight cards, with the third run queued.
+
+    Exactly three cards is both settings naming the same number — the floor is what makes
+    the third run wait rather than start on the two that are left. Each run claims through
+    its own queue object, exactly as three processes would, and the survey reports every
+    card that no lease covers as free.
+    """
+    runs = [queue_for(tmp_path, run_id=f"run-{name}", user=name) for name in ("a", "b", "c")]
+    taken: set[int] = set()
+
+    def survey_the_unleased() -> GpuSurvey:
+        survey = _survey(8, 8)
+        for gpu in survey.gpus:
+            gpu.foreign_process_count = 1 if gpu.torch_index in taken else 0
+        return survey
+
+    for queue in runs[:2]:
+        chosen = wait_for_devices(
+            guarded(min_gpus=3, max_gpus=3),
+            probe=survey_the_unleased,
+            sleep=lambda _: None,
+            queue=queue,
+        )
+        taken.update(gpu.torch_index for gpu in chosen)
+
+    assert sorted(taken) == [0, 1, 2, 3, 4, 5]
+
+    def cancel_from_the_viewer(seconds: float) -> None:
+        for entry in runs[2].live_entries():
+            runs[2].remove_entry(entry)
+
+    # Two cards are left and the third run needs three, so it queues rather than starting
+    # on what is there. Cancelling from cy-queue is how a wait with no deadline ends.
+    with pytest.raises(RuntimeError, match="cancelled"):
+        wait_for_devices(
+            guarded(min_gpus=3, max_gpus=3),
+            probe=survey_the_unleased,
+            sleep=cancel_from_the_viewer,
+            queue=runs[2],
+        )
+
+
+def test_training_hands_back_every_card_but_the_one_inference_needs(tmp_path: Path) -> None:
+    """Inference, metrics and the report all run on one card, and used to hold four.
+
+    The leases outlive a stage only because predict follows train onto *its* card; the
+    others were a neighbour's cards held to the end of the pipeline for nothing.
+    """
+    mine = queue_for(tmp_path)
+    assert mine.claim_leases([0, 1, 2, 3])
+    gpu_module._hold(mine, [0, 1, 2, 3])
+    assert sorted(lease.gpu_index for lease in mine.live_leases()) == [0, 1, 2, 3]
+
+    gpu_module.release_gpus_except([0])
+
+    assert [lease.gpu_index for lease in mine.live_leases()] == [0]
+    assert sorted(gpu_module._HELD) == [0]
+
+
+def test_releasing_what_is_already_released_is_not_an_error(tmp_path: Path) -> None:
+    """Standalone cy-train reaches this with one card, and cy-predict with none."""
+    mine = queue_for(tmp_path)
+    assert mine.claim_leases([1])
+    gpu_module._hold(mine, [1])
+
+    gpu_module.release_gpus_except([1])
+    gpu_module.release_gpus_except([1])
+
+    assert [lease.gpu_index for lease in mine.live_leases()] == [1]

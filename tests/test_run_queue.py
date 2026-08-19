@@ -686,3 +686,42 @@ def test_the_queue_directory_comes_from_the_config_then_the_environment_then_tmp
     monkeypatch.delenv(QUEUE_DIR_ENV_VAR)
 
     assert queue_dir(QueueConfig()).parent == DEFAULT_QUEUE_ROOT
+
+
+def test_a_seized_lease_replaces_the_holder_rather_than_refusing(tmp_path: Path) -> None:
+    """--force-gpu is the one caller allowed past the claim primitive.
+
+    Everything else in this module exists so that one card has one holder; seizing writes
+    over the file instead, and the run it displaced finds out at its next heartbeat.
+    """
+    holder = make_queue(tmp_path, run_id="run-a", user="ann")
+    assert holder.claim_lease(0) is not None
+    forcing = make_queue(tmp_path, run_id="run-b", user="bob")
+
+    seized = forcing.seize_leases([0])
+
+    assert [lease.gpu_index for lease in seized] == [0]
+    assert [(lease.gpu_index, lease.run_id) for lease in forcing.live_leases()] == [(0, "run-b")]
+    # The displaced run is refused its own card back, which is what tells it what happened.
+    holder.release_lease(0)
+    assert [lease.run_id for lease in forcing.live_leases()] == ["run-b"]
+
+
+def test_seizing_a_card_nobody_holds_is_an_ordinary_claim(tmp_path: Path) -> None:
+    forcing = make_queue(tmp_path, run_id="run-b", user="bob")
+
+    assert [lease.gpu_index for lease in forcing.seize_leases([1, 2])] == [1, 2]
+    assert [lease.gpu_index for lease in forcing.live_leases()] == [1, 2]
+
+
+def test_seizing_leaves_a_reclaim_marker_alone(tmp_path: Path) -> None:
+    """A marker is somebody's reclaim in flight and this is not one; sweeping it would
+    admit a second reclaimer of the same lease generation."""
+    forcing = make_queue(tmp_path, run_id="run-b", user="bob")
+    marker = forcing.leases_dir / f"{RECLAIM_MARKER_PREFIX}gpu-0-1-2"
+    marker.write_text("run-c", encoding="utf-8")
+
+    forcing.seize_leases([0])
+
+    assert marker.exists()
+    assert [lease.gpu_index for lease in forcing.live_leases()] == [0]

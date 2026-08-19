@@ -13,6 +13,7 @@ from hydra_zen import instantiate, store
 
 import clearml_yolo.configs  # noqa: F401  registers every config
 from clearml_yolo.clearml_session import ClearMLConfig
+from clearml_yolo.configs import absorb_force_gpu_flag
 from clearml_yolo.gpu import AutoGpuConfig
 from clearml_yolo.run_identity import LATEST_LINK_NAME, RUNS_ROOT
 from clearml_yolo.tasks.compare import InferenceConfig, ModelRef, compare
@@ -501,3 +502,32 @@ def test_auto_gpu_defaults_are_valid() -> None:
     assert auto_gpu.batch_size is None
     assert auto_gpu.min_free_vram_gb is None
     assert auto_gpu.force is False
+
+
+def test_the_force_gpu_flag_becomes_the_override_hydra_can_read() -> None:
+    """Hydra takes `key=value` and nothing else, so a bare flag would kill the run.
+
+    The two spellings have to be one thing: the flag is what a person types when a card
+    must be taken now, and the override is what a config file holds.
+    """
+    argv = ["cy", "--force-gpu", "train.ultralytics.epochs=1"]
+
+    absorb_force_gpu_flag(argv)
+
+    assert argv == ["cy", "train.ultralytics.epochs=1", "auto_gpu.force=true"]
+
+
+def test_the_flag_and_the_override_together_still_say_it_once() -> None:
+    argv = ["cy", "--force-gpu", "auto_gpu.force=true", "--force-gpu"]
+
+    absorb_force_gpu_flag(argv)
+
+    assert argv == ["cy", "auto_gpu.force=true"]
+
+
+def test_a_command_without_the_flag_is_left_exactly_as_it_was() -> None:
+    argv = ["cy", "train.ultralytics.epochs=1"]
+
+    absorb_force_gpu_flag(argv)
+
+    assert argv == ["cy", "train.ultralytics.epochs=1"]
