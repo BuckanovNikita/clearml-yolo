@@ -67,7 +67,7 @@ Shortest honest verification of a pipeline change, no server needed:
 
 ```bash
 uv run cy clearml.enabled=false train.ultralytics.data=coco8.yaml train.ultralytics.epochs=1 \
-  report/baseline=none skip_compare=true auto_gpu.scale_to_vram=false \
+  report/baseline=none skip_compare=true \
   auto_gpu.queue.enabled=false auto_gpu.wait_timeout_seconds=120
 ```
 
@@ -76,12 +76,12 @@ defaults the run takes a place in this machine's queue instead, and a queued run
 deadline** — the timeout is read only on the no-queue path. Leave the queue on when the point of the run
 is the queue; switch it off whenever the run must fail rather than sit behind CVAT holding the card.
 
-`auto_gpu.scale_to_vram=false` pins the batch to the 24 GB `reference_vram_gb` rather than scaling to the
-5090's 32 GB. At the shipped defaults it is defensive rather than load-bearing — `round_to_power_of_two`
-floors the scaled batch back to the same number — but it holds if a run raises the anchor. The GPU is
-shared with CVAT and the ClearML server; verification runs must not claim the whole card. Do not raise
-`reference_vram_gb` to 32 to match the hardware; it is the denominator that sizes batches, not a memory
-cap, so raising it *shrinks* the batch.
+Nothing in the command sizes the batch, and that is now correct: the batch is the largest one a run of
+this stage was seen to *finish* at on this model and this card, read from
+`~/.cache/clearml-yolo/batch_table.json`, and `DEFAULT_BATCH` before anything has. The GPU is shared with
+CVAT and the ClearML server, so a verification run that must stay small says
+`auto_gpu.batch_size=<n>` — a batch **per card**, used exactly as written. There is no reference-VRAM
+arithmetic left to get backwards.
 
 `report/baseline=none` is a group override, and it composes only against the packaged config. From a
 `cy-init-config` folder the group is gone from the defaults list and the same thing is spelled
@@ -169,8 +169,18 @@ Two facts that have cost time before:
 task signature), expose an app in `apps/`, then extend `PIPELINE_FILLED_KEYS`/`stage_configs` so the run
 hands it the shared values. Add the parity case to `tests/test_configs.py`.
 
-**Change GPU/batch behaviour**: `gpu.py` decides devices and batch; `tests/test_gpu.py` pins each rung of
-the ladder. Verify with a real run — the mocked suite cannot see a device it never allocates.
+**Change GPU/batch behaviour**: `gpu.py` decides devices and batch; `tests/test_gpu.py` pins each rung.
+How many cards a run takes is `auto_gpu.min_gpus` (the floor it will not start below) and
+`auto_gpu.max_gpus` (the ceiling); an *exact* count is both of them naming the same number, and a run
+with no ceiling takes every free card less what the runs already waiting asked for. That cap, and the one
+poll a greedy run waits before it claims, are the whole of what stops the first run swallowing a machine.
+Neither can take a card back out of a running DDP job, so a planned split is still two runs each naming
+`min_gpus`/`max_gpus`. Verify with a real run — the mocked suite cannot see a device it never allocates.
+
+`auto_gpu.force=true`, spelled `--force-gpu` on the command line, is past all of it: no queue, no wait,
+no guards, and other runs' leases written over. It can put two trainings on one card. It is the only
+caller of `RunQueue.seize_leases`, which is the only write in `run_queue.py` that is not an `O_EXCL`
+create.
 
 **Change the queue or the run directory**: `run_queue.py` owns the lease and entry files and the pure
 `order()`; `gpu._wait_in_turn` is the whole scheduler (there is no daemon — the waiting `cy` process is

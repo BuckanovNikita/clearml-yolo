@@ -47,7 +47,6 @@ uv run cy \
   train.ultralytics.name=verify-1ep \
   report/baseline=none \
   skip_compare=true \
-  auto_gpu.scale_to_vram=false \
   auto_gpu.queue.enabled=false \
   auto_gpu.wait_timeout_seconds=120
 ```
@@ -117,7 +116,6 @@ uv run cy \
   clearml.tags=[prod] \
   train.ultralytics.data=coco8.yaml \
   train.ultralytics.epochs=1 \
-  auto_gpu.scale_to_vram=false \
   auto_gpu.queue.enabled=false \
   auto_gpu.wait_timeout_seconds=120
 ```
@@ -168,21 +166,27 @@ terminals.
 **This box has one GPU**, so the 4+4 split the queue exists for is not verifiable here. The observable
 equivalent is two runs each asking for one card: the second must queue behind the first rather than
 collide with it or hang. Keep `auto_gpu.queue.enabled` at its default here — switching it off is what
-the other sections do, and it is the very thing under test. Do not reach for `auto_gpu.num_gpus=2` to
+the other sections do, and it is the very thing under test. Do not reach for `auto_gpu.min_gpus=2` to
 simulate the split: a request for more cards than the machine has is refused right after the first
-survey, before anything is enqueued, naming `auto_gpu.num_gpus` (or `auto_gpu.min_devices` when that is
-what asked). That refusal is itself worth exercising once — `entries/` must stay empty afterwards.
+survey, before anything is enqueued, naming `auto_gpu.min_gpus`. That refusal is itself worth exercising
+once — `entries/` must stay empty afterwards.
+
+Both runs below name `auto_gpu.max_gpus=1`, which also keeps them off the settling pass: a run that names
+no ceiling and could take more than `min_gpus` cards enqueues and waits one `queue.poll_seconds` before
+claiming, so that a run starting inside that window is in the order and gets its share. On a one-card box
+there is never more than `min_gpus` free, so the pass never triggers here either way — which is exactly
+why the 8-card behaviour lives in `tests/test_gpu.py` against a fabricated survey.
 
 ```bash
 # terminal 1
 uv run cy clearml.enabled=false train.ultralytics.data=coco8.yaml train.ultralytics.epochs=1 \
   clearml.task_name=par-a report/baseline=none skip_compare=true \
-  auto_gpu.scale_to_vram=false auto_gpu.num_gpus=1
+  auto_gpu.max_gpus=1
 
 # terminal 2, started while the first is training
 uv run cy clearml.enabled=false train.ultralytics.data=coco8.yaml train.ultralytics.epochs=1 \
   clearml.task_name=par-b report/baseline=none skip_compare=true \
-  auto_gpu.scale_to_vram=false auto_gpu.num_gpus=1
+  auto_gpu.max_gpus=1
 
 # terminal 3
 uv run cy-queue
@@ -233,10 +237,16 @@ resolution.
 
 ## Overrides that matter on this box
 
-`auto_gpu.scale_to_vram=false` pins the batch to the 24 GB `reference_vram_gb` instead of scaling it up
-to the 5090's 32 GB. The GPU is shared with CVAT and the ClearML server, so verification runs must not
-claim the full card. Do **not** raise `reference_vram_gb` to 32 to "match the hardware" — that is a
-batch-sizing knob, not a memory cap.
+`auto_gpu.batch_size=<n>` is the batch **per card**, used exactly as written — the only lever on batch
+size left, and the way a verification run stays small on a GPU shared with CVAT and the ClearML server.
+Unset, the batch is the largest one a run of this stage was seen to *finish* at on this model and this
+card, read back from `~/.cache/clearml-yolo/batch_table.json`; before anything has finished there it is
+`DEFAULT_BATCH`. Nothing scales a batch to a card's VRAM any more, so there is no denominator left to
+raise the wrong way.
+
+`auto_gpu.min_gpus` and `auto_gpu.max_gpus` are the floor and the ceiling on card count. One card is
+`auto_gpu.max_gpus=1`; *exactly* two is `auto_gpu.min_gpus=2 auto_gpu.max_gpus=2`. Naming neither means
+every free card, less what the runs already in the queue asked for.
 
 `auto_gpu.wait_timeout_seconds=120` stops a run from blocking for the default 3600 s when another process
 holds the card — **but only together with `auto_gpu.queue.enabled=false`**. At the shipped defaults the
@@ -253,6 +263,8 @@ where the queue is the subject.
 | Skipping `lint-imports` | It is the only check that catches a layering violation, and pre-commit will reject the commit. |
 | Reading an empty `<run_dir>/reports` as failure | Expected with `report/baseline=none`. |
 | `wait_timeout_seconds=120` on its own to bound a run | Unread at the shipped defaults; a queued run has no deadline. Add `auto_gpu.queue.enabled=false`. |
+| `auto_gpu.max_gpus=2` to get *exactly* two cards | It is a ceiling. With one card free the run starts on one, because `min_gpus` is still 1. Exactly two is both keys naming 2. |
+| `--force-gpu` to get past a queued peer in an ordinary verification run | It writes over the peer's lease and puts two trainings on one card. It is for a person who has decided that, not for making a test go. |
 | `predict.output=` / `metrics.output_dir=` to redirect a `cy` run | They no longer compose. Use `run_dir=`. |
 | `ultralytics.device=[0]` to get past a queued peer | A named device skips the *survey*, not the queue: it leases exactly the indices it names and refuses one a live peer lease covers. Deliberate sharing is `auto_gpu.queue.enabled=false`, and `auto_gpu.enabled=false` does not switch the leases off either. |
 | Reaching for one blessed device spelling | `0`, `[0]`, `"0"`, `"0,1"` and `"cuda:0"` normalise to the same card, once, before any lease is taken, so the lease and the batch can no longer disagree about which card was meant. A spelling that names no card (`1.5`, `["cpu"]`, an empty list, a negative index) is refused by name with nothing leased. |

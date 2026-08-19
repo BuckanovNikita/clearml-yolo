@@ -408,7 +408,8 @@ def _warn_if_process_view_is_blind(gpus: list[GpuInfo]) -> None:
 
     On WSL the occupied memory is usually the Windows host's — a desktop, a browser, a
     game — which no process inside this Linux has a handle on. That is unknowable from
-    here, so the VRAM thresholds are what stands between the run and a shared card.
+    here and no lease covers it, so a VRAM threshold is the only thing that can stand
+    between the run and a shared card — and none of them is set unless somebody set it.
     """
     global _warned_about_blind_process_view  # noqa: PLW0603  warn once per process
     if _warned_about_blind_process_view:
@@ -423,9 +424,9 @@ def _warn_if_process_view_is_blind(gpus: list[GpuInfo]) -> None:
     _warned_about_blind_process_view = True
     logger.warning(
         "No process on this machine accounts for the {} in use on GPU(s) {} — it belongs "
-        "to another user, or to the host outside WSL. auto_gpu.max_compute_processes "
-        "cannot see such a neighbour; min_free_vram_gb and max_used_fraction are what "
-        "guard against sharing the card.",
+        "to another user, or to the host outside WSL. No lease covers it and "
+        "auto_gpu.max_compute_processes cannot see it; set auto_gpu.min_free_vram_gb or "
+        "auto_gpu.max_used_fraction (both unset by default) to refuse a card like this.",
         ", ".join(f"{gpu.unattributed_vram_gb:.1f} GiB" for gpu in blind),
         [gpu.torch_index for gpu in blind],
     )
