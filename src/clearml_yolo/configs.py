@@ -15,6 +15,8 @@ import os
 import socket
 import sys
 from collections.abc import Callable
+from importlib.resources import files
+from pathlib import Path
 from typing import Any
 
 from hydra.conf import HydraConf, JobConf, RunDir
@@ -55,17 +57,85 @@ COMPARISON_OUTPUT_DIR = f"{LATEST_RUN}/{COMPARISON_DIR}"
 RUN_STAMP_RESOLVER = "cy_run_token"
 HYDRA_RUN_DIR = "outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}-${" + RUN_STAMP_RESOLVER + ":}"
 
-# Hydra composes the ultralytics parameter sets from files inside the installed package,
-# because their comments are the point and a store entry cannot carry any. The path is
-# declared per primary config: `hydra.searchpath` is resolved before the `hydra/config`
-# store entry is composed, so setting it there is too late and the group is not found.
-PACKAGE_CONF = {"searchpath": ["pkg://clearml_yolo.conf"]}
+# The packaged parameter sets stay files rather than store entries because their comments
+# are the point, and they are read into the config here rather than composed as a Hydra
+# group: a group can only ever name a file by stem, from a directory Hydra already
+# searches, and the whole of `cfg=` is that a run names an ultralytics file by path.
+PACKAGED_PARAMS_DIR = "ultralytics"
 
-# The group reference is absolute, so one `ultralytics/` directory serves both the
-# standalone apps and the stage blocks nested inside the pipeline. Written relatively,
-# Hydra would look for `train/ultralytics/` and `predict/ultralytics/` as well, and the
-# same file would have to exist three times.
-ULTRALYTICS_GROUP = "/ultralytics@ultralytics"
+# Which composed config carries which ultralytics blocks, and which packaged parameter set
+# fills each one. Keyed by config name so `config_tree` reads the same mapping when it
+# dumps them back out. Beside every block sits the key naming the file that overlays it:
+# `ultralytics` -> `cfg`, `train.ultralytics` -> `train.cfg`.
+ULTRALYTICS_BLOCKS: dict[str, dict[str, str]] = {
+    "train": {"ultralytics": "train"},
+    "predict": {"ultralytics": "predict"},
+    "pipeline": {"train.ultralytics": "train", "predict.ultralytics": "predict"},
+}
+
+# The key that names an ultralytics file, beside the block it fills.
+CFG_KEY = "cfg"
+
+
+def packaged_ultralytics_params(stage: str) -> dict[str, Any]:
+    """Every ultralytics parameter for one stage, as the packaged file writes it."""
+    text = (
+        files("clearml_yolo.conf")
+        .joinpath(PACKAGED_PARAMS_DIR, f"{stage}.yaml")
+        .read_text(encoding="utf-8")
+    )
+    params: dict[str, Any] = OmegaConf.to_object(OmegaConf.create(text))  # type: ignore[assignment]
+    return params
+
+
+def _overlaid(
+    stage: str, packaged: dict[str, Any], composed: dict[str, Any], chosen: dict[str, Any]
+) -> dict[str, Any]:
+    """Merge one ultralytics file into a composed block: packaged < the file < what you wrote.
+
+    A key whose composed value still equals the packaged default was chosen by nobody, so
+    the file fills it. A key that differs was written on the command line or in a config
+    file, and the file does not take it back — which is the same rule
+    :func:`clearml_yolo.ultralytics_params.fill_unset` states one layer down, where a value
+    beats what the run would have worked out for itself.
+
+    >>> packaged = {"epochs": 100, "batch": None}
+    >>> _overlaid("train", packaged, {"epochs": 3, "batch": None}, {"epochs": 50, "batch": 8})
+    {'epochs': 3, 'batch': 8}
+    """
+    unknown = sorted(set(chosen) - set(packaged))
+    if unknown:
+        raise ValueError(
+            f"{', '.join(unknown)}: the {stage} stage reads no such parameter. What it does "
+            f"read is every uncommented key of clearml_yolo/conf/{PACKAGED_PARAMS_DIR}/"
+            f"{stage}.yaml; the commented ones are the parameters this stage ignores."
+        )
+    untouched = {
+        key: value for key, value in chosen.items() if composed.get(key) == packaged.get(key)
+    }
+    return {**composed, **untouched}
+
+
+def overlay_ultralytics_files(config_name: str) -> Callable[[Any], None]:
+    """A ``zen`` pre-call hook filling each ultralytics block from the file its ``cfg`` names.
+
+    It runs on the composed config, before the task is called, because that is the one
+    moment both halves are known: what the packaged defaults say, and what this command
+    line and this config file changed.
+    """
+
+    def apply(config: Any) -> None:
+        for dotted, stage in ULTRALYTICS_BLOCKS[config_name].items():
+            parent, _, leaf = dotted.rpartition(".")
+            node = OmegaConf.select(config, parent) if parent else config
+            named = node[CFG_KEY]
+            if named is None:
+                continue
+            chosen: dict[str, Any] = OmegaConf.to_object(OmegaConf.load(Path(named)))  # type: ignore[assignment]
+            composed: dict[str, Any] = OmegaConf.to_object(node[leaf])  # type: ignore[assignment]
+            node[leaf] = _overlaid(stage, packaged_ultralytics_params(stage), composed, chosen)
+
+    return apply
 
 AutoGpuConf = builds(AutoGpuConfig, populate_full_signature=True)
 ClearMLConf = builds(ClearMLConfig, populate_full_signature=True)
@@ -116,11 +186,12 @@ def absorb_force_gpu_flag(argv: list[str] | None = None) -> None:
 
 def _train_fields() -> dict[str, Any]:
     return {
-        "hydra_defaults": ["_self_", {ULTRALYTICS_GROUP: "train"}],
-        "hydra": PACKAGE_CONF,
-        # Filled by the group above; declared so the composed config has somewhere to put
-        # it, which a structured config otherwise refuses.
-        "ultralytics": None,
+        # The whole packaged set, inline, so every parameter stays overridable one at a
+        # time as `ultralytics.<key>=<value>` without any file being named at all.
+        "ultralytics": packaged_ultralytics_params("train"),
+        # An ultralytics file this run reads over those defaults. Unset means the defaults
+        # as they stand.
+        CFG_KEY: None,
         "auto_gpu": AutoGpuConf,
         "clearml": ClearMLConf,
     }
@@ -128,9 +199,8 @@ def _train_fields() -> dict[str, Any]:
 
 def _predict_fields() -> dict[str, Any]:
     return {
-        "hydra_defaults": ["_self_", {ULTRALYTICS_GROUP: "predict"}],
-        "hydra": PACKAGE_CONF,
-        "ultralytics": None,
+        "ultralytics": packaged_ultralytics_params("predict"),
+        CFG_KEY: None,
         # Unset means the model the last training run in this folder left behind, which the
         # predict task resolves from the experiment this run was named after. A path built
         # here instead is built once, at import, from the *default* experiment name — so
@@ -230,10 +300,6 @@ def _stage_config(stage: str, *, in_pipeline: bool) -> Any:
     fields = {key: value for key, value in STAGE_FIELDS[stage]().items() if key not in filled}
     if in_pipeline:
         fields.update(PIPELINE_FIELD_OVERRIDES.get(stage, {}))
-        # `hydra` is the run's own node, and the pipeline declares it once at the top.
-        # Left here it would become a `train.hydra` field: a stage keyword argument no
-        # task takes, and no search path at all.
-        fields.pop("hydra", None)
     defaults = fields.pop("hydra_defaults", None)
     if defaults is not None:
         # A group whose key the pipeline fills has nothing left to select.
@@ -254,7 +320,6 @@ GroundTruthConf = make_config(
 
 
 PipelineConf = make_config(
-    hydra=PACKAGE_CONF,
     hydra_defaults=[
         "_self_",
         {"train": "default"},

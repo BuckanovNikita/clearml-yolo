@@ -1,9 +1,10 @@
 # Every ultralytics parameter, for detection training.
 #
 # Generated from ultralytics 8.4.115's own cfg/default.yaml, comments and all.
-# Copy it, edit the copy, and select it by file name: a `highlr.yaml` beside this
-# one is reached with `ultralytics=highlr`. One key alone is
-# `ultralytics.<key>=<value>` — or `<stage>.ultralytics.<key>=<value>` under `cy`.
+# Write your parameters here, or keep them in a file of your own and name that file
+# by path: `cy-train cfg=my.yaml`, or `cy train.cfg=my.yaml` under `cy`. One key
+# alone needs no file at all — `ultralytics.<key>=<value>`, or
+# `train.ultralytics.<key>=<value>` under `cy` — and it beats the file.
 #
 # A `null` below is a key this run works out for itself. Write a value and it is
 # passed to ultralytics verbatim, and nothing here overrides it.

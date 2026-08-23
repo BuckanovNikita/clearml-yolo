@@ -10,8 +10,15 @@ from hydra_zen import store
 from omegaconf import OmegaConf
 
 import clearml_yolo.configs  # noqa: F401  registers every config
-from clearml_yolo.config_tree import COMMAND_OF_CONFIG, ULTRALYTICS_BLOCKS, dump_config_tree
+from clearml_yolo.config_tree import COMMAND_OF_CONFIG, dump_config_tree
+from clearml_yolo.configs import ULTRALYTICS_BLOCKS, overlay_ultralytics_files
 from clearml_yolo.tasks.pipeline import PIPELINE_FILLED_KEYS
+
+# The blocks are keyed by config name; a dumped file is named after the command that
+# reads it, which is what every assertion here opens.
+BLOCKS_OF_COMMAND = {
+    COMMAND_OF_CONFIG[config_name]: blocks for config_name, blocks in ULTRALYTICS_BLOCKS.items()
+}
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -34,28 +41,27 @@ def test_one_file_per_command(tmp_path: Path) -> None:
     }
 
 
-def test_the_ultralytics_parameters_are_a_folder_of_their_own(tmp_path: Path) -> None:
-    """One file per stage, selectable by name, rather than a block inlined into every
-    command that has one — which would be the same hundred and fifteen keys in three
-    places, any two of which could disagree."""
+def test_the_ultralytics_parameters_are_in_the_command_s_own_file(tmp_path: Path) -> None:
+    """Not a folder beside it: a dumped file is the whole of what Hydra composes, so a
+    parameter it does not carry cannot be overridden one at a time — `ultralytics.lr0=0.02`
+    against an absent block is refused rather than applied."""
     dump_config_tree(tmp_path)
 
-    assert {path.name for path in (tmp_path / "ultralytics").glob("*.yaml")} == {
-        "train.yaml",
-        "predict.yaml",
-    }
-    assert "- /ultralytics@ultralytics: train" in (tmp_path / "cy-train.yaml").read_text(
-        encoding="utf-8"
-    )
+    assert not (tmp_path / "ultralytics").exists()
+    with initialize_config_dir(config_dir=str(tmp_path), version_base="1.3"):
+        dumped = compose(config_name="cy-train", overrides=["ultralytics.lr0=0.02"])
+
+    assert dumped.ultralytics.lr0 == 0.02
+    assert dumped.cfg is None
 
 
-def test_the_copied_parameters_keep_the_documentation_that_makes_them_legible(
+def test_the_spliced_parameters_keep_the_documentation_that_makes_them_legible(
     tmp_path: Path,
 ) -> None:
-    """They are copied byte for byte rather than rendered: every key carries ultralytics'
-    own one-line explanation, and OmegaConf would drop all of them."""
+    """They are spliced in byte for byte rather than rendered: every key carries
+    ultralytics' own one-line explanation, and OmegaConf would drop all of them."""
     dump_config_tree(tmp_path)
-    text = (tmp_path / "ultralytics" / "train.yaml").read_text(encoding="utf-8")
+    text = (tmp_path / "cy-train.yaml").read_text(encoding="utf-8")
 
     assert "# (float) initial learning rate" in text
     assert "# ---- ignored by detection training ----" in text
@@ -116,17 +122,19 @@ def test_the_pipeline_header_names_every_value_the_run_hands_to_its_stages(
         assert key in header, key
 
 
-@pytest.mark.parametrize("command", sorted(ULTRALYTICS_BLOCKS))
-def test_the_group_override_a_header_prints_is_one_that_command_takes(
+@pytest.mark.parametrize("command", sorted(BLOCKS_OF_COMMAND))
+def test_the_cfg_override_a_header_prints_is_one_that_command_takes(
     tmp_path: Path, command: str
 ) -> None:
-    """The group is mounted at the top level for a standalone app and once per stage inside
-    `cy`, and Hydra refuses an override naming a key a config never mounted rather than
-    ignoring it. One spelling printed in every file therefore sent most of its readers to a
-    composition error, so the line is built from the same mapping that mounts the blocks and
-    is composed here exactly as printed."""
+    """The key naming an ultralytics file is at the top level for a standalone app and one
+    per stage inside `cy`, and Hydra refuses an override naming a key a config never
+    declared rather than ignoring it. One spelling printed in every file therefore sent most
+    of its readers to a composition error, so the line is built from the same mapping the
+    blocks come from and is composed here exactly as printed."""
     dump_config_tree(tmp_path)
-    blocks = ULTRALYTICS_BLOCKS[command]
+    blocks = BLOCKS_OF_COMMAND[command]
+    named = tmp_path / "mine.yaml"
+    named.write_text("iou: 0.55\n", encoding="utf-8")
     prefix = f"#     {command} "
     printed = [
         line[len(prefix) :]
@@ -135,18 +143,14 @@ def test_the_group_override_a_header_prints_is_one_that_command_takes(
     ]
 
     assert len(printed) == len(blocks)
-    overrides = [
-        line.replace("<file-stem>", name)
-        for line, name in zip(printed, blocks.values(), strict=True)
-    ]
+    overrides = [line.replace("<your-file>.yaml", str(named)) for line in printed]
+    config_name = next(name for name, one in COMMAND_OF_CONFIG.items() if one == command)
     with initialize_config_dir(config_dir=str(tmp_path), version_base="1.3"):
         as_printed = compose(config_name=command, overrides=overrides)
-    with initialize_config_dir(config_dir=str(tmp_path), version_base="1.3"):
-        untouched = compose(config_name=command)
+    overlay_ultralytics_files(config_name)(as_printed)
 
-    assert OmegaConf.to_container(as_printed, resolve=False) == OmegaConf.to_container(
-        untouched, resolve=False
-    )
+    for dotted in blocks:
+        assert OmegaConf.select(as_printed, f"{dotted}.iou") == 0.55
 
 
 def test_a_command_with_no_parameters_of_its_own_is_told_nothing_about_the_group(
@@ -156,7 +160,7 @@ def test_a_command_with_no_parameters_of_its_own_is_told_nothing_about_the_group
     editing one and an override selecting it are both instructions the command rejects."""
     dump_config_tree(tmp_path)
 
-    for command in set(COMMAND_OF_CONFIG.values()) - set(ULTRALYTICS_BLOCKS):
+    for command in set(COMMAND_OF_CONFIG.values()) - set(BLOCKS_OF_COMMAND):
         assert "ultralytics" not in (tmp_path / f"{command}.yaml").read_text(encoding="utf-8")
 
 
@@ -166,10 +170,9 @@ def test_folder_composes_back_to_the_built_in_defaults(
 ) -> None:
     """A dumped-then-loaded config is the config, or the folder is a lie.
 
-    Compared as containers rather than as rendered YAML: the ultralytics block is lifted
-    out into a defaults list, and a key that arrives through one lands at the end of the
-    file rather than where it was declared. That is a difference in key order and in
-    nothing else, which is not a difference in the configuration.
+    Compared as containers rather than as rendered YAML: what the dump writes is one file
+    of values plus the packaged parameter text spliced into it, and a comment is not a
+    difference in the configuration.
     """
     dump_config_tree(tmp_path)
 

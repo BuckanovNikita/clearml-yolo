@@ -13,7 +13,7 @@ from hydra_zen import instantiate, store
 
 import clearml_yolo.configs  # noqa: F401  registers every config
 from clearml_yolo.clearml_session import ClearMLConfig
-from clearml_yolo.configs import absorb_force_gpu_flag
+from clearml_yolo.configs import absorb_force_gpu_flag, overlay_ultralytics_files
 from clearml_yolo.gpu import AutoGpuConfig
 from clearml_yolo.run_identity import LATEST_LINK_NAME, RUNS_ROOT
 from clearml_yolo.tasks.compare import InferenceConfig, ModelRef, compare
@@ -531,3 +531,84 @@ def test_a_command_without_the_flag_is_left_exactly_as_it_was() -> None:
     absorb_force_gpu_flag(argv)
 
     assert argv == ["cy", "train.ultralytics.epochs=1"]
+
+
+def _named_file(tmp_path: Path, name: str, text: str) -> str:
+    path = tmp_path / name
+    path.write_text(text, encoding="utf-8")
+    return str(path)
+
+
+def _from_a_named_file(app: str, overrides: list[str]) -> Any:
+    """One app's config with the file its ``cfg`` names already merged in, as the CLI runs it."""
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        config = compose(config_name=app, overrides=overrides)
+    overlay_ultralytics_files(app)(config)
+    return config
+
+
+def test_a_named_file_fills_only_the_parameters_it_writes(tmp_path: Path) -> None:
+    """The simplest way to run a training is to point at an ultralytics file, and a short
+    file must stay short: the keys it does not mention keep the packaged default, and the
+    `null`s among those are what `auto_gpu` and the run's own identity answer later. A file
+    read as the whole configuration would hand ultralytics a batch of None and a run
+    directory of None instead."""
+    named = _named_file(tmp_path, "tiny.yaml", "epochs: 7\ndata: mine.yaml\n")
+
+    params = _from_a_named_file("train", [f"cfg={named}"]).ultralytics
+
+    assert (params.epochs, params.data) == (7, "mine.yaml")
+    assert params.batch is None
+    assert params.device is None
+    assert params.project is None
+    assert params.name is None
+
+
+def test_a_parameter_written_on_the_command_line_beats_the_file(tmp_path: Path) -> None:
+    """Both spellings are available at once and the order between them has to be the
+    obvious one: a file is what a run is normally configured by, and a key named on the
+    command line is what somebody typed to change this run alone."""
+    named = _named_file(tmp_path, "tiny.yaml", "epochs: 7\n")
+
+    params = _from_a_named_file("train", [f"cfg={named}", "ultralytics.epochs=3"]).ultralytics
+
+    assert params.epochs == 3
+
+
+def test_naming_no_file_at_all_leaves_the_packaged_defaults(tmp_path: Path) -> None:
+    """`cy-train` alone is still a run: the parameters are in the config already, and the
+    file is a way to replace them rather than the only way to have any."""
+    assert _from_a_named_file("train", []).ultralytics.epochs == 100
+
+
+def test_a_file_naming_a_parameter_the_stage_never_reads_says_so(tmp_path: Path) -> None:
+    """Passed through, it reaches ultralytics as an unexpected keyword argument several
+    minutes into a run, or is silently ignored. `lr0` is the case that matters: a real
+    ultralytics parameter, and one inference has no use for."""
+    named = _named_file(tmp_path, "wrong.yaml", "lr0: 0.02\n")
+
+    with pytest.raises(ValueError, match="lr0"):
+        _from_a_named_file("predict", [f"cfg={named}"])
+
+
+def test_each_stage_of_a_pipeline_run_names_its_own_file(tmp_path: Path) -> None:
+    """Training and inference read different parameter sets, so one file for the run would
+    be one of them wrong. Neither file may reach the other stage's block."""
+    for_training = _named_file(tmp_path, "train.yaml", "iou: 0.55\n")
+    for_inference = _named_file(tmp_path, "predict.yaml", "iou: 0.35\n")
+
+    config = _from_a_named_file(
+        "pipeline", [f"train.cfg={for_training}", f"predict.cfg={for_inference}"]
+    )
+
+    assert config.train.ultralytics.iou == 0.55
+    assert config.predict.ultralytics.iou == 0.35
+
+
+def test_the_file_a_stage_named_is_not_a_keyword_argument_of_its_task(tmp_path: Path) -> None:
+    """By the time a stage runs the file has been merged into its parameters, so the name
+    has done its work. Left in the block it would reach the task as an argument no task
+    takes."""
+    named = _named_file(tmp_path, "tiny.yaml", "epochs: 7\n")
+
+    assert "cfg" not in _pipeline_stages([f"train.cfg={named}"])["train"]

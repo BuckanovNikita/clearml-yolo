@@ -40,7 +40,11 @@ from clearml_yolo.tasks.train import train as run_training
 # that dataclass declares `defaults` as an ordinary field. So it comes back as data on
 # exactly the path the CLI takes and no other, which is why it has to be dropped here
 # rather than trusted to have been consumed.
-COMPOSITION_ONLY_KEYS = frozenset({"defaults"})
+#
+# `cfg` names the ultralytics file a stage reads its parameters from. By the time a stage
+# is called that file has already been merged into the stage's `ultralytics` block, so the
+# name has done its work and no task takes it.
+COMPOSITION_ONLY_KEYS = frozenset({"defaults", "cfg"})
 
 # Every path a run writes hangs off one directory of its own, under `RUNS_ROOT`. Two runs
 # started in the same folder used to share `runs/detect/<task_name>` with ultralytics'
