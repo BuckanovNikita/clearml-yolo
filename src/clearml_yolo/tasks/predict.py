@@ -106,7 +106,8 @@ def predict(
 ) -> PredictResult:
     """Infer over the dataset images and write a predictions CSV.
 
-    ``ultralytics`` is the whole of ``conf/ultralytics/predict.yaml``: every parameter
+    ``ultralytics`` is the whole of ``conf/ultralytics/predict.yaml``, with whatever the file
+    named by ``cfg=`` and the command line wrote over it: every parameter
     ultralytics accepts for detection prediction. Its ``conf`` is deliberately near zero,
     because per-class thresholds are chosen later during evaluation and filtering here
     would discard the detections that calibration needs.

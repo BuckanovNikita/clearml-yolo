@@ -139,8 +139,20 @@ composes, reads as a caller-named checkpoint and silently restores the old behav
 
 Every ultralytics parameter lives in `src/clearml_yolo/conf/ultralytics/`, one file per stage, each
 listing the whole of ultralytics' configuration. `null` there means "leave ultralytics' own default
-alone". A `cy-init-config` dump copies these to `<dir>/ultralytics/`; repo-root `conf/` is such a dump
-and is untracked.
+alone". Those files are the **defaults**, read into the config at import — there is no Hydra group and
+no package search path any more. A run names its own parameter file by path: `cy-train cfg=my.yaml`,
+`cy-predict cfg=`, `cy train.cfg=`/`predict.cfg=`. One rule decides what wins — a packaged default,
+then the file, then anything written on the command line or in a config file — and a file naming a key
+the stage never reads is refused by name rather than passed on. `configs.overlay_ultralytics_files` is
+the `zen` pre-call hook that applies it; `cfg` is in `COMPOSITION_ONLY_KEYS`, so it never reaches a
+task.
+
+A `cy-init-config` dump splices the packaged text, comments and all, into each command's own file
+rather than copying it to a folder beside it: a dumped file is the whole of what Hydra composes, so a
+block it does not carry could not be overridden one key at a time. **A folder dumped before this
+change fails composition** — its `- /ultralytics@ultralytics: train` names a group that no longer
+exists — so re-dump with `cy-init-config <dir> --force`. Repo-root `conf/` is such a dump and is
+untracked.
 
 ## ClearML
 

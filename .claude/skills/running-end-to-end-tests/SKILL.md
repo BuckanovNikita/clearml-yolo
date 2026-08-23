@@ -244,6 +244,11 @@ card, read back from `~/.cache/clearml-yolo/batch_table.json`; before anything h
 `DEFAULT_BATCH`. Nothing scales a batch to a card's VRAM any more, so there is no denominator left to
 raise the wrong way.
 
+`train.cfg=<path>` (and `predict.cfg=`, or plain `cfg=` on a standalone app) names an ultralytics
+parameter file, which is the shortest way to pin a verification run's `data`, `epochs` and `name` in one
+place. It fills only what it writes; everything else keeps the packaged default, and
+`train.ultralytics.<key>=` on the command line still wins over it.
+
 `auto_gpu.min_gpus` and `auto_gpu.max_gpus` are the floor and the ceiling on card count. One card is
 `auto_gpu.max_gpus=1`; *exactly* two is `auto_gpu.min_gpus=2 auto_gpu.max_gpus=2`. Naming neither means
 every free card, less what the runs already in the queue asked for.

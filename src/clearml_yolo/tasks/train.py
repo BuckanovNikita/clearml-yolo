@@ -84,7 +84,8 @@ def train(
 ) -> TrainResult:
     """Run training and return the best checkpoint with the device that produced it.
 
-    ``ultralytics`` is the whole of ``conf/ultralytics/train.yaml``: every parameter
+    ``ultralytics`` is the whole of ``conf/ultralytics/train.yaml``, with whatever the file
+    named by ``cfg=`` and the command line wrote over it: every parameter
     ultralytics accepts for detection training, passed on as it stands. The keys left
     ``null`` there are the ones decided here — the batch and cards from ``auto_gpu``, AMP
     and ``torch.compile`` from whether this run is on a GPU at all, the run's name from the
