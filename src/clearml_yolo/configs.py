@@ -131,7 +131,13 @@ def overlay_ultralytics_files(config_name: str) -> Callable[[Any], None]:
             named = node[CFG_KEY]
             if named is None:
                 continue
-            chosen: dict[str, Any] = OmegaConf.to_object(OmegaConf.load(Path(named)))  # type: ignore[assignment]
+            loaded = OmegaConf.load(Path(named))
+            if not OmegaConf.is_dict(loaded):
+                raise ValueError(
+                    f"{named}: an ultralytics file is a mapping of parameter to value, and "
+                    "this one is not."
+                )
+            chosen: dict[str, Any] = OmegaConf.to_object(loaded)  # type: ignore[assignment]
             composed: dict[str, Any] = OmegaConf.to_object(node[leaf])  # type: ignore[assignment]
             node[leaf] = _overlaid(stage, packaged_ultralytics_params(stage), composed, chosen)
 

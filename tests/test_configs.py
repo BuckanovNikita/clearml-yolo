@@ -612,3 +612,13 @@ def test_the_file_a_stage_named_is_not_a_keyword_argument_of_its_task(tmp_path: 
     named = _named_file(tmp_path, "tiny.yaml", "epochs: 7\n")
 
     assert "cfg" not in _pipeline_stages([f"train.cfg={named}"])["train"]
+
+
+def test_a_file_that_is_not_a_set_of_parameters_says_so(tmp_path: Path) -> None:
+    """Pointing at the wrong YAML is part of naming files by path, and the whole of the
+    feature is the path — so the refusal names the file rather than failing somewhere
+    inside a set difference."""
+    named = _named_file(tmp_path, "list.yaml", "- epochs\n- 1\n")
+
+    with pytest.raises(ValueError, match="mapping of parameter to value"):
+        _from_a_named_file("train", [f"cfg={named}"])
