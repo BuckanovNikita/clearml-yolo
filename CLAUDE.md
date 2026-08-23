@@ -147,6 +147,19 @@ the stage never reads is refused by name rather than passed on. `configs.overlay
 the `zen` pre-call hook that applies it; `cfg` is in `COMPOSITION_ONLY_KEYS`, so it never reaches a
 task.
 
+`train.ultralytics.augmentations` is a deliberate exception to "a written value is passed to
+ultralytics verbatim". It holds a **path** to an albumentations JSON pipeline while ultralytics is handed
+transform objects; `tasks/train.py` converts, popping the key at the last moment so a folder dumped before
+it existed still runs. Naming a file also switches ultralytics' own overlapping image-level augmentations
+off — each of them would augment an image the JSON has already augmented — and that reconciliation
+(`augment.replace_duplicated_augmentations`) runs inside the same hook, which therefore now does two
+things: composition is the one moment both the packaged default and what this command line chose are
+known, and telling those apart is the whole check. An overlapping key the caller chose is **refused by
+name**, never silently overruled. The dependency floor is `ultralytics>=8.4.117` because that release
+routes spatial transforms by type (`DualTransform` at any depth, `A.OneOf` and subclasses included) and
+round-trips `augmentations` through `A.to_dict`/`A.from_dict` so the DDP children rebuild them.
+`ultralytics_patch.py` did both by monkey-patching and is not coming back.
+
 A `cy-init-config` dump splices the packaged text, comments and all, into each command's own file
 rather than copying it to a folder beside it: a dumped file is the whole of what Hydra composes, so a
 block it does not carry could not be overridden one key at a time. **A folder dumped before this

@@ -215,7 +215,7 @@ requires-dist = [
     { name = "rich", specifier = ">=13" },
     { name = "scipy", specifier = ">=1.11" },
     { name = "tqdm", specifier = ">=4.66" },
-    { name = "ultralytics", specifier = ">=8.4" },
+    { name = "ultralytics", specifier = ">=8.4.117" },
 ]
 
 [package.metadata.requires-dev]

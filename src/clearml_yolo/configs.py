@@ -23,6 +23,7 @@ from hydra.conf import HydraConf, JobConf, RunDir
 from hydra_zen import builds, make_config, store
 from omegaconf import OmegaConf
 
+from clearml_yolo.augment import replace_duplicated_augmentations
 from clearml_yolo.clearml_session import ClearMLConfig
 from clearml_yolo.gpu import AutoGpuConfig
 from clearml_yolo.run_identity import LATEST_LINK_NAME, RUNS_ROOT
@@ -117,29 +118,35 @@ def _overlaid(
 
 
 def overlay_ultralytics_files(config_name: str) -> Callable[[Any], None]:
-    """A ``zen`` pre-call hook filling each ultralytics block from the file its ``cfg`` names.
+    """A ``zen`` pre-call hook settling each ultralytics block before its task reads it.
 
-    It runs on the composed config, before the task is called, because that is the one
+    Two things happen to every block here, and both happen here because this is the one
     moment both halves are known: what the packaged defaults say, and what this command
-    line and this config file changed.
+    line and this config file changed. First the file ``cfg`` names is merged in, when a
+    run named one at all. Then the block is reconciled with the albumentations pipeline its
+    ``augmentations`` key names, which switches off the ultralytics augmentations that
+    pipeline has already applied — so the reconciliation runs whether or not a file was
+    named, and against the block a named file has already had its say in. A block with no
+    such key, and a training that named no pipeline, come back from it unchanged.
     """
 
     def apply(config: Any) -> None:
         for dotted, stage in ULTRALYTICS_BLOCKS[config_name].items():
             parent, _, leaf = dotted.rpartition(".")
             node = OmegaConf.select(config, parent) if parent else config
-            named = node[CFG_KEY]
-            if named is None:
-                continue
-            loaded = OmegaConf.load(Path(named))
-            if not OmegaConf.is_dict(loaded):
-                raise ValueError(
-                    f"{named}: an ultralytics file is a mapping of parameter to value, and "
-                    "this one is not."
-                )
-            chosen: dict[str, Any] = OmegaConf.to_object(loaded)  # type: ignore[assignment]
+            packaged = packaged_ultralytics_params(stage)
             composed: dict[str, Any] = OmegaConf.to_object(node[leaf])  # type: ignore[assignment]
-            node[leaf] = _overlaid(stage, packaged_ultralytics_params(stage), composed, chosen)
+            named = node[CFG_KEY]
+            if named is not None:
+                loaded = OmegaConf.load(Path(named))
+                if not OmegaConf.is_dict(loaded):
+                    raise ValueError(
+                        f"{named}: an ultralytics file is a mapping of parameter to value, and "
+                        "this one is not."
+                    )
+                chosen: dict[str, Any] = OmegaConf.to_object(loaded)  # type: ignore[assignment]
+                composed = _overlaid(stage, packaged, composed, chosen)
+            node[leaf] = replace_duplicated_augmentations(composed, packaged)
 
     return apply
 

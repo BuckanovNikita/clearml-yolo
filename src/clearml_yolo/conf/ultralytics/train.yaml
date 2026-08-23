@@ -14,6 +14,20 @@
 # its kernels are not things to leave to a dependency's default, and both change the
 # numbers a run produces — so thresholds calibrated with them do not carry over to a run
 # without them. Write `false` against either to reproduce older numbers.
+#
+# One key here is not an ultralytics parameter at all. `augmentations` is an extra that
+# ultralytics allowlists and passes through untouched, and it is the one key this file does
+# not hand over verbatim: the file holds a PATH to an albumentations JSON pipeline, while
+# ultralytics is handed the transform objects — the run loads the file and converts.
+#
+# Naming a file there also switches OFF ultralytics' own overlapping image-level
+# augmentations — hsv_h, hsv_s, hsv_v, bgr, degrees, translate, shear, perspective, flipud,
+# fliplr, and either scale or close_mosaic depending on whether mosaic runs — because every
+# one of them would augment an image the JSON pipeline has already augmented. Mosaic, mixup
+# and cutmix stay as configured: they stitch several images into one before the pipeline
+# ever sees a sample, which no albumentations transform expresses. A value you have written
+# yourself against one of the keys that would be switched off is refused by name rather
+# than silently overruled — express that augmentation in the JSON instead.
 
 # ---- read by detection training ----
 model: yolo11n.pt  # (str, optional) path to model file, i.e. yolo26n.pt or yolo26n.yaml
@@ -89,6 +103,8 @@ bgr: 0.0  # (float) RGB↔BGR channel swap probability
 mosaic: 1.0  # (float) mosaic augmentation probability
 mixup: 0.0  # (float) MixUp augmentation probability
 cutmix: 0.0  # (float) CutMix augmentation probability
+augmentations: null  # (str, optional) path to an albumentations JSON pipeline, as albumentations' own A.save writes it;
+                     # null -> ultralytics' own default albumentations block
 
 # ---- ignored by detection training ----
 # Ultralytics accepts every key below, but this stage never reads one. They are

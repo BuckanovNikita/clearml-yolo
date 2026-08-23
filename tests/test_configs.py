@@ -622,3 +622,66 @@ def test_a_file_that_is_not_a_set_of_parameters_says_so(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="mapping of parameter to value"):
         _from_a_named_file("train", [f"cfg={named}"])
+
+
+def test_a_custom_augmentation_pipeline_switches_off_what_it_duplicates(tmp_path: Path) -> None:
+    """Ultralytics runs its own image-level augmentations around a custom pipeline rather
+    than instead of it, so naming a pipeline and changing nothing else would flip, shift and
+    hue-shift every image the JSON had already augmented. The hook is where that is settled,
+    for the same reason the file overlay happens there: it is the one moment the packaged
+    defaults and what this run chose are both known.
+
+    The file the path names is never opened here — the block carries the path and the train
+    task is what loads it — so an empty one exercises the whole of the reconciliation.
+    """
+    pipeline = _named_file(tmp_path, "augmentations.json", "{}")
+    named = _named_file(tmp_path, "with-pipeline.yaml", f"augmentations: {pipeline}\n")
+
+    params = _from_a_named_file("train", [f"cfg={named}"]).ultralytics
+
+    assert params.augmentations == pipeline
+    assert (params.fliplr, params.hsv_h, params.degrees, params.translate) == (0.0, 0.0, 0.0, 0.0)
+    # `scale` is also what resamples the double-sized mosaic canvas back down to imgsz, so
+    # while mosaic runs it stays — and the schedule that would rebuild the transforms
+    # without mosaic, leaving `scale` behind as a bare zoom, goes instead.
+    assert (params.mosaic, params.scale, params.close_mosaic) == (1.0, 0.5, 0)
+
+
+def test_a_pipeline_named_without_a_file_is_reconciled_too(tmp_path: Path) -> None:
+    """`ultralytics.augmentations=<path>` is the shortest way to name a pipeline, and a hook
+    that settled a block only when a `cfg` file was named would leave that run augmenting on
+    top of its own JSON. The path itself has to come through untouched: it is the train task
+    that turns it into transforms, and a reconciliation that consumed it would zero the
+    duplicated keys and then train with no custom pipeline at all."""
+    pipeline = _named_file(tmp_path, "augmentations.json", "{}")
+
+    params = _from_a_named_file("train", [f"ultralytics.augmentations={pipeline}"]).ultralytics
+
+    assert params.augmentations == pipeline
+    assert params.fliplr == 0.0
+    assert params.close_mosaic == 0
+
+
+def test_an_augmentation_asked_for_beside_a_pipeline_is_refused(tmp_path: Path) -> None:
+    """Zeroing it in silence answers a run that asked for hue jitter with a run that has
+    none, an hour in and visible only to somebody reading the training log. The rule is the
+    one a named file already follows — what somebody wrote wins — so where it cannot win the
+    refusal names the key, at composition time."""
+    pipeline = _named_file(tmp_path, "augmentations.json", "{}")
+
+    with pytest.raises(ValueError, match="hsv_h"):
+        _from_a_named_file(
+            "train", [f"ultralytics.augmentations={pipeline}", "ultralytics.hsv_h=0.5"]
+        )
+
+
+def test_the_inference_block_has_no_pipeline_to_reconcile(tmp_path: Path) -> None:
+    """Ultralytics reads `augmentations` only while building the training transforms, so the
+    key is in the training parameter file alone and a pipeline named for a `cy` run must
+    leave the prediction block exactly as it composed."""
+    pipeline = _named_file(tmp_path, "augmentations.json", "{}")
+
+    config = _from_a_named_file("pipeline", [f"train.ultralytics.augmentations={pipeline}"])
+
+    assert "augmentations" not in config.predict.ultralytics
+    assert config.predict.ultralytics == _from_a_named_file("pipeline", []).predict.ultralytics

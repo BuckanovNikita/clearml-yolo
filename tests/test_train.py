@@ -12,6 +12,7 @@ import types
 from pathlib import Path
 from typing import Any
 
+import albumentations
 import pytest
 
 from clearml_yolo.clearml_session import ClearMLConfig
@@ -211,3 +212,36 @@ def test_the_checkpoint_template_names_the_file_training_writes(tmp_path: Path) 
         )
 
     assert str(result.weights) == CHECKPOINT.format(project=project, name="run")
+
+
+def test_a_custom_pipeline_reaches_ultralytics_as_transforms_and_not_as_a_path(
+    tmp_path: Path,
+) -> None:
+    """`augmentations` is the one parameter this stage does not forward as written: the
+    config holds a path and ultralytics reads a list of transform objects. Forwarding the
+    string would fail inside ultralytics' own Compose, far from the line that caused it."""
+    pipeline = tmp_path / "augmentations.json"
+    albumentations.save(
+        albumentations.Compose(
+            [albumentations.HorizontalFlip(p=0.5), albumentations.RandomBrightnessContrast(p=0.5)]
+        ),
+        str(pipeline),
+        data_format="json",
+    )
+
+    kwargs = _train([0], tmp_path, augmentations=str(pipeline))
+
+    assert [type(transform).__name__ for transform in kwargs["augmentations"]] == [
+        "HorizontalFlip",
+        "RandomBrightnessContrast",
+    ]
+    assert not isinstance(kwargs["augmentations"], (str, albumentations.Compose))
+
+
+def test_a_run_that_named_no_pipeline_hands_ultralytics_no_such_key(tmp_path: Path) -> None:
+    """`null` is the packaged default, and it has to reach ultralytics as the absence of the
+    key: `augmentations=None` would replace ultralytics' own default albumentations block
+    with nothing at all rather than leaving it alone."""
+    kwargs = _train([0], tmp_path, augmentations=None)
+
+    assert "augmentations" not in kwargs

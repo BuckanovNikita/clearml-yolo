@@ -26,7 +26,7 @@ uv run clearml-init
 | Команда | Что делает |
 |---|---|
 | `cy-ground-truth` | разметка из `data.yaml` в CSV, который читают все следующие этапы |
-| `cy-train` | обучение YOLO (DDP, авто-выбор GPU) |
+| `cy-train` | обучение YOLO (DDP, авто-выбор GPU, кастомные аугментации) |
 | `cy-predict` | инференс, CSV предсказаний в схеме digital-metrics |
 | `cy-metrics` | метрики по каждому сплиту, дашборды в xlsx |
 | `cy-report` | сравнение с базовой моделью, dev и business отчёты |
@@ -336,7 +336,8 @@ FP16. Обе настройки меняют сами рамки, поэтому
 
 Записанное значение уходит в ultralytics как есть, и код его не перекрывает. Правило
 одно на всё: `train_kwargs`/`predict_kwargs` и отдельная развилка `half`/`quantize`
-больше не нужны.
+больше не нужны. Исключение — `augmentations` у обучения: см.
+«[Кастомные аугментации](#кастомные-аугментации)».
 
 `quantize` конвейер передаёт из `predict` в сравнение, а `compile` — нет: сравнение
 компилирует по своей карте. Внутри одного сравнения обе модели всегда в одном режиме
@@ -420,6 +421,89 @@ uv run cy-predict ultralytics.quantize=32 ultralytics.compile=false
 ```bash
 uv run cy-train ultralytics.amp=false ultralytics.compile=false
 ```
+
+## Кастомные аугментации
+
+Свой пайплайн albumentations передаётся файлом JSON — тем самым, который пишет `A.save`:
+
+```python
+import albumentations as A
+
+pipeline = A.Compose([A.HorizontalFlip(p=0.5), A.Rotate(limit=15, p=0.3)])
+A.save(pipeline, "augmentations.json", data_format="json")
+```
+
+Путь к файлу задаётся как любой другой ключ:
+
+```bash
+uv run cy-train ultralytics.augmentations=./augmentations.json
+uv run cy train.ultralytics.augmentations=./augmentations.json
+```
+
+То же самое строкой `augmentations: ./augmentations.json` в своём файле параметров
+(`cy-train cfg=my.yaml`). Ключ есть только у обучения: ultralytics читает его в
+`v8_transforms`, то есть при сборке трансформов обучающего датасета, и в `predict.yaml` его
+нет вовсе.
+
+Это единственный ключ в `conf/ultralytics/train.yaml`, который уходит в ultralytics не так, как
+записан: в файле лежит путь, а ultralytics получает объекты — запуск читает JSON и передаёт
+`pipeline.transforms`, сам `Compose` он не передаёт. Так и надо: ultralytics оборачивает список
+в собственный `A.Compose` с `bbox_params=A.BboxParams(format="yolo", ...)`, и рамки едут вместе
+с изображением. `bbox_params` из вашего файла при этом отбрасывается — задавать его не нужно.
+
+Требуется ultralytics ≥ 8.4.117. С этой версии пространственные трансформы распознаются по
+типу — `A.DualTransform` на любой глубине вложенности, включая трансформ внутри `A.OneOf` и ваш
+собственный подкласс, — а не по списку имён классов, из-за которого незнакомое имя считалось
+пиксельным: картинка поворачивалась, а боксы оставались на месте, и разметка молча переставала
+совпадать. Там же пайплайн стал переживать передачу в DDP-подпроцессы: `utils/dist.py`
+прогоняет его через `A.to_dict`/`A.from_dict`, так что каждый ранг собирает те же трансформы.
+Ради этого проект вёз собственный патч ultralytics — теперь не везёт и возвращать не будет.
+`A.Lambda` и собственные классы трансформов не сериализуются, до подпроцессов они не доедут.
+
+### Что происходит со штатными аугментациями ultralytics
+
+Ultralytics ставит кастомный пайплайн в середину собственного стека, а не вместо него:
+
+```
+Mosaic → CopyPaste → RandomPerspective → MixUp → CutMix
+    → Albumentations (ваш JSON)
+    → RandomHSV → RandomFlip
+```
+
+Поэтому вместе с путём к файлу отключаются штатные аугментации, которые дублируют работу
+пайплайна: `hsv_h`, `hsv_s`, `hsv_v`, `bgr`, `degrees`, `translate`, `shear`, `perspective`,
+`flipud`, `fliplr`. Каждая из них аугментировала бы изображение, которое пайплайн уже
+аугментировал.
+
+Многокадровые аугментации (`mosaic`, `mixup`, `cutmix`) остаются как заданы: они склеивают
+несколько изображений в одно ещё до того, как пайплайн увидит сэмпл, и albumentations этого не
+выражает.
+
+`scale` отключается только при выключенной мозаике. При включённой он несёт служебную функцию —
+`RandomPerspective` этим коэффициентом вписывает двойной холст мозаики обратно в `imgsz`, и
+обнуление превратило бы мозаику в центральный кроп. `mosaic: null` считается при этом
+включённой мозаикой: `null` означает «оставить умолчание ultralytics», а у него мозаика на
+каждом сэмпле.
+
+Из-за этого при включённой мозаике отключается и расписание `close_mosaic`: оно пересобирает
+трансформы с `mosaic=0`, не трогая остальные гиперпараметры, так что последние N эпох `scale`
+работал бы уже как обычный случайный зум поверх пайплайна.
+
+Отключается молча только то, чего вы не просили. Отключаемый ключ, значение которого отличается
+от упакованного умолчания и при этом не выключено, задан вами сознательно — такой запуск не
+перекрывает, а отвергает по имени, до старта обучения:
+
+```bash
+uv run cy-train ultralytics.augmentations=./augmentations.json ultralytics.fliplr=0.9
+# ValueError: fliplr: asked for alongside a custom albumentations pipeline, and each of them
+# either augments images the pipeline has already augmented or changes the augmentation regime
+# part-way through the run. Express them in the JSON pipeline instead…
+```
+
+Так же отвергается `ultralytics.close_mosaic=5` при включённой мозаике — при выключенной
+расписание не трогается вовсе. Явный ноль (`ultralytics.fliplr=0.0`) не отвергается: вы просите
+ровно то, что запуск и так сделает. Всё остальное выражайте в самом JSON — ради этого файл и
+задаётся: один источник правды для аугментаций.
 
 ## Авто-выбор GPU
 

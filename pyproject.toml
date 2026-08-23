@@ -8,8 +8,13 @@ authors = [
 ]
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "ultralytics>=8.4",
-    # Not used directly. Ultralytics declares it only as an extra, and without it its own
+    # 8.4.117 is the release that routes a custom albumentations pipeline by transform
+    # *type* instead of by a hardcoded list of class names, and that serialises the
+    # `augmentations` override through A.to_dict/A.from_dict so DDP children rebuild it.
+    # Below it, clearml_yolo.augment would need the monkey-patch this project used to carry.
+    "ultralytics>=8.4.117",
+    # Imported directly by clearml_yolo.augment, and a dependency even without it:
+    # ultralytics declares albumentations only as an extra, and without it ultralytics' own
     # default augmentation block silently turns into a no-op.
     "albumentations>=2.0,<3",
     "hydra-core>=1.3",
@@ -130,6 +135,9 @@ ignore = [
 # Tests assert, reach into privates, name literal expectations inline, feed known-value
 # temp paths and unpickle their own fixtures, and pytest collects them without a package.
 "tests/**" = ["ARG", "INP001", "PLR2004", "S101", "S108", "S301", "SLF001"]
+# `import albumentations as A` is that library's universal convention.
+"src/clearml_yolo/augment.py" = ["N812"]
+"tests/test_augment.py" = ["N812"]
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
@@ -158,7 +166,7 @@ layers = [
     "clearml_yolo.tasks",
     "clearml_yolo.comparison",
     "clearml_yolo.inference | clearml_yolo.ground_truth | clearml_yolo.clearml_models | clearml_yolo.clearml_report",
-    "clearml_yolo.clearml_session | clearml_yolo.gpu | clearml_yolo.progress | clearml_yolo.artifact_names | clearml_yolo.ultralytics_params | clearml_yolo.queue_view",
+    "clearml_yolo.clearml_session | clearml_yolo.gpu | clearml_yolo.progress | clearml_yolo.artifact_names | clearml_yolo.ultralytics_params | clearml_yolo.augment | clearml_yolo.queue_view",
     "clearml_yolo.run_queue | clearml_yolo.run_identity",
 ]
 
@@ -203,6 +211,7 @@ source_modules = [
     "clearml_yolo.progress",
     "clearml_yolo.artifact_names",
     "clearml_yolo.ultralytics_params",
+    "clearml_yolo.augment",
     "clearml_yolo.run_queue",
     "clearml_yolo.run_identity",
     "clearml_yolo.queue_view",
@@ -224,6 +233,7 @@ source_modules = [
     "clearml_yolo.clearml_models",
     "clearml_yolo.clearml_report",
     "clearml_yolo.ultralytics_params",
+    "clearml_yolo.augment",
     "clearml_yolo.run_queue",
     "clearml_yolo.run_identity",
     "clearml_yolo.queue_view",
@@ -249,6 +259,9 @@ source_modules = [
     # The rule that decides what reaches ultralytics must not itself need ultralytics:
     # importing it here would put torch on the critical path of every CLI start.
     "clearml_yolo.ultralytics_params",
+    # The module that reconciles the hyperparameters a custom albumentations pipeline
+    # replaces reads only names, so it needs neither ultralytics nor torch to do it.
+    "clearml_yolo.augment",
     "clearml_yolo.run_queue",
     "clearml_yolo.run_identity",
     "clearml_yolo.queue_view",
@@ -282,6 +295,7 @@ exclude = ["^(digital-metrics|report-generator)/"]
 # The only dependencies that ship neither inline types nor a stub package. Everything
 # else, ultralytics and the ClearML SDK included, is checked against its real signatures.
 module = [
+    "albumentations.*",
     "digital_metrics.*",
     "report_generator.*",
     "pynvml.*",

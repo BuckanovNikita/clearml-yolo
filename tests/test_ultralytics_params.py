@@ -12,8 +12,10 @@ import re
 from pathlib import Path
 from typing import Any
 
+import albumentations
 import pytest
 from ultralytics.cfg import get_cfg
+from ultralytics.data.augment import Albumentations
 from ultralytics.utils import DEFAULT_CFG_DICT, YAML
 
 from clearml_yolo.ultralytics_params import fill_unset
@@ -23,6 +25,16 @@ IGNORED_MARKER = "# ---- ignored by detection"
 
 LIVE_KEY = re.compile(r"^([a-z_0-9]+):")
 COMMENTED_KEY = re.compile(r"^# ([a-z_0-9]+):")
+
+# What this project writes into a parameter file that is not one of ultralytics' own
+# parameters. `augmentations` is an extra ultralytics allowlists in
+# `cfg/__init__.py::check_dict_alignment` and passes through untouched rather than declaring
+# in its `default.yaml`, so it can never be in `DEFAULT_CFG_DICT`; it is also the one key a
+# file does not hand over verbatim, because it holds the path to an albumentations JSON
+# pipeline and the run hands ultralytics the transforms loaded from it. Named per stage
+# rather than once, because ultralytics reads it only while building the training
+# transforms: written in the prediction file it would be a key that never does anything.
+PROJECT_EXTRAS: dict[str, set[str]] = {"train": {"augmentations"}, "predict": set()}
 
 # What each stage works out for itself, and a value it plausibly works out. The files
 # leave these null, which is this project's own sentinel — ultralytics rejects a null
@@ -62,11 +74,18 @@ def test_every_ultralytics_param_is_live_or_commented(stem: str) -> None:
     """An upgrade that adds a parameter must fail here rather than hide it.
 
     A key nobody lists is a knob that has silently stopped being visible in the config,
-    which is the whole defect this file set exists to remove.
+    which is the whole defect this file set exists to remove. The stage's own extras are
+    taken out of the union rather than added to the right-hand side, so a file is still
+    required to name every ultralytics parameter and only the keys :data:`PROJECT_EXTRAS`
+    accounts for may sit beside them — and an upgrade that turns one of those extras into a
+    real ultralytics parameter reports the carve-out as stale instead of masking it.
     """
     live, ignored = _keys(stem)
+    extras = PROJECT_EXTRAS[stem]
 
-    assert live | ignored == set(DEFAULT_CFG_DICT)
+    assert not extras & set(DEFAULT_CFG_DICT)
+    assert extras <= live
+    assert (live - extras) | ignored == set(DEFAULT_CFG_DICT)
     assert not live & ignored
 
 
@@ -125,3 +144,24 @@ def test_a_key_the_file_never_mentions_is_still_filled() -> None:
     """A commented-out key and a null one are the same thing once Hydra has composed the
     file, so both have to reach the run the same way."""
     assert fill_unset({"epochs": 100}, batch=64) == {"epochs": 100, "batch": 64}
+
+
+def test_a_spatial_transform_nested_in_a_composition_still_carries_the_boxes() -> None:
+    """The upstream fix a custom albumentations pipeline rests on, pinned here.
+
+    Ultralytics decides once, while building the pipeline, whether the boxes travel with the
+    image. Before 8.4.117 it decided by looking each transform's class *name* up in a
+    hardcoded list, so a spatial transform nested inside an `A.OneOf` — or a subclass of
+    one, or a class albumentations added later — was taken for a pixel-level transform: the
+    image was flipped and the boxes stayed where they were, which is not a crash but a
+    silently mislabelled epoch. This project carried a monkey-patch for exactly that and has
+    deleted it, because 8.4.117 routes by type and recurses through the compositions
+    instead. An ultralytics older than that cannot pass this.
+    """
+    nested = [albumentations.OneOf([albumentations.HorizontalFlip(p=1.0)], p=1.0)]
+
+    built = Albumentations(p=1.0, transforms=nested)
+
+    assert built.contains_spatial is True
+    assert built.transform is not None
+    assert built.transform.processors["bboxes"].params.format == "yolo"
