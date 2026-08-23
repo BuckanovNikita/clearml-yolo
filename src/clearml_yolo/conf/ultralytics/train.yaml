@@ -1,6 +1,6 @@
 # Every ultralytics parameter, for detection training.
 #
-# Generated from ultralytics 8.4.115's own cfg/default.yaml, comments and all.
+# Generated from ultralytics 8.4.126's own cfg/default.yaml, comments and all.
 # Write your parameters here, or keep them in a file of your own and name that file
 # by path: `cy-train cfg=my.yaml`, or `cy train.cfg=my.yaml` under `cy`. One key
 # alone needs no file at all — `ultralytics.<key>=<value>`, or
@@ -17,7 +17,7 @@
 
 # ---- read by detection training ----
 model: yolo11n.pt  # (str, optional) path to model file, i.e. yolo26n.pt or yolo26n.yaml
-data: coco8.yaml  # (str, optional) path to data file, i.e. coco8.yaml
+data: coco8.yaml  # (str, optional) path to dataset file or classification directory/name
 epochs: 100  # (int) number of epochs to train for
 time:  # (float, optional) max hours to train; overrides epochs if set
 patience: 100  # (int) early stop after N epochs without val improvement
@@ -34,7 +34,7 @@ exist_ok: true  # (bool) overwrite existing 'project/name' if True
 pretrained: true  # (bool | str) use pretrained weights (bool) or load weights from path (str)
 cls_remap: true  # (bool) when fine-tuning across datasets, remap pretrained cls head rows by class-name match
 optimizer: auto  # (str) optimizer: SGD, MuSGD, Adam, Adamax, AdamW, NAdam, RAdam, RMSProp, or auto
-verbose: true  # (bool) print verbose logs during training/val
+verbose: true  # (bool) print verbose logs
 seed: 0  # (int) random seed for reproducibility
 deterministic: true  # (bool) enable deterministic ops; reproducible but may be slower
 single_cls: false  # (bool) treat all classes as a single class
@@ -124,7 +124,7 @@ cutmix: 0.0  # (float) CutMix augmentation probability
 # simplify: true  # (bool) supported ONNX-based exports (see export table); simplify intermediate ONNX graph
 # opset:  # (int, optional) supported ONNX-based exports (see export table); intermediate ONNX opset version
 # workspace:  # (float, optional) engine (TensorRT) only; workspace size in GiB, e.g. 4
-# nms: false  # (bool) fuse NMS into exported model when backend supports; if True, conf/iou apply (agnostic_nms except coreml)
+# nms: false  # (bool) fuse NMS into exported model when backend supports; if True, conf/iou/agnostic_nms apply
 # pose: 12.0  # (float) pose loss gain (pose tasks)
 # kobj: 1.0  # (float) keypoint objectness loss gain (pose tasks)
 # rle: 1.0  # (float) rle loss gain (pose tasks)
@@ -132,7 +132,7 @@ cutmix: 0.0  # (float) CutMix augmentation probability
 # dlog: 1.0  # (float) depth log (SILog) loss gain (depth tasks)
 # dgrad: 0.5  # (float) depth gradient loss gain (depth tasks)
 # dlam: 1.0  # (float) depth SILog variance focus: 1.0=scale-invariant, 0.0=log-RMSE (depth tasks)
-# copy_paste: 0.0  # (float) segmentation copy-paste probability
+# copy_paste: 0.0  # (float) segmentation copy-paste fraction of eligible objects
 # copy_paste_mode: flip  # (str) copy-paste strategy for segmentation: flip or mixup
 # auto_augment: randaugment  # (str) classification auto augmentation policy: randaugment, autoaugment, augmix
 # erasing: 0.4  # (float) random erasing probability for classification (0.0–1.0)
