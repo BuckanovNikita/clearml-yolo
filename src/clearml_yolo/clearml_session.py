@@ -8,6 +8,7 @@ reports all land on one experiment.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
 
 from loguru import logger
@@ -85,6 +86,32 @@ def init_task(config: ClearMLConfig, stage: str) -> Any:
     # otherwise call Task.init() itself and create a second, disconnected experiment.
     os.environ[CLEARML_TASK_ID_ENV] = task.id
     return task
+
+
+def connect_config_file(task: Any, name: str, path: Path) -> Path:
+    """Store a file the run is configured by on the task, and return the path to read.
+
+    A ClearML *configuration object* rather than an artifact: artifacts are what a run
+    produced, and this is what it was told to do. The file's whole text lands in the
+    experiment's configuration tab, so the run is readable a year later without the machine
+    it ran on.
+
+    The return value is the path that must be read from here on, and it is not always the
+    one passed in. A task cloned and run on an agent is handed ClearML's own copy of the
+    file — that is what makes the clone reproduce this run rather than whatever now sits at
+    that path — so ignoring the return value would quietly reintroduce the machine
+    dependency this removes. With tracking disabled the path comes back unchanged.
+
+    Values that are not primitives never survive the hyperparameters: ultralytics' own
+    ClearML callback connects ``vars(trainer.args)``, and ClearML drops each entry it
+    cannot store rather than warning. An albumentations pipeline is such a value, which is
+    why it is connected here as the file it came from.
+    """
+    if task is None:
+        return path
+    stored = Path(task.connect_configuration(configuration=path, name=name))
+    logger.info("Connected {} to ClearML as configuration {!r}", path, name)
+    return stored
 
 
 def upload_dataframe(task: Any, name: str, frame: Any) -> None:

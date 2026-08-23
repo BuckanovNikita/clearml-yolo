@@ -173,13 +173,21 @@ The server is a **machine-level service shared with other work**, not part of th
 `/home/nkt/clearml-server`, UI on 8580 (CVAT's traefik owns 8080), API on 8008, files on 8081.
 Credentials in `~/clearml.conf` (gitignored). Never `docker compose down` a stack you did not start.
 
-Two facts that have cost time before:
+Three facts that have cost time before:
 
 - **ClearML model metadata carries no label enumeration.** Class names must come from the checkpoint, not
   from ClearML metadata.
 - **Dashboard thresholds are rounded.** For exact per-class thresholds read the
   `metrics_best_confidences_<split>` artifact, not the dashboard. (`best_confidences` is the in-process
   field name; the artifact names are all built in `artifact_names.py`.)
+- **A hyperparameter ClearML cannot store is dropped, not stringified, and not warned about.**
+  Ultralytics' callback connects `vars(trainer.args)` wholesale, so an object-valued setting is simply
+  absent from the experiment while every primitive it affected is recorded — the page then reads as
+  "nothing was configured" rather than "this could not be stored". `augmentations` is the one such
+  setting this project has, and `clearml_session.connect_config_file` is the answer to it: the JSON
+  becomes a *configuration object*, whose text the experiment keeps and whose stored copy a cloned task
+  reruns against. Anything else object-valued needs the same treatment. Ultralytics' own
+  `<run_dir>/detect/<name>/args.yaml` keeps them all, as `repr` strings.
 
 ## Important Files
 

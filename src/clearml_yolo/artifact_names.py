@@ -17,6 +17,12 @@ from __future__ import annotations
 
 PREDICTIONS = "predict_predictions"
 
+# Not an artifact but a configuration object, which is a different tab and a different
+# lifecycle: an agent running a clone of the task reads it back and reruns with it. It is
+# named here anyway, beside the artifacts, because a name a run writes and a later reader
+# looks up is exactly what this module exists to keep in one place.
+TRAIN_AUGMENTATIONS = "train_augmentations"
+
 DASHBOARD_FULL_PREFIX = "metrics_dashboard_full"
 DASHBOARD_DTRK_PREFIX = "metrics_dashboard_dtrk"
 MATCHES_GT_PREFIX = "metrics_matches_gt"

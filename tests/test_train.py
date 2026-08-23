@@ -15,6 +15,7 @@ from typing import Any
 import albumentations
 import pytest
 
+from clearml_yolo.artifact_names import TRAIN_AUGMENTATIONS
 from clearml_yolo.clearml_session import ClearMLConfig
 from clearml_yolo.gpu import AutoGpuConfig, DeviceSelection
 from clearml_yolo.tasks.train import CHECKPOINT, train
@@ -244,4 +245,55 @@ def test_a_run_that_named_no_pipeline_hands_ultralytics_no_such_key(tmp_path: Pa
     with nothing at all rather than leaving it alone."""
     kwargs = _train([0], tmp_path, augmentations=None)
 
+    assert "augmentations" not in kwargs
+
+
+class FakeTask:
+    """A ClearML task that records what was connected to it and answers as an agent would.
+
+    ``connect_configuration`` returns ClearML's own copy of the file rather than the one
+    passed in, which is what a task cloned onto an agent is handed — so a run that reads the
+    path it started with instead of the answer would pass a test that returns the same path.
+    """
+
+    def __init__(self, stored: Path) -> None:
+        self.stored = stored
+        self.connected: dict[str, Path] = {}
+
+    def connect_configuration(self, configuration: Path, name: str) -> str:
+        self.connected[name] = configuration
+        return str(self.stored)
+
+
+def _pipeline(path: Path, *transforms: Any) -> Path:
+    albumentations.save(albumentations.Compose(list(transforms)), str(path), data_format="json")
+    return path
+
+
+def test_the_pipeline_a_run_trains_with_is_the_one_clearml_handed_back(tmp_path: Path) -> None:
+    """A task cloned onto an agent is handed ClearML's copy of the configuration file, and
+    reading the path the config named instead would rerun the clone against whatever now
+    sits on that machine — which is the reproducibility this connection exists to buy."""
+    named = _pipeline(tmp_path / "named.json", albumentations.HorizontalFlip(p=0.5))
+    stored = _pipeline(tmp_path / "stored.json", albumentations.ToGray(p=0.5))
+    task = FakeTask(stored)
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr("clearml_yolo.tasks.train.init_task", lambda *_a, **_k: task)
+        kwargs = _train([0], tmp_path, augmentations=str(named))
+
+    assert task.connected == {TRAIN_AUGMENTATIONS: named}
+    assert [type(transform).__name__ for transform in kwargs["augmentations"]] == ["ToGray"]
+
+
+def test_a_run_that_named_no_pipeline_connects_nothing(tmp_path: Path) -> None:
+    """The connection is the pipeline's, not the stage's: a run without one must not leave an
+    empty configuration object on the experiment for a reader to interpret."""
+    task = FakeTask(tmp_path / "unused.json")
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr("clearml_yolo.tasks.train.init_task", lambda *_a, **_k: task)
+        kwargs = _train([0], tmp_path, augmentations=None)
+
+    assert task.connected == {}
     assert "augmentations" not in kwargs

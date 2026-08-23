@@ -9,8 +9,9 @@ from typing import Any
 from loguru import logger
 from pydantic import BaseModel
 
+from clearml_yolo.artifact_names import TRAIN_AUGMENTATIONS
 from clearml_yolo.augment import load_augmentations
-from clearml_yolo.clearml_session import ClearMLConfig, init_task
+from clearml_yolo.clearml_session import ClearMLConfig, connect_config_file, init_task
 from clearml_yolo.gpu import (
     AutoGpuConfig,
     DeviceSelection,
@@ -88,8 +89,10 @@ def train(
     ``ultralytics`` is the whole of ``conf/ultralytics/train.yaml``, with whatever the file
     named by ``cfg=`` and the command line wrote over it: every parameter
     ultralytics accepts for detection training, passed on as it stands — except
-    ``augmentations``, which names an albumentations JSON file here and reaches ultralytics
-    as the transforms loaded from it. The keys left
+    ``augmentations``, which names an albumentations JSON file here, reaches ultralytics as
+    the transforms loaded from it, and is connected to the ClearML task as the file it came
+    from, because a list of transform objects is not a value ClearML can hold as a
+    hyperparameter. The keys left
     ``null`` there are the ones decided here — the batch and cards from ``auto_gpu``, AMP
     and ``torch.compile`` from whether this run is on a GPU at all, the run's name from the
     ClearML experiment, so the run directory always matches the experiment, and the project
@@ -101,9 +104,10 @@ def train(
     """
     from ultralytics.models import YOLO
 
-    # Only the task identity is ours. Ultralytics' own ClearML callback connects the
-    # hyperparameters, logs losses and metrics, and uploads best.pt on its own.
-    init_task(clearml, stage="train")
+    # Only the task identity is ours, and the one setting the callback cannot carry.
+    # Ultralytics' own ClearML callback connects the hyperparameters, logs losses and
+    # metrics, and uploads best.pt on its own.
+    task = init_task(clearml, stage="train")
     architecture = ultralytics["model"]
     selection = resolve_devices(
         auto_gpu,
@@ -134,9 +138,14 @@ def train(
     # `pop` rather than a lookup: the key is a path on this side and transform objects on
     # ultralytics' side, so the path itself must not travel on — and a config folder dumped
     # before the key existed carries no `augmentations` at all.
-    loaded_augmentations = load_augmentations(settings.pop("augmentations", None))
-    if loaded_augmentations is not None:
-        settings["augmentations"] = loaded_augmentations
+    pipeline_file = settings.pop("augmentations", None)
+    if pipeline_file is not None:
+        # Read from where ClearML says, not from where the config said: on a clone this is
+        # the file stored with the task rather than whatever now sits at that path.
+        stored = connect_config_file(task, TRAIN_AUGMENTATIONS, Path(pipeline_file))
+        loaded_augmentations = load_augmentations(stored)
+        if loaded_augmentations is not None:
+            settings["augmentations"] = loaded_augmentations
 
     logger.info(
         "Training {} on {} for {} epochs — devices={} batch={} (per GPU {})",
