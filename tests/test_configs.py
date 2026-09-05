@@ -12,7 +12,8 @@ from hydra import compose, initialize_config_module
 from hydra_zen import instantiate, store
 
 import clearml_yolo.configs  # noqa: F401  registers every config
-from clearml_yolo.clearml_session import ClearMLConfig
+from clearml_yolo.clearml_session import ClearMLConfig, tagged_project_name
+from clearml_yolo.config_tree import COMMAND_OF_CONFIG
 from clearml_yolo.configs import absorb_force_gpu_flag, overlay_ultralytics_files
 from clearml_yolo.gpu import AutoGpuConfig
 from clearml_yolo.run_identity import LATEST_LINK_NAME, RUNS_ROOT
@@ -46,6 +47,27 @@ def test_app_config_composes(app: str) -> None:
         config = compose(config_name=app)
 
     assert config is not None
+
+
+@pytest.mark.parametrize("app", sorted(COMMAND_OF_CONFIG))
+def test_hydras_own_run_directory_is_overridable_on_every_app(app: str) -> None:
+    """A run kept out of the repository has to move Hydra's ``outputs/`` too, and it can
+    only do so if ``hydra.run.dir=`` composes for every console script."""
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        config = compose(
+            config_name=app,
+            overrides=["hydra.run.dir=/scratch/tagged-run/hydra"],
+            return_hydra_config=True,
+        )
+
+    assert config.hydra.run.dir == "/scratch/tagged-run/hydra"
+
+
+def test_the_pipelines_run_directory_is_overridable_from_the_command_line() -> None:
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        config = compose(config_name="pipeline", overrides=["run_dir=/scratch/tagged-run"])
+
+    assert config.run_dir == "/scratch/tagged-run"
 
 
 RUN_DIR = Path("runs/exp-here")
@@ -103,6 +125,28 @@ def test_clearml_name_reaches_every_pipeline_stage() -> None:
         assert isinstance(clearml, ClearMLConfig)
         assert clearml.project_name == "my-proj", stage
         assert clearml.task_name == "exp-42", stage
+
+
+def test_a_run_tag_names_the_project_of_every_pipeline_stage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Derived through hydra-zen's instantiation and not only on a bare model: every stage
+    is handed the same tagged project, and a project named on the command line wins."""
+    tag = "clearml-yolo-claude-20260905-stages-c0de"
+    monkeypatch.setenv("CY_RUN_TAG", tag)
+
+    tagged = _pipeline_stages([])
+    named = _pipeline_stages(["clearml.project_name=my-proj"])
+
+    for stage in ALL_STAGES:
+        derived = tagged[stage]["clearml"]
+        overridden = named[stage]["clearml"]
+        assert isinstance(derived, ClearMLConfig)
+        assert isinstance(overridden, ClearMLConfig)
+        assert derived.project_name == tagged_project_name(tag), stage
+        assert derived.tags == [tag], stage
+        assert overridden.project_name == "my-proj", stage
+        assert overridden.tags == [tag], stage
 
 
 @pytest.mark.parametrize("stage", ALL_STAGES)

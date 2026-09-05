@@ -673,6 +673,15 @@ def test_a_timeout_no_heartbeat_can_outrun_is_refused(settings: dict[str, Any]) 
         QueueConfig(**settings)
 
 
+def test_a_queued_wait_has_no_deadline_unless_one_is_named() -> None:
+    """Unset is for ever — a run queued behind a three-hour training waits three hours —
+    and a deadline of nothing at all is a run that could never take its turn."""
+    assert QueueConfig().wait_timeout_seconds is None
+    assert QueueConfig(wait_timeout_seconds=900.0).wait_timeout_seconds == 900.0
+    with pytest.raises(ValidationError):
+        QueueConfig(wait_timeout_seconds=0.0)
+
+
 def test_the_queue_directory_comes_from_the_config_then_the_environment_then_tmp(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

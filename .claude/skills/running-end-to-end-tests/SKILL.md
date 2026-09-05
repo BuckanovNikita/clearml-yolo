@@ -42,8 +42,7 @@ uv run cy \
   train.ultralytics.name=verify-1ep \
   report/baseline=none \
   skip_compare=true \
-  auto_gpu.queue.enabled=false \
-  auto_gpu.wait_timeout_seconds=120 \
+  auto_gpu.queue.wait_timeout_seconds=120 \
   run_dir=<disposable-run-directory>
 ```
 

@@ -111,6 +111,11 @@ class QueueConfig(BaseModel):
     # Wide on purpose: NFS attribute caching can hold a stale mtime for tens of seconds,
     # so a timeout close to the heartbeat would declare live runs dead over the network.
     stale_after_seconds: float = Field(default=120.0, gt=0)
+    # How long a run waits for its turn before giving up. Unset means for ever: a run
+    # queued behind a three-hour training waits three hours, and cancelling it from
+    # ``cy-queue`` is the way out. A run nobody is watching — an agent's, a CI job's —
+    # names a deadline instead, so that it fails where it would otherwise block.
+    wait_timeout_seconds: float | None = Field(default=None, gt=0)
 
     @model_validator(mode="after")
     def _a_heartbeat_must_outrun_the_timeout(self) -> QueueConfig:

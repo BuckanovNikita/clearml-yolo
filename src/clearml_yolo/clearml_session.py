@@ -12,25 +12,67 @@ from pathlib import Path
 from typing import Any
 
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 CLEARML_TASK_ID_ENV = "CLEARML_TASK_ID"
 
+# The run tag of the shared infrastructure, when this process runs under one: the
+# project's own spelling first, the contract's second. A tagged run is an agent's or a CI
+# job's, and its experiments belong in a project named after the tag so that the janitor
+# finds them and nothing lands among the user's own runs.
+RUN_TAG_ENV_VARS = ("CY_RUN_TAG", "INFRA_RUN_TAG")
+DEFAULT_PROJECT_NAME = "clearml-yolo"
+
 # clearml ships no type information, so its Task is opaque to the type checker.
 Task = Any
+
+
+def run_tag() -> str | None:
+    """The run tag this process was started under, or None for a person's own run."""
+    for name in RUN_TAG_ENV_VARS:
+        tag = os.environ.get(name, "").strip()
+        if tag:
+            return tag
+    return None
+
+
+def tagged_project_name(tag: str) -> str:
+    """The project a tagged run's experiments go to: ``<tag> <what>``, as the contract spells it."""
+    return f"{tag} {DEFAULT_PROJECT_NAME}"
 
 
 class ClearMLConfig(BaseModel):
     """Identity of the ClearML experiment this run belongs to."""
 
     enabled: bool = True
-    project_name: str = "clearml-yolo"
+    project_name: str = DEFAULT_PROJECT_NAME
     task_name: str = "yolo-run"
     task_type: str = "training"
     tags: list[str] = Field(default_factory=list)
     output_uri: str | bool | None = True
     continue_task_id: str | None = None
     reuse_last_task_id: bool = False
+
+    @model_validator(mode="after")
+    def _a_tagged_run_lands_in_its_own_project(self) -> ClearMLConfig:
+        """Send a tagged run's experiments to the tag's project, unless one was named.
+
+        Decided here rather than where the task is created because the project is read in
+        more than one place — the report and the comparison search it for a baseline — and
+        a name derived at only one of them would have the run write to one project and look
+        in another. ``project_name`` is taken as overridden whenever it differs from the
+        default: hydra-zen passes every field explicitly, so absence cannot be told from the
+        default any other way. The tag itself goes on every tagged run, named project or
+        not, so that its experiments can be found by tag wherever they landed.
+        """
+        tag = run_tag()
+        if tag is None:
+            return self
+        if self.project_name == DEFAULT_PROJECT_NAME:
+            self.project_name = tagged_project_name(tag)
+        if tag not in self.tags:
+            self.tags = [*self.tags, tag]
+        return self
 
 
 def resolve_task_name(config: ClearMLConfig, stage: str) -> str:

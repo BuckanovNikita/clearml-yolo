@@ -107,6 +107,36 @@ def test_latest_is_repointed_at_the_newer_run(tmp_path: Path) -> None:
 
 
 @pytest.mark.usefixtures("fixed_identity")
+def test_a_run_outside_the_workspace_leaves_latest_where_it_was(tmp_path: Path) -> None:
+    """An agent's run in a scratch directory is deleted by its cleanup, and a link pointing
+    there would dangle; the workspace's shortcut keeps naming the last run that landed in
+    the workspace."""
+    root = tmp_path / "workspace" / "runs"
+    here = root / "run-here"
+    here.mkdir(parents=True)
+    elsewhere = tmp_path / "scratch" / "run-elsewhere"
+    elsewhere.mkdir(parents=True)
+    point_latest_at(root, here)
+
+    point_latest_at(root, elsewhere)
+
+    assert (root / LATEST_LINK_NAME).resolve() == here.resolve()
+    assert [entry.name for entry in root.iterdir()] == sorted([LATEST_LINK_NAME, "run-here"])
+
+
+@pytest.mark.usefixtures("fixed_identity")
+def test_a_run_beside_the_runs_root_is_still_the_workspaces_own(tmp_path: Path) -> None:
+    """``run_dir=sweeps/07`` is inside the workspace even though it is outside ``runs/``."""
+    root = tmp_path / "runs"
+    beside = tmp_path / "sweeps" / "07"
+    beside.mkdir(parents=True)
+
+    point_latest_at(root, beside)
+
+    assert (root / LATEST_LINK_NAME).resolve() == beside.resolve()
+
+
+@pytest.mark.usefixtures("fixed_identity")
 def test_no_temporary_link_is_left_beside_the_run_dirs(tmp_path: Path) -> None:
     """The rename that makes the swap atomic must consume the link it renamed."""
     run_dir = tmp_path / "run-a"

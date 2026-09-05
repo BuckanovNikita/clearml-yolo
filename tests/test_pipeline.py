@@ -400,12 +400,17 @@ def test_a_run_that_scores_nothing_needs_no_ground_truth(
 
 
 def test_a_comparison_that_cannot_reach_its_baseline_is_rejected_before_training_starts(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """Inside the pipeline the baseline is always a ClearML task, so tracking turned off
     leaves the lookup nothing to search. The comparison is the last stage, so without this
     the run trains, predicts, scores and reports before failing on a lookup that could
-    never have succeeded."""
+    never have succeeded.
+
+    The ground truth is written first because its check runs before this one: without it
+    the run refuses for the missing CSV and the baseline check is never reached."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "ground_truth.csv").write_text("image_name,image_path,instance_label,split\n")
     monkeypatch.setattr(pipeline_module, "run_training", lambda **kwargs: pytest.fail("trained"))
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
         config = compose(config_name="pipeline", overrides=["clearml.enabled=false"])
@@ -500,6 +505,24 @@ def test_a_named_run_directory_is_where_everything_that_run_writes_goes(
         _run_alone([f"run_dir={chosen}"])
 
     assert _train_project(seen[0]) == str(chosen / "detect")
+
+
+def test_a_run_directory_outside_the_workspace_leaves_latest_alone(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """An agent's run lives in a scratch directory its cleanup deletes; the user's
+    ``runs/latest`` must keep naming the user's last run rather than dangle."""
+    monkeypatch.chdir(tmp_path)
+    seen: list[dict[str, object]] = []
+    monkeypatch.setattr(pipeline_module, "run_training", _recording_training(seen))
+    previous = _previous_run(tmp_path)
+    scratch = tmp_path_factory.mktemp("scratch") / "tagged-run"
+
+    with pytest.raises(_ReachedTrainingError):
+        _run_alone([f"run_dir={scratch}"])
+
+    assert _train_project(seen[0]) == str(scratch / "detect")
+    assert (tmp_path / RUNS_ROOT / LATEST_LINK_NAME).resolve() == previous
 
 
 def test_a_run_that_skips_training_with_nothing_to_load_is_refused_up_front(
