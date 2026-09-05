@@ -6,6 +6,14 @@
 # stale ~/clearml.conf is the failure this script exists to catch — it looks
 # healthy right up to the moment `Task.init()` raises LoginError 401.
 #
+# The endpoint and the credentials are read the way the ClearML SDK reads them:
+# CLEARML_API_HOST, CLEARML_API_ACCESS_KEY and CLEARML_API_SECRET_KEY from the
+# environment first (what `source scripts/agent_env.sh` exports for the shared
+# cluster stand), the config file for whatever the environment leaves unset. The
+# report names which endpoint it authenticated against and where each value came
+# from, and warns when that endpoint is the user's own host stand on
+# localhost:8008 rather than the shared cluster stand an agent run belongs on.
+#
 # Always exits 0. This reports; it never blocks a session or a test run.
 #
 #   scripts/check_env.sh          human-readable report
@@ -55,7 +63,7 @@ check_docker() {
         return
     fi
     if [[ -z "$output" || "$output" != *"ompose"* ]]; then
-        record "WARN docker — no working docker compose; you cannot start or stop the ClearML server from this shell"
+        record "WARN docker — no working docker compose in this shell"
         return
     fi
     record "OK   $(echo "$output" | head -1)"
@@ -65,42 +73,71 @@ read_conf_value() {
     sed -n "s/.*$1:[[:space:]]*//p" "$CLEARML_CONF" 2>/dev/null | tr -d '",' | head -1
 }
 
-check_clearml() {
-    if [[ ! -f "$CLEARML_CONF" ]]; then
-        record "FAIL clearml.conf — $CLEARML_CONF missing; mint credentials per the running-clearml-server skill"
-        return
-    fi
+read_conf_credential() {
+    grep -oP "\"$1\"\s*=\s*\"\K[^\"]+" "$CLEARML_CONF" 2>/dev/null | head -1
+}
 
-    local api
-    api="$(read_conf_value api_server)"
+# The user's own ClearML runs on the host, API on localhost:8008; the shared cluster
+# stand agents run against answers on api.clearml.k8s.localhost. An agent that sees the
+# former has not sourced scripts/agent_env.sh and would write into the user's projects.
+HOST_STAND_API_PATTERN='^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0):8008/?$'
+
+CLEARML_API_IN_USE=""
+
+check_clearml() {
+    local api key secret api_source credentials_source body
+    api="${CLEARML_API_HOST:-}"
+    api_source="environment"
     if [[ -z "$api" ]]; then
-        record "FAIL clearml.conf — no api_server line in $CLEARML_CONF"
-        return
+        if [[ ! -f "$CLEARML_CONF" ]]; then
+            record "FAIL clearml.conf — $CLEARML_CONF missing and CLEARML_API_HOST unset; agents source scripts/agent_env.sh, people run clearml-init"
+            return
+        fi
+        api="$(read_conf_value api_server)"
+        api_source="$CLEARML_CONF"
+        if [[ -z "$api" ]]; then
+            record "FAIL clearml.conf — no api_server line in $CLEARML_CONF and CLEARML_API_HOST unset"
+            return
+        fi
     fi
+    api="${api%/}"
+    CLEARML_API_IN_USE="$api"
 
     if ! curl -sf -m 5 "$api/debug.ping" >/dev/null 2>&1; then
-        record "FAIL ClearML $api — unreachable; start it per the running-clearml-server skill"
+        record "FAIL ClearML $api (from $api_source) — unreachable"
         return
     fi
 
-    local key secret body
-    key="$(grep -oP '"access_key"\s*=\s*"\K[^"]+' "$CLEARML_CONF" 2>/dev/null | head -1)"
-    secret="$(grep -oP '"secret_key"\s*=\s*"\K[^"]+' "$CLEARML_CONF" 2>/dev/null | head -1)"
+    key="${CLEARML_API_ACCESS_KEY:-}"
+    secret="${CLEARML_API_SECRET_KEY:-}"
+    credentials_source="environment"
     if [[ -z "$key" || -z "$secret" ]]; then
-        record "FAIL ClearML $api — reachable, but $CLEARML_CONF holds no credentials pair"
+        key="${key:-$(read_conf_credential access_key)}"
+        secret="${secret:-$(read_conf_credential secret_key)}"
+        credentials_source="$CLEARML_CONF"
+    fi
+    if [[ -z "$key" || -z "$secret" ]]; then
+        record "FAIL ClearML $api (from $api_source) — reachable, but neither the environment nor $CLEARML_CONF holds a credentials pair"
         return
     fi
 
     body="$(curl -s -m 10 -u "$key:$secret" "$api/auth.login" 2>/dev/null)"
     if [[ "$body" != *'"result_code":200'* ]]; then
-        record "FAIL ClearML $api — reachable but credentials rejected; \`cy\` will die on LoginError 401 mid-run"
+        record "FAIL ClearML $api (from $api_source) — reachable but the credentials from $credentials_source are rejected; \`cy\` will die on LoginError 401 mid-run"
         return
     fi
-    record "OK   ClearML $api — reachable and authenticated"
+    record "OK   ClearML $api — authenticated (endpoint from $api_source, credentials from $credentials_source)"
+}
+
+warn_if_host_stand() {
+    if [[ "$CLEARML_API_IN_USE" =~ $HOST_STAND_API_PATTERN ]]; then
+        record "WARN ClearML $CLEARML_API_IN_USE is the user's host stand, not the shared cluster stand; an agent run sources scripts/agent_env.sh first"
+    fi
 }
 
 check_uv
 check_clearml
+warn_if_host_stand
 check_gpu
 check_docker
 

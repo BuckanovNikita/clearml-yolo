@@ -25,7 +25,8 @@ the project reuses a successful observed value for the stage and hardware or its
 packaged fallback; do not infer a usable batch from VRAM arithmetic.
 
 With `auto_gpu.queue.enabled=true`, the filesystem queue coordinates waiting
-runs and there is no no-queue timeout. With it disabled,
+runs, and a run waits for its turn without a deadline unless
+`auto_gpu.queue.wait_timeout_seconds` names one. With it disabled,
 `auto_gpu.wait_timeout_seconds` applies. The queue directory is configurable by
 `auto_gpu.queue.dir` or `CLEARML_YOLO_QUEUE_DIR`; its default is a host-specific
 directory under `/tmp/clearml-yolo`. `cy-queue` is interactive and requires a
