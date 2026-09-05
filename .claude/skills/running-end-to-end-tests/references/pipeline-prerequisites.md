@@ -15,7 +15,15 @@ an exported configuration tree expresses the same choice as
 
 `run_dir` re-enters or redirects the selected run. Do not attempt to route a
 pipeline with stage-specific output overrides; the pipeline supplies those paths
-to its stages.
+to its stages. A `run_dir` outside the working directory (an agent's
+`$CY_RUN_DIR`) leaves the workspace's `runs/latest` link alone, so a standalone
+stage run afterwards in the checkout still reads the user's last run, not the
+agent's.
+
+With `CY_RUN_TAG` (or `INFRA_RUN_TAG`) exported, `clearml.project_name` defaults
+to `<run-tag> clearml-yolo` and the tag is appended to `clearml.tags`; a project
+named outright is kept and still tagged. The examples spell both keys anyway so
+a command line shows where its experiments go.
 
 ## GPU and queue
 
@@ -40,6 +48,7 @@ completed task with its output model and metric artifacts. Model labels come
 from the checkpoint, not ClearML metadata.
 
 Comparison needs a completed baseline that the candidate is configured to find.
-Run baseline and candidate in a disposable project and keep their output
-directories separate. Do not manufacture a comparison by reusing a production
+Run baseline and candidate in the run's own tagged project,
+`<run-tag> clearml-yolo` on the stand, and keep their output directories
+separate under `$CY_RUN_DIR`. Do not manufacture a comparison by reusing a production
 task or by changing shared service state.
