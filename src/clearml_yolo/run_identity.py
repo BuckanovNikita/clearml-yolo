@@ -69,6 +69,13 @@ def resolve_run_dir(root: Path, run_id: str, explicit: Path | None) -> Path:
 def point_latest_at(root: Path, run_dir: Path) -> None:
     """Repoint ``root/latest`` at this run, and never fail the run over it.
 
+    Only a run inside the workspace the root lives in is pointed at. The link is the
+    workspace's shortcut to its own newest run, and a run written elsewhere — an agent's in
+    a scratch directory that its cleanup deletes — is not one of those: pointing at it would
+    leave the link dangling and the next standalone stage reading a checkpoint through it
+    finding nothing. Such a run is left alone and the link keeps naming the last run that
+    did land here.
+
     The replacement goes through a second symlink renamed over the first, so a reader
     following the link concurrently sees the old target or the new one and never a gap.
 
@@ -85,6 +92,16 @@ def point_latest_at(root: Path, run_dir: Path) -> None:
     raised, and the next run tries again under a different pid.
     """
     latest = root / LATEST_LINK_NAME
+    workspace = root.resolve().parent
+    target = run_dir.resolve()
+    if target != workspace and workspace not in target.parents:
+        logger.info(
+            "Leaving {} alone: {} is outside {}, and the link names only this workspace's runs",
+            latest,
+            run_dir,
+            workspace,
+        )
+        return
     host, pid = _host_and_pid()
     pending = root / f".{LATEST_LINK_NAME}-{host}-{pid}"
     displaced = root / f"{LATEST_LINK_NAME}-displaced-{host}-{pid}"

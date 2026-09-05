@@ -39,7 +39,8 @@ recreate a generated tree when its composition schema becomes stale.
 
 `auto_gpu.force=true` (or `--force-gpu`) bypasses queueing and GPU safety
 guards, including lease protection. Do not use it for ordinary verification.
-With the normal queue enabled, a run waits in the filesystem queue; with it
+With the normal queue enabled, a run waits in the filesystem queue without a
+deadline unless `auto_gpu.queue.wait_timeout_seconds` names one; with it
 disabled, `auto_gpu.wait_timeout_seconds` bounds the wait.
 
 ## Proportional verification

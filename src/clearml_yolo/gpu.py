@@ -11,7 +11,8 @@ memory is actually held. The wait loop holds the run at the door until enough ca
 free, and a lease file taken through :mod:`clearml_yolo.run_queue` is what closes the
 window between the two. With the queue in front of the cards the wait also becomes a
 queue: entries are read before the survey, only the head of the order may claim, and a run
-that has taken its place in line waits for its turn however long that is. A named
+that has taken its place in line waits for its turn however long that is — unless it named
+``auto_gpu.queue.wait_timeout_seconds``, after which it fails rather than blocks. A named
 ``device`` is exempt from the survey and not from the leases: it claims exactly the cards
 it names, and refuses the ones a peer's lease covers rather than starting on top of them.
 
@@ -99,9 +100,10 @@ class AutoGpuConfig(BaseModel):
     max_compute_processes: int | None = Field(default=None, ge=0)
     wait_poll_seconds: float = Field(default=30.0, gt=0)
     # The deadline of a run waiting with no queue in front of it, where a card still busy
-    # after an hour is held by something nobody is going to hand over. A queued run has no
-    # deadline at all: queue it behind a three-hour training and this would kill it at the
-    # one-hour mark, which is the opposite of waiting for a turn.
+    # after an hour is held by something nobody is going to hand over. A queued run does not
+    # read it: queue it behind a three-hour training and this would kill it at the one-hour
+    # mark, which is the opposite of waiting for a turn. The queue's own deadline is
+    # ``queue.wait_timeout_seconds``, unset by default.
     wait_timeout_seconds: float = Field(default=3600.0, gt=0)
     # Where this run takes its place in line, and how it is recognised as still alive.
     # Nested here rather than beside auto_gpu because the wait is where it is read, and the
@@ -616,7 +618,7 @@ def wait_for_devices(
         return _seized(config, waiting_room, probe=probe)
     if waiting_room is None:
         return _wait_alone(config, probe=probe, sleep=sleep, monotonic=monotonic)
-    return _wait_in_turn(config, waiting_room, probe=probe, sleep=sleep)
+    return _wait_in_turn(config, waiting_room, probe=probe, sleep=sleep, monotonic=monotonic)
 
 
 def _seized(
@@ -692,8 +694,9 @@ def _refuse_more_cards_than_the_machine_has(config: AutoGpuConfig, survey: GpuSu
 
     Selection can only ever yield cards the machine has, so a run asking for more of them
     than exist never leaves the wait. Queued, that is not merely its own hour lost: the
-    queued wait reads no deadline and the entry is heartbeated every poll, so it stays at
-    the head of the order for ever and every other run on the machine waits behind it.
+    queued wait has no deadline unless one was named and the entry is heartbeated every
+    poll, so it stays at the head of the order for ever and every other run on the machine
+    waits behind it.
     """
     needed = _requested_devices(config)
     if needed <= len(survey.gpus):
@@ -830,23 +833,66 @@ def _announce_position(entry: Entry, waiting: Sequence[Entry], queue: RunQueue) 
     )
 
 
+def _gave_up_waiting_message(
+    queue: RunQueue, entry: Entry, waiting: Sequence[Entry], waited: float
+) -> str:
+    ranked = order(waiting, queue.served_mtimes())
+    ahead = len(list(takewhile(lambda other: other.run_id != entry.run_id, ranked)))
+    return (
+        f"Waited {waited:.0f}s in the queue at {queue.dir} for {entry.num_gpus} GPU(s) with "
+        f"{ahead} run(s) still ahead, and auto_gpu.queue.wait_timeout_seconds="
+        f"{queue.config.wait_timeout_seconds} has passed. Nothing was started and this "
+        "run's place in line is given up. Raise or unset the deadline to wait for a turn, "
+        "lower auto_gpu.min_gpus, or start regardless with --force-gpu."
+    )
+
+
+def _sleep_a_poll_or_give_up(
+    queue: RunQueue,
+    entry: Entry,
+    waiting: Sequence[Entry],
+    *,
+    waited: float,
+    sleep: Callable[[float], None],
+) -> None:
+    """One poll's wait in line, cut to the deadline when one was named and refused past it.
+
+    The sleep is capped at what is left so the deadline is met to the second rather than
+    to the poll, and a deadline that has passed raises here rather than after one more
+    survey: the cards were looked at on this pass and were not this run's to take.
+    """
+    deadline = queue.config.wait_timeout_seconds
+    if deadline is None:
+        sleep(queue.config.poll_seconds)
+        return
+    remaining = deadline - waited
+    if remaining <= 0:
+        raise RuntimeError(_gave_up_waiting_message(queue, entry, waiting, waited))
+    sleep(min(queue.config.poll_seconds, remaining))
+
+
 def _wait_in_turn(
     config: AutoGpuConfig,
     queue: RunQueue,
     *,
     probe: Callable[[], GpuSurvey],
     sleep: Callable[[float], None],
+    monotonic: Callable[[], float],
 ) -> list[GpuInfo]:
     """Take a place in line, wait for the head of it, and claim the cards on arriving there.
 
-    There is no deadline: a run queued behind a three-hour training waits three hours, and
-    ``cy-queue`` cancelling its entry is the way out. The cards this run already holds are
-    answered with before anything else, because a stage that queued for a card its own
-    process is holding would wait for a peer that can never get past it.
+    By default there is no deadline: a run queued behind a three-hour training waits three
+    hours, and ``cy-queue`` cancelling its entry is the way out. A run that named
+    ``queue.wait_timeout_seconds`` gives its place up when that passes and fails the way
+    an unqueued run does on its own deadline, so a run nobody is watching fails rather than
+    blocks. The cards this run already holds are answered with before anything else,
+    because a stage that queued for a card its own process is holding would wait for a peer
+    that can never get past it.
     """
     global _peers  # noqa: PLW0603  the survey seam below takes nothing to pass this through
 
     needed = _requested_devices(config)
+    started = monotonic()
     entry: Entry | None = None
     try:
         while True:
@@ -901,7 +947,9 @@ def _wait_in_turn(
                     "cy-queue while it waited for GPU(s). Nothing was started."
                 )
             _announce_position(entry, waiting, queue)
-            sleep(queue.config.poll_seconds)
+            _sleep_a_poll_or_give_up(
+                queue, entry, waiting, waited=monotonic() - started, sleep=sleep
+            )
     finally:
         if entry is not None:
             queue.remove_entry(entry)

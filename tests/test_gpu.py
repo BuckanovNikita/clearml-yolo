@@ -168,15 +168,20 @@ def unqueued(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[None]:
 
 
 def queue_for(
-    tmp_path: Path, run_id: str = "run-a", user: str = "ann", pid: int = 4242
+    tmp_path: Path,
+    run_id: str = "run-a",
+    user: str = "ann",
+    pid: int = 4242,
+    **settings: Any,
 ) -> RunQueue:
     """A queue of this run's own in ``tmp_path``, standing in for the machine's.
 
     ``pid`` is named rather than read so a lease can claim to be held by a process that is
-    not this one, which is what every peer in these tests is.
+    not this one, which is what every peer in these tests is. ``settings`` are the queue's
+    own, a deadline for instance.
     """
     return RunQueue(
-        QueueConfig(dir=tmp_path / "queue", poll_seconds=1.0),
+        QueueConfig(dir=tmp_path / "queue", poll_seconds=1.0, **settings),
         run_id=run_id,
         user=user,
         host="box",
@@ -999,6 +1004,67 @@ def test_a_cancelled_entry_stops_the_run_instead_of_starting_it(tmp_path: Path) 
             sleep=cancel_from_the_viewer,
             queue=mine,
         )
+
+
+def test_a_queued_run_with_a_deadline_gives_up_its_place_when_it_passes(tmp_path: Path) -> None:
+    """A run nobody is watching — an agent's, a CI job's — has to fail where it would
+    otherwise block for ever behind a card a peer is holding. Failing means the same error
+    an unqueued run raises on its own deadline, and no entry left in the order for the runs
+    behind it to wait on."""
+    peer = queue_for(tmp_path, run_id="run-b", user="bob", pid=99)
+    peer.claim_leases([0])
+    mine = queue_for(tmp_path, wait_timeout_seconds=3.0)
+    slept: list[float] = []
+
+    deadline = r"auto_gpu\.queue\.wait_timeout_seconds=3\.0"
+    with pytest.raises(RuntimeError, match=deadline) as failure:
+        wait_for_devices(
+            guarded(),
+            probe=lambda: _survey(1, cards=1),
+            sleep=slept.append,
+            monotonic=lambda: float(sum(slept)),
+            queue=mine,
+        )
+
+    assert str(failure.value).startswith("Waited 3s")
+    assert sum(slept) == 3.0
+    assert mine.live_entries() == []
+    assert [lease.run_id for lease in mine.live_leases()] == ["run-b"]
+
+
+def test_a_deadline_that_has_not_passed_changes_nothing_about_the_turn(tmp_path: Path) -> None:
+    """The deadline is a ceiling on the wait and not a change to the order: a run whose
+    card frees up in time claims it exactly as one with no deadline would."""
+    busy_then_free = [_survey(0), _survey(0), _survey(1)]
+    slept: list[float] = []
+
+    chosen = wait_for_devices(
+        guarded(),
+        probe=lambda: busy_then_free.pop(0),
+        sleep=slept.append,
+        monotonic=lambda: float(sum(slept)),
+        queue=queue_for(tmp_path, wait_timeout_seconds=60.0),
+    )
+
+    assert [gpu.torch_index for gpu in chosen] == [0]
+    # One poll: the first pass takes a place in line and surveys again without sleeping.
+    assert slept == [1.0]
+
+
+def test_the_last_poll_before_the_deadline_is_cut_to_it(tmp_path: Path) -> None:
+    """A deadline of two and a half polls fails at the deadline, not at the third poll."""
+    slept: list[float] = []
+
+    with pytest.raises(RuntimeError, match="Waited"):
+        wait_for_devices(
+            guarded(),
+            probe=lambda: _survey(0),
+            sleep=slept.append,
+            monotonic=lambda: float(sum(slept)),
+            queue=queue_for(tmp_path, wait_timeout_seconds=2.5),
+        )
+
+    assert slept == [1.0, 1.0, 0.5]
 
 
 def test_a_request_for_more_cards_than_exist_never_reaches_the_queue(tmp_path: Path) -> None:

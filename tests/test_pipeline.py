@@ -507,6 +507,24 @@ def test_a_named_run_directory_is_where_everything_that_run_writes_goes(
     assert _train_project(seen[0]) == str(chosen / "detect")
 
 
+def test_a_run_directory_outside_the_workspace_leaves_latest_alone(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """An agent's run lives in a scratch directory its cleanup deletes; the user's
+    ``runs/latest`` must keep naming the user's last run rather than dangle."""
+    monkeypatch.chdir(tmp_path)
+    seen: list[dict[str, object]] = []
+    monkeypatch.setattr(pipeline_module, "run_training", _recording_training(seen))
+    previous = _previous_run(tmp_path)
+    scratch = tmp_path_factory.mktemp("scratch") / "tagged-run"
+
+    with pytest.raises(_ReachedTrainingError):
+        _run_alone([f"run_dir={scratch}"])
+
+    assert _train_project(seen[0]) == str(scratch / "detect")
+    assert (tmp_path / RUNS_ROOT / LATEST_LINK_NAME).resolve() == previous
+
+
 def test_a_run_that_skips_training_with_nothing_to_load_is_refused_up_front(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
