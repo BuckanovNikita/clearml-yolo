@@ -13,8 +13,9 @@ English.
 
 - For a real pipeline run, GPU allocation, a queue check, ClearML artifacts, or
   a baseline comparison, load `running-end-to-end-tests`.
-- For server reachability, credentials, or the shared ClearML deployment, load
-  `running-clearml-server`.
+- For which ClearML a run talks to, its credentials, or a LoginError 401, load
+  `running-clearml-server`: the target is the shared ClearML stand on the
+  cluster, never the user's own ClearML on this host.
 - For a run of your own against the shared ClearML stand, follow
   [Agent runs](#agent-runs) below: `source scripts/agent_env.sh <slug>` first,
   `scripts/agent_cleanup.sh` last.
@@ -66,9 +67,11 @@ mocked checks.
 
 ## ClearML facts
 
-The local ClearML server is a shared machine service, outside this repository.
-Its endpoint and ownership contract are in `running-clearml-server`; do not
-assume a checkout path or manage its lifecycle from this project.
+An agent's runs go to the shared ClearML stand (`clearml.k8s.localhost`) as
+the project `clearml-yolo`; `running-clearml-server` says how to become that
+identity and points at the k8s-infra stand reference for the rest. The stand
+is deployed and torn down by k8s-infra, never from this project, and the
+user's own ClearML on this host is not a target for agents.
 
 ClearML model metadata does not enumerate labels; obtain class names from the
 checkpoint. Dashboard confidence thresholds are rounded; use the
