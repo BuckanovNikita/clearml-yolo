@@ -400,12 +400,17 @@ def test_a_run_that_scores_nothing_needs_no_ground_truth(
 
 
 def test_a_comparison_that_cannot_reach_its_baseline_is_rejected_before_training_starts(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """Inside the pipeline the baseline is always a ClearML task, so tracking turned off
     leaves the lookup nothing to search. The comparison is the last stage, so without this
     the run trains, predicts, scores and reports before failing on a lookup that could
-    never have succeeded."""
+    never have succeeded.
+
+    The ground truth is written first because its check runs before this one: without it
+    the run refuses for the missing CSV and the baseline check is never reached."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "ground_truth.csv").write_text("image_name,image_path,instance_label,split\n")
     monkeypatch.setattr(pipeline_module, "run_training", lambda **kwargs: pytest.fail("trained"))
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
         config = compose(config_name="pipeline", overrides=["clearml.enabled=false"])
