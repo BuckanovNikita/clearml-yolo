@@ -1,20 +1,13 @@
-"""CLI: run every stage as a single experiment."""
+"""CLI: pipeline."""
 
 from __future__ import annotations
 
-from hydra_zen import store, zen
-
-import clearml_yolo.configs  # noqa: F401  registers every config
-from clearml_yolo.configs import absorb_force_gpu_flag, overlay_ultralytics_files
+from clearml_yolo.apps.common import launch
 from clearml_yolo.tasks.pipeline import run_pipeline
 
 
 def main() -> None:
-    absorb_force_gpu_flag()
-    store.add_to_hydra_store(overwrite_ok=True)
-    zen(run_pipeline, pre_call=overlay_ultralytics_files("pipeline")).hydra_main(
-        config_name="pipeline", config_path=None, version_base="1.3"
-    )
+    launch("pipeline", run_pipeline)
 
 
 if __name__ == "__main__":

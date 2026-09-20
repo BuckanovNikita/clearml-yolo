@@ -21,7 +21,6 @@ PREDICTIONS = "predict_predictions"
 # lifecycle: an agent running a clone of the task reads it back and reruns with it. It is
 # named here anyway, beside the artifacts, because a name a run writes and a later reader
 # looks up is exactly what this module exists to keep in one place.
-TRAIN_AUGMENTATIONS = "train_augmentations"
 
 DASHBOARD_FULL_PREFIX = "metrics_dashboard_full"
 DASHBOARD_DTRK_PREFIX = "metrics_dashboard_dtrk"

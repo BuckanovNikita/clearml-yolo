@@ -1,6 +1,6 @@
 [project]
 name = "clearml-yolo"
-version = "0.2.0"
+version = "0.3.0"
 description = "Composable hydra-zen apps for YOLO training, inference, metrics and model comparison reports"
 readme = "README.md"
 authors = [
@@ -8,30 +8,21 @@ authors = [
 ]
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    # 8.4.117 is the release that routes a custom albumentations pipeline by transform
-    # *type* instead of by a hardcoded list of class names, and that serialises the
-    # `augmentations` override through A.to_dict/A.from_dict so DDP children rebuild it.
-    # Below it, clearml_yolo.augment would need the monkey-patch this project used to carry.
     "ultralytics>=8.4.117",
-    # Imported directly by clearml_yolo.augment, and a dependency even without it:
-    # ultralytics declares albumentations only as an extra, and without it ultralytics' own
-    # default augmentation block silently turns into a no-op.
+    # Native training uses this optional upstream augmentation block.
     "albumentations>=2.0,<3",
     "hydra-core>=1.3",
     "hydra-zen>=0.16",
     "clearml>=1.13",
     "pydantic>=2",
+    "pyyaml>=6",
     "loguru>=0.7",
     "pandas>=2.0",
     "scipy>=1.11",
     "openpyxl>=3.1",
-    "nvidia-ml-py",
     "tqdm>=4.66",
-    # The cy-queue TUI draws with it. Ultralytics happens to pull it in today, which is not
-    # a promise we can build on.
-    "rich>=13",
-    "digital-metrics",
-    "report-generator",
+    "digital-metrics @ git+https://github.com/Wasilkas/digital-metrics@ecce79cdcade2bb463c4bcc9eac77512d1033117",
+    "report-generator @ git+https://github.com/Wasilkas/report-generator@2172d3945723233b087b1375c2c821d020462f00",
 ]
 
 [project.scripts]
@@ -42,22 +33,18 @@ cy-metrics = "clearml_yolo.apps.metrics:main"
 cy-report = "clearml_yolo.apps.report:main"
 cy-compare = "clearml_yolo.apps.compare:main"
 cy-ground-truth = "clearml_yolo.apps.ground_truth:main"
-cy-init-config = "clearml_yolo.apps.config_tree:main"
-cy-queue = "clearml_yolo.apps.queue:main"
+cy-val = "clearml_yolo.apps.val:main"
 
 [build-system]
 requires = ["uv_build>=0.11.32,<0.12.0"]
 build-backend = "uv_build"
-
-[tool.uv.sources]
-digital-metrics = { git = "https://github.com/Wasilkas/digital-metrics" }
-report-generator = { git = "https://github.com/Wasilkas/report-generator" }
 
 [dependency-groups]
 dev = [
     "import-linter>=2.13",
     "mypy>=1.11",
     "pandas-stubs",
+    "types-PyYAML",
     "pre-commit>=4.6.1",
     "pytest>=8.0",
     "ruff>=0.6",
@@ -135,10 +122,6 @@ ignore = [
 # Tests assert, reach into privates, name literal expectations inline, feed known-value
 # temp paths and unpickle their own fixtures, and pytest collects them without a package.
 "tests/**" = ["ARG", "INP001", "PLR2004", "S101", "S108", "S301", "SLF001"]
-# `import albumentations as A` is that library's universal convention.
-"src/clearml_yolo/augment.py" = ["N812"]
-"tests/test_augment.py" = ["N812"]
-
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
 
@@ -161,20 +144,19 @@ name = "Package layers"
 type = "layers"
 layers = [
     "clearml_yolo.apps",
-    "clearml_yolo.config_tree",
     "clearml_yolo.configs",
     "clearml_yolo.tasks",
     "clearml_yolo.comparison",
     "clearml_yolo.inference | clearml_yolo.ground_truth | clearml_yolo.clearml_models | clearml_yolo.clearml_report",
-    "clearml_yolo.clearml_session | clearml_yolo.gpu | clearml_yolo.progress | clearml_yolo.artifact_names | clearml_yolo.ultralytics_params | clearml_yolo.augment | clearml_yolo.queue_view",
-    "clearml_yolo.run_queue | clearml_yolo.run_identity",
+    "clearml_yolo.native_runtime | clearml_yolo.clearml_session | clearml_yolo.progress | clearml_yolo.artifact_names",
+    "clearml_yolo.run_identity",
 ]
 
 [[tool.importlinter.contracts]]
 name = "Task layers"
 type = "layers"
 containers = ["clearml_yolo.tasks"]
-layers = ["pipeline", "report", "metrics", "compare | predict | train"]
+layers = ["pipeline", "val | report", "metrics", "compare | predict | train | ground_truth"]
 
 [[tool.importlinter.contracts]]
 name = "Comparison layers"
@@ -187,14 +169,13 @@ name = "Every app entrypoint stands alone"
 type = "independence"
 modules = [
     "clearml_yolo.apps.compare",
-    "clearml_yolo.apps.config_tree",
     "clearml_yolo.apps.ground_truth",
     "clearml_yolo.apps.metrics",
     "clearml_yolo.apps.pipeline",
     "clearml_yolo.apps.predict",
-    "clearml_yolo.apps.queue",
     "clearml_yolo.apps.report",
     "clearml_yolo.apps.train",
+    "clearml_yolo.apps.val",
 ]
 
 [[tool.importlinter.contracts]]
@@ -204,17 +185,11 @@ source_modules = [
     "clearml_yolo.apps",
     "clearml_yolo.comparison",
     "clearml_yolo.configs",
-    "clearml_yolo.config_tree",
     "clearml_yolo.inference",
     "clearml_yolo.ground_truth",
-    "clearml_yolo.gpu",
     "clearml_yolo.progress",
     "clearml_yolo.artifact_names",
-    "clearml_yolo.ultralytics_params",
-    "clearml_yolo.augment",
-    "clearml_yolo.run_queue",
     "clearml_yolo.run_identity",
-    "clearml_yolo.queue_view",
 ]
 forbidden_modules = ["clearml"]
 allow_indirect_imports = true
@@ -226,17 +201,12 @@ source_modules = [
     "clearml_yolo.comparison",
     "clearml_yolo.inference",
     "clearml_yolo.ground_truth",
-    "clearml_yolo.gpu",
     "clearml_yolo.progress",
     "clearml_yolo.artifact_names",
     "clearml_yolo.clearml_session",
     "clearml_yolo.clearml_models",
     "clearml_yolo.clearml_report",
-    "clearml_yolo.ultralytics_params",
-    "clearml_yolo.augment",
-    "clearml_yolo.run_queue",
     "clearml_yolo.run_identity",
-    "clearml_yolo.queue_view",
 ]
 forbidden_modules = ["hydra", "hydra_zen", "omegaconf"]
 allow_indirect_imports = true
@@ -247,7 +217,6 @@ type = "forbidden"
 source_modules = [
     "clearml_yolo.apps",
     "clearml_yolo.configs",
-    "clearml_yolo.config_tree",
     "clearml_yolo.clearml_session",
     "clearml_yolo.clearml_models",
     "clearml_yolo.clearml_report",
@@ -256,15 +225,7 @@ source_modules = [
     "clearml_yolo.tasks.pipeline",
     "clearml_yolo.tasks.metrics",
     "clearml_yolo.tasks.report",
-    # The rule that decides what reaches ultralytics must not itself need ultralytics:
-    # importing it here would put torch on the critical path of every CLI start.
-    "clearml_yolo.ultralytics_params",
-    # The module that reconciles the hyperparameters a custom albumentations pipeline
-    # replaces reads only names, so it needs neither ultralytics nor torch to do it.
-    "clearml_yolo.augment",
-    "clearml_yolo.run_queue",
     "clearml_yolo.run_identity",
-    "clearml_yolo.queue_view",
 ]
 forbidden_modules = ["ultralytics", "torch"]
 allow_indirect_imports = true
@@ -295,10 +256,8 @@ exclude = ["^(digital-metrics|report-generator)/"]
 # The only dependencies that ship neither inline types nor a stub package. Everything
 # else, ultralytics and the ClearML SDK included, is checked against its real signatures.
 module = [
-    "albumentations.*",
     "digital_metrics.*",
     "report_generator.*",
-    "pynvml.*",
     "scipy.*",
     "tqdm.*",
 ]

@@ -37,6 +37,9 @@ def published(monkeypatch: pytest.MonkeyPatch) -> dict[str, pd.DataFrame]:
         tables[f"{title}/{series}"] = frame
 
     monkeypatch.setattr(predict_module, "report_table", report_table)
+    monkeypatch.setattr(predict_module, "init_task", lambda *_a, **_k: object())
+    monkeypatch.setattr(predict_module, "expect_artifacts", lambda *_a, **_k: None)
+    monkeypatch.setattr(predict_module, "upload_artifact", lambda *_a, **_k: None)
     monkeypatch.setattr(predict_module, "resolve_weights", lambda weights: weights)
     monkeypatch.setattr(
         predict_module, "predict_on_images", lambda *_, **__: pd.DataFrame({"image_name": []})
@@ -55,7 +58,7 @@ def _predict(tmp_path: Path, imgsz: int | None) -> Any:
         weights="best.pt",
         ground_truth=_ground_truth(tmp_path),
         output=tmp_path / "predictions.csv",
-        clearml=ClearMLConfig(enabled=False),
+        clearml=ClearMLConfig(),
         ultralytics={"imgsz": imgsz, "device": "cpu", "batch": 1},
     )
 
@@ -90,3 +93,44 @@ def test_the_resolution_travels_with_the_predictions(
     assert result.predictions == tmp_path / "predictions.csv"
     assert result.resolution.scored_at == 1280
     assert not result.resolution.was_trained_elsewhere
+
+
+def test_splits_are_inferred_separately_for_reproducible_test_batches(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    checkpoint_recording: Any,
+    published: dict[str, pd.DataFrame],
+) -> None:
+    checkpoint_recording({"imgsz": 64})
+    truth = tmp_path / "truth.csv"
+    truth.write_text("image_path,split\nz.png,val\na.png,test\nb.png,test\n")
+    calls: list[list[str]] = []
+
+    def infer(_: object, paths: list[str], **kwargs: Any) -> pd.DataFrame:
+        calls.append(paths)
+        assert kwargs["project"] == str(tmp_path / "native")
+        assert kwargs["name"] == "predict"
+        return pd.DataFrame({"image_name": paths})
+
+    monkeypatch.setattr(predict_module, "predict_on_images", infer)
+    predict("best.pt", truth, tmp_path / "pred.csv", ClearMLConfig(), {}, ["val", "test"])
+    assert calls == [["z.png"], ["a.png", "b.png"]]
+
+
+def test_prediction_satisfies_its_registered_artifacts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    checkpoint_recording: Any,
+    published: dict[str, pd.DataFrame],
+) -> None:
+    checkpoint_recording({"imgsz": 64})
+    expected: list[str] = []
+    uploaded: list[str] = []
+    monkeypatch.setattr(
+        predict_module, "expect_artifacts", lambda task, names: expected.extend(names)
+    )
+    monkeypatch.setattr(
+        predict_module, "upload_artifact", lambda task, name, value: uploaded.append(name)
+    )
+    _predict(tmp_path, 64)
+    assert set(expected) <= set(uploaded)

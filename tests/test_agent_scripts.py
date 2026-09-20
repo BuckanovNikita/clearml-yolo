@@ -235,18 +235,18 @@ def test_the_slug_defaults_to_run(harness: Harness) -> None:
     assert result.environment["CY_RUN_TAG"].endswith("-run-ab12")
 
 
-def test_the_printed_run_line_carries_the_deadline_the_gpu_cap_and_the_tagged_project(
+def test_the_printed_run_line_carries_explicit_native_devices_and_the_tagged_project(
     harness: Harness,
 ) -> None:
-    """The line an agent copies must fail rather than block, take one card, and land by tag."""
-    result = _source_agent_env(harness, "smoke", CY_QUEUE_WAIT_SECONDS="900")
+    """The line an agent copies selects the host GPU directly and lands by tag."""
+    result = _source_agent_env(harness, "smoke")
 
-    assert "auto_gpu.queue.wait_timeout_seconds=900" in result.stdout
-    assert "auto_gpu.max_gpus=1" in result.stdout
+    assert "+train.ultralytics.device=0" in result.stdout
+    assert "+predict.ultralytics.device=0" in result.stdout
+    assert "auto_gpu" not in result.stdout
     assert "run_dir=$CY_RUN_DIR" in result.stdout
     assert 'clearml.project_name="$CY_RUN_TAG clearml-yolo"' in result.stdout
     assert "clearml.tags=[$CY_RUN_TAG]" in result.stdout
-    assert "never enqueue" in result.stdout
     assert "stand-secret" not in result.stdout
 
 

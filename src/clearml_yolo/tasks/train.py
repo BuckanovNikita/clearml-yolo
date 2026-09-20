@@ -1,4 +1,4 @@
-"""Train a YOLO model with DDP and ClearML tracking."""
+"""Native Ultralytics training with explicit artifact ownership."""
 
 from __future__ import annotations
 
@@ -7,175 +7,90 @@ from pathlib import Path
 from typing import Any
 
 from loguru import logger
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from clearml_yolo.artifact_names import TRAIN_AUGMENTATIONS
-from clearml_yolo.augment import load_augmentations
-from clearml_yolo.clearml_session import ClearMLConfig, connect_config_file, init_task
-from clearml_yolo.gpu import (
-    AutoGpuConfig,
-    DeviceSelection,
-    release_gpus_except,
-    remember_batch,
-    resolve_devices,
+from clearml_yolo.clearml_session import (
+    ClearMLConfig,
+    connect_config_file,
+    expect_artifacts,
+    init_task,
+    sanitize_configuration,
+    upload_artifact,
 )
 from clearml_yolo.run_identity import RUNS_ROOT, point_latest_at, resolve_run_dir, resolve_run_id
-from clearml_yolo.ultralytics_params import fill_unset
 
-# Where ultralytics puts a run's checkpoint. Named here because two other places have to
-# predict this path without a trainer to ask: the standalone predict default, and the
-# pipeline when training is skipped.
-CHECKPOINT = "{project}/{name}/weights/best.pt"
-
-# What training's own directory is called inside the run directory. `detect` is what it
-# was called when every run shared one of them, and it is still what ultralytics' own
-# layout calls a detection project.
 TRAIN_DIR = "detect"
+CHECKPOINT = "{project}/{name}/weights/best.pt"
 
 
 class TrainResult(BaseModel):
-    """The checkpoint plus the device it was produced on.
-
-    The device travels with the result so a stage that follows training in the same
-    process can reuse it instead of surveying again: training still holds the card's
-    memory at that point, so a fresh survey would wait for a device this very run owns.
-    """
-
     weights: Path
-    inference_device: str | None = None
-
-
-def _inference_device(selection: DeviceSelection) -> str | None:
-    """Name training's device the way inference expects it, or None for CPU."""
-    if isinstance(selection.devices, list) and selection.devices:
-        return str(selection.devices[0])
-    return None
+    save_dir: Path
+    effective_args: dict[str, Any] = Field(default_factory=dict)
 
 
 def _project_of_this_run(project: str | None, task_name: str) -> Path:
-    """Where training writes, absolute, and — when it decided that itself — what ``latest`` names.
-
-    A project written against the key is honoured exactly as written. That is how the
-    pipeline hands this stage the one directory the whole run writes into, and how a
-    caller redirects training somewhere else entirely. It is resolved because ultralytics
-    resolves a relative project against its own configured ``runs_dir`` rather than the
-    working directory, which is rarely the same place.
-
-    Left unset, this run is a run of its own and names one, exactly as the pipeline names
-    one for its stages: two ``cy-train`` started in the same folder used to share
-    ``runs/detect/<task name>`` with ``exist_ok`` set, which is not a merge but a deletion
-    — the DDP launcher clears the save directory before it spawns its children. ``latest``
-    is repointed at the new directory, because that link is how the standalone stages that
-    score this model find the run that produced it.
-    """
     if project is not None:
         return Path(project).resolve()
-    run_dir = resolve_run_dir(
+    directory = resolve_run_dir(
         RUNS_ROOT, resolve_run_id(task_name, None, datetime.now(tz=UTC)), None
     )
-    run_dir.mkdir(parents=True, exist_ok=True)
-    point_latest_at(RUNS_ROOT, run_dir)
-    logger.info("Training run {} writes everything it produces to {}", run_dir.name, run_dir)
-    return run_dir / TRAIN_DIR
+    directory.mkdir(parents=True, exist_ok=True)
+    point_latest_at(RUNS_ROOT, directory)
+    return directory / TRAIN_DIR
 
 
-def train(
-    ultralytics: dict[str, Any],
-    auto_gpu: AutoGpuConfig,
-    clearml: ClearMLConfig,
-) -> TrainResult:
-    """Run training and return the best checkpoint with the device that produced it.
+def _publish_training(task: Any, directory: Path) -> None:
+    """Upload native outputs, excluding image-containing training/debug batches."""
+    for path in sorted(directory.rglob("*")):
+        if not path.is_file() or path.suffix not in {".pt", ".csv", ".png", ".jpg", ".yaml"}:
+            continue
+        if path.name.startswith(("train_batch", "val_batch")):
+            continue
+        name = "train_" + path.relative_to(directory).as_posix().replace("/", "_")
+        if path.suffix == ".yaml":
+            connect_config_file(task, name, path, allow_remote_override=False)
+        else:
+            upload_artifact(task, name, path)
 
-    ``ultralytics`` is the whole of ``conf/ultralytics/train.yaml``, with whatever the file
-    named by ``cfg=`` and the command line wrote over it: every parameter
-    ultralytics accepts for detection training, passed on as it stands — except
-    ``augmentations``, which names an albumentations JSON file here, reaches ultralytics as
-    the transforms loaded from it, and is connected to the ClearML task as the file it came
-    from, because a list of transform objects is not a value ClearML can hold as a
-    hyperparameter. The keys left
-    ``null`` there are the ones decided here — the batch and cards from ``auto_gpu``, AMP
-    and ``torch.compile`` from whether this run is on a GPU at all, the run's name from the
-    ClearML experiment, so the run directory always matches the experiment, and the project
-    from the identity this run takes when nobody handed it one.
 
-    The checkpoint path is derived from project/name rather than from the return value
-    of ``model.train()``: under DDP the parent process never runs a validator, so
-    ultralytics returns no metrics there.
-    """
+def train(ultralytics: dict[str, Any], clearml: ClearMLConfig) -> TrainResult:
+    """Pass native settings unchanged, except isolated default output routing."""
     from ultralytics.models import YOLO
 
-    # Only the task identity is ours, and the one setting the callback cannot carry.
-    # Ultralytics' own ClearML callback connects the hyperparameters, logs losses and
-    # metrics, and uploads best.pt on its own.
     task = init_task(clearml, stage="train")
-    architecture = ultralytics["model"]
-    selection = resolve_devices(
-        auto_gpu,
-        ultralytics.get("device"),
-        ultralytics.get("batch"),
-        model=architecture,
-        stage="train",
+    expect_artifacts(
+        task,
+        [
+            "training_model_reference",
+            "train_effective_arguments",
+            "train_output_location",
+            "dataset_resolved_configuration",
+            "train_weights_best.pt",
+        ],
     )
-    on_gpu = isinstance(selection.devices, list) and bool(selection.devices)
-
-    settings = fill_unset(
-        ultralytics,
-        # Training's half precision is AMP, not the `quantize` flag inference takes: that
-        # one casts the weights outright, which training cannot do.
-        amp=on_gpu,
-        # Unlike inference, training runs long enough to earn the one-off compilation back
-        # many times over — it is paid once and amortised across every epoch.
-        compile=on_gpu,
-        name=clearml.task_name,
-    )
-    settings["batch"] = selection.batch
-    settings["device"] = selection.devices
+    settings = dict(ultralytics)
+    architecture = settings.pop("model", "yolo11n.pt")
     settings["project"] = str(_project_of_this_run(settings.get("project"), clearml.task_name))
-    # `model` names the weights YOLO() is built from. Left in as well, it would reach
-    # train() as a keyword argument, which ultralytics lets win over the constructor —
-    # two ways to say which model this is, and no rule for which of them means it.
-    del settings["model"]
-    # `pop` rather than a lookup: the key is a path on this side and transform objects on
-    # ultralytics' side, so the path itself must not travel on — and a config folder dumped
-    # before the key existed carries no `augmentations` at all.
-    pipeline_file = settings.pop("augmentations", None)
-    if pipeline_file is not None:
-        # Read from where ClearML says, not from where the config said: on a clone this is
-        # the file stored with the task rather than whatever now sits at that path.
-        stored = connect_config_file(task, TRAIN_AUGMENTATIONS, Path(pipeline_file))
-        loaded_augmentations = load_augmentations(stored)
-        if loaded_augmentations is not None:
-            settings["augmentations"] = loaded_augmentations
-
-    logger.info(
-        "Training {} on {} for {} epochs — devices={} batch={} (per GPU {})",
-        architecture,
-        settings["data"],
-        settings["epochs"],
-        selection.devices,
-        selection.batch,
-        selection.batch_per_gpu,
+    settings.setdefault("name", clearml.task_name)
+    data = settings.get("data")
+    if isinstance(data, (str, Path)) and (Path(data).is_file() or not task.running_locally()):
+        settings["data"] = str(connect_config_file(task, "dataset_configuration", Path(data)))
+    upload_artifact(
+        task, "training_model_reference", sanitize_configuration({"model": architecture})
     )
-
-    yolo = YOLO(architecture)
-    yolo.train(**settings)
-
-    # Read the run directory from the trainer rather than rebuilding it: ultralytics
-    # may deduplicate the name, and only it knows where the checkpoint actually went.
-    # The attribute is declared optional upstream but is always set once train() returns.
-    trainer: Any = yolo.trainer
-    save_dir = Path(trainer.save_dir)
-    best = save_dir / "weights" / "best.pt"
+    model = YOLO(architecture)
+    model.train(**settings)
+    # Native DDP returns no validator result in its parent; trainer.save_dir still owns outputs.
+    trainer: Any = model.trainer
+    upload_artifact(task, "dataset_resolved_configuration", sanitize_configuration(trainer.data))
+    directory = Path(trainer.save_dir)
+    best = directory / "weights" / "best.pt"
     if not best.is_file():
-        raise FileNotFoundError(
-            f"Training finished but {best} does not exist. Check the run directory {save_dir}."
-        )
-    logger.info("Best checkpoint: {}", best)
-    # Only now is this batch known to fit: it survived every epoch, including the
-    # validation pass, which is where a batch that trains but does not validate fails.
-    remember_batch("train", architecture, selection)
-    # Training was the only stage that wanted more than one card. Everything after it in
-    # this process — inference here, or the rest of the pipeline — runs on a single device,
-    # so the others go back to the machine now rather than at exit.
-    release_gpus_except(selection.devices[:1] if isinstance(selection.devices, list) else [])
-    return TrainResult(weights=best, inference_device=_inference_device(selection))
+        raise FileNotFoundError(f"Training finished without required checkpoint {best}")
+    effective = dict(vars(trainer.args))
+    upload_artifact(task, "train_effective_arguments", sanitize_configuration(effective))
+    upload_artifact(task, "train_output_location", {"save_dir": str(directory)})
+    _publish_training(task, directory)
+    logger.info("Training checkpoint: {}", best)
+    return TrainResult(weights=best, save_dir=directory, effective_args=effective)

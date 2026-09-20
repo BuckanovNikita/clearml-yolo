@@ -1,49 +1,7 @@
-"""Run a checkpoint over a list of images, returning detections in digital-metrics' schema.
+"""Convert native manifest inference into the digital-metrics prediction table.
 
-This is digital-metrics' ``predict_on_images`` given a progress signal and GPU-side
-defaults. It lives here rather than upstream because digital-metrics is consumed as a
-released package.
-
-**The source is a manifest, and that is the whole trick.** Ultralytics routes a *list*
-source through ``autocast_list`` into ``LoadPilAndNumpy``, which sets ``bs = len(list)``
-and never consults the ``batch`` argument, so the whole list becomes one forward pass —
-slower than a batched run, and with VRAM that grows with the size of the split rather than
-with ``batch``. The same loader names
-images from PIL's ``filename``, which is lost through ``ImageOps.exif_transpose``'s copy,
-so ``Results.path`` comes back as ``image0.jpg``. Both problems belong to the list form
-alone. A ``.txt`` of paths goes to ``LoadImagesAndVideos`` instead, which honours
-``batch``, reports the real file, and decodes with the same OpenCV call training uses — so
-no EXIF rotation appears between training and inference. One ``predict`` call therefore
-does the whole run, and every box is attributed by path rather than by position.
-
-Two consequences of that loader are handled here. It absolutises every manifest entry and
-sorts the file list, so results arrive neither spelled nor ordered as the caller wrote
-them; the join back is keyed on the same absolutisation. And it *skips* an image OpenCV
-cannot decode, logging a warning, which would quietly shrink the scored set and surface
-downstream as a recall drop that reads like a model regression — so every requested image
-is accounted for before returning.
-
-Throughput came out level with the chunked-and-threaded version this replaces, box for box
-identical. Ultralytics decodes inline, so the per-image cost that decoding off the main
-thread used to hide is paid again — and it is repaid by not setting a source up once per
-chunk. Both are dominated by one-off ``torch.compile`` work for the final partial batch's
-shape; a warm process scores the same split in a fraction of the time.
-
-**``batch`` is not only a memory knob, it moves the boxes.** Ultralytics letterboxes with
-``auto=same_shapes and rect``, and ``same_shapes`` is computed over the images of *one
-batch* (``engine/predictor.py``). ``rect`` defaults to True for predict, so a batch whose
-images happen to share a shape is padded to the smallest rectangle that fits them, while a
-batch of mixed shapes is padded to a full square — different input, different detections,
-for the same image. Change ``batch`` and some images cross that line. Anything that caches
-or compares predictions has to key on it, and thresholds do not carry across a change of
-it any more than they carry across a change of ``imgsz``.
-
-On CUDA, half precision and ``torch.compile`` are both on by default. Neither buys much on
-a model this small: preprocessing, postprocessing and decoding together outweigh the
-network, so speeding the network up has little left to win — FP16 measured slower, and
-``compile`` charges its one-off compilation against a steady-state gain a small split
-never repays. Both are still on because both scale with model size, and both are one line
-of ``conf/ultralytics/predict.yaml`` away from off.
+A text manifest preserves filenames and native batching. Every requested image must
+produce a result, including empty images; silently skipped images fail the invocation.
 """
 
 from __future__ import annotations
@@ -58,7 +16,6 @@ from loguru import logger
 from pydantic import BaseModel
 
 from clearml_yolo.progress import track
-from clearml_yolo.ultralytics_params import fill_unset
 
 ImageNameMode = Literal["name", "stem", "path"]
 
@@ -73,29 +30,7 @@ PREDICTION_COLUMNS = [
     "bbox_y_br",
 ]
 
-# Everything ultralytics accepts that is not one of these is a CUDA ordinal ("0", "0,1")
-# or an explicit cuda device ("cuda:0").
-NON_CUDA_DEVICES = frozenset({"cpu", "mps"})
-
 _MAX_REPORTED_PATHS = 5
-
-
-def is_cuda_device(device: str | None) -> bool:
-    """Whether inference will run on a CUDA card.
-
-    Two defaults hang off this — half precision and ``torch.compile`` — because neither is
-    available anywhere else. It also has to reach anything that caches or compares
-    predictions, since both change which boxes come back: an FP32 cache scored against
-    fresh FP16 detections is a model difference that is not one.
-
-    With no device named, ultralytics picks the card itself, so the question is only
-    whether this machine has one.
-    """
-    if not device:
-        from torch.cuda import is_available
-
-        return bool(is_available())
-    return not any(part.strip().lower() in NON_CUDA_DEVICES for part in str(device).split(","))
 
 
 class ScoredResolution(BaseModel):
@@ -108,7 +43,7 @@ class ScoredResolution(BaseModel):
     """
 
     trained_at: int | None
-    scored_at: int
+    scored_at: int | list[int]
 
     @property
     def was_trained_elsewhere(self) -> bool:
@@ -162,7 +97,7 @@ def trained_imgsz(weights: str | Path) -> int | None:
     return None
 
 
-def resolution_of(weights: str | Path, imgsz: int | None) -> ScoredResolution:
+def resolution_of(weights: str | Path, imgsz: int | list[int] | None) -> ScoredResolution:
     """The resolution to infer at: the one asked for, or the one the weights were trained at.
 
     A model is shown images at one scale and generalises to that scale, so inferring at
@@ -270,41 +205,19 @@ def predict_on_images(
     *,
     conf: float = 0.001,
     iou: float = 0.7,
-    imgsz: int = 640,
-    batch: int = 16,
-    device: str | None = None,
-    quantize: int | str | None = None,
+    imgsz: int | list[int] = 640,
+    batch: int = 1,
+    device: str | int | list[int] | None = None,
     image_name: ImageNameMode = "name",
     **model_kwargs: Any,
 ) -> pd.DataFrame:
-    """Score ``image_paths`` with ``weights`` and return the detections as a DataFrame.
+    """Score images with native precision, compilation and device settings.
 
-    ``batch`` is the memory knob: it is how many images go through the network at once and
-    how many are held decoded at once, so peak RAM and VRAM are both proportional to it.
-    Lower it (or ``imgsz``) to fit a smaller card. It also decides how images are grouped
-    for letterboxing, and so which boxes come back at all — see the module docstring.
-
-    ``conf`` defaults to near zero because per-class thresholds are calibrated downstream,
-    and filtering here would discard the detections that calibration needs.
-
-    ``quantize`` and ``compile`` left unset follow the device: FP16 and compilation on a
-    CUDA card, neither anywhere else. Both pay off on a model heavy enough to be GPU-bound,
-    and both change which boxes come back, so thresholds calibrated without them do not
-    carry over — recalibrate rather than mixing. See the module docstring for what each
-    measured on a small model.
-
-    Unset means the same thing here as it does in ``conf/ultralytics/predict.yaml``: this
-    decides it. A value passed in is used as it stands, which is how the predict stage
-    hands over whatever its config file says, and how the comparison names the precision
-    its prediction cache is keyed on.
-
-    ``model_kwargs`` reach ``model.predict`` untouched, so any other ultralytics parameter
-    goes through as well.
-
-    Raises:
-        ValueError: If ``batch`` is below one, or if any requested image came back
-            unscored because ultralytics could not read it.
+    The low confidence default retains detections for later validation calibration.
+    Explicit native arguments override defaults without hardware-dependent rewriting.
     """
+    if image_name not in ("name", "stem", "path"):
+        raise ValueError(f"Unsupported image_name mode: {image_name!r}")
     if batch < 1:
         raise ValueError(f"batch must be >= 1, got {batch}")
 
@@ -317,24 +230,18 @@ def predict_on_images(
 
     model = YOLO(str(weights))
     names: dict[int, str] = model.names
-    accelerated = is_cuda_device(device)
-    settings: dict[str, Any] = fill_unset(
-        {
-            "conf": conf,
-            "iou": iou,
-            "imgsz": imgsz,
-            "batch": batch,
-            "device": device,
-            "quantize": quantize,
-            # Ultralytics' own default for predict, named here because it decides the shape
-            # the network actually sees and therefore belongs in the log line beside imgsz.
-            # See the module docstring for what it costs.
-            "rect": True,
-            **model_kwargs,
-        },
-        quantize=16 if accelerated else 32,
-        compile=accelerated,
-    )
+    settings: dict[str, Any] = {
+        "conf": conf,
+        "iou": iou,
+        "imgsz": imgsz,
+        "batch": batch,
+        "device": device,
+        "rect": True,
+        **model_kwargs,
+    }
+    if "source" in settings or "stream" in settings:
+        raise ValueError("source and stream are owned by dataset manifest inference")
+    settings.setdefault("verbose", False)
     logger.info(
         "Predicting on {} images with {} ({})",
         len(paths),
@@ -348,7 +255,7 @@ def predict_on_images(
         manifest, by_absolute = _write_manifest(paths, Path(workspace))
         # Ultralytics types predict as returning `list[Results] | Tensor` regardless of
         # `stream`, so the annotation has to be widened rather than narrowed.
-        results: Any = model.predict(source=manifest, stream=True, verbose=False, **settings)
+        results: Any = model.predict(source=manifest, stream=True, **settings)
         for result in track(results, "Inference", total=len(paths), unit="img"):
             scored.add(result.path)
             boxes = result.boxes
@@ -357,4 +264,11 @@ def predict_on_images(
 
     _refuse_unscored(by_absolute, scored)
     logger.info("Predicted {} boxes over {} images", len(rows), len(scored))
-    return pd.DataFrame(rows, columns=PREDICTION_COLUMNS)
+    frame = pd.DataFrame(rows, columns=PREDICTION_COLUMNS)
+    # Opaque native predictor objects carry the arguments after native normalization.
+    predictor: Any = getattr(model, "predictor", None)
+    if predictor is not None:
+        frame.attrs["effective_args"] = dict(vars(predictor.args))
+        frame.attrs["save_dir"] = str(predictor.save_dir)
+    frame.attrs["image_paths"] = sorted(by_absolute)
+    return frame

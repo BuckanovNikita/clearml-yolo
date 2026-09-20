@@ -57,6 +57,32 @@ class NumericNamePredictor(RecordingPredictor):
         return frame.assign(image_name=["000000000009", "000000000025"][: len(frame)])
 
 
+class EvidencePredictor(RecordingPredictor):
+    @override
+    def __call__(self, weights: Any, image_paths: list[str], **kwargs: Any) -> pd.DataFrame:
+        frame = super().__call__(weights, image_paths, **kwargs)
+        frame.attrs["effective_args"] = {
+            "device": "cpu-normalized",
+            "project": kwargs["project"],
+            "name": kwargs["name"],
+        }
+        frame.attrs["save_dir"] = str(Path(str(kwargs["project"])) / str(kwargs["name"]))
+        return frame
+
+
+class SensitiveEvidencePredictor(EvidencePredictor):
+    @override
+    def __call__(self, weights: Any, image_paths: list[str], **kwargs: Any) -> pd.DataFrame:
+        frame = super().__call__(weights, image_paths, **kwargs)
+        frame.attrs["effective_args"].update(
+            {
+                "access_key": "access-secret",
+                "endpoint": "https://user:password@example.test/predict?token=query-secret",
+            }
+        )
+        return frame
+
+
 def _explode(weights: Any, image_paths: list[str], **kwargs: Any) -> pd.DataFrame:
     raise AssertionError("inference must not run when a cached prediction file is reused")
 
@@ -132,8 +158,10 @@ def _reinfer(
         imgsz=640,
         batch=16,
         device=None,
-        quantize=32,
         image_name="name",
+        native_project=output.parent / "native",
+        native_name=f"baseline_{split}",
+        native_kwargs={"agnostic_nms": True},
         reuse_existing=reuse_existing,
         predictor=predictor,
         class_names=_names,
@@ -162,11 +190,75 @@ def test_forwards_the_inference_settings(ground_truth: pd.DataFrame, tmp_path: P
         "imgsz": 640,
         "batch": 16,
         "device": None,
-        # Named rather than left to the inference default, so the precision the cache is
-        # keyed on is the precision that was passed.
-        "quantize": 32,
         "image_name": "name",
+        "project": str(tmp_path / "native"),
+        "name": "baseline_test",
+        "agnostic_nms": True,
     }
+
+
+def test_native_outputs_are_routed_below_comparison_destination(
+    ground_truth: pd.DataFrame, tmp_path: Path
+) -> None:
+    output = tmp_path / "comparison" / "preds.csv"
+    predictor = RecordingPredictor()
+
+    _reinfer(ground_truth, output, predictor)
+
+    kwargs = predictor.calls[0][2]
+    assert Path(kwargs["project"]) == tmp_path / "comparison" / "native"
+    assert kwargs["name"] == "baseline_test"
+
+
+def test_cached_inference_evidence_uses_shared_credential_sanitizer(
+    ground_truth: pd.DataFrame, tmp_path: Path
+) -> None:
+    output = tmp_path / "comparison" / "preds.csv"
+
+    predictions, _ = _reinfer(ground_truth, output, SensitiveEvidencePredictor())
+
+    metadata = output.with_suffix(".metadata.json").read_text(encoding="utf-8")
+    effective = predictions.attrs["effective_args"]
+    assert effective["access_key"] == "<redacted>"
+    assert effective["endpoint"] == "https://<redacted>@example.test/predict?token=%3Credacted%3E"
+    assert "access-secret" not in metadata
+    assert "password" not in metadata
+    assert "query-secret" not in metadata
+
+
+@pytest.mark.parametrize("key", ["source", "model", "project", "name", "save_dir"])
+def test_native_kwargs_cannot_override_owned_inference_inputs(
+    ground_truth: pd.DataFrame, tmp_path: Path, key: str
+) -> None:
+    with pytest.raises(ValueError, match=key):
+        reinfer_split(
+            "baseline.pt",
+            ground_truth,
+            "test",
+            tmp_path / "preds.csv",
+            conf=0.001,
+            iou=0.7,
+            imgsz=640,
+            batch=16,
+            device=None,
+            image_name="name",
+            native_project=tmp_path / "native",
+            native_name="baseline_test",
+            native_kwargs={key: "override"},
+            predictor=RecordingPredictor(),
+            class_names=_names,
+        )
+
+
+def test_images_are_in_one_stable_global_order(
+    ground_truth: pd.DataFrame, tmp_path: Path
+) -> None:
+    predictor = RecordingPredictor()
+    reversed_truth = ground_truth.iloc[::-1].reset_index(drop=True)
+
+    _reinfer(reversed_truth, tmp_path / "preds.csv", predictor)
+
+    assert predictor.calls[0][1] == sorted(predictor.calls[0][1])
 
 
 def test_writes_predictions_csv(ground_truth: pd.DataFrame, tmp_path: Path) -> None:
@@ -187,6 +279,33 @@ def test_reuses_an_existing_csv_without_inference(
     second, _ = _reinfer(ground_truth, output, _explode)
 
     pd.testing.assert_frame_equal(first, second)
+
+
+def test_cache_sidecar_restores_actual_native_arguments_and_output_location(
+    ground_truth: pd.DataFrame, tmp_path: Path
+) -> None:
+    output = tmp_path / "preds.csv"
+    first, _ = _reinfer(ground_truth, output, EvidencePredictor())
+
+    second, _ = _reinfer(ground_truth, output, _explode)
+
+    assert first.attrs["effective_args"]["device"] == "cpu-normalized"
+    assert second.attrs["effective_args"] == first.attrs["effective_args"]
+    assert second.attrs["save_dir"] == first.attrs["save_dir"]
+    assert output.with_suffix(".metadata.json").is_file()
+
+
+def test_cache_without_provenance_sidecar_is_not_reused(
+    ground_truth: pd.DataFrame, tmp_path: Path
+) -> None:
+    output = tmp_path / "preds.csv"
+    output.write_text(",".join(PREDICTION_COLUMNS) + "\n", encoding="utf-8")
+    predictor = RecordingPredictor()
+
+    _reinfer(ground_truth, output, predictor)
+
+    assert len(predictor.calls) == 1
+    assert output.with_suffix(".metadata.json").is_file()
 
 
 def test_reused_identifiers_keep_their_text_form(

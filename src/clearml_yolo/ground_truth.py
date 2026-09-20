@@ -31,7 +31,7 @@ GROUND_TRUTH_COLUMNS = [
 SPLITS = ("train", "val", "test")
 DETECTION_LABEL_FIELDS = 5
 
-GroundTruthRow = dict[str, str | float]
+GroundTruthRow = dict[str, str | float | None]
 YoloBox = tuple[str, float, float, float, float]
 
 
@@ -126,6 +126,18 @@ def _split_rows(
         boxes = _parse_label_file(label_path, names) if label_path.is_file() else []
         if not boxes:
             background_images += 1
+            rows.append(
+                {
+                    "image_name": image.name,
+                    "image_path": str(image),
+                    "instance_label": None,
+                    "bbox_x_tl": None,
+                    "bbox_y_tl": None,
+                    "bbox_x_br": None,
+                    "bbox_y_br": None,
+                    "split": split,
+                }
+            )
             continue
         width, height = _image_size(image)
         for class_name, center_x, center_y, box_width, box_height in boxes:

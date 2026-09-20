@@ -1,56 +1,20 @@
-# clearml-yolo
+# Personal engineering instructions
 
-`clearml-yolo` is a Python 3.12 set of Hydra/hydra-zen applications for YOLO
-training, prediction, metrics, reports, and model comparison. `cy` runs the
-pipeline; `cy-train`, `cy-predict`, `cy-metrics`, `cy-report`, `cy-compare`,
-`cy-ground-truth`, and `cy-init-config` run individual stages. `cy-queue` is
-an argparse/Rich queue viewer and does not compose Hydra configuration.
+## Working agreement
 
-Keep user-facing README text in Russian. Keep code comments and log messages in
-English.
+Carry the requested outcome through implementation and appropriate verification.
+Inspect relevant code, configuration, and existing changes before editing. Treat plans
+and task files as intent and the current repository as implementation evidence. Preserve
+unrelated work. Ask only for information that materially changes the result and cannot
+be discovered in the repository.
 
-## Route work deliberately
+For a bug, capture and reproduce the failing observation when feasible. Verify the
+original failure path after the fix. Report checks and limitations accurately.
 
-- For a real pipeline run, GPU allocation, a queue check, ClearML artifacts, or
-  a baseline comparison, load `running-end-to-end-tests`.
-- For which ClearML a run talks to, its credentials, or a LoginError 401, load
-  `running-clearml-server`: the target is the shared ClearML stand on the
-  cluster, never the user's own ClearML on this host.
-- For a run of your own against the shared ClearML stand, follow
-  [Agent runs](#agent-runs) below: `source scripts/agent_env.sh <slug>` first,
-  `scripts/agent_cleanup.sh` last.
-- Read `pyproject.toml` for the current commands, dependency constraints, and
-  import-linter contracts. The mocked suite does not establish that a pipeline
-  can train, use a GPU, or upload artifacts.
+## Verification and collaboration
 
-## Project contracts
-
-Import layers are enforced by `lint-imports`:
-
-```
-apps -> config_tree -> configs -> tasks -> comparison -> domain modules -> run_queue | run_identity
-```
-
-`configs` builds task configuration and remains above `tasks`. Keep ClearML SDK
-access in the ClearML adapters and tasks; `run_queue` and `run_identity` remain
-filesystem-only bottom-layer modules.
-
-Shared pipeline values (`clearml`, `auto_gpu`, `ground_truth`, `splits`,
-`weights`, `run_id`, and `run_dir`) are handed to stages by the pipeline. Set
-`run_dir` to redirect a pipeline run; stage output paths are not reliable
-pipeline overrides. Use `cy-init-config` to create an editable config tree and
-recreate a generated tree when its composition schema becomes stale.
-
-`auto_gpu.force=true` (or `--force-gpu`) bypasses queueing and GPU safety
-guards, including lease protection. Do not use it for ordinary verification.
-With the normal queue enabled, a run waits in the filesystem queue without a
-deadline unless `auto_gpu.queue.wait_timeout_seconds` names one; with it
-disabled, `auto_gpu.wait_timeout_seconds` bounds the wait.
-
-## Proportional verification
-
-For a documentation-only change, validate the changed Markdown and referenced
-paths. For code or commit work, choose relevant repository gates from:
+Use the repository's documented tooling and current check configuration. For code or
+commit work, select the affected gates from:
 
 ```bash
 uv run pytest
@@ -60,73 +24,121 @@ uv run lint-imports
 uv run pre-commit run --all-files
 ```
 
-The `tests/test_ultralytics_params.py` test intentionally imports the installed
-Ultralytics configuration; other tests may stub ClearML, Ultralytics, or Torch.
-Use the end-to-end skill when a change needs evidence beyond those static or
-mocked checks.
+Documentation-only work needs Markdown and link validation, not an unrelated application
+suite. The mocked suite cannot prove native training, a GPU, or ClearML uploads. Do not
+claim those outcomes without dated real-run evidence.
 
-## ClearML facts
+Track processes and temporary resources created by this task and clean them up. Leave
+pre-existing shared services, containers, and data intact.
 
-An agent's runs go to the shared ClearML stand (`clearml.k8s.localhost`) as
-the project `clearml-yolo`; `running-clearml-server` says how to become that
-identity and points at the k8s-infra stand reference for the rest. The stand
-is deployed and torn down by k8s-infra, never from this project, and the
-user's own ClearML on this host is not a target for agents.
+## Python preferences
 
-ClearML model metadata does not enumerate labels; obtain class names from the
-checkpoint. Dashboard confidence thresholds are rounded; use the
-`metrics_best_confidences_<split>` artifact for exact per-class values.
+Follow the existing toolchain. Prefer strict types, explicit access, Loguru for application
+logging, and Pydantic for validated configuration. Catch exceptions at a boundary that can
+handle them, using specific types where practical. Keep code comments and log messages in
+English.
+
+## Git and documentation
+
+Commit only when requested. Stage explicit paths or hunks belonging to the task; preserve
+unrelated staged and unstaged changes. Do not stash, reset, revert, or bypass hooks to make
+a check pass. Use Conventional Commits when committing.
+
+Write README.md in Russian. Write other documentation, skills, and instruction files in
+English unless the user or project states otherwise. Keep observed test counts, timings,
+and deployment status in dated evidence rather than evergreen documentation.
+
+--- project-doc ---
+
+# clearml-yolo
+
+`clearml-yolo` is a Python 3.12 group of Hydra/hydra-zen applications for native
+Ultralytics YOLO training, prediction, validation, metrics, reports, and model comparison.
+`cy` runs the pipeline; `cy-train`, `cy-predict`, `cy-val`, `cy-metrics`, `cy-report`,
+`cy-compare`, and `cy-ground-truth` run individual stages.
+
+## Project contracts
+
+Eight entrypoints remain: `cy`, `cy-train`, `cy-predict`, `cy-val`, `cy-metrics`,
+`cy-report`, `cy-compare`, and `cy-ground-truth`. `cy-queue` and `cy-init-config` are
+removed.
+
+Native model settings are sparse `ultralytics` mappings: `train.ultralytics` and
+`predict.ultralytics` in the pipeline. A neighbouring `cfg` names unchanged native YAML.
+Precedence is native defaults, cfg YAML, the explicitly supplied embedded mapping, then
+Hydra CLI overrides. Add an absent setting with `+ultralytics.key=value` (or
+`+train.ultralytics.key=value`); override an existing setting without `+`. Pass device,
+batch, AMP, compilation, and native augmentation options directly to Ultralytics.
+
+The project no longer provides GPU scheduling, filesystem queues or leases, batch tuning,
+custom augmentation JSON, configuration-tree generation, `--force-gpu`, or disabled
+tracking. Removed options must fail rather than be silently ignored.
+
+`run_dir` owns output routing for `cy`. Pipeline stages cannot use conflicting stage output
+paths or conflicting native training project/name. Standalone output-producing commands use
+fresh output directories and require their explicit inputs. Keep ClearML SDK access in its
+adapters and tasks; output routing has no dependency on ClearML.
+
+Candidate thresholds are calibrated on validation once and frozen for test. A comparison
+runs baseline and candidate on identical current test images and consumes their paired
+current-test results from `comparison_dir`. Historical dashboards are not comparison input.
+The automatic baseline is the latest completed prod-tagged task excluding the current task;
+missing automatic baseline skips comparison, while invalid explicit references fail.
+
+ClearML is required. One invocation owns exactly one task; nested stages reuse it and workers
+do not create tasks or upload artifacts. Complete a task only after all required artifacts
+are uploaded and flushed. Fail task and command on computation, upload, flush, or interruption
+errors while retaining local output. Never capture credentials or dataset images.
+
+## Route work deliberately
+
+- For a real pipeline run, GPU use, ClearML artifacts, or a baseline/candidate comparison,
+  load `running-end-to-end-tests`.
+- For ClearML endpoint, credentials, or LoginError 401, load `running-clearml-server`.
+  Agent runs target the shared stand, never the user's host ClearML.
+- Read `pyproject.toml` for installed entrypoints, dependency constraints, and import-linter
+  contracts. Read the CLI and artifact contracts in `specs/001-release-030/contracts/` when
+  changing public behaviour.
 
 ## Agent runs
 
-An agent's `cy` run acts as the project `clearml-yolo` on the shared ClearML
-stand, under one run tag, in one directory of its own. The scripts do the
-contract's steps so nobody types them:
+An agent run uses the shared ClearML stand as project `clearml-yolo`, under one tag and in
+one directory. Do not perform stand operations unless the task requires a real run. Before
+minting a tag outside an environment that already supplies it, set `INFRA_HARNESS=codex`.
 
 ```bash
-source scripts/agent_env.sh <slug>   # room preflight, stand credentials, INFRA_RUN_TAG, CY_RUN_TAG, CY_RUN_DIR
-uv run cy auto_gpu.queue.wait_timeout_seconds=1800 auto_gpu.max_gpus=1 \
-    run_dir=$CY_RUN_DIR clearml.project_name="$CY_RUN_TAG clearml-yolo" clearml.tags=[$CY_RUN_TAG] ...
-scripts/agent_cleanup.sh             # clearml.py cleanup --prefix $CY_RUN_TAG, ls to prove it, rm -rf $CY_RUN_DIR
+source scripts/agent_env.sh <slug>
+uv run cy run_dir=$CY_RUN_DIR \
+    clearml.project_name="$CY_RUN_TAG clearml-yolo" clearml.tags=[$CY_RUN_TAG] \
+    +train.ultralytics.device=0 +predict.ultralytics.device=0 ...
+scripts/agent_cleanup.sh
 ```
 
-- `agent_env.sh` is sourced, not run. It refuses (returns 3) when `room` says
-  WAIT, and exports nothing when the Secret or the mint is refused; the run
-  line it prints is the one above with the tag filled in. An `INFRA_RUN_TAG`
-  already exported (minted with `--keep`, say) is kept as is.
-- GPU: the cap is `[capacity].gpu_runs` in the registry; training runs on the
-  host GPU through this project's own filesystem queue, always with
-  `auto_gpu.queue.wait_timeout_seconds` set so an unattended run fails rather
-  than blocks, and never with `--force-gpu`. Never enqueue a task on the
-  stand's `CLEARML_QUEUE`: its task pods are CPU-only and cannot reach the GPU.
-- The ClearML SDK reads `CLEARML_API_HOST` and the key pair from the
-  environment before `~/clearml.conf`; that is why the sourced exports are
-  enough and why `scripts/check_env.sh` reports which endpoint it authenticated
-  against and warns when it is the user's host stand on `localhost:8008`.
-- Clean up on success and on failure. `agent_cleanup.sh` removes the run
-  directory only when it is named after the tag; anything kept on purpose is
-  reported by its full name.
+- `agent_env.sh` is sourced and returns 3 when `room` says WAIT. It exports no run tag when
+  credential retrieval or minting fails. It preserves a pre-exported `INFRA_RUN_TAG`.
+- `run_dir` keeps agent output outside the checkout. Native `device=0` selects the host GPU;
+  no project GPU queue or force option exists.
+- The ClearML SDK reads its endpoint and key pair from the environment before
+  `~/clearml.conf`; `scripts/check_env.sh` reports the authenticated endpoint and warns when
+  it is the user's host stand.
+- Always clean up on success and failure. `agent_cleanup.sh` calls tag-scoped cleanup, proves
+  it with `ls`, and removes a directory only when its name is the tag.
 
 ## Shared infra
 
-This project is `clearml-yolo` in the k8s-infra registry and may use the shared
-stands `clearml` on the docker-desktop cluster as identity `clearml-yolo`. The
-skill is `/mnt/wsl/data/nkt/k8s-infra/skills/k8s-infra` (its `projects.toml` is the registry); read its
-`references/run-contract.md` before touching a stand.
+This project is `clearml-yolo` in the k8s-infra registry and may use the shared `clearml`
+stand on the docker-desktop cluster. Read
+`/mnt/wsl/data/nkt/k8s-infra/skills/k8s-infra/references/run-contract.md` before touching a
+stand.
 
-- Preflight: `python3 /mnt/wsl/data/nkt/k8s-infra/skills/k8s-infra/scripts/infra.py room`; obey WAIT (exit status 3).
-- Mint one tag per run and export it (assign, then export, so a refused mint
-  stops you instead of exporting an empty tag):
-  `INFRA_RUN_TAG=$(python3 /mnt/wsl/data/nkt/k8s-infra/skills/k8s-infra/scripts/infra.py newtag --project clearml-yolo --slug <what>) && export INFRA_RUN_TAG`
-  Not Claude Code? Export `INFRA_HARNESS=codex|ci|human` first; the default is `claude`.
-- Name everything you create by `$INFRA_RUN_TAG` as the stand reference says.
-- Credentials come from the helpers, never from files:
-  `eval "$(python3 /mnt/wsl/data/nkt/k8s-infra/skills/k8s-infra/scripts/clearml.py --project clearml-yolo env)"`
-- Clean up on success and on failure, then prove it with `ls`:
-  `python3 /mnt/wsl/data/nkt/k8s-infra/skills/k8s-infra/scripts/clearml.py --project clearml-yolo cleanup --prefix "$INFRA_RUN_TAG"`
-- Caps are `[capacity]` keys in `/mnt/wsl/data/nkt/k8s-infra/skills/k8s-infra/projects.toml`: `sandbox_runs_soft`
-  bounds every run, `cveta2_integration_runs` the cveta2 suites, `gpu_runs` the
-  trainings, `lakefs_heavy_runs` the lakeFS-heavy runs; `room` enforces
-  `max_pods_soft`, `fat_stand_max` and `clearml_max_task_pods`.
-- Never run `cleanup --stale` without `--dry-run`. Never touch another tag or a
-  durable name. Report anything intentionally kept by its full name.
+- Preflight with `python3 /mnt/wsl/data/nkt/k8s-infra/skills/k8s-infra/scripts/infra.py room`
+  and obey WAIT (exit status 3).
+- Mint exactly one tag per real run:
+  `INFRA_RUN_TAG=$(python3 /mnt/wsl/data/nkt/k8s-infra/skills/k8s-infra/scripts/infra.py newtag --project clearml-yolo --slug <what>) && export INFRA_RUN_TAG`.
+- Obtain credentials only through
+  `eval "$(python3 /mnt/wsl/data/nkt/k8s-infra/skills/k8s-infra/scripts/clearml.py --project clearml-yolo env)"`.
+- Clean up only the run's tag and prove it:
+  `python3 /mnt/wsl/data/nkt/k8s-infra/skills/k8s-infra/scripts/clearml.py --project clearml-yolo cleanup --prefix "$INFRA_RUN_TAG"`, then `ls` with the same prefix.
+- Capacity is maintained in the registry's `[capacity]` values. `room` enforces the shared
+  soft limits. Never use stale cleanup without `--dry-run`, touch another tag, or delete a
+  durable name.

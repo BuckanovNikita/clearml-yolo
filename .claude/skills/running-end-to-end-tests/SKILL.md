@@ -2,21 +2,20 @@
 name: running-end-to-end-tests
 description: >
   Use when verifying clearml-yolo beyond mocked tests: a real cy pipeline run,
-  GPU queue behavior, ClearML tracking or artifacts, or a baseline comparison.
-  Trigger on end to end, full test, real run, smoke test, verify against
-  ClearML, coco8, cy run, baseline, compare stage, run tag, or GPU queue.
+  native device execution, ClearML tracking or artifacts, cy-val, or a current-data
+  baseline/candidate comparison. Trigger on end to end, full test, real run, smoke test,
+  verify against ClearML, coco8, cy run, baseline, compare stage, run tag, or GPU.
 ---
 
 # Verify clearml-yolo end to end
 
-Use this skill when the change needs real evidence. The unit suite can validate
-logic without a ClearML server or GPU, but cannot prove pipeline wiring, device
-allocation, or artifact upload.
+Use this skill when the change needs real evidence. Unit tests validate contracts without
+proving native training, a GPU, the shared ClearML stand, or artifact uploads. Do not run a
+live pipeline merely for documentation work.
 
-Read [pipeline prerequisites](references/pipeline-prerequisites.md) before
-choosing a run. Do not run a live pipeline merely for a documentation change.
+Read [pipeline prerequisites](references/pipeline-prerequisites.md) before choosing a run.
 
-## Start with relevant static checks
+## Start with static checks
 
 ```bash
 uv run pytest
@@ -25,130 +24,79 @@ uv run mypy .
 uv run lint-imports
 ```
 
-`lint-imports` enforces the project's layer boundaries. `uv run pre-commit run
---all-files` is available when the task needs the repository hook set.
+`lint-imports` enforces the package boundaries. Use `uv run pre-commit run --all-files` when
+the change needs the complete repository hook set.
 
-## Every real run is a tagged run
+## Every real run is tagged
 
-A real run acts as the project `clearml-yolo` on the shared ClearML stand
-(`running-clearml-server`), under one run tag, in a directory of its own
-outside the checkout. Start every session of real runs with
+A real run acts as `clearml-yolo` on the shared ClearML stand, under one tag and in one
+directory outside the checkout. Do not substitute the user's host ClearML. Before minting a
+tag from a non-Codex environment, export `INFRA_HARNESS=codex`.
 
 ```bash
 source scripts/agent_env.sh <slug>
 ```
 
-It preflights the cluster, exports the stand's credentials, mints `CY_RUN_TAG`
-and creates `CY_RUN_DIR`, then runs `scripts/check_env.sh`. It refuses when
-the cluster says WAIT or the Secret cannot be read; there is no fallback to the
-user's ClearML or to a directory inside the checkout. The offline run below
-sources it too: the tag and the directory come from nowhere else.
+The helper preflights capacity, exports stand credentials, mints `CY_RUN_TAG`, creates
+`CY_RUN_DIR`, and invokes `scripts/check_env.sh`. It refuses if capacity says WAIT or the
+Secret cannot be read; it does not fall back to host credentials.
 
-Every `cy` command line then carries four keys. `run_dir=$CY_RUN_DIR` keeps the
-outputs out of the checkout and leaves the user's `runs/latest` alone;
-`clearml.project_name="$CY_RUN_TAG clearml-yolo"` and
-`clearml.tags=[$CY_RUN_TAG]` put the experiments where the tag's cleanup finds
-them; `auto_gpu.queue.wait_timeout_seconds=<n>` gives the queued wait a
-deadline so an unattended run fails instead of blocking. Without the last key a
-queued run waits for ever: `auto_gpu.wait_timeout_seconds` is read only with
-the queue disabled and never bounded the queued wait.
-
-Two different things are called "the queue" here: the local filesystem queue
-(`auto_gpu.queue.*`, `cy-queue`) hands out leases on this host's GPU and is
-what a `cy` run waits in, while the ClearML queue on the stand (`CLEARML_QUEUE`,
-named `agents`) runs tasks in CPU-only pods and is never enqueued to by this
-project.
-
-## Offline pipeline smoke run
-
-Use an existing small dataset configuration. This representative command keeps
-ClearML off and disables comparison, whose default baseline is resolved through
-ClearML:
+Every `cy` command must set `run_dir=$CY_RUN_DIR`, the tagged project, the tag list, and
+explicit native devices. The output directory isolates files from the checkout; explicit
+native mappings leave device selection with Ultralytics:
 
 ```bash
-uv run cy \
-  clearml.enabled=false \
+uv run cy run_dir=$CY_RUN_DIR \
   clearml.project_name="$CY_RUN_TAG clearml-yolo" \
   clearml.tags=[$CY_RUN_TAG] \
-  train.ultralytics.data=coco8.yaml \
-  train.ultralytics.epochs=1 \
-  train.ultralytics.name=verify-1ep \
-  report/baseline=none \
-  skip_compare=true \
-  auto_gpu.queue.wait_timeout_seconds=120 \
-  auto_gpu.max_gpus=1 \
-  run_dir=$CY_RUN_DIR
+  +train.ultralytics.device=0 \
+  +predict.ultralytics.device=0 ...
 ```
 
-The dataset and ground-truth requirements still apply. Check that `$CY_RUN_DIR`
-contains the checkpoint, predictions, and metrics outputs that its enabled
-stages should produce. `run_dir` controls pipeline output routing.
+## Pipeline smoke run
 
-## ClearML-backed run and comparison
-
-First pass `running-clearml-server`'s authenticated check (`check_env.sh` from
-`agent_env.sh` is that check). The run's project is `"$CY_RUN_TAG clearml-yolo"`
-and nothing else: never create verification tasks in the user's projects or
-in another tag's. A first run can legitimately have no prior baseline. To
-exercise comparison, complete a baseline run and then a candidate in the same
-tagged project, with the baseline selection configured for the first task:
+Use a small, valid dataset. ClearML tracking remains enabled. The command below runs in a
+tagged project and uses native execution settings:
 
 ```bash
-uv run cy \
+uv run cy run_dir=$CY_RUN_DIR/smoke \
   clearml.project_name="$CY_RUN_TAG clearml-yolo" \
   clearml.tags=[$CY_RUN_TAG] \
-  clearml.task_name=baseline \
-  train.ultralytics.data=coco8.yaml \
-  train.ultralytics.epochs=1 \
-  report/baseline=none \
-  skip_compare=true \
-  auto_gpu.queue.wait_timeout_seconds=1800 \
-  auto_gpu.max_gpus=1 \
-  run_dir=$CY_RUN_DIR/baseline
-
-uv run cy \
-  clearml.project_name="$CY_RUN_TAG clearml-yolo" \
-  clearml.tags=[$CY_RUN_TAG] \
-  clearml.task_name=candidate \
-  train.ultralytics.data=coco8.yaml \
-  train.ultralytics.epochs=1 \
-  report.baseline.project_name="$CY_RUN_TAG clearml-yolo" \
-  report.baseline.task_name=baseline \
-  report.baseline.tags=[] \
-  auto_gpu.queue.wait_timeout_seconds=1800 \
-  auto_gpu.max_gpus=1 \
-  run_dir=$CY_RUN_DIR/candidate
+  ground_truth=ground_truth.csv \
+  +train.ultralytics.data=coco8.yaml \
+  +train.ultralytics.epochs=1 \
+  +train.ultralytics.device=0 \
+  +predict.ultralytics.device=0
 ```
 
-`report.baseline.tags=[]` is needed because the baseline lookup filters on the
-`prod` tag by default, and a verification baseline is never promoted.
+Verify the task owns one complete lifecycle, and that required checkpoints, prediction and
+truth tables, exact thresholds, metrics, plots, reports, effective native arguments, and
+manifest are downloadable. Inspect outputs beneath the selected `run_dir`; do not route
+pipeline stages through their own output settings.
 
-Verify against the stand's UI at `http://clearml.k8s.localhost/`, in the
-project `<run-tag> clearml-yolo`: task completion, one output model when
-training is enabled, and the metrics dashboard and exact-confidence artifacts.
-Exact per-class thresholds come from `metrics_best_confidences_<split>`, not a
-rounded dashboard. `python3 "$CY_INFRA_SKILL_DIR/scripts/clearml.py" --project
-clearml-yolo ls --prefix "$CY_RUN_TAG"` lists the same objects from the shell.
+## Validation and comparison evidence
 
-## Queue evidence is conditional
+Run `cy-val` against a checkpoint with validation and test data. Confirm candidate thresholds
+are calibrated on validation and reused unchanged for test. The artifact
+`metrics_best_confidences_<split>` contains the exact threshold mapping; dashboard values are
+rounded.
 
-Queue behavior needs task-owned concurrent real runs, an available GPU, and a
-real terminal for `cy-queue`. Leave queueing enabled for that test, keep each
-run's `run_dir` distinct under `$CY_RUN_DIR`, and inspect only its own entries
-and leases. The GPU cap for agents is one training at a time (`gpu_runs` in
-the k8s-infra registry), so a second concurrent run exists only to be seen
-waiting, with a deadline. Never cancel, reclaim, pin, or force a queue item
-owned by another user or service. `auto_gpu.force=true` bypasses queue and
-lease safeguards and is not a queue test.
+For a paired comparison, first complete a prod-tagged baseline, then run a candidate in the
+same tagged project. The candidate must select that baseline explicitly or through the latest
+completed prod-task lookup. Confirm both checkpoints infer the same current test images under
+matching settings, and that paired outputs in `comparison_dir` feed the statistical,
+developer, and business reports. A first run with no automatic baseline may complete with the
+comparison marked skipped. An invalid explicit baseline must fail.
 
-## Clean up, on success and on failure
+Do not use historical dashboards as comparison input. Do not claim real distributed execution
+without specific evidence; CPU and one explicit host GPU are the required real-run gates.
+
+## Clean up on success and failure
 
 ```bash
 scripts/agent_cleanup.sh
 ```
 
-It runs `clearml.py --project clearml-yolo cleanup --prefix "$CY_RUN_TAG"`,
-proves the stand is clean with `ls --prefix "$CY_RUN_TAG"`, and removes
-`$CY_RUN_DIR`. Add `--dry-run` to see what it would do. Anything that must
-survive for the user to look at is named in the final message by its full
-project name and task id, or minted under a `-keep` tag in the first place.
+It performs tag-scoped ClearML cleanup, proves the result with `ls --prefix "$CY_RUN_TAG"`,
+and removes `$CY_RUN_DIR` only when that directory is named after the tag. Use `--dry-run` to
+inspect cleanup. Report any intentionally retained object by its full project and task id.

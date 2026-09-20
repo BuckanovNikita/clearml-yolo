@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from clearml_yolo.comparison.scoring import ClassCounts, score_split
+from clearml_yolo.comparison.scoring import ClassCounts, score_split, validate_thresholds
 
 GT_COLUMNS = ["image_name", "instance_label", "bbox_x_tl", "bbox_y_tl", "bbox_x_br", "bbox_y_br"]
 GtRow = tuple[str, str | None, float, float, float, float]
@@ -100,6 +100,49 @@ def test_class_missing_from_thresholds_is_scored_at_zero() -> None:
     assert outcome.counts == {"cat": ClassCounts(tp=2, fp=0, fn=0)}
     assert outcome.gt_status["detected"].tolist() == [True, True]
     assert outcome.pred_status["pred_index"].tolist() == [5, 6]
+
+
+def test_prediction_class_absent_from_ground_truth_is_counted_as_false_positive() -> None:
+    gt = _gt_frame([("img1.jpg", "cat", 0.0, 0.0, 10.0, 10.0)], index=[0])
+    predictions = _pred_frame(
+        [("img1.jpg", "bird", 20.0, 20.0, 30.0, 30.0, 0.9)],
+        index=[0],
+    )
+
+    outcome = score_split(
+        gt,
+        predictions,
+        ["bird", "cat"],
+        {"cat": 0.5},
+        iou_threshold=0.5,
+        matching_strategy="iou_prior",
+    )
+
+    assert outcome.counts["bird"] == ClassCounts(tp=0, fp=1, fn=0)
+    assert outcome.pred_status["instance_label"].tolist() == ["bird"]
+
+
+@pytest.mark.parametrize(
+    ("thresholds", "message"),
+    [
+        ({}, "missing"),
+        ({"cat": float("nan")}, "finite"),
+        ({"cat": float("inf")}, "finite"),
+        ({"cat": -0.01}, r"\[0, 1\]"),
+        ({"cat": 1.01}, r"\[0, 1\]"),
+    ],
+)
+def test_required_thresholds_are_exact_and_valid(
+    thresholds: dict[str, float], message: str
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        validate_thresholds(thresholds, ["cat"])
+
+
+def test_threshold_validation_returns_a_numeric_copy() -> None:
+    source: dict[str, float | int] = {"cat": 1, "dog": 0.25}
+
+    assert validate_thresholds(source, ["cat", "dog"]) == {"cat": 1.0, "dog": 0.25}
 
 
 def test_empty_predictions_leave_every_ground_truth_box_undetected() -> None:

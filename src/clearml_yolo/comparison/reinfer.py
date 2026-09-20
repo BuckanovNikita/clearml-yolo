@@ -9,14 +9,17 @@ stage also calls).
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from typing import Any
 
 import pandas as pd
 from loguru import logger
 from pydantic import BaseModel
 
+from clearml_yolo.clearml_session import sanitize_configuration
 from clearml_yolo.inference import predict_on_images
 
 Predictor = Callable[..., pd.DataFrame]
@@ -27,6 +30,22 @@ _MAX_REPORTED_PATHS = 5
 # Numeric-looking identifiers (COCO stems, "0001") would come back as int64 and stop
 # joining to the ground truth, so the cached frame must reload as the model produced it.
 _CACHED_TEXT_COLUMNS = {"image_name": str, "instance_label": str}
+_OWNED_NATIVE_KEYS = {
+    "batch",
+    "conf",
+    "device",
+    "image_name",
+    "imgsz",
+    "iou",
+    "mode",
+    "model",
+    "name",
+    "project",
+    "save_dir",
+    "source",
+    "stream",
+    "task",
+}
 
 
 class VocabularyReport(BaseModel):
@@ -35,6 +54,13 @@ class VocabularyReport(BaseModel):
     model_classes: list[str]
     unknown_to_model: list[str]
     unknown_to_ground_truth: list[str]
+
+
+class InferenceEvidence(BaseModel):
+    """Native arguments and output location captured after predictor normalization."""
+
+    effective_args: dict[str, Any]
+    save_dir: str
 
 
 def _model_class_names(weights: str | Path) -> dict[int, str]:
@@ -65,7 +91,7 @@ def _select_split(ground_truth: pd.DataFrame, split: str) -> pd.DataFrame:
 
 
 def _existing_image_paths(split_rows: pd.DataFrame, split: str) -> list[str]:
-    paths = [str(path) for path in split_rows["image_path"].unique()]
+    paths = sorted(str(path) for path in split_rows["image_path"].dropna().unique())
     missing = [path for path in paths if not Path(path).is_file()]
     if missing:
         # Dropping unreadable images instead would shrink the scored set and surface
@@ -83,7 +109,7 @@ def _vocabulary_report(
     model_names: dict[int, str], split_labels: pd.Series[str]
 ) -> VocabularyReport:
     model_classes = [model_names[index] for index in sorted(model_names)]
-    ground_truth_classes = {str(label) for label in split_labels.unique()}
+    ground_truth_classes = {str(label) for label in split_labels.dropna().unique()}
     return VocabularyReport(
         model_classes=model_classes,
         unknown_to_model=sorted(ground_truth_classes - set(model_classes)),
@@ -91,7 +117,34 @@ def _vocabulary_report(
     )
 
 
-def _write_cache(predictions: pd.DataFrame, output: Path) -> None:
+def _metadata_path(output: Path) -> Path:
+    return output.with_suffix(".metadata.json")
+
+
+def _evidence(predictions: pd.DataFrame, fallback: dict[str, object]) -> InferenceEvidence:
+    effective = predictions.attrs.get("effective_args", fallback)
+    if not isinstance(effective, dict):
+        effective = fallback
+    save_dir = predictions.attrs.get(
+        "save_dir", str(Path(str(fallback["project"])) / str(fallback["name"]))
+    )
+    evidence = InferenceEvidence.model_validate(
+        {"effective_args": sanitize_configuration(effective), "save_dir": str(save_dir)}
+    )
+    native_root = Path(str(fallback["project"])).resolve()
+    actual_output = Path(evidence.save_dir).resolve()
+    if not actual_output.is_relative_to(native_root):
+        raise ValueError(
+            f"Native inference wrote outside the comparison directory: {actual_output} "
+            f"is not below {native_root}"
+        )
+    predictions.attrs.update(evidence.model_dump())
+    return evidence
+
+
+def _write_cache(
+    predictions: pd.DataFrame, output: Path, evidence: InferenceEvidence
+) -> None:
     """Publish the cache in one step, because a peer run may be reading it.
 
     This file is keyed by the baseline's hash rather than by the run, so two runs
@@ -104,6 +157,32 @@ def _write_cache(predictions: pd.DataFrame, output: Path) -> None:
         predictions.to_csv(handle, index=False)
         written = Path(handle.name)
     written.replace(output)
+    metadata = _metadata_path(output)
+    with NamedTemporaryFile("w", dir=output.parent, delete=False, encoding="utf-8") as handle:
+        handle.write(evidence.model_dump_json(indent=2))
+        written_metadata = Path(handle.name)
+    written_metadata.replace(metadata)
+
+
+def _read_cache(output: Path, native_project: Path) -> pd.DataFrame | None:
+    metadata = _metadata_path(output)
+    if not output.is_file() or not metadata.is_file():
+        return None
+    try:
+        evidence = InferenceEvidence.model_validate_json(metadata.read_text(encoding="utf-8"))
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        logger.warning("Ignoring prediction cache with invalid provenance {}: {}", metadata, error)
+        return None
+    if not Path(evidence.save_dir).resolve().is_relative_to(native_project.resolve()):
+        logger.warning(
+            "Ignoring prediction cache whose native output {} is outside {}",
+            evidence.save_dir,
+            native_project,
+        )
+        return None
+    predictions = pd.read_csv(output, dtype=_CACHED_TEXT_COLUMNS)
+    predictions.attrs.update(evidence.model_dump())
+    return predictions
 
 
 def reinfer_split(
@@ -114,11 +193,13 @@ def reinfer_split(
     *,
     conf: float,
     iou: float,
-    imgsz: int,
+    imgsz: int | list[int],
     batch: int,
-    device: str | None,
-    quantize: int | str,
+    device: str | int | list[int] | None,
     image_name: str,
+    native_project: Path,
+    native_name: str,
+    native_kwargs: dict[str, object] | None = None,
     reuse_existing: bool = True,
     predictor: Predictor = predict_on_images,
     class_names: ClassNameLoader = _model_class_names,
@@ -138,11 +219,18 @@ def reinfer_split(
         ValueError: If the split is empty, the required columns are absent, or any of
             the split's images is missing on disk.
     """
+    duplicate_native_keys = sorted(_OWNED_NATIVE_KEYS & set(native_kwargs or {}))
+    if duplicate_native_keys:
+        raise ValueError(
+            "native_kwargs cannot override comparison-owned inference key(s): "
+            f"{duplicate_native_keys}"
+        )
     split_rows = _select_split(ground_truth, split)
     image_paths = _existing_image_paths(split_rows, split)
 
-    if reuse_existing and output.is_file():
-        predictions = pd.read_csv(output, dtype=_CACHED_TEXT_COLUMNS)
+    cached = _read_cache(output, native_project) if reuse_existing else None
+    if cached is not None:
+        predictions = cached
         logger.info(
             "Reusing {} cached baseline predictions for split {!r} from {}",
             len(predictions),
@@ -150,18 +238,24 @@ def reinfer_split(
             output,
         )
     else:
+        settings: dict[str, object] = {
+            "conf": conf,
+            "iou": iou,
+            "imgsz": imgsz,
+            "batch": batch,
+            "device": device,
+            "image_name": image_name,
+            "project": str(native_project.resolve()),
+            "name": native_name,
+            **(native_kwargs or {}),
+        }
         predictions = predictor(
             weights,
             image_paths,
-            conf=conf,
-            iou=iou,
-            imgsz=imgsz,
-            batch=batch,
-            device=device,
-            quantize=quantize,
-            image_name=image_name,
+            **settings,
         )
-        _write_cache(predictions, output)
+        evidence = _evidence(predictions, settings)
+        _write_cache(predictions, output, evidence)
         logger.info(
             "Re-inferred {} baseline predictions over {} images of split {!r} into {}",
             len(predictions),

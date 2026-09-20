@@ -52,6 +52,7 @@ def latest_completed_task_id(
     project_name: str,
     task_name: str | None = None,
     tags: Sequence[str] | None = None,
+    exclude_task_id: str | None = None,
 ) -> str | None:
     """The most recently finished task of a project carrying every one of ``tags``.
 
@@ -67,18 +68,22 @@ def latest_completed_task_id(
         project_name=project_name,
         task_name=_anchored(task_name),
         tags=list(tags) if tags else None,
-        task_filter={"status": ["completed", "published"], "order_by": ["-last_update"]},
+        task_filter={
+            "status": ["completed", "published"],
+            "order_by": ["-completed", "-last_update"],
+        },
     )
-    if not tasks:
+    selected = next((task for task in tasks if task.id != exclude_task_id), None)
+    if selected is None:
         return None
     logger.info(
         "Latest completed task in {!r} tagged {}: {} ({})",
         project_name,
         list(tags) if tags else "(any)",
-        tasks[0].id,
-        tasks[0].name,
+        selected.id,
+        selected.name,
     )
-    task_id: str = tasks[0].id
+    task_id: str = selected.id
     return task_id
 
 
@@ -100,7 +105,23 @@ def _checkpoint_from_models(task: Any) -> str | None:
 
 def _checkpoint_from_artifacts(task: Any) -> str | None:
     """Fall back to an uploaded .pt artifact, for tasks that saved one by hand."""
-    for name, artifact in task.artifacts.items():
+    artifacts: dict[str, Any] = task.artifacts
+    preferred = (
+        "train_weights_best.pt",
+        "train_weights_best",
+        "best.pt",
+        "best",
+        "model",
+        "checkpoint",
+    )
+    named = [name for name in preferred if name in artifacts]
+    named.extend(
+        name
+        for name in sorted(artifacts)
+        if name not in named and str(name).endswith(".pt")
+    )
+    for name in named:
+        artifact = artifacts[name]
         local = Path(str(artifact.get_local_copy()))
         if local.suffix == ".pt":
             logger.info("Using artifact {!r} of task {} as the checkpoint", name, task.id)

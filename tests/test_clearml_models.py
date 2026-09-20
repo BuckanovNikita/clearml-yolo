@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 import types
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 import pandas as pd
 import pytest
@@ -42,13 +42,20 @@ class FakeArtifact:
         return self._payload
 
 
+class ExplodingArtifact(FakeArtifact):
+    @override
+    def get_local_copy(self) -> str:
+        raise AssertionError("non-checkpoint artifacts must not be downloaded")
+
+
 class FakeTask:
     def __init__(
         self,
         models: dict[str, list[FakeModel]] | None = None,
         artifacts: dict[str, FakeArtifact] | None = None,
+        task_id: str = TASK_ID,
     ) -> None:
-        self.id = TASK_ID
+        self.id = task_id
         self.name = "previous-run"
         self._models = models or {}
         self.artifacts = artifacts or {}
@@ -89,6 +96,7 @@ def test_the_baseline_lookup_asks_clearml_for_the_tag(monkeypatch: pytest.Monkey
     assert latest_completed_task_id("detection", tags=["prod"]) == TASK_ID
     assert asked["tags"] == ["prod"]
     assert asked["task_filter"]["status"] == ["completed", "published"]
+    assert asked["task_filter"]["order_by"][0] == "-completed"
 
 
 def test_a_task_name_matches_the_whole_name(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -114,6 +122,33 @@ def test_no_promoted_model_is_reported_as_absent(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setitem(sys.modules, "clearml", module)
 
     assert latest_completed_task_id("detection", tags=["prod"]) is None
+
+
+def test_automatic_baseline_excludes_the_current_invocation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    current = "b" * 32
+    previous = "c" * 32
+    module = types.ModuleType("clearml")
+    module.Task = types.SimpleNamespace(  # type: ignore[attr-defined]
+        get_tasks=lambda **_: [FakeTask(task_id=current), FakeTask(task_id=previous)]
+    )
+    monkeypatch.setitem(sys.modules, "clearml", module)
+
+    assert latest_completed_task_id("detection", tags=["prod"], exclude_task_id=current) == previous
+
+
+def test_current_invocation_is_the_only_match_reports_automatic_absence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    current = "b" * 32
+    module = types.ModuleType("clearml")
+    module.Task = types.SimpleNamespace(  # type: ignore[attr-defined]
+        get_tasks=lambda **_: [FakeTask(task_id=current)]
+    )
+    monkeypatch.setitem(sys.modules, "clearml", module)
+
+    assert latest_completed_task_id("detection", exclude_task_id=current) is None
 
 
 def test_task_ids_are_told_apart_from_checkpoint_names() -> None:
@@ -151,6 +186,26 @@ def test_weights_fall_back_to_an_uploaded_checkpoint_artifact(
     )
 
     assert resolve_task_weights(TASK_ID) == checkpoint
+
+
+def test_weights_prefer_named_best_checkpoint_without_downloading_other_artifacts(
+    patch_clearml: Any, tmp_path: Path
+) -> None:
+    best = tmp_path / "best.pt"
+    last = tmp_path / "last.pt"
+    best.write_bytes(b"best")
+    last.write_bytes(b"last")
+    patch_clearml(
+        FakeTask(
+            artifacts={
+                "metrics_predictions": ExplodingArtifact(),
+                "train_weights_last": FakeArtifact(str(last)),
+                "train_weights_best": FakeArtifact(str(best)),
+            }
+        )
+    )
+
+    assert resolve_task_weights(TASK_ID) == best
 
 
 def test_a_task_without_a_checkpoint_says_so(patch_clearml: Any) -> None:

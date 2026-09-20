@@ -22,10 +22,6 @@
 # Undo everything it created with scripts/agent_cleanup.sh.
 
 CY_INFRA_PROJECT="clearml-yolo"
-# The deadline the sanctioned run line gives a queued run: an agent's run must fail rather
-# than block for ever behind a training nobody is watching. Override before sourcing.
-CY_QUEUE_WAIT_SECONDS="${CY_QUEUE_WAIT_SECONDS:-1800}"
-
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
     echo "agent_env.sh: source it, do not run it: source ${BASH_SOURCE[0]} [<slug>]" >&2
     exit 1
@@ -86,10 +82,10 @@ cy_agent_env() {
     export CY_RUN_DIR
 
     cat <<EOF
-agent_env.sh: project $CY_INFRA_PROJECT on ${CLEARML_API_HOST:-<no CLEARML_API_HOST>} (queue ${CLEARML_QUEUE:-<unset>}, never enqueue: pods have no GPU)
+agent_env.sh: project $CY_INFRA_PROJECT on ${CLEARML_API_HOST:-<no CLEARML_API_HOST>}
   CY_RUN_TAG=$CY_RUN_TAG
   CY_RUN_DIR=$CY_RUN_DIR
-  run:     uv run cy auto_gpu.queue.wait_timeout_seconds=$CY_QUEUE_WAIT_SECONDS auto_gpu.max_gpus=1 run_dir=\$CY_RUN_DIR clearml.project_name="\$CY_RUN_TAG clearml-yolo" clearml.tags=[\$CY_RUN_TAG] <your keys>
+  run:     uv run cy run_dir=\$CY_RUN_DIR clearml.project_name="\$CY_RUN_TAG clearml-yolo" clearml.tags=[\$CY_RUN_TAG] +train.ultralytics.device=0 +predict.ultralytics.device=0 <your keys>
   cleanup: $repo_root/scripts/agent_cleanup.sh
 EOF
     "$repo_root/scripts/check_env.sh"

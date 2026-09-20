@@ -126,7 +126,9 @@ def test_zero_test_fraction_keeps_val_whole(dataset_yaml: Path, tmp_path: Path) 
     assert frame.loc[frame["split"] == "val", "image_name"].nunique() == VAL_IMAGE_COUNT
 
 
-def test_background_images_contribute_no_rows(dataset_yaml: Path, tmp_path: Path) -> None:
+def test_background_images_keep_membership_placeholder_rows(
+    dataset_yaml: Path, tmp_path: Path
+) -> None:
     root = dataset_yaml.parent
     _write_image(root / "images" / "train" / "no_label.jpg", TRAIN_IMAGE_SIZE)
     _write_image(root / "images" / "train" / "empty_label.jpg", TRAIN_IMAGE_SIZE)
@@ -134,8 +136,13 @@ def test_background_images_contribute_no_rows(dataset_yaml: Path, tmp_path: Path
 
     frame = _build(dataset_yaml, tmp_path)
 
-    assert not {"no_label.jpg", "empty_label.jpg"} & set(frame["image_name"])
-    assert len(frame) == 3 + VAL_IMAGE_COUNT
+    empty = frame[frame["image_name"].isin({"no_label.jpg", "empty_label.jpg"})]
+    assert set(empty["image_name"]) == {"no_label.jpg", "empty_label.jpg"}
+    assert empty["instance_label"].isna().all()
+    assert empty[["bbox_x_tl", "bbox_y_tl", "bbox_x_br", "bbox_y_br"]].isna().all().all()
+    assert empty["image_path"].map(lambda value: Path(value).is_file()).all()
+    assert set(empty["split"]) == {"train"}
+    assert len(frame) == 3 + VAL_IMAGE_COUNT + 2
 
 
 def test_manifest_split_entry_is_supported(dataset_yaml: Path, tmp_path: Path) -> None:
@@ -214,3 +221,24 @@ def test_non_positive_box_size_is_rejected(dataset_yaml: Path, tmp_path: Path) -
 def test_invalid_test_fraction_is_rejected(dataset_yaml: Path, tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="test_fraction"):
         build_ground_truth(dataset_yaml, tmp_path / "gt.csv", test_fraction=1.0)
+
+
+def test_tracked_conversion_uses_effective_dataset_configuration(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from clearml_yolo.clearml_session import ClearMLConfig
+    from clearml_yolo.tasks import ground_truth as stage
+
+    calls: list[str] = []
+    override = tmp_path / "remote.yaml"
+    output = tmp_path / "truth.csv"
+    monkeypatch.setattr(stage, "init_task", lambda *args, **kwargs: object())
+    monkeypatch.setattr(stage, "expect_artifacts", lambda *args: None)
+    monkeypatch.setattr(stage, "upload_artifact", lambda *args: None)
+    monkeypatch.setattr(stage, "connect_config_file", lambda *args: override)
+    monkeypatch.setattr(
+        stage, "build_ground_truth", lambda source, *args, **kwargs: calls.append(source)
+    )
+    stage.ground_truth("missing-original.yaml", str(output), ClearMLConfig())
+    assert calls == [str(override)]

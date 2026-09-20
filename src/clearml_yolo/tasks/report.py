@@ -1,252 +1,167 @@
-"""Compare the new model against a baseline and publish the comparison workbooks."""
+"""Build developer and business workbooks from one current-test comparison."""
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 from loguru import logger
 from pydantic import BaseModel, Field
 
 from clearml_yolo import artifact_names
-from clearml_yolo.clearml_models import latest_completed_task_id
 from clearml_yolo.clearml_report import report_table
-from clearml_yolo.clearml_session import ClearMLConfig, init_task
-from clearml_yolo.inference import ScoredResolution
-from clearml_yolo.progress import track
-from clearml_yolo.tasks.metrics import DASHBOARD_PREFIX
-
-BaselineSource = Literal["clearml", "local", "none"]
-
-# The sheet appended to the dev workbook naming the scale its numbers were measured at. The
-# business report does not get one: it is written for a reader who is being told whether the
-# model got better, not how it was inferred.
-RESOLUTION_SHEET = "inference_resolution"
-
-
-class BaselineConfig(BaseModel):
-    """Where the previous model's dashboards come from.
-
-    Without a ``task_id`` the latest finished run tagged ``prod`` is used, the same
-    promotion marker the comparison stage reads — the business report calls this side
-    "прод модель", and the last run to finish is as likely to be a failed experiment.
-    Clear ``tags`` to fall back to the most recent finished run whatever it is.
-    """
-
-    source: BaselineSource = "clearml"
-    project_name: str | None = None
-    task_id: str | None = None
-    task_name: str | None = None
-    tags: list[str] = Field(default_factory=lambda: ["prod"])
-    directory: Path | None = None
-    artifact_prefix: str = artifact_names.DASHBOARD_FULL_PREFIX
+from clearml_yolo.clearml_session import (
+    ClearMLConfig,
+    connect_config_file,
+    expect_artifacts,
+    init_task,
+    upload_artifact,
+)
+from clearml_yolo.tasks.compare import MANIFEST_NAME, ComparisonManifest
 
 
 class ReportResult(BaseModel):
-    """Generated workbooks, keyed by split."""
+    """Generated workbooks keyed by the evaluated split."""
 
     dev_reports: dict[str, Path] = Field(default_factory=dict)
     business_reports: dict[str, Path] = Field(default_factory=dict)
     skipped_splits: list[str] = Field(default_factory=list)
 
 
-def _latest_baseline_task(config: BaselineConfig, fallback_project: str) -> Any | None:
-    from clearml import Task
-
-    if config.task_id:
-        return Task.get_task(task_id=config.task_id)
-
-    project = config.project_name or fallback_project
-    task_id = latest_completed_task_id(project, config.task_name, config.tags)
-    if task_id is None:
-        logger.warning(
-            "No completed ClearML task tagged {} found in project {!r}; promote one with "
-            "clearml.tags=[prod], or clear baseline.tags to use the last finished run",
-            config.tags or "(any)",
-            project,
+def _manifest(comparison_dir: str | Path) -> tuple[Path, Path, ComparisonManifest]:
+    directory = Path(comparison_dir)
+    path = directory / MANIFEST_NAME
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"Comparison directory {directory} has no {MANIFEST_NAME}; run cy-compare first"
         )
-        return None
-    return Task.get_task(task_id=task_id)
+    return (
+        directory,
+        path,
+        ComparisonManifest.model_validate_json(path.read_text(encoding="utf-8")),
+    )
 
 
-def _baseline_from_clearml(
-    config: BaselineConfig, splits: list[str], fallback_project: str, workdir: Path
-) -> dict[str, Path]:
-    task = _latest_baseline_task(config, fallback_project)
-    if task is None:
-        return {}
-
-    import pandas as pd
-
-    resolved: dict[str, Path] = {}
-    for split in track(splits, "Downloading baseline dashboards", unit="split"):
-        artifact = task.artifacts.get(artifact_names.per_split(config.artifact_prefix, split))
-        if artifact is None:
-            logger.warning("Baseline task {} has no artifact for split {!r}", task.id, split)
-            continue
-        # The artifact is a CSV; report-generator only reads .xlsx, so convert it.
-        frame = pd.read_csv(artifact.get_local_copy(), index_col=0)
-        destination = workdir / f"baseline_{split}.xlsx"
-        frame.to_excel(destination)
-        resolved[split] = destination
-        logger.info("Baseline for split {!r}: {}", split, destination)
-    return resolved
-
-
-def discover_dashboards(metrics_dir: str | Path, splits: list[str]) -> dict[str, Path]:
-    """Find the dashboard workbook digital-metrics wrote for each split.
-
-    Both sides of the report are found this way: the new model's workbooks in the metrics
-    stage's output directory, and a local baseline's in whatever directory it names. They
-    are the same files under the same naming convention, so looking them up twice is how
-    that convention would come to be spelled two ways.
-    """
-    directory = Path(metrics_dir)
-    found: dict[str, Path] = {}
-    for split in splits:
-        candidate = directory / f"{DASHBOARD_PREFIX}_{split}.xlsx"
-        if candidate.is_file():
-            found[split] = candidate
-        else:
-            logger.warning("No dashboard for split {!r} at {}", split, candidate)
-    return found
-
-
-def _append_resolution_sheet(workbook: Path, resolution: ScoredResolution) -> None:
-    """Record on the dev workbook what scale its numbers were measured at.
-
-    The workbook itself is built by report-generator, a released package this repo consumes
-    rather than owns, so the fact is added to the file afterwards instead of to a builder.
-    Appending in ``mode="a"`` leaves every sheet that package wrote untouched.
-
-    A failure here must not take down a report that is otherwise complete and correct: the
-    resolution is context for numbers that are already on disk, not one of them.
-    """
-    import pandas as pd
-
-    try:
-        with pd.ExcelWriter(workbook, engine="openpyxl", mode="a") as writer:
-            resolution.as_table().to_excel(writer, sheet_name=RESOLUTION_SHEET, index=False)
-    except (OSError, ValueError) as error:
-        logger.warning(
-            "Could not append the {!r} sheet to {}: {}", RESOLUTION_SHEET, workbook, error
-        )
-        return
-    if resolution.was_trained_elsewhere:
-        logger.warning(
-            "{} reports a model trained at imgsz {} but scored at {}",
-            workbook.name,
-            resolution.trained_at,
-            resolution.scored_at,
-        )
+def _required_path(directory: Path, relative: str, description: str) -> Path:
+    path = directory / relative
+    if not path.is_file():
+        raise FileNotFoundError(f"Comparison {description} does not exist: {path}")
+    return path
 
 
 def report(
-    metrics_dir: str | Path,
+    comparison_dir: str | Path,
     output_dir: str | Path,
     clearml: ClearMLConfig,
-    baseline: BaselineConfig,
-    splits: list[str] | None = None,
     report_config_path: str | Path | None = None,
 ) -> ReportResult:
-    """Standalone entrypoint: locate dashboards on disk, then compare them."""
-    splits = splits or ["train", "val", "test"]
-    dashboards = discover_dashboards(metrics_dir, splits)
-    if not dashboards:
-        raise FileNotFoundError(
-            f"No dashboard workbooks found in {metrics_dir} for splits {splits}. "
-            "Run the metrics stage first."
-        )
-    return build_reports(dashboards, output_dir, clearml, baseline, report_config_path)
+    """Load the paired evaluated dashboards recorded by ``compare``."""
+    directory, manifest_path, manifest = _manifest(comparison_dir)
+    candidate = _required_path(
+        directory, manifest.candidate_dashboard, "candidate dashboard"
+    )
+    baseline = _required_path(directory, manifest.baseline_dashboard, "baseline dashboard")
+    return build_reports(
+        candidate,
+        baseline,
+        output_dir,
+        clearml,
+        report_config_path,
+        split=manifest.split,
+        comparison_manifest=manifest_path,
+    )
 
 
 def build_reports(
-    dashboards: dict[str, Path],
+    candidate_dashboard: str | Path,
+    baseline_dashboard: str | Path,
     output_dir: str | Path,
     clearml: ClearMLConfig,
-    baseline: BaselineConfig,
     report_config_path: str | Path | None = None,
-    resolution: ScoredResolution | None = None,
+    *,
+    split: str = "test",
+    comparison_manifest: str | Path | None = None,
 ) -> ReportResult:
-    """Produce dev and business comparison workbooks for every split with a baseline.
-
-    Comparison is always new minus previous, so argument order into the builders is
-    load-bearing.
-
-    ``resolution`` is the scale the numbers being reported were measured at, known only when
-    this process ran the inference that produced them. Left None — a standalone ``cy-report``
-    reading dashboards off disk, or a run with ``skip_predict`` — the sheet naming it is
-    omitted rather than filled with a guess, because the workbook is the artefact a reviewer
-    trusts months later and a wrong resolution there is worse than an absent one.
-    """
+    """Render both established workbook formats from the same evaluated pair."""
     from report_generator.config import Config
     from report_generator.core.reader import MetricsReader
     from report_generator.reports.business.builder import BusinessReportBuilder
     from report_generator.reports.dev.builder import DevReportBuilder
 
+    candidate_path = Path(candidate_dashboard)
+    baseline_path = Path(baseline_dashboard)
+    for path, description in (
+        (candidate_path, "candidate dashboard"),
+        (baseline_path, "baseline dashboard"),
+    ):
+        if not path.is_file():
+            raise FileNotFoundError(f"Comparison {description} does not exist: {path}")
+
     task = init_task(clearml, stage="report")
     destination = Path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
-
-    splits = list(dashboards)
-    result = ReportResult()
-
-    if baseline.source == "none":
-        logger.info("Baseline disabled; publishing new metrics without comparison")
-        result.skipped_splits = splits
-        return result
-
-    if baseline.source == "clearml":
-        baselines = _baseline_from_clearml(baseline, splits, clearml.project_name, destination)
-    elif baseline.directory is None:
-        raise ValueError("report.baseline.source='local' requires baseline.directory")
-    else:
-        baselines = discover_dashboards(baseline.directory, splits)
-
-    if not baselines:
-        logger.warning("No baseline dashboards resolved; nothing to compare against")
-        result.skipped_splits = splits
-        return result
-
-    config = Config.load(report_config_path) if report_config_path else Config.load()
-
-    for split in track(list(dashboards), "Building reports", unit="split"):
-        new_dashboard = dashboards[split]
-        previous = baselines.get(split)
-        if previous is None:
-            logger.warning("Skipping split {!r}: no baseline dashboard", split)
-            result.skipped_splits.append(split)
-            continue
-
-        dev_path = destination / f"{artifact_names.REPORT_DEV_PREFIX}_{split}.xlsx"
-        business_path = destination / f"{artifact_names.REPORT_BUSINESS_PREFIX}_{split}.xlsx"
-
-        baseline_reader = MetricsReader(previous)
-        DevReportBuilder(MetricsReader(new_dashboard), baseline_reader, config).build(dev_path)
-        BusinessReportBuilder(MetricsReader(new_dashboard), baseline_reader, config).build(
-            business_path
+    manifest_path = Path(comparison_manifest) if comparison_manifest is not None else None
+    expected = [
+        artifact_names.per_split(artifact_names.REPORT_DEV_PREFIX, split),
+        artifact_names.per_split(artifact_names.REPORT_BUSINESS_PREFIX, split),
+        artifact_names.per_split("report_input_dashboard_candidate", split),
+        artifact_names.per_split("report_input_dashboard_baseline", split),
+    ]
+    if manifest_path is not None:
+        if not manifest_path.is_file():
+            raise FileNotFoundError(f"Comparison manifest does not exist: {manifest_path}")
+        expected.append(artifact_names.per_split("report_input_manifest", split))
+    if task is not None:
+        expect_artifacts(task, expected)
+    effective_config_path: str | Path | None = report_config_path
+    if report_config_path is not None and task is not None:
+        effective_config_path = connect_config_file(
+            task, "source_report_configuration", Path(report_config_path)
         )
-        # Before the upload below, or ClearML stores the copy without the sheet — and the
-        # stored copy is the one anyone reads later.
-        if resolution is not None:
-            _append_resolution_sheet(dev_path, resolution)
-        result.dev_reports[split] = dev_path
-        result.business_reports[split] = business_path
-        logger.info("Split {!r}: {} and {}", split, dev_path.name, business_path.name)
+    config = Config.load(effective_config_path) if effective_config_path else Config.load()
 
-        if task is not None:
-            # The baseline is the one side of the comparison that never reaches ClearML: it
-            # lands in a throwaway workbook here and is discarded, so "which numbers was
-            # this compared against?" cannot be answered from the UI. Publishing it as a
-            # table puts every split of the report into one collapsible section.
-            report_table(task, artifact_names.REPORT_SECTION, split, baseline_reader.read())
-            task.upload_artifact(
-                name=artifact_names.per_split(artifact_names.REPORT_DEV_PREFIX, split),
-                artifact_object=dev_path,
-            )
-            task.upload_artifact(
-                name=artifact_names.per_split(artifact_names.REPORT_BUSINESS_PREFIX, split),
-                artifact_object=business_path,
-            )
+    candidate_reader = MetricsReader(candidate_path)
+    baseline_reader = MetricsReader(baseline_path)
+    dev_path = destination / f"{artifact_names.REPORT_DEV_PREFIX}_{split}.xlsx"
+    business_path = destination / f"{artifact_names.REPORT_BUSINESS_PREFIX}_{split}.xlsx"
+    DevReportBuilder(candidate_reader, baseline_reader, config).build(dev_path)
+    BusinessReportBuilder(candidate_reader, baseline_reader, config).build(business_path)
 
+    result = ReportResult(
+        dev_reports={split: dev_path},
+        business_reports={split: business_path},
+    )
+    logger.info("Split {!r}: {} and {}", split, dev_path.name, business_path.name)
+    if task is not None:
+        report_table(task, artifact_names.REPORT_SECTION, split, baseline_reader.read())
+        upload_artifact(
+            task,
+            artifact_names.per_split("report_input_dashboard_candidate", split),
+            candidate_path,
+        )
+        upload_artifact(
+            task,
+            artifact_names.per_split("report_input_dashboard_baseline", split),
+            baseline_path,
+        )
+        if manifest_path is not None:
+            upload_artifact(
+                task,
+                artifact_names.per_split("report_input_manifest", split),
+                manifest_path,
+            )
+        _upload_reports(task, split, dev_path, business_path)
     return result
+
+
+def _upload_reports(task: Any, split: str, dev_path: Path, business_path: Path) -> None:
+    upload_artifact(
+        task,
+        artifact_names.per_split(artifact_names.REPORT_DEV_PREFIX, split),
+        dev_path,
+    )
+    upload_artifact(
+        task,
+        artifact_names.per_split(artifact_names.REPORT_BUSINESS_PREFIX, split),
+        business_path,
+    )

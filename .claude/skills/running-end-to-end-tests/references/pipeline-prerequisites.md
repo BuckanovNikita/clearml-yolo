@@ -2,53 +2,41 @@
 
 ## Inputs and configuration
 
-`cy` uses the packaged pipeline configuration unless a tree created with
-`cy-init-config` is selected with `--config-dir` and `--config-name`. Regenerate
-that tree when its composition schema no longer matches the package.
+`cy` composes the packaged wrapper configuration. Native Ultralytics YAML is supplied with
+`train.cfg=<path>` or `predict.cfg=<path>`; standalone commands use `cfg=<path>`. Native
+values are sparse mappings, so preserve the precedence native defaults, cfg YAML, embedded
+mapping, then CLI. Add absent native keys with `+ultralytics.key=value` (or the matching
+pipeline prefix).
 
-The enabled prediction, metrics, and comparison stages require the configured
-ground-truth CSV to exist. `clearml.enabled=false` requires `skip_compare=true`
-unless the comparison baseline is named explicitly, because the normal baseline
-lookup uses ClearML. `report/baseline=none` is the packaged-config group override;
-an exported configuration tree expresses the same choice as
-`report.baseline.source=none`.
+Build the ground-truth CSV before stages that consume it:
 
-`run_dir` re-enters or redirects the selected run. Do not attempt to route a
-pipeline with stage-specific output overrides; the pipeline supplies those paths
-to its stages. A `run_dir` outside the working directory (an agent's
-`$CY_RUN_DIR`) leaves the workspace's `runs/latest` link alone, so a standalone
-stage run afterwards in the checkout still reads the user's last run, not the
-agent's.
+```bash
+uv run cy-ground-truth data_yaml=data.yaml output=ground_truth.csv
+```
 
-With `CY_RUN_TAG` (or `INFRA_RUN_TAG`) exported, `clearml.project_name` defaults
-to `<run-tag> clearml-yolo` and the tag is appended to `clearml.tags`; a project
-named outright is kept and still tagged. The examples spell both keys anyway so
-a command line shows where its experiments go.
+ClearML is required. Do not use `clearml.enabled=false`. `run_dir` routes all pipeline output;
+stage-specific paths and conflicting native training `project` or `name` are rejected. A
+standalone output-producing command uses a fresh output directory and requires explicit inputs.
 
-## GPU and queue
+With `CY_RUN_TAG` or `INFRA_RUN_TAG`, set the project to `<run-tag> clearml-yolo` and append
+the same tag. The examples spell both values out to make cleanup ownership visible.
 
-`auto_gpu.min_gpus` is the minimum allocation and `auto_gpu.max_gpus` is an
-optional cap. `auto_gpu.batch_size` is per GPU. If no explicit batch is given,
-the project reuses a successful observed value for the stage and hardware or its
-packaged fallback; do not infer a usable batch from VRAM arithmetic.
+## Native execution
 
-With `auto_gpu.queue.enabled=true`, the filesystem queue coordinates waiting
-runs, and a run waits for its turn without a deadline unless
-`auto_gpu.queue.wait_timeout_seconds` names one. With it disabled,
-`auto_gpu.wait_timeout_seconds` applies. The queue directory is configurable by
-`auto_gpu.queue.dir` or `CLEARML_YOLO_QUEUE_DIR`; its default is a host-specific
-directory under `/tmp/clearml-yolo`. `cy-queue` is interactive and requires a
-terminal.
+Set the desired device directly through Ultralytics, for example
+`+train.ultralytics.device=0` and `+predict.ultralytics.device=0`. Native `batch`, `amp`, and
+`compile` values are forwarded unchanged and recorded as effective arguments. There is no
+project queue, GPU lease, batch tuning, or force option.
 
 ## What a real run demonstrates
 
-An offline run demonstrates train-to-output wiring but not ClearML uploads. A
-ClearML-backed run needs authenticated credentials and should appear as a
-completed task with its output model and metric artifacts. Model labels come
-from the checkpoint, not ClearML metadata.
+A ClearML-backed run demonstrates the one-task owner, synchronous required artifact uploads,
+and actual output paths. Model labels come from the checkpoint, not ClearML metadata. Confirm
+that a computation, upload, or interruption failure makes the task and process fail while local
+outputs remain available.
 
-Comparison needs a completed baseline that the candidate is configured to find.
-Run baseline and candidate in the run's own tagged project,
-`<run-tag> clearml-yolo` on the stand, and keep their output directories
-separate under `$CY_RUN_DIR`. Do not manufacture a comparison by reusing a production
-task or by changing shared service state.
+Candidate thresholds are calibrated once on validation and frozen for current test evaluation.
+Comparison needs a completed baseline with valid exact thresholds, current ground truth, and
+both models' inference on the same current test images. The automatic lookup excludes the
+current task and only skips if it finds no baseline; invalid explicit selections fail. Reports
+use the resulting `comparison_dir`, not historical dashboard artifacts.

@@ -1,4 +1,4 @@
-"""Score predictions per split and publish dashboards to ClearML."""
+"""Calibrate on validation once, then score every split at frozen thresholds."""
 
 from __future__ import annotations
 
@@ -6,139 +6,98 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+from digital_metrics import summarize_metrics
 from loguru import logger
 from pydantic import BaseModel, Field
 
 from clearml_yolo import artifact_names
 from clearml_yolo.clearml_report import report_scalars, report_table
-from clearml_yolo.clearml_session import ClearMLConfig, init_task, upload_dataframe
+from clearml_yolo.clearml_session import (
+    ClearMLConfig,
+    expect_artifacts,
+    init_task,
+    upload_artifact,
+)
+from clearml_yolo.comparison.scoring import (
+    EvaluatedSplit,
+    EvaluationConfig,
+    calibrate_thresholds,
+    classes_from_ground_truth,
+    evaluate_split,
+    prepare_ground_truth,
+    prepare_predictions,
+)
 from clearml_yolo.progress import track
 
-# The workbook file name is written by digital-metrics' get_dashboards, not by us, so it
-# stays as it is while the artifact carrying it is named by artifact_names.
 DASHBOARD_PREFIX = "full_dashboard"
-
-
-class EvaluationConfig(BaseModel):
-    """Knobs forwarded to digital-metrics' Evaluation."""
-
-    iou_threshold: float = 0.5
-    matching_strategy: str = "iou_prior"
-    ap_method: str = "interp"
-    confidence_optimization: str = "per_class"
-    skip_cohen_kappa: bool = True
-    preprocess: bool = False
-    preprocess_preds_conf_threshold: float | None = None
-    preprocess_preds_nms_containment_threshold: float | None = None
-    preprocess_preds_nms_iou_threshold: float | None = None
-    backend: str | None = None
+__all__ = ["EvaluationConfig"]
 
 
 class MetricsResult(BaseModel):
-    """Where each split's dashboard workbook ended up, and at what thresholds.
-
-    ``best_confidences`` carries the per-class thresholds each split was calibrated at,
-    keyed by split. They are the numbers a later comparison has to score this model at,
-    and they are returned rather than read back from ClearML so the comparison works at
-    full precision and with tracking switched off.
-    """
+    """Dashboard workbooks and the one frozen threshold map used for each split."""
 
     output_dir: Path
     dashboards: dict[str, Path] = Field(default_factory=dict)
     best_confidences: dict[str, dict[str, float]] = Field(default_factory=dict)
 
 
-def _evaluate_split(
-    split: str,
-    preds: pd.DataFrame,
+def _upload(task: Any, name: str, value: Any) -> None:
+    if task is None:
+        return
+    upload_artifact(task, name, value)
+
+
+def _publish_split(task: Any, split: str, evaluated: EvaluatedSplit) -> None:
+    name = artifact_names.per_split
+    _upload(task, name(artifact_names.DASHBOARD_FULL_PREFIX, split), evaluated.dashboard_path)
+    _upload(task, name(artifact_names.DASHBOARD_DTRK_PREFIX, split), evaluated.dtrk_dashboard_path)
+    _upload(task, name(artifact_names.MATCHES_GT_PREFIX, split), evaluated.gt_matches)
+    _upload(task, name(artifact_names.MATCHES_PREDS_PREFIX, split), evaluated.pred_matches)
+    _upload(task, name("metrics_confusion_matrix", split), evaluated.confusion_matrix_path)
+    for metric_name, path in evaluated.plot_paths.items():
+        _upload(task, name(f"metrics_plot_{metric_name}", split), path)
+
+    per_class, summary = summarize_metrics(evaluated.metrics)
+    _upload(task, name(artifact_names.METRICS_SUMMARY_PREFIX, split), per_class)
+    report_table(task, artifact_names.METRICS_SECTION, split, per_class)
+    report_scalars(task, f"{artifact_names.METRICS_SECTION}_{split}", summary)
+    _upload(
+        task,
+        name(artifact_names.METRICS_RAW_PREFIX, split),
+        {class_name: metric.model_dump() for class_name, metric in evaluated.metrics.items()},
+    )
+    _upload(
+        task,
+        name(artifact_names.BEST_CONFIDENCES_PREFIX, split),
+        evaluated.thresholds,
+    )
+
+
+def _prepare(
+    predictions: pd.DataFrame,
     ground_truth: pd.DataFrame,
     config: EvaluationConfig,
-    calibration_split: str | None,
-    output_dir: Path,
-    task: Any,
-) -> tuple[Path, dict[str, float]] | None:
-    """Score one split and upload its artifacts.
-
-    Returns the dashboard workbook and the thresholds the split was scored at, or None
-    when the split produced no metrics at all.
-    """
-    from digital_metrics import Evaluation, summarize_metrics
-
-    # A fresh Evaluation per split: calling an existing one again overwrites metrics,
-    # the confusion matrix and the calibrated thresholds.
-    evaluation = Evaluation(
-        preds,
-        ground_truth,
-        iou_threshold=config.iou_threshold,
-        matching_strategy=config.matching_strategy,
-        ap_method=config.ap_method,
-        confidence_optimization=config.confidence_optimization,
-        skip_cohen_kappa=config.skip_cohen_kappa,
-        preprocess=config.preprocess,
-        preprocess_preds_conf_threshold=config.preprocess_preds_conf_threshold,
-        preprocess_preds_nms_containment_threshold=(
-            config.preprocess_preds_nms_containment_threshold
-        ),
-        preprocess_preds_nms_iou_threshold=config.preprocess_preds_nms_iou_threshold,
-        backend=config.backend,
-    )
-    evaluation.suffix = split
-    # Calibrating a split against itself is rejected as a leak, so the calibration
-    # split scores with thresholds solved on its own data instead.
-    if calibration_split == split:
-        evaluation(split=split, find_best_confs=True)
-    else:
-        evaluation(split=split, calibration_split=calibration_split)
-
-    if not evaluation.metrics:
-        logger.warning("Split {!r} produced no metrics; skipping it", split)
-        return None
-
-    devs, dtrk = evaluation.get_dashboards(save_to_excel=True, path=str(output_dir))
-    name = artifact_names.per_split
-    upload_dataframe(task, name(artifact_names.DASHBOARD_FULL_PREFIX, split), devs)
-    upload_dataframe(task, name(artifact_names.DASHBOARD_DTRK_PREFIX, split), dtrk)
-
-    # Thresholds were already solved during the call above; re-solving them here would
-    # cost another sweep and could drift from the ones the dashboards were built with.
-    visualization_gt, visualization_preds = evaluation.get_dfs_visualization(find_best_confs=False)
-    upload_dataframe(task, name(artifact_names.MATCHES_GT_PREFIX, split), visualization_gt)
-    upload_dataframe(task, name(artifact_names.MATCHES_PREDS_PREFIX, split), visualization_preds)
-
-    per_class, summary = summarize_metrics(evaluation.metrics)
-    upload_dataframe(task, name(artifact_names.METRICS_SUMMARY_PREFIX, split), per_class)
-    # The same per-class table again as a plot, so the splits of a run read as one
-    # collapsible section instead of as unrelated files in the artifacts list.
-    report_table(task, artifact_names.METRICS_SECTION, split, per_class)
-    # ClearML groups scalars by title, so one "metrics" title with {split}/{metric} series
-    # crowds three splits of unrelated lines onto one graph; a title per split is a card each.
-    report_scalars(task, f"{artifact_names.METRICS_SECTION}_{split}", summary)
-
-    if task is not None:
-        task.upload_artifact(
-            name=name(artifact_names.METRICS_RAW_PREFIX, split),
-            artifact_object={
-                class_name: metric.model_dump() for class_name, metric in evaluation.metrics.items()
-            },
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, list[str]]:
+    if config.backend is not None:
+        raise ValueError(
+            "Frozen thresholds require the native digital-metrics backend; "
+            f"backend={config.backend!r} is unsupported"
         )
-        task.upload_artifact(
-            name=name(artifact_names.BEST_CONFIDENCES_PREFIX, split),
-            artifact_object=evaluation.best_confidences,
-        )
-
-    dashboard = output_dir / f"{DASHBOARD_PREFIX}_{split}.xlsx"
-    logger.info(
-        "Split {!r}: {} classes, mean f1 {:.4f} -> {}",
-        split,
-        len(evaluation.metrics),
-        summary.get("mean_f1_score", float("nan")),
-        dashboard,
+    prepared_gt = prepare_ground_truth(ground_truth, deduplicate=config.preprocess)
+    raw_predictions = predictions.copy().reset_index(drop=True)
+    prepared_predictions = prepare_predictions(
+        raw_predictions,
+        preprocess_conf_threshold=config.preprocess_preds_conf_threshold,
+        preprocess_nms_containment_threshold=(config.preprocess_preds_nms_containment_threshold),
+        preprocess_nms_iou_threshold=config.preprocess_preds_nms_iou_threshold,
     )
-    thresholds = {
-        str(class_name): float(confidence)
-        for class_name, confidence in dict(evaluation.best_confidences).items()
-    }
-    return dashboard, thresholds
+    classes = sorted(
+        set(classes_from_ground_truth(prepared_gt))
+        | {str(value) for value in prepared_predictions["instance_label"].dropna().unique()}
+    )
+    if not classes:
+        raise ValueError("Ground truth contains no labelled objects to evaluate")
+    return prepared_gt, raw_predictions, prepared_predictions, classes
 
 
 def compute_metrics(
@@ -150,42 +109,96 @@ def compute_metrics(
     splits: list[str] | None = None,
     calibration_split: str | None = "val",
 ) -> MetricsResult:
-    """Evaluate every requested split, writing one dashboard workbook per split."""
+    """Calibrate once on validation and score requested splits at that exact mapping."""
     task = init_task(clearml, stage="metrics")
-    splits = splits or ["train", "val", "test"]
-
-    preds_frame = pd.read_csv(predictions)
-    ground_truth_frame = pd.read_csv(ground_truth)
-
-    known_splits = set(ground_truth_frame.get("split", pd.Series(dtype=str)).unique())
-    missing = [split for split in splits if split not in known_splits and split != "all"]
-    if missing:
-        logger.warning(
-            "Ground truth has no rows for split(s) {}; available: {}",
-            missing,
-            sorted(known_splits),
+    requested = splits or ["train", "val", "test"]
+    if calibration_split != "val":
+        raise ValueError(
+            "calibration_split must be exactly 'val'; test data must never calibrate thresholds"
         )
+    if "all" in requested:
+        raise ValueError("split='all' is unsupported for frozen evaluation; name concrete splits")
 
+    expected = ["metrics_predictions", "metrics_ground_truth", "metrics_methodology"]
+    for split in requested:
+        expected.extend(
+            [
+                artifact_names.per_split(artifact_names.DASHBOARD_FULL_PREFIX, split),
+                artifact_names.per_split(artifact_names.DASHBOARD_DTRK_PREFIX, split),
+                artifact_names.per_split(artifact_names.MATCHES_GT_PREFIX, split),
+                artifact_names.per_split(artifact_names.MATCHES_PREDS_PREFIX, split),
+                artifact_names.per_split("metrics_confusion_matrix", split),
+                artifact_names.per_split(artifact_names.METRICS_SUMMARY_PREFIX, split),
+                artifact_names.per_split(artifact_names.METRICS_RAW_PREFIX, split),
+                artifact_names.per_split(artifact_names.BEST_CONFIDENCES_PREFIX, split),
+                *(
+                    artifact_names.per_split(f"metrics_plot_{metric}", split)
+                    for metric in ("recall", "precision", "perebrak", "nedobrak")
+                ),
+            ]
+        )
+    if task is not None:
+        expect_artifacts(task, expected)
+
+    predictions_frame = pd.read_csv(predictions, dtype={"image_name": str, "instance_label": str})
+    ground_truth_frame = pd.read_csv(
+        ground_truth, dtype={"image_name": str, "instance_label": str, "split": str}
+    )
+    _upload(task, "metrics_predictions", Path(predictions))
+    _upload(task, "metrics_ground_truth", Path(ground_truth))
+    prepared_gt, raw_predictions, prepared_predictions, classes = _prepare(
+        predictions_frame, ground_truth_frame, evaluation
+    )
+
+    thresholds = calibrate_thresholds(
+        prepared_gt,
+        prepared_predictions,
+        calibration_split=calibration_split,
+        classes=classes,
+        iou_threshold=evaluation.iou_threshold,
+        matching_strategy=evaluation.matching_strategy,
+        confidence_optimization=evaluation.confidence_optimization,
+    )
+
+    _upload(
+        task,
+        "metrics_methodology",
+        {
+            **evaluation.model_dump(),
+            "calibration_split": "val",
+            "thresholds": thresholds,
+            "evaluated_splits": requested,
+            "test_calibration": False,
+        },
+    )
     destination = Path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
-
     result = MetricsResult(output_dir=destination)
-    for split in track(splits, "Scoring splits", unit="split"):
-        scored = _evaluate_split(
-            split,
-            preds_frame,
-            ground_truth_frame,
-            evaluation,
-            calibration_split,
-            destination,
-            task,
+    for split in track(requested, "Scoring splits", unit="split"):
+        evaluated = evaluate_split(
+            prepared_gt,
+            raw_predictions,
+            prepared_predictions,
+            split=split,
+            classes=classes,
+            thresholds=thresholds,
+            required_classes=classes,
+            iou_threshold=evaluation.iou_threshold,
+            matching_strategy=evaluation.matching_strategy,
+            ap_method=evaluation.ap_method,
+            skip_cohen_kappa=evaluation.skip_cohen_kappa,
+            output_dir=destination,
+            suffix=split,
         )
-        if scored is not None:
-            result.dashboards[split], result.best_confidences[split] = scored
-
-    if not result.dashboards:
-        raise RuntimeError(
-            f"No split produced metrics. Requested {splits}, ground truth contains "
-            f"{sorted(known_splits)}."
+        _publish_split(task, split, evaluated)
+        result.dashboards[split] = evaluated.dashboard_path
+        result.best_confidences[split] = dict(evaluated.thresholds)
+        _, summary = summarize_metrics(evaluated.metrics)
+        logger.info(
+            "Split {!r}: {} classes, mean f1 {:.4f} -> {}",
+            split,
+            len(evaluated.metrics),
+            summary.get("mean_f1_score", float("nan")),
+            evaluated.dashboard_path,
         )
     return result

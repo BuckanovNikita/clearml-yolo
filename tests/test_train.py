@@ -1,9 +1,4 @@
-"""What the training stage forwards to ultralytics, and where it reads the checkpoint from.
-
-Training itself never runs here: a fake YOLO records the call and writes the checkpoint
-ultralytics would have written, which is enough to pin the settings and the save-directory
-handling without a GPU.
-"""
+"""Native training forwards settings and reads actual parent-process outputs."""
 
 from __future__ import annotations
 
@@ -12,288 +7,91 @@ import types
 from pathlib import Path
 from typing import Any
 
-import albumentations
 import pytest
 
-from clearml_yolo.artifact_names import TRAIN_AUGMENTATIONS
 from clearml_yolo.clearml_session import ClearMLConfig
-from clearml_yolo.gpu import AutoGpuConfig, DeviceSelection
-from clearml_yolo.tasks.train import CHECKPOINT, train
-
-DISABLED = ClearMLConfig(enabled=False)
+from clearml_yolo.tasks.train import train
 
 
-class FakeTrainer:
-    def __init__(self, save_dir: Path) -> None:
-        self.save_dir = save_dir
-
-
-class FakeYolo:
-    """Records the training call and lays down the checkpoint ultralytics would write."""
-
-    last: FakeYolo | None = None
-    save_root: Path
-
-    def __init__(self, model: str) -> None:
-        self.model = model
-        self.kwargs: dict[str, Any] = {}
-        self.trainer: FakeTrainer | None = None
-        FakeYolo.last = self
-
-    def train(self, **kwargs: Any) -> None:
-        self.kwargs = kwargs
-        save_dir = FakeYolo.save_root / str(kwargs["name"])
-        (save_dir / "weights").mkdir(parents=True, exist_ok=True)
-        (save_dir / "weights" / "best.pt").write_bytes(b"trained")
-        self.trainer = FakeTrainer(save_dir)
-
-
-@pytest.fixture(autouse=True)
-def fake_ultralytics(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    module = types.ModuleType("ultralytics.models")
-    module.YOLO = FakeYolo  # type: ignore[attr-defined]
-    monkeypatch.setitem(sys.modules, "ultralytics.models", module)
-    FakeYolo.save_root = tmp_path / "runs"
-
-
-def _params(tmp_path: Path, **overrides: Any) -> dict[str, Any]:
-    """A train.yaml-shaped block: the keys the run decides are null unless overridden."""
-    return {
-        "model": "yolo11n.pt",
-        "data": "data.yaml",
-        "epochs": 1,
-        "imgsz": 640,
-        "batch": 16,
-        "project": str(tmp_path / "runs"),
-        "name": "run",
-        "amp": None,
-        "compile": None,
-        **overrides,
-    }
-
-
-def _train(devices: list[int] | str, tmp_path: Path, **overrides: Any) -> dict[str, Any]:
-    selection = DeviceSelection(devices=devices, batch=16, batch_per_gpu=16)
-    with pytest.MonkeyPatch.context() as patch:
-        patch.setattr(
-            "clearml_yolo.tasks.train.resolve_devices", lambda *_args, **_kwargs: selection
-        )
-        train(
-            ultralytics=_params(tmp_path, **overrides),
-            auto_gpu=AutoGpuConfig(),
-            clearml=DISABLED,
-        )
-    return FakeYolo.last.kwargs  # type: ignore[union-attr]
-
-
-def test_a_gpu_run_trains_in_mixed_precision_and_compiles(tmp_path: Path) -> None:
-    """Training's half precision is AMP — the weights themselves cannot be cast — and a run
-    is long enough that compilation is paid once and amortised over every epoch."""
-    kwargs = _train([0], tmp_path)
-
-    assert kwargs["amp"] is True
-    assert kwargs["compile"] is True
-
-
-def test_a_cpu_run_asks_for_neither(tmp_path: Path) -> None:
-    kwargs = _train("cpu", tmp_path)
-
-    assert kwargs["amp"] is False
-    assert kwargs["compile"] is False
-
-
-def test_a_value_in_the_config_wins_over_the_defaults(tmp_path: Path) -> None:
-    """Both change the numbers a run produces, so reproducing an older run must opt out."""
-    kwargs = _train([0], tmp_path, amp=False, compile=False)
-
-    assert kwargs["amp"] is False
-    assert kwargs["compile"] is False
-
-
-def test_every_other_ultralytics_param_reaches_the_trainer_untouched(tmp_path: Path) -> None:
-    """The block is the whole of ultralytics' configuration, not a list this stage knows."""
-    kwargs = _train([0], tmp_path, lr0=0.5, mosaic=0.0, optimizer="AdamW", patience=3)
-
-    assert kwargs["lr0"] == 0.5
-    assert kwargs["mosaic"] == 0.0
-    assert kwargs["optimizer"] == "AdamW"
-    assert kwargs["patience"] == 3
-
-
-def test_the_model_reaches_the_constructor_and_not_the_training_call(tmp_path: Path) -> None:
-    """Ultralytics lets a `model=` keyword win over the object it was asked to build, so
-    passing it both ways is two answers to which checkpoint this run started from."""
-    kwargs = _train([0], tmp_path)
-
-    assert "model" not in kwargs
-    assert FakeYolo.last.model == "yolo11n.pt"  # type: ignore[union-attr]
-
-
-def test_an_unnamed_run_lands_in_the_experiment_it_belongs_to(tmp_path: Path) -> None:
-    """`name` unset means the ClearML task name, so the run directory always says which
-    experiment produced it rather than saying `train` for every one of them."""
-    kwargs = _train([0], tmp_path, name=None)
-
-    assert kwargs["name"] == DISABLED.task_name
-
-
-def test_the_project_is_anchored_to_the_working_directory(tmp_path: Path) -> None:
-    """A relative project is otherwise resolved against ultralytics' own runs_dir."""
-    kwargs = _train([0], tmp_path, project="runs/detect")
-
-    assert Path(kwargs["project"]).is_absolute()
-    assert kwargs["project"].endswith("runs/detect")
-
-
-def test_a_run_nobody_gave_a_directory_names_one_after_itself(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """`cy-train` is a run of its own, and two of them in one folder trained into the same
-    `runs/detect/<task name>` — with `exist_ok` set, the second start deletes the first
-    run's checkpoints rather than landing beside them. So an unset project is a directory
-    named after the experiment, the machine and the moment, exactly as `cy` names one."""
-    monkeypatch.chdir(tmp_path)
-
-    project = Path(_train([0], tmp_path, project=None)["project"])
-
-    assert project.name == "detect"
-    assert project.parent.parent == (tmp_path / "runs").resolve()
-    assert project.parent.name.startswith(DISABLED.task_name)
-
-
-def test_a_run_that_names_its_own_directory_repoints_latest_at_it(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The link is how every later standalone command finds this run: `cy-predict` loads
-    `runs/latest/detect/<task name>/weights/best.pt` with no weights named, and before the
-    training stage moved the link that path was the pipeline's last run — so inference
-    silently scored a model this command never trained."""
-    monkeypatch.chdir(tmp_path)
-
-    project = Path(_train([0], tmp_path, project=None)["project"])
-
-    assert (tmp_path / "runs" / "latest").is_symlink()
-    assert (tmp_path / "runs" / "latest").resolve() == project.parent
-
-
-def test_a_run_told_where_to_write_moves_no_link(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Which is what the pipeline does to every stage: one directory for the whole run,
-    named once by the run and not again by each stage. A stage that repointed `latest`
-    from inside a run would name the run's training directory as the run itself."""
-    monkeypatch.chdir(tmp_path)
-
-    _train([0], tmp_path, project=str(tmp_path / "elsewhere"))
-
-    assert not (tmp_path / "runs" / "latest").exists()
-
-
-def test_the_checkpoint_comes_from_the_trainer_not_the_requested_name(tmp_path: Path) -> None:
-    """Ultralytics may deduplicate the run name, and only it knows where the file went."""
-    result = _train([0], tmp_path)
-
-    assert result["name"] == "run"
-    assert FakeYolo.last.trainer is not None  # type: ignore[union-attr]
-
-
-def test_the_checkpoint_template_names_the_file_training_writes(tmp_path: Path) -> None:
-    """The pipeline predicts this path when training is skipped, so a template that drifts
-    from the layout training uses would point a skipped run at a file nobody wrote."""
-    selection = DeviceSelection(devices=[0], batch=16, batch_per_gpu=16)
-    project = str(tmp_path / "runs")
-    with pytest.MonkeyPatch.context() as patch:
-        patch.setattr(
-            "clearml_yolo.tasks.train.resolve_devices", lambda *_args, **_kwargs: selection
-        )
-        result = train(
-            ultralytics=_params(tmp_path, project=project),
-            auto_gpu=AutoGpuConfig(),
-            clearml=DISABLED,
-        )
-
-    assert str(result.weights) == CHECKPOINT.format(project=project, name="run")
-
-
-def test_a_custom_pipeline_reaches_ultralytics_as_transforms_and_not_as_a_path(
+@pytest.mark.parametrize("device", ["cpu", [0, 1]])
+def test_native_forwarding_and_actual_checkpoint(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    device: Any,
 ) -> None:
-    """`augmentations` is the one parameter this stage does not forward as written: the
-    config holds a path and ultralytics reads a list of transform objects. Forwarding the
-    string would fail inside ultralytics' own Compose, far from the line that caused it."""
-    pipeline = tmp_path / "augmentations.json"
-    albumentations.save(
-        albumentations.Compose(
-            [albumentations.HorizontalFlip(p=0.5), albumentations.RandomBrightnessContrast(p=0.5)]
-        ),
-        str(pipeline),
-        data_format="json",
+    calls: dict[str, Any] = {}
+    source = tmp_path / "original.yaml"
+    source.write_text("path: original\n")
+    override = tmp_path / "override.yaml"
+    override.write_text("path: override\n")
+    monkeypatch.setattr(
+        "clearml_yolo.tasks.train.connect_config_file", lambda *args, **kwargs: override
     )
+    actual = tmp_path / "native-incremented"
+    (actual / "weights").mkdir(parents=True)
+    (actual / "weights/best.pt").write_bytes(b"checkpoint")
+    (actual / "weights/last.pt").write_bytes(b"last")
 
-    kwargs = _train([0], tmp_path, augmentations=str(pipeline))
+    class Model:
+        def __init__(self, model: str) -> None:
+            calls["model"] = model
+            self.trainer = types.SimpleNamespace(
+                save_dir=actual, args=types.SimpleNamespace(), data={}
+            )
 
-    assert [type(transform).__name__ for transform in kwargs["augmentations"]] == [
-        "HorizontalFlip",
-        "RandomBrightnessContrast",
-    ]
-    assert not isinstance(kwargs["augmentations"], (str, albumentations.Compose))
+        def train(self, **kwargs: Any) -> None:
+            calls.update(kwargs)
+            self.trainer.args = types.SimpleNamespace(**kwargs)
 
-
-def test_a_run_that_named_no_pipeline_hands_ultralytics_no_such_key(tmp_path: Path) -> None:
-    """`null` is the packaged default, and it has to reach ultralytics as the absence of the
-    key: `augmentations=None` would replace ultralytics' own default albumentations block
-    with nothing at all rather than leaving it alone."""
-    kwargs = _train([0], tmp_path, augmentations=None)
-
-    assert "augmentations" not in kwargs
-
-
-class FakeTask:
-    """A ClearML task that records what was connected to it and answers as an agent would.
-
-    ``connect_configuration`` returns ClearML's own copy of the file rather than the one
-    passed in, which is what a task cloned onto an agent is handed — so a run that reads the
-    path it started with instead of the answer would pass a test that returns the same path.
-    """
-
-    def __init__(self, stored: Path) -> None:
-        self.stored = stored
-        self.connected: dict[str, Path] = {}
-
-    def connect_configuration(self, configuration: Path, name: str) -> str:
-        self.connected[name] = configuration
-        return str(self.stored)
-
-
-def _pipeline(path: Path, *transforms: Any) -> Path:
-    albumentations.save(albumentations.Compose(list(transforms)), str(path), data_format="json")
-    return path
-
-
-def test_the_pipeline_a_run_trains_with_is_the_one_clearml_handed_back(tmp_path: Path) -> None:
-    """A task cloned onto an agent is handed ClearML's copy of the configuration file, and
-    reading the path the config named instead would rerun the clone against whatever now
-    sits on that machine — which is the reproducibility this connection exists to buy."""
-    named = _pipeline(tmp_path / "named.json", albumentations.HorizontalFlip(p=0.5))
-    stored = _pipeline(tmp_path / "stored.json", albumentations.ToGray(p=0.5))
-    task = FakeTask(stored)
-
-    with pytest.MonkeyPatch.context() as patch:
-        patch.setattr("clearml_yolo.tasks.train.init_task", lambda *_a, **_k: task)
-        kwargs = _train([0], tmp_path, augmentations=str(named))
-
-    assert task.connected == {TRAIN_AUGMENTATIONS: named}
-    assert [type(transform).__name__ for transform in kwargs["augmentations"]] == ["ToGray"]
+    module = types.ModuleType("ultralytics.models")
+    module.YOLO = Model  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "ultralytics.models", module)
+    monkeypatch.setattr("clearml_yolo.tasks.train.init_task", lambda *a, **k: object())
+    monkeypatch.setattr("clearml_yolo.tasks.train.expect_artifacts", lambda *a, **k: None)
+    monkeypatch.setattr(
+        "clearml_yolo.tasks.train.upload_artifact", lambda *a, **k: None, raising=False
+    )
+    result = train(
+        ultralytics={
+            "model": "architecture.pt",
+            "data": str(source),
+            "device": device,
+            "batch": -1,
+            "amp": False,
+            "compile": False,
+            "project": str(tmp_path),
+            "name": "asked",
+        },
+        clearml=ClearMLConfig(),
+    )
+    assert calls["data"] == str(override)
+    assert calls["device"] == device
+    assert calls["batch"] == -1
+    assert calls["amp"] is False
+    assert calls["compile"] is False
+    assert result.weights == actual / "weights/best.pt"
 
 
-def test_a_run_that_named_no_pipeline_connects_nothing(tmp_path: Path) -> None:
-    """The connection is the pipeline's, not the stage's: a run without one must not leave an
-    empty configuration object on the experiment for a reader to interpret."""
-    task = FakeTask(tmp_path / "unused.json")
+def test_native_ddp_children_inherit_tracking_isolation() -> None:
+    import os
+    import subprocess
 
-    with pytest.MonkeyPatch.context() as patch:
-        patch.setattr("clearml_yolo.tasks.train.init_task", lambda *_a, **_k: task)
-        kwargs = _train([0], tmp_path, augmentations=None)
+    from clearml_yolo.native_runtime import native_runtime
 
-    assert task.connected == {}
-    assert "augmentations" not in kwargs
+    with native_runtime():
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                (
+                    "from ultralytics.utils import SETTINGS; "
+                    "from ultralytics.utils.callbacks import clearml; "
+                    "assert SETTINGS['clearml'] is False; assert not clearml.callbacks"
+                ),
+            ],
+            env=dict(os.environ, LOCAL_RANK="-1"),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    assert result.returncode == 0, result.stderr

@@ -1,186 +1,162 @@
-"""Locating dashboard workbooks: the new model's and a local baseline's, one way."""
+"""Developer/business reports consume paired current-test comparison dashboards."""
 
 from __future__ import annotations
 
+import sys
+import types
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 from clearml_yolo.clearml_session import ClearMLConfig
-from clearml_yolo.inference import ScoredResolution
-from clearml_yolo.tasks import report as report_module
-from clearml_yolo.tasks.metrics import DASHBOARD_PREFIX
-from clearml_yolo.tasks.report import (
-    RESOLUTION_SHEET,
-    BaselineConfig,
-    build_reports,
-    discover_dashboards,
-)
-
-
-def _workbooks(directory: Path, splits: list[str]) -> None:
-    directory.mkdir(parents=True, exist_ok=True)
-    for split in splits:
-        (directory / f"{DASHBOARD_PREFIX}_{split}.xlsx").write_bytes(b"")
+from clearml_yolo.tasks.compare import MANIFEST_NAME, ComparisonManifest
+from clearml_yolo.tasks.report import build_reports, report
 
 
 @pytest.fixture
-def report_generator(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Stand in for report-generator, whose builders read real dashboard workbooks.
-
-    It is a released package this repo consumes rather than owns, so what is under test is
-    only what happens to the file after it has written one.
-    """
-    import sys
-    import types
-
-    import pandas as pd
-
-    class FakeBuilder:
-        def __init__(self, *_: object) -> None:
-            pass
-
-        def build(self, path: Path) -> None:
-            pd.DataFrame({"metric": ["f1"], "delta": [0.01]}).to_excel(path, index=False)
+def report_generator(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Path, Path]]:
+    pairs: list[tuple[Path, Path]] = []
 
     class FakeReader:
-        def __init__(self, *_: object) -> None:
-            pass
+        def __init__(self, path: str | Path) -> None:
+            self.file_path = Path(path)
 
         def read(self) -> pd.DataFrame:
-            return pd.DataFrame({"metric": ["f1"]})
+            return pd.read_excel(self.file_path, index_col=0)
+
+    class FakeBuilder:
+        def __init__(self, candidate: FakeReader, baseline: FakeReader, *_: object) -> None:
+            self.candidate = candidate
+            self.baseline = baseline
+
+        def build(self, path: str | Path) -> None:
+            pairs.append((self.candidate.file_path, self.baseline.file_path))
+            pd.DataFrame({"metric": ["f1"]}).to_excel(path, index=False)
 
     class FakeConfig:
         @staticmethod
         def load(*_: object) -> dict[str, object]:
             return {}
 
-    def _install(name: str, attribute: str, value: object) -> types.ModuleType:
+    def install(name: str, attribute: str, value: object) -> None:
         module = types.ModuleType(name)
         setattr(module, attribute, value)
         monkeypatch.setitem(sys.modules, name, module)
-        return module
 
-    _install("report_generator.config", "Config", FakeConfig)
-    _install("report_generator.core.reader", "MetricsReader", FakeReader)
-    _install("report_generator.reports.dev.builder", "DevReportBuilder", FakeBuilder)
-    _install("report_generator.reports.business.builder", "BusinessReportBuilder", FakeBuilder)
+    install("report_generator.config", "Config", FakeConfig)
+    install("report_generator.core.reader", "MetricsReader", FakeReader)
+    install("report_generator.reports.dev.builder", "DevReportBuilder", FakeBuilder)
+    install("report_generator.reports.business.builder", "BusinessReportBuilder", FakeBuilder)
+    monkeypatch.setattr("clearml_yolo.tasks.report.init_task", lambda *_args, **_kwargs: None)
+    return pairs
 
 
-def _built(tmp_path: Path, resolution: ScoredResolution | None) -> Path:
-    """Run the report stage against a local baseline, returning the dev workbook."""
-    _workbooks(tmp_path / "metrics", ["test"])
-    _workbooks(tmp_path / "previous", ["test"])
-    result = build_reports(
-        {"test": tmp_path / "metrics" / f"{DASHBOARD_PREFIX}_test.xlsx"},
-        tmp_path / "reports",
-        ClearMLConfig(enabled=False),
-        BaselineConfig(source="local", directory=tmp_path / "previous"),
-        None,
-        resolution,
+def _comparison_dir(tmp_path: Path) -> tuple[Path, Path, Path]:
+    directory = tmp_path / "comparison"
+    directory.mkdir()
+    baseline = directory / "full_dashboard_baseline_test.xlsx"
+    candidate = directory / "full_dashboard_candidate_test.xlsx"
+    pd.DataFrame({"tp": [1]}, index=["cat"]).to_excel(baseline)
+    pd.DataFrame({"tp": [2]}, index=["cat"]).to_excel(candidate)
+    (directory / MANIFEST_NAME).write_text(
+        ComparisonManifest(
+            split="test",
+            baseline_dashboard=baseline.name,
+            candidate_dashboard=candidate.name,
+            baseline_predictions="baseline.csv",
+            candidate_predictions="candidate.csv",
+            statistical_workbook="comparison.xlsx",
+        ).model_dump_json(indent=2),
+        encoding="utf-8",
     )
-    return result.dev_reports["test"]
+    return directory, candidate, baseline
 
 
-def test_the_dev_workbook_records_the_scale_its_numbers_were_measured_at(
-    tmp_path: Path, report_generator: None
+def test_report_builds_both_formats_from_manifest_pair(
+    tmp_path: Path,
+    report_generator: list[tuple[Path, Path]],
 ) -> None:
-    """The workbook outlives the console log it was announced in, and is the artefact a
-    reviewer opens months later to ask what these numbers mean."""
-    import pandas as pd
+    comparison, candidate, baseline = _comparison_dir(tmp_path)
 
-    workbook = _built(tmp_path, ScoredResolution(trained_at=1280, scored_at=640))
+    result = report(comparison, tmp_path / "reports", ClearMLConfig())
 
-    sheet = pd.read_excel(workbook, sheet_name=RESOLUTION_SHEET)
-    assert dict(zip(sheet["parameter"], sheet["value"], strict=True)) == {
-        "trained at imgsz": "1280",
-        "scored at imgsz": "640",
-        "same resolution?": "NO — scored at a scale this model was never shown",
-    }
+    assert result.dev_reports["test"].is_file()
+    assert result.business_reports["test"].is_file()
+    assert report_generator == [(candidate, baseline), (candidate, baseline)]
 
 
-def test_a_report_that_did_not_run_the_inference_claims_no_resolution(
-    tmp_path: Path, report_generator: None
+def test_missing_comparison_manifest_fails_explicitly(tmp_path: Path) -> None:
+    with pytest.raises(FileNotFoundError, match=MANIFEST_NAME):
+        report(tmp_path / "comparison", tmp_path / "reports", ClearMLConfig())
+
+
+def test_missing_paired_dashboard_fails_explicitly(
+    tmp_path: Path, report_generator: list[tuple[Path, Path]]
 ) -> None:
-    """A standalone `cy-report` reads dashboards off disk and has no way to know what
-    produced them, and a wrong resolution in the workbook is worse than an absent one."""
-    import pandas as pd
+    comparison, _, baseline = _comparison_dir(tmp_path)
+    baseline.unlink()
 
-    workbook = _built(tmp_path, None)
-
-    assert RESOLUTION_SHEET not in pd.ExcelFile(workbook).sheet_names
+    with pytest.raises(FileNotFoundError, match="baseline dashboard"):
+        report(comparison, tmp_path / "reports", ClearMLConfig())
 
 
-def test_clearml_stores_the_workbook_with_the_sheet_already_on_it(
-    tmp_path: Path, report_generator: None, monkeypatch: pytest.MonkeyPatch
+def test_build_reports_preserves_candidate_minus_baseline_order(
+    tmp_path: Path,
+    report_generator: list[tuple[Path, Path]],
 ) -> None:
-    """Uploading before appending would leave the copy anyone actually reads without the
-    sheet, which is the whole reason it is written — so the order is asserted, not assumed."""
-    import pandas as pd
+    _, candidate, baseline = _comparison_dir(tmp_path)
 
-    uploaded: dict[str, list[str]] = {}
+    build_reports(
+        candidate,
+        baseline,
+        tmp_path / "reports",
+        ClearMLConfig(),
+        split="test",
+    )
+
+    assert report_generator == [(candidate, baseline), (candidate, baseline)]
+
+
+def test_standalone_report_tracks_consumed_inputs_and_sanitized_config(
+    tmp_path: Path,
+    report_generator: list[tuple[Path, Path]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    comparison, candidate, baseline = _comparison_dir(tmp_path)
+    manifest = comparison / MANIFEST_NAME
+    config = tmp_path / "report.yaml"
+    config.write_text("title: audit\n", encoding="utf-8")
+    expected: list[str] = []
+    uploads: dict[str, object] = {}
+    connected: list[tuple[str, Path]] = []
 
     class FakeTask:
-        def upload_artifact(self, name: str, artifact_object: Path) -> None:
-            uploaded[name] = [str(sheet) for sheet in pd.ExcelFile(artifact_object).sheet_names]
+        pass
 
-    monkeypatch.setattr(report_module, "init_task", lambda *_, **__: FakeTask())
-    monkeypatch.setattr(report_module, "report_table", lambda *_, **__: None)
-
-    _built(tmp_path, ScoredResolution(trained_at=1280, scored_at=640))
-
-    dev = next(sheets for name, sheets in uploaded.items() if "dev" in name)
-    assert RESOLUTION_SHEET in dev
-
-
-def test_the_sheet_is_appended_rather_than_replacing_what_the_builder_wrote(
-    tmp_path: Path, report_generator: None
-) -> None:
-    """`mode="a"` is what keeps the report a report; the resolution is context beside it."""
-    import pandas as pd
-
-    workbook = _built(tmp_path, ScoredResolution(trained_at=640, scored_at=640))
-
-    assert len(pd.ExcelFile(workbook).sheet_names) > 1
-
-
-def test_only_the_splits_that_have_a_workbook_are_returned(tmp_path: Path) -> None:
-    _workbooks(tmp_path, ["train", "test"])
-
-    found = discover_dashboards(tmp_path, ["train", "val", "test"])
-
-    assert set(found) == {"train", "test"}
-    assert found["train"] == tmp_path / f"{DASHBOARD_PREFIX}_train.xlsx"
-
-
-def test_a_local_baseline_is_read_the_same_way_the_new_model_is(tmp_path: Path) -> None:
-    """Both sides are the same files under the same naming convention, so a baseline
-    directory is searched by the very function that finds the run's own dashboards."""
-    baseline_dir = tmp_path / "previous"
-    _workbooks(baseline_dir, ["test"])
-
-    assert discover_dashboards(baseline_dir, ["test"]) == {
-        "test": baseline_dir / f"{DASHBOARD_PREFIX}_test.xlsx"
-    }
-
-
-def test_a_local_baseline_without_a_directory_is_rejected(tmp_path: Path) -> None:
-    with pytest.raises(ValueError, match=r"baseline\.directory"):
-        build_reports(
-            {"test": tmp_path / f"{DASHBOARD_PREFIX}_test.xlsx"},
-            tmp_path / "reports",
-            ClearMLConfig(enabled=False),
-            BaselineConfig(source="local"),
-        )
-
-
-def test_a_disabled_baseline_skips_every_split_instead_of_failing(tmp_path: Path) -> None:
-    result = build_reports(
-        {"test": tmp_path / f"{DASHBOARD_PREFIX}_test.xlsx"},
-        tmp_path / "reports",
-        ClearMLConfig(enabled=False),
-        BaselineConfig(source="none"),
+    monkeypatch.setattr(
+        "clearml_yolo.tasks.report.init_task", lambda *_args, **_kwargs: FakeTask()
     )
+    monkeypatch.setattr(
+        "clearml_yolo.tasks.report.expect_artifacts",
+        lambda _task, names: expected.extend(names),
+    )
+    monkeypatch.setattr(
+        "clearml_yolo.tasks.report.upload_artifact",
+        lambda _task, name, value: uploads.setdefault(name, value),
+    )
+    monkeypatch.setattr("clearml_yolo.tasks.report.report_table", lambda *_args: None)
 
-    assert result.skipped_splits == ["test"]
-    assert not result.dev_reports
+    def connect(_task: object, name: str, path: Path) -> Path:
+        connected.append((name, path))
+        return path
+
+    monkeypatch.setattr("clearml_yolo.tasks.report.connect_config_file", connect)
+
+    report(comparison, tmp_path / "reports", ClearMLConfig(), config)
+
+    assert connected == [("source_report_configuration", config)]
+    assert uploads["report_input_manifest_test"] == manifest
+    assert uploads["report_input_dashboard_candidate_test"] == candidate
+    assert uploads["report_input_dashboard_baseline_test"] == baseline
+    assert set(expected) == set(uploads)

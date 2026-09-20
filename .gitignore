@@ -20,3 +20,8 @@ clearml.conf
 
 # coco8 test fixtures
 ground_truth.csv
+
+# Distribution artifacts and private local overrides
+dist/
+build/
+.env*

@@ -9,9 +9,9 @@ the degraded counts are reported before the improved ones and the degraded class
 their own table, because a model that improves twelve classes while breaking three must
 never read as an unqualified win.
 
-Every entry point is a no-op when ``task`` is ``None`` (ClearML tracking is switchable
-off), and a missing column is a warning rather than an exception — a reporting layer must
-never fail a run that already produced valid results.
+Every entry point is a no-op when ``task`` is ``None`` (a distributed worker).
+A missing optional presentation column emits a warning; required artifact failures
+are handled by the invocation owner.
 
 The constants below are the integration seam with the comparison frame: they name the
 columns this module reads out of it.
@@ -62,7 +62,7 @@ COMPARED_METRICS = (
 
 
 def report_table(task: Task, title: str, series: str, frame: pd.DataFrame) -> None:
-    """Publish a DataFrame as a ClearML table plot, tolerating disabled tracking."""
+    """Publish a DataFrame as a ClearML table plot, skipping distributed workers."""
     if task is None:
         return
     task.get_logger().report_table(

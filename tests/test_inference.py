@@ -18,7 +18,6 @@ from loguru import logger
 
 from clearml_yolo.inference import (
     PREDICTION_COLUMNS,
-    is_cuda_device,
     predict_on_images,
     resolution_of,
 )
@@ -215,6 +214,16 @@ def test_the_image_name_mode_decides_how_the_join_key_is_spelled(mode: Any, expe
     assert frame["image_name"].tolist() == [expected]
 
 
+def test_unknown_image_name_mode_is_rejected_before_native_inference() -> None:
+    with pytest.raises(ValueError, match="Unsupported image_name mode"):
+        predict_on_images(
+            "best.pt",
+            ["dir/000012.png"],
+            image_name="filename",  # type: ignore[arg-type]
+            device="cpu",
+        )
+
+
 def test_images_without_detections_contribute_no_rows() -> None:
     DETECTIONS["a.png"] = None
     DETECTIONS["b.png"] = _boxes()
@@ -271,17 +280,10 @@ def test_inference_settings_reach_ultralytics() -> None:
     assert call["stream"] is True
 
 
-def test_half_precision_follows_the_device() -> None:
-    """FP16 by default on a card, and never where it is unsupported.
-
-    Spelled `quantize`, not `half`: ultralytics 8.4 deprecated the latter.
-    """
+def test_precision_is_left_to_native_defaults() -> None:
     DETECTIONS["a.png"] = _boxes(([1, 2, 3, 4], 0.9, 0))
     predict_on_images("best.pt", ["a.png"], device="0")
-    assert FakeYolo.last.calls[0]["quantize"] == 16  # type: ignore[union-attr]
-
-    predict_on_images("best.pt", ["a.png"], device="cpu")
-    assert FakeYolo.last.calls[0]["quantize"] == 32  # type: ignore[union-attr]
+    assert "quantize" not in FakeYolo.last.calls[0]  # type: ignore[union-attr]
 
 
 @pytest.mark.parametrize("named", [{"quantize": 32}, {"quantize": "fp32"}])
@@ -297,14 +299,10 @@ def test_naming_the_precision_hands_the_decision_over(named: dict[str, Any]) -> 
     assert {key: call[key] for key in named} == named
 
 
-def test_torch_compile_follows_the_device() -> None:
-    """Compilation is a CUDA-only default, and costs a one-off per process to earn back."""
+def test_compilation_is_left_to_native_defaults() -> None:
     DETECTIONS["a.png"] = _boxes(([1, 2, 3, 4], 0.9, 0))
     predict_on_images("best.pt", ["a.png"], device="0")
-    assert FakeYolo.last.calls[0]["compile"] is True  # type: ignore[union-attr]
-
-    predict_on_images("best.pt", ["a.png"], device="cpu")
-    assert FakeYolo.last.calls[0]["compile"] is False  # type: ignore[union-attr]
+    assert "compile" not in FakeYolo.last.calls[0]  # type: ignore[union-attr]
 
 
 def test_the_letterbox_shape_is_named_rather_than_inherited() -> None:
@@ -325,14 +323,6 @@ def test_compilation_can_be_forced_back_off() -> None:
     predict_on_images("best.pt", ["a.png"], device="0", compile=False)
 
     assert FakeYolo.last.calls[0]["compile"] is False  # type: ignore[union-attr]
-
-
-@pytest.mark.parametrize(
-    ("device", "expected"),
-    [("0", True), ("0,1", True), ("cuda:0", True), ("cpu", False), ("mps", False)],
-)
-def test_which_devices_get_the_gpu_defaults(device: str, expected: bool) -> None:
-    assert is_cuda_device(device) is expected
 
 
 def test_a_batch_below_one_is_refused() -> None:
@@ -375,3 +365,9 @@ def test_the_weights_path_is_forwarded_as_given(tmp_path: Path) -> None:
     predict_on_images(checkpoint, ["a.png"], device="cpu")
 
     assert FakeYolo.last.weights == str(checkpoint)  # type: ignore[union-attr]
+
+
+def test_rectangular_native_resolution_is_preserved(checkpoint_recording: Any) -> None:
+    checkpoint_recording({"imgsz": 640})
+    result = resolution_of("best.pt", [320, 640])
+    assert result.scored_at == [320, 640]
