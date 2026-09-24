@@ -17,27 +17,6 @@ Python проекта — 3.12. Перед первым запуском нас�
 `CLEARML_API_ACCESS_KEY` и `CLEARML_API_SECRET_KEY`. Переменные окружения имеют
 приоритет над `~/clearml.conf`.
 
-Агенты Codex, CI и другие автоматические запуски используют общий стенд
-`clearml.k8s.localhost`, а не пользовательский ClearML на хосте:
-
-```bash
-source scripts/agent_env.sh smoke
-uv run cy run_dir=$CY_RUN_DIR \
-  clearml.project_name="$CY_RUN_TAG clearml-yolo" \
-  clearml.tags=[$CY_RUN_TAG] \
-  +train.ultralytics.device=0 \
-  +predict.ultralytics.device=0 \
-  ground_truth=ground_truth.csv \
-  +train.ultralytics.data=data.yaml
-scripts/agent_cleanup.sh
-```
-
-Скрипт проверяет вместимость общего стенда, получает учётные данные из его
-секрета, создаёт тег и отдельную папку, затем проверяет, к какому endpoint
-авторизовался ClearML. Перед выпуском тега задайте `INFRA_HARNESS=codex`, если эта переменная
-ещё не установлена. Очистка удаляет только объекты и каталог с этим
-тегом.
-
 ## Приложения
 
 | Команда | Назначение |
@@ -105,7 +84,8 @@ uv run cy-val weights=./weights/best.pt ground_truth=ground_truth.csv \
 
 ```bash
 uv run cy-train cfg=training.yaml +ultralytics.epochs=10 +ultralytics.batch=16
-uv run cy +train.ultralytics.epochs=10 +train.ultralytics.compile=true
+uv run cy ground_truth=ground_truth.csv +train.ultralytics.data=data.yaml \
+  +train.ultralytics.epochs=10 +train.ultralytics.compile=true
 ```
 
 Нативный файл `training.yaml` может содержать обычные параметры Ultralytics:
@@ -134,7 +114,8 @@ predict:
 ```
 
 ```bash
-uv run cy --config-dir=. --config-name=experiment train.ultralytics.epochs=10
+uv run cy --config-dir=. --config-name=experiment \
+  ground_truth=ground_truth.csv train.ultralytics.epochs=10
 ```
 
 Указывайте `device`, `batch`, `amp` и `compile` как нативные параметры. Ultralytics
@@ -191,7 +172,7 @@ uv run lint-imports
 ```
 
 Это проверки без доказательства реального обучения, GPU или загрузки артефактов.
-Для настоящего запуска на общем стенде следуйте `AGENTS.md` и скиллу
-`running-end-to-end-tests`; после каждого агентского запуска запускайте
-`scripts/agent_cleanup.sh`. Миграция со старых конфигов описана в
-[docs/migration-030.md](docs/migration-030.md).
+Для интеграционной проверки используйте отдельный проект ClearML, доступный датасет
+и явно выбранное устройство. Порядок проверки описан в
+[руководстве](specs/001-release-030/quickstart.md), изменения конфигурации — в
+[миграции на 0.3.0](docs/migration-030.md).

@@ -5,7 +5,7 @@
 Decision: sparse Hydra mappings and ordinary dictionary overlay; default comparison is removed.
 Rationale: presence preserves explicit defaults; native parameter validation remains upstream.
 Alternative rejected: maintain a second full default schema, which loses provenance and drifts.
-Evidence: existing configs.py `_overlaid` treats equal values as absent; installed Ultralytics
+Evidence: the pre-0.3.0 configs.py `_overlaid` treated equal values as absent; installed Ultralytics
 configuration is authoritative. Keep dataset/table adapters, delegate model runtime settings.
 
 ## Tracking
@@ -34,5 +34,5 @@ report_generator DevReportBuilder and BusinessReportBuilder consume dashboard re
 
 Decision: retain Python/toolchain constraints; remove only dependencies exclusively serving deleted
 features. Keep statistical implementations and their regression tests. Verify real CPU/single-GPU
-runs on the shared stand and label real multi-GPU unverified.
+runs in an isolated integration environment and label real multi-GPU unverified.
 Alternative rejected: claim mocked tests establish live artifact or GPU behavior.

@@ -4,17 +4,19 @@ Use Python/toolchain from pyproject.toml. Run `uv sync --group dev` then `uv run
 See [CLI](contracts/cli.md) and [artifacts](contracts/artifacts.md) for exact contracts.
 
 1. Run pytest, Ruff, mypy, import-linter and applicable pre-commit checks.
-2. Read the shared infrastructure run contract and project end-to-end skill. Source
-   `scripts/agent_env.sh release-030`, respect room/capacity, and select CPU or device 0 explicitly.
-3. Build ground truth from a tiny YOLO dataset with disjoint val/test. Train one epoch on CPU
-   with raw native cfg, then a one-GPU candidate with equivalent embedded native settings.
-4. In the task-owned project first confirm automatic baseline absence, then tag the baseline
-   prod and compare the candidate. Exercise cy-val and cy-compare independently.
-5. Download required artifacts and check file hashes/contents and one-task ownership; induce
-   upload failure and interruption using isolated test tasks. Preserve dated evidence, then
-   call scripts/agent_cleanup.sh and prove task-owned resource removal.
-6. Build with `uv build`, install each distribution into fresh temporary environments, verify
-   eight command helps and absent cy-queue/cy-init-config. Run documented examples.
+2. Follow the environment's setup and resource-ownership instructions. Configure an
+   isolated ClearML project and select native devices explicitly.
+3. Build ground truth from a tiny YOLO dataset with disjoint val/test and empty images.
+   Train one epoch on CPU with raw native YAML, then a single-GPU candidate with equivalent
+   embedded settings. An unavailable device leaves that release gate unverified.
+4. First confirm automatic baseline absence, then tag the completed baseline `prod` and
+   compare the candidate. Exercise cy-val, cy-compare and cy-report independently.
+5. Download required artifacts; check contents, thresholds, paired counts and one-task
+   ownership. Induce upload failure and interruption using isolated test tasks.
+6. Build with `uv build`, install each distribution in a fresh environment, verify eight
+   command helps and absent cy-queue/cy-init-config. Run documented examples.
+7. Record dated outcomes and limitations, then remove only owned resources. Physical
+   distributed execution is unverified unless actually tested.
 
-Record executed commands, task identities, outcomes and artifact download evidence under
-`docs/evidence/2026-09-19-release-030.md`. Real multi-GPU execution is explicitly unverified.
+Keep a portable summary under `docs/evidence/`. Machine-specific commands, task identities,
+endpoint details and download records belong with the environment's global skill.

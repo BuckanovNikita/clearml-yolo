@@ -16,8 +16,8 @@ Centralize invocation tracking with nested stage reuse and synchronous artifact 
 **Primary Dependencies**: Ultralytics, Hydra/hydra-zen, Pydantic, ClearML, digital-metrics,
 report-generator, pandas, scipy, openpyxl, Loguru; exact constraints in pyproject.toml.
 **Storage**: isolated local run directory plus required ClearML artifacts; images external.
-**Testing**: pytest, Ruff, mypy, import-linter, pre-commit, real shared-stand runs, package install.
-**Target Platform**: existing Linux host, CPU and one GPU; native DDP contract tests.
+**Testing**: pytest, Ruff, mypy, import-linter, pre-commit, real integration runs, package install.
+**Target Platform**: Linux, CPU and GPU execution; native DDP contract tests.
 **Project Type**: CLI package with eight commands.
 **Performance Goals**: native execution without custom scheduling/tuning overhead; correctness
 and reproducibility are release gates, not a new latency promise.
@@ -28,7 +28,7 @@ and reproducibility are release gates, not a new latency promise.
 
 Before research and after design: PASS against constitution 2.0.0. Preserve strict checks,
 Loguru, clear module boundaries, explicit external-library adapters, isolated outputs, one
-task and upload completion, validation-only calibration, shared-stand preflight/capacity and
+task and upload completion, validation-only calibration, environment-specific preflight/capacity and
 cleanup. This release intentionally updates import contracts for removed modules and new val.
 No weakened checks or undocumented exceptions are planned.
 
@@ -45,7 +45,7 @@ No weakened checks or undocumented exceptions are planned.
 - src/clearml_yolo/inference.py: image manifest/table conversion, no hardware automation.
 - tests/: focused contract tests plus retained domain regressions.
 - docs/migration-030.md, docs/evidence/: migration and dated release acceptance evidence.
-- scripts/agent_env.sh and .claude/skills/running-end-to-end-tests/: revised agent workflow.
+- .claude/skills/running-end-to-end-tests/: portable verification; machine helpers live in a global environment skill.
 
 ## Phases and decisions
 

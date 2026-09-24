@@ -1,5 +1,3 @@
+"""Native YOLO workflows with tracked evaluation and comparison."""
+
 from __future__ import annotations
-
-
-def hello() -> str:
-    return "Hello from clearml-yolo!"

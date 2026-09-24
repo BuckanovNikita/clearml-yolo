@@ -203,7 +203,7 @@ dev = [
 requires-dist = [
     { name = "albumentations", specifier = ">=2.0,<3" },
     { name = "clearml", specifier = ">=1.13" },
-    { name = "digital-metrics", git = "https://github.com/Wasilkas/digital-metrics?rev=ecce79cdcade2bb463c4bcc9eac77512d1033117" },
+    { name = "digital-metrics", git = "https://github.com/Wasilkas/digital-metrics?rev=12fa6ce1b6ac4ab2b6db1f39e10f816a5849d068" },
     { name = "hydra-core", specifier = ">=1.3" },
     { name = "hydra-zen", specifier = ">=0.16" },
     { name = "loguru", specifier = ">=0.7" },
@@ -351,8 +351,8 @@ wheels = [
 
 [[package]]
 name = "digital-metrics"
-version = "0.4.0"
-source = { git = "https://github.com/Wasilkas/digital-metrics?rev=ecce79cdcade2bb463c4bcc9eac77512d1033117#ecce79cdcade2bb463c4bcc9eac77512d1033117" }
+version = "0.5.3"
+source = { git = "https://github.com/Wasilkas/digital-metrics?rev=12fa6ce1b6ac4ab2b6db1f39e10f816a5849d068#12fa6ce1b6ac4ab2b6db1f39e10f816a5849d068" }
 dependencies = [
     { name = "loguru" },
     { name = "matplotlib" },

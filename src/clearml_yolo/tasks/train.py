@@ -20,7 +20,6 @@ from clearml_yolo.clearml_session import (
 from clearml_yolo.run_identity import RUNS_ROOT, point_latest_at, resolve_run_dir, resolve_run_id
 
 TRAIN_DIR = "detect"
-CHECKPOINT = "{project}/{name}/weights/best.pt"
 
 
 class TrainResult(BaseModel):

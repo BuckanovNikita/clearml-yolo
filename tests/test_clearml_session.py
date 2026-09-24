@@ -1,4 +1,4 @@
-"""The ClearML identity of a run: where a tagged run's experiments go."""
+"""Explicit ClearML configuration, artifact storage, and invocation lifecycle."""
 
 from __future__ import annotations
 
@@ -16,77 +16,29 @@ import pytest
 from clearml_yolo.clearml_session import (
     ARTIFACT_MANIFEST,
     DEFAULT_PROJECT_NAME,
-    RUN_TAG_ENV_VARS,
     ArtifactUploadError,
     ClearMLConfig,
     connect_config_file,
     expect_artifacts,
     init_task,
     invocation,
-    run_tag,
-    tagged_project_name,
     upload_artifact,
-    upload_dataframe,
 )
 
-TAG = "clearml-yolo-claude-20260905-deadline-a1b2"
 
-
-def test_a_run_without_a_tag_keeps_the_default_project() -> None:
-    config = ClearMLConfig()
-
-    assert run_tag() is None
-    assert config.project_name == DEFAULT_PROJECT_NAME
-    assert config.tags == []
-
-
-@pytest.mark.parametrize("variable", RUN_TAG_ENV_VARS)
-def test_a_tagged_run_lands_in_the_tags_project_and_carries_the_tag(
-    monkeypatch: pytest.MonkeyPatch, variable: str
-) -> None:
-    """An agent's experiments belong in a project named after its tag, where the janitor
-    finds them, and never among the user's own runs under the default name."""
-    monkeypatch.setenv(variable, TAG)
-
-    config = ClearMLConfig()
-
-    assert config.project_name == tagged_project_name(TAG) == f"{TAG} {DEFAULT_PROJECT_NAME}"
-    assert config.tags == [TAG]
-
-
-def test_a_project_named_outright_is_kept_and_still_tagged(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Naming the project is the override; the tag goes on regardless so the run is
-    findable by tag wherever it landed."""
-    monkeypatch.setenv("CY_RUN_TAG", TAG)
-
-    config = ClearMLConfig(project_name="detection", tags=["prod"])
-
-    assert config.project_name == "detection"
-    assert config.tags == ["prod", TAG]
-
-
-def test_the_projects_own_spelling_of_the_tag_wins_over_the_contracts(
+def test_harness_environment_does_not_rewrite_tracking_configuration(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("INFRA_RUN_TAG", "clearml-yolo-ci-20260905-other-ffff")
-    monkeypatch.setenv("CY_RUN_TAG", TAG)
+    monkeypatch.setenv("CY_RUN_TAG", "external-harness-tag")
+    monkeypatch.setenv("INFRA_RUN_TAG", "another-harness-tag")
 
-    assert run_tag() == TAG
-    assert ClearMLConfig().project_name == tagged_project_name(TAG)
+    defaults = ClearMLConfig()
+    explicit = ClearMLConfig(project_name="detection", tags=["prod"])
 
-
-def test_a_blank_tag_is_no_tag(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("CY_RUN_TAG", "  ")
-    monkeypatch.setenv("INFRA_RUN_TAG", "")
-
-    assert run_tag() is None
-    assert ClearMLConfig().project_name == DEFAULT_PROJECT_NAME
-
-
-def test_a_tag_already_on_the_run_is_not_added_twice(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("CY_RUN_TAG", TAG)
-
-    assert ClearMLConfig(tags=[TAG]).tags == [TAG]
+    assert defaults.project_name == DEFAULT_PROJECT_NAME
+    assert defaults.tags == []
+    assert explicit.project_name == "detection"
+    assert explicit.tags == ["prod"]
 
 
 class FakeTask:
@@ -549,14 +501,14 @@ def test_source_json_is_sanitized_without_changing_non_secret_values(
     assert task.uploads[0]["artifact_object"].suffix == ".json"
 
 
-def test_upload_dataframe_uses_the_required_synchronous_path(
+def test_dataframe_artifact_uses_the_required_synchronous_path(
     fake_clearml: tuple[type[Any], FakeTask],
 ) -> None:
     _, task = fake_clearml
     frame = pd.DataFrame({"value": [1]})
 
     with invocation(ClearMLConfig(), "metrics") as owner:
-        upload_dataframe(owner, "metrics_table", frame)
+        upload_artifact(owner, "metrics_table", frame)
 
     uploaded = task.uploads[0]
     assert uploaded["artifact_object"] is frame

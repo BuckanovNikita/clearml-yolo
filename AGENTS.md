@@ -90,55 +90,23 @@ do not create tasks or upload artifacts. Complete a task only after all required
 are uploaded and flushed. Fail task and command on computation, upload, flush, or interruption
 errors while retaining local output. Never capture credentials or dataset images.
 
-## Route work deliberately
+## External dependencies
 
-- For a real pipeline run, GPU use, ClearML artifacts, or a baseline/candidate comparison,
-  load `running-end-to-end-tests`.
-- For ClearML endpoint, credentials, or LoginError 401, load `running-clearml-server`.
-  Agent runs target the shared stand, never the user's host ClearML.
-- Read `pyproject.toml` for installed entrypoints, dependency constraints, and import-linter
-  contracts. Read the CLI and artifact contracts in `specs/001-release-030/contracts/` when
-  changing public behaviour.
+`digital-metrics` is an external dependency. Keep it pinned to the approved upstream
+revision. Do not change its source, checkout, dependency reference or locked revision
+without the user's explicit intent to change that dependency. General implementation,
+cleanup and dependency maintenance requests do not authorize such changes. Adapt
+`clearml-yolo` integration code when compatibility work is needed; report upstream
+issues instead of patching or monkeypatching the dependency.
 
-## Agent runs
+## Project and environment guidance
 
-An agent run uses the shared ClearML stand as project `clearml-yolo`, under one tag and in
-one directory. Do not perform stand operations unless the task requires a real run. Before
-minting a tag outside an environment that already supplies it, set `INFRA_HARNESS=codex`.
-
-```bash
-source scripts/agent_env.sh <slug>
-uv run cy run_dir=$CY_RUN_DIR \
-    clearml.project_name="$CY_RUN_TAG clearml-yolo" clearml.tags=[$CY_RUN_TAG] \
-    +train.ultralytics.device=0 +predict.ultralytics.device=0 ...
-scripts/agent_cleanup.sh
-```
-
-- `agent_env.sh` is sourced and returns 3 when `room` says WAIT. It exports no run tag when
-  credential retrieval or minting fails. It preserves a pre-exported `INFRA_RUN_TAG`.
-- `run_dir` keeps agent output outside the checkout. Native `device=0` selects the host GPU;
-  no project GPU queue or force option exists.
-- The ClearML SDK reads its endpoint and key pair from the environment before
-  `~/clearml.conf`; `scripts/check_env.sh` reports the authenticated endpoint and warns when
-  it is the user's host stand.
-- Always clean up on success and failure. `agent_cleanup.sh` calls tag-scoped cleanup, proves
-  it with `ls`, and removes a directory only when its name is the tag.
-
-## Shared infra
-
-This project is `clearml-yolo` in the k8s-infra registry and may use the shared `clearml`
-stand on the docker-desktop cluster. Read
-`/mnt/wsl/data/nkt/k8s-infra/skills/k8s-infra/references/run-contract.md` before touching a
-stand.
-
-- Preflight with `python3 /mnt/wsl/data/nkt/k8s-infra/skills/k8s-infra/scripts/infra.py room`
-  and obey WAIT (exit status 3).
-- Mint exactly one tag per real run:
-  `INFRA_RUN_TAG=$(python3 /mnt/wsl/data/nkt/k8s-infra/skills/k8s-infra/scripts/infra.py newtag --project clearml-yolo --slug <what>) && export INFRA_RUN_TAG`.
-- Obtain credentials only through
-  `eval "$(python3 /mnt/wsl/data/nkt/k8s-infra/skills/k8s-infra/scripts/clearml.py --project clearml-yolo env)"`.
-- Clean up only the run's tag and prove it:
-  `python3 /mnt/wsl/data/nkt/k8s-infra/skills/k8s-infra/scripts/clearml.py --project clearml-yolo cleanup --prefix "$INFRA_RUN_TAG"`, then `ls` with the same prefix.
-- Capacity is maintained in the registry's `[capacity]` values. `room` enforces the shared
-  soft limits. Never use stale cleanup without `--dry-run`, touch another tag, or delete a
-  durable name.
+- Read `pyproject.toml` for entrypoints, dependencies and import contracts.
+- Public CLI and artifact contracts live in `specs/001-release-030/contracts/`.
+- For integration verification, load the project skill `running-end-to-end-tests`.
+- Machine-specific endpoints, credentials, capacity, run helpers and local execution
+  records belong in global environment skills. When available, load
+  `clearml-yolo-environment` for this project's local integration environment.
+  Other installations should use their own environment instructions.
+- Pass ClearML project names and tags explicitly. Application configuration must not
+  depend on an agent harness or a particular machine.

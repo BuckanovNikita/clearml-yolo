@@ -145,26 +145,13 @@ and dependency constraints unless an authorized change updates them. Exact value
 [pyproject.toml](../../pyproject.toml) and [uv.lock](../../uv.lock). New dependencies MUST be
 declared directly when imported rather than assumed to remain available transitively.
 
-Agent runs MUST target the shared ClearML stand as the `clearml-yolo` project identity,
-never the user's own host ClearML. Before a stand operation, contributors MUST read the
-k8s-infra run contract referenced by [AGENTS.md](../../AGENTS.md). Endpoint and credential
-work MUST follow `running-clearml-server`; this repository MUST NOT deploy or tear down the
-shared stand.
-
-- Before an agent pipeline run, source [scripts/agent_env.sh](../../scripts/agent_env.sh) with
-  the run slug. Respect a WAIT result or a refused credential/tag mint. Credentials MUST
-  come from designated helpers, never copied from files.
-- Each run MUST use one run tag and its own directory, with resources named and tagged
-  according to the shared contract. Capacity values MUST come from the k8s-infra registry.
-- Agent training MUST select an explicit native device and respect shared GPU capacity.
-  There is no application scheduler or lease layer. Preflight and task-scoped cleanup remain
-  mandatory; occupied shared capacity MUST NOT be bypassed.
-- GPU tasks MUST NOT be enqueued on the stand's `CLEARML_QUEUE`; its task pods are CPU-only
-  and cannot reach the host GPU.
-- On success and failure, run [scripts/agent_cleanup.sh](../../scripts/agent_cleanup.sh) and
-  verify cleanup. Cleanup MUST be scoped to the task's tag; other tags and durable resources
-  MUST remain untouched. `cleanup --stale` MUST NOT run without `--dry-run`. Resources kept
-  intentionally MUST be reported by full name.
+Machine-specific infrastructure instructions MUST live in global environment skills.
+Repository documentation and application code MUST remain portable. Before a real
+integration run, contributors MUST follow the environment's applicable access,
+capacity and resource-ownership contract. Credentials MUST stay out of tracked
+files; cleanup MUST affect only resources owned by the task. Select native devices
+explicitly and preserve unrelated workloads. This repository does not deploy or
+tear down shared infrastructure.
 
 Model class names MUST come from the checkpoint rather than ClearML model metadata. Exact
 per-class confidence values MUST come from the `metrics_best_confidences_<split>` artifact,
@@ -184,6 +171,10 @@ not rounded dashboard thresholds.
    within existing authorization and after the applicable stage checks pass.
 
 ## Governance
+
+Amendment 2.0.1 relocates machine-specific operational guidance to global skills.
+It preserves credential, capacity and task-owned cleanup safeguards while keeping
+application and repository instructions independent of a particular installation.
 
 This constitution records the established engineering conventions of `clearml-yolo`.
 Implementation, specifications, plans, and reviews MUST comply with its principles within
@@ -209,4 +200,4 @@ that deliberately alters a governing rule MUST include an explicit amendment rat
 quietly weakening checks. Constitution updates MUST remain confined to this document;
 dependent template or implementation changes require their own authorized work.
 
-**Version**: 2.0.0 | **Ratified**: 2026-09-19 | **Last Amended**: 2026-09-19
+**Version**: 2.0.1 | **Ratified**: 2026-09-19 | **Last Amended**: 2026-09-20

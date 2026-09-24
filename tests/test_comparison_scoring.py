@@ -178,9 +178,8 @@ def _one_gt_one_cross_class_prediction() -> tuple[pd.DataFrame, pd.DataFrame]:
     return gt, preds
 
 
-def test_greedy_cross_class_match_still_lists_the_consumed_ground_truth_box() -> None:
-    """Greedy assignment is label-agnostic, so the GT box is consumed by a foreign
-    class and yields no match record at all — only the every-GT-row pass keeps it."""
+def test_greedy_cross_class_prediction_preserves_the_ground_truth_miss() -> None:
+    """Class-aware assignment counts a wrong-class prediction as both FP and FN."""
     gt, preds = _one_gt_one_cross_class_prediction()
 
     outcome = score_split(
@@ -194,10 +193,12 @@ def test_greedy_cross_class_match_still_lists_the_consumed_ground_truth_box() ->
 
     assert outcome.counts == {
         "cat": ClassCounts(tp=0, fp=1, fn=0),
-        "dog": ClassCounts(tp=0, fp=0, fn=0),
+        "dog": ClassCounts(tp=0, fp=0, fn=1),
     }
     assert outcome.gt_status["gt_index"].tolist() == [42]
     assert outcome.gt_status["detected"].tolist() == [False]
+    assert outcome.pred_status["pred_index"].tolist() == [3]
+    assert outcome.pred_status["is_tp"].tolist() == [False]
 
 
 def test_cross_class_false_positive_does_not_mark_its_ground_truth_detected() -> None:

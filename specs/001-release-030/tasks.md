@@ -48,13 +48,13 @@ Goal: exactly one complete task. Independent test: required upload rejection fai
 Goal: usable 0.3.0 distribution. Independent test: clean install exposes exactly eight commands.
 
 - [X] T020 [P] [US4] Update Russian README.md, docs/migration-030.md and remove obsolete docs/superpowers specifications per FR-005, FR-015.
-- [X] T021 [P] [US4] Update scripts/agent_env.sh, AGENTS.md and .claude/skills/running-end-to-end-tests/ for explicit devices with preflight/capacity/cleanup per FR-015.
-- [X] T022 [US4] Set 0.3.0, update uv.lock, build wheel/sdist and verify clean installation/help/examples via pyproject.toml and docs/evidence/2026-09-19-release-030.md per SC-005.
+- [X] T021 [P] [US4] Update AGENTS.md and .claude/skills/running-end-to-end-tests/ for explicit devices with environment-owned preflight/capacity/cleanup (local helpers subsequently moved to the global environment skill) per FR-015.
+- [X] T022 [US4] Set 0.3.0, update uv.lock, build wheel/sdist and verify clean installation/help/examples via pyproject.toml and docs/evidence/2026-09-20-release-030.md per SC-005.
 
 ## Phase 7: Release verification and convergence
 
-- [X] T023 Run pytest, Ruff, mypy, import-linter and pre-commit checks; record commands/results in docs/evidence/2026-09-19-release-030.md per SC-004.
-- [X] T024 Run task-owned CPU/GPU workflows, no-baseline and baseline/candidate, cy-val/cy-compare, both styles and artifact downloads; record cleanup and distributed limitation in docs/evidence/2026-09-19-release-030.md per SC-003–SC-004.
+- [X] T023 Run pytest, Ruff, mypy, import-linter and pre-commit checks; record commands/results in docs/evidence/2026-09-20-release-030.md per SC-004.
+- [X] T024 Run task-owned CPU/GPU workflows, no-baseline and baseline/candidate, cy-val/cy-compare, both styles and artifact downloads; record cleanup and distributed limitation in docs/evidence/2026-09-20-release-030.md per SC-003–SC-004.
 - [X] T025 Run speckit-converge and repeat analysis, close acceptance gaps in specs/001-release-030/tasks.md and obtain fresh review per plan.
 
 ## Dependencies and parallel execution

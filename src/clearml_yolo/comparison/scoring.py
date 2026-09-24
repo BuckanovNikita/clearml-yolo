@@ -406,12 +406,10 @@ def score_split(
     excluded from ``gt_status``, because ``slice_by_conf`` drops their records and
     their status would otherwise be unknowable rather than merely undetected.
 
-    ``gt_status`` is built from every scored ground-truth row rather than from the
-    match records: under the ``greedy`` strategy a ground-truth box consumed by a
-    cross-class match produces no record at all, so a record-derived pass would
-    drop it from the recall denominator entirely. Under the default ``iou_prior``
-    strategy every ground-truth box does yield its own record, so there
-    ``len(gt_status)`` equals ``tp + fn`` and the two recalls coincide.
+    ``gt_status`` is built from every scored ground-truth row to preserve the
+    recall denominator. Upstream assignment is class-aware for every strategy:
+    a cross-class prediction leaves the ground-truth box unmatched and records
+    its FN, so ``len(gt_status)`` equals ``tp + fn``.
 
     Only a class's own TP record marks a ground-truth box detected. A cross-class
     false positive also carries a ``gt_index``, but that box's real status is

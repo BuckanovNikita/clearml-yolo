@@ -1,5 +1,0 @@
-deleting project 'clearml-yolo-codex-20260919-release030-ndku clearml-yolo' (0h38m old, owner clearml-yolo, 85c9ce4b145a4631a592110325d4d851) with its tasks
-1 project(s), 0 standalone task(s) deleted
-agent_cleanup.sh: what is left under clearml-yolo-codex-20260919-release030-ndku on the stand:
-0 project(s), 0 task(s) with prefix 'clearml-yolo-codex-20260919-release030-ndku'
-agent_cleanup.sh: removed /tmp/clearml-yolo-runs/clearml-yolo-codex-20260919-release030-ndku

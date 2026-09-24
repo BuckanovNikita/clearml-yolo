@@ -29,7 +29,6 @@ from clearml_yolo.comparison.scoring import (
 )
 from clearml_yolo.progress import track
 
-DASHBOARD_PREFIX = "full_dashboard"
 __all__ = ["EvaluationConfig"]
 
 

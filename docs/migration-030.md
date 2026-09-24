@@ -33,7 +33,8 @@ an absent key:
 
 ```bash
 uv run cy-train cfg=training.yaml +ultralytics.device=0 +ultralytics.epochs=10
-uv run cy +train.ultralytics.device=0 +predict.ultralytics.device=0
+uv run cy ground_truth=ground_truth.csv +train.ultralytics.data=data.yaml \
+  +train.ultralytics.device=0 +predict.ultralytics.device=0
 ```
 
 There is no `auto_gpu`, `--force-gpu`, custom augmentation JSON, or
@@ -96,23 +97,13 @@ metrics, tables and artifact records are published explicitly.
 Remote failure status records the exception type; full exception text stays in
 local diagnostics because it can contain credentials outside structured fields.
 
-## Agent runs
+## Local environment tooling
 
-Use the shared stand only through the helper:
+Repository-local agent scripts and automatic environment probes are no longer part
+of the application. Local operators can use the global `clearml-yolo-environment`
+skill; other environments supply their own ClearML setup and resource management.
+Set `clearml.project_name` and `clearml.tags` explicitly. Harness-specific environment
+variables no longer rewrite application configuration.
 
-```bash
-source scripts/agent_env.sh migration-030
-uv run cy run_dir=$CY_RUN_DIR \
-  clearml.project_name="$CY_RUN_TAG clearml-yolo" \
-  clearml.tags=[$CY_RUN_TAG] \
-  +train.ultralytics.device=0 \
-  +predict.ultralytics.device=0 \
-  ground_truth=ground_truth.csv \
-  +train.ultralytics.data=data.yaml
-scripts/agent_cleanup.sh
-```
-
-The helper preflights capacity, supplies the shared-stand credentials, creates a
-tagged directory, and verifies the authenticated endpoint. Set `INFRA_HARNESS=codex`
-before minting a tag when the environment has not already set it. Cleanup removes
-only objects and the directory named by the task's tag.
+The obsolete generated `conf/` snapshots were removed because they referenced
+retired modules. Create native YAML or a small Hydra overlay as shown in the README.

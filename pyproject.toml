@@ -21,7 +21,8 @@ dependencies = [
     "scipy>=1.11",
     "openpyxl>=3.1",
     "tqdm>=4.66",
-    "digital-metrics @ git+https://github.com/Wasilkas/digital-metrics@ecce79cdcade2bb463c4bcc9eac77512d1033117",
+    # Pin upstream main; changes require explicit user intent (see AGENTS.md).
+    "digital-metrics @ git+https://github.com/Wasilkas/digital-metrics@12fa6ce1b6ac4ab2b6db1f39e10f816a5849d068",
     "report-generator @ git+https://github.com/Wasilkas/report-generator@2172d3945723233b087b1375c2c821d020462f00",
 ]
 
@@ -254,7 +255,7 @@ exclude = ["^(digital-metrics|report-generator)/"]
 
 [[tool.mypy.overrides]]
 # The only dependencies that ship neither inline types nor a stub package. Everything
-# else, ultralytics and the ClearML SDK included, is checked against its real signatures.
+# else is checked against available signatures, except explicitly opaque adapter boundaries.
 module = [
     "digital_metrics.*",
     "report_generator.*",

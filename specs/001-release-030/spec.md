@@ -2,7 +2,7 @@
 
 **Feature Directory**: `specs/001-release-030`
 **Created**: 2026-09-19
-**Status**: Approved intent, ready for design
+**Status**: Implemented; see dated release verification
 **Input**: Implement the supplied 0.3.0 release plan without publication.
 
 ## Context and inventory
@@ -135,6 +135,6 @@ first run without baseline, and distributed parent return values are covered by 
 
 - Existing Python/toolchain constraints remain unless evidence requires a change.
 - Full comparison requires valid val/test data, accessible checkpoints and baseline thresholds.
-- Dataset images remain external. Agents use only the shared stand under task-owned tags.
-- Multiple physical GPUs are unavailable as a required gate; native forwarding and worker ownership
+- Dataset images remain external. Integration runs follow the environment's access and cleanup contract.
+- Physical multi-GPU execution is not a required release gate; native forwarding and worker ownership
   receive automated tests, with real distributed execution recorded as unverified.

@@ -88,13 +88,13 @@ def latest_completed_task_id(
 
 
 def _checkpoint_from_models(task: Any) -> str | None:
-    """Take the last output model a task registered, which is ultralytics' best.pt.
+    """Read the last registered model from a task using native callback storage.
 
     Ultralytics' own ClearML callback registers checkpoints as output models rather
     than artifacts, and registers more than one over a run — the last is the one that
     survived training.
     """
-    # clearml ships no type information, so the model containers are opaque.
+    # The adapter accepts opaque SDK task objects and keeps that boundary local.
     models: Any = task.get_models()
     output: list[Any] = list(models.get("output") or [])
     if not output:

@@ -30,29 +30,10 @@ RESOLVED_CONFIGURATION = "resolved_configuration"
 OWNER_PID_ENV = "CY_CLEARML_OWNER_PID"
 REDACTED = "<redacted>"
 
-# The run tag of the shared infrastructure, when this process runs under one: the
-# project's own spelling first, the contract's second. A tagged run is an agent's or a CI
-# job's, and its experiments belong in a project named after the tag so that the janitor
-# finds them and nothing lands among the user's own runs.
-RUN_TAG_ENV_VARS = ("CY_RUN_TAG", "INFRA_RUN_TAG")
 DEFAULT_PROJECT_NAME = "clearml-yolo"
 
-# clearml ships no type information, so its Task is opaque to the type checker.
+# Keep the SDK opaque at the adapter boundary so reporting modules need no SDK import.
 Task = Any
-
-
-def run_tag() -> str | None:
-    """The run tag this process was started under, or None for a person's own run."""
-    for name in RUN_TAG_ENV_VARS:
-        tag = os.environ.get(name, "").strip()
-        if tag:
-            return tag
-    return None
-
-
-def tagged_project_name(tag: str) -> str:
-    """The project a tagged run's experiments go to: ``<tag> <what>``, as the contract spells it."""
-    return f"{tag} {DEFAULT_PROJECT_NAME}"
 
 
 class ClearMLConfig(BaseModel):
@@ -68,25 +49,9 @@ class ClearMLConfig(BaseModel):
 
     @model_validator(mode="after")
     def _validate_tracking_destination(self) -> ClearMLConfig:
-        """Require remote artifacts and route tagged runs to their project.
-
-        Decided here rather than where the task is created because the project is read in
-        more than one place — the report and the comparison search it for a baseline — and
-        a name derived at only one of them would have the run write to one project and look
-        in another. ``project_name`` is taken as overridden whenever it differs from the
-        default: hydra-zen passes every field explicitly, so absence cannot be told from the
-        default any other way. The tag itself goes on every tagged run, named project or
-        not, so that its experiments can be found by tag wherever they landed.
-        """
+        """Require remote artifact storage without changing explicit run identity."""
         if self.output_uri is None or self.output_uri is False or self.output_uri == "":
             raise ValueError("ClearML output_uri is required for remote artifact storage")
-        tag = run_tag()
-        if tag is None:
-            return self
-        if self.project_name == DEFAULT_PROJECT_NAME:
-            self.project_name = tagged_project_name(tag)
-        if tag not in self.tags:
-            self.tags = [*self.tags, tag]
         return self
 
 
@@ -524,8 +489,3 @@ def connect_config_file(
     # Sanitization is for storage, not model execution: preserve local source values
     # (including externally managed credentials) or use the clone's effective source.
     return path if connected == sanitized_path and path.is_file() else connected
-
-
-def upload_dataframe(task: Any, name: str, frame: Any) -> None:
-    """Synchronously upload a required DataFrame artifact."""
-    upload_artifact(task, name, frame)
