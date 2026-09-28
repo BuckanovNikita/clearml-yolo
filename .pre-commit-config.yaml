@@ -1,7 +1,10 @@
 # Every check runs the project's own tools through `uv run`, so a hook and the command
 # you type by hand are the same command against the same locked versions. Nothing here
 # pins a second copy of ruff or mypy that could drift from the `dev` dependency group.
+# Install both hooks with scripts/local_release.py --install-hooks. The custom
+# post-commit launcher uses --all-files so pre-commit cannot hide dirty files.
 default_install_hook_types: [pre-commit]
+default_stages: [pre-commit]
 fail_fast: false
 
 repos:
@@ -46,3 +49,13 @@ repos:
         language: system
         types_or: [python, toml]
         pass_filenames: false
+
+      - id: local-release
+        name: Create local semantic version commit and tag
+        entry: uv run --locked --no-sync python scripts/local_release.py
+        args: [--post-commit]
+        language: system
+        stages: [post-commit]
+        always_run: true
+        pass_filenames: false
+        require_serial: true

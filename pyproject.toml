@@ -57,6 +57,7 @@ dev = [
     "pre-commit>=4.6.1",
     "pytest>=8.0",
     "ruff>=0.6",
+    "python-semantic-release>=10.5,<11",
 ]
 
 [tool.ruff]
@@ -278,3 +279,19 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = ["--strict-markers", "--strict-config"]
+
+[tool.semantic_release]
+commit_parser = "conventional"
+version_toml = ["pyproject.toml:project.version"]
+tag_format = "v{version}"
+allow_zero_version = true
+major_on_zero = false
+commit_message = "chore(release): {version}"
+no_git_verify = false
+
+[tool.semantic_release.branches.master]
+match = "^master$"
+prerelease = false
+
+[tool.semantic_release.remote]
+ignore_token_for_push = true
