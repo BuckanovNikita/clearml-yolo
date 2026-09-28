@@ -13,9 +13,6 @@ metrics/
 *.pt
 *.onnx
 
-digital-metrics/
-report-generator/
-
 clearml.conf
 
 # coco8 test fixtures

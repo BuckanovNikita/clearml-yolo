@@ -1,7 +1,5 @@
 """Hydra configuration with sparse, explicitly supplied native model arguments."""
 
-from __future__ import annotations
-
 import os
 import socket
 from collections.abc import Callable

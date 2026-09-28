@@ -1,7 +1,5 @@
 """Predict dataset images with native settings and persist the evaluation table."""
 
-from __future__ import annotations
-
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any

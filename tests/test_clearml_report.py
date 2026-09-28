@@ -5,8 +5,6 @@ tables, scalars, single values and the warn-and-skip paths — is exercised with
 ClearML server or the SDK.
 """
 
-from __future__ import annotations
-
 import math
 from collections.abc import Iterator
 from typing import Any

@@ -6,11 +6,9 @@ than in the order the caller listed them, and an image ultralytics cannot read s
 never appears among the results.
 """
 
-from __future__ import annotations
-
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 
 import numpy as np
 import pytest
@@ -31,7 +29,7 @@ class _Movable:
     def __init__(self, values: np.ndarray) -> None:
         self._values = values
 
-    def cpu(self) -> _Movable:
+    def cpu(self) -> Self:
         return self
 
     def numpy(self) -> np.ndarray:
@@ -65,7 +63,7 @@ class FakeYolo:
     it, so the tests exercise the real ordering and the real skipping.
     """
 
-    last: FakeYolo | None = None
+    last: "FakeYolo | None" = None
 
     def __init__(self, weights: str) -> None:
         self.weights = weights

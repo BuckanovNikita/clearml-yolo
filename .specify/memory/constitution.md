@@ -8,8 +8,10 @@ Python changes MUST follow the Ruff and strict mypy configuration in
 [pyproject.toml](../../pyproject.toml). Its rules, exceptions, and dependency constraints are
 the maintained source of truth; changes MUST NOT weaken them merely to silence a failure.
 
-- Modules MUST use `from __future__ import annotations`, absolute imports, and configured
-  import ordering. Code MUST follow the configured Python target and line-length limit.
+- Modules MUST NOT use `from __future__ import annotations`. Use runtime annotations,
+  `typing.Self` for methods returning their receiver, and quoted forward references or
+  stub-only generics where runtime evaluation is unsupported. Modules MUST use absolute
+  imports and configured import ordering, Python target and line-length limit.
 - Functions MUST declare parameter and return types. Configuration and validated data models
   MUST use Pydantic where validation is required, following existing model conventions.
   Mutable model defaults MUST use factories.
@@ -37,7 +39,7 @@ including package layers, task layers, comparison layers, independent app entryp
 forbidden external imports. The package dependency direction is:
 
 ```text
-apps -> configs -> tasks -> comparison -> domain modules -> run_identity
+apps -> config_tree -> configs -> tasks -> comparison -> domain modules -> run_identity
 ```
 
 App entrypoints MUST remain independent and delegate work to tasks or domain modules.
@@ -61,8 +63,10 @@ MUST derive from the same task contracts rather than duplicate independently mai
 parameter definitions.
 
 The pipeline MUST own shared tracking, dataset, splits, checkpoint, identity and output
-routing. Producers MUST pass actual outputs to consumers. Every invocation MUST own one
-ClearML task; pipeline stages MUST share it. ClearML is required. Completion MUST wait for
+routing. Producers MUST pass actual outputs to consumers. Every execution invocation MUST
+own one ClearML task; pipeline stages MUST share it. ClearML is required for execution.
+Local configuration initialization MUST NOT create a task or load model runtimes.
+Completion MUST wait for
 all required stage artifacts to upload; computation or upload failures MUST fail the task
 and preserve local diagnostic outputs. Credentials and dataset images MUST NOT be uploaded.
 
@@ -71,8 +75,11 @@ use run_dir; conflicting native output settings MUST be rejected explicitly. Ski
 consumers MUST validate required existing inputs. Convenience links MUST preserve user data.
 
 Model execution MUST delegate device, batch, AMP, compilation and distributed training to
-Ultralytics. Runtime GPU scheduling, leases, batch tuning, augmentation-JSON processing and
-configuration-tree generation MUST NOT be provided. Raw native YAML and explicitly supplied
+Ultralytics. Runtime GPU scheduling, leases, batch tuning and augmentation-JSON processing
+MUST NOT be provided. `cy-init-config` MUST export current command defaults as editable
+examples, preserving sparse native mappings and required inputs. Existing examples MUST
+be protected unless replacement is explicit; unrelated files MUST be preserved.
+Raw native YAML and explicitly supplied
 embedded mappings MUST compose as upstream defaults < raw YAML < embedded values < CLI.
 Explicit values equal to defaults MUST retain their precedence.
 
@@ -176,6 +183,14 @@ Amendment 2.0.1 relocates machine-specific operational guidance to global skills
 It preserves credential, capacity and task-owned cleanup safeguards while keeping
 application and repository instructions independent of a particular installation.
 
+Amendment 3.0.0 implements the user's explicit requests to restore `cy-init-config` and
+remove all future-annotations imports. It reverses the import mandate in Principle I
+and the config-generation prohibition in Principle III, adds the generator to Principle II's
+dependency direction, and exempts local initialization from task ownership. The major version
+reflects these incompatible governance changes. Existing execution, privacy, dependency and
+verification contracts remain in force. Migration removes the imports, repairs annotations
+that require explicit deferral, and regenerates obsolete examples using current defaults.
+
 This constitution records the established engineering conventions of `clearml-yolo`.
 Implementation, specifications, plans, and reviews MUST comply with its principles within
 their scope. [AGENTS.md](../../AGENTS.md) supplies operational guidance;
@@ -200,4 +215,4 @@ that deliberately alters a governing rule MUST include an explicit amendment rat
 quietly weakening checks. Constitution updates MUST remain confined to this document;
 dependent template or implementation changes require their own authorized work.
 
-**Version**: 2.0.1 | **Ratified**: 2026-09-19 | **Last Amended**: 2026-09-20
+**Version**: 3.0.0 | **Ratified**: 2026-09-19 | **Last Amended**: 2026-09-28

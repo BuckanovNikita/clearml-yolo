@@ -13,8 +13,6 @@ collapsible sections exist in the plots and scalars tabs, keyed by title — see
 :mod:`clearml_yolo.clearml_report`.
 """
 
-from __future__ import annotations
-
 PREDICTIONS = "predict_predictions"
 
 # Not an artifact but a configuration object, which is a different tab and a different

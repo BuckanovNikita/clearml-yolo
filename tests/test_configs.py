@@ -1,7 +1,5 @@
 """Every retained CLI composes while removed fields fail explicitly."""
 
-from __future__ import annotations
-
 import pytest
 from hydra import compose, initialize_config_module
 from hydra.errors import ConfigCompositionException

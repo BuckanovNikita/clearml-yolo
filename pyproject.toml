@@ -21,9 +21,9 @@ dependencies = [
     "scipy>=1.11",
     "openpyxl>=3.1",
     "tqdm>=4.66",
-    # Pin upstream main; changes require explicit user intent (see AGENTS.md).
-    "digital-metrics @ git+https://github.com/Wasilkas/digital-metrics@12fa6ce1b6ac4ab2b6db1f39e10f816a5849d068",
-    "report-generator @ git+https://github.com/Wasilkas/report-generator@2172d3945723233b087b1375c2c821d020462f00",
+    # The external/ submodules track upstream main and pin resolved commits (see AGENTS.md).
+    "digital-metrics>=0.5.3",
+    "report-generator>=0.1.0",
 ]
 
 [project.scripts]
@@ -35,10 +35,17 @@ cy-report = "clearml_yolo.apps.report:main"
 cy-compare = "clearml_yolo.apps.compare:main"
 cy-ground-truth = "clearml_yolo.apps.ground_truth:main"
 cy-val = "clearml_yolo.apps.val:main"
+cy-init-config = "clearml_yolo.apps.config_tree:main"
 
 [build-system]
 requires = ["uv_build>=0.11.32,<0.12.0"]
 build-backend = "uv_build"
+
+[tool.uv.sources]
+# Local development uses the pinned submodules. For other environments, replace
+# these with Git sources via `uv add`; see the installation instructions in README.md.
+digital-metrics = { path = "external/digital-metrics", editable = true }
+report-generator = { path = "external/report-generator", editable = true }
 
 [dependency-groups]
 dev = [
@@ -55,6 +62,7 @@ dev = [
 line-length = 100
 target-version = "py312"
 src = ["src", "tests"]
+extend-exclude = ["external"]
 
 [tool.ruff.lint]
 select = [
@@ -131,7 +139,6 @@ ban-relative-imports = "all"
 
 [tool.ruff.lint.isort]
 known-first-party = ["clearml_yolo"]
-required-imports = ["from __future__ import annotations"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10
@@ -145,6 +152,7 @@ name = "Package layers"
 type = "layers"
 layers = [
     "clearml_yolo.apps",
+    "clearml_yolo.config_tree",
     "clearml_yolo.configs",
     "clearml_yolo.tasks",
     "clearml_yolo.comparison",
@@ -170,6 +178,7 @@ name = "Every app entrypoint stands alone"
 type = "independence"
 modules = [
     "clearml_yolo.apps.compare",
+    "clearml_yolo.apps.config_tree",
     "clearml_yolo.apps.ground_truth",
     "clearml_yolo.apps.metrics",
     "clearml_yolo.apps.pipeline",
@@ -184,6 +193,7 @@ name = "The ClearML SDK stays behind the clearml_* adapters"
 type = "forbidden"
 source_modules = [
     "clearml_yolo.apps",
+    "clearml_yolo.config_tree",
     "clearml_yolo.comparison",
     "clearml_yolo.configs",
     "clearml_yolo.inference",
@@ -217,6 +227,7 @@ name = "Model weights are only ever loaded in one place"
 type = "forbidden"
 source_modules = [
     "clearml_yolo.apps",
+    "clearml_yolo.config_tree",
     "clearml_yolo.configs",
     "clearml_yolo.clearml_session",
     "clearml_yolo.clearml_models",
@@ -249,9 +260,8 @@ enable_error_code = [
     "unimported-reveal",
     "unused-awaitable",
 ]
-# Both upstream repos are cloned into this tree for reference but consumed as installed
-# packages, so they are not ours to type-check.
-exclude = ["^(digital-metrics|report-generator)/"]
+# Submodules are external dependencies, so they are not ours to type-check.
+exclude = ["^external/"]
 
 [[tool.mypy.overrides]]
 # The only dependencies that ship neither inline types nor a stub package. Everything

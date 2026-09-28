@@ -34,6 +34,7 @@ This skill defines product acceptance, not deployment or machine setup.
    Clean up only owned resources according to that environment's instructions.
 
 Build and install both distributions in fresh environments for release acceptance.
-Verify eight command helps, removed entrypoints, and documented configuration examples.
+Verify nine command helps, absence of `cy-queue`, and documented configuration examples.
+Check `cy-init-config` generation and overwrite protection without a ClearML task.
 CPU and single-GPU runs are required release gates; report an unavailable device as
 an unverified gate. Describe physical multi-GPU execution as unverified unless exercised.

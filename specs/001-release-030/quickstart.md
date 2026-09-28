@@ -1,6 +1,9 @@
 # Release validation guide
 
-Use Python/toolchain from pyproject.toml. Run `uv sync --group dev` then `uv run cy --help`.
+Use Python/toolchain from pyproject.toml. Run `git submodule update --init --recursive`,
+then `uv sync --locked --group dev` and `uv run cy --help`. Both external dependencies
+are installed editable from `external/`. For installations without submodules, select
+Git sources using the [installation instructions](../../README.md#установка).
 See [CLI](contracts/cli.md) and [artifacts](contracts/artifacts.md) for exact contracts.
 
 1. Run pytest, Ruff, mypy, import-linter and applicable pre-commit checks.
@@ -13,8 +16,9 @@ See [CLI](contracts/cli.md) and [artifacts](contracts/artifacts.md) for exact co
    compare the candidate. Exercise cy-val, cy-compare and cy-report independently.
 5. Download required artifacts; check contents, thresholds, paired counts and one-task
    ownership. Induce upload failure and interruption using isolated test tasks.
-6. Build with `uv build`, install each distribution in a fresh environment, verify eight
-   command helps and absent cy-queue/cy-init-config. Run documented examples.
+6. Build with `uv build`, install each distribution in a fresh environment, verify nine
+   command helps and absent cy-queue. Run `cy-init-config` into a fresh directory, check
+   all eight generated examples compose and verify overwrite protection. Run documented examples.
 7. Record dated outcomes and limitations, then remove only owned resources. Physical
    distributed execution is unverified unless actually tested.
 

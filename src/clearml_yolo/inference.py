@@ -4,8 +4,6 @@ A text manifest preserves filenames and native batching. Every requested image m
 produce a result, including empty images; silently skipped images fail the invocation.
 """
 
-from __future__ import annotations
-
 from collections.abc import Sequence
 from pathlib import Path
 from tempfile import TemporaryDirectory

@@ -1,7 +1,5 @@
 """Native Ultralytics training with explicit artifact ownership."""
 
-from __future__ import annotations
-
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any

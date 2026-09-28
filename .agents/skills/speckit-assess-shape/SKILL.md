@@ -7,6 +7,15 @@ metadata:
   source: assess:commands/speckit.assess.shape.md
 ---
 
+## Host compatibility
+
+These instructions are shared by Codex and Claude Code. Examples use Codex's
+`$speckit-*` syntax; use `/speckit-*` in Claude Code. These are skill invocations,
+not shell commands. Convert dotted hook IDs to hyphenated skill names and use the
+current host's invocation mechanism for both hook display and execution. If an
+argument placeholder is left unexpanded, use the current user's invocation text;
+an empty invocation has no arguments. Run repository scripts from the repository root.
+
 # Shape a Concept
 
 Take the defined problem and shape a **concept** at `.specify/assessments/<slug>/concept.md`: the rough solution options, the scope/appetite, and the trade-offs between them. This is where the assessment crosses from problem space into solution space — but only at the *concept* level. Detailed design (architecture, data models, APIs, tasks) stays with `$speckit-specify` and the rest of the SDD lifecycle.

@@ -16,9 +16,11 @@ uv run cy-ground-truth data_yaml=data.yaml output=ground_truth.csv
 The precedence is native defaults, YAML, explicit embedded mapping, then CLI overrides.
 Add absent keys with `+ultralytics.key=value` or the matching pipeline prefix.
 
-ClearML is required. Pass `clearml.project_name` and `clearml.tags` explicitly when
-isolating runs. `run_dir` routes pipeline output; conflicting stage paths or native
-training `project`/`name` values fail. Standalone stages require explicit inputs.
+ClearML is required for execution commands. Pass `clearml.project_name` and
+`clearml.tags` explicitly when isolating runs. `run_dir` routes pipeline output;
+conflicting stage paths or native training `project`/`name` values fail. Standalone
+stages require explicit inputs. `cy-init-config DIRECTORY [--force]` only writes
+editable configuration examples and does not create a ClearML task.
 
 Select native `device`, `batch`, `amp` and `compile` settings for the environment.
 The application performs no scheduling, GPU leasing, or batch tuning.

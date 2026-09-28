@@ -1,7 +1,5 @@
 """Re-inference must score the current split's own images, or fail loudly."""
 
-from __future__ import annotations
-
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, override

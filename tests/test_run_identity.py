@@ -1,7 +1,5 @@
 """Run identity: the id, the private run directory, and the ``latest`` symlink."""
 
-from __future__ import annotations
-
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path

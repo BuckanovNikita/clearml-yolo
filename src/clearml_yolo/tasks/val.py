@@ -1,7 +1,5 @@
 """Standalone checkpoint inference followed by frozen-threshold evaluation."""
 
-from __future__ import annotations
-
 from pathlib import Path
 from typing import Any
 

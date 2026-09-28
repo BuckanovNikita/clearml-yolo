@@ -1,12 +1,10 @@
 """Re-infer and evaluate two checkpoints on the same current test images."""
 
-from __future__ import annotations
-
 import hashlib
 import json
 import zipfile
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Self
 
 import pandas as pd
 import yaml
@@ -65,7 +63,7 @@ class ModelRef(BaseModel):
     thresholds: dict[str, float] | None = None
 
     @model_validator(mode="after")
-    def _validate_source(self) -> ModelRef:
+    def _validate_source(self) -> Self:
         if self.source == "local":
             if self.weights is None:
                 raise ValueError("source='local' requires weights")
@@ -177,7 +175,7 @@ class InferenceConfig(BaseModel):
     ultralytics: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def _no_duplicate_native_keys(self) -> InferenceConfig:
+    def _no_duplicate_native_keys(self) -> Self:
         fixed = {
             "batch",
             "conf",

@@ -1,7 +1,5 @@
 """Calibrate on validation once, then score every split at frozen thresholds."""
 
-from __future__ import annotations
-
 from pathlib import Path
 from typing import Any
 

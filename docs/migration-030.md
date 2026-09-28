@@ -2,16 +2,28 @@
 
 Version 0.3.0 removes the project's custom execution automation. YOLO now owns
 device selection, batching, AMP, compilation and augmentation through its native
-arguments. ClearML tracking is required for every invocation.
+arguments. ClearML tracking is required for every execution invocation.
 
 ## Commands
 
 The installed commands are `cy`, `cy-train`, `cy-predict`, `cy-val`,
-`cy-metrics`, `cy-report`, `cy-compare`, and `cy-ground-truth`.
+`cy-metrics`, `cy-report`, `cy-compare`, `cy-ground-truth`, and `cy-init-config`.
 
-`cy-queue` and `cy-init-config` have been removed. Do not retain generated
-configuration trees; pass native YAML with `cfg=<path>` or set wrapper and native
-arguments directly.
+`cy-queue` remains removed. `cy-init-config DIRECTORY [--force]` is restored to write
+editable examples for the eight execution commands, using current defaults and sparse
+native mappings. Replace old generated configuration trees with these examples; retired
+wrapper options remain unsupported. Existing examples are preserved unless `--force` is
+supplied. Initialization does not connect to ClearML or create a task.
+
+```bash
+uv run cy-init-config ./conf
+uv run cy-train --config-dir=./conf --config-name=cy-train \
+  +ultralytics.data=data.yaml +ultralytics.epochs=10
+```
+
+Fill required `???` inputs and configure ClearML before execution. Relative input paths
+are resolved from the working directory. Native YAML via `cfg=<path>` and direct wrapper
+and native command-line arguments remain supported.
 
 `cy-val` predicts a checkpoint on validation and requested splits, calibrates the
 candidate thresholds on validation, and evaluates the requested data with those
@@ -83,7 +95,7 @@ and statistical counts describe the same evaluation.
 
 ## Tracking and artifacts
 
-Every invocation owns one ClearML task. Nested pipeline stages reuse that owner;
+Every execution invocation owns one ClearML task. Nested pipeline stages reuse that owner;
 native callbacks and workers do not create tasks or upload artifacts. A task is
 completed only after required artifacts have uploaded. Computation, upload, flush,
 or interruption failures fail both task and command while retaining local outputs.
@@ -106,4 +118,5 @@ Set `clearml.project_name` and `clearml.tags` explicitly. Harness-specific envir
 variables no longer rewrite application configuration.
 
 The obsolete generated `conf/` snapshots were removed because they referenced
-retired modules. Create native YAML or a small Hydra overlay as shown in the README.
+retired modules. Use `cy-init-config ./conf` for current examples, or create native YAML
+or a small Hydra overlay as shown in the README.

@@ -59,9 +59,10 @@ Ultralytics YOLO training, prediction, validation, metrics, reports, and model c
 
 ## Project contracts
 
-Eight entrypoints remain: `cy`, `cy-train`, `cy-predict`, `cy-val`, `cy-metrics`,
-`cy-report`, `cy-compare`, and `cy-ground-truth`. `cy-queue` and `cy-init-config` are
-removed.
+Nine entrypoints: `cy`, `cy-train`, `cy-predict`, `cy-val`, `cy-metrics`,
+`cy-report`, `cy-compare`, `cy-ground-truth`, and `cy-init-config`.
+`cy-init-config DIRECTORY [--force]` writes editable examples for the eight execution
+commands without creating a ClearML task. `cy-queue` remains removed.
 
 Native model settings are sparse `ultralytics` mappings: `train.ultralytics` and
 `predict.ultralytics` in the pipeline. A neighbouring `cfg` names unchanged native YAML.
@@ -71,8 +72,8 @@ Hydra CLI overrides. Add an absent setting with `+ultralytics.key=value` (or
 batch, AMP, compilation, and native augmentation options directly to Ultralytics.
 
 The project no longer provides GPU scheduling, filesystem queues or leases, batch tuning,
-custom augmentation JSON, configuration-tree generation, `--force-gpu`, or disabled
-tracking. Removed options must fail rather than be silently ignored.
+custom augmentation JSON, `--force-gpu`, or disabled tracking. Removed options must fail
+rather than be silently ignored.
 
 `run_dir` owns output routing for `cy`. Pipeline stages cannot use conflicting stage output
 paths or conflicting native training project/name. Standalone output-producing commands use
@@ -85,12 +86,23 @@ current-test results from `comparison_dir`. Historical dashboards are not compar
 The automatic baseline is the latest completed prod-tagged task excluding the current task;
 missing automatic baseline skips comparison, while invalid explicit references fail.
 
-ClearML is required. One invocation owns exactly one task; nested stages reuse it and workers
-do not create tasks or upload artifacts. Complete a task only after all required artifacts
+ClearML is required for execution commands. One execution invocation owns exactly one task;
+nested stages reuse it and workers do not create tasks or upload artifacts.
+Complete a task only after all required artifacts
 are uploaded and flushed. Fail task and command on computation, upload, flush, or interruption
 errors while retaining local output. Never capture credentials or dataset images.
 
 ## External dependencies
+
+`digital-metrics` and `report-generator` live in `external/` as Git submodules.
+Both track upstream `main` through `.gitmodules`; `git submodule update --remote`
+advances their checkouts when an upstream update is requested.
+Initialize them with `git submodule update --init --recursive` before `uv sync`.
+Local development installs them editable through `[tool.uv.sources]`; the parent
+repository's gitlinks pin their revisions. For installations without submodules,
+users can select Git URLs and branches as documented in README.md. Git sources use
+`branch = "main"` (or `master` for a user-selected repository); `uv.lock` records
+the resolved commits.
 
 `digital-metrics` is an external dependency. Keep it pinned to the approved upstream
 revision. Do not change its source, checkout, dependency reference or locked revision

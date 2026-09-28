@@ -7,8 +7,6 @@ went through (``clearml_yolo.inference.predict_on_images``, which the predict
 stage also calls).
 """
 
-from __future__ import annotations
-
 import json
 from collections.abc import Callable
 from pathlib import Path
@@ -106,7 +104,7 @@ def _existing_image_paths(split_rows: pd.DataFrame, split: str) -> list[str]:
 
 
 def _vocabulary_report(
-    model_names: dict[int, str], split_labels: pd.Series[str]
+    model_names: dict[int, str], split_labels: "pd.Series[str]"
 ) -> VocabularyReport:
     model_classes = [model_names[index] for index in sorted(model_names)]
     ground_truth_classes = {str(label) for label in split_labels.dropna().unique()}

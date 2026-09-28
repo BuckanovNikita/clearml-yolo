@@ -5,6 +5,15 @@
 **Status**: Implemented; see dated release verification
 **Input**: Implement the supplied 0.3.0 release plan without publication.
 
+**Post-release amendment (2026-09-28)**: Restore `cy-init-config DIRECTORY [--force]`
+as a local initializer for eight editable command examples. The current
+[CLI contract](contracts/cli.md) supersedes the original config-generation removal and
+eight-entrypoint requirement below; the package now exposes nine commands. ClearML task
+ownership applies to execution commands, not this local initializer.
+The subsequent [configuration and publication specification](../002-config-init-release/spec.md)
+also governs removal of future-annotations imports and authorizes publication of 0.3.0,
+superseding this original specification's non-publication scope.
+
 ## Context and inventory
 
 Detection practitioners need native model execution plus reproducible evaluation and

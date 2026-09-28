@@ -5,8 +5,6 @@ that training scalars, prediction artifacts, per-split metrics and the compariso
 reports all land on one experiment.
 """
 
-from __future__ import annotations
-
 import dataclasses
 import json
 import os
@@ -18,7 +16,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any
+from typing import Any, Self
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import yaml
@@ -48,7 +46,7 @@ class ClearMLConfig(BaseModel):
     output_uri: str | bool | None = True
 
     @model_validator(mode="after")
-    def _validate_tracking_destination(self) -> ClearMLConfig:
+    def _validate_tracking_destination(self) -> Self:
         """Require remote artifact storage without changing explicit run identity."""
         if self.output_uri is None or self.output_uri is False or self.output_uri == "":
             raise ValueError("ClearML output_uri is required for remote artifact storage")

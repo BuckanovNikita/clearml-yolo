@@ -7,6 +7,15 @@ metadata:
   source: bug:commands/speckit.bug.test.md
 ---
 
+## Host compatibility
+
+These instructions are shared by Codex and Claude Code. Examples use Codex's
+`$speckit-*` syntax; use `/speckit-*` in Claude Code. These are skill invocations,
+not shell commands. Convert dotted hook IDs to hyphenated skill names and use the
+current host's invocation mechanism for both hook display and execution. If an
+argument placeholder is left unexpanded, use the current user's invocation text;
+an empty invocation has no arguments. Run repository scripts from the repository root.
+
 # Test Bug Fix
 
 Validate that the fix recorded by `$speckit-bug-fix` actually resolves the bug described by `$speckit-bug-assess`. The output is a verification report at `.specify/bugs/<slug>/test.md`.

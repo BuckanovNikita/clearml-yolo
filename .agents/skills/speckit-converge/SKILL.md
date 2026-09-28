@@ -5,8 +5,18 @@ compatibility: "Requires spec-kit project structure with .specify/ directory"
 metadata:
   author: "github-spec-kit"
   source: "templates/commands/converge.md"
+user-invocable: true
+disable-model-invocation: false
 ---
 
+## Host compatibility
+
+These instructions are shared by Codex and Claude Code. Examples use Codex's
+`$speckit-*` syntax; use `/speckit-*` in Claude Code. These are skill invocations,
+not shell commands. Convert dotted hook IDs to hyphenated skill names and use the
+current host's invocation mechanism for both hook display and execution. If an
+argument placeholder is left unexpanded, use the current user's invocation text;
+an empty invocation has no arguments. Run repository scripts from the repository root.
 
 ## User Input
 
@@ -94,7 +104,7 @@ skip constitution checks gracefully rather than failing.
 
 ### 1. Initialize Convergence Context
 
-Run `.specify/scripts/bash/check-prerequisites.sh --json --require-spec --require-tasks --include-tasks` once from repo root and parse JSON for FEATURE_DIR and AVAILABLE_DOCS. Derive absolute paths:
+Run `bash .specify/scripts/bash/check-prerequisites.sh --json --paths-only` once from repo root and parse FEATURE_DIR. This mode leaves `.specify/feature.json` unchanged; validate required files explicitly below because it resolves paths without checking file existence. Derive absolute paths:
 
 - SPEC = FEATURE_DIR/spec.md
 - PLAN = FEATURE_DIR/plan.md

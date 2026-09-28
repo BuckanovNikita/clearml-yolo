@@ -12,8 +12,6 @@ supplies recall's confidence interval only and deliberately returns a NaN p-valu
 the recall hypothesis cannot be counted twice in the Benjamini-Hochberg family.
 """
 
-from __future__ import annotations
-
 from collections.abc import Sequence
 
 import numpy as np

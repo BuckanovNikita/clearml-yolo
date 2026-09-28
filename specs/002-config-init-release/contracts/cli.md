@@ -1,0 +1,25 @@
+# Initializer and Annotation Contracts
+
+The complete execution contract remains [the current CLI contract](../../001-release-030/contracts/cli.md).
+
+```text
+cy-init-config DIRECTORY [--force]
+```
+
+- Required positional directory, standard `--help`, optional explicit replacement.
+- Creates `cy.yaml`, `cy-train.yaml`, `cy-predict.yaml`, `cy-val.yaml`, `cy-metrics.yaml`,
+  `cy-report.yaml`, `cy-compare.yaml`, and `cy-ground-truth.yaml`.
+- Each is consumed by its matching command with `--config-dir DIRECTORY --config-name COMMAND`.
+- Missing inputs remain `???`; native mappings remain sparse. Relative inputs use the
+  execution working directory. Comments describe usage, tracking identity, and native overrides.
+- Existing example paths fail before writes unless force is supplied. Force refuses symlink
+  and directory destinations and only replaces regular example files. Other contents survive.
+- Success exits zero. argparse argument/filesystem errors exit 2 with a diagnostic.
+- No task, credential lookup, training, prediction, or model import occurs during initialization.
+
+All first-party Python modules omit the future-annotations import. Self references and
+stub-only generics use explicit compatible annotations. This changes annotation evaluation
+inside the package, not the supported command or artifact interfaces.
+
+The existing dependency pins, ClearML execution requirement, removed queue/GPU automation,
+native precedence, and pipeline output ownership remain unchanged.

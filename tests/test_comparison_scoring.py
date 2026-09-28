@@ -1,7 +1,5 @@
 """Fixed-threshold scoring must tally exactly what the match records describe."""
 
-from __future__ import annotations
-
 import pandas as pd
 import pytest
 

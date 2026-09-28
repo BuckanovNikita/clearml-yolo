@@ -6,8 +6,6 @@ by image name. Dataset roots, split entries and label locations are resolved wit
 ultralytics' own helpers so a plain ``data=`` yaml behaves exactly as it does in training.
 """
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import numpy as np

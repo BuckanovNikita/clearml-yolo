@@ -7,8 +7,6 @@ back — the report stage pulls dashboards, but a dashboard is neither a checkpo
 full-precision threshold table.
 """
 
-from __future__ import annotations
-
 import json
 from collections.abc import Sequence
 from pathlib import Path

@@ -11,8 +11,6 @@ controlled over. And the pooled row stays outside the family: it is a summary of
 same data, so folding it in would count the evidence twice.
 """
 
-from __future__ import annotations
-
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass

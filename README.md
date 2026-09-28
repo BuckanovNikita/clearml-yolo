@@ -7,9 +7,63 @@ ClearML.
 
 ## Установка
 
+Для локальной разработки инициализируйте подмодули и установите зависимости:
+
 ```bash
+git submodule update --init --recursive
+uv sync --locked
+```
+
+`digital-metrics` и `report-generator` находятся в `external/` как Git-подмодули.
+Оба подмодуля отслеживают upstream-ветку `main`; точные ревизии закреплены в
+родительском репозитории. `uv sync` устанавливает оба
+пакета в editable-режиме из этих каталогов; изменения исходников видны без
+переустановки. После переключения ветки или обновления репозитория повторите
+обе команды. При первом клонировании можно использовать `git clone --recurse-submodules`.
+
+Для обновления обоих подмодулей до текущей `main`:
+
+```bash
+git submodule update --remote --recursive
 uv sync
 ```
+
+Сохраняйте обновлённые ревизии подмодулей и `uv.lock` вместе.
+
+Для установки без подмодулей задайте свои Git-источники. Установите
+`DIGITAL_METRICS_GIT_URL` и `REPORT_GENERATOR_GIT_URL` в адреса нужных репозиториев
+(`https://…` или `ssh://git@…`, без префикса `git+`). Оба upstream-репозитория
+используют `main`; для репозиториев с веткой `master` замените имя ветки:
+
+```bash
+uv add --no-sync --branch main \
+  "digital-metrics @ git+${DIGITAL_METRICS_GIT_URL:?}" \
+  "report-generator @ git+${REPORT_GENERATOR_GIT_URL:?}"
+uv sync --locked --no-dev
+```
+
+Эта команда заменяет оба пути в `[tool.uv.sources]` файла `pyproject.toml`
+на Git-источники с `branch = "main"` и обновляет `uv.lock`; сохраняйте их вместе
+для воспроизводимости. Lock-файл фиксирует выбранные коммиты. Для обновления
+Git-источников до текущей ветки выполните
+`uv lock --upgrade-package digital-metrics --upgrade-package report-generator`,
+затем `uv sync --locked --no-dev`.
+Переменные используются оболочкой только при выполнении команды. Сам флаг
+`--no-dev` исключает инструменты разработки, но не переключает источники.
+Настройка источников описана в [документации uv](https://docs.astral.sh/uv/concepts/projects/dependencies/#dependency-sources).
+
+Для возврата к локальным подмодулям:
+
+```bash
+git submodule update --init --recursive
+uv add --no-sync --editable ./external/digital-metrics ./external/report-generator
+uv sync --locked
+```
+
+При установке wheel через `uv pip install` или `pip install` передавайте оба
+Git-требования из примера выше с суффиксом `@main` (либо `@master`) после URL
+вместе с путём к wheel. Эти команды не используют `[tool.uv.sources]`, а внешние
+пакеты не включаются в дистрибутив `clearml-yolo`.
 
 Python проекта — 3.12. Перед первым запуском настройте ClearML: для своей
 интерактивной работы подойдёт `uv run clearml-init` либо переменные окружения
@@ -29,15 +83,39 @@ Python проекта — 3.12. Перед первым запуском нас�
 | `cy-report` | developer и business отчёты из парной текущей оценки |
 | `cy-compare` | сравнение baseline и candidate на одних текущих test-изображениях |
 | `cy-ground-truth` | преобразование разметки YOLO из `data.yaml` в CSV |
+| `cy-init-config` | создание каталога с примерами конфигураций |
 
-Команд `cy-queue` и `cy-init-config` больше нет. Проект не управляет очередью,
+Команды `cy-queue` больше нет. Проект не управляет очередью,
 лизами GPU, подбором batch, пользовательскими JSON-аугментациями и отключённым
 треккингом. `auto_gpu`, `--force-gpu`, `clearml.enabled=false` и удалённые поля
 вызывают явную ошибку.
 
 ## Быстрый старт
 
-Сначала постройте CSV разметки:
+Создайте каталог с редактируемыми примерами:
+
+```bash
+uv run cy-init-config ./conf
+```
+
+Команда создаёт восемь файлов: `cy.yaml`, `cy-train.yaml`, `cy-predict.yaml`,
+`cy-val.yaml`, `cy-metrics.yaml`, `cy-report.yaml`, `cy-compare.yaml` и
+`cy-ground-truth.yaml`. Они содержат текущие настройки команд и подсказки по
+нативным параметрам. Замените обязательные значения `???`, задайте входные пути
+и настройки ClearML. Относительные пути считаются от рабочей директории запуска.
+Инициализация не требует подключения к ClearML и не создаёт задачу.
+Существующие примеры защищены от перезаписи; для их замены используйте
+`uv run cy-init-config ./conf --force`. Остальные файлы каталога сохраняются.
+
+Пример запуска с созданной конфигурацией:
+
+```bash
+uv run cy-train --config-dir=./conf --config-name=cy-train \
+  +ultralytics.data=data.yaml +ultralytics.model=yolo11n.pt +ultralytics.epochs=10 \
+  clearml.project_name=detection clearml.tags='[example]'
+```
+
+Для полного конвейера сначала постройте CSV разметки:
 
 ```bash
 uv run cy-ground-truth data_yaml=data.yaml output=ground_truth.csv
@@ -148,8 +226,9 @@ business-отчётов. Поэтому числа, исключённые кл�
 
 ## ClearML и артефакты
 
-Каждое обращение к команде создаёт ровно одну задачу ClearML. Вложенные стадии
-конвейера используют того же владельца; воркеры и callback Ultralytics не создают
+Каждая команда исполнения создаёт ровно одну задачу ClearML; `cy-init-config`
+только записывает локальные YAML. Вложенные стадии конвейера используют того же
+владельца; воркеры и callback Ultralytics не создают
 дополнительных задач, моделей, метрик или загрузок. Задача считается завершённой
 только после синхронной загрузки всех обязательных результатов.
 

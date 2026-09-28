@@ -8,8 +8,6 @@ this module composes the public sub-package functions (``match_boxes`` then
 ``slice_by_conf``) and does its own tally.
 """
 
-from __future__ import annotations
-
 import math
 from collections.abc import Mapping
 from copy import deepcopy

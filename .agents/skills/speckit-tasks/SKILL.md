@@ -5,8 +5,19 @@ compatibility: "Requires spec-kit project structure with .specify/ directory"
 metadata:
   author: "github-spec-kit"
   source: "templates/commands/tasks.md"
+argument-hint: "Optional task generation constraints"
+user-invocable: true
+disable-model-invocation: false
 ---
 
+## Host compatibility
+
+These instructions are shared by Codex and Claude Code. Examples use Codex's
+`$speckit-*` syntax; use `/speckit-*` in Claude Code. These are skill invocations,
+not shell commands. Convert dotted hook IDs to hyphenated skill names and use the
+current host's invocation mechanism for both hook display and execution. If an
+argument placeholder is left unexpanded, use the current user's invocation text;
+an empty invocation has no arguments. Run repository scripts from the repository root.
 
 ## User Input
 

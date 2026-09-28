@@ -1,7 +1,5 @@
 """Configuration provenance must preserve explicit native defaults."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import pytest

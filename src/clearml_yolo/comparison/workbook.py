@@ -4,8 +4,6 @@ Sheet titles, column headers and cell markers are Russian because the workbook i
 stakeholders; they are data, not documentation.
 """
 
-from __future__ import annotations
-
 import math
 from pathlib import Path
 from typing import Any

@@ -1,7 +1,5 @@
 """Compose native execution and current-data evaluation under one tracking owner."""
 
-from __future__ import annotations
-
 import json
 from dataclasses import is_dataclass
 from datetime import UTC, datetime

@@ -7,6 +7,15 @@ metadata:
   source: bug:commands/speckit.bug.assess.md
 ---
 
+## Host compatibility
+
+These instructions are shared by Codex and Claude Code. Examples use Codex's
+`$speckit-*` syntax; use `/speckit-*` in Claude Code. These are skill invocations,
+not shell commands. Convert dotted hook IDs to hyphenated skill names and use the
+current host's invocation mechanism for both hook display and execution. If an
+argument placeholder is left unexpanded, use the current user's invocation text;
+an empty invocation has no arguments. Run repository scripts from the repository root.
+
 # Assess Bug
 
 Triage a bug report against the current codebase: understand the symptom, locate the suspected root cause, judge severity, and propose a remediation. The output is a single assessment file at `.specify/bugs/<slug>/assessment.md` that downstream commands (`$speckit-bug-fix`, `$speckit-bug-test`) consume.

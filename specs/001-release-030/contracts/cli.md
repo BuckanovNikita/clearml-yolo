@@ -1,7 +1,16 @@
 # CLI and configuration contract
 
-Eight entrypoints: cy, cy-train, cy-predict, cy-val, cy-metrics, cy-report, cy-compare,
-cy-ground-truth. cy-queue and cy-init-config are removed.
+Nine entrypoints: cy, cy-train, cy-predict, cy-val, cy-metrics, cy-report, cy-compare,
+cy-ground-truth and cy-init-config. cy-queue remains removed.
+
+`cy-init-config DIRECTORY [--force]` creates missing parent directories and writes one
+editable YAML per execution command, named after that command (including `cy-val.yaml`).
+Examples compose with `COMMAND --config-dir DIRECTORY --config-name COMMAND` and preserve
+current defaults, sparse native mappings and required `???` inputs. Comments explain input
+paths and native overrides. Initialization is local only: no ClearML task or model execution.
+Existing example paths are checked before any writes; without `--force`, collisions fail.
+`--force` replaces regular example files, preserves unrelated files and rejects symlink or
+directory destinations. Filesystem errors produce a nonzero exit with a CLI error message.
 
 Native settings live in `ultralytics` (pipeline: `train.ultralytics`, `predict.ultralytics`).
 `cfg` next to a mapping names unchanged native YAML. Sparse mappings track presence.
@@ -27,5 +36,5 @@ Standalone `evaluation` is a sparse mapping (`+evaluation.ap_method=continuous`)
 its supplied values override legacy `iou_threshold` and `matching_strategy`.
 The pipeline forwards the full `metrics.evaluation` configuration to comparison.
 
-Removed auto_gpu, force-gpu, augmentation JSON, generated-tree and clearml.enabled options
+Removed auto_gpu, force-gpu, augmentation JSON and clearml.enabled options
 must fail rather than be silently ignored. No public disabled-tracking mode.

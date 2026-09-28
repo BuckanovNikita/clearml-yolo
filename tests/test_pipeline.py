@@ -1,7 +1,5 @@
 """Pipeline routing rejects conflicting native and stage-owned outputs."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import pytest

@@ -4,8 +4,6 @@ The tests lean on the contracts the consumers pin: the column set in
 ``comparison/workbook.py`` and the pooled/BH conventions in ``clearml_report.py``.
 """
 
-from __future__ import annotations
-
 import math
 import zipfile
 from collections.abc import Callable

@@ -1,7 +1,5 @@
 """Explicit ClearML configuration, artifact storage, and invocation lifecycle."""
 
-from __future__ import annotations
-
 import os
 import signal
 import sys

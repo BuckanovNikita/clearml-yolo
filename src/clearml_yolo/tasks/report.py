@@ -1,7 +1,5 @@
 """Build developer and business workbooks from one current-test comparison."""
 
-from __future__ import annotations
-
 from pathlib import Path
 from typing import Any
 

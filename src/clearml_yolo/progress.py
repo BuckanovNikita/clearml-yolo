@@ -6,8 +6,6 @@ only on a real terminal, and everything else gets periodic loguru lines carrying
 information.
 """
 
-from __future__ import annotations
-
 import sys
 from collections.abc import Iterable, Iterator, Sized
 from time import monotonic

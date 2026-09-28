@@ -1,7 +1,5 @@
 """Native training forwards settings and reads actual parent-process outputs."""
 
-from __future__ import annotations
-
 import sys
 import types
 from pathlib import Path

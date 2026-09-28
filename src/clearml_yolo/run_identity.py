@@ -14,8 +14,6 @@ from quietly overwriting an old one. ``now`` is a parameter rather than read her
 identity is decided by the caller and the tests are deterministic.
 """
 
-from __future__ import annotations
-
 import os
 import socket
 from contextlib import suppress

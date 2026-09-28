@@ -1,7 +1,5 @@
 """Check native parameter validation against the installed Ultralytics version."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import pytest

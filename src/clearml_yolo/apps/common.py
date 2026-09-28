@@ -1,7 +1,5 @@
 """The shared CLI ownership boundary; stage entrypoints remain independent."""
 
-from __future__ import annotations
-
 import inspect
 from collections.abc import Callable
 from pathlib import Path

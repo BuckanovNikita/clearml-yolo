@@ -17,8 +17,6 @@ The constants below are the integration seam with the comparison frame: they nam
 columns this module reads out of it.
 """
 
-from __future__ import annotations
-
 from collections.abc import Mapping
 from numbers import Real
 from typing import Any, NamedTuple
@@ -103,7 +101,7 @@ def _tested_hypotheses(per_class: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(tested, index=per_class.index)
 
 
-def _verdicts(per_class: pd.DataFrame) -> dict[str, pd.Series[Any]]:
+def _verdicts(per_class: pd.DataFrame) -> dict[str, "pd.Series[Any]"]:
     """The verdict column of every compared metric the frame actually carries."""
     found: dict[str, pd.Series[Any]] = {}
     for metric in COMPARED_METRICS:
@@ -119,7 +117,7 @@ def _verdicts(per_class: pd.DataFrame) -> dict[str, pd.Series[Any]]:
 
 
 def _degraded_classes(
-    per_class: pd.DataFrame, verdicts: Mapping[str, pd.Series[Any]]
+    per_class: pd.DataFrame, verdicts: Mapping[str, "pd.Series[Any]"]
 ) -> pd.DataFrame:
     """The per-class rows that got significantly worse on at least one metric."""
     if not verdicts:
@@ -133,7 +131,7 @@ def _degraded_classes(
 def _headline_values(
     per_class: pd.DataFrame,
     pooled: pd.DataFrame,
-    verdicts: Mapping[str, pd.Series[Any]],
+    verdicts: Mapping[str, "pd.Series[Any]"],
     tested_hypotheses: pd.DataFrame,
 ) -> dict[str, float]:
     """Reduce the comparison to the handful of numbers that answer "did it get better?".

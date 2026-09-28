@@ -7,6 +7,15 @@ metadata:
   source: assess:commands/speckit.assess.decide.md
 ---
 
+## Host compatibility
+
+These instructions are shared by Codex and Claude Code. Examples use Codex's
+`$speckit-*` syntax; use `/speckit-*` in Claude Code. These are skill invocations,
+not shell commands. Convert dotted hook IDs to hyphenated skill names and use the
+current host's invocation mechanism for both hook display and execution. If an
+argument placeholder is left unexpanded, use the current user's invocation text;
+an empty invocation has no arguments. Run repository scripts from the repository root.
+
 # Decide: Go, Clarify, or Kill
 
 Render the **verdict** on an assessed idea and record it at `.specify/assessments/<slug>/decision.md`. This is the gate between discovery and delivery: a **go** hands the idea off to `$speckit-specify`; a **kill** stops it with a documented reason; **needs-clarification** sends it back to an earlier stage. Killing ideas here is a success, not a failure — that is the entire point of an assessment pipeline.

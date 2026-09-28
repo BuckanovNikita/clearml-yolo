@@ -1,7 +1,5 @@
 """Track dataset conversion as its own invocation stage."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 from clearml_yolo.clearml_session import (

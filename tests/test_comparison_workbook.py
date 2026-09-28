@@ -1,7 +1,5 @@
 """The comparison workbook is the audit trail, so its layout is asserted literally."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import pandas as pd

@@ -1,7 +1,5 @@
 """Ground-truth conversion tests over a synthetic YOLO dataset."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import pandas as pd

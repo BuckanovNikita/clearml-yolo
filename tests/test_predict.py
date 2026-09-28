@@ -1,7 +1,5 @@
 """The predict stage records the scale it inferred at, not only the boxes it found."""
 
-from __future__ import annotations
-
 import sys
 import types
 from pathlib import Path

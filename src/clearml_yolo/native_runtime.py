@@ -1,7 +1,5 @@
 """Scope native tracking settings to this invocation and inherited DDP workers."""
 
-from __future__ import annotations
-
 import json
 import os
 from collections.abc import Iterator

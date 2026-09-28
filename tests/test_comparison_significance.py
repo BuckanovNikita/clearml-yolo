@@ -1,7 +1,5 @@
 """Significance tests checked against synthetic data with known answers."""
 
-from __future__ import annotations
-
 import math
 from collections.abc import Sequence
 

@@ -7,6 +7,15 @@ metadata:
   source: assess:commands/speckit.assess.research.md
 ---
 
+## Host compatibility
+
+These instructions are shared by Codex and Claude Code. Examples use Codex's
+`$speckit-*` syntax; use `/speckit-*` in Claude Code. These are skill invocations,
+not shell commands. Convert dotted hook IDs to hyphenated skill names and use the
+current host's invocation mechanism for both hook display and execution. If an
+argument placeholder is left unexpanded, use the current user's invocation text;
+an empty invocation has no arguments. Run repository scripts from the repository root.
+
 # Research an Idea
 
 Gather the **evidence** needed to judge an idea honestly, and record it at `.specify/assessments/<slug>/research.md`. This stage exists to *challenge* the idea as much as support it — surfacing prior art, real user signal, market context, and data so the later `$speckit-assess-define` and `$speckit-assess-decide` stages rest on facts, not enthusiasm.
