@@ -4,15 +4,18 @@
 
 Reviewed the specification, plan, tasks, constitution, current CLI contracts, implementation,
 installation guidance, shared skills, and dated release evidence. This is a retrospective
-Spec Kit record for implemented code and a prospective gate for remaining publication work.
+Spec Kit record for implemented code and the completed v0.3.0 publication workflow.
 The user explicitly authorized including concurrent dependency and skill changes.
+The [native configuration feature](../003-ultralytics-config-groups/spec.md) later superseded
+the sparse native configuration details with top-level shared and prediction groups and two
+additional generated files; constitution 4.0.0 governs that current behavior.
 
 ## Requirement Coverage
 
 | Requirement | Tasks | Evidence or acceptance |
 |---|---|---|
 | FR-001 | T005–T008 | Entrypoint metadata, nine installed helps |
-| FR-002 | T005–T006, T014 | Eight examples and Hydra round trips |
+| FR-002 | T005–T006, T014 | Eight command examples and Hydra round trips; the [native configuration feature](../003-ultralytics-config-groups/spec.md) later added two native group files |
 | FR-003 | T005–T006, T014 | Collision, force, symlink, directory, unrelated-content checks |
 | FR-004 | T006–T007, T014 | Initialization without service configuration; dependency boundaries |
 | FR-005 | T005, T008, T014 | Usage comments, required inputs, native overrides |
@@ -30,13 +33,14 @@ The user explicitly authorized including concurrent dependency and skill changes
 
 All 11 functional requirements and five success criteria have task coverage. All 21 tasks
 support an identified requirement, validation step, or necessary workflow setup. US1 and US2
-remain independently testable; US3 publication follows the combined verification gates.
+were independently testable; US3 publication followed the combined verification gates.
 
 ## Findings and Resolutions
 
 - The former constitution required a future import and prohibited configuration generation.
-  The explicit user instructions supersede those policies; constitution 3.0.0 and the active
-  contracts now match implementation. Historical dated evidence remains untouched.
+  The explicit user instructions superseded those policies in constitution 3.0.0. Constitution
+  4.0.0 and the [native configuration contracts](../003-ultralytics-config-groups/contracts/configuration.md)
+  now govern native groups. Historical evidence remains untouched.
 - Initial release documents excluded the concurrent submodules and skills. The user's scope
   confirmation superseded that assumption; FR-010/011, T019–T021, and installation evidence
   now cover them. Upstream source files and approved revisions remain unchanged.

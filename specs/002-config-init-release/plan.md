@@ -8,6 +8,12 @@ Record the completed restoration of the local configuration initializer and remo
 future-annotations imports, then validate, commit, push, and publish the pending 0.3.0.
 This plan is retrospective for code already implemented; release tasks remain sequential.
 
+> **Historical plan.** It records the v0.3.0 publication workflow. The later
+> [native configuration feature](../003-ultralytics-config-groups/spec.md) replaced sparse
+> native mappings with top-level native groups and expanded initializer output from eight
+> command files to ten protected files. The maintained version is declared in
+> [pyproject.toml](../../pyproject.toml).
+
 ## Technical Context
 
 - Python 3.12; existing uv/uv_build toolchain and locked dependencies.
@@ -16,20 +22,23 @@ This plan is retrospective for code already implemented; release tasks remain se
 - Existing upstream dependencies become editable Git submodules at unchanged revisions.
 - `.agents/skills` owns shared skills; `.claude/skills` links to that directory.
 - pytest behavior checks, Ruff, strict mypy, seven import contracts, and pre-commit.
-- Eight execution examples and nine installed console scripts; required inputs stay missing.
-- Version 0.3.0 is verified in isolation, then committed and published from master; latest published version is 0.2.0.
+- Eight execution examples, two native group files, and nine installed console scripts;
+  required inputs stay missing.
+- At plan execution time, version 0.3.0 was verified in isolation, committed and published
+  from master; v0.2.0 had been the latest published version.
 
 ## Constitution Check
 
-The user explicitly changed two former rules. Constitution 3.0.0 replaces the mandatory
+The user explicitly changed two former rules. Constitution 3.0.0 replaced the mandatory
 future import and config-generation prohibition, and distinguishes local initialization from
-tracked execution. Pre-design and post-design checks against all five principles:
+tracked execution. Constitution 4.0.0 later superseded its native configuration rules.
+The original pre-design and post-design checks against all five principles were:
 
 | Principle | Application |
 |---|---|
 | Typed, explicit Python | Remove imports; use Self and quoted runtime-incompatible references; retain strict checks |
 | Module boundaries | Add config_tree between apps and configs; CLI modules remain independent |
-| Configuration and ownership | Export central defaults; preserve missing inputs, sparse mappings, and user files; no task for initialization |
+| Configuration and ownership | Export central defaults; preserve missing inputs and user files; no task for initialization. The later [native configuration feature](../003-ultralytics-config-groups/spec.md) added full shared native defaults and prediction overrides. |
 | Verification | Reproduce runtime annotation failures; verify pytest, CLI composition, packages, and live release paths |
 | Communication and collaboration | Russian README, English artifacts, explicit evidence limits, task-owned staging and cleanup |
 

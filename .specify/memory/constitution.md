@@ -1,7 +1,3 @@
-<!-- Sync Impact Report: 3.0.0 -> 4.0.0; modified Principle III (Configuration and
-Run Ownership); no added/removed principles; no deferred placeholders. Remove this temporary
-report before committing. -->
-
 # clearml-yolo Constitution
 
 ## Core Principles
@@ -54,7 +50,7 @@ by the contracts. `run_identity` MUST remain a filesystem-only bottom layer.
 
 Torch, Ultralytics, and ClearML imports MUST stay behind the established permitted boundaries
 and be deferred to use where needed to preserve responsive CLI startup. Code that only
-resolves parameter names, configuration MUST NOT load model dependencies.
+resolves parameter names or configuration MUST NOT load model dependencies.
 
 These boundaries keep orchestration, external services, and expensive model operations out
 of independently testable domain code.

@@ -8,14 +8,15 @@ uv sync --locked --group dev
 uv run cy-init-config ./conf
 uv run cy-train --config-dir=./conf --config-name=cy-train --cfg job
 uv run cy --config-dir=./conf --config-name=cy --cfg job \
-  ground_truth=ground_truth.csv +train.ultralytics.data=data.yaml
+  ground_truth=ground_truth.csv ultralytics.data=data.yaml
 ```
 
 The last two commands only compose settings. They do not train or create a task.
 Replace required inputs and set explicit ClearML identity before real execution.
 
-Repeat initialization: it must fail without replacing examples. Use `--force` only when
-discarding edits to the generated examples is intended. Unrelated files must survive.
+Initialization writes eight command examples and the two native group files. Repeat
+initialization: it must fail without replacing examples. Use `--force` only when discarding
+edits to the generated files is intended. Unrelated files must survive.
 
 ```bash
 uv run pytest
@@ -37,7 +38,7 @@ Follow the [end-to-end skill](../../.agents/skills/running-end-to-end-tests/SKIL
 and the installation's environment guidance for isolated CPU/GPU runs, artifact retrieval,
 and cleanup. Keep fresh evidence separate from historical release results.
 
-Before publication, review the diff and stage explicit task paths. After pushing and
-publishing `v0.3.0`, verify the remote tag's commit and download assets to compare SHA-256
-hashes with the checked local artifacts. Record dated results in
+The v0.3.0 publication workflow reviewed explicit task paths, verified the remote tag's
+commit, and downloaded assets to compare SHA-256 hashes with the checked local artifacts.
+Its dated results are in
 [release evidence](../../docs/evidence/2026-09-28-release-030.md).

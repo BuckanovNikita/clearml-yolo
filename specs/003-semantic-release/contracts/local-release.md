@@ -28,7 +28,8 @@ release commit and annotated tag, and never rewrites prior refs. No push/fetch/b
 changelog/publication occurs. Manual pushes explicitly name the desired tag.
 
 A failed metadata preparation leaves files for inspection. Resolve the reported cause,
-inspect the diff, finish only the intended version changes and commit them as
-`chore(release): VERSION`, then retry. A clean matching completed release commit is
-revalidated and tagged directly; a completed attempt is a no-op. Changed history or
-unrelated file changes are rejected rather than guessed safe.
+inspect the diff, and finish only the intended version changes as
+`chore(release): VERSION`. The installed hook then revalidates that matching release
+commit and creates its tag; run the retry command explicitly when the hook is absent or
+tagging still fails. A completed attempt is a no-op. Changed history or unrelated file
+changes are rejected rather than guessed safe.

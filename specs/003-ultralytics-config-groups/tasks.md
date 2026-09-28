@@ -3,7 +3,8 @@
 **Input**: [spec.md](spec.md), [plan.md](plan.md), research, data model and contracts.
 
 Tasks are unchecked until implementation or executed evidence supports completion. Heavy tests
-were authorized explicitly on 2026-09-28 and completed successfully. The user subsequently authorized committing and pushing to master.
+were authorized explicitly on 2026-09-28 and completed with the limits recorded in the dated
+[verification evidence](verification-2026-09-28.md).
 
 ## Phase 1: Setup
 
@@ -74,10 +75,14 @@ Preserve user's changes and dependency pins; never infer heavy-test authorizatio
 
 ## Phase 7: Convergence
 
-- [x] T022 Reject explicitly owned prediction model/project/name in src/clearml_yolo/tasks/compare.py per FR-006 (contradicts).
-- [x] T023 Isolate retained comparison manifests by cache identity in src/clearml_yolo/comparison/reinfer.py per FR-009 (partial).
-- [x] T024 Comment prediction-only rendering keys in training YAML in src/clearml_yolo/native_config.py per FR-005 (partial).
+- [x] T022 Reject non-null comparison-owned prediction model/project/name overrides in
+  src/clearml_yolo/tasks/compare.py, resolving the FR-006 ownership conflict.
+- [x] T023 Isolate retained comparison manifests by cache identity in
+  src/clearml_yolo/comparison/reinfer.py, closing the FR-009 replay gap.
+- [x] T024 Comment prediction-only rendering keys in training YAML in
+  src/clearml_yolo/native_config.py, closing the FR-005 filtering gap.
 
 ## Phase 8: Live verification findings
 
-- [x] T025 Restore fresh-process config registration in src/clearml_yolo/apps/common.py and test every generated command in a subprocess per FR-003/SC-001 (contradicts).
+- [x] T025 Restore fresh-process config registration in src/clearml_yolo/apps/common.py and test
+  every generated command in a subprocess, closing the FR-003/SC-001 composition gap.

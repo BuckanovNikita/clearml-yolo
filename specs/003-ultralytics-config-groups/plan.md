@@ -18,7 +18,9 @@ Pydantic, Loguru; declare the selected comment-preserving YAML dependency direct
 **Storage**: Local YAML/manifests and existing ClearML configuration/artifact storage.
 
 **Testing**: Focused pytest with controlled external substitutes, Ruff, mypy, import-linter,
-and documentation/link checks. Heavy native/GPU/live ClearML checks were explicitly authorized on 2026-09-28.
+and documentation/link checks. Heavy native/GPU/live ClearML checks were explicitly authorized
+on 2026-09-28 and are recorded with their limits in
+[verification-2026-09-28.md](verification-2026-09-28.md).
 
 **Target Platform**: Existing supported Python environment; portable filesystem behavior.
 
@@ -27,7 +29,7 @@ and documentation/link checks. Heavy native/GPU/live ClearML checks were explici
 **Performance Goals**: Config initialization and composition import neither Ultralytics nor Torch.
 
 **Constraints**: Preserve dependency pins, one-task ownership, credentials protection and
-existing model/calibration/output contracts. Commit and push to master are authorized for finalization; publishing a release is outside scope.
+existing model/calibration/output contracts. Publishing a release is outside scope.
 
 **Scale/Scope**: Five model command interfaces, eight generated command files, two group files.
 
@@ -63,7 +65,8 @@ Tests remain in `tests/` alongside related configuration, task and artifact cove
 4. Export effective native YAML and persistent source manifests. Connect sanitized commented
    YAML through existing ClearML ownership and upload lifecycle; use split/role identifiers.
 5. Update current contracts, Russian README and migration documentation. Verify focused
-   behavior and static gates, then converge against requirements; execute heavy checks after explicit authorization.
+   behavior and static gates, then converge against requirements. Execute heavy checks only
+   after explicit authorization and keep their outcomes in dated evidence.
 
 ## Complexity Tracking
 

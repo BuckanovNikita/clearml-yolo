@@ -1,10 +1,10 @@
 # Feature Specification: Local Semantic Release
 
-**Feature Branch**: existing checkout; no implementation commit requested
+**Feature Branch**: `master`
 
 **Created**: 2026-09-28
 
-**Status**: Approved for implementation
+**Status**: Implemented; see [dated verification](../../docs/evidence/2026-09-28-semantic-release.md)
 
 **Input**: Integrate semantic release using the existing Spec Kit workflow. Use local
 hooks and tags only, automatically after commits, with package version updates and
@@ -127,4 +127,5 @@ and verify exactly one release commit and one tag.
 - The first eligible invocation includes existing unreleased history after v0.3.0.
 - Routine non-release types do not cause a bump; all eligible history is considered
   when earlier releases were deferred. Promotion to 1.0 is deliberate configuration work.
-- This task implements the approved workflow without committing or pushing the implementation.
+- Acceptance verification uses temporary repositories; creating a release, pushing,
+  and publication in the main checkout are separate authorized operations.

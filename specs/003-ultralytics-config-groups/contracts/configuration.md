@@ -34,7 +34,7 @@ Initialization creates no task and imports no model runtime.
 
 Stage-owned exceptions: prediction `model: null` means no checkpoint override; `mode`
 defaults to `predict`, and `project`/`name` default to null for stage output routing. These
-fields do not inherit training routing. Comparison rejects explicit prediction model/project/name;
-use its model references and output directory. `cy-train` accepts both groups for consistent
-composition but only uses shared training settings. Native compatibility aliases and custom
-`augmentations`, absent from the upstream template, are retained when explicitly supplied.
+fields do not inherit training routing. Comparison rejects non-null prediction model/project/name
+overrides; use its model references and output directory. `cy-train` accepts both groups for
+consistent composition but only uses shared training settings. Native compatibility aliases and
+custom `augmentations`, absent from the upstream template, are retained when explicitly supplied.

@@ -3,6 +3,13 @@
 Input: spec.md, plan.md, research.md, data-model.md and contracts/ in this directory.
 Tests are required by the supplied release acceptance plan.
 
+This is a historical completion ledger. Checked sparse/raw-configuration and eight-command
+tasks describe the 0.3.0 baseline at the time they ran. The
+[configuration and publication feature](../002-config-init-release/spec.md) restored the
+initializer, and the [native configuration feature](../003-ultralytics-config-groups/spec.md)
+introduced top-level native groups. The current interface has eight execution commands plus
+the initializer. Completion marks do not mean removed interfaces remain supported.
+
 ## Phase 1: Setup
 
 - [X] T001 Amend .specify/memory/constitution.md to 2.0.0 and retain Spec Kit templates/feature.json per FR-015.
@@ -45,7 +52,8 @@ Goal: exactly one complete task. Independent test: required upload rejection fai
 
 ## Phase 6: User Story 4 — Install and migrate (P2)
 
-Goal: usable 0.3.0 distribution. Independent test: clean install exposes exactly eight commands.
+Goal at the time: usable 0.3.0 distribution. The later restored initializer increased the
+installed interface to nine commands.
 
 - [X] T020 [P] [US4] Update Russian README.md, docs/migration-030.md and remove obsolete docs/superpowers specifications per FR-005, FR-015.
 - [X] T021 [P] [US4] Update AGENTS.md and .claude/skills/running-end-to-end-tests/ for explicit devices with environment-owned preflight/capacity/cleanup (local helpers subsequently moved to the global environment skill) per FR-015.

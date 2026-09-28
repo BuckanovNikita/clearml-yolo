@@ -2,11 +2,17 @@
 
 ## Native configuration and execution
 
-Decision: sparse Hydra mappings and ordinary dictionary overlay; default comparison is removed.
-Rationale: presence preserves explicit defaults; native parameter validation remains upstream.
-Alternative rejected: maintain a second full default schema, which loses provenance and drifts.
-Evidence: the pre-0.3.0 configs.py `_overlaid` treated equal values as absent; installed Ultralytics
-configuration is authoritative. Keep dataset/table adapters, delegate model runtime settings.
+Historical decision: sparse Hydra mappings and ordinary dictionary overlay; default comparison
+was removed for 0.3.0.
+Historical rationale: presence preserved explicit defaults; native parameter validation remained
+upstream. The alternative of maintaining a second full default schema was rejected because it
+would lose provenance and drift. The pre-0.3.0 `configs.py` `_overlaid` treated equal values as
+absent; installed Ultralytics configuration was authoritative.
+
+The [native configuration feature](../003-ultralytics-config-groups/spec.md) superseded this
+design with a full shared group sourced from the installed defaults and sparse explicit
+prediction overrides. Presence still preserves explicit null/default overrides. Raw/non-null
+`cfg` and nested stage-native mappings now fail with migration guidance.
 
 ## Tracking
 

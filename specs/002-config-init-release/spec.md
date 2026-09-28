@@ -7,7 +7,18 @@
 **Input**: Restore `cy-init-config`, remove all current future-annotations imports,
 document all changes through Spec Kit, commit, push, and make a release.
 
-This specification records the implemented changes retrospectively and governs the remaining
+**Post-release amendment (2026-09-28)**: This feature remains the historical record for the
+v0.3.0 initializer and publication. The later
+[native configuration specification](../003-ultralytics-config-groups/spec.md) supersedes its
+sparse-native-setting details: initialization now writes eight command examples plus
+`ultralytics/default.yaml` and `ultralytics_predict/default.yaml`; model commands use those
+top-level groups and reject raw/non-null `cfg`. The maintained package version is declared in
+[pyproject.toml](../../pyproject.toml).
+The original FR-002 intentionally required sparse native settings; that historical choice and
+its rationale remain in the [research record](research.md), while the linked later feature
+defines the current replacement.
+
+This specification records the implemented changes retrospectively and governed the completed
 release work. It supersedes the configuration-generation removal and non-publication scope
 of [001-release-030](../001-release-030/spec.md). The user explicitly expanded publication
 scope to include the concurrent dependency-source and shared-skill changes. Dependency
@@ -26,7 +37,8 @@ corresponding installed command.
 
 **Acceptance Scenarios**:
 
-1. Given a missing destination, initialization creates its parents and eight example files.
+1. Given a missing destination, initialization creates its parents, eight command examples,
+   and two native group files.
 2. Given an existing example, initialization fails before writing any examples unless the
    user explicitly requests replacement. Unrelated files always remain intact.
 3. Given generated examples, all eight execution commands load their defaults and accept
@@ -77,7 +89,7 @@ types, unavailable integration services, and an already-published tag.
 
 - **FR-001**: Restore `cy-init-config DIRECTORY [--force]` and retain the eight execution commands.
 - **FR-002**: Generate one editable example per execution command from its current defaults,
-  preserving required inputs and sparse native settings.
+  preserving required inputs, and generate shared and prediction native group files.
 - **FR-003**: Preflight all example destinations; protect existing content by default, replace
   only regular example files with `--force`, and preserve unrelated files.
 - **FR-004**: Initialization MUST remain local and independent of service credentials and model execution.
@@ -89,8 +101,8 @@ types, unavailable integration services, and an already-published tag.
   verification guidance; preserve dated historical evidence as history.
 - **FR-008**: Verify affected behavior, repository gates, both distributions, and release identity;
   report unavailable live prerequisites explicitly.
-- **FR-009**: Commit task-owned changes, push to the existing origin, and publish the currently
-  unpublished `0.3.0` with a wheel, source distribution, and checksums.
+- **FR-009**: Commit task-owned changes, push to the existing origin, and publish the
+  then-unpublished `0.3.0` with a wheel, source distribution, and checksums.
 - **FR-010**: Include the approved editable submodules and their locked development sources;
   preserve both upstream revisions and document package installation without submodules.
 - **FR-011**: Consolidate skills under `.agents/skills`, retain Claude compatibility through a
@@ -98,7 +110,8 @@ types, unavailable integration services, and an already-published tag.
 
 ### Key Entities
 
-- Example set: eight command-named files with editable defaults and usage comments.
+- Example set: eight command-named files plus two native group files, with editable defaults
+  and usage comments.
 - Destination: a user-selected directory with collision and replacement rules.
 - Release: version, source commit, tag, packages, checksums, notes, and dated verification.
 
@@ -112,7 +125,8 @@ types, unavailable integration services, and an already-published tag.
 
 ## Assumptions
 
-- Publish `v0.3.0`: the package is already `0.3.0`, while GitHub's latest release is `v0.2.0`.
+- At the publication decision point, the package was `0.3.0` and GitHub's latest release was
+  `v0.2.0`; v0.3.0 was then published. The maintained version is read from `pyproject.toml`.
 - Release means a GitHub release on the existing repository; registry publication is outside scope.
 - The coding preference also persists in global instructions; that personal file is outside this Git repo.
 - Local examples deliberately preserve missing inputs rather than selecting a user's dataset or device.

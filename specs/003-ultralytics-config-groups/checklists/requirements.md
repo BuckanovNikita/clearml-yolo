@@ -9,6 +9,6 @@
 - [x] Comment retention, native replay and ClearML requirements are specified.
 - [x] Edge cases cover configuration, filesystem and publication failures.
 - [x] No unresolved clarification placeholders remain.
-- [x] Heavy-test deferral is explicit and does not imply passing integration evidence.
+- [x] Real-run completion claims cite dated evidence and retain its scope limitations.
 
 This checklist evaluates specification completeness, not implementation or test completion.

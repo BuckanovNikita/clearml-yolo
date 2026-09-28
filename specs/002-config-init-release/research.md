@@ -5,9 +5,16 @@
 **Decision**: Retain `cy-init-config DIRECTORY [--force]` and generate eight command-named
 YAML examples from the current registered defaults.
 **Rationale**: Git history establishes the interface. Central defaults prevent drift and
-preserve the current sparse native configuration contract.
+preserved the then-current sparse native configuration contract.
 **Alternatives**: Static copied templates would require independent maintenance. Restoring
 the obsolete exhaustive native parameter tree would revive removed configuration behavior.
+
+**Supersession**: The
+[native configuration feature](../003-ultralytics-config-groups/spec.md) retained the eight
+command examples and added two native group files. Its shared group intentionally covers the
+installed upstream defaults with original comments; its prediction group contains explicit
+overrides. That later design supersedes the sparse-native-mapping rationale above without
+changing the initializer interface.
 
 ## Preserve user data
 
@@ -30,9 +37,13 @@ would lose precision; modifying pandas or other dependencies is unnecessary and 
 ## Publish the pending 0.3.0
 
 **Decision**: Keep the package version and publish `v0.3.0` on the existing GitHub repository.
-**Rationale**: Local and origin master agree, the package already declares 0.3.0, and the latest
-GitHub release and tag are v0.2.0. No published 0.3.0 artifact needs replacement.
+**Rationale at decision time**: Local and origin master agreed, the package declared 0.3.0,
+and the latest GitHub release and tag were v0.2.0. No published 0.3.0 artifact needed replacement.
 **Alternatives**: A new 0.3.1 or 0.4.0 would skip the already-prepared unpublished release.
+
+v0.3.0 was subsequently published from the verified source. Later release automation advanced
+the version; [pyproject.toml](../../pyproject.toml) is the maintained source. These facts do not
+alter the historical version decision.
 
 ## Evidence and environment separation
 

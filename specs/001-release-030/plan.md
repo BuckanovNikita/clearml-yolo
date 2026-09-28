@@ -3,11 +3,18 @@
 **Branch context**: existing checkout; feature selected by `.specify/feature.json`
 **Date**: 2026-09-19 | **Spec**: [spec.md](spec.md)
 
+> **Historical plan.** This records the implementation route used for the original 0.3.0
+> baseline. The [configuration and publication feature](../002-config-init-release/spec.md)
+> restored `cy-init-config` and published v0.3.0. The later
+> [native configuration feature](../003-ultralytics-config-groups/spec.md) replaced
+> sparse/raw-file native configuration with top-level `ultralytics` and
+> `ultralytics_predict` groups. The installed interface now has eight execution commands and
+> the local initializer; the maintained version is declared in [pyproject.toml](../../pyproject.toml).
+
 ## Summary
 
-Remove custom model runtime automation. Keep native model argument mappings sparse so
-presence, never comparison with defaults, determines precedence. Preserve evaluation and
-comparison mathematics while replacing historical report inputs with current-test outcomes.
+Remove custom model runtime automation. Preserve explicit native-setting precedence and
+evaluation/comparison mathematics while replacing historical report inputs with current-test outcomes.
 Centralize invocation tracking with nested stage reuse and synchronous artifact checks.
 
 ## Technical Context
@@ -18,7 +25,7 @@ report-generator, pandas, scipy, openpyxl, Loguru; exact constraints in pyprojec
 **Storage**: isolated local run directory plus required ClearML artifacts; images external.
 **Testing**: pytest, Ruff, mypy, import-linter, pre-commit, real integration runs, package install.
 **Target Platform**: Linux, CPU and GPU execution; native DDP contract tests.
-**Project Type**: CLI package with eight commands.
+**Project Type**: CLI package; originally eight commands, now nine after the initializer restoration.
 **Performance Goals**: native execution without custom scheduling/tuning overhead; correctness
 and reproducibility are release gates, not a new latency promise.
 **Constraints**: no new service, no registry publication, no shared-resource teardown.
@@ -34,8 +41,8 @@ No weakened checks or undocumented exceptions are planned.
 
 ## Project Structure
 
-- src/clearml_yolo/configs.py: sparse configuration registration and raw-YAML overlay.
-- src/clearml_yolo/apps/: eight independent CLIs and common invocation adapter.
+- src/clearml_yolo/configs.py: centralized command registration and native Hydra groups.
+- src/clearml_yolo/apps/: eight execution CLIs, the local initializer CLI and common invocation adapter.
 - src/clearml_yolo/tasks/train.py, predict.py: native execution and actual result paths.
 - src/clearml_yolo/tasks/val.py: prediction and frozen evaluation of a checkpoint.
 - src/clearml_yolo/tasks/pipeline.py: ordered composition, output ownership and shared task.
@@ -45,14 +52,16 @@ No weakened checks or undocumented exceptions are planned.
 - src/clearml_yolo/inference.py: image manifest/table conversion, no hardware automation.
 - tests/: focused contract tests plus retained domain regressions.
 - docs/migration-030.md, docs/evidence/: migration and dated release acceptance evidence.
-- .claude/skills/running-end-to-end-tests/: portable verification; machine helpers live in a global environment skill.
+- .agents/skills/running-end-to-end-tests/: portable verification; `.claude/skills` is a
+  compatibility symlink and machine helpers live in a global environment skill.
 
 ## Phases and decisions
 
 1. Record release intent, contracts and dependency-ordered tasks; analyze coverage.
-2. Implement sparse native configuration and remove runtime automation. Keep default model
-   selection as a minimal example; upstream owns runtime defaults. Use +ultralytics.key=value
-   to add a previously absent key; existing embedded keys accept ordinary Hydra overrides.
+2. The original release implemented sparse native configuration while removing runtime
+   automation. The [native configuration feature](../003-ultralytics-config-groups/spec.md)
+   superseded that design with full shared native defaults, sparse prediction overrides,
+   and ordinary `ultralytics.key=value` overrides.
 3. Implement tracking owner boundary around all CLI invocations. Nested tasks call init_task
    to reuse the owner. Disable native ClearML integration before model imports and in workers.
    Synchronously upload named artifacts and keep a required manifest, fail on missing/rejected

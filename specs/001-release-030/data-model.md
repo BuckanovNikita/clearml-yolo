@@ -1,6 +1,8 @@
 # Data model
 
-- Native settings: sparse string-keyed mapping; explicit values are never inferred from equality.
+- Native settings: a full shared `ultralytics` mapping plus explicit
+  `ultralytics_predict` overrides; explicit values and nulls are never inferred from equality.
+  Stage projection excludes irrelevant keys before native execution.
 - Run: unique identity, absolute directory, owner task and stage-specific required artifact manifest.
 - ModelRef: source local/clearml, task/project/tags or checkpoint; exact class -> confidence mapping.
   Required thresholds must be finite and within [0,1]; missing required classes fail explicitly.

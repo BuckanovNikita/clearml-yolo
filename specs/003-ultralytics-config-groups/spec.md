@@ -4,7 +4,8 @@
 
 **Created**: 2026-09-28
 
-**Status**: Implemented; lightweight and authorized real-run verification complete
+**Status**: Implemented; lightweight and authorized real-run verification results are recorded in
+[verification-2026-09-28.md](verification-2026-09-28.md)
 
 **Input**: Replace sparse stage settings and raw-file loading with a full native training
 configuration, prediction overrides, preserved upstream comments, and replayable ClearML YAML.
@@ -53,8 +54,9 @@ an individual stage using native Ultralytics and retained source manifests.
 
 **Why this priority**: Reproducibility requires actual execution inputs rather than wrapper options.
 
-**Independent Test**: Parse exported YAML and inspect mocked ClearML objects/artifact uploads;
-real native replay is a separately authorized integration check.
+**Independent Test**: Parse exported YAML and inspect mocked ClearML objects/artifact uploads.
+Direct native replay remains a separately authorized integration check; the authorized
+2026-09-28 run is recorded in [verification evidence](verification-2026-09-28.md).
 
 **Acceptance Scenarios**:
 
@@ -122,14 +124,16 @@ real native replay is a separately authorized integration check.
   split/role sources and checkpoint selection.
 - **SC-004**: Removed interfaces reject use, collision scenarios preserve user files, and
   required artifact failures produce nonzero execution outcomes.
-- **SC-005**: Once separately authorized, direct native replay and downloaded ClearML YAML
-  verify real execution and artifact round trips. Until then these outcomes remain unverified.
+- **SC-005**: Separately authorized direct native replay and downloaded ClearML YAML MUST verify
+  real execution and artifact round trips. Completion evidence and scope limitations belong in
+  [dated verification evidence](verification-2026-09-28.md).
 
 ## Assumptions
 
 - Defaults follow the installed locked Ultralytics package, not a vendored independent copy.
 - `cy-val` retains prediction followed by calibration/evaluation rather than native `model.val()`.
-- Heavy testing and subsequent commit/push to master were explicitly authorized on 2026-09-28. Publishing a release is outside scope.
+- Heavy testing was explicitly authorized on 2026-09-28; its results and limits are dated evidence.
+  Publishing a release is outside scope.
 
 ## Clarifications
 

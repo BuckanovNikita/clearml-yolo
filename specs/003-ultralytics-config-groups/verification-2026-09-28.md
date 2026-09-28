@@ -1,6 +1,6 @@
 # Verification evidence — 2026-09-28
 
-## Documentation and SpecKit
+## Initial documentation and SpecKit review
 
 - Resolved active specification/constitution templates through `resolve-template.sh`.
 - `setup-plan.sh --json`, `setup-tasks.sh --json`, and
@@ -8,9 +8,10 @@
 - Extension hook configuration contains no registered hooks.
 - Specification clarification used the approved plan and subsequent heavy-test restriction;
   no new questions were necessary. Requirements quality checklist passed all eight items.
-- Cross-artifact analysis mapped all 12 functional requirements to tasks; all five success
-  criteria have corresponding lightweight or explicitly deferred real-run verification.
-  No critical, high, ambiguity, duplication or constitution-conflict findings remain.
+- At that checkpoint, cross-artifact analysis mapped all 12 functional requirements to tasks;
+  all five success criteria had corresponding lightweight or explicitly deferred real-run
+  verification. No critical, high, ambiguity, duplication or constitution-conflict findings
+  remained in that review.
 - `git diff --check` passed after documentation edits.
 - Local relative Markdown link and code-fence check passed for 14 changed/current Markdown
   files. This check did not verify remote URLs.
@@ -111,4 +112,4 @@ the environment skill's dated evidence, outside the repository.
 
 T021 and T025 are complete. These runs verify CPU and a single GPU with a small synthetic
 dataset; they do not establish model quality, performance at scale, or physical multi-GPU DDP.
-No commit, push or release was performed.
+At the completion of these verification runs, no commit, push or release was performed.

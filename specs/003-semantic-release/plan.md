@@ -65,6 +65,7 @@ facts are excluded. Real GPU/ClearML verification is outside local tag automatio
 - Verify commit parent, changed paths and final metadata; annotate the checked commit.
 - Retain the recovery record until successful tagging. A clean matching release commit
   can be rechecked and tagged on retry; dirty failed preparation requires the contributor
-  to inspect/fix and commit only the two metadata files before retrying.
+  to inspect/fix and commit only the two metadata files. With the installed hook, that
+  manual release commit invokes tag recovery automatically; otherwise retry explicitly.
 - Existing tags are never replaced. The operation lock is released on handled exits;
   a hard crash requires owner inspection and manual stale-lock removal.
