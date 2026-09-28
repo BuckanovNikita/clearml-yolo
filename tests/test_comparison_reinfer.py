@@ -191,6 +191,7 @@ def test_forwards_the_inference_settings(ground_truth: pd.DataFrame, tmp_path: P
         "image_name": "name",
         "project": str(tmp_path / "native"),
         "name": "baseline_test",
+        "manifest_dir": tmp_path / "prediction_inputs" / "baseline_test" / "preds",
         "agnostic_nms": True,
     }
 
@@ -248,9 +249,7 @@ def test_native_kwargs_cannot_override_owned_inference_inputs(
         )
 
 
-def test_images_are_in_one_stable_global_order(
-    ground_truth: pd.DataFrame, tmp_path: Path
-) -> None:
+def test_images_are_in_one_stable_global_order(ground_truth: pd.DataFrame, tmp_path: Path) -> None:
     predictor = RecordingPredictor()
     reversed_truth = ground_truth.iloc[::-1].reset_index(drop=True)
 
@@ -418,3 +417,17 @@ def test_vocabulary_report_lists_classes_the_split_never_shows(
     _, vocabulary = _reinfer(without_dogs, tmp_path / "preds.csv", RecordingPredictor())
 
     assert vocabulary.unknown_to_ground_truth == ["dog"]
+
+
+def test_different_caches_keep_distinct_replay_manifests(
+    ground_truth: pd.DataFrame, tmp_path: Path
+) -> None:
+    first, _ = _reinfer(ground_truth, tmp_path / "first.csv", RecordingPredictor())
+    source = Path(first.attrs["effective_args"]["source"])
+    original = source.read_text()
+    reduced = ground_truth[ground_truth["image_name"] != "b.jpg"]
+    second, _ = _reinfer(reduced, tmp_path / "second.csv", RecordingPredictor())
+    assert source != Path(second.attrs["effective_args"]["source"])
+    assert source.read_text() == original
+    cached, _ = _reinfer(ground_truth, tmp_path / "first.csv", _explode)
+    assert Path(cached.attrs["effective_args"]["source"]).read_text() == original

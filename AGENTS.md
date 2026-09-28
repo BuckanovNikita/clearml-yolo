@@ -64,12 +64,18 @@ Nine entrypoints: `cy`, `cy-train`, `cy-predict`, `cy-val`, `cy-metrics`,
 `cy-init-config DIRECTORY [--force]` writes editable examples for the eight execution
 commands without creating a ClearML task. `cy-queue` remains removed.
 
-Native model settings are sparse `ultralytics` mappings: `train.ultralytics` and
-`predict.ultralytics` in the pipeline. A neighbouring `cfg` names unchanged native YAML.
-Precedence is native defaults, cfg YAML, the explicitly supplied embedded mapping, then
-Hydra CLI overrides. Add an absent setting with `+ultralytics.key=value` (or
-`+train.ultralytics.key=value`); override an existing setting without `+`. Pass device,
-batch, AMP, compilation, and native augmentation options directly to Ultralytics.
+Native model settings use top-level Hydra groups `ultralytics` and `ultralytics_predict`
+for all model commands. The shared group covers installed upstream defaults; prediction
+inherits applicable values and applies explicit overrides, preserving nulls and defaults.
+Generated `ultralytics/default.yaml` and `ultralytics_predict/default.yaml` contain native
+keys without wrapper indentation and preserve original comments. Use ordinary overrides
+such as `ultralytics.epochs=10` and `ultralytics_predict.batch=8`.
+Stage-irrelevant settings are commented in exported native YAML and excluded from execution.
+Raw `cfg` loading, non-null native `cfg`, nested stage-native mappings and duplicate native
+comparison inference settings are removed and must fail with migration guidance.
+Effective native YAML and retained prediction manifests support replay; YAML is recorded
+locally and in ClearML as configuration objects and artifacts with comments preserved.
+Pass device, batch, AMP, compilation and native augmentation options directly to Ultralytics.
 
 The project no longer provides GPU scheduling, filesystem queues or leases, batch tuning,
 custom augmentation JSON, `--force-gpu`, or disabled tracking. Removed options must fail

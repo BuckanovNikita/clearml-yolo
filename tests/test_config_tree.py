@@ -32,14 +32,14 @@ def test_installed_command_creates_examples(
     monkeypatch.setattr("sys.argv", ["cy-init-config", str(target)])
     entrypoints[0].load()()
     assert {path.name for path in target.iterdir()} == {
-        f"{command}.yaml" for command in COMMANDS
+        *[f"{command}.yaml" for command in COMMANDS],
+        "ultralytics",
+        "ultralytics_predict",
     }
 
 
 @pytest.mark.parametrize(("command", "config_name"), COMMANDS.items())
-def test_examples_round_trip_through_hydra(
-    tmp_path: Path, command: str, config_name: str
-) -> None:
+def test_examples_round_trip_through_hydra(tmp_path: Path, command: str, config_name: str) -> None:
     from clearml_yolo.config_tree import dump_config_tree
 
     dump_config_tree(tmp_path)
@@ -60,15 +60,16 @@ def test_generated_pipeline_accepts_inputs_and_native_overrides(tmp_path: Path) 
             overrides=[
                 "ground_truth=truth.csv",
                 "run_dir=runs/example",
-                "+train.ultralytics.data=data.yaml",
-                "+train.ultralytics.epochs=2",
-                "+predict.ultralytics.device=cpu",
+                "ultralytics.data=data.yaml",
+                "ultralytics.epochs=2",
+                "ultralytics_predict.device=cpu",
             ],
         )
     assert config.ground_truth == "truth.csv"
     assert config.run_dir == "runs/example"
-    assert dict(config.train.ultralytics) == {"data": "data.yaml", "epochs": 2}
-    assert dict(config.predict.ultralytics) == {"device": "cpu"}
+    assert config.ultralytics.data == "data.yaml"
+    assert config.ultralytics.epochs == 2
+    assert config.ultralytics_predict.device == "cpu"
     assert not OmegaConf.missing_keys(config)
 
 
@@ -148,3 +149,61 @@ def test_force_rejects_nonregular_destinations_before_writing(
         assert external.read_text(encoding="utf-8") == "# Keep me\n"
     else:
         assert not external.exists()
+
+
+def test_upstream_can_be_pasted_unchanged_into_group(tmp_path: Path) -> None:
+    from clearml_yolo.config_tree import dump_config_tree
+    from clearml_yolo.native_config import native_template
+
+    dump_config_tree(tmp_path)
+    (tmp_path / "ultralytics/default.yaml").write_text(native_template())
+    with initialize_config_dir(config_dir=str(tmp_path), version_base="1.3"):
+        config = compose(config_name="cy", overrides=["ultralytics.imgsz=1280"])
+    assert config.ultralytics_predict.imgsz == 1280
+    assert config.ultralytics_predict.conf == 0.001
+
+
+def test_group_directory_symlink_is_rejected(tmp_path: Path) -> None:
+    from clearml_yolo.config_tree import dump_config_tree
+
+    target = tmp_path / "configs"
+    target.mkdir()
+    external = tmp_path / "external"
+    external.mkdir()
+    (target / "ultralytics").symlink_to(external, target_is_directory=True)
+    with pytest.raises(FileExistsError):
+        dump_config_tree(target, overwrite=True)
+    assert list(external.iterdir()) == []
+    assert not (target / "cy.yaml").exists()
+
+
+@pytest.mark.parametrize(("command", "config_name"), COMMANDS.items())
+def test_generated_examples_load_in_fresh_cli_process(
+    tmp_path: Path, command: str, config_name: str
+) -> None:
+    import subprocess
+    import sys
+
+    from clearml_yolo.config_tree import dump_config_tree
+
+    dump_config_tree(tmp_path)
+    result = subprocess.run(  # noqa: S603 - fixed project modules and generated test paths
+        [
+            sys.executable,
+            "-m",
+            f"clearml_yolo.apps.{config_name}",
+            "--config-dir",
+            str(tmp_path),
+            "--config-name",
+            command,
+            "--cfg",
+            "job",
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "clearml:" in result.stdout

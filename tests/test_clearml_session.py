@@ -459,6 +459,43 @@ def test_remote_source_override_is_resanitized_and_used_as_the_effective_file(
     assert task.configurations[-1]["ignore_remote_overrides"] is True
 
 
+def test_source_yaml_preserves_comments_order_and_redacts_commented_credentials(
+    fake_clearml: tuple[type[Any], FakeTask], tmp_path: Path
+) -> None:
+    _, task = fake_clearml
+    source = tmp_path / "ultralytics.yaml"
+    source.write_text(
+        "# Ultralytics license and configuration\n"
+        "# Training settings\n"
+        "epochs: 3 # Number of epochs\n"
+        "# source: null # Prediction only\n"
+        "nested:\n  - batch: 4 # Batch size\n"
+        "# password: comment-secret\n"
+        "# Original credential was active-secret\n"
+        "# Download: https://user:pass@example.test/model?token=url-secret\n"
+        "token: active-secret # api_key=inline-secret\n",
+        encoding="utf-8",
+    )
+
+    with invocation(ClearMLConfig(), "train") as owner:
+        connect_config_file(owner, "ultralytics", source)
+        stored = task.configurations[-1]["configuration"].read_text(encoding="utf-8")
+        uploaded = task.uploads[0]["artifact_object"].read_text(encoding="utf-8")
+
+    for comment in (
+        "# Ultralytics license and configuration",
+        "# Training settings",
+        "# Number of epochs",
+        "# source: null # Prediction only",
+        "# Batch size",
+    ):
+        assert comment in stored
+    assert stored.index("epochs:") < stored.index("nested:") < stored.index("token:")
+    for secret in ("comment-secret", "user:pass", "url-secret", "active-secret", "inline-secret"):
+        assert secret not in stored
+    assert uploaded == stored
+
+
 def test_invalid_source_yaml_fails_without_echoing_its_contents(
     fake_clearml: tuple[type[Any], FakeTask], tmp_path: Path
 ) -> None:

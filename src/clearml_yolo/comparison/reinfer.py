@@ -19,6 +19,7 @@ from pydantic import BaseModel
 
 from clearml_yolo.clearml_session import sanitize_configuration
 from clearml_yolo.inference import predict_on_images
+from clearml_yolo.native_config import write_native_yaml
 
 Predictor = Callable[..., pd.DataFrame]
 ClassNameLoader = Callable[[str | Path], dict[int, str]]
@@ -82,9 +83,7 @@ def _select_split(ground_truth: pd.DataFrame, split: str) -> pd.DataFrame:
     rows = ground_truth[ground_truth["split"] == split]
     if rows.empty:
         available = sorted({str(value) for value in ground_truth["split"].unique()})
-        raise ValueError(
-            f"Split {split!r} has no ground-truth rows; available splits: {available}"
-        )
+        raise ValueError(f"Split {split!r} has no ground-truth rows; available splits: {available}")
     return rows
 
 
@@ -140,9 +139,7 @@ def _evidence(predictions: pd.DataFrame, fallback: dict[str, object]) -> Inferen
     return evidence
 
 
-def _write_cache(
-    predictions: pd.DataFrame, output: Path, evidence: InferenceEvidence
-) -> None:
+def _write_cache(predictions: pd.DataFrame, output: Path, evidence: InferenceEvidence) -> None:
     """Publish the cache in one step, because a peer run may be reading it.
 
     This file is keyed by the baseline's hash rather than by the run, so two runs
@@ -178,6 +175,10 @@ def _read_cache(output: Path, native_project: Path) -> pd.DataFrame | None:
             native_project,
         )
         return None
+    source = evidence.effective_args.get("source")
+    if not isinstance(source, str) or not Path(source).is_file():
+        logger.warning("Ignoring prediction cache without a retained source manifest: {}", output)
+        return None
     predictions = pd.read_csv(output, dtype=_CACHED_TEXT_COLUMNS)
     predictions.attrs.update(evidence.model_dump())
     return predictions
@@ -189,7 +190,7 @@ def reinfer_split(
     split: str,
     output: Path,
     *,
-    conf: float,
+    conf: float | None,
     iou: float,
     imgsz: int | list[int],
     batch: int,
@@ -247,11 +248,27 @@ def reinfer_split(
             "name": native_name,
             **(native_kwargs or {}),
         }
+        manifest_dir = output.parent / "prediction_inputs" / native_name / output.stem
+        manifest_dir.mkdir(parents=True, exist_ok=True)
+        manifest = manifest_dir / "images.txt"
+        manifest.write_text(
+            "\n".join(str(Path(path).absolute()) for path in image_paths), encoding="utf-8"
+        )
+        write_native_yaml(
+            output.parent / f"ultralytics_predict_{native_name}.yaml",
+            {key: value for key, value in settings.items() if key != "image_name"}
+            | {"source": str(manifest.resolve()), "model": str(weights), "mode": "predict"},
+            "predict",
+        )
         predictions = predictor(
             weights,
             image_paths,
+            manifest_dir=manifest_dir,
             **settings,
         )
+        effective = dict(predictions.attrs.get("effective_args", settings))
+        effective.update(source=str(manifest.resolve()), model=str(weights), mode="predict")
+        predictions.attrs["effective_args"] = effective
         evidence = _evidence(predictions, settings)
         _write_cache(predictions, output, evidence)
         logger.info(

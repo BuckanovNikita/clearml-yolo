@@ -1,3 +1,7 @@
+<!-- Sync Impact Report: 3.0.0 -> 4.0.0; modified Principle III (Configuration and
+Run Ownership); no added/removed principles; no deferred placeholders. Remove this temporary
+report before committing. -->
+
 # clearml-yolo Constitution
 
 ## Core Principles
@@ -77,11 +81,16 @@ consumers MUST validate required existing inputs. Convenience links MUST preserv
 Model execution MUST delegate device, batch, AMP, compilation and distributed training to
 Ultralytics. Runtime GPU scheduling, leases, batch tuning and augmentation-JSON processing
 MUST NOT be provided. `cy-init-config` MUST export current command defaults as editable
-examples, preserving sparse native mappings and required inputs. Existing examples MUST
-be protected unless replacement is explicit; unrelated files MUST be preserved.
-Raw native YAML and explicitly supplied
-embedded mappings MUST compose as upstream defaults < raw YAML < embedded values < CLI.
-Explicit values equal to defaults MUST retain their precedence.
+examples with top-level `ultralytics` and `ultralytics_predict` groups and required inputs.
+The shared group MUST cover the installed native configuration and preserve its comments;
+the prediction group MUST override applicable shared values. Explicit nulls and explicit
+values equal to defaults MUST retain their precedence. Stage-irrelevant settings MUST be
+commented in stage YAML and excluded from native execution. Raw native file loading through
+`cfg` and nested stage-native mappings MUST be rejected with migration guidance.
+Effective native YAML MUST be saved locally and logged as ClearML configuration objects and
+artifacts, with original comments retained and secrets sanitized. Output and checkpoint
+ownership MUST remain with the pipeline. Existing examples MUST be protected unless
+replacement is explicit; unrelated files MUST be preserved.
 
 Candidate thresholds MUST be calibrated on validation data and frozen for test evaluation.
 Baseline thresholds MUST be loaded, never recalibrated on test. Comparisons MUST use the
@@ -191,6 +200,12 @@ reflects these incompatible governance changes. Existing execution, privacy, dep
 verification contracts remain in force. Migration removes the imports, repairs annotations
 that require explicit deferral, and regenerates obsolete examples using current defaults.
 
+Amendment 4.0.0 implements the approved native configuration groups change. Principle III
+replaces sparse stage mappings and raw `cfg` precedence with shared native defaults,
+prediction overrides, stage filtering, comment-preserving YAML and ClearML records.
+This incompatible interface change requires regenerated examples and migration to top-level
+Hydra groups; all execution ownership, privacy and verification safeguards remain in force.
+
 This constitution records the established engineering conventions of `clearml-yolo`.
 Implementation, specifications, plans, and reviews MUST comply with its principles within
 their scope. [AGENTS.md](../../AGENTS.md) supplies operational guidance;
@@ -215,4 +230,4 @@ that deliberately alters a governing rule MUST include an explicit amendment rat
 quietly weakening checks. Constitution updates MUST remain confined to this document;
 dependent template or implementation changes require their own authorized work.
 
-**Version**: 3.0.0 | **Ratified**: 2026-09-19 | **Last Amended**: 2026-09-28
+**Version**: 4.0.0 | **Ratified**: 2026-09-19 | **Last Amended**: 2026-09-28

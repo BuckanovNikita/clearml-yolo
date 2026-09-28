@@ -1,46 +1,30 @@
-"""Hydra configuration with sparse, explicitly supplied native model arguments."""
+"""Shared native Hydra groups for training and prediction overrides."""
 
 import os
 import socket
-from collections.abc import Callable
-from pathlib import Path
 from typing import Any
 
 from hydra.conf import HydraConf, JobConf, RunDir
 from hydra_zen import builds, make_config, store
-from omegaconf import MISSING, OmegaConf, open_dict
+from omegaconf import MISSING, OmegaConf
 
 from clearml_yolo.clearml_session import ClearMLConfig
-from clearml_yolo.tasks.compare import InferenceConfig, ModelRef
+from clearml_yolo.native_config import native_defaults, prediction_defaults
+from clearml_yolo.tasks.compare import ModelRef
 from clearml_yolo.tasks.metrics import EvaluationConfig
 
 RUN_STAMP_RESOLVER = "cy_run_token"
 HYDRA_RUN_DIR = "outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}-${cy_run_token:}"
-NATIVE_BLOCKS = {
-    "train": [""],
-    "predict": [""],
-    "val": [""],
-    "pipeline": ["train", "predict"],
-}
+NATIVE_COMMANDS = frozenset({"train", "predict", "val", "pipeline", "compare"})
+PREDICTION_COMMANDS = NATIVE_COMMANDS
 
 
-def overlay_ultralytics_files(config_name: str) -> Callable[[Any], None]:
-    """Overlay raw native YAML below only explicitly supplied embedded/CLI values."""
-
-    def apply(config: Any) -> None:
-        for parent in NATIVE_BLOCKS.get(config_name, []):
-            node = OmegaConf.select(config, parent) if parent else config
-            named = node.get("cfg")
-            if named is None:
-                continue
-            loaded = OmegaConf.load(Path(named))
-            if not OmegaConf.is_dict(loaded):
-                raise ValueError(f"{named}: native configuration must be a mapping")
-            composed = OmegaConf.merge(loaded, node.ultralytics)
-            with open_dict(node):
-                node.ultralytics = composed
-
-    return apply
+def _native() -> dict[str, Any]:
+    groups: list[Any] = ["_self_", {"ultralytics": "_defaults"}]
+    fields: dict[str, Any] = {"ultralytics": native_defaults()}
+    groups.append({"ultralytics_predict": "_defaults"})
+    fields["ultralytics_predict"] = prediction_defaults()
+    return {"hydra_defaults": groups, **fields}
 
 
 def _token() -> str:
@@ -54,12 +38,12 @@ def register_configs() -> None:
     tracking = builds(ClearMLConfig, populate_full_signature=True)
     evaluation = builds(EvaluationConfig, populate_full_signature=True)
     model = builds(ModelRef, populate_full_signature=True)
-    inference = builds(InferenceConfig, populate_full_signature=True)
-    native: dict[str, Any] = {"cfg": None, "ultralytics": {}}
-    store(make_config(**native, clearml=tracking), name="train")
+    store({}, group="ultralytics", name="_defaults")
+    store({}, group="ultralytics_predict", name="_defaults")
+    store(make_config(**_native(), clearml=tracking), name="train")
     store(
         make_config(
-            **native,
+            **_native(),
             weights=None,
             ground_truth=MISSING,
             output=None,
@@ -71,7 +55,7 @@ def register_configs() -> None:
     )
     store(
         make_config(
-            **native,
+            **_native(),
             weights=None,
             ground_truth=MISSING,
             output_dir=None,
@@ -109,7 +93,8 @@ def register_configs() -> None:
             ground_truth=MISSING,
             output_dir=None,
             split="test",
-            inference=inference,
+            **_native(),
+            inference={"reuse_existing": True, "image_name": "name"},
             iou_threshold=0.5,
             matching_strategy="iou_prior",
             q=0.05,
@@ -132,8 +117,7 @@ def register_configs() -> None:
     )
     store(
         make_config(
-            train=make_config(**native),
-            predict=make_config(**native),
+            **_native(),
             metrics=make_config(evaluation=evaluation, calibration_split="val"),
             compare=make_config(baseline_model=model, q=0.05, bootstrap_iterations=10000, seed=0),
             report=make_config(report_config_path=None),

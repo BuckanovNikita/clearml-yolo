@@ -9,6 +9,7 @@ from typing import Any
 from hydra_zen import instantiate
 
 from clearml_yolo.clearml_session import ClearMLConfig, init_task, upload_artifact
+from clearml_yolo.native_config import prediction_settings
 from clearml_yolo.run_identity import RUNS_ROOT, point_latest_at, resolve_run_dir, resolve_run_id
 from clearml_yolo.tasks.compare import InferenceConfig, ModelRef, NoBaselineModelError
 from clearml_yolo.tasks.compare import compare as run_comparison
@@ -27,7 +28,7 @@ def _as_dict(config: Any) -> dict[str, Any]:
     # zen already instantiates nested Pydantic objects inside generated stage dataclasses.
     # Instantiating that dataclass again would rebuild an OmegaConf wrapper around it.
     values = vars(config) if is_dataclass(config) else instantiate(config, _convert_="all")
-    return {key: value for key, value in values.items() if key not in {"defaults", "cfg"}}
+    return {key: value for key, value in values.items() if key != "defaults"}
 
 
 def routed_native(settings: dict[str, Any], project: Path, name: str) -> dict[str, Any]:
@@ -106,8 +107,8 @@ def _compare_and_report(
 
 
 def run_pipeline(
-    train: Any,
-    predict: Any,
+    ultralytics: dict[str, Any],
+    ultralytics_predict: dict[str, Any],
     metrics: Any,
     report: Any,
     compare: Any,
@@ -129,15 +130,15 @@ def run_pipeline(
         raise ValueError("weights is only valid with skip_train=true; training chooses its model")
     identity = resolve_run_id(clearml.task_name, run_id, datetime.now(tz=UTC))
     directory = resolve_run_dir(RUNS_ROOT, identity, Path(run_dir) if run_dir else None)
-    train_cfg = _stage_values(train, {"ultralytics"}, "train")
-    predict_cfg = _stage_values(predict, {"ultralytics"}, "predict")
     metrics_cfg = _stage_values(metrics, {"evaluation", "calibration_split"}, "metrics")
     report_cfg = _stage_values(report, {"report_config_path"}, "report")
     compare_cfg = _stage_values(
         compare, {"baseline_model", "q", "bootstrap_iterations", "seed"}, "compare"
     )
-    train_params = routed_native(train_cfg["ultralytics"], directory / "detect", "train")
-    predict_params = routed_native(predict_cfg["ultralytics"], directory / "native", "predict")
+    train_params = routed_native(ultralytics, directory / "detect", "train")
+    predict_params = routed_native(
+        prediction_settings(ultralytics, ultralytics_predict), directory / "native", "predict"
+    )
     directory.mkdir(parents=True, exist_ok=True)
     point_latest_at(RUNS_ROOT, directory)
     results: dict[str, Any] = {"run_dir": directory}
@@ -155,6 +156,8 @@ def run_pipeline(
             clearml,
             predict_params,
             splits=list(dict.fromkeys(["val", *splits])),
+            ultralytics_predict=ultralytics_predict
+            | {"project": predict_params["project"], "name": predict_params["name"]},
         )
         predictions = predicted.predictions
         results["predictions"] = predictions

@@ -37,6 +37,7 @@ def published(monkeypatch: pytest.MonkeyPatch) -> dict[str, pd.DataFrame]:
     monkeypatch.setattr(predict_module, "report_table", report_table)
     monkeypatch.setattr(predict_module, "init_task", lambda *_a, **_k: object())
     monkeypatch.setattr(predict_module, "expect_artifacts", lambda *_a, **_k: None)
+    monkeypatch.setattr(predict_module, "connect_config_file", lambda *a, **k: a[2])
     monkeypatch.setattr(predict_module, "upload_artifact", lambda *_a, **_k: None)
     monkeypatch.setattr(predict_module, "resolve_weights", lambda weights: weights)
     monkeypatch.setattr(
@@ -130,5 +131,75 @@ def test_prediction_satisfies_its_registered_artifacts(
     monkeypatch.setattr(
         predict_module, "upload_artifact", lambda task, name, value: uploaded.append(name)
     )
+    monkeypatch.setattr(
+        predict_module,
+        "connect_config_file",
+        lambda task, name, value, **kwargs: uploaded.append(name),
+    )
     _predict(tmp_path, 64)
     assert set(expected) <= set(uploaded)
+
+
+def test_prediction_overrides_inherit_shared_and_replace_training_model() -> None:
+    from clearml_yolo.native_config import prediction_settings
+
+    settings = prediction_settings(
+        {"model": "architecture.pt", "epochs": 20, "batch": 16, "imgsz": 640},
+        {"batch": 4, "conf": 0.001},
+        "best.pt",
+    )
+    assert settings["model"] == "best.pt"
+    assert settings["batch"] == 4
+    assert settings["imgsz"] == 640
+    assert "epochs" not in settings
+
+
+def test_prediction_explicit_model_conflict_fails() -> None:
+    from clearml_yolo.native_config import prediction_settings
+
+    with pytest.raises(ValueError, match=r"ultralytics_predict\.model"):
+        prediction_settings({}, {"model": "different.pt"}, "best.pt")
+
+
+def test_prediction_autobatch_requires_override() -> None:
+    from clearml_yolo.native_config import prediction_settings
+
+    with pytest.raises(ValueError, match="batch"):
+        prediction_settings({"batch": -1}, {}, "best.pt")
+
+
+@pytest.mark.parametrize(("weights", "expected"), [("best.pt", "best.pt"), (None, "base.pt")])
+def test_null_predict_model_inherits_base_or_owned_checkpoint(
+    weights: str | None, expected: str
+) -> None:
+    from clearml_yolo.native_config import prediction_settings
+
+    assert prediction_settings({"model": "base.pt"}, {"model": None}, weights)["model"] == expected
+
+
+def test_source_cannot_override_ground_truth_membership() -> None:
+    from clearml_yolo.native_config import prediction_settings
+
+    with pytest.raises(ValueError, match="ground_truth"):
+        prediction_settings({"source": "different-images.txt"})
+
+
+def test_native_failure_preserves_replay_config_and_manifest(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    checkpoint_recording: Any,
+    published: dict[str, pd.DataFrame],
+) -> None:
+    import yaml
+
+    checkpoint_recording({"imgsz": 64})
+
+    def fail(*args: Any, **kwargs: Any) -> pd.DataFrame:
+        raise RuntimeError("native failure")
+
+    monkeypatch.setattr(predict_module, "predict_on_images", fail)
+    with pytest.raises(RuntimeError, match="native failure"):
+        _predict(tmp_path, 64)
+    settings = yaml.safe_load((tmp_path / "ultralytics_predict.yaml").read_text())
+    assert settings["model"] == "best.pt"
+    assert Path(settings["source"]).is_file()

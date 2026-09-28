@@ -6,28 +6,32 @@ cy-ground-truth and cy-init-config. cy-queue remains removed.
 `cy-init-config DIRECTORY [--force]` creates missing parent directories and writes one
 editable YAML per execution command, named after that command (including `cy-val.yaml`).
 Examples compose with `COMMAND --config-dir DIRECTORY --config-name COMMAND` and preserve
-current defaults, sparse native mappings and required `???` inputs. Comments explain input
+current defaults, native groups and required `???` inputs. It also writes
+`ultralytics/default.yaml` and `ultralytics_predict/default.yaml`. Comments explain input
 paths and native overrides. Initialization is local only: no ClearML task or model execution.
 Existing example paths are checked before any writes; without `--force`, collisions fail.
 `--force` replaces regular example files, preserves unrelated files and rejects symlink or
 directory destinations. Filesystem errors produce a nonzero exit with a CLI error message.
 
-Native settings live in `ultralytics` (pipeline: `train.ultralytics`, `predict.ultralytics`).
-`cfg` next to a mapping names unchanged native YAML. Sparse mappings track presence.
-Precedence: native defaults < cfg YAML < embedded mapping (including explicit default values)
-< Hydra CLI overrides. Add an absent key with `+ultralytics.epochs=1`; override an existing
-one with `ultralytics.epochs=1`. Unknown native parameters fail at native validation.
-Wrapper settings (ClearML, inputs, evaluation, model selection, reports) remain separate.
-Raw source configs and resolved configuration are captured before execution.
+Native settings use top-level `ultralytics` and `ultralytics_predict` groups for every model
+command. The shared group covers upstream defaults and original comments; prediction inherits
+applicable values and applies explicit overrides, including nulls/default values. Ordinary
+Hydra overrides work without `+` for known native keys. Prediction confidence defaults to 0.001.
+Native group files have native keys at their root. Stage-irrelevant settings are excluded from
+execution and commented in effective native YAML. Wrapper controls remain separate.
+Raw wrapper `cfg`, non-null native `cfg`, nested stage mappings and duplicate native comparison
+inference settings fail with migration guidance. See the current
+[configuration contract](../../003-ultralytics-config-groups/contracts/configuration.md).
+Source configurations and resolved configuration are captured before execution.
 
 `run_dir` routes the whole pipeline. Native project/name that disagree with the chosen
 pipeline training directory fail. Standalone training honors explicit native project/name;
 otherwise it creates an isolated run. Standalone output-producing commands default to a
 fresh directory and require explicit input paths; no silently shared output directories.
-`cy-val` accepts weights, ground_truth, ultralytics, cfg, evaluation, splits and output_dir;
+`cy-val` accepts weights, ground_truth, ultralytics, ultralytics_predict, evaluation, splits and output_dir;
 it predicts required val plus requested splits and evaluates at frozen validation thresholds.
 
-Comparison takes baseline_model/candidate_model references, current ground_truth, inference,
+Comparison takes baseline_model/candidate_model references, current ground_truth, ultralytics, ultralytics_predict,
 split=test and statistical options. Automatic baseline is latest completed prod excluding
 current task. Explicit local models require weights and exact thresholds; explicit invalid
 inputs fail. Reports consume the comparison's current-test evaluated dashboards, not stored

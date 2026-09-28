@@ -16,6 +16,7 @@ def validate(
     ultralytics: dict[str, Any],
     evaluation: EvaluationConfig,
     splits: list[str] | None = None,
+    ultralytics_predict: dict[str, Any] | None = None,
 ) -> MetricsResult:
     init_task(clearml, stage="val")
     selected = splits or ["val", "test"]
@@ -26,6 +27,7 @@ def validate(
         destination / "predictions.csv",
         clearml,
         ultralytics,
+        ultralytics_predict=ultralytics_predict,
         splits=list(dict.fromkeys(["val", *selected])),
     )
     return compute_metrics(

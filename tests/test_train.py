@@ -38,6 +38,7 @@ def test_native_forwarding_and_actual_checkpoint(
             )
 
         def train(self, **kwargs: Any) -> None:
+            assert not (Path(kwargs["project"]) / kwargs["name"]).exists()
             calls.update(kwargs)
             self.trainer.args = types.SimpleNamespace(**kwargs)
 

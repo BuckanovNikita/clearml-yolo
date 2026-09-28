@@ -8,7 +8,8 @@ from hydra_zen import store
 from loguru import logger
 from omegaconf import OmegaConf
 
-from clearml_yolo.configs import NATIVE_BLOCKS
+from clearml_yolo.configs import NATIVE_COMMANDS, PREDICTION_COMMANDS
+from clearml_yolo.native_config import native_defaults, render_native_yaml
 
 COMMAND_OF_CONFIG = {
     "pipeline": "cy",
@@ -37,48 +38,74 @@ def _header(config_name: str, command: str, directory: Path) -> str:
         lines.append("# Set run_dir to route all pipeline outputs together.")
     if config_name in {"predict", "val"}:
         lines.append("# Set weights to your trained checkpoint (or use ultralytics.model).")
-    for parent in NATIVE_BLOCKS.get(config_name, []):
-        prefix = f"{parent}." if parent else ""
+    if config_name in NATIVE_COMMANDS:
         lines.extend(
             [
-                f"# Native YAML: {prefix}cfg=native.yaml; embedded keys take precedence.",
-                (
-                    f"# Add native keys: +{prefix}ultralytics.device=cpu; "
-                    "omit + to override existing keys."
-                ),
+                "# Paste upstream native YAML unchanged into ultralytics/default.yaml.",
+                "# Override shared values: ultralytics.device=cpu ultralytics.epochs=10",
             ]
         )
-        if config_name == "train" or parent == "train":
-            lines.append(
-                f"# Training example: +{prefix}ultralytics.model=yolo11n.pt "
-                f"+{prefix}ultralytics.data=data.yaml +{prefix}ultralytics.epochs=10"
-            )
+    if config_name in PREDICTION_COMMANDS:
+        lines.append(
+            "# Prediction overrides: ultralytics_predict/default.yaml or CLI "
+            "ultralytics_predict.batch=8"
+        )
     return "\n".join(lines) + "\n\n"
 
 
-def dump_config_tree(directory: str | Path, *, overwrite: bool = False) -> list[Path]:
-    """Write one example per pipeline/stage command, preserving existing files by default."""
-    target = Path(directory).expanduser()
-    paths = [target / f"{command}.yaml" for command in COMMAND_OF_CONFIG.values()]
-    # Check every destination before writing any examples, including dangling symlinks.
+def _check_destinations(paths: list[Path], *, overwrite: bool) -> None:
+    """Preflight files and their parents before writing any example."""
     for path in paths:
+        for parent in path.parents:
+            if parent.is_symlink() or (parent.exists() and not parent.is_dir()):
+                raise FileExistsError(f"{parent} is not a regular directory")
         if path.exists() or path.is_symlink():
             if not overwrite:
                 raise FileExistsError(f"{path} already exists. Pass --force to overwrite examples.")
             if path.is_symlink() or not path.is_file():
                 raise FileExistsError(f"{path} is not a regular file; choose another directory.")
 
+
+def dump_config_tree(directory: str | Path, *, overwrite: bool = False) -> list[Path]:
+    """Write one example per pipeline/stage command, preserving existing files by default."""
+    target = Path(directory).expanduser()
+    paths = [target / f"{command}.yaml" for command in COMMAND_OF_CONFIG.values()]
+    paths.extend(target / name / "default.yaml" for name in ("ultralytics", "ultralytics_predict"))
+    _check_destinations(paths, overwrite=overwrite)
+
     store.add_to_hydra_store(overwrite_ok=True)
     contents = []
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
         for config_name, command in COMMAND_OF_CONFIG.items():
             config = compose(config_name=config_name)
+            # Reference the registered command schema to keep inherited values lazy;
+            # group YAML remains plain native YAML and can be pasted unchanged.
+            values = OmegaConf.to_container(config, resolve=False)
+            if not isinstance(values, dict):
+                raise TypeError("Command configuration must be a mapping")
+            values.pop("ultralytics", None)
+            values.pop("ultralytics_predict", None)
+            defaults: list[object] = [config_name]
+            if config_name in NATIVE_COMMANDS:
+                defaults.append({"override /ultralytics": "default"})
+            if config_name in PREDICTION_COMMANDS:
+                defaults.append({"override /ultralytics_predict": "default"})
+            defaults.append("_self_")
+            example = OmegaConf.create({"defaults": defaults, **values})
             contents.append(
-                _header(config_name, command, target) + OmegaConf.to_yaml(config, resolve=False)
+                _header(config_name, command, target) + OmegaConf.to_yaml(example, resolve=False)
             )
+    contents.extend(
+        [
+            render_native_yaml(native_defaults(), "train"),
+            "# Uncomment a parameter to override the shared ultralytics value.\n"
+            + render_native_yaml({"conf": 0.001}, "predict", overrides_only=True),
+        ]
+    )
 
     target.mkdir(parents=True, exist_ok=True)
     for path, content in zip(paths, contents, strict=True):
+        path.parent.mkdir(parents=True, exist_ok=True)
         # Exclusive creation also protects files created after the initial preflight.
         with path.open("w" if overwrite else "x", encoding="utf-8") as stream:
             stream.write(content)

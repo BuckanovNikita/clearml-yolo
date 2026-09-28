@@ -369,3 +369,12 @@ def test_rectangular_native_resolution_is_preserved(checkpoint_recording: Any) -
     checkpoint_recording({"imgsz": 640})
     result = resolution_of("best.pt", [320, 640])
     assert result.scored_at == [320, 640]
+
+
+def test_explicit_manifest_persists_for_native_yaml_replay(tmp_path: Path) -> None:
+    frame = predict_on_images("best.pt", ["a.png"], device="cpu", manifest_dir=tmp_path / "inputs")
+    manifest = Path(frame.attrs["effective_args"]["source"])
+    assert manifest.is_file()
+    assert manifest.read_text() == str(Path("a.png").absolute())
+    assert frame.attrs["effective_args"]["model"] == "best.pt"
+    assert frame.attrs["effective_args"]["mode"] == "predict"

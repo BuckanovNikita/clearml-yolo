@@ -20,6 +20,7 @@ from clearml_yolo.clearml_session import (
     upload_artifact,
 )
 from clearml_yolo.inference import ImageNameMode, ScoredResolution, predict_on_images, resolution_of
+from clearml_yolo.native_config import prediction_settings, write_native_yaml
 from clearml_yolo.run_identity import RUNS_ROOT, resolve_run_dir, resolve_run_id
 
 
@@ -53,6 +54,7 @@ def predict(
     ultralytics: dict[str, Any],
     splits: list[str] | None = None,
     image_name: ImageNameMode = "name",
+    ultralytics_predict: dict[str, Any] | None = None,
 ) -> PredictResult:
     task = init_task(clearml, stage="predict")
     expect_artifacts(
@@ -66,11 +68,8 @@ def predict(
             "predict_output_locations",
         ],
     )
-    settings = dict(ultralytics)
-    native_model = settings.pop("model", None)
-    if weights is not None and native_model is not None and str(weights) != str(native_model):
-        raise ValueError("weights conflicts with ultralytics.model")
-    selected = weights or native_model
+    settings = prediction_settings(ultralytics, ultralytics_predict, weights)
+    selected = settings.pop("model", None)
     if selected is None:
         raise ValueError("Prediction requires weights=<checkpoint> or ultralytics.model")
     checkpoint = resolve_weights(selected)
@@ -89,8 +88,10 @@ def predict(
         output = directory / "predictions.csv"
     output_path = Path(output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    settings.setdefault("project", str(output_path.parent.resolve() / "native"))
-    settings.setdefault("name", "predict")
+    settings["project"] = settings.get("project") or str(output_path.parent.resolve() / "native")
+    settings["name"] = settings.get("name") or "predict"
+    settings["mode"] = "predict"
+    settings.pop("source", None)
     truth = pd.read_csv(ground_truth, dtype={"image_name": str, "instance_label": str})
     paths = images_to_score(truth, splits)
     # Native rectangular padding depends on batch membership. Keep each split's
@@ -99,7 +100,8 @@ def predict(
         [images_to_score(truth, [split]) for split in dict.fromkeys(splits)] if splits else [paths]
     )
     frames = [
-        predict_on_images(checkpoint, group, image_name=image_name, **settings) for group in groups
+        _predict_group(task, checkpoint, group, image_name, settings, output_path, index)
+        for index, group in enumerate(groups)
     ]
     effective = frames[0].attrs.get("effective_args", settings)
     frame = pd.concat(frames, ignore_index=True)
@@ -146,3 +148,41 @@ def _publish_native_outputs(task: Any, frames: list[pd.DataFrame]) -> None:
                 connect_config_file(task, name, path, allow_remote_override=False)
             else:
                 upload_artifact(task, name, path)
+
+
+def _predict_group(
+    task: Any,
+    checkpoint: str | Path,
+    group: list[str],
+    image_name: ImageNameMode,
+    settings: dict[str, Any],
+    output_path: Path,
+    index: int,
+) -> pd.DataFrame:
+    manifest_dir = output_path.parent / "prediction_inputs" / str(index)
+    manifest_dir.mkdir(parents=True, exist_ok=True)
+    manifest = manifest_dir / "images.txt"
+    manifest.write_text("\n".join(str(Path(path).absolute()) for path in group), encoding="utf-8")
+    config_path = output_path.parent / (
+        "ultralytics_predict.yaml" if index == 0 else f"ultralytics_predict_{index}.yaml"
+    )
+    provisional = settings | {
+        "source": str(manifest.resolve()),
+        "model": str(checkpoint),
+        "mode": "predict",
+    }
+    write_native_yaml(config_path, provisional, "predict")
+    frame = predict_on_images(
+        checkpoint, group, image_name=image_name, manifest_dir=manifest_dir, **settings
+    )
+    effective_group = settings | frame.attrs.get("effective_args", {})
+    effective_group.update(model=str(checkpoint), mode="predict")
+    effective_group["source"] = str((manifest_dir / "images.txt").resolve())
+    config_path = output_path.parent / (
+        "ultralytics_predict.yaml" if index == 0 else f"ultralytics_predict_{index}.yaml"
+    )
+    write_native_yaml(config_path, effective_group, "predict")
+    config_name = "ultralytics_predict" if index == 0 else f"ultralytics_predict_{index}"
+    expect_artifacts(task, [config_name])
+    connect_config_file(task, config_name, config_path, allow_remote_override=False)
+    return frame

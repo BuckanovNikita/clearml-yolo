@@ -15,6 +15,7 @@ from clearml_yolo.clearml_session import (
     sanitize_configuration,
     upload_artifact,
 )
+from clearml_yolo.native_config import stage_settings, write_native_yaml
 from clearml_yolo.run_identity import RUNS_ROOT, point_latest_at, resolve_run_dir, resolve_run_id
 
 TRAIN_DIR = "detect"
@@ -51,7 +52,11 @@ def _publish_training(task: Any, directory: Path) -> None:
             upload_artifact(task, name, path)
 
 
-def train(ultralytics: dict[str, Any], clearml: ClearMLConfig) -> TrainResult:
+def train(
+    ultralytics: dict[str, Any],
+    clearml: ClearMLConfig,
+    ultralytics_predict: dict[str, Any] | None = None,
+) -> TrainResult:
     """Pass native settings unchanged, except isolated default output routing."""
     from ultralytics.models import YOLO
 
@@ -66,15 +71,24 @@ def train(ultralytics: dict[str, Any], clearml: ClearMLConfig) -> TrainResult:
             "train_weights_best.pt",
         ],
     )
-    settings = dict(ultralytics)
-    architecture = settings.pop("model", "yolo11n.pt")
+    # Shared command configs include prediction overrides; they never affect training.
+    stage_settings(ultralytics_predict or {}, "predict")
+    settings = stage_settings(ultralytics, "train")
+    architecture = settings.pop("model", None) or "yolo11n.pt"
+    settings["mode"] = "train"
     settings["project"] = str(_project_of_this_run(settings.get("project"), clearml.task_name))
-    settings.setdefault("name", clearml.task_name)
+    settings["name"] = settings.get("name") or clearml.task_name
     data = settings.get("data")
     if isinstance(data, (str, Path)) and (Path(data).is_file() or not task.running_locally()):
         settings["data"] = str(connect_config_file(task, "dataset_configuration", Path(data)))
     upload_artifact(
         task, "training_model_reference", sanitize_configuration({"model": architecture})
+    )
+    # Creating the native run directory here would trigger Ultralytics name incrementation.
+    write_native_yaml(
+        Path(settings["project"]) / ".configs" / settings["name"] / "ultralytics.yaml",
+        settings | {"model": architecture},
+        "train",
     )
     model = YOLO(architecture)
     model.train(**settings)
@@ -88,6 +102,13 @@ def train(ultralytics: dict[str, Any], clearml: ClearMLConfig) -> TrainResult:
     effective = dict(vars(trainer.args))
     upload_artifact(task, "train_effective_arguments", sanitize_configuration(effective))
     upload_artifact(task, "train_output_location", {"save_dir": str(directory)})
+    config_path = write_native_yaml(
+        directory / "ultralytics.yaml",
+        settings | effective | {"model": architecture, "mode": "train"},
+        "train",
+    )
+    expect_artifacts(task, ["ultralytics"])
+    connect_config_file(task, "ultralytics", config_path, allow_remote_override=False)
     _publish_training(task, directory)
     logger.info("Training checkpoint: {}", best)
     return TrainResult(weights=best, save_dir=directory, effective_args=effective)

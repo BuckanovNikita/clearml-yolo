@@ -8,6 +8,7 @@ reports all land on one experiment.
 import dataclasses
 import json
 import os
+import re
 import signal
 import threading
 from collections.abc import Iterator, Mapping
@@ -19,9 +20,12 @@ from tempfile import TemporaryDirectory
 from typing import Any, Self
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-import yaml
 from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from ruamel.yaml import YAML
+from ruamel.yaml.comments import CommentedMap, CommentedSeq
+from ruamel.yaml.error import YAMLError
+from ruamel.yaml.tokens import CommentToken
 
 ARTIFACT_MANIFEST = "artifact_manifest"
 RESOLVED_CONFIGURATION = "resolved_configuration"
@@ -405,32 +409,104 @@ def expect_artifacts(task: Any, names: list[str]) -> None:
         )
 
 
+def _configuration_secrets(value: Any, *, sensitive: bool = False) -> set[str]:
+    if isinstance(value, Mapping):
+        return {
+            secret
+            for key, item in value.items()
+            for secret in _configuration_secrets(item, sensitive=sensitive or _sensitive_key(key))
+        }
+    if isinstance(value, (list, tuple)):
+        return {
+            secret for item in value for secret in _configuration_secrets(item, sensitive=sensitive)
+        }
+    if isinstance(value, str):
+        if sensitive:
+            return {value} if value and value != REDACTED else set()
+        parts = urlsplit(value)
+        if parts.scheme and parts.netloc:
+            candidates = {parts.username, parts.password}
+            candidates.update(item for key, item in parse_qsl(parts.query) if _sensitive_key(key))
+            return {item for item in candidates if item and item != REDACTED}
+    return set()
+
+
+def _sanitize_yaml_comment(value: str, secrets: set[str]) -> str:
+    lines = []
+    for line in value.splitlines(keepends=True):
+        # Disabled settings are comments too: keep native settings, but remove
+        # credential assignments rather than uploading their inactive values.
+        assignments = re.findall(r"\b([A-Za-z_][\w-]*)\s*[:=]\s*\S+", line)
+        if any(_sensitive_key(key) for key in assignments):
+            newline = "\n" if line.endswith("\n") else ""
+            lines.append(f"# {REDACTED}{newline}")
+        else:
+            lines.append(
+                re.sub(r"[A-Za-z][\w+.-]*://[^\s<>]+", lambda m: _sanitize_url(m[0]), line)
+            )
+    sanitized = "".join(lines)
+    for secret in sorted(secrets, key=len, reverse=True):
+        sanitized = sanitized.replace(secret, REDACTED)
+    return sanitized
+
+
+def _sanitize_yaml_comments(value: Any, secrets: set[str]) -> None:
+    # ruamel stores comment tokens in lists grouped by position (before a key,
+    # beside a value, or at document end), including nested lists for sequences.
+    if isinstance(value, CommentToken):
+        value.value = _sanitize_yaml_comment(value.value, secrets)
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            _sanitize_yaml_comments(item, secrets)
+
+
+def _sanitize_yaml_configuration(value: Any, secrets: set[str]) -> Any:
+    if isinstance(value, (CommentedMap, CommentedSeq)):
+        _sanitize_yaml_comments(value.ca.comment, secrets)
+        _sanitize_yaml_comments(value.ca.end, secrets)
+        for comments in value.ca.items.values():
+            _sanitize_yaml_comments(comments, secrets)
+    if isinstance(value, CommentedMap):
+        for key, item in value.items():
+            value[key] = (
+                REDACTED if _sensitive_key(key) else _sanitize_yaml_configuration(item, secrets)
+            )
+        return value
+    if isinstance(value, CommentedSeq):
+        for index, item in enumerate(value):
+            value[index] = _sanitize_yaml_configuration(item, secrets)
+        return value
+    return sanitize_configuration(value)
+
+
 def _sanitized_config_file(state: _InvocationState, path: Path) -> Path:
     if not path.is_file():
         raise FileNotFoundError(f"Configuration file does not exist: {path}")
     suffix = path.suffix.lower()
+    yaml = YAML(typ="rt")
+    yaml.preserve_quotes = True
     try:
         if suffix == ".json":
             content = json.loads(path.read_text(encoding="utf-8"))
         elif suffix in {".yaml", ".yml"}:
-            content = yaml.safe_load(path.read_text(encoding="utf-8"))
+            content = yaml.load(path.read_text(encoding="utf-8"))
         else:
             raise ValueError(f"Unsupported configuration file format: {path.suffix or '<none>'}")
     except json.JSONDecodeError:
         raise ValueError(f"Invalid JSON configuration file: {path}") from None
-    except yaml.YAMLError:
+    except YAMLError:
         raise ValueError(f"Invalid YAML configuration file: {path}") from None
 
     sanitized_path = state.config_path(suffix)
-    sanitized = sanitize_configuration(content)
     if suffix == ".json":
         sanitized_path.write_text(
-            json.dumps(sanitized, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+            json.dumps(sanitize_configuration(content), indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
         )
     else:
-        sanitized_path.write_text(
-            yaml.safe_dump(sanitized, sort_keys=False, allow_unicode=True), encoding="utf-8"
-        )
+        sanitized = _sanitize_yaml_configuration(content, _configuration_secrets(content))
+        with sanitized_path.open("w", encoding="utf-8") as stream:
+            yaml.dump(sanitized, stream)
     return sanitized_path
 
 

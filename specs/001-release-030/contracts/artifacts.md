@@ -19,3 +19,9 @@ Report: developer and business workbooks from that same paired evaluation.
 A required output must exist and upload successfully before manifest completion. Metadata must
 not capture credentials (including nested keys or credential-bearing URLs). Source images
 remain external. Native callback task, scalar and model uploads are suppressed to avoid duplication.
+
+Native effective configuration is also recorded as commented `ultralytics.yaml` and
+`ultralytics_predict.yaml`, as applicable, with split/role variants and retained local source
+manifests. Matching ClearML configuration objects and downloadable YAML artifacts preserve
+upstream comments through sanitization. See the current
+[native artifact contract](../../003-ultralytics-config-groups/contracts/artifacts.md).

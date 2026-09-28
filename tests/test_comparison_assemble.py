@@ -109,8 +109,7 @@ def _outcome(detected: dict[str, list[bool]], correct: dict[str, list[bool]]) ->
 def _flags(per_class: dict[str, int]) -> dict[str, list[bool]]:
     """``count`` leading True flags per class, over the fixed image list."""
     return {
-        name: [index < count for index in range(len(IMAGES))]
-        for name, count in per_class.items()
+        name: [index < count for index in range(len(IMAGES))] for name, count in per_class.items()
     }
 
 
@@ -309,9 +308,7 @@ def test_a_cache_is_not_reused_when_current_image_content_changes(tmp_path: Path
     checkpoint.write_bytes(b"weights")
     image = tmp_path / "image.jpg"
     image.write_bytes(b"first")
-    truth = pd.DataFrame(
-        [{"image_name": "image.jpg", "image_path": str(image), "split": "test"}]
-    )
+    truth = pd.DataFrame([{"image_name": "image.jpg", "image_path": str(image), "split": "test"}])
     before = _prediction_cache(
         tmp_path, "baseline", "test", checkpoint, _settled(), _split_fingerprint(truth, "test")
     )
@@ -573,8 +570,7 @@ def test_compare_dashboards_and_statistics_share_the_same_test_counts(
     from clearml_yolo.inference import ScoredResolution
     from clearml_yolo.tasks.compare import InferenceConfig, ModelRef, compare
 
-    baseline_weights = tmp_path / "baseline.pt"
-    candidate_weights = tmp_path / "candidate.pt"
+    baseline_weights, candidate_weights = tmp_path / "baseline.pt", tmp_path / "candidate.pt"
     baseline_weights.write_bytes(b"baseline")
     candidate_weights.write_bytes(b"candidate")
     image = tmp_path / "image.jpg"
@@ -641,6 +637,10 @@ def test_compare_dashboards_and_statistics_share_the_same_test_counts(
     monkeypatch.setattr(
         "clearml_yolo.tasks.compare.upload_artifact",
         lambda _task, name, value: uploads.setdefault(name, value),
+    )
+    monkeypatch.setattr(
+        "clearml_yolo.tasks.compare.connect_config_file",
+        lambda _task, name, value, **kwargs: uploads.setdefault(name, value),
     )
     monkeypatch.setattr(
         "clearml_yolo.tasks.compare.expect_artifacts",
@@ -918,6 +918,10 @@ def test_automatic_baseline_absence_still_evaluates_candidate(
     monkeypatch.setattr(
         "clearml_yolo.tasks.compare.upload_artifact",
         lambda _task, name, value: uploads.setdefault(name, value),
+    )
+    monkeypatch.setattr(
+        "clearml_yolo.tasks.compare.connect_config_file",
+        lambda _task, name, value, **kwargs: uploads.setdefault(name, value),
     )
     monkeypatch.setattr(
         "clearml_yolo.tasks.compare.latest_completed_task_id", lambda *_args, **_kwargs: None

@@ -21,6 +21,7 @@ from clearml_yolo.clearml_models import (
 from clearml_yolo.clearml_report import report_comparison
 from clearml_yolo.clearml_session import (
     ClearMLConfig,
+    connect_config_file,
     expect_artifacts,
     init_task,
     sanitize_configuration,
@@ -40,6 +41,7 @@ from clearml_yolo.comparison.scoring import (
 )
 from clearml_yolo.comparison.workbook import write_comparison_workbook
 from clearml_yolo.inference import ImageNameMode, resolution_of, trained_imgsz
+from clearml_yolo.native_config import prediction_settings, write_native_yaml
 
 ModelSource = Literal["clearml", "local"]
 MANIFEST_NAME = "comparison_manifest.json"
@@ -165,7 +167,7 @@ class InferenceConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    conf: float = 0.001
+    conf: float | None = 0.001
     iou: float = 0.7
     imgsz: int | list[int] | None = None
     batch: int = 1
@@ -201,7 +203,7 @@ class InferenceConfig(BaseModel):
 class SettledInference(BaseModel):
     """Inference settings after checkpoint-derived resolution is filled."""
 
-    conf: float
+    conf: float | None
     iou: float
     imgsz: int | list[int]
     batch: int
@@ -247,9 +249,7 @@ def _prediction_cache(
         stat = weights.stat()
         identity = f"{identity}:{stat.st_size}:{stat.st_mtime_ns}"
     settings = json.dumps(inference.model_dump(mode="json"), sort_keys=True, ensure_ascii=True)
-    digest = hashlib.sha256(
-        f"{identity}:{settings}:{split_fingerprint}".encode()
-    ).hexdigest()[:12]
+    digest = hashlib.sha256(f"{identity}:{settings}:{split_fingerprint}".encode()).hexdigest()[:12]
     return destination / f"{role}_predictions_{split}_{digest}.csv"
 
 
@@ -309,6 +309,7 @@ def _scored(
     classes: list[str],
     *,
     evaluation: EvaluationConfig,
+    task: Any = None,
 ) -> tuple[EvaluatedSplit, VocabularyReport, InferenceEvidence, Path]:
     native_project = destination / "native"
     native_name = f"{role}_{split}"
@@ -342,6 +343,16 @@ def _scored(
             ),
         }
     )
+    config_path = write_native_yaml(
+        destination / f"ultralytics_predict_{role}_{split}.yaml",
+        {key: value for key, value in evidence.effective_args.items() if key != "image_name"}
+        | {"model": str(weights), "mode": "predict"},
+        "predict",
+    )
+    if task is not None:
+        config_name = f"ultralytics_predict_{role}_{split}"
+        expect_artifacts(task, [config_name])
+        connect_config_file(task, config_name, config_path, allow_remote_override=False)
     native_archive = _archive_native_outputs(
         Path(evidence.save_dir), destination, role=role, split=split
     )
@@ -380,9 +391,7 @@ def _scored(
     return evaluated, vocabulary, evidence, native_archive
 
 
-def _archive_native_outputs(
-    save_dir: Path, destination: Path, *, role: str, split: str
-) -> Path:
+def _archive_native_outputs(save_dir: Path, destination: Path, *, role: str, split: str) -> Path:
     """Archive native tabular/text outputs without copying source-derived images."""
     archive = destination / f"native_outputs_{role}_{split}.zip"
     allowed = {".csv", ".json", ".txt", ".yaml", ".yml"}
@@ -420,9 +429,9 @@ def _archive_native_outputs(
 
 def _degraded(tables: ComparisonTables) -> list[str]:
     per_class = tables.rows[~tables.rows["is_pooled"].astype(bool)]
-    degraded = per_class["precision_verdict"].eq("degraded") | per_class[
-        "recall_verdict"
-    ].eq("degraded")
+    degraded = per_class["precision_verdict"].eq("degraded") | per_class["recall_verdict"].eq(
+        "degraded"
+    )
     return [str(name) for name in per_class.loc[degraded, "class_name"]]
 
 
@@ -608,16 +617,13 @@ def _skip_without_baseline(
         candidate.thresholds,
         classes,
         evaluation=evaluation,
+        task=task,
     )
     artifacts = _common_artifacts(
         ground_truth_path,
         {"candidate": candidate.model_dump(mode="json")},
         {"candidate": candidate_evidence},
-        {
-            "candidate": _output_location(
-                candidate_evidence, predictions, candidate_archive
-            )
-        },
+        {"candidate": _output_location(candidate_evidence, predictions, candidate_archive)},
         split,
         evaluated.image_names,
     )
@@ -629,9 +635,7 @@ def _skip_without_baseline(
                 evaluated.thresholds,
             ),
             ("comparison_status", {"status": "skipped", "reason": reason}),
-            *_evaluated_artifacts(
-                "candidate", split, evaluated, predictions, candidate_archive
-            ),
+            *_evaluated_artifacts("candidate", split, evaluated, predictions, candidate_archive),
         ]
     )
     _upload_many(task, artifacts)
@@ -654,13 +658,41 @@ def _normalize_evaluation(
     return EvaluationConfig.model_validate(values)
 
 
+def _native_inference(
+    inference: dict[str, Any],
+    ultralytics: dict[str, Any] | None,
+    ultralytics_predict: dict[str, Any] | None,
+) -> InferenceConfig:
+    """Adapt public native groups to paired comparison's internal settings."""
+    conflicts = {
+        key
+        for key in ("model", "project", "name")
+        if (ultralytics_predict or {}).get(key) is not None
+    }
+    if conflicts:
+        raise ValueError(
+            f"Prediction {sorted(conflicts)} are owned by comparison; "
+            "use baseline_model/candidate_model and output_dir"
+        )
+    unknown = set(inference) - {"reuse_existing", "image_name"}
+    if unknown:
+        raise ValueError(f"inference settings {sorted(unknown)} moved to ultralytics_predict")
+    settings = prediction_settings(ultralytics or {}, ultralytics_predict)
+    fields = {
+        key: settings[key] for key in ("conf", "iou", "imgsz", "batch", "device") if key in settings
+    }
+    owned = {"model", "source", "stream", "project", "name", "save_dir", "mode", "task"}
+    extras = {key: value for key, value in settings.items() if key not in {*fields, *owned}}
+    return InferenceConfig(**inference, **fields, ultralytics=extras)
+
+
 def compare(
     baseline_model: ModelRef,
     candidate_model: ModelRef,
     ground_truth: str | Path,
     output_dir: str | Path,
     clearml: ClearMLConfig,
-    inference: InferenceConfig,
+    inference: InferenceConfig | dict[str, Any],
     split: str = "test",
     iou_threshold: float = 0.5,
     matching_strategy: str = "iou_prior",
@@ -668,8 +700,12 @@ def compare(
     bootstrap_iterations: int = 10_000,
     seed: int = 0,
     evaluation: EvaluationConfig | dict[str, Any] | None = None,
+    ultralytics: dict[str, Any] | None = None,
+    ultralytics_predict: dict[str, Any] | None = None,
 ) -> CompareResult | None:
     """Evaluate both models once on current data and share those exact outcomes."""
+    if isinstance(inference, dict):
+        inference = _native_inference(inference, ultralytics, ultralytics_predict)
     task = init_task(clearml, stage="compare")
     destination = Path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
@@ -779,6 +815,7 @@ def compare(
         baseline.thresholds,
         classes,
         evaluation=evaluation_config,
+        task=task,
     )
     (
         candidate_evaluated,
@@ -796,6 +833,7 @@ def compare(
         candidate.thresholds,
         classes,
         evaluation=evaluation_config,
+        task=task,
     )
 
     tables = build_comparison_rows(
@@ -838,9 +876,7 @@ def compare(
         },
         {"baseline": baseline_evidence, "candidate": candidate_evidence},
         {
-            "baseline": _output_location(
-                baseline_evidence, baseline_predictions, baseline_archive
-            ),
+            "baseline": _output_location(baseline_evidence, baseline_predictions, baseline_archive),
             "candidate": _output_location(
                 candidate_evidence, candidate_predictions, candidate_archive
             ),

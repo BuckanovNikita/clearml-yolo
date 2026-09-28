@@ -201,12 +201,13 @@ def predict_on_images(
     weights: str | Path,
     image_paths: Sequence[str],
     *,
-    conf: float = 0.001,
+    conf: float | None = 0.001,
     iou: float = 0.7,
     imgsz: int | list[int] = 640,
     batch: int = 1,
     device: str | int | list[int] | None = None,
     image_name: ImageNameMode = "name",
+    manifest_dir: Path | None = None,
     **model_kwargs: Any,
 ) -> pd.DataFrame:
     """Score images with native precision, compilation and device settings.
@@ -216,7 +217,7 @@ def predict_on_images(
     """
     if image_name not in ("name", "stem", "path"):
         raise ValueError(f"Unsupported image_name mode: {image_name!r}")
-    if batch < 1:
+    if isinstance(batch, bool) or batch < 1:
         raise ValueError(f"batch must be >= 1, got {batch}")
 
     paths = [str(path) for path in image_paths]
@@ -249,8 +250,10 @@ def predict_on_images(
 
     rows: list[dict[str, Any]] = []
     scored: set[str] = set()
-    with TemporaryDirectory() as workspace:
-        manifest, by_absolute = _write_manifest(paths, Path(workspace))
+    with TemporaryDirectory(prefix="clearml-yolo-inference-") as temporary:
+        workspace = manifest_dir or Path(temporary)
+        workspace.mkdir(parents=True, exist_ok=True)
+        manifest, by_absolute = _write_manifest(paths, workspace)
         # Ultralytics types predict as returning `list[Results] | Tensor` regardless of
         # `stream`, so the annotation has to be widened rather than narrowed.
         results: Any = model.predict(source=manifest, stream=True, **settings)
@@ -268,5 +271,7 @@ def predict_on_images(
     if predictor is not None:
         frame.attrs["effective_args"] = dict(vars(predictor.args))
         frame.attrs["save_dir"] = str(predictor.save_dir)
+    frame.attrs.setdefault("effective_args", settings)
+    frame.attrs["effective_args"].update(source=manifest, model=str(weights), mode="predict")
     frame.attrs["image_paths"] = sorted(by_absolute)
     return frame

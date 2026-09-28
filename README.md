@@ -98,10 +98,12 @@ Python проекта — 3.12. Перед первым запуском нас�
 uv run cy-init-config ./conf
 ```
 
-Команда создаёт восемь файлов: `cy.yaml`, `cy-train.yaml`, `cy-predict.yaml`,
+Команда создаёт восемь файлов команд: `cy.yaml`, `cy-train.yaml`, `cy-predict.yaml`,
 `cy-val.yaml`, `cy-metrics.yaml`, `cy-report.yaml`, `cy-compare.yaml` и
 `cy-ground-truth.yaml`. Они содержат текущие настройки команд и подсказки по
-нативным параметрам. Замените обязательные значения `???`, задайте входные пути
+нативным параметрам. Дополнительно создаются группы `ultralytics/default.yaml` и
+`ultralytics_predict/default.yaml` с оригинальными комментариями Ultralytics.
+Замените обязательные значения `???`, задайте входные пути
 и настройки ClearML. Относительные пути считаются от рабочей директории запуска.
 Инициализация не требует подключения к ClearML и не создаёт задачу.
 Существующие примеры защищены от перезаписи; для их замены используйте
@@ -111,7 +113,7 @@ uv run cy-init-config ./conf
 
 ```bash
 uv run cy-train --config-dir=./conf --config-name=cy-train \
-  +ultralytics.data=data.yaml +ultralytics.model=yolo11n.pt +ultralytics.epochs=10 \
+  ultralytics.data=data.yaml ultralytics.model=yolo11n.pt ultralytics.epochs=10 \
   clearml.project_name=detection clearml.tags='[example]'
 ```
 
@@ -130,79 +132,65 @@ uv run cy \
   clearml.project_name=detection \
   clearml.task_name=yolo11n-v3 \
   ground_truth=ground_truth.csv \
-  +train.ultralytics.data=data.yaml \
-  +train.ultralytics.epochs=100 \
-  +train.ultralytics.device=0 \
-  +predict.ultralytics.device=0
+  ultralytics.data=data.yaml \
+  ultralytics.epochs=100 \
+  ultralytics.device=0 \
+  ultralytics_predict.device=0
 ```
 
 Входные пути обязательны: команды не выбирают файлы из текущей папки по умолчанию.
 Для отдельной стадии их задают так:
 
 ```bash
-uv run cy-train cfg=training.yaml +ultralytics.device=0
+uv run cy-train ultralytics.data=data.yaml ultralytics.model=yolo11n.pt ultralytics.device=0
 uv run cy-predict weights=./weights/best.pt ground_truth=ground_truth.csv \
-  output=./runs/predictions.csv +ultralytics.device=0
+  output=./runs/predictions.csv ultralytics.device=0
 uv run cy-val weights=./weights/best.pt ground_truth=ground_truth.csv \
-  output_dir=./runs/validation +ultralytics.device=0
+  output_dir=./runs/validation ultralytics.device=0
 ```
 
 ## Нативные параметры Ultralytics
 
-Параметры модели находятся в разреженном отображении `ultralytics`; у `cy` это
-`train.ultralytics` и `predict.ultralytics`. Рядом с отображением ключ `cfg`
-называет исходный YAML Ultralytics. Порядок приоритета такой:
+Все команды работы с моделями используют верхнеуровневые группы `ultralytics` и
+`ultralytics_predict`. Первая содержит нативные параметры обучения; вторая наследует
+применимые общие значения и переопределяет их для предсказаний. По умолчанию в файле
+группы предсказаний активно только `conf: 0.001`, остальные параметры показаны в
+комментариях. В составленной конфигурации доступны унаследованные ключи.
 
-1. значения по умолчанию Ultralytics;
-2. YAML из `cfg`;
-3. встроенные `ultralytics` значения, включая явно заданное значение по умолчанию;
-4. оверрайды Hydra в командной строке.
-
-Обычный оверрайд меняет уже существующий ключ; `+` добавляет отсутствующий:
-
-```bash
-uv run cy-train cfg=training.yaml +ultralytics.epochs=10 +ultralytics.batch=16
-uv run cy ground_truth=ground_truth.csv +train.ultralytics.data=data.yaml \
-  +train.ultralytics.epochs=10 +train.ultralytics.compile=true
-```
-
-Нативный файл `training.yaml` может содержать обычные параметры Ultralytics:
-
-```yaml
-model: yolo11n.pt
-data: data.yaml
-epochs: 100
-batch: 16
-```
-
-Для встроенных значений создайте `experiment.yaml` поверх конфигурации конвейера:
-
-```yaml
-defaults:
-  - pipeline
-  - _self_
-train:
-  cfg: training.yaml
-  ultralytics:
-    epochs: 20
-    device: 0
-predict:
-  ultralytics:
-    device: 0
-```
+Скопируйте обычный YAML Ultralytics в `conf/ultralytics/default.yaml` без дополнительной
+вложенности. Оригинальные комментарии и порядок параметров сохраняются в генерируемых
+файлах; параметры, не влияющие на соответствующую стадию, закомментированы. Команды
+выбирают группы через Hydra defaults. Нативные ключи меняются обычным оверрайдом без `+`:
 
 ```bash
-uv run cy --config-dir=. --config-name=experiment \
-  ground_truth=ground_truth.csv train.ultralytics.epochs=10
+uv run cy-train --config-dir=./conf --config-name=cy-train \
+  ultralytics.data=data.yaml ultralytics.model=yolo11n.pt ultralytics.epochs=10
+uv run cy --config-dir=./conf --config-name=cy ground_truth=ground_truth.csv \
+  ultralytics.data=data.yaml ultralytics.imgsz=1280 ultralytics_predict.batch=8
 ```
 
-Указывайте `device`, `batch`, `amp` и `compile` как нативные параметры. Ultralytics
-проверяет неизвестные параметры сам. Проект записывает эффективные аргументы и
-фактически созданные пути в артефакты запуска.
+Общие значения задаются defaults, выбранным файлом группы и оверрайдами Hydra.
+Явные настройки `ultralytics_predict` имеют приоритет над общими, включая общие
+оверрайды командной строки. Явно заданные `null` и значения, равные значениям по
+умолчанию, сохраняют свой приоритет. Оверрайд `ultralytics_predict.batch=8` меняет
+настройку предсказаний поверх файла группы.
 
-В конвейере нельзя направлять отдельные этапы через собственные выходные пути и
-нельзя задавать `train.ultralytics.project` или `train.ultralytics.name`, если
-они противоречат каталогу, выбранному `run_dir`: команда откажется до выполнения.
+`cfg=training.yaml`, вложенные `train.ultralytics` / `predict.ultralytics` и нативные
+поля внутри comparison `inference` удалены. Ненулевой `ultralytics.cfg` также запрещён.
+Перенесите содержимое старого файла в группу; см. [миграцию](docs/migration-ultralytics-groups.md).
+
+`device`, `batch`, `amp`, `compile` и аугментации остаются нативными параметрами.
+Training AutoBatch требует отдельного корректного batch для предсказаний.
+Конвейер выбирает checkpoint после обучения, изображения и выходные пути.
+Противоречащие `run_dir` значения `ultralytics.project` / `ultralytics.name`
+или явно конфликтующий prediction checkpoint вызывают ошибку.
+
+Эффективные настройки сохраняются в `ultralytics.yaml` и `ultralytics_predict.yaml`
+соответствующих стадий, а для разных сплитов и ролей сравнения — в отдельных YAML.
+В них находятся фактические checkpoint, source и mode без служебных ключей Hydra;
+списки изображений сохраняются локально. Эти файлы можно передавать непосредственно
+Ultralytics при наличии исходных входов. Они также записываются в ClearML как
+конфигурационные объекты и скачиваемые артефакты с сохранением комментариев.
 
 ## Оценка и сравнение
 
@@ -213,7 +201,7 @@ uv run cy --config-dir=. --config-name=experiment \
 дашборде округлены.
 
 `cy-compare` принимает ссылки `baseline_model` и `candidate_model`, текущий
-`ground_truth`, настройки инференса, `split=test` и выходной каталог. По умолчанию
+`ground_truth`, группы `ultralytics` и `ultralytics_predict`, `split=test` и выходной каталог. По умолчанию
 baseline — последняя завершённая задача с тегом `prod`, кроме текущей задачи. Если
 автоматический поиск ничего не находит, сравнение отмечается пропущенным. Некорректно
 названная явно задача или checkpoint, а также отсутствие требуемых точных порогов —

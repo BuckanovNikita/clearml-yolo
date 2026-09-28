@@ -11,10 +11,12 @@ Build the ground-truth CSV before stages that consume it:
 uv run cy-ground-truth data_yaml=data.yaml output=ground_truth.csv
 ```
 
-`cy` composes the packaged wrapper configuration. Supply unchanged native YAML with
-`train.cfg=<path>` or `predict.cfg=<path>`; standalone commands use `cfg=<path>`.
-The precedence is native defaults, YAML, explicit embedded mapping, then CLI overrides.
-Add absent keys with `+ultralytics.key=value` or the matching pipeline prefix.
+`cy` composes the packaged wrapper configuration. Generate examples with
+`cy-init-config configs`, then paste native YAML into `configs/ultralytics/default.yaml`.
+Prediction overrides live in `configs/ultralytics_predict/default.yaml`. Invoke generated
+examples with `--config-dir configs --config-name cy`; override shared values with
+`ultralytics.key=value` and prediction values with `ultralytics_predict.key=value`.
+Raw `cfg` loading and nested `train.ultralytics`/`predict.ultralytics` are removed.
 
 ClearML is required for execution commands. Pass `clearml.project_name` and
 `clearml.tags` explicitly when isolating runs. `run_dir` routes pipeline output;
