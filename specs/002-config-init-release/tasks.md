@@ -45,8 +45,8 @@ match the checksums attached to the release's pushed source commit.
 - [x] T014 [US3] Validate package installation, nine command helps, and generated examples for both distributions; record results in `docs/evidence/2026-09-28-release-030.md`.
 - [x] T015 [US3] Verify isolated live CPU/GPU paths and artifact retrieval using `.agents/skills/running-end-to-end-tests/SKILL.md`; record current outcomes and limitations in `docs/evidence/2026-09-28-release-030.md`.
 - [x] T016 [US3] Record cross-artifact consistency review in `specs/002-config-init-release/analysis.md` and release notes in `docs/releases/0.3.0.md`.
-- [ ] T017 [US3] Pass all `.pre-commit-config.yaml` gates and commit/push explicit task-owned source, test, and documentation paths.
-- [ ] T018 [US3] Publish `v0.3.0` with verified distributions and checksums from the task's build directory; verify remote tag and downloaded assets against `docs/releases/0.3.0.md`.
+- [x] T017 [US3] Pass all `.pre-commit-config.yaml` gates and commit/push explicit task-owned source, test, and documentation paths.
+- [x] T018 [US3] Publish `v0.3.0` with verified distributions and checksums from the task's build directory; verify remote tag and downloaded assets against `docs/releases/0.3.0.md`.
 
 ## Phase 6: Approved Concurrent Changes
 

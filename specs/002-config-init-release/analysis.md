@@ -49,8 +49,8 @@ remain independently testable; US3 publication follows the combined verification
   installed script keys and composed template output; analysis resolution preserves the pointer.
 
 No unresolved requirement ambiguity, duplicate requirement, or constitution conflict was
-identified. Publication tasks remain unchecked until remote evidence exists. This report is
-not a claim that planning preceded implementation or that publication has already completed.
+identified. Publication tasks were closed after the remote tag and downloaded asset hashes were verified.
+All 21 tasks are complete. This retrospective report does not claim planning preceded implementation.
 
 See the [dated evidence](../../docs/evidence/2026-09-28-release-030.md) and
 [task record](tasks.md) for execution state.

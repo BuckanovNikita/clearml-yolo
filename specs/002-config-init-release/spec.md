@@ -3,7 +3,7 @@
 **Feature Directory**: `specs/002-config-init-release`
 **Branch**: `master`
 **Created**: 2026-09-28
-**Status**: Implemented; release verification in progress
+**Status**: Implemented, verified, and published as v0.3.0
 **Input**: Restore `cy-init-config`, remove all current future-annotations imports,
 document all changes through Spec Kit, commit, push, and make a release.
 
