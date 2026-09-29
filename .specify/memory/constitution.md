@@ -67,8 +67,11 @@ routing. Producers MUST pass actual outputs to consumers. Every execution invoca
 own one ClearML task; pipeline stages MUST share it. ClearML is required for execution.
 Local configuration initialization MUST NOT create a task or load model runtimes.
 Completion MUST wait for
-all required stage artifacts to upload; computation or upload failures MUST fail the task
-and preserve local diagnostic outputs. Credentials and dataset images MUST NOT be uploaded.
+all required artifacts and native output models to upload and flush; computation, callback,
+upload, flush, or interruption failures MUST fail the task and preserve local diagnostics.
+Credentials MUST NOT be uploaded. Native Ultralytics training and validation image previews
+MAY be published by the invocation owner; workers MUST NOT create tasks or publish.
+The best checkpoint MUST use the same native Output Model record, without duplicate artifacts.
 
 Runs MUST have isolated identities and output directories. Pipeline output overrides MUST
 use run_dir; conflicting native output settings MUST be rejected explicitly. Skipped-stage
@@ -83,8 +86,9 @@ the prediction group MUST override applicable shared values. Explicit nulls and 
 values equal to defaults MUST retain their precedence. Stage-irrelevant settings MUST be
 commented in stage YAML and excluded from native execution. Raw native file loading through
 `cfg` and nested stage-native mappings MUST be rejected with migration guidance.
-Effective native YAML MUST be saved locally and logged as ClearML configuration objects and
-artifacts, with original comments retained and secrets sanitized. Output and checkpoint
+Effective native YAML MUST be saved locally with original comments retained. Remote replay
+MUST use canonical nonempty configurations with secrets sanitized; Configuration Objects
+MUST NOT be duplicated as artifacts. Native General parameters own training arguments. Output and checkpoint
 ownership MUST remain with the pipeline. Existing examples MUST be protected unless
 replacement is explicit; unrelated files MUST be preserved.
 
@@ -166,8 +170,9 @@ explicitly and preserve unrelated workloads. This repository does not deploy or
 tear down shared infrastructure.
 
 Model class names MUST come from the checkpoint rather than ClearML model metadata. Exact
-per-class confidence values MUST come from the `metrics_best_confidences_<split>` artifact,
-not rounded dashboard thresholds.
+per-class confidence values MUST come from the source task validation threshold CSV,
+with historical `metrics_best_confidences_<split>` payloads supported for compatibility,
+never rounded dashboard thresholds.
 
 ## Development Workflow
 
@@ -183,6 +188,11 @@ not rounded dashboard thresholds.
    within existing authorization and after the applicable stage checks pass.
 
 ## Governance
+
+Amendment 5.0.0 authorizes native previews and native model publication, replaces duplicate
+configuration artifacts with canonical replay configurations, and adopts readable exact
+threshold tables. Historical tasks remain unchanged. Credential protection, single-task
+ownership, and upload-completion guarantees remain mandatory.
 
 Amendment 2.0.1 relocates machine-specific operational guidance to global skills.
 It preserves credential, capacity and task-owned cleanup safeguards while keeping
@@ -226,4 +236,4 @@ that deliberately alters a governing rule MUST include an explicit amendment rat
 quietly weakening checks. Constitution updates MUST remain confined to this document;
 dependent template or implementation changes require their own authorized work.
 
-**Version**: 4.0.0 | **Ratified**: 2026-09-19 | **Last Amended**: 2026-09-28
+**Version**: 5.0.0 | **Ratified**: 2026-09-19 | **Last Amended**: 2026-09-29

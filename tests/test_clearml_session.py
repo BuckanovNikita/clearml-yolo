@@ -12,7 +12,6 @@ import pandas as pd
 import pytest
 
 from clearml_yolo.clearml_session import (
-    ARTIFACT_MANIFEST,
     DEFAULT_PROJECT_NAME,
     ArtifactUploadError,
     ClearMLConfig,
@@ -20,6 +19,10 @@ from clearml_yolo.clearml_session import (
     expect_artifacts,
     init_task,
     invocation,
+    publish_table,
+    record_run_configuration,
+    register_model_barrier,
+    replay_configuration,
     upload_artifact,
 )
 
@@ -51,7 +54,10 @@ class FakeTask:
         self.flush_result = True
         self.upload_result = True
         self.configuration_result: Path | None = None
+        self.run_configuration_result: dict[str, Any] | None = None
         self.closed = False
+        self.local = True
+        self.reload_count = 0
 
     def upload_artifact(self, **kwargs: Any) -> bool:
         self.uploads.append(kwargs)
@@ -61,6 +67,8 @@ class FakeTask:
         self.configurations.append(kwargs)
         if kwargs.get("ignore_remote_overrides"):
             return kwargs["configuration"]
+        if kwargs.get("name") == "run":
+            return self.run_configuration_result or kwargs["configuration"]
         return self.configuration_result or kwargs["configuration"]
 
     def flush(self, *, wait_for_uploads: bool) -> bool:
@@ -68,11 +76,14 @@ class FakeTask:
         return self.flush_result
 
     def running_locally(self) -> bool:
-        return True
+        return self.local
 
     def close(self) -> None:
         self.events.append("close")
         self.closed = True
+
+    def reload(self) -> None:
+        self.reload_count += 1
 
     def mark_failed(self, **kwargs: Any) -> object:
         self.events.append("failed")
@@ -107,6 +118,15 @@ def fake_clearml(monkeypatch: pytest.MonkeyPatch) -> tuple[type[Any], FakeTask]:
 
     module = types.ModuleType("clearml")
     module.Task = Task  # type: ignore[attr-defined]
+
+    class OutputModel:
+        wait_calls: ClassVar[int] = 0
+
+        @classmethod
+        def wait_for_uploads(cls) -> None:
+            cls.wait_calls += 1
+
+    module.OutputModel = OutputModel  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "clearml", module)
     return Task, task
 
@@ -150,24 +170,17 @@ def test_invocation_owns_one_task_and_nested_stages_reuse_it(
     assert task.completed == [{"ignore_errors": False, "force": True}]
     assert task.failed == []
     assert "CY_CLEARML_OWNER_PID" not in os.environ
-    manifest_call = task.uploads[-1]
-    assert manifest_call["name"] == ARTIFACT_MANIFEST
-    assert manifest_call["wait_on_upload"] is True
-    assert manifest_call["artifact_object"]["stages"] == ["pipeline", "train"]
-    assert manifest_call["artifact_object"]["artifacts"] == [
+    assert [item["name"] for item in task.uploads] == ["train_best"]
+    assert task.configurations == [
         {
-            "stage": "pipeline",
-            "name": "resolved_configuration",
-            "local_path": None,
-            "required": True,
-            "uploaded": True,
+            "configuration": {"run_dir": "runs/example"},
+            "name": "run",
+            "ignore_remote_overrides": False,
         },
         {
-            "stage": "train",
-            "name": "train_best",
-            "local_path": None,
-            "required": True,
-            "uploaded": True,
+            "configuration": {"run_dir": "runs/example"},
+            "name": "run",
+            "ignore_remote_overrides": True,
         },
     ]
 
@@ -199,16 +212,7 @@ def test_upload_fulfils_a_predeclared_stage_artifact(
             expect_artifacts(owner, ["metrics_table"])
         upload_artifact(owner, "metrics_table", {"value": 1})
 
-    manifest = task.uploads[-1]["artifact_object"]
-    assert manifest["artifacts"] == [
-        {
-            "stage": "metrics",
-            "name": "metrics_table",
-            "local_path": None,
-            "required": True,
-            "uploaded": True,
-        }
-    ]
+    assert [upload["name"] for upload in task.uploads] == ["metrics_table"]
 
 
 def test_upload_rejection_fails_the_invocation(
@@ -395,18 +399,17 @@ def test_resolved_configuration_is_sanitized_recursively(
     with invocation(ClearMLConfig(), "train", resolved):
         pass
 
-    stored = task.configurations[0]["configuration"]
+    stored = task.configurations[-1]["configuration"]
     assert stored == {
         "clearml": {"access_key": "<redacted>", "secret_key": "<redacted>"},
         "endpoint": ("https://<redacted>@example.test/path?token=%3Credacted%3E&safe=yes&empty="),
         "nested": [{"password": "<redacted>", "epochs": 3}],
     }
-    resolved_upload = task.uploads[0]
-    assert resolved_upload["name"] == "resolved_configuration"
-    assert resolved_upload["artifact_object"] == stored
+    assert task.uploads == []
+    assert task.configurations[-1]["name"] == "run"
 
 
-def test_source_yaml_is_sanitized_in_configuration_and_downloadable_artifact(
+def test_source_yaml_is_sanitized_in_configuration_without_an_artifact(
     fake_clearml: tuple[type[Any], FakeTask], tmp_path: Path
 ) -> None:
     _, task = fake_clearml
@@ -418,12 +421,9 @@ def test_source_yaml_is_sanitized_in_configuration_and_downloadable_artifact(
     )
 
     with invocation(ClearMLConfig(), "train") as owner:
-        expect_artifacts(owner, ["dataset_configuration"])
         stored = connect_config_file(owner, "dataset_configuration", source)
         assert stored == source
         stored_text = task.configurations[-1]["configuration"].read_text(encoding="utf-8")
-        artifact_path = task.uploads[0]["artifact_object"]
-        artifact_text = artifact_path.read_text(encoding="utf-8")
 
     assert "hidden" not in stored_text
     assert "pass" not in stored_text
@@ -431,8 +431,7 @@ def test_source_yaml_is_sanitized_in_configuration_and_downloadable_artifact(
     assert "<redacted>" in stored_text
     assert "/datasets/cats" in stored_text
     assert "auth: <redacted>" in stored_text
-    assert artifact_text == stored_text
-    assert task.configurations[-1]["configuration"] == artifact_path
+    assert task.uploads == []
     assert task.configurations[-1]["ignore_remote_overrides"] is True
 
 
@@ -449,13 +448,13 @@ def test_remote_source_override_is_resanitized_and_used_as_the_effective_file(
     with invocation(ClearMLConfig(), "train") as owner:
         effective = connect_config_file(owner, "dataset_configuration", source)
         effective_text = effective.read_text(encoding="utf-8")
-        uploaded_text = task.uploads[0]["artifact_object"].read_text(encoding="utf-8")
+        stored_text = task.configurations[-1]["configuration"].read_text(encoding="utf-8")
 
     assert "epochs: 2" in effective_text
     assert effective == override
     assert "remote-secret" in effective_text
-    assert "remote-secret" not in uploaded_text
-    assert "epochs: 2" in uploaded_text
+    assert "remote-secret" not in stored_text
+    assert "epochs: 2" in stored_text
     assert task.configurations[-1]["ignore_remote_overrides"] is True
 
 
@@ -480,7 +479,6 @@ def test_source_yaml_preserves_comments_order_and_redacts_commented_credentials(
     with invocation(ClearMLConfig(), "train") as owner:
         connect_config_file(owner, "ultralytics", source)
         stored = task.configurations[-1]["configuration"].read_text(encoding="utf-8")
-        uploaded = task.uploads[0]["artifact_object"].read_text(encoding="utf-8")
 
     for comment in (
         "# Ultralytics license and configuration",
@@ -493,7 +491,7 @@ def test_source_yaml_preserves_comments_order_and_redacts_commented_credentials(
     assert stored.index("epochs:") < stored.index("nested:") < stored.index("token:")
     for secret in ("comment-secret", "user:pass", "url-secret", "active-secret", "inline-secret"):
         assert secret not in stored
-    assert uploaded == stored
+    assert task.uploads == []
 
 
 def test_invalid_source_yaml_fails_without_echoing_its_contents(
@@ -528,12 +526,13 @@ def test_source_json_is_sanitized_without_changing_non_secret_values(
     with invocation(ClearMLConfig(), "train") as owner:
         stored = connect_config_file(owner, "native_configuration", source)
         assert stored == source
-        stored_text = task.uploads[0]["artifact_object"].read_text(encoding="utf-8")
+        stored_text = task.configurations[-1]["configuration"].read_text(encoding="utf-8")
 
     assert stored_text == (
         '{\n  "model": "yolo11n.pt",\n  "api_token": "<redacted>",\n  "epochs": 3\n}\n'
     )
-    assert task.uploads[0]["artifact_object"].suffix == ".json"
+    assert task.configurations[-1]["configuration"].suffix == ".json"
+    assert task.uploads == []
 
 
 def test_dataframe_artifact_uses_the_required_synchronous_path(
@@ -618,3 +617,193 @@ def test_metric_split_upload_rejection_fails_owner_and_retains_payload(
     assert not task.completed
     assert (tmp_path / "metrics/evaluation_test.json").is_file()
     assert (tmp_path / "metrics/full_dashboard_test.xlsx").is_file()
+
+
+def test_publish_table_deduplicates_bytes_and_satisfies_aliases(
+    fake_clearml: tuple[type[Any], FakeTask], tmp_path: Path
+) -> None:
+    _, task = fake_clearml
+    first = tmp_path / "first.csv"
+    alias = tmp_path / "alias.csv"
+    first.write_bytes(b"name,value\ncat,1\n")
+    alias.write_bytes(first.read_bytes())
+
+    with invocation(ClearMLConfig(), "pipeline") as owner:
+        expect_artifacts(owner, ["ground_truth", "metrics_ground_truth"])
+        publish_table(owner, "ground_truth", first)
+        publish_table(owner, "metrics_ground_truth", alias)
+        publish_table(owner, "ground_truth", first)
+
+    assert [upload["name"] for upload in task.uploads] == ["ground_truth"]
+
+
+def test_publish_table_suffixes_different_content_under_the_same_name(
+    fake_clearml: tuple[type[Any], FakeTask], tmp_path: Path
+) -> None:
+    _, task = fake_clearml
+    first = tmp_path / "first.csv"
+    second = tmp_path / "second.csv"
+    third = tmp_path / "third.csv"
+    first.write_bytes(b"name,value\ncat,1\n")
+    second.write_bytes(b"name,value\ndog,2\n")
+    third.write_bytes(b"name,value\nbird,3\n")
+
+    with invocation(ClearMLConfig(), "metrics") as owner:
+        publish_table(owner, "predictions", first)
+        publish_table(owner, "predictions", second)
+        publish_table(owner, "predictions", third)
+        publish_table(owner, "predictions", second)
+
+    assert task.uploads[0]["name"] == "predictions"
+    assert task.uploads[1]["name"].startswith("predictions_")
+    assert len(task.uploads[1]["name"]) == len("predictions_") + 12
+    assert task.uploads[2]["name"].startswith("predictions_")
+    assert len({upload["name"] for upload in task.uploads}) == 3
+
+
+def test_record_run_configuration_merges_sanitized_meaningful_values(
+    fake_clearml: tuple[type[Any], FakeTask],
+) -> None:
+    _, task = fake_clearml
+
+    with invocation(ClearMLConfig(), "pipeline") as owner:
+        first = record_run_configuration(
+            owner,
+            {
+                "wrapper": {"output": "runs/example", "unused": {}},
+                "token": "secret",
+                "predict": {"save": False, "classes": None},
+            },
+        )
+        merged = record_run_configuration(owner, {"evaluation": {"iou": 0.0}, "empty": []})
+
+    assert first["predict"] == {"save": False, "classes": None}
+    assert merged == {
+        "wrapper": {"output": "runs/example"},
+        "token": "<redacted>",
+        "predict": {"save": False, "classes": None},
+        "evaluation": {"iou": 0.0},
+    }
+    assert all(configuration["name"] == "run" for configuration in task.configurations)
+    assert task.configurations[-1]["configuration"] == merged
+    assert task.uploads == []
+
+
+def test_empty_run_configuration_contribution_is_a_noop(
+    fake_clearml: tuple[type[Any], FakeTask],
+) -> None:
+    _, task = fake_clearml
+
+    with invocation(ClearMLConfig(), "train") as owner:
+        assert record_run_configuration(owner, {"normalization": {}}) == {}
+
+    assert task.configurations == []
+
+
+def test_replay_configuration_returns_remote_canonical_mapping(
+    fake_clearml: tuple[type[Any], FakeTask],
+) -> None:
+    _, task = fake_clearml
+    task.local = False
+    task.run_configuration_result = {
+        "wrapper": {"output": "remote"},
+        "predict": {"classes": None, "save": False},
+    }
+
+    with invocation(ClearMLConfig(), "predict") as owner:
+        effective = replay_configuration(owner, {"wrapper": {"output": "local"}})
+
+    assert effective == task.run_configuration_result
+    assert task.configurations[0]["ignore_remote_overrides"] is False
+    assert task.configurations[1] == {
+        "configuration": task.run_configuration_result,
+        "name": "run",
+        "ignore_remote_overrides": True,
+    }
+
+
+def test_model_barrier_waits_flushes_reloads_and_verifies_before_completion(
+    fake_clearml: tuple[type[Any], FakeTask], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, task = fake_clearml
+    clearml_module = sys.modules["clearml"]
+    output_model = clearml_module.OutputModel
+    events: list[str] = []
+    original_flush = task.flush
+
+    def flush(*, wait_for_uploads: bool) -> bool:
+        events.append("flush")
+        return original_flush(wait_for_uploads=wait_for_uploads)
+
+    monkeypatch.setattr(task, "flush", flush)
+    original_reload = task.reload
+
+    def reload() -> None:
+        events.append("reload")
+        original_reload()
+
+    monkeypatch.setattr(task, "reload", reload)
+
+    with invocation(ClearMLConfig(), "train") as owner:
+        register_model_barrier(owner, lambda: events.append("verify"))
+
+    assert output_model.wait_calls == 1
+    assert events == ["flush", "reload", "verify"]
+    assert task.events[-2:] == ["close", "completed"]
+
+
+def test_model_barrier_failure_fails_task_and_command(
+    fake_clearml: tuple[type[Any], FakeTask],
+) -> None:
+    _, task = fake_clearml
+
+    def run() -> None:
+        with invocation(ClearMLConfig(), "train") as owner:
+            register_model_barrier(
+                owner, lambda: (_ for _ in ()).throw(ArtifactUploadError("model missing"))
+            )
+
+    with pytest.raises(ArtifactUploadError, match="model missing"):
+        run()
+
+    assert task.failed
+    assert not task.completed
+
+
+def test_model_upload_wait_failure_fails_task_and_command(
+    fake_clearml: tuple[type[Any], FakeTask], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, task = fake_clearml
+    output_model = sys.modules["clearml"].OutputModel
+    monkeypatch.setattr(
+        output_model,
+        "wait_for_uploads",
+        classmethod(lambda cls: (_ for _ in ()).throw(ArtifactUploadError("upload wait"))),
+    )
+
+    with (
+        pytest.raises(ArtifactUploadError, match="upload wait"),
+        invocation(ClearMLConfig(), "train") as owner,
+    ):
+        register_model_barrier(owner, lambda: None)
+
+    assert task.failed
+    assert not task.completed
+
+
+@pytest.mark.parametrize("remote", [False, True])
+def test_run_replay_redacts_storage_without_rewriting_execution_credentials(
+    fake_clearml: tuple[type[Any], FakeTask], remote: bool
+) -> None:
+    _, task = fake_clearml
+    task.local = not remote
+    local = {"weights": "https://host/model.pt?token=local-secret"}
+    effective = {"weights": "https://host/model.pt?token=remote-secret"} if remote else local
+    if remote:
+        task.run_configuration_result = effective
+    with invocation(ClearMLConfig(), "predict") as owner:
+        replayed = replay_configuration(owner, local)
+    assert replayed == effective
+    stored = str(task.configurations[-1]["configuration"])
+    assert "local-secret" not in stored
+    assert "remote-secret" not in stored

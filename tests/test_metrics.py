@@ -254,11 +254,14 @@ def test_metrics_preflights_before_scoring_and_publishes_evaluation_payloads(
     monkeypatch.setattr(metrics_module, "init_task", lambda *_args, **_kwargs: task)
     monkeypatch.setattr(metrics_module, "create_publisher", lambda _config: FakePublisher())
     monkeypatch.setattr(metrics_module, "expect_artifacts", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(metrics_module, "publish_table", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(metrics_module, "upload_artifact", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(metrics_module, "record_run_configuration", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(metrics_module, "report_table", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(metrics_module, "report_scalars", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr("clearml_yolo.tasks.publication.expect_artifacts", lambda *_args: None)
-    monkeypatch.setattr("clearml_yolo.tasks.publication.upload_artifact", lambda *_args: None)
+    monkeypatch.setattr(
+        "clearml_yolo.tasks.publication.record_run_configuration", lambda *_args: None
+    )
 
     def prepare(*args: object, **kwargs: object) -> object:
         events.append("compute")
@@ -293,7 +296,7 @@ def test_metrics_preflights_before_scoring_and_publishes_evaluation_payloads(
 
 
 @pytest.mark.parametrize("zero_predictions", [False, True])
-def test_three_split_inventory_and_exact_payloads(
+def test_metrics_publishes_only_canonical_tables_and_readable_workbooks(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, zero_predictions: bool
 ) -> None:
     from typing import Any
@@ -312,10 +315,19 @@ def test_three_split_inventory_and_exact_payloads(
     (frame.iloc[:0] if zero_predictions else frame).to_csv(predictions, index=False)
     uploads: dict[str, Any] = {}
     monkeypatch.setattr(module, "init_task", lambda *a, **k: object())
-    monkeypatch.setattr(module, "expect_artifacts", lambda *a: None)
+    monkeypatch.setattr(
+        module, "publish_table", lambda _t, name, value: uploads.update({name: value})
+    )
     monkeypatch.setattr(
         module, "upload_artifact", lambda _t, name, value: uploads.update({name: value})
     )
+    monkeypatch.setattr(module, "expect_artifacts", lambda *_args, **_kwargs: None)
+
+    def record(_task: Any, values: dict[str, Any]) -> None:
+        # Result metadata must not merge into the executable EvaluationConfig on replay.
+        assert set(values) == {"evaluation_result"}
+
+    monkeypatch.setattr(module, "record_run_configuration", record)
     monkeypatch.setattr(module, "report_table", lambda *a: None)
     monkeypatch.setattr(module, "report_scalars", lambda *a: None)
     result = compute_metrics(
@@ -326,26 +338,45 @@ def test_three_split_inventory_and_exact_payloads(
         EvaluationConfig(),
         fiftyone=FiftyOneConfig(enabled=False),
     )
-    _assert_split_evidence(result, uploads, zero_predictions)
+    _assert_readable_metrics_evidence(result, uploads, zero_predictions)
 
 
-def _assert_split_evidence(
+def _assert_readable_metrics_evidence(
     result: MetricsResult, uploads: dict[str, Any], zero_predictions: bool
 ) -> None:
     from clearml_yolo.comparison.evaluation_payload import EvaluationPayload
 
-    inventories: list[set[str]] = []
-    file_paths: set[Path] = set()
+    assert set(uploads) == {
+        "ground_truth",
+        "predict_predictions",
+        "metrics_best_confidences_val",
+        "metrics_evaluation_train",
+        "metrics_evaluation_val",
+        "metrics_evaluation_test",
+    }
+    thresholds = uploads["metrics_best_confidences_val"]
+    assert isinstance(thresholds, Path)
+    assert thresholds.is_file()
+    assert list(pd.read_csv(thresholds)) == ["class_name", "confidence"]
+    assert pd.read_csv(thresholds).iloc[0].to_dict() == {
+        "class_name": "cat",
+        "confidence": result.best_confidences["val"]["cat"],
+    }
     for split in ("train", "val", "test"):
-        names = {name for name in uploads if name.endswith(f"_{split}")}
-        assert len(names) == 13
-        inventories.append({name.removesuffix(f"_{split}") for name in names})
-        for name in names:
-            value = uploads[name]
-            if isinstance(value, Path):
-                assert value.is_file()
-                assert value not in file_paths
-                file_paths.add(value)
+        workbook = uploads[f"metrics_evaluation_{split}"]
+        assert isinstance(workbook, Path)
+        assert workbook.is_file()
+        assert set(pd.ExcelFile(workbook).sheet_names) == {
+            "summary",
+            "per_class",
+            "ground_truth_matches",
+            "prediction_matches",
+            "confusion_matrix",
+            "thresholds",
+            "methodology",
+        }
+        per_class = pd.read_excel(workbook, sheet_name="per_class")
+        assert list(per_class["class_name"]) == ["cat"]
         payload = EvaluationPayload.model_validate_json(result.evaluations[split].read_text())
         assert payload.schema_version == 1
         assert payload.split == split
@@ -369,13 +400,86 @@ def _assert_split_evidence(
                     assert match.status == box.status
                 if match.status == "TP":
                     assert match.iou == 1.0
-    assert inventories[0] == inventories[1] == inventories[2]
     assert (
         result.best_confidences["train"]
         == result.best_confidences["val"]
         == result.best_confidences["test"]
     )
     assert "fiftyone_publication" not in uploads
+
+
+def test_metrics_publishes_frozen_validation_thresholds_even_without_val_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from clearml_yolo.tasks import metrics as module
+
+    predictions, ground_truth = _write_inputs(tmp_path)
+    uploads: dict[str, object] = {}
+    monkeypatch.setattr(module, "init_task", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr(
+        module, "publish_table", lambda _task, name, path: uploads.setdefault(name, path)
+    )
+    monkeypatch.setattr(
+        module, "upload_artifact", lambda _task, name, path: uploads.setdefault(name, path)
+    )
+    monkeypatch.setattr(module, "expect_artifacts", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(module, "record_run_configuration", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(module, "report_table", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(module, "report_scalars", lambda *_args, **_kwargs: None)
+
+    compute_metrics(
+        predictions,
+        ground_truth,
+        tmp_path / "metrics",
+        ClearMLConfig(),
+        EvaluationConfig(),
+        splits=["test"],
+        fiftyone=FiftyOneConfig(enabled=False),
+    )
+
+    assert set(uploads) == {
+        "ground_truth",
+        "predict_predictions",
+        "metrics_best_confidences_val",
+        "metrics_evaluation_test",
+    }
+
+
+def test_validation_threshold_csv_keeps_full_float_precision(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from clearml_yolo.tasks import metrics as module
+
+    predictions, ground_truth = _write_inputs(tmp_path)
+    uploads: dict[str, Path] = {}
+    monkeypatch.setattr(module, "init_task", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr(
+        module, "publish_table", lambda _task, name, path: uploads.setdefault(name, path)
+    )
+    monkeypatch.setattr(
+        module, "upload_artifact", lambda _task, name, path: uploads.setdefault(name, path)
+    )
+    monkeypatch.setattr(module, "expect_artifacts", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(module, "record_run_configuration", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(module, "report_table", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(module, "report_scalars", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        module, "calibrate_thresholds", lambda *_args, **_kwargs: {"cat": 0.12345678901234566}
+    )
+
+    compute_metrics(
+        predictions,
+        ground_truth,
+        tmp_path / "metrics",
+        ClearMLConfig(),
+        EvaluationConfig(),
+        splits=["test"],
+        fiftyone=FiftyOneConfig(enabled=False),
+    )
+
+    assert uploads["metrics_best_confidences_val"].read_text(encoding="utf-8") == (
+        "class_name,confidence\ncat,0.12345678901234566\n"
+    )
 
 
 def test_missing_required_plot_fails_even_without_tracking(

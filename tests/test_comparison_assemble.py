@@ -301,7 +301,7 @@ def test_a_cache_is_not_reused_across_inference_settings(tmp_path: Path) -> None
         )
 
 
-def test_a_cache_is_not_reused_when_current_image_content_changes(tmp_path: Path) -> None:
+def test_immutable_images_are_not_hashed_for_prediction_cache(tmp_path: Path) -> None:
     from clearml_yolo.tasks.compare import _prediction_cache, _split_fingerprint
 
     checkpoint = tmp_path / "best.pt"
@@ -318,7 +318,7 @@ def test_a_cache_is_not_reused_when_current_image_content_changes(tmp_path: Path
         tmp_path, "baseline", "test", checkpoint, _settled(), _split_fingerprint(truth, "test")
     )
 
-    assert before != after
+    assert before == after
 
 
 def test_native_output_archive_excludes_source_derived_images(tmp_path: Path) -> None:
@@ -556,6 +556,11 @@ def test_resolved_clearml_model_keeps_exact_task_id(
         "clearml_yolo.tasks.compare.resolve_task_weights", lambda _task_id: checkpoint
     )
     monkeypatch.setattr(
+        "clearml_yolo.tasks.compare.source_model_links",
+        lambda task_id: {"task_id": task_id},
+        raising=False,
+    )
+    monkeypatch.setattr(
         "clearml_yolo.tasks.compare.fetch_best_confidences",
         lambda _task_id, _split: {"cat": 0.5},
     )
@@ -582,8 +587,7 @@ def test_compare_dashboards_and_statistics_share_the_same_test_counts(
     baseline_weights, candidate_weights = tmp_path / "baseline.pt", tmp_path / "candidate.pt"
     baseline_weights.write_bytes(b"baseline")
     candidate_weights.write_bytes(b"candidate")
-    image = tmp_path / "image.jpg"
-    empty = tmp_path / "empty.jpg"
+    image, empty = tmp_path / "image.jpg", tmp_path / "empty.jpg"
     image.write_bytes(b"image")
     empty.write_bytes(b"empty")
     truth = pd.DataFrame(
@@ -634,6 +638,12 @@ def test_compare_dashboards_and_statistics_share_the_same_test_counts(
         )
 
     uploads: dict[str, object] = {}
+    configurations: dict[str, Any] = {}
+    monkeypatch.setattr(
+        "clearml_yolo.tasks.compare.record_run_configuration",
+        lambda _task, values: configurations.update(values),
+        raising=False,
+    )
     expected: list[str] = []
 
     class FakeTask:
@@ -648,8 +658,9 @@ def test_compare_dashboards_and_statistics_share_the_same_test_counts(
         lambda _task, name, value: uploads.setdefault(name, value),
     )
     monkeypatch.setattr(
-        "clearml_yolo.tasks.compare.connect_config_file",
+        "clearml_yolo.tasks.compare.publish_table",
         lambda _task, name, value, **kwargs: uploads.setdefault(name, value),
+        raising=False,
     )
     monkeypatch.setattr(
         "clearml_yolo.tasks.compare.expect_artifacts",
@@ -688,28 +699,13 @@ def test_compare_dashboards_and_statistics_share_the_same_test_counts(
         candidate.loc["cat", "fn"],
     ) == (row["TP новая"], row["FP новая"], row["FN новая"])
     assert candidate.loc["cat", "fp"] == 1
-    _assert_native_audit_artifacts(uploads)
-    assert {
-        "compare_ground_truth",
-        "compare_model_references",
-        "compare_effective_inference",
-        "compare_image_membership_test",
-        "compare_thresholds_baseline_test",
-        "compare_thresholds_candidate_test",
-        "compare_counts_test",
-        "compare_exclusions_test",
-        "compare_methodology_test",
-        "compare_dashboard_dtrk_baseline_test",
-        "compare_dashboard_dtrk_candidate_test",
-        "compare_matches_gt_baseline_test",
-        "compare_matches_preds_candidate_test",
-        "compare_confusion_matrix_baseline_test",
-        "compare_plot_recall_candidate_test",
-        "compare_metrics_summary_baseline_test",
-        "compare_metrics_raw_candidate_test",
-        "compare_manifest",
-    } <= set(uploads)
-    assert set(expected) == set(uploads)
+    assert set(uploads) == {
+        "ground_truth",
+        "compare_predictions_baseline_test",
+        "compare_predictions_candidate_test",
+        "compare_workbook_test",
+    }
+    assert set(expected) == {"compare_workbook_test"}
 
 
 def test_comparison_scoring_uses_the_full_evaluation_configuration(
@@ -719,8 +715,7 @@ def test_comparison_scoring_uses_the_full_evaluation_configuration(
     from clearml_yolo.comparison.scoring import EvaluationConfig, evaluate_split
     from clearml_yolo.tasks.compare import _scored
 
-    image = tmp_path / "image.jpg"
-    empty = tmp_path / "empty.jpg"
+    image, empty = tmp_path / "image.jpg", tmp_path / "empty.jpg"
     image.write_bytes(b"image")
     empty.write_bytes(b"empty")
     truth = pd.DataFrame(
@@ -912,6 +907,12 @@ def test_automatic_baseline_absence_still_evaluates_candidate(
     )
 
     uploads: dict[str, object] = {}
+    configurations: dict[str, Any] = {}
+    monkeypatch.setattr(
+        "clearml_yolo.tasks.compare.record_run_configuration",
+        lambda _task, values: configurations.update(values),
+        raising=False,
+    )
     expected: list[str] = []
 
     class FakeTask:
@@ -929,8 +930,9 @@ def test_automatic_baseline_absence_still_evaluates_candidate(
         lambda _task, name, value: uploads.setdefault(name, value),
     )
     monkeypatch.setattr(
-        "clearml_yolo.tasks.compare.connect_config_file",
+        "clearml_yolo.tasks.compare.publish_table",
         lambda _task, name, value, **kwargs: uploads.setdefault(name, value),
+        raising=False,
     )
     monkeypatch.setattr(
         "clearml_yolo.tasks.compare.latest_completed_task_id", lambda *_args, **_kwargs: None
@@ -963,8 +965,13 @@ def test_automatic_baseline_absence_still_evaluates_candidate(
 
     assert result is None
     assert list((tmp_path / "comparison").glob("full_dashboard_candidate_test.xlsx"))
-    assert uploads["comparison_status"] == {
+    assert configurations["comparison_status"] == {
         "status": "skipped",
         "reason": "No completed ClearML task in project 'clearml-yolo' tagged ['prod']",
     }
-    assert set(expected) == set(uploads)
+    assert set(uploads) == {
+        "ground_truth",
+        "compare_predictions_candidate_test",
+        "compare_evaluation_candidate_test",
+    }
+    assert set(expected) == {"compare_evaluation_candidate_test"}

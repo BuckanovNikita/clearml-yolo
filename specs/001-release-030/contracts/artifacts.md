@@ -1,31 +1,27 @@
 # Tracking and artifact contract
 
-Exactly one owner per invocation; nested stages reuse it, workers never create tasks/upload.
-Lifecycle: created -> running -> required artifacts uploaded -> completed. Any computation,
-missing output, rejected upload, SDK flush failure or interruption -> failed + nonzero exit.
-Local outputs remain on failure. Upload methods must be synchronous or explicitly awaited.
+One task owner per invocation; nested stages reuse it, workers never create tasks or publish.
+Lifecycle: created -> running -> required artifacts/native model verified and flushed -> completed.
+Computation, registration, rejected upload, missing output, flush or interruption errors fail
+both task and command and retain local outputs. Credentials must never be captured.
 
-Required common records: source configuration files (sanitized), resolved configuration,
-dataset configuration when supplied, ground truth when consumed/produced, model references,
-effective native arguments/output paths, evaluation methodology and final artifact manifest.
-Training: every generated checkpoint and native outputs (CSV, plots, args), no dataset images.
-Prediction: predictions table, image membership and effective settings.
-Metrics: exactly 13 required artifacts per selected split: two dashboards, two matching
-tables, confusion matrix, summary, raw metrics, exact metrics_best_confidences_<split>,
-four confidence-interval plots and schema-version-1 metrics_evaluation_<split>. Every split
-uses the same frozen validation thresholds. The evaluation JSON preserves exact matching
-indices, labels, statuses, confidence and IoU. The single invocation-level
-fiftyone_publication receipt, common inputs and methodology are outside split parity.
-Comparison: both current-test predictions, ground truth, frozen thresholds, paired dashboards,
-counts, exclusions, methodology and statistical workbook.
-Report: developer and business workbooks from that same paired evaluation.
+Native callbacks own training Scalars, Plots, Debug Samples and one best.pt Output Model.
+Enrich that same model with checkpoint-backed metadata; verify its remote contents before
+completion. No wrapper checkpoint/plot copies. Native previews are explicitly permitted.
 
-A required output must exist and upload successfully before manifest completion. Metadata must
-not capture credentials (including nested keys or credential-bearing URLs). Source images
-remain external. Native callback task, scalar and model uploads are suppressed to avoid duplication.
+Artifacts: canonical truth/prediction CSVs, one full-precision validation threshold CSV per
+calibrated model, one consolidated evaluation XLSX per split, one comparison XLSX per split,
+and final developer/business report XLSX files. Identical CSV bytes are deduplicated.
+Valid empty prediction tables remain results. Comparison XLSX includes paired counts,
+exclusions, methodology and source task/model links. No duplicate report input workbooks.
 
-Native effective configuration is also recorded as commented `ultralytics.yaml` and
-`ultralytics_predict.yaml`, as applicable, with split/role variants and retained local source
-manifests. Matching ClearML configuration objects and downloadable YAML artifacts preserve
-upstream comments through sanitization. See the current
-[native artifact contract](../../003-ultralytics-config-groups/contracts/artifacts.md).
+Raw metrics, matching JSON, NDJSON, archives, manifests and publication receipts remain local.
+Internal required-publication verification remains mandatory without remote bookkeeping files.
+One nonempty sanitized run Configuration Object owns wrapper/shared inference/evaluation
+settings and meaningful differences/source links. General owns native training arguments.
+Only consumed dataset and explicit report configurations remain separately. Local native YAML
+retains comments and exact replay manifests; configuration artifacts are not published.
+
+See the complete [before/after inventory](../../008-dataset-clearml-tracking/contracts/publication.md)
+and [native model mapping](../../008-dataset-clearml-tracking/contracts/model-metadata.md).
+Historical tasks and their readers remain compatible.

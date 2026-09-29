@@ -14,7 +14,7 @@ collapsible sections exist in the plots and scalars tabs, keyed by title — see
 """
 
 PREDICTIONS = "predict_predictions"
-FIFTYONE_PUBLICATION = "fiftyone_publication"
+GROUND_TRUTH = "ground_truth"
 FIFTYONE_PUBLICATION_FILE = "fiftyone_publication.json"
 
 # Not an artifact but a configuration object, which is a different tab and a different
@@ -22,26 +22,13 @@ FIFTYONE_PUBLICATION_FILE = "fiftyone_publication.json"
 # named here anyway, beside the artifacts, because a name a run writes and a later reader
 # looks up is exactly what this module exists to keep in one place.
 
-DASHBOARD_FULL_PREFIX = "metrics_dashboard_full"
-DASHBOARD_DTRK_PREFIX = "metrics_dashboard_dtrk"
-MATCHES_GT_PREFIX = "metrics_matches_gt"
-MATCHES_PREDS_PREFIX = "metrics_matches_preds"
-METRICS_SUMMARY_PREFIX = "metrics_summary"
-METRICS_RAW_PREFIX = "metrics_raw"
+BEST_CONFIDENCES_VAL = "metrics_best_confidences_val"
+EVALUATION_PREFIX = "metrics_evaluation"
+
+# Historical-task readers still need these local naming constants. New publications use
+# BEST_CONFIDENCES_VAL and never upload plot files.
 BEST_CONFIDENCES_PREFIX = "metrics_best_confidences"
 PLOT_METRICS = ("recall", "precision", "perebrak", "nedobrak")
-METRIC_SPLIT_PREFIXES = (
-    DASHBOARD_FULL_PREFIX,
-    DASHBOARD_DTRK_PREFIX,
-    MATCHES_GT_PREFIX,
-    MATCHES_PREDS_PREFIX,
-    "metrics_confusion_matrix",
-    METRICS_SUMMARY_PREFIX,
-    METRICS_RAW_PREFIX,
-    BEST_CONFIDENCES_PREFIX,
-    *(f"metrics_plot_{metric}" for metric in PLOT_METRICS),
-    "metrics_evaluation",
-)
 
 REPORT_DEV_PREFIX = "report_dev"
 REPORT_BUSINESS_PREFIX = "report_business"
@@ -67,8 +54,3 @@ def per_split(prefix: str, split: str) -> str:
     keeps three evaluations of the same model from overwriting each other.
     """
     return f"{prefix}_{split}"
-
-
-def metric_split_names(split: str) -> tuple[str, ...]:
-    """The required split inventory, excluding invocation-wide evidence and receipts."""
-    return tuple(per_split(prefix, split) for prefix in METRIC_SPLIT_PREFIXES)

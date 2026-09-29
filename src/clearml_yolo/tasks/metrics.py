@@ -1,5 +1,6 @@
-"""Calibrate on validation once, then score every split at frozen thresholds."""
+"""Calibrate on validation once, score each split, and publish readable evidence."""
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +15,8 @@ from clearml_yolo.clearml_session import (
     ClearMLConfig,
     expect_artifacts,
     init_task,
+    publish_table,
+    record_run_configuration,
     upload_artifact,
 )
 from clearml_yolo.comparison.scoring import (
@@ -42,44 +45,65 @@ class MetricsResult(BaseModel):
     evaluations: dict[str, Path] = Field(default_factory=dict)
 
 
-def _upload(task: Any, name: str, value: Any) -> None:
-    if task is None:
-        return
-    upload_artifact(task, name, value)
-
-
-def _publish_split(
-    task: Any, split: str, evaluated: EvaluatedSplit, evaluation_path: Path
-) -> None:
+def _publish_split(task: Any, split: str, evaluated: EvaluatedSplit, workbook_path: Path) -> None:
     per_class, summary = summarize_metrics(evaluated.metrics)
-    artifacts: dict[str, Any] = {
-        artifact_names.DASHBOARD_FULL_PREFIX: evaluated.dashboard_path,
-        artifact_names.DASHBOARD_DTRK_PREFIX: evaluated.dtrk_dashboard_path,
-        artifact_names.MATCHES_GT_PREFIX: evaluated.gt_matches,
-        artifact_names.MATCHES_PREDS_PREFIX: evaluated.pred_matches,
-        "metrics_confusion_matrix": evaluated.confusion_matrix_path,
-        artifact_names.METRICS_SUMMARY_PREFIX: per_class,
-        artifact_names.METRICS_RAW_PREFIX: {
-            class_name: metric.model_dump() for class_name, metric in evaluated.metrics.items()
-        },
-        artifact_names.BEST_CONFIDENCES_PREFIX: evaluated.thresholds,
-        "metrics_evaluation": evaluation_path,
-        **{f"metrics_plot_{metric}": path for metric, path in evaluated.plot_paths.items()},
-    }
-    required = set(artifact_names.METRIC_SPLIT_PREFIXES)
-    if artifacts.keys() != required:
-        raise ValueError(
-            f"Split {split!r} artifact inventory mismatch: "
-            f"missing={sorted(required - artifacts.keys())}, "
-            f"unexpected={sorted(artifacts.keys() - required)}"
+    if task is not None:
+        upload_artifact(
+            task, artifact_names.per_split(artifact_names.EVALUATION_PREFIX, split), workbook_path
         )
-    for value in artifacts.values():
-        if isinstance(value, Path) and not value.is_file():
-            raise FileNotFoundError(f"Required split artifact is not a file: {value}")
-    for prefix in artifact_names.METRIC_SPLIT_PREFIXES:
-        _upload(task, artifact_names.per_split(prefix, split), artifacts[prefix])
     report_table(task, artifact_names.METRICS_SECTION, split, per_class)
     report_scalars(task, f"{artifact_names.METRICS_SECTION}_{split}", summary)
+
+
+def _methodology_frame(values: dict[str, Any]) -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "parameter": list(values),
+            "value": [
+                json.dumps(value, ensure_ascii=False, sort_keys=True) for value in values.values()
+            ],
+        }
+    )
+
+
+def _write_evaluation_workbook(
+    path: Path,
+    evaluated: EvaluatedSplit,
+    *,
+    methodology: dict[str, Any],
+) -> None:
+    """Consolidate every readable evaluation surface while retaining local diagnostics."""
+    required_diagnostics = [
+        evaluated.dashboard_path,
+        evaluated.dtrk_dashboard_path,
+        evaluated.confusion_matrix_path,
+        *evaluated.plot_paths.values(),
+    ]
+    missing = [str(item) for item in required_diagnostics if not item.is_file()]
+    if missing:
+        raise FileNotFoundError(f"Required local evaluation diagnostics are missing: {missing}")
+    expected_plots = {"recall", "precision", "perebrak", "nedobrak"}
+    if set(evaluated.plot_paths) != expected_plots:
+        raise ValueError(
+            f"Evaluation plot inventory mismatch: expected={sorted(expected_plots)}, "
+            f"actual={sorted(evaluated.plot_paths)}"
+        )
+    per_class, summary = summarize_metrics(evaluated.metrics)
+    confusion = pd.read_excel(evaluated.confusion_matrix_path, index_col=0)
+    thresholds = pd.DataFrame(
+        sorted(evaluated.thresholds.items()), columns=["class_name", "confidence"]
+    )
+    summary_frame = pd.DataFrame([summary])
+    per_class_frame = per_class.rename_axis("class_name").reset_index()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with pd.ExcelWriter(path, engine="openpyxl") as writer:
+        summary_frame.to_excel(writer, sheet_name="summary", index=False)
+        per_class_frame.to_excel(writer, sheet_name="per_class", index=False)
+        evaluated.gt_matches.to_excel(writer, sheet_name="ground_truth_matches", index=False)
+        evaluated.pred_matches.to_excel(writer, sheet_name="prediction_matches", index=False)
+        confusion.to_excel(writer, sheet_name="confusion_matrix")
+        thresholds.to_excel(writer, sheet_name="thresholds", index=False)
+        _methodology_frame(methodology).to_excel(writer, sheet_name="methodology", index=False)
 
 
 def _prepare(
@@ -129,19 +153,22 @@ def compute_metrics(
         )
     if "all" in requested:
         raise ValueError("split='all' is unsupported for frozen evaluation; name concrete splits")
-
-    expected = ["metrics_predictions", "metrics_ground_truth", "metrics_methodology"]
-    for split in requested:
-        expected.extend(artifact_names.metric_split_names(split))
     if task is not None:
-        expect_artifacts(task, expected)
+        expect_artifacts(
+            task,
+            [
+                artifact_names.per_split(artifact_names.EVALUATION_PREFIX, split)
+                for split in requested
+            ],
+        )
 
     predictions_frame = pd.read_csv(predictions, dtype={"image_name": str, "instance_label": str})
     ground_truth_frame = pd.read_csv(
         ground_truth, dtype={"image_name": str, "instance_label": str, "split": str}
     )
-    _upload(task, "metrics_predictions", Path(predictions))
-    _upload(task, "metrics_ground_truth", Path(ground_truth))
+    if task is not None:
+        publish_table(task, artifact_names.PREDICTIONS, Path(predictions))
+        publish_table(task, artifact_names.GROUND_TRUTH, Path(ground_truth))
     prepared_gt, raw_predictions, prepared_predictions, classes = _prepare(
         predictions_frame, ground_truth_frame, evaluation
     )
@@ -156,19 +183,24 @@ def compute_metrics(
         confidence_optimization=evaluation.confidence_optimization,
     )
 
-    _upload(
-        task,
-        "metrics_methodology",
-        {
-            **evaluation.model_dump(),
-            "calibration_split": "val",
-            "thresholds": thresholds,
-            "evaluated_splits": requested,
-            "test_calibration": False,
-        },
-    )
     destination = Path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
+    threshold_path = destination / f"{artifact_names.BEST_CONFIDENCES_VAL}.csv"
+    pd.DataFrame(sorted(thresholds.items()), columns=["class_name", "confidence"]).to_csv(
+        threshold_path, index=False, float_format="%.17g"
+    )
+    if task is not None:
+        publish_table(task, artifact_names.BEST_CONFIDENCES_VAL, threshold_path)
+        record_run_configuration(
+            task,
+            {
+                "evaluation_result": {
+                    **evaluation.model_dump(mode="json"),
+                    "calibration_split": "val",
+                    "evaluated_splits": requested,
+                }
+            },
+        )
     result = MetricsResult(output_dir=destination)
     for split in track(requested, "Scoring splits", unit="split"):
         evaluated = evaluate_split(
@@ -191,7 +223,18 @@ def compute_metrics(
         evaluation_path.write_text(
             evaluated.evaluation_payload.model_dump_json(indent=2), encoding="utf-8"
         )
-        _publish_split(task, split, evaluated, evaluation_path)
+        workbook_path = destination / f"{artifact_names.EVALUATION_PREFIX}_{split}.xlsx"
+        _write_evaluation_workbook(
+            workbook_path,
+            evaluated,
+            methodology={
+                **evaluation.model_dump(mode="json"),
+                "calibration_split": calibration_split,
+                "evaluated_splits": requested,
+                "test_calibration": False,
+            },
+        )
+        _publish_split(task, split, evaluated, workbook_path)
         result.dashboards[split] = evaluated.dashboard_path
         result.best_confidences[split] = dict(evaluated.thresholds)
         result.evaluations[split] = evaluation_path

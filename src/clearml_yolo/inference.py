@@ -239,5 +239,7 @@ def predict_on_images(
         "model": str(weights),
         "mode": "predict",
     }
+    native_model: Any = model.model
+    frame.attrs["checkpoint_design"] = dict(native_model.yaml)
     frame.attrs["image_paths"] = sorted(by_absolute)
     return frame

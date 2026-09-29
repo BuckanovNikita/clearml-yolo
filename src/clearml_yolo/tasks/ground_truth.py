@@ -7,7 +7,7 @@ from clearml_yolo.clearml_session import (
     connect_config_file,
     expect_artifacts,
     init_task,
-    upload_artifact,
+    publish_table,
 )
 from clearml_yolo.ground_truth import build_ground_truth
 
@@ -20,8 +20,8 @@ def ground_truth(
     seed: int = 0,
 ) -> Path:
     task = init_task(clearml, stage="ground_truth")
-    expect_artifacts(task, ["dataset_configuration", "ground_truth"])
-    effective = connect_config_file(task, "dataset_configuration", Path(data_yaml))
+    expect_artifacts(task, ["ground_truth"])
+    effective = connect_config_file(task, "dataset", Path(data_yaml))
     build_ground_truth(str(effective), output, test_fraction=test_fraction, seed=seed)
-    upload_artifact(task, "ground_truth", Path(output))
+    publish_table(task, "ground_truth", Path(output))
     return Path(output)

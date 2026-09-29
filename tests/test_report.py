@@ -116,13 +116,12 @@ def test_build_reports_preserves_candidate_minus_baseline_order(
     assert report_generator == [(candidate, baseline), (candidate, baseline)]
 
 
-def test_standalone_report_tracks_consumed_inputs_and_sanitized_config(
+def test_standalone_report_publishes_only_final_workbooks_and_report_configuration(
     tmp_path: Path,
     report_generator: list[tuple[Path, Path]],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    comparison, candidate, baseline = _comparison_dir(tmp_path)
-    manifest = comparison / MANIFEST_NAME
+    comparison, _, _ = _comparison_dir(tmp_path)
     config = tmp_path / "report.yaml"
     config.write_text("title: audit\n", encoding="utf-8")
     expected: list[str] = []
@@ -132,9 +131,7 @@ def test_standalone_report_tracks_consumed_inputs_and_sanitized_config(
     class FakeTask:
         pass
 
-    monkeypatch.setattr(
-        "clearml_yolo.tasks.report.init_task", lambda *_args, **_kwargs: FakeTask()
-    )
+    monkeypatch.setattr("clearml_yolo.tasks.report.init_task", lambda *_args, **_kwargs: FakeTask())
     monkeypatch.setattr(
         "clearml_yolo.tasks.report.expect_artifacts",
         lambda _task, names: expected.extend(names),
@@ -143,7 +140,6 @@ def test_standalone_report_tracks_consumed_inputs_and_sanitized_config(
         "clearml_yolo.tasks.report.upload_artifact",
         lambda _task, name, value: uploads.setdefault(name, value),
     )
-    monkeypatch.setattr("clearml_yolo.tasks.report.report_table", lambda *_args: None)
 
     def connect(_task: object, name: str, path: Path) -> Path:
         connected.append((name, path))
@@ -153,8 +149,6 @@ def test_standalone_report_tracks_consumed_inputs_and_sanitized_config(
 
     report(comparison, tmp_path / "reports", ClearMLConfig(), config)
 
-    assert connected == [("source_report_configuration", config)]
-    assert uploads["report_input_manifest_test"] == manifest
-    assert uploads["report_input_dashboard_candidate_test"] == candidate
-    assert uploads["report_input_dashboard_baseline_test"] == baseline
-    assert set(expected) == set(uploads)
+    assert connected == [("report", config)]
+    assert set(expected) == {"report_dev_test", "report_business_test"}
+    assert set(uploads) == set(expected)

@@ -49,3 +49,64 @@ def test_other_commands_do_not_enable_publishing(command: str) -> None:
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
         config = compose(config_name=command)
     assert "fiftyone" not in config
+
+
+def test_fiftyone_receipt_stays_local_and_is_linked_from_run_configuration(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from datetime import UTC, datetime
+
+    from clearml_yolo.publishing.models import PublicationReceipt
+    from clearml_yolo.tasks import publication
+
+    receipt = PublicationReceipt(
+        dataset_name="clearml-yolo-fixture",
+        task_id="publication-task",
+        run_key="publication-task",
+        ground_truth_sha256="truth-hash",
+        source_ground_truth_sha256="truth-hash",
+        dataset_reused=True,
+        sample_count=3,
+        fields={"predictions": "predictions_publication-task"},
+        dataset_complete=True,
+        run_complete=True,
+        payload_paths={},
+        published_at=datetime(2026, 9, 29, tzinfo=UTC),
+    )
+    recorded: list[dict[str, object]] = []
+
+    class Publisher:
+        enabled = True
+
+        def preflight(self) -> None:
+            pass
+
+        def publish(self, _request: object) -> PublicationReceipt:
+            return receipt
+
+    monkeypatch.setattr(
+        publication,
+        "record_run_configuration",
+        lambda _task, values: recorded.append(values),
+    )
+
+    result = publication.publish_results(
+        Publisher(),
+        type("Task", (), {"id": "publication-task"})(),
+        output_dir=tmp_path,
+        ground_truth=tmp_path / "ground_truth.csv",
+    )
+
+    assert result == receipt
+    assert (tmp_path / "fiftyone_publication.json").is_file()
+    assert recorded == [
+        {
+            "fiftyone_result": {
+                "dataset_name": "clearml-yolo-fixture",
+                "run_key": "publication-task",
+                "dataset_reused": True,
+                "sample_count": 3,
+                "fields": {"predictions": "predictions_publication-task"},
+            }
+        }
+    ]

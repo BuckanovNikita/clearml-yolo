@@ -7,8 +7,14 @@ from typing import Any
 
 from hydra_zen import instantiate
 
-from clearml_yolo.clearml_session import ClearMLConfig, init_task, task_identity, upload_artifact
+from clearml_yolo.clearml_session import (
+    ClearMLConfig,
+    init_task,
+    record_run_configuration,
+    task_identity,
+)
 from clearml_yolo.dataset import apply_dataset_policy
+from clearml_yolo.dataset_cache import dataset_cache_root
 from clearml_yolo.dataset_export import DatasetFormat
 from clearml_yolo.native_config import prediction_settings
 from clearml_yolo.publishing import Publisher, create_publisher
@@ -91,12 +97,17 @@ def _compare_and_report(
     evaluation: Any,
     report_config: dict[str, Any],
     skip_report: bool,
+    candidate_task_id: str | None = None,
 ) -> dict[str, Any]:
     task = init_task(clearml, stage="compare")
     try:
         result = run_comparison(
             **config,
-            candidate_model=ModelRef(source="local", weights=checkpoint, thresholds=thresholds),
+            candidate_model=(
+                ModelRef(source="clearml", task_id=candidate_task_id)
+                if candidate_task_id is not None
+                else ModelRef(source="local", weights=checkpoint, thresholds=thresholds)
+            ),
             ground_truth=ground_truth,
             output_dir=directory / COMPARISON_DIR,
             clearml=clearml,
@@ -107,7 +118,9 @@ def _compare_and_report(
             evaluation=evaluation,
         )
     except NoBaselineModelError as error:
-        upload_artifact(task, "comparison_status", {"status": "skipped", "reason": str(error)})
+        record_run_configuration(
+            task, {"comparison_status": {"status": "skipped", "reason": str(error)}}
+        )
         return {"comparison_status": "skipped"}
     if result is None:
         return {"comparison_status": "skipped"}
@@ -127,6 +140,7 @@ def _train_from_ground_truth(
     clearml: ClearMLConfig,
     ground_truth: str,
     dataset_format: DatasetFormat,
+    dataset_cache_dir: str | Path | None,
     required_splits: list[str],
     prediction_data_overrides: dict[str, dict[str, Any]],
     task: Any,
@@ -136,11 +150,12 @@ def _train_from_ground_truth(
         clearml,
         ground_truth=ground_truth,
         dataset_format=dataset_format,
+        dataset_cache_dir=dataset_cache_dir,
         required_splits=required_splits,
     )
     if trained.cleaned_ground_truth is None:
         raise RuntimeError("CSV training did not return cleaned_ground_truth")
-    upload_artifact(task, "predict_data_overrides", prediction_data_overrides)
+    record_run_configuration(task, {"prediction_data_overrides": prediction_data_overrides})
     return trained.weights, trained.cleaned_ground_truth
 
 
@@ -186,6 +201,7 @@ def run_pipeline(
     ground_truth: str,
     splits: list[str] | None = None,
     dataset_format: DatasetFormat = "ndjson",
+    dataset_cache_dir: str | Path | None = None,
     run_id: str | None = None,
     run_dir: str | Path | None = None,
     weights: str | Path | None = None,
@@ -207,6 +223,8 @@ def run_pipeline(
         if run_dir or run_id
         else task_run_dir(RUNS_ROOT, *task_identity(task))
     )
+    if dataset_cache_root(dataset_cache_dir).is_relative_to(directory.resolve()):
+        raise ValueError("dataset_cache_dir must be outside run_dir")
     metrics_cfg = _stage_values(metrics, {"evaluation", "calibration_split"}, "metrics")
     report_cfg = _stage_values(report, {"report_config_path"}, "report")
     compare_cfg = _stage_values(
@@ -235,6 +253,7 @@ def run_pipeline(
             clearml,
             ground_truth,
             dataset_format,
+            dataset_cache_dir,
             _required_training_splits(
                 splits,
                 skip_predict=skip_predict,
@@ -274,7 +293,6 @@ def run_pipeline(
         )
         thresholds = next(iter(evaluated.best_confidences.values()))
         thresholds_path.write_text(json.dumps(thresholds))
-        upload_artifact(task, "frozen_thresholds", thresholds_path)
         results["metrics"] = evaluated
         evaluations = evaluated.evaluations
     elif not skip_compare:
@@ -294,6 +312,7 @@ def run_pipeline(
                 metrics_cfg["evaluation"],
                 report_cfg,
                 skip_report,
+                candidate_task_id=str(task.id) if not skip_train else None,
             )
         )
     elif not skip_report:

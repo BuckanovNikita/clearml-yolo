@@ -17,13 +17,15 @@ from clearml_yolo.clearml_models import (
     fetch_best_confidences,
     latest_completed_task_id,
     resolve_task_weights,
+    source_model_links,
 )
 from clearml_yolo.clearml_report import report_comparison
 from clearml_yolo.clearml_session import (
     ClearMLConfig,
-    connect_config_file,
     expect_artifacts,
     init_task,
+    publish_table,
+    record_run_configuration,
     sanitize_configuration,
     upload_artifact,
 )
@@ -87,6 +89,7 @@ class ResolvedModel(BaseModel):
     weights: Path
     thresholds: dict[str, float]
     task_id: str | None = None
+    links: dict[str, str] = Field(default_factory=dict)
 
 
 def _is_automatic_baseline(model: ModelRef) -> bool:
@@ -158,6 +161,7 @@ def _resolve_model(
         source="clearml",
         task_id=task_id,
         weights=resolve_task_weights(task_id),
+        links=source_model_links(task_id),
         thresholds=thresholds,
     )
 
@@ -254,7 +258,7 @@ def _prediction_cache(
 
 
 def _split_fingerprint(ground_truth: pd.DataFrame, split: str) -> str:
-    """Hash ordered split membership and image bytes for safe prediction-cache reuse."""
+    """Identify current membership under the immutable-image contract."""
     required = {"image_name", "image_path", "split"}
     missing = sorted(required - set(ground_truth.columns))
     if missing:
@@ -271,9 +275,6 @@ def _split_fingerprint(ground_truth: pd.DataFrame, split: str) -> str:
         digest.update(b"\0")
         if not path.is_file():
             raise FileNotFoundError(f"Current comparison image does not exist: {path}")
-        with path.open("rb") as image:
-            for chunk in iter(lambda: image.read(1024 * 1024), b""):
-                digest.update(chunk)
         digest.update(b"\0")
     return digest.hexdigest()
 
@@ -311,6 +312,7 @@ def _scored(
     evaluation: EvaluationConfig,
     task: Any = None,
 ) -> tuple[EvaluatedSplit, VocabularyReport, InferenceEvidence, Path]:
+    del task  # Scoring retains local replay evidence; its caller owns publication.
     native_project = destination / "native"
     native_name = f"{role}_{split}"
     predictions, vocabulary = reinfer_split(
@@ -340,32 +342,24 @@ def _scored(
             "effective_args": predictions.attrs.get("effective_args", fallback_args),
             "requested_args": predictions.attrs.get("requested_args", fallback_args),
             "normalized_imgsz": predictions.attrs.get("normalized_imgsz"),
+            "checkpoint_design": predictions.attrs.get("checkpoint_design", {}),
             "save_dir": predictions.attrs.get(
                 "save_dir", str(native_project.resolve() / native_name)
             ),
         }
     )
-    config_path = write_native_yaml(
+    write_native_yaml(
         destination / f"ultralytics_predict_{role}_{split}.yaml",
         {key: value for key, value in evidence.effective_args.items() if key != "image_name"}
         | {"model": str(weights), "mode": "predict"},
         "predict",
     )
-    requested_path = write_native_yaml(
+    write_native_yaml(
         destination / f"ultralytics_predict_{role}_{split}_requested.yaml",
         {key: value for key, value in evidence.requested_args.items() if key != "image_name"}
         | {"model": str(weights), "mode": "predict"},
         "predict",
     )
-    if task is not None:
-        requested_name = requested_path.stem
-        shape_name = f"predict_normalized_image_size_{role}_{split}"
-        expect_artifacts(task, [requested_name, shape_name])
-        connect_config_file(task, requested_name, requested_path, allow_remote_override=False)
-        upload_artifact(task, shape_name, {"imgsz": evidence.normalized_imgsz})
-        config_name = f"ultralytics_predict_{role}_{split}"
-        expect_artifacts(task, [config_name])
-        connect_config_file(task, config_name, config_path, allow_remote_override=False)
     native_archive = _archive_native_outputs(
         Path(evidence.save_dir), destination, role=role, split=split
     )
@@ -470,117 +464,22 @@ def _write_manifest(
     return path
 
 
-def _evaluated_artifact_names(role: str, split: str) -> list[str]:
-    names = [
-        artifact_names.per_split(f"compare_dashboard_{role}", split),
-        artifact_names.per_split(f"compare_dashboard_dtrk_{role}", split),
-        artifact_names.per_split(f"compare_matches_gt_{role}", split),
-        artifact_names.per_split(f"compare_matches_preds_{role}", split),
-        artifact_names.per_split(f"compare_confusion_matrix_{role}", split),
-        artifact_names.per_split(f"compare_metrics_summary_{role}", split),
-        artifact_names.per_split(f"compare_metrics_raw_{role}", split),
-        artifact_names.per_split(f"compare_inference_metadata_{role}", split),
-        artifact_names.per_split(f"compare_native_outputs_{role}", split),
-    ]
-    names.extend(
-        artifact_names.per_split(f"compare_plot_{metric}_{role}", split)
-        for metric in ("recall", "precision", "perebrak", "nedobrak")
-    )
-    return names
-
-
-def _evaluated_artifacts(
-    role: str,
-    split: str,
-    evaluated: EvaluatedSplit,
-    predictions: Path,
-    native_archive: Path,
-) -> list[tuple[str, object]]:
-    per_class, _ = summarize_metrics(evaluated.metrics)
-    values: list[tuple[str, object]] = [
-        (
-            artifact_names.per_split(f"compare_dashboard_{role}", split),
-            evaluated.dashboard_path,
-        ),
-        (
-            artifact_names.per_split(f"compare_dashboard_dtrk_{role}", split),
-            evaluated.dtrk_dashboard_path,
-        ),
-        (
-            artifact_names.per_split(f"compare_matches_gt_{role}", split),
-            evaluated.gt_matches,
-        ),
-        (
-            artifact_names.per_split(f"compare_matches_preds_{role}", split),
-            evaluated.pred_matches,
-        ),
-        (
-            artifact_names.per_split(f"compare_confusion_matrix_{role}", split),
-            evaluated.confusion_matrix_path,
-        ),
-        (
-            artifact_names.per_split(f"compare_metrics_summary_{role}", split),
-            per_class,
-        ),
-        (
-            artifact_names.per_split(f"compare_metrics_raw_{role}", split),
-            {name: metric.model_dump() for name, metric in evaluated.metrics.items()},
-        ),
-        (
-            artifact_names.per_split(f"compare_inference_metadata_{role}", split),
-            predictions.with_suffix(".metadata.json"),
-        ),
-        (
-            artifact_names.per_split(f"compare_native_outputs_{role}", split),
-            native_archive,
-        ),
-    ]
-    values.extend(
-        (
-            artifact_names.per_split(f"compare_plot_{metric}_{role}", split),
-            path,
+def _source_configuration(model: ResolvedModel) -> dict[str, Any]:
+    return dict(
+        sanitize_configuration(
+            model.links or {"source": model.source, "weights": str(model.weights)}
         )
-        for metric, path in evaluated.plot_paths.items()
     )
-    return values
 
 
-def _upload_many(task: Any, artifacts: list[tuple[str, object]]) -> None:
+def _publish_comparison_tables(
+    task: Any, truth: Path, predictions: dict[str, Path], split: str
+) -> None:
     if task is None:
         return
-    for name, value in artifacts:
-        upload_artifact(task, name, value)
-
-
-def _common_artifacts(
-    ground_truth: Path,
-    models: dict[str, object],
-    evidence: dict[str, InferenceEvidence],
-    output_locations: dict[str, dict[str, str]],
-    split: str,
-    image_names: list[str],
-) -> list[tuple[str, object]]:
-    return [
-        ("compare_ground_truth", ground_truth),
-        ("compare_model_references", models),
-        (
-            "compare_effective_inference",
-            {role: item.effective_args for role, item in evidence.items()},
-        ),
-        ("compare_native_output_locations", output_locations),
-        (artifact_names.per_split("compare_image_membership", split), image_names),
-    ]
-
-
-def _output_location(
-    evidence: InferenceEvidence, predictions: Path, native_archive: Path
-) -> dict[str, str]:
-    return {
-        "predictions": str(predictions.resolve()),
-        "metadata": str(predictions.with_suffix(".metadata.json").resolve()),
-        "native_save_dir": str(Path(evidence.save_dir).resolve()),
-        "native_outputs": str(native_archive.resolve()),
-    }
+    publish_table(task, "ground_truth", truth)
+    for role, path in predictions.items():
+        publish_table(task, f"compare_predictions_{role}_{split}", path)
 
 
 def _skip_without_baseline(
@@ -606,20 +505,7 @@ def _skip_without_baseline(
         settled,
         fingerprint,
     )
-    expected = [
-        "compare_ground_truth",
-        "compare_model_references",
-        "compare_effective_inference",
-        "compare_native_output_locations",
-        artifact_names.per_split("compare_image_membership", split),
-        artifact_names.per_split("compare_predictions_candidate", split),
-        artifact_names.per_split("compare_thresholds_candidate", split),
-        "comparison_status",
-        *_evaluated_artifact_names("candidate", split),
-    ]
-    if task is not None:
-        expect_artifacts(task, expected)
-    evaluated, _, candidate_evidence, candidate_archive = _scored(
+    evaluated, _, _, _ = _scored(
         candidate.weights,
         truth,
         split,
@@ -632,26 +518,33 @@ def _skip_without_baseline(
         evaluation=evaluation,
         task=task,
     )
-    artifacts = _common_artifacts(
-        ground_truth_path,
-        {"candidate": candidate.model_dump(mode="json")},
-        {"candidate": candidate_evidence},
-        {"candidate": _output_location(candidate_evidence, predictions, candidate_archive)},
-        split,
-        evaluated.image_names,
-    )
-    artifacts.extend(
-        [
-            (artifact_names.per_split("compare_predictions_candidate", split), predictions),
-            (
-                artifact_names.per_split("compare_thresholds_candidate", split),
-                evaluated.thresholds,
-            ),
-            ("comparison_status", {"status": "skipped", "reason": reason}),
-            *_evaluated_artifacts("candidate", split, evaluated, predictions, candidate_archive),
-        ]
-    )
-    _upload_many(task, artifacts)
+    workbook = destination / f"compare_evaluation_candidate_{split}.xlsx"
+    per_class, summary = summarize_metrics(evaluated.metrics)
+    with pd.ExcelWriter(workbook, engine="openpyxl") as writer:
+        per_class.to_excel(writer, sheet_name="Classes")
+        pd.DataFrame([summary]).to_excel(writer, sheet_name="Summary", index=False)
+        pd.DataFrame(
+            list(candidate.thresholds.items()), columns=["class_name", "confidence"]
+        ).to_excel(writer, sheet_name="Thresholds", index=False)
+        pd.DataFrame(
+            [{"status": "skipped", "reason": reason, **_source_configuration(candidate)}]
+        ).to_excel(writer, sheet_name="Methodology", index=False)
+    if task is not None:
+        record_run_configuration(
+            task,
+            {
+                "comparison_status": {"status": "skipped", "reason": reason},
+                "comparison": {
+                    "candidate": _source_configuration(candidate),
+                    "inference": settled.model_dump(),
+                    "evaluation": evaluation.model_dump(),
+                },
+            },
+        )
+        _publish_comparison_tables(task, ground_truth_path, {"candidate": predictions}, split)
+        name = f"compare_evaluation_candidate_{split}"
+        expect_artifacts(task, [name])
+        upload_artifact(task, name, workbook)
 
 
 def _normalize_evaluation(
@@ -792,31 +685,11 @@ def compare(
     candidate_predictions = _prediction_cache(
         destination, "candidate", split, candidate.weights, settled, split_fingerprint
     )
-    expected = [
-        "compare_ground_truth",
-        "compare_model_references",
-        "compare_effective_inference",
-        "compare_native_output_locations",
-        artifact_names.per_split("compare_image_membership", split),
-        artifact_names.per_split("compare_predictions_baseline", split),
-        artifact_names.per_split("compare_predictions_candidate", split),
-        artifact_names.per_split("compare_thresholds_baseline", split),
-        artifact_names.per_split("compare_thresholds_candidate", split),
-        artifact_names.per_split("compare_counts", split),
-        artifact_names.per_split("compare_exclusions", split),
-        artifact_names.per_split("compare_methodology", split),
-        artifact_names.per_split(artifact_names.COMPARISON_WORKBOOK_PREFIX, split),
-        "compare_manifest",
-        *_evaluated_artifact_names("baseline", split),
-        *_evaluated_artifact_names("candidate", split),
-    ]
-    if task is not None:
-        expect_artifacts(task, expected)
     (
         baseline_evaluated,
         baseline_vocabulary,
-        baseline_evidence,
-        baseline_archive,
+        _baseline_evidence,
+        _baseline_archive,
     ) = _scored(
         baseline.weights,
         truth,
@@ -833,8 +706,8 @@ def compare(
     (
         candidate_evaluated,
         candidate_vocabulary,
-        candidate_evidence,
-        candidate_archive,
+        _candidate_evidence,
+        _candidate_archive,
     ) = _scored(
         candidate.weights,
         truth,
@@ -866,6 +739,13 @@ def compare(
             "baseline_weights": str(baseline.weights),
             "candidate_weights": str(candidate.weights),
             "split": split,
+            "baseline_source": _source_configuration(baseline),
+            "candidate_source": _source_configuration(candidate),
+            "baseline_architecture": _baseline_evidence.checkpoint_design,
+            "candidate_architecture": _candidate_evidence.checkpoint_design,
+            "shared_inference": settled.model_dump(),
+            "image_count": len(baseline_evaluated.image_names),
+            "images": baseline_evaluated.image_names,
             **evaluation_config.model_dump(),
         }
     )
@@ -881,62 +761,30 @@ def compare(
         candidate_predictions,
         workbook,
     )
-    artifacts = _common_artifacts(
-        ground_truth_path,
-        {
-            "baseline": baseline.model_dump(mode="json"),
-            "candidate": candidate.model_dump(mode="json"),
-        },
-        {"baseline": baseline_evidence, "candidate": candidate_evidence},
-        {
-            "baseline": _output_location(baseline_evidence, baseline_predictions, baseline_archive),
-            "candidate": _output_location(
-                candidate_evidence, candidate_predictions, candidate_archive
-            ),
-        },
-        split,
-        baseline_evaluated.image_names,
-    )
-    artifacts.extend(
-        [
-            (artifact_names.per_split("compare_predictions_baseline", split), baseline_predictions),
-            (
-                artifact_names.per_split("compare_predictions_candidate", split),
-                candidate_predictions,
-            ),
-            (
-                artifact_names.per_split("compare_thresholds_baseline", split),
-                baseline_evaluated.thresholds,
-            ),
-            (
-                artifact_names.per_split("compare_thresholds_candidate", split),
-                candidate_evaluated.thresholds,
-            ),
-            (artifact_names.per_split("compare_counts", split), tables.rows),
-            (artifact_names.per_split("compare_exclusions", split), tables.excluded),
-            (artifact_names.per_split("compare_methodology", split), tables.methodology),
-            (
-                artifact_names.per_split(artifact_names.COMPARISON_WORKBOOK_PREFIX, split),
-                workbook,
-            ),
-            ("compare_manifest", manifest),
-            *_evaluated_artifacts(
-                "baseline",
-                split,
-                baseline_evaluated,
-                baseline_predictions,
-                baseline_archive,
-            ),
-            *_evaluated_artifacts(
-                "candidate",
-                split,
-                candidate_evaluated,
-                candidate_predictions,
-                candidate_archive,
-            ),
-        ]
-    )
-    _upload_many(task, artifacts)
+    if task is not None:
+        record_run_configuration(
+            task,
+            {
+                "comparison": {
+                    "baseline": _source_configuration(baseline),
+                    "candidate": _source_configuration(candidate),
+                    "inference": settled.model_dump(),
+                    "evaluation": evaluation_config.model_dump(),
+                }
+            },
+        )
+        _publish_comparison_tables(
+            task,
+            ground_truth_path,
+            {
+                "baseline": baseline_predictions,
+                "candidate": candidate_predictions,
+            },
+            split,
+        )
+        name = artifact_names.per_split(artifact_names.COMPARISON_WORKBOOK_PREFIX, split)
+        expect_artifacts(task, [name])
+        upload_artifact(task, name, workbook)
 
     degraded = _degraded(tables)
     return CompareResult(

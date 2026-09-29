@@ -126,3 +126,14 @@ def test_prediction_device_is_independent(training_device: str) -> None:
     assert list(config.ultralytics_predict.device) == [-1]
     assert overridden.ultralytics_predict.device is None
     assert overridden.ultralytics.device is None
+
+
+def test_cache_location_is_exposed_on_training_commands() -> None:
+    from hydra import compose, initialize_config_module
+    from hydra_zen import store
+
+    store.add_to_hydra_store(overwrite_ok=True)
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        for name in ("train", "pipeline"):
+            config = compose(config_name=name, overrides=["dataset_cache_dir=/shared/datasets"])
+            assert config.dataset_cache_dir == "/shared/datasets"

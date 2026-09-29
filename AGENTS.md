@@ -76,8 +76,9 @@ such as `ultralytics.epochs=10` and `ultralytics_predict.batch=8`.
 Stage-irrelevant settings are commented in exported native YAML and excluded from execution.
 Raw `cfg` loading, non-null native `cfg`, nested stage-native mappings and duplicate native
 comparison inference settings are removed and must fail with migration guidance.
-Effective native YAML and retained prediction manifests support replay; YAML is recorded
-locally and in ClearML as configuration objects and artifacts with comments preserved.
+Effective native YAML and retained prediction manifests support replay; YAML is retained
+locally with comments preserved; canonical run/dataset/report configurations and native General
+parameters support ClearML replay without artifact copies.
 Pass device, batch, AMP, compilation and native augmentation options directly to Ultralytics.
 
 The project no longer provides GPU scheduling, filesystem queues or leases, batch tuning,
@@ -97,9 +98,10 @@ missing automatic baseline skips comparison, while invalid explicit references f
 
 ClearML is required for execution commands. One execution invocation owns exactly one task;
 nested stages reuse it and workers do not create tasks or upload artifacts.
-Complete a task only after all required artifacts
-are uploaded and flushed. Fail task and command on computation, upload, flush, or interruption
-errors while retaining local output. Never capture credentials or dataset images.
+Complete a task only after all required artifacts and the native best Output Model
+are uploaded, verified and flushed. Fail task and command on computation, upload, flush, or interruption
+errors while retaining local output. Never capture credentials. Native owner-only training/validation image previews are permitted.
+Use the shared CSV-addressed dataset cache outside run outputs; source images are immutable.
 
 ## External dependencies
 

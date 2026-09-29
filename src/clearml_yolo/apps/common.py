@@ -2,48 +2,22 @@
 
 import inspect
 from collections.abc import Callable
-from pathlib import Path
 from typing import Any
 
 import hydra
-from hydra.core.hydra_config import HydraConfig
 from hydra_zen import instantiate, store, zen
 from omegaconf import DictConfig, OmegaConf, open_dict
 
 # Populate the shared ConfigStore in fresh CLI processes before Hydra composes examples.
 import clearml_yolo.configs  # noqa: F401
 from clearml_yolo.clearml_session import (
-    connect_config_file,
     invocation,
-    sanitize_configuration,
+    replay_configuration,
     task_identity,
-    upload_artifact,
 )
 from clearml_yolo.native_config import stage_settings
 from clearml_yolo.native_runtime import native_runtime
 from clearml_yolo.run_identity import RUNS_ROOT, task_run_dir
-
-
-def _sources(task: Any) -> None:
-    hydra_config = HydraConfig.get()
-    selected = [str(hydra_config.job.config_name)]
-    selected.extend(
-        f"{group.split('@')[0]}/{choice}"
-        for group, choice in hydra_config.runtime.choices.items()
-        if choice is not None and not group.startswith("hydra/")
-    )
-    for index, source in enumerate(hydra_config.runtime.config_sources):
-        if source.schema == "file":
-            folder = Path(source.path)
-            for selected_name in selected:
-                path = folder / f"{selected_name}.yaml"
-                if path.is_file():
-                    connect_config_file(
-                        task,
-                        f"source_hydra_{index}_{selected_name}",
-                        path,
-                        allow_remote_override=False,
-                    )
 
 
 def validate_wrapper_keys(config: DictConfig, function: Callable[..., Any]) -> None:
@@ -78,9 +52,32 @@ def launch(name: str, function: Callable[..., Any]) -> None:
         # concurrent torch submodule discovery can observe a partially loaded package.
         with (
             native_runtime(),
-            invocation(instantiate(config.clearml), name, resolved) as task,
+            invocation(instantiate(config.clearml), name) as task,
         ):
-            _sources(task)
+            if not isinstance(resolved, dict):
+                raise TypeError("Resolved command configuration must be a mapping")
+            inputs = {str(key): value for key, value in resolved.items()}
+            native = dict(inputs.pop("ultralytics", {}))
+            replay = replay_configuration(task, inputs)
+            # Run also contains result provenance; only command inputs are executable.
+            accepted = set(inspect.signature(function).parameters)
+            replay = {key: value for key, value in replay.items() if key in accepted}
+            if native and not task.running_locally() and name in {"pipeline", "train"}:
+                # General stores the previous trainer's effective output route. A clone
+                # must derive its own route, retaining only current explicit requests.
+                routing = {
+                    key: native[key] for key in ("project", "name", "save_dir") if key in native
+                }
+                native = dict(task.connect(native, name="General", ignore_remote_overrides=False))
+                for key in ("project", "name", "save_dir"):
+                    native.pop(key, None)
+                native.update(routing)
+            with open_dict(config):
+                for key, value in replay.items():
+                    config[key] = value
+                if "ultralytics" in config:
+                    config.ultralytics = native
+            validate_wrapper_keys(config, function)
             # Derive paths only after the owner exists; remote task names may differ.
             with open_dict(config):
                 if "output_dir" in config and config.output_dir is None:
@@ -89,11 +86,6 @@ def launch(name: str, function: Callable[..., Any]) -> None:
                     config.output = str(
                         task_run_dir(RUNS_ROOT, *task_identity(task)) / f"{name}.csv"
                     )
-            upload_artifact(
-                task,
-                "effective_configuration",
-                sanitize_configuration(OmegaConf.to_container(config, resolve=True)),
-            )
             zen(function)(config)
 
     execute()

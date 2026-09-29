@@ -8,6 +8,7 @@ never appears among the results.
 
 from collections.abc import Iterator
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Self
 
 import numpy as np
@@ -78,6 +79,7 @@ class FakeYolo:
     def __init__(self, weights: str) -> None:
         self.weights = weights
         self.names = dict(NAMES)
+        self.model = SimpleNamespace(yaml={"nc": 2, "backbone": [[-1, 1, "Conv", [16, 3, 2]]]})
         self.task = "detect"
         self.calls: list[dict[str, Any]] = []
         FakeYolo.last = self
@@ -436,3 +438,8 @@ def test_non_detection_checkpoint_fails_before_prediction(
     monkeypatch.setattr(FakeYolo, "__init__", initialize)
     with pytest.raises(ValueError, match="detection model"):
         _predict("wrong.pt", ["a.png"])
+
+
+def test_inference_retains_checkpoint_design(tmp_path: Path) -> None:
+    frame = _predict("best.pt", [str(tmp_path / "empty.jpg")])
+    assert frame.attrs["checkpoint_design"]["nc"] == 2

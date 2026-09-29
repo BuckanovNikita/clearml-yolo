@@ -166,11 +166,13 @@ layers = [
     "clearml_yolo.tasks",
     "clearml_yolo.publishing",
     "clearml_yolo.comparison",
+    "clearml_yolo.dataset_cache",
     "clearml_yolo.dataset",
     "clearml_yolo.dataset_export",
     "clearml_yolo.dataset_records",
-    "clearml_yolo.inference | clearml_yolo.ground_truth | clearml_yolo.clearml_models | clearml_yolo.clearml_report",
-    "clearml_yolo.native_config | clearml_yolo.native_runtime | clearml_yolo.clearml_session | clearml_yolo.progress | clearml_yolo.artifact_names",
+    "clearml_yolo.native_ddp",
+    "clearml_yolo.inference | clearml_yolo.ground_truth | clearml_yolo.clearml_models | clearml_yolo.clearml_report | clearml_yolo.clearml_native | clearml_yolo.native_runtime",
+    "clearml_yolo.native_config | clearml_yolo.clearml_session | clearml_yolo.progress | clearml_yolo.artifact_names",
     "clearml_yolo.run_identity",
 ]
 
@@ -205,6 +207,7 @@ modules = [
 name = "The ClearML SDK stays behind the clearml_* adapters"
 type = "forbidden"
 source_modules = [
+    "clearml_yolo.dataset_cache",
     "clearml_yolo.dataset",
     "clearml_yolo.dataset_export",
     "clearml_yolo.dataset_records",
@@ -225,6 +228,7 @@ allow_indirect_imports = true
 name = "The domain does not know it is configured by hydra"
 type = "forbidden"
 source_modules = [
+    "clearml_yolo.dataset_cache",
     "clearml_yolo.dataset",
     "clearml_yolo.dataset_export",
     "clearml_yolo.dataset_records",
@@ -245,6 +249,7 @@ allow_indirect_imports = true
 name = "Model weights are only ever loaded in one place"
 type = "forbidden"
 source_modules = [
+    "clearml_yolo.dataset_cache",
     "clearml_yolo.dataset",
     "clearml_yolo.dataset_export",
     "clearml_yolo.dataset_records",

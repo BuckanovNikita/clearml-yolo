@@ -11,6 +11,7 @@ import pytest
 
 from clearml_yolo import artifact_names
 from clearml_yolo.clearml_session import ClearMLConfig
+from clearml_yolo.inference import PREDICTION_COLUMNS
 from clearml_yolo.publishing.models import FiftyOneConfig, PublicationReceipt
 from clearml_yolo.tasks import predict as predict_module
 from clearml_yolo.tasks.predict import predict
@@ -39,9 +40,8 @@ def published(monkeypatch: pytest.MonkeyPatch) -> dict[str, pd.DataFrame]:
 
     monkeypatch.setattr(predict_module, "report_table", report_table)
     monkeypatch.setattr(predict_module, "init_task", lambda *_a, **_k: object())
-    monkeypatch.setattr(predict_module, "expect_artifacts", lambda *_a, **_k: None)
-    monkeypatch.setattr(predict_module, "connect_config_file", lambda *a, **k: a[2])
-    monkeypatch.setattr(predict_module, "upload_artifact", lambda *_a, **_k: None)
+    monkeypatch.setattr(predict_module, "publish_table", lambda *_a, **_k: None)
+    monkeypatch.setattr(predict_module, "record_run_configuration", lambda *_a, **_k: None)
     monkeypatch.setattr(predict_module, "resolve_weights", lambda weights: weights)
     monkeypatch.setattr(
         predict_module, "predict_on_images", lambda *_, **__: pd.DataFrame({"image_name": []})
@@ -140,7 +140,6 @@ def test_prediction_preflights_before_compute_and_publishes_exact_outputs(
     task = types.SimpleNamespace(id="predict-task")
     events: list[str] = []
     requests: list[Any] = []
-    uploads: list[tuple[str, Path]] = []
 
     class FakePublisher:
         enabled = True
@@ -175,15 +174,7 @@ def test_prediction_preflights_before_compute_and_publishes_exact_outputs(
 
     monkeypatch.setattr(predict_module, "predict_on_images", infer)
     monkeypatch.setattr(
-        "clearml_yolo.tasks.publication.expect_artifacts", lambda _task, _names: None
-    )
-    monkeypatch.setattr(
-        "clearml_yolo.tasks.publication.upload_artifact",
-        lambda _task, name, value: (
-            uploads.append((name, Path(value)))
-            if name == artifact_names.FIFTYONE_PUBLICATION
-            else None
-        ),
+        "clearml_yolo.tasks.publication.record_run_configuration", lambda *_args: None
     )
     truth = _ground_truth(tmp_path)
 
@@ -207,10 +198,7 @@ def test_prediction_preflights_before_compute_and_publishes_exact_outputs(
     assert request.prediction_splits == ["test"]
     assert request.evaluations == {}
     assert request.metadata == {"model": "best.pt"}
-    assert uploads == [
-        (artifact_names.FIFTYONE_PUBLICATION, tmp_path / "fiftyone_publication.json")
-    ]
-    assert uploads[0][1].is_file()
+    assert (tmp_path / "fiftyone_publication.json").is_file()
 
 
 def test_prediction_satisfies_its_registered_artifacts(
@@ -220,21 +208,35 @@ def test_prediction_satisfies_its_registered_artifacts(
     published: dict[str, pd.DataFrame],
 ) -> None:
     checkpoint_recording({"imgsz": 64})
-    expected: list[str] = []
-    uploaded: list[str] = []
+    published_names: list[str] = []
     monkeypatch.setattr(
-        predict_module, "expect_artifacts", lambda task, names: expected.extend(names)
-    )
-    monkeypatch.setattr(
-        predict_module, "upload_artifact", lambda task, name, value: uploaded.append(name)
+        predict_module, "publish_table", lambda task, name, value: published_names.append(name)
     )
     monkeypatch.setattr(
         predict_module,
-        "connect_config_file",
-        lambda task, name, value, **kwargs: uploaded.append(name),
+        "record_run_configuration",
+        lambda *_args: None,
     )
     _predict(tmp_path, 64)
-    assert set(expected) <= set(uploaded)
+    assert published_names == [artifact_names.PREDICTIONS, "ground_truth"]
+
+
+def test_empty_prediction_output_has_canonical_header_and_is_published(
+    tmp_path: Path,
+    checkpoint_recording: Any,
+    published: dict[str, pd.DataFrame],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkpoint_recording({"imgsz": 64})
+    tables: dict[str, Path] = {}
+    monkeypatch.setattr(
+        predict_module, "publish_table", lambda _task, name, path: tables.setdefault(name, path)
+    )
+
+    result = _predict(tmp_path, 64)
+
+    assert set(tables) == {"ground_truth", artifact_names.PREDICTIONS}
+    assert list(pd.read_csv(result.predictions)) == PREDICTION_COLUMNS
 
 
 def test_prediction_overrides_inherit_shared_and_replace_training_model() -> None:
@@ -303,3 +305,39 @@ def test_native_failure_preserves_replay_config_and_manifest(
     settings = yaml.safe_load((tmp_path / "ultralytics_predict.yaml").read_text())
     assert settings["model"] == "best.pt"
     assert Path(settings["source"]).is_file()
+
+
+@pytest.mark.parametrize("changed", [False, True])
+def test_prediction_run_records_only_meaningful_native_changes(
+    tmp_path: Path,
+    checkpoint_recording: Any,
+    published: dict[str, pd.DataFrame],
+    monkeypatch: pytest.MonkeyPatch,
+    changed: bool,
+) -> None:
+    checkpoint_recording({"imgsz": 64})
+    recorded: list[dict[str, Any]] = []
+    monkeypatch.setattr(
+        predict_module, "record_run_configuration", lambda _t, values: recorded.append(values)
+    )
+
+    def infer(*_args: Any, **settings: Any) -> pd.DataFrame:
+        frame = pd.DataFrame(columns=PREDICTION_COLUMNS)
+        frame.attrs["effective_args"] = {"augment": changed}
+        frame.attrs["normalized_imgsz"] = [96, 96] if changed else [64, 64]
+        return frame
+
+    monkeypatch.setattr(predict_module, "predict_on_images", infer)
+    _predict(tmp_path, 64)
+    result = recorded[0]["prediction_result"]
+    assert result["model"] == "best.pt"
+    assert "requested" not in result
+    assert "effective" not in result
+    changes = result["native_normalization"]
+    assert "device" not in changes
+    assert "batch" not in changes
+    if changed:
+        assert changes["augment"] == {"requested": False, "effective": True}
+        assert changes["imgsz"] == {"requested": 64, "effective": [96, 96]}
+    else:
+        assert changes == {}

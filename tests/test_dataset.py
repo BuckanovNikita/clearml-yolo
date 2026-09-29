@@ -89,6 +89,32 @@ def test_invalid_format_fails_without_output(tmp_path: Path) -> None:
     assert not (tmp_path / "output").exists()
 
 
+def test_ndjson_preparation_preserves_original_basename_and_extension_case(tmp_path: Path) -> None:
+    from clearml_yolo.dataset import prepare_dataset
+
+    source = _source(tmp_path / "input")
+    rows = list(csv.DictReader(source.open()))
+    old_image = source.parent / rows[0]["image_path"]
+    renamed = source.parent / "Camera.Frame.PNG"
+    old_image.rename(renamed)
+    for row in rows:
+        if row["split"] == "train":
+            row["image_name"] = renamed.name
+            row["image_path"] = renamed.name
+    with source.open("w", newline="") as stream:
+        writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+
+    result = prepare_dataset(source, tmp_path / "prepared", "ndjson")
+
+    assert (result.data.parent / "images/train/Camera.Frame.PNG").is_file()
+    assert (result.data.parent / "labels/train/Camera.Frame.txt").is_file()
+    metadata = json.loads(result.manifest.read_text())
+    train = next(item for item in metadata["images"] if item["split"] == "train")
+    assert Path(train["generated_path"]).name == "Camera.Frame.PNG"
+
+
 def test_data_policy_records_owned_changes_and_preserves_native_controls(tmp_path: Path) -> None:
     from clearml_yolo.dataset import apply_dataset_policy
 

@@ -7,10 +7,13 @@ back — the report stage pulls dashboards, but a dashboard is neither a checkpo
 full-precision threshold table.
 """
 
+import csv
 import json
+import math
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote, urlsplit
 
 import pandas as pd
 from loguru import logger
@@ -85,20 +88,36 @@ def latest_completed_task_id(
     return task_id
 
 
-def _checkpoint_from_models(task: Any) -> str | None:
-    """Read the last registered model from a task using native callback storage.
+def best_output_model(task: Any) -> Any | None:
+    """Select explicitly marked best weights, independent of registration order."""
+    outputs: list[Any] = list(task.get_models().get("output") or [])
+    candidates = [
+        model
+        for model in outputs
+        if model.get_metadata("clearml_yolo_checkpoint_role") == "best"
+        or Path(unquote(urlsplit(str(model.url or "")).path)).name == "best.pt"
+    ]
+    if len(candidates) > 1:
+        raise ValueError(f"Ambiguous best output models on ClearML task {task.id}")
+    return candidates[0] if candidates else None
 
-    Ultralytics' own ClearML callback registers checkpoints as output models rather
-    than artifacts, and registers more than one over a run — the last is the one that
-    survived training.
-    """
-    # The adapter accepts opaque SDK task objects and keeps that boundary local.
-    models: Any = task.get_models()
-    output: list[Any] = list(models.get("output") or [])
-    if not output:
+
+def _checkpoint_from_models(task: Any) -> str | None:
+    model = best_output_model(task)
+    if model is None:
         return None
-    local_copy: str | None = output[-1].get_local_copy()
+    local_copy: str | None = model.get_local_copy()
     return local_copy
+
+
+def source_model_links(task_id: str) -> dict[str, str]:
+    """Record source identity and links without copying source training parameters."""
+    task = _task(task_id)
+    links = {"task_id": task_id, "task_url": str(task.get_output_log_web_page())}
+    model = best_output_model(task)
+    if model is not None:
+        links.update(model_id=str(model.id), model_url=str(model.url))
+    return links
 
 
 def _checkpoint_from_artifacts(task: Any) -> str | None:
@@ -114,9 +133,7 @@ def _checkpoint_from_artifacts(task: Any) -> str | None:
     )
     named = [name for name in preferred if name in artifacts]
     named.extend(
-        name
-        for name in sorted(artifacts)
-        if name not in named and str(name).endswith(".pt")
+        name for name in sorted(artifacts) if name not in named and str(name).endswith(".pt")
     )
     for name in named:
         artifact = artifacts[name]
@@ -168,25 +185,46 @@ def _as_threshold_mapping(payload: Any) -> dict[str, float]:
     raise TypeError(f"Unsupported best_confidences artifact of type {type(payload).__name__}")
 
 
-def fetch_best_confidences(task_id: str, split: str) -> dict[str, float]:
-    """Read the per-class thresholds a task calibrated for one split.
+def _validated_thresholds(values: dict[str, float]) -> dict[str, float]:
+    if not values or any(not name.strip() for name in values):
+        raise ValueError("Exact thresholds require nonempty class names")
+    if any(not math.isfinite(value) or not 0 <= value <= 1 for value in values.values()):
+        raise ValueError("Exact confidence thresholds must be finite values in [0, 1]")
+    return values
 
-    The dashboards round their thresholds for display, so scoring both models at their
-    frozen production thresholds has to read this artifact instead: a rounded threshold
-    silently rescores every class and shows up as a model difference that is not one.
-    """
+
+def _threshold_csv(path: Path) -> dict[str, float]:
+    with path.open(newline="", encoding="utf-8") as stream:
+        reader = csv.DictReader(stream)
+        if reader.fieldnames != ["class_name", "confidence"]:
+            raise ValueError("Validation threshold CSV requires class_name,confidence columns")
+        values: dict[str, float] = {}
+        for row in reader:
+            name = row["class_name"]
+            if name in values:
+                raise ValueError(f"Duplicate threshold class {name!r}")
+            values[name] = float(row["confidence"])
+    return _validated_thresholds(values)
+
+
+def fetch_best_confidences(task_id: str, split: str) -> dict[str, float]:
+    """Prefer exact validation CSV; retain historical per-split payload readers."""
     task = _task(task_id)
+    validation = task.artifacts.get(per_split(BEST_CONFIDENCES_PREFIX, "val"))
+    if validation is not None:
+        local = validation.get_local_copy()
+        if local and Path(str(local)).suffix.lower() == ".csv":
+            return _threshold_csv(Path(str(local)))
     name = per_split(BEST_CONFIDENCES_PREFIX, split)
     artifact = task.artifacts.get(name)
     if artifact is None:
         raise ValueError(
-            f"ClearML task {task_id} ({task.name}) has no {name!r} artifact. Run the metrics "
-            f"stage for split {split!r} on that task, or supply thresholds explicitly."
+            f"ClearML task {task_id} ({task.name}) has no {name!r} artifact or exact "
+            "validation threshold CSV. Run validation metrics or supply thresholds explicitly."
         )
-
     payload: Any = artifact.get()
     if isinstance(payload, str):
         payload = json.loads(payload)
-    thresholds = _as_threshold_mapping(payload)
+    thresholds = _validated_thresholds(_as_threshold_mapping(payload))
     logger.info("Thresholds of task {} for split {!r}: {} classes", task_id, split, len(thresholds))
     return thresholds

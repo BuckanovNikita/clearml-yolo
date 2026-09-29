@@ -7,7 +7,6 @@ from loguru import logger
 from pydantic import BaseModel, Field
 
 from clearml_yolo import artifact_names
-from clearml_yolo.clearml_report import report_table
 from clearml_yolo.clearml_session import (
     ClearMLConfig,
     connect_config_file,
@@ -55,9 +54,7 @@ def report(
 ) -> ReportResult:
     """Load the paired evaluated dashboards recorded by ``compare``."""
     directory, manifest_path, manifest = _manifest(comparison_dir)
-    candidate = _required_path(
-        directory, manifest.candidate_dashboard, "candidate dashboard"
-    )
+    candidate = _required_path(directory, manifest.candidate_dashboard, "candidate dashboard")
     baseline = _required_path(directory, manifest.baseline_dashboard, "baseline dashboard")
     return build_reports(
         candidate,
@@ -102,20 +99,14 @@ def build_reports(
     expected = [
         artifact_names.per_split(artifact_names.REPORT_DEV_PREFIX, split),
         artifact_names.per_split(artifact_names.REPORT_BUSINESS_PREFIX, split),
-        artifact_names.per_split("report_input_dashboard_candidate", split),
-        artifact_names.per_split("report_input_dashboard_baseline", split),
     ]
-    if manifest_path is not None:
-        if not manifest_path.is_file():
-            raise FileNotFoundError(f"Comparison manifest does not exist: {manifest_path}")
-        expected.append(artifact_names.per_split("report_input_manifest", split))
+    if manifest_path is not None and not manifest_path.is_file():
+        raise FileNotFoundError(f"Comparison manifest does not exist: {manifest_path}")
     if task is not None:
         expect_artifacts(task, expected)
     effective_config_path: str | Path | None = report_config_path
     if report_config_path is not None and task is not None:
-        effective_config_path = connect_config_file(
-            task, "source_report_configuration", Path(report_config_path)
-        )
+        effective_config_path = connect_config_file(task, "report", Path(report_config_path))
     config = Config.load(effective_config_path) if effective_config_path else Config.load()
 
     candidate_reader = MetricsReader(candidate_path)
@@ -131,23 +122,6 @@ def build_reports(
     )
     logger.info("Split {!r}: {} and {}", split, dev_path.name, business_path.name)
     if task is not None:
-        report_table(task, artifact_names.REPORT_SECTION, split, baseline_reader.read())
-        upload_artifact(
-            task,
-            artifact_names.per_split("report_input_dashboard_candidate", split),
-            candidate_path,
-        )
-        upload_artifact(
-            task,
-            artifact_names.per_split("report_input_dashboard_baseline", split),
-            baseline_path,
-        )
-        if manifest_path is not None:
-            upload_artifact(
-                task,
-                artifact_names.per_split("report_input_manifest", split),
-                manifest_path,
-            )
         _upload_reports(task, split, dev_path, business_path)
     return result
 

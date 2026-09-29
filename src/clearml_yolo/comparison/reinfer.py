@@ -62,14 +62,13 @@ class InferenceEvidence(BaseModel):
     save_dir: str
     requested_args: dict[str, Any] = Field(default_factory=dict)
     normalized_imgsz: list[int] | None = None
+    checkpoint_design: dict[str, Any] = Field(default_factory=dict)
 
 
 def _model_class_names(weights: str | Path) -> dict[int, str]:
     from ultralytics.models import YOLO
 
-    # A ClearML-registered model carries no label enumeration (empty `labels`,
-    # `config_text` and `get_labels_enumeration()`), so the checkpoint's own mapping
-    # is the only source that cannot silently mislabel every detection.
+    # Checkpoint labels remain authoritative even when remote model metadata exists.
     names: dict[int, str] = YOLO(str(weights)).names
     return names
 
@@ -135,6 +134,9 @@ def _evidence(predictions: pd.DataFrame, fallback: dict[str, object]) -> Inferen
                 predictions.attrs.get("requested_args", fallback)
             ),
             "normalized_imgsz": predictions.attrs.get("normalized_imgsz"),
+            "checkpoint_design": sanitize_configuration(
+                predictions.attrs.get("checkpoint_design", {})
+            ),
         }
     )
     native_root = Path(str(fallback["project"])).resolve()

@@ -149,7 +149,7 @@ def test_payload_uses_sliced_matches_and_preserves_backgrounds_and_filtered_boxe
     assert all(match.pred_index != 203 for match in payload.matches)
 
 
-def test_metrics_persists_and_uploads_the_split_payload(
+def test_metrics_retains_local_payload_and_publishes_readable_workbook(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     ground_truth = pd.DataFrame(
@@ -182,6 +182,8 @@ def test_metrics_persists_and_uploads_the_split_payload(
     ground_truth.to_csv(ground_truth_path, index=False)
     predictions.to_csv(predictions_path, index=False)
     task = object()
+    monkeypatch.setattr("clearml_yolo.tasks.metrics.publish_table", lambda *args: None)
+    monkeypatch.setattr("clearml_yolo.tasks.metrics.record_run_configuration", lambda *args: None)
     expected: list[str] = []
     uploaded: dict[str, Any] = {}
     monkeypatch.setattr("clearml_yolo.tasks.metrics.init_task", lambda *_args, **_kwargs: task)
@@ -216,4 +218,6 @@ def test_metrics_persists_and_uploads_the_split_payload(
         (2, "filtered"),
     ]
     assert "metrics_evaluation_test" in expected
-    assert uploaded["metrics_evaluation_test"] == payload_path
+    workbook = uploaded["metrics_evaluation_test"]
+    assert workbook.suffix == ".xlsx"
+    assert payload_path not in uploaded.values()

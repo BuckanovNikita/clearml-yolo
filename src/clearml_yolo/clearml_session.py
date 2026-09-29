@@ -6,12 +6,13 @@ reports all land on one experiment.
 """
 
 import dataclasses
+import hashlib
 import json
 import os
 import re
 import signal
 import threading
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
@@ -27,9 +28,8 @@ from ruamel.yaml.comments import CommentedMap, CommentedSeq
 from ruamel.yaml.error import YAMLError
 from ruamel.yaml.tokens import CommentToken
 
-ARTIFACT_MANIFEST = "artifact_manifest"
-RESOLVED_CONFIGURATION = "resolved_configuration"
 OWNER_PID_ENV = "CY_CLEARML_OWNER_PID"
+OWNER_TASK_ENV = "CY_CLEARML_OWNER_TASK_ID"
 REDACTED = "<redacted>"
 
 DEFAULT_PROJECT_NAME = "clearml-yolo"
@@ -89,20 +89,17 @@ class _InvocationState:
     stages: list[str]
     current_stage: str
     artifacts: list[_ArtifactRecord] = field(default_factory=list)
+    table_by_digest: dict[str, str] = field(default_factory=dict)
+    table_remote_by_key: dict[tuple[str, str], str] = field(default_factory=dict)
+    table_remote_names: set[str] = field(default_factory=set)
+    model_barriers: list[Callable[[], None]] = field(default_factory=list)
+    run_configuration: dict[str, Any] = field(default_factory=dict)
     config_directory: TemporaryDirectory[str] | None = None
 
     def enter_stage(self, stage: str) -> None:
         self.current_stage = stage
         if stage not in self.stages:
             self.stages.append(stage)
-
-    def manifest(self) -> dict[str, Any]:
-        return {
-            "schema_version": 1,
-            "task_id": str(self.task.id),
-            "stages": list(self.stages),
-            "artifacts": [dataclasses.asdict(artifact) for artifact in self.artifacts],
-        }
 
     def config_path(self, suffix: str) -> Path:
         if self.config_directory is None:
@@ -117,6 +114,12 @@ class _InvocationState:
 _ACTIVE_INVOCATION: ContextVar[_InvocationState | None] = ContextVar(
     "clearml_yolo_active_invocation", default=None
 )
+
+
+def active_task() -> Any | None:
+    """Return the invocation-owned task in the current execution context."""
+    active = _ACTIVE_INVOCATION.get()
+    return active.task if active is not None else None
 
 
 class _SignalExit(SystemExit):
@@ -241,9 +244,16 @@ def _finalize(state: _InvocationState) -> None:
     ]
     if missing:
         raise ArtifactUploadError(f"Required artifacts were not uploaded: {', '.join(missing)}")
-    _sync_upload(state.task, ARTIFACT_MANIFEST, state.manifest())
+    if state.model_barriers:
+        from clearml import OutputModel
+
+        OutputModel.wait_for_uploads()
     if state.task.flush(wait_for_uploads=True) is not True:
         raise ArtifactUploadError("ClearML flush did not confirm completion")
+    if state.model_barriers:
+        state.task.reload()
+        for verify in state.model_barriers:
+            verify()
     # close() waits for repository detection and shuts down the status monitor.
     # Marking completed first makes that monitor interpret our own success as an
     # external abort while background configuration uploads are still running.
@@ -257,6 +267,19 @@ def _finalize(state: _InvocationState) -> None:
 
 def _exit_on_signal(signum: int, _frame: Any) -> None:
     raise _SignalExit(signum)
+
+
+def _restore_environment(name: str, previous: str | None) -> None:
+    if previous is None:
+        os.environ.pop(name, None)
+    else:
+        os.environ[name] = previous
+
+
+def _replay_initial_configuration(task: Any, resolved_config: Any) -> None:
+    if not isinstance(resolved_config, Mapping):
+        raise TypeError("Resolved run configuration must be a mapping")
+    replay_configuration(task, dict(resolved_config))
 
 
 @contextmanager
@@ -330,16 +353,11 @@ def invocation(
         config.project_name,
         resolve_task_name(config, stage),
     )
+    previous_task_id = os.environ.get(OWNER_TASK_ENV)
+    os.environ[OWNER_TASK_ENV] = str(task.id)
     try:
         if resolved_config is not None:
-            sanitized = sanitize_configuration(resolved_config)
-            task.connect_configuration(
-                configuration=sanitized,
-                name="resolved",
-                ignore_remote_overrides=True,
-            )
-            expect_artifacts(task, [RESOLVED_CONFIGURATION])
-            upload_artifact(task, RESOLVED_CONFIGURATION, sanitized)
+            _replay_initial_configuration(task, resolved_config)
         yield task
         _finalize(state)
     except BaseException as error:
@@ -351,10 +369,8 @@ def invocation(
     finally:
         if owns_signal:
             signal.signal(signal.SIGTERM, previous_sigterm)
-        if previous_owner is None:
-            os.environ.pop(OWNER_PID_ENV, None)
-        else:
-            os.environ[OWNER_PID_ENV] = previous_owner
+        _restore_environment(OWNER_PID_ENV, previous_owner)
+        _restore_environment(OWNER_TASK_ENV, previous_task_id)
         _ACTIVE_INVOCATION.reset(token)
         state.cleanup()
 
@@ -415,6 +431,133 @@ def expect_artifacts(task: Any, names: list[str]) -> None:
         active.artifacts.append(
             _ArtifactRecord(stage=active.current_stage, name=name, local_path=None)
         )
+
+
+def publish_table(task: Any, name: str, path: Path) -> None:
+    """Publish CSV bytes once while satisfying every internal alias for those bytes."""
+    if _is_worker():
+        return
+    active = _active_state(task, "Table publication")
+    if not name:
+        raise ValueError("Published table name must be non-empty")
+    if not path.is_file():
+        raise FileNotFoundError(f"Required table does not exist: {path}")
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    existing_name = active.table_by_digest.get(digest)
+    existing_key_name = active.table_remote_by_key.get((name, digest))
+    record = next((item for item in active.artifacts if item.name == name), None)
+    if record is None:
+        record = _ArtifactRecord(
+            stage=active.current_stage,
+            name=name,
+            local_path=str(path.resolve()),
+        )
+        active.artifacts.append(record)
+    elif record.uploaded and existing_key_name is None:
+        # The expectation is for the canonical logical name. A deterministic remote
+        # suffix preserves both distinct tables without registering the expectation twice.
+        pass
+    else:
+        record.local_path = str(path.resolve())
+    if existing_name is not None:
+        record.uploaded = True
+        active.table_remote_by_key[(name, digest)] = existing_name
+        return
+    remote_name = name
+    if remote_name in active.table_remote_names:
+        remote_name = f"{name}_{digest[:12]}"
+        if remote_name in active.table_remote_names:
+            remote_name = f"{name}_{digest}"
+    _sync_upload(task, remote_name, path)
+    active.table_by_digest[digest] = remote_name
+    active.table_remote_by_key[(name, digest)] = remote_name
+    active.table_remote_names.add(remote_name)
+    record.uploaded = True
+    logger.debug("Published canonical table {} as {}", name, remote_name)
+
+
+def register_model_barrier(task: Any, verifier: Callable[[], None]) -> None:
+    """Require native model upload and a fresh verification before task completion."""
+    if _is_worker():
+        return
+    active = _active_state(task, "Model barrier registration")
+    if not callable(verifier):
+        raise TypeError("Model barrier verifier must be callable")
+    active.model_barriers.append(verifier)
+
+
+def _meaningful(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        mapping_result = {
+            str(key): cleaned
+            for key, item in value.items()
+            if (cleaned := _meaningful(item)) is not _EMPTY
+        }
+        return mapping_result or _EMPTY
+    if isinstance(value, (list, tuple, set, frozenset)):
+        list_result = [cleaned for item in value if (cleaned := _meaningful(item)) is not _EMPTY]
+        return list_result or _EMPTY
+    if isinstance(value, str) and not value.strip():
+        return _EMPTY
+    return value
+
+
+def _merge_configuration(target: dict[str, Any], update: Mapping[str, Any]) -> None:
+    for key, value in update.items():
+        if isinstance(value, Mapping) and isinstance(target.get(key), dict):
+            _merge_configuration(target[key], value)
+        else:
+            target[key] = value
+
+
+_EMPTY = object()
+
+
+def record_run_configuration(task: Any, values: dict[str, Any]) -> dict[str, Any]:
+    """Merge sanitized meaningful values into the invocation's canonical run object."""
+    if _is_worker():
+        return values
+    active = _active_state(task, "Run configuration recording")
+    cleaned = _meaningful(sanitize_configuration(values))
+    if cleaned is _EMPTY:
+        return dict(active.run_configuration)
+    if not isinstance(cleaned, Mapping):
+        raise TypeError("Run configuration must be a mapping")
+    _merge_configuration(active.run_configuration, cleaned)
+    task.connect_configuration(
+        configuration=active.run_configuration,
+        name="run",
+        ignore_remote_overrides=True,
+    )
+    return dict(active.run_configuration)
+
+
+def replay_configuration(task: Any, values: dict[str, Any]) -> dict[str, Any]:
+    """Resolve a clone's canonical run object and freeze it for this invocation."""
+    if _is_worker():
+        return values
+    active = _active_state(task, "Run configuration replay")
+    cleaned = _meaningful(sanitize_configuration(values))
+    if cleaned is _EMPTY or not isinstance(cleaned, Mapping):
+        raise ValueError("Canonical run configuration must not be empty")
+    connected = task.connect_configuration(
+        configuration=dict(cleaned),
+        name="run",
+        ignore_remote_overrides=False,
+    )
+    if not isinstance(connected, Mapping):
+        raise TypeError("ClearML run configuration override must be a mapping")
+    effective = _meaningful(sanitize_configuration(connected))
+    if effective is _EMPTY or not isinstance(effective, Mapping):
+        raise ValueError("Effective ClearML run configuration must not be empty")
+    active.run_configuration = dict(effective)
+    task.connect_configuration(
+        configuration=active.run_configuration,
+        name="run",
+        ignore_remote_overrides=True,
+    )
+    # Redaction is a storage boundary, not a mutation of executable inputs.
+    return dict(values if task.running_locally() else connected)
 
 
 def _configuration_secrets(value: Any, *, sensitive: bool = False) -> set[str]:
@@ -521,11 +664,7 @@ def _sanitized_config_file(state: _InvocationState, path: Path) -> Path:
 def connect_config_file(
     task: Any, name: str, path: Path, *, allow_remote_override: bool = True
 ) -> Path:
-    """Store a file the run is configured by on the task, and return the path to read.
-
-    The sanitized file is attached as both a ClearML configuration object and a downloadable
-    artifact, so the run remains reproducible without exposing credentials or depending on
-    the machine it ran on.
+    """Attach a sanitized consumed configuration object and return the path to read.
 
     The return value is the path that must be read from here on, and it is not always the
     one passed in. A task cloned and run on an agent is handed ClearML's own copy of the
@@ -549,8 +688,6 @@ def connect_config_file(
         sanitized_path.write_text("{}\n", encoding="utf-8")
     else:
         raise FileNotFoundError(f"Configuration file does not exist: {path}")
-    if not any(artifact.name == name for artifact in active.artifacts):
-        expect_artifacts(task, [name])
     connected = Path(
         task.connect_configuration(
             configuration=sanitized_path,
@@ -560,13 +697,14 @@ def connect_config_file(
     )
     if connected == sanitized_path and not path.is_file():
         raise FileNotFoundError(f"Remote task has no attached configuration for {path}")
-    effective = _sanitized_config_file(active, connected)
+    effective = (
+        _sanitized_config_file(active, connected) if connected != sanitized_path else sanitized_path
+    )
     task.connect_configuration(
         configuration=effective,
         name=name,
         ignore_remote_overrides=True,
     )
-    upload_artifact(task, name, effective)
     logger.info("Connected {} to ClearML as configuration {!r}", path, name)
     # Sanitization is for storage, not model execution: preserve local source values
     # (including externally managed credentials) or use the clone's effective source.

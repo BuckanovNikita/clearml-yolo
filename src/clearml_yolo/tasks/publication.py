@@ -7,7 +7,7 @@ from typing import Any, Literal
 from pydantic import JsonValue
 
 from clearml_yolo import artifact_names
-from clearml_yolo.clearml_session import expect_artifacts, upload_artifact
+from clearml_yolo.clearml_session import record_run_configuration
 from clearml_yolo.publishing import Publisher, create_publisher
 from clearml_yolo.publishing.models import (
     FiftyOneConfig,
@@ -44,7 +44,7 @@ def publish_results(
     evaluations: dict[str, Path] | None = None,
     metadata: dict[str, JsonValue] | None = None,
 ) -> PublicationReceipt | None:
-    """Publish durable outputs, then record the owner's single receipt artifact."""
+    """Publish durable outputs and retain the backend receipt beside local diagnostics."""
     if not publisher.enabled:
         return None
     request = PublicationRequest(
@@ -66,6 +66,16 @@ def publish_results(
     destination.mkdir(parents=True, exist_ok=True)
     receipt_path = destination / artifact_names.FIFTYONE_PUBLICATION_FILE
     receipt_path.write_text(receipt.model_dump_json(indent=2), encoding="utf-8")
-    expect_artifacts(task, [artifact_names.FIFTYONE_PUBLICATION])
-    upload_artifact(task, artifact_names.FIFTYONE_PUBLICATION, receipt_path)
+    record_run_configuration(
+        task,
+        {
+            "fiftyone_result": {
+                "dataset_name": receipt.dataset_name,
+                "run_key": receipt.run_key,
+                "dataset_reused": receipt.dataset_reused,
+                "sample_count": receipt.sample_count,
+                "fields": receipt.fields,
+            }
+        },
+    )
     return receipt

@@ -2,6 +2,8 @@
 
 import sys
 import types
+from collections.abc import Iterator
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +13,21 @@ from clearml_yolo.clearml_session import ClearMLConfig
 from clearml_yolo.dataset import PreparedDataset
 from clearml_yolo.tasks.train import train
 from native_config_helpers import training_settings
+
+
+@pytest.fixture(autouse=True)
+def native_publication_boundary(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "clearml_yolo.tasks.train.native_ddp_relay",
+        lambda *a: nullcontext(types.SimpleNamespace(replay=lambda trainer: None)),
+    )
+    monkeypatch.setattr(
+        "clearml_yolo.tasks.train.finalize_native_model", lambda *a: None, raising=False
+    )
+    monkeypatch.setattr(
+        "clearml_yolo.tasks.train.record_run_configuration", lambda *a: None, raising=False
+    )
+    monkeypatch.setattr("clearml_yolo.tasks.train.publish_table", lambda *a: None, raising=False)
 
 
 @pytest.mark.parametrize("device", ["cpu", [0, 1]])
@@ -49,7 +66,9 @@ def test_native_forwarding_and_actual_checkpoint(
     module.YOLO = Model  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "ultralytics.models", module)
     monkeypatch.setattr("clearml_yolo.tasks.train.init_task", lambda *a, **k: object())
-    monkeypatch.setattr("clearml_yolo.tasks.train.expect_artifacts", lambda *a, **k: None)
+    monkeypatch.setattr(
+        "clearml_yolo.tasks.train.expect_artifacts", lambda *a, **k: None, raising=False
+    )
     monkeypatch.setattr(
         "clearml_yolo.tasks.train.upload_artifact", lambda *a, **k: None, raising=False
     )
@@ -91,17 +110,19 @@ def test_csv_training_uses_prepared_data_and_returns_cleaned_ground_truth(
     alternate.write_text("remote\n", encoding="utf-8")
     calls: dict[str, Any] = {"uploads": [], "connections": []}
 
-    def prepare_dataset(
+    @contextmanager
+    def cached_dataset(
         source: str | Path,
-        directory: Path,
+        cache_dir: Path,
         dataset_format: str = "ndjson",
         required_splits: tuple[str, ...] = ("train", "val"),
-    ) -> Any:
+    ) -> Iterator[PreparedDataset]:
         assert source == "source.csv"
-        assert directory == prepared_dir
+        assert cache_dir == tmp_path.parent / (tmp_path.name + "-cache")
         assert dataset_format == "flat"
         assert required_splits == ("train", "val", "test")
-        return PreparedDataset(
+        calls["locked"] = True
+        yield PreparedDataset(
             data=data,
             ground_truth=cleaned,
             manifest=manifest,
@@ -109,16 +130,21 @@ def test_csv_training_uses_prepared_data_and_returns_cleaned_ground_truth(
             artifacts=[ndjson, labels],
         )
 
-    monkeypatch.setattr("clearml_yolo.tasks.train.prepare_dataset", prepare_dataset)
+        calls["locked"] = False
+
+    monkeypatch.setattr("clearml_yolo.tasks.train.cached_dataset", cached_dataset, raising=False)
     monkeypatch.setattr("clearml_yolo.tasks.train.init_task", lambda *args, **kwargs: object())
-    monkeypatch.setattr("clearml_yolo.tasks.train.expect_artifacts", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        "clearml_yolo.tasks.train.expect_artifacts", lambda *args, **kwargs: None, raising=False
+    )
     monkeypatch.setattr(
         "clearml_yolo.tasks.train.connect_config_file",
         lambda *args, **kwargs: calls["connections"].append((args, kwargs)) or alternate,
     )
     monkeypatch.setattr(
-        "clearml_yolo.tasks.train.upload_artifact",
+        "clearml_yolo.tasks.train.publish_table",
         lambda _task, name, value: calls["uploads"].append((name, value)),
+        raising=False,
     )
     native_dir = tmp_path / "native"
     (native_dir / "weights").mkdir(parents=True)
@@ -132,6 +158,7 @@ def test_csv_training_uses_prepared_data_and_returns_cleaned_ground_truth(
             )
 
         def train(self, **kwargs: Any) -> None:
+            assert calls["locked"]
             calls["native"] = kwargs
             self.trainer.args = types.SimpleNamespace(**kwargs)
 
@@ -150,19 +177,15 @@ def test_csv_training_uses_prepared_data_and_returns_cleaned_ground_truth(
         clearml=ClearMLConfig(),
         ground_truth="source.csv",
         dataset_format="flat",
+        dataset_cache_dir=tmp_path.parent / (tmp_path.name + "-cache"),
         required_splits=["train", "val", "test"],
     )
 
     assert calls["native"]["data"] == str(data)
-    assert calls["connections"][0][0][1:] == ("dataset_configuration", data)
+    assert calls["connections"][0][0][1:] == ("dataset", data)
     assert calls["connections"][0][1]["allow_remote_override"] is False
-    assert {name for name, _ in calls["uploads"]} >= {
-        "dataset_preparation",
-        "dataset_ground_truth",
-        "dataset_ndjson",
-        "dataset_labels",
-        "train_data_overrides",
-    }
+    assert {name for name, _ in calls["uploads"]} == {"ground_truth"}
+    assert calls["locked"] is False
     assert result.cleaned_ground_truth == cleaned
     assert result.dataset_reference == data
 
@@ -171,13 +194,16 @@ def test_csv_training_rejects_preparation_directory_outside_project(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr("clearml_yolo.tasks.train.init_task", lambda *args, **kwargs: object())
-    monkeypatch.setattr("clearml_yolo.tasks.train.expect_artifacts", lambda *args, **kwargs: None)
     monkeypatch.setattr(
-        "clearml_yolo.tasks.train.prepare_dataset",
+        "clearml_yolo.tasks.train.expect_artifacts", lambda *args, **kwargs: None, raising=False
+    )
+    monkeypatch.setattr(
+        "clearml_yolo.tasks.train.cached_dataset",
         lambda *args, **kwargs: pytest.fail("escaped path must not reach dataset preparation"),
+        raising=False,
     )
 
-    with pytest.raises(ValueError, match="run-owned dataset directory"):
+    with pytest.raises(ValueError, match="training output directory"):
         train(
             ultralytics=training_settings() | {"project": str(tmp_path), "name": "../outside"},
             clearml=ClearMLConfig(),
@@ -225,8 +251,8 @@ def test_native_data_training_rejects_non_detection_model(
     import clearml_yolo.tasks.train as training
 
     monkeypatch.setattr(training, "init_task", lambda *args, **kwargs: object())
-    monkeypatch.setattr(training, "expect_artifacts", lambda *args, **kwargs: None)
-    monkeypatch.setattr(training, "upload_artifact", lambda *args, **kwargs: None)
+    monkeypatch.setattr(training, "expect_artifacts", lambda *args, **kwargs: None, raising=False)
+    monkeypatch.setattr(training, "upload_artifact", lambda *args, **kwargs: None, raising=False)
     module = types.ModuleType("ultralytics.models")
     module.YOLO = lambda *args, **kwargs: types.SimpleNamespace(task="segment")  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "ultralytics.models", module)
@@ -244,7 +270,7 @@ def test_implicit_training_name_uses_active_task(
     task = SimpleNamespace(name="renamed/task", id="id", get_project_name=lambda: "project")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(module, "init_task", lambda *a, **k: task)
-    monkeypatch.setattr(module, "expect_artifacts", lambda *a: None)
+    monkeypatch.setattr(module, "expect_artifacts", lambda *a: None, raising=False)
 
     def capture(_task: object, settings: dict[str, Any], *args: Any) -> Any:
         assert settings["name"] == "renamed%2Ftask"
@@ -254,3 +280,68 @@ def test_implicit_training_name_uses_active_task(
     monkeypatch.setattr(module, "_prepare_csv_dataset", capture)
     with pytest.raises(RuntimeError, match="captured routing"):
         train(training_settings(), ClearMLConfig(task_name="requested"), ground_truth="truth.csv")
+
+
+@pytest.mark.parametrize("explicit", [False, True])
+def test_cache_cannot_live_inside_training_project(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, explicit: bool
+) -> None:
+    from clearml_yolo.tasks.train import _prepare_csv_dataset
+
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+    monkeypatch.setattr(
+        "clearml_yolo.tasks.train.cached_dataset",
+        lambda *a, **k: pytest.fail("run-owned cache must be rejected before preparation"),
+    )
+    with (
+        pytest.raises(ValueError, match="outside the run-owned training project"),
+        _prepare_csv_dataset(
+            object(),
+            {"project": str(tmp_path), "name": "train"},
+            "source.csv",
+            "ndjson",
+            None,
+            tmp_path / "cache" if explicit else None,
+        ),
+    ):
+        pytest.fail("unsafe cache accepted")
+
+
+def test_native_ddp_events_replay_before_model_finalization(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from clearml_yolo.tasks.train import _execute_training
+
+    events: list[str] = []
+    directory = tmp_path / "train"
+    (directory / "weights").mkdir(parents=True)
+    (directory / "weights/best.pt").write_bytes(b"native checkpoint")
+
+    class Model:
+        def __init__(self, _architecture: object) -> None:
+            self.task = "detect"
+            self.trainer = types.SimpleNamespace(save_dir=directory)
+
+        def train(self, **settings: Any) -> None:
+            events.append("train")
+            self.trainer.args = types.SimpleNamespace(**settings)
+
+    @contextmanager
+    def relay(_task: object, _model: object) -> Iterator[Any]:
+        yield types.SimpleNamespace(replay=lambda _trainer: events.append("replay"))
+        events.append("relay_closed")
+
+    module = types.ModuleType("ultralytics.models")
+    module.YOLO = Model  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "ultralytics.models", module)
+    monkeypatch.setattr("clearml_yolo.tasks.train.native_ddp_relay", relay, raising=False)
+    monkeypatch.setattr(
+        "clearml_yolo.tasks.train.finalize_native_model", lambda *args: events.append("finalize")
+    )
+    _execute_training(
+        object(),
+        "model.pt",
+        training_settings() | {"project": str(tmp_path), "name": "train"},
+        None,
+    )
+    assert events == ["train", "replay", "finalize", "relay_closed"]

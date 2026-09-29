@@ -28,7 +28,9 @@ CSV dataset ownership, exact image manifests, fresh output routing and selected 
 retain their existing contracts. Derived model/source/output values are inspectable.
 Configured native options are passed unchanged. Native normalization is recorded separately;
 an explicitly requested image size 906 is preserved even when execution uses a stride-compatible size.
-No image uploads, no extra ClearML tasks, no weakened artifact failure handling.
+Native owner-only training/validation previews are permitted. No extra tasks, checkpoint
+duplicates, or weakened artifact/model failure handling; see the
+[publication contract](../../008-dataset-clearml-tracking/contracts/publication.md).
 
 ## Migration
 

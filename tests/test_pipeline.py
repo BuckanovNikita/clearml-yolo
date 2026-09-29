@@ -40,7 +40,7 @@ def test_hydra_pipeline_passes_real_stage_objects(
 
     calls: list[Any] = []
     monkeypatch.setattr(pipeline, "init_task", lambda *a, **k: object())
-    monkeypatch.setattr(pipeline, "upload_artifact", lambda *a, **k: None)
+    monkeypatch.setattr(pipeline, "record_run_configuration", lambda *a, **k: None)
     monkeypatch.setattr(pipeline, "point_latest_at", lambda *a: None)
     monkeypatch.setattr(
         pipeline,
@@ -95,8 +95,8 @@ def test_pipeline_routes_cleaned_truth_and_prediction_policy_after_csv_training(
     monkeypatch.setattr(pipeline, "point_latest_at", lambda *args, **kwargs: None)
     monkeypatch.setattr(
         pipeline,
-        "upload_artifact",
-        lambda _task, name, value: calls["uploads"].append((name, value)),
+        "record_run_configuration",
+        lambda _task, values: calls["uploads"].extend(values.items()),
     )
 
     def training(*args: Any, **kwargs: Any) -> SimpleNamespace:
@@ -143,7 +143,7 @@ def test_pipeline_routes_cleaned_truth_and_prediction_policy_after_csv_training(
 
     assert calls["truth"] == [cleaned, cleaned]
     assert (
-        "predict_data_overrides",
+        "prediction_data_overrides",
         {
             "ultralytics_predict": {
                 "classes": {"requested": [0], "effective": None},
@@ -198,9 +198,10 @@ def test_pipeline_preflights_once_and_publishes_effective_outputs(
     monkeypatch.setattr(pipeline, "init_task", lambda *_args, **_kwargs: task)
     monkeypatch.setattr(pipeline, "create_publisher", lambda _config: FakePublisher())
     monkeypatch.setattr(pipeline, "point_latest_at", lambda *_args: None)
-    monkeypatch.setattr(pipeline, "upload_artifact", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr("clearml_yolo.tasks.publication.expect_artifacts", lambda *_args: None)
-    monkeypatch.setattr("clearml_yolo.tasks.publication.upload_artifact", lambda *_args: None)
+    monkeypatch.setattr(pipeline, "record_run_configuration", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        "clearml_yolo.tasks.publication.record_run_configuration", lambda *_args: None
+    )
 
     def train(*_args: Any, **_kwargs: Any) -> SimpleNamespace:
         events.append("train")
@@ -302,8 +303,9 @@ def test_pipeline_publishes_only_existing_predictions_when_prediction_is_skipped
     )
     monkeypatch.setattr(pipeline, "create_publisher", lambda _config: FakePublisher())
     monkeypatch.setattr(pipeline, "point_latest_at", lambda *_args: None)
-    monkeypatch.setattr("clearml_yolo.tasks.publication.expect_artifacts", lambda *_args: None)
-    monkeypatch.setattr("clearml_yolo.tasks.publication.upload_artifact", lambda *_args: None)
+    monkeypatch.setattr(
+        "clearml_yolo.tasks.publication.record_run_configuration", lambda *_args: None
+    )
 
     pipeline.run_pipeline(
         ultralytics=training_settings(),
@@ -437,3 +439,60 @@ def test_pipeline_uses_active_task_root_and_preserves_explicit_routing(
     assert set(captured["splits"]) == {"train", "val", "test"}
     assert captured["fiftyone"].enabled is False
     assert captured["ultralytics_predict"]["project"] == str(expected / "native")
+
+
+def test_pipeline_comparison_uses_its_native_candidate_source_task(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from types import SimpleNamespace
+
+    from clearml_yolo.tasks import pipeline
+    from clearml_yolo.tasks.compare import InferenceConfig, ModelRef
+    from clearml_yolo.tasks.metrics import EvaluationConfig
+
+    received: list[ModelRef] = []
+    monkeypatch.setattr(
+        pipeline, "init_task", lambda *_args, **_kwargs: SimpleNamespace(id="owner")
+    )
+    monkeypatch.setattr(
+        pipeline, "run_comparison", lambda **kwargs: received.append(kwargs["candidate_model"])
+    )
+    pipeline._compare_and_report(
+        {},
+        tmp_path / "best.pt",
+        {"cat": 0.3},
+        tmp_path / "truth.csv",
+        tmp_path,
+        ClearMLConfig(),
+        InferenceConfig(conf=0.001, iou=0.7, imgsz=96, batch=1, device="cpu"),
+        EvaluationConfig(),
+        {},
+        True,
+        candidate_task_id="owner",
+    )
+    assert received[0].source == "clearml"
+    assert received[0].task_id == "owner"
+    assert received[0].thresholds is None
+
+
+@pytest.mark.parametrize("explicit", [False, True])
+def test_cache_cannot_live_inside_pipeline_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, explicit: bool
+) -> None:
+    from clearml_yolo.tasks import pipeline
+
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+    monkeypatch.setattr(pipeline, "init_task", lambda *a, **k: object())
+    with pytest.raises(ValueError, match="outside run_dir"):
+        pipeline.run_pipeline(
+            ground_truth="source.csv",
+            ultralytics=training_settings(),
+            ultralytics_predict={},
+            clearml=ClearMLConfig(),
+            run_dir=tmp_path,
+            metrics={},
+            report={},
+            compare={},
+            dataset_cache_dir=tmp_path / "cache" if explicit else None,
+            fiftyone=FiftyOneConfig(enabled=False),
+        )

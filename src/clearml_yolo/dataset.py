@@ -1,6 +1,8 @@
 """Prepare CSV-owned datasets and retain the exact truth used by every stage."""
 
 import csv
+import hashlib
+import io
 import json
 from collections import Counter
 from pathlib import Path
@@ -10,7 +12,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 from loguru import logger
 from pydantic import BaseModel
 
-from clearml_yolo.dataset_export import DatasetFormat, export_dataset
+from clearml_yolo.dataset_export import DatasetFormat, export_dataset, exported_image_filename
 from clearml_yolo.dataset_records import ValidatedDataset, validate_ground_truth
 
 _COLUMNS = (
@@ -26,7 +28,7 @@ _COLUMNS = (
 
 
 class PreparedDataset(BaseModel):
-    """Only explicit non-image files are eligible for preparation artifact uploads."""
+    """Prepared native inputs and local diagnostics, separate from run publication."""
 
     data: Path
     ground_truth: Path
@@ -57,6 +59,46 @@ def _write_cleaned_truth(records: ValidatedDataset, path: Path) -> None:
                 )
 
 
+def _snapshot_csv(source: Path, source_bytes: bytes) -> str:
+    """Resolve relative image paths while preserving the captured CSV rows."""
+    rows = list(csv.reader(io.StringIO(source_bytes.decode("utf-8"), newline="")))
+    if not rows or rows[0].count("image_path") != 1:
+        return source_bytes.decode("utf-8")
+    image_path_index = rows[0].index("image_path")
+    for row in rows[1:]:
+        if len(row) <= image_path_index or row[image_path_index] == "":
+            continue
+        image_path = Path(row[image_path_index]).expanduser()
+        if not image_path.is_absolute():
+            image_path = source.parent / image_path
+        row[image_path_index] = str(image_path.resolve())
+    snapshot = io.StringIO(newline="")
+    csv.writer(snapshot).writerows(rows)
+    return snapshot.getvalue()
+
+
+def _validate_source(
+    source: Path,
+    directory: Path,
+    required_splits: tuple[str, ...],
+    source_bytes: bytes | None,
+) -> ValidatedDataset:
+    if source_bytes is None:
+        return validate_ground_truth(source, required_splits=required_splits)
+    snapshot = directory / ".source.csv"
+    snapshot.write_text(_snapshot_csv(source, source_bytes), encoding="utf-8")
+    try:
+        records = validate_ground_truth(snapshot, required_splits=required_splits)
+    finally:
+        snapshot.unlink(missing_ok=True)
+    return records.model_copy(
+        update={
+            "source": source,
+            "input_sha256": hashlib.sha256(source_bytes).hexdigest(),
+        }
+    )
+
+
 def _preparation_record(
     records: ValidatedDataset,
     directory: Path,
@@ -84,7 +126,10 @@ def _preparation_record(
                 "height": image.height,
                 "boxes": len(image.boxes),
                 "generated_path": str(
-                    directory / "images" / image.split / f"{index:08d}{image.path.suffix.lower()}"
+                    directory
+                    / "images"
+                    / image.split
+                    / exported_image_filename(image, index, dataset_format)
                 ),
             }
             for index, image in enumerate(records.images, start=1)
@@ -97,6 +142,8 @@ def prepare_dataset(
     directory: Path,
     dataset_format: DatasetFormat = "ndjson",
     required_splits: tuple[str, ...] = ("train", "val"),
+    *,
+    source_bytes: bytes | None = None,
 ) -> PreparedDataset:
     """Reserve fresh output, clean once, and export the requested native representation."""
     if dataset_format not in {"ndjson", "flat"}:
@@ -104,7 +151,8 @@ def prepare_dataset(
     directory = directory.expanduser().absolute()
     # Exclusive reservation rejects stale files and symlinks instead of reusing another run.
     directory.mkdir(parents=True, exist_ok=False)
-    records = validate_ground_truth(source, required_splits=required_splits)
+    source_path = Path(source).expanduser().resolve()
+    records = _validate_source(source_path, directory, required_splits, source_bytes)
     ground_truth = directory / "ground_truth.csv"
     _write_cleaned_truth(records, ground_truth)
     manifest = directory / "preparation.json"

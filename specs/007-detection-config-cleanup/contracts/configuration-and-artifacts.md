@@ -17,13 +17,12 @@ and reports. Encoding preserves ASCII alphanumeric, hyphen and underscore; other
 use percent encoding. Windows device names and the reserved latest shortcut name are encoded too. Empty components fail. Explicit paths retain existing semantics.
 
 Default splits for cy, cy-val, cy-metrics: train, val, test. Calibration uses val once.
-Each evaluated split has exactly these 13 artifact prefixes plus its split suffix:
-metrics_dashboard_full, metrics_dashboard_dtrk, metrics_matches_gt, metrics_matches_preds,
-metrics_confusion_matrix, metrics_summary, metrics_raw, metrics_best_confidences,
-metrics_plot_recall, metrics_plot_precision, metrics_plot_perebrak, metrics_plot_nedobrak,
-metrics_evaluation. Missing files or unsuccessful uploads fail the invocation.
+Each evaluated split publishes one consolidated metrics_evaluation_<split> workbook.
+Exact validation thresholds are published once as metrics_best_confidences_val CSV. Shared
+truth/prediction tables are deduplicated; local raw metrics/matching JSON remain available.
+This replaces the earlier thirteen-artifact split inventory under the
+[008 publication contract](../../008-dataset-clearml-tracking/contracts/publication.md).
 
-Shared input/methodology artifacts and the one fiftyone_publication receipt are excluded.
-cy-val never publishes. Pipeline nested prediction/metrics never publish. Schema/version,
-matching fidelity, GT identity, media resolution and task-ID publication namespaces stay
-unchanged. Comparison and developer/business reports remain test-only.
+cy-val does not publish to FiftyOne. Pipeline nested prediction/metrics do not publish to
+FiftyOne. Matching fidelity, GT identity, media resolution and task-ID namespaces remain.
+Comparison and developer/business reports remain test-only.

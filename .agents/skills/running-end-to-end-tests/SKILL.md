@@ -15,7 +15,7 @@ This skill defines product acceptance, not deployment or machine setup.
 1. Run the repository's pytest, Ruff, mypy and import-linter checks. Include applicable
    pre-commit hooks for release or commit work.
 2. Configure an isolated ClearML project and output directory. Pass project name and
-   tags explicitly. Keep dataset images external and credentials out of files and logs.
+   tags explicitly. Keep credentials out of files and logs; native callback image previews are permitted.
 3. Build ground truth from a small YOLO dataset with disjoint validation/test images,
    including an empty image in each split. Exercise native YAML and embedded mappings
    with explicit CPU and available GPU devices.
@@ -25,9 +25,15 @@ This skill defines product acceptance, not deployment or machine setup.
 5. Confirm validation thresholds are frozen for test and baseline thresholds are loaded
    unchanged. Compare metrics, statistical results and report counts. Exercise `cy-val`,
    `cy-compare` and `cy-report` independently, including nondefault evaluation options.
-6. Force-download every required artifact and verify its contents and manifest. Confirm
-   one task per invocation, without native duplicate tasks or model uploads.
-7. Check upload rejection and interruption with isolated test invocations. Both must fail
+6. Force-download every required artifact and verify the explicit publication inventory.
+   Download the single native best Output Model, load it, and compare model fields with
+   checkpoint/trainer data. Inspect native Scalars, Plots and Debug Samples. Confirm one
+   task per invocation, owner-only callbacks and no duplicate checkpoint artifacts.
+   Repeat CSV training against one dataset cache: filenames and extension casing remain
+   intact, and image copies and NDJSON conversion do not repeat. Internal manifests and
+   diagnostic receipts remain local.
+7. Check artifact/model upload rejection, callback-registration failure, flush failure and
+   interruption with isolated test invocations. Each must fail
    the command and task while retaining local diagnostics until intentional cleanup.
 8. Record commands, outcomes and limitations. Store machine-specific logs and task records
    with the environment skill; keep a portable verification summary in the repository.

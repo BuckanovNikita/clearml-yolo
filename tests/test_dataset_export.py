@@ -27,7 +27,7 @@ def _records(tmp_path: Path) -> tuple[ValidatedDataset, Path, Path]:
         input_sha256="a" * 64,
         images=[
             ImageRecord(
-                name="train-original",
+                name=train.name,
                 path=train,
                 width=10,
                 height=10,
@@ -35,7 +35,7 @@ def _records(tmp_path: Path) -> tuple[ValidatedDataset, Path, Path]:
                 boxes=[Box(label="zeta", x1=0.0, y1=0.0, x2=2.0, y2=4.0)],
             ),
             ImageRecord(
-                name="validation-original",
+                name=val.name,
                 path=val,
                 width=10,
                 height=10,
@@ -64,10 +64,16 @@ def test_export_materializes_native_dataset_from_canonical_records(
     data_yaml = export_dataset(records, directory, dataset_format)
 
     assert data_yaml == directory / "data.yaml"
-    train_image = directory / "images/train/00000001.png"
-    val_image = directory / "images/val/00000002.jpeg"
-    train_label = directory / "labels/train/00000001.txt"
-    val_label = directory / "labels/val/00000002.txt"
+    if dataset_format == "ndjson":
+        train_image = directory / "images/train/Train.PNG"
+        val_image = directory / "images/val/validation.JPEG"
+        train_label = directory / "labels/train/Train.txt"
+        val_label = directory / "labels/val/validation.txt"
+    else:
+        train_image = directory / "images/train/00000001.png"
+        val_image = directory / "images/val/00000002.jpeg"
+        train_label = directory / "labels/train/00000001.txt"
+        val_label = directory / "labels/val/00000002.txt"
     assert train_image.read_bytes() == train_bytes
     assert val_image.read_bytes() == val_bytes
     assert not train_image.is_symlink()
@@ -115,15 +121,15 @@ def test_ndjson_is_durable_manifest_consumed_into_native_layout(tmp_path: Path) 
     }
     assert parsed[1] == {
         "type": "image",
-        "file": "00000001.png",
+        "file": "Train.PNG",
         "split": "train",
         "width": 10,
         "height": 10,
-        "original_image_name": "train-original",
+        "original_image_name": "Train.PNG",
         "original_image_path": str(train_source),
         "annotations": {"boxes": [[1, 0.1, 0.2, 0.2, 0.4]]},
     }
-    assert parsed[2]["file"] == "00000002.jpeg"
+    assert parsed[2]["file"] == "validation.JPEG"
     assert parsed[2]["annotations"] == {"boxes": []}
     assert all("url" not in record for record in parsed[1:])
     assert "0.10000000000000001" in raw_lines[1]
@@ -153,12 +159,13 @@ def test_ndjson_native_conversion_reads_local_images_without_network(
     directory = tmp_path / "prepared"
     export_dataset(records, directory, "ndjson")
     monkeypatch.setattr(
-        aiohttp.ClientSession, "get",
+        aiohttp.ClientSession,
+        "get",
         lambda *args, **kwargs: pytest.fail("local NDJSON must not fetch an HTTP image"),
     )
-    data = asyncio.run(convert_ndjson_to_yolo(
-        directory / "dataset.ndjson", output_path=directory / "native"
-    ))
+    data = asyncio.run(
+        convert_ndjson_to_yolo(directory / "dataset.ndjson", output_path=directory / "native")
+    )
     checked = check_det_dataset(str(data))
     assert checked["names"] == {0: "alpha", 1: "zeta"}
     for split in ("train", "val"):
@@ -168,34 +175,33 @@ def test_ndjson_native_conversion_reads_local_images_without_network(
         assert bool(label.read_text().strip()) is (split == "train")
 
 
-@pytest.mark.parametrize("dataset_format", ["ndjson", "flat"])
-def test_same_stem_images_and_pixel_coordinates_survive_export(
-    tmp_path: Path, dataset_format: DatasetFormat
-) -> None:
-    """Distinct extensions must not collapse labels, even with fractional pixel corners."""
-    import asyncio
-
-    from ultralytics.data.converter import convert_ndjson_to_yolo
-
+def test_flat_same_stem_images_and_pixel_coordinates_survive_export(tmp_path: Path) -> None:
+    """Numbered flat files keep distinct labels and fractional pixel corners."""
     images = []
     cases: tuple[tuple[str, Split], ...] = (("png", "train"), ("jpg", "train"), ("jpeg", "val"))
     for suffix, split in cases:
         path = tmp_path / f"same.{suffix}"
         Image.new("RGB", (641, 479)).save(path)
-        images.append(ImageRecord(
-            name=path.name, path=path, width=641, height=479, split=split,
-            boxes=[Box(label="object", x1=1.125, y1=3.75, x2=639.625, y2=478.25)],
-        ))
+        images.append(
+            ImageRecord(
+                name=path.name,
+                path=path,
+                width=641,
+                height=479,
+                split=split,
+                boxes=[Box(label="object", x1=1.125, y1=3.75, x2=639.625, y2=478.25)],
+            )
+        )
     records = ValidatedDataset(
-        source=tmp_path / "truth.csv", input_sha256="b" * 64, images=images,
-        names={0: "object"}, errors=[], input_boxes=3,
+        source=tmp_path / "truth.csv",
+        input_sha256="b" * 64,
+        images=images,
+        names={0: "object"},
+        errors=[],
+        input_boxes=3,
     )
-    directory = tmp_path / dataset_format
-    data = export_dataset(records, directory, dataset_format)
-    if dataset_format == "ndjson":
-        data = asyncio.run(convert_ndjson_to_yolo(
-            directory / "dataset.ndjson", output_path=directory / "native"
-        ))
+    directory = tmp_path / "flat"
+    data = export_dataset(records, directory, "flat")
     checked = check_det_dataset(str(data))
     for split, count in (("train", 2), ("val", 1)):
         paths = list(Path(checked[split]).iterdir())
@@ -206,7 +212,55 @@ def test_same_stem_images_and_pixel_coordinates_survive_export(
             class_id, cx, cy, width, height = map(float, label.read_text().split())
             assert class_id == 0
             corners = (
-                (cx - width / 2) * 641, (cy - height / 2) * 479,
-                (cx + width / 2) * 641, (cy + height / 2) * 479,
+                (cx - width / 2) * 641,
+                (cy - height / 2) * 479,
+                (cx + width / 2) * 641,
+                (cy + height / 2) * 479,
             )
             assert corners == pytest.approx((1.125, 3.75, 639.625, 478.25), abs=0.01)
+
+
+def test_ndjson_rejects_same_split_label_stem_collisions_before_copy(tmp_path: Path) -> None:
+    """Original NDJSON basenames cannot overwrite one shared YOLO label file."""
+    first = _image(tmp_path / "same.JPG", (1, 2, 3))
+    second = _image(tmp_path / "same.PNG", (4, 5, 6))
+    val = _image(tmp_path / "val.PNG", (7, 8, 9))
+    records = ValidatedDataset(
+        source=tmp_path / "truth.csv",
+        input_sha256="c" * 64,
+        images=[
+            ImageRecord(
+                name=first.name,
+                path=first,
+                width=10,
+                height=10,
+                split="train",
+                boxes=[Box(label="object", x1=1, y1=1, x2=5, y2=5)],
+            ),
+            ImageRecord(
+                name=second.name,
+                path=second,
+                width=10,
+                height=10,
+                split="train",
+                boxes=[Box(label="object", x1=2, y1=2, x2=6, y2=6)],
+            ),
+            ImageRecord(
+                name=val.name,
+                path=val,
+                width=10,
+                height=10,
+                split="val",
+                boxes=[],
+            ),
+        ],
+        names={0: "object"},
+        errors=[],
+        input_boxes=2,
+    )
+    directory = tmp_path / "prepared"
+
+    with pytest.raises(ValueError, match=r"label stem.*same"):
+        export_dataset(records, directory, "ndjson")
+
+    assert not (directory / "images").exists()

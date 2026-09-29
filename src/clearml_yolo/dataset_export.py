@@ -1,7 +1,7 @@
 """Export validated detection records into local Ultralytics datasets.
 
-NDJSON uses the native dataset ``path`` and per-split image filenames. Training
-uses Ultralytics' converter with an explicit run-owned output directory.
+NDJSON preserves original per-split filenames. Preparation builds one native YAML
+layout directly so consumers never repeat Ultralytics' NDJSON conversion.
 """
 
 import json
@@ -43,11 +43,31 @@ def _format_coordinate(value: float) -> str:
     return format(value, ".17g")
 
 
-def _export_image(image: ImageRecord, index: int, class_ids: dict[str, int]) -> _ExportImage:
+def exported_image_filename(image: ImageRecord, index: int, dataset_format: DatasetFormat) -> str:
+    """Return the stable native filename for one validated image."""
     suffix = image.path.suffix.lower()
     if not suffix:
         raise ValueError(f"Image path has no file extension: {image.path}")
-    filename = f"{index:08d}{suffix}"
+    if dataset_format == "flat":
+        return f"{index:08d}{suffix}"
+    if dataset_format != "ndjson":
+        raise ValueError(
+            f"Unsupported dataset format {dataset_format!r}; expected 'ndjson' or 'flat'"
+        )
+    if image.name in {"", ".", ".."} or Path(image.name).name != image.name:
+        raise ValueError(f"NDJSON image name must be a safe basename: {image.name!r}")
+    if "/" in image.name or "\\" in image.name:
+        raise ValueError(f"NDJSON image name must be a safe basename: {image.name!r}")
+    return image.name
+
+
+def _export_image(
+    image: ImageRecord,
+    index: int,
+    class_ids: dict[str, int],
+    dataset_format: DatasetFormat,
+) -> _ExportImage:
+    filename = exported_image_filename(image, index, dataset_format)
     boxes = tuple(
         _ExportBox(
             class_id=class_ids[box.label],
@@ -69,12 +89,27 @@ def _export_image(image: ImageRecord, index: int, class_ids: dict[str, int]) -> 
     )
 
 
-def _export_images(records: ValidatedDataset) -> tuple[_ExportImage, ...]:
+def _export_images(
+    records: ValidatedDataset, dataset_format: DatasetFormat
+) -> tuple[_ExportImage, ...]:
     class_ids = {name: class_id for class_id, name in records.names.items()}
-    return tuple(
-        _export_image(image, index, class_ids)
+    images = tuple(
+        _export_image(image, index, class_ids, dataset_format)
         for index, image in enumerate(records.images, start=1)
     )
+    if dataset_format == "ndjson":
+        label_owners: dict[tuple[str, str], str] = {}
+        for image in images:
+            stem = Path(image.file).stem
+            key = (image.split, stem.casefold())
+            owner = label_owners.get(key)
+            if owner is not None:
+                raise ValueError(
+                    f"NDJSON label stem collision in split {image.split!r}: "
+                    f"{owner!r} and {Path(image.file).name!r} share stem {stem!r}"
+                )
+            label_owners[key] = Path(image.file).name
+    return images
 
 
 def _box_json(box: _ExportBox) -> str:
@@ -174,7 +209,7 @@ def export_dataset(
 ) -> Path:
     """Export canonical records and return the native YAML consumed by Ultralytics."""
     directory.mkdir(parents=True, exist_ok=True)
-    images = _export_images(records)
+    images = _export_images(records, dataset_format)
     if dataset_format == "ndjson":
         manifest = directory / "dataset.ndjson"
         _write_ndjson(manifest, records.names, images)

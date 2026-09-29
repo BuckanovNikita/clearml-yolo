@@ -233,7 +233,7 @@ def test_tracked_conversion_uses_effective_dataset_configuration(
     output = tmp_path / "truth.csv"
     monkeypatch.setattr(stage, "init_task", lambda *args, **kwargs: object())
     monkeypatch.setattr(stage, "expect_artifacts", lambda *args: None)
-    monkeypatch.setattr(stage, "upload_artifact", lambda *args: None)
+    monkeypatch.setattr(stage, "publish_table", lambda *args: None)
     monkeypatch.setattr(stage, "connect_config_file", lambda *args: override)
     monkeypatch.setattr(
         stage, "build_ground_truth", lambda source, *args, **kwargs: calls.append(source)

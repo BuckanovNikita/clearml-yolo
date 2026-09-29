@@ -9,10 +9,10 @@ Active YAML values match native execution; irrelevant parameters are commented. 
 comments, license header and order remain. Files contain no Hydra wrapper keys or unresolved
 interpolation and are accepted directly by native Ultralytics configuration loading.
 
-Connect corresponding sanitized YAML as ClearML configuration objects and upload downloadable
-YAML artifacts. Stage/split/role identities avoid collisions in the invocation's single task.
-Sanitization preserves original comments while removing secrets, including credential-bearing
-URLs; dataset images are never uploaded. Local native inputs remain authoritative for replay.
+Native YAML stays local with comments and replay manifests. Canonical sanitized run
+configuration and native General training parameters support remote clones. Only consumed
+dataset/explicit report Configuration Objects are separate; no downloadable configuration copies.
+Credentials stay excluded; native owner-only training and validation previews are permitted.
 
-Required writes, uploads and SDK flush precede completion. Failure retains local output and
-fails both task and command. Existing checkpoint/metrics/report artifacts remain required.
+Required artifacts and the single native best model must be verified and flushed before
+completion. See the current [publication inventory](../../008-dataset-clearml-tracking/contracts/publication.md).

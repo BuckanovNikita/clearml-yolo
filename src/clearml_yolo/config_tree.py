@@ -42,6 +42,8 @@ def _header(config_name: str, command: str, directory: Path) -> str:
             [
                 "# CSV training: ground_truth=truth.csv dataset_format=ndjson (or flat).",
                 "# Image paths inside the CSV resolve relative to the CSV directory.",
+                "# dataset_cache_dir=null uses XDG_CACHE_HOME or ~/.cache/clearml-yolo/datasets.",
+                "# Cached images are immutable; invalidate explicitly after source corrections.",
                 "# Invalid boxes are dropped and their total is reported before training.",
                 "# CSV data overrides native data, class filters, and dataset fractions.",
             ]
