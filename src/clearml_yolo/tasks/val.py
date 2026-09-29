@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from clearml_yolo.clearml_session import ClearMLConfig, init_task
+from clearml_yolo.publishing.models import FiftyOneConfig
 from clearml_yolo.tasks.metrics import EvaluationConfig, MetricsResult, compute_metrics
 from clearml_yolo.tasks.predict import predict
 
@@ -29,6 +30,7 @@ def validate(
         ultralytics,
         ultralytics_predict=ultralytics_predict,
         splits=list(dict.fromkeys(["val", *selected])),
+        fiftyone=FiftyOneConfig(enabled=False),
     )
     return compute_metrics(
         predicted.predictions,
@@ -38,4 +40,5 @@ def validate(
         evaluation,
         splits=selected,
         calibration_split="val",
+        fiftyone=FiftyOneConfig(enabled=False),
     )

@@ -12,11 +12,14 @@ from clearml_yolo.clearml_session import ClearMLConfig, init_task, upload_artifa
 from clearml_yolo.dataset import apply_dataset_policy
 from clearml_yolo.dataset_export import DatasetFormat
 from clearml_yolo.native_config import prediction_settings
+from clearml_yolo.publishing import Publisher, create_publisher
+from clearml_yolo.publishing.models import FiftyOneConfig
 from clearml_yolo.run_identity import RUNS_ROOT, point_latest_at, resolve_run_dir, resolve_run_id
 from clearml_yolo.tasks.compare import InferenceConfig, ModelRef, NoBaselineModelError
 from clearml_yolo.tasks.compare import compare as run_comparison
 from clearml_yolo.tasks.metrics import compute_metrics
 from clearml_yolo.tasks.predict import predict as run_prediction
+from clearml_yolo.tasks.publication import prepare_publisher, publish_results
 from clearml_yolo.tasks.report import report as run_report
 from clearml_yolo.tasks.train import train as run_training
 
@@ -142,6 +145,38 @@ def _train_from_ground_truth(
     return trained.weights, trained.cleaned_ground_truth
 
 
+def _publish_pipeline(
+    publisher: Publisher,
+    task: Any,
+    directory: Path,
+    effective_ground_truth: str | Path,
+    source_ground_truth: str | Path,
+    predictions: Path,
+    prediction_splits: list[str],
+    evaluations: dict[str, Path],
+    checkpoint: Path,
+    metrics_cfg: dict[str, Any],
+    skip_predict: bool,
+) -> None:
+    if not publisher.enabled:
+        return
+    evaluation_metadata = metrics_cfg["evaluation"].model_dump(mode="json") | {
+        "calibration_split": metrics_cfg["calibration_split"]
+    }
+    available_predictions = predictions if predictions.is_file() else None
+    publish_results(
+        publisher,
+        task,
+        output_dir=directory,
+        ground_truth=effective_ground_truth,
+        source_ground_truth=source_ground_truth,
+        predictions=available_predictions,
+        prediction_splits=(prediction_splits if not skip_predict else None),
+        evaluations=evaluations,
+        metadata={"model": str(checkpoint), "evaluation": evaluation_metadata},
+    )
+
+
 def run_pipeline(
     ultralytics: dict[str, Any],
     ultralytics_predict: dict[str, Any],
@@ -160,9 +195,11 @@ def run_pipeline(
     skip_metrics: bool = False,
     skip_report: bool = False,
     skip_compare: bool = False,
+    fiftyone: FiftyOneConfig | None = None,
 ) -> dict[str, Any]:
     """Pass real producer outputs to consumers and preserve files on any failure."""
     task = init_task(clearml, stage="pipeline")
+    publisher = prepare_publisher(task, fiftyone, factory=create_publisher)
     if weights is not None and not skip_train:
         raise ValueError("weights is only valid with skip_train=true; training chooses its model")
     identity = resolve_run_id(clearml.task_name, run_id, datetime.now(tz=UTC))
@@ -206,6 +243,7 @@ def run_pipeline(
         )
         results["weights"] = checkpoint
     predictions = directory / PREDICTIONS_NAME
+    prediction_splits = list(dict.fromkeys(["val", *splits]))
     if not skip_predict:
         predicted = run_prediction(
             checkpoint,
@@ -213,12 +251,14 @@ def run_pipeline(
             predictions,
             clearml,
             predict_params,
-            splits=list(dict.fromkeys(["val", *splits])),
+            splits=prediction_splits,
             ultralytics_predict=predict_params,
+            fiftyone=FiftyOneConfig(enabled=False),
         )
         predictions = predicted.predictions
         results["predictions"] = predictions
     thresholds_path = directory / METRICS_DIR / "frozen_thresholds.json"
+    evaluations: dict[str, Path] = {}
     if not skip_metrics:
         evaluated = compute_metrics(
             predictions,
@@ -226,12 +266,14 @@ def run_pipeline(
             directory / METRICS_DIR,
             clearml,
             splits=splits,
+            fiftyone=FiftyOneConfig(enabled=False),
             **metrics_cfg,
         )
         thresholds = next(iter(evaluated.best_confidences.values()))
         thresholds_path.write_text(json.dumps(thresholds))
         upload_artifact(task, "frozen_thresholds", thresholds_path)
         results["metrics"] = evaluated
+        evaluations = evaluated.evaluations
     elif not skip_compare:
         thresholds = json.loads(thresholds_path.read_text())
     else:
@@ -258,4 +300,17 @@ def run_pipeline(
             clearml=clearml,
             **report_cfg,
         )
+    _publish_pipeline(
+        publisher,
+        task,
+        directory,
+        effective_ground_truth,
+        ground_truth,
+        predictions,
+        prediction_splits,
+        evaluations,
+        checkpoint,
+        metrics_cfg,
+        skip_predict,
+    )
     return results

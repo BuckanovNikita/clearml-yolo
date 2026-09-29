@@ -1,11 +1,13 @@
 """Pipeline routing rejects conflicting native and stage-owned outputs."""
 
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import pytest
 
 from clearml_yolo.clearml_session import ClearMLConfig
+from clearml_yolo.publishing.models import FiftyOneConfig, PublicationReceipt
 from clearml_yolo.tasks.pipeline import routed_native
 from native_config_helpers import prediction_config, training_settings
 
@@ -58,7 +60,9 @@ def test_hydra_pipeline_passes_real_stage_objects(
     def evaluate(*args: object, **kwargs: object) -> SimpleNamespace:
         calls.append(kwargs["evaluation"])
         (tmp_path / "metrics").mkdir()
-        return SimpleNamespace(best_confidences={"val": {"cat": 0.5}, "test": {"cat": 0.5}})
+        return SimpleNamespace(
+            best_confidences={"val": {"cat": 0.5}, "test": {"cat": 0.5}}, evaluations={}
+        )
 
     monkeypatch.setattr(pipeline, "compute_metrics", evaluate)
     store.add_to_hydra_store(overwrite_ok=True)
@@ -70,6 +74,7 @@ def test_hydra_pipeline_passes_real_stage_objects(
                 "ground_truth=explicit.csv",
                 "skip_compare=true",
                 "skip_report=true",
+                "fiftyone.enabled=false",
             ],
         )
     result = zen(pipeline.run_pipeline)(config)
@@ -113,7 +118,7 @@ def test_pipeline_routes_cleaned_truth_and_prediction_policy_after_csv_training(
     def metrics(*args: Any, **kwargs: Any) -> SimpleNamespace:
         calls["truth"].append(args[1])
         Path(args[2]).mkdir(parents=True)
-        return SimpleNamespace(best_confidences={"val": {"cat": 0.5}})
+        return SimpleNamespace(best_confidences={"val": {"cat": 0.5}}, evaluations={})
 
     monkeypatch.setattr(pipeline, "run_training", training)
     monkeypatch.setattr(pipeline, "run_prediction", prediction)
@@ -133,6 +138,7 @@ def test_pipeline_routes_cleaned_truth_and_prediction_policy_after_csv_training(
         dataset_format="flat",
         skip_compare=True,
         skip_report=True,
+        fiftyone=FiftyOneConfig(enabled=False),
     )
 
     assert calls["truth"] == [cleaned, cleaned]
@@ -144,3 +150,238 @@ def test_pipeline_routes_cleaned_truth_and_prediction_policy_after_csv_training(
             },
         },
     ) in calls["uploads"]
+
+
+def test_pipeline_preflights_once_and_publishes_effective_outputs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from types import SimpleNamespace
+
+    from clearml_yolo.tasks import pipeline
+    from clearml_yolo.tasks.metrics import EvaluationConfig
+
+    source = tmp_path / "source.csv"
+    source.write_text("image_name,image_path,split\na,a.jpg,val\n", encoding="utf-8")
+    cleaned = tmp_path / "cleaned.csv"
+    predictions = tmp_path / "predictions.csv"
+    evaluation_path = tmp_path / "metrics/evaluation_test.json"
+    checkpoint = tmp_path / "detect/train/weights/best.pt"
+    task = SimpleNamespace(id="pipeline-task")
+    events: list[str] = []
+    requests: list[Any] = []
+    nested: list[FiftyOneConfig] = []
+
+    class FakePublisher:
+        enabled = True
+
+        def preflight(self) -> None:
+            events.append("preflight")
+
+        def publish(self, request: Any) -> PublicationReceipt:
+            events.append("publish")
+            requests.append(request)
+            return PublicationReceipt(
+                dataset_complete=True,
+                run_complete=True,
+                payload_paths={},
+                published_at=datetime(2026, 9, 29, tzinfo=UTC),
+                dataset_name="clearml-yolo-fixture",
+                task_id="pipeline-task",
+                run_key="pipeline-task",
+                ground_truth_sha256="effective-hash",
+                source_ground_truth_sha256="source-hash",
+                dataset_reused=False,
+                sample_count=1,
+                fields={"evaluation_test": "evaluation_test_pipeline-task"},
+            )
+
+    monkeypatch.setattr(pipeline, "init_task", lambda *_args, **_kwargs: task)
+    monkeypatch.setattr(pipeline, "create_publisher", lambda _config: FakePublisher())
+    monkeypatch.setattr(pipeline, "point_latest_at", lambda *_args: None)
+    monkeypatch.setattr(pipeline, "upload_artifact", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr("clearml_yolo.tasks.publication.expect_artifacts", lambda *_args: None)
+    monkeypatch.setattr("clearml_yolo.tasks.publication.upload_artifact", lambda *_args: None)
+
+    def train(*_args: Any, **_kwargs: Any) -> SimpleNamespace:
+        events.append("train")
+        cleaned.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+        checkpoint.parent.mkdir(parents=True)
+        checkpoint.write_text("weights", encoding="utf-8")
+        return SimpleNamespace(weights=checkpoint, cleaned_ground_truth=cleaned)
+
+    def predict(*_args: Any, **kwargs: Any) -> SimpleNamespace:
+        nested.append(kwargs["fiftyone"])
+        predictions.write_text("image_name\na\n", encoding="utf-8")
+        return SimpleNamespace(predictions=predictions)
+
+    def metrics(*_args: Any, **kwargs: Any) -> SimpleNamespace:
+        nested.append(kwargs["fiftyone"])
+        evaluation_path.parent.mkdir(parents=True)
+        evaluation_path.write_text("{}", encoding="utf-8")
+        return SimpleNamespace(
+            best_confidences={"test": {"cat": 0.5}},
+            evaluations={"test": evaluation_path},
+        )
+
+    monkeypatch.setattr(pipeline, "run_training", train)
+    monkeypatch.setattr(pipeline, "run_prediction", predict)
+    monkeypatch.setattr(pipeline, "compute_metrics", metrics)
+    evaluation = EvaluationConfig()
+
+    pipeline.run_pipeline(
+        ultralytics=training_settings() | {"model": "architecture.pt"},
+        ultralytics_predict=prediction_config(),
+        metrics={"evaluation": evaluation, "calibration_split": "val"},
+        report={"report_config_path": None},
+        compare={"baseline_model": None, "q": 0.05, "bootstrap_iterations": 1, "seed": 0},
+        clearml=ClearMLConfig(),
+        ground_truth=str(source),
+        splits=["test"],
+        run_dir=tmp_path,
+        skip_compare=True,
+        skip_report=True,
+        fiftyone=FiftyOneConfig(),
+    )
+
+    assert events == ["preflight", "train", "publish"]
+    assert len(nested) == 2
+    assert all(not config.enabled for config in nested)
+    request = requests[0]
+    assert request.task_id == "pipeline-task"
+    assert request.ground_truth == cleaned
+    assert request.source_ground_truth == source
+    assert request.predictions == predictions
+    assert request.prediction_splits == ["val", "test"]
+    assert request.evaluations == {"test": evaluation_path}
+    assert request.metadata == {
+        "model": str(checkpoint),
+        "evaluation": evaluation.model_dump(mode="json") | {"calibration_split": "val"},
+    }
+    assert (tmp_path / "fiftyone_publication.json").is_file()
+
+
+@pytest.mark.parametrize("existing", [False, True])
+def test_pipeline_publishes_only_existing_predictions_when_prediction_is_skipped(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, existing: bool
+) -> None:
+    from types import SimpleNamespace
+
+    from clearml_yolo.tasks import pipeline
+    from clearml_yolo.tasks.metrics import EvaluationConfig
+
+    predictions = tmp_path / "predictions.csv"
+    if existing:
+        predictions.write_text("image_name\na\n", encoding="utf-8")
+    requests: list[Any] = []
+
+    class FakePublisher:
+        enabled = True
+
+        def preflight(self) -> None:
+            pass
+
+        def publish(self, request: Any) -> PublicationReceipt:
+            requests.append(request)
+            return PublicationReceipt(
+                dataset_complete=True,
+                run_complete=True,
+                payload_paths={},
+                published_at=datetime(2026, 9, 29, tzinfo=UTC),
+                dataset_name="fixture",
+                task_id="pipeline-task",
+                run_key="pipeline-task",
+                ground_truth_sha256="hash",
+                source_ground_truth_sha256="hash",
+                dataset_reused=True,
+                sample_count=1,
+                fields={},
+            )
+
+    monkeypatch.setattr(
+        pipeline, "init_task", lambda *_args, **_kwargs: SimpleNamespace(id="pipeline-task")
+    )
+    monkeypatch.setattr(pipeline, "create_publisher", lambda _config: FakePublisher())
+    monkeypatch.setattr(pipeline, "point_latest_at", lambda *_args: None)
+    monkeypatch.setattr("clearml_yolo.tasks.publication.expect_artifacts", lambda *_args: None)
+    monkeypatch.setattr("clearml_yolo.tasks.publication.upload_artifact", lambda *_args: None)
+
+    pipeline.run_pipeline(
+        ultralytics=training_settings(),
+        ultralytics_predict=prediction_config(),
+        metrics={"evaluation": EvaluationConfig(), "calibration_split": "val"},
+        report={"report_config_path": None},
+        compare={"baseline_model": None, "q": 0.05, "bootstrap_iterations": 1, "seed": 0},
+        clearml=ClearMLConfig(),
+        ground_truth=str(tmp_path / "truth.csv"),
+        splits=["test"],
+        run_dir=tmp_path,
+        weights="best.pt",
+        skip_train=True,
+        skip_predict=True,
+        skip_metrics=True,
+        skip_compare=True,
+        skip_report=True,
+        fiftyone=FiftyOneConfig(),
+    )
+
+    assert requests[0].predictions == (predictions if existing else None)
+    assert requests[0].prediction_splits is None
+
+
+def test_pipeline_publication_failure_propagates_after_preserving_predictions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from types import SimpleNamespace
+
+    from clearml_yolo.tasks import pipeline
+    from clearml_yolo.tasks.metrics import EvaluationConfig
+
+    predictions = tmp_path / "predictions.csv"
+
+    class FailingPublisher:
+        enabled = True
+
+        def preflight(self) -> None:
+            pass
+
+        def publish(self, _request: Any) -> PublicationReceipt:
+            raise RuntimeError("publication failed")
+
+    monkeypatch.setattr(
+        pipeline, "init_task", lambda *_args, **_kwargs: SimpleNamespace(id="pipeline-task")
+    )
+    monkeypatch.setattr(pipeline, "create_publisher", lambda _config: FailingPublisher())
+    monkeypatch.setattr(pipeline, "point_latest_at", lambda *_args: None)
+
+    def predict(*_args: Any, **kwargs: Any) -> SimpleNamespace:
+        assert not kwargs["fiftyone"].enabled
+        predictions.write_text("image_name\na\n", encoding="utf-8")
+        return SimpleNamespace(predictions=predictions)
+
+    monkeypatch.setattr(pipeline, "run_prediction", predict)
+
+    with pytest.raises(RuntimeError, match="publication failed"):
+        pipeline.run_pipeline(
+            ultralytics=training_settings(),
+            ultralytics_predict=prediction_config(),
+            metrics={"evaluation": EvaluationConfig(), "calibration_split": "val"},
+            report={"report_config_path": None},
+            compare={
+                "baseline_model": None,
+                "q": 0.05,
+                "bootstrap_iterations": 1,
+                "seed": 0,
+            },
+            clearml=ClearMLConfig(),
+            ground_truth=str(tmp_path / "truth.csv"),
+            splits=["test"],
+            run_dir=tmp_path,
+            weights="best.pt",
+            skip_train=True,
+            skip_metrics=True,
+            skip_compare=True,
+            skip_report=True,
+            fiftyone=FiftyOneConfig(),
+        )
+
+    assert predictions.read_text(encoding="utf-8") == "image_name\na\n"

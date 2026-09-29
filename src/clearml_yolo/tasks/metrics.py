@@ -26,6 +26,9 @@ from clearml_yolo.comparison.scoring import (
     prepare_predictions,
 )
 from clearml_yolo.progress import track
+from clearml_yolo.publishing import create_publisher
+from clearml_yolo.publishing.models import FiftyOneConfig
+from clearml_yolo.tasks.publication import prepare_publisher, publish_results
 
 __all__ = ["EvaluationConfig"]
 
@@ -36,6 +39,7 @@ class MetricsResult(BaseModel):
     output_dir: Path
     dashboards: dict[str, Path] = Field(default_factory=dict)
     best_confidences: dict[str, dict[str, float]] = Field(default_factory=dict)
+    evaluations: dict[str, Path] = Field(default_factory=dict)
 
 
 def _upload(task: Any, name: str, value: Any) -> None:
@@ -44,7 +48,9 @@ def _upload(task: Any, name: str, value: Any) -> None:
     upload_artifact(task, name, value)
 
 
-def _publish_split(task: Any, split: str, evaluated: EvaluatedSplit) -> None:
+def _publish_split(
+    task: Any, split: str, evaluated: EvaluatedSplit, evaluation_path: Path
+) -> None:
     name = artifact_names.per_split
     _upload(task, name(artifact_names.DASHBOARD_FULL_PREFIX, split), evaluated.dashboard_path)
     _upload(task, name(artifact_names.DASHBOARD_DTRK_PREFIX, split), evaluated.dtrk_dashboard_path)
@@ -68,6 +74,7 @@ def _publish_split(task: Any, split: str, evaluated: EvaluatedSplit) -> None:
         name(artifact_names.BEST_CONFIDENCES_PREFIX, split),
         evaluated.thresholds,
     )
+    _upload(task, name("metrics_evaluation", split), evaluation_path)
 
 
 def _prepare(
@@ -105,9 +112,11 @@ def compute_metrics(
     evaluation: EvaluationConfig,
     splits: list[str] | None = None,
     calibration_split: str | None = "val",
+    fiftyone: FiftyOneConfig | None = None,
 ) -> MetricsResult:
     """Calibrate once on validation and score requested splits at that exact mapping."""
     task = init_task(clearml, stage="metrics")
+    publisher = prepare_publisher(task, fiftyone, factory=create_publisher)
     requested = splits or ["train", "val", "test"]
     if calibration_split != "val":
         raise ValueError(
@@ -128,6 +137,7 @@ def compute_metrics(
                 artifact_names.per_split(artifact_names.METRICS_SUMMARY_PREFIX, split),
                 artifact_names.per_split(artifact_names.METRICS_RAW_PREFIX, split),
                 artifact_names.per_split(artifact_names.BEST_CONFIDENCES_PREFIX, split),
+                artifact_names.per_split("metrics_evaluation", split),
                 *(
                     artifact_names.per_split(f"metrics_plot_{metric}", split)
                     for metric in ("recall", "precision", "perebrak", "nedobrak")
@@ -186,10 +196,16 @@ def compute_metrics(
             skip_cohen_kappa=evaluation.skip_cohen_kappa,
             output_dir=destination,
             suffix=split,
+            methodology=evaluation.model_dump(mode="json"),
         )
-        _publish_split(task, split, evaluated)
+        evaluation_path = destination / f"evaluation_{split}.json"
+        evaluation_path.write_text(
+            evaluated.evaluation_payload.model_dump_json(indent=2), encoding="utf-8"
+        )
+        _publish_split(task, split, evaluated, evaluation_path)
         result.dashboards[split] = evaluated.dashboard_path
         result.best_confidences[split] = dict(evaluated.thresholds)
+        result.evaluations[split] = evaluation_path
         _, summary = summarize_metrics(evaluated.metrics)
         logger.info(
             "Split {!r}: {} classes, mean f1 {:.4f} -> {}",
@@ -198,4 +214,17 @@ def compute_metrics(
             summary.get("mean_f1_score", float("nan")),
             evaluated.dashboard_path,
         )
+    publish_results(
+        publisher,
+        task,
+        output_dir=destination,
+        ground_truth=ground_truth,
+        predictions=predictions,
+        prediction_splits=None,
+        evaluations=result.evaluations,
+        metadata={
+            "evaluation": evaluation.model_dump(mode="json")
+            | {"calibration_split": calibration_split}
+        },
+    )
     return result

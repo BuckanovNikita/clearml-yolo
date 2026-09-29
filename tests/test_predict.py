@@ -2,6 +2,7 @@
 
 import sys
 import types
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,7 @@ import pytest
 
 from clearml_yolo import artifact_names
 from clearml_yolo.clearml_session import ClearMLConfig
+from clearml_yolo.publishing.models import FiftyOneConfig, PublicationReceipt
 from clearml_yolo.tasks import predict as predict_module
 from clearml_yolo.tasks.predict import predict
 from native_config_helpers import prediction_config
@@ -61,6 +63,7 @@ def _predict(tmp_path: Path, imgsz: int | None) -> Any:
         clearml=ClearMLConfig(),
         ultralytics={},
         ultralytics_predict=prediction_config(imgsz=imgsz, device="cpu", batch=1),
+        fiftyone=FiftyOneConfig(enabled=False),
     )
 
 
@@ -122,8 +125,92 @@ def test_splits_are_inferred_separately_for_reproducible_test_batches(
         {},
         ["val", "test"],
         ultralytics_predict=prediction_config(),
+        fiftyone=FiftyOneConfig(enabled=False),
     )
     assert calls == [["z.png"], ["a.png", "b.png"]]
+
+
+def test_prediction_preflights_before_compute_and_publishes_exact_outputs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    checkpoint_recording: Any,
+    published: dict[str, pd.DataFrame],
+) -> None:
+    checkpoint_recording({"imgsz": 64})
+    task = types.SimpleNamespace(id="predict-task")
+    events: list[str] = []
+    requests: list[Any] = []
+    uploads: list[tuple[str, Path]] = []
+
+    class FakePublisher:
+        enabled = True
+
+        def preflight(self) -> None:
+            events.append("preflight")
+
+        def publish(self, request: Any) -> PublicationReceipt:
+            events.append("publish")
+            requests.append(request)
+            return PublicationReceipt(
+                dataset_complete=True,
+                run_complete=True,
+                payload_paths={},
+                published_at=datetime(2026, 9, 29, tzinfo=UTC),
+                dataset_name="clearml-yolo-fixture",
+                task_id="predict-task",
+                run_key="predict-task",
+                ground_truth_sha256="ground-truth-hash",
+                source_ground_truth_sha256="ground-truth-hash",
+                dataset_reused=False,
+                sample_count=1,
+                fields={"predictions": "predictions_predict-task"},
+            )
+
+    monkeypatch.setattr(predict_module, "init_task", lambda *_a, **_k: task)
+    monkeypatch.setattr(predict_module, "create_publisher", lambda _config: FakePublisher())
+
+    def infer(*_: Any, **__: Any) -> pd.DataFrame:
+        events.append("compute")
+        return pd.DataFrame({"image_name": []})
+
+    monkeypatch.setattr(predict_module, "predict_on_images", infer)
+    monkeypatch.setattr(
+        "clearml_yolo.tasks.publication.expect_artifacts", lambda _task, _names: None
+    )
+    monkeypatch.setattr(
+        "clearml_yolo.tasks.publication.upload_artifact",
+        lambda _task, name, value: (
+            uploads.append((name, Path(value)))
+            if name == artifact_names.FIFTYONE_PUBLICATION
+            else None
+        ),
+    )
+    truth = _ground_truth(tmp_path)
+
+    predict(
+        weights="best.pt",
+        ground_truth=truth,
+        output=tmp_path / "predictions.csv",
+        clearml=ClearMLConfig(),
+        ultralytics={},
+        splits=["test"],
+        ultralytics_predict=prediction_config(imgsz=64, device="cpu", batch=1),
+        fiftyone=FiftyOneConfig(),
+    )
+
+    assert events == ["preflight", "compute", "publish"]
+    request = requests[0]
+    assert request.task_id == "predict-task"
+    assert request.ground_truth == truth
+    assert request.source_ground_truth is None
+    assert request.predictions == tmp_path / "predictions.csv"
+    assert request.prediction_splits == ["test"]
+    assert request.evaluations == {}
+    assert request.metadata == {"model": "best.pt"}
+    assert uploads == [
+        (artifact_names.FIFTYONE_PUBLICATION, tmp_path / "fiftyone_publication.json")
+    ]
+    assert uploads[0][1].is_file()
 
 
 def test_prediction_satisfies_its_registered_artifacts(

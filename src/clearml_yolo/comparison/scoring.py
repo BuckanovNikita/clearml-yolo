@@ -30,7 +30,15 @@ from digital_metrics.scoring import (
 )
 from digital_metrics.validation import validate_dataframes
 from loguru import logger
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, JsonValue
+
+from clearml_yolo.comparison.evaluation_payload import (
+    EvaluationBox,
+    EvaluationBoxStatus,
+    EvaluationMatch,
+    EvaluationMatchStatus,
+    EvaluationPayload,
+)
 
 BBOX_COLUMNS = ["bbox_x_tl", "bbox_y_tl", "bbox_x_br", "bbox_y_br"]
 PLOT_METRICS = ("recall", "precision", "perebrak", "nedobrak")
@@ -59,6 +67,10 @@ class MatchRecord(Protocol):
     type: str
     gt_index: int
     pred_index: int
+    gt_label: str
+    pred_label: str
+    confidence: float
+    iou: float | None
 
 
 def validate_thresholds(
@@ -124,6 +136,96 @@ class EvaluatedSplit:
     confusion_matrix_path: Path
     gt_matches: pd.DataFrame
     pred_matches: pd.DataFrame
+    evaluation_payload: EvaluationPayload
+
+
+def _match_status(value: str) -> EvaluationMatchStatus:
+    if value not in {"TP", "FP", "FN"}:
+        raise ValueError(f"Unexpected evaluation match status: {value!r}")
+    return cast(EvaluationMatchStatus, value)
+
+
+def _box_coordinates(row: pd.Series) -> tuple[float, float, float, float]:
+    return (
+        float(row["bbox_x_tl"]),
+        float(row["bbox_y_tl"]),
+        float(row["bbox_x_br"]),
+        float(row["bbox_y_br"]),
+    )
+
+
+def _integer_index(value: object) -> int:
+    if not isinstance(value, (int, np.integer)):
+        raise TypeError(f"Evaluation box index must be an integer, got {value!r}")
+    return int(value)
+
+
+def build_evaluation_payload(
+    ground_truth: pd.DataFrame,
+    predictions: pd.DataFrame,
+    *,
+    split: str,
+    image_names: list[str],
+    thresholds: dict[str, float],
+    sliced: Mapping[str, list[MatchRecord]],
+    methodology: Mapping[str, JsonValue] | None = None,
+) -> EvaluationPayload:
+    """Convert the exact sliced match result into a neutral persisted payload."""
+    records = [match for class_matches in sliced.values() for match in class_matches]
+    tp_gt_indices = {match.gt_index for match in records if match.type == "TP"}
+    pred_statuses: dict[int, EvaluationBoxStatus] = {
+        match.pred_index: _match_status(match.type)
+        for match in records
+        if match.pred_index != -1
+    }
+
+    scoped_gt = ground_truth[ground_truth["image_name"].isin(image_names)]
+    scored_gt = scoped_gt.dropna(subset=BBOX_COLUMNS)
+    ground_truth_boxes = [
+        EvaluationBox(
+            index=_integer_index(index),
+            image_name=str(row["image_name"]),
+            label=str(row["instance_label"]),
+            box=_box_coordinates(row),
+            status="TP" if _integer_index(index) in tp_gt_indices else "FN",
+        )
+        for index, row in scored_gt.iterrows()
+    ]
+
+    scoped_predictions = predictions[predictions["image_name"].isin(image_names)]
+    prediction_boxes = [
+        EvaluationBox(
+            index=_integer_index(index),
+            image_name=str(row["image_name"]),
+            label=str(row["instance_label"]),
+            box=_box_coordinates(row),
+            confidence=float(row["confidence"]),
+            status=pred_statuses.get(_integer_index(index), "filtered"),
+        )
+        for index, row in scoped_predictions.iterrows()
+    ]
+
+    payload_matches = [
+        EvaluationMatch(
+            gt_index=None if match.gt_index == -1 else match.gt_index,
+            pred_index=None if match.pred_index == -1 else match.pred_index,
+            gt_label=match.gt_label,
+            pred_label=match.pred_label,
+            confidence=match.confidence,
+            iou=match.iou,
+            status=_match_status(match.type),
+        )
+        for match in records
+    ]
+    return EvaluationPayload(
+        split=split,
+        image_names=list(image_names),
+        thresholds=dict(thresholds),
+        ground_truth=ground_truth_boxes,
+        predictions=prediction_boxes,
+        matches=payload_matches,
+        methodology=dict(methodology or {}),
+    )
 
 
 def classes_from_ground_truth(ground_truth: pd.DataFrame) -> list[str]:
@@ -314,6 +416,7 @@ def evaluate_split(
     output_dir: Path,
     suffix: str,
     dashboard_classes: set[str] | None = None,
+    methodology: Mapping[str, JsonValue] | None = None,
 ) -> EvaluatedSplit:
     """Score a split at an already-frozen mapping and write its dashboards."""
     if not skip_cohen_kappa:
@@ -331,6 +434,23 @@ def evaluate_split(
         split_image_names=image_names,
     )
     sliced = cast(dict[str, list[MatchRecord]], slice_by_conf(matches, classes, normalized))
+    payload_methodology: dict[str, JsonValue] = {
+        "iou_threshold": iou_threshold,
+        "matching_strategy": matching_strategy,
+        "ap_method": ap_method,
+        "skip_cohen_kappa": skip_cohen_kappa,
+    }
+    if methodology is not None:
+        payload_methodology.update(methodology)
+    evaluation_payload = build_evaluation_payload(
+        gt_df,
+        predictions,
+        split=split,
+        image_names=image_names,
+        thresholds=normalized,
+        sliced=sliced,
+        methodology=payload_methodology,
+    )
     metrics: dict[str, Any] = compute_metrics_from_matches(sliced, classes, normalized)
     gt_boxes = gt_df.dropna(subset=BBOX_COLUMNS)
     compute_map(
@@ -385,6 +505,7 @@ def evaluate_split(
         confusion_matrix_path=confusion_matrix_path,
         gt_matches=gt_matches,
         pred_matches=pred_matches,
+        evaluation_payload=evaluation_payload,
     )
 
 

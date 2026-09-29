@@ -21,7 +21,10 @@ from clearml_yolo.clearml_session import (
 )
 from clearml_yolo.inference import ImageNameMode, ScoredResolution, predict_on_images, resolution_of
 from clearml_yolo.native_config import prediction_settings, write_native_yaml
+from clearml_yolo.publishing import create_publisher
+from clearml_yolo.publishing.models import FiftyOneConfig
 from clearml_yolo.run_identity import RUNS_ROOT, resolve_run_dir, resolve_run_id
+from clearml_yolo.tasks.publication import prepare_publisher, publish_results
 
 
 class PredictResult(BaseModel):
@@ -55,8 +58,10 @@ def predict(
     splits: list[str] | None = None,
     image_name: ImageNameMode = "name",
     ultralytics_predict: dict[str, Any] | None = None,
+    fiftyone: FiftyOneConfig | None = None,
 ) -> PredictResult:
     task = init_task(clearml, stage="predict")
+    publisher = prepare_publisher(task, fiftyone, factory=create_publisher)
     expect_artifacts(
         task,
         [
@@ -142,6 +147,22 @@ def predict(
         ),
     )
     _publish_native_outputs(task, frames)
+    publish_results(
+        publisher,
+        task,
+        output_dir=output_path.parent,
+        ground_truth=ground_truth,
+        predictions=output_path,
+        prediction_splits=(
+            splits
+            if splits is not None
+            else sorted(str(value) for value in truth["split"].unique())
+        )
+        if publisher.enabled
+        else None,
+        prediction_image_name=image_name,
+        metadata={"model": str(checkpoint)},
+    )
     logger.info("Wrote {} predictions to {}", len(frame), output_path)
     return PredictResult(predictions=output_path, resolution=resolution, effective_args=effective)
 

@@ -1,10 +1,17 @@
 """Validation-only calibration and frozen split evaluation."""
 
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
 import pytest
 
+from clearml_yolo.clearml_session import ClearMLConfig
+from clearml_yolo.publishing.models import (
+    FiftyOneConfig,
+    PublicationReceipt,
+    PublicationRequest,
+)
 from clearml_yolo.tasks.metrics import EvaluationConfig, _prepare, compute_metrics
 
 GT_COLUMNS = [
@@ -67,6 +74,7 @@ def test_candidate_threshold_is_calibrated_on_val_and_reused_for_test(
         evaluation=EvaluationConfig(),
         splits=["val", "test"],
         calibration_split="val",
+        fiftyone=FiftyOneConfig(enabled=False),
     )
 
     assert result.best_confidences["val"] == {"cat": 0.8}
@@ -78,9 +86,7 @@ def test_candidate_threshold_is_calibrated_on_val_and_reused_for_test(
     assert test.loc["cat", "fp"] == 0
     for split in ("val", "test"):
         for metric in ("recall", "precision", "perebrak", "nedobrak"):
-            assert (
-                tmp_path / "metrics" / f"{metric}_confidence_intervals_{split}.png"
-            ).is_file()
+            assert (tmp_path / "metrics" / f"{metric}_confidence_intervals_{split}.png").is_file()
         assert (tmp_path / "metrics" / f"matrix_{split}.xlsx").is_file()
 
 
@@ -102,6 +108,7 @@ def test_test_only_evaluation_still_requires_validation_membership(
             evaluation=EvaluationConfig(),
             splits=["test"],
             calibration_split="val",
+            fiftyone=FiftyOneConfig(enabled=False),
         )
 
 
@@ -120,6 +127,7 @@ def test_calibration_split_must_be_validation(
             evaluation=EvaluationConfig(),
             splits=["test"],
             calibration_split="test",
+            fiftyone=FiftyOneConfig(enabled=False),
         )
 
 
@@ -140,6 +148,7 @@ def test_one_image_cannot_belong_to_validation_and_test(
             clearml=object(),  # type: ignore[arg-type]
             evaluation=EvaluationConfig(),
             splits=["test"],
+            fiftyone=FiftyOneConfig(enabled=False),
         )
 
 
@@ -197,7 +206,86 @@ def test_numeric_image_identifiers_remain_text_when_loaded(
             clearml=object(),  # type: ignore[arg-type]
             evaluation=EvaluationConfig(),
             splits=["test"],
+            fiftyone=FiftyOneConfig(enabled=False),
         )
 
     assert seen["predictions"]["image_name"].iloc[0] == "000000000009"
     assert seen["ground_truth"]["image_name"].iloc[0] == "000000000009"
+
+
+def test_metrics_preflights_before_scoring_and_publishes_evaluation_payloads(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from types import SimpleNamespace
+
+    from clearml_yolo.tasks import metrics as metrics_module
+
+    predictions, ground_truth = _write_inputs(tmp_path)
+    task = SimpleNamespace(id="metrics-task")
+    events: list[str] = []
+    requests: list[PublicationRequest] = []
+    original_prepare = metrics_module._prepare
+
+    class FakePublisher:
+        enabled = True
+
+        def preflight(self) -> None:
+            events.append("preflight")
+
+        def publish(self, request: PublicationRequest) -> PublicationReceipt:
+            events.append("publish")
+            requests.append(request)
+            return PublicationReceipt(
+                dataset_complete=True,
+                run_complete=True,
+                payload_paths={},
+                published_at=datetime(2026, 9, 29, tzinfo=UTC),
+                dataset_name="fixture",
+                task_id="metrics-task",
+                run_key="metrics-task",
+                ground_truth_sha256="hash",
+                source_ground_truth_sha256="hash",
+                dataset_reused=False,
+                sample_count=3,
+                fields={"evaluation_test": "evaluation_test_metrics-task"},
+            )
+
+    monkeypatch.setattr(metrics_module, "init_task", lambda *_args, **_kwargs: task)
+    monkeypatch.setattr(metrics_module, "create_publisher", lambda _config: FakePublisher())
+    monkeypatch.setattr(metrics_module, "expect_artifacts", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(metrics_module, "upload_artifact", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(metrics_module, "report_table", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(metrics_module, "report_scalars", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr("clearml_yolo.tasks.publication.expect_artifacts", lambda *_args: None)
+    monkeypatch.setattr("clearml_yolo.tasks.publication.upload_artifact", lambda *_args: None)
+
+    def prepare(*args: object, **kwargs: object) -> object:
+        events.append("compute")
+        return original_prepare(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(metrics_module, "_prepare", prepare)
+    evaluation = EvaluationConfig()
+
+    result = compute_metrics(
+        predictions,
+        ground_truth,
+        tmp_path / "metrics",
+        clearml=ClearMLConfig(),
+        evaluation=evaluation,
+        splits=["test"],
+        calibration_split="val",
+        fiftyone=FiftyOneConfig(),
+    )
+
+    assert events == ["preflight", "compute", "publish"]
+    request = requests[0]
+    assert request.task_id == "metrics-task"
+    assert request.ground_truth == ground_truth
+    assert request.source_ground_truth is None
+    assert request.predictions == predictions
+    assert request.prediction_splits is None
+    assert request.evaluations == result.evaluations
+    assert request.metadata == {
+        "evaluation": evaluation.model_dump(mode="json") | {"calibration_split": "val"}
+    }
+    assert (tmp_path / "metrics/fiftyone_publication.json").is_file()

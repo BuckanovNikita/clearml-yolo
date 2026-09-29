@@ -10,6 +10,7 @@ from omegaconf import MISSING, OmegaConf
 
 from clearml_yolo.clearml_session import ClearMLConfig
 from clearml_yolo.native_config import native_defaults, prediction_defaults, stage_settings
+from clearml_yolo.publishing.models import FiftyOneConfig
 from clearml_yolo.tasks.compare import ModelRef
 from clearml_yolo.tasks.metrics import EvaluationConfig
 
@@ -36,6 +37,7 @@ def register_configs() -> None:
     OmegaConf.register_new_resolver(RUN_STAMP_RESOLVER, _token, replace=True)
     store(HydraConf(job=JobConf(chdir=False), run=RunDir(dir=HYDRA_RUN_DIR)))
     tracking = builds(ClearMLConfig, populate_full_signature=True)
+    publishing = builds(FiftyOneConfig, populate_full_signature=True)
     evaluation = builds(EvaluationConfig, populate_full_signature=True)
     model = builds(ModelRef, populate_full_signature=True)
     store({}, group="ultralytics", name="_defaults")
@@ -59,6 +61,7 @@ def register_configs() -> None:
             splits=None,
             image_name="name",
             clearml=tracking,
+            fiftyone=publishing,
         ),
         name="predict",
     )
@@ -83,6 +86,7 @@ def register_configs() -> None:
             calibration_split="val",
             evaluation=evaluation,
             clearml=tracking,
+            fiftyone=publishing,
         ),
         name="metrics",
     )
@@ -142,6 +146,7 @@ def register_configs() -> None:
             skip_metrics=False,
             skip_report=False,
             skip_compare=False,
+            fiftyone=publishing,
         ),
         name="pipeline",
     )

@@ -14,6 +14,8 @@ collapsible sections exist in the plots and scalars tabs, keyed by title — see
 """
 
 PREDICTIONS = "predict_predictions"
+FIFTYONE_PUBLICATION = "fiftyone_publication"
+FIFTYONE_PUBLICATION_FILE = "fiftyone_publication.json"
 
 # Not an artifact but a configuration object, which is a different tab and a different
 # lifecycle: an agent running a clone of the task reads it back and reruns with it. It is
