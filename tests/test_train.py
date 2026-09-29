@@ -10,6 +10,7 @@ import pytest
 from clearml_yolo.clearml_session import ClearMLConfig
 from clearml_yolo.dataset import PreparedDataset
 from clearml_yolo.tasks.train import train
+from native_config_helpers import training_settings
 
 
 @pytest.mark.parametrize("device", ["cpu", [0, 1]])
@@ -53,7 +54,8 @@ def test_native_forwarding_and_actual_checkpoint(
         "clearml_yolo.tasks.train.upload_artifact", lambda *a, **k: None, raising=False
     )
     result = train(
-        ultralytics={
+        ultralytics=training_settings()
+        | {
             "model": "architecture.pt",
             "data": str(source),
             "device": device,
@@ -109,9 +111,7 @@ def test_csv_training_uses_prepared_data_and_returns_cleaned_ground_truth(
 
     monkeypatch.setattr("clearml_yolo.tasks.train.prepare_dataset", prepare_dataset)
     monkeypatch.setattr("clearml_yolo.tasks.train.init_task", lambda *args, **kwargs: object())
-    monkeypatch.setattr(
-        "clearml_yolo.tasks.train.expect_artifacts", lambda *args, **kwargs: None
-    )
+    monkeypatch.setattr("clearml_yolo.tasks.train.expect_artifacts", lambda *args, **kwargs: None)
     monkeypatch.setattr(
         "clearml_yolo.tasks.train.connect_config_file",
         lambda *args, **kwargs: calls["connections"].append((args, kwargs)) or alternate,
@@ -140,7 +140,8 @@ def test_csv_training_uses_prepared_data_and_returns_cleaned_ground_truth(
     monkeypatch.setitem(sys.modules, "ultralytics.models", module)
 
     result = train(
-        ultralytics={
+        ultralytics=training_settings()
+        | {
             "model": "architecture.pt",
             "data": "stale.yaml",
             "project": str(tmp_path),
@@ -170,9 +171,7 @@ def test_csv_training_rejects_preparation_directory_outside_project(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr("clearml_yolo.tasks.train.init_task", lambda *args, **kwargs: object())
-    monkeypatch.setattr(
-        "clearml_yolo.tasks.train.expect_artifacts", lambda *args, **kwargs: None
-    )
+    monkeypatch.setattr("clearml_yolo.tasks.train.expect_artifacts", lambda *args, **kwargs: None)
     monkeypatch.setattr(
         "clearml_yolo.tasks.train.prepare_dataset",
         lambda *args, **kwargs: pytest.fail("escaped path must not reach dataset preparation"),
@@ -180,7 +179,7 @@ def test_csv_training_rejects_preparation_directory_outside_project(
 
     with pytest.raises(ValueError, match="run-owned dataset directory"):
         train(
-            ultralytics={"project": str(tmp_path), "name": "../outside"},
+            ultralytics=training_settings() | {"project": str(tmp_path), "name": "../outside"},
             clearml=ClearMLConfig(),
             ground_truth="source.csv",
         )
@@ -209,3 +208,27 @@ def test_native_ddp_children_inherit_tracking_isolation() -> None:
             check=False,
         )
     assert result.returncode == 0, result.stderr
+
+
+def test_training_has_no_implicit_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("clearml_yolo.tasks.train.init_task", lambda *args, **kwargs: object())
+    with pytest.raises(ValueError, match=r"ultralytics\.model"):
+        train(training_settings(model=None), ClearMLConfig())
+
+
+def test_native_data_training_rejects_non_detection_model(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import clearml_yolo.tasks.train as training
+
+    monkeypatch.setattr(training, "init_task", lambda *args, **kwargs: object())
+    monkeypatch.setattr(training, "expect_artifacts", lambda *args, **kwargs: None)
+    monkeypatch.setattr(training, "upload_artifact", lambda *args, **kwargs: None)
+    module = types.ModuleType("ultralytics.models")
+    module.YOLO = lambda *args, **kwargs: types.SimpleNamespace(task="segment")  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "ultralytics.models", module)
+    with pytest.raises(ValueError, match="detection model"):
+        train(training_settings(project=str(tmp_path), name="native", data=None), ClearMLConfig())

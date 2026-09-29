@@ -193,6 +193,8 @@ def test_forwards_the_inference_settings(ground_truth: pd.DataFrame, tmp_path: P
         "name": "baseline_test",
         "manifest_dir": tmp_path / "prediction_inputs" / "baseline_test" / "preds",
         "agnostic_nms": True,
+        "task": "detect",
+        "mode": "predict",
     }
 
 

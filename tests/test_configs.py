@@ -89,3 +89,21 @@ def test_composed_prediction_uses_produced_checkpoint_and_shared_resolution() ->
     assert settings["model"] == "produced.pt"
     assert settings["imgsz"] == 1280
     assert settings["conf"] == 0.001
+
+
+def test_resolved_prediction_does_not_inherit_batch_or_save_implicitly() -> None:
+    from clearml_yolo.native_config import prediction_settings
+
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        config = compose(config_name="pipeline", overrides=["ultralytics.batch=32"])
+    settings = prediction_settings(
+        {"imgsz": 1, "model": "hidden.pt"}, dict(config.ultralytics_predict)
+    )
+    assert settings["model"] is None
+    assert settings["imgsz"] == 960
+    assert settings["compile"] is True
+    assert settings["nms"] is True
+    assert settings["batch"] == 1
+    assert settings["save"] is False
+    assert settings["rect"] is True
+    assert "overlap_mask" not in config.ultralytics

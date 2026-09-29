@@ -173,19 +173,16 @@ def run_pipeline(
         compare, {"baseline_model", "q", "bootstrap_iterations", "seed"}, "compare"
     )
     train_params = routed_native(ultralytics, directory / "detect", "train")
-    prediction_base = dict(ultralytics)
     prediction_overrides = dict(ultralytics_predict)
     prediction_data_overrides: dict[str, dict[str, Any]] = {}
     if not skip_train:
         # Validate both native groups before starting the expensive native training call.
-        prediction_base, shared_overrides = apply_dataset_policy(prediction_base)
         prediction_overrides, explicit_overrides = apply_dataset_policy(prediction_overrides)
         prediction_data_overrides = {
-            "shared": shared_overrides,
             "ultralytics_predict": explicit_overrides,
         }
     predict_params = routed_native(
-        prediction_settings(prediction_base, prediction_overrides), directory / "native", "predict"
+        prediction_settings(ultralytics, prediction_overrides), directory / "native", "predict"
     )
     directory.mkdir(parents=True, exist_ok=True)
     point_latest_at(RUNS_ROOT, directory)
@@ -217,8 +214,7 @@ def run_pipeline(
             clearml,
             predict_params,
             splits=list(dict.fromkeys(["val", *splits])),
-            ultralytics_predict=prediction_overrides
-            | {"project": predict_params["project"], "name": predict_params["name"]},
+            ultralytics_predict=predict_params,
         )
         predictions = predicted.predictions
         results["predictions"] = predictions

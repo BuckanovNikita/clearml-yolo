@@ -9,7 +9,7 @@ from loguru import logger
 from omegaconf import OmegaConf
 
 from clearml_yolo.configs import NATIVE_COMMANDS, PREDICTION_COMMANDS
-from clearml_yolo.native_config import native_defaults, render_native_yaml
+from clearml_yolo.native_config import native_defaults, prediction_defaults, render_native_yaml
 
 COMMAND_OF_CONFIG = {
     "pipeline": "cy",
@@ -48,7 +48,7 @@ def _header(config_name: str, command: str, directory: Path) -> str:
     if config_name == "train":
         lines.append("# Without ground_truth, set ultralytics.data for native dataset training.")
     if config_name in {"predict", "val"}:
-        lines.append("# Set weights to your trained checkpoint (or use ultralytics.model).")
+        lines.append("# Set weights to your trained checkpoint (or use ultralytics_predict.model).")
     if config_name in NATIVE_COMMANDS:
         lines.extend(
             [
@@ -109,8 +109,8 @@ def dump_config_tree(directory: str | Path, *, overwrite: bool = False) -> list[
     contents.extend(
         [
             render_native_yaml(native_defaults(), "train"),
-            "# Uncomment a parameter to override the shared ultralytics value.\n"
-            + render_native_yaml({"conf": 0.001}, "predict", overrides_only=True),
+            "# Shared references remain editable; use a literal to override a reference.\n"
+            + render_native_yaml(prediction_defaults(), "predict"),
         ]
     )
 

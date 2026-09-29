@@ -13,6 +13,7 @@ import pandas as pd
 from loguru import logger
 from pydantic import BaseModel
 
+from clearml_yolo.native_config import execution_settings
 from clearml_yolo.progress import track
 
 ImageNameMode = Literal["name", "stem", "path"]
@@ -32,20 +33,14 @@ _MAX_REPORTED_PATHS = 5
 
 
 class ScoredResolution(BaseModel):
-    """The scale a checkpoint was trained at, beside the one it is being scored at.
-
-    The two travel together because the second is only meaningful next to the first: 640 on
-    its own says nothing, and 640 against weights trained at 1280 says the numbers that
-    follow were measured on images unlike anything the model ever saw. ``trained_at`` is
-    None when the checkpoint does not record it, which is not the same as agreeing.
-    """
+    """Checkpoint training size and requested inference size, before native normalization."""
 
     trained_at: int | None
     scored_at: int | list[int]
 
     @property
     def was_trained_elsewhere(self) -> bool:
-        """Whether the model is being scored at a scale it was never shown."""
+        """Whether requested size differs from recorded training size before normalization."""
         return self.trained_at is not None and self.trained_at != self.scored_at
 
     def as_table(self) -> pd.DataFrame:
@@ -61,26 +56,23 @@ class ScoredResolution(BaseModel):
         if self.trained_at is None:
             verdict = "unknown: the checkpoint does not say what it was trained at"
         elif self.was_trained_elsewhere:
-            verdict = "NO — scored at a scale this model was never shown"
+            verdict = "different requested size; compare the normalized predictor target"
         else:
             verdict = "yes"
         return pd.DataFrame(
             {
-                "parameter": ["trained at imgsz", "scored at imgsz", "same resolution?"],
+                "parameter": [
+                    "trained at imgsz",
+                    "requested inference imgsz",
+                    "same requested size?",
+                ],
                 "value": [str(trained), str(self.scored_at), verdict],
             }
         )
 
 
 def trained_imgsz(weights: str | Path) -> int | None:
-    """The resolution these weights were trained at, or None if the file does not say.
-
-    Ultralytics writes the whole training configuration into every checkpoint it saves,
-    so the number does not have to be carried alongside the file and cannot go stale
-    against it. A stage handed a checkpoint and no resolution asks it here rather than
-    falling back to a library default, which is how a model trained at 1280 came to be
-    scored at 640 without anything saying so.
-    """
+    """Read checkpoint training resolution for diagnostics, never configuration defaults."""
     from ultralytics.nn.tasks import torch_safe_load
 
     checkpoint, _ = torch_safe_load(str(weights))  # type: ignore[no-untyped-call]
@@ -96,37 +88,17 @@ def trained_imgsz(weights: str | Path) -> int | None:
 
 
 def resolution_of(weights: str | Path, imgsz: int | list[int] | None) -> ScoredResolution:
-    """The resolution to infer at: the one asked for, or the one the weights were trained at.
-
-    A model is shown images at one scale and generalises to that scale, so inferring at
-    another scores it on images unlike anything it ever saw. The pipeline keeps the two in
-    step itself, handing predict the resolution train just used, but a checkpoint reached
-    any other way — a ClearML task, a file handed over — carries no such link, and 640 is
-    a plausible enough number to be wrong without ever looking wrong.
-
-    Both numbers come back rather than only the one inference needs. The checkpoint is read
-    here either way, and a caller that reports how a result was produced would otherwise
-    have to open it a second time to say what the model was built for.
-    """
-    recorded = trained_imgsz(weights)
+    """Report checkpoint resolution without using it as an inference default."""
     if imgsz is None:
-        if recorded is None:
-            raise ValueError(
-                f"{Path(weights).name} does not record the resolution it was trained at, "
-                "so there is nothing to infer imgsz from. Set imgsz explicitly."
-            )
-        logger.info(
-            "Inferring at imgsz {}, the resolution {} was trained at",
-            recorded,
-            Path(weights).name,
+        raise ValueError(
+            "Set imgsz explicitly in ultralytics_predict; checkpoint fallback was removed"
         )
-        return ScoredResolution(trained_at=recorded, scored_at=recorded)
+    recorded = trained_imgsz(weights)
     if recorded is not None and recorded != imgsz:
         logger.warning(
-            "Inferring at imgsz {} on weights trained at {}: the model was never shown "
-            "images at this scale, and thresholds calibrated here do not carry back to {}",
+            "Requested inference imgsz {} differs from weights trained at {}; "
+            "compare the recorded normalized predictor target after native stride alignment",
             imgsz,
-            recorded,
             recorded,
         )
     return ScoredResolution(trained_at=recorded, scored_at=imgsz)
@@ -201,24 +173,22 @@ def predict_on_images(
     weights: str | Path,
     image_paths: Sequence[str],
     *,
-    conf: float | None = 0.001,
-    iou: float = 0.7,
-    imgsz: int | list[int] = 640,
-    batch: int = 1,
-    device: str | int | list[int] | None = None,
     image_name: ImageNameMode = "name",
     manifest_dir: Path | None = None,
     **model_kwargs: Any,
 ) -> pd.DataFrame:
     """Score images with native precision, compilation and device settings.
 
-    The low confidence default retains detections for later validation calibration.
-    Explicit native arguments override defaults without hardware-dependent rewriting.
+    All native options come from the resolved prediction group. Command-owned
+    weights and image membership are the only additions at this boundary.
     """
     if image_name not in ("name", "stem", "path"):
         raise ValueError(f"Unsupported image_name mode: {image_name!r}")
-    if isinstance(batch, bool) or batch < 1:
-        raise ValueError(f"batch must be >= 1, got {batch}")
+    if "source" in model_kwargs or "stream" in model_kwargs:
+        raise ValueError("source and stream are owned by dataset manifest inference")
+    settings = execution_settings(model_kwargs | {"model": str(weights), "source": None}, "predict")
+    settings.pop("model")
+    settings.pop("source")
 
     paths = [str(path) for path in image_paths]
     if not paths:
@@ -228,19 +198,9 @@ def predict_on_images(
     from ultralytics.models import YOLO
 
     model = YOLO(str(weights))
+    if model.task != "detect":
+        raise ValueError(f"Prediction requires a detection model; loaded task={model.task!r}")
     names: dict[int, str] = model.names
-    settings: dict[str, Any] = {
-        "conf": conf,
-        "iou": iou,
-        "imgsz": imgsz,
-        "batch": batch,
-        "device": device,
-        "rect": True,
-        **model_kwargs,
-    }
-    if "source" in settings or "stream" in settings:
-        raise ValueError("source and stream are owned by dataset manifest inference")
-    settings.setdefault("verbose", False)
     logger.info(
         "Predicting on {} images with {} ({})",
         len(paths),
@@ -271,7 +231,13 @@ def predict_on_images(
     if predictor is not None:
         frame.attrs["effective_args"] = dict(vars(predictor.args))
         frame.attrs["save_dir"] = str(predictor.save_dir)
-    frame.attrs.setdefault("effective_args", settings)
+        frame.attrs["normalized_imgsz"] = predictor.imgsz
+    frame.attrs.setdefault("effective_args", settings.copy())
     frame.attrs["effective_args"].update(source=manifest, model=str(weights), mode="predict")
+    frame.attrs["requested_args"] = settings | {
+        "source": manifest,
+        "model": str(weights),
+        "mode": "predict",
+    }
     frame.attrs["image_paths"] = sorted(by_absolute)
     return frame

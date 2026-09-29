@@ -39,7 +39,7 @@ def _settled(**overrides: Any) -> Any:
         device=None,
         image_name="name",
         reuse_existing=True,
-        ultralytics={"half": False},
+        ultralytics={"quantize": None},
     ).model_copy(update=overrides)
 
 
@@ -376,7 +376,7 @@ def test_comparing_a_model_against_itself_is_refused(
             ground_truth=tmp_path / "gt.csv",
             output_dir=tmp_path / "out",
             clearml=ClearMLConfig(),
-            inference=InferenceConfig(device="cpu"),
+            inference=InferenceConfig(conf=0.001, iou=0.7, imgsz=640, batch=1, device="cpu"),
         )
 
 
@@ -447,7 +447,14 @@ def test_inference_image_name_mode_rejects_unknown_fallback() -> None:
     from clearml_yolo.tasks.compare import InferenceConfig
 
     with pytest.raises(ValidationError, match="image_name"):
-        InferenceConfig(image_name="filename")  # type: ignore[arg-type]
+        InferenceConfig(
+            conf=0.001,
+            iou=0.7,
+            imgsz=640,
+            batch=1,
+            device=None,
+            image_name="filename",  # type: ignore[arg-type]
+        )
 
 
 def test_evaluation_mapping_overlays_legacy_comparison_defaults() -> None:
@@ -490,7 +497,9 @@ def test_inference_native_mapping_cannot_override_owned_keys(key: str) -> None:
     from clearml_yolo.tasks.compare import InferenceConfig
 
     with pytest.raises(ValidationError, match=key):
-        InferenceConfig(ultralytics={key: "override"})
+        InferenceConfig(
+            conf=0.001, iou=0.7, imgsz=640, batch=1, device=None, ultralytics={key: "override"}
+        )
 
 
 @pytest.mark.parametrize(
@@ -659,7 +668,7 @@ def test_compare_dashboards_and_statistics_share_the_same_test_counts(
         truth_path,
         tmp_path / "comparison",
         ClearMLConfig(),
-        InferenceConfig(imgsz=640, device="cpu"),
+        InferenceConfig(conf=0.001, iou=0.7, imgsz=640, batch=1, device="cpu"),
         bootstrap_iterations=20,
     )
 
@@ -948,7 +957,7 @@ def test_automatic_baseline_absence_still_evaluates_candidate(
         truth_path,
         tmp_path / "comparison",
         ClearMLConfig(),
-        InferenceConfig(imgsz=640, device="cpu"),
+        InferenceConfig(conf=0.001, iou=0.7, imgsz=640, batch=1, device="cpu"),
         bootstrap_iterations=20,
     )
 

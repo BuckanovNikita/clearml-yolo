@@ -18,7 +18,7 @@ from clearml_yolo.clearml_session import (
 )
 from clearml_yolo.dataset import PreparedDataset, apply_dataset_policy, prepare_dataset
 from clearml_yolo.dataset_export import DatasetFormat
-from clearml_yolo.native_config import stage_settings, write_native_yaml
+from clearml_yolo.native_config import execution_settings, stage_settings, write_native_yaml
 from clearml_yolo.run_identity import RUNS_ROOT, point_latest_at, resolve_run_dir, resolve_run_id
 
 TRAIN_DIR = "detect"
@@ -103,9 +103,7 @@ def _prepare_csv_dataset(
 ) -> tuple[PreparedDataset, dict[str, Any]]:
 
     if settings.get("resume"):
-        raise ValueError(
-            "resume is unsupported with ground_truth; use model weights to fine-tune"
-        )
+        raise ValueError("resume is unsupported with ground_truth; use model weights to fine-tune")
     prepared = prepare_dataset(
         ground_truth,
         _preparation_directory(settings),
@@ -146,8 +144,10 @@ def train(
     task = init_task(clearml, stage="train")
     # Shared command configs include prediction overrides; they never affect training.
     stage_settings(ultralytics_predict or {}, "predict")
-    settings = stage_settings(ultralytics, "train")
-    architecture = settings.pop("model", None) or "yolo11n.pt"
+    settings = execution_settings(ultralytics, "train")
+    architecture = settings.pop("model")
+    if not architecture:
+        raise ValueError("Set ultralytics.model explicitly; no training model fallback is provided")
     settings["mode"] = "train"
     settings["project"] = str(_project_of_this_run(settings.get("project"), clearml.task_name))
     settings["name"] = settings.get("name") or clearml.task_name
@@ -182,11 +182,18 @@ def train(
     from ultralytics.models import YOLO
 
     model = YOLO(architecture)
-    if prepared is not None and model.task != "detect":
+    if model.task != "detect":
         raise ValueError(
-            "ground_truth training requires a detection model; "
-            f"loaded task={model.task!r}"
+            f"ground_truth training requires a detection model; loaded task={model.task!r}"
         )
+    requested = settings | {"model": architecture}
+    requested_path = write_native_yaml(
+        Path(settings["project"]) / ".configs" / settings["name"] / "ultralytics_requested.yaml",
+        requested,
+        "train",
+    )
+    expect_artifacts(task, ["ultralytics_requested"])
+    connect_config_file(task, "ultralytics_requested", requested_path, allow_remote_override=False)
     model.train(**settings)
     # Native DDP returns no validator result in its parent; trainer.save_dir still owns outputs.
     trainer: Any = model.trainer

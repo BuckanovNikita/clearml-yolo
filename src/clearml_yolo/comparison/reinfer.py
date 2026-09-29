@@ -15,7 +15,7 @@ from typing import Any
 
 import pandas as pd
 from loguru import logger
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from clearml_yolo.clearml_session import sanitize_configuration
 from clearml_yolo.inference import predict_on_images
@@ -60,6 +60,8 @@ class InferenceEvidence(BaseModel):
 
     effective_args: dict[str, Any]
     save_dir: str
+    requested_args: dict[str, Any] = Field(default_factory=dict)
+    normalized_imgsz: list[int] | None = None
 
 
 def _model_class_names(weights: str | Path) -> dict[int, str]:
@@ -126,7 +128,14 @@ def _evidence(predictions: pd.DataFrame, fallback: dict[str, object]) -> Inferen
         "save_dir", str(Path(str(fallback["project"])) / str(fallback["name"]))
     )
     evidence = InferenceEvidence.model_validate(
-        {"effective_args": sanitize_configuration(effective), "save_dir": str(save_dir)}
+        {
+            "effective_args": sanitize_configuration(effective),
+            "save_dir": str(save_dir),
+            "requested_args": sanitize_configuration(
+                predictions.attrs.get("requested_args", fallback)
+            ),
+            "normalized_imgsz": predictions.attrs.get("normalized_imgsz"),
+        }
     )
     native_root = Path(str(fallback["project"])).resolve()
     actual_output = Path(evidence.save_dir).resolve()
@@ -246,6 +255,8 @@ def reinfer_split(
             "image_name": image_name,
             "project": str(native_project.resolve()),
             "name": native_name,
+            "task": "detect",
+            "mode": "predict",
             **(native_kwargs or {}),
         }
         manifest_dir = output.parent / "prediction_inputs" / native_name / output.stem

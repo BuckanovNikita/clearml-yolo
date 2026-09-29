@@ -167,11 +167,11 @@ class InferenceConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    conf: float | None = 0.001
-    iou: float = 0.7
-    imgsz: int | list[int] | None = None
-    batch: int = 1
-    device: str | int | list[int] | None = None
+    conf: float | None
+    iou: float
+    imgsz: int | list[int]
+    batch: int
+    device: str | int | list[int] | None
     image_name: ImageNameMode = "name"
     reuse_existing: bool = True
     ultralytics: dict[str, Any] = Field(default_factory=dict)
@@ -201,7 +201,7 @@ class InferenceConfig(BaseModel):
 
 
 class SettledInference(BaseModel):
-    """Inference settings after checkpoint-derived resolution is filled."""
+    """Validated inference settings shared by both checkpoints."""
 
     conf: float | None
     iou: float
@@ -285,8 +285,8 @@ def _settled(
     baseline_resolution = trained_imgsz(baseline) if baseline is not None else None
     if baseline_resolution is not None and baseline_resolution != resolution.scored_at:
         logger.warning(
-            "The baseline was trained at imgsz {} and the candidate is scored at {}; "
-            "both are re-inferred at {}",
+            "The baseline was trained at imgsz {} and the candidate requests imgsz {}; "
+            "both are passed the same requested imgsz {} before native normalization",
             baseline_resolution,
             resolution.scored_at,
             resolution.scored_at,
@@ -338,6 +338,8 @@ def _scored(
     evidence = InferenceEvidence.model_validate(
         {
             "effective_args": predictions.attrs.get("effective_args", fallback_args),
+            "requested_args": predictions.attrs.get("requested_args", fallback_args),
+            "normalized_imgsz": predictions.attrs.get("normalized_imgsz"),
             "save_dir": predictions.attrs.get(
                 "save_dir", str(native_project.resolve() / native_name)
             ),
@@ -349,7 +351,18 @@ def _scored(
         | {"model": str(weights), "mode": "predict"},
         "predict",
     )
+    requested_path = write_native_yaml(
+        destination / f"ultralytics_predict_{role}_{split}_requested.yaml",
+        {key: value for key, value in evidence.requested_args.items() if key != "image_name"}
+        | {"model": str(weights), "mode": "predict"},
+        "predict",
+    )
     if task is not None:
+        requested_name = requested_path.stem
+        shape_name = f"predict_normalized_image_size_{role}_{split}"
+        expect_artifacts(task, [requested_name, shape_name])
+        connect_config_file(task, requested_name, requested_path, allow_remote_override=False)
+        upload_artifact(task, shape_name, {"imgsz": evidence.normalized_imgsz})
         config_name = f"ultralytics_predict_{role}_{split}"
         expect_artifacts(task, [config_name])
         connect_config_file(task, config_name, config_path, allow_remote_override=False)

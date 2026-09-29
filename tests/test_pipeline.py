@@ -7,6 +7,7 @@ import pytest
 
 from clearml_yolo.clearml_session import ClearMLConfig
 from clearml_yolo.tasks.pipeline import routed_native
+from native_config_helpers import prediction_config, training_settings
 
 
 def test_routing_fills_only_output_ownership(tmp_path: Path) -> None:
@@ -119,8 +120,9 @@ def test_pipeline_routes_cleaned_truth_and_prediction_policy_after_csv_training(
     monkeypatch.setattr(pipeline, "compute_metrics", metrics)
 
     pipeline.run_pipeline(
-        ultralytics={"model": "architecture.pt", "classes": [1], "task": "detect"},
-        ultralytics_predict={"classes": [0]},
+        ultralytics=training_settings()
+        | {"model": "architecture.pt", "classes": [1], "task": "detect"},
+        ultralytics_predict=prediction_config() | {"classes": [0]},
         metrics={"evaluation": object(), "calibration_split": "val"},
         report={"report_config_path": None},
         compare={"baseline_model": object(), "q": 0.05, "bootstrap_iterations": 1, "seed": 0},
@@ -137,10 +139,8 @@ def test_pipeline_routes_cleaned_truth_and_prediction_policy_after_csv_training(
     assert (
         "predict_data_overrides",
         {
-            "shared": {"classes": {"requested": [1], "effective": None}},
             "ultralytics_predict": {
                 "classes": {"requested": [0], "effective": None},
-                "task": {"requested": None, "effective": "detect"},
             },
         },
     ) in calls["uploads"]

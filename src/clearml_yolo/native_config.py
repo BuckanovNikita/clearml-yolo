@@ -32,8 +32,7 @@ SHARED_KEYS = frozenset(
         "iou",
         "max_det",
         "quantize",
-        "dnn",
-        "end2end",
+        "nms",
         "augment",
         "agnostic_nms",
         "classes",
@@ -44,8 +43,6 @@ SHARED_KEYS = frozenset(
         "show_conf",
     ]
 )
-# Native get_cfg also accepts compatibility aliases absent from default.yaml.
-SHARED_KEYS = SHARED_KEYS | {"half", "int8"}
 TRAIN_KEYS = SHARED_KEYS | frozenset(
     [
         "epochs",
@@ -68,9 +65,6 @@ TRAIN_KEYS = SHARED_KEYS | frozenset(
         "profile",
         "freeze",
         "multi_scale",
-        "overlap_mask",
-        "mask_ratio",
-        "dropout",
         "val",
         "split",
         "save_json",
@@ -88,13 +82,6 @@ TRAIN_KEYS = SHARED_KEYS | frozenset(
         "cls",
         "cls_pw",
         "dfl",
-        "pose",
-        "kobj",
-        "rle",
-        "angle",
-        "dlog",
-        "dgrad",
-        "dlam",
         "nbs",
         "hsv_h",
         "hsv_s",
@@ -110,22 +97,14 @@ TRAIN_KEYS = SHARED_KEYS | frozenset(
         "mosaic",
         "mixup",
         "cutmix",
-        "copy_paste",
-        "copy_paste_mode",
-        "auto_augment",
-        "erasing",
     ]
 )
 TRAIN_KEYS = TRAIN_KEYS | {"augmentations"}
 PREDICT_KEYS = SHARED_KEYS | frozenset(
     [
         "source",
-        "vid_stride",
-        "stream_buffer",
-        "embed",
+        "dnn",
         "show",
-        "save_frames",
-        "retina_masks",
         "save_crop",
         "show_boxes",
         "line_width",
@@ -133,14 +112,31 @@ PREDICT_KEYS = SHARED_KEYS | frozenset(
 )
 INACTIVE_KEYS = frozenset(
     [
+        "overlap_mask",
+        "mask_ratio",
+        "dropout",
+        "pose",
+        "kobj",
+        "rle",
+        "angle",
+        "dlog",
+        "dgrad",
+        "dlam",
+        "copy_paste",
+        "copy_paste_mode",
+        "auto_augment",
+        "erasing",
+        "vid_stride",
+        "stream_buffer",
+        "embed",
+        "save_frames",
+        "retina_masks",
         "format",
-        "keras",
         "optimize",
         "dynamic",
         "simplify",
         "opset",
         "workspace",
-        "nms",
         "cfg",
         "tracker",
     ]
@@ -157,16 +153,22 @@ def native_template() -> str:
 
 
 def native_defaults() -> dict[str, Any]:
-    """Return upstream values, refusing unclassified dependency changes."""
+    """Return native values and explicit project defaults; reject unclassified upgrades."""
     loaded: dict[str, Any] = yaml.safe_load(native_template())
     unknown = set(loaded) - KNOWN_KEYS
     if unknown:
         raise ValueError(f"Unclassified Ultralytics parameters: {sorted(unknown)}")
-    return loaded
+    return loaded | {"imgsz": 960, "compile": True, "nms": True, "model": "yolo11n.pt"}
 
 
 def stage_settings(settings: dict[str, Any], stage: Stage) -> dict[str, Any]:
-    """Project a complete upstream mapping onto the selected execution stage."""
+    """Project supplied native values onto the selected execution stage."""
+    legacy = set(settings) & {"end2end", "half", "int8", "keras"}
+    if legacy:
+        raise ValueError(
+            f"Native aliases {sorted(legacy)} are removed/deprecated; "
+            "use nms instead of end2end and quantize instead of half/int8; remove keras"
+        )
     unknown = set(settings) - KNOWN_KEYS - {"save_dir"}
     if unknown:
         raise ValueError(f"Unknown Ultralytics parameters: {sorted(unknown)}")
@@ -176,13 +178,56 @@ def stage_settings(settings: dict[str, Any], stage: Stage) -> dict[str, Any]:
     return {key: value for key, value in settings.items() if key in allowed}
 
 
+def execution_settings(settings: dict[str, Any], stage: Stage) -> dict[str, Any]:
+    """Validate a complete resolved owning group without introducing defaults."""
+    values = stage_settings(settings, stage)
+    group = "ultralytics" if stage == "train" else "ultralytics_predict"
+    allowed = TRAIN_KEYS if stage == "train" else PREDICT_KEYS
+    missing = (native_defaults().keys() & allowed) - values.keys()
+    if missing:
+        raise ValueError(
+            f"Missing {group} parameters {sorted(missing)}; compose a complete {group} "
+            "group or regenerate examples with cy-init-config"
+        )
+    if values["task"] != "detect":
+        raise ValueError(f"{group}.task must be detect")
+    if values["mode"] != stage:
+        raise ValueError(f"{group}.mode must be {stage}")
+    if settings.get("embed") is not None:
+        raise ValueError("embed is unsupported for detection records; remove its override")
+    size = values["imgsz"]
+    dimensions = size if isinstance(size, list) else [size]
+    if (
+        not dimensions
+        or (stage == "predict" and len(dimensions) not in (1, 2))
+        or any(isinstance(x, bool) or not isinstance(x, int) or x <= 0 for x in dimensions)
+    ):
+        raise ValueError(f"{group}.imgsz must contain positive integer image dimensions")
+    if stage == "predict":
+        batch = values["batch"]
+        if isinstance(batch, bool) or not isinstance(batch, int) or batch < 1:
+            raise ValueError("Prediction requires a positive integer ultralytics_predict.batch")
+    return values
+
+
 def prediction_defaults() -> dict[str, Any]:
-    """Inherit shared values lazily so CLI base overrides reach prediction."""
+    """Expose shared references and literal native prediction-only values."""
+    defaults = native_defaults()
     values: dict[str, Any] = {
-        key: f"${{ultralytics.{key}}}" for key in native_defaults() if key in PREDICT_KEYS
+        key: f"${{ultralytics.{key}}}" if key in TRAIN_KEYS else value
+        for key, value in defaults.items()
+        if key in PREDICT_KEYS
     }
-    # These values are stage-owned, rather than training hyperparameters to inherit.
-    values.update(conf=0.001, model=None, mode="predict", project=None, name=None)
+    values.update(
+        conf=0.001,
+        model=None,
+        mode="predict",
+        project=None,
+        name=None,
+        batch=1,
+        rect=True,
+        save=False,
+    )
     return values
 
 
@@ -202,9 +247,7 @@ def _value_yaml(key: str, value: Any) -> str:
     return dumped.rstrip("\n")
 
 
-def render_native_yaml(
-    settings: dict[str, Any], stage: Stage, *, overrides_only: bool = False
-) -> str:
+def render_native_yaml(settings: dict[str, Any], stage: Stage) -> str:
     """Keep every upstream comment and comment out inactive parameter entries."""
     values = stage_settings(settings, stage)
     allowed = TRAIN_KEYS if stage == "train" else PREDICT_KEYS
@@ -215,12 +258,9 @@ def render_native_yaml(
             lines.append(line)
             continue
         key = match.group(1)
-        active = key in allowed and (not overrides_only or key in values)
+        active = key in allowed and key in values
         if not active:
             lines.append(f"# {line}")
-            continue
-        if key not in values:
-            lines.append(line)
             continue
         comment = line.partition(" #")[2]
         rendered = _value_yaml(key, values[key])
@@ -244,18 +284,14 @@ def prediction_settings(
     ultralytics_predict: dict[str, Any] | None = None,
     weights: str | Path | None = None,
 ) -> dict[str, Any]:
-    """Merge stage settings while preserving explicit prediction overrides."""
-    overrides = ultralytics_predict or {}
-    native_model = overrides.get("model")
+    """Consume only the resolved prediction group and explicit checkpoint ownership."""
+    del ultralytics  # Retain the public signature without cross-stage fallback.
+    settings = execution_settings(dict(ultralytics_predict or {}), "predict")
+    native_model = settings["model"]
     if weights is not None and native_model is not None and str(weights) != str(native_model):
         raise ValueError("weights conflicts with ultralytics_predict.model")
-    settings = stage_settings(dict(ultralytics) | overrides, "predict")
-    selected_model = weights or native_model or ultralytics.get("model")
-    if selected_model is not None:
-        settings["model"] = str(selected_model)
-    if settings.get("source") is not None:
+    if weights is not None:
+        settings["model"] = str(weights)
+    if settings["source"] is not None:
         raise ValueError("ultralytics source is owned by ground_truth image membership")
-    batch = settings.get("batch", 1)
-    if isinstance(batch, bool) or not isinstance(batch, int) or batch < 1:
-        raise ValueError("Prediction requires a positive integer ultralytics_predict.batch")
     return settings

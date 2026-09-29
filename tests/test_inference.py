@@ -20,6 +20,16 @@ from clearml_yolo.inference import (
     resolution_of,
 )
 
+
+def _predict(weights: str | Path, paths: list[str], **overrides: Any) -> Any:
+    from native_config_helpers import prediction_config
+
+    settings = prediction_config()
+    settings.pop("model")
+    settings.pop("source")
+    return predict_on_images(weights, paths, **(settings | overrides))
+
+
 NAMES = {0: "person", 1: "dog"}
 
 
@@ -68,6 +78,7 @@ class FakeYolo:
     def __init__(self, weights: str) -> None:
         self.weights = weights
         self.names = dict(NAMES)
+        self.task = "detect"
         self.calls: list[dict[str, Any]] = []
         FakeYolo.last = self
 
@@ -125,14 +136,10 @@ def checkpoint_recording(monkeypatch: pytest.MonkeyPatch) -> Any:
     return _record
 
 
-def test_inference_takes_the_resolution_out_of_the_checkpoint(checkpoint_recording: Any) -> None:
-    """The one source that cannot go stale against the weights it describes."""
+def test_inference_requires_configured_resolution(checkpoint_recording: Any) -> None:
     checkpoint_recording({"imgsz": 1280})
-
-    resolution = resolution_of("best.pt", None)
-
-    assert (resolution.scored_at, resolution.trained_at) == (1280, 1280)
-    assert not resolution.was_trained_elsewhere
+    with pytest.raises(ValueError, match="imgsz"):
+        resolution_of("best.pt", None)
 
 
 def test_a_named_resolution_wins_but_is_answered_for(
@@ -160,8 +167,8 @@ def test_the_resolution_pair_carries_both_numbers_into_the_run_record(
 
     assert dict(zip(rows["parameter"], rows["value"], strict=True)) == {
         "trained at imgsz": "1280",
-        "scored at imgsz": "640",
-        "same resolution?": "NO — scored at a scale this model was never shown",
+        "requested inference imgsz": "640",
+        "same requested size?": "different requested size; compare the normalized predictor target",
     }
 
 
@@ -192,7 +199,7 @@ def test_each_box_is_attributed_by_path_not_by_position() -> None:
     DETECTIONS["000012.png"] = _boxes(([1, 2, 3, 4], 0.9, 0))
     DETECTIONS["000018.png"] = _boxes(([5, 6, 7, 8], 0.8, 1))
 
-    frame = predict_on_images("best.pt", ["dir/000018.png", "dir/000012.png"], device="cpu")
+    frame = _predict("best.pt", ["dir/000018.png", "dir/000012.png"], device="cpu")
 
     assert dict(zip(frame["image_name"], frame["instance_label"], strict=True)) == {
         "000012.png": "person",
@@ -207,17 +214,17 @@ def test_the_image_name_mode_decides_how_the_join_key_is_spelled(mode: Any, expe
     """``path`` is the caller's own spelling, not the absolute one the manifest carries."""
     DETECTIONS["000012.png"] = _boxes(([1, 2, 3, 4], 0.9, 0))
 
-    frame = predict_on_images("best.pt", ["dir/000012.png"], image_name=mode, device="cpu")
+    frame = _predict("best.pt", ["dir/000012.png"], image_name=mode, device="cpu")
 
     assert frame["image_name"].tolist() == [expected]
 
 
 def test_unknown_image_name_mode_is_rejected_before_native_inference() -> None:
     with pytest.raises(ValueError, match="Unsupported image_name mode"):
-        predict_on_images(
+        _predict(
             "best.pt",
             ["dir/000012.png"],
-            image_name="filename",  # type: ignore[arg-type]
+            image_name="filename",
             device="cpu",
         )
 
@@ -226,7 +233,7 @@ def test_images_without_detections_contribute_no_rows() -> None:
     DETECTIONS["a.png"] = None
     DETECTIONS["b.png"] = _boxes()
 
-    frame = predict_on_images("best.pt", ["a.png", "b.png"], device="cpu")
+    frame = _predict("best.pt", ["a.png", "b.png"], device="cpu")
 
     assert frame.empty
     assert list(frame.columns) == PREDICTION_COLUMNS
@@ -237,9 +244,7 @@ def test_the_whole_run_is_one_predict_call_with_batch_forwarded() -> None:
     for index in range(5):
         DETECTIONS[f"{index}.png"] = _boxes(([1, 2, 3, 4], 0.9, 0))
 
-    frame = predict_on_images(
-        "best.pt", [f"{index}.png" for index in range(5)], batch=2, device="cpu"
-    )
+    frame = _predict("best.pt", [f"{index}.png" for index in range(5)], batch=2, device="cpu")
 
     calls = FakeYolo.last.calls  # type: ignore[union-attr]
     assert len(calls) == 1
@@ -252,7 +257,7 @@ def test_ultralytics_is_handed_a_txt_manifest_of_absolute_paths() -> None:
     and reports real paths; absolute entries keep the join off the manifest's own parent."""
     DETECTIONS["a.png"] = _boxes(([1, 2, 3, 4], 0.9, 0))
 
-    predict_on_images("best.pt", ["dir/a.png", "/tmp/b.png"], device="cpu")
+    _predict("best.pt", ["dir/a.png", "/tmp/b.png"], device="cpu")
 
     call = FakeYolo.last.calls[0]  # type: ignore[union-attr]
     assert Path(call["source"]).suffix == ".txt"
@@ -265,13 +270,13 @@ def test_an_image_ultralytics_could_not_read_is_refused_not_dropped() -> None:
     UNREADABLE.add("broken.png")
 
     with pytest.raises(ValueError, match="no result for 1 of 2 images"):
-        predict_on_images("best.pt", ["a.png", "broken.png"], device="cpu")
+        _predict("best.pt", ["a.png", "broken.png"], device="cpu")
 
 
 def test_inference_settings_reach_ultralytics() -> None:
     DETECTIONS["a.png"] = _boxes(([1, 2, 3, 4], 0.9, 0))
 
-    predict_on_images("best.pt", ["a.png"], conf=0.25, iou=0.5, imgsz=1280, device="0")
+    _predict("best.pt", ["a.png"], conf=0.25, iou=0.5, imgsz=1280, device="0")
 
     call = FakeYolo.last.calls[0]  # type: ignore[union-attr]
     assert (call["conf"], call["iou"], call["imgsz"], call["device"]) == (0.25, 0.5, 1280, "0")
@@ -280,8 +285,8 @@ def test_inference_settings_reach_ultralytics() -> None:
 
 def test_precision_is_left_to_native_defaults() -> None:
     DETECTIONS["a.png"] = _boxes(([1, 2, 3, 4], 0.9, 0))
-    predict_on_images("best.pt", ["a.png"], device="0")
-    assert "quantize" not in FakeYolo.last.calls[0]  # type: ignore[union-attr]
+    _predict("best.pt", ["a.png"], device="0")
+    assert FakeYolo.last.calls[0]["quantize"] is None  # type: ignore[union-attr]
 
 
 @pytest.mark.parametrize("named", [{"quantize": 32}, {"quantize": "fp32"}])
@@ -290,27 +295,27 @@ def test_naming_the_precision_hands_the_decision_over(named: dict[str, Any]) -> 
     run reproducing numbers taken before FP16 became the default opts back out."""
     DETECTIONS["a.png"] = _boxes(([1, 2, 3, 4], 0.9, 0))
 
-    predict_on_images("best.pt", ["a.png"], device="0", **named)
+    _predict("best.pt", ["a.png"], device="0", **named)
 
     call = FakeYolo.last.calls[0]  # type: ignore[union-attr]
     assert call.get("quantize") != 16
     assert {key: call[key] for key in named} == named
 
 
-def test_compilation_is_left_to_native_defaults() -> None:
+def test_compilation_comes_from_explicit_configuration() -> None:
     DETECTIONS["a.png"] = _boxes(([1, 2, 3, 4], 0.9, 0))
-    predict_on_images("best.pt", ["a.png"], device="0")
-    assert "compile" not in FakeYolo.last.calls[0]  # type: ignore[union-attr]
+    _predict("best.pt", ["a.png"], device="0")
+    assert FakeYolo.last.calls[0]["compile"] is True  # type: ignore[union-attr]
 
 
 def test_the_letterbox_shape_is_named_rather_than_inherited() -> None:
     """`rect` decides the shape the network actually sees, so it is a decision of this
     run's rather than whatever the installed ultralytics happens to default to."""
     DETECTIONS["a.png"] = _boxes(([1, 2, 3, 4], 0.9, 0))
-    predict_on_images("best.pt", ["a.png"], device="0")
+    _predict("best.pt", ["a.png"], device="0")
     assert FakeYolo.last.calls[0]["rect"] is True  # type: ignore[union-attr]
 
-    predict_on_images("best.pt", ["a.png"], device="0", rect=False)
+    _predict("best.pt", ["a.png"], device="0", rect=False)
     assert FakeYolo.last.calls[0]["rect"] is False  # type: ignore[union-attr]
 
 
@@ -318,19 +323,19 @@ def test_compilation_can_be_forced_back_off() -> None:
     """It changes which boxes come back, so a run reproducing older numbers must opt out."""
     DETECTIONS["a.png"] = _boxes(([1, 2, 3, 4], 0.9, 0))
 
-    predict_on_images("best.pt", ["a.png"], device="0", compile=False)
+    _predict("best.pt", ["a.png"], device="0", compile=False)
 
     assert FakeYolo.last.calls[0]["compile"] is False  # type: ignore[union-attr]
 
 
 def test_a_batch_below_one_is_refused() -> None:
-    with pytest.raises(ValueError, match="batch must be >= 1"):
-        predict_on_images("best.pt", ["a.png"], batch=0)
+    with pytest.raises(ValueError, match="batch"):
+        _predict("best.pt", ["a.png"], batch=0)
 
 
 def test_no_images_is_an_empty_frame_rather_than_a_crash() -> None:
     """Ultralytics raises FileNotFoundError on an empty manifest; an empty split must not."""
-    frame = predict_on_images("best.pt", [], device="cpu")
+    frame = _predict("best.pt", [], device="cpu")
 
     assert frame.empty
     assert list(frame.columns) == PREDICTION_COLUMNS
@@ -351,7 +356,7 @@ def logs() -> Iterator[list[str]]:
 def test_the_run_says_what_it_scored(logs: list[str]) -> None:
     DETECTIONS["a.png"] = _boxes(([1, 2, 3, 4], 0.9, 0), ([5, 6, 7, 8], 0.7, 1))
 
-    predict_on_images("best.pt", ["a.png"], device="cpu")
+    _predict("best.pt", ["a.png"], device="cpu")
 
     assert "Predicted 2 boxes over 1 images" in logs
 
@@ -360,7 +365,7 @@ def test_the_weights_path_is_forwarded_as_given(tmp_path: Path) -> None:
     checkpoint = tmp_path / "best.pt"
     DETECTIONS["a.png"] = _boxes(([1, 2, 3, 4], 0.9, 0))
 
-    predict_on_images(checkpoint, ["a.png"], device="cpu")
+    _predict(checkpoint, ["a.png"], device="cpu")
 
     assert FakeYolo.last.weights == str(checkpoint)  # type: ignore[union-attr]
 
@@ -372,9 +377,62 @@ def test_rectangular_native_resolution_is_preserved(checkpoint_recording: Any) -
 
 
 def test_explicit_manifest_persists_for_native_yaml_replay(tmp_path: Path) -> None:
-    frame = predict_on_images("best.pt", ["a.png"], device="cpu", manifest_dir=tmp_path / "inputs")
+    frame = _predict("best.pt", ["a.png"], device="cpu", manifest_dir=tmp_path / "inputs")
     manifest = Path(frame.attrs["effective_args"]["source"])
     assert manifest.is_file()
     assert manifest.read_text() == str(Path("a.png").absolute())
     assert frame.attrs["effective_args"]["model"] == "best.pt"
     assert frame.attrs["effective_args"]["mode"] == "predict"
+
+
+def test_missing_native_settings_do_not_fall_back() -> None:
+    with pytest.raises(ValueError, match="ultralytics_predict"):
+        predict_on_images("best.pt", ["a.png"])
+
+
+def test_missing_resolution_never_uses_checkpoint(checkpoint_recording: Any) -> None:
+    checkpoint_recording({"imgsz": 1280})
+    with pytest.raises(ValueError, match="imgsz"):
+        resolution_of("best.pt", None)
+
+
+def test_native_normalization_is_separate_from_requested_settings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from types import SimpleNamespace
+
+    from native_config_helpers import prediction_config
+
+    original = FakeYolo.predict
+
+    def normalized(self: FakeYolo, source: str, **kwargs: Any) -> Iterator[FakeResult]:
+        self.predictor = SimpleNamespace(  # type: ignore[attr-defined]
+            args=SimpleNamespace(**kwargs), imgsz=[928, 928], save_dir="native/predict"
+        )
+        return original(self, source, **kwargs)
+
+    monkeypatch.setattr(FakeYolo, "predict", normalized)
+    settings = prediction_config(imgsz=906, compile=True, nms=True)
+    for key in ("model", "source"):
+        settings.pop(key, None)
+    frame = predict_on_images("best.pt", ["a.png"], **settings)
+    assert frame.attrs["requested_args"]["imgsz"] == 906
+    assert frame.attrs["normalized_imgsz"] == [928, 928]
+    assert FakeYolo.last is not None
+    assert FakeYolo.last.calls[0]["compile"] is True
+    assert FakeYolo.last.calls[0]["nms"] is True
+
+
+@pytest.mark.parametrize("task", ["segment", "pose", "classify", "obb"])
+def test_non_detection_checkpoint_fails_before_prediction(
+    monkeypatch: pytest.MonkeyPatch, task: str
+) -> None:
+    original = FakeYolo.__init__
+
+    def initialize(self: FakeYolo, weights: str) -> None:
+        original(self, weights)
+        self.task = task
+
+    monkeypatch.setattr(FakeYolo, "__init__", initialize)
+    with pytest.raises(ValueError, match="detection model"):
+        _predict("wrong.pt", ["a.png"])

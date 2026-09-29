@@ -12,6 +12,7 @@ from clearml_yolo import artifact_names
 from clearml_yolo.clearml_session import ClearMLConfig
 from clearml_yolo.tasks import predict as predict_module
 from clearml_yolo.tasks.predict import predict
+from native_config_helpers import prediction_config
 
 
 @pytest.fixture
@@ -58,7 +59,8 @@ def _predict(tmp_path: Path, imgsz: int | None) -> Any:
         ground_truth=_ground_truth(tmp_path),
         output=tmp_path / "predictions.csv",
         clearml=ClearMLConfig(),
-        ultralytics={"imgsz": imgsz, "device": "cpu", "batch": 1},
+        ultralytics={},
+        ultralytics_predict=prediction_config(imgsz=imgsz, device="cpu", batch=1),
     )
 
 
@@ -75,8 +77,8 @@ def test_the_scale_inference_ran_at_reaches_the_run_record(
     rows = published[section]
     assert dict(zip(rows["parameter"], rows["value"], strict=True)) == {
         "trained at imgsz": "1280",
-        "scored at imgsz": "640",
-        "same resolution?": "NO — scored at a scale this model was never shown",
+        "requested inference imgsz": "640",
+        "same requested size?": "different requested size; compare the normalized predictor target",
     }
 
 
@@ -87,7 +89,7 @@ def test_the_resolution_travels_with_the_predictions(
     checkpoint to ask a second time is how the two would come to disagree."""
     checkpoint_recording({"imgsz": 1280})
 
-    result = _predict(tmp_path, None)
+    result = _predict(tmp_path, 1280)
 
     assert result.predictions == tmp_path / "predictions.csv"
     assert result.resolution.scored_at == 1280
@@ -112,7 +114,15 @@ def test_splits_are_inferred_separately_for_reproducible_test_batches(
         return pd.DataFrame({"image_name": paths})
 
     monkeypatch.setattr(predict_module, "predict_on_images", infer)
-    predict("best.pt", truth, tmp_path / "pred.csv", ClearMLConfig(), {}, ["val", "test"])
+    predict(
+        "best.pt",
+        truth,
+        tmp_path / "pred.csv",
+        ClearMLConfig(),
+        {},
+        ["val", "test"],
+        ultralytics_predict=prediction_config(),
+    )
     assert calls == [["z.png"], ["a.png", "b.png"]]
 
 
@@ -145,7 +155,7 @@ def test_prediction_overrides_inherit_shared_and_replace_training_model() -> Non
 
     settings = prediction_settings(
         {"model": "architecture.pt", "epochs": 20, "batch": 16, "imgsz": 640},
-        {"batch": 4, "conf": 0.001},
+        prediction_config(batch=4, conf=0.001, imgsz=640),
         "best.pt",
     )
     assert settings["model"] == "best.pt"
@@ -158,30 +168,33 @@ def test_prediction_explicit_model_conflict_fails() -> None:
     from clearml_yolo.native_config import prediction_settings
 
     with pytest.raises(ValueError, match=r"ultralytics_predict\.model"):
-        prediction_settings({}, {"model": "different.pt"}, "best.pt")
+        prediction_settings({}, prediction_config(model="different.pt"), "best.pt")
 
 
 def test_prediction_autobatch_requires_override() -> None:
     from clearml_yolo.native_config import prediction_settings
 
     with pytest.raises(ValueError, match="batch"):
-        prediction_settings({"batch": -1}, {}, "best.pt")
+        prediction_settings({}, prediction_config(batch=-1), "best.pt")
 
 
-@pytest.mark.parametrize(("weights", "expected"), [("best.pt", "best.pt"), (None, "base.pt")])
-def test_null_predict_model_inherits_base_or_owned_checkpoint(
-    weights: str | None, expected: str
+@pytest.mark.parametrize(("weights", "expected"), [("best.pt", "best.pt"), (None, None)])
+def test_null_predict_model_never_inherits_training_architecture(
+    weights: str | None, expected: str | None
 ) -> None:
     from clearml_yolo.native_config import prediction_settings
 
-    assert prediction_settings({"model": "base.pt"}, {"model": None}, weights)["model"] == expected
+    assert (
+        prediction_settings({"model": "base.pt"}, prediction_config(model=None), weights)["model"]
+        == expected
+    )
 
 
 def test_source_cannot_override_ground_truth_membership() -> None:
     from clearml_yolo.native_config import prediction_settings
 
     with pytest.raises(ValueError, match="ground_truth"):
-        prediction_settings({"source": "different-images.txt"})
+        prediction_settings({}, prediction_config(source="different-images.txt"))
 
 
 def test_native_failure_preserves_replay_config_and_manifest(

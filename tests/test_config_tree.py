@@ -224,3 +224,20 @@ def test_generated_examples_load_in_fresh_cli_process(
     )
     assert result.returncode == 0, result.stderr
     assert "clearml:" in result.stdout
+
+
+def test_prediction_export_lists_complete_references_and_stage_values(tmp_path: Path) -> None:
+    import yaml
+
+    from clearml_yolo.config_tree import dump_config_tree
+    from clearml_yolo.native_config import PREDICT_KEYS, native_defaults
+
+    dump_config_tree(tmp_path)
+    prediction = yaml.safe_load((tmp_path / "ultralytics_predict/default.yaml").read_text())
+    assert prediction.keys() == native_defaults().keys() & PREDICT_KEYS
+    assert prediction["imgsz"] == "${ultralytics.imgsz}"
+    assert prediction["nms"] == "${ultralytics.nms}"
+    assert prediction["batch"] == 1
+    assert prediction["rect"] is True
+    assert prediction["save"] is False
+    assert prediction["source"] is None

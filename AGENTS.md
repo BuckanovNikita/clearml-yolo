@@ -65,8 +65,11 @@ Nine entrypoints: `cy`, `cy-train`, `cy-predict`, `cy-val`, `cy-metrics`,
 commands without creating a ClearML task. `cy-queue` remains removed.
 
 Native model settings use top-level Hydra groups `ultralytics` and `ultralytics_predict`
-for all model commands. The shared group covers installed upstream defaults; prediction
-inherits applicable values and applies explicit overrides, preserving nulls and defaults.
+for all model commands. The shared group covers detection-relevant installed upstream defaults; prediction
+inherits applicable values through visible configuration references, preserving explicit nulls
+and overrides. Prediction execution reads only its resolved group. Project defaults are
+imgsz=960, compile=true and nms=true; prediction uses conf=0.001, batch=1, rect=true and
+save=false. Native normalization is recorded separately from requested values.
 Generated `ultralytics/default.yaml` and `ultralytics_predict/default.yaml` contain native
 keys without wrapper indentation and preserve original comments. Use ordinary overrides
 such as `ultralytics.epochs=10` and `ultralytics_predict.batch=8`.

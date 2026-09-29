@@ -71,7 +71,7 @@ def predict(
     settings = prediction_settings(ultralytics, ultralytics_predict, weights)
     selected = settings.pop("model", None)
     if selected is None:
-        raise ValueError("Prediction requires weights=<checkpoint> or ultralytics.model")
+        raise ValueError("Prediction requires weights=<checkpoint> or ultralytics_predict.model")
     checkpoint = resolve_weights(selected)
     resolution = resolution_of(checkpoint, settings.get("imgsz"))
     settings["imgsz"] = resolution.scored_at
@@ -104,6 +104,17 @@ def predict(
         for index, group in enumerate(groups)
     ]
     effective = frames[0].attrs.get("effective_args", settings)
+    requested_by_split = {
+        str(i): frame.attrs.get("requested_args", settings) for i, frame in enumerate(frames)
+    }
+    native_shapes = {str(i): frame.attrs.get("normalized_imgsz") for i, frame in enumerate(frames)}
+    expect_artifacts(
+        task, ["predict_requested_arguments_by_split", "predict_normalized_image_sizes"]
+    )
+    upload_artifact(
+        task, "predict_requested_arguments_by_split", sanitize_configuration(requested_by_split)
+    )
+    upload_artifact(task, "predict_normalized_image_sizes", native_shapes)
     frame = pd.concat(frames, ignore_index=True)
 
     frame.to_csv(output_path, index=False)
@@ -172,6 +183,11 @@ def _predict_group(
         "mode": "predict",
     }
     write_native_yaml(config_path, provisional, "predict")
+    requested_path = config_path.with_name(config_path.stem + "_requested.yaml")
+    write_native_yaml(requested_path, provisional, "predict")
+    requested_name = requested_path.stem
+    expect_artifacts(task, [requested_name])
+    connect_config_file(task, requested_name, requested_path, allow_remote_override=False)
     frame = predict_on_images(
         checkpoint, group, image_name=image_name, manifest_dir=manifest_dir, **settings
     )

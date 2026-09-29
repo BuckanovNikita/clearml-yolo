@@ -9,7 +9,7 @@ from hydra_zen import builds, make_config, store
 from omegaconf import MISSING, OmegaConf
 
 from clearml_yolo.clearml_session import ClearMLConfig
-from clearml_yolo.native_config import native_defaults, prediction_defaults
+from clearml_yolo.native_config import native_defaults, prediction_defaults, stage_settings
 from clearml_yolo.tasks.compare import ModelRef
 from clearml_yolo.tasks.metrics import EvaluationConfig
 
@@ -21,7 +21,7 @@ PREDICTION_COMMANDS = NATIVE_COMMANDS
 
 def _native() -> dict[str, Any]:
     groups: list[Any] = ["_self_", {"ultralytics": "_defaults"}]
-    fields: dict[str, Any] = {"ultralytics": native_defaults()}
+    fields: dict[str, Any] = {"ultralytics": stage_settings(native_defaults(), "train")}
     groups.append({"ultralytics_predict": "_defaults"})
     fields["ultralytics_predict"] = prediction_defaults()
     return {"hydra_defaults": groups, **fields}
