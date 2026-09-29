@@ -73,6 +73,23 @@ def test_generated_pipeline_accepts_inputs_and_native_overrides(tmp_path: Path) 
     assert not OmegaConf.missing_keys(config)
 
 
+@pytest.mark.parametrize("command", ["cy", "cy-train"])
+def test_generated_csv_training_example_accepts_both_formats(tmp_path: Path, command: str) -> None:
+    from clearml_yolo.config_tree import dump_config_tree
+
+    dump_config_tree(tmp_path)
+    for dataset_format in ("ndjson", "flat"):
+        with initialize_config_dir(config_dir=str(tmp_path), version_base="1.3"):
+            config = compose(
+                config_name=command,
+                overrides=["ground_truth=truth.csv", f"dataset_format={dataset_format}"],
+            )
+        assert config.ground_truth == "truth.csv"
+        assert config.dataset_format == dataset_format
+        assert config.ultralytics.data is None
+        assert not OmegaConf.missing_keys(config)
+
+
 def test_existing_config_prevents_all_writes(tmp_path: Path) -> None:
     from clearml_yolo.config_tree import dump_config_tree
 

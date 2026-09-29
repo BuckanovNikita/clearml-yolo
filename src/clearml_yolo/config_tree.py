@@ -36,6 +36,17 @@ def _header(config_name: str, command: str, directory: Path) -> str:
     ]
     if config_name == "pipeline":
         lines.append("# Set run_dir to route all pipeline outputs together.")
+    if config_name in {"pipeline", "train"}:
+        lines.extend(
+            [
+                "# CSV training: ground_truth=truth.csv dataset_format=ndjson (or flat).",
+                "# Image paths inside the CSV resolve relative to the CSV directory.",
+                "# Invalid boxes are dropped and their total is reported before training.",
+                "# CSV data overrides native data, class filters, and dataset fractions.",
+            ]
+        )
+    if config_name == "train":
+        lines.append("# Without ground_truth, set ultralytics.data for native dataset training.")
     if config_name in {"predict", "val"}:
         lines.append("# Set weights to your trained checkpoint (or use ultralytics.model).")
     if config_name in NATIVE_COMMANDS:

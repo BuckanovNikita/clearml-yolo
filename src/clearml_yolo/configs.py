@@ -40,7 +40,16 @@ def register_configs() -> None:
     model = builds(ModelRef, populate_full_signature=True)
     store({}, group="ultralytics", name="_defaults")
     store({}, group="ultralytics_predict", name="_defaults")
-    store(make_config(**_native(), clearml=tracking), name="train")
+    store(
+        make_config(
+            **_native(),
+            clearml=tracking,
+            ground_truth=None,
+            dataset_format="ndjson",
+            required_splits=None,
+        ),
+        name="train",
+    )
     store(
         make_config(
             **_native(),
@@ -124,6 +133,7 @@ def register_configs() -> None:
             clearml=tracking,
             ground_truth=MISSING,
             splits=["val", "test"],
+            dataset_format="ndjson",
             weights=None,
             run_id=None,
             run_dir=None,

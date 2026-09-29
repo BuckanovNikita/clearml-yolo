@@ -42,6 +42,15 @@ def test_native_mapping_starts_full_and_accepts_explicit_values() -> None:
     assert "optimizer" in config.ultralytics
 
 
+@pytest.mark.parametrize("command", ["train", "pipeline"])
+def test_csv_training_commands_expose_dataset_format_defaults(command: str) -> None:
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        config = compose(config_name=command)
+    assert config.dataset_format == "ndjson"
+    if command == "train":
+        assert config.ground_truth is None
+
+
 def test_prediction_inherits_shared_cli_values_and_explicit_overrides() -> None:
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
         config = compose(

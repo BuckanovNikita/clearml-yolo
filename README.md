@@ -113,11 +113,12 @@ uv run cy-init-config ./conf
 
 ```bash
 uv run cy-train --config-dir=./conf --config-name=cy-train \
-  ultralytics.data=data.yaml ultralytics.model=yolo11n.pt ultralytics.epochs=10 \
+  ground_truth=ground_truth.csv ultralytics.model=yolo11n.pt ultralytics.epochs=10 \
   clearml.project_name=detection clearml.tags='[example]'
 ```
 
-Для полного конвейера сначала постройте CSV разметки:
+Для полного конвейера достаточно готового CSV разметки и доступных изображений.
+Если исходная разметка уж е находится в формате YOLO, сначала получите CSV:
 
 ```bash
 uv run cy-ground-truth data_yaml=data.yaml output=ground_truth.csv
@@ -132,7 +133,6 @@ uv run cy \
   clearml.project_name=detection \
   clearml.task_name=yolo11n-v3 \
   ground_truth=ground_truth.csv \
-  ultralytics.data=data.yaml \
   ultralytics.epochs=100 \
   ultralytics.device=0 \
   ultralytics_predict.device=0
@@ -148,6 +148,54 @@ uv run cy-predict weights=./weights/best.pt ground_truth=ground_truth.csv \
 uv run cy-val weights=./weights/best.pt ground_truth=ground_truth.csv \
   output_dir=./runs/validation ultralytics.device=0
 ```
+
+## Обучение из CSV разметки
+
+`cy` использует `ground_truth` как единственный источник данных для обучения и оценки.
+Для отдельного обучения передайте тот же CSV в `cy-train`:
+
+```bash
+uv run cy-train ground_truth=ground_truth.csv dataset_format=ndjson \
+  ultralytics.model=yolo11n.pt ultralytics.epochs=10 \
+  clearml.project_name=detection clearml.tags='[csv-training]'
+uv run cy-train ground_truth=ground_truth.csv dataset_format=flat \
+  ultralytics.model=yolo11n.pt ultralytics.epochs=10 \
+  clearml.project_name=detection clearml.tags='[csv-training-flat]'
+```
+
+По умолчанию `dataset_format=ndjson`; альтернативный формат — `flat`. Параметр находится
+на уровне команды, а не внутри `ultralytics`. NDJSON сохраняет метаданные и разметку
+по изображениям и локальный `path`. Нативный конвертер Ultralytics (>=8.4.165) читает
+этот файл и готовит данные внутри каталога запуска. HTTP-сервер не нужен.
+Flat сразу создаёт каталоги изображений и меток по сплитам и `data.yaml`.
+
+CSV содержит столбцы `image_name`, `image_path`, `instance_label`, `bbox_x_tl`,
+`bbox_y_tl`, `bbox_x_br`, `bbox_y_br`, `split`. Координаты — углы рамки в пикселях;
+`instance_label` — имя класса. `image_name` должен совпадать с именем файла изображения
+и однозначно определять его. Относительные `image_path` разрешаются от каталога CSV.
+Существующие `train`, `val`, `test` сохраняются без переразбиения; для обучения нужны
+непустые `train` и `val`, а для включённой оценки — запрошенные сплиты.
+Пустые класс и четыре координаты обозначают фоновое изображение.
+
+Некорректные рамки удаляются: неполные, нечисловые, бесконечные, нулевого или отрицательного
+размера, выходящие за границы изображения, либо без класса. Перед обучением выводится
+`Invalid bounding boxes dropped: N`, включая ноль. Каждая удалённая рамка учитывается один
+раз. Остальные рамки сохраняются; изображение без оставшихся рамок становится фоновым.
+Если во всём `train` не осталось корректной рамки, обучение не начинается. Ошибки структуры
+CSV, недоступные изображения и противоречивые идентификаторы или сплиты остаются фатальными.
+
+При CSV-обучении `ultralytics.data` заменяется подготовленными данными, отключаются фильтры
+классов и изменение доли датасета; `single_cls` и переназначение классов также не применяются.
+`resume` запрещён: для дообучения укажите checkpoint через `ultralytics.model`. Настройки
+устройства, batch, AMP, эпох и аугментаций сохраняются. Конвейер использует очищенный CSV
+для последующих предсказаний, метрик и сравнения.
+
+Подготовленные файлы находятся внутри каталога запуска, в `.datasets/<имя обучения>`
+нативного project. Исходный CSV и изображения не меняются. В ClearML сохраняются очищенная
+разметка, сводка подготовки с числом и причинами ошибок, описание датасета, архив меток,
+NDJSON для соответствующего режима и фактические переопределения. Изображения не загружаются.
+`cy-train` без `ground_truth` по-прежнему принимает нативный `ultralytics.data`;
+`skip_train=true` не запускает подготовку обучающего датасета.
 
 ## Нативные параметры Ultralytics
 
@@ -166,7 +214,7 @@ uv run cy-val weights=./weights/best.pt ground_truth=ground_truth.csv \
 uv run cy-train --config-dir=./conf --config-name=cy-train \
   ultralytics.data=data.yaml ultralytics.model=yolo11n.pt ultralytics.epochs=10
 uv run cy --config-dir=./conf --config-name=cy ground_truth=ground_truth.csv \
-  ultralytics.data=data.yaml ultralytics.imgsz=1280 ultralytics_predict.batch=8
+  ultralytics.imgsz=1280 ultralytics_predict.batch=8
 ```
 
 Общие значения задаются defaults, выбранным файлом группы и оверрайдами Hydra.

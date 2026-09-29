@@ -9,6 +9,8 @@ from typing import Any
 from hydra_zen import instantiate
 
 from clearml_yolo.clearml_session import ClearMLConfig, init_task, upload_artifact
+from clearml_yolo.dataset import apply_dataset_policy
+from clearml_yolo.dataset_export import DatasetFormat
 from clearml_yolo.native_config import prediction_settings
 from clearml_yolo.run_identity import RUNS_ROOT, point_latest_at, resolve_run_dir, resolve_run_id
 from clearml_yolo.tasks.compare import InferenceConfig, ModelRef, NoBaselineModelError
@@ -64,11 +66,23 @@ def _comparison_settings(settings: dict[str, Any]) -> InferenceConfig:
     return InferenceConfig(**fields, ultralytics=extras)
 
 
+def _required_training_splits(
+    splits: list[str], *, skip_predict: bool, skip_metrics: bool, skip_compare: bool
+) -> list[str]:
+    """Require only the supplied CSV splits that an enabled pipeline stage consumes."""
+    required = ["train", "val"]
+    if not skip_predict or not skip_metrics:
+        required.extend(splits)
+    if not skip_compare:
+        required.append("test")
+    return list(dict.fromkeys(required))
+
+
 def _compare_and_report(
     config: dict[str, Any],
     checkpoint: Path,
     thresholds: dict[str, float],
-    ground_truth: str,
+    ground_truth: str | Path,
     directory: Path,
     clearml: ClearMLConfig,
     inference: InferenceConfig,
@@ -106,6 +120,28 @@ def _compare_and_report(
     return results
 
 
+def _train_from_ground_truth(
+    train_params: dict[str, Any],
+    clearml: ClearMLConfig,
+    ground_truth: str,
+    dataset_format: DatasetFormat,
+    required_splits: list[str],
+    prediction_data_overrides: dict[str, dict[str, Any]],
+    task: Any,
+) -> tuple[Path, Path]:
+    trained = run_training(
+        train_params,
+        clearml,
+        ground_truth=ground_truth,
+        dataset_format=dataset_format,
+        required_splits=required_splits,
+    )
+    if trained.cleaned_ground_truth is None:
+        raise RuntimeError("CSV training did not return cleaned_ground_truth")
+    upload_artifact(task, "predict_data_overrides", prediction_data_overrides)
+    return trained.weights, trained.cleaned_ground_truth
+
+
 def run_pipeline(
     ultralytics: dict[str, Any],
     ultralytics_predict: dict[str, Any],
@@ -115,6 +151,7 @@ def run_pipeline(
     clearml: ClearMLConfig,
     ground_truth: str,
     splits: list[str],
+    dataset_format: DatasetFormat = "ndjson",
     run_id: str | None = None,
     run_dir: str | Path | None = None,
     weights: str | Path | None = None,
@@ -136,27 +173,51 @@ def run_pipeline(
         compare, {"baseline_model", "q", "bootstrap_iterations", "seed"}, "compare"
     )
     train_params = routed_native(ultralytics, directory / "detect", "train")
+    prediction_base = dict(ultralytics)
+    prediction_overrides = dict(ultralytics_predict)
+    prediction_data_overrides: dict[str, dict[str, Any]] = {}
+    if not skip_train:
+        # Validate both native groups before starting the expensive native training call.
+        prediction_base, shared_overrides = apply_dataset_policy(prediction_base)
+        prediction_overrides, explicit_overrides = apply_dataset_policy(prediction_overrides)
+        prediction_data_overrides = {
+            "shared": shared_overrides,
+            "ultralytics_predict": explicit_overrides,
+        }
     predict_params = routed_native(
-        prediction_settings(ultralytics, ultralytics_predict), directory / "native", "predict"
+        prediction_settings(prediction_base, prediction_overrides), directory / "native", "predict"
     )
     directory.mkdir(parents=True, exist_ok=True)
     point_latest_at(RUNS_ROOT, directory)
     results: dict[str, Any] = {"run_dir": directory}
     checkpoint = Path(weights) if weights else directory / "detect/train/weights/best.pt"
+    effective_ground_truth: str | Path = ground_truth
     if not skip_train:
-        trained = run_training(train_params, clearml)
-        checkpoint = trained.weights
+        checkpoint, effective_ground_truth = _train_from_ground_truth(
+            train_params,
+            clearml,
+            ground_truth,
+            dataset_format,
+            _required_training_splits(
+                splits,
+                skip_predict=skip_predict,
+                skip_metrics=skip_metrics,
+                skip_compare=skip_compare,
+            ),
+            prediction_data_overrides,
+            task,
+        )
         results["weights"] = checkpoint
     predictions = directory / PREDICTIONS_NAME
     if not skip_predict:
         predicted = run_prediction(
             checkpoint,
-            ground_truth,
+            effective_ground_truth,
             predictions,
             clearml,
             predict_params,
             splits=list(dict.fromkeys(["val", *splits])),
-            ultralytics_predict=ultralytics_predict
+            ultralytics_predict=prediction_overrides
             | {"project": predict_params["project"], "name": predict_params["name"]},
         )
         predictions = predicted.predictions
@@ -165,7 +226,7 @@ def run_pipeline(
     if not skip_metrics:
         evaluated = compute_metrics(
             predictions,
-            ground_truth,
+            effective_ground_truth,
             directory / METRICS_DIR,
             clearml,
             splits=splits,
@@ -185,7 +246,7 @@ def run_pipeline(
                 compare_cfg,
                 checkpoint,
                 thresholds,
-                ground_truth,
+                effective_ground_truth,
                 directory,
                 clearml,
                 _comparison_settings(predict_params),

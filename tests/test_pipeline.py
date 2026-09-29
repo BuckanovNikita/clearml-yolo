@@ -1,9 +1,11 @@
 """Pipeline routing rejects conflicting native and stage-owned outputs."""
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
+from clearml_yolo.clearml_session import ClearMLConfig
 from clearml_yolo.tasks.pipeline import routed_native
 
 
@@ -40,7 +42,11 @@ def test_hydra_pipeline_passes_real_stage_objects(
     monkeypatch.setattr(
         pipeline,
         "run_training",
-        lambda params, tracking: SimpleNamespace(weights=tmp_path / "actual.pt"),
+        lambda params, tracking, **kwargs: SimpleNamespace(
+            weights=tmp_path / "actual.pt",
+            cleaned_ground_truth=tmp_path / "cleaned.csv",
+            dataset_reference=tmp_path / "data.yaml",
+        ),
     )
     monkeypatch.setattr(
         pipeline,
@@ -68,3 +74,73 @@ def test_hydra_pipeline_passes_real_stage_objects(
     result = zen(pipeline.run_pipeline)(config)
     assert result["weights"] == tmp_path / "actual.pt"
     assert calls[0].iou_threshold == 0.5
+
+
+def test_pipeline_routes_cleaned_truth_and_prediction_policy_after_csv_training(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from types import SimpleNamespace
+
+    from clearml_yolo.tasks import pipeline
+
+    cleaned = tmp_path / "cleaned.csv"
+    calls: dict[str, Any] = {"truth": [], "uploads": []}
+    monkeypatch.setattr(pipeline, "init_task", lambda *args, **kwargs: object())
+    monkeypatch.setattr(pipeline, "point_latest_at", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        pipeline,
+        "upload_artifact",
+        lambda _task, name, value: calls["uploads"].append((name, value)),
+    )
+
+    def training(*args: Any, **kwargs: Any) -> SimpleNamespace:
+        assert kwargs["ground_truth"] == "source.csv"
+        assert kwargs["dataset_format"] == "flat"
+        assert kwargs["required_splits"] == ["train", "val", "test"]
+        return SimpleNamespace(
+            weights=tmp_path / "actual.pt",
+            cleaned_ground_truth=cleaned,
+            dataset_reference=tmp_path / "data.yaml",
+        )
+
+    def prediction(*args: Any, **kwargs: Any) -> SimpleNamespace:
+        calls["truth"].append(args[1])
+        assert args[4]["classes"] is None
+        assert kwargs["ultralytics_predict"]["classes"] is None
+        return SimpleNamespace(predictions=tmp_path / "predictions.csv")
+
+    def metrics(*args: Any, **kwargs: Any) -> SimpleNamespace:
+        calls["truth"].append(args[1])
+        Path(args[2]).mkdir(parents=True)
+        return SimpleNamespace(best_confidences={"val": {"cat": 0.5}})
+
+    monkeypatch.setattr(pipeline, "run_training", training)
+    monkeypatch.setattr(pipeline, "run_prediction", prediction)
+    monkeypatch.setattr(pipeline, "compute_metrics", metrics)
+
+    pipeline.run_pipeline(
+        ultralytics={"model": "architecture.pt", "classes": [1], "task": "detect"},
+        ultralytics_predict={"classes": [0]},
+        metrics={"evaluation": object(), "calibration_split": "val"},
+        report={"report_config_path": None},
+        compare={"baseline_model": object(), "q": 0.05, "bootstrap_iterations": 1, "seed": 0},
+        clearml=ClearMLConfig(),
+        ground_truth="source.csv",
+        splits=["test"],
+        run_dir=tmp_path,
+        dataset_format="flat",
+        skip_compare=True,
+        skip_report=True,
+    )
+
+    assert calls["truth"] == [cleaned, cleaned]
+    assert (
+        "predict_data_overrides",
+        {
+            "shared": {"classes": {"requested": [1], "effective": None}},
+            "ultralytics_predict": {
+                "classes": {"requested": [0], "effective": None},
+                "task": {"requested": None, "effective": "detect"},
+            },
+        },
+    ) in calls["uploads"]
