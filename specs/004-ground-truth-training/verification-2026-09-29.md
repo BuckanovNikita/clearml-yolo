@@ -107,3 +107,15 @@ were explicit; runtime confirmation and token usage were not exposed by the nati
 
 API-EQUIVALENT COST RECEIPT: unavailable for parent, implementers, and both reviewers because
 per-call usage is unobservable. No token totals, USD estimates, or savings are claimed.
+
+## Release Follow-up
+
+After the user authorized commit, push, and release, the final 434-test suite passed and
+all commit hooks passed on feature commit `ef7c6d9`. A native single-GPU NDJSON pipeline
+then completed one epoch with AMP enabled, produced its checkpoint, evaluated validation
+and test, and followed the expected missing-baseline skip path. Exactly one ClearML task
+completed; all 79 artifacts were downloaded and validated. The pre-training invalid-box
+count was three, CSV-owned overrides remained effective, and test thresholds matched
+validation thresholds. This extends the earlier CPU-only verification scope; physical
+multi-GPU/DDP remains unverified. Machine-specific logs are retained with the global
+environment skill. Distribution-install and publication results are reported in the release.
