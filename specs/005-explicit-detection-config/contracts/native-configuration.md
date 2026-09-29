@@ -4,11 +4,13 @@
 
 ultralytics owns detection training and its internal validation. ultralytics_predict owns
 all application prediction, including cy-val and cy-compare. Ordinary CLI overrides remain.
-Generated prediction YAML lists all applicable keys. Shared references are visible; changing
+Generated prediction YAML lists all applicable keys, with cy-controlled keys commented
+only in examples; see the [cleanup contract](../../007-detection-config-cleanup/contracts/configuration-and-artifacts.md). Shared references are visible; changing
 a reference to a literal makes it independent. A prediction literal always wins.
 
 Project defaults: training model yolo11n.pt, imgsz 960, compile true, nms true. Prediction
-references shared imgsz/compile/nms and uses conf 0.001, batch 1, rect true, save false.
+references shared imgsz/compile/nms and uses device [-1], conf 0.001, batch 1, rect true,
+save false. Training device remains null; prediction device is independent.
 Training's native conf null is preserved. Model/project/name are prediction-local null;
 model is provided by weights or explicit ultralytics_predict.model. No training-model fallback.
 

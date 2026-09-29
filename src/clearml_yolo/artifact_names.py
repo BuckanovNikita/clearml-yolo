@@ -29,6 +29,19 @@ MATCHES_PREDS_PREFIX = "metrics_matches_preds"
 METRICS_SUMMARY_PREFIX = "metrics_summary"
 METRICS_RAW_PREFIX = "metrics_raw"
 BEST_CONFIDENCES_PREFIX = "metrics_best_confidences"
+PLOT_METRICS = ("recall", "precision", "perebrak", "nedobrak")
+METRIC_SPLIT_PREFIXES = (
+    DASHBOARD_FULL_PREFIX,
+    DASHBOARD_DTRK_PREFIX,
+    MATCHES_GT_PREFIX,
+    MATCHES_PREDS_PREFIX,
+    "metrics_confusion_matrix",
+    METRICS_SUMMARY_PREFIX,
+    METRICS_RAW_PREFIX,
+    BEST_CONFIDENCES_PREFIX,
+    *(f"metrics_plot_{metric}" for metric in PLOT_METRICS),
+    "metrics_evaluation",
+)
 
 REPORT_DEV_PREFIX = "report_dev"
 REPORT_BUSINESS_PREFIX = "report_business"
@@ -54,3 +67,8 @@ def per_split(prefix: str, split: str) -> str:
     keeps three evaluations of the same model from overwriting each other.
     """
     return f"{prefix}_{split}"
+
+
+def metric_split_names(split: str) -> tuple[str, ...]:
+    """The required split inventory, excluding invocation-wide evidence and receipts."""
+    return tuple(per_split(prefix, split) for prefix in METRIC_SPLIT_PREFIXES)

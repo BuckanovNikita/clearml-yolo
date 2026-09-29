@@ -51,30 +51,35 @@ def _upload(task: Any, name: str, value: Any) -> None:
 def _publish_split(
     task: Any, split: str, evaluated: EvaluatedSplit, evaluation_path: Path
 ) -> None:
-    name = artifact_names.per_split
-    _upload(task, name(artifact_names.DASHBOARD_FULL_PREFIX, split), evaluated.dashboard_path)
-    _upload(task, name(artifact_names.DASHBOARD_DTRK_PREFIX, split), evaluated.dtrk_dashboard_path)
-    _upload(task, name(artifact_names.MATCHES_GT_PREFIX, split), evaluated.gt_matches)
-    _upload(task, name(artifact_names.MATCHES_PREDS_PREFIX, split), evaluated.pred_matches)
-    _upload(task, name("metrics_confusion_matrix", split), evaluated.confusion_matrix_path)
-    for metric_name, path in evaluated.plot_paths.items():
-        _upload(task, name(f"metrics_plot_{metric_name}", split), path)
-
     per_class, summary = summarize_metrics(evaluated.metrics)
-    _upload(task, name(artifact_names.METRICS_SUMMARY_PREFIX, split), per_class)
+    artifacts: dict[str, Any] = {
+        artifact_names.DASHBOARD_FULL_PREFIX: evaluated.dashboard_path,
+        artifact_names.DASHBOARD_DTRK_PREFIX: evaluated.dtrk_dashboard_path,
+        artifact_names.MATCHES_GT_PREFIX: evaluated.gt_matches,
+        artifact_names.MATCHES_PREDS_PREFIX: evaluated.pred_matches,
+        "metrics_confusion_matrix": evaluated.confusion_matrix_path,
+        artifact_names.METRICS_SUMMARY_PREFIX: per_class,
+        artifact_names.METRICS_RAW_PREFIX: {
+            class_name: metric.model_dump() for class_name, metric in evaluated.metrics.items()
+        },
+        artifact_names.BEST_CONFIDENCES_PREFIX: evaluated.thresholds,
+        "metrics_evaluation": evaluation_path,
+        **{f"metrics_plot_{metric}": path for metric, path in evaluated.plot_paths.items()},
+    }
+    required = set(artifact_names.METRIC_SPLIT_PREFIXES)
+    if artifacts.keys() != required:
+        raise ValueError(
+            f"Split {split!r} artifact inventory mismatch: "
+            f"missing={sorted(required - artifacts.keys())}, "
+            f"unexpected={sorted(artifacts.keys() - required)}"
+        )
+    for value in artifacts.values():
+        if isinstance(value, Path) and not value.is_file():
+            raise FileNotFoundError(f"Required split artifact is not a file: {value}")
+    for prefix in artifact_names.METRIC_SPLIT_PREFIXES:
+        _upload(task, artifact_names.per_split(prefix, split), artifacts[prefix])
     report_table(task, artifact_names.METRICS_SECTION, split, per_class)
     report_scalars(task, f"{artifact_names.METRICS_SECTION}_{split}", summary)
-    _upload(
-        task,
-        name(artifact_names.METRICS_RAW_PREFIX, split),
-        {class_name: metric.model_dump() for class_name, metric in evaluated.metrics.items()},
-    )
-    _upload(
-        task,
-        name(artifact_names.BEST_CONFIDENCES_PREFIX, split),
-        evaluated.thresholds,
-    )
-    _upload(task, name("metrics_evaluation", split), evaluation_path)
 
 
 def _prepare(
@@ -117,7 +122,7 @@ def compute_metrics(
     """Calibrate once on validation and score requested splits at that exact mapping."""
     task = init_task(clearml, stage="metrics")
     publisher = prepare_publisher(task, fiftyone, factory=create_publisher)
-    requested = splits or ["train", "val", "test"]
+    requested = list(dict.fromkeys(splits or ["train", "val", "test"]))
     if calibration_split != "val":
         raise ValueError(
             "calibration_split must be exactly 'val'; test data must never calibrate thresholds"
@@ -127,23 +132,7 @@ def compute_metrics(
 
     expected = ["metrics_predictions", "metrics_ground_truth", "metrics_methodology"]
     for split in requested:
-        expected.extend(
-            [
-                artifact_names.per_split(artifact_names.DASHBOARD_FULL_PREFIX, split),
-                artifact_names.per_split(artifact_names.DASHBOARD_DTRK_PREFIX, split),
-                artifact_names.per_split(artifact_names.MATCHES_GT_PREFIX, split),
-                artifact_names.per_split(artifact_names.MATCHES_PREDS_PREFIX, split),
-                artifact_names.per_split("metrics_confusion_matrix", split),
-                artifact_names.per_split(artifact_names.METRICS_SUMMARY_PREFIX, split),
-                artifact_names.per_split(artifact_names.METRICS_RAW_PREFIX, split),
-                artifact_names.per_split(artifact_names.BEST_CONFIDENCES_PREFIX, split),
-                artifact_names.per_split("metrics_evaluation", split),
-                *(
-                    artifact_names.per_split(f"metrics_plot_{metric}", split)
-                    for metric in ("recall", "precision", "perebrak", "nedobrak")
-                ),
-            ]
-        )
+        expected.extend(artifact_names.metric_split_names(split))
     if task is not None:
         expect_artifacts(task, expected)
 

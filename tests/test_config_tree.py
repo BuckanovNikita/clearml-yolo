@@ -2,6 +2,7 @@
 
 from importlib.metadata import distribution
 from pathlib import Path
+from typing import Literal
 
 import pytest
 from hydra import compose, initialize_config_dir, initialize_config_module
@@ -234,10 +235,53 @@ def test_prediction_export_lists_complete_references_and_stage_values(tmp_path: 
 
     dump_config_tree(tmp_path)
     prediction = yaml.safe_load((tmp_path / "ultralytics_predict/default.yaml").read_text())
-    assert prediction.keys() == native_defaults().keys() & PREDICT_KEYS
+    assert prediction.keys() == (native_defaults().keys() & PREDICT_KEYS) - {
+        "task",
+        "mode",
+        "data",
+        "project",
+        "name",
+        "source",
+        "model",
+    }
     assert prediction["imgsz"] == "${ultralytics.imgsz}"
     assert prediction["nms"] == "${ultralytics.nms}"
     assert prediction["batch"] == 1
     assert prediction["rect"] is True
     assert prediction["save"] is False
-    assert prediction["source"] is None
+    assert prediction["device"] == [-1]
+
+
+@pytest.mark.parametrize("stage", ["train", "predict"])
+def test_example_sections_comment_controlled_keys_only_in_examples(
+    tmp_path: Path, stage: Literal["train", "predict"]
+) -> None:
+    import yaml
+
+    from clearml_yolo.config_tree import dump_config_tree
+    from clearml_yolo.native_config import native_template, render_native_yaml
+
+    dump_config_tree(tmp_path)
+    group = "ultralytics" if stage == "train" else "ultralytics_predict"
+    text = (tmp_path / group / "default.yaml").read_text()
+    values = yaml.safe_load(text)
+    controlled = {"task", "mode", "data", "project", "name"}
+    if stage == "predict":
+        controlled |= {"source", "model"}
+    else:
+        assert {"model", "classes", "fraction"} <= values.keys()
+    assert controlled.isdisjoint(values)
+    assert all(f"# {key}:" in text for key in controlled)
+    assert text.index("imgsz:") < text.index("# task:") < text.index("# overlap_mask:")
+    for line in native_template().splitlines():
+        if "#" in line:
+            assert line[line.index("#") :] in text
+    with initialize_config_dir(config_dir=str(tmp_path), version_base="1.3"):
+        config = compose(config_name="cy")
+    resolved = OmegaConf.to_container(config[group], resolve=True)
+    assert isinstance(resolved, dict)
+    assert controlled <= resolved.keys()
+    runtime = yaml.safe_load(
+        render_native_yaml({str(key): value for key, value in resolved.items()}, stage)
+    )
+    assert controlled <= runtime.keys()

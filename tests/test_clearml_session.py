@@ -580,3 +580,41 @@ def test_common_authentication_shapes_are_redacted() -> None:
         "auth": "<redacted>",
         "endpoint": "https://example.test?sig=%3Credacted%3E&safe=yes",
     }
+
+
+def test_metric_split_upload_rejection_fails_owner_and_retains_payload(
+    fake_clearml: tuple[type[Any], FakeTask], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from clearml_yolo.publishing.models import FiftyOneConfig
+    from clearml_yolo.tasks.metrics import EvaluationConfig, compute_metrics
+    from test_metrics import _write_inputs
+
+    _, task = fake_clearml
+    predictions, ground_truth = _write_inputs(tmp_path)
+    original = task.upload_artifact
+
+    def reject_evaluation(**kwargs: Any) -> bool:
+        if kwargs["name"] == "metrics_evaluation_test":
+            return False
+        return original(**kwargs)
+
+    monkeypatch.setattr(task, "upload_artifact", reject_evaluation)
+    monkeypatch.setattr("clearml_yolo.tasks.metrics.report_table", lambda *a: None)
+    monkeypatch.setattr("clearml_yolo.tasks.metrics.report_scalars", lambda *a: None)
+    with (
+        pytest.raises(ArtifactUploadError, match="metrics_evaluation_test"),
+        invocation(ClearMLConfig(), "metrics"),
+    ):
+        compute_metrics(
+            predictions,
+            ground_truth,
+            tmp_path / "metrics",
+            ClearMLConfig(),
+            EvaluationConfig(),
+            splits=["test"],
+            fiftyone=FiftyOneConfig(enabled=False),
+        )
+    assert task.failed
+    assert not task.completed
+    assert (tmp_path / "metrics/evaluation_test.json").is_file()
+    assert (tmp_path / "metrics/full_dashboard_test.xlsx").is_file()

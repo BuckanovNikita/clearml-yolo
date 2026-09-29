@@ -227,6 +227,7 @@ def prediction_defaults() -> dict[str, Any]:
         batch=1,
         rect=True,
         save=False,
+        device=[-1],
     )
     return values
 
@@ -247,7 +248,7 @@ def _value_yaml(key: str, value: Any) -> str:
     return dumped.rstrip("\n")
 
 
-def render_native_yaml(settings: dict[str, Any], stage: Stage) -> str:
+def render_native_yaml(settings: dict[str, Any], stage: Stage, *, example: bool = False) -> str:
     """Keep every upstream comment and comment out inactive parameter entries."""
     values = stage_settings(settings, stage)
     allowed = TRAIN_KEYS if stage == "train" else PREDICT_KEYS
@@ -269,7 +270,40 @@ def render_native_yaml(settings: dict[str, Any], stage: Stage) -> str:
     if additional:
         lines.extend(["", "# Additional native parameters (not listed in upstream default.yaml)"])
         lines.extend(_value_yaml(key, values[key]) for key in sorted(additional))
+    if example:
+        return _example_sections(lines, stage)
     return "\n".join(lines) + "\n"
+
+
+def _example_sections(lines: list[str], stage: Stage) -> str:
+    """Move documented parameter blocks together without changing runtime rendering."""
+    controlled = {"task", "mode", "data", "project", "name"}
+    if stage == "predict":
+        controlled |= {"source", "model"}
+    sections: list[list[str]] = [[], [], []]
+    pending: list[str] = []
+    for line in lines:
+        match = _KEY_LINE.match(line.removeprefix("# "))
+        if match is None:
+            pending.append(line)
+            continue
+        section = 1 if match.group(1) in controlled else (2 if line.startswith("# ") else 0)
+        rendered = f"# {line}" if section == 1 and not line.startswith("# ") else line
+        sections[section].extend([*pending, rendered])
+        pending = []
+    sections[-1].extend(pending)
+    headings = (
+        "Active detection settings",
+        "cy-controlled settings",
+        "Stage-inapplicable settings",
+    )
+    return (
+        "\n\n".join(
+            f"# {heading}\n" + "\n".join(section)
+            for heading, section in zip(headings, sections, strict=True)
+        )
+        + "\n"
+    )
 
 
 def write_native_yaml(path: Path, settings: dict[str, Any], stage: Stage) -> Path:

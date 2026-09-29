@@ -39,10 +39,12 @@ def test_validation_disables_nested_prediction_and_metrics_publication(
     monkeypatch.setattr(val, "init_task", lambda *_args, **_kwargs: SimpleNamespace(id="val-task"))
 
     def predict(*_args: Any, **kwargs: Any) -> SimpleNamespace:
+        assert set(kwargs["splits"]) == {"train", "val", "test"}
         nested.append(kwargs["fiftyone"])
         return SimpleNamespace(predictions=predictions)
 
     def metrics(*_args: Any, **kwargs: Any) -> MetricsResult:
+        assert set(kwargs["splits"]) == {"train", "val", "test"}
         nested.append(kwargs["fiftyone"])
         return expected
 

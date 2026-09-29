@@ -232,3 +232,25 @@ def test_native_data_training_rejects_non_detection_model(
     monkeypatch.setitem(sys.modules, "ultralytics.models", module)
     with pytest.raises(ValueError, match="detection model"):
         train(training_settings(project=str(tmp_path), name="native", data=None), ClearMLConfig())
+
+
+def test_implicit_training_name_uses_active_task(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from types import SimpleNamespace
+
+    from clearml_yolo.tasks import train as module
+
+    task = SimpleNamespace(name="renamed/task", id="id", get_project_name=lambda: "project")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(module, "init_task", lambda *a, **k: task)
+    monkeypatch.setattr(module, "expect_artifacts", lambda *a: None)
+
+    def capture(_task: object, settings: dict[str, Any], *args: Any) -> Any:
+        assert settings["name"] == "renamed%2Ftask"
+        assert settings["project"] == str(tmp_path / "runs/project/renamed%2Ftask-id/detect")
+        raise RuntimeError("captured routing")
+
+    monkeypatch.setattr(module, "_prepare_csv_dataset", capture)
+    with pytest.raises(RuntimeError, match="captured routing"):
+        train(training_settings(), ClearMLConfig(task_name="requested"), ground_truth="truth.csv")

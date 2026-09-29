@@ -62,6 +62,14 @@ def resolve_task_name(config: ClearMLConfig, stage: str) -> str:
     return config.task_name if stage == "pipeline" else f"{config.task_name}/{stage}"
 
 
+def task_identity(task: Any) -> tuple[str, str, str]:
+    """Read the active SDK identity, including remote overrides and project hierarchy."""
+    values = (task.get_project_name(), task.name, task.id)
+    if any(not isinstance(value, str) or not value for value in values):
+        raise ValueError("Active ClearML task requires a project name, task name and ID")
+    return values
+
+
 class ArtifactUploadError(RuntimeError):
     """A required artifact or final upload barrier was rejected."""
 

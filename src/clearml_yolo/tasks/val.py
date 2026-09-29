@@ -20,7 +20,7 @@ def validate(
     ultralytics_predict: dict[str, Any] | None = None,
 ) -> MetricsResult:
     init_task(clearml, stage="val")
-    selected = splits or ["val", "test"]
+    selected = list(dict.fromkeys(splits or ["train", "val", "test"]))
     destination = Path(output_dir)
     predicted = predict(
         weights,

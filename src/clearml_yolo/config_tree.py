@@ -33,6 +33,7 @@ def _header(config_name: str, command: str, directory: Path) -> str:
         "# Replace ??? with your required inputs before running.",
         "# Relative input paths are resolved from the working directory.",
         "# Set clearml.project_name, clearml.task_name and clearml.tags for your run.",
+        "# Implicit outputs use runs/<safe-project>/<safe-task>-<task-id>/.",
     ]
     if config_name == "pipeline":
         lines.append("# Set run_dir to route all pipeline outputs together.")
@@ -53,7 +54,9 @@ def _header(config_name: str, command: str, directory: Path) -> str:
         lines.extend(
             [
                 "# Paste upstream native YAML unchanged into ultralytics/default.yaml.",
-                "# Override shared values: ultralytics.device=cpu ultralytics.epochs=10",
+                "# Override shared values: ultralytics.imgsz=960 ultralytics.epochs=10",
+                "# Devices are independent: training=null, prediction=[-1].",
+                "# CPU: ultralytics.device=cpu ultralytics_predict.device=cpu",
             ]
         )
     if config_name in PREDICTION_COMMANDS:
@@ -108,9 +111,9 @@ def dump_config_tree(directory: str | Path, *, overwrite: bool = False) -> list[
             )
     contents.extend(
         [
-            render_native_yaml(native_defaults(), "train"),
+            render_native_yaml(native_defaults(), "train", example=True),
             "# Shared references remain editable; use a literal to override a reference.\n"
-            + render_native_yaml(prediction_defaults(), "predict"),
+            + render_native_yaml(prediction_defaults(), "predict", example=True),
         ]
     )
 

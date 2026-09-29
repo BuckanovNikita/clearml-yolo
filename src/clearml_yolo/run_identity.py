@@ -1,17 +1,7 @@
-"""What one run is called, and the directory that is only its own.
+"""Filesystem-only output identities and the workspace's latest-run shortcut.
 
-Two runs started in the same folder used to train into the same ``runs/detect/<task_name>``
-with ultralytics' ``exist_ok: true`` set, which is not a confusing merge but a deletion: the
-DDP launcher clears the save directory before it spawns its children, so one run's start
-destroys a peer's in-flight checkpoints. A run therefore gets an identity first, and every
-path it writes hangs off a directory named after that identity.
-
-The id carries the host because a workspace on a shared mount can be driven from two
-machines, and the pid because two runs on one machine must differ. Neither is enough on its
-own and the pair is unique only among *live* runs: per-run directories are kept, pids are
-recycled across a reboot, and ``exist_ok`` is still true, so a stamp is what stops a run
-from quietly overwriting an old one. ``now`` is a parameter rather than read here so the
-identity is decided by the caller and the tests are deterministic.
+Execution roots use plain identity values supplied by the tracking adapter. The legacy
+host/time identity helper remains available to callers that explicitly use it.
 """
 
 import os
@@ -19,6 +9,7 @@ import socket
 from contextlib import suppress
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import quote
 
 from loguru import logger
 
@@ -30,6 +21,34 @@ LATEST_LINK_NAME = "latest"
 # to write names itself one under here, whether it is the whole pipeline or a single
 # standalone app.
 RUNS_ROOT = Path("runs")
+
+
+def safe_path_component(value: str) -> str:
+    """Encode names reversibly as portable single components, including Windows devices."""
+    if not value:
+        raise ValueError("Task identity components must be nonempty")
+    encoded = quote(value, safe="-_", encoding="utf-8").replace(".", "%2E").replace("~", "%7E")
+    reserved = {
+        LATEST_LINK_NAME.upper(),
+        "CON",
+        "PRN",
+        "AUX",
+        "NUL",
+        *(f"COM{i}" for i in range(10)),
+        *(f"LPT{i}" for i in range(10)),
+    }
+    if encoded.upper() in reserved:
+        encoded = f"%{ord(encoded[0]):02X}{encoded[1:]}"
+    return encoded
+
+
+def task_run_dir(root: Path, project_name: str, task_name: str, task_id: str) -> Path:
+    """Resolve an implicit root from plain identity values, independent of tracking SDKs."""
+    return (
+        root
+        / safe_path_component(project_name)
+        / f"{safe_path_component(task_name)}-{safe_path_component(task_id)}"
+    ).resolve()
 
 
 def _host_and_pid() -> tuple[str, int]:

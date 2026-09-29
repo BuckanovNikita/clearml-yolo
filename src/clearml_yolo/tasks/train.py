@@ -1,7 +1,6 @@
 """Native Ultralytics training with explicit artifact ownership."""
 
 import asyncio
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -14,12 +13,13 @@ from clearml_yolo.clearml_session import (
     expect_artifacts,
     init_task,
     sanitize_configuration,
+    task_identity,
     upload_artifact,
 )
 from clearml_yolo.dataset import PreparedDataset, apply_dataset_policy, prepare_dataset
 from clearml_yolo.dataset_export import DatasetFormat
 from clearml_yolo.native_config import execution_settings, stage_settings, write_native_yaml
-from clearml_yolo.run_identity import RUNS_ROOT, point_latest_at, resolve_run_dir, resolve_run_id
+from clearml_yolo.run_identity import RUNS_ROOT, point_latest_at, safe_path_component, task_run_dir
 
 TRAIN_DIR = "detect"
 
@@ -32,12 +32,10 @@ class TrainResult(BaseModel):
     dataset_reference: Path | None = None
 
 
-def _project_of_this_run(project: str | None, task_name: str) -> Path:
+def _project_of_this_run(project: str | None, task: Any) -> Path:
     if project is not None:
         return Path(project).resolve()
-    directory = resolve_run_dir(
-        RUNS_ROOT, resolve_run_id(task_name, None, datetime.now(tz=UTC)), None
-    )
+    directory = task_run_dir(RUNS_ROOT, *task_identity(task))
     directory.mkdir(parents=True, exist_ok=True)
     point_latest_at(RUNS_ROOT, directory)
     return directory / TRAIN_DIR
@@ -149,8 +147,8 @@ def train(
     if not architecture:
         raise ValueError("Set ultralytics.model explicitly; no training model fallback is provided")
     settings["mode"] = "train"
-    settings["project"] = str(_project_of_this_run(settings.get("project"), clearml.task_name))
-    settings["name"] = settings.get("name") or clearml.task_name
+    settings["project"] = str(_project_of_this_run(settings.get("project"), task))
+    settings["name"] = settings.get("name") or safe_path_component(task_identity(task)[1])
     expected = [
         "training_model_reference",
         "train_effective_arguments",

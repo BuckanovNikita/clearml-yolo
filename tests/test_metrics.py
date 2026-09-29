@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import pytest
@@ -12,7 +13,7 @@ from clearml_yolo.publishing.models import (
     PublicationReceipt,
     PublicationRequest,
 )
-from clearml_yolo.tasks.metrics import EvaluationConfig, _prepare, compute_metrics
+from clearml_yolo.tasks.metrics import EvaluationConfig, MetricsResult, _prepare, compute_metrics
 
 GT_COLUMNS = [
     "image_name",
@@ -289,3 +290,140 @@ def test_metrics_preflights_before_scoring_and_publishes_evaluation_payloads(
         "evaluation": evaluation.model_dump(mode="json") | {"calibration_split": "val"}
     }
     assert (tmp_path / "metrics/fiftyone_publication.json").is_file()
+
+
+@pytest.mark.parametrize("zero_predictions", [False, True])
+def test_three_split_inventory_and_exact_payloads(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, zero_predictions: bool
+) -> None:
+    from typing import Any
+
+    from clearml_yolo.tasks import metrics as module
+
+    predictions, ground_truth = _write_inputs(tmp_path)
+    truth = pd.read_csv(ground_truth)
+    train = truth[truth.split == "val"].assign(
+        split="train", image_name="train.jpg", image_path="/images/train.jpg"
+    )
+    pd.concat([train, truth], ignore_index=True).to_csv(ground_truth, index=False)
+    frame = pd.read_csv(predictions)
+    train_predictions = frame[frame.image_name == "val.jpg"].assign(image_name="train.jpg")
+    frame = pd.concat([train_predictions, frame], ignore_index=True)
+    (frame.iloc[:0] if zero_predictions else frame).to_csv(predictions, index=False)
+    uploads: dict[str, Any] = {}
+    monkeypatch.setattr(module, "init_task", lambda *a, **k: object())
+    monkeypatch.setattr(module, "expect_artifacts", lambda *a: None)
+    monkeypatch.setattr(
+        module, "upload_artifact", lambda _t, name, value: uploads.update({name: value})
+    )
+    monkeypatch.setattr(module, "report_table", lambda *a: None)
+    monkeypatch.setattr(module, "report_scalars", lambda *a: None)
+    result = compute_metrics(
+        predictions,
+        ground_truth,
+        tmp_path / "metrics",
+        ClearMLConfig(),
+        EvaluationConfig(),
+        fiftyone=FiftyOneConfig(enabled=False),
+    )
+    _assert_split_evidence(result, uploads, zero_predictions)
+
+
+def _assert_split_evidence(
+    result: MetricsResult, uploads: dict[str, Any], zero_predictions: bool
+) -> None:
+    from clearml_yolo.comparison.evaluation_payload import EvaluationPayload
+
+    inventories: list[set[str]] = []
+    file_paths: set[Path] = set()
+    for split in ("train", "val", "test"):
+        names = {name for name in uploads if name.endswith(f"_{split}")}
+        assert len(names) == 13
+        inventories.append({name.removesuffix(f"_{split}") for name in names})
+        for name in names:
+            value = uploads[name]
+            if isinstance(value, Path):
+                assert value.is_file()
+                assert value not in file_paths
+                file_paths.add(value)
+        payload = EvaluationPayload.model_validate_json(result.evaluations[split].read_text())
+        assert payload.schema_version == 1
+        assert payload.split == split
+        assert payload.thresholds == result.best_confidences[split]
+        assert len(payload.ground_truth) == 1
+        if zero_predictions:
+            assert payload.predictions == []
+            assert [
+                (match.status, match.gt_index, match.pred_index) for match in payload.matches
+            ] == [("FN", 0, None)]
+        else:
+            for match in payload.matches:
+                if match.gt_index is not None:
+                    box = next(box for box in payload.ground_truth if box.index == match.gt_index)
+                    assert match.gt_label == box.label
+                    assert match.status == box.status
+                if match.pred_index is not None:
+                    box = next(box for box in payload.predictions if box.index == match.pred_index)
+                    assert match.pred_label == box.label
+                    assert match.confidence == box.confidence
+                    assert match.status == box.status
+                if match.status == "TP":
+                    assert match.iou == 1.0
+    assert inventories[0] == inventories[1] == inventories[2]
+    assert (
+        result.best_confidences["train"]
+        == result.best_confidences["val"]
+        == result.best_confidences["test"]
+    )
+    assert "fiftyone_publication" not in uploads
+
+
+def test_missing_required_plot_fails_even_without_tracking(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from typing import Any
+
+    from clearml_yolo.tasks import metrics as module
+
+    predictions, ground_truth = _write_inputs(tmp_path)
+    from clearml_yolo.comparison.scoring import evaluate_split
+
+    original = evaluate_split
+
+    def missing_plot(*args: Any, **kwargs: Any) -> Any:
+        evaluated = original(*args, **kwargs)
+        evaluated.plot_paths.pop("recall")
+        return evaluated
+
+    monkeypatch.setattr(module, "init_task", lambda *a, **k: None)
+    monkeypatch.setattr(module, "evaluate_split", missing_plot)
+    with pytest.raises(ValueError, match="inventory"):
+        compute_metrics(
+            predictions,
+            ground_truth,
+            tmp_path / "metrics",
+            ClearMLConfig(),
+            EvaluationConfig(),
+            splits=["test"],
+            fiftyone=FiftyOneConfig(enabled=False),
+        )
+
+
+@pytest.mark.parametrize("case", ["missing", "empty"])
+def test_unsupported_split_inputs_fail_clearly(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, case: str
+) -> None:
+    predictions, ground_truth = _write_inputs(tmp_path)
+    if case == "empty":
+        pd.read_csv(ground_truth).iloc[:0].to_csv(ground_truth, index=False)
+    monkeypatch.setattr("clearml_yolo.tasks.metrics.init_task", lambda *a, **k: None)
+    with pytest.raises(ValueError, match=r"(?i)no ground-truth rows|no labelled objects"):
+        compute_metrics(
+            predictions,
+            ground_truth,
+            tmp_path / "metrics",
+            ClearMLConfig(),
+            EvaluationConfig(),
+            splits=["train"],
+            fiftyone=FiftyOneConfig(enabled=False),
+        )

@@ -17,6 +17,9 @@ Native settings use top-level `ultralytics` and `ultralytics_predict` groups for
 command. The shared group covers upstream defaults and original comments; prediction inherits
 applicable values and applies explicit overrides, including nulls/default values. Ordinary
 Hydra overrides work without `+` for known native keys. Prediction confidence defaults to 0.001.
+Prediction device defaults independently to [-1]; training device remains null. Example-only
+controlled-key comments and active-first sections are defined in the
+[cleanup contract](../../007-detection-config-cleanup/contracts/configuration-and-artifacts.md).
 Native group files have native keys at their root. Stage-irrelevant settings are excluded from
 execution and commented in effective native YAML. Wrapper controls remain separate.
 Raw wrapper `cfg`, non-null native `cfg`, nested stage mappings and duplicate native comparison
@@ -26,10 +29,13 @@ Source configurations and resolved configuration are captured before execution.
 
 `run_dir` routes the whole pipeline. Native project/name that disagree with the chosen
 pipeline training directory fail. Standalone training honors explicit native project/name;
-otherwise it creates an isolated run. Standalone output-producing commands default to a
+otherwise it creates an isolated run rooted at
+`runs/<safe-project>/<safe-task>-<task-id>/` using the active ClearML identity. Standalone output-producing commands default to a
 fresh directory and require explicit input paths; no silently shared output directories.
 `cy-val` accepts weights, ground_truth, ultralytics, ultralytics_predict, evaluation, splits and output_dir;
 it predicts required val plus requested splits and evaluates at frozen validation thresholds.
+`cy`, `cy-val`, and `cy-metrics` default to train/val/test, with explicit subsets preserved.
+Comparison and reports remain test-only; `cy-val` never publishes to FiftyOne.
 
 Comparison takes baseline_model/candidate_model references, current ground_truth, ultralytics, ultralytics_predict,
 split=test and statistical options. Automatic baseline is latest completed prod excluding

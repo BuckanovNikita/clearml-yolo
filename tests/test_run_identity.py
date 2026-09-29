@@ -67,9 +67,10 @@ def test_an_explicit_run_dir_wins_over_the_one_the_id_would_name(tmp_path: Path)
 
 def test_a_run_dir_is_named_after_the_run_id_beneath_the_root(tmp_path: Path) -> None:
     """The directory is what makes two runs in one folder stop overwriting each other."""
-    assert resolve_run_dir(tmp_path, "yolo-run-box-20260816-120000-4242", None) == (
-        tmp_path / "yolo-run-box-20260816-120000-4242"
-    ).resolve()
+    assert (
+        resolve_run_dir(tmp_path, "yolo-run-box-20260816-120000-4242", None)
+        == (tmp_path / "yolo-run-box-20260816-120000-4242").resolve()
+    )
 
 
 @pytest.mark.parametrize("explicit", [None, Path("runs/handmade")])
@@ -231,3 +232,55 @@ def test_a_filesystem_that_refuses_symlinks_costs_a_warning_and_not_the_run(
 
     assert not (tmp_path / LATEST_LINK_NAME).exists()
     assert any("Operation not permitted" in warning for warning in warnings)
+
+
+def test_task_output_root_encodes_names_and_retains_task_id(tmp_path: Path) -> None:
+    from clearml_yolo.run_identity import task_run_dir
+
+    root = task_run_dir(tmp_path, "team/project", "../task\\name", "abc123")
+    assert root == tmp_path / "team%2Fproject" / "%2E%2E%2Ftask%5Cname-abc123"
+    assert task_run_dir(tmp_path, "team/project", "../task\\name", "def456") != root
+
+
+@pytest.mark.parametrize("name", ["..", ".", "CON", "NUL", "a/b", "a\\b", "a: ", "кот"])
+def test_task_output_components_are_portable(tmp_path: Path, name: str) -> None:
+    from clearml_yolo.run_identity import task_run_dir
+
+    root = task_run_dir(tmp_path, name, name, "id")
+    assert root.parent.parent == tmp_path
+    assert root.parent.name not in {".", "..", "CON", "NUL"}
+    assert all(character not in root.parent.name for character in '/\\:<>"|?* ')
+
+
+def test_task_identity_adapter_reads_active_values() -> None:
+    from types import SimpleNamespace
+
+    from clearml_yolo.clearml_session import task_identity
+
+    task = SimpleNamespace(
+        id="active-id", name="actual task", get_project_name=lambda: "actual/project"
+    )
+    assert task_identity(task) == ("actual/project", "actual task", "active-id")
+
+
+@pytest.mark.parametrize("existing_latest", [False, True])
+def test_latest_project_does_not_collide_with_convenience_link(
+    tmp_path: Path, existing_latest: bool
+) -> None:
+    from clearml_yolo.run_identity import task_run_dir
+
+    root = tmp_path / "runs"
+    root.mkdir()
+    previous = root / "previous"
+    if existing_latest:
+        previous.mkdir()
+        (root / LATEST_LINK_NAME).symlink_to(previous, target_is_directory=True)
+    directory = task_run_dir(root, "latest", "task", "id")
+    directory.mkdir(parents=True)
+    point_latest_at(root, directory)
+    assert directory.parent.parent == root
+    (directory / "artifact.json").write_text("{}")
+    assert (root / LATEST_LINK_NAME).resolve() == directory
+    assert directory.parent.name != LATEST_LINK_NAME
+    if existing_latest:
+        assert list(previous.iterdir()) == []

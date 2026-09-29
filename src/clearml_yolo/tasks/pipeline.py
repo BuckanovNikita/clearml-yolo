@@ -2,19 +2,18 @@
 
 import json
 from dataclasses import is_dataclass
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from hydra_zen import instantiate
 
-from clearml_yolo.clearml_session import ClearMLConfig, init_task, upload_artifact
+from clearml_yolo.clearml_session import ClearMLConfig, init_task, task_identity, upload_artifact
 from clearml_yolo.dataset import apply_dataset_policy
 from clearml_yolo.dataset_export import DatasetFormat
 from clearml_yolo.native_config import prediction_settings
 from clearml_yolo.publishing import Publisher, create_publisher
 from clearml_yolo.publishing.models import FiftyOneConfig
-from clearml_yolo.run_identity import RUNS_ROOT, point_latest_at, resolve_run_dir, resolve_run_id
+from clearml_yolo.run_identity import RUNS_ROOT, point_latest_at, resolve_run_dir, task_run_dir
 from clearml_yolo.tasks.compare import InferenceConfig, ModelRef, NoBaselineModelError
 from clearml_yolo.tasks.compare import compare as run_comparison
 from clearml_yolo.tasks.metrics import compute_metrics
@@ -185,7 +184,7 @@ def run_pipeline(
     compare: Any,
     clearml: ClearMLConfig,
     ground_truth: str,
-    splits: list[str],
+    splits: list[str] | None = None,
     dataset_format: DatasetFormat = "ndjson",
     run_id: str | None = None,
     run_dir: str | Path | None = None,
@@ -202,8 +201,12 @@ def run_pipeline(
     publisher = prepare_publisher(task, fiftyone, factory=create_publisher)
     if weights is not None and not skip_train:
         raise ValueError("weights is only valid with skip_train=true; training chooses its model")
-    identity = resolve_run_id(clearml.task_name, run_id, datetime.now(tz=UTC))
-    directory = resolve_run_dir(RUNS_ROOT, identity, Path(run_dir) if run_dir else None)
+    splits = list(dict.fromkeys(splits or ["train", "val", "test"]))
+    directory = (
+        resolve_run_dir(RUNS_ROOT, run_id or "", Path(run_dir) if run_dir else None)
+        if run_dir or run_id
+        else task_run_dir(RUNS_ROOT, *task_identity(task))
+    )
     metrics_cfg = _stage_values(metrics, {"evaluation", "calibration_split"}, "metrics")
     report_cfg = _stage_values(report, {"report_config_path"}, "report")
     compare_cfg = _stage_values(

@@ -385,3 +385,55 @@ def test_pipeline_publication_failure_propagates_after_preserving_predictions(
         )
 
     assert predictions.read_text(encoding="utf-8") == "image_name\na\n"
+
+
+@pytest.mark.parametrize("explicit", ["none", "run_dir", "run_id"])
+def test_pipeline_uses_active_task_root_and_preserves_explicit_routing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, explicit: str
+) -> None:
+    from types import SimpleNamespace
+
+    from clearml_yolo.tasks import pipeline
+
+    monkeypatch.chdir(tmp_path)
+    task = SimpleNamespace(
+        name="actual/task", id="unique-id", get_project_name=lambda: "team/project"
+    )
+    monkeypatch.setattr(pipeline, "init_task", lambda *a, **k: task)
+    monkeypatch.setattr(pipeline, "point_latest_at", lambda *a: None)
+    captured: dict[str, Any] = {}
+
+    def predict(*args: Any, **kwargs: Any) -> SimpleNamespace:
+        captured.update(kwargs)
+        return SimpleNamespace(predictions=args[2])
+
+    monkeypatch.setattr(pipeline, "run_prediction", predict)
+    run_dir = tmp_path / "explicit" if explicit == "run_dir" else None
+    run_id = "custom" if explicit == "run_id" else None
+    result = pipeline.run_pipeline(
+        training_settings(),
+        prediction_config(),
+        {},
+        {},
+        {},
+        ClearMLConfig(),
+        "truth.csv",
+        run_dir=run_dir,
+        run_id=run_id,
+        weights="weights.pt",
+        skip_train=True,
+        skip_metrics=True,
+        skip_compare=True,
+        skip_report=True,
+        fiftyone=FiftyOneConfig(enabled=False),
+    )
+    expected = {
+        "none": tmp_path / "runs/team%2Fproject/actual%2Ftask-unique-id",
+        "run_dir": tmp_path / "explicit",
+        "run_id": tmp_path / "runs/custom",
+    }[explicit]
+    assert result["run_dir"] == expected
+    assert result["predictions"] == expected / "predictions.csv"
+    assert set(captured["splits"]) == {"train", "val", "test"}
+    assert captured["fiftyone"].enabled is False
+    assert captured["ultralytics_predict"]["project"] == str(expected / "native")

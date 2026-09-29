@@ -107,3 +107,22 @@ def test_resolved_prediction_does_not_inherit_batch_or_save_implicitly() -> None
     assert settings["save"] is False
     assert settings["rect"] is True
     assert "overlap_mask" not in config.ultralytics
+
+
+@pytest.mark.parametrize("command", ["pipeline", "val", "metrics"])
+def test_evaluation_defaults_to_all_three_splits(command: str) -> None:
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        config = compose(config_name=command)
+    assert list(config.splits) == ["train", "val", "test"]
+
+
+@pytest.mark.parametrize("training_device", ["null", "cpu", "[0,1]"])
+def test_prediction_device_is_independent(training_device: str) -> None:
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        config = compose(
+            config_name="pipeline", overrides=[f"ultralytics.device={training_device}"]
+        )
+        overridden = compose(config_name="pipeline", overrides=["ultralytics_predict.device=null"])
+    assert list(config.ultralytics_predict.device) == [-1]
+    assert overridden.ultralytics_predict.device is None
+    assert overridden.ultralytics.device is None

@@ -32,6 +32,7 @@ from digital_metrics.validation import validate_dataframes
 from loguru import logger
 from pydantic import BaseModel, ConfigDict, JsonValue
 
+from clearml_yolo.artifact_names import PLOT_METRICS
 from clearml_yolo.comparison.evaluation_payload import (
     EvaluationBox,
     EvaluationBoxStatus,
@@ -41,7 +42,6 @@ from clearml_yolo.comparison.evaluation_payload import (
 )
 
 BBOX_COLUMNS = ["bbox_x_tl", "bbox_y_tl", "bbox_x_br", "bbox_y_br"]
-PLOT_METRICS = ("recall", "precision", "perebrak", "nedobrak")
 
 
 class EvaluationConfig(BaseModel):

@@ -1,6 +1,5 @@
 """Predict dataset images with native settings and persist the evaluation table."""
 
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -17,13 +16,14 @@ from clearml_yolo.clearml_session import (
     expect_artifacts,
     init_task,
     sanitize_configuration,
+    task_identity,
     upload_artifact,
 )
 from clearml_yolo.inference import ImageNameMode, ScoredResolution, predict_on_images, resolution_of
 from clearml_yolo.native_config import prediction_settings, write_native_yaml
 from clearml_yolo.publishing import create_publisher
 from clearml_yolo.publishing.models import FiftyOneConfig
-from clearml_yolo.run_identity import RUNS_ROOT, resolve_run_dir, resolve_run_id
+from clearml_yolo.run_identity import RUNS_ROOT, task_run_dir
 from clearml_yolo.tasks.publication import prepare_publisher, publish_results
 
 
@@ -87,9 +87,7 @@ def predict(
         resolution.as_table(),
     )
     if output is None:
-        directory = resolve_run_dir(
-            RUNS_ROOT, resolve_run_id(clearml.task_name, None, datetime.now(tz=UTC)), None
-        )
+        directory = task_run_dir(RUNS_ROOT, *task_identity(task))
         output = directory / "predictions.csv"
     output_path = Path(output)
     output_path.parent.mkdir(parents=True, exist_ok=True)

@@ -16,10 +16,12 @@ from clearml_yolo.clearml_session import (
     connect_config_file,
     invocation,
     sanitize_configuration,
+    task_identity,
     upload_artifact,
 )
 from clearml_yolo.native_config import stage_settings
 from clearml_yolo.native_runtime import native_runtime
+from clearml_yolo.run_identity import RUNS_ROOT, task_run_dir
 
 
 def _sources(task: Any) -> None:
@@ -79,12 +81,14 @@ def launch(name: str, function: Callable[..., Any]) -> None:
             invocation(instantiate(config.clearml), name, resolved) as task,
         ):
             _sources(task)
-            # Standalone output defaults use Hydra's unique invocation directory.
+            # Derive paths only after the owner exists; remote task names may differ.
             with open_dict(config):
                 if "output_dir" in config and config.output_dir is None:
-                    config.output_dir = str(Path(HydraConfig.get().runtime.output_dir) / name)
+                    config.output_dir = str(task_run_dir(RUNS_ROOT, *task_identity(task)) / name)
                 if "output" in config and config.output is None:
-                    config.output = str(Path(HydraConfig.get().runtime.output_dir) / f"{name}.csv")
+                    config.output = str(
+                        task_run_dir(RUNS_ROOT, *task_identity(task)) / f"{name}.csv"
+                    )
             upload_artifact(
                 task,
                 "effective_configuration",
