@@ -101,7 +101,7 @@ def test_remote_clone_replays_canonical_run_and_general(monkeypatch: Any) -> Non
 
     monkeypatch.setattr(hydra, "main", lambda **kwargs: lambda fn: lambda: fn(config))
     monkeypatch.setattr(common, "native_runtime", nullcontext)
-    monkeypatch.setattr(common, "invocation", lambda *_args: nullcontext(RemoteTask()))
+    monkeypatch.setattr(common, "invocation", lambda *_args, **_kwargs: nullcontext(RemoteTask()))
     monkeypatch.setattr(common, "replay_configuration", replay)
     common.launch("train", command)
 
@@ -171,7 +171,7 @@ def test_remote_clone_does_not_replay_previous_owner_output_route(
 
     monkeypatch.setattr(hydra, "main", lambda **kwargs: lambda fn: lambda: fn(config))
     monkeypatch.setattr(common, "native_runtime", nullcontext)
-    monkeypatch.setattr(common, "invocation", lambda *_args: nullcontext(task))
+    monkeypatch.setattr(common, "invocation", lambda *_args, **_kwargs: nullcontext(task))
     monkeypatch.setattr(common, "replay_configuration", lambda _task, values: values)
     monkeypatch.setattr(training, "init_task", lambda *_args, **_kwargs: task)
     monkeypatch.setattr(training, "RUNS_ROOT", tmp_path / "runs")
@@ -226,7 +226,7 @@ def test_current_save_dir_override_reaches_pipeline_conflict_validation(
 
     monkeypatch.setattr(hydra, "main", lambda **kwargs: lambda fn: lambda: fn(config))
     monkeypatch.setattr(common, "native_runtime", nullcontext)
-    monkeypatch.setattr(common, "invocation", lambda *_args: nullcontext(Task()))
+    monkeypatch.setattr(common, "invocation", lambda *_args, **_kwargs: nullcontext(Task()))
     monkeypatch.setattr(common, "replay_configuration", lambda _task, values: values)
     with pytest.raises(ValueError, match="save_dir conflicts with pipeline run_dir"):
         common.launch("pipeline", command)

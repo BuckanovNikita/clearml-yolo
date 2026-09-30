@@ -5,6 +5,7 @@ that training scalars, prediction artifacts, per-split metrics and the compariso
 reports all land on one experiment.
 """
 
+import copy
 import dataclasses
 import hashlib
 import json
@@ -17,7 +18,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
-from tempfile import TemporaryDirectory
+from tempfile import NamedTemporaryFile, TemporaryDirectory
 from typing import Any, Self
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -74,6 +75,14 @@ class ArtifactUploadError(RuntimeError):
     """A required artifact or final upload barrier was rejected."""
 
 
+@dataclass(frozen=True)
+class ResolvedConfigFile:
+    """Detached file values and credential provenance required for safe publication."""
+
+    values: Any
+    secrets: frozenset[str] = field(repr=False)
+
+
 @dataclass
 class _ArtifactRecord:
     stage: str
@@ -95,6 +104,9 @@ class _InvocationState:
     model_barriers: list[Callable[[], None]] = field(default_factory=list)
     run_configuration: dict[str, Any] = field(default_factory=dict)
     config_directory: TemporaryDirectory[str] | None = None
+    config_resolver: Callable[[Any], Any] | None = None
+    config_file_count: int = 0
+    execution_config_paths: list[Path] = field(default_factory=list)
 
     def enter_stage(self, stage: str) -> None:
         self.current_stage = stage
@@ -104,9 +116,26 @@ class _InvocationState:
     def config_path(self, suffix: str) -> Path:
         if self.config_directory is None:
             self.config_directory = TemporaryDirectory(prefix="clearml-yolo-config-")
-        return Path(self.config_directory.name) / f"{len(self.artifacts):04d}{suffix}"
+        path = Path(self.config_directory.name) / f"{self.config_file_count:04d}{suffix}"
+        self.config_file_count += 1
+        return path
+
+    def execution_config_path(self, source: Path) -> Path:
+        # Dataset consumers interpret relative image paths against the YAML parent.
+        # Keep the owned execution copy beside its source rather than moving that base.
+        with NamedTemporaryFile(
+            prefix=f".{source.stem}-resolved-",
+            suffix=source.suffix,
+            dir=source.parent,
+            delete=False,
+        ) as stream:
+            path = Path(stream.name)
+        self.execution_config_paths.append(path)
+        return path
 
     def cleanup(self) -> None:
+        for path in self.execution_config_paths:
+            path.unlink(missing_ok=True)
         if self.config_directory is not None:
             self.config_directory.cleanup()
 
@@ -284,7 +313,11 @@ def _replay_initial_configuration(task: Any, resolved_config: Any) -> None:
 
 @contextmanager
 def invocation(
-    config: ClearMLConfig, stage: str, resolved_config: Any | None = None
+    config: ClearMLConfig,
+    stage: str,
+    resolved_config: Any | None = None,
+    *,
+    config_resolver: Callable[[Any], Any] | None = None,
 ) -> Iterator[Any]:
     """Own the sole ClearML task and its terminal status for one CLI invocation."""
     if _is_worker():
@@ -340,7 +373,9 @@ def invocation(
             False,
         ),
     )
-    state = _InvocationState(task=task, stages=[stage], current_stage=stage)
+    state = _InvocationState(
+        task=task, stages=[stage], current_stage=stage, config_resolver=config_resolver
+    )
     token = _ACTIVE_INVOCATION.set(state)
     previous_owner = os.environ.get(OWNER_PID_ENV)
     os.environ[OWNER_PID_ENV] = str(os.getpid())
@@ -571,6 +606,8 @@ def _configuration_secrets(value: Any, *, sensitive: bool = False) -> set[str]:
         return {
             secret for item in value for secret in _configuration_secrets(item, sensitive=sensitive)
         }
+    if sensitive and isinstance(value, (bool, int, float)):
+        return {str(value)}
     if isinstance(value, str):
         if sensitive:
             return {value} if value and value != REDACTED else set()
@@ -580,6 +617,11 @@ def _configuration_secrets(value: Any, *, sensitive: bool = False) -> set[str]:
             candidates.update(item for key, item in parse_qsl(parts.query) if _sensitive_key(key))
             return {item for item in candidates if item and item != REDACTED}
     return set()
+
+
+def configuration_secrets(value: Any) -> set[str]:
+    """Collect credential values for file publication without changing dictionary storage."""
+    return _configuration_secrets(value)
 
 
 def _sanitize_yaml_comment(value: str, secrets: set[str]) -> str:
@@ -611,54 +653,152 @@ def _sanitize_yaml_comments(value: Any, secrets: set[str]) -> None:
             _sanitize_yaml_comments(item, secrets)
 
 
+def _sanitize_config_scalar(value: Any, secrets: set[str]) -> Any:
+    sanitized = sanitize_configuration(value)
+    if isinstance(sanitized, str):
+        for secret in sorted(secrets, key=len, reverse=True):
+            sanitized = sanitized.replace(secret, REDACTED)
+    elif isinstance(sanitized, (bool, int, float)) and str(sanitized) in secrets:
+        return REDACTED
+    return sanitized
+
+
 def _sanitize_yaml_configuration(value: Any, secrets: set[str]) -> Any:
     if isinstance(value, (CommentedMap, CommentedSeq)):
         _sanitize_yaml_comments(value.ca.comment, secrets)
         _sanitize_yaml_comments(value.ca.end, secrets)
         for comments in value.ca.items.values():
             _sanitize_yaml_comments(comments, secrets)
-    if isinstance(value, CommentedMap):
+    if isinstance(value, Mapping):
+        if not isinstance(value, CommentedMap):
+            value = dict(value)
         for key, item in value.items():
             value[key] = (
                 REDACTED if _sensitive_key(key) else _sanitize_yaml_configuration(item, secrets)
             )
         return value
-    if isinstance(value, CommentedSeq):
+    if isinstance(value, list):
         for index, item in enumerate(value):
             value[index] = _sanitize_yaml_configuration(item, secrets)
         return value
-    return sanitize_configuration(value)
+    return _sanitize_config_scalar(value, secrets)
 
 
-def _sanitized_config_file(state: _InvocationState, path: Path) -> Path:
+def _plain_config_document(value: Any) -> Any:
+    """Detach round-trip containers and scalar wrappers from the resolver input."""
+    if isinstance(value, Mapping):
+        return {
+            _plain_config_document(key): _plain_config_document(item) for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_plain_config_document(item) for item in value]
+    if isinstance(value, str):
+        return str(value)
+    if isinstance(value, int) and not isinstance(value, bool):
+        return int(value)
+    if isinstance(value, float):
+        return float(value)
+    return value
+
+
+def _requires_config_resolver(value: Any) -> bool:
+    if isinstance(value, Mapping):
+        return any(_requires_config_resolver(item) for item in value.values())
+    if isinstance(value, list):
+        return any(_requires_config_resolver(item) for item in value)
+    return isinstance(value, str) and (
+        value == "???" or re.search(r"(?<!\\)(?:\\\\)*\$\{", value) is not None
+    )
+
+
+def _update_yaml_values(original: Any, resolved: Any) -> Any:
+    """Replace active values while retaining round-trip comment positions and order."""
+    if isinstance(original, CommentedMap) and isinstance(resolved, Mapping):
+        for key in list(original):
+            if key not in resolved:
+                del original[key]
+        for key, value in resolved.items():
+            original[key] = _update_yaml_values(original.get(key), value)
+        return original
+    if isinstance(original, CommentedSeq) and isinstance(resolved, list):
+        for index, value in enumerate(resolved):
+            if index < len(original):
+                original[index] = _update_yaml_values(original[index], value)
+            else:
+                original.append(_update_yaml_values(None, value))
+        del original[len(resolved) :]
+        return original
+    if isinstance(resolved, Mapping):
+        return CommentedMap(
+            {key: _update_yaml_values(None, item) for key, item in resolved.items()}
+        )
+    if isinstance(resolved, list):
+        return CommentedSeq([_update_yaml_values(None, item) for item in resolved])
+    return resolved
+
+
+def _write_config_document(path: Path, content: Any, yaml: YAML) -> None:
+    if path.suffix.lower() == ".json":
+        path.write_text(json.dumps(content, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    else:
+        with path.open("w", encoding="utf-8") as stream:
+            yaml.dump(content, stream)
+
+
+def _load_config_document(path: Path, yaml: YAML) -> Any:
     if not path.is_file():
         raise FileNotFoundError(f"Configuration file does not exist: {path}")
     suffix = path.suffix.lower()
-    yaml = YAML(typ="rt")
-    yaml.preserve_quotes = True
     try:
         if suffix == ".json":
-            content = json.loads(path.read_text(encoding="utf-8"))
-        elif suffix in {".yaml", ".yml"}:
-            content = yaml.load(path.read_text(encoding="utf-8"))
-        else:
-            raise ValueError(f"Unsupported configuration file format: {path.suffix or '<none>'}")
+            return json.loads(path.read_text(encoding="utf-8"))
+        if suffix in {".yaml", ".yml"}:
+            return yaml.load(path.read_text(encoding="utf-8"))
+        raise ValueError(f"Unsupported configuration file format: {path.suffix or '<none>'}")
     except json.JSONDecodeError:
         raise ValueError(f"Invalid JSON configuration file: {path}") from None
     except YAMLError:
         raise ValueError(f"Invalid YAML configuration file: {path}") from None
 
-    sanitized_path = state.config_path(suffix)
-    if suffix == ".json":
-        sanitized_path.write_text(
-            json.dumps(sanitize_configuration(content), indent=2, ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
+
+def _prepared_config_file(state: _InvocationState, path: Path) -> tuple[Path, Path]:
+    """Resolve once, then produce separate executable and sanitized storage inputs."""
+    yaml = YAML(typ="rt")
+    yaml.preserve_quotes = True
+    content = _load_config_document(path, yaml)
+    suffix = path.suffix.lower()
+    plain = _plain_config_document(content)
+    provenance_secrets: frozenset[str] = frozenset()
+    if state.config_resolver is None:
+        if _requires_config_resolver(plain):
+            raise ValueError(
+                "Configuration contains unresolved values; use an execution command or "
+                "provide invocation(config_resolver=...)"
+            )
+        resolved = plain
     else:
-        sanitized = _sanitize_yaml_configuration(content, _configuration_secrets(content))
-        with sanitized_path.open("w", encoding="utf-8") as stream:
-            yaml.dump(sanitized, stream)
-    return sanitized_path
+        try:
+            resolved = state.config_resolver(plain)
+            if isinstance(resolved, ResolvedConfigFile):
+                provenance_secrets = resolved.secrets
+                resolved = resolved.values
+        except Exception:  # noqa: BLE001 - opaque resolver errors can contain credentials
+            raise ValueError("Configuration values could not be resolved") from None
+
+    try:
+        effective = _update_yaml_values(content, resolved) if suffix != ".json" else resolved
+        execution_path = path
+        if resolved != plain:
+            execution_path = state.execution_config_path(path)
+            _write_config_document(execution_path, effective, yaml)
+        sanitized_path = state.config_path(suffix)
+        sanitized = _sanitize_yaml_configuration(
+            copy.deepcopy(effective), _configuration_secrets(resolved) | provenance_secrets
+        )
+        _write_config_document(sanitized_path, sanitized, yaml)
+    except Exception:  # noqa: BLE001 - parser/serializer details can contain credentials
+        raise ValueError("Configuration file could not be prepared") from None
+    return execution_path, sanitized_path
 
 
 def connect_config_file(
@@ -681,11 +821,12 @@ def connect_config_file(
         return path
     active = _active_state(task, "Configuration recording")
     if path.is_file():
-        sanitized_path = _sanitized_config_file(active, path)
+        execution_path, sanitized_path = _prepared_config_file(active, path)
     elif allow_remote_override and not task.running_locally():
         # A cloned task can supply its attached source without the original host path.
         sanitized_path = active.config_path(path.suffix or ".yaml")
         sanitized_path.write_text("{}\n", encoding="utf-8")
+        execution_path = path
     else:
         raise FileNotFoundError(f"Configuration file does not exist: {path}")
     connected = Path(
@@ -697,15 +838,14 @@ def connect_config_file(
     )
     if connected == sanitized_path and not path.is_file():
         raise FileNotFoundError(f"Remote task has no attached configuration for {path}")
-    effective = (
-        _sanitized_config_file(active, connected) if connected != sanitized_path else sanitized_path
-    )
+    if connected != sanitized_path:
+        execution_path, sanitized_path = _prepared_config_file(active, connected)
     task.connect_configuration(
-        configuration=effective,
+        configuration=sanitized_path,
         name=name,
         ignore_remote_overrides=True,
     )
     logger.info("Connected {} to ClearML as configuration {!r}", path, name)
     # Sanitization is for storage, not model execution: preserve local source values
     # (including externally managed credentials) or use the clone's effective source.
-    return path if connected == sanitized_path and path.is_file() else connected
+    return execution_path

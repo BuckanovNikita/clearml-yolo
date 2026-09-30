@@ -10,6 +10,7 @@ from omegaconf import DictConfig, OmegaConf, open_dict
 
 # Populate the shared ConfigStore in fresh CLI processes before Hydra composes examples.
 import clearml_yolo.configs  # noqa: F401
+from clearml_yolo.apps.config_resolution import resolve_config_file
 from clearml_yolo.clearml_session import (
     invocation,
     replay_configuration,
@@ -52,7 +53,11 @@ def launch(name: str, function: Callable[..., Any]) -> None:
         # concurrent torch submodule discovery can observe a partially loaded package.
         with (
             native_runtime(),
-            invocation(instantiate(config.clearml), name) as task,
+            invocation(
+                instantiate(config.clearml),
+                name,
+                config_resolver=lambda document: resolve_config_file(document, config),
+            ) as task,
         ):
             if not isinstance(resolved, dict):
                 raise TypeError("Resolved command configuration must be a mapping")

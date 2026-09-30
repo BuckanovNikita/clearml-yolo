@@ -1,5 +1,6 @@
 """Explicit ClearML configuration, artifact storage, and invocation lifecycle."""
 
+import json
 import os
 import signal
 import sys
@@ -10,6 +11,7 @@ from typing import Any, ClassVar
 
 import pandas as pd
 import pytest
+from ruamel.yaml import YAML
 
 from clearml_yolo.clearml_session import (
     DEFAULT_PROJECT_NAME,
@@ -807,3 +809,320 @@ def test_run_replay_redacts_storage_without_rewriting_execution_credentials(
     stored = str(task.configurations[-1]["configuration"])
     assert "local-secret" not in stored
     assert "remote-secret" not in stored
+
+
+def _resolve_attachment(document: Any) -> Any:
+    from clearml_yolo.apps.config_resolution import resolve_config_document
+
+    return resolve_config_document(document, {"run_dir": "runs/effective", "batch": 8})
+
+
+@pytest.mark.parametrize("suffix", [".yaml", ".yml", ".json"])
+def test_configuration_file_resolves_active_typed_values_and_preserves_source(
+    fake_clearml: tuple[type[Any], FakeTask], tmp_path: Path, suffix: str
+) -> None:
+    _, task = fake_clearml
+    source = tmp_path / f"source{suffix}"
+    document = {
+        "size": 960,
+        "copy": "${size}",
+        "output": "${run_dir}",
+        "nested": [{"value": "${batch}", "enabled": True, "empty": None}],
+        "literal": r"\${kept}",
+    }
+    if suffix == ".json":
+        source.write_text(json.dumps(document), encoding="utf-8")
+    else:
+        with source.open("w", encoding="utf-8") as stream:
+            YAML().dump(document, stream)
+        with source.open("a", encoding="utf-8") as stream:
+            stream.write("# example: ${unknown} remains a comment\n")
+    original = source.read_bytes()
+
+    with invocation(ClearMLConfig(), "train", config_resolver=_resolve_attachment) as owner:
+        effective = connect_config_file(owner, "source", source)
+        initial_path = task.configurations[0]["configuration"]
+        stored_path = task.configurations[-1]["configuration"]
+        stored = YAML(typ="safe").load(stored_path)
+        executed = YAML(typ="safe").load(effective)
+        assert effective != source
+        assert effective != stored_path
+        assert (
+            stored
+            == executed
+            == {
+                "size": 960,
+                "copy": 960,
+                "output": "runs/effective",
+                "nested": [{"value": 8, "enabled": True, "empty": None}],
+                "literal": "${kept}",
+            }
+        )
+        assert YAML(typ="safe").load(initial_path) == stored
+        if suffix != ".json":
+            assert "# example: ${unknown} remains a comment" in stored_path.read_text()
+
+    assert source.read_bytes() == original
+    assert task.uploads == []
+    assert task.completed
+
+
+@pytest.mark.parametrize("suffix", [".yaml", ".json"])
+def test_configuration_file_redacts_resolved_secret_aliases_only_in_storage(
+    fake_clearml: tuple[type[Any], FakeTask],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    suffix: str,
+) -> None:
+    _, task = fake_clearml
+    monkeypatch.setenv("CY_ATTACHMENT_TEST_SECRET", "private-test-value")
+    document = {
+        "password": "${oc.env:CY_ATTACHMENT_TEST_SECRET}",
+        "copy": "${password}",
+        "message": "prefix-${password}",
+    }
+    source = tmp_path / f"private{suffix}"
+    source.write_text(json.dumps(document), encoding="utf-8")
+    original = source.read_bytes()
+    with invocation(ClearMLConfig(), "train", config_resolver=_resolve_attachment) as owner:
+        effective = connect_config_file(owner, "private", source)
+        assert YAML(typ="safe").load(effective) == {
+            "password": "private-test-value",
+            "copy": "private-test-value",
+            "message": "prefix-private-test-value",
+        }
+        for attachment in task.configurations:
+            payload = attachment["configuration"].read_text()
+            assert "private-test-value" not in payload
+            assert "${" not in payload
+            assert "<redacted>" in payload
+        assert effective != task.configurations[-1]["configuration"]
+    assert source.read_bytes() == original
+
+
+@pytest.mark.parametrize("missing_source", [False, True])
+def test_remote_configuration_resolution_preserves_private_execution_and_comments(
+    fake_clearml: tuple[type[Any], FakeTask], tmp_path: Path, missing_source: bool
+) -> None:
+    _, task = fake_clearml
+    task.local = False
+    source = tmp_path / "source.yaml"
+    if not missing_source:
+        source.write_text("epochs: 1\n", encoding="utf-8")
+    override = tmp_path / "override.yaml"
+    override.write_text(
+        "# example: ${unknown}\npassword: remote-private\n"
+        "copy: ${password} # copy comment\nepochs: ${batch}\n",
+        encoding="utf-8",
+    )
+    original = override.read_bytes()
+    task.configuration_result = override
+    with invocation(ClearMLConfig(), "train", config_resolver=_resolve_attachment) as owner:
+        effective = connect_config_file(owner, "source", source)
+        assert effective != override
+        assert YAML(typ="safe").load(effective) == {
+            "password": "remote-private",
+            "copy": "remote-private",
+            "epochs": 8,
+        }
+        stored = task.configurations[-1]["configuration"].read_text()
+        assert "remote-private" not in stored
+        assert "epochs: 8" in stored
+        assert "# example: ${unknown}" in stored
+        assert "# copy comment" in stored
+        assert task.configurations[-1]["ignore_remote_overrides"] is True
+    assert override.read_bytes() == original
+
+
+@pytest.mark.parametrize("value", ["${absent}", "???", "${a}"])
+def test_direct_file_attachment_requires_resolver_for_active_references(
+    fake_clearml: tuple[type[Any], FakeTask], tmp_path: Path, value: str
+) -> None:
+    _, task = fake_clearml
+    source = tmp_path / "source.yaml"
+    source.write_text(f"a: {value}\n", encoding="utf-8")
+    original = source.read_bytes()
+    with (
+        pytest.raises(ValueError, match="config_resolver"),
+        invocation(ClearMLConfig(), "train") as owner,
+    ):
+        connect_config_file(owner, "source", source)
+    assert task.configurations == []
+    assert task.uploads == []
+    assert task.failed
+    assert not task.completed
+    assert source.read_bytes() == original
+
+
+@pytest.mark.parametrize("remote", [False, True])
+@pytest.mark.parametrize(
+    "value",
+    [
+        "${missing}",
+        "???",
+        "${a}",
+        "${unregistered:value}",
+        "${oc.env:CY_ATTACHMENT_ABSENT_ENV}",
+    ],
+)
+def test_invalid_file_resolution_fails_before_final_publication(
+    fake_clearml: tuple[type[Any], FakeTask],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    value: str,
+    remote: bool,
+) -> None:
+    _, task = fake_clearml
+    monkeypatch.delenv("CY_ATTACHMENT_ABSENT_ENV", raising=False)
+    source = tmp_path / "source.yaml"
+    invalid = tmp_path / "invalid.yaml"
+    source.write_text("a: 1\n", encoding="utf-8")
+    invalid.write_text(f"password: never-publish\na: {value}\n", encoding="utf-8")
+    original = invalid.read_bytes()
+    if remote:
+        task.configuration_result = invalid
+    else:
+        source = invalid
+    with (
+        pytest.raises(ValueError, match="could not be resolved") as raised,
+        invocation(ClearMLConfig(), "train", config_resolver=_resolve_attachment) as owner,
+    ):
+        connect_config_file(owner, "source", source)
+    assert "never-publish" not in str(raised.value)
+    assert task.uploads == []
+    assert task.failed
+    assert not task.completed
+    assert invalid.read_bytes() == original
+    assert len(task.configurations) == (1 if remote else 0)
+
+
+def test_attachment_resolver_exception_does_not_expose_credential_details(
+    fake_clearml: tuple[type[Any], FakeTask], tmp_path: Path
+) -> None:
+    _, task = fake_clearml
+    source = tmp_path / "source.yaml"
+    source.write_text("password: ${hidden}\n", encoding="utf-8")
+
+    def broken_resolver(document: Any) -> Any:
+        raise RuntimeError("private exception credential")
+
+    with (
+        pytest.raises(ValueError, match="could not be resolved") as raised,
+        invocation(ClearMLConfig(), "train", config_resolver=broken_resolver) as owner,
+    ):
+        connect_config_file(owner, "source", source)
+    assert "private exception credential" not in str(raised.value)
+    assert raised.value.__suppress_context__
+    assert task.configurations == []
+    assert "private exception credential" not in str(task.failed)
+
+
+def test_configuration_copies_have_unique_paths_without_artifact_registration(
+    fake_clearml: tuple[type[Any], FakeTask], tmp_path: Path
+) -> None:
+    _, task = fake_clearml
+    first = tmp_path / "first.yaml"
+    second = tmp_path / "second.yaml"
+    first.write_text("epochs: 2\n", encoding="utf-8")
+    second.write_text("epochs: 3\n", encoding="utf-8")
+    with invocation(ClearMLConfig(), "train") as owner:
+        assert connect_config_file(owner, "first", first) == first
+        first_copy = task.configurations[-1]["configuration"]
+        assert connect_config_file(owner, "second", second) == second
+        second_copy = task.configurations[-1]["configuration"]
+        assert first_copy != second_copy
+        assert YAML(typ="safe").load(first_copy) == {"epochs": 2}
+        assert YAML(typ="safe").load(second_copy) == {"epochs": 3}
+    assert task.uploads == []
+
+
+def test_resolved_dataset_execution_keeps_relative_path_base_and_cleans_owned_copy(
+    fake_clearml: tuple[type[Any], FakeTask], tmp_path: Path
+) -> None:
+    _, task = fake_clearml
+    dataset_dir = tmp_path / "dataset"
+    dataset_dir.mkdir()
+    source = dataset_dir / "dataset.yaml"
+    source.write_text("train: images/train\nval: images/val\ninference_batch: ${batch}\n")
+    neighbor = dataset_dir / ".preexisting-resolved.yaml"
+    neighbor.write_text("untouched\n")
+    with invocation(ClearMLConfig(), "train", config_resolver=_resolve_attachment) as owner:
+        effective = connect_config_file(owner, "source", source)
+        stored = task.configurations[-1]["configuration"]
+        assert effective.parent == source.parent
+        assert effective != source
+        assert effective.is_file()
+        assert YAML(typ="safe").load(effective)["train"] == "images/train"
+    assert source.is_file()
+    assert neighbor.read_text() == "untouched\n"
+    assert not effective.exists()
+    assert not stored.exists()
+
+
+@pytest.mark.parametrize("use_resolver", [False, True])
+def test_yaml_dataset_integer_label_keys_and_comments_survive_publication(
+    fake_clearml: tuple[type[Any], FakeTask], tmp_path: Path, use_resolver: bool
+) -> None:
+    _, task = fake_clearml
+    source = tmp_path / "dataset.yaml"
+    source.write_text("names:\n  0: person # person label\n  1: car # car label\n")
+    with invocation(
+        ClearMLConfig(), "train", config_resolver=_resolve_attachment if use_resolver else None
+    ) as owner:
+        assert connect_config_file(owner, "source", source) == source
+        stored = task.configurations[-1]["configuration"]
+        assert YAML(typ="safe").load(stored) == {"names": {0: "person", 1: "car"}}
+        assert "# person label" in stored.read_text()
+        assert "# car label" in stored.read_text()
+
+
+@pytest.mark.parametrize("secret", [172983, True, 1729.83])
+@pytest.mark.parametrize("suffix", [".yaml", ".json"])
+def test_configuration_file_redacts_typed_credential_aliases(
+    fake_clearml: tuple[type[Any], FakeTask],
+    tmp_path: Path,
+    secret: bool | float,
+    suffix: str,
+) -> None:
+    _, task = fake_clearml
+    source = tmp_path / f"private{suffix}"
+    source.write_text(json.dumps({"password": secret, "copy": "${password}"}))
+    with invocation(ClearMLConfig(), "train", config_resolver=_resolve_attachment) as owner:
+        effective = connect_config_file(owner, "source", source)
+        assert YAML(typ="safe").load(effective) == {"password": secret, "copy": secret}
+        stored = task.configurations[-1]["configuration"]
+        assert YAML(typ="safe").load(stored) == {
+            "password": "<redacted>",
+            "copy": "<redacted>",
+        }
+
+
+@pytest.mark.parametrize("reference", ["${auth.password}", "${oc.env:CY_PROBE_API_SECRET}"])
+def test_configuration_file_redacts_aliases_with_secret_provenance_from_context(
+    fake_clearml: tuple[type[Any], FakeTask],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    reference: str,
+) -> None:
+    _, task = fake_clearml
+    monkeypatch.setenv("CY_PROBE_API_SECRET", "probe-private-value")
+    source = tmp_path / "alias.yaml"
+    source.write_text(f"copy: {reference}\n")
+    original = source.read_bytes()
+
+    def resolve_private(document: Any) -> Any:
+        from clearml_yolo.apps.config_resolution import resolve_config_file
+
+        context = (
+            {"auth": {"password": "probe-private-value"}} if reference == "${auth.password}" else {}
+        )
+        return resolve_config_file(document, context)
+
+    with invocation(ClearMLConfig(), "train", config_resolver=resolve_private) as owner:
+        effective = connect_config_file(owner, "source", source)
+        assert YAML(typ="safe").load(effective) == {"copy": "probe-private-value"}
+        for attachment in task.configurations:
+            stored = attachment["configuration"].read_text()
+            assert "probe-private-value" not in stored
+            assert YAML(typ="safe").load(stored) == {"copy": "<redacted>"}
+    assert source.read_bytes() == original
