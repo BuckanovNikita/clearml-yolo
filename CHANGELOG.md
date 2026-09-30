@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.12.0 (2026-09-30)
+
+### Features
+
+- **release**: Generate changelog in commit hooks and releases
+  ([`2372b9a`](https://github.com/BuckanovNikita/clearml-yolo/commit/2372b9a558b3fa30a4515ce580ddd4956a5352b1))
+
+
 ## v0.11.0 (2026-09-30)
 
 ### Documentation
