@@ -3,6 +3,7 @@
 import hashlib
 import sys
 import types
+from collections.abc import Callable
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, ClassVar, override
@@ -283,3 +284,56 @@ def test_unknown_package_version_is_omitted_from_metadata(
     model, trainer = _training_objects(checkpoint)
     finalize_native_model(task, model, trainer, "yolo11n.pt")
     assert not any(key.endswith("_version") for key in record.metadata)
+
+
+def test_finalize_requires_native_model_registration(
+    native_sdk: tuple[_Task, _Record, Path],
+) -> None:
+    task, _, checkpoint = native_sdk
+    task.records.clear()
+    model, trainer = _training_objects(checkpoint)
+
+    with pytest.raises(NativeModelError, match=r"exactly one.*found 0"):
+        finalize_native_model(task, model, trainer, "yolo11n.pt")
+
+
+@pytest.mark.parametrize("field", ["original_task", "task", "project"])
+def test_finalize_rejects_model_from_another_owner(
+    native_sdk: tuple[_Task, _Record, Path], monkeypatch: pytest.MonkeyPatch, field: str
+) -> None:
+    task, record, checkpoint = native_sdk
+    monkeypatch.setattr(record, field, "another-owner")
+    model, trainer = _training_objects(checkpoint)
+
+    with pytest.raises(NativeModelError, match="not associated"):
+        finalize_native_model(task, model, trainer, "yolo11n.pt")
+
+
+def test_finalize_requires_confirmed_flush(
+    native_sdk: tuple[_Task, _Record, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    task, _, checkpoint = native_sdk
+    monkeypatch.setattr(task, "flush", lambda **_kwargs: False)
+    model, trainer = _training_objects(checkpoint)
+
+    with pytest.raises(NativeModelError, match="flush"):
+        finalize_native_model(task, model, trainer, "yolo11n.pt")
+
+
+def test_completion_barrier_rechecks_downloaded_best_bytes(
+    native_sdk: tuple[_Task, _Record, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    task, record, checkpoint = native_sdk
+    barriers: list[Callable[[], None]] = []
+    monkeypatch.setattr(
+        "clearml_yolo.clearml_native.register_model_barrier",
+        lambda _owner, verifier: barriers.append(verifier),
+    )
+    model, trainer = _training_objects(checkpoint)
+    finalize_native_model(task, model, trainer, "yolo11n.pt")
+
+    record.local.write_bytes(b"changed-after-finalization")
+
+    with pytest.raises(NativeModelError, match="does not match"):
+        barriers[0]()
+    assert checkpoint.read_bytes() == b"checkpoint"

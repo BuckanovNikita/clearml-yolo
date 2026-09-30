@@ -5,9 +5,11 @@ import os
 import shutil
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
+from contextvars import copy_context
 from functools import partial
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from threading import Event, Thread
 from types import SimpleNamespace, TracebackType
 from typing import Any, Self, cast
 from uuid import uuid4
@@ -21,6 +23,32 @@ _EVENTS = (
     "on_val_end",
     "on_train_end",
 )
+
+
+_RECORD_FIELDS: dict[str, dict[str, type[Any] | tuple[type[Any], ...]]] = {
+    "on_pretrain_routine_start": {"args": dict},
+    "on_train_epoch_end": {"epoch": int, "losses": dict, "lr": dict, "save_dir": str},
+    "on_fit_epoch_end": {"epoch": int, "epoch_time": (int, float), "metrics": dict},
+    "on_val_end": {"save_dir": str},
+    "on_train_end": {
+        "args": dict,
+        "save_dir": str,
+        "best": str,
+        "trainer_plots": list,
+        "validator_plots": list,
+        "results": dict,
+    },
+}
+
+
+def _validate_record(record: dict[str, Any]) -> None:
+    event = str(record["event"])
+    fields = _RECORD_FIELDS[event]
+    if event == "on_fit_epoch_end" and record.get("epoch") == 0:
+        fields = fields | {"model_info": dict}
+    for name, expected in fields.items():
+        if not isinstance(record.get(name), expected):
+            raise TypeError(f"Native DDP event output is incomplete: invalid {event} {name}")
 
 
 def _plain(value: Any) -> Any:  # noqa: PLR0911 - explicit recursive JSON boundary
@@ -176,13 +204,100 @@ class NativeDDPRelay:
         self._directory = Path(directory)
         self._registered: list[tuple[str, Any]] = []
         self._attempted = False
+        self._stop = Event()
+        self._thread: Thread | None = None
+        self._failure: BaseException | None = None
+        self._offset = 0
+        self._pending = b""
+        self._consumed: list[dict[str, Any]] = []
+        self._args: SimpleNamespace | None = None
 
     def __enter__(self) -> Self:
         for event in _EVENTS:
             callback = partial(_capture_event, event=event, journal=str(self._directory))
             self._model.add_callback(event, callback)
             self._registered.append((event, callback))
+        context = copy_context()
+        self._thread = Thread(
+            target=context.run,
+            args=(self._consume_live,),
+            name="cy-native-ddp-relay",
+            daemon=True,
+        )
+        self._thread.start()
         return self
+
+    def _consume_live(self) -> None:
+        # Callback exceptions belong to the invocation boundary, never to a detached
+        # thread's stderr. Training may finish, but cannot finalize successfully.
+        try:
+            while not self._stop.wait(0.25):
+                trainer = getattr(self._model, "trainer", None)
+                if getattr(trainer, "ddp", False):
+                    self._consume()
+        except BaseException as error:  # noqa: BLE001 - relay all failures to the owner boundary
+            self._failure = error
+
+    def _stop_consumer(self) -> None:
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join()
+
+    def _callbacks(self) -> dict[str, Any]:
+        from ultralytics.utils.callbacks import clearml as integration
+
+        callbacks: dict[str, Any] = integration.callbacks
+        if set(callbacks) != set(_EVENTS) or not all(
+            callable(callbacks[event]) for event in _EVENTS
+        ):
+            raise RuntimeError("Installed native ClearML callback set changed before DDP replay")
+        return callbacks
+
+    def _consume(self) -> None:
+        journal = self._directory / "events.jsonl"
+        if not journal.is_file():
+            return
+        self._validate_owner()
+        with journal.open("rb") as stream:
+            stream.seek(self._offset)
+            payload = stream.read()
+            self._offset = stream.tell()
+        lines = (self._pending + payload).split(b"\n")
+        self._pending = lines.pop()
+        for line in lines:
+            try:
+                record = json.loads(line)
+            except (UnicodeDecodeError, json.JSONDecodeError) as error:
+                raise RuntimeError("Native DDP event output is incomplete or corrupt") from error
+            if not isinstance(record, dict) or record.get("event") not in _EVENTS:
+                raise RuntimeError("Native DDP event output contains an invalid event")
+            _validate_record(record)
+            if self._consumed and self._consumed[-1]["event"] == "on_train_end":
+                raise RuntimeError("Native DDP event output continues after training ended")
+            if not self._consumed:
+                arguments = record.get("args")
+                if record["event"] != "on_pretrain_routine_start" or not isinstance(
+                    arguments, dict
+                ):
+                    raise RuntimeError(
+                        "Native DDP event output is incomplete: effective arguments are missing"
+                    )
+                self._args = SimpleNamespace(**arguments)
+            elif record["event"] == "on_pretrain_routine_start":
+                raise RuntimeError("Native DDP event output contains duplicate pretrain events")
+            self._consumed.append(record)
+            # Keep native best publication behind full-journal/checkpoint validation.
+            if record["event"] != "on_train_end":
+                self._dispatch(record)
+
+    def _dispatch(self, record: dict[str, Any]) -> None:
+        if self._args is None:
+            raise RuntimeError(
+                "Native DDP event output is incomplete: effective arguments are missing"
+            )
+        view = _ReplayTrainer(record, self._args)
+        with _recorded_model_info(record.get("model_info")):
+            self._callbacks()[str(record["event"])](view)
 
     def _remove_callbacks(self) -> None:
         for event, callback in self._registered:
@@ -196,20 +311,18 @@ class NativeDDPRelay:
         _error: BaseException | None,
         _traceback: TracebackType | None,
     ) -> None:
+        self._stop_consumer()
         self._remove_callbacks()
+        if error_type is None and self._failure is not None:
+            raise self._failure
         trainer = getattr(self._model, "trainer", None)
         if error_type is None and getattr(trainer, "ddp", False) and not self._attempted:
             raise RuntimeError("Native DDP events were not replayed in the invocation owner")
 
     def _records(self) -> list[dict[str, Any]]:
-        journal = self._directory / "events.jsonl"
-        if not journal.is_file() or journal.stat().st_size == 0:
-            raise RuntimeError("Native DDP event output is incomplete: no rank-zero journal")
-        try:
-            lines = journal.read_text(encoding="utf-8").splitlines()
-            records = [json.loads(line) for line in lines]
-        except (OSError, json.JSONDecodeError) as error:
-            raise RuntimeError("Native DDP event output is incomplete or corrupt") from error
+        records = self._consumed
+        if not records or self._pending:
+            raise RuntimeError("Native DDP event output is incomplete: rank-zero journal")
         counts = {
             event: sum(record.get("event") == event for record in records) for event in _EVENTS
         }
@@ -224,6 +337,12 @@ class NativeDDPRelay:
         ):
             raise RuntimeError(f"Native DDP event output is incomplete: {counts}")
         final = records[-1]
+        for name in ("trainer_plots", "validator_plots"):
+            for path in final[name]:
+                if not isinstance(path, str) or not Path(path).is_file():
+                    raise RuntimeError(
+                        "Native DDP event output is incomplete: final plot is missing"
+                    )
         best = Path(str(final.get("best", "")))
         if not best.is_file() or best.stat().st_size == 0:
             raise RuntimeError("Native DDP event output is incomplete: best checkpoint is missing")
@@ -244,31 +363,24 @@ class NativeDDPRelay:
 
     def replay(self, trainer: Any) -> None:
         """Replay complete DDP rank-zero events and apply effective worker state to the parent."""
+        if self._attempted:
+            raise RuntimeError("Native DDP final replay was already attempted")
         self._attempted = True
+        self._stop_consumer()
         if not getattr(trainer, "ddp", False):
             return
+        if self._failure is not None:
+            raise self._failure
         self._validate_owner()
+        self._consume()
         records = self._records()
-        from ultralytics.utils.callbacks import clearml as integration
-
-        callbacks = integration.callbacks
-        complete = set(callbacks) == set(_EVENTS) and all(
-            callable(callbacks[event]) for event in _EVENTS
-        )
-        if not complete:
-            raise RuntimeError("Installed native ClearML callback set changed before DDP replay")
-        pretrain_args = records[0].get("args")
         final_args = records[-1].get("args")
-        if not isinstance(pretrain_args, dict) or not isinstance(final_args, dict):
+        if not isinstance(final_args, dict):
             raise TypeError(
                 "Native DDP event output is incomplete: effective arguments are missing"
             )
-        args = SimpleNamespace(**pretrain_args)
-        for record in records:
-            event = str(record["event"])
-            view = _ReplayTrainer(record, args)
-            with _recorded_model_info(record.get("model_info")):
-                callbacks[event](view)
+        self._args = SimpleNamespace(**final_args)
+        self._dispatch(records[-1])
         for name, value in final_args.items():
             setattr(trainer.args, name, value)
         trainer.best = Path(str(records[-1]["best"]))

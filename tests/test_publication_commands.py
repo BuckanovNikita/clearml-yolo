@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 
 from clearml_yolo.clearml_session import ClearMLConfig
+from clearml_yolo.dataset import PreparedDataset
 from clearml_yolo.publishing import NoOpPublisher
 from clearml_yolo.publishing.models import FiftyOneConfig
 from clearml_yolo.tasks.metrics import EvaluationConfig, MetricsResult
@@ -28,6 +29,143 @@ def test_worker_publication_is_disabled_without_reading_task_identity(tmp_path: 
         is None
     )
     assert not (tmp_path / "must-not-be-created").exists()
+
+
+@pytest.fixture
+def publication_dataset(tmp_path: Path) -> PreparedDataset:
+    cache = tmp_path / "cache"
+    cache.mkdir()
+    data = cache / "dataset.yaml"
+    data.write_text("names: [widget]\ntrain: images/train\nval: images/val\n")
+    truth = cache / "cleaned.csv"
+    truth.write_text("image_name,split\nexample.jpg,val\n")
+    manifest = cache / "preparation.json"
+    manifest.write_text('{"dataset_format":"flat"}\n')
+    local_archive = cache / "labels.zip"
+    local_archive.write_bytes(b"local dataset diagnostics")
+    return PreparedDataset(
+        data=data,
+        ground_truth=truth,
+        manifest=manifest,
+        dataset_format="flat",
+        artifacts=[local_archive],
+    )
+
+
+def test_training_policy_normalization_and_receipts_stay_out_of_artifacts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, publication_dataset: PreparedDataset
+) -> None:
+    from collections.abc import Iterator
+    from contextlib import contextmanager, nullcontext
+    from datetime import UTC, datetime
+
+    import clearml
+    import ultralytics.models
+
+    from clearml_yolo.clearml_session import invocation, publish_table
+    from clearml_yolo.publishing.models import PublicationReceipt, PublicationRequest
+    from clearml_yolo.tasks import train as training
+    from clearml_yolo.tasks.publication import publish_results
+    from native_config_helpers import training_settings
+    from test_clearml_session import FakeTask
+
+    task = FakeTask()
+    monkeypatch.setattr(clearml.Task, "init", lambda **_kwargs: task)
+    monkeypatch.setattr(clearml.Task, "get_task", lambda **_kwargs: task)
+    monkeypatch.delenv("LOCAL_RANK", raising=False)
+    prepared = publication_dataset
+    truth = prepared.ground_truth
+
+    @contextmanager
+    def dataset(*_args: Any, **_kwargs: Any) -> Iterator[PreparedDataset]:
+        yield prepared
+
+    native_output = tmp_path / "native"
+    (native_output / "weights").mkdir(parents=True)
+    best = native_output / "weights" / "best.pt"
+    best.write_bytes(b"best")
+
+    class Model:
+        task = "detect"
+
+        def __init__(self, _architecture: str) -> None:
+            self.trainer = SimpleNamespace(save_dir=native_output)
+
+        def train(self, **settings: Any) -> None:
+            assert settings["fraction"] == 1.0
+            assert settings["classes"] is None
+            self.trainer.args = SimpleNamespace(**(settings | {"batch": 8}))
+
+    receipt = PublicationReceipt(
+        dataset_name="model-performance",
+        task_id=task.id,
+        run_key="evaluation",
+        ground_truth_sha256="truth",
+        source_ground_truth_sha256="truth",
+        dataset_reused=False,
+        sample_count=1,
+        fields={"predictions": "candidate"},
+        dataset_complete=True,
+        run_complete=True,
+        payload_paths={"ground_truth": truth},
+        published_at=datetime.now(UTC),
+    )
+
+    class Publisher:
+        enabled = True
+
+        def preflight(self) -> None:
+            pass
+
+        def publish(self, request: PublicationRequest) -> PublicationReceipt:
+            assert request.task_id == task.id
+            assert request.ground_truth == truth
+            return receipt
+
+    monkeypatch.setattr(training, "cached_dataset", dataset)
+    monkeypatch.setattr(ultralytics.models, "YOLO", Model)
+    monkeypatch.setattr(training, "finalize_native_model", lambda *_args: None)
+    monkeypatch.setattr(
+        training,
+        "native_ddp_relay",
+        lambda *_args: nullcontext(SimpleNamespace(replay=lambda _trainer: None)),
+    )
+    with invocation(ClearMLConfig(), "train"):
+        result = training.train(
+            training_settings()
+            | {
+                "model": "architecture.yaml",
+                "project": str(tmp_path / "training"),
+                "name": "detector",
+                "fraction": 0.5,
+                "classes": [0],
+                "batch": -1,
+            },
+            ClearMLConfig(),
+            ground_truth="source.csv",
+            dataset_cache_dir=prepared.data.parent,
+        )
+        publish_table(task, "metrics_ground_truth", truth)
+        assert (
+            publish_results(
+                Publisher(), task, output_dir=tmp_path / "publication", ground_truth=truth
+            )
+            == receipt
+        )
+
+    assert result.weights == best
+    assert [item["name"] for item in task.uploads] == ["ground_truth"]
+    run = next(
+        item["configuration"] for item in reversed(task.configurations) if item["name"] == "run"
+    )
+    assert run["training_data_overrides"]["fraction"] == {"requested": 0.5, "effective": 1.0}
+    assert run["training_data_overrides"]["classes"] == {"requested": [0], "effective": None}
+    assert run["training_normalization"]["batch"] == {"requested": -1, "effective": 8}
+    assert run["fiftyone_result"]["dataset_name"] == receipt.dataset_name
+    assert (tmp_path / "publication" / "fiftyone_publication.json").is_file()
+    assert prepared.manifest.is_file()
+    assert prepared.artifacts[0].is_file()
+    assert (native_output / "ultralytics.yaml").is_file()
 
 
 def test_validation_disables_nested_prediction_and_metrics_publication(
