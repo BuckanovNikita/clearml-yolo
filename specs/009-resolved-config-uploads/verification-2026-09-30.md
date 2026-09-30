@@ -26,11 +26,11 @@ The maintained global environment evidence document named `resolved-config-uploa
 - A real missing-reference dataset attachment failed its command and task without publishing dataset configuration or artifacts.
 - Final task-owned cleanup reported zero matching projects/tasks, with unrelated workloads and shared infrastructure preserved.
 
-## Limitations and pending acceptance
+## Limitations and harness corrections
 
-The real smoke above predates the final credential-provenance corrections. Root must rerun relevant attachment/provenance checks and final review/gates before release acceptance. Two verification-harness assertions interrupted checks after successful product commands: a HOCON-only parser was incorrectly applied to YAML model metadata, and exact float equality was incorrectly required for rounded workbook display. Corrected checks reused owned successful evidence and retained outputs.
+The native smoke above predates the final credential-provenance corrections; the subsequent real attachment checks and final gates below cover those corrections. Two verification-harness assertions interrupted checks after successful product commands: a HOCON-only parser was incorrectly applied to YAML model metadata, and exact float equality was incorrectly required for rounded workbook display. Corrected checks reused owned successful evidence and retained outputs.
 
-Physical multi-GPU operation and live upload-rejection, flush-failure, callback-registration-failure and interruption fault injection were not established by this smoke. Mocked checks remain distinct evidence. Final build/install, semantic-release, push and GitHub wheel/sdist publication results are pending and must be recorded when observed.
+Physical multi-GPU operation and live upload-rejection, flush-failure, callback-registration-failure and interruption fault injection were not established by this smoke. Mocked checks remain distinct evidence. Final build/install, semantic-release and remote publication evidence is recorded below.
 
 ## Intermediate combined checks
 
@@ -46,7 +46,7 @@ A separate real invocation using the default provenance-aware callback published
 
 An initial harness ordering error let SDK process-master state reach a subsequently launched child and produce a StubObject. Its log was retained, cleanup ran, and the successful retry launched the public command first without product changes. Final cleanup reported zero matching projects/tasks and removal of owned scratch resources. Remote clone replacement remains covered by fake repository tests, not this real run. No native training was repeated for the attachment checks.
 
-These attachment observations precede acceptance of the newest supplemental resolver corrections. Final checks, review, convergence and release remain pending.
+These attachment observations precede the newest supplemental corrections; the subsequent final edge checks below cover them.
 
 ## Final review corrections and edge checks
 
@@ -60,6 +60,12 @@ Actual ClearML YAML/JSON edge checks confirmed one custom private-resolver call 
 
 Final `uv run pre-commit run --all-files --verbose` passed every configured gate. Its repository pytest run passed **668 tests, 8 skipped, 4 existing warnings in 115.87 seconds**. Ruff passed, strict mypy found no issues in 92 source files, and import-linter kept all nine contracts. Eleven changed Markdown files passed local-link (14 links), whitespace and fenced-block checks; staged diff whitespace validation passed.
 
-Spec Kit convergence checked 11 functional requirements, five success criteria, seven acceptance scenarios, six implementation design decisions and the five governing constitution principles against the implemented scope and regression/live evidence. No remaining implementation finding was identified; no empty convergence phase was appended. Existing delivery tasks remain until their outcomes are observed. Independent scoped review has no remaining blocker.
+Spec Kit convergence checked 11 functional requirements, five success criteria, seven acceptance scenarios, six implementation design decisions and the five governing constitution principles against the implemented scope and regression/live evidence. No remaining implementation finding was identified; no empty convergence phase was appended. All implementation and delivery tasks have observed acceptance evidence. Independent scoped review has no remaining blocker.
 
-Commit/tag, fresh package installation and remote release evidence are pending observation.
+The authorized feature commit is `6aefaa354e2f20ef05e3d62b7901399548045133` (`feat(config): resolve configuration files before ClearML upload`). Normal commit hooks passed; the local release hook checked and created `4431d8f543ff3f55e9926c4db82af5ac1a5c1bf3` (`chore(release): 0.10.0`) with annotated tag `v0.10.0`. The release commit changes only the root project versions in pyproject.toml and uv.lock. All external locked package metadata, versions and sources, and both submodule revisions, remain unchanged.
+
+`uv build` produced the 0.10.0 wheel and source distribution. Fresh separate wheel/sdist installations each passed version/import checks, all **nine** command help pages, all **eight** exported command-config compositions, overwrite protection, device/default/publication compatibility and the new provenance-aware resolver check. All 52 packaged Python modules matched the checked tag source. Owned package environments and fixtures were removed; logs and release artifacts were retained.
+
+The commits and exact annotated tag were pushed through the existing SSH remote. The published [GitHub release v0.10.0](https://github.com/BuckanovNikita/clearml-yolo/releases/tag/v0.10.0) is neither draft nor prerelease and includes the wheel, source distribution and SHA256SUMS. GitHub reported all three assets uploaded with matching sizes and SHA256 digests. Downloaded wheel/sdist bytes and SHA256SUMS also matched the tested local assets. The first public asset-host download timed out; a retry completed and passed integrity checks. Remote master/tag references matched the checked release commit before final evidence bookkeeping.
+
+All T001–T026 tasks are complete. Full SDD workflow, independent scoped review and final convergence have no remaining implementation finding. Extension configuration registers no before/after implement or converge hooks. Physical multi-GPU and live fault injection limitations remain as stated above.

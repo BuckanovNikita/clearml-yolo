@@ -42,8 +42,8 @@
 - [x] T014 Run affected tests and repository pytest/Ruff/mypy/import gates, documenting actual results in specs/009-resolved-config-uploads/verification-2026-09-30.md (root; SC-001–004).
 - [x] T015 Run real ClearML downloaded-file verification and required release CPU/single-GPU native evidence using project/environment skills; record owned resources and limitations in specs/009-resolved-config-uploads/verification-2026-09-30.md (root; SC-005).
 - [x] T016 Independently review implementation and run speckit-converge against specs/009-resolved-config-uploads artifacts; append and implement gaps until converged (root/reviewer and documentation agent).
-- [ ] T017 Validate feature Markdown/links and run applicable pre-commit gates; review/stage only explicit task-owned paths, then create the authorized Conventional Commit using scripts/local_release.py documented hooks (root; verification document records results).
-- [ ] T018 Verify semantic-release version commit/tag, push authorized commits/tags, publish/verify GitHub release and wheel/sdist assets, and record release evidence in specs/009-resolved-config-uploads/verification-2026-09-30.md (root).
+- [x] T017 Validate feature Markdown/links and run applicable pre-commit gates; review/stage only explicit task-owned paths, then create the authorized Conventional Commit using scripts/local_release.py documented hooks (root; verification document records results).
+- [x] T018 Verify semantic-release version commit/tag, push authorized commits/tags, publish/verify GitHub release and wheel/sdist assets, and record release evidence in specs/009-resolved-config-uploads/verification-2026-09-30.md (root).
 
 ## Dependencies and parallel execution
 
