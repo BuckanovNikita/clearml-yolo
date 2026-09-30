@@ -43,10 +43,11 @@ def test_an_explicit_run_id_is_used_exactly_as_given() -> None:
 
 
 @pytest.mark.usefixtures("fixed_identity")
-@pytest.mark.parametrize("part", ["yolo-run", HOST, "20260816-120000", str(PID)])
-def test_a_generated_run_id_carries_the_task_the_host_the_stamp_and_the_pid(part: str) -> None:
+def test_a_generated_run_id_carries_the_task_the_host_the_stamp_and_the_pid() -> None:
     """Drop any one of the four and two runs somewhere can still land in one directory."""
-    assert part in resolve_run_id("yolo-run", None, NOON)
+    run_id = resolve_run_id("yolo-run", None, NOON)
+    for part in ("yolo-run", HOST, "20260816-120000", str(PID)):
+        assert part in run_id, part
 
 
 @pytest.mark.usefixtures("fixed_identity")

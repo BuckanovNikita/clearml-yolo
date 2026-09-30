@@ -46,6 +46,8 @@ def test_examples_round_trip_through_hydra(tmp_path: Path, command: str, config_
     dump_config_tree(tmp_path)
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
         builtin = compose(config_name=config_name)
+    assert "clearml" in builtin
+    assert "enabled" not in builtin.clearml
     with initialize_config_dir(config_dir=str(tmp_path), version_base="1.3"):
         example = compose(config_name=command)
     assert OmegaConf.to_container(example) == OmegaConf.to_container(builtin)

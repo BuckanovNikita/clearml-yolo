@@ -7,20 +7,10 @@ from hydra_zen import store
 
 import clearml_yolo.configs  # noqa: F401
 
-COMMANDS = ["train", "predict", "val", "metrics", "report", "compare", "ground_truth", "pipeline"]
-
 
 @pytest.fixture(autouse=True)
 def registered() -> None:
     store.add_to_hydra_store(overwrite_ok=True)
-
-
-@pytest.mark.parametrize("command", COMMANDS)
-def test_command_composes(command: str) -> None:
-    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
-        config = compose(config_name=command)
-    assert "clearml" in config
-    assert "enabled" not in config.clearml
 
 
 @pytest.mark.parametrize("override", ["auto_gpu.force=true", "clearml.enabled=false"])

@@ -166,5 +166,6 @@ def test_classification_covers_template_once_and_preserves_detection_losses() ->
     assert native_defaults().keys() <= TRAIN_KEYS | PREDICT_KEYS | INACTIVE_KEYS
     assert INACTIVE_KEYS.isdisjoint(TRAIN_KEYS | PREDICT_KEYS)
     train = stage_settings(native_defaults(), "train")
+    assert train["epochs"] == native_defaults()["epochs"]
     assert {"box", "cls", "cls_pw", "dfl", "distill_model", "dis", "cutmix"} <= train.keys()
     assert "dnn" not in train

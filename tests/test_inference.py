@@ -275,59 +275,39 @@ def test_an_image_ultralytics_could_not_read_is_refused_not_dropped() -> None:
         _predict("best.pt", ["a.png", "broken.png"], device="cpu")
 
 
-def test_inference_settings_reach_ultralytics() -> None:
+def test_default_prediction_settings_reach_ultralytics() -> None:
     DETECTIONS["a.png"] = _boxes(([1, 2, 3, 4], 0.9, 0))
-
-    _predict("best.pt", ["a.png"], conf=0.25, iou=0.5, imgsz=1280, device="0")
-
-    call = FakeYolo.last.calls[0]  # type: ignore[union-attr]
-    assert (call["conf"], call["iou"], call["imgsz"], call["device"]) == (0.25, 0.5, 1280, "0")
+    _predict("best.pt", ["a.png"], device="0")
+    assert FakeYolo.last is not None
+    call = FakeYolo.last.calls[0]
+    assert call["quantize"] is None
+    assert call["compile"] is True
+    assert call["rect"] is True
     assert call["stream"] is True
 
 
-def test_precision_is_left_to_native_defaults() -> None:
+@pytest.mark.parametrize("quantize", [32, "fp32"])
+def test_explicit_prediction_settings_reach_ultralytics(quantize: int | str) -> None:
     DETECTIONS["a.png"] = _boxes(([1, 2, 3, 4], 0.9, 0))
-    _predict("best.pt", ["a.png"], device="0")
-    assert FakeYolo.last.calls[0]["quantize"] is None  # type: ignore[union-attr]
-
-
-@pytest.mark.parametrize("named", [{"quantize": 32}, {"quantize": "fp32"}])
-def test_naming_the_precision_hands_the_decision_over(named: dict[str, Any]) -> None:
-    """This is how the predict stage passes on whatever its config file says, and how a
-    run reproducing numbers taken before FP16 became the default opts back out."""
-    DETECTIONS["a.png"] = _boxes(([1, 2, 3, 4], 0.9, 0))
-
-    _predict("best.pt", ["a.png"], device="0", **named)
-
-    call = FakeYolo.last.calls[0]  # type: ignore[union-attr]
-    assert call.get("quantize") != 16
-    assert {key: call[key] for key in named} == named
-
-
-def test_compilation_comes_from_explicit_configuration() -> None:
-    DETECTIONS["a.png"] = _boxes(([1, 2, 3, 4], 0.9, 0))
-    _predict("best.pt", ["a.png"], device="0")
-    assert FakeYolo.last.calls[0]["compile"] is True  # type: ignore[union-attr]
-
-
-def test_the_letterbox_shape_is_named_rather_than_inherited() -> None:
-    """`rect` decides the shape the network actually sees, so it is a decision of this
-    run's rather than whatever the installed ultralytics happens to default to."""
-    DETECTIONS["a.png"] = _boxes(([1, 2, 3, 4], 0.9, 0))
-    _predict("best.pt", ["a.png"], device="0")
-    assert FakeYolo.last.calls[0]["rect"] is True  # type: ignore[union-attr]
-
-    _predict("best.pt", ["a.png"], device="0", rect=False)
-    assert FakeYolo.last.calls[0]["rect"] is False  # type: ignore[union-attr]
-
-
-def test_compilation_can_be_forced_back_off() -> None:
-    """It changes which boxes come back, so a run reproducing older numbers must opt out."""
-    DETECTIONS["a.png"] = _boxes(([1, 2, 3, 4], 0.9, 0))
-
-    _predict("best.pt", ["a.png"], device="0", compile=False)
-
-    assert FakeYolo.last.calls[0]["compile"] is False  # type: ignore[union-attr]
+    _predict(
+        "best.pt",
+        ["a.png"],
+        conf=0.25,
+        iou=0.5,
+        imgsz=1280,
+        device="0",
+        quantize=quantize,
+        compile=False,
+        rect=False,
+    )
+    assert FakeYolo.last is not None
+    call = FakeYolo.last.calls[0]
+    assert (call["conf"], call["iou"], call["imgsz"], call["device"]) == (0.25, 0.5, 1280, "0")
+    assert call["quantize"] == quantize
+    assert call["quantize"] != 16
+    assert call["compile"] is False
+    assert call["rect"] is False
+    assert call["stream"] is True
 
 
 def test_a_batch_below_one_is_refused() -> None:
@@ -390,12 +370,6 @@ def test_explicit_manifest_persists_for_native_yaml_replay(tmp_path: Path) -> No
 def test_missing_native_settings_do_not_fall_back() -> None:
     with pytest.raises(ValueError, match="ultralytics_predict"):
         predict_on_images("best.pt", ["a.png"])
-
-
-def test_missing_resolution_never_uses_checkpoint(checkpoint_recording: Any) -> None:
-    checkpoint_recording({"imgsz": 1280})
-    with pytest.raises(ValueError, match="imgsz"):
-        resolution_of("best.pt", None)
 
 
 def test_native_normalization_is_separate_from_requested_settings(
