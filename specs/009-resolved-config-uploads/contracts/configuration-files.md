@@ -1,4 +1,4 @@
-# Configuration file publication contract
+# Configuration file attachment contract
 
 ## Interfaces
 
@@ -10,16 +10,22 @@ The shared CLI uses `resolve_config_file` with a closure over current composed c
 
 ## Observable behavior
 
-- Resolve active YAML/JSON values in nested mappings and lists before upload and before sanitation.
+- Resolve active YAML/JSON values in nested mappings and lists before Configuration Object
+  attachment and before sanitation.
 - File roots override corresponding command roots as whole values; unrelated command fields never appear in the published file.
 - Preserve resolved scalar and collection types, YAML comments, source bytes and original-field topology.
 - Preserve comments containing interpolation examples unless existing credential sanitization requires redaction.
-- Keep unredacted execution and sanitized upload copies separate with unique paths; replay files returned by ClearML obey the same preparation rules. Resolved secrets copied through aliases under otherwise innocuous keys must also be redacted. Confidential error categories distinguish resolution/preparation failure without printing configuration contents or credential values.
+- Keep unredacted execution and sanitized storage copies separate with unique paths; replay
+  files returned by ClearML obey the same preparation rules. Resolved secrets copied through
+  aliases under otherwise innocuous keys must also be redacted. Confidential error categories
+  distinguish resolution/preparation failure without printing configuration contents or values.
 - Return the original execution input path for files without interpolation even when credential sanitization requires a separate upload copy; retain existing replay behavior.
-- Fail on unknown references, cycles, unknown resolvers, missing mandatory values and unavailable environment variables; never upload unresolved active content.
+- Fail on unknown references, cycles, unknown resolvers, missing mandatory values and unavailable
+  environment variables; never attach unresolved active content.
 - Registered resolvers receive unmodified resolved arguments; escaped literals/direct aliases preserve meaning. Tuple outputs are recursively normalized/validated; unsupported set/object outputs and resolver-emitted active interpolation are rejected. Mixed escaped literals and active references, including embedded aliases, preserve their respective semantics. Computed node targets such as `${${key}}` are rejected confidentially because credential provenance cannot be established safely; nested resolver arguments such as `${oc.env:${variable}}` remain supported.
 - Sensitive command-context and environment reference values retain redaction provenance when aliases use innocuous keys. Provenance records the exact value consumed without reevaluating noncached custom resolvers.
 - Resolved execution copies live beside their source for relative-path semantics and are uniquely named, tracked and cleaned up.
-- Retain existing configuration/artifact identifiers, single-task ownership and verified completion guarantees.
+- Retain existing Configuration Object identifiers, single-task ownership and verified
+  completion guarantees. Do not publish configuration files as artifacts.
 
-Editable local exports and historical task files are outside this publication contract.
+Editable local exports and historical task files are outside this attachment contract.

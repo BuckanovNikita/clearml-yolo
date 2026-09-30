@@ -1,5 +1,10 @@
 # Implementation Plan: Resolved configuration uploads
 
+> **Snapshot note:** This is the approved pre-implementation plan and retains its original
+> upload terminology. The completed system attaches consumed files as Configuration Objects
+> and publishes no configuration artifacts; see [current contracts](../../docs/current-contracts.md)
+> and [dated verification](verification-2026-09-30.md).
+
 **Branch**: `master` | **Date**: 2026-09-30 | **Spec**: [spec.md](spec.md)
 
 ## Summary

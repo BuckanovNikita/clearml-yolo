@@ -7,14 +7,16 @@
 Use a repository development script and Python Semantic Release (PSR) for automatic
 local versioning. The post-commit helper computes and stamps a version, refreshes
 only the project lock metadata, then uses ordinary Git to create a checked release
-commit and annotated tag. No application code or public entrypoints change.
+commit and annotated tag. The 2026-09-30 amendment adds full-history changelog generation
+before commits and versioned changelog preparation in the release transaction.
+No application code or public entrypoints change.
 
 ## Technical Context
 
 - Python 3.12; existing uv, pytest, Ruff, strict mypy and pre-commit tooling.
 - PSR 10.x is a development dependency, locked with the other tools.
 - Local Git metadata stores a cross-worktree exclusive lock and per-worktree recovery
-  record. No credentials, remote calls, changelog, distribution build or publishing.
+  record. No credentials, remote calls, distribution build or publishing.
 - Tests use real Git, PSR, uv lock, and installed pre-commit hooks in temporary
   repositories; lightweight fixture check hooks replace application checks there.
 - Portable Python filesystem locking uses exclusive directory creation. An interrupted
@@ -24,7 +26,7 @@ commit and annotated tag. No application code or public entrypoints change.
 
 Pre-design and post-design gates pass: no runtime boundaries or nine command contracts
 change; existing quality hooks remain enabled; no dependency checkout/pin is advanced.
-Only explicit version paths are staged. No stash/reset/revert or hook bypass is used.
+Only explicit release paths are staged. No stash/reset/revert or hook bypass is used.
 README is Russian; other documentation and code messages are English. Machine-specific
 facts are excluded. Real GPU/ClearML verification is outside local tag automation.
 
@@ -53,19 +55,37 @@ facts are excluded. Real GPU/ClearML verification is outside local tag automatio
   commits whose operation markers have already been removed by Git.
 - Reject shallow history before PSR can automatically fetch. Require a reachable version
   baseline. Acquire the common-directory lock before inspecting mutable release state.
-- A clean tracked tree/index is mandatory before starting. Untracked files are untouched.
+- A clean tracked tree/index is mandatory before starting. Unrelated untracked files are untouched.
 - Use PSR `version --print` to calculate; compare with reachable tags to distinguish a
   no-op from a conflicting existing tag elsewhere in history.
-- Write recovery metadata before stamping. Run PSR with no commit/tag/build/changelog/
+- Write recovery metadata before stamping. Run PSR with changelog generation enabled
+  and no commit/tag/build/
   push/VCS release; it may stage the declared version file even with no commit.
 - Refresh `uv.lock` offline. Compare its parsed contents with the committed original,
   allowing only the root package version to change; do not upgrade dependencies.
-- Stage explicit metadata paths and invoke ordinary path-limited `git commit --only` with the recursion
+- Record the prepared CHANGELOG.md checksum. Stage the three explicit release paths
+  and invoke ordinary path-limited `git commit --only` with the recursion
   guard set only for the helper. All configured pre-commit checks still run.
-- Verify commit parent, changed paths and final metadata; annotate the checked commit.
+- Verify commit parent, changed paths, final metadata and changelog checksum; annotate the checked commit.
 - Retain the recovery record until successful tagging. A clean matching release commit
   can be rechecked and tagged on retry; dirty failed preparation requires the contributor
-  to inspect/fix and commit only the two metadata files. With the installed hook, that
+  to inspect/fix and commit only the two metadata files and prepared changelog. With the installed hook, that
   manual release commit invokes tag recovery automatically; otherwise retry explicitly.
 - Existing tags are never replaced. The operation lock is released on handled exits;
   a hard crash requires owner inspection and manual stale-lock removal.
+
+## Changelog and documentation amendment (2026-09-30)
+
+- Configure PSR full-history Markdown generation without masking the first release.
+  The pre-commit helper reports changed output for review/staging, never stages files,
+  and preserves prepared output when a release guard or recovery record is present.
+- Test actual Git/pre-commit execution, generation idempotence, source inclusion,
+  immutable dependency metadata and checksum-protected recovery in temporary repositories.
+- Documentation update scope: README.md, this feature's spec, plan, data model,
+  contracts/local-release.md, quickstart.md and appended tasks; update the local-release
+  row in docs/current-contracts.md and annotate research's superseded two-file scope.
+  Preserve completed history and original dated evidence. Record new checks separately
+  in docs/evidence/2026-09-30-changelog-release.md.
+- Final documentation tasks depend on implementation and include Markdown structure,
+  local-link validation and release-command examples. No runtime integration skill or
+  environment example changes are needed because application execution is unchanged.

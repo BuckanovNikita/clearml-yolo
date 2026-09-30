@@ -10,5 +10,5 @@ No new persistent application model or database schema is introduced.
 | Release record | Version, source commit, tag, notes, distributions, SHA-256 hashes | Published assets must match verified packages and tag must identify the pushed commit |
 
 Generation transitions from destination validation to configuration composition, directory
-creation, and file writes. A detected collision fails before writes. Filesystem errors during
-writing fail the command; no transaction or rollback is promised for mid-write I/O failures.
+creation, and file writes. A detected collision fails before writes. Filesystem write errors
+fail the command; no transaction or rollback is promised for mid-write I/O failures.

@@ -40,7 +40,7 @@ part of the original removal inventory and was restored by the
 
 ### Session 2026-09-19
 
-The supplied release plan records the prior clarification decisions; no additional
+The supplied release plan records prior clarification decisions; no further
 questions are needed. Thin wrapper describes model execution, not evaluation/reporting.
 The baseline is the latest completed prod-tagged task excluding this invocation, or an
 explicit task/checkpoint. Automatic absence skips comparison; invalid explicit inputs fail.
@@ -63,12 +63,13 @@ A practitioner trains or predicts through the shared native configuration groups
 
 ### User Story 2 - Evaluate and compare on current data (Priority: P1)
 
-A practitioner evaluates a checkpoint and compares production and candidate on current test images.
+A practitioner evaluates a checkpoint and compares production and candidate on the same current
+images from a selected split. Standalone comparison defaults to test; the pipeline uses test.
 **Why this priority**: Dataset drift and test calibration otherwise invalidate model decisions.
 **Independent Test**: A baseline/candidate fixture produces consistent statistical and business counts.
 **Acceptance Scenarios**:
 1. Given validation and test data, candidate thresholds are calibrated on val once and frozen.
-2. Given a baseline, both models infer the same current test images under matching settings;
+2. Given a baseline, both models infer the same current selected-split images under matching settings;
    exact saved baseline thresholds are used and all reports use these results.
 3. Given no automatic baseline, candidate evaluation succeeds with comparison marked skipped;
    invalid explicit baselines or missing required thresholds fail.
@@ -116,14 +117,17 @@ first run without baseline, and distributed parent return values are covered by 
 - **FR-005**: Remove the listed runtime automation, obsolete options, entrypoints, exclusive
   dependencies, tests and instructions. Retain the subsequently restored local initializer.
 - **FR-006**: Preserve YOLO dataset ingestion and ground-truth/prediction table contracts.
-- **FR-007**: Calibrate candidate on val and freeze test thresholds; load baseline thresholds;
-  reject missing required thresholds and unsupported evaluation inputs explicitly.
+- **FR-007**: Calibrate on val and freeze the resulting thresholds for every evaluated split;
+  accept exact supplied thresholds, prefer tracked validation CSVs, retain historical per-split
+  threshold readers, and reject missing or invalid thresholds explicitly.
 - **FR-008**: Resolve latest completed prod baseline excluding current task, preserve explicit
   task/checkpoint selection, skip only automatic absence and fail invalid explicit selections.
-- **FR-009**: Infer both checkpoints on identical current test images with matching settings;
-  prohibit historical dashboard comparison across datasets.
+- **FR-009**: Standalone comparison MUST accept a split override defaulting to test; pipeline
+  comparison MUST use test. Infer both checkpoints on identical current selected-split images
+  with matching settings and prohibit historical dashboard comparison across datasets.
 - **FR-010**: Preserve statistical methods, exclusions and developer/business workbook formats;
-  share evaluated results among builders to ensure consistent counts and thresholds.
+  share evaluated results among builders to ensure consistent counts and thresholds. Reports
+  MUST use the paired split recorded by the comparison manifest.
 - **FR-011**: Require ClearML, own one task per invocation and share it across pipeline stages;
   prevent upstream/worker duplicate tasks, metrics and model uploads.
 - **FR-012**: Save source configs, resolved wrapper config, effective model args, dataset config,
@@ -149,8 +153,8 @@ first run without baseline, and distributed parent return values are covered by 
 ### Measurable Outcomes
 
 - **SC-001**: All configuration precedence and removed-option acceptance cases pass.
-- **SC-002**: All evaluated test images and per-class counts agree across comparison reports;
-  no test-set calibration occurs.
+- **SC-002**: All evaluated selected-split images and per-class counts agree across comparison
+  reports; no comparison split calibration occurs.
 - **SC-003**: Every enabled stage's required artifacts are downloadable from exactly one task;
   induced failures never yield a successful task.
 - **SC-004**: Mandatory regression checks pass and dated real CPU/single-GPU evidence covers

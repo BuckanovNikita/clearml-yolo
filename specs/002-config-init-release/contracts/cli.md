@@ -29,6 +29,6 @@ inside the package, not the supported command or artifact interfaces.
 The existing dependency pins, ClearML execution requirement, removed queue/GPU automation,
 native precedence, and pipeline output ownership remain unchanged.
 
-The native-group details above supersede this feature's original sparse-mapping design. The
+These native-group details supersede this feature's original sparse-mapping design. The
 [current configuration contract](../../003-ultralytics-config-groups/contracts/configuration.md)
 defines accepted overrides, stage filtering, removed `cfg` forms, and effective YAML records.

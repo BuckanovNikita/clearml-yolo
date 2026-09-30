@@ -1,11 +1,12 @@
-# Specification Quality Checklist: Resolved configuration uploads
+# Specification Quality Checklist: Resolved configuration attachments
 
 **Purpose**: Validate the approved requirement before implementation.
 
 **Created**: 2026-09-30
 
 - [x] Requirement describes user value and independently testable stories.
-- [x] Scope distinguishes uploaded files from editable local exports and existing Configuration Objects.
+- [x] Scope distinguishes consumed Configuration Objects from editable local exports and
+  excludes configuration artifacts.
 - [x] Functional requirements and measurable success criteria are testable.
 - [x] Resolution context and root precedence are explicit.
 - [x] Comment preservation and original-file preservation are explicit.

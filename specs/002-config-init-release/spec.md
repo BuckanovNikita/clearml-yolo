@@ -29,7 +29,7 @@ source code and pinned revisions stay unchanged; removed execution automation st
 ### User Story 1 - Start from editable examples (Priority: P1)
 
 A practitioner initializes a directory and edits an example for the pipeline or an individual
-stage instead of reconstructing the available settings manually.
+stage instead of manually reconstructing available settings.
 
 **Why this priority**: Restore the requested starting point for configuring experiments.
 **Independent Test**: Generate examples without service credentials and load each with its
@@ -125,7 +125,7 @@ types, unavailable integration services, and an already-published tag.
 
 ## Assumptions
 
-- At the publication decision point, the package was `0.3.0` and GitHub's latest release was
+- At the publication decision, the package was `0.3.0` and GitHub's latest release was
   `v0.2.0`; v0.3.0 was then published. The maintained version is read from `pyproject.toml`.
 - Release means a GitHub release on the existing repository; registry publication is outside scope.
 - The coding preference also persists in global instructions; that personal file is outside this Git repo.

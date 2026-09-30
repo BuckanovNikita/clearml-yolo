@@ -2,6 +2,10 @@
 
 **Input**: [spec.md](spec.md), [plan.md](plan.md), [data-model.md](data-model.md), [publisher contract](contracts/publisher.md)
 
+> **Current-contract note:** Checked tasks preserve completed feature history. The receipt is
+> now local, with meaningful dataset/run fields in canonical run configuration; T007 and T015
+> describe the earlier artifact target. See [current contracts](../../docs/current-contracts.md).
+
 ## Phase 1: Setup
 
 - [x] T001 Add FiftyOne main dependency and import-linter package boundary in pyproject.toml

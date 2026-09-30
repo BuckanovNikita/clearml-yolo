@@ -35,13 +35,18 @@ fresh directory and require explicit input paths; no silently shared output dire
 `cy-val` accepts weights, ground_truth, ultralytics, ultralytics_predict, evaluation, splits and output_dir;
 it predicts required val plus requested splits and evaluates at frozen validation thresholds.
 `cy`, `cy-val`, and `cy-metrics` default to train/val/test, with explicit subsets preserved.
-Comparison and reports remain test-only; `cy-val` never publishes to FiftyOne.
+Standalone `cy-compare` accepts `split=<name>` and defaults to `test`; the pipeline fixes its
+comparison to `test`. `cy-report` reads the paired split from `comparison_manifest.json`, so
+its output names and content follow the comparison rather than assuming test. `cy-val` never
+publishes to FiftyOne.
 
 Comparison takes baseline_model/candidate_model references, current ground_truth, ultralytics, ultralytics_predict,
-split=test and statistical options. Automatic baseline is latest completed prod excluding
+a standalone split override (default `test`) and statistical options. Automatic baseline is latest completed prod excluding
 current task. Explicit local models require weights and exact thresholds; explicit invalid
-inputs fail. Reports consume the comparison's current-test evaluated dashboards, not stored
-historical dashboards. Missing automatic baseline records a skipped comparison.
+inputs fail. Tracked models prefer the exact validation-threshold CSV and retain historical
+per-split threshold payload compatibility; explicitly supplied thresholds remain exact.
+Reports consume the paired evaluated dashboards named by the local comparison manifest, not
+stored historical dashboards. Missing automatic baseline records a skipped comparison.
 Standalone `evaluation` is a sparse mapping (`+evaluation.ap_method=continuous`);
 its supplied values override legacy `iou_threshold` and `matching_strategy`.
 The pipeline forwards the full `metrics.evaluation` configuration to comparison.

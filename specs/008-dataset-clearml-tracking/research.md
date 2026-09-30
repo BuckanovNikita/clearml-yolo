@@ -3,7 +3,7 @@
 ## Dataset lifecycle
 
 Decision: Use cached prepared data.yaml directly, retaining NDJSON locally. Existing export
-already writes a complete YOLO layout, so running convert_ndjson_to_yolo again duplicates
+already writes a complete YOLO layout, so rerunning convert_ndjson_to_yolo duplicates
 work. Preserve NDJSON basename/casing; keep flat numbered lowercase names. Reject repeated
 label stems per split. CSV bytes are the only input content identity; no image hashes/mtimes.
 
@@ -11,8 +11,7 @@ Decision: Hold one filelock per entry across publication and the native training
 Installed native verification may repair JPEGs and native caches can write .cache/.npy files.
 Serializing consumers for the same entry is conservative but preserves native settings and
 source-image immutability without monkeypatching the upstream dataset. Different cache entries
-remain independent. Atomic staging and completion metadata prevent interrupted entries from
-being consumed. Run cleanup has no ownership over this cache.
+remain independent. Atomic staging and completion metadata prevent consumption of interrupted entries. Run cleanup has no ownership over this cache.
 
 Alternatives rejected: Reconvert NDJSON each run (violates reuse); hardlink originals (native
 repair can alter user images); image-content hashing (explicitly excluded); unguarded shared
@@ -41,8 +40,8 @@ Deduplicate tables by content, with internal alias satisfaction of required-publ
 
 Decision: Read exact validation CSV thresholds for new tasks and historical payloads for old
 ones. Prefer explicitly identifiable best native model, never arbitrary last model. Preserve
-latest completed prod task exclusion and paired current-test inference. Source task/model links
-replace copied configurations. Architecture and labels are checkpoint-owned.
+latest completed prod task exclusion and paired selected-split inference (test in the pipeline).
+Source task/model links replace copied configurations. Architecture and labels are checkpoint-owned.
 
 ## DDP native callback compatibility
 

@@ -45,3 +45,21 @@ T001–T004 precede US1; US2/US3 extend the same transaction and are implemented
 Documentation can be reviewed independently while tests run. No parallel writers share
 the helper or test file. Deliver the basic transaction, then preservation/recovery, then
 full verification. The main repository is not committed, tagged or pushed for testing.
+
+## Phase 7: Changelog amendment (2026-09-30)
+
+- [x] T014 Add failing real Git/hook changelog scenarios to tests/test_local_release.py.
+- [x] T015 Configure full-history Markdown generation in pyproject.toml and an always-running pre-commit hook in .pre-commit-config.yaml; depends on T014.
+- [x] T016 Extend scripts/local_release.py with refresh, release inclusion, checksum validation and protected recovery; depends on T015.
+- [x] T017 Run the complete release acceptance suite and required quality gates; depends on T016.
+
+## Phase 8: Documentation update
+
+- [x] T018 Reconcile README.md, specs/003-semantic-release/{spec.md,plan.md,data-model.md,research.md,contracts/local-release.md,quickstart.md}, and docs/current-contracts.md with the implemented changelog behavior; depends on T016.
+- [x] T019 Validate changed Markdown structure, local links and release-command examples; record results and limits in docs/evidence/2026-09-30-changelog-release.md; depends on T017 and T018.
+- [x] T020 Review all authorized workspace changes for publication; depends on T019.
+
+The user explicitly requests committing the reviewed snapshot, creating the checked
+next release and pushing master plus its exact annotated tag after these gates. Final
+commit/tag and remote-ref evidence is reported in the publication session; fixture tests
+remain isolated and do not publish.

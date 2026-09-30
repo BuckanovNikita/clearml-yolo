@@ -1,8 +1,15 @@
 # Feature Specification: Explicit Detection Configuration
 
 **Created**: 2026-09-29
-**Status**: Accepted for implementation
+**Status**: Implemented and verified; see
+[verification-2026-09-29.md](verification-2026-09-29.md)
 **Input**: Approved phase 005 plan and explicit implementation request.
+
+**Documentation amendment (2026-09-30)**: The standalone split-override wording
+reflects current code and configuration composition. The linked original acceptance
+records exercise paired current-test execution; they do not establish live non-test
+comparison. See the [documentation audit](../../docs/evidence/2026-09-30-instruction-contract-audit.md)
+for static checks and limitations.
 
 ## Clarifications
 
@@ -18,7 +25,7 @@
 
 ### User Story 1 - Inspect useful detection parameters (Priority: P1)
 
-An operator generates editable examples and can see every applicable detection setting,
+An operator generates editable examples showing every applicable detection setting,
 its documentation, and any relationship with training settings.
 
 **Independent Test**: Generate and load examples; compare active keys with the reviewed
@@ -64,7 +71,8 @@ Unknown native keys fail classification. Unsupported task/stage combinations can
 produce a non-detection workflow. Null image size and absent training model fail instead of
 selecting hidden values. Explicit weights conflict with a different prediction model.
 Native optional null/auto behavior remains native. CSV ownership, source privacy, task failure,
-upload/flush handling, fresh output routing and paired test membership remain unchanged.
+upload/flush handling, fresh output routing and paired membership remain unchanged. The
+pipeline uses current test images; standalone comparison uses its explicitly selected split.
 
 ## Requirements
 
@@ -100,7 +108,8 @@ upload/flush handling, fresh output routing and paired test membership remain un
 - **SC-002**: All five model commands pass configured values without application fallback;
   shared references and overrides produce the same result in built-in and exported examples.
 - **SC-003**: Real training and inference retain usable outputs and inspectable configuration
-  records; paired comparison uses identical settings and current-test membership.
+  records; paired comparison uses identical settings and selected-split membership, with test
+  fixed only by the pipeline.
 
 ## Assumptions
 

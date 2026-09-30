@@ -53,7 +53,7 @@ were independently testable; US3 publication followed the combined verification 
   installed script keys and composed template output; analysis resolution preserves the pointer.
 
 No unresolved requirement ambiguity, duplicate requirement, or constitution conflict was
-identified. Publication tasks were closed after the remote tag and downloaded asset hashes were verified.
+identified. Publication tasks closed after verification of the remote tag and downloaded asset hashes.
 All 21 tasks are complete. This retrospective report does not claim planning preceded implementation.
 
 See the [dated evidence](../../docs/evidence/2026-09-28-release-030.md) and

@@ -15,7 +15,8 @@ native template. Preserve checkpoint, routing, task ownership and sanitization c
 **Primary Dependencies**: Hydra/hydra-zen, OmegaConf, installed Ultralytics, ClearML,
 Pydantic, Loguru; declare the selected comment-preserving YAML dependency directly.
 
-**Storage**: Local YAML/manifests and existing ClearML configuration/artifact storage.
+**Storage**: Local YAML/manifests, canonical ClearML run configuration, native General
+parameters, and command-specific performance artifacts.
 
 **Testing**: Focused pytest with controlled external substitutes, Ruff, mypy, import-linter,
 and documentation/link checks. Heavy native/GPU/live ClearML checks were explicitly authorized
@@ -62,13 +63,14 @@ Tests remain in `tests/` alongside related configuration, task and artifact cove
 3. Resolve effective inputs at task/native boundaries. Filter stage-irrelevant settings,
    preserve internal training validation options, validate prediction batch, enforce owned
    checkpoint/output paths and shared comparison settings.
-4. Export effective native YAML and persistent source manifests. Connect sanitized commented
-   YAML through existing ClearML ownership and upload lifecycle; use split/role identifiers.
+4. Export effective native YAML and persistent source manifests locally using split/role
+   identifiers. Store replayable wrapper settings in the canonical run Configuration Object
+   and native training settings in General; do not publish native YAML copies.
 5. Update current contracts, Russian README and migration documentation. Verify focused
    behavior and static gates, then converge against requirements. Execute heavy checks only
    after explicit authorization and keep their outcomes in dated evidence.
 
 ## Complexity Tracking
 
-No architectural exception is required. A shared native configuration module replaces
+No architectural exception required. A shared native configuration module replaces
 independently maintained sparse defaults and raw file precedence.

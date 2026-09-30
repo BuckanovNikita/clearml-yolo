@@ -3,6 +3,10 @@
 Read-only analysis performed after task generation. No blocking findings; no constitution
 conflicts, duplicate requirements or uncovered acceptance criteria identified.
 
+**Snapshot status**: This analysis predates implementation. The feature later completed; see
+[verification-2026-09-29.md](verification-2026-09-29.md) and the repository-wide
+[current contracts](../../docs/current-contracts.md).
+
 | Requirements | Tasks |
 |---|---|
 | FR-001–FR-003 | T002, T003, T005 |
@@ -14,6 +18,6 @@ conflicts, duplicate requirements or uncovered acceptance criteria identified.
 | SC-003 | T011 |
 
 All eight requirements, three success criteria and three user stories have coverage.
-Parameter inventory research precedes implementation. Review of requirements checklist is
+Parameter inventory research precedes implementation. Requirements checklist review is
 separate from implementation completion; passing checklists do not claim runtime acceptance.
 Extension hooks are empty. T012 records convergence and independent implementation review.

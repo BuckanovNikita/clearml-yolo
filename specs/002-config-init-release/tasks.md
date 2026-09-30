@@ -3,7 +3,7 @@
 **Input**: [spec.md](spec.md), [plan.md](plan.md), [research.md](research.md),
 [data-model.md](data-model.md), and [CLI contract](contracts/cli.md).
 
-This is the completed historical ledger for v0.3.0. Checked tasks are backed by repository
+This completed historical ledger covers v0.3.0. Checked tasks are backed by repository
 inspection or dated evidence. The
 [native configuration feature](../003-ultralytics-config-groups/spec.md) later superseded sparse
 native settings and expanded initializer output to include two native group files; those

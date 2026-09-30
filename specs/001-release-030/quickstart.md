@@ -18,10 +18,10 @@ See [CLI](contracts/cli.md) and [artifacts](contracts/artifacts.md) for exact co
    ownership. Induce upload failure and interruption using isolated test tasks.
 6. Build with `uv build`, install each distribution in a fresh environment, verify nine
    command helps and absent cy-queue. Run `cy-init-config` into a fresh directory, check
-   all eight command examples and both native group files compose as applicable, and verify
+   all eight command examples and both native group files compose as applicable; verify
    overwrite protection. Run documented examples.
 7. Record dated outcomes and limitations, then remove only owned resources. Physical
-   distributed execution is unverified unless actually tested.
+   distributed execution is unverified unless tested.
 
 Keep a portable summary under `docs/evidence/`. Machine-specific commands, task identities,
 endpoint details and download records belong with the environment's global skill.

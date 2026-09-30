@@ -7,8 +7,9 @@
   strings. Alternative rejected: use requested ClearMLConfig names or import SDK in paths.
 - Decision: percent-encode unsafe UTF-8 bytes and special components to prevent path
   traversal while retaining readable ordinary names. Explicit routes retain precedence.
-- Decision: centralize all 13 split kinds in artifact_names and validate produced files
-  before uploads. Existing scoring already calibrates once and records exact payloads.
+- Superseded decision: the initial plan centralized 13 split kinds. The current publication
+  contract instead uploads one consolidated evaluation workbook per selected split and one
+  exact validation-threshold CSV, while retaining component files locally for validation.
 - Decision: keep publication service/schema unchanged; validate existing owner integration.
 - Clarification review: supplied plan resolves all material questions. Empty selections
   retain existing default fallback; duplicates are evaluated once.

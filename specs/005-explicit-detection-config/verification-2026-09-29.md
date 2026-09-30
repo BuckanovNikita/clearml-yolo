@@ -44,7 +44,7 @@ Standalone comparison also completed with 49 artifacts downloaded at 906. After 
 correction it completed again at the default 960: all 49 artifacts were force-downloaded,
 both roles' requested YAML contained imgsz=960, compile=true and nms=true, and both recorded
 normalized targets were [960, 960]. Cleanup verified zero remaining tagged tasks/projects.
-The final default correction was not followed by another training epoch; training's
+No training epoch followed the final default correction; training's
 configuration path passed the full tests, and the earlier real training run used 906.
 Each successful invocation owned exactly one completed ClearML task. All artifacts were
 force-downloaded and inspected: 19 for training, 85 for the baseline, 95 for the candidate,

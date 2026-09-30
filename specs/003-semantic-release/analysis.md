@@ -29,5 +29,5 @@ checks run before tagging. These are acceptance-test obligations, not passing cl
 | Medium | Amend lacks active operation markers | Automatic mode checks reflog action; real amend regression failed before the fix and passed afterward; real cherry-pick also tested |
 
 The installer is a justified design refinement needed to preserve the approved clean-tree
-contract. There are no deferred review findings. Final check evidence is recorded in
+contract. No deferred review findings. Final check evidence is in
 [the dated verification report](../../docs/evidence/2026-09-28-semantic-release.md).

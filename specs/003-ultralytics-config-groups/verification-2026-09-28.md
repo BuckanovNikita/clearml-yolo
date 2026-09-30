@@ -93,7 +93,7 @@ one training epoch, image size 96, and explicit project/tags:
 | Standalone comparison | Completed; continuous AP method | 48 |
 | Standalone report | Completed | 9 |
 
-All required-upload manifests were checked and every artifact was force-downloaded, with
+All required-upload manifests were checked and every artifact force-downloaded, with
 file size and SHA-256 recorded. Downloaded native YAML and ClearML configuration objects
 retained upstream comments and stage filtering. Retained prediction manifests were present.
 Direct native Ultralytics training and prediction replay using the downloaded YAML both
@@ -112,4 +112,4 @@ the environment skill's dated evidence, outside the repository.
 
 T021 and T025 are complete. These runs verify CPU and a single GPU with a small synthetic
 dataset; they do not establish model quality, performance at scale, or physical multi-GPU DDP.
-At the completion of these verification runs, no commit, push or release was performed.
+At completion of these verification runs, no commit, push or release was performed.

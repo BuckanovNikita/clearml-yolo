@@ -25,7 +25,7 @@ The reviewed parameter inventory below was completed from installed consumers be
 
 ## Reviewed Parameter Inventory (2026-09-29)
 
-The installed locked Ultralytics 8.4.165 template contains 113 keys. The following
+The installed locked Ultralytics 8.4.165 template contains 113 keys. These
 mutually exclusive groups cover every template key. Paths below are relative to the
 Ultralytics package and describe reviewed source evidence, not a machine setup.
 
@@ -55,7 +55,7 @@ uses references only for shared keys whose defaults are not explicitly stage-spe
 
 `dnn`, `source`, `show`, `save_crop`, `show_boxes`, `line_width`.
 
-`source` is present as an explicitly reserved null setting; image membership supplies
+`source` is an explicitly reserved null setting; image membership supplies
 its actual value. A user-supplied non-null source fails rather than being discarded.
 DNN selects an ONNX backend; training and its final checkpoint validation use PT.
 

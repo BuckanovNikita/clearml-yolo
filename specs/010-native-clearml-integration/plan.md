@@ -4,7 +4,7 @@
 
 ## Summary
 
-Stream native DDP epoch events while training runs and retain existing v0.10 configuration-only replay, performance publication and verified native best-model contracts. Preserve native callback authority and final publication barriers.
+Stream native DDP epoch events during training and retain existing v0.10 configuration-only replay, performance publication and verified native best-model contracts. Preserve native callback authority and final publication barriers.
 
 ## Technical Context
 
@@ -35,7 +35,7 @@ Preserve native_ddp_relay context-manager and replay(trainer) call interfaces. S
 
 Defer on_train_end until replay(trainer) stops/joins the consumer, drains pending bytes and validates full journal ordering/counts/arguments/best checkpoint. Only then dispatch the deferred native final callback, apply final worker args/checkpoint/save_dir to the parent trainer and proceed to existing best-model verification. Do not replay prior events. Repeated or misplaced terminal events fail validation. Non-DDP execution does not consume local owner events as DDP events.
 
-Store consumer failures and propagate them at replay/exit boundaries. Stop and join before callbacks or temporary journal resources are removed, including exceptions and interruption. No worker tasks/uploads and no surviving task-owned consumer. Earlier telemetry on failed runs is allowed, final successful completion is not.
+Store consumer failures and propagate them at replay/exit boundaries. Stop and join before removing callbacks or temporary journal resources, including exceptions and interruption. No worker tasks/uploads and no surviving task-owned consumer. Earlier telemetry on failed runs is allowed, final successful completion is not.
 
 ### Native tracking and publication contracts
 
@@ -43,7 +43,10 @@ Add behavior coverage for native registration, task reuse, requested plots behav
 
 Protect existing exactly-one native best-model barrier and byte verification with existing/new regressions. Audit command publication inventories and configuration-return paths, including repeated consumed files, numbered temporary names, train_data_overrides.json, report inputs and local manifests/receipts. Keep named configurations/General as replay authority. Root makes production changes only where tests/evidence demonstrate a remaining violation; do not rewrite feature 009 or broad-filter filenames/extensions.
 
-Source-model provenance uses the model's source task. Preserve existing comparison inference ownership, canonical exact validation CSV readers and historical weight/threshold fallback. Missing required configuration fails with actionable guidance.
+Source-model provenance uses task/model links from the model's source task. Preserve existing
+comparison inference ownership, canonical exact validation CSV readers and historical weight/
+threshold fallback. Resolve source weights and thresholds without automatically fetching source
+General parameters or Configuration Objects; missing required model inputs fail actionably.
 
 ### Parallel ownership
 

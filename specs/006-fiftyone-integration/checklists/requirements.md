@@ -1,6 +1,6 @@
 # Specification Quality Checklist: FiftyOne Integration
 
-**Purpose**: Validate specification completeness and quality before proceeding to planning
+**Purpose**: Validate specification completeness and quality before planning
 **Created**: 2026-09-29
 **Feature**: [spec.md](../spec.md)
 

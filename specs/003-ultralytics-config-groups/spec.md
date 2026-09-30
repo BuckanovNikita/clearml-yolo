@@ -4,11 +4,24 @@
 
 **Created**: 2026-09-28
 
-**Status**: Implemented; lightweight and authorized real-run verification results are recorded in
-[verification-2026-09-28.md](verification-2026-09-28.md)
+**Status**: Implemented; original acceptance is recorded in
+[historical verification](verification-2026-09-28.md). Current amendments and their
+verification scope are described below.
 
 **Input**: Replace sparse stage settings and raw-file loading with a full native training
-configuration, prediction overrides, preserved upstream comments, and replayable ClearML YAML.
+configuration, prediction overrides, preserved upstream comments, and replayable local YAML.
+
+## Current contract evidence
+
+The 2026-09-28 record verifies the original native-YAML artifact/replay behavior; it does
+not verify the amended no-configuration-artifact requirement. Later
+[resolved-configuration evidence](../009-resolved-config-uploads/verification-2026-09-30.md)
+and [native-tracking evidence](../010-native-clearml-integration/verification.md) record
+canonical configuration publication, consolidated performance artifacts and owner callbacks.
+Direct native replay belongs to the original record; remote cloned-task recovery remains
+mocked, not a live remote-agent result. The
+[documentation audit](../../docs/evidence/2026-09-30-instruction-contract-audit.md)
+records current static/configuration checks without repeating native execution.
 
 ## User Scenarios & Testing
 
@@ -49,14 +62,16 @@ An author shares model settings and overrides only prediction-specific values.
 
 ### User Story 3 - Inspect and replay native settings (Priority: P2)
 
-An author obtains commented, resolved native YAML locally and from ClearML and replays
-an individual stage using native Ultralytics and retained source manifests.
+An author obtains commented, resolved native YAML locally and replays an individual stage
+using native Ultralytics and retained source manifests.
 
 **Why this priority**: Reproducibility requires actual execution inputs rather than wrapper options.
 
-**Independent Test**: Parse exported YAML and inspect mocked ClearML objects/artifact uploads.
-Direct native replay remains a separately authorized integration check; the authorized
-2026-09-28 run is recorded in [verification evidence](verification-2026-09-28.md).
+**Independent Test**: Parse exported YAML and verify that ClearML stores canonical run
+configuration without a native-YAML artifact.
+Direct native replay remains a separately authorized integration check. The
+[2026-09-28 record](verification-2026-09-28.md) is historical direct-replay evidence;
+current configuration-only publication evidence and limitations are listed above.
 
 **Acceptance Scenarios**:
 
@@ -64,8 +79,8 @@ Direct native replay remains a separately authorized integration check; the auth
    comments remain, irrelevant settings are commented, and active values match native inputs.
 2. **Given** multiple splits or comparison roles, **When** prediction completes, **Then** each
    distinct input has resolved YAML and a retained manifest supporting replay.
-3. **Given** failed upload or flush, **When** finalizing, **Then** the command and task fail
-   while local outputs remain.
+3. **Given** failed required performance publication or flush, **When** finalizing, **Then**
+   the command and task fail while local YAML and other outputs remain.
 
 ### Edge Cases
 
@@ -74,7 +89,8 @@ Direct native replay remains a separately authorized integration check; the auth
 - Explicit conflicting prediction model or native pipeline output settings fail.
 - Explicit native nulls remain distinct from absent overrides; unknown keys fail validation.
 - Existing files, symlinks, parent collisions and paths with spaces retain generator safeguards.
-- Comments and values must not leak credentials; dataset images are never uploaded.
+- Comments and values must not leak credentials. Raw source dataset images are never uploaded
+  as artifacts; owner-only native training/validation previews remain permitted.
 
 ## Requirements
 
@@ -98,8 +114,10 @@ Direct native replay remains a separately authorized integration check; the auth
   as applicable, plus split/role variants with actual inputs and retained prediction manifests.
 - **FR-009**: Exported native YAML MUST contain no Hydra metadata or unresolved interpolation,
   and MUST be usable directly by native Ultralytics with the corresponding local inputs.
-- **FR-010**: Effective YAML MUST be connected as ClearML configuration objects and uploaded
-  as artifacts with comments preserved through sanitization; no credentials or images may leak.
+- **FR-010**: Effective/requested native YAML and prediction manifests MUST remain local.
+  Canonical sanitized run Configuration Objects and native General parameters MUST support
+  remote replay without configuration artifacts. Credentials and raw source dataset artifacts
+  MUST NOT leak; owner-only native training/validation previews remain permitted.
 - **FR-011**: Initialization MUST preserve collision protection and avoid importing model
   runtimes or creating ClearML tasks; one execution MUST retain one task and failure semantics.
 - **FR-012**: Existing dependency pins MUST remain unchanged; heavy tests MUST wait for explicit
@@ -124,9 +142,10 @@ Direct native replay remains a separately authorized integration check; the auth
   split/role sources and checkpoint selection.
 - **SC-004**: Removed interfaces reject use, collision scenarios preserve user files, and
   required artifact failures produce nonzero execution outcomes.
-- **SC-005**: Separately authorized direct native replay and downloaded ClearML YAML MUST verify
-  real execution and artifact round trips. Completion evidence and scope limitations belong in
-  [dated verification evidence](verification-2026-09-28.md).
+- **SC-005**: Separately authorized direct replay from local native YAML and ClearML replay from
+  canonical configuration MUST verify real execution without configuration artifacts. Use the
+  current contract evidence above; historical native-YAML artifact downloads do not establish
+  the amended publication requirement, and mocked replay does not prove live remote recovery.
 
 ## Assumptions
 

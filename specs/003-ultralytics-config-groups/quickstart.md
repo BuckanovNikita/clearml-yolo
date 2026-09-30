@@ -21,8 +21,8 @@ and verify per-split/per-role sources still exist after prediction.
 
 Follow the project `running-end-to-end-tests` skill and applicable environment
 skill using explicit project/tags, task-owned outputs and available inputs. Run training,
-prediction and paired comparison, download YAML artifacts, and compare comments/active values
-with local records. Replay training and prediction using native Ultralytics `cfg=EXPORTED_YAML`
+prediction and paired comparison, inspect the local requested/effective YAML, and compare its
+active values with captured native arguments. Replay training and prediction using native Ultralytics `cfg=EXPORTED_YAML`
 with the corresponding local dataset, model and manifest. Record dated real-run evidence.
 
 Native replay's `cfg` belongs to the external Ultralytics command; it is intentionally forbidden

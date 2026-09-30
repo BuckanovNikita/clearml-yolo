@@ -10,7 +10,8 @@
 - `ValidatedDataset`: source path, `input_sha256`, sorted images, contiguous integer-to-name
   `names`, invalid `errors`, and `input_boxes` count (excluding explicit backgrounds).
 - `PreparedDataset`: native `data` path, `ground_truth` cleaned CSV path, `manifest` JSON
-  path, selected `dataset_format`, and explicit list of non-image `artifacts` paths.
+  path, selected `dataset_format`, and an implementation-named `artifacts` list of local
+  cache files. That field is a cache inventory, not a ClearML artifact inventory.
 
 The parser preserves labels as strings (including numeric-looking names), retains class
 names found on invalid boxes, and sorts names lexically for deterministic IDs. It rejects
@@ -30,4 +31,6 @@ record → selected native dataset export → training → shared cleaned evalua
 Errors retain owned diagnostics. A failed preparation never returns a ready dataset.
 The preparation record retains input fingerprint, original/resolved/generated identity,
 class names, split and box counts, dropped rows/reasons, and the selected representation.
-Native-setting overrides are recorded separately by training and pipeline integration.
+Native-setting overrides are recorded separately by training and pipeline integration in
+the canonical run Configuration Object. Generated dataset YAML is a consumed dataset
+Configuration Object; other preparation files stay local.

@@ -1,7 +1,11 @@
 # Specification Analysis Report
 
 **Date**: 2026-09-30
-**Method**: read-only speckit-analyze over spec.md, plan.md, tasks.md and constitution 5.0.0. This file captures the resulting report after analysis; analysis performed no remediation edits.
+**Method**: read-only speckit-analyze over spec.md, plan.md, tasks.md and constitution 5.0.0. This file records the analysis report; analysis performed no remediation edits.
+
+**Snapshot status**: This analysis predates implementation. Tasks and convergence later
+completed; see [verification.md](verification.md). Current cross-feature behavior is summarized
+in [current contracts](../../docs/current-contracts.md).
 
 ## Findings
 

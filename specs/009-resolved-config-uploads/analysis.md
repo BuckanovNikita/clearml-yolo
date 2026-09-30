@@ -4,6 +4,10 @@
 
 **Method**: Read-only comparison of completed specification, plan and tasks with the constitution. This report records intent consistency; it does not establish implemented behavior.
 
+**Snapshot status**: This analysis predates implementation. All tasks were later completed;
+see [verification-2026-09-30.md](verification-2026-09-30.md). Current publication semantics are
+summarized in [current contracts](../../docs/current-contracts.md).
+
 ## Findings
 
 No critical or high consistency issue remains. The approved decisions cover file scope, context precedence, typed resolution, comments, credential sequencing, original-file protection, strict failure and module boundaries. Existing user approval supplies specification/plan reviews. No registered extension hook is pending.
@@ -34,7 +38,7 @@ Implement the tasks, then verify and run converge. All implementation and releas
 
 ## Post-implementation review, 2026-09-30
 
-The initial implementation and passing initial suite were followed by independent review. Three P1 implementation gaps are recorded as append-only convergence tasks T019–T021; T022 covers relative-path/owned-cleanup refinement. Spec, plan and contracts were updated through the specification/design workflow before running converge. Review corrections remain pending acceptance and do not change the original pre-implementation analysis conclusion. No extension hooks are registered; no separate discovery/bug workflow or constitution amendment is required.
+The initial implementation and passing initial suite were followed by independent review. Three P1 implementation gaps are recorded as append-only convergence tasks T019–T021; T022 covers relative-path/owned-cleanup refinement. Spec, plan and contracts were updated through the specification/design workflow before converge. Review corrections remain pending acceptance and do not change the original pre-implementation analysis conclusion. No extension hooks are registered; no separate discovery/bug workflow or constitution amendment is required.
 
 Credential provenance uses frozen ResolvedConfigFile metadata while primitive resolution remains available. Strict validation covers tuple outputs and resolver-emitted interpolation. Custom resolvers must not receive artificial markers. Final acceptance still requires T014–T018 plus completed convergence tasks.
 

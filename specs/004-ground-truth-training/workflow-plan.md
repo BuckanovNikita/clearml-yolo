@@ -4,7 +4,9 @@
 
 **Feature**: [Ground-truth-driven training](spec.md)
 
-**Status**: Specification completed; remaining steps planned, not executed.
+**Snapshot Status**: This was the pre-implementation workflow plan. Its steps were later
+completed; current behavior is defined by [spec.md](spec.md), [contracts/cli.md](contracts/cli.md)
+and the repository-wide [current contracts](../../docs/current-contracts.md).
 
 This document schedules the remaining feature lifecycle. `$speckit-plan` will produce
 the technical `plan.md`; this workflow must be carried into that plan and its generated
@@ -20,8 +22,8 @@ bounded independent work while the parent continues useful work on the critical 
 
 Before delegation, inspect the available native tool schema and runtime metadata. Emit
 the required `ASTRA ROUTE` declaration. Select model and supported effort dynamically
-for each task, with explicit controls and no inherited conversation history as required
-by the orchestration skill. Do not claim requested model settings as observed runtime
+for each task, with explicit controls and no inherited conversation history, as the orchestration
+skill requires. Do not claim requested model settings as observed runtime
 settings. If the required native interface or controls are unavailable, report that
 limitation and continue safe parent work; do not silently replace delegation with an
 unsupported interface or external agent process.
@@ -41,7 +43,7 @@ parent integrates them into one consistent technical plan.
 
 These are independently bounded packages, not a fixed agent count or model-to-role
 assignment. Combine or sequence packages when actual tool support or dependencies
-make that more appropriate. Do not ask several agents to duplicate the same investigation.
+make that more appropriate. Do not assign the same investigation to several agents.
 
 ### Implementation Work
 
@@ -50,14 +52,14 @@ parent establishes shared interfaces, schedule disjoint implementation packages 
 
 - CSV validation, invalid-box dropping/counting, and canonical cleaned dataset records,
   with owned behavior tests.
-- NDJSON export and flat export in parallel once the canonical record contract is stable,
+- NDJSON export and flat export in parallel after the canonical record contract stabilizes,
   each with separately owned files and format-specific tests.
-- Command/configuration integration once preparation interfaces are stable, with one
+- Command/configuration integration after preparation interfaces stabilize, with one
   owner for shared training, pipeline, and configuration files.
 - Preparation artifact and tracking integration where its write set is independent of
   command integration; otherwise schedule it after the shared-file owner finishes.
 - Documentation and generated-example updates after public parameter names and behavior
-  are settled, alongside remaining independent implementation work.
+  settle, alongside remaining independent implementation work.
 
 Before each dispatch, name the task, exact owned paths, read-only/shared paths, dependencies,
 requested model/effort, and required acceptance evidence. Resolve actual file ownership
@@ -101,8 +103,9 @@ reported honestly and no invented delegation savings.
 
 ## Required Technical Planning Decisions
 
-- Confirm how the locked Ultralytics runtime consumes locally referenced NDJSON images,
-  preserves supplied splits, and places conversion byproducts inside the run directory.
+- Confirm how the locked Ultralytics runtime consumes locally referenced NDJSON images and
+  preserves supplied splits. Current implementation retains conversion byproducts in the
+  shared CSV-addressed cache outside run outputs.
 - Define flat dataset naming, label-stem collision handling, and source-to-generated
   identity records without changing evaluation image identities.
 - Specify CSV validation, relative-path resolution, background rows, duplicate handling,
@@ -163,6 +166,6 @@ reported honestly and no invented delegation savings.
 
 All specification requirements have implementation and acceptance evidence; required
 checks pass; the feature checklist has no unresolved gaps; convergence reports no
-remaining work; and final review identifies no unresolved blocking findings. Any unavailable
-acceptance environment or failed check must be reported as an outstanding limitation,
+remaining work; and final review identifies no unresolved blocking findings. Report any unavailable
+acceptance environment or failed check as an outstanding limitation,
 not counted as completed verification.

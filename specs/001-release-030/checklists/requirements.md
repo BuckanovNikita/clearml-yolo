@@ -13,7 +13,7 @@ Feature: [spec](../spec.md)
 - [x] Success criteria describe observable outcomes
 - [x] All acceptance scenarios are defined
 - [x] Edge cases are identified
-- [x] Scope is clearly bounded
+- [x] Scope is bounded
 - [x] Dependencies and assumptions identified
 - [x] All requirements have acceptance criteria
 - [x] User scenarios cover primary flows

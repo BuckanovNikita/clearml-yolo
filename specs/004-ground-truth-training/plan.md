@@ -6,8 +6,8 @@
 
 Validate the supplied detection CSV once, remove and count invalid boxes, and export a
 native NDJSON dataset by default or a flat dataset on request. Return a cleaned CSV for
-all downstream evaluation. Keep conversion, images, manifests, and native byproducts
-inside run-owned directories. Preserve legacy standalone native-data training.
+all downstream evaluation. Keep conversion, images, manifests and native byproducts in a
+shared CSV-addressed cache outside run outputs. Preserve legacy standalone native-data training.
 
 ## Technical Context
 
@@ -18,10 +18,11 @@ ClearML, and pinned external metrics/report dependencies. Require Ultralytics >=
 for native local NDJSON conversion and declare its aiohttp extra directly. Declare Pillow
 directly because new dataset domain code imports it; do not change external dependency revisions.
 
-**Storage**: Local run-owned files and non-image ClearML artifacts.
+**Storage**: Local cached preparation files; canonical cleaned truth as a performance
+artifact; consumed dataset YAML and run overrides as ClearML Configuration Objects.
 
 **Testing**: pytest behavior tests; Ruff, strict mypy, import-linter; real native training
-and artifact-download acceptance using the project integration skill.
+and publication-inventory acceptance using the project integration skill.
 
 **Target Platform**: Existing native execution platforms and local filesystem inputs.
 
@@ -31,7 +32,7 @@ and artifact-download acceptance using the project integration skill.
 loading model dependencies during configuration or domain validation.
 
 **Constraints**: Exact CSV membership, 0.01-pixel tolerance, deterministic classes,
-no source mutation, one tracking task, no image uploads, no dependency monkeypatching.
+no source mutation, one tracking task, no raw source-image artifacts, no dependency monkeypatching.
 
 **Scale/Scope**: Existing detection CSV workflow; no remote ingestion or generated splits.
 
@@ -49,7 +50,8 @@ existing import contracts while adding explicit domain layers for the new module
 - `dataset_records.py`: typed boxes/images/validation result and CSV validation.
 - `dataset_export.py`: native NDJSON and flat writers consuming validated records.
 - `dataset.py`: preparation orchestration, cleaned CSV and preparation record, data policy.
-- `tasks/train.py`: prepares CSV data, publishes non-image records, returns cleaned CSV.
+- `tasks/train.py`: prepares CSV data, publishes canonical cleaned truth, attaches consumed
+  dataset configuration, records overrides, and returns cleaned CSV.
 - `tasks/pipeline.py`: forwards format, required splits, and cleaned CSV to consumers.
 - `configs.py`, `config_tree.py`: expose parameters and generated example guidance.
 - `tests/test_dataset_records.py`, `tests/test_dataset_export.py`, `tests/test_dataset.py`:
@@ -70,12 +72,13 @@ dataset_format, required_splits)` reserves a fresh directory, validates, writes 
 CSV and metadata, exports the selected format, and returns a typed `PreparedDataset`.
 
 NDJSON export writes a native local manifest with header `path: "."` and per-split
-image filenames. Training uses the Ultralytics >=8.4.165 converter with explicit run-owned
-output, then passes its YAML to the trainer. No HTTP server or custom parser is needed.
+image filenames. The completed cache retains generated `data.yaml`, NDJSON, images, labels
+and conversion byproducts and passes its YAML to the trainer. No HTTP server or custom parser is needed.
 Flat mode writes the native layout directly.
 
-Training prepares under its project's `.datasets/<name>` sibling of the native output;
-this avoids pre-creating the native training directory and triggering name incrementation.
+Training acquires a content-addressed entry from `dataset_cache_dir` or the default user cache,
+which must resolve outside the native training project/run directory. Atomic staging and a
+per-entry lock protect concurrent builders and native consumers.
 The pipeline obtains the cleaned path from `TrainResult.cleaned_ground_truth` and uses it for prediction,
 metrics, and comparison. Evaluation-only invocations retain existing behavior.
 
@@ -85,8 +88,8 @@ native training, including zero. Preserve all images; an image losing its final 
 background. Require at least one valid training box and nonempty requested splits.
 
 The data policy owns `data`, class filtering/remapping, full dataset fraction, detection
-task, and validation split. Reject resume rather than allowing checkpoint settings to
-replace CSV ownership. Prediction/comparison must not reintroduce class filters.
+task, and validation split. Reject resume to prevent checkpoint settings from
+replacing CSV ownership. Prediction/comparison must not reintroduce class filters.
 All overrides are recorded with their requested/effective values; unrelated settings
 continue through existing native configuration handling.
 
@@ -115,5 +118,5 @@ Test valid/invalid/background mixtures, zero/multiple error counts, coordinate r
 class and split determinism, image identity/stem collisions, native format consumption,
 override precedence, resume rejection, cleaned evaluation, and output/artifact ownership.
 Run the repository gates and real standalone/pipeline NDJSON and flat invocations. Inspect
-and download required tracking artifacts, including failure paths and current-test
+required performance artifacts and Configuration Objects, including failure paths and test
 comparison. Record dated evidence and clean task-owned resources only.

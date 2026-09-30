@@ -1,4 +1,4 @@
-# CSV Training CLI and Artifact Contract
+# CSV Training CLI and Publication Contract
 
 `cy ground_truth=truth.csv` trains from the supplied CSV. `cy-train ground_truth=truth.csv`
 uses the same conversion. Both accept `dataset_format=ndjson` (default) or `flat`.
@@ -17,14 +17,14 @@ attached to ClearML cannot override the generated data. Device, epochs, batch, A
 compilation, and augmentation retain existing precedence.
 
 Preparation writes a cleaned CSV, JSON preparation record, selected native dataset,
-class mapping and original/generated image identity inventory. Flat labels and dataset
-metadata are retained; images remain local. The invocation records these non-image files
-as required artifacts and records effective native YAML with existing comment preservation.
-NDJSON is a dataset artifact, not a YAML configuration passed through the YAML-only adapter.
+class mapping and original/generated image identity inventory. `dataset.ndjson`,
+`preparation.json`, `labels.zip`, generated labels, conversion byproducts and
+requested/effective native YAML are local cache or run diagnostics.
 
-Preparation uses `ground_truth.csv`, `preparation.json`, `data.yaml`, optional
-`dataset.ndjson`, and an explicit non-image labels archive. Artifact names are
-`dataset_ground_truth`, `dataset_preparation`, `dataset_configuration`, `dataset_ndjson`,
-`dataset_labels`, and `train_data_overrides`, as applicable. `TrainResult` adds optional `cleaned_ground_truth` and `dataset_reference`
-paths so pipeline consumers receive the actual prepared outputs. Legacy training leaves
-them null. No stage creates a second tracking task.
+The cleaned canonical `ground_truth.csv` is the performance artifact. Generated `data.yaml`
+is attached as the consumed `dataset` Configuration Object. Requested/effective dataset-policy
+changes are stored in the canonical run Configuration Object under `training_data_overrides`
+or `prediction_data_overrides`. Raw source dataset images are never uploaded as artifacts;
+owner-only native training/validation previews remain permitted. `TrainResult` adds optional
+`cleaned_ground_truth` and `dataset_reference` paths so pipeline consumers receive actual
+prepared outputs. Legacy training leaves them null. No stage creates a second tracking task.

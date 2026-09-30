@@ -2,6 +2,12 @@
 
 **Input**: [spec.md](spec.md), [plan.md](plan.md), [research.md](research.md), [data-model.md](data-model.md), [configuration-files.md](contracts/configuration-files.md)
 
+> **Current-contract note:** Checked tasks preserve completed feature and release history.
+> Consumed configuration files are now stored as Configuration Objects and never duplicated as
+> artifacts. Task phrases such as "uploaded configuration files" and "downloaded-file
+> verification" describe the original implementation target and acceptance evidence.
+> See [current contracts](../../docs/current-contracts.md).
+
 **Tests**: Required behavioral regression tests precede implementation. Checkboxes record completed work only after acceptance evidence is available.
 
 ## Phase 1: Setup

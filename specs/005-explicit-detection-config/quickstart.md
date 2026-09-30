@@ -10,7 +10,8 @@ applicable pre-commit hooks. Behavioral tests capture native calls without servi
 
 For real checks use the running-end-to-end-tests and environment skills. Run short CSV
 training and pipeline inference using the agreed compile/nms/image defaults, then paired
-current-test comparison. Download requested/effective configuration artifacts and inspect
-normalization. Include explicit override runs and failure checks. Use fresh task-owned
+comparison on an explicit standalone split (default test); the pipeline uses test. Inspect local requested/effective native YAML and the run
+Configuration Object's normalization record; native YAML is not a ClearML artifact. Include
+explicit override runs and failure checks. Use fresh task-owned
 outputs, explicit ClearML project/tags, and clean up only task-owned temporary resources.
 Record commands, task IDs, outcomes and limitations in dated evidence.

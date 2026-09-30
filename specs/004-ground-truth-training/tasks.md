@@ -2,6 +2,12 @@
 
 **Input**: [plan.md](plan.md), [spec.md](spec.md), [data-model.md](data-model.md), and contracts.
 
+> **Current-contract note:** Checked tasks preserve completed feature history. The later
+> publication contract keeps NDJSON, preparation, labels, override files and native YAML local;
+> it publishes cleaned canonical truth, attaches dataset YAML as a Configuration Object and
+> records overrides in run configuration. Artifact wording in T012/T015 is historical.
+> See [current contracts](../../docs/current-contracts.md).
+
 **Tests**: Required by the accepted workflow; write failing behavior tests before code.
 
 ## Phase 1: Setup

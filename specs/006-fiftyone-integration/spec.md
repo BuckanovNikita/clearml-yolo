@@ -86,14 +86,21 @@ A reviewer sees raw predictions separately from run-specific evaluated ground tr
 - **FR-010**: The neutral persisted `EvaluationPayload` MUST be Pydantic, schema version 1, and contain split, image names, thresholds, ground truth, predictions, and matches. Each box MUST retain index, image name, label, `(x1,y1,x2,y2)`, optional confidence, and status; each match MUST retain nullable GT/pred indices, labels, confidence, IoU, and status.
 - **FR-011**: Metrics MUST produce the neutral payload from exact digital-metrics fixed-threshold matching. It MUST retain TP/FP/FN/filtered labels, indices, and IoU, separate raw predictions from run-specific evaluated GT/predictions, and MUST NOT rematch or use FiftyOne evaluation.
 - **FR-012**: `MetricsResult` MUST expose paths to neutral persisted evaluation payloads; external `digital-metrics` MUST NOT be modified or monkeypatched.
-- **FR-013**: The pipeline MUST publish once after its applicable results are ready; nested prediction/metrics publication MUST be disabled. `cy-val`, `cy-compare`, and all other standalone entrypoints MUST NOT publish.
-- **FR-014**: Publication MUST preflight the database before costly compute. An enabled publication error MUST fail the owning invocation after retaining local outputs; one ClearML owner MUST upload or record exactly one local/artifact receipt.
+- **FR-013**: The pipeline MUST publish once after its applicable results are ready; nested
+  prediction/metrics publication MUST be disabled. Standalone `cy-predict` and `cy-metrics`
+  remain eligible owners. `cy-val`, `cy-compare`, `cy-report`, `cy-train` and
+  `cy-ground-truth` MUST NOT publish to FiftyOne.
+- **FR-014**: Publication MUST preflight the database before costly compute. An enabled
+  publication error MUST fail the owning invocation after retaining local outputs. The owner
+  MUST write exactly one local receipt and record its meaningful dataset/run link in canonical
+  run configuration; the receipt MUST NOT be uploaded as an artifact.
 - **FR-015**: The feature MUST preserve nine existing entrypoints, existing ClearML single-task ownership, current frozen-threshold evaluation, and raw artifact contracts.
 
 ### Key Entities
 
 - **Dataset identity**: reusable dataset key and evidence for the effective GT, adapter schema, prefix, and resolved media paths.
-- **Publication receipt**: local and ClearML-recorded evidence naming the owner task, dataset completion, and run completion.
+- **Publication receipt**: local evidence naming the owner task, dataset completion, and run
+  completion; its meaningful dataset/run identity is represented in run configuration.
 - **Evaluation payload**: neutral persisted record of an evaluated split and its exact scoring correspondence.
 - **Run scope**: task-ID-namespaced fields and marker owned by one invocation.
 

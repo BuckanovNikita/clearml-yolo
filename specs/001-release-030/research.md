@@ -5,7 +5,7 @@
 Historical decision: sparse Hydra mappings and ordinary dictionary overlay; default comparison
 was removed for 0.3.0.
 Historical rationale: presence preserved explicit defaults; native parameter validation remained
-upstream. The alternative of maintaining a second full default schema was rejected because it
+upstream. Maintaining a second full default schema was rejected because it
 would lose provenance and drift. The pre-0.3.0 `configs.py` `_overlaid` treated equal values as
 absent; installed Ultralytics configuration was authoritative.
 
@@ -21,7 +21,9 @@ Rationale: ClearML 2.1.10 `upload_artifact` defaults asynchronous and returns a 
 `flush(wait_for_uploads=True)` alone cannot establish artifact success. Explicit failure handling
 is needed because SDK shutdown classifies interrupts as stopped. Native ClearML callbacks must
 be disabled in parent and DDP workers without altering user settings.
-Alternative rejected: rely on atexit or native callbacks; these hide upload failures and duplicate work.
+Alternative rejected: rely only on atexit or unchecked native callbacks. Installed native
+callbacks now publish owner-only telemetry/model data, while the wrapper lifecycle barrier
+still verifies required artifacts/model upload and propagates failures before completion.
 Installed evidence: clearml/task.py upload_artifact, flush and shutdown handlers;
 ultralytics/utils/callbacks/clearml.py and utils/dist.py worker construction.
 

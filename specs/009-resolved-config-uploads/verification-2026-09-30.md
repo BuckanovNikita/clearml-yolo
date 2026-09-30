@@ -4,17 +4,17 @@
 
 ## Initial implementation checks
 
-Root reported the first combined `uv run pytest` run: **643 passed, 8 skipped, 4 existing warnings**, in **115.82 seconds**. Skips concern optional FiftyOne behavior; existing warnings are Pydantic deprecations. This initial suite predates the independent-review corrections below and is not final release acceptance.
+Root reported the first combined `uv run pytest`: **643 passed, 8 skipped, 4 existing warnings**, in **115.82 seconds**. Skips concern optional FiftyOne behavior; existing warnings are Pydantic deprecations. This initial suite predates the independent-review corrections below and is not final release acceptance.
 
 ## Independent review and convergence
 
 Review identified three P1 gaps: artificial markers could corrupt custom-resolver arguments; sensitive context/environment aliases lost credential provenance; tuple outputs could bypass strict validation. These are captured in appended T019–T021. Relative-path preservation and task-owned execution-copy cleanup are captured in T022. Specification/design clarification established that effective context is current composed command values after replay/app output derivation, preserving explicit nulls; it does not include native model/task normalization.
 
-Initial corrections passed 127 affected tests. Final independent review then reproduced a credential leak through computed node targets; T026 records confidential rejection of that unsupported expression form. Two regression tests failed before the guard and passed afterward. Final scoped review found no remaining blocker and confirmed ordinary/nested resolver arguments and mixed literals still work. The final combined affected suite passed **129 tests**, with four existing warnings; Ruff, strict mypy (92 source files) and all nine import contracts passed. Final repository/pre-commit and release acceptance are recorded below as completed.
+Initial corrections passed 127 affected tests. Final independent review then reproduced a credential leak through computed node targets; T026 records confidential rejection of that unsupported expression form. Two regression tests failed before the guard and passed afterward. Final scoped review found no remaining blocker and confirmed ordinary/nested resolver arguments and mixed literals still work. The final combined affected suite passed **129 tests**, with four existing warnings; Ruff, strict mypy (92 source files) and all nine import contracts passed. Completed final repository/pre-commit and release acceptance are recorded below.
 
 ## Real-run evidence inspected
 
-The maintained global environment evidence document named `resolved-config-uploads-2026-09-30/verification.md` was read directly. Machine-specific run identity, service details, capacity readings and operational paths remain in that global source.
+The maintained global environment evidence document `resolved-config-uploads-2026-09-30/verification.md` was read directly. Machine-specific run identity, service details, capacity readings and operational paths remain in that global source.
 
 - Real ground-truth publication resolved environment, file-local and owning-command references in dataset YAML. Active uploaded values retained types; source bytes and interpolation-example comments were preserved.
 - CPU baseline and single-GPU candidate pipelines trained native YOLO11n for one epoch over four training, two validation and two test images, including empty images and mixed extension casing. Successful training took 52.1 and 58.3 seconds respectively.

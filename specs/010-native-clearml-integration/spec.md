@@ -2,8 +2,14 @@
 
 **Feature Branch**: `010-native-clearml-integration`
 **Created**: 2026-09-30
-**Status**: Approved for implementation
+**Status**: Implemented, verified and converged; see [verification.md](verification.md)
 **Input**: User-approved native tracking, best-model publication and performance-only artifact plan, revalidated against v0.10.0.
+
+**Documentation amendment (2026-09-30)**: The standalone split-override wording
+reflects current code and configuration composition. The linked original acceptance
+records exercise paired current-test execution; they do not establish live non-test
+comparison. See the [documentation audit](../../docs/evidence/2026-09-30-instruction-contract-audit.md)
+for static checks and limitations.
 
 ## Clarifications
 
@@ -13,8 +19,12 @@ The approved conversation supplies these decisions; no additional questions were
 
 - Progress means native epoch reporting; custom batch scalars are excluded.
 - New tasks must contain only performance data artifacts and one native best Output Model. Historical tasks remain unchanged.
-- Settings are recovered from current-task configuration or the compared model's source-task configuration.
-- Frozen validation thresholds remain performance data; comparison uses identical current-test images and shared inference settings.
+- Execution settings are recovered from the current task's configuration. Compared tracked
+  models resolve weights and frozen thresholds from their source tasks and record source
+  task/model links; current comparison settings remain authoritative.
+- Frozen validation thresholds remain performance data. Standalone comparison accepts a split
+  override defaulting to test; pipeline comparison uses test. Both roles use identical selected
+  images and shared current inference settings.
 - Existing dependencies and feature 009 configuration-resolution behavior remain intact. Commit, push and release are excluded.
 
 ## User Scenarios & Testing
@@ -50,7 +60,8 @@ An operator retrieves the best checkpoint from the successful training task and 
 
 ### User Story 3 - Analyze clean artifacts and replay configuration (Priority: P2)
 
-An operator finds only model-performance evidence in artifacts and restores execution settings from task configuration, including compared models' source tasks.
+An operator finds only model-performance evidence in artifacts, restores execution settings
+from current-task configuration and follows compared models' source-task provenance links.
 
 **Why this priority**: configuration clutter obscures useful evidence and must not become a second replay source.
 
@@ -60,9 +71,13 @@ An operator finds only model-performance evidence in artifacts and restores exec
 
 1. **Given** an execution invocation consuming YAML/JSON inputs, **When** publication completes, **Then** temporary numbered YAML, train_data_overrides.json, manifests and receipts are absent from artifacts.
 2. **Given** a replayed task, **When** original input paths are unavailable, **Then** canonical task configuration supplies the required settings with existing resolution and sanitization behavior.
-3. **Given** compared models with source-task provenance, **When** comparison runs, **Then** the compared model links to its source-task configuration for provenance and recovery; current shared comparison inference settings remain authoritative and are not replaced by source training arguments.
+3. **Given** compared models with source-task provenance, **When** comparison runs, **Then**
+   it records source task/model links and resolves source weights plus exact frozen thresholds;
+   current shared comparison inference settings remain authoritative. It does not automatically
+   fetch source General parameters or Configuration Objects.
 4. **Given** validation-calibrated thresholds, **When** test comparison runs, **Then** both models use the frozen source thresholds on identical current-test images; thresholds are not recalibrated on test.
-5. **Given** missing required source configuration, **When** recovery is requested, **Then** an actionable failure identifies the missing configuration rather than silently inventing values.
+5. **Given** missing source weights or thresholds, **When** comparison resolves the model,
+   **Then** an actionable failure identifies the missing input rather than inventing values.
 
 ### Edge Cases
 
@@ -84,9 +99,17 @@ An operator finds only model-performance evidence in artifacts and restores exec
 - **FR-005**: Successful training MUST expose exactly one verified native best Output Model matching the local checkpoint, without a duplicate weight artifact.
 - **FR-006**: Native plots and debug samples MUST remain available according to installed callback behavior and explicit plot settings; scalars MUST remain enabled when plots are disabled.
 - **FR-007**: New task artifacts MUST contain only canonical ground-truth/prediction CSVs, frozen validation-threshold CSVs, evaluation/comparison workbooks and final performance reports; identical tables MUST be deduplicated.
-- **FR-008**: Execution settings, dataset overrides, normalization, source references and meaningful provenance MUST use sanitized Configuration Objects or native General parameters; temporary files, manifests and diagnostic receipts MUST remain local.
-- **FR-009**: Current-task replay and compared-model recovery MUST use canonical task/source-task configuration without configuration artifacts, preserve feature 009 resolution behavior and fail actionably for missing required configuration.
-- **FR-010**: Comparison MUST retain frozen source validation thresholds, identical paired current-test inputs and shared comparison inference settings; historical weight/threshold compatibility MUST remain intact.
+- **FR-008**: Current execution settings, dataset overrides, normalization and meaningful
+  provenance MUST use sanitized Configuration Objects or native General parameters; temporary
+  files, manifests and diagnostic receipts MUST remain local.
+- **FR-009**: Current-task replay MUST use canonical current-task configuration without
+  configuration artifacts and preserve feature 009 resolution behavior. Compared tracked models
+  MUST resolve source weights and exact thresholds and record source task/model links without
+  automatically fetching source General parameters or Configuration Objects.
+- **FR-010**: Comparison MUST retain frozen source validation thresholds, identical paired
+  selected-split inputs and shared current comparison inference settings. Standalone comparison
+  defaults to test and accepts a split override; pipeline comparison uses test. Exact supplied
+  thresholds and historical weight/per-split-threshold compatibility MUST remain intact.
 - **FR-011**: Historical tasks, external dependency revisions and unrelated workspace changes MUST remain unchanged.
 
 ### Key Entities
@@ -95,8 +118,10 @@ An operator finds only model-performance evidence in artifacts and restores exec
 - **Native event**: ordered epoch/callback observation with enough captured state for native reporting.
 - **Best Output Model**: one native model identity linked to the verified local best checkpoint.
 - **Performance artifact**: durable result evidence from the command-specific permitted inventory.
-- **Replay configuration**: sanitized canonical settings linked to current or source training task.
-- **Frozen threshold table**: validation-calibrated exact thresholds reused for test.
+- **Replay configuration**: sanitized canonical settings of the current invocation; compared
+  source tasks contribute provenance links, weights and thresholds.
+- **Frozen threshold table**: validation-calibrated exact thresholds reused for every evaluated
+  or compared split; exact supplied maps and historical per-split payloads remain compatible.
 
 ## Success Criteria
 
@@ -105,7 +130,8 @@ An operator finds only model-performance evidence in artifacts and restores exec
 - **SC-001**: In every available multi-epoch acceptance mode, at least one completed epoch's loss is visible before training finishes.
 - **SC-002**: A successful training task exposes exactly one downloadable, loadable best model whose bytes equal the local best checkpoint; failed publication never yields successful completion.
 - **SC-003**: Every new acceptance task has zero configuration/diagnostic artifacts and only its approved performance inventory.
-- **SC-004**: Replay and paired model comparison recover required settings without configuration artifacts and retain exact frozen validation thresholds.
+- **SC-004**: Current-task replay recovers required settings without configuration artifacts;
+  paired comparison retains current settings, source links and exact frozen thresholds.
 - **SC-005**: Failed/interrupted acceptance scenarios leave no task-owned relay process/thread running; physical DDP unavailable for acceptance is explicitly reported as unverified.
 
 ## Assumptions

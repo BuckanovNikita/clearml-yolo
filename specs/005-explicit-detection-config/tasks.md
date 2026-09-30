@@ -6,6 +6,11 @@
 **Final clarification**: The user corrected the default image size to 960; 906 is retained
 only as an explicit normalization test case and in dated pre-correction evidence.
 
+> **Current-contract note:** Checked tasks preserve completed feature history. Requested and
+> effective native YAML now stays local; ClearML replay uses canonical run configuration and
+> native General parameters. T011's downloaded-configuration wording records the acceptance
+> method used at that time. See [current contracts](../../docs/current-contracts.md).
+
 ## Phase 1: Setup
 
 - [X] T001 Capture accepted clarifications and create specification/design artifacts in specs/005-explicit-detection-config/ (FR-001–FR-008).

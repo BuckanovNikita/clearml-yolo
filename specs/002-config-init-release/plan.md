@@ -6,7 +6,7 @@
 
 Record the completed restoration of the local configuration initializer and removal of
 future-annotations imports, then validate, commit, push, and publish the pending 0.3.0.
-This plan is retrospective for code already implemented; release tasks remain sequential.
+This plan is retrospective for implemented code; release tasks remain sequential.
 
 > **Historical plan.** It records the v0.3.0 publication workflow. The later
 > [native configuration feature](../003-ultralytics-config-groups/spec.md) replaced sparse
@@ -24,7 +24,7 @@ This plan is retrospective for code already implemented; release tasks remain se
 - pytest behavior checks, Ruff, strict mypy, seven import contracts, and pre-commit.
 - Eight execution examples, two native group files, and nine installed console scripts;
   required inputs stay missing.
-- At plan execution time, version 0.3.0 was verified in isolation, committed and published
+- During plan execution, version 0.3.0 was verified in isolation, committed and published
   from master; v0.2.0 had been the latest published version.
 
 ## Constitution Check
@@ -32,7 +32,7 @@ This plan is retrospective for code already implemented; release tasks remain se
 The user explicitly changed two former rules. Constitution 3.0.0 replaced the mandatory
 future import and config-generation prohibition, and distinguishes local initialization from
 tracked execution. Constitution 4.0.0 later superseded its native configuration rules.
-The original pre-design and post-design checks against all five principles were:
+The original pre-design and post-design checks against all five principles:
 
 | Principle | Application |
 |---|---|
@@ -42,7 +42,7 @@ The original pre-design and post-design checks against all five principles were:
 | Verification | Reproduce runtime annotation failures; verify pytest, CLI composition, packages, and live release paths |
 | Communication and collaboration | Russian README, English artifacts, explicit evidence limits, task-owned staging and cleanup |
 
-No remaining exception is required. The user explicitly authorized the source-layout change;
+No remaining exception required. The user explicitly authorized the source-layout change;
 external dependency revisions and source code remain unchanged.
 
 ## Project Structure
@@ -60,9 +60,9 @@ tests/*.py                             # matching annotation migration
 ```
 
 The generator remains outside the tracked execution adapter. Defaults are composed before
-writing. All destinations are checked first; ordinary creation uses exclusive file creation.
+writing. All destinations are prechecked; ordinary creation uses exclusive file creation.
 Force replacement is limited to regular example files. Command names avoid Hydra schema-name
-collisions. Filesystem failures are reported by argparse with a nonzero exit.
+collisions. argparse reports filesystem failures with a nonzero exit.
 
 ## Implementation and Release Sequence
 

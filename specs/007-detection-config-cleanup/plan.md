@@ -5,7 +5,7 @@
 ## Summary
 
 Separate example presentation from runtime native YAML, resolve default filesystem roots
-from adapter-provided task identity, and enforce one inventory for three-split evaluation.
+from adapter-provided task identity, and publish consolidated evidence for selected splits.
 Preserve feature 006 publication and all pinned dependencies.
 
 ## Technical Context
@@ -37,12 +37,14 @@ example commenting does not weaken composition. No dependency or constitution am
 1. US1: failing composition/example tests, device defaults, example-only sections.
 2. US2: failing identity/routing tests, safe filesystem helper and ClearML adapter,
    CLI and direct-call routing. Preserve explicit precedence and stage layout.
-3. US3: three-split tests, common required inventory, defaults/fallbacks and failure paths.
+3. US3: selected-split tests, consolidated workbooks, one validation-threshold CSV,
+   defaults/fallbacks and failure paths.
 4. Update documentation; run gates, real isolated acceptance and fresh-context review.
 
 ## Review Focus
 
 Example comments must not delete registered Hydra keys or runtime-derived values.
 Explicit routing must not need fake/default task identity. Unsafe task names cannot create
-nested native paths. Inventory must enforce missing plots even outside a tracked invocation.
+nested native paths. Workbook construction must enforce required local diagnostics even
+outside a tracked invocation.
 Publication must preserve exact matching and dataset reuse when roots differ.

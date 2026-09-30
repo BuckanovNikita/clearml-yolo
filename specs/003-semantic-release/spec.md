@@ -10,6 +10,11 @@
 hooks and tags only, automatically after commits, with package version updates and
 continued 0.x versioning.
 
+**2026-09-30 amendment**: Generate CHANGELOG.md during pre-commit and release preparation.
+The original no-changelog scope is superseded by the requirements below. See the
+[changelog verification](../../docs/evidence/2026-09-30-changelog-release.md) for checks
+and limitations of this amendment; the earlier evidence covers the original workflow.
+
 ## User Scenarios & Testing
 
 ### User Story 1 - Automatic local versioning (Priority: P1)
@@ -74,8 +79,9 @@ and verify exactly one release commit and one tag.
   HEAD, rebase/cherry-pick in progress, tag collisions, and simultaneous worktrees.
 - Nested release commit hooks, stale recovery state, interrupted metadata updates,
   failed dependency lock refresh, failed quality hooks, or failed tag creation.
-- Existing untracked files remain untouched; a later retry requires inspection of
-  retained release edits before they are committed.
+- Unrelated untracked files remain untouched; CHANGELOG.md is owned by generation.
+  A later retry requires inspection of
+  retained release edits before committing them.
 
 ## Requirements
 
@@ -95,15 +101,22 @@ and verify exactly one release commit and one tag.
   releases before modifying tracked files; report actionable failures.
 - **FR-007**: Provide an idempotent local retry command, including recovery after a
   completed release commit whose tag failed.
-- **FR-008**: Do not build distributions, create changelogs, publish releases,
+- **FR-008**: Do not build distributions, publish releases,
   push, fetch, or introduce CI/CD. Installing hooks must not release anything.
 - **FR-009**: Document setup, commit categories, failure recovery, and manual tag
   pushing in the Russian README; retain the nine application entrypoints.
+- **FR-010**: Regenerate English CHANGELOG.md from complete committed history in an
+  always-running pre-commit hook, including historical and unreleased entries and
+  excluding generated release commits. Changed output stops the commit for explicit
+  review and staging, including when the file is newly created; hooks never stage it.
+- **FR-011**: Include the source commit in a finalized version section during release
+  preparation and commit CHANGELOG.md with the two version files. Preserve prepared
+  output during nested checks and recovery; verify its recorded checksum before tagging.
 
 ### Key Entities
 
 - Release candidate: source commit, previous reachable tag, computed next version.
-- Release commit: only package-version metadata and its matching lockfile update.
+- Release commit: package-version metadata, its matching lockfile update and generated changelog.
 - Version tag: immutable annotated reference to the checked release commit.
 - Local operation: exclusive lock and recoverable attempt metadata, outside tracked files.
 

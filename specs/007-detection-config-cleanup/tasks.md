@@ -1,5 +1,11 @@
 # Tasks: Detection configuration cleanup
 
+> **Current-contract note:** Checked tasks preserve completed history. The later publication
+> cleanup replaced the 13/39 artifact inventory with one evaluation workbook per selected split
+> and one frozen validation CSV, keeps the FiftyOne receipt local, and enables installed native
+> callbacks for the owner only. T007/T008 and their goal describe the original requirement.
+> See [current contracts](../../docs/current-contracts.md).
+
 ## Setup and foundation
 
 - [x] T001 Inspect implementation, dependencies and constitution; capture design in spec.md and plan.md.

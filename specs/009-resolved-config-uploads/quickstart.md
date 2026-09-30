@@ -1,4 +1,4 @@
-# Validation: Resolved configuration uploads
+# Validation: Resolved configuration attachments
 
 ## Prerequisites
 
@@ -12,7 +12,12 @@ Run `uv run pytest`, `uv run ruff check .`, `uv run mypy .`, and `uv run lint-im
 
 ## Real ClearML evidence
 
-Use explicitly tagged task-owned validation with representative configuration-file references and download the uploaded configuration files. Parse active values and verify zero unresolved interpolation, expected effective command values, preserved comments and absent credentials. Follow the project end-to-end skill for any native execution prerequisites; preserve shared infrastructure and clean only task-owned resources.
+Use explicitly tagged task-owned validation with representative consumed configuration-file
+references. Inspect their ClearML Configuration Objects through the UI or SDK, parse active
+values and verify zero unresolved interpolation, expected effective command values, preserved
+comments, absent credentials and no configuration artifacts. Follow the project end-to-end
+skill for native execution prerequisites; preserve shared infrastructure and clean only
+task-owned resources.
 
 Record commands, task identifiers, file evidence, results and limitations in a dated verification document. Do not record credentials. Run converge after implementation and finish any appended tasks before final review and release.
 

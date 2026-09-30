@@ -126,7 +126,15 @@ def test_commit_updates_metadata_and_tags_once(
     assert (repo / ".git/checks").read_text().splitlines() == ["0.3.0", version]
     assert git(repo, "status", "--porcelain", "--untracked-files=no") == ""
     assert not (repo / "dist").exists()
-    assert not (repo / "CHANGELOG.md").exists()
+    changelog = (repo / "CHANGELOG.md").read_text()
+    assert f"## v{version} (" in changelog
+    assert message.splitlines()[0].split(": ", 1)[1] in changelog.casefold()
+    assert "chore(release)" not in changelog
+    assert set(git(repo, "diff", "--name-only", "HEAD~1", "HEAD").splitlines()) == {
+        "pyproject.toml",
+        "uv.lock",
+        "CHANGELOG.md",
+    }
     before = git(repo, "rev-parse", "HEAD")
     result = retry(repo)
     assert result.returncode == 0, result.stderr
@@ -186,7 +194,7 @@ def test_failed_quality_check_leaves_original_commit_and_no_tag(release_repo: Pa
     assert result.returncode == 1
     (repo / ".git/reject-release").unlink()
     # Contributor inspects retained edits and completes the exact metadata commit.
-    git(repo, "add", "pyproject.toml", "uv.lock")
+    git(repo, "add", "pyproject.toml", "uv.lock", "CHANGELOG.md")
     git(repo, "commit", "-m", "chore(release): 0.3.1")
     assert git(repo, "rev-parse", "v0.3.1^{commit}") == git(repo, "rev-parse", "HEAD")
     assert git(repo, "rev-list", "--count", "HEAD") == "3"
@@ -443,3 +451,76 @@ def test_unreachable_tag_conflict_does_not_stamp_metadata(release_repo: Path) ->
     assert git(repo, "rev-parse", "v0.3.1^{commit}") == other
     assert tomllib.loads((repo / "pyproject.toml").read_text())["project"]["version"] == "0.3.0"
     assert git(repo, "status", "--porcelain", "--untracked-files=no") == ""
+
+
+def install_changelog_hook(repo: Path) -> None:
+    config = yaml.safe_load((ROOT / ".pre-commit-config.yaml").read_text())
+    hook = next(
+        hook for item in config["repos"] for hook in item["hooks"] if hook["id"] == "changelog"
+    )
+    hook["entry"] = f'{sys.executable} "{HELPER}" --changelog'
+    path = repo / ".pre-commit-config.yaml"
+    fixture_config = yaml.safe_load(path.read_text())
+    fixture_config["repos"][0]["hooks"].insert(0, hook)
+    path.write_text(yaml.safe_dump(fixture_config))
+    git(repo, "add", ".pre-commit-config.yaml")
+
+
+def test_pre_commit_refreshes_history_without_staging(release_repo: Path) -> None:
+    repo = release_repo
+    git(repo, "switch", "-c", "feature/changelog")
+    commit(repo, "feat: historical change")
+    install_changelog_hook(repo)
+    result = command(repo, sys.executable, "-m", "pre_commit", "run", "--all-files", check=False)
+    assert result.returncode == 1
+    changelog = (repo / "CHANGELOG.md").read_text()
+    assert "historical change" in changelog.casefold()
+    assert "Unreleased" in changelog
+    assert "v0.3.0" in changelog
+    assert git(repo, "ls-files", "CHANGELOG.md") == ""
+    git(repo, "add", "CHANGELOG.md")
+    result = command(repo, sys.executable, "-m", "pre_commit", "run", "--all-files", check=False)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (repo / "CHANGELOG.md").read_text() == changelog
+    assert git(repo, "rev-list", "--count", "HEAD") == "2"
+
+
+def test_changelog_hook_preserves_release_and_tag_retry(release_repo: Path) -> None:
+    repo = release_repo
+    install_changelog_hook(repo)
+    result = command(repo, sys.executable, str(HELPER), "--changelog", check=False)
+    assert result.returncode == 1
+    git(repo, "add", "CHANGELOG.md")
+    hook = refuse_tag(repo)
+    commit(repo, "fix: finalized release entry")
+    head = git(repo, "rev-parse", "HEAD")
+    assert git(repo, "log", "-1", "--format=%s") == "chore(release): 0.3.1"
+    changelog = (repo / "CHANGELOG.md").read_text()
+    assert "## v0.3.1 (" in changelog
+    assert "finalized release entry" in changelog.casefold()
+    assert "Unreleased" not in changelog
+    # Manual pre-commit during recovery must preserve the untagged release section.
+    command(repo, sys.executable, "-m", "pre_commit", "run", "--all-files")
+    assert (repo / "CHANGELOG.md").read_text() == changelog
+    hook.unlink()
+    result = retry(repo)
+    assert result.returncode == 0, result.stderr
+    assert git(repo, "rev-parse", "v0.3.1^{commit}") == head
+    result = command(repo, sys.executable, "-m", "pre_commit", "run", "--all-files", check=False)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (repo / "CHANGELOG.md").read_text() == changelog
+
+
+def test_recovery_rejects_changed_changelog(release_repo: Path) -> None:
+    repo = release_repo
+    (repo / ".git/reject-release").touch()
+    commit(repo, "fix: protect release notes")
+    path = repo / "CHANGELOG.md"
+    path.write_text(path.read_text() + "\nUnreviewed addition\n")
+    (repo / ".git/reject-release").unlink()
+    git(repo, "add", "pyproject.toml", "uv.lock", "CHANGELOG.md")
+    git(repo, "commit", "-m", "chore(release): 0.3.1")
+    result = retry(repo)
+    assert result.returncode == 1
+    assert "changelog" in result.stderr.lower()
+    assert git(repo, "tag", "--list") == "v0.3.0"

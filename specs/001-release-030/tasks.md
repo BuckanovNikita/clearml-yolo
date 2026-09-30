@@ -4,7 +4,7 @@ Input: spec.md, plan.md, research.md, data-model.md and contracts/ in this direc
 Tests are required by the supplied release acceptance plan.
 
 This is a historical completion ledger. Checked sparse/raw-configuration and eight-command
-tasks describe the 0.3.0 baseline at the time they ran. The
+tasks describe the 0.3.0 baseline when they ran. The
 [configuration and publication feature](../002-config-init-release/spec.md) restored the
 initializer, and the [native configuration feature](../003-ultralytics-config-groups/spec.md)
 introduced top-level native groups. The current interface has eight execution commands plus
@@ -52,7 +52,7 @@ Goal: exactly one complete task. Independent test: required upload rejection fai
 
 ## Phase 6: User Story 4 — Install and migrate (P2)
 
-Goal at the time: usable 0.3.0 distribution. The later restored initializer increased the
+Historical goal: usable 0.3.0 distribution. The later restored initializer increased the
 installed interface to nine commands.
 
 - [X] T020 [P] [US4] Update Russian README.md, docs/migration-030.md and remove obsolete docs/superpowers specifications per FR-005, FR-015.

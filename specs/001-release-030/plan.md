@@ -3,8 +3,8 @@
 **Branch context**: existing checkout; feature selected by `.specify/feature.json`
 **Date**: 2026-09-19 | **Spec**: [spec.md](spec.md)
 
-> **Historical plan.** This records the implementation route used for the original 0.3.0
-> baseline. The [configuration and publication feature](../002-config-init-release/spec.md)
+> **Historical plan.** This records the original 0.3.0 baseline implementation route.
+> The [configuration and publication feature](../002-config-init-release/spec.md)
 > restored `cy-init-config` and published v0.3.0. The later
 > [native configuration feature](../003-ultralytics-config-groups/spec.md) replaced
 > sparse/raw-file native configuration with top-level `ultralytics` and
@@ -37,7 +37,7 @@ Before research and after design: PASS against constitution 2.0.0. Preserve stri
 Loguru, clear module boundaries, explicit external-library adapters, isolated outputs, one
 task and upload completion, validation-only calibration, environment-specific preflight/capacity and
 cleanup. This release intentionally updates import contracts for removed modules and new val.
-No weakened checks or undocumented exceptions are planned.
+No weakened checks or undocumented exceptions planned.
 
 ## Project Structure
 

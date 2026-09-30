@@ -20,7 +20,7 @@
 - [x] CHK010 Are valid empty predictions distinguished from empty configurations? [Consistency, Spec §FR-008, FR-009]
 - [x] CHK011 Are canonical configuration replay and local commented YAML retention specified? [Completeness, Spec §FR-009]
 - [x] CHK012 Are native, historical and explicit local comparison sources covered? [Coverage, Spec §FR-010, FR-012]
-- [x] CHK013 Are frozen validation thresholds and current-test pairing consistently required? [Consistency, Spec §FR-010, FR-011]
+- [x] CHK013 Are frozen validation thresholds and same-selected-split pairing consistently required, with pipeline test fixed? [Consistency, Spec §FR-010, FR-011]
 - [x] CHK014 Are source links distinguished from copied source training parameters? [Clarity, Spec §FR-011]
 - [x] CHK015 Are repeated/concurrent preparation and exact publication outcomes measurable? [Measurability, Spec §SC-001, SC-003]
 - [x] CHK016 Are downloaded model accuracy and unsuccessful failure scenarios measurable? [Measurability, Spec §SC-002, SC-004]

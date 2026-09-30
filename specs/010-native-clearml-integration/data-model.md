@@ -18,4 +18,9 @@ Existing native model ID, task/project association, uploaded URI and local best 
 
 ## Replay configuration and performance evidence
 
-Canonical Configuration Objects and native General hold sanitized execution settings, dataset overrides, normalization and source-task references. Performance artifacts are canonical truth/prediction tables, exact frozen validation thresholds and result/report workbooks. Identical table hashes share one remote artifact. Local diagnostic/manifests/receipts are not artifacts. Compared models resolve source-task configuration without mutating current comparison configuration.
+Current-task Configuration Objects and native General hold sanitized execution settings,
+dataset overrides and normalization. Performance artifacts are canonical truth/prediction
+tables, exact frozen validation thresholds and result/report workbooks. Identical table hashes
+share one remote artifact. Local diagnostics/manifests/receipts are not artifacts. Compared
+models retain current comparison configuration while resolving source weights, exact thresholds
+and source task/model links; source General/Configuration Objects are not fetched automatically.

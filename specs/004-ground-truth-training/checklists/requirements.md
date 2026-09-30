@@ -1,6 +1,6 @@
 # Specification Quality Checklist: Ground-Truth-Driven Training
 
-**Purpose**: Validate specification completeness and quality before proceeding to planning
+**Purpose**: Validate specification completeness and quality before planning
 
 **Created**: 2026-09-29
 

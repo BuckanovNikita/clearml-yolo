@@ -3,6 +3,12 @@
 **Input**: [spec.md](spec.md), [plan.md](plan.md), design and publication contract.
 **Tests**: Required by the approved plan and constitution. Capture original failure before changing relay behavior.
 
+> **Current-contract note:** Checked tasks preserve completed implementation history. Current
+> replay reads current-task configuration; comparison resolves source weights/thresholds and
+> records source links without automatically fetching source General/Configuration Objects.
+> References to compared-model configuration recovery in T010–T012/T015 reflect the original
+> target. See [current contracts](../../docs/current-contracts.md).
+
 ## Phase 1: Setup and Specification
 
 - [x] T001 Complete assessment intake/research/define/shape/decide in .specify/assessments/native-clearml-integration/ and clarified specification in specs/010-native-clearml-integration/spec.md.

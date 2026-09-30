@@ -21,8 +21,8 @@ Raw `cfg` loading and nested `train.ultralytics`/`predict.ultralytics` are remov
 ClearML is required for execution commands. Pass `clearml.project_name` and
 `clearml.tags` explicitly when isolating runs. `run_dir` routes pipeline output;
 conflicting stage paths or native training `project`/`name` values fail. Standalone
-stages require explicit inputs. `cy-init-config DIRECTORY [--force]` only writes
-editable configuration examples and does not create a ClearML task.
+stages require explicit inputs. `cy-init-config DIRECTORY [--force]` writes only
+editable configuration examples without creating a ClearML task.
 
 Select native `device`, `batch`, `amp` and `compile` settings for the environment.
 The application performs no scheduling, GPU leasing, or batch tuning.

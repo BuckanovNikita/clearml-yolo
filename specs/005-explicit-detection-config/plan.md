@@ -19,7 +19,8 @@ Scope: five native model commands and cy-init-config; detection only.
 ## Constitution Check
 
 Pre/post-design gates pass: preserve layering, required tracking, command ownership,
-comment-preserving YAML, explicit nulls, frozen thresholds and paired current-test comparison.
+comment-preserving YAML, explicit nulls, frozen validation thresholds and paired
+selected-split comparison (test in the pipeline).
 The accepted explicit-reference design retains inheritance through configuration, removes
 hidden runtime merges and refines stage relevance. No governance amendment is needed.
 External dependency pins remain unchanged. No commit/push; preserve pre-existing files.
@@ -46,7 +47,7 @@ cfg fail. Preserve accepted native aliases only when the runtime supports their 
 reject aliases that would silently conflict with canonical quantize/end2end semantics.
 
 Keep weights/checkpoint resolution, CSV dataset policy and output routing as explicit
-command-owned derivations. A null model in prediction requires weights (or explicit
+command-owned derivations. A null prediction model requires weights (or explicit
 ultralytics_predict.model), never falls back to the training architecture. Training model
 is explicit yolo11n.pt; a null training model fails. Native numeric settings are never
 rewritten by wrapper helpers. Native argument/shape normalization remains observable.

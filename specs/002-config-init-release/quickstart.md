@@ -15,8 +15,8 @@ The last two commands only compose settings. They do not train or create a task.
 Replace required inputs and set explicit ClearML identity before real execution.
 
 Initialization writes eight command examples and the two native group files. Repeat
-initialization: it must fail without replacing examples. Use `--force` only when discarding
-edits to the generated files is intended. Unrelated files must survive.
+initialization: it must fail without replacing examples. Use `--force` only to discard
+edits to generated files. Unrelated files must survive.
 
 ```bash
 uv run pytest

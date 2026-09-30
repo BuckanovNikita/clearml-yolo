@@ -47,16 +47,21 @@ An experiment reader downloads canonical tables and final workbooks without diag
 
 ### User Story 4 - Discover compared model inputs (Priority: P2)
 
-An evaluator compares task-referenced models using their best checkpoint and frozen validation thresholds on identical current-test images.
+An evaluator compares task-referenced models using their best checkpoint and frozen validation
+thresholds on identical current images from the selected split. Standalone comparison defaults
+to test; pipeline comparison uses test.
 
 **Why this priority**: Comparison must remain usable across new and historical runs.
 **Independent Test**: Compare new native-model and historical artifact tasks, and explicit local models.
 **Acceptance Scenarios**:
 
-1. Given source task IDs, then best model selection is explicit, labels and architecture come from checkpoints, and full-precision thresholds come from source validation tables.
+1. Given source task IDs, then best model selection is explicit, labels and architecture come
+   from checkpoints, and full-precision thresholds prefer source validation tables with
+   historical per-split payloads retained for compatibility.
 2. Given automatic baseline lookup, then the latest completed prod task excluding the current task is used; no matching task skips comparison.
 3. Given an invalid explicit reference, then comparison fails. Local models remain supported with explicit exact thresholds.
-4. Given source tasks, then the comparison records links and shared settings without copying model training configurations or recalibrating on test.
+4. Given source tasks, then the comparison records links and shared current settings without
+   copying model training configurations or recalibrating the selected comparison split.
 
 ### Edge Cases
 
@@ -80,8 +85,12 @@ An evaluator compares task-referenced models using their best checkpoint and fro
 - **FR-007**: Completion MUST verify required artifact and native-model registration/upload/flush; all computation, registration, upload, flush and interruption failures MUST fail task and command while retaining local output.
 - **FR-008**: Downloadable artifacts MUST follow the explicit readable inventory: canonical truth/prediction CSVs, full-precision validation-threshold CSVs, consolidated per-split evaluation/comparison XLSX, and final report workbooks. Diagnostic JSON, raw metrics, manifests, archives, NDJSON, model duplicates, plot files and configuration copies remain local.
 - **FR-009**: One nonempty run configuration MUST contain wrapper/shared inference/evaluation settings, source links and meaningful requested/effective differences. Native General owns training arguments. Only consumed dataset and explicit report configurations remain separately. Commented YAML remains local and canonical configurations support remote clones.
-- **FR-010**: Comparison MUST explicitly resolve the source best model, read checkpoint labels/architecture and exact source validation thresholds, and retain historical checkpoint/threshold readers.
-- **FR-011**: Comparison MUST record source task/model links and shared settings, paired current-test inference, counts, exclusions and methodology without copied source training parameters or test recalibration.
+- **FR-010**: Comparison MUST explicitly resolve the source best model, read checkpoint
+  labels/architecture and exact source validation thresholds, accept exact supplied thresholds,
+  and retain historical checkpoint/per-split-threshold readers.
+- **FR-011**: Comparison MUST record source task/model links and shared settings, paired
+  current selected-split inference, counts, exclusions and methodology without copied source
+  training parameters or selected-split recalibration. Standalone defaults to test; pipeline uses test.
 - **FR-012**: Automatic prod selection/exclusion/skip and invalid-explicit-reference errors MUST remain; local models require exact explicit thresholds.
 - **FR-013**: Existing 007 behavior, immutable historical tasks, pinned digital-metrics and all nine entrypoints MUST remain compatible except the explicitly changed publication/cache contracts.
 
@@ -99,13 +108,15 @@ An evaluator compares task-referenced models using their best checkpoint and fro
 - **SC-001**: Two repeated and two concurrent preparations of one input produce one complete dataset with zero repeat copies/conversions; changed inputs produce distinct entries.
 - **SC-002**: Every successful training invocation has exactly one task and one native best model; downloaded weights load and metadata matches actual training/checkpoint data.
 - **SC-003**: All command inventories match the publication contract, including skipped stages and valid empty results, with zero diagnostic or duplicate publications.
-- **SC-004**: New and historical model comparisons preserve every frozen threshold and use identical test images; every injected publication/registration/flush/interruption failure is unsuccessful.
+- **SC-004**: New and historical model comparisons preserve every frozen threshold and use
+  identical images from the selected split; every injected publication/registration/flush/
+  interruption failure is unsuccessful.
 
 ## Assumptions
 
 - Images are immutable; identical CSV bytes reference the same images, including when the CSV is moved.
 - CSV identity deliberately excludes image hashing and mtime invalidation. Cache invalidation is explicit deletion while no run uses the entry.
-- Shared cache consumers are on a filesystem supporting process locks and atomic directory rename.
+- Shared cache consumers use a filesystem supporting process locks and atomic directory rename.
 - Native ClearML and Ultralytics are installed project dependencies; service access is required for real-run acceptance.
 - Historical tasks and unrelated working changes remain untouched. No commits, pushes or issues are requested.
 

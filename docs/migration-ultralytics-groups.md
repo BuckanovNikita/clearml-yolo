@@ -1,7 +1,7 @@
 # Migration to native Ultralytics groups
 
 Regenerate examples into a fresh directory with `cy-init-config DIRECTORY`; merge desired
-wrapper values into the new command examples rather than reusing old nested native mappings.
+wrapper values into new command examples rather than reusing old nested native mappings.
 
 | Removed interface | Replacement |
 |---|---|
@@ -21,11 +21,13 @@ comment is retained as documentation. Upstream irrelevant settings may remain in
 full file; stage execution filters them and effective YAML comments them out.
 
 The pipeline still owns produced checkpoint, selected images, mode and output routing.
-Effective native YAML appears locally and in ClearML configuration objects/artifacts, with
-split/role variants and retained prediction source manifests. Native replay uses the external
+Effective native YAML and split/role variants remain local alongside prediction source
+manifests. ClearML replay uses canonical Configuration Objects and native General parameters;
+configuration copies are not artifacts. Native replay uses the external
 Ultralytics command's `cfg` option, not a clearml-yolo option.
 
-The current contract is [native configuration](../specs/005-explicit-detection-config/contracts/native-configuration.md).
+See [native configuration](../specs/005-explicit-detection-config/contracts/native-configuration.md)
+and the [current contract index](current-contracts.md) for publication and replay requirements.
 
 Prediction checkpoint and output fields are stage-owned: `model: null` selects the pipeline
 checkpoint (or standalone weights), `mode` defaults to `predict`, and null

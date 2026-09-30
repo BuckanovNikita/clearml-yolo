@@ -2,12 +2,16 @@
 
 **Date**: 2026-09-29
 
+**Snapshot status**: This records the original investigation and the later cache correction.
+Current behavior is summarized in [current contracts](../../docs/current-contracts.md).
+
 ## Native Local NDJSON Compatibility
 
-Decision: use Ultralytics >=8.4.165 and its native local NDJSON converter. The header
+Original decision: use Ultralytics >=8.4.165 and its native local NDJSON converter. The header
 contains `path: "."`; each image record names a file under `images/<split>/`.
-The training task explicitly calls `convert_ndjson_to_yolo` with an output directory
-inside the run-owned preparation directory, then passes the resulting YAML to training.
+Later implementation materializes the complete native layout in a shared content-addressed
+cache and passes its `data.yaml` directly to training. This supersedes the initial plan to run
+`convert_ndjson_to_yolo` inside each run-owned preparation directory.
 Declare aiohttp directly because the native converter imports it even for local files.
 
 Evidence: the released 8.4.165 converter resolves these paths locally and copies images
@@ -38,9 +42,11 @@ task, classes, class remapping, fraction, single-class, and validation split own
 Reject resume in CSV mode. Disable prediction class filtering for the CSV-driven pipeline.
 Retain requested/effective override records. Preserve ordinary native controls.
 
-Generated YAML is connected with remote overrides disabled. NDJSON and explicit non-image
-manifests/label archives are artifacts, not files passed through the YAML configuration adapter.
-Preparation uses sibling `.datasets/<name>` storage and the existing invocation task.
+Generated YAML is connected as the consumed dataset Configuration Object with remote overrides
+disabled. NDJSON, preparation manifests, label archives and native YAML are local diagnostics,
+not ClearML artifacts.
+Current preparation uses a shared CSV-addressed cache outside run outputs and the existing invocation
+task. Atomic staging and a per-entry lock protect construction and native consumption.
 
 ## Parallel Review and Clarification
 

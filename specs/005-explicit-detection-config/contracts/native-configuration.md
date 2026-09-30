@@ -12,7 +12,7 @@ Project defaults: training model yolo11n.pt, imgsz 960, compile true, nms true. 
 references shared imgsz/compile/nms and uses device [-1], conf 0.001, batch 1, rect true,
 save false. Training device remains null; prediction device is independent.
 Training's native conf null is preserved. Model/project/name are prediction-local null;
-model is provided by weights or explicit ultralytics_predict.model. No training-model fallback.
+weights or explicit ultralytics_predict.model provide model. No training-model fallback.
 
 ## Validation and filtering
 

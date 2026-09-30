@@ -26,4 +26,4 @@ requirements are clear, not that implementation is complete.
 ## Notes
 
 The implementation skill reads this gate without changing markers. Review each item
-against the referenced specification before beginning implementation.
+against the referenced specification before implementation.

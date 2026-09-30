@@ -15,11 +15,14 @@ uv run cy ground_truth=truth.csv dataset_format=flat run_dir=runs/csv-validation
 
 Substitute the environment's assigned project/tag and fresh output paths. Use its capacity
 and cleanup guidance before real runs. Check the displayed dropped-box total, checkpoint,
-cleaned CSV, class/split identity, dataset artifacts, validation thresholds, and test metrics.
+class/split identity, cleaned-CSV performance artifact, consumed dataset Configuration Object,
+run-configuration overrides, validation thresholds and test metrics. NDJSON, preparation JSON,
+labels and native YAML stay local.
 Use a completed tagged baseline to exercise paired current-test comparison and reports.
 Repeat with mixed valid/invalid boxes and backgrounds in every split. Both modes must
 preserve the same valid annotations and show the same error-box count before training.
 
 Run `uv run pytest`, `uv run ruff check .`, `uv run mypy .`, and `uv run lint-imports`.
 Mocked tests establish contracts only. Use `running-end-to-end-tests` for real acceptance,
-artifact downloads, and failure checks, recording commands and results in dated evidence.
+performance-artifact downloads, Configuration Object inspection and failure checks, recording
+commands and results in dated evidence.

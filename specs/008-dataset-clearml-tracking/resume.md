@@ -23,7 +23,7 @@ scenarios passed. DDP callback relay was exercised through a real CPU subprocess
 multi-GPU computation was not run. Remote-agent scheduling and live FiftyOne publication
 were not exercised. See the dated evidence for details and limits.
 
-No commits, pushes or issues were created. The task-owned test project and scratch run
+The task-owned test project and scratch run
 directory were cleaned after evidence archival; the tag-scoped stand listing is empty.
 Machine-specific evidence remains with the global environment skill. Requested delegate
 routes are recorded in the plan; observed runtime model/effort and native token usage

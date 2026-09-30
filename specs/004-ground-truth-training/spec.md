@@ -34,7 +34,7 @@ and the pipeline's requested evaluation outputs using only the supplied data.
    checkpoint without requiring a test split.
 3. **Given** multiple boxes on an image and explicit background images, **When** training
    data is prepared, **Then** each image appears once, all annotated instances survive,
-   and background images remain present with no fabricated boxes. Invalid boxes follow
+   and background images remain with no fabricated boxes. Invalid boxes follow
    the drop-and-report policy below.
 4. **Given** a full pipeline invocation, **When** training finishes, **Then** predictions,
    validation calibration, test evaluation, and any baseline comparison use the same image
@@ -66,7 +66,7 @@ compare image membership, annotations, class mapping, and split assignments.
 
 ### User Story 3 - Keep data ownership explicit and inspectable (Priority: P2)
 
-As a model developer, I can reuse training settings while knowing that the supplied CSV
+As a model developer, I can reuse training settings knowing the supplied CSV
 controls the dataset, and I can inspect what was generated and overridden after a run.
 
 **Why this priority**: Stale dataset settings must not silently change the experiment.
@@ -122,8 +122,8 @@ configuration, generated data inventory, and tracking records for both formats.
 - Classes present only in validation or test retain their names and receive a visible
   training-coverage warning; they are neither discarded nor moved into training.
 - Interrupted preparation, insufficient disk space, and native conversion failures leave
-  diagnostic output and cannot be treated as a completed dataset or successful run.
-- A requested resume that would restore different data or class meanings fails with guidance
+  diagnostic output and cannot count as a completed dataset or successful run.
+- A requested resume restoring different data or class meanings fails with guidance
   instead of bypassing CSV ownership.
 
 ## Requirements *(mandatory)*
@@ -174,15 +174,19 @@ configuration, generated data inventory, and tracking records for both formats.
 - **FR-012**: Dataset preparation MUST preserve unrelated native settings, including device,
   batch, AMP, epochs, compilation, and augmentation, subject to existing stage/output rules.
   Prediction and comparison MUST retain original class meanings and requested CSV membership.
-- **FR-013**: Prepared datasets and native conversion byproducts MUST remain in isolated,
-  run-owned output locations. Source CSVs, source images, and existing labels MUST remain
-  unchanged. Pipeline `run_dir` ownership and standalone fresh-output behavior MUST persist.
-- **FR-014**: Each run MUST retain the selected format, input fingerprint, resolved image
+- **FR-013**: Prepared datasets and native conversion byproducts MUST live in the shared,
+  CSV-addressed dataset cache outside run outputs. Cache entries MUST be isolated, atomically
+  completed, locked while consumed and reusable across runs. Source CSVs, source images and
+  existing labels MUST remain unchanged; pipeline `run_dir` and standalone outputs remain
+  isolated from the cache.
+- **FR-014**: Each run MUST retain locally the selected format, input fingerprint, resolved image
   inventory and split counts, input/retained/dropped annotation counts, invalid-box reasons,
   class mapping, generated dataset reference,
-  and effective data overrides. Non-image dataset manifests and effective configuration MUST
-  be available locally and as required ClearML artifacts, with secrets sanitized and native
-  configuration comments preserved. Dataset images MUST NOT be uploaded.
+  and effective data overrides. The cleaned canonical ground-truth CSV MUST be the dataset
+  performance artifact; generated dataset YAML MUST be a consumed dataset Configuration Object;
+  data overrides MUST be stored in canonical run configuration. NDJSON, preparation records,
+  labels and native YAML MUST remain local. Raw source dataset images MUST NOT be uploaded as
+  artifacts; owner-only native training/validation previews MAY be published.
 - **FR-015**: Preparation MUST share the invocation's single ClearML task with training and
   later stages; workers MUST NOT create tasks or upload artifacts. Completion MUST wait for
   required uploads and flushes. Preparation, computation, upload, flush, and interruption
@@ -196,7 +200,7 @@ configuration, generated data inventory, and tracking records for both formats.
 - **FR-018**: Generated command examples MUST make CSV training discoverable and distinguish
   dataset preparation controls from top-level native groups. No additional entrypoint is
   required, and `cy-ground-truth` MUST retain its existing dataset-to-CSV behavior.
-- **FR-019**: Before native training begins, the command MUST display the total number of
+- **FR-019**: Before native training, the command MUST display the total number of
   invalid boxes dropped across the supplied CSV, including zero when none are invalid.
   Count each dropped annotation row once, independently of its number of errors; valid
   background rows MUST NOT contribute. Both formats MUST use the same cleaning policy and

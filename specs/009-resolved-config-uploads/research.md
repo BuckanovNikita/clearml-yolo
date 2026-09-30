@@ -1,5 +1,9 @@
 # Research: Resolved configuration uploads
 
+> **Snapshot note:** This records the 2026-09-30 design vocabulary. Current ClearML storage
+> uses Configuration Objects without configuration artifacts; see
+> [current contracts](../../docs/current-contracts.md).
+
 **Date**: 2026-09-30
 
 ## Resolution placement

@@ -24,8 +24,8 @@ The review covers all Markdown in the following feature directories, plus the go
 
 These are document inventories, not new test results or proof that each requirement is
 implemented. Existing task completion markers and prior runtime evidence retain their
-original scope. Both `003-` directories are identified by their full names to avoid confusing
-the separate features. Spec Kit prerequisite resolution selected `003-semantic-release`;
+original scope. Both `003-` directories use their full names to distinguish
+the features. Spec Kit prerequisite resolution selected `003-semantic-release`;
 reviewers received explicit directories for the other features. No active-feature metadata
 was changed, and no analysis extension hooks were registered.
 

@@ -25,4 +25,10 @@ This replaces the earlier thirteen-artifact split inventory under the
 
 cy-val does not publish to FiftyOne. Pipeline nested prediction/metrics do not publish to
 FiftyOne. Matching fidelity, GT identity, media resolution and task-ID namespaces remain.
-Comparison and developer/business reports remain test-only.
+Installed native ClearML callbacks are enabled for the invocation owner and disabled for
+workers; owner-only training telemetry and the single native best Output Model are permitted.
+
+Standalone comparison accepts a split override and defaults to test. Pipeline comparison is
+fixed to test. Reports follow the split in `comparison_manifest.json`. Every compared model
+uses exact supplied thresholds or tracked validation thresholds, with historical per-split
+payloads supported only as a compatibility reader; no compared split is recalibrated.

@@ -47,7 +47,8 @@ conflicts, concurrent publication, and interrupted import/run recovery.
 For actual pipeline verification, follow the `running-end-to-end-tests` skill. Exercise
 the initial pipeline and paired current-test rerun, standalone prediction/metrics,
 disabled publication, and an enabled publication failure. Download required ClearML
-artifacts and verify one owner receipt, frozen thresholds, retained local outputs on
-failure, and no publication by validation/report/comparison commands.
+performance artifacts and verify one local owner receipt plus its run-configuration link,
+frozen thresholds, retained local outputs on failure, and no FiftyOne publication by
+validation/report/comparison commands. The receipt must not appear in ClearML artifacts.
 
 See [dated implementation evidence](../../docs/evidence/2026-09-29-fiftyone.md).

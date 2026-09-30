@@ -3,7 +3,7 @@
 Use the project running-end-to-end-tests skill and the installation's environment instructions
 for credentials, capacity and cleanup. Pass an isolated ClearML project and tags explicitly.
 Provide a small immutable ground_truth.csv containing train/val/test with disjoint images and
-negative images, and a local detection checkpoint. The following variables are caller inputs:
+negative images, and a local detection checkpoint. Caller input variables:
 `TRUTH`, `MODEL`, `CACHE`, `RUNS`, `PROJECT`, `TAG`.
 
 ```bash

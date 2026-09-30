@@ -21,7 +21,8 @@ PASS: typed Pydantic models, strict import boundary, one ClearML owner, preserve
 - Reuse key is prefix/schema/effective-GT SHA256. Stored identity additionally records resolved paths, which must validate before reuse; original GT hash is provenance.
 - Dataset completion and task-run completion are separate. A per-dataset local lock protects mutation; retries replace only their task-ID namespace.
 - Metrics emits exact fixed-threshold digital-metrics status/index/label/confidence/IoU payloads. Raw predictions remain separate; publication never rematches or evaluates.
-- Preflight precedes costly work. Pipeline suppresses nested publication and produces the single receipt; enabled errors fail owner while keeping local outputs.
+- Preflight precedes costly work. Pipeline suppresses nested publication and produces one local
+  receipt plus a meaningful run-configuration link; enabled errors fail owner while keeping local outputs.
 
 ## Artifacts
 

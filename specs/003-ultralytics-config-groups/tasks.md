@@ -2,6 +2,12 @@
 
 **Input**: [spec.md](spec.md), [plan.md](plan.md), research, data model and contracts.
 
+> **Current-contract note:** Checked tasks preserve the work accepted in this feature. Later
+> publication cleanup keeps requested/effective native YAML and manifests local and uses the
+> canonical run Configuration Object plus native General parameters for replay; T015, T016,
+> T021 and the strategy's artifact wording describe the historical implementation target.
+> See [current contracts](../../docs/current-contracts.md).
+
 Tasks are unchecked until implementation or executed evidence supports completion. Heavy tests
 were authorized explicitly on 2026-09-28 and completed with the limits recorded in the dated
 [verification evidence](verification-2026-09-28.md).

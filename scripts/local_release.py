@@ -1,6 +1,7 @@
 """Create checked local version commits and tags after contributor commits."""
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -17,7 +18,7 @@ from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 RELEASE_VERSION = re.compile(r"(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)")
-METADATA = ("pyproject.toml", "uv.lock")
+RELEASE_FILES = ("pyproject.toml", "uv.lock", "CHANGELOG.md")
 RETRY = "uv run --locked --no-sync python scripts/local_release.py"
 GUARD = "CLEARML_YOLO_RELEASE_ACTIVE"
 HOOK_MARKER = "# clearml-yolo: local-release post-commit launcher"
@@ -33,6 +34,7 @@ class Attempt(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     source: str = Field(pattern=r"^[0-9a-f]{40,64}$")
     version: str = Field(pattern=r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
+    changelog_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
 
     @property
     def tag(self) -> str:
@@ -133,7 +135,8 @@ def require_clean(root: Path) -> None:
     if git(root, "status", "--porcelain", "--untracked-files=no"):
         raise ReleaseError(
             "Release deferred: dirty tracked worktree or index. Inspect retained changes; "
-            "if a release attempt failed, finish only its pyproject.toml and uv.lock edits "
+            "if a release attempt failed, finish only its pyproject.toml, uv.lock and "
+            "CHANGELOG.md edits "
             "and commit them with the recorded chore(release): VERSION subject before retrying."
         )
 
@@ -165,10 +168,20 @@ def validate_release_commit(root: Path, attempt: Attempt) -> None:
     if git(root, "log", "-1", "--format=%s") != attempt.subject:
         raise ReleaseError(f"Expected release commit subject: {attempt.subject}")
     paths = git(root, "diff", "--name-only", attempt.source, "HEAD").splitlines()
-    if set(paths) != set(METADATA):
-        raise ReleaseError("Release commit must change only pyproject.toml and uv.lock.")
+    if set(paths) != set(RELEASE_FILES):
+        raise ReleaseError(
+            "Release commit must change only pyproject.toml, uv.lock and CHANGELOG.md."
+        )
     require_clean(root)
     validate_metadata(root, attempt)
+    if (
+        attempt.changelog_sha256 is None
+        or hashlib.sha256((root / "CHANGELOG.md").read_bytes()).hexdigest()
+        != attempt.changelog_sha256
+    ):
+        raise ReleaseError(
+            "Changelog does not match the prepared release; inspect recovery metadata."
+        )
 
 
 def tag_exists(root: Path, tag: str) -> bool:
@@ -209,7 +222,7 @@ def semantic_release(root: Path, *options: str) -> str:
         "-m",
         "semantic_release",
         "version",
-        "--no-changelog",
+        "--changelog",
         "--skip-build",
         "--no-commit",
         "--no-tag",
@@ -234,17 +247,58 @@ def next_attempt(root: Path) -> Attempt | None:
     return attempt
 
 
-def prepare_commit(root: Path, attempt: Attempt) -> None:
+def refresh_changelog(root: Path) -> bool:
+    """Generate committed history without replacing a prepared, untagged release."""
+    if git_path(root, "clearml-yolo-release.json").exists():
+        logger.info("Preserving changelog for the recorded release attempt.")
+        return False
+    if git(root, "rev-parse", "--is-shallow-repository") == "true":
+        raise ReleaseError("Shallow history cannot generate a complete changelog.")
+    if git(root, "rev-parse", "--abbrev-ref", "HEAD") == "HEAD":
+        logger.info("Changelog refresh skipped for detached HEAD.")
+        return False
+    path = root / "CHANGELOG.md"
+    before = path.read_bytes() if path.exists() else None
+    config = tomllib.loads((root / "pyproject.toml").read_text())["tool"]["semantic_release"]
+    # PSR requires a release branch even for changelog-only rendering. Override that
+    # restriction in a temporary config; the project's master-only version policy stays intact.
+    config["branches"] = {"changelog": {"match": ".*", "prerelease": False}}
+    with tempfile.TemporaryDirectory(prefix="clearml-yolo-changelog-") as directory:
+        temporary = Path(directory) / "config.json"
+        temporary.write_text(json.dumps({"semantic_release": config}))
+        run(
+            root,
+            sys.executable,
+            "-m",
+            "semantic_release",
+            "--strict",
+            "--config",
+            str(temporary),
+            "changelog",
+        )
+    return path.read_bytes() != before
+
+
+def prepare_commit(root: Path, attempt: Attempt) -> Attempt:
     semantic_release(root)
     run(root, "uv", "lock", "--offline")
     validate_metadata(root, attempt)
     paths = git(root, "diff", "HEAD", "--name-only").splitlines()
-    if set(paths) != set(METADATA) or git(root, "rev-parse", "HEAD") != attempt.source:
+    if not git(root, "ls-files", "--", "CHANGELOG.md"):
+        paths.append("CHANGELOG.md")
+    if set(paths) != set(RELEASE_FILES) or git(root, "rev-parse", "HEAD") != attempt.source:
         raise ReleaseError("Source commit or files changed during release preparation.")
-    git(root, "add", "--", *METADATA)
+    attempt = attempt.model_copy(
+        update={
+            "changelog_sha256": hashlib.sha256((root / "CHANGELOG.md").read_bytes()).hexdigest()
+        }
+    )
+    git_path(root, "clearml-yolo-release.json").write_text(attempt.model_dump_json() + "\n")
+    git(root, "add", "--", *RELEASE_FILES)
     # A contributor can stage unrelated work after our preflight. A path-limited
     # commit preserves it in the index rather than including it in our release.
-    git(root, "commit", "--only", "-m", attempt.subject, "--", *METADATA)
+    git(root, "commit", "--only", "-m", attempt.subject, "--", *RELEASE_FILES)
+    return attempt
 
 
 def release(root: Path) -> None:
@@ -262,7 +316,7 @@ def release(root: Path) -> None:
                 return
             # A failed attempt with restored source files can be restarted, but never
             # reuse its version blindly after history or release tags have changed.
-            if next_attempt(root) != attempt:
+            if next_attempt(root) != attempt.model_copy(update={"changelog_sha256": None}):
                 raise ReleaseError("Recorded release candidate changed; inspect recovery metadata.")
         else:
             candidate = next_attempt(root)
@@ -272,7 +326,7 @@ def release(root: Path) -> None:
             attempt = candidate
             with record.open("x") as stream:
                 stream.write(attempt.model_dump_json() + "\n")
-        prepare_commit(root, attempt)
+        attempt = prepare_commit(root, attempt)
         finish_tag(root, attempt, retrying=False)
         record.unlink()
         logger.info("Created local release {}; push explicitly when ready.", attempt.tag)
@@ -283,19 +337,28 @@ def main() -> int:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--install-hooks", action="store_true", help="install both local Git hooks")
     mode.add_argument("--post-commit", action="store_true", help="invoked automatically by Git")
+    mode.add_argument(
+        "--changelog", action="store_true", help="refresh committed changelog history"
+    )
     args = parser.parse_args()
     if os.environ.get(GUARD) == "1":
         return 0
     try:
         root = Path(git(Path.cwd(), "rev-parse", "--show-toplevel"))
-        if args.install_hooks:
+        if args.changelog:
+            if refresh_changelog(root):
+                logger.info(
+                    "Changelog updated. Review and stage CHANGELOG.md, then retry the commit."
+                )
+                return 1
+        elif args.install_hooks:
             install_hooks(root)
-            return 0
-        reason = skip_reason(root, post_commit=args.post_commit)
-        if reason:
-            logger.info("Release skipped: {}.", reason)
-            return 0
-        release(root)
+        else:
+            reason = skip_reason(root, post_commit=args.post_commit)
+            if reason:
+                logger.info("Release skipped: {}.", reason)
+            else:
+                release(root)
     except (ReleaseError, OSError, ValueError, KeyError, ValidationError) as exc:
         logger.error(
             "{}. The original commit is retained. Retry after resolving this: {}", exc, RETRY
