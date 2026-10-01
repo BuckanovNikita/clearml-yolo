@@ -1,7 +1,12 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.13.0 (2026-10-01)
+
+### Features
+
+- Contain workspace writes and export evaluation evidence as CSV
+  ([`eb7fdc6`](https://github.com/BuckanovNikita/clearml-yolo/commit/eb7fdc6b5ba09dadae5bdb12f82745769c25eb1d))
 
 ### Testing
 
