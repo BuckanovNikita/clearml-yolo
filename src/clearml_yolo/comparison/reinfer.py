@@ -8,16 +8,18 @@ stage also calls).
 """
 
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Any
+from typing import IO, Any
 
 import pandas as pd
 from loguru import logger
 from pydantic import BaseModel, Field
 
 from clearml_yolo.clearml_session import sanitize_configuration
+from clearml_yolo.filesystem import model_weights_path
 from clearml_yolo.inference import predict_on_images
 from clearml_yolo.native_config import write_native_yaml
 
@@ -69,7 +71,7 @@ def _model_class_names(weights: str | Path) -> dict[int, str]:
     from ultralytics.models import YOLO
 
     # Checkpoint labels remain authoritative even when remote model metadata exists.
-    names: dict[int, str] = YOLO(str(weights)).names
+    names: dict[int, str] = YOLO(str(model_weights_path(weights))).names
     return names
 
 
@@ -150,6 +152,20 @@ def _evidence(predictions: pd.DataFrame, fallback: dict[str, object]) -> Inferen
     return evidence
 
 
+@contextmanager
+def _atomic_text(output: Path) -> Iterator[IO[str]]:
+    """Keep rename atomic across filesystems and remove only our own temporary file."""
+    temporary: Path | None = None
+    try:
+        with NamedTemporaryFile("w", dir=output.parent, delete=False, encoding="utf-8") as handle:
+            temporary = Path(handle.name)
+            yield handle.file
+        temporary.replace(output)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
 def _write_cache(predictions: pd.DataFrame, output: Path, evidence: InferenceEvidence) -> None:
     """Publish the cache in one step, because a peer run may be reading it.
 
@@ -159,15 +175,11 @@ def _write_cache(predictions: pd.DataFrame, output: Path, evidence: InferenceEvi
     back does not fail — it scores as a recall drop, which reads as a model regression.
     """
     output.parent.mkdir(parents=True, exist_ok=True)
-    with NamedTemporaryFile("w", dir=output.parent, delete=False, encoding="utf-8") as handle:
+    with _atomic_text(output) as handle:
         predictions.to_csv(handle, index=False)
-        written = Path(handle.name)
-    written.replace(output)
     metadata = _metadata_path(output)
-    with NamedTemporaryFile("w", dir=output.parent, delete=False, encoding="utf-8") as handle:
+    with _atomic_text(metadata) as handle:
         handle.write(evidence.model_dump_json(indent=2))
-        written_metadata = Path(handle.name)
-    written_metadata.replace(metadata)
 
 
 def _read_cache(output: Path, native_project: Path) -> pd.DataFrame | None:

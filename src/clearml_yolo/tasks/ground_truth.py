@@ -22,6 +22,6 @@ def ground_truth(
     task = init_task(clearml, stage="ground_truth")
     expect_artifacts(task, ["ground_truth"])
     effective = connect_config_file(task, "dataset", Path(data_yaml))
-    build_ground_truth(str(effective), output, test_fraction=test_fraction, seed=seed)
-    publish_table(task, "ground_truth", Path(output))
-    return Path(output)
+    destination = build_ground_truth(str(effective), output, test_fraction=test_fraction, seed=seed)
+    publish_table(task, "ground_truth", destination)
+    return destination

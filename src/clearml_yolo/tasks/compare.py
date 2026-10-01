@@ -42,6 +42,7 @@ from clearml_yolo.comparison.scoring import (
     validate_thresholds,
 )
 from clearml_yolo.comparison.workbook import write_comparison_workbook
+from clearml_yolo.filesystem import write_path
 from clearml_yolo.inference import ImageNameMode, resolution_of, trained_imgsz
 from clearml_yolo.native_config import prediction_settings, write_native_yaml
 
@@ -523,12 +524,18 @@ def _skip_without_baseline(
     with pd.ExcelWriter(workbook, engine="openpyxl") as writer:
         per_class.to_excel(writer, sheet_name="Classes")
         pd.DataFrame([summary]).to_excel(writer, sheet_name="Summary", index=False)
-        pd.DataFrame(
+    tables: dict[str, Path] = {}
+    for title, frame in {
+        "thresholds": pd.DataFrame(
             list(candidate.thresholds.items()), columns=["class_name", "confidence"]
-        ).to_excel(writer, sheet_name="Thresholds", index=False)
-        pd.DataFrame(
+        ),
+        "methodology": pd.DataFrame(
             [{"status": "skipped", "reason": reason, **_source_configuration(candidate)}]
-        ).to_excel(writer, sheet_name="Methodology", index=False)
+        ),
+    }.items():
+        table_path = workbook.with_name(f"{workbook.stem}_{title}.csv")
+        frame.to_csv(table_path, index=False, float_format="%.17g")
+        tables[table_path.stem] = table_path
     if task is not None:
         record_run_configuration(
             task,
@@ -545,6 +552,8 @@ def _skip_without_baseline(
         name = f"compare_evaluation_candidate_{split}"
         expect_artifacts(task, [name])
         upload_artifact(task, name, workbook)
+        for name, table_path in tables.items():
+            publish_table(task, name, table_path)
 
 
 def _normalize_evaluation(
@@ -613,7 +622,7 @@ def compare(
     if isinstance(inference, dict):
         inference = _native_inference(inference, ultralytics, ultralytics_predict)
     task = init_task(clearml, stage="compare")
-    destination = Path(output_dir)
+    destination = write_path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
     current_task_id = str(task.id) if task is not None else None
     evaluation_config = _normalize_evaluation(
@@ -750,7 +759,9 @@ def compare(
         }
     )
     workbook = destination / f"{artifact_names.COMPARISON_WORKBOOK_PREFIX}_{split}.xlsx"
-    write_comparison_workbook(tables.rows, tables.excluded, tables.methodology, workbook)
+    csv_tables = write_comparison_workbook(
+        tables.rows, tables.excluded, tables.methodology, workbook
+    )
     report_comparison(task, split, tables.rows, tables.methodology)
     manifest = _write_manifest(
         destination,
@@ -785,6 +796,8 @@ def compare(
         name = artifact_names.per_split(artifact_names.COMPARISON_WORKBOOK_PREFIX, split)
         expect_artifacts(task, [name])
         upload_artifact(task, name, workbook)
+        for name, table_path in csv_tables.items():
+            publish_table(task, name, table_path)
 
     degraded = _degraded(tables)
     return CompareResult(

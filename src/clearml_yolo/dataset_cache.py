@@ -17,6 +17,7 @@ from pydantic import BaseModel, ValidationError
 
 from clearml_yolo.dataset import PreparedDataset, prepare_dataset
 from clearml_yolo.dataset_export import DatasetFormat
+from clearml_yolo.filesystem import cy_home, write_path
 
 PREPARATION_VERSION = 1
 _COMPLETION_FILE = "completion.json"
@@ -36,10 +37,10 @@ class _Completion(BaseModel):
 def dataset_cache_root(cache_dir: str | Path | None) -> Path:
     """Resolve the shared cache location before validating output ownership."""
     if cache_dir is not None:
-        return Path(cache_dir).expanduser().resolve()
+        return write_path(cache_dir).resolve()
     xdg_cache = os.environ.get("XDG_CACHE_HOME")
-    base = Path(xdg_cache).expanduser() if xdg_cache else Path.home() / ".cache"
-    return (base / "clearml-yolo" / "datasets").resolve()
+    base = Path(xdg_cache).expanduser() if xdg_cache else cy_home() / ".cache"
+    return write_path(base / "clearml-yolo" / "datasets").resolve()
 
 
 def _identity(csv_sha256: str, dataset_format: DatasetFormat) -> str:

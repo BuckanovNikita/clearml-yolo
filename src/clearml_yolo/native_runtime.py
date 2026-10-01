@@ -8,6 +8,14 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, cast
 
+from clearml_yolo.filesystem import (
+    cy_home,
+    initialize_filesystem,
+    native_weights_directory,
+    temporary_root,
+    write_path,
+)
+
 OWNER_PID_ENV = "CY_CLEARML_OWNER_PID"
 OWNER_TASK_ENV = "CY_CLEARML_OWNER_TASK_ID"
 
@@ -117,9 +125,16 @@ def _restore_attribute(target: Any, name: str, existed: bool, value: Any) -> Non
 @contextmanager
 def native_runtime() -> Iterator[None]:
     """Enable native callbacks only for the owner and restore every modified global."""
+    initialize_filesystem()
     previous = os.environ.get("YOLO_CONFIG_DIR")
-    from ultralytics.utils import SETTINGS, get_user_config_dir
+    from ultralytics import utils
+    from ultralytics.data import utils as dataset_utils
+    from ultralytics.utils import SETTINGS, dist, get_user_config_dir
     from ultralytics.utils.callbacks import clearml as integration
+
+    # These native runtime globals exist upstream but are not exported by its type interface.
+    dataset_paths: Any = dataset_utils
+    ddp_paths: Any = dist
 
     original_setting = SETTINGS["clearml"]
     original_callbacks = integration.callbacks
@@ -127,19 +142,41 @@ def native_runtime() -> Iterator[None]:
     original_task = getattr(integration, "Task", None)
     had_clearml = hasattr(integration, "clearml")
     original_clearml = getattr(integration, "clearml", None)
-    with TemporaryDirectory(prefix="cy-native-") as directory:
+    original_paths = {key: SETTINGS[key] for key in ("datasets_dir", "weights_dir", "runs_dir")}
+    original_globals = (utils.DATASETS_DIR, utils.WEIGHTS_DIR, utils.RUNS_DIR,
+                        dataset_paths.DATASETS_DIR, ddp_paths.USER_CONFIG_DIR)
+    with TemporaryDirectory(prefix="cy-native-", dir=temporary_root()) as directory:
         os.environ["YOLO_CONFIG_DIR"] = directory
         try:
+            for key, folder in (
+                ("datasets_dir", cy_home() / ".cache/ultralytics/datasets"),
+                ("weights_dir", cy_home() / ".cache/ultralytics/weights"),
+                ("runs_dir", cy_home() / "runs"),
+            ):
+                selected = folder if SETTINGS[key] == SETTINGS.defaults[key] else SETTINGS[key]
+                path = write_path(selected).resolve()
+                path.mkdir(parents=True, exist_ok=True)
+                dict.__setitem__(SETTINGS, key, str(path))
+            utils.DATASETS_DIR = dataset_paths.DATASETS_DIR = Path(SETTINGS["datasets_dir"])
+            utils.WEIGHTS_DIR = Path(SETTINGS["weights_dir"])
+            utils.RUNS_DIR = Path(SETTINGS["runs_dir"])
+            ddp_paths.USER_CONFIG_DIR = Path(directory) / "Ultralytics"
+            ddp_paths.USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
             _write_inherited_settings(SETTINGS, get_user_config_dir)
             if _is_worker():
                 dict.__setitem__(SETTINGS, "clearml", False)
                 integration.callbacks = {}
             else:
                 _enable_owner(integration, SETTINGS)
-            yield
+            with native_weights_directory(Path(SETTINGS["weights_dir"])):
+                yield
         finally:
             # Bypass SettingsManager persistence: only process memory is restored.
             dict.__setitem__(SETTINGS, "clearml", original_setting)
+            for key, value in original_paths.items():
+                dict.__setitem__(SETTINGS, key, value)
+            (utils.DATASETS_DIR, utils.WEIGHTS_DIR, utils.RUNS_DIR,
+             dataset_paths.DATASETS_DIR, ddp_paths.USER_CONFIG_DIR) = original_globals
             integration.callbacks = original_callbacks
             _restore_attribute(integration, "Task", had_task, original_task)
             _restore_attribute(integration, "clearml", had_clearml, original_clearml)

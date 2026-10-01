@@ -235,8 +235,35 @@ def test_tracked_conversion_uses_effective_dataset_configuration(
     monkeypatch.setattr(stage, "expect_artifacts", lambda *args: None)
     monkeypatch.setattr(stage, "publish_table", lambda *args: None)
     monkeypatch.setattr(stage, "connect_config_file", lambda *args: override)
-    monkeypatch.setattr(
-        stage, "build_ground_truth", lambda source, *args, **kwargs: calls.append(source)
-    )
+
+    def convert(source: str, *_args: object, **_kwargs: object) -> Path:
+        calls.append(source)
+        return output
+
+    monkeypatch.setattr(stage, "build_ground_truth", convert)
     stage.ground_truth("missing-original.yaml", str(output), ClearMLConfig())
     assert calls == [str(override)]
+
+
+def test_tracked_conversion_publishes_the_expanded_output_path(
+    dataset_yaml: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from clearml_yolo.clearml_session import ClearMLConfig
+    from clearml_yolo.tasks import ground_truth as stage
+
+    selected = tmp_path / "home/truth.csv"
+    original_expanduser = Path.expanduser
+    monkeypatch.setattr(
+        Path, "expanduser",
+        lambda path: selected if str(path) == "~/truth.csv" else original_expanduser(path),
+    )
+    monkeypatch.setattr(Path, "home", lambda: selected.parent)
+    published: list[Path] = []
+    monkeypatch.setattr(stage, "init_task", lambda *args, **kwargs: object())
+    monkeypatch.setattr(stage, "expect_artifacts", lambda *args: None)
+    monkeypatch.setattr(stage, "connect_config_file", lambda *args: dataset_yaml)
+    monkeypatch.setattr(stage, "publish_table", lambda _task, _name, path: published.append(path))
+    result = stage.ground_truth(str(dataset_yaml), "~/truth.csv", ClearMLConfig())
+    assert result == selected
+    assert published == [selected]
+    assert selected.is_file()

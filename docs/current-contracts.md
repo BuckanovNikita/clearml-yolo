@@ -9,11 +9,12 @@ rather than silently changing the requirement or code.
 | Topic | Maintained contract | Implementation evidence |
 |---|---|---|
 | Commands and output routing | [CLI](../specs/001-release-030/contracts/cli.md) | [Entrypoints and checks](../pyproject.toml), [output identity](../src/clearml_yolo/run_identity.py), [pipeline](../src/clearml_yolo/tasks/pipeline.py) |
+| Filesystem defaults and explicit destinations | [Filesystem ownership](filesystem-policy.md) | [Workspace policy](../src/clearml_yolo/filesystem.py), [native input staging](../src/clearml_yolo/native_dataset.py), [native runtime](../src/clearml_yolo/native_runtime.py) |
 | Native training and prediction groups | [Native configuration](../specs/005-explicit-detection-config/contracts/native-configuration.md), [example layout](../specs/007-detection-config-cleanup/contracts/configuration-and-artifacts.md) | [Native settings](../src/clearml_yolo/native_config.py), [registration](../src/clearml_yolo/configs.py), [export](../src/clearml_yolo/config_tree.py) |
 | CSV training and dataset cache | [Dataset inputs](../specs/004-ground-truth-training/contracts/cli.md), [current publication](../specs/008-dataset-clearml-tracking/contracts/publication.md) | [Training](../src/clearml_yolo/tasks/train.py), [cache](../src/clearml_yolo/dataset_cache.py) |
 | Configuration resolution and remote replay | [File resolution](../specs/009-resolved-config-uploads/contracts/configuration-files.md), [tracking and recovery](../specs/010-native-clearml-integration/contracts/tracking-publication.md) | [Resolution](../src/clearml_yolo/apps/config_resolution.py), [session adapter](../src/clearml_yolo/clearml_session.py) |
 | Artifacts, native callbacks and task completion | [Publication inventory](../specs/008-dataset-clearml-tracking/contracts/publication.md), [native tracking](../specs/010-native-clearml-integration/contracts/tracking-publication.md), [model metadata](../specs/008-dataset-clearml-tracking/contracts/model-metadata.md) | [Artifact names](../src/clearml_yolo/artifact_names.py), [native runtime](../src/clearml_yolo/native_runtime.py), [model verification](../src/clearml_yolo/clearml_native.py), [DDP relay](../src/clearml_yolo/native_ddp.py) |
-| Comparison, thresholds and reports | [CLI evaluation contract](../specs/001-release-030/contracts/cli.md) | [Comparison](../src/clearml_yolo/tasks/compare.py), [exact thresholds](../src/clearml_yolo/clearml_models.py), [paired reports](../src/clearml_yolo/tasks/report.py) |
+| Evaluation, comparison, thresholds and reports | [Publication inventory](../specs/008-dataset-clearml-tracking/contracts/publication.md), [CLI evaluation contract](../specs/001-release-030/contracts/cli.md) | [Metrics](../src/clearml_yolo/tasks/metrics.py), [comparison](../src/clearml_yolo/tasks/compare.py), [comparison workbook](../src/clearml_yolo/comparison/workbook.py), [exact thresholds](../src/clearml_yolo/clearml_models.py), [paired reports](../src/clearml_yolo/tasks/report.py) |
 | FiftyOne publication | [Publisher](../specs/006-fiftyone-integration/contracts/publisher.md), [current inventory](../specs/008-dataset-clearml-tracking/contracts/publication.md) | [Owner publication](../src/clearml_yolo/tasks/publication.py), [replaceable adapter](../src/clearml_yolo/publishing/fiftyone_adapter.py) |
 | Local versioning, changelog and release hooks | [Local release](../specs/003-semantic-release/contracts/local-release.md) | [Release helper](../scripts/local_release.py), [hook configuration](../.pre-commit-config.yaml), [generated changelog](../CHANGELOG.md) |
 
@@ -30,6 +31,11 @@ Consumed dataset and explicit report configurations are Configuration Objects; c
 `run` and native `General` support replay. Configuration copies are not artifacts.
 Native owner callbacks may publish training/validation previews. Workers do not publish.
 The native best checkpoint uses one Output Model, verified before completion.
+
+Tabular evaluation and comparison exports keep only dashboards and metric tables in XLSX;
+row-level matches, thresholds, exclusions and methodology use named CSV sidecars. JSON
+manifests/payloads/configuration and PNG diagnostics retain their formats. See the
+[tabular export migration](migration-evaluation-csv.md).
 
 Pipeline comparison uses the current `test` images. Standalone `cy-compare` defaults to
 `split=test` and accepts another split present in the current ground truth. Both models

@@ -46,7 +46,17 @@ Add `resolve_config_document(document: Any, command_config: DictConfig | Mapping
 
 Extend `invocation(..., *, config_resolver: Callable[[Any], Any] | None = None)` and retain its callback in invocation state. Shared CLI wiring supplies a closure evaluating the current composed config at attachment time after replay and routing mutations. Direct invocation attachments without an injected resolver reject interpolated inputs with guidance while accepting concrete files; clearml_session does not import Hydra or OmegaConf.
 
-Resolve before discovering and redacting secrets; provenance metadata retains sensitive context/environment values even when aliases use innocuous keys. Retain comments using existing round-trip YAML handling. Produce separate unredacted execution copies beside the source to preserve relative-path semantics, with unique task-owned paths and cleanup, and sanitized upload copies when transformation is required, and preserve the no-interpolation original execution path even when the upload copy is sanitized. Handle initial files and ClearML-returned replay files using the same strict preparation contract. Propagate failure through existing invocation failure/finalization handling.
+Resolve before discovering and redacting secrets; provenance metadata retains sensitive
+context/environment values even when aliases use innocuous keys. Retain comments using existing
+round-trip YAML handling. Produce unique task-owned unredacted execution copies under
+`CY_HOME/.tmp` and sanitized storage copies when transformation is required; preserve the
+no-interpolation original execution path even when the storage copy is sanitized. For a native
+dataset YAML without an explicit root, add its source parent only to the execution copy so moving
+it does not change relative split semantics; retain original fields in publication. Handle initial
+files and ClearML-returned replay files using the same strict preparation contract. Propagate
+failure through existing invocation failure/finalization handling. This workspace-owned behavior
+supersedes the original beside-source design recorded in historical task T022; see
+[filesystem ownership](../../docs/filesystem-policy.md).
 
 ### Subagent ownership
 

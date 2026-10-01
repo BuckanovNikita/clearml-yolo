@@ -17,6 +17,7 @@ from clearml_yolo.clearml_session import (
     record_run_configuration,
     task_identity,
 )
+from clearml_yolo.filesystem import runs_root, write_path
 from clearml_yolo.inference import (
     PREDICTION_COLUMNS,
     ImageNameMode,
@@ -27,7 +28,7 @@ from clearml_yolo.inference import (
 from clearml_yolo.native_config import prediction_settings, write_native_yaml
 from clearml_yolo.publishing import create_publisher
 from clearml_yolo.publishing.models import FiftyOneConfig
-from clearml_yolo.run_identity import RUNS_ROOT, task_run_dir
+from clearml_yolo.run_identity import task_run_dir
 from clearml_yolo.tasks.publication import prepare_publisher, publish_results
 
 
@@ -80,12 +81,13 @@ def predict(
         resolution.as_table(),
     )
     if output is None:
-        directory = task_run_dir(RUNS_ROOT, *task_identity(task))
+        directory = task_run_dir(runs_root(), *task_identity(task))
         output = directory / "predictions.csv"
-    output_path = Path(output)
+    output_path = write_path(output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     settings["project"] = settings.get("project") or str(output_path.parent.resolve() / "native")
     settings["name"] = settings.get("name") or "predict"
+    write_path(Path(settings["project"]) / str(settings["name"]))
     settings["mode"] = "predict"
     settings.pop("source", None)
     truth = pd.read_csv(ground_truth, dtype={"image_name": str, "instance_label": str})

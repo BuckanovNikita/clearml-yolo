@@ -17,6 +17,10 @@ from native_config_helpers import training_settings
 
 @pytest.fixture(autouse=True)
 def native_publication_boundary(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Native dataset staging has its own real image/annotation ownership tests.
+    monkeypatch.setattr(
+        "clearml_yolo.tasks.train.native_dataset", lambda data, **_: nullcontext(data)
+    )
     monkeypatch.setattr(
         "clearml_yolo.tasks.train.native_ddp_relay",
         lambda *a: nullcontext(types.SimpleNamespace(replay=lambda trainer: None)),
@@ -269,6 +273,7 @@ def test_implicit_training_name_uses_active_task(
 
     task = SimpleNamespace(name="renamed/task", id="id", get_project_name=lambda: "project")
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("CY_HOME", str(tmp_path))
     monkeypatch.setattr(module, "init_task", lambda *a, **k: task)
     monkeypatch.setattr(module, "expect_artifacts", lambda *a: None, raising=False)
 

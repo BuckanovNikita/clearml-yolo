@@ -23,7 +23,10 @@
 - Effective command context means composed values after replay and app output/output_dir derivation; task-internal native normalization/routing does not redefine this context, and explicit nulls retain their meaning.
 - Registered resolver arguments receive original resolved values without artificial markers. Escaped literals and aliases retain their meaning; tuple outputs undergo the same strict checks as other sequences, and resolver-emitted active interpolation is rejected.
 - Resolution failures, including missing references, cycles, unknown resolvers and unavailable environment variables, fail publication and invocation. Computed node targets such as `${${key}}` fail confidentially because their credential provenance cannot be established without reevaluation; nested resolver arguments remain supported.
-- Resolve before credential sanitization, preserve the original source file, and keep separate unredacted execution and sanitized upload copies.
+- Resolve before credential sanitization, preserve the original source file, and keep separate
+  unredacted execution and sanitized upload copies. Owned execution copies use `CY_HOME/.tmp`.
+- A native dataset YAML without an explicit root receives its source parent only in the execution
+  copy so moving it does not change relative split paths; published fields remain unchanged.
 - Files without interpolation retain their original execution return path even when the upload copy requires credential sanitization.
 
 ## User Scenarios & Testing
@@ -80,17 +83,19 @@ An operator retains original local configuration and can run with its original v
 - **FR-003**: File root keys MUST override command root keys as whole values, and published content MUST retain only original file fields.
 - **FR-004**: Resolution MUST occur before credential sanitization; execution and storage copies
   MUST remain separate at unique paths, and credentials, including aliases under innocuous keys,
-  MUST NOT be stored.
+  MUST NOT be stored. Owned resolved execution copies MUST use workspace temporary storage and be
+  cleaned on invocation exit. A rootless native dataset YAML MUST retain source-relative path
+  semantics without adding the execution-only root to its stored Configuration Object.
 - **FR-005**: Preparation MUST preserve original source files and existing YAML comments, including commented interpolation examples.
 - **FR-006**: Resolution failures MUST fail the invocation before unresolved content is attached;
   local diagnostics MUST remain available under existing failure handling without printing
   configuration contents or credential values.
 - **FR-007**: Files without interpolation MUST retain their original execution return path even when credential sanitization requires a separate upload copy.
 - **FR-008**: All execution commands MUST provide effective configuration context after replay and output-routing changes. Direct invocation attachments without an injected resolver MUST reject interpolated or mandatory-missing inputs with actionable guidance while accepting concrete files.
-- **FR-010**: Resolution MUST preserve custom-resolver argument values and escaped literals, validate all sequence outputs including tuples, and reject resolver-emitted active interpolation.
-- **FR-011**: Credential redaction MUST retain provenance from sensitive command values and sensitive environment references even when published under innocuous keys.
 - **FR-009**: Resolution integration MUST preserve ClearML adapter boundaries, Configuration
   Object identities and completion guarantees without creating configuration artifacts.
+- **FR-010**: Resolution MUST preserve custom-resolver argument values and escaped literals, validate all sequence outputs including tuples, and reject resolver-emitted active interpolation.
+- **FR-011**: Credential redaction MUST retain provenance from sensitive command values and sensitive environment references even when published under innocuous keys.
 
 ### Key Entities
 
@@ -98,6 +103,8 @@ An operator retains original local configuration and can run with its original v
 - **Effective command context**: Current composed command values, including replay and routing updates.
 - **Storage configuration copy**: Resolved, sanitized file retaining the source field topology
   and comments for the Configuration Object boundary.
+- **Execution configuration copy**: Unredacted invocation-owned file under `CY_HOME/.tmp`; for a
+  rootless native dataset YAML it includes an execution-only source-parent root.
 
 ## Success Criteria
 

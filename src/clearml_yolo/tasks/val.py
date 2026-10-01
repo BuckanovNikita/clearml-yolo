@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from clearml_yolo.clearml_session import ClearMLConfig, init_task
+from clearml_yolo.filesystem import write_path
 from clearml_yolo.publishing.models import FiftyOneConfig
 from clearml_yolo.tasks.metrics import EvaluationConfig, MetricsResult, compute_metrics
 from clearml_yolo.tasks.predict import predict
@@ -21,7 +22,7 @@ def validate(
 ) -> MetricsResult:
     init_task(clearml, stage="val")
     selected = list(dict.fromkeys(splits or ["train", "val", "test"]))
-    destination = Path(output_dir)
+    destination = write_path(output_dir)
     predicted = predict(
         weights,
         ground_truth,

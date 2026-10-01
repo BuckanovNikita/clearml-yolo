@@ -16,10 +16,11 @@ from clearml_yolo.clearml_session import (
 from clearml_yolo.dataset import apply_dataset_policy
 from clearml_yolo.dataset_cache import dataset_cache_root
 from clearml_yolo.dataset_export import DatasetFormat
+from clearml_yolo.filesystem import model_weights_path, runs_root
 from clearml_yolo.native_config import prediction_settings
 from clearml_yolo.publishing import Publisher, create_publisher
 from clearml_yolo.publishing.models import FiftyOneConfig
-from clearml_yolo.run_identity import RUNS_ROOT, point_latest_at, resolve_run_dir, task_run_dir
+from clearml_yolo.run_identity import point_latest_at, resolve_run_dir, task_run_dir
 from clearml_yolo.tasks.compare import InferenceConfig, ModelRef, NoBaselineModelError
 from clearml_yolo.tasks.compare import compare as run_comparison
 from clearml_yolo.tasks.metrics import compute_metrics
@@ -88,7 +89,7 @@ def _required_training_splits(
 
 def _compare_and_report(
     config: dict[str, Any],
-    checkpoint: Path,
+    checkpoint: str | Path,
     thresholds: dict[str, float],
     ground_truth: str | Path,
     directory: Path,
@@ -99,15 +100,21 @@ def _compare_and_report(
     skip_report: bool,
     candidate_task_id: str | None = None,
 ) -> dict[str, Any]:
+    if candidate_task_id is None:
+        local_weights = model_weights_path(checkpoint)
+        if isinstance(local_weights, str):
+            raise ValueError(
+                "Local comparison requires a filesystem checkpoint; "
+                "resolve remote weights before comparison"
+            )
+        candidate = ModelRef(source="local", weights=local_weights, thresholds=thresholds)
+    else:
+        candidate = ModelRef(source="clearml", task_id=candidate_task_id)
     task = init_task(clearml, stage="compare")
     try:
         result = run_comparison(
             **config,
-            candidate_model=(
-                ModelRef(source="clearml", task_id=candidate_task_id)
-                if candidate_task_id is not None
-                else ModelRef(source="local", weights=checkpoint, thresholds=thresholds)
-            ),
+            candidate_model=candidate,
             ground_truth=ground_truth,
             output_dir=directory / COMPARISON_DIR,
             clearml=clearml,
@@ -168,7 +175,7 @@ def _publish_pipeline(
     predictions: Path,
     prediction_splits: list[str],
     evaluations: dict[str, Path],
-    checkpoint: Path,
+    checkpoint: str | Path,
     metrics_cfg: dict[str, Any],
     skip_predict: bool,
 ) -> None:
@@ -219,9 +226,9 @@ def run_pipeline(
         raise ValueError("weights is only valid with skip_train=true; training chooses its model")
     splits = list(dict.fromkeys(splits or ["train", "val", "test"]))
     directory = (
-        resolve_run_dir(RUNS_ROOT, run_id or "", Path(run_dir) if run_dir else None)
+        resolve_run_dir(runs_root(), run_id or "", Path(run_dir) if run_dir else None)
         if run_dir or run_id
-        else task_run_dir(RUNS_ROOT, *task_identity(task))
+        else task_run_dir(runs_root(), *task_identity(task))
     )
     if dataset_cache_root(dataset_cache_dir).is_relative_to(directory.resolve()):
         raise ValueError("dataset_cache_dir must be outside run_dir")
@@ -243,9 +250,9 @@ def run_pipeline(
         prediction_settings(ultralytics, prediction_overrides), directory / "native", "predict"
     )
     directory.mkdir(parents=True, exist_ok=True)
-    point_latest_at(RUNS_ROOT, directory)
+    point_latest_at(runs_root(), directory)
     results: dict[str, Any] = {"run_dir": directory}
-    checkpoint = Path(weights) if weights else directory / "detect/train/weights/best.pt"
+    checkpoint = weights if weights is not None else directory / "detect/train/weights/best.pt"
     effective_ground_truth: str | Path = ground_truth
     if not skip_train:
         checkpoint, effective_ground_truth = _train_from_ground_truth(

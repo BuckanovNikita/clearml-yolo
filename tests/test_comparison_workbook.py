@@ -128,10 +128,12 @@ def test_sheet_names_and_headers(
 ) -> None:
     book = _write(tmp_path, rows, excluded, methodology)
 
-    assert list(book) == ["Сравнение", "Исключённые классы", "Методика"]
+    assert list(book) == ["Сравнение"]
+    excluded_csv = pd.read_csv(tmp_path / "nested/comparison_excluded.csv")
+    methodology_csv = pd.read_csv(tmp_path / "nested/comparison_methodology.csv")
     assert list(book["Сравнение"].columns) == EXPECTED_HEADERS
-    assert list(book["Исключённые классы"].columns) == ["Класс", "Причина"]
-    assert list(book["Методика"].columns) == ["Параметр", "Значение"]
+    assert list(excluded_csv.columns) == ["Класс", "Причина"]
+    assert list(methodology_csv.columns) == ["Параметр", "Значение"]
 
 
 def test_class_rows_are_rounded_and_flags_are_readable(
@@ -215,9 +217,9 @@ def test_missing_methodology_values_render_as_a_dash(
 
     destination = tmp_path / "methodology.xlsx"
     write_comparison_workbook(rows, excluded, methodology, destination)
-    dump = load_workbook(destination)["Методика"]
+    dump = pd.read_csv(tmp_path / "methodology_methodology.csv")
 
-    assert [dump.cell(row=number, column=2).value for number in (2, 3, 4)] == ["—", "—", "500"]
+    assert list(dump["Значение"]) == ["—", "—", "500"]
 
 
 def test_missing_values_never_render_as_nan_text(
@@ -233,12 +235,13 @@ def test_missing_values_never_render_as_nan_text(
 def test_excluded_and_methodology_round_trip(
     tmp_path: Path, rows: pd.DataFrame, excluded: pd.DataFrame, methodology: dict[str, object]
 ) -> None:
-    book = _write(tmp_path, rows, excluded, methodology)
+    _write(tmp_path, rows, excluded, methodology)
+    excluded_csv = pd.read_csv(tmp_path / "nested/comparison_excluded.csv")
 
-    assert list(book["Исключённые классы"]["Класс"]) == ["ferret", "otter"]
-    assert book["Исключённые классы"]["Причина"].iloc[0] == "нет GT-объектов в сплите"
+    assert list(excluded_csv["Класс"]) == ["ferret", "otter"]
+    assert excluded_csv["Причина"].iloc[0] == "нет GT-объектов в сплите"
 
-    dump = book["Методика"]
+    dump = pd.read_csv(tmp_path / "nested/comparison_methodology.csv")
     assert list(dump["Параметр"]) == list(methodology)
     assert list(dump["Значение"].astype(str)) == [str(value) for value in methodology.values()]
 
@@ -246,10 +249,11 @@ def test_excluded_and_methodology_round_trip(
 @pytest.mark.parametrize(
     "empty", [pd.DataFrame(), pd.DataFrame(columns=["class_name", "reason"])], ids=["bare", "typed"]
 )
-def test_empty_excluded_frame_still_gets_a_headed_sheet(
+def test_empty_excluded_frame_still_gets_a_headed_csv(
     tmp_path: Path, rows: pd.DataFrame, methodology: dict[str, object], empty: pd.DataFrame
 ) -> None:
-    sheet = _write(tmp_path, rows, empty, methodology)["Исключённые классы"]
+    _write(tmp_path, rows, empty, methodology)
+    sheet = pd.read_csv(tmp_path / "nested/comparison_excluded.csv")
 
     assert list(sheet.columns) == ["Класс", "Причина"]
     assert sheet.empty

@@ -28,7 +28,9 @@ this branch.
 1. Run the repository's pytest, Ruff, mypy and import-linter checks. Include applicable
    pre-commit hooks for release or commit work.
 2. Configure an isolated ClearML project and output directory. Pass project name and
-   tags explicitly. Keep credentials out of files and logs; native callback image previews are permitted.
+   tags explicitly. Set `CY_HOME` to the task-owned invocation workspace and configure the
+   runner's cache/temp/initial-bytecode settings per the filesystem contract. Keep credentials
+   out of files and logs; native callback image previews are permitted.
 3. Build ground truth from a small YOLO dataset with disjoint validation/test images,
    including an empty image in each split. Exercise the top-level `ultralytics` and
    `ultralytics_predict` groups through locally editable generated YAML, with explicit
@@ -40,6 +42,13 @@ this branch.
    unchanged. Compare metrics, statistical results and report counts. Exercise `cy-val`,
    `cy-compare` and `cy-report` independently, including nondefault evaluation options.
 6. Force-download every required artifact and verify the explicit publication inventory.
+   Confirm every `metrics_evaluation_<split>.xlsx` contains only `summary`, `per_class` and
+   `confusion_matrix`, with `_ground_truth_matches.csv`, `_prediction_matches.csv`,
+   `_thresholds.csv` and `_methodology.csv` sidecars. Confirm a completed comparison workbook
+   contains only `Сравнение`, with `_excluded.csv` and `_methodology.csv`; for a skipped
+   automatic baseline, confirm the candidate workbook contains only `Classes` and `Summary`,
+   with `_thresholds.csv` and `_methodology.csv`. Verify JSON and PNG outputs retain their
+   established formats and that table deduplication still satisfies every required alias.
    Download the single native best Output Model, load it, and compare model fields with
    checkpoint/trainer data. Verify canonical run and native General parameters support
    replay; when used by the invocation, verify the consumed-dataset and explicit-report
@@ -48,7 +57,11 @@ this branch.
    and no duplicate checkpoint artifacts.
    Repeat CSV training against one dataset cache: filenames and extension casing remain
    intact, and image copies and NDJSON conversion do not repeat. Internal manifests and
-   diagnostic receipts remain local.
+   diagnostic receipts remain local. For native-YAML training, verify real image/label copies
+   and native caches remain under the locked workspace cache while original source bytes remain
+   unchanged. Inspect the workspace after success and injected failure for owned temporary files.
+   Explicit output/cache paths outside `CY_HOME` must remain selected; a physical-home destination
+   warns without rejection or relocation.
 7. Check artifact/model upload rejection, callback-registration failure, flush failure and
    interruption with isolated test invocations. Each must fail
    the command and task while retaining local diagnostics until intentional cleanup.

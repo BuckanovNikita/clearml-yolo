@@ -1037,7 +1037,7 @@ def test_configuration_copies_have_unique_paths_without_artifact_registration(
 
 
 def test_resolved_dataset_execution_keeps_relative_path_base_and_cleans_owned_copy(
-    fake_clearml: tuple[type[Any], FakeTask], tmp_path: Path
+    fake_clearml: tuple[type[Any], FakeTask], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _, task = fake_clearml
     dataset_dir = tmp_path / "dataset"
@@ -1046,13 +1046,16 @@ def test_resolved_dataset_execution_keeps_relative_path_base_and_cleans_owned_co
     source.write_text("train: images/train\nval: images/val\ninference_batch: ${batch}\n")
     neighbor = dataset_dir / ".preexisting-resolved.yaml"
     neighbor.write_text("untouched\n")
+    workspace = tmp_path / "workspace"
+    monkeypatch.setenv("CY_HOME", str(workspace))
     with invocation(ClearMLConfig(), "train", config_resolver=_resolve_attachment) as owner:
         effective = connect_config_file(owner, "source", source)
         stored = task.configurations[-1]["configuration"]
-        assert effective.parent == source.parent
+        assert effective.is_relative_to(workspace / ".tmp")
         assert effective != source
         assert effective.is_file()
         assert YAML(typ="safe").load(effective)["train"] == "images/train"
+        assert YAML(typ="safe").load(effective)["path"] == str(source.parent)
     assert source.is_file()
     assert neighbor.read_text() == "untouched\n"
     assert not effective.exists()

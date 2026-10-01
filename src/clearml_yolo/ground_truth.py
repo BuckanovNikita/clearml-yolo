@@ -14,6 +14,7 @@ from loguru import logger
 from PIL import Image
 from ultralytics.data.utils import IMG_FORMATS, check_det_dataset, img2label_paths
 
+from clearml_yolo.filesystem import write_path
 from clearml_yolo.progress import track
 
 GROUND_TRUTH_COLUMNS = [
@@ -254,7 +255,7 @@ def build_ground_truth(
         logger.info("Split {!r}: {} images, {} annotations", split, len(paths), len(split_rows))
 
     frame = pd.DataFrame(rows, columns=GROUND_TRUTH_COLUMNS)
-    output_path = Path(output)
+    output_path = write_path(output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     frame.to_csv(output_path, index=False)
 

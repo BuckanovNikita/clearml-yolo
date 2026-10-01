@@ -50,12 +50,6 @@ cy-init-config = "clearml_yolo.apps.config_tree:main"
 requires = ["uv_build>=0.11.32,<0.12.0"]
 build-backend = "uv_build"
 
-[tool.uv.sources]
-# Local development uses the pinned submodules. For other environments, replace
-# these with Git sources via `uv add`; see the installation instructions in README.md.
-digital-metrics = { path = "external/digital-metrics", editable = true }
-report-generator = { path = "external/report-generator", editable = true }
-
 [dependency-groups]
 dev = [
     "import-linter>=2.13",
@@ -172,9 +166,11 @@ layers = [
     "clearml_yolo.dataset_export",
     "clearml_yolo.dataset_records",
     "clearml_yolo.native_ddp",
+    "clearml_yolo.native_dataset",
     "clearml_yolo.inference | clearml_yolo.ground_truth | clearml_yolo.clearml_models | clearml_yolo.clearml_report | clearml_yolo.clearml_native | clearml_yolo.native_runtime",
     "clearml_yolo.native_config | clearml_yolo.clearml_session | clearml_yolo.progress | clearml_yolo.artifact_names",
     "clearml_yolo.run_identity",
+    "clearml_yolo.filesystem",
 ]
 
 [[tool.importlinter.contracts]]
@@ -304,7 +300,7 @@ enable_error_code = [
     "unused-awaitable",
 ]
 # Submodules are external dependencies, so they are not ours to type-check.
-exclude = ["^external/"]
+exclude = ["^external/", "^(outputs|runs|multirun|build|dist)/"]
 
 [[tool.mypy.overrides]]
 # The only dependencies that ship neither inline types nor a stub package. Everything

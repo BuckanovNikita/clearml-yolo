@@ -398,6 +398,7 @@ def test_pipeline_uses_active_task_root_and_preserves_explicit_routing(
     from clearml_yolo.tasks import pipeline
 
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("CY_HOME", str(tmp_path))
     task = SimpleNamespace(
         name="actual/task", id="unique-id", get_project_name=lambda: "team/project"
     )
@@ -439,6 +440,80 @@ def test_pipeline_uses_active_task_root_and_preserves_explicit_routing(
     assert set(captured["splits"]) == {"train", "val", "test"}
     assert captured["fiftyone"].enabled is False
     assert captured["ultralytics_predict"]["project"] == str(expected / "native")
+
+
+@pytest.mark.parametrize(
+    "reference",
+    ["s3://bucket/model.pt", "https://example.com/model.pt", "ul://user/project/model",
+     "./explicit-model.pt", "bare-model.pt"],
+)
+def test_pipeline_preserves_model_reference_at_prediction_handoff(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, reference: str
+) -> None:
+    from types import SimpleNamespace
+
+    from clearml_yolo.tasks import pipeline
+
+    monkeypatch.setenv("CY_HOME", str(tmp_path))
+    monkeypatch.setattr(pipeline, "init_task", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr(pipeline, "point_latest_at", lambda *_args: None)
+    received: list[str | Path] = []
+
+    def predict(
+        weights: str | Path, _truth: str | Path, output: str | Path,
+        *_args: object, **_kwargs: object,
+    ) -> SimpleNamespace:
+        received.append(weights)
+        return SimpleNamespace(predictions=Path(output))
+
+    monkeypatch.setattr(pipeline, "run_prediction", predict)
+    pipeline.run_pipeline(
+        training_settings(), prediction_config(), {}, {}, {}, ClearMLConfig(), "truth.csv",
+        run_dir=tmp_path / "run", weights=reference,
+        skip_train=True, skip_metrics=True, skip_compare=True, skip_report=True,
+        fiftyone=FiftyOneConfig(enabled=False),
+    )
+    assert received == [reference]
+
+
+def test_pipeline_comparison_reuses_the_workspace_bare_checkpoint(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from clearml_yolo.tasks import pipeline
+    from clearml_yolo.tasks.compare import InferenceConfig, ModelRef
+    from clearml_yolo.tasks.metrics import EvaluationConfig
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("CY_HOME", str(tmp_path))
+    checkpoint = tmp_path / ".cache/ultralytics/weights/model.pt"
+    checkpoint.parent.mkdir(parents=True)
+    checkpoint.write_bytes(b"downloaded native checkpoint")
+    received: list[ModelRef] = []
+    monkeypatch.setattr(pipeline, "init_task", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr(
+        pipeline, "run_comparison", lambda **kwargs: received.append(kwargs["candidate_model"])
+    )
+    pipeline._compare_and_report(
+        {}, "model.pt", {"cat": 0.3}, tmp_path / "truth.csv", tmp_path,
+        ClearMLConfig(),
+        InferenceConfig(conf=0.001, iou=0.7, imgsz=96, batch=1, device="cpu"),
+        EvaluationConfig(), {}, True,
+    )
+    assert received[0].weights == checkpoint
+
+
+def test_pipeline_local_comparison_rejects_unresolved_remote_references(tmp_path: Path) -> None:
+    from clearml_yolo.tasks import pipeline
+    from clearml_yolo.tasks.compare import InferenceConfig
+    from clearml_yolo.tasks.metrics import EvaluationConfig
+
+    with pytest.raises(ValueError, match="resolve remote weights before comparison"):
+        pipeline._compare_and_report(
+            {}, "s3://bucket/model.pt", {"cat": 0.3}, tmp_path / "truth.csv", tmp_path,
+            ClearMLConfig(),
+            InferenceConfig(conf=0.001, iou=0.7, imgsz=96, batch=1, device="cpu"),
+            EvaluationConfig(), {}, True,
+        )
 
 
 def test_pipeline_comparison_uses_its_native_candidate_source_task(

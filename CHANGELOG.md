@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Testing
+
+- Consolidate redundant regression tests
+  ([`bedc3af`](https://github.com/BuckanovNikita/clearml-yolo/commit/bedc3afa0d341e8fbdc520e01f4b0075b3d9f1f4))
+
+
 ## v0.12.0 (2026-09-30)
 
 ### Features

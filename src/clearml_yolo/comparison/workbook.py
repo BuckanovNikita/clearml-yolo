@@ -14,8 +14,6 @@ from openpyxl.styles import Font, PatternFill  # type: ignore[import-untyped]
 from openpyxl.utils import get_column_letter  # type: ignore[import-untyped]
 
 COMPARISON_SHEET = "Сравнение"
-EXCLUDED_SHEET = "Исключённые классы"
-METHODOLOGY_SHEET = "Методика"
 
 POOLED_LABEL = "Итого"
 NOT_APPLICABLE = "не применимо"
@@ -153,8 +151,8 @@ def write_comparison_workbook(
     excluded: pd.DataFrame,
     methodology: dict[str, object],
     path: Path,
-) -> None:
-    """Write the per-class comparison, the excluded classes and the methodology dump.
+) -> dict[str, Path]:
+    """Write comparison metrics to Excel and exclusions/methodology to CSV.
 
     ``rows`` carries the canonical English column names of :data:`COMPARISON_COLUMNS` plus
     ``is_pooled``; the pooled row is the micro-averaged hypothesis and stays outside the
@@ -177,8 +175,6 @@ def write_comparison_workbook(
 
     written = {
         COMPARISON_SHEET: comparison,
-        EXCLUDED_SHEET: excluded_sheet,
-        METHODOLOGY_SHEET: methodology_sheet,
     }
     pooled_row_present = bool(rows[POOLED_FLAG].astype(bool).any())
 
@@ -191,6 +187,12 @@ def write_comparison_workbook(
             _style_sheet(writer.sheets[title], frame, bold_last_row=bold_last_row)
         _paint_verdicts(writer.sheets[COMPARISON_SHEET], comparison)
 
+    tables: dict[str, Path] = {}
+    for title, frame in {"excluded": excluded_sheet, "methodology": methodology_sheet}.items():
+        table_path = path.with_name(f"{path.stem}_{title}.csv")
+        frame.to_csv(table_path, index=False)
+        tables[table_path.stem] = table_path
     logger.info(
         "Comparison workbook: {} ({} classes, {} excluded)", path, len(comparison), len(excluded)
     )
+    return tables

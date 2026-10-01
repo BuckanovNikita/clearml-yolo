@@ -14,6 +14,7 @@ from clearml_yolo.clearml_session import (
     init_task,
     upload_artifact,
 )
+from clearml_yolo.filesystem import write_path
 from clearml_yolo.tasks.compare import MANIFEST_NAME, ComparisonManifest
 
 
@@ -93,7 +94,7 @@ def build_reports(
             raise FileNotFoundError(f"Comparison {description} does not exist: {path}")
 
     task = init_task(clearml, stage="report")
-    destination = Path(output_dir)
+    destination = write_path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
     manifest_path = Path(comparison_manifest) if comparison_manifest is not None else None
     expected = [

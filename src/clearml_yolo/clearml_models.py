@@ -19,6 +19,7 @@ import pandas as pd
 from loguru import logger
 
 from clearml_yolo.artifact_names import BEST_CONFIDENCES_PREFIX, per_split
+from clearml_yolo.filesystem import model_weights_path
 
 # ClearML ids are 32 lowercase hex characters. Recognising them by shape is what lets
 # `weights=` accept either a checkpoint on disk or a task, without a second config key
@@ -161,17 +162,18 @@ def resolve_task_weights(task_id: str) -> Path:
     return path
 
 
-def resolve_weights(weights: str | Path) -> Path:
+def resolve_weights(weights: str | Path) -> str | Path:
     """Accept either a checkpoint on disk or a ClearML task id, and return a real file."""
+    if isinstance(weights, str) and "://" in weights:
+        return weights
     candidate = Path(weights)
     if candidate.exists():
         return candidate
     text = str(weights)
     if looks_like_task_id(text):
         return resolve_task_weights(text)
-    # Bare model names such as "yolo11n.pt" are downloaded by ultralytics itself, so a
-    # missing file is not necessarily an error here.
-    return candidate
+    # Native downloads use the workspace, while existing and explicit file paths stay intact.
+    return model_weights_path(weights)
 
 
 def _as_threshold_mapping(payload: Any) -> dict[str, float]:

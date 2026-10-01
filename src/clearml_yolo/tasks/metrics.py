@@ -28,6 +28,7 @@ from clearml_yolo.comparison.scoring import (
     prepare_ground_truth,
     prepare_predictions,
 )
+from clearml_yolo.filesystem import write_path
 from clearml_yolo.progress import track
 from clearml_yolo.publishing import create_publisher
 from clearml_yolo.publishing.models import FiftyOneConfig
@@ -45,12 +46,20 @@ class MetricsResult(BaseModel):
     evaluations: dict[str, Path] = Field(default_factory=dict)
 
 
-def _publish_split(task: Any, split: str, evaluated: EvaluatedSplit, workbook_path: Path) -> None:
+def _publish_split(
+    task: Any,
+    split: str,
+    evaluated: EvaluatedSplit,
+    workbook_path: Path,
+    tables: dict[str, Path],
+) -> None:
     per_class, summary = summarize_metrics(evaluated.metrics)
     if task is not None:
         upload_artifact(
             task, artifact_names.per_split(artifact_names.EVALUATION_PREFIX, split), workbook_path
         )
+        for name, table_path in tables.items():
+            publish_table(task, name, table_path)
     report_table(task, artifact_names.METRICS_SECTION, split, per_class)
     report_scalars(task, f"{artifact_names.METRICS_SECTION}_{split}", summary)
 
@@ -71,8 +80,8 @@ def _write_evaluation_workbook(
     evaluated: EvaluatedSplit,
     *,
     methodology: dict[str, Any],
-) -> None:
-    """Consolidate every readable evaluation surface while retaining local diagnostics."""
+) -> dict[str, Path]:
+    """Write metric tables to Excel and row-level evidence/metadata to CSV."""
     required_diagnostics = [
         evaluated.dashboard_path,
         evaluated.dtrk_dashboard_path,
@@ -99,11 +108,18 @@ def _write_evaluation_workbook(
     with pd.ExcelWriter(path, engine="openpyxl") as writer:
         summary_frame.to_excel(writer, sheet_name="summary", index=False)
         per_class_frame.to_excel(writer, sheet_name="per_class", index=False)
-        evaluated.gt_matches.to_excel(writer, sheet_name="ground_truth_matches", index=False)
-        evaluated.pred_matches.to_excel(writer, sheet_name="prediction_matches", index=False)
         confusion.to_excel(writer, sheet_name="confusion_matrix")
-        thresholds.to_excel(writer, sheet_name="thresholds", index=False)
-        _methodology_frame(methodology).to_excel(writer, sheet_name="methodology", index=False)
+    tables: dict[str, Path] = {}
+    for title, frame in {
+        "ground_truth_matches": evaluated.gt_matches,
+        "prediction_matches": evaluated.pred_matches,
+        "thresholds": thresholds,
+        "methodology": _methodology_frame(methodology),
+    }.items():
+        table_path = path.with_name(f"{path.stem}_{title}.csv")
+        frame.to_csv(table_path, index=False, float_format="%.17g")
+        tables[table_path.stem] = table_path
+    return tables
 
 
 def _prepare(
@@ -183,7 +199,7 @@ def compute_metrics(
         confidence_optimization=evaluation.confidence_optimization,
     )
 
-    destination = Path(output_dir)
+    destination = write_path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
     threshold_path = destination / f"{artifact_names.BEST_CONFIDENCES_VAL}.csv"
     pd.DataFrame(sorted(thresholds.items()), columns=["class_name", "confidence"]).to_csv(
@@ -224,7 +240,7 @@ def compute_metrics(
             evaluated.evaluation_payload.model_dump_json(indent=2), encoding="utf-8"
         )
         workbook_path = destination / f"{artifact_names.EVALUATION_PREFIX}_{split}.xlsx"
-        _write_evaluation_workbook(
+        tables = _write_evaluation_workbook(
             workbook_path,
             evaluated,
             methodology={
@@ -234,7 +250,7 @@ def compute_metrics(
                 "test_calibration": False,
             },
         )
-        _publish_split(task, split, evaluated, workbook_path)
+        _publish_split(task, split, evaluated, workbook_path, tables)
         result.dashboards[split] = evaluated.dashboard_path
         result.best_confidences[split] = dict(evaluated.thresholds)
         result.evaluations[split] = evaluation_path

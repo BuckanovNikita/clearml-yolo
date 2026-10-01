@@ -312,7 +312,7 @@ def test_remote_clone_does_not_replay_previous_owner_output_route(
     monkeypatch.setattr(common, "invocation", lambda *_args, **_kwargs: nullcontext(task))
     monkeypatch.setattr(common, "replay_configuration", lambda _task, values: values)
     monkeypatch.setattr(training, "init_task", lambda *_args, **_kwargs: task)
-    monkeypatch.setattr(training, "RUNS_ROOT", tmp_path / "runs")
+    monkeypatch.setenv("CY_HOME", str(tmp_path))
     monkeypatch.setattr(training, "_execute_training", execute_training)
     common.launch(stage, command)
 

@@ -18,7 +18,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
-from tempfile import NamedTemporaryFile, TemporaryDirectory
+from tempfile import TemporaryDirectory
 from typing import Any, Self
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -28,6 +28,8 @@ from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
 from ruamel.yaml.error import YAMLError
 from ruamel.yaml.tokens import CommentToken
+
+from clearml_yolo.filesystem import temporary_root
 
 OWNER_PID_ENV = "CY_CLEARML_OWNER_PID"
 OWNER_TASK_ENV = "CY_CLEARML_OWNER_TASK_ID"
@@ -115,21 +117,15 @@ class _InvocationState:
 
     def config_path(self, suffix: str) -> Path:
         if self.config_directory is None:
-            self.config_directory = TemporaryDirectory(prefix="clearml-yolo-config-")
+            self.config_directory = TemporaryDirectory(
+                prefix="clearml-yolo-config-", dir=temporary_root()
+            )
         path = Path(self.config_directory.name) / f"{self.config_file_count:04d}{suffix}"
         self.config_file_count += 1
         return path
 
     def execution_config_path(self, source: Path) -> Path:
-        # Dataset consumers interpret relative image paths against the YAML parent.
-        # Keep the owned execution copy beside its source rather than moving that base.
-        with NamedTemporaryFile(
-            prefix=f".{source.stem}-resolved-",
-            suffix=source.suffix,
-            dir=source.parent,
-            delete=False,
-        ) as stream:
-            path = Path(stream.name)
+        path = self.config_path(source.suffix)
         self.execution_config_paths.append(path)
         return path
 
@@ -790,7 +786,16 @@ def _prepared_config_file(state: _InvocationState, path: Path) -> tuple[Path, Pa
         execution_path = path
         if resolved != plain:
             execution_path = state.execution_config_path(path)
-            _write_config_document(execution_path, effective, yaml)
+            executable = copy.deepcopy(effective)
+            # Native dataset YAML without a root anchors splits to its YAML parent.
+            # Moving the owned copy must not redirect those inputs into our temp directory.
+            if (
+                isinstance(executable, dict)
+                and "train" in executable and "val" in executable
+                and not executable.get("path")
+            ):
+                executable["path"] = str(path.resolve().parent)
+            _write_config_document(execution_path, executable, yaml)
         sanitized_path = state.config_path(suffix)
         sanitized = _sanitize_yaml_configuration(
             copy.deepcopy(effective), _configuration_secrets(resolved) | provenance_secrets

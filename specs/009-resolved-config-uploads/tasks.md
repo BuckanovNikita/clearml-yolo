@@ -68,6 +68,13 @@ Initial implementation ran before this assessment. Independent review identified
 - [x] T021 [US1] Normalize and strictly validate tuple resolver outputs and reject resolver-emitted active interpolation; add nested sequence/error regressions in src/clearml_yolo/apps/config_resolution.py and tests/test_config_resolution.py (resolver agent; FR-001, FR-006, FR-010).
 - [x] T022 [US2] Preserve relative-path semantics by placing unique resolved execution copies beside the source and cleaning only owned files; test lifecycle cleanup in src/clearml_yolo/clearml_session.py and tests/test_clearml_session.py (attachment agent; FR-005, FR-009).
 
+> **Supersession note (2026-10-01):** T022 records the completed design at that time. The current
+> filesystem contract moves owned execution copies to `CY_HOME/.tmp`; rootless native dataset YAML
+> receives its source parent only in the execution copy so relative paths remain valid. See
+> [filesystem ownership](../../docs/filesystem-policy.md) and
+> [feature 011](../011-workspace-filesystem/spec.md). The historical completion marker remains
+> unchanged.
+
 T019–T022 precede final T014–T018 acceptance. Resolver and attachment writers retain exclusive ownership; root coordinates the shared frozen-result interface and reruns integration/live checks.
 
 ## Phase 7: Convergence

@@ -4,9 +4,15 @@
 
 Use the initialized submodules and current uv environment. Read the global clearml-yolo-environment skill and project running-end-to-end-tests skill before a real shared-stand run. Obtain changing endpoints, credentials and capacity from maintained environment sources; never put them here.
 
+Set `CY_HOME` to a task-owned workspace and configure cold-launch runner/bytecode caches as
+described by the [filesystem ownership contract](../../docs/filesystem-policy.md). During tests,
+inspect `CY_HOME/.tmp` and verify resolved execution copies are cleaned on success and failure.
+
 ## Automated validation
 
 Run resolver tests and ClearML session tests, including nested local/context references, strict resolver failures, null/type preservation, file root precedence, original-field projection, unchanged comments/source bytes, credential-bearing environment references and initial/replayed attachment copies. Integration tests must inspect the actual path passed to the fake publication boundary and prove the effective context is read after routing/replay changes.
+For rootless native dataset YAML, verify the execution copy anchors relative splits to the source
+parent while the sanitized Configuration Object retains its original fields.
 
 Run `uv run pytest`, `uv run ruff check .`, `uv run mypy .`, and `uv run lint-imports`; complete applicable pre-commit checks before committing. These commands prove the mocked contract and repository gates, not real uploads.
 

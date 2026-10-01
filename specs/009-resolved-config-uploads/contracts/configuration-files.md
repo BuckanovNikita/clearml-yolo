@@ -24,7 +24,9 @@ The shared CLI uses `resolve_config_file` with a closure over current composed c
   environment variables; never attach unresolved active content.
 - Registered resolvers receive unmodified resolved arguments; escaped literals/direct aliases preserve meaning. Tuple outputs are recursively normalized/validated; unsupported set/object outputs and resolver-emitted active interpolation are rejected. Mixed escaped literals and active references, including embedded aliases, preserve their respective semantics. Computed node targets such as `${${key}}` are rejected confidentially because credential provenance cannot be established safely; nested resolver arguments such as `${oc.env:${variable}}` remain supported.
 - Sensitive command-context and environment reference values retain redaction provenance when aliases use innocuous keys. Provenance records the exact value consumed without reevaluating noncached custom resolvers.
-- Resolved execution copies live beside their source for relative-path semantics and are uniquely named, tracked and cleaned up.
+- Resolved execution copies live under `CY_HOME/.tmp`, are uniquely named and cleaned up.
+  Native dataset YAML without an explicit root records its original parent as the execution
+  root; sanitized publication preserves original fields. See [filesystem ownership](../../../docs/filesystem-policy.md).
 - Retain existing Configuration Object identifiers, single-task ownership and verified
   completion guarantees. Do not publish configuration files as artifacts.
 

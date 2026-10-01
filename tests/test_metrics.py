@@ -91,6 +91,68 @@ def test_candidate_threshold_is_calibrated_on_val_and_reused_for_test(
         assert (tmp_path / "metrics" / f"matrix_{split}.xlsx").is_file()
 
 
+def test_match_tables_preserve_excel_illegal_characters_in_csv(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    predictions, ground_truth = _write_inputs(tmp_path)
+    frame = pd.read_csv(predictions)
+    frame["diagnostic"] = "detail\x01with control character"
+    frame.to_csv(predictions, index=False)
+    monkeypatch.setattr("clearml_yolo.tasks.metrics.init_task", lambda *_args, **_kwargs: None)
+
+    result = compute_metrics(
+        predictions,
+        ground_truth,
+        tmp_path / "metrics",
+        clearml=object(),  # type: ignore[arg-type]
+        evaluation=EvaluationConfig(),
+        splits=["test"],
+        fiftyone=FiftyOneConfig(enabled=False),
+    )
+
+    matches = pd.read_csv(result.output_dir / "metrics_evaluation_test_prediction_matches.csv")
+    assert list(matches["diagnostic"]) == ["detail\x01with control character"] * 4
+    assert list(matches["predict_type"]) == ["filtered"] * 4
+
+
+def test_match_table_larger_than_an_excel_sheet_is_saved_as_csv(tmp_path: Path) -> None:
+    from dataclasses import replace
+
+    from clearml_yolo.comparison.scoring import evaluate_split
+    from clearml_yolo.tasks.metrics import _write_evaluation_workbook
+
+    predictions_path, truth_path = _write_inputs(tmp_path)
+    truth, raw, predictions, classes = _prepare(
+        pd.read_csv(predictions_path), pd.read_csv(truth_path), EvaluationConfig()
+    )
+    evaluated = evaluate_split(
+        truth,
+        raw,
+        predictions,
+        split="test",
+        classes=classes,
+        thresholds={"cat": 0.8},
+        required_classes=classes,
+        iou_threshold=0.5,
+        matching_strategy="iou_prior",
+        ap_method="interp",
+        skip_cohen_kappa=True,
+        output_dir=tmp_path,
+        suffix="test",
+    )
+    rows = 1_048_577
+    evaluated = replace(evaluated, pred_matches=pd.DataFrame({"pred_index": pd.RangeIndex(rows)}))
+    workbook = tmp_path / "metrics_evaluation_test.xlsx"
+
+    tables = _write_evaluation_workbook(workbook, evaluated, methodology={})
+
+    matches = pd.read_csv(tables["metrics_evaluation_test_prediction_matches"])
+    assert len(matches) == rows
+    assert matches.iloc[0].to_dict() == {"pred_index": 0}
+    assert matches.iloc[-1].to_dict() == {"pred_index": rows - 1}
+    assert set(pd.ExcelFile(workbook).sheet_names) == {"summary", "per_class", "confusion_matrix"}
+
+
 def test_test_only_evaluation_still_requires_validation_membership(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -353,6 +415,11 @@ def _assert_readable_metrics_evidence(
         "metrics_evaluation_train",
         "metrics_evaluation_val",
         "metrics_evaluation_test",
+        *{
+            f"metrics_evaluation_{split}_{table}"
+            for split in ("train", "val", "test")
+            for table in ("ground_truth_matches", "prediction_matches", "thresholds", "methodology")
+        },
     }
     thresholds = uploads["metrics_best_confidences_val"]
     assert isinstance(thresholds, Path)
@@ -369,12 +436,16 @@ def _assert_readable_metrics_evidence(
         assert set(pd.ExcelFile(workbook).sheet_names) == {
             "summary",
             "per_class",
-            "ground_truth_matches",
-            "prediction_matches",
             "confusion_matrix",
-            "thresholds",
-            "methodology",
         }
+        for table in ("ground_truth_matches", "prediction_matches", "thresholds", "methodology"):
+            csv = uploads[f"metrics_evaluation_{split}_{table}"]
+            assert csv.suffix == ".csv"
+            assert pd.read_csv(csv).columns.size > 0
+        matches = pd.read_csv(uploads[f"metrics_evaluation_{split}_prediction_matches"])
+        assert matches.empty == zero_predictions
+        if not zero_predictions:
+            assert "predict_type" in matches.columns
         per_class = pd.read_excel(workbook, sheet_name="per_class")
         assert list(per_class["class_name"]) == ["cat"]
         payload = EvaluationPayload.model_validate_json(result.evaluations[split].read_text())
@@ -442,6 +513,10 @@ def test_metrics_publishes_frozen_validation_thresholds_even_without_val_output(
         "predict_predictions",
         "metrics_best_confidences_val",
         "metrics_evaluation_test",
+        "metrics_evaluation_test_ground_truth_matches",
+        "metrics_evaluation_test_prediction_matches",
+        "metrics_evaluation_test_thresholds",
+        "metrics_evaluation_test_methodology",
     }
 
 

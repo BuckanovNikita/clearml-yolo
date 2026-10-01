@@ -704,6 +704,8 @@ def test_compare_dashboards_and_statistics_share_the_same_test_counts(
         "compare_predictions_baseline_test",
         "compare_predictions_candidate_test",
         "compare_workbook_test",
+        "compare_workbook_test_excluded",
+        "compare_workbook_test_methodology",
     }
     assert set(expected) == {"compare_workbook_test"}
 
@@ -973,5 +975,7 @@ def test_automatic_baseline_absence_still_evaluates_candidate(
         "ground_truth",
         "compare_predictions_candidate_test",
         "compare_evaluation_candidate_test",
+        "compare_evaluation_candidate_test_thresholds",
+        "compare_evaluation_candidate_test_methodology",
     }
     assert set(expected) == {"compare_evaluation_candidate_test"}

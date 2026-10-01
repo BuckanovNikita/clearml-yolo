@@ -41,7 +41,9 @@ An experiment reader downloads canonical tables and final workbooks without diag
 **Independent Test**: Compare each command's exact publication inventory with the contract.
 **Acceptance Scenarios**:
 
-1. Given a completed stage, then only its canonical CSVs, exact threshold tables, consolidated evaluation workbooks, comparison workbooks and final reports are downloadable artifacts.
+1. Given a completed stage, then canonical data, row-level evidence and metadata tables are
+   downloadable as CSV, while published tabular XLSX contains metric tables only; locally
+   retained dashboards and final report workbooks keep their established XLSX formats.
 2. Given an actual empty prediction result, then its valid header-bearing CSV is retained.
 3. Given configuration overrides, then one nonempty canonical run configuration and consumed dataset/report configurations support replay; native General owns training arguments.
 
@@ -79,11 +81,20 @@ to test; pipeline comparison uses test.
 - **FR-001**: Cache identity MUST depend only on CSV bytes, format and preparation version; reuse MUST NOT read image contents or mtimes or repeat copying/conversion.
 - **FR-002**: NDJSON training MUST preserve original filenames and extension casing; flat naming remains compatible; label-stem collisions MUST fail.
 - **FR-003**: Cache construction MUST serialize per entry, publish atomically, validate completion and required files/splits, recover interrupted builds, and protect concurrent consumers from native repair/cache writes.
-- **FR-004**: Training and pipeline commands MUST expose a shared dataset cache location with XDG/home defaults; run cleanup MUST NOT delete shared entries; image corrections require explicit invalidation.
+- **FR-004**: Training and pipeline commands MUST expose a shared dataset cache location with an
+  explicit XDG cache or `CY_HOME/.cache` default; run cleanup MUST NOT delete shared entries;
+  image corrections require explicit invalidation. Native YAML training MUST stage real image and
+  label copies in the workspace cache before native repair/cache writes touch them.
 - **FR-005**: The invocation owner MUST enable every installed native ClearML callback with one existing task; workers MUST NOT create tasks or publish; runtime settings MUST be restored without changing global settings files.
 - **FR-006**: The same native best Output Model MUST receive accurate available name, task/project, framework, design, labels, tags, description, lineage and checkpoint/version/input metadata; unknown/server-owned fields and production readiness MUST NOT be invented.
 - **FR-007**: Completion MUST verify required artifact and native-model registration/upload/flush; all computation, registration, upload, flush and interruption failures MUST fail task and command while retaining local output.
-- **FR-008**: Downloadable artifacts MUST follow the explicit readable inventory: canonical truth/prediction CSVs, full-precision validation-threshold CSVs, consolidated per-split evaluation/comparison XLSX, and final report workbooks. Diagnostic JSON, raw metrics, manifests, archives, NDJSON, model duplicates, plot files and configuration copies remain local.
+- **FR-008**: Downloadable artifacts MUST follow the explicit readable inventory: canonical
+  truth/prediction CSVs, full-precision validation-threshold CSVs, CSV sidecars for row-level
+  matches, thresholds, exclusions and methodology, tabular XLSX containing only dashboards or
+  metric tables, and final report workbooks. Evaluation XLSX contains summary, per-class and
+  confusion matrix tables; comparison XLSX contains only the comparison table. Diagnostic JSON, raw
+  metrics, manifests, archives, NDJSON, model duplicates, plot files and configuration copies
+  remain local. JSON payloads/configuration and PNG diagnostics retain their formats.
 - **FR-009**: One nonempty run configuration MUST contain wrapper/shared inference/evaluation settings, source links and meaningful requested/effective differences. Native General owns training arguments. Only consumed dataset and explicit report configurations remain separately. Commented YAML remains local and canonical configurations support remote clones.
 - **FR-010**: Comparison MUST explicitly resolve the source best model, read checkpoint
   labels/architecture and exact source validation thresholds, accept exact supplied thresholds,
@@ -99,7 +110,8 @@ to test; pipeline comparison uses test.
 - Prepared dataset: content identity, format/version, completion metadata, split membership, original filenames, reusable files.
 - Invocation: one task owner, requested/effective settings, required publication receipts retained internally.
 - Published model: native best checkpoint, truthful metadata, optional known lineage, source links.
-- Evaluation: result CSVs, exact frozen thresholds, readable consolidated workbook and provenance.
+- Evaluation: result CSVs, exact frozen thresholds, CSV evidence/metadata sidecars, metric-only
+  workbooks and provenance.
 
 ## Success Criteria *(mandatory)*
 
@@ -117,6 +129,9 @@ to test; pipeline comparison uses test.
 - Images are immutable; identical CSV bytes reference the same images, including when the CSV is moved.
 - CSV identity deliberately excludes image hashing and mtime invalidation. Cache invalidation is explicit deletion while no run uses the entry.
 - Shared cache consumers use a filesystem supporting process locks and atomic directory rename.
+- Automatic cache locations follow the maintained
+  [filesystem ownership contract](../../docs/filesystem-policy.md); explicit cache selections
+  remain valid anywhere.
 - Native ClearML and Ultralytics are installed project dependencies; service access is required for real-run acceptance.
 - Historical tasks and unrelated working changes remain untouched. No commits, pushes or issues are requested.
 

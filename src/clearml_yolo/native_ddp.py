@@ -14,6 +14,7 @@ from types import SimpleNamespace, TracebackType
 from typing import Any, Self, cast
 from uuid import uuid4
 
+from clearml_yolo.filesystem import temporary_root
 from clearml_yolo.native_runtime import OWNER_PID_ENV, OWNER_TASK_ENV
 
 _EVENTS = (
@@ -391,7 +392,7 @@ class NativeDDPRelay:
 def native_ddp_relay(task: Any, model: Any) -> Iterator[NativeDDPRelay]:
     """Yield replay storage that callers keep through native model finalization and flush."""
     with (
-        TemporaryDirectory(prefix="cy-native-ddp-") as directory,
+        TemporaryDirectory(prefix="cy-native-ddp-", dir=temporary_root()) as directory,
         NativeDDPRelay(task, model, directory) as relay,
     ):
         yield relay

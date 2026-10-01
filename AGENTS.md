@@ -17,6 +17,16 @@ original failure path after the fix. Report checks and limitations accurately.
 
 ## Verification and collaboration
 
+For every request to complete work, load `astra-advisor:orchestration` and use
+native subagents in parallel with the primary agent. Give each subagent a bounded
+deliverable, explicit file ownership, dependencies, and acceptance evidence. Delegate
+independent investigation, implementation, verification, or review; for a small change,
+delegate a read-only review while the primary agent performs the change. The primary
+agent integrates the results, inspects the combined diff, and owns final verification.
+Bounded subagents do not delegate further. Respect available
+tools, supported model controls, and sequential dependencies; if delegation is
+unavailable, report the limitation and continue the authorized work safely.
+
 Use the repository's documented tooling and current check configuration. For code or
 commit work, select the affected gates from:
 
@@ -48,7 +58,32 @@ Commit only when requested. Stage explicit paths or hunks belonging to the task;
 unrelated staged and unstaged changes. Do not stash, reset, revert, or bypass hooks to make
 a check pass. Use Conventional Commits when committing.
 
-Write README.md in Russian. Write other documentation, skills, and instruction files in
+Before every commit, temporarily remove the entire `[tool.uv.sources]` section
+from `pyproject.toml`, including its comments and the local editable overrides:
+
+```toml
+[tool.uv.sources]
+# Local development uses the pinned submodules. For other environments, replace
+# these with Git sources via `uv add`; see the installation instructions in README.md.
+digital-metrics = { path = "external/digital-metrics", editable = true }
+report-generator = { path = "external/report-generator", editable = true }
+```
+
+Preserve the exact local section before removing it. Stage only the section removal
+and other authorized changes; verify that the staged `pyproject.toml` has no
+`[tool.uv.sources]` section. Preserve unrelated staged and unstaged edits. Run the
+applicable commit checks without bypassing hooks. This temporary removal does not
+authorize dependency resolution, changes to `uv.lock`, or submodule updates.
+
+After the commit command and its hooks finish, restore the saved section locally
+without staging it. Keep the section absent throughout any automatic release commit.
+Restore it on failed or interrupted commit attempts as well; remove it again before
+retrying. Verify that the working copy has the local overrides and that a successful
+commit contains no `[tool.uv.sources]` section.
+
+Write README.md in Russian for users: explain installation, usage, configuration,
+and troubleshooting; keep agent workflow instructions out of it.
+Write other documentation, skills, and instruction files in
 English unless the user or project states otherwise. Keep observed test counts, timings,
 and deployment status in dated evidence rather than evergreen documentation.
 
@@ -117,8 +152,9 @@ Use the shared CSV-addressed dataset cache outside run outputs; source images ar
 Both track upstream `main` through `.gitmodules`; `git submodule update --remote`
 advances their checkouts when an upstream update is requested.
 Initialize them with `git submodule update --init --recursive` before `uv sync`.
-Local development installs them editable through `[tool.uv.sources]`; the parent
-repository's gitlinks pin their revisions. For installations without submodules,
+Local development installs them editable through uncommitted `[tool.uv.sources]`
+overrides, restored after each commit as described above; the parent repository's
+gitlinks pin their revisions. For installations without submodules,
 users can select Git URLs and branches per README.md. Git sources use
 `branch = "main"` (or `master` for a user-selected repository); `uv.lock` records
 the resolved commits.
@@ -156,6 +192,30 @@ Keep installed Spec Kit skills, extension commands, templates and other `.specif
 files unchanged unless the user explicitly requests a change to those files. Put
 project workflow policy in this file or separate project hooks. Project feature
 specifications under `specs/` remain project documentation.
+
+### Automatic workflow routing
+
+Automatically follow the applicable Spec Kit workflow for every user request to
+complete work; explicit skill invocation is unnecessary. Reuse the relevant existing
+feature or bug artifacts and preserve completed history. Keep the workflow proportionate
+to the request while recording intent, tasks, verification, and documentation outcomes.
+
+- For features and other changes, use `speckit-specify`, `speckit-clarify` when material
+  ambiguity remains, `speckit-plan`, `speckit-tasks`, `speckit-analyze`, and
+  `speckit-implement`, followed by appropriate verification and the mandatory
+  documentation stage below. Use `speckit-converge` when assessing remaining work
+  against existing feature artifacts.
+- For bugs, use `speckit-bug-assess`, `speckit-bug-fix`, and `speckit-bug-test`,
+  including the mandatory documentation stage and verification of the original
+  failure path.
+- For planning-only, read-only, or explicitly limited requests, perform only the
+  authorized workflow stages and return the requested result. Follow the active host
+  mode and retain applicable review gates; automatic routing does not authorize
+  implementation, commits, deployment, or changes to installed workflow tooling.
+- Do not ask the user to invoke the next skill when the completion request already
+  authorizes that stage. Continue through the applicable stages and completion gates;
+  ask only for material missing information or a new scope decision. If a required
+  skill is unavailable, report the gap accurately.
 
 ### Mandatory documentation stage
 

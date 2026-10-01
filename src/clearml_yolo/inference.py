@@ -13,6 +13,7 @@ import pandas as pd
 from loguru import logger
 from pydantic import BaseModel
 
+from clearml_yolo.filesystem import model_weights_path, temporary_root
 from clearml_yolo.native_config import execution_settings
 from clearml_yolo.progress import track
 
@@ -197,7 +198,7 @@ def predict_on_images(
 
     from ultralytics.models import YOLO
 
-    model = YOLO(str(weights))
+    model = YOLO(str(model_weights_path(weights)))
     if model.task != "detect":
         raise ValueError(f"Prediction requires a detection model; loaded task={model.task!r}")
     names: dict[int, str] = model.names
@@ -210,7 +211,7 @@ def predict_on_images(
 
     rows: list[dict[str, Any]] = []
     scored: set[str] = set()
-    with TemporaryDirectory(prefix="clearml-yolo-inference-") as temporary:
+    with TemporaryDirectory(prefix="clearml-yolo-inference-", dir=temporary_root()) as temporary:
         workspace = manifest_dir or Path(temporary)
         workspace.mkdir(parents=True, exist_ok=True)
         manifest, by_absolute = _write_manifest(paths, workspace)

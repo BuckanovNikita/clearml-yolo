@@ -4,18 +4,19 @@ import os
 import socket
 from typing import Any
 
-from hydra.conf import HydraConf, JobConf, RunDir
+from hydra.conf import HydraConf, JobConf, RunDir, SweepDir
 from hydra_zen import builds, make_config, store
 from omegaconf import MISSING, OmegaConf
 
 from clearml_yolo.clearml_session import ClearMLConfig
+from clearml_yolo.filesystem import cy_home
 from clearml_yolo.native_config import native_defaults, prediction_defaults, stage_settings
 from clearml_yolo.publishing.models import FiftyOneConfig
 from clearml_yolo.tasks.compare import ModelRef
 from clearml_yolo.tasks.metrics import EvaluationConfig
 
 RUN_STAMP_RESOLVER = "cy_run_token"
-HYDRA_RUN_DIR = "outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}-${cy_run_token:}"
+HYDRA_RUN_DIR = "${cy_home:}/outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}-${cy_run_token:}"
 NATIVE_COMMANDS = frozenset({"train", "predict", "val", "pipeline", "compare"})
 PREDICTION_COMMANDS = NATIVE_COMMANDS
 
@@ -35,7 +36,13 @@ def _token() -> str:
 def register_configs() -> None:
     """Register all eight commands without importing model runtime dependencies."""
     OmegaConf.register_new_resolver(RUN_STAMP_RESOLVER, _token, replace=True)
-    store(HydraConf(job=JobConf(chdir=False), run=RunDir(dir=HYDRA_RUN_DIR)))
+    OmegaConf.register_new_resolver("cy_home", lambda: str(cy_home()), replace=True)
+    store(
+        HydraConf(
+            job=JobConf(chdir=False), run=RunDir(dir=HYDRA_RUN_DIR),
+            sweep=SweepDir(dir="${cy_home:}/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}"),
+        )
+    )
     tracking = builds(ClearMLConfig, populate_full_signature=True)
     publishing = builds(FiftyOneConfig, populate_full_signature=True)
     evaluation = builds(EvaluationConfig, populate_full_signature=True)

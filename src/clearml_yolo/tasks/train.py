@@ -20,9 +20,11 @@ from clearml_yolo.clearml_session import (
 from clearml_yolo.dataset import PreparedDataset, apply_dataset_policy
 from clearml_yolo.dataset_cache import cached_dataset, dataset_cache_root
 from clearml_yolo.dataset_export import DatasetFormat
+from clearml_yolo.filesystem import model_weights_path, runs_root, write_path
 from clearml_yolo.native_config import execution_settings, stage_settings, write_native_yaml
+from clearml_yolo.native_dataset import native_dataset
 from clearml_yolo.native_ddp import native_ddp_relay
-from clearml_yolo.run_identity import RUNS_ROOT, point_latest_at, safe_path_component, task_run_dir
+from clearml_yolo.run_identity import point_latest_at, safe_path_component, task_run_dir
 
 TRAIN_DIR = "detect"
 
@@ -37,10 +39,10 @@ class TrainResult(BaseModel):
 
 def _project_of_this_run(project: str | None, task: Any) -> Path:
     if project is not None:
-        return Path(project).resolve()
-    directory = task_run_dir(RUNS_ROOT, *task_identity(task))
+        return write_path(project).resolve()
+    directory = task_run_dir(runs_root(), *task_identity(task))
     directory.mkdir(parents=True, exist_ok=True)
-    point_latest_at(RUNS_ROOT, directory)
+    point_latest_at(runs_root(), directory)
     return directory / TRAIN_DIR
 
 
@@ -79,7 +81,7 @@ def _execute_training(
 ) -> TrainResult:
     from ultralytics.models import YOLO
 
-    model = YOLO(architecture)
+    model = YOLO(model_weights_path(architecture))
     if model.task != "detect":
         raise ValueError(f"Training requires a detection model; loaded task={model.task!r}")
     requested = settings | {"model": str(architecture)}
@@ -88,8 +90,19 @@ def _execute_training(
         requested,
         "train",
     )
-    with native_ddp_relay(task, model) as relay:
-        model.train(**settings)
+    data = settings.get("data")
+    preparation = (
+        native_dataset(
+            data, fraction=settings.get("fraction", 1.0), split=settings.get("split", "val")
+        )
+        if prepared is None and isinstance(data, (str, Path))
+        else nullcontext(data)
+    )
+    with preparation as owned_data, native_ddp_relay(task, model) as relay:
+        effective_settings = (
+            settings | {"data": str(owned_data)} if owned_data is not None else settings
+        )
+        model.train(**effective_settings)
         trainer: Any = model.trainer
         relay.replay(trainer)
         directory = Path(trainer.save_dir)
@@ -134,6 +147,7 @@ def train(
     settings["mode"] = "train"
     settings["project"] = str(_project_of_this_run(settings.get("project"), task))
     settings["name"] = settings.get("name") or safe_path_component(task_identity(task)[1])
+    write_path(Path(settings["project"]) / str(settings["name"]))
     if ground_truth is None:
         data = settings.get("data")
         if isinstance(data, (str, Path)) and (Path(data).is_file() or not task.running_locally()):

@@ -13,6 +13,8 @@ from urllib.parse import quote
 
 from loguru import logger
 
+from clearml_yolo.filesystem import write_path
+
 # The symlink beside the run directories that always names the newest of them, so the
 # documented habits stay one directory away: ``ls runs/latest/metrics``.
 LATEST_LINK_NAME = "latest"
@@ -80,7 +82,7 @@ def resolve_run_dir(root: Path, run_id: str, explicit: Path | None) -> Path:
     a stage would mean one thing when it was composed and another when it was used.
     """
     chosen = explicit if explicit is not None else root / run_id
-    return chosen.expanduser().resolve()
+    return write_path(chosen).resolve()
 
 
 def point_latest_at(root: Path, run_dir: Path) -> None:

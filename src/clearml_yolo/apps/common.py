@@ -16,9 +16,10 @@ from clearml_yolo.clearml_session import (
     replay_configuration,
     task_identity,
 )
+from clearml_yolo.filesystem import runs_root, write_path
 from clearml_yolo.native_config import stage_settings
 from clearml_yolo.native_runtime import native_runtime
-from clearml_yolo.run_identity import RUNS_ROOT, task_run_dir
+from clearml_yolo.run_identity import task_run_dir
 
 
 def validate_wrapper_keys(config: DictConfig, function: Callable[..., Any]) -> None:
@@ -47,6 +48,10 @@ def launch(name: str, function: Callable[..., Any]) -> None:
 
     @hydra.main(config_name=name, config_path=None, version_base="1.3")
     def execute(config: DictConfig) -> None:
+        from hydra.core.hydra_config import HydraConfig
+
+        if HydraConfig.initialized():
+            write_path(HydraConfig.get().runtime.output_dir)
         validate_wrapper_keys(config, function)
         resolved = OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
         # Initialize native imports before ClearML starts background package detection;
@@ -86,10 +91,10 @@ def launch(name: str, function: Callable[..., Any]) -> None:
             # Derive paths only after the owner exists; remote task names may differ.
             with open_dict(config):
                 if "output_dir" in config and config.output_dir is None:
-                    config.output_dir = str(task_run_dir(RUNS_ROOT, *task_identity(task)) / name)
+                    config.output_dir = str(task_run_dir(runs_root(), *task_identity(task)) / name)
                 if "output" in config and config.output is None:
                     config.output = str(
-                        task_run_dir(RUNS_ROOT, *task_identity(task)) / f"{name}.csv"
+                        task_run_dir(runs_root(), *task_identity(task)) / f"{name}.csv"
                     )
             zen(function)(config)
 

@@ -30,8 +30,11 @@ Source configurations and resolved configuration are captured before execution.
 `run_dir` routes the whole pipeline. Native project/name that disagree with the chosen
 pipeline training directory fail. Standalone training honors explicit native project/name;
 otherwise it creates an isolated run rooted at
-`runs/<safe-project>/<safe-task>-<task-id>/` using the active ClearML identity. Standalone output-producing commands default to a
-fresh directory and require explicit input paths; no silently shared output directories.
+`$CY_HOME/runs/<safe-project>/<safe-task>-<task-id>/` using the active ClearML identity.
+Standalone output-producing commands default to a fresh directory and require explicit input
+paths; no silently shared output directories. See the maintained
+[filesystem ownership contract](../../../docs/filesystem-policy.md) for automatic and explicit
+destination rules.
 `cy-val` accepts weights, ground_truth, ultralytics, ultralytics_predict, evaluation, splits and output_dir;
 it predicts required val plus requested splits and evaluates at frozen validation thresholds.
 `cy`, `cy-val`, and `cy-metrics` default to train/val/test, with explicit subsets preserved.
@@ -54,7 +57,7 @@ The pipeline forwards the full `metrics.evaluation` configuration to comparison.
 Removed auto_gpu, force-gpu, augmentation JSON and clearml.enabled options
 must fail rather than be silently ignored. No public disabled-tracking mode.
 
-`cy` and `cy-train` accept `dataset_cache_dir=null` (XDG cache/home default) or an explicit
-shared directory outside run outputs. CSV SHA-256, format and preparation version identify
+`cy` and `cy-train` accept `dataset_cache_dir=null` (explicit XDG cache or `CY_HOME` default) or an
+explicit shared directory outside run outputs. CSV SHA-256, format and preparation version identify
 entries. NDJSON preserves original filename casing; flat names remain numbered. Images are
 immutable and corrections require explicit cache invalidation while not in use.

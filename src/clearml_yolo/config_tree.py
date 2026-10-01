@@ -9,6 +9,7 @@ from loguru import logger
 from omegaconf import OmegaConf
 
 from clearml_yolo.configs import NATIVE_COMMANDS, PREDICTION_COMMANDS
+from clearml_yolo.filesystem import write_path
 from clearml_yolo.native_config import native_defaults, prediction_defaults, render_native_yaml
 
 COMMAND_OF_CONFIG = {
@@ -42,7 +43,7 @@ def _header(config_name: str, command: str, directory: Path) -> str:
             [
                 "# CSV training: ground_truth=truth.csv dataset_format=ndjson (or flat).",
                 "# Image paths inside the CSV resolve relative to the CSV directory.",
-                "# dataset_cache_dir=null uses XDG_CACHE_HOME or ~/.cache/clearml-yolo/datasets.",
+                "# Cache default: XDG_CACHE_HOME or CY_HOME/.cache, then clearml-yolo/datasets.",
                 "# Cached images are immutable; invalidate explicitly after source corrections.",
                 "# Invalid boxes are dropped and their total is reported before training.",
                 "# CSV data overrides native data, class filters, and dataset fractions.",
@@ -84,7 +85,7 @@ def _check_destinations(paths: list[Path], *, overwrite: bool) -> None:
 
 def dump_config_tree(directory: str | Path, *, overwrite: bool = False) -> list[Path]:
     """Write one example per pipeline/stage command, preserving existing files by default."""
-    target = Path(directory).expanduser()
+    target = write_path(directory)
     paths = [target / f"{command}.yaml" for command in COMMAND_OF_CONFIG.values()]
     paths.extend(target / name / "default.yaml" for name in ("ultralytics", "ultralytics_predict"))
     _check_destinations(paths, overwrite=overwrite)
