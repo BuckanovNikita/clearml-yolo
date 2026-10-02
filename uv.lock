@@ -750,8 +750,10 @@ provides-extras = ["ultralytics", "torchmetrics", "clearml"]
 dev = [
     { name = "mypy", specifier = ">=2.1.0" },
     { name = "pandas-stubs", specifier = ">=3.0.3.260530" },
+    { name = "pre-commit", specifier = ">=4.3,<5" },
     { name = "pytest", specifier = ">=9.0.3" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
+    { name = "python-semantic-release", specifier = ">=10.5,<11" },
     { name = "ruff", specifier = ">=0.15.16" },
 ]
 

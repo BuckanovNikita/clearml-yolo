@@ -85,8 +85,11 @@ Objects, plus native `General`, provide remote replay. See the
 
 Active interpolations in consumed YAML/JSON resolve before execution and publication;
 source bytes remain intact. Executable copies and sanitized remote copies are separate.
-Credentials never enter published configuration; native console output and full failure
-details remain local. See the [resolution contract](../specs/009-resolved-config-uploads/contracts/configuration-files.md).
+Credentials never enter published configuration. During the task lifetime, ClearML receives
+normal stdout and stderr without sanitization, including native YOLO output; avoid printing
+credentials. Output after task closure and streams from DDP subprocesses are not guaranteed
+to appear in the task Console. See the
+[resolution contract](../specs/009-resolved-config-uploads/contracts/configuration-files.md).
 
 ## Environment guidance
 

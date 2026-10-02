@@ -3,6 +3,7 @@
 import json
 import os
 import signal
+import subprocess
 import sys
 import types
 from collections.abc import Callable
@@ -162,7 +163,7 @@ def test_invocation_owns_one_task_and_nested_stages_reuse_it(
 
     assert len(task_type.init_calls) == 1
     assert task_type.init_calls[0]["reuse_last_task_id"] is False
-    assert task_type.init_calls[0]["auto_connect_streams"] is False
+    assert task_type.init_calls[0]["auto_connect_streams"] is True
     integrations = task_type.init_calls[0]["auto_connect_frameworks"]
     assert integrations["detect_repository"] is False
     assert integrations["pytorch"] is False
@@ -185,6 +186,57 @@ def test_invocation_owns_one_task_and_nested_stages_reuse_it(
             "ignore_remote_overrides": True,
         },
     ]
+
+
+def test_console_streams_reach_offline_sdk_without_duplicates(tmp_path: Path) -> None:
+    code = """
+import json
+import sys
+from pathlib import Path
+
+from loguru import logger
+from clearml_yolo.clearml_session import ClearMLConfig, invocation
+
+try:
+    with invocation(ClearMLConfig(project_name='console-regression'), 'predict') as task:
+        folder = Path(task.get_offline_mode_folder())
+        print('console-stdout-marker')
+        print('console-stderr-marker', file=sys.stderr)
+        logger.info('console-loguru-marker')
+        raise RuntimeError('controlled offline failure')
+except RuntimeError as error:
+    assert str(error) == 'controlled offline failure', error
+
+events = [
+    event
+    for line in (folder / 'log.jsonl').read_text().splitlines()
+    for event in json.loads(line)
+]
+for marker in ('console-stdout-marker', 'console-stderr-marker', 'console-loguru-marker'):
+    assert sum(marker in event['msg'] for event in events) == 1, (marker, events)
+"""
+    environment = dict(os.environ)
+    environment.update(
+        CLEARML_OFFLINE_MODE="1",
+        CLEARML_CACHE_DIR=str(tmp_path / "clearml"),
+        CY_HOME=str(tmp_path),
+    )
+    environment.pop("LOCAL_RANK", None)
+    environment.pop("CY_CLEARML_OWNER_PID", None)
+    environment.pop("CY_CLEARML_OWNER_TASK_ID", None)
+    result = subprocess.run(  # noqa: S603 - fixed interpreter and test-owned source
+        [sys.executable, "-c", code],
+        cwd=tmp_path,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.stdout.count("console-stdout-marker") == 1
+    assert result.stderr.count("console-stderr-marker") == 1
+    assert result.stderr.count("console-loguru-marker") == 1
 
 
 def test_expected_artifact_must_be_uploaded_before_completion(

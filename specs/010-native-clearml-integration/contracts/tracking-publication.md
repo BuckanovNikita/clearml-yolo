@@ -8,10 +8,23 @@ All existing commands/options remain unchanged. Each execution invocation owns o
 
 Owner dispatches native completed epoch observations while DDP is running. Events dispatch once in journal order under the owner invocation context. Partial records wait; malformed or incomplete final journals fail. Final on_train_end executes only after full drain and completeness validation. Existing relay context-manager/replay interfaces remain compatible.
 
+## Console publication
+
+The invocation-owned task enables ClearML stdout/stderr stream capture. Normal terminal
+output emitted while that task is active, including native YOLO output, is forwarded to the
+task Console. Argument-parser and framework auto-capture remain disabled. Nested stages reuse
+the owner task, and workers do not create tasks or independently publish console streams.
+
+Configuration Objects and General parameters retain credential sanitization. Console
+stdout/stderr is raw and is not passed through that sanitizer, so callers must not print
+credentials. This contract does not backfill historical tasks, cover output emitted after
+the task closes, or guarantee forwarding from DDP subprocess streams.
+
 ## Publication inventory
 
 | Destination | Permitted contents |
 |---|---|
+| Console | Raw stdout and stderr captured during the invocation-owned task lifetime, including native YOLO output. |
 | Scalars / Plots / Debug Samples | Installed native training/validation telemetry and project performance visualization. |
 | Output Model | One native best checkpoint, verified before successful completion. |
 | Artifacts | Canonical ground truth, prediction, frozen validation-threshold CSVs; evaluation/comparison workbooks; final performance reports. |

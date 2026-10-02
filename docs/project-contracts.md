@@ -50,9 +50,15 @@ missing automatic baseline skips comparison, while invalid explicit references f
 
 ClearML is required for execution commands. One execution invocation owns exactly one task;
 nested stages reuse it and workers do not create tasks or upload artifacts.
+The invocation-owned task forwards normal stdout and stderr to its ClearML Console while it
+is active, including native YOLO output. Console streams are raw; credential sanitization
+applies to published configuration. Argument-parser and framework auto-capture remain
+disabled, and forwarding does not cover output after task closure or guarantee capture of
+DDP subprocess streams.
 Complete a task only after all required artifacts and the native best Output Model
 are uploaded, verified and flushed. Fail task and command on computation, upload, flush, or interruption
-errors while retaining local output. Never capture credentials. Native owner-only training/validation image previews are permitted.
+errors while retaining local output. Keep credentials out of published configuration and
+failure status. Native owner-only training/validation image previews are permitted.
 FiftyOne visualization is optional: setup and publication errors warn and cannot fail
 otherwise successful computation or the ClearML task. Required artifacts/model uploads
 and flush verification retain their failure behavior.

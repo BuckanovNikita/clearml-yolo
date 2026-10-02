@@ -343,9 +343,9 @@ def invocation(
         output_uri=config.output_uri,
         reuse_last_task_id=False,
         auto_connect_arg_parser=False,
-        # Native console output may include unredacted URLs/arguments. Keep it local;
-        # the wrapper publishes sanitized configuration and explicit metrics instead.
-        auto_connect_streams=False,
+        # Capture both streams: native output and Loguru's default stderr sink
+        # belong to the same invocation-owned ClearML console.
+        auto_connect_streams=True,
         # Repository auto-detection uploads arbitrary checkout diffs outside our
         # sanitized provenance contract. Disable it along with framework captures.
         auto_connect_frameworks=dict.fromkeys(
