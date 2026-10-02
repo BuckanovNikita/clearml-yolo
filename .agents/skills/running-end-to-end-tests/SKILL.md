@@ -28,8 +28,10 @@ this branch.
 1. Run the repository's pytest, Ruff, mypy and import-linter checks. Include applicable
    pre-commit hooks for release or commit work.
 2. Configure an isolated ClearML project and output directory. Pass project name and
-   tags explicitly. Set `CY_HOME` to the task-owned invocation workspace and configure the
-   runner's cache/temp/initial-bytecode settings per the filesystem contract. Keep credentials
+   tags explicitly. Set `CY_HOME` to the task-owned invocation workspace for project data and
+   owned temporary files per the filesystem contract. General runner/library caches and
+   interpreter temporary/bytecode settings retain their defaults unless explicitly selected.
+   Keep credentials
    out of files and logs; native callback image previews are permitted.
 3. Build ground truth from a small YOLO dataset with disjoint validation/test images,
    including an empty image in each split. Exercise the top-level `ultralytics` and

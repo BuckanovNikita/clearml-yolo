@@ -2,7 +2,6 @@
 
 import hashlib
 import json
-import os
 import shutil
 from collections import Counter
 from collections.abc import Iterator
@@ -38,9 +37,7 @@ def dataset_cache_root(cache_dir: str | Path | None) -> Path:
     """Resolve the shared cache location before validating output ownership."""
     if cache_dir is not None:
         return write_path(cache_dir).resolve()
-    xdg_cache = os.environ.get("XDG_CACHE_HOME")
-    base = Path(xdg_cache).expanduser() if xdg_cache else cy_home() / ".cache"
-    return write_path(base / "clearml-yolo" / "datasets").resolve()
+    return write_path(cy_home() / ".cache" / "clearml-yolo" / "datasets").resolve()
 
 
 def _identity(csv_sha256: str, dataset_format: DatasetFormat) -> str:

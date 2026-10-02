@@ -406,7 +406,7 @@ def test_missing_requested_split_fails_without_complete_entry(tmp_path: Path) ->
     assert not any(path.is_dir() and not path.name.startswith(".") for path in cache_dir.iterdir())
 
 
-def test_default_cache_root_uses_xdg_cache_home(
+def test_default_cache_root_uses_workspace_despite_xdg_cache_home(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from clearml_yolo.dataset_cache import cached_dataset
@@ -414,9 +414,13 @@ def test_default_cache_root_uses_xdg_cache_home(
     source = _source(tmp_path / "input")
     xdg = tmp_path / "xdg"
     monkeypatch.setenv("XDG_CACHE_HOME", str(xdg))
+    monkeypatch.setenv("CY_HOME", str(tmp_path / "workspace"))
 
     with cached_dataset(source) as prepared:
-        assert prepared.data.is_relative_to(xdg / "clearml-yolo" / "datasets")
+        assert prepared.data.is_relative_to(
+            tmp_path / "workspace" / ".cache" / "clearml-yolo" / "datasets"
+        )
+    assert not xdg.exists()
 
 
 @pytest.mark.parametrize("corruption", [{"train": "images/missing"}, {"names": {}}])

@@ -4,7 +4,7 @@ Use the project running-end-to-end-tests skill and the installation's environmen
 for credentials, capacity and cleanup. Pass an isolated ClearML project and tags explicitly.
 Provide a small immutable ground_truth.csv containing train/val/test with disjoint images and
 negative images, and a local detection checkpoint. Select a task-owned `CY_HOME`; automatic
-cache, run and temporary paths follow the
+project data, run and owned temporary paths follow the
 [filesystem ownership contract](../../docs/filesystem-policy.md). Caller input variables:
 `CY_HOME`, `TRUTH`, `MODEL`, `PROJECT`, `TAG`. `CACHE` and `RUNS` below make the automatic
 locations visible for inspection.
@@ -12,10 +12,6 @@ locations visible for inspection.
 ```bash
 export CACHE="$CY_HOME/.cache/clearml-yolo/datasets"
 export RUNS="$CY_HOME/runs"
-export UV_CACHE_DIR="$CY_HOME/.cache/uv"
-export PYTHONPYCACHEPREFIX="$CY_HOME/.cache/python"
-export TMPDIR="$CY_HOME/.tmp"
-mkdir -p "$TMPDIR"
 uv sync --locked --dev
 uv run pytest
 uv run ruff check .

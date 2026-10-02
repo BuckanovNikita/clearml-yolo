@@ -556,7 +556,7 @@ def test_cache_cannot_live_inside_pipeline_run(
 ) -> None:
     from clearml_yolo.tasks import pipeline
 
-    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+    monkeypatch.setenv("CY_HOME", str(tmp_path))
     monkeypatch.setattr(pipeline, "init_task", lambda *a, **k: object())
     with pytest.raises(ValueError, match="outside run_dir"):
         pipeline.run_pipeline(

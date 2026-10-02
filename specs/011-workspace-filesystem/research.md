@@ -1,5 +1,11 @@
 # Research: Workspace-owned filesystem defaults
 
+> **Historical research note (2026-10-01):** Decisions 1, 4, 5 and 6 below describe the original
+> broad-routing design that informed the completed implementation and dated checks. The approved
+> boundary was subsequently narrowed by Decision 7. These sections are retained as historical
+> reasoning and must not be read as the current contract where they conflict with Decision 7 or
+> [the maintained filesystem policy](../../docs/filesystem-policy.md).
+
 ## Decision 1: Capture one workspace root at startup
 
 Use `CY_HOME`, defaulting to the launch working directory, as the root for automatic application
@@ -81,3 +87,22 @@ their own settings.
 
 **Rationale**: Application code cannot retroactively redirect an import cache written before that
 code runs. Describing an OS sandbox would overstate the enforceable boundary.
+
+## Decision 7: Limit workspace routing to application-owned storage (current)
+
+Retain workspace defaults for runs and Hydra outputs; CSV/native dataset caches; Ultralytics
+downloaded datasets, weights and settings; ClearML downloads/cache; FiftyOne dataset,
+dataset-zoo and database directories; and application-owned temporary resources. A null
+`dataset_cache_dir` always selects `CY_HOME/.cache/clearml-yolo/datasets` and ignores ambient XDG.
+
+Leave general XDG, Python bytecode, Torch/CUDA/Triton/Numba/Hugging Face/Matplotlib, ETA,
+FiftyOne model-zoo/plugins/config and generic process/tempfile defaults untouched. Preserve all
+explicit destinations, including FiftyOne configuration data paths and ClearML's legacy
+`TRAINS_CACHE_DIR` alias. Continue reading existing home configuration without rewriting it.
+
+**Rationale**: `CY_HOME` is an ownership boundary for this application, not a replacement home or
+a blanket policy for shared libraries. Directly selecting owned paths keeps cleanup and location
+predictable without changing unrelated library behavior in the hosting process.
+
+**Migration decision**: Do not migrate or delete data created under the earlier defaults. The
+corrected defaults apply to subsequent process startup only.

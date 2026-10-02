@@ -57,7 +57,8 @@ The pipeline forwards the full `metrics.evaluation` configuration to comparison.
 Removed auto_gpu, force-gpu, augmentation JSON and clearml.enabled options
 must fail rather than be silently ignored. No public disabled-tracking mode.
 
-`cy` and `cy-train` accept `dataset_cache_dir=null` (explicit XDG cache or `CY_HOME` default) or an
-explicit shared directory outside run outputs. CSV SHA-256, format and preparation version identify
+`cy` and `cy-train` accept `dataset_cache_dir=null`, which selects
+`CY_HOME/.cache/clearml-yolo/datasets` independently of `XDG_CACHE_HOME`, or an explicit shared
+directory outside run outputs. CSV SHA-256, format and preparation version identify
 entries. NDJSON preserves original filename casing; flat names remain numbered. Images are
 immutable and corrections require explicit cache invalidation while not in use.

@@ -4,8 +4,9 @@
 
 Use the initialized submodules and current uv environment. Read the global clearml-yolo-environment skill and project running-end-to-end-tests skill before a real shared-stand run. Obtain changing endpoints, credentials and capacity from maintained environment sources; never put them here.
 
-Set `CY_HOME` to a task-owned workspace and configure cold-launch runner/bytecode caches as
-described by the [filesystem ownership contract](../../docs/filesystem-policy.md). During tests,
+Set `CY_HOME` to a task-owned workspace for project data and owned temporary files as
+described by the [filesystem ownership contract](../../docs/filesystem-policy.md). General
+runner and Python bytecode caches keep their ordinary defaults. During tests,
 inspect `CY_HOME/.tmp` and verify resolved execution copies are cleaned on success and failure.
 
 ## Automated validation

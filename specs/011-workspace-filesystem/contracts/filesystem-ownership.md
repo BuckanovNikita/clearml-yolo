@@ -7,7 +7,8 @@ This feature contract records the compatibility surface used by implementation a
 
 - `CY_HOME` selects the automatic workspace and defaults to the launch working directory.
 - Explicit command paths and supported dependency environment variables retain their values.
-- `dataset_cache_dir=null` uses explicit `XDG_CACHE_HOME` when present, then the workspace cache.
+- `dataset_cache_dir=null` always uses the workspace cache and ignores ambient `XDG_CACHE_HOME`;
+  an explicit `dataset_cache_dir` remains authoritative.
 - Existing or explicitly pathed checkpoints remain inputs. An absent bare `.pt` name uses the
   workspace Ultralytics weight cache.
 - Pipeline prediction preserves the original reference string. Local comparison requires a
@@ -20,12 +21,17 @@ This feature contract records the compatibility surface used by implementation a
 |---|---|
 | Runs and latest shortcut | `$CY_HOME/runs` |
 | Hydra outputs and sweeps | `$CY_HOME/outputs`, `$CY_HOME/multirun` |
-| CSV dataset cache | `$CY_HOME/.cache/clearml-yolo/datasets` unless XDG is explicit |
+| CSV dataset cache | `$CY_HOME/.cache/clearml-yolo/datasets` |
 | Native YAML dataset copies | `$CY_HOME/.cache/clearml-yolo/native-datasets` |
-| Bare checkpoint downloads | `$CY_HOME/.cache/ultralytics/weights` |
-| Supported dependency caches | `$CY_HOME/.cache` |
-| Supported dependency configuration | `$CY_HOME/.config` |
+| Ultralytics downloaded datasets and weights | `$CY_HOME/.cache/ultralytics/datasets`, `$CY_HOME/.cache/ultralytics/weights` |
+| Ultralytics settings | `$CY_HOME/.config/Ultralytics` |
+| ClearML downloads and cache | `$CY_HOME/.cache/clearml` |
+| FiftyOne datasets, dataset zoo and database | `$CY_HOME/.cache/fiftyone` |
 | Owned temporary work | `$CY_HOME/.tmp` |
+
+General XDG, Python bytecode, Torch/CUDA/Triton/Numba/Hugging Face/Matplotlib, ETA,
+FiftyOne model-zoo/plugins/config and generic process/tempfile defaults keep their ordinary
+environment or library behavior. Application-owned temporary helpers select `.tmp` directly.
 
 ## Source and publication invariants
 
@@ -37,10 +43,11 @@ This feature contract records the compatibility surface used by implementation a
 - Sanitized Configuration Objects retain source fields; execution-only path anchoring is local.
 - Adjacent comparison temporary files exist only for same-filesystem atomic replacement and are
   removed on every exit path.
-- Existing user configuration is read-only. `HOME` is unchanged.
+- Existing user configuration is read-only. Explicit FiftyOne data paths and the legacy ClearML
+  `TRAINS_CACHE_DIR` alias remain selected. `HOME` is unchanged.
 
 ## Boundary
 
-The contract governs automatic paths used by clearml-yolo and its supported dependency setup.
-External scripts, plugins, runners and the interpreter's initial package import require their own
-workspace/cache controls.
+The contract governs automatic paths owned by clearml-yolo and the named dependency data stores.
+External scripts, plugins, runners and the interpreter retain their general defaults. Callers
+may configure them explicitly when broader isolation is required.

@@ -180,3 +180,25 @@ ClearML upload success or an operating-system sandbox from mocked tests.
   `verification-2026-10-01.md`; confirm model-reference guidance in `docs/filesystem-policy.md`
   and `contracts/filesystem-ownership.md`, then validate final Markdown and local links
   (depends on T030 and final independent acceptance).
+
+## Phase 13: Workspace boundary correction
+
+The earlier completed tasks and dated verification above describe the implementation at the time
+they ran. They do not establish the corrected boundary below.
+
+- [x] T032 Restrict startup defaults to application-owned storage plus Ultralytics downloaded
+  datasets/weights/settings, ClearML downloads/cache and FiftyOne dataset/dataset-zoo/database
+  directories. Restore ordinary general XDG, compute/library cache/config, Python bytecode,
+  ETA/FiftyOne model/plugin/config and generic process/tempfile behavior; preserve explicit values,
+  FiftyOne configured data paths and the ClearML legacy alias (FR-002, FR-003, FR-005, FR-011).
+- [x] T033 Make `dataset_cache_dir=null` always select
+  `CY_HOME/.cache/clearml-yolo/datasets` independently of XDG and retain explicit values; add or
+  update regression coverage for the corrected selections (FR-013).
+- [x] T034 Reconcile `README.md`, `docs/filesystem-policy.md` and this feature's current intent,
+  design, validation guide and compatibility contract. Annotate superseded research without
+  rewriting prior completion history or dated verification.
+- [x] T035 Run affected tests and project gates, validate changed Markdown/local links after the
+  final code diff, obtain independent review, and record new dated evidence without claiming native
+  GPU execution or remote ClearML upload verification.
+
+Correction evidence: [2026-10-01 workspace cache boundary verification](../../.specify/bugs/workspace-cache-boundary/test.md).

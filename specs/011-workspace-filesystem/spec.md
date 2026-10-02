@@ -13,6 +13,11 @@ a write resolves physically beneath the user's home without rejecting or relocat
 
 > **Workflow note:** This feature was materialized after implementation had begun. The artifacts
 > record the approved behavior and remaining completion gates without rewriting earlier history.
+>
+> **Boundary correction (2026-10-01):** The current intent limits automatic routing to
+> application-owned storage and the named Ultralytics, ClearML and FiftyOne data stores below.
+> Earlier dependency-wide routing statements are superseded by this correction; dated verification
+> remains evidence of what was checked before the correction, not evidence for the corrected code.
 
 ## Clarifications
 
@@ -25,39 +30,43 @@ a write resolves physically beneath the user's home without rejecting or relocat
 - Home detection follows resolved symlink targets. A path lexically below home but resolving
   outside it does not warn; a path elsewhere that resolves into home does warn.
 - Existing ClearML and FiftyOne configuration may be read from home. It is not copied, rewritten
-  or treated as an automatic output. Explicit directory values found in FiftyOne configuration
-  remain authoritative.
+  or treated as an automatic output. Explicit FiftyOne dataset, dataset-zoo and database directory
+  values remain authoritative. The legacy `TRAINS_CACHE_DIR` ClearML alias remains supported.
+- `dataset_cache_dir=null` always uses `CY_HOME/.cache/clearml-yolo/datasets`, even when
+  `XDG_CACHE_HOME` is set. An explicit `dataset_cache_dir` remains authoritative.
+- General XDG, Python bytecode, Torch/CUDA/Triton/Numba/Hugging Face/Matplotlib, ETA,
+  FiftyOne model-zoo/plugins/config and process temporary defaults are outside workspace routing.
+  Application-owned temporary resources still use `CY_HOME/.tmp` explicitly.
 - Native YAML inputs require real image and label copies because Ultralytics may repair images or
   write caches beside them. Copies are reusable and locked through training; source data is
   assumed immutable until the unused cache entry is explicitly invalidated.
 - Temporary comparison files remain beside an explicitly selected output to preserve atomic
   same-filesystem replacement. They are task-owned and cleaned on success and failure.
-- The policy covers supported application and dependency defaults. It is not an operating-system
-  sandbox for arbitrary user scripts or plugins. The first package import may precede application
-  bytecode routing; cold launchers must set `PYTHONPYCACHEPREFIX` or disable bytecode when that
-  initial write must also be workspace-owned.
+- The policy covers application-owned storage and the named dependency data stores. It is not an
+  operating-system sandbox for arbitrary user scripts or plugins. Callers configure bytecode,
+  runner caches and other general dependency state when broader isolation is required.
 
 ## User Scenarios & Testing
 
 ### User Story 1 - Launch in an isolated workspace (Priority: P1)
 
-An operator starts any command in a task directory and finds automatically created runs, caches,
-configuration and temporary files in that workspace.
+An operator starts any command in a task directory and finds automatically created runs and
+application-owned temporary files in that workspace. Named Ultralytics downloads/settings,
+ClearML cache/downloads and FiftyOne dataset/database storage also default there.
 
 **Why this priority**: Automated runs must not silently populate shared user locations or collide
 with another invocation's files.
 
-**Independent Test**: Start representative configuration and native-runtime paths with no related
-environment overrides, audit write events, and verify every automatic destination is under the
-launch directory.
+**Independent Test**: Start representative application and native-runtime paths with no related
+environment overrides, audit selected destinations, and verify every documented workspace default
+is under the launch directory while excluded general defaults remain unchanged.
 
 **Acceptance Scenarios**:
 
 1. **Given** no `CY_HOME`, **When** a command starts, **Then** the launch directory becomes the
    fixed workspace root and defaults remain below it after later directory changes.
 2. **Given** a relative or absolute `CY_HOME`, **When** a command starts, **Then** it resolves once
-   against the launch directory and supplies the automatic run, cache, configuration and temporary
-   roots.
+   against the launch directory and supplies the automatic run and application-owned storage roots.
 3. **Given** a native worker, **When** it inherits the invocation environment, **Then** its native
    dataset, weight, run, DDP and temporary defaults use the same workspace.
 
@@ -80,6 +89,9 @@ including symlinks into and out of home, and inspect the resolved writes and war
    used in a process, **Then** one warning is emitted and the operation continues at that path.
 3. **Given** an existing user configuration used as read-only input, **When** startup initializes
    defaults, **Then** that file remains unchanged and its configured directories remain selected.
+4. **Given** general dependency or process cache/config/temp defaults are absent, **When** startup
+   initializes application storage, **Then** those general defaults remain absent and retain their
+   ordinary library behavior.
 
 ### User Story 3 - Protect source data from native writes (Priority: P1)
 
@@ -131,6 +143,7 @@ inference manifests and atomic replacement, then inspect the selected temporary 
 - Read-only native images and labels produce owner-writable copies without changing source
   permissions; cwd-relative text manifests receive distinct entries when their targets differ.
 - Startup preserves legacy `TRAINS_CACHE_DIR` as an explicit ClearML cache selection.
+- `XDG_CACHE_HOME` does not change the null CSV dataset cache default.
 - Existing cache contents are neither migrated nor deleted when `CY_HOME` changes.
 
 ## Requirements
@@ -140,15 +153,17 @@ inference manifests and atomic replacement, then inspect the selected temporary 
 - **FR-001**: All nine command entrypoints MUST initialize filesystem defaults before importing
   execution dependencies. `CY_HOME` MUST default to the launch working directory, and relative
   values MUST be resolved against that directory once.
-- **FR-002**: Automatic run and Hydra output paths MUST use `CY_HOME`; automatic caches MUST use
-  `CY_HOME/.cache`; automatic dependency configuration MUST use `CY_HOME/.config`; and owned
-  temporary files MUST use `CY_HOME/.tmp`.
+- **FR-002**: Automatic run and Hydra output paths MUST use `CY_HOME`. CSV/native dataset caches,
+  Ultralytics downloaded datasets/weights/settings, ClearML downloads/cache and FiftyOne
+  dataset/dataset-zoo/database storage MUST use their documented locations beneath `CY_HOME` when
+  no explicit selection exists. Owned temporary files MUST use `CY_HOME/.tmp`.
 - **FR-003**: Explicit command destinations, supported dependency environment settings and
   configured native directories MUST remain valid anywhere and MUST NOT be relocated or overridden.
 - **FR-004**: A destination resolving physically beneath the user home MUST warn once per resolved
   destination per process without rejection. Home classification MUST follow existing symlinks.
 - **FR-005**: Startup MUST NOT reassign `HOME`, rewrite existing user configuration or migrate or
-  delete existing caches. Existing ClearML/FiftyOne configuration may remain a read-only input.
+  delete existing caches. Existing ClearML/FiftyOne configuration may remain a read-only input,
+  and explicit FiftyOne data paths plus the ClearML `TRAINS_CACHE_DIR` alias MUST be preserved.
 - **FR-006**: Native YAML training MUST use real cached image and matching-label copies under the
   workspace and MUST hold per-entry ownership through native training writes. Original sources
   MUST remain unchanged.
@@ -163,16 +178,20 @@ inference manifests and atomic replacement, then inspect the selected temporary 
   Only an absent bare `.pt` checkpoint name MUST select the workspace weight cache.
 - **FR-010**: Atomic comparison publication MAY create its temporary file beside the explicit
   output to preserve same-filesystem replacement, and MUST clean that file on every exit path.
-- **FR-011**: The package MUST route bytecode for imports after bootstrap into the workspace when
-  no explicit bytecode setting exists. Documentation MUST state the initial-import limitation and
-  launcher settings needed for a fully workspace-owned cold start.
+- **FR-011**: Startup MUST leave general `XDG_CACHE_HOME`/`XDG_CONFIG_HOME`, Python bytecode,
+  Torch/CUDA/Triton/Numba/Hugging Face/Matplotlib caches/configuration, ETA state, FiftyOne
+  model-zoo/plugins/config paths and generic process/tempfile defaults unchanged. Application-owned
+  temporary helpers MUST select `CY_HOME/.tmp` without changing those generic defaults.
 - **FR-012**: The filesystem policy MUST be documented as supported default routing rather than an
   operating-system sandbox, and must preserve arbitrary explicit destinations.
+- **FR-013**: `dataset_cache_dir=null` MUST select
+  `CY_HOME/.cache/clearml-yolo/datasets` regardless of `XDG_CACHE_HOME`; an explicit value MUST be
+  honored.
 
 ### Key Entities
 
-- **Workspace**: Captured absolute `CY_HOME`, launch directory and automatic run/cache/config/temp
-  roots.
+- **Workspace**: Captured absolute `CY_HOME`, launch directory and application-owned
+  run/cache/Ultralytics-settings/temp roots.
 - **Destination selection**: Automatic default or explicit path plus its physical home-warning
   classification.
 - **Native dataset entry**: Stable source-derived identity, staged YAML, copied images/labels and
@@ -185,8 +204,8 @@ inference manifests and atomic replacement, then inspect the selected temporary 
 
 ### Measurable Outcomes
 
-- **SC-001**: Startup write auditing for representative configuration, native runtime, ClearML,
-  plotting and FiftyOne imports reports zero automatic writes outside the selected workspace.
+- **SC-001**: Startup selection auditing confirms all documented application-owned defaults use
+  the selected workspace while every excluded general dependency/process default stays unchanged.
 - **SC-002**: Every tested explicit output/cache/configuration destination remains unchanged; each
   physical-home target produces exactly one warning and zero rejections or relocations.
 - **SC-003**: Native staging tests produce image and label caches and simulated repairs while

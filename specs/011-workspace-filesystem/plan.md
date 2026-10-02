@@ -8,14 +8,20 @@ explicit destination and protecting native source data.
 > **Materialization note:** Implementation was already substantially underway when this workflow
 > artifact was required. This plan describes the approved final design and remaining acceptance
 > work; it does not claim that unchecked gates have passed.
+>
+> **Correction (2026-10-01):** The original dependency-wide default design was too broad. The
+> current plan retains only application-owned and explicitly named dependency storage under
+> `CY_HOME`; the correction tasks are appended to [tasks.md](tasks.md).
 
 ## Summary
 
 Introduce a filesystem policy module initialized by every entrypoint before execution dependencies.
-Capture `CY_HOME`, set missing dependency cache/configuration/temp defaults, warn on physical-home
-write targets and leave explicit paths intact. Stage native YAML datasets as locked real copies,
-scope Ultralytics directory globals to the workspace, move invocation-owned temporary work into
-`.tmp`, and preserve atomic replacement beside explicit outputs. Document the bootstrap boundary.
+Capture `CY_HOME`, set missing defaults for application-owned storage plus Ultralytics downloads
+and settings, ClearML cache/downloads and FiftyOne datasets/database, warn on physical-home write
+targets and leave explicit paths intact. Keep general dependency and process defaults unchanged.
+Stage native YAML datasets as locked real copies, scope Ultralytics directory globals to the
+workspace, move invocation-owned temporary work into `.tmp`, and preserve atomic replacement
+beside explicit outputs. Document the application storage boundary.
 
 ## Technical Context
 
@@ -42,8 +48,9 @@ hashing of source images beyond the established immutable-source assumption.
 submodules and dependency revisions. Do not claim an OS sandbox or initial interpreter-write
 coverage that application code cannot enforce.
 
-**Scale/Scope**: Startup defaults, run/cache/config/temp routing, native dataset inputs, native
-runtime directories, model download paths, configuration execution copies and atomic comparison
+**Scale/Scope**: Startup defaults for owned run/cache/temp storage and named dependency data,
+native dataset inputs/runtime directories, model download paths, configuration execution copies
+and atomic comparison
 publication.
 
 ## Constitution Check
@@ -73,9 +80,11 @@ surface to the maintained [filesystem policy](../../docs/filesystem-policy.md).
 ### Startup and destination policy
 
 Add a bottom-layer `filesystem.py` with workspace, warning, model-path and temporary-root helpers.
-The package bootstrap selects the bytecode prefix for subsequent imports; each apps package import
-then initializes dependency environment defaults. Hydra run/sweep defaults and application run
-identity use the captured root. Explicit values pass through the warning helper without relocation.
+Startup initializes only the documented application, Ultralytics, ClearML and FiftyOne data
+defaults. Hydra run/sweep defaults and application run identity use the captured root. General
+XDG/cache/config/bytecode/temp defaults retain their standard behavior. Explicit values pass
+through the warning helper without relocation. A null CSV dataset cache ignores ambient XDG and
+uses the application cache; an explicit cache directory remains selected.
 
 ### Native input and runtime isolation
 
@@ -91,7 +100,8 @@ dataset directories before staging.
 ### Temporary and model routing
 
 Route resolved execution configuration copies, inference manifests, DDP relay/runtime state and
-other owned temporary directories through `.tmp`. Preserve rootless native-YAML relative paths by
+other owned temporary directories directly through `.tmp`, without modifying generic tempfile
+defaults. Preserve rootless native-YAML relative paths by
 injecting the source parent into the execution representation only. Keep existing and explicit
 checkpoints unchanged; route only absent bare `.pt` assets to the workspace weight cache.
 

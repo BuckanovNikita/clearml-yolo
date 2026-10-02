@@ -6,6 +6,9 @@ earlier contracts. A contract describes required behavior; inspect implementatio
 tests before claiming verification. Surface an unexplained mismatch
 rather than silently changing the requirement or code.
 
+The [project contract summary](project-contracts.md) provides the cross-cutting command,
+configuration, output, tracking and evaluation rules formerly listed in `AGENTS.md`.
+
 | Topic | Maintained contract | Implementation evidence |
 |---|---|---|
 | Commands and output routing | [CLI](../specs/001-release-030/contracts/cli.md) | [Entrypoints and checks](../pyproject.toml), [output identity](../src/clearml_yolo/run_identity.py), [pipeline](../src/clearml_yolo/tasks/pipeline.py) |
@@ -48,7 +51,7 @@ over current comparison settings.
 ## Maintaining consistency
 
 Spec Kit implementation and bug-fix workflows require a **Documentation update**
-stage before completion. Follow the [project workflow policy](../AGENTS.md#mandatory-documentation-stage)
+stage before completion. Follow the [project workflow policy](agent-workflow.md#mandatory-documentation-stage)
 to plan explicit documentation tasks, reconcile them with the actual changes and
 validate the result. If no documentation changes are needed, record the reviewed scope
 and reason in the workflow artifacts. Missing required updates or failed validation
@@ -73,7 +76,8 @@ required proportionally; adding new tests depends on affected behavior and risk.
 
 Keep installed Spec Kit skills, commands, templates and `.specify/` files unchanged
 unless the user explicitly requests modifying them. Project workflow overrides belong
-in [AGENTS.md](../AGENTS.md) or separate project hooks. Feature specifications in
+in [agent workflow policy](agent-workflow.md), linked from [AGENTS.md](../AGENTS.md),
+or separate project hooks. Feature specifications in
 `specs/` remain maintained project documentation. Upstream regeneration must not erase
 separate project policy or treat historical requirements as current authority.
 

@@ -293,7 +293,7 @@ def test_cache_cannot_live_inside_training_project(
 ) -> None:
     from clearml_yolo.tasks.train import _prepare_csv_dataset
 
-    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+    monkeypatch.setenv("CY_HOME", str(tmp_path))
     monkeypatch.setattr(
         "clearml_yolo.tasks.train.cached_dataset",
         lambda *a, **k: pytest.fail("run-owned cache must be rejected before preparation"),

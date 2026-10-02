@@ -5,11 +5,12 @@ its supported SDK environment variables or user configuration before real execut
 Infrastructure access, resource capacity and cleanup are supplied by the environment,
 not this repository.
 
-Set `CY_HOME` to the invocation workspace (default: launch working directory). Keep runner
-caches and temporary files in that workspace too. Explicit output/cache paths remain valid
-elsewhere; physically home-resident write destinations warn without rejection. Follow the
-[filesystem contract](../../../../docs/filesystem-policy.md), including interpreter bootstrap
-cache settings for cold launches. Preserve source images and existing user configuration.
+Set `CY_HOME` to the invocation workspace (default: launch working directory) for project
+datasets, task outputs and owned temporary files. General runner/library caches and Python
+bytecode retain their normal defaults. Explicit output/cache paths remain valid elsewhere;
+physically home-resident project write destinations warn without rejection. Follow the
+[filesystem contract](../../../../docs/filesystem-policy.md).
+Preserve source images and existing user configuration.
 
 Build the ground-truth CSV before stages that consume it:
 

@@ -2,7 +2,6 @@
 
 import json
 import os
-import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -63,15 +62,10 @@ def temporary_root() -> Path:
     return directory
 
 
-def _fiftyone_inputs(config: Path) -> dict[str, object]:
-    for kind in ("", "APP_", "ANNOTATION_", "EVALUATION_"):
-        name = f"FIFTYONE_{kind}CONFIG_PATH"
-        filename = f"{kind.lower()}config.json"
-        existing = Path.home() / ".fiftyone" / filename
-        default = existing if existing.is_file() else config / "fiftyone" / filename
-        # Existing credentials/configuration stay read-only, never copied or rewritten.
-        os.environ.setdefault(name, str(default))
-    source = Path(os.environ["FIFTYONE_CONFIG_PATH"]).expanduser()
+def _fiftyone_inputs() -> dict[str, object]:
+    # Read explicit data selections without changing the dependency's configuration paths.
+    source = Path(os.environ.get("FIFTYONE_CONFIG_PATH") or
+                  Path.home() / ".fiftyone" / "config.json").expanduser()
     if not source.is_file():
         return {}
     try:
@@ -84,7 +78,7 @@ def _fiftyone_inputs(config: Path) -> dict[str, object]:
 
 
 def initialize_filesystem() -> None:
-    """Set dependency defaults before import, preserving explicit environment settings.
+    """Set project data defaults before import, preserving explicit environment settings.
 
     Settings stay in the process environment so spawned native workers inherit them.
     No home variable is changed and no existing user configuration is rewritten.
@@ -93,28 +87,13 @@ def initialize_filesystem() -> None:
     os.environ["CY_HOME"] = str(root)
     cache = root / ".cache"
     config = root / ".config"
-    fiftyone_inputs = _fiftyone_inputs(config)
+    fiftyone_inputs = _fiftyone_inputs()
     defaults = {
-        "XDG_CACHE_HOME": cache,
-        "XDG_CONFIG_HOME": config,
         "YOLO_CONFIG_DIR": config,
         "CLEARML_CACHE_DIR": cache / "clearml",
-        "MPLCONFIGDIR": config / "matplotlib",
-        "TORCH_HOME": cache / "torch",
-        "TORCH_EXTENSIONS_DIR": cache / "torch-extensions",
-        "TORCHINDUCTOR_CACHE_DIR": cache / "torchinductor",
-        "TRITON_CACHE_DIR": cache / "triton",
-        "CUDA_CACHE_PATH": cache / "cuda",
-        "NUMBA_CACHE_DIR": cache / "numba",
-        "HF_HOME": cache / "huggingface",
-        "PYTHONPYCACHEPREFIX": cache / "python",
         "FIFTYONE_DATABASE_DIR": cache / "fiftyone" / "database",
         "FIFTYONE_DEFAULT_DATASET_DIR": cache / "fiftyone" / "datasets",
         "FIFTYONE_DATASET_ZOO_DIR": cache / "fiftyone" / "datasets",
-        "FIFTYONE_MODEL_ZOO_DIR": cache / "fiftyone" / "models",
-        "FIFTYONE_PLUGINS_DIR": config / "fiftyone" / "plugins",
-        "ETA_CONFIG_DIR": config / "eta",
-        "ETA_OUTPUT_DIR": cache / "eta",
     }
     for name, default in defaults.items():
         # The legacy ClearML alias is also an explicit user selection.
@@ -125,8 +104,3 @@ def initialize_filesystem() -> None:
                 selected = configured
         destination = write_path(os.environ.setdefault(name, str(selected or default)))
         destination.mkdir(parents=True, exist_ok=True)
-    selected_temp = os.environ.get("TMP") or os.environ.get("TEMP") or str(root / ".tmp")
-    destination = write_path(os.environ.setdefault("TMPDIR", selected_temp))
-    destination.mkdir(parents=True, exist_ok=True)
-    # tempfile may already have cached a system directory before CLI startup.
-    tempfile.tempdir = str(destination.resolve())

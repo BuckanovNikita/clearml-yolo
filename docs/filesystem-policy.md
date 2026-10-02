@@ -1,6 +1,7 @@
 # Filesystem ownership
 
-All nine commands initialize filesystem defaults before importing execution dependencies.
+All nine commands initialize application-owned filesystem defaults before importing execution
+dependencies.
 `CY_HOME` defaults to the launch working directory. An absolute value selects another
 workspace; a relative value is resolved against the launch directory once. Changing the
 process working directory later does not change the captured root. Explicit relative
@@ -14,16 +15,27 @@ input and output paths retain their existing working-directory semantics.
 | Hydra logs and sweeps | `outputs/`, `multirun/` |
 | Shared CSV datasets | `.cache/clearml-yolo/datasets/` |
 | Writable native YAML dataset copies | `.cache/clearml-yolo/native-datasets/` |
-| Bare checkpoint downloads | `.cache/ultralytics/weights/` |
-| Dependency caches and Python bytecode after bootstrap | `.cache/` |
-| Dependency configuration defaults | `.config/` |
+| Ultralytics downloaded datasets and weights | `.cache/ultralytics/datasets/`, `.cache/ultralytics/weights/` |
+| Ultralytics settings | `.config/Ultralytics/` |
+| ClearML downloads and cache | `.cache/clearml/` |
+| FiftyOne datasets, dataset zoo and database | `.cache/fiftyone/` |
 | Owned execution copies, inference manifests and DDP relay/runtime files | `.tmp/` |
 
-Explicit command paths, dependency environment settings and configured native directory
-values remain valid anywhere. An explicit `XDG_CACHE_HOME` still controls the default CSV
-cache parent. Existing ClearML and FiftyOne configuration can be read from home; it is
-neither copied nor rewritten. Existing FiftyOne configuration supplies its explicit
-directory selections. `HOME` is never reassigned.
+`dataset_cache_dir=null` always selects
+`CY_HOME/.cache/clearml-yolo/datasets`, independent of `XDG_CACHE_HOME`; an explicit
+`dataset_cache_dir` remains authoritative. Explicit command paths, supported dependency
+environment settings and configured native directory values remain valid anywhere. This includes
+existing FiftyOne configuration selections for its dataset, dataset-zoo and database directories.
+`TRAINS_CACHE_DIR` remains the legacy explicit alias for the ClearML cache when
+`CLEARML_CACHE_DIR` is absent. Existing ClearML and FiftyOne configuration can be read from home;
+it is neither copied nor rewritten. `HOME` is never reassigned.
+
+The application does not supply workspace defaults for general-purpose dependency or process
+state: `XDG_CACHE_HOME`, `XDG_CONFIG_HOME`, Python bytecode, Torch, CUDA, Triton, Numba,
+Hugging Face and Matplotlib caches/configuration, ETA state, FiftyOne model-zoo/plugins/config
+paths, and `TMPDIR`/`TMP`/`TEMP` plus `tempfile` defaults keep their ordinary environment or
+library behavior. Caller-provided values for those settings remain untouched. Application-owned
+temporary resources still select `CY_HOME/.tmp` directly.
 
 Write destinations resolving physically beneath the home directory produce a warning,
 once per resolved destination in a process. Warnings do not reject, relocate or override
@@ -57,18 +69,16 @@ root and scoped settings, and their DDP launcher files are inside the owned runt
 
 Atomic comparison cache publication uses temporary files beside the selected output so
 rename remains atomic when the output is on another filesystem. These files are removed
-on serialization, replacement or interruption errors as well as success. Other temporary
-storage uses `.tmp/`.
+on serialization, replacement or interruption errors as well as success. Other application-owned
+temporary storage uses `.tmp/` without changing process-wide temporary directory settings.
 
 ## Launch boundary
 
-This policy routes application and supported dependency writes; it is not an operating
-system sandbox for arbitrary user-supplied scripts or plugins. Python loads the initial
-package bootstrap before application code can redirect bytecode. For a cold launch from
-outside the installation directory, set `PYTHONPYCACHEPREFIX` beneath the chosen workspace
-(or `PYTHONDONTWRITEBYTECODE=1`) in the launcher to cover that initial interpreter write
-as well. Subsequent imports use the workspace cache automatically. External runners such
-as uv, pytest and pre-commit also require their own workspace cache/temp settings.
+This policy routes application-owned writes and the named dependency storage needed for native
+execution and publication; it is not an operating-system sandbox for arbitrary user-supplied
+scripts or plugins. Python bytecode, external runners such as uv, pytest and pre-commit, and other
+general dependency caches/configuration use their standard settings. A caller that needs broader
+isolation must configure those tools in its launcher.
 
 Existing caches are not migrated or deleted. Changing `CY_HOME` changes automatic paths;
 explicit paths and read-only inputs remain independent of it.

@@ -81,8 +81,10 @@ to test; pipeline comparison uses test.
 - **FR-001**: Cache identity MUST depend only on CSV bytes, format and preparation version; reuse MUST NOT read image contents or mtimes or repeat copying/conversion.
 - **FR-002**: NDJSON training MUST preserve original filenames and extension casing; flat naming remains compatible; label-stem collisions MUST fail.
 - **FR-003**: Cache construction MUST serialize per entry, publish atomically, validate completion and required files/splits, recover interrupted builds, and protect concurrent consumers from native repair/cache writes.
-- **FR-004**: Training and pipeline commands MUST expose a shared dataset cache location with an
-  explicit XDG cache or `CY_HOME/.cache` default; run cleanup MUST NOT delete shared entries;
+- **FR-004**: Training and pipeline commands MUST expose a shared dataset cache location.
+  A null selection MUST use `CY_HOME/.cache/clearml-yolo/datasets` independently of
+  `XDG_CACHE_HOME`; an explicit `dataset_cache_dir` MUST remain authoritative.
+  Run cleanup MUST NOT delete shared entries;
   image corrections require explicit invalidation. Native YAML training MUST stage real image and
   label copies in the workspace cache before native repair/cache writes touch them.
 - **FR-005**: The invocation owner MUST enable every installed native ClearML callback with one existing task; workers MUST NOT create tasks or publish; runtime settings MUST be restored without changing global settings files.
