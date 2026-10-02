@@ -1,9 +1,12 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.13.2 (2026-10-02)
 
 ### Bug Fixes
+
+- **clearml**: Restore task console logs
+  ([`063b670`](https://github.com/BuckanovNikita/clearml-yolo/commit/063b670e3ecb0ee9dca9acaffa83244f40eb76e2))
 
 - **publishing**: Keep visualization failures nonfatal
   ([`772e508`](https://github.com/BuckanovNikita/clearml-yolo/commit/772e50872016b5c84a35379d5da8c1f87a953380))
