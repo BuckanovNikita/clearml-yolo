@@ -3,10 +3,14 @@
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
 
 import pytest
 from hydra import compose, initialize_config_module
 from hydra_zen import store
+
+from test_clearml_report import warnings_log as warnings_log  # noqa: PLC0414 - fixture export
 
 
 def test_disabled_publisher_does_not_import_fiftyone(tmp_path: Path) -> None:
@@ -110,3 +114,175 @@ def test_fiftyone_receipt_stays_local_and_is_linked_from_run_configuration(
             }
         }
     ]
+
+
+@pytest.mark.parametrize("stage", ["factory", "preflight"])
+def test_visualization_setup_failure_warns_and_disables_publication(
+    stage: str, warnings_log: list[str]
+) -> None:
+    from clearml_yolo.publishing.models import FiftyOneConfig
+    from clearml_yolo.tasks.publication import prepare_publisher
+
+    class FailingPublisher:
+        enabled = True
+
+        def preflight(self) -> None:
+            raise RuntimeError("database unavailable")
+
+        def publish(self, _request: object) -> None:
+            pytest.fail("failed preflight must disable publication")
+
+    def factory(_config: FiftyOneConfig | None) -> FailingPublisher:
+        if stage == "factory":
+            raise ImportError("visualization backend unavailable")
+        return FailingPublisher()
+
+    result = prepare_publisher(SimpleNamespace(id="task"), FiftyOneConfig(), factory=factory)
+    assert result.enabled is False
+    assert any("FiftyOne visualization setup failed" in warning for warning in warnings_log)
+
+
+@pytest.mark.parametrize("failure", [ValueError("invalid box"), OSError("database write failed")])
+def test_visualization_publication_failure_warns_without_success_receipt(
+    tmp_path: Path, failure: Exception, warnings_log: list[str]
+) -> None:
+    from clearml_yolo.tasks.publication import publish_results
+
+    class FailingPublisher:
+        enabled = True
+
+        def preflight(self) -> None:
+            pass
+
+        def publish(self, _request: object) -> None:
+            raise failure
+
+    result = publish_results(
+        FailingPublisher(), SimpleNamespace(id="task"), output_dir=tmp_path, ground_truth="gt.csv"
+    )
+    assert result is None
+    assert not (tmp_path / "fiftyone_publication.json").exists()
+    assert any(type(failure).__name__ in warning for warning in warnings_log)
+
+
+@pytest.mark.parametrize("stage", ["factory", "preflight", "publication"])
+def test_visualization_warnings_do_not_expose_backend_credentials(
+    tmp_path: Path, stage: str, warnings_log: list[str]
+) -> None:
+    from clearml_yolo.publishing.models import FiftyOneConfig
+    from clearml_yolo.tasks.publication import prepare_publisher, publish_results
+
+    failure = RuntimeError("mongodb://user:private-password@host/?authSource=admin")
+
+    class FailingPublisher:
+        enabled = True
+
+        def preflight(self) -> None:
+            if stage == "preflight":
+                raise failure
+
+        def publish(self, _request: object) -> None:
+            raise failure
+
+    def factory(_config: FiftyOneConfig | None) -> FailingPublisher:
+        if stage == "factory":
+            raise failure
+        return FailingPublisher()
+
+    task = SimpleNamespace(id="task")
+    publisher = prepare_publisher(task, FiftyOneConfig(), factory=factory)
+    assert publish_results(publisher, task, output_dir=tmp_path, ground_truth="gt.csv") is None
+    assert any("RuntimeError" in warning for warning in warnings_log)
+    assert all("private-password" not in warning for warning in warnings_log)
+    assert all("mongodb://" not in warning for warning in warnings_log)
+
+
+@pytest.mark.parametrize("failure_stage", ["receipt", "run_configuration", "missing_receipt"])
+def test_visualization_receipt_failure_does_not_fail_computation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure_stage: str,
+    warnings_log: list[str],
+) -> None:
+    from datetime import UTC, datetime
+
+    from clearml_yolo.publishing.models import PublicationReceipt
+    from clearml_yolo.tasks import publication
+
+    receipt = PublicationReceipt(
+        dataset_name="visualization",
+        task_id="task",
+        run_key="run",
+        ground_truth_sha256="hash",
+        source_ground_truth_sha256="hash",
+        dataset_reused=False,
+        sample_count=1,
+        fields={},
+        dataset_complete=True,
+        run_complete=True,
+        payload_paths={},
+        published_at=datetime.now(UTC),
+    )
+
+    class Publisher:
+        enabled = True
+
+        def preflight(self) -> None:
+            pass
+
+        def publish(self, _request: object) -> PublicationReceipt | None:
+            return None if failure_stage == "missing_receipt" else receipt
+
+    def fail_record(*_args: Any) -> None:
+        raise RuntimeError("visualization link unavailable")
+
+    monkeypatch.setattr(publication, "record_run_configuration", fail_record)
+    destination = tmp_path / "output"
+    if failure_stage == "receipt":
+        destination.write_text("existing file")
+    result = publication.publish_results(
+        Publisher(), SimpleNamespace(id="task"), output_dir=destination, ground_truth="gt.csv"
+    )
+    assert result is None
+    assert any("FiftyOne visualization publication failed" in warning for warning in warnings_log)
+
+
+@pytest.mark.parametrize("stage", ["preflight", "publish"])
+def test_visualization_failure_allows_clearml_task_completion(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, stage: str
+) -> None:
+    import clearml
+
+    from clearml_yolo.clearml_session import ClearMLConfig, invocation, upload_artifact
+    from clearml_yolo.publishing.models import FiftyOneConfig
+    from clearml_yolo.tasks.publication import prepare_publisher, publish_results
+    from test_clearml_session import FakeTask
+
+    task = FakeTask()
+    monkeypatch.setattr(clearml.Task, "init", lambda **_kwargs: task)
+    monkeypatch.setattr(clearml.Task, "get_task", lambda **_kwargs: task)
+    monkeypatch.delenv("LOCAL_RANK", raising=False)
+    predictions = tmp_path / "predictions.csv"
+    predictions.write_text("image_name\nexample.jpg\n")
+
+    class FailingPublisher:
+        enabled = True
+
+        def preflight(self) -> None:
+            if stage == "preflight":
+                raise RuntimeError("visualization unavailable")
+
+        def publish(self, _request: object) -> None:
+            raise ValueError("invalid visualization box")
+
+    with invocation(ClearMLConfig(), "predict") as owner:
+        publisher = prepare_publisher(owner, FiftyOneConfig(), factory=lambda _: FailingPublisher())
+        upload_artifact(owner, "predictions", predictions)
+        assert (
+            publish_results(publisher, owner, output_dir=tmp_path, ground_truth="gt.csv") is None
+        )
+    assert task.failed == []
+    assert task.completed == [{"ignore_errors": False, "force": True}]
+    assert task.closed is True
+    assert [upload["name"] for upload in task.uploads] == ["predictions"]
+    assert predictions.is_file()

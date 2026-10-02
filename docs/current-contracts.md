@@ -48,6 +48,13 @@ task/model links provide provenance; comparison retrieves weights and exact thre
 and does not automatically import the source task's General or Configuration Objects
 over current comparison settings.
 
+FiftyOne visualization is optional. Its setup or publication failures warn and continue
+the owning computation; setup failure disables visualization for that invocation.
+Successful publication retains one local receipt and the canonical run link. Raw
+predictions preserve finite, ordered zero-area boxes from native clipping and their
+CSV indices; publication does not filter inference data or change metric inputs.
+See the [publisher contract](../specs/006-fiftyone-integration/contracts/publisher.md).
+
 ## Maintaining consistency
 
 Spec Kit implementation and bug-fix workflows require a **Documentation update**

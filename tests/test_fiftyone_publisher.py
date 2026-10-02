@@ -108,6 +108,33 @@ def test_retry_replaces_only_its_own_predictions(
     assert empty[second.fields["predicted"]] is None
 
 
+def test_collapsed_native_predictions_are_persisted(
+    tmp_path: Path, publisher: Any, backend: Any
+) -> None:
+    truth = write_truth(tmp_path)
+    predictions = tmp_path / "predictions.csv"
+    predictions.write_text(
+        "image_name,instance_label,confidence,bbox_x_tl,bbox_y_tl,bbox_x_br,bbox_y_br\n"
+        "001.png,01,0.001,10,50,40,50\n"
+        "001.png,01,0.002,100,5,100,25\n"
+        "001.png,01,0.003,100,50,100,50\n"
+    )
+    receipt = publisher.publish(
+        PublicationRequest(task_id="collapsed", ground_truth=truth, predictions=predictions)
+    )
+    dataset = backend.load_dataset(receipt.dataset_name)
+    sample = dataset[str(tmp_path / "001.png")]
+    detections = sample[receipt.fields["predictions"]].detections
+    assert [box.bounding_box for box in detections] == [
+        [0.1, 1.0, 0.3, 0.0],
+        [1.0, 0.1, 0.0, 0.4],
+        [1.0, 1.0, 0.0, 0.0],
+    ]
+    assert [box.dm_index for box in detections] == [0, 1, 2]
+    assert [box.confidence for box in detections] == [0.001, 0.002, 0.003]
+    assert receipt.run_complete is True
+
+
 def test_incomplete_import_is_repaired(
     tmp_path: Path, publisher: Any, backend: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:

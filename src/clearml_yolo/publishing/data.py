@@ -55,10 +55,20 @@ def _read_csv(
     return rows
 
 
-def _box(row: dict[str, str], index: int) -> PublicationBox:
+def _box(row: dict[str, str], index: int, *, allow_collapsed: bool = False) -> PublicationBox:
     x1, y1, x2, y2 = (float(row[key]) for key in BOX_COLUMNS)
-    if not all(math.isfinite(value) for value in (x1, y1, x2, y2)) or x2 <= x1 or y2 <= y1:
-        raise ValueError(f"Invalid publication box at CSV data row {index}")
+    if (
+        not all(math.isfinite(value) for value in (x1, y1, x2, y2))
+        or x2 < x1
+        or y2 < y1
+        or (not allow_collapsed and (x2 == x1 or y2 == y1))
+    ):
+        raise ValueError(
+            f"Invalid publication box at CSV data row {index} (zero-based): "
+            f"image_name={row['image_name']!r}, box={(x1, y1, x2, y2)!r}; "
+            "coordinates must be finite and ordered"
+            + ("" if allow_collapsed else " with positive width and height")
+        )
     confidence = float(row["confidence"]) if "confidence" in row else None
     if confidence is not None and (not math.isfinite(confidence) or not 0 <= confidence <= 1):
         raise ValueError(f"Invalid prediction confidence at CSV data row {index}")
@@ -126,7 +136,8 @@ def read_predictions(path: Path | None, aliases: dict[str, str]) -> dict[str, li
             raise ValueError(
                 f"Prediction image {row['image_name']!r} has no matching ground-truth sample"
             )
-        grouped.setdefault(name, []).append(_box(row, index))
+        # Native boundary clipping can collapse boxes; retain raw detections and CSV indices.
+        grouped.setdefault(name, []).append(_box(row, index, allow_collapsed=True))
     return grouped
 
 

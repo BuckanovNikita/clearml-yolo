@@ -101,3 +101,101 @@ def test_prediction_names_follow_standalone_inference_mode(tmp_path: Path, mode:
     )
     result = read_predictions(path, prediction_aliases(snapshot, mode))
     assert list(result) == ["001.png"]
+
+
+@pytest.mark.parametrize(
+    "box",
+    [
+        (10.0, 50.0, 40.0, 50.0),
+        (100.0, 5.0, 100.0, 25.0),
+        (100.0, 50.0, 100.0, 50.0),
+        (1482.845458984375, 1464.0, 1501.89892578125, 1464.0),
+    ],
+)
+def test_predictions_preserve_collapsed_native_boxes_at_row_225(
+    tmp_path: Path, box: tuple[float, float, float, float]
+) -> None:
+    from clearml_yolo.publishing.data import normalize_box, read_predictions
+
+    path = tmp_path / "predictions.csv"
+    path.write_text(
+        "image_name,instance_label,confidence,bbox_x_tl,bbox_y_tl,bbox_x_br,bbox_y_br\n"
+        + "001.png,01,0.8,10,5,50,25\n" * 225
+        + "001.png,01,0.001,"
+        + ",".join(str(value) for value in box)
+        + "\n"
+        + "001.png,01,0.9,20,10,60,30\n"
+    )
+    result = read_predictions(path, {"001.png": "001.png"})["001.png"]
+    assert len(result) == 227
+    assert result[225].box == box
+    assert result[225].label == "01"
+    assert result[225].confidence == 0.001
+    assert result[225].index == 225
+    assert result[226].index == 226
+    assert 0 in normalize_box(result[225].box, 100, 50)[2:]
+
+
+@pytest.mark.parametrize(
+    "coordinates",
+    ["40,5,10,25", "10,25,40,5", "nan,5,40,25", "10,5,inf,25"],
+)
+def test_predictions_reject_reversed_or_nonfinite_boxes(tmp_path: Path, coordinates: str) -> None:
+    from clearml_yolo.publishing.data import read_predictions
+
+    path = tmp_path / "predictions.csv"
+    path.write_text(
+        "image_name,instance_label,confidence,bbox_x_tl,bbox_y_tl,bbox_x_br,bbox_y_br\n"
+        f"001.png,01,0.8,{coordinates}\n"
+    )
+    with pytest.raises(ValueError, match="Invalid publication box"):
+        read_predictions(path, {"001.png": "001.png"})
+
+
+def test_invalid_prediction_error_identifies_the_offending_record(tmp_path: Path) -> None:
+    from clearml_yolo.publishing.data import read_predictions
+
+    path = tmp_path / "predictions.csv"
+    path.write_text(
+        "image_name,instance_label,confidence,bbox_x_tl,bbox_y_tl,bbox_x_br,bbox_y_br\n"
+        "00031829_06_012835.jpg,Пятна Эмульсии,0.0024610012769699097,"
+        "1540.61328125,1105.0345458984375,1563.83056640625,1124.69775390625\n"
+        "invalid.jpg,01,0.8,40,5,10,25\n"
+    )
+    with pytest.raises(ValueError, match="Invalid publication box") as raised:
+        read_predictions(
+            path,
+            {"00031829_06_012835.jpg": "00031829_06_012835.jpg", "invalid.jpg": "invalid.jpg"},
+        )
+    message = str(raised.value)
+    assert "CSV data row 1 (zero-based)" in message
+    assert "invalid.jpg" in message
+    assert "(40.0, 5.0, 10.0, 25.0)" in message
+
+
+@pytest.mark.parametrize("confidence", ["nan", "inf", "-0.1", "1.1"])
+def test_collapsed_predictions_still_require_valid_confidence(
+    tmp_path: Path, confidence: str
+) -> None:
+    from clearml_yolo.publishing.data import read_predictions
+
+    path = tmp_path / "predictions.csv"
+    path.write_text(
+        "image_name,instance_label,confidence,bbox_x_tl,bbox_y_tl,bbox_x_br,bbox_y_br\n"
+        f"001.png,01,{confidence},10,50,40,50\n"
+    )
+    with pytest.raises(ValueError, match="Invalid prediction confidence"):
+        read_predictions(path, {"001.png": "001.png"})
+
+
+@pytest.mark.parametrize("coordinates", ["10,50,40,50", "100,5,100,25", "100,50,100,50"])
+def test_ground_truth_rejects_collapsed_boxes(tmp_path: Path, coordinates: str) -> None:
+    from clearml_yolo.publishing.data import read_snapshot
+
+    path = tmp_path / "gt.csv"
+    path.write_text(
+        "image_name,image_path,instance_label,bbox_x_tl,bbox_y_tl,bbox_x_br,bbox_y_br,split\n"
+        f"001.png,001.png,01,{coordinates},val\n"
+    )
+    with pytest.raises(ValueError, match="Invalid publication box"):
+        read_snapshot(path)

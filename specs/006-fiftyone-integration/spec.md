@@ -16,8 +16,15 @@
 
 - Q: Which commands publish by default? → A: `cy`, `cy-predict`, and `cy-metrics` only.
 - Q: What persistence and media policy applies? → A: local persistent DB; reference existing media without copying or UI launch.
-- Q: What happens on enabled publication failure? → A: fail the owning invocation and retain local outputs.
+- Q: What happens on enabled publication failure? → A: Originally fail the owning invocation
+  and retain local outputs; superseded by the 2026-10-02 clarification below.
 - Q: How are run and image identities handled? → A: all run fields use ClearML task-ID namespaces; include split; image bytes are accepted immutable inputs after resolved-path validation.
+
+### Session 2026-10-02
+
+- Q: May visualization bugs fail a task? → A: Never. Visualization setup/publication
+  errors produce warnings and may skip visualization; computation continues. Native
+  collapsed boxes may be visualized without changing predictions or metric inputs.
 
 ### User Story 1 - Review an eligible run (Priority: P1)
 
@@ -45,7 +52,9 @@ An operator reruns an eligible command over unchanged inputs and reuses the comp
 **Acceptance Scenarios**:
 
 1. **Given** matching effective-GT hash, schema, prefix identity, and resolved image paths, **When** import is requested, **Then** completed dataset data is reused.
-2. **Given** a changed resolved image path for an existing identity, **When** reuse is requested, **Then** the invocation fails before publication.
+2. **Given** a changed resolved image path for an existing identity, **When** reuse is
+   requested, **Then** publication is rejected before dataset mutation, a warning is
+   emitted, and the owning computation continues.
 
 ---
 
@@ -65,10 +74,15 @@ A reviewer sees raw predictions separately from run-specific evaluated ground tr
 ### Edge Cases
 
 - A disabled run imports no FiftyOne module and creates no database, receipt, or dataset state.
-- Preflight database failure occurs before expensive scoring or inference and fails the invocation while retaining local outputs.
+- Preflight database failure warns before expensive scoring or inference and disables
+  visualization for that invocation; computation continues.
 - Dataset completion and run completion are separately marked; incomplete markers are never reused as completed.
-- A publisher failure fails an enabled invocation, while nested pipeline stages remain disabled so the pipeline publishes once.
+- A publisher failure warns and leaves the invocation running, while nested pipeline
+  stages remain disabled so the pipeline attempts publication once.
 - Image bytes are assumed immutable after path validation; resolved path changes invalidate reuse.
+- Native clipping can collapse raw prediction boxes to zero width or height. Publication
+  preserves their finite, ordered coordinates, confidence and CSV indices; reversed or
+  non-finite coordinates remain invalid, and labelled GT requires positive box area.
 
 ## Requirements *(mandatory)*
 
@@ -91,8 +105,9 @@ A reviewer sees raw predictions separately from run-specific evaluated ground tr
   remain eligible owners. `cy-val`, `cy-compare`, `cy-report`, `cy-train` and
   `cy-ground-truth` MUST NOT publish to FiftyOne.
 - **FR-014**: Publication MUST preflight the database before costly compute. An enabled
-  publication error MUST fail the owning invocation after retaining local outputs. The owner
-  MUST write exactly one local receipt and record its meaningful dataset/run link in canonical
+  visualization setup or publication error MUST warn and MUST NOT fail the owning invocation.
+  Setup failure MUST disable visualization for that invocation. On successful publication,
+  the owner MUST write exactly one local receipt and record its meaningful dataset/run link in canonical
   run configuration; the receipt MUST NOT be uploaded as an artifact.
 - **FR-015**: The feature MUST preserve nine existing entrypoints, existing ClearML single-task ownership, current frozen-threshold evaluation, and raw artifact contracts.
 
@@ -112,10 +127,13 @@ A reviewer sees raw predictions separately from run-specific evaluated ground tr
 - **SC-002**: The disabled-path tests complete without importing FiftyOne or requiring a FiftyOne installation.
 - **SC-003**: Fixture publication reproduces each expected TP, FP, FN, filtered status, source index, label, and IoU from the fixed-threshold scoring payload.
 - **SC-004**: A completed identical import reuses its dataset without duplicating samples, while a resolved-path mismatch fails before data mutation.
-- **SC-005**: A pipeline fixture produces one owner receipt and no nested-stage receipt; an enabled adapter failure fails the invocation and retains local result paths.
+- **SC-005**: A successful pipeline fixture produces one owner receipt and no nested-stage
+  receipt; an enabled adapter failure warns, allows the invocation to complete and retains
+  local result paths without emitting a successful adapter receipt.
 
 ## Assumptions
 
 - Existing image bytes do not change behind a stable validated resolved path during reuse.
-- The local FiftyOne server/database is available to enabled commands; its preflight is a required operational check.
+- The local FiftyOne server/database is required for successful visualization; unavailable
+  visualization is optional for computation, and its preflight logs a warning.
 - Real FiftyOne behavior is verified by smoke and pipeline evidence rather than inferred from unit substitutes.

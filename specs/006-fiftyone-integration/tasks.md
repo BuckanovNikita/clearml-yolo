@@ -5,6 +5,8 @@
 > **Current-contract note:** Checked tasks preserve completed feature history. The receipt is
 > now local, with meaningful dataset/run fields in canonical run configuration; T007 and T015
 > describe the earlier artifact target. See [current contracts](../../docs/current-contracts.md).
+> The 2026-10-02 clarification in [spec.md](spec.md) also supersedes the original
+> strict-failure intent in T012: optional visualization failures warn and allow task completion.
 
 ## Phase 1: Setup
 

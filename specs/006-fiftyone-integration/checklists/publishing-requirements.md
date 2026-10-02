@@ -27,3 +27,5 @@
 ## Notes
 
 - Reviewer check completed before implementation; all items assess requirements quality only.
+- The 2026-10-02 clarification supersedes CHK008's original strict-failure intent:
+  visualization errors warn without failing computation; a receipt is required on success.

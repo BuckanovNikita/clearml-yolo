@@ -10,6 +10,7 @@ from clearml_yolo.clearml_session import ClearMLConfig
 from clearml_yolo.publishing.models import FiftyOneConfig, PublicationReceipt
 from clearml_yolo.tasks.pipeline import routed_native
 from native_config_helpers import prediction_config, training_settings
+from test_clearml_report import warnings_log as warnings_log  # noqa: PLC0414 - fixture export
 
 
 def test_routing_fills_only_output_ownership(tmp_path: Path) -> None:
@@ -330,8 +331,8 @@ def test_pipeline_publishes_only_existing_predictions_when_prediction_is_skipped
     assert requests[0].prediction_splits is None
 
 
-def test_pipeline_publication_failure_propagates_after_preserving_predictions(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+def test_pipeline_publication_failure_warns_and_preserves_predictions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, warnings_log: list[str]
 ) -> None:
     from types import SimpleNamespace
 
@@ -362,31 +363,27 @@ def test_pipeline_publication_failure_propagates_after_preserving_predictions(
 
     monkeypatch.setattr(pipeline, "run_prediction", predict)
 
-    with pytest.raises(RuntimeError, match="publication failed"):
-        pipeline.run_pipeline(
-            ultralytics=training_settings(),
-            ultralytics_predict=prediction_config(),
-            metrics={"evaluation": EvaluationConfig(), "calibration_split": "val"},
-            report={"report_config_path": None},
-            compare={
-                "baseline_model": None,
-                "q": 0.05,
-                "bootstrap_iterations": 1,
-                "seed": 0,
-            },
-            clearml=ClearMLConfig(),
-            ground_truth=str(tmp_path / "truth.csv"),
-            splits=["test"],
-            run_dir=tmp_path,
-            weights="best.pt",
-            skip_train=True,
-            skip_metrics=True,
-            skip_compare=True,
-            skip_report=True,
-            fiftyone=FiftyOneConfig(),
-        )
+    pipeline.run_pipeline(
+        ultralytics=training_settings(),
+        ultralytics_predict=prediction_config(),
+        metrics={"evaluation": EvaluationConfig(), "calibration_split": "val"},
+        report={"report_config_path": None},
+        compare={"baseline_model": None, "q": 0.05, "bootstrap_iterations": 1, "seed": 0},
+        clearml=ClearMLConfig(),
+        ground_truth=str(tmp_path / "truth.csv"),
+        splits=["test"],
+        run_dir=tmp_path,
+        weights="best.pt",
+        skip_train=True,
+        skip_metrics=True,
+        skip_compare=True,
+        skip_report=True,
+        fiftyone=FiftyOneConfig(),
+    )
 
     assert predictions.read_text(encoding="utf-8") == "image_name\na\n"
+    assert not (tmp_path / "fiftyone_publication.json").exists()
+    assert any("publication failed" in warning for warning in warnings_log)
 
 
 @pytest.mark.parametrize("explicit", ["none", "run_dir", "run_id"])

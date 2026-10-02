@@ -22,7 +22,9 @@ PASS: typed Pydantic models, strict import boundary, one ClearML owner, preserve
 - Dataset completion and task-run completion are separate. A per-dataset local lock protects mutation; retries replace only their task-ID namespace.
 - Metrics emits exact fixed-threshold digital-metrics status/index/label/confidence/IoU payloads. Raw predictions remain separate; publication never rematches or evaluates.
 - Preflight precedes costly work. Pipeline suppresses nested publication and produces one local
-  receipt plus a meaningful run-configuration link; enabled errors fail owner while keeping local outputs.
+  receipt plus a meaningful run-configuration link on success. Visualization setup and
+  publication errors warn and continue computation, per the 2026-10-02 clarification;
+  setup failure disables visualization for that invocation. Earlier fail-owner intent is superseded.
 
 ## Artifacts
 
