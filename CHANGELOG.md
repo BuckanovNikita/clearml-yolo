@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.13.1 (2026-10-02)
+
+### Bug Fixes
+
+- Narrow workspace cache ownership
+  ([`1e4b8db`](https://github.com/BuckanovNikita/clearml-yolo/commit/1e4b8dbc6add0c181067b82112bcf968b9a6a0a8))
+
+
 ## v0.13.0 (2026-10-01)
 
 ### Features
