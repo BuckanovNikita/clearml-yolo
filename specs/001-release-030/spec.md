@@ -20,6 +20,13 @@ top-level `ultralytics` and `ultralytics_predict` groups, generates two native g
 addition to the eight command examples, and rejects raw/non-null `cfg`. The maintained package
 version is declared in [pyproject.toml](../../pyproject.toml).
 
+**Current-only amendment (2026-10-02)**: The
+[remove-legacy-compatibility feature](../012-remove-legacy-compatibility/spec.md) supersedes
+the migration and historical-reader requirements below. Current training requires CSV ground
+truth; task recovery uses only the role-marked best Output Model and validation threshold CSV;
+comparison uses only its `evaluation` configuration. The original release history remains in
+the plan, research and task ledger.
+
 For historical clarity, the original FR-001 accepted raw YAML plus sparse embedded mappings,
 FR-005 removed configuration-tree generation, FR-015 prohibited publication, and SC-005
 expected eight commands. Those requirements were implemented for the initial 0.3.0 baseline
@@ -118,8 +125,8 @@ first run without baseline, and distributed parent return values are covered by 
   dependencies, tests and instructions. Retain the subsequently restored local initializer.
 - **FR-006**: Preserve YOLO dataset ingestion and ground-truth/prediction table contracts.
 - **FR-007**: Calibrate on val and freeze the resulting thresholds for every evaluated split;
-  accept exact supplied thresholds, prefer tracked validation CSVs, retain historical per-split
-  threshold readers, and reject missing or invalid thresholds explicitly.
+  accept exact supplied thresholds, require validation CSVs for task recovery, and reject
+  missing or invalid thresholds explicitly.
 - **FR-008**: Resolve latest completed prod baseline excluding current task, preserve explicit
   task/checkpoint selection, skip only automatic absence and fail invalid explicit selections.
 - **FR-009**: Standalone comparison MUST accept a split override defaulting to test; pipeline

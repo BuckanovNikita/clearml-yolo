@@ -1,9 +1,10 @@
-"""Every retained CLI composes while removed fields fail explicitly."""
+"""Current CLI schemas compose and unsupported fields fail explicitly."""
 
 import pytest
 from hydra import compose, initialize_config_module
 from hydra.errors import ConfigCompositionException
 from hydra_zen import store
+from omegaconf import OmegaConf
 
 import clearml_yolo.configs  # noqa: F401
 
@@ -38,7 +39,7 @@ def test_csv_training_commands_expose_dataset_format_defaults(command: str) -> N
         config = compose(config_name=command)
     assert config.dataset_format == "ndjson"
     if command == "train":
-        assert config.ground_truth is None
+        assert OmegaConf.is_missing(config, "ground_truth")
 
 
 def test_prediction_inherits_shared_cli_values_and_explicit_overrides() -> None:
@@ -73,9 +74,8 @@ def test_composed_prediction_uses_produced_checkpoint_and_shared_resolution() ->
             config_name="pipeline",
             overrides=["ultralytics.model=architecture.pt", "ultralytics.imgsz=1280"],
         )
-    base = dict(config.ultralytics)
     overrides = dict(config.ultralytics_predict)
-    settings = prediction_settings(base, overrides, "produced.pt")
+    settings = prediction_settings(overrides, "produced.pt")
     assert settings["model"] == "produced.pt"
     assert settings["imgsz"] == 1280
     assert settings["conf"] == 0.001
@@ -87,7 +87,7 @@ def test_resolved_prediction_does_not_inherit_batch_or_save_implicitly() -> None
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
         config = compose(config_name="pipeline", overrides=["ultralytics.batch=32"])
     settings = prediction_settings(
-        {"imgsz": 1, "model": "hidden.pt"}, dict(config.ultralytics_predict)
+        dict(config.ultralytics_predict)
     )
     assert settings["model"] is None
     assert settings["imgsz"] == 960
@@ -127,3 +127,15 @@ def test_cache_location_is_exposed_on_training_commands() -> None:
         for name in ("train", "pipeline"):
             config = compose(config_name=name, overrides=["dataset_cache_dir=/shared/datasets"])
             assert config.dataset_cache_dir == "/shared/datasets"
+
+
+def test_comparison_uses_shared_evaluation_configuration() -> None:
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        config = compose(
+            config_name="compare",
+            overrides=["evaluation.iou_threshold=0.3", "evaluation.matching_strategy=greedy"],
+        )
+    assert config.evaluation.iou_threshold == 0.3
+    assert config.evaluation.matching_strategy == "greedy"
+    assert "iou_threshold" not in config
+    assert "matching_strategy" not in config

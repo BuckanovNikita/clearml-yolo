@@ -10,7 +10,7 @@ and implementation evidence by topic; this summary does not replace those contra
 Nine entrypoints: `cy`, `cy-train`, `cy-predict`, `cy-val`, `cy-metrics`,
 `cy-report`, `cy-compare`, `cy-ground-truth`, and `cy-init-config`.
 `cy-init-config DIRECTORY [--force]` writes editable examples for the eight execution
-commands without creating a ClearML task. `cy-queue` remains removed.
+commands without creating a ClearML task.
 
 Native model settings use top-level Hydra groups `ultralytics` and `ultralytics_predict`
 for all model commands. The shared group covers detection-relevant installed upstream defaults; prediction
@@ -23,7 +23,7 @@ keys without wrapper indentation and preserve original comments. Use ordinary ov
 such as `ultralytics.epochs=10` and `ultralytics_predict.batch=8`.
 Stage-irrelevant settings are commented in exported native YAML and excluded from execution.
 Raw `cfg` loading, non-null native `cfg`, nested stage-native mappings and duplicate native
-comparison inference settings are removed and must fail with migration guidance.
+comparison inference settings are unsupported and fail ordinary strict validation.
 Effective native YAML and retained prediction manifests support replay; YAML is retained
 locally with comments preserved; canonical run/dataset/report configurations and native General
 parameters support ClearML replay without artifact copies.
@@ -63,3 +63,5 @@ FiftyOne visualization is optional: setup and publication errors warn and cannot
 otherwise successful computation or the ClearML task. Required artifacts/model uploads
 and flush verification retain their failure behavior.
 Use the shared CSV-addressed dataset cache outside run outputs; source images are immutable.
+Standalone `cy-train` requires `ground_truth`; prepared dataset paths returned by training are
+always present. Direct native-dataset training and native staging are not supported.

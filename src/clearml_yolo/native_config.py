@@ -163,17 +163,11 @@ def native_defaults() -> dict[str, Any]:
 
 def stage_settings(settings: dict[str, Any], stage: Stage) -> dict[str, Any]:
     """Project supplied native values onto the selected execution stage."""
-    legacy = set(settings) & {"end2end", "half", "int8", "keras"}
-    if legacy:
-        raise ValueError(
-            f"Native aliases {sorted(legacy)} are removed/deprecated; "
-            "use nms instead of end2end and quantize instead of half/int8; remove keras"
-        )
     unknown = set(settings) - KNOWN_KEYS - {"save_dir"}
     if unknown:
         raise ValueError(f"Unknown Ultralytics parameters: {sorted(unknown)}")
     if settings.get("cfg") is not None:
-        raise ValueError("Native cfg loading was removed; use the ultralytics Hydra group")
+        raise ValueError("Native cfg must be null")
     allowed = TRAIN_KEYS if stage == "train" else PREDICT_KEYS
     return {key: value for key, value in settings.items() if key in allowed}
 
@@ -186,8 +180,7 @@ def execution_settings(settings: dict[str, Any], stage: Stage) -> dict[str, Any]
     missing = (native_defaults().keys() & allowed) - values.keys()
     if missing:
         raise ValueError(
-            f"Missing {group} parameters {sorted(missing)}; compose a complete {group} "
-            "group or regenerate examples with cy-init-config"
+            f"Missing {group} parameters {sorted(missing)}; compose a complete {group} group"
         )
     if values["task"] != "detect":
         raise ValueError(f"{group}.task must be detect")
@@ -314,13 +307,11 @@ def write_native_yaml(path: Path, settings: dict[str, Any], stage: Stage) -> Pat
 
 
 def prediction_settings(
-    ultralytics: dict[str, Any],
-    ultralytics_predict: dict[str, Any] | None = None,
+    ultralytics_predict: dict[str, Any],
     weights: str | Path | None = None,
 ) -> dict[str, Any]:
     """Consume only the resolved prediction group and explicit checkpoint ownership."""
-    del ultralytics  # Retain the public signature without cross-stage fallback.
-    settings = execution_settings(dict(ultralytics_predict or {}), "predict")
+    settings = execution_settings(dict(ultralytics_predict), "predict")
     native_model = settings["model"]
     if weights is not None and native_model is not None and str(weights) != str(native_model):
         raise ValueError("weights conflicts with ultralytics_predict.model")

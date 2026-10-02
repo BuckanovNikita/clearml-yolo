@@ -305,7 +305,7 @@ def test_remote_clone_does_not_replay_previous_owner_output_route(
         if stage == "pipeline":
             executed.append(routed_native(ultralytics, project, "train"))
         else:
-            training.train(ultralytics, ClearMLConfig())
+            training.train(ultralytics, ClearMLConfig(), ground_truth="truth.csv")
 
     monkeypatch.setattr(hydra, "main", lambda **kwargs: lambda fn: lambda: fn(config))
     monkeypatch.setattr(common, "native_runtime", nullcontext)
@@ -313,6 +313,10 @@ def test_remote_clone_does_not_replay_previous_owner_output_route(
     monkeypatch.setattr(common, "replay_configuration", lambda _task, values: values)
     monkeypatch.setattr(training, "init_task", lambda *_args, **_kwargs: task)
     monkeypatch.setenv("CY_HOME", str(tmp_path))
+    monkeypatch.setattr(
+        training, "_prepare_csv_dataset",
+        lambda _task, settings, *_args: nullcontext((object(), settings)),
+    )
     monkeypatch.setattr(training, "_execute_training", execute_training)
     common.launch(stage, command)
 

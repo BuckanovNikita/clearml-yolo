@@ -112,19 +112,19 @@ def test_partial_render_does_not_invent_unobserved_values() -> None:
 
 
 @pytest.mark.parametrize("alias", ["end2end", "half", "int8", "keras"])
-def test_legacy_aliases_fail_with_migration_guidance(alias: str) -> None:
+def test_unrecognized_native_keys_fail_strict_validation(alias: str) -> None:
     from clearml_yolo.native_config import stage_settings
 
-    with pytest.raises(ValueError, match=r"removed|deprecated"):
+    with pytest.raises(ValueError, match=r"Unknown Ultralytics parameters"):
         stage_settings({alias: True}, "predict")
 
 
 def test_prediction_settings_reject_sparse_or_missing_section() -> None:
-    from clearml_yolo.native_config import native_defaults, prediction_settings
+    from clearml_yolo.native_config import prediction_settings
 
-    for overrides in (None, {}, {"conf": 0.1}):
+    for overrides in ({}, {"conf": 0.1}):
         with pytest.raises(ValueError, match=r"complete|Missing"):
-            prediction_settings(native_defaults(), overrides, "weights.pt")
+            prediction_settings(overrides, "weights.pt")
 
 
 def test_execution_validates_stage_and_image_size() -> None:

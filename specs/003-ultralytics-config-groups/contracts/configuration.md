@@ -22,7 +22,7 @@ nulls and values equal to native defaults are not treated as absent. Prediction-
 overrides win over prediction file values. Native execution receives stage-applicable settings.
 
 `train.ultralytics`, `predict.ultralytics`, wrapper `cfg`, non-null native `cfg` and comparison
-`inference` native settings are removed and fail with migration guidance. Comparison-only
+`inference` native settings are unsupported and fail ordinary strict validation. Comparison-only
 controls such as cache reuse remain. Upstream `cfg` comments remain documentation only.
 
 Pipeline `run_dir`, produced checkpoint and selected images own execution routing and inputs.
@@ -40,5 +40,6 @@ Stage-owned exceptions: prediction `model: null` means no checkpoint override; `
 defaults to `predict`, and `project`/`name` default to null for stage output routing. These
 fields do not inherit training routing. Comparison rejects non-null prediction model/project/name
 overrides; use its model references and output directory. `cy-train` accepts both groups for
-consistent composition but only uses shared training settings. Native compatibility aliases and
-custom `augmentations`, absent from the upstream template, are retained when explicitly supplied.
+consistent composition but only uses shared training settings. Unknown native keys
+fail strict validation; custom `augmentations`, absent from the upstream template, remain
+available when explicitly supplied.

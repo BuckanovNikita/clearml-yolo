@@ -457,30 +457,6 @@ def test_inference_image_name_mode_rejects_unknown_fallback() -> None:
         )
 
 
-def test_evaluation_mapping_overlays_legacy_comparison_defaults() -> None:
-    from clearml_yolo.tasks.compare import _normalize_evaluation
-
-    legacy = _normalize_evaluation(None, iou_threshold=0.25, matching_strategy="greedy")
-    mapped = _normalize_evaluation(
-        {"ap_method": "continuous"},
-        iou_threshold=0.25,
-        matching_strategy="greedy",
-    )
-    overridden = _normalize_evaluation(
-        {"iou_threshold": 0.75, "matching_strategy": "hungarian"},
-        iou_threshold=0.25,
-        matching_strategy="greedy",
-    )
-
-    assert (legacy.iou_threshold, legacy.matching_strategy) == (0.25, "greedy")
-    assert (mapped.iou_threshold, mapped.matching_strategy, mapped.ap_method) == (
-        0.25,
-        "greedy",
-        "continuous",
-    )
-    assert (overridden.iou_threshold, overridden.matching_strategy) == (0.75, "hungarian")
-
-
 def test_nonfinite_model_threshold_is_rejected() -> None:
     from pydantic import ValidationError
 
@@ -529,7 +505,6 @@ def test_explicit_missing_baseline_is_an_error(
     with pytest.raises(ValueError, match="No completed") as error:
         _resolve_model(
             model,
-            "test",
             "fallback-project",
             exclude_task_id="current-task",
             automatic_absence_is_skip=_is_automatic_baseline(model),
@@ -562,12 +537,11 @@ def test_resolved_clearml_model_keeps_exact_task_id(
     )
     monkeypatch.setattr(
         "clearml_yolo.tasks.compare.fetch_best_confidences",
-        lambda _task_id, _split: {"cat": 0.5},
+        lambda _task_id: {"cat": 0.5},
     )
 
     resolved = _resolve_model(
         ModelRef(task_id=task_id),
-        "test",
         "project",
         exclude_task_id=None,
         automatic_absence_is_skip=False,

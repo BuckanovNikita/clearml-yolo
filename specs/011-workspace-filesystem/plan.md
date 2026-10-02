@@ -1,5 +1,10 @@
 # Implementation Plan: Workspace-owned filesystem defaults
 
+> Historical path note (2026-10-02): `src/clearml_yolo/native_dataset.py` and
+> `tests/test_native_dataset.py` named below were removed by
+> [feature 012](../012-remove-legacy-compatibility/spec.md). This plan retains the paths as
+> implementation history; they are not current source links.
+
 **Branch**: `master` | **Date**: 2026-10-01 | **Spec**: [spec.md](spec.md)
 
 **Input**: Route automatic filesystem writes through a captured workspace while preserving every

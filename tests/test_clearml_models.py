@@ -8,7 +8,7 @@ from typing import Any, override
 import pandas as pd
 import pytest
 
-from clearml_yolo.artifact_names import BEST_CONFIDENCES_PREFIX, per_split
+from clearml_yolo.artifact_names import BEST_CONFIDENCES_VAL
 from clearml_yolo.clearml_models import (
     fetch_best_confidences,
     latest_completed_task_id,
@@ -21,12 +21,15 @@ TASK_ID = "a" * 32
 
 
 class FakeModel:
-    def __init__(self, local_copy: str) -> None:
+    def __init__(self, local_copy: str, *, checkpoint_role: str | None = None) -> None:
         self._local_copy = local_copy
+        self._checkpoint_role = checkpoint_role
         self.url = "https://files.example/" + Path(local_copy).name
         self.id = Path(local_copy).stem
 
     def get_metadata(self, key: str) -> str | None:
+        if key == "clearml_yolo_checkpoint_role":
+            return self._checkpoint_role
         return None
 
     def get_local_copy(self) -> str:
@@ -164,17 +167,24 @@ def test_task_ids_are_told_apart_from_checkpoint_names() -> None:
 def test_weights_selects_best_even_when_registered_before_other_models(
     patch_clearml: Any, tmp_path: Path
 ) -> None:
-    """Registration order must not select an epoch checkpoint over best.pt."""
-    last = tmp_path / "best.pt"
-    last.write_bytes(b"")
+    """Registration order must not select an unmarked epoch checkpoint."""
+    best = tmp_path / "checkpoint.pt"
+    best.write_bytes(b"")
     patch_clearml(
-        FakeTask(models={"output": [FakeModel(str(last)), FakeModel(str(tmp_path / "epoch1.pt"))]})
+        FakeTask(
+            models={
+                "output": [
+                    FakeModel(str(best), checkpoint_role="best"),
+                    FakeModel(str(tmp_path / "epoch1.pt")),
+                ]
+            }
+        )
     )
 
-    assert resolve_task_weights(TASK_ID) == last
+    assert resolve_task_weights(TASK_ID) == best
 
 
-def test_weights_fall_back_to_an_uploaded_checkpoint_artifact(
+def test_weights_reject_an_uploaded_checkpoint_artifact_without_a_best_output_model(
     patch_clearml: Any, tmp_path: Path
 ) -> None:
     checkpoint = tmp_path / "manual.pt"
@@ -188,33 +198,37 @@ def test_weights_fall_back_to_an_uploaded_checkpoint_artifact(
         )
     )
 
-    assert resolve_task_weights(TASK_ID) == checkpoint
+    with pytest.raises(ValueError, match="best Output Model"):
+        resolve_task_weights(TASK_ID)
 
 
-def test_weights_prefer_named_best_checkpoint_without_downloading_other_artifacts(
-    patch_clearml: Any, tmp_path: Path
-) -> None:
-    best = tmp_path / "best.pt"
-    last = tmp_path / "last.pt"
-    best.write_bytes(b"best")
-    last.write_bytes(b"last")
+def test_weights_do_not_download_checkpoint_artifacts(patch_clearml: Any) -> None:
     patch_clearml(
         FakeTask(
             artifacts={
                 "metrics_predictions": ExplodingArtifact(),
-                "train_weights_last": FakeArtifact(str(last)),
-                "train_weights_best": FakeArtifact(str(best)),
+                "train_weights_best": ExplodingArtifact(),
             }
         )
     )
 
-    assert resolve_task_weights(TASK_ID) == best
+    with pytest.raises(ValueError, match="best Output Model"):
+        resolve_task_weights(TASK_ID)
+
+
+def test_filename_only_best_output_model_is_rejected(patch_clearml: Any, tmp_path: Path) -> None:
+    checkpoint = tmp_path / "best.pt"
+    checkpoint.write_bytes(b"")
+    patch_clearml(FakeTask(models={"output": [FakeModel(str(checkpoint))]}))
+
+    with pytest.raises(ValueError, match="best Output Model"):
+        resolve_task_weights(TASK_ID)
 
 
 def test_a_task_without_a_checkpoint_says_so(patch_clearml: Any) -> None:
     patch_clearml(FakeTask())
 
-    with pytest.raises(ValueError, match="no output model"):
+    with pytest.raises(ValueError, match="best Output Model"):
         resolve_task_weights(TASK_ID)
 
 
@@ -226,42 +240,45 @@ def test_local_checkpoints_never_reach_clearml(tmp_path: Path) -> None:
     assert resolve_weights(checkpoint) == checkpoint
 
 
-def test_bare_model_downloads_use_cy_home(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_bare_model_downloads_use_cy_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CY_HOME", str(tmp_path))
     monkeypatch.chdir(tmp_path)
     assert resolve_weights("yolo11n.pt") == tmp_path / ".cache/ultralytics/weights/yolo11n.pt"
 
 
-def test_thresholds_come_back_as_plain_floats(patch_clearml: Any) -> None:
-    frame = pd.DataFrame({"confidence": [0.31, 0.47]}, index=["car", "van"])
+def test_thresholds_come_from_validation_csv_as_plain_floats(
+    patch_clearml: Any, tmp_path: Path
+) -> None:
+    path = tmp_path / "thresholds.csv"
+    path.write_text("class_name,confidence\ncar,0.31\nvan,0.47\n")
+    patch_clearml(FakeTask(artifacts={BEST_CONFIDENCES_VAL: FakeArtifact(str(path))}))
+
+    assert fetch_best_confidences(TASK_ID) == pytest.approx({"car": 0.31, "van": 0.47})
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"car": 0.25},
+        '{"car": 0.25}',
+        pytest.param(pd.Series({"car": 0.25}), id="series"),
+        pytest.param(pd.DataFrame({"confidence": [0.25]}, index=["car"]), id="dataframe"),
+    ],
+)
+def test_historical_threshold_payloads_are_rejected(patch_clearml: Any, payload: object) -> None:
     patch_clearml(
-        FakeTask(
-            artifacts={per_split(BEST_CONFIDENCES_PREFIX, "test"): FakeArtifact(payload=frame)}
-        )
+        FakeTask(artifacts={"metrics_best_confidences_test": FakeArtifact(payload=payload)})
     )
 
-    assert fetch_best_confidences(TASK_ID, "test") == pytest.approx({"car": 0.31, "van": 0.47})
+    with pytest.raises(ValueError, match=BEST_CONFIDENCES_VAL):
+        fetch_best_confidences(TASK_ID)
 
 
-def test_thresholds_survive_a_json_encoded_artifact(patch_clearml: Any) -> None:
-    patch_clearml(
-        FakeTask(
-            artifacts={
-                per_split(BEST_CONFIDENCES_PREFIX, "val"): FakeArtifact(payload='{"car": 0.25}')
-            }
-        )
-    )
-
-    assert fetch_best_confidences(TASK_ID, "val") == pytest.approx({"car": 0.25})
-
-
-def test_a_missing_threshold_artifact_names_the_split(patch_clearml: Any) -> None:
+def test_a_missing_threshold_artifact_names_the_current_artifact(patch_clearml: Any) -> None:
     patch_clearml(FakeTask())
 
-    with pytest.raises(ValueError, match=per_split(BEST_CONFIDENCES_PREFIX, "test")):
-        fetch_best_confidences(TASK_ID, "test")
+    with pytest.raises(ValueError, match=BEST_CONFIDENCES_VAL):
+        fetch_best_confidences(TASK_ID)
 
 
 def test_ambiguous_native_best_models_fail(patch_clearml: Any, tmp_path: Path) -> None:
@@ -269,8 +286,8 @@ def test_ambiguous_native_best_models_fail(patch_clearml: Any, tmp_path: Path) -
         FakeTask(
             models={
                 "output": [
-                    FakeModel(str(tmp_path / "a" / "best.pt")),
-                    FakeModel(str(tmp_path / "b" / "best.pt")),
+                    FakeModel(str(tmp_path / "a" / "checkpoint.pt"), checkpoint_role="best"),
+                    FakeModel(str(tmp_path / "b" / "checkpoint.pt"), checkpoint_role="best"),
                 ]
             }
         )
@@ -279,23 +296,30 @@ def test_ambiguous_native_best_models_fail(patch_clearml: Any, tmp_path: Path) -
         resolve_task_weights(TASK_ID)
 
 
-def test_validation_csv_thresholds_override_historical_test_payload(
-    patch_clearml: Any, tmp_path: Path
-) -> None:
+def test_validation_csv_is_the_only_threshold_source(patch_clearml: Any, tmp_path: Path) -> None:
     path = tmp_path / "thresholds.csv"
     value = 0.12345678901234566
-    pd.DataFrame({"class_name": ["001"], "confidence": [value]}).to_csv(
-        path, index=False, float_format="%.17g"
-    )
+    path.write_text(f"class_name,confidence\n001,{value:.17g}\n")
     patch_clearml(
         FakeTask(
             artifacts={
-                per_split(BEST_CONFIDENCES_PREFIX, "val"): FakeArtifact(str(path)),
-                per_split(BEST_CONFIDENCES_PREFIX, "test"): FakeArtifact(payload={"001": 0.9}),
+                BEST_CONFIDENCES_VAL: FakeArtifact(str(path)),
+                "metrics_best_confidences_test": FakeArtifact(payload={"001": 0.9}),
             }
         )
     )
-    assert fetch_best_confidences(TASK_ID, "test") == {"001": value}
+    assert fetch_best_confidences(TASK_ID) == {"001": value}
+
+
+def test_non_csv_current_threshold_artifact_is_rejected(patch_clearml: Any, tmp_path: Path) -> None:
+    path = tmp_path / "thresholds.json"
+    path.write_text('{"car": 0.9}')
+    patch_clearml(
+        FakeTask(artifacts={BEST_CONFIDENCES_VAL: FakeArtifact(str(path), payload={"car": 0.9})})
+    )
+
+    with pytest.raises(ValueError, match="CSV"):
+        fetch_best_confidences(TASK_ID)
 
 
 @pytest.mark.parametrize(
@@ -315,10 +339,10 @@ def test_invalid_threshold_csv_fails_without_historical_fallback(
     patch_clearml(
         FakeTask(
             artifacts={
-                per_split(BEST_CONFIDENCES_PREFIX, "val"): FakeArtifact(str(path)),
-                per_split(BEST_CONFIDENCES_PREFIX, "test"): FakeArtifact(payload={"car": 0.9}),
+                BEST_CONFIDENCES_VAL: FakeArtifact(str(path)),
+                "metrics_best_confidences_test": FakeArtifact(payload={"car": 0.9}),
             }
         )
     )
     with pytest.raises(ValueError, match=r"threshold|confidence|class"):
-        fetch_best_confidences(TASK_ID, "test")
+        fetch_best_confidences(TASK_ID)

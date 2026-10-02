@@ -38,8 +38,9 @@ No numbered YAML, train_data_overrides.json, configuration copies, replay manife
 Replay uses the current task's canonical configuration. Model provenance records source
 task/model links and resolves source weights plus exact thresholds; it does not automatically
 fetch the source task's Configuration Objects or General parameters, and current comparison
-settings remain authoritative. Thresholds prefer validation CSVs, accept exact supplied maps
-and retain historical per-split readers. Missing required weights or thresholds fail actionably.
+settings remain authoritative. Task recovery reads thresholds only from the validation CSV;
+exact maps supplied on explicit model references remain authoritative. Task weights come only
+from the role-marked best Output Model. Missing or malformed current publications fail actionably.
 Existing remote override, resolution, secret redaction and local execution-copy behavior remain intact.
 
 Any computation, callback, journal, upload, flush or interruption error fails command/task and preserves local diagnostics. Prior telemetry on a failed task is valid partial evidence, never a completion signal. Historical tasks are not modified.

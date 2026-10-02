@@ -8,6 +8,12 @@
 
 **Input**: User description (format name corrected by the user to NDJSON): "Next feature is full training based only on provided ground truth file. Convert from input csv to ultraltics ndjson dataset or flat dataset (support both by default ndjson switch by tool params). Override yolo params related to data if need"
 
+**Current-only amendment (2026-10-02)**: The
+[remove-legacy-compatibility feature](../012-remove-legacy-compatibility/spec.md) supersedes
+the original direct native-data exception. Standalone `cy-train` now requires `ground_truth`,
+and successful training always returns its prepared dataset paths. The original decision remains
+below where needed to explain completed history.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Train directly from ground truth (Priority: P1)
@@ -194,9 +200,9 @@ configuration, generated data inventory, and tracking records for both formats.
 - **FR-016**: Full-pipeline evaluation MUST calibrate on validation once, freeze thresholds
   for test, and compare baseline and candidate on identical current test images. Existing
   missing-automatic-baseline and invalid-explicit-baseline behavior MUST remain intact.
-- **FR-017**: Standalone training without `ground_truth` MUST retain the existing explicit
-  native-data path. CSV input takes precedence when both are provided. `skip_train=true`
-  MUST avoid training-dataset preparation and retain existing evaluation input requirements.
+- **FR-017**: Standalone training MUST require `ground_truth`; `ultralytics.data` MUST be derived
+  from CSV preparation and MUST NOT provide an alternate input path. `skip_train=true` MUST avoid
+  training-dataset preparation and retain existing evaluation input requirements.
 - **FR-018**: Generated command examples MUST make CSV training discoverable and distinguish
   dataset preparation controls from top-level native groups. No additional entrypoint is
   required, and `cy-ground-truth` MUST retain its existing dataset-to-CSV behavior.
@@ -259,8 +265,8 @@ configuration, generated data inventory, and tracking records for both formats.
   and native compatibility.
 - `dataset_format` is the proposed public tool parameter. Both representations ship together;
   NDJSON is the default rather than a fallback that requires separate installation or setup.
-- Existing standalone native-data training remains supported; the requested feature does not
-  require its removal. A CSV-driven full pipeline always treats its CSV as authoritative.
+- The original feature retained standalone native-data training; the 2026-10-02 current-only
+  amendment supersedes that decision and makes CSV ground truth authoritative for all training.
 - Dependencies are the existing native training runtime, ClearML, and the established
   evaluation interfaces. No changes to the pinned `digital-metrics` dependency are authorized.
 - Format terminology follows the official

@@ -26,8 +26,8 @@ Repeat with a fresh task name and the same CSV/cache; inspect one cache entry an
 prepared files. Repeat on the available GPU with explicit device. Run two simultaneous
 preparations of the same CSV and interrupt one builder: only complete entries are consumed.
 Check original NDJSON filename casing and reject a same-split repeated label stem.
-For native YAML training, also verify that real image/label copies and native cache files remain
-under `CY_HOME/.cache/clearml-yolo/native-datasets` while every source byte stays unchanged.
+Verify source image bytes remain unchanged and the successful result contains non-null prepared
+ground-truth and dataset paths.
 
 ```bash
 uv run cy ground_truth="$TRUTH" dataset_cache_dir="$CACHE" run_dir="$RUNS/candidate" ultralytics.model="$MODEL" ultralytics.epochs=2 ultralytics.imgsz=64 ultralytics.batch=2 ultralytics.device=cpu ultralytics.compile=false ultralytics.workers=0 clearml.project_name="$PROJECT" clearml.tags="[$TAG]"
@@ -50,8 +50,8 @@ and PNG diagnostics retain their existing formats.
 
 Use a completed test-owned baseline tagged prod and run another candidate; compare source
 links, frozen exact validation thresholds, paired image membership and reports. Exercise
-cy-val, cy-compare and cy-report separately with the generated examples. Also compare a
-historical artifact-based task and explicit local models with exact thresholds.
+cy-val, cy-compare and cy-report separately with the generated examples. Also compare explicit
+local models with exact thresholds, and verify historical-only task publications are rejected.
 
 Inject rejected artifact/model upload, missing callback registration, flush failure and
 interruption in isolated invocations; none may complete successfully. Record dated portable

@@ -9,6 +9,10 @@
 
 **Input**: User requirement: all configuration parts uploaded to ClearML files must be resolved without interpolation. The user approved the implementation plan and requested implementation using subagents and the full Spec Kit workflow.
 
+**Current-only amendment (2026-10-02)**: Direct native-dataset training was removed by
+[feature 012](../012-remove-legacy-compatibility/spec.md). Rootless user-supplied dataset-YAML
+anchoring below is superseded; resolution and sanitization still apply to current consumed files.
+
 ## Clarifications
 
 ### Session 2026-09-30
@@ -25,8 +29,6 @@
 - Resolution failures, including missing references, cycles, unknown resolvers and unavailable environment variables, fail publication and invocation. Computed node targets such as `${${key}}` fail confidentially because their credential provenance cannot be established without reevaluation; nested resolver arguments remain supported.
 - Resolve before credential sanitization, preserve the original source file, and keep separate
   unredacted execution and sanitized upload copies. Owned execution copies use `CY_HOME/.tmp`.
-- A native dataset YAML without an explicit root receives its source parent only in the execution
-  copy so moving it does not change relative split paths; published fields remain unchanged.
 - Files without interpolation retain their original execution return path even when the upload copy requires credential sanitization.
 
 ## User Scenarios & Testing
@@ -84,8 +86,7 @@ An operator retains original local configuration and can run with its original v
 - **FR-004**: Resolution MUST occur before credential sanitization; execution and storage copies
   MUST remain separate at unique paths, and credentials, including aliases under innocuous keys,
   MUST NOT be stored. Owned resolved execution copies MUST use workspace temporary storage and be
-  cleaned on invocation exit. A rootless native dataset YAML MUST retain source-relative path
-  semantics without adding the execution-only root to its stored Configuration Object.
+  cleaned on invocation exit.
 - **FR-005**: Preparation MUST preserve original source files and existing YAML comments, including commented interpolation examples.
 - **FR-006**: Resolution failures MUST fail the invocation before unresolved content is attached;
   local diagnostics MUST remain available under existing failure handling without printing
@@ -103,8 +104,7 @@ An operator retains original local configuration and can run with its original v
 - **Effective command context**: Current composed command values, including replay and routing updates.
 - **Storage configuration copy**: Resolved, sanitized file retaining the source field topology
   and comments for the Configuration Object boundary.
-- **Execution configuration copy**: Unredacted invocation-owned file under `CY_HOME/.tmp`; for a
-  rootless native dataset YAML it includes an execution-only source-parent root.
+- **Execution configuration copy**: Unredacted invocation-owned file under `CY_HOME/.tmp`.
 
 ## Success Criteria
 

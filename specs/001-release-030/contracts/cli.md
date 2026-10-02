@@ -1,7 +1,7 @@
 # CLI and configuration contract
 
 Nine entrypoints: cy, cy-train, cy-predict, cy-val, cy-metrics, cy-report, cy-compare,
-cy-ground-truth and cy-init-config. cy-queue remains removed.
+cy-ground-truth and cy-init-config.
 
 `cy-init-config DIRECTORY [--force]` creates missing parent directories and writes one
 editable YAML per execution command, named after that command (including `cy-val.yaml`).
@@ -23,7 +23,7 @@ controlled-key comments and active-first sections are defined in the
 Native group files have native keys at their root. Stage-irrelevant settings are excluded from
 execution and commented in effective native YAML. Wrapper controls remain separate.
 Raw wrapper `cfg`, non-null native `cfg`, nested stage mappings and duplicate native comparison
-inference settings fail with migration guidance. See the current
+inference settings fail ordinary strict validation. See the current
 [configuration contract](../../003-ultralytics-config-groups/contracts/configuration.md).
 Source configurations and resolved configuration are captured before execution.
 
@@ -46,19 +46,21 @@ publishes to FiftyOne.
 Comparison takes baseline_model/candidate_model references, current ground_truth, ultralytics, ultralytics_predict,
 a standalone split override (default `test`) and statistical options. Automatic baseline is latest completed prod excluding
 current task. Explicit local models require weights and exact thresholds; explicit invalid
-inputs fail. Tracked models prefer the exact validation-threshold CSV and retain historical
-per-split threshold payload compatibility; explicitly supplied thresholds remain exact.
+inputs fail. Task recovery uses the exact validation-threshold CSV; exact thresholds supplied
+on an explicit model reference remain authoritative.
 Reports consume the paired evaluated dashboards named by the local comparison manifest, not
 stored historical dashboards. Missing automatic baseline records a skipped comparison.
-Standalone `evaluation` is a sparse mapping (`+evaluation.ap_method=continuous`);
-its supplied values override legacy `iou_threshold` and `matching_strategy`.
+Standalone comparison uses the `evaluation` mapping; matching options are configured only as
+`evaluation.iou_threshold` and `evaluation.matching_strategy`.
 The pipeline forwards the full `metrics.evaluation` configuration to comparison.
 
-Removed auto_gpu, force-gpu, augmentation JSON and clearml.enabled options
-must fail rather than be silently ignored. No public disabled-tracking mode.
+Unsupported options must fail rather than be silently ignored. Every execution command
+requires ClearML tracking.
 
 `cy` and `cy-train` accept `dataset_cache_dir=null`, which selects
 `CY_HOME/.cache/clearml-yolo/datasets` independently of `XDG_CACHE_HOME`, or an explicit shared
 directory outside run outputs. CSV SHA-256, format and preparation version identify
 entries. NDJSON preserves original filename casing; flat names remain numbered. Images are
 immutable and corrections require explicit cache invalidation while not in use.
+`cy-train` requires `ground_truth`; `ultralytics.data` is prepared from that CSV and cannot
+replace the command input.

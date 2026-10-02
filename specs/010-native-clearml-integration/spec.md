@@ -5,6 +5,12 @@
 **Status**: Implemented, verified and converged; see [verification.md](verification.md)
 **Input**: User-approved native tracking, best-model publication and performance-only artifact plan, revalidated against v0.10.0.
 
+**Current-only amendment (2026-10-02)**: The
+[remove-legacy-compatibility feature](../012-remove-legacy-compatibility/spec.md) supersedes
+historical weight and per-split threshold readers. Task-backed recovery now requires the
+role-marked best Output Model and exact validation-threshold CSV. Historical tasks remain
+unchanged, but their old publication shapes are not current inputs.
+
 **Documentation amendment (2026-09-30)**: The standalone split-override wording
 reflects current code and configuration composition. The linked original acceptance
 records exercise paired current-test execution; they do not establish live non-test
@@ -86,7 +92,7 @@ from current-task configuration and follows compared models' source-task provena
 - Native final-best validation values retain upstream epoch semantics; equality of epoch indices does not imply duplicate relay events.
 - Identical CSV contents publish once; logical aliases remain satisfied.
 - Remote overrides, explicit nulls, comments and credential sanitization retain existing configuration-resolution semantics.
-- Historical weight and threshold readers remain supported; no historical configuration artifacts become required.
+- Historical weight and threshold publications are not recovery inputs; current publications are required.
 
 ## Requirements
 
@@ -108,8 +114,9 @@ from current-task configuration and follows compared models' source-task provena
   automatically fetching source General parameters or Configuration Objects.
 - **FR-010**: Comparison MUST retain frozen source validation thresholds, identical paired
   selected-split inputs and shared current comparison inference settings. Standalone comparison
-  defaults to test and accepts a split override; pipeline comparison uses test. Exact supplied
-  thresholds and historical weight/per-split-threshold compatibility MUST remain intact.
+  defaults to test and accepts a split override; pipeline comparison uses test. Model references
+  may carry exact supplied thresholds; task recovery requires the current Output Model and
+  validation-threshold CSV.
 - **FR-011**: Historical tasks, external dependency revisions and unrelated workspace changes MUST remain unchanged.
 
 ### Key Entities
@@ -121,7 +128,7 @@ from current-task configuration and follows compared models' source-task provena
 - **Replay configuration**: sanitized canonical settings of the current invocation; compared
   source tasks contribute provenance links, weights and thresholds.
 - **Frozen threshold table**: validation-calibrated exact thresholds reused for every evaluated
-  or compared split; exact supplied maps and historical per-split payloads remain compatible.
+  or compared split; model references may provide exact supplied maps.
 
 ## Success Criteria
 

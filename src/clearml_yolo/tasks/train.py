@@ -1,7 +1,7 @@
-"""Native training from reusable datasets with one verified native best model."""
+"""CSV-backed native training with one verified native best model."""
 
 from collections.abc import Iterator
-from contextlib import contextmanager, nullcontext
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +22,6 @@ from clearml_yolo.dataset_cache import cached_dataset, dataset_cache_root
 from clearml_yolo.dataset_export import DatasetFormat
 from clearml_yolo.filesystem import model_weights_path, runs_root, write_path
 from clearml_yolo.native_config import execution_settings, stage_settings, write_native_yaml
-from clearml_yolo.native_dataset import native_dataset
 from clearml_yolo.native_ddp import native_ddp_relay
 from clearml_yolo.run_identity import point_latest_at, safe_path_component, task_run_dir
 
@@ -33,8 +32,8 @@ class TrainResult(BaseModel):
     weights: Path
     save_dir: Path
     effective_args: dict[str, Any] = Field(default_factory=dict)
-    cleaned_ground_truth: Path | None = None
-    dataset_reference: Path | None = None
+    cleaned_ground_truth: Path
+    dataset_reference: Path
 
 
 def _project_of_this_run(project: str | None, task: Any) -> Path:
@@ -77,7 +76,7 @@ def _prepare_csv_dataset(
 
 
 def _execute_training(
-    task: Any, architecture: str | Path, settings: dict[str, Any], prepared: PreparedDataset | None
+    task: Any, architecture: str | Path, settings: dict[str, Any], prepared: PreparedDataset
 ) -> TrainResult:
     from ultralytics.models import YOLO
 
@@ -90,19 +89,8 @@ def _execute_training(
         requested,
         "train",
     )
-    data = settings.get("data")
-    preparation = (
-        native_dataset(
-            data, fraction=settings.get("fraction", 1.0), split=settings.get("split", "val")
-        )
-        if prepared is None and isinstance(data, (str, Path))
-        else nullcontext(data)
-    )
-    with preparation as owned_data, native_ddp_relay(task, model) as relay:
-        effective_settings = (
-            settings | {"data": str(owned_data)} if owned_data is not None else settings
-        )
-        model.train(**effective_settings)
+    with native_ddp_relay(task, model) as relay:
+        model.train(**settings)
         trainer: Any = model.trainer
         relay.replay(trainer)
         directory = Path(trainer.save_dir)
@@ -123,21 +111,21 @@ def _execute_training(
             weights=best,
             save_dir=directory,
             effective_args=effective,
-            cleaned_ground_truth=prepared.ground_truth if prepared is not None else None,
-            dataset_reference=prepared.data if prepared is not None else None,
+            cleaned_ground_truth=prepared.ground_truth,
+            dataset_reference=prepared.data,
         )
 
 
 def train(
     ultralytics: dict[str, Any],
     clearml: ClearMLConfig,
+    ground_truth: str | Path,
     ultralytics_predict: dict[str, Any] | None = None,
-    ground_truth: str | Path | None = None,
     dataset_format: DatasetFormat = "ndjson",
     required_splits: list[str] | None = None,
     dataset_cache_dir: str | Path | None = None,
 ) -> TrainResult:
-    """Train inside the shared entry lock; native callbacks own training publications."""
+    """Train from CSV ground truth; native callbacks own training publications."""
     task = init_task(clearml, stage="train")
     stage_settings(ultralytics_predict or {}, "predict")
     settings = execution_settings(ultralytics, "train")
@@ -148,16 +136,7 @@ def train(
     settings["project"] = str(_project_of_this_run(settings.get("project"), task))
     settings["name"] = settings.get("name") or safe_path_component(task_identity(task)[1])
     write_path(Path(settings["project"]) / str(settings["name"]))
-    if ground_truth is None:
-        data = settings.get("data")
-        if isinstance(data, (str, Path)) and (Path(data).is_file() or not task.running_locally()):
-            settings["data"] = str(connect_config_file(task, "dataset", Path(data)))
-    preparation = (
-        _prepare_csv_dataset(
-            task, settings, ground_truth, dataset_format, required_splits, dataset_cache_dir
-        )
-        if ground_truth is not None
-        else nullcontext((None, settings))
-    )
-    with preparation as (prepared, effective):
+    with _prepare_csv_dataset(
+        task, settings, ground_truth, dataset_format, required_splits, dataset_cache_dir
+    ) as (prepared, effective):
         return _execute_training(task, architecture, effective, prepared)

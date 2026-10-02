@@ -50,8 +50,6 @@ def _header(config_name: str, command: str, directory: Path) -> str:
                 "# CSV data overrides native data, class filters, and dataset fractions.",
             ]
         )
-    if config_name == "train":
-        lines.append("# Without ground_truth, set ultralytics.data for native dataset training.")
     if config_name in {"predict", "val"}:
         lines.append("# Set weights to your trained checkpoint (or use ultralytics_predict.model).")
     if config_name in NATIVE_COMMANDS:

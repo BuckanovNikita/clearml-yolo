@@ -1088,7 +1088,7 @@ def test_configuration_copies_have_unique_paths_without_artifact_registration(
     assert task.uploads == []
 
 
-def test_resolved_dataset_execution_keeps_relative_path_base_and_cleans_owned_copy(
+def test_resolved_configuration_preserves_fields_and_cleans_owned_copy(
     fake_clearml: tuple[type[Any], FakeTask], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _, task = fake_clearml
@@ -1107,7 +1107,7 @@ def test_resolved_dataset_execution_keeps_relative_path_base_and_cleans_owned_co
         assert effective != source
         assert effective.is_file()
         assert YAML(typ="safe").load(effective)["train"] == "images/train"
-        assert YAML(typ="safe").load(effective)["path"] == str(source.parent)
+        assert "path" not in YAML(typ="safe").load(effective)
     assert source.is_file()
     assert neighbor.read_text() == "untouched\n"
     assert not effective.exists()

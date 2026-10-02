@@ -91,9 +91,7 @@ def trained_imgsz(weights: str | Path) -> int | None:
 def resolution_of(weights: str | Path, imgsz: int | list[int] | None) -> ScoredResolution:
     """Report checkpoint resolution without using it as an inference default."""
     if imgsz is None:
-        raise ValueError(
-            "Set imgsz explicitly in ultralytics_predict; checkpoint fallback was removed"
-        )
+        raise ValueError("Set imgsz explicitly in ultralytics_predict")
     recorded = trained_imgsz(weights)
     if recorded is not None and recorded != imgsz:
         logger.warning(

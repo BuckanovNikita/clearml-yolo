@@ -6,9 +6,10 @@ Use Python 3.12 and the locked project environment:
 git submodule update --init --recursive
 uv sync --locked --group dev
 uv run cy-init-config ./conf
-uv run cy-train --config-dir=./conf --config-name=cy-train --cfg job
+uv run cy-train --config-dir=./conf --config-name=cy-train --cfg job \
+  ground_truth=ground_truth.csv
 uv run cy --config-dir=./conf --config-name=cy --cfg job \
-  ground_truth=ground_truth.csv ultralytics.data=data.yaml
+  ground_truth=ground_truth.csv
 ```
 
 The last two commands only compose settings. They do not train or create a task.
@@ -30,7 +31,7 @@ uv build
 Install the wheel and source archive into separate fresh environments, supplying the
 exact upstream Git requirements in the [release notes](../../docs/releases/0.3.0.md).
 These installations must not depend on editable submodule paths. Check all nine
-command helps, absence of `cy-queue`, example generation, collision/force behavior, and
+command helps, example generation, collision/force behavior, and
 composition through all eight execution commands. Scan first-party Python for the
 prohibited import. Do not scan or modify external dependency checkouts.
 

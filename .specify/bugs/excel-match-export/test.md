@@ -50,7 +50,7 @@ Updated and inspected:
 - [Active spec](../../../specs/008-dataset-clearml-tracking/spec.md).
 - [Quickstart](../../../specs/008-dataset-clearml-tracking/quickstart.md).
 - [Contract index](../../../docs/current-contracts.md).
-- [Export migration](../../../docs/migration-evaluation-csv.md).
+- [Export migration](https://github.com/BuckanovNikita/clearml-yolo/blob/96aa7508d9e16364722d9126f37748ce074d2134/docs/migration-evaluation-csv.md).
 - [Integration skill](../../../.agents/skills/running-end-to-end-tests/SKILL.md).
 
 Documentation describes exact workbook sheets, CSV filenames, full-precision

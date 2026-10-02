@@ -1,5 +1,9 @@
 # Tasks: Workspace-owned filesystem defaults
 
+> Historical path note (2026-10-02): `src/clearml_yolo/native_dataset.py` and
+> `tests/test_native_dataset.py` named in completed tasks below were removed by
+> [feature 012](../012-remove-legacy-compatibility/spec.md). The entries remain as completed history.
+
 **Input**: [spec.md](spec.md), [plan.md](plan.md), [research.md](research.md),
 [data-model.md](data-model.md), [filesystem contract](contracts/filesystem-ownership.md)
 

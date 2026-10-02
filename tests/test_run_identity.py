@@ -1,7 +1,6 @@
 """Run identity: the id, the private run directory, and the ``latest`` symlink."""
 
 from collections.abc import Callable
-from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -12,12 +11,10 @@ from clearml_yolo.run_identity import (
     LATEST_LINK_NAME,
     point_latest_at,
     resolve_run_dir,
-    resolve_run_id,
 )
 
 HOST = "box"
 PID = 4242
-NOON = datetime(2026, 8, 16, 12, 0, 0, tzinfo=UTC)
 
 
 @pytest.fixture
@@ -37,28 +34,6 @@ def _warnings_from(action: Callable[[], None]) -> list[str]:
 
 
 @pytest.mark.usefixtures("fixed_identity")
-def test_an_explicit_run_id_is_used_exactly_as_given() -> None:
-    """Naming an id is how a rerun deliberately lands beside an earlier one."""
-    assert resolve_run_id("yolo-run", "handmade", NOON) == "handmade"
-
-
-@pytest.mark.usefixtures("fixed_identity")
-def test_a_generated_run_id_carries_the_task_the_host_the_stamp_and_the_pid() -> None:
-    """Drop any one of the four and two runs somewhere can still land in one directory."""
-    run_id = resolve_run_id("yolo-run", None, NOON)
-    for part in ("yolo-run", HOST, "20260816-120000", str(PID)):
-        assert part in run_id, part
-
-
-@pytest.mark.usefixtures("fixed_identity")
-def test_two_runs_a_second_apart_on_one_machine_get_different_ids() -> None:
-    """A pid is reused after a reboot, and ultralytics still trains with exist_ok=True, so
-    without the stamp the second run would silently overwrite the first one's directory."""
-    later = NOON.replace(second=1)
-
-    assert resolve_run_id("yolo-run", None, NOON) != resolve_run_id("yolo-run", None, later)
-
-
 def test_an_explicit_run_dir_wins_over_the_one_the_id_would_name(tmp_path: Path) -> None:
     """A run pointed at a scratch disk must write there and not under the workspace."""
     elsewhere = tmp_path / "scratch" / "somewhere"

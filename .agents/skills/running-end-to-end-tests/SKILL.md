@@ -58,10 +58,9 @@ this branch.
    Samples. Confirm one task per invocation, owner-only training/validation callbacks,
    and no duplicate checkpoint artifacts.
    Repeat CSV training against one dataset cache: filenames and extension casing remain
-   intact, and image copies and NDJSON conversion do not repeat. Internal manifests and
-   diagnostic receipts remain local. For native-YAML training, verify real image/label copies
-   and native caches remain under the locked workspace cache while original source bytes remain
-   unchanged. Inspect the workspace after success and injected failure for owned temporary files.
+   intact, image copies and NDJSON conversion do not repeat, source bytes remain unchanged,
+   and the returned prepared paths are present. Internal manifests and diagnostic receipts
+   remain local. Inspect the workspace after success and injected failure for owned temporary files.
    Explicit output/cache paths outside `CY_HOME` must remain selected; a physical-home destination
    warns without rejection or relocation.
 7. Check artifact/model upload rejection, callback-registration failure, flush failure and
@@ -72,7 +71,7 @@ this branch.
    Clean up only owned resources per that environment's instructions.
 
 Build and install both distributions in fresh environments for release acceptance.
-Verify nine command helps, absence of `cy-queue`, and documented configuration examples.
+Verify all nine command helps and documented configuration examples.
 Check `cy-init-config` generation and overwrite protection without a ClearML task.
 CPU and single-GPU runs are required release gates; report an unavailable device as
 an unverified gate. Describe physical multi-GPU execution as unverified unless exercised.

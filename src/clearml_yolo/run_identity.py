@@ -1,13 +1,8 @@
-"""Filesystem-only output identities and the workspace's latest-run shortcut.
-
-Execution roots use plain identity values supplied by the tracking adapter. The legacy
-host/time identity helper remains available to callers that explicitly use it.
-"""
+"""Filesystem-only output identities and the workspace's latest-run shortcut."""
 
 import os
 import socket
 from contextlib import suppress
-from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
 
@@ -18,11 +13,6 @@ from clearml_yolo.filesystem import write_path
 # The symlink beside the run directories that always names the newest of them, so the
 # documented habits stay one directory away: ``ls runs/latest/metrics``.
 LATEST_LINK_NAME = "latest"
-
-# The directory the run directories and that link live in. A run that was not told where
-# to write names itself one under here, whether it is the whole pipeline or a single
-# standalone app.
-RUNS_ROOT = Path("runs")
 
 
 def safe_path_component(value: str) -> str:
@@ -54,24 +44,8 @@ def task_run_dir(root: Path, project_name: str, task_name: str, task_id: str) ->
 
 
 def _host_and_pid() -> tuple[str, int]:
-    """The two facts that separate concurrent runs, behind one seam.
-
-    Both are read through here rather than inline so a test can make an id reproducible by
-    replacing this single function.
-    """
+    """Identify concurrent latest-link updates and displaced destinations."""
     return socket.gethostname(), os.getpid()
-
-
-def resolve_run_id(task_name: str, explicit: str | None, now: datetime) -> str:
-    """Name this run, unless the caller already named it.
-
-    An explicit id wins outright: it is how two stages of one pipeline, or a rerun that
-    means to land beside an earlier one, share a directory on purpose.
-    """
-    if explicit:
-        return explicit
-    host, pid = _host_and_pid()
-    return f"{task_name}-{host}-{now:%Y%m%d-%H%M%S}-{pid}"
 
 
 def resolve_run_dir(root: Path, run_id: str, explicit: Path | None) -> Path:

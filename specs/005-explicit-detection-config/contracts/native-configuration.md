@@ -17,7 +17,7 @@ weights or explicit ultralytics_predict.model provide model. No training-model f
 ## Validation and filtering
 
 Known detection-irrelevant settings remain commented and are omitted from execution.
-Unknown keys and non-null cfg fail with guidance. Non-detect task, wrong stage mode,
+Unknown keys and non-null cfg fail ordinary strict validation. Non-detect task, wrong stage mode,
 non-null embed and invalid image size fail rather than silently changing the workflow.
 Complete resolved execution mappings are mandatory; sparse Python callers must explicitly
 compose settings. Aliases cannot silently override populated canonical parameters.
@@ -32,9 +32,9 @@ Native owner-only training/validation previews are permitted. No extra tasks, ch
 duplicates, or weakened artifact/model failure handling; see the
 [publication contract](../../008-dataset-clearml-tracking/contracts/publication.md).
 
-## Migration
+## Current configuration examples
 
-Regenerate old examples with cy-init-config into a new directory, then reapply explicit
-choices. Prediction values no longer come from an implicit merge. Use weights or
-ultralytics_predict.model for standalone inference. Remove unsupported/deprecated aliases
-in favor of the installed canonical parameter. No dependency update is required.
+Generate complete examples with cy-init-config into a new directory, then apply explicit
+choices. Prediction values come only from the resolved prediction group. Use weights or
+ultralytics_predict.model for standalone inference. Use the installed canonical parameter
+names. No dependency update is required.

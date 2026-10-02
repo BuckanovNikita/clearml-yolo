@@ -18,6 +18,11 @@ a write resolves physically beneath the user's home without rejecting or relocat
 > application-owned storage and the named Ultralytics, ClearML and FiftyOne data stores below.
 > Earlier dependency-wide routing statements are superseded by this correction; dated verification
 > remains evidence of what was checked before the correction, not evidence for the corrected code.
+>
+> **Current-only amendment (2026-10-02):** The
+> [remove-legacy-compatibility feature](../012-remove-legacy-compatibility/spec.md) removes direct
+> native-dataset training, native staging and the `TRAINS_CACHE_DIR` alias. CSV preparation owns
+> training data, and `CLEARML_CACHE_DIR` is the supported explicit ClearML cache setting.
 
 ## Clarifications
 
@@ -31,15 +36,14 @@ a write resolves physically beneath the user's home without rejecting or relocat
   outside it does not warn; a path elsewhere that resolves into home does warn.
 - Existing ClearML and FiftyOne configuration may be read from home. It is not copied, rewritten
   or treated as an automatic output. Explicit FiftyOne dataset, dataset-zoo and database directory
-  values remain authoritative. The legacy `TRAINS_CACHE_DIR` ClearML alias remains supported.
+  values remain authoritative. `CLEARML_CACHE_DIR` is the supported explicit ClearML cache setting.
 - `dataset_cache_dir=null` always uses `CY_HOME/.cache/clearml-yolo/datasets`, even when
   `XDG_CACHE_HOME` is set. An explicit `dataset_cache_dir` remains authoritative.
 - General XDG, Python bytecode, Torch/CUDA/Triton/Numba/Hugging Face/Matplotlib, ETA,
   FiftyOne model-zoo/plugins/config and process temporary defaults are outside workspace routing.
   Application-owned temporary resources still use `CY_HOME/.tmp` explicitly.
-- Native YAML inputs require real image and label copies because Ultralytics may repair images or
-  write caches beside them. Copies are reusable and locked through training; source data is
-  assumed immutable until the unused cache entry is explicitly invalidated.
+- CSV training preparation owns the native data reference in its reusable, locked dataset cache;
+  source images are immutable until the unused cache entry is explicitly invalidated.
 - Temporary comparison files remain beside an explicitly selected output to preserve atomic
   same-filesystem replacement. They are task-owned and cleaned on success and failure.
 - The policy covers application-owned storage and the named dependency data stores. It is not an
@@ -93,22 +97,22 @@ including symlinks into and out of home, and inspect the resolved writes and war
    initializes application storage, **Then** those general defaults remain absent and retain their
    ordinary library behavior.
 
-### User Story 3 - Protect source data from native writes (Priority: P1)
+### User Story 3 - Protect CSV training sources (Priority: P1)
 
-An operator trains from a native dataset YAML without allowing native cache generation or repair
-to modify source images or annotations.
+An operator trains from ground-truth CSV without allowing dataset preparation or native execution
+to modify source images or the source table.
 
 **Why this priority**: Native training can write beside dataset inputs; source datasets are user
 data and must remain unchanged.
 
-**Independent Test**: Train or instantiate the native dataset on a staged copy, produce native
-image/label caches and a simulated repair, then compare all source bytes with their originals.
+**Independent Test**: Prepare and train the CSV dataset, then compare all source bytes with their
+originals and inspect the returned prepared paths.
 
 **Acceptance Scenarios**:
 
-1. **Given** a native dataset YAML, **When** training starts, **Then** real images and matching
-   labels are copied into a reusable workspace cache before native dataset access.
-2. **Given** two invocations selecting the same native dataset, **When** native writes occur, **Then**
+1. **Given** a ground-truth CSV, **When** training starts, **Then** preparation publishes a complete
+   reusable workspace-cache entry and returns its cleaned CSV and native data paths.
+2. **Given** two invocations selecting the same CSV and format, **When** training runs, **Then**
    one cache entry is used under an exclusive lock held through training.
 3. **Given** an existing explicit checkpoint path, **When** a model loads, **Then** the original
    path remains the input; an absent bare checkpoint name uses the workspace weight cache.
@@ -126,8 +130,7 @@ inference manifests and atomic replacement, then inspect the selected temporary 
 **Acceptance Scenarios**:
 
 1. **Given** a resolved execution configuration, **When** it is moved to workspace temporary
-   storage, **Then** a rootless native dataset YAML retains source-relative split semantics while
-   its sanitized publication retains the original fields.
+   storage, **Then** its sanitized publication retains the supported source fields.
 2. **Given** an atomic comparison write to an explicit output filesystem, **When** serialization or
    replacement fails, **Then** the previous output remains and the adjacent partial file is removed.
 3. **Given** native runtime completion or failure, **When** its scope exits, **Then** modified native
@@ -138,11 +141,9 @@ inference manifests and atomic replacement, then inspect the selected temporary 
 - Explicit relative command paths keep their existing command working-directory semantics.
 - Remote model references and non-checkpoint strings are not rewritten as local cache paths.
 - A broken or invalid existing FiftyOne JSON configuration fails explicitly without being changed.
-- Native YAML files with absolute, relative, list or text-file split sources preserve image
-  membership in staged copies; missing labels remain valid negative images.
-- Read-only native images and labels produce owner-writable copies without changing source
-  permissions; cwd-relative text manifests receive distinct entries when their targets differ.
-- Startup preserves legacy `TRAINS_CACHE_DIR` as an explicit ClearML cache selection.
+- CSV paths resolve according to the dataset contract, and background rows remain valid negative images.
+- Read-only source images remain unchanged during preparation and training.
+- Startup recognizes `CLEARML_CACHE_DIR`, not `TRAINS_CACHE_DIR`, as the explicit ClearML cache selection.
 - `XDG_CACHE_HOME` does not change the null CSV dataset cache default.
 - Existing cache contents are neither migrated nor deleted when `CY_HOME` changes.
 
@@ -153,7 +154,7 @@ inference manifests and atomic replacement, then inspect the selected temporary 
 - **FR-001**: All nine command entrypoints MUST initialize filesystem defaults before importing
   execution dependencies. `CY_HOME` MUST default to the launch working directory, and relative
   values MUST be resolved against that directory once.
-- **FR-002**: Automatic run and Hydra output paths MUST use `CY_HOME`. CSV/native dataset caches,
+- **FR-002**: Automatic run and Hydra output paths MUST use `CY_HOME`. The CSV dataset cache,
   Ultralytics downloaded datasets/weights/settings, ClearML downloads/cache and FiftyOne
   dataset/dataset-zoo/database storage MUST use their documented locations beneath `CY_HOME` when
   no explicit selection exists. Owned temporary files MUST use `CY_HOME/.tmp`.
@@ -163,17 +164,15 @@ inference manifests and atomic replacement, then inspect the selected temporary 
   destination per process without rejection. Home classification MUST follow existing symlinks.
 - **FR-005**: Startup MUST NOT reassign `HOME`, rewrite existing user configuration or migrate or
   delete existing caches. Existing ClearML/FiftyOne configuration may remain a read-only input,
-  and explicit FiftyOne data paths plus the ClearML `TRAINS_CACHE_DIR` alias MUST be preserved.
-- **FR-006**: Native YAML training MUST use real cached image and matching-label copies under the
-  workspace and MUST hold per-entry ownership through native training writes. Original sources
-  MUST remain unchanged.
+  and explicit FiftyOne data paths plus `CLEARML_CACHE_DIR` MUST be preserved.
+- **FR-006**: CSV training preparation MUST own the native data reference in the shared workspace
+  cache and MUST hold per-entry ownership through training. Original sources MUST remain unchanged.
 - **FR-007**: Native default dataset, weight and run directories plus DDP launcher storage MUST be
   scoped to the workspace for an invocation, while explicit configured native values remain
   selected and every modified native global is restored afterward.
 - **FR-008**: Resolved execution configuration copies, inference manifests and DDP relay/runtime
   files MUST use owned temporary storage and be cleaned on success, failure and interruption.
-  Moving a rootless native dataset YAML MUST preserve source-relative split semantics without
-  adding the execution-only root to its sanitized publication.
+  Sanitized publications MUST retain supported source fields without temporary execution paths.
 - **FR-009**: Existing explicit checkpoint inputs and remote references MUST remain unchanged.
   Only an absent bare `.pt` checkpoint name MUST select the workspace weight cache.
 - **FR-010**: Atomic comparison publication MAY create its temporary file beside the explicit
@@ -194,7 +193,7 @@ inference manifests and atomic replacement, then inspect the selected temporary 
   run/cache/Ultralytics-settings/temp roots.
 - **Destination selection**: Automatic default or explicit path plus its physical home-warning
   classification.
-- **Native dataset entry**: Stable source-derived identity, staged YAML, copied images/labels and
+- **Prepared dataset entry**: CSV/format/version identity, cleaned CSV, native data reference and
   lifetime lock.
 - **Owned temporary resource**: Invocation-scoped file or directory with a defined cleanup owner.
 - **Native runtime scope**: Selected native directories and the original global state restored on
@@ -208,8 +207,8 @@ inference manifests and atomic replacement, then inspect the selected temporary 
   the selected workspace while every excluded general dependency/process default stays unchanged.
 - **SC-002**: Every tested explicit output/cache/configuration destination remains unchanged; each
   physical-home target produces exactly one warning and zero rejections or relocations.
-- **SC-003**: Native staging tests produce image and label caches and simulated repairs while
-  every source image, label and YAML byte remains unchanged.
+- **SC-003**: CSV preparation and training tests return required prepared paths while every
+  source CSV and image byte remains unchanged.
 - **SC-004**: Success and injected-failure tests leave zero owned configuration, inference, DDP and
   atomic-publication temporary files.
 - **SC-005**: Repository tests, Ruff, strict mypy and import-linter pass, and changed Markdown and
@@ -217,7 +216,7 @@ inference manifests and atomic replacement, then inspect the selected temporary 
 
 ## Assumptions
 
-- Native source images and labels are immutable while a reusable cache entry exists; corrections
+- Source images are immutable while a reusable cache entry exists; corrections
   are followed by explicit invalidation when no invocation holds the entry.
 - Filesystems used for shared dataset caches support process locks and atomic rename.
 - External scripts, plugins, runners and the Python interpreter before package bootstrap may need

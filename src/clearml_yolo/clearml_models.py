@@ -1,24 +1,14 @@
-"""Fetch a previous run's checkpoint and thresholds back out of ClearML.
-
-Every stage after training needs artefacts a *past* run produced: the comparison needs
-the old model's weights, and scoring at frozen thresholds needs the confidences that
-run calibrated. Both live on a ClearML task, and nothing else in the project reads them
-back — the report stage pulls dashboards, but a dashboard is neither a checkpoint nor a
-full-precision threshold table.
-"""
+"""Recover current best Output Models and exact validation thresholds from ClearML."""
 
 import csv
-import json
 import math
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
-from urllib.parse import unquote, urlsplit
 
-import pandas as pd
 from loguru import logger
 
-from clearml_yolo.artifact_names import BEST_CONFIDENCES_PREFIX, per_split
+from clearml_yolo.artifact_names import BEST_CONFIDENCES_VAL
 from clearml_yolo.filesystem import model_weights_path
 
 # ClearML ids are 32 lowercase hex characters. Recognising them by shape is what lets
@@ -61,8 +51,8 @@ def latest_completed_task_id(
     ``task_name`` is anchored before it is sent. ClearML matches it as a regular
     expression against any part of the name, so an unanchored ``yolo-v1`` also matches
     ``yolo-v10`` — and since the newest match wins, asking for one model can silently
-    return a different one. Anchoring leaves deliberate patterns working: pass
-    ``yolo-v1.*`` to get the old behaviour back.
+    return a different one. Anchoring also supports deliberate patterns such as
+    ``yolo-v1.*``.
     """
     from clearml import Task
 
@@ -93,10 +83,7 @@ def best_output_model(task: Any) -> Any | None:
     """Select explicitly marked best weights, independent of registration order."""
     outputs: list[Any] = list(task.get_models().get("output") or [])
     candidates = [
-        model
-        for model in outputs
-        if model.get_metadata("clearml_yolo_checkpoint_role") == "best"
-        or Path(unquote(urlsplit(str(model.url or "")).path)).name == "best.pt"
+        model for model in outputs if model.get_metadata("clearml_yolo_checkpoint_role") == "best"
     ]
     if len(candidates) > 1:
         raise ValueError(f"Ambiguous best output models on ClearML task {task.id}")
@@ -121,39 +108,15 @@ def source_model_links(task_id: str) -> dict[str, str]:
     return links
 
 
-def _checkpoint_from_artifacts(task: Any) -> str | None:
-    """Fall back to an uploaded .pt artifact, for tasks that saved one by hand."""
-    artifacts: dict[str, Any] = task.artifacts
-    preferred = (
-        "train_weights_best.pt",
-        "train_weights_best",
-        "best.pt",
-        "best",
-        "model",
-        "checkpoint",
-    )
-    named = [name for name in preferred if name in artifacts]
-    named.extend(
-        name for name in sorted(artifacts) if name not in named and str(name).endswith(".pt")
-    )
-    for name in named:
-        artifact = artifacts[name]
-        local = Path(str(artifact.get_local_copy()))
-        if local.suffix == ".pt":
-            logger.info("Using artifact {!r} of task {} as the checkpoint", name, task.id)
-            return str(local)
-    return None
-
-
 def resolve_task_weights(task_id: str) -> Path:
-    """Download the checkpoint a ClearML task produced and return its local path."""
+    """Download the best Output Model a ClearML task produced."""
     task = _task(task_id)
-    checkpoint = _checkpoint_from_models(task) or _checkpoint_from_artifacts(task)
+    checkpoint = _checkpoint_from_models(task)
     if checkpoint is None:
         raise ValueError(
-            f"ClearML task {task_id} ({task.name}) registered no output model and uploaded "
-            "no .pt artifact, so it carries no checkpoint to run. Point at the training task "
-            "rather than a downstream stage, or pass a local path instead."
+            f"ClearML task {task_id} ({task.name}) registered no best Output Model, so it "
+            "carries no current checkpoint to run. Point at the training task or pass a local "
+            "path instead."
         )
     path = Path(checkpoint)
     if not path.is_file():
@@ -174,17 +137,6 @@ def resolve_weights(weights: str | Path) -> str | Path:
         return resolve_task_weights(text)
     # Native downloads use the workspace, while existing and explicit file paths stay intact.
     return model_weights_path(weights)
-
-
-def _as_threshold_mapping(payload: Any) -> dict[str, float]:
-    if isinstance(payload, pd.DataFrame):
-        frame = payload if payload.shape[1] == 1 else payload.iloc[:, :1]
-        return {str(name): float(value) for name, value in frame.iloc[:, 0].items()}
-    if isinstance(payload, pd.Series):
-        return {str(name): float(value) for name, value in payload.items()}
-    if isinstance(payload, dict):
-        return {str(name): float(value) for name, value in payload.items()}
-    raise TypeError(f"Unsupported best_confidences artifact of type {type(payload).__name__}")
 
 
 def _validated_thresholds(values: dict[str, float]) -> dict[str, float]:
@@ -209,24 +161,19 @@ def _threshold_csv(path: Path) -> dict[str, float]:
     return _validated_thresholds(values)
 
 
-def fetch_best_confidences(task_id: str, split: str) -> dict[str, float]:
-    """Prefer exact validation CSV; retain historical per-split payload readers."""
+def fetch_best_confidences(task_id: str) -> dict[str, float]:
+    """Read exact validation thresholds from the current CSV publication."""
     task = _task(task_id)
-    validation = task.artifacts.get(per_split(BEST_CONFIDENCES_PREFIX, "val"))
-    if validation is not None:
-        local = validation.get_local_copy()
-        if local and Path(str(local)).suffix.lower() == ".csv":
-            return _threshold_csv(Path(str(local)))
-    name = per_split(BEST_CONFIDENCES_PREFIX, split)
-    artifact = task.artifacts.get(name)
+    artifact = task.artifacts.get(BEST_CONFIDENCES_VAL)
     if artifact is None:
         raise ValueError(
-            f"ClearML task {task_id} ({task.name}) has no {name!r} artifact or exact "
-            "validation threshold CSV. Run validation metrics or supply thresholds explicitly."
+            f"ClearML task {task_id} ({task.name}) has no {BEST_CONFIDENCES_VAL!r} CSV "
+            "artifact. Run validation metrics or supply thresholds explicitly."
         )
-    payload: Any = artifact.get()
-    if isinstance(payload, str):
-        payload = json.loads(payload)
-    thresholds = _validated_thresholds(_as_threshold_mapping(payload))
-    logger.info("Thresholds of task {} for split {!r}: {} classes", task_id, split, len(thresholds))
+    local = artifact.get_local_copy()
+    path = Path(str(local))
+    if not local or path.suffix.lower() != ".csv":
+        raise ValueError(f"ClearML artifact {BEST_CONFIDENCES_VAL!r} must be a CSV file")
+    thresholds = _threshold_csv(path)
+    logger.info("Validation thresholds of task {}: {} classes", task_id, len(thresholds))
     return thresholds

@@ -1,22 +1,20 @@
 # Publication inventory and adapters
 
-| Before | After |
+| Current publication | Destination and contents |
 |---|---|
-| artifact_manifest, resolved/effective configuration dumps, source_hydra copies | Internal verification; canonical run Configuration Object only |
-| training_model_reference, train_effective_arguments/output_location, train_data_overrides | run meaningful differences; native General training arguments |
-| train_weights_best.pt / last.pt and native output model | One native best.pt Output Model |
-| train CSV/plot files, batch previews omitted | Native Scalars, Plots, Debug Samples |
-| dataset_preparation, labels.zip, dataset_ndjson | Local only |
-| dataset_ground_truth, ground_truth, metrics_ground_truth, compare_ground_truth | One ground_truth CSV per distinct content |
-| predict_predictions, metrics_predictions, compare_predictions_ROLE_SPLIT | One canonical prediction CSV per distinct content/result |
-| metrics_best_confidences_SPLIT dictionary | metrics_best_confidences_val full-precision CSV, once per calibrated model |
-| full/dtrk dashboards, raw metrics, matches, summaries, confusion PNG, plot files, evaluation JSON | metrics_evaluation_SPLIT XLSX containing only summary, per_class and confusion_matrix; ground_truth_matches, prediction_matches, thresholds and methodology CSV sidecars; local diagnostics retained |
-| compare per-role dashboards/raw metrics/metadata/native ZIP, counts/exclusions/methodology dumps | compare_workbook_SPLIT XLSX containing only Сравнение; excluded and methodology CSV sidecars; source links in run configuration |
-| comparison_manifest/status/model-reference dumps | Local manifest and meaningful run configuration fields |
-| report input dashboards/manifest | Local inputs only |
-| report_dev_SPLIT, report_business_SPLIT | Final XLSX workbooks retained |
-| fiftyone_publication diagnostic receipt | Local receipt; meaningful link in run configuration |
-| dataset/native/report YAML object plus artifact | Consumed dataset and explicit report object only; local commented native YAML |
+| Native best checkpoint | One role-marked best Output Model |
+| Native training/validation telemetry | Scalars, Plots and owner-only Debug Samples |
+| ground_truth | One CSV artifact per distinct content |
+| predictions | One canonical CSV artifact per distinct content/result |
+| metrics_best_confidences_val | Full-precision CSV artifact, once per calibrated model |
+| metrics_evaluation_SPLIT | XLSX artifact containing only summary, per_class and confusion_matrix |
+| Evaluation row-level evidence | ground_truth_matches, prediction_matches, thresholds and methodology CSV sidecars |
+| compare_workbook_SPLIT | XLSX artifact containing only Сравнение; excluded and methodology CSV sidecars |
+| compare_evaluation_candidate_SPLIT | Skipped-baseline XLSX artifact containing Classes and Summary; thresholds and methodology CSV sidecars |
+| report_dev_SPLIT, report_business_SPLIT | Final XLSX artifacts |
+| run, consumed dataset, explicit report configuration | Canonical Configuration Objects; native General owns training arguments |
+| Source links and meaningful requested/effective differences | Canonical run configuration |
+| Preparation records, NDJSON, label archives, native YAML, raw metrics, dashboards, JSON/PNG diagnostics, comparison manifests, report inputs and publication receipts | Local files only; meaningful result links recorded in run configuration |
 
 `expect_artifacts(task, names)` and `upload_artifact(task, name, path)` remain strict.
 `publish_table(task, name, path)` performs table content deduplication and internally satisfies
@@ -41,9 +39,8 @@ predict = truth + prediction; metrics = truth + prediction + validation threshol
 workbooks and CSV sidecars; val = predict + metrics union; compare = truth + paired predictions +
 comparison workbook and CSV sidecars (candidate evaluation workbook and its sidecars if automatic
 baseline is absent); report = final reports;
-ground-truth = truth; pipeline = deduplicated union. Native-YAML-only training publishes its
-consumed dataset Configuration Object and native model; it does not produce a truth CSV.
-Config-init creates no task/publications.
+ground-truth = truth; pipeline = deduplicated union. Every training inventory starts from CSV
+truth and its consumed prepared-dataset Configuration Object. Config-init creates no task/publications.
 
 Result-only sections such as `evaluation_result` and `fiftyone_result` stay separate from
 executable `evaluation` and `fiftyone` inputs. Remote clones ignore result-only roots and
@@ -56,7 +53,6 @@ Redaction applies to stored copies only; executable local inputs and explicit re
 overrides retain their original values.
 
 Local dataset/configuration files follow the maintained
-[filesystem ownership contract](../../../docs/filesystem-policy.md). Native-YAML training stages
-real image and label copies in its locked workspace cache before native repair or cache generation;
-the original YAML, images and labels remain read-only inputs. Invocation-owned resolved execution
-copies use workspace temporary storage and are not publication artifacts.
+[filesystem ownership contract](../../../docs/filesystem-policy.md). CSV preparation owns the
+native data reference and preserves source images. Invocation-owned resolved execution copies use
+workspace temporary storage and are not publication artifacts.

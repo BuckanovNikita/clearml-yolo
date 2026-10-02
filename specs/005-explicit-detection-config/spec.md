@@ -92,8 +92,8 @@ pipeline uses current test images; standalone comparison uses its explicitly sel
   keep candidate/baseline settings identical and existing command-owned inputs authoritative.
 - **FR-007**: Retain requested and effective values separately, including native image-size
   normalization. Do not infer requested image size from checkpoints.
-- **FR-008**: Document migration by regenerating old sparse examples; preserve CLI group names,
-  native comments, existing dataset/output/tracking contracts and pinned dependencies.
+- **FR-008**: Generate complete current examples; preserve CLI group names, native comments,
+  existing dataset/output/tracking contracts and pinned dependencies.
 
 ### Key Entities
 

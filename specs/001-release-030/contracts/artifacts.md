@@ -22,6 +22,6 @@ settings and meaningful differences/source links. General owns native training a
 Only consumed dataset and explicit report configurations remain separately. Local native YAML
 retains comments and exact replay manifests; configuration artifacts are not published.
 
-See the complete [before/after inventory](../../008-dataset-clearml-tracking/contracts/publication.md)
+See the complete [publication inventory](../../008-dataset-clearml-tracking/contracts/publication.md)
 and [native model mapping](../../008-dataset-clearml-tracking/contracts/model-metadata.md).
-Historical tasks and their readers remain compatible.
+Task recovery requires the current role-marked best Output Model and validation-threshold CSV.

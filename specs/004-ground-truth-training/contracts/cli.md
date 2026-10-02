@@ -1,8 +1,8 @@
 # CSV Training CLI and Publication Contract
 
 `cy ground_truth=truth.csv` trains from the supplied CSV. `cy-train ground_truth=truth.csv`
-uses the same conversion. Both accept `dataset_format=ndjson` (default) or `flat`.
-Standalone `cy-train` without ground truth retains explicit `ultralytics.data` behavior.
+uses the same conversion and requires `ground_truth`. Both accept `dataset_format=ndjson`
+(default) or `flat`; an explicit `ultralytics.data` is not an alternative training input.
 The format is a wrapper parameter, never a native Ultralytics key. No new command.
 
 CSV image paths resolve relative to the CSV directory. Train and val must be nonempty;
@@ -25,6 +25,6 @@ The cleaned canonical `ground_truth.csv` is the performance artifact. Generated 
 is attached as the consumed `dataset` Configuration Object. Requested/effective dataset-policy
 changes are stored in the canonical run Configuration Object under `training_data_overrides`
 or `prediction_data_overrides`. Raw source dataset images are never uploaded as artifacts;
-owner-only native training/validation previews remain permitted. `TrainResult` adds optional
+owner-only native training/validation previews remain permitted. `TrainResult` returns required
 `cleaned_ground_truth` and `dataset_reference` paths so pipeline consumers receive actual
-prepared outputs. Legacy training leaves them null. No stage creates a second tracking task.
+prepared outputs. No stage creates a second tracking task.

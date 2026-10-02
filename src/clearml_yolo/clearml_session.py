@@ -787,14 +787,6 @@ def _prepared_config_file(state: _InvocationState, path: Path) -> tuple[Path, Pa
         if resolved != plain:
             execution_path = state.execution_config_path(path)
             executable = copy.deepcopy(effective)
-            # Native dataset YAML without a root anchors splits to its YAML parent.
-            # Moving the owned copy must not redirect those inputs into our temp directory.
-            if (
-                isinstance(executable, dict)
-                and "train" in executable and "val" in executable
-                and not executable.get("path")
-            ):
-                executable["path"] = str(path.resolve().parent)
             _write_config_document(execution_path, executable, yaml)
         sanitized_path = state.config_path(suffix)
         sanitized = _sanitize_yaml_configuration(

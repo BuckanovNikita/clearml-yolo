@@ -10,7 +10,8 @@ from omegaconf import OmegaConf
 
 from clearml_yolo.apps import common
 from clearml_yolo.clearml_session import ResolvedConfigFile
-from clearml_yolo.run_identity import RUNS_ROOT, task_run_dir
+from clearml_yolo.filesystem import runs_root
+from clearml_yolo.run_identity import task_run_dir
 from test_clearml_session import FakeTask
 
 
@@ -68,7 +69,7 @@ def test_file_resolver_sees_remote_inputs_and_derived_output(
     assert attached == [
         {
             "artifact_dir": str(
-                task_run_dir(RUNS_ROOT, "clone-project", "clone/report", "clone-id") / "report"
+                task_run_dir(runs_root(), "clone-project", "clone/report", "clone-id") / "report"
             ),
             "model": "remote.pt",
             "owner": "remote",

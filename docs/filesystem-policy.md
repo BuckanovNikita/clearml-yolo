@@ -14,7 +14,6 @@ input and output paths retain their existing working-directory semantics.
 | Task-owned runs and latest shortcut | `runs/` |
 | Hydra logs and sweeps | `outputs/`, `multirun/` |
 | Shared CSV datasets | `.cache/clearml-yolo/datasets/` |
-| Writable native YAML dataset copies | `.cache/clearml-yolo/native-datasets/` |
 | Ultralytics downloaded datasets and weights | `.cache/ultralytics/datasets/`, `.cache/ultralytics/weights/` |
 | Ultralytics settings | `.config/Ultralytics/` |
 | ClearML downloads and cache | `.cache/clearml/` |
@@ -26,8 +25,8 @@ input and output paths retain their existing working-directory semantics.
 `dataset_cache_dir` remains authoritative. Explicit command paths, supported dependency
 environment settings and configured native directory values remain valid anywhere. This includes
 existing FiftyOne configuration selections for its dataset, dataset-zoo and database directories.
-`TRAINS_CACHE_DIR` remains the legacy explicit alias for the ClearML cache when
-`CLEARML_CACHE_DIR` is absent. Existing ClearML and FiftyOne configuration can be read from home;
+`CLEARML_CACHE_DIR` is the supported explicit ClearML cache setting. Existing ClearML and
+FiftyOne configuration can be read from home;
 it is neither copied nor rewritten. `HOME` is never reassigned.
 
 The application does not supply workspace defaults for general-purpose dependency or process
@@ -42,28 +41,19 @@ once per resolved destination in a process. Warnings do not reject, relocate or 
 the requested path. Existing symlinks determine the physical destination: a link beneath
 home pointing outside it does not make the external target home-resident.
 
-## Native inputs and temporary ownership
+## Inputs and temporary ownership
 
-Native YAML training stages real copies of source images and matching labels in the
-shared native cache. Copies are owner-writable even when sources are read-only;
-source permissions remain unchanged. Native JPEG repair and label/image cache generation operate on
-those copies. Cache entries are locked throughout training, so native writes cannot race
-another invocation using the same entry. Staging preserves native sorted image membership,
-including repeated entries and manifest paths: `./` entries use the manifest parent;
-other relative entries use the process working directory. Cache identity includes resolved
-text-manifest membership, so different working-directory targets use different entries.
-Source images are assumed immutable; invalidate the unused entry explicitly after source
+Training prepares its native inputs from `ground_truth` in the shared CSV-addressed dataset
+cache. Source images are immutable; callers invalidate an unused prepared entry after source
 corrections. Native defaults for downloaded datasets, weights and runs use the workspace;
-explicit configured values are retained, including NDJSON/platform conversion directories.
-Existing local checkpoints remain input files at their original paths.
-Pipeline prediction retains remote URI strings and explicit relative references. Local
-comparison requires a filesystem checkpoint; resolve remote weights before comparing.
-Comparison reuses the selected native cache for bare checkpoint names.
+explicit configured values remain selected, including NDJSON/platform conversion directories.
+Existing local checkpoints remain input files at their original paths. Pipeline prediction
+retains remote URI strings and explicit relative references. Local comparison requires a
+filesystem checkpoint; resolve remote weights before comparing. Comparison reuses the selected
+native cache for bare checkpoint names.
 
-Resolved execution configurations live in owned temporary storage. A native dataset YAML
-without an explicit root receives its original YAML parent as the execution root, keeping
-relative split paths valid; the sanitized published configuration retains original fields.
-Untransformed configurations retain their original input path. Invocation cleanup removes
+Resolved execution configurations live in owned temporary storage. Untransformed configurations
+retain their original input path. Invocation cleanup removes
 owned temporary copies on success, failure or interruption. Native workers inherit the
 root and scoped settings, and their DDP launcher files are inside the owned runtime directory.
 

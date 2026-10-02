@@ -84,8 +84,10 @@ examples with top-level `ultralytics` and `ultralytics_predict` groups and requi
 The shared group MUST cover the installed native configuration and preserve its comments;
 the prediction group MUST override applicable shared values. Explicit nulls and explicit
 values equal to defaults MUST retain their precedence. Stage-irrelevant settings MUST be
-commented in stage YAML and excluded from native execution. Raw native file loading through
-`cfg` and nested stage-native mappings MUST be rejected with migration guidance.
+commented in stage YAML and excluded from native execution. Unsupported wrapper and native
+settings MUST fail strict validation. Non-null native
+`cfg` and nested stage-native mappings are unsupported. Standalone training MUST require
+CSV ground truth; dataset preparation and replay MUST use the same current input contract.
 Effective native YAML MUST be saved locally with original comments retained. Remote replay
 MUST use canonical nonempty configurations with secrets sanitized; Configuration Objects
 MUST NOT be duplicated as artifacts. Native General parameters own training arguments. Output and checkpoint
@@ -118,7 +120,7 @@ when feasible, and verify the original failure path after the fix. When reproduc
 unavailable, reports MUST distinguish hypotheses, static evidence, and executed checks.
 
 Mocked tests MUST NOT be presented as evidence of training, GPU access, or artifact uploads.
-[tests/test_ultralytics_params.py](../../tests/test_ultralytics_params.py) intentionally checks
+[tests/test_native_config.py](../../tests/test_native_config.py) intentionally checks
 the installed Ultralytics configuration; other tests may stub ClearML, Ultralytics, or Torch.
 Work needing real pipeline evidence MUST follow the `running-end-to-end-tests` skill and
 agent-run contract in [AGENTS.md](../../AGENTS.md).
@@ -169,10 +171,10 @@ files; cleanup MUST affect only resources owned by the task. Select native devic
 explicitly and preserve unrelated workloads. This repository does not deploy or
 tear down shared infrastructure.
 
-Model class names MUST come from the checkpoint rather than ClearML model metadata. Exact
-per-class confidence values MUST come from the source task validation threshold CSV,
-with historical `metrics_best_confidences_<split>` payloads supported for compatibility,
-never rounded dashboard thresholds.
+Model class names MUST come from the checkpoint rather than ClearML model metadata. Task-based
+weights MUST come from the current best Output Model. Exact per-class confidence values MUST
+come from the source task validation threshold CSV, never rounded dashboard thresholds.
+Historical checkpoint artifacts and threshold payloads MUST NOT provide recovery alternatives.
 
 ## Development Workflow
 
@@ -188,6 +190,13 @@ never rounded dashboard thresholds.
    within existing authorization and after the applicable stage checks pass.
 
 ## Governance
+
+Amendment 6.0.0 implements the user-approved removal of all legacy compatibility paths.
+Standalone training now requires CSV ground truth; current model publications and evaluation
+configuration are the sole supported contracts. Strict input validation replaces migration
+branches. Historical records and prior amendments are preserved as dated history; current
+requirements supersede their compatibility and migration obligations. No old data is migrated
+or deleted, and dependency revisions and installed workflow tooling remain unchanged.
 
 Amendment 5.0.0 authorizes native previews and native model publication, replaces duplicate
 configuration artifacts with canonical replay configurations, and adopts readable exact
@@ -236,4 +245,4 @@ that deliberately alters a governing rule MUST include an explicit amendment rat
 quietly weakening checks. Constitution updates MUST remain confined to this document;
 dependent template or implementation changes require their own authorized work.
 
-**Version**: 5.0.0 | **Ratified**: 2026-09-19 | **Last Amended**: 2026-09-29
+**Version**: 6.0.0 | **Ratified**: 2026-09-19 | **Last Amended**: 2026-10-02

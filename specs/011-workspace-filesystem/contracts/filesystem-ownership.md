@@ -1,7 +1,7 @@
 # Filesystem ownership contract
 
 The maintained normative contract is [Filesystem ownership](../../../docs/filesystem-policy.md).
-This feature contract records the compatibility surface used by implementation and tests.
+This feature contract records the current surface used by implementation and tests.
 
 ## Public selection rules
 
@@ -22,7 +22,6 @@ This feature contract records the compatibility surface used by implementation a
 | Runs and latest shortcut | `$CY_HOME/runs` |
 | Hydra outputs and sweeps | `$CY_HOME/outputs`, `$CY_HOME/multirun` |
 | CSV dataset cache | `$CY_HOME/.cache/clearml-yolo/datasets` |
-| Native YAML dataset copies | `$CY_HOME/.cache/clearml-yolo/native-datasets` |
 | Ultralytics downloaded datasets and weights | `$CY_HOME/.cache/ultralytics/datasets`, `$CY_HOME/.cache/ultralytics/weights` |
 | Ultralytics settings | `$CY_HOME/.config/Ultralytics` |
 | ClearML downloads and cache | `$CY_HOME/.cache/clearml` |
@@ -35,16 +34,13 @@ environment or library behavior. Application-owned temporary helpers select `.tm
 
 ## Source and publication invariants
 
-- Native source YAML, images and labels are read-only inputs. Native repairs and generated caches
-  operate on owner-writable real staged copies under a lock held through training. Original file
-  permissions remain unchanged. Identity includes resolved text-manifest membership, including
-  cwd-relative entries; native duplicates and ordering remain intact.
-- Moving a resolved native YAML execution copy does not change its relative split membership.
-- Sanitized Configuration Objects retain source fields; execution-only path anchoring is local.
+- Training requires CSV ground truth and prepares its native data reference in the shared dataset
+  cache. Source images remain immutable; cache identity and locking follow the CSV dataset contract.
+- Sanitized Configuration Objects retain supported source fields.
 - Adjacent comparison temporary files exist only for same-filesystem atomic replacement and are
   removed on every exit path.
-- Existing user configuration is read-only. Explicit FiftyOne data paths and the legacy ClearML
-  `TRAINS_CACHE_DIR` alias remain selected. `HOME` is unchanged.
+- Existing user configuration is read-only. Explicit FiftyOne data paths remain selected.
+  `CLEARML_CACHE_DIR` is the supported explicit ClearML cache setting. `HOME` is unchanged.
 
 ## Boundary
 

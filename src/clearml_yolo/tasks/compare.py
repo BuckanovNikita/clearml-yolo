@@ -44,7 +44,7 @@ from clearml_yolo.comparison.scoring import (
 from clearml_yolo.comparison.workbook import write_comparison_workbook
 from clearml_yolo.filesystem import write_path
 from clearml_yolo.inference import ImageNameMode, resolution_of, trained_imgsz
-from clearml_yolo.native_config import prediction_settings, write_native_yaml
+from clearml_yolo.native_config import prediction_settings, stage_settings, write_native_yaml
 
 ModelSource = Literal["clearml", "local"]
 MANIFEST_NAME = "comparison_manifest.json"
@@ -132,7 +132,6 @@ def _resolved_task_id(
 
 def _resolve_model(
     model: ModelRef,
-    split: str,
     fallback_project: str,
     *,
     exclude_task_id: str | None,
@@ -156,7 +155,7 @@ def _resolve_model(
     thresholds = (
         dict(model.thresholds)
         if model.thresholds is not None
-        else fetch_best_confidences(task_id, split)
+        else fetch_best_confidences(task_id)
     )
     return ResolvedModel(
         source="clearml",
@@ -556,26 +555,8 @@ def _skip_without_baseline(
             publish_table(task, name, table_path)
 
 
-def _normalize_evaluation(
-    evaluation: EvaluationConfig | dict[str, Any] | None,
-    *,
-    iou_threshold: float,
-    matching_strategy: str,
-) -> EvaluationConfig:
-    """Overlay sparse evaluation overrides on the legacy comparison settings."""
-    if isinstance(evaluation, EvaluationConfig):
-        return evaluation
-    values: dict[str, Any] = {
-        "iou_threshold": iou_threshold,
-        "matching_strategy": matching_strategy,
-    }
-    values.update(evaluation or {})
-    return EvaluationConfig.model_validate(values)
-
-
 def _native_inference(
     inference: dict[str, Any],
-    ultralytics: dict[str, Any] | None,
     ultralytics_predict: dict[str, Any] | None,
 ) -> InferenceConfig:
     """Adapt public native groups to paired comparison's internal settings."""
@@ -591,8 +572,8 @@ def _native_inference(
         )
     unknown = set(inference) - {"reuse_existing", "image_name"}
     if unknown:
-        raise ValueError(f"inference settings {sorted(unknown)} moved to ultralytics_predict")
-    settings = prediction_settings(ultralytics or {}, ultralytics_predict)
+        raise ValueError(f"Unsupported inference settings: {sorted(unknown)}")
+    settings = prediction_settings(ultralytics_predict or {})
     fields = {
         key: settings[key] for key in ("conf", "iou", "imgsz", "batch", "device") if key in settings
     }
@@ -609,8 +590,6 @@ def compare(
     clearml: ClearMLConfig,
     inference: InferenceConfig | dict[str, Any],
     split: str = "test",
-    iou_threshold: float = 0.5,
-    matching_strategy: str = "iou_prior",
     q: float = 0.05,
     bootstrap_iterations: int = 10_000,
     seed: int = 0,
@@ -619,16 +598,17 @@ def compare(
     ultralytics_predict: dict[str, Any] | None = None,
 ) -> CompareResult | None:
     """Evaluate both models once on current data and share those exact outcomes."""
+    stage_settings(ultralytics or {}, "train")
     if isinstance(inference, dict):
-        inference = _native_inference(inference, ultralytics, ultralytics_predict)
+        inference = _native_inference(inference, ultralytics_predict)
     task = init_task(clearml, stage="compare")
     destination = write_path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
     current_task_id = str(task.id) if task is not None else None
-    evaluation_config = _normalize_evaluation(
-        evaluation,
-        iou_threshold=iou_threshold,
-        matching_strategy=matching_strategy,
+    evaluation_config = (
+        evaluation
+        if isinstance(evaluation, EvaluationConfig)
+        else EvaluationConfig.model_validate(evaluation or {})
     )
     if evaluation_config.backend is not None:
         raise ValueError(
@@ -645,7 +625,6 @@ def compare(
     try:
         baseline = _resolve_model(
             baseline_model,
-            split,
             clearml.project_name,
             exclude_task_id=current_task_id,
             automatic_absence_is_skip=_is_automatic_baseline(baseline_model),
@@ -654,7 +633,6 @@ def compare(
         classes = classes_from_ground_truth(truth[truth["split"] == split])
         candidate = _resolve_model(
             candidate_model,
-            split,
             clearml.project_name,
             exclude_task_id=None,
             automatic_absence_is_skip=False,
@@ -674,7 +652,6 @@ def compare(
         return None
     candidate = _resolve_model(
         candidate_model,
-        split,
         clearml.project_name,
         exclude_task_id=None,
         automatic_absence_is_skip=False,

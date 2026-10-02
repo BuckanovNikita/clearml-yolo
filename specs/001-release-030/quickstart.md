@@ -16,8 +16,8 @@ See [CLI](contracts/cli.md) and [artifacts](contracts/artifacts.md) for exact co
    compare the candidate. Exercise cy-val, cy-compare and cy-report independently.
 5. Download required artifacts; check contents, thresholds, paired counts and one-task
    ownership. Induce upload failure and interruption using isolated test tasks.
-6. Build with `uv build`, install each distribution in a fresh environment, verify nine
-   command helps and absent cy-queue. Run `cy-init-config` into a fresh directory, check
+6. Build with `uv build`, install each distribution in a fresh environment, verify all nine
+   command helps. Run `cy-init-config` into a fresh directory, check
    all eight command examples and both native group files compose as applicable; verify
    overwrite protection. Run documented examples.
 7. Record dated outcomes and limitations, then remove only owned resources. Physical

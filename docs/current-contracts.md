@@ -12,7 +12,7 @@ configuration, output, tracking and evaluation rules formerly listed in `AGENTS.
 | Topic | Maintained contract | Implementation evidence |
 |---|---|---|
 | Commands and output routing | [CLI](../specs/001-release-030/contracts/cli.md) | [Entrypoints and checks](../pyproject.toml), [output identity](../src/clearml_yolo/run_identity.py), [pipeline](../src/clearml_yolo/tasks/pipeline.py) |
-| Filesystem defaults and explicit destinations | [Filesystem ownership](filesystem-policy.md) | [Workspace policy](../src/clearml_yolo/filesystem.py), [native input staging](../src/clearml_yolo/native_dataset.py), [native runtime](../src/clearml_yolo/native_runtime.py) |
+| Filesystem defaults and explicit destinations | [Filesystem ownership](filesystem-policy.md) | [Workspace policy](../src/clearml_yolo/filesystem.py), [native runtime](../src/clearml_yolo/native_runtime.py) |
 | Native training and prediction groups | [Native configuration](../specs/005-explicit-detection-config/contracts/native-configuration.md), [example layout](../specs/007-detection-config-cleanup/contracts/configuration-and-artifacts.md) | [Native settings](../src/clearml_yolo/native_config.py), [registration](../src/clearml_yolo/configs.py), [export](../src/clearml_yolo/config_tree.py) |
 | CSV training and dataset cache | [Dataset inputs](../specs/004-ground-truth-training/contracts/cli.md), [current publication](../specs/008-dataset-clearml-tracking/contracts/publication.md) | [Training](../src/clearml_yolo/tasks/train.py), [cache](../src/clearml_yolo/dataset_cache.py) |
 | Configuration resolution and remote replay | [File resolution](../specs/009-resolved-config-uploads/contracts/configuration-files.md), [tracking and recovery](../specs/010-native-clearml-integration/contracts/tracking-publication.md) | [Resolution](../src/clearml_yolo/apps/config_resolution.py), [session adapter](../src/clearml_yolo/clearml_session.py) |
@@ -26,7 +26,7 @@ configuration, output, tracking and evaluation rules formerly listed in `AGENTS.
 Native model commands use complete top-level `ultralytics` and `ultralytics_predict`
 groups. Prediction reads its resolved group; visible references provide inheritance.
 Raw wrapper `cfg`, non-null native `cfg`, nested stage-native mappings and duplicate
-native comparison inference fields are removed. See the [migration](migration-ultralytics-groups.md).
+native comparison inference fields are unsupported and fail ordinary strict validation.
 
 ClearML publications follow the current inventory, not old artifact counts. Native
 YAML, NDJSON, archives, manifests and diagnostic/publication receipts remain local.
@@ -37,8 +37,9 @@ The native best checkpoint uses one Output Model, verified before completion.
 
 Tabular evaluation and comparison exports keep only dashboards and metric tables in XLSX;
 row-level matches, thresholds, exclusions and methodology use named CSV sidecars. JSON
-manifests/payloads/configuration and PNG diagnostics retain their formats. See the
-[tabular export migration](migration-evaluation-csv.md).
+manifests/payloads/configuration and PNG diagnostics retain their formats. The maintained
+[publication inventory](../specs/008-dataset-clearml-tracking/contracts/publication.md)
+defines the current names and destinations.
 
 Pipeline comparison uses the current `test` images. Standalone `cy-compare` defaults to
 `split=test` and accepts another split present in the current ground truth. Both models
@@ -65,7 +66,7 @@ and reason in the workflow artifacts. Missing required updates or failed validat
 blocks completion.
 
 For a contract change, inspect this index, affected contracts, active specifications,
-quickstarts, README, migrations, project-owned integration skills and any applicable
+quickstarts, README, project-owned integration skills and any applicable
 environment skill.
 Update current normative text together. Preserve completed task history and dated
 analysis/verification; annotate superseded intent and link to current guidance.

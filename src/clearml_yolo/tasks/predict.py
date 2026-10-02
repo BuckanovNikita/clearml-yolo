@@ -25,7 +25,7 @@ from clearml_yolo.inference import (
     predict_on_images,
     resolution_of,
 )
-from clearml_yolo.native_config import prediction_settings, write_native_yaml
+from clearml_yolo.native_config import prediction_settings, stage_settings, write_native_yaml
 from clearml_yolo.publishing import create_publisher
 from clearml_yolo.publishing.models import FiftyOneConfig
 from clearml_yolo.run_identity import task_run_dir
@@ -67,7 +67,8 @@ def predict(
 ) -> PredictResult:
     task = init_task(clearml, stage="predict")
     publisher = prepare_publisher(task, fiftyone, factory=create_publisher)
-    settings = prediction_settings(ultralytics, ultralytics_predict, weights)
+    stage_settings(ultralytics, "train")
+    settings = prediction_settings(ultralytics_predict or {}, weights)
     selected = settings.pop("model", None)
     if selected is None:
         raise ValueError("Prediction requires weights=<checkpoint> or ultralytics_predict.model")

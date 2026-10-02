@@ -16,8 +16,10 @@
 | IDs/timestamps | ClearML server | Never write fabricated values |
 
 Do not copy model training parameters into comparison Configuration Objects. Read class names
-and design from the downloaded checkpoint. Best selection uses explicit role metadata or
-best.pt storage basename; ambiguity fails. Historical .pt artifact readers remain supported.
+and design from the downloaded checkpoint. Completed-task recovery requires exactly one current
+Output Model marked with the `best` role; absence or ambiguity fails. During native callback
+finalization, the local `best.pt` basename identifies the model before that role metadata is
+enriched and verified. Checkpoint artifacts are not a recovery source.
 The invocation requires successful native registration and verified remote weights before
 completion; missing registration must not create a wrapper fallback model.
 

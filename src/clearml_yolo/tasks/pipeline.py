@@ -120,8 +120,6 @@ def _compare_and_report(
             clearml=clearml,
             inference=inference,
             split="test",
-            iou_threshold=evaluation.iou_threshold,
-            matching_strategy=evaluation.matching_strategy,
             evaluation=evaluation,
         )
     except NoBaselineModelError as error:
@@ -160,8 +158,6 @@ def _train_from_ground_truth(
         dataset_cache_dir=dataset_cache_dir,
         required_splits=required_splits,
     )
-    if trained.cleaned_ground_truth is None:
-        raise RuntimeError("CSV training did not return cleaned_ground_truth")
     record_run_configuration(task, {"prediction_data_overrides": prediction_data_overrides})
     return trained.weights, trained.cleaned_ground_truth
 
@@ -247,7 +243,7 @@ def run_pipeline(
             "ultralytics_predict": explicit_overrides,
         }
     predict_params = routed_native(
-        prediction_settings(ultralytics, prediction_overrides), directory / "native", "predict"
+        prediction_settings(prediction_overrides), directory / "native", "predict"
     )
     directory.mkdir(parents=True, exist_ok=True)
     point_latest_at(runs_root(), directory)

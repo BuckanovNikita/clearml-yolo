@@ -40,8 +40,8 @@ and changes native settings using the same top-level Hydra paths for every model
    and two native group files are created without ClearML tasks or model-runtime imports.
 2. **Given** unchanged upstream YAML in `ultralytics/default.yaml`, **When** a command is
    composed with `ultralytics.epochs=10`, **Then** the supplied setting resolves without `+`.
-3. **Given** an old nested mapping or non-null `cfg`, **When** invoked, **Then** execution
-   fails with migration guidance before training or prediction.
+3. **Given** a nested mapping or non-null `cfg`, **When** invoked, **Then** execution
+   fails ordinary strict validation before training or prediction.
 
 ### User Story 2 - Override prediction settings (Priority: P1)
 
@@ -109,7 +109,7 @@ current configuration-only publication evidence and limitations are listed above
 - **FR-006**: The pipeline MUST own checkpoint, images, mode and output routing; comparison
   MUST use identical prediction settings for baseline and candidate.
 - **FR-007**: Wrapper `cfg`, non-null native `cfg`, nested stage mappings and duplicate native
-  comparison inference settings MUST fail with migration guidance.
+  comparison inference settings MUST fail ordinary strict validation.
 - **FR-008**: Execution MUST save effective `ultralytics.yaml` or `ultralytics_predict.yaml`
   as applicable, plus split/role variants with actual inputs and retained prediction manifests.
 - **FR-009**: Exported native YAML MUST contain no Hydra metadata or unresolved interpolation,

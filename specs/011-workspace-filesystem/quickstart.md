@@ -10,7 +10,7 @@ uv run cy-init-config "$CY_HOME/configs"
 uv run cy-train --help
 ```
 
-Inspect `workspace/`: application runs, Hydra outputs, CSV/native dataset caches, named
+Inspect `workspace/`: application runs, Hydra outputs, the prepared CSV dataset cache, named
 Ultralytics/ClearML/FiftyOne stores and owned temporary work must use the locations in
 [the filesystem contract](contracts/filesystem-ownership.md). General XDG, Python, compute-library
 and process temp defaults must remain unchanged. A normal exit must not leave invocation-owned
@@ -36,19 +36,19 @@ Also validate that `dataset_cache_dir=null` selects
 `$CY_HOME/.cache/clearml-yolo/datasets` even with an ambient `XDG_CACHE_HOME`, while an explicit
 `dataset_cache_dir` remains selected.
 
-## Native source safety
+## Training source safety
 
-Use a small native dataset with disjoint train/validation images and matching YOLO labels. Run the
-native staging regression, then verify:
+Use a small ground-truth CSV with disjoint train/validation images. Run preparation and training,
+then verify:
 
-1. staged image and label files are real files under `.cache/clearml-yolo/native-datasets`;
-2. native `.npy` and label-cache files appear only in the staged entry;
-3. source YAML, images and labels retain their original bytes;
+1. the complete entry is under `.cache/clearml-yolo/datasets`;
+2. returned cleaned-ground-truth and native-data paths are present;
+3. source CSV and images retain their original bytes;
 4. a second consumer reuses the entry and waits on the same lifetime lock.
 
 ## Repository gates
 
-Run the affected filesystem, native dataset/runtime, configuration, model and training tests, then
+Run the affected filesystem, dataset/runtime, configuration, model and training tests, then
 the project gates:
 
 ```bash

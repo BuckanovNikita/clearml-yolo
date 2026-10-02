@@ -21,7 +21,7 @@ Expect early DDP epoch dispatch, exact-once final drain, deferred native termina
 Follow the E2E skill's portable command/configuration examples and read actual maintained environment values there. Run a small multi-epoch CPU or single-GPU native training case plus a pipeline case with explicit project/tags and dataset inputs. Inspect backend loss scalars before training finishes; after completion inspect native plots/debug samples, single native Output Model, downloaded checkpoint hash/loadability and exact artifact inventory from the publication contract.
 
 Replay using the current task's configuration with original consumed files unavailable. Compare
-source task/model links, source checkpoint/threshold resolution and paired selected-split
+source task/model links, role-marked Output Model/validation-CSV resolution and paired selected-split
 evaluation under the current comparison settings (test for the pipeline). Confirm temporary numbered YAML and
 train_data_overrides.json never appear as artifacts. Exercise physical DDP only if sufficient
 owned resources are available; otherwise record it as unverified, separate from simulated relay coverage.

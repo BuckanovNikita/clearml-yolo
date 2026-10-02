@@ -239,11 +239,10 @@ def test_empty_prediction_output_has_canonical_header_and_is_published(
     assert list(pd.read_csv(result.predictions)) == PREDICTION_COLUMNS
 
 
-def test_prediction_overrides_inherit_shared_and_replace_training_model() -> None:
+def test_prediction_settings_use_resolved_group_and_produced_checkpoint() -> None:
     from clearml_yolo.native_config import prediction_settings
 
     settings = prediction_settings(
-        {"model": "architecture.pt", "epochs": 20, "batch": 16, "imgsz": 640},
         prediction_config(batch=4, conf=0.001, imgsz=640),
         "best.pt",
     )
@@ -257,24 +256,24 @@ def test_prediction_explicit_model_conflict_fails() -> None:
     from clearml_yolo.native_config import prediction_settings
 
     with pytest.raises(ValueError, match=r"ultralytics_predict\.model"):
-        prediction_settings({}, prediction_config(model="different.pt"), "best.pt")
+        prediction_settings(prediction_config(model="different.pt"), "best.pt")
 
 
 def test_prediction_autobatch_requires_override() -> None:
     from clearml_yolo.native_config import prediction_settings
 
     with pytest.raises(ValueError, match="batch"):
-        prediction_settings({}, prediction_config(batch=-1), "best.pt")
+        prediction_settings(prediction_config(batch=-1), "best.pt")
 
 
 @pytest.mark.parametrize(("weights", "expected"), [("best.pt", "best.pt"), (None, None)])
-def test_null_predict_model_never_inherits_training_architecture(
+def test_prediction_model_uses_explicit_weights_or_resolved_null(
     weights: str | None, expected: str | None
 ) -> None:
     from clearml_yolo.native_config import prediction_settings
 
     assert (
-        prediction_settings({"model": "base.pt"}, prediction_config(model=None), weights)["model"]
+        prediction_settings(prediction_config(model=None), weights)["model"]
         == expected
     )
 
@@ -283,7 +282,7 @@ def test_source_cannot_override_ground_truth_membership() -> None:
     from clearml_yolo.native_config import prediction_settings
 
     with pytest.raises(ValueError, match="ground_truth"):
-        prediction_settings({}, prediction_config(source="different-images.txt"))
+        prediction_settings(prediction_config(source="different-images.txt"))
 
 
 def test_native_failure_preserves_replay_config_and_manifest(

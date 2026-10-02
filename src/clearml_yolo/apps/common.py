@@ -23,23 +23,18 @@ from clearml_yolo.run_identity import task_run_dir
 
 
 def validate_wrapper_keys(config: DictConfig, function: Callable[..., Any]) -> None:
-    """Hydra's + syntax must not turn removed wrapper settings into ignored keys."""
+    """Validate the command schema, including keys introduced with Hydra's + syntax."""
     accepted = set(inspect.signature(function).parameters)
     unknown = set(config) - accepted
     if unknown:
-        raise ValueError(
-            f"Unsupported wrapper settings: {sorted(unknown)}; use top-level "
-            "ultralytics and ultralytics_predict Hydra groups instead of cfg/train/predict"
-        )
+        raise ValueError(f"Unsupported wrapper settings: {sorted(unknown)}")
     for group in ("ultralytics", "ultralytics_predict"):
         if group in config:
             stage_settings(dict(config[group]), "train" if group == "ultralytics" else "predict")
     if "inference" in config:
-        legacy = set(config.inference) - {"reuse_existing", "image_name"}
-        if legacy:
-            raise ValueError(
-                f"Unsupported inference settings: {sorted(legacy)}; use ultralytics_predict"
-            )
+        unknown = set(config.inference) - {"reuse_existing", "image_name"}
+        if unknown:
+            raise ValueError(f"Unsupported inference settings: {sorted(unknown)}")
 
 
 def launch(name: str, function: Callable[..., Any]) -> None:

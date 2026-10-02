@@ -30,5 +30,5 @@ workers; owner-only training telemetry and the single native best Output Model a
 
 Standalone comparison accepts a split override and defaults to test. Pipeline comparison is
 fixed to test. Reports follow the split in `comparison_manifest.json`. Every compared model
-uses exact supplied thresholds or tracked validation thresholds, with historical per-split
-payloads supported only as a compatibility reader; no compared split is recalibrated.
+uses exact supplied thresholds or the tracked model's validation CSV;
+no compared split is recalibrated.

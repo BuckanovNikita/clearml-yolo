@@ -7,9 +7,9 @@ from omegaconf import OmegaConf
 
 
 @pytest.mark.parametrize(
-    "key", ["auto_gpu", "augmentations", "force_gpu", "enabled", "cfg", "train", "predict"]
+    "key", ["unknown_option", "iou_threshold", "matching_strategy"]
 )
-def test_added_removed_wrapper_keys_are_not_silently_ignored(key: str) -> None:
+def test_added_unknown_wrapper_keys_are_not_silently_ignored(key: str) -> None:
     from clearml_yolo.apps.common import validate_wrapper_keys
     from clearml_yolo.tasks.train import train
 
@@ -47,6 +47,7 @@ def test_file_backed_group_and_cli_preserve_precedence(tmp_path: Path) -> None:
     ("name", "key"),
     [
         ("pipeline", "ground_truth"),
+        ("train", "ground_truth"),
         ("predict", "ground_truth"),
         ("val", "ground_truth"),
         ("metrics", "predictions"),
@@ -66,25 +67,30 @@ def test_command_inputs_are_required(name: str, key: str) -> None:
     assert OmegaConf.is_missing(config, key)
 
 
-def test_standalone_compare_exposes_a_sparse_evaluation_mapping() -> None:
+def test_standalone_compare_exposes_shared_evaluation_defaults() -> None:
     from hydra import compose, initialize_config_module
     from hydra_zen import store
 
     store.add_to_hydra_store(overwrite_ok=True)
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
         defaults = compose(config_name="compare")
-        overridden = compose(config_name="compare", overrides=["+evaluation.ap_method=continuous"])
+        overridden = compose(config_name="compare", overrides=["evaluation.ap_method=continuous"])
 
-    assert OmegaConf.to_container(defaults.evaluation) == {}
+    from clearml_yolo.comparison.scoring import EvaluationConfig
+
+    values = OmegaConf.to_container(defaults.evaluation)
+    assert isinstance(values, dict)
+    values.pop("_target_")
+    assert values == EvaluationConfig().model_dump()
     assert overridden.evaluation.ap_method == "continuous"
 
 
-def test_old_comparison_native_fields_are_rejected() -> None:
+def test_unknown_inference_settings_are_rejected() -> None:
     from clearml_yolo.apps.common import validate_wrapper_keys
     from clearml_yolo.tasks.compare import compare
 
     config = OmegaConf.create({"inference": {"batch": 4}})
-    with pytest.raises(ValueError, match="ultralytics_predict"):
+    with pytest.raises(ValueError, match="Unsupported inference settings"):
         validate_wrapper_keys(config, compare)
 
 

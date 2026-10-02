@@ -1,4 +1,4 @@
-"""Default filesystem ownership and explicit destination compatibility."""
+"""Default filesystem ownership and explicit destinations."""
 
 import json
 import os
@@ -169,7 +169,7 @@ def test_explicit_dependency_paths_and_temp_settings_are_preserved(tmp_path: Pat
     selected = tmp_path / "explicit"
     selected.mkdir()
     environment.update(CY_HOME=str(workspace), XDG_CACHE_HOME=str(selected), TMP=str(selected),
-                       TRAINS_CACHE_DIR=str(selected / "clearml"))
+                       CLEARML_CACHE_DIR=str(selected / "clearml"))
     script = """
 import json, os, tempfile
 import clearml_yolo.apps.config_tree
@@ -272,3 +272,21 @@ def test_atomic_publication_cleans_partial_output_on_failure(tmp_path: Path) -> 
         fail_serialization()
     assert output.read_text() == "existing result\n"
     assert list(tmp_path.iterdir()) == [output]
+
+
+def test_cache_initialization_uses_only_canonical_setting(tmp_path: Path) -> None:
+    environment = _environment()
+    environment["TRAINS_CACHE_DIR"] = str(tmp_path / "old-cache")
+    script = """
+import os
+from pathlib import Path
+from clearml_yolo.filesystem import initialize_filesystem
+initialize_filesystem()
+assert Path(os.environ['CLEARML_CACHE_DIR']) == Path.cwd() / '.cache/clearml'
+assert not (Path.cwd() / 'old-cache').exists()
+"""
+    result = subprocess.run(  # noqa: S603 - fixed script and isolated environment
+        [sys.executable, "-B", "-c", script], cwd=tmp_path, env=environment,
+        check=False, capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stderr

@@ -12,6 +12,8 @@
 - `PreparedDataset`: native `data` path, `ground_truth` cleaned CSV path, `manifest` JSON
   path, selected `dataset_format`, and an implementation-named `artifacts` list of local
   cache files. That field is a cache inventory, not a ClearML artifact inventory.
+- `TrainResult`: weights, save directory, effective arguments, and required prepared
+  `ground_truth` and native `data` paths after successful training.
 
 The parser preserves labels as strings (including numeric-looking names), retains class
 names found on invalid boxes, and sorts names lexically for deterministic IDs. It rejects

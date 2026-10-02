@@ -28,22 +28,21 @@ diagnostics, never the selected path.
 
 For `dataset_cache_dir`, `null` is an application default and resolves directly beneath
 `cache_root` without consulting XDG. A non-null value is explicit. Existing FiftyOne
-configuration may provide explicit dataset, dataset-zoo and database selections; the legacy
-ClearML alias may provide its explicit cache selection.
+configuration may provide explicit dataset, dataset-zoo and database selections;
+`CLEARML_CACHE_DIR` may provide an explicit ClearML cache selection.
 
-## Native dataset entry
+## Prepared dataset entry
 
 | Field | Meaning |
 |---|---|
-| `identity` | Stable digest of the checked definition and resolved text-manifest membership |
-| `directory` | Workspace cache entry containing the final staged dataset |
-| `yaml` | Staged definition rooted at the final entry |
-| `images` | Owner-writable real copies preserving sorted membership, duplicates and source order |
-| `labels` | Owner-writable annotation copies; absent labels represent negative images |
-| `lock` | Per-entry ownership held through staging and native training |
+| `identity` | Stable digest of CSV bytes, selected format and preparation version |
+| `directory` | Workspace cache entry containing the complete prepared dataset |
+| `ground_truth` | Validated cleaned CSV used by later stages |
+| `data` | Prepared NDJSON or flat native training reference |
+| `lock` | Per-entry ownership held through preparation and training |
 
-Lifecycle: missing entry → private staging directory → atomic published entry → locked native
-consumer → reusable entry. Failed staging removes the private directory.
+Lifecycle: missing entry → private preparation directory → atomic complete entry → locked
+consumer → reusable entry. Failed preparation is never consumed.
 
 ## Owned temporary resource
 

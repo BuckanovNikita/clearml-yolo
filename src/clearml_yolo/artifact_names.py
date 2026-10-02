@@ -25,9 +25,7 @@ FIFTYONE_PUBLICATION_FILE = "fiftyone_publication.json"
 BEST_CONFIDENCES_VAL = "metrics_best_confidences_val"
 EVALUATION_PREFIX = "metrics_evaluation"
 
-# Historical-task readers still need these local naming constants. New publications use
-# BEST_CONFIDENCES_VAL and never upload plot files.
-BEST_CONFIDENCES_PREFIX = "metrics_best_confidences"
+# Current metric plots use these series names; they are not uploaded plot-file artifacts.
 PLOT_METRICS = ("recall", "precision", "perebrak", "nedobrak")
 
 REPORT_DEV_PREFIX = "report_dev"

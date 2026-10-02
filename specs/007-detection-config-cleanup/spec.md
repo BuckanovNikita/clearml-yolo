@@ -90,8 +90,8 @@ explicit standalone model/data overrides, and skipped pipeline stages.
   one owner receipt, disabled nested publication, GT identity, resolved media and task namespaces.
 - **FR-009**: Standalone comparison accepts a split override defaulting to test; pipeline
   comparison is fixed to test; reports follow the paired split in the comparison manifest.
-  Thresholds always come from validation, exact supplied values or historical compatibility
-  readers and are never calibrated on the compared split.
+  Thresholds always come from the current validation CSV or exact supplied values and are never
+  calibrated on the compared split.
 - **FR-010**: Update guidance and Russian README, preserve dependencies and feature 006,
   verify repository gates and real isolated three-split execution with downloaded evidence.
 

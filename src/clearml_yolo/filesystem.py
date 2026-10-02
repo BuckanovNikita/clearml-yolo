@@ -96,8 +96,7 @@ def initialize_filesystem() -> None:
         "FIFTYONE_DATASET_ZOO_DIR": cache / "fiftyone" / "datasets",
     }
     for name, default in defaults.items():
-        # The legacy ClearML alias is also an explicit user selection.
-        selected = os.environ.get("TRAINS_CACHE_DIR") if name == "CLEARML_CACHE_DIR" else None
+        selected = None
         if name.startswith("FIFTYONE_"):
             configured = fiftyone_inputs.get(name.removeprefix("FIFTYONE_").lower())
             if isinstance(configured, str) and configured:
