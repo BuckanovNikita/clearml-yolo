@@ -7,6 +7,9 @@ and every upstream comment. task/mode/data/project/name are controlled in both e
 prediction also controls source/model. Training model/classes/fraction stay editable.
 These groups still compose complete configurations; supported CLI overrides remain valid.
 Runtime YAML includes actual derived values, including project, name, source, model and data.
+The two requested device groups remain independent. Under queued GPU execution, their requested
+values are preserved separately while the effective child configuration uses assigned local native
+indices; GPU prediction and comparison use retained child-local device 0.
 
 Implicit roots: runs/<encoded-project>/<encoded-task>-<encoded-task-id>/ using the active
 ClearML task. Explicit run_dir wins; explicit run_id retains runs/<run_id>. Standalone

@@ -2,7 +2,7 @@
 
 import json
 import os
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -18,6 +18,20 @@ from clearml_yolo.filesystem import (
 
 OWNER_PID_ENV = "CY_CLEARML_OWNER_PID"
 OWNER_TASK_ENV = "CY_CLEARML_OWNER_TASK_ID"
+
+
+def release_training_memory() -> None:
+    """Drop unreachable trainers and unused allocations before releasing their devices."""
+    import gc
+
+    import torch
+
+    gc.collect()
+    # Torch exposes this runtime predicate without a typed signature.
+    initialized = cast(Callable[[], bool], torch.cuda.is_initialized)
+    if initialized():
+        torch.cuda.synchronize()
+        torch.cuda.empty_cache()
 
 
 def _is_worker() -> bool:

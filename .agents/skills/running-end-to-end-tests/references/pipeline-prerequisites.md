@@ -31,8 +31,20 @@ conflicting stage paths or native training `project`/`name` values fail. Standal
 stages require explicit inputs. `cy-init-config DIRECTORY [--force]` writes only
 editable configuration examples without creating a ClearML task.
 
-Select native `device`, `batch`, `amp` and `compile` settings for the environment.
-The application performs no scheduling, GPU leasing, or batch tuning.
+Select native `device`, `batch`, `amp` and `compile` settings for the environment. The five model
+commands derive whole-GPU demand from native `device` and coordinate through a user-wide, same-OS
+strict FIFO queue. There is no separate GPU-count setting. A training integer means one GPU, a list
+uses its length, every automatic `-1` contributes one, null/empty/`cuda` means one, and `cpu`/`mps`
+means zero. GPU inference requires one device; a pipeline reserves the maximum training/inference
+demand before starting. Keep inherited `CUDA_VISIBLE_DEVICES` accurate for the test environment.
+
+Before a native queue test, establish that the request does not exceed the visible whole-GPU set
+and that unrelated compute processes do not own candidate devices. Waiting occurs before ClearML
+task creation and native GPU context. Multi-GPU acceptance must observe verified training/DDP
+cleanup before N-1 reservations are released, then confirm prediction and comparison use retained
+child-local device `0` through job exit. Record physical multi-GPU execution as unverified when it
+was not exercised. The application does not tune batches and does not coordinate MIG, remote hosts,
+or separate operating-system instances.
 
 Full comparison requires validation/test data and exact baseline thresholds. Candidate
 thresholds come from validation only. Both checkpoints must use the same current test

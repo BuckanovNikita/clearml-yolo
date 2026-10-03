@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Refactoring
+
+- Remove legacy compatibility paths
+  ([`4ca463f`](https://github.com/BuckanovNikita/clearml-yolo/commit/4ca463fc0f3e44cbdf9099f4a46175eca3b984a9))
+
+### Breaking Changes
+
+- Native-only training, historical checkpoint/threshold recovery, comparison overlays and legacy
+  cache aliases are no longer supported.
+
+
 ## v0.13.2 (2026-10-02)
 
 ### Bug Fixes

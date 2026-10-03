@@ -25,7 +25,12 @@ from clearml_yolo.inference import (
     predict_on_images,
     resolution_of,
 )
-from clearml_yolo.native_config import prediction_settings, stage_settings, write_native_yaml
+from clearml_yolo.native_config import (
+    prediction_settings,
+    requested_settings,
+    stage_settings,
+    write_native_yaml,
+)
 from clearml_yolo.publishing import create_publisher
 from clearml_yolo.publishing.models import FiftyOneConfig
 from clearml_yolo.run_identity import task_run_dir
@@ -177,6 +182,8 @@ def _predict_group(
         "model": str(checkpoint),
         "mode": "predict",
     }
+    requested_path = config_path.with_stem(config_path.stem + "_requested")
+    write_native_yaml(requested_path, requested_settings(provisional, "predict"), "predict")
     write_native_yaml(config_path, provisional, "predict")
     frame = predict_on_images(
         checkpoint, group, image_name=image_name, manifest_dir=manifest_dir, **settings

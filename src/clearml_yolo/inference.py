@@ -14,7 +14,7 @@ from loguru import logger
 from pydantic import BaseModel
 
 from clearml_yolo.filesystem import model_weights_path, temporary_root
-from clearml_yolo.native_config import execution_settings
+from clearml_yolo.native_config import execution_settings, requested_settings
 from clearml_yolo.progress import track
 
 ImageNameMode = Literal["name", "stem", "path"]
@@ -233,7 +233,7 @@ def predict_on_images(
         frame.attrs["normalized_imgsz"] = predictor.imgsz
     frame.attrs.setdefault("effective_args", settings.copy())
     frame.attrs["effective_args"].update(source=manifest, model=str(weights), mode="predict")
-    frame.attrs["requested_args"] = settings | {
+    frame.attrs["requested_args"] = requested_settings(settings, "predict") | {
         "source": manifest,
         "model": str(weights),
         "mode": "predict",
