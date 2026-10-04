@@ -3,6 +3,11 @@
 
 ## Unreleased
 
+### Features
+
+- **gpu**: Add user-wide FIFO experiment queue
+  ([`6a55413`](https://github.com/BuckanovNikita/clearml-yolo/commit/6a55413a83c4542bc0721774ad588a22fbddca8f))
+
 ### Refactoring
 
 - Remove legacy compatibility paths
