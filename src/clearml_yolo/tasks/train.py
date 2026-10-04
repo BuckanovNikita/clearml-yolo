@@ -21,7 +21,12 @@ from clearml_yolo.dataset import PreparedDataset, apply_dataset_policy
 from clearml_yolo.dataset_cache import cached_dataset, dataset_cache_root
 from clearml_yolo.dataset_export import DatasetFormat
 from clearml_yolo.filesystem import model_weights_path, runs_root, write_path
-from clearml_yolo.native_config import execution_settings, stage_settings, write_native_yaml
+from clearml_yolo.native_config import (
+    execution_settings,
+    requested_settings,
+    stage_settings,
+    write_native_yaml,
+)
 from clearml_yolo.native_ddp import native_ddp_relay
 from clearml_yolo.run_identity import point_latest_at, safe_path_component, task_run_dir
 
@@ -83,7 +88,7 @@ def _execute_training(
     model = YOLO(model_weights_path(architecture))
     if model.task != "detect":
         raise ValueError(f"Training requires a detection model; loaded task={model.task!r}")
-    requested = settings | {"model": str(architecture)}
+    requested = requested_settings(settings, "train") | {"model": str(architecture)}
     write_native_yaml(
         Path(settings["project"]) / ".configs" / settings["name"] / "ultralytics_requested.yaml",
         requested,

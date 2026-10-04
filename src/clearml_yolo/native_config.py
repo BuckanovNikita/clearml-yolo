@@ -1,6 +1,9 @@
 """Native parameter classification and documented YAML without model-runtime imports."""
 
 import re
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from importlib.metadata import distribution
 from pathlib import Path
 from typing import Any, Literal
@@ -8,6 +11,25 @@ from typing import Any, Literal
 import yaml
 
 Stage = Literal["train", "predict"]
+_REQUESTED_DEVICES: ContextVar[dict[str, Any] | None] = ContextVar(
+    "requested_devices", default=None
+)
+
+
+@contextmanager
+def requested_devices(values: dict[str, Any]) -> Iterator[None]:
+    """Preserve device intent while the scheduler supplies native execution ordinals."""
+    token = _REQUESTED_DEVICES.set(values)
+    try:
+        yield
+    finally:
+        _REQUESTED_DEVICES.reset(token)
+
+
+def requested_settings(settings: dict[str, Any], stage: Stage) -> dict[str, Any]:
+    values = _REQUESTED_DEVICES.get() or {}
+    group = "ultralytics" if stage == "train" else "ultralytics_predict"
+    return settings | {"device": values[group]} if group in values else dict(settings)
 
 # Classify keys explicitly: a dependency upgrade must not silently assign new settings
 # to a stage. Training includes the validator run inside the native trainer.

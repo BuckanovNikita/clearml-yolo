@@ -78,7 +78,13 @@ use run_dir; conflicting native output settings MUST be rejected explicitly. Ski
 consumers MUST validate required existing inputs. Convenience links MUST preserve user data.
 
 Model execution MUST delegate device, batch, AMP, compilation and distributed training to
-Ultralytics. Runtime GPU scheduling, leases, batch tuning and augmentation-JSON processing
+Ultralytics. The project MAY provide one user-wide, same-operating-system FIFO scheduler for
+whole NVIDIA GPUs when all demand is derived from native device settings. That scheduler MUST
+reserve each request atomically, fail closed when device availability is unknown, wait before
+ClearML task creation or native GPU context, use fresh execution children, and preserve requested
+settings separately from concrete child-local effective settings. It MUST NOT add a daemon,
+priority, queue bypass, TTL or PID-only reclaim, separate GPU-count setting, MIG scheduling,
+cross-host coordination, or an upstream monkeypatch. Batch tuning and augmentation-JSON processing
 MUST NOT be provided. `cy-init-config` MUST export current command defaults as editable
 examples with top-level `ultralytics` and `ultralytics_predict` groups and required inputs.
 The shared group MUST cover the installed native configuration and preserve its comments;
@@ -191,6 +197,14 @@ Historical checkpoint artifacts and threshold payloads MUST NOT provide recovery
 
 ## Governance
 
+Amendment 7.0.0 implements the explicitly approved GPU experiment queue. Principle III replaces
+the blanket runtime-scheduling prohibition with a narrow permission for a user-wide, local,
+whole-NVIDIA-device FIFO scheduler derived from native settings. It requires atomic reservations,
+fail-closed telemetry, pre-task/pre-context waiting, isolated execution children, and separate
+requested/effective provenance while prohibiting daemon, bypass, priority, TTL/PID-only reclaim,
+new count configuration, MIG/cross-host scope, and upstream monkeypatching. Existing single-task,
+native configuration, publication, privacy, dependency, and evidence rules remain mandatory.
+
 Amendment 6.0.0 implements the user-approved removal of all legacy compatibility paths.
 Standalone training now requires CSV ground truth; current model publications and evaluation
 configuration are the sole supported contracts. Strict input validation replaces migration
@@ -245,4 +259,4 @@ that deliberately alters a governing rule MUST include an explicit amendment rat
 quietly weakening checks. Constitution updates MUST remain confined to this document;
 dependent template or implementation changes require their own authorized work.
 
-**Version**: 6.0.0 | **Ratified**: 2026-09-19 | **Last Amended**: 2026-10-02
+**Version**: 7.0.0 | **Ratified**: 2026-09-19 | **Last Amended**: 2026-10-02

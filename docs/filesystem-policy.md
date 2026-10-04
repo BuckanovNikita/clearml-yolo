@@ -36,6 +36,15 @@ paths, and `TMPDIR`/`TMP`/`TEMP` plus `tempfile` defaults keep their ordinary en
 library behavior. Caller-provided values for those settings remain untouched. Application-owned
 temporary resources still select `CY_HOME/.tmp` directly.
 
+The GPU queue is application-owned state but intentionally lives outside `CY_HOME` so commands
+from different workspaces coordinate. On Unix-like systems its root is
+`$XDG_STATE_HOME/clearml-yolo/queue`, falling back to
+`~/.local/state/clearml-yolo/queue`; on Windows it is
+`%LOCALAPPDATA%\clearml-yolo\queue`. There is no public queue-root option. Tests may inject an
+isolated internal root. The registry, transaction lock, and supervisor/child native liveness locks
+belong to this state root. Do not delete or edit them while jobs are pending or running. Recovery
+uses native lock ownership; entry age and PID are not reclaim authority.
+
 Write destinations resolving physically beneath the home directory produce a warning,
 once per resolved destination in a process. Warnings do not reject, relocate or override
 the requested path. Existing symlinks determine the physical destination: a link beneath
@@ -69,6 +78,13 @@ execution and publication; it is not an operating-system sandbox for arbitrary u
 scripts or plugins. Python bytecode, external runners such as uv, pytest and pre-commit, and other
 general dependency caches/configuration use their standard settings. A caller that needs broader
 isolation must configure those tools in its launcher.
+
+For queued model commands, the supervisor reads direct NVML inventory/process telemetry and uses a
+metadata-only subprocess solely to map inherited `CUDA_VISIBLE_DEVICES` values to stable GPU UUIDs.
+It waits without a ClearML task or native GPU context. An admitted fresh child receives assigned
+UUIDs as its visible set and uses child-local native indices. Queue state remains outside run output
+and owned temporary execution copies; child exit releases remaining reservations independently of
+run-directory cleanup.
 
 Existing caches are not migrated or deleted. Changing `CY_HOME` changes automatic paths;
 explicit paths and read-only inputs remain independent of it.

@@ -23,12 +23,13 @@ Ultralytics YOLO training, prediction, validation, metrics, reports and comparis
 
 ## Collaboration
 
-For completion work, load `astra-advisor:orchestration` and use native subagents in
+For completion work, load `$sol-orchestration` and use native subagents in
 parallel with the primary agent. Assign bounded independent work with explicit file
 ownership, dependencies and acceptance evidence; a small change can use a read-only
 review. Subagents must not delegate further. The primary agent inspects the combined
-diff and owns final verification. Respect live tool/model limits; if delegation is
-unavailable, report that limitation and continue safely.
+diff and owns final verification, followed by a fresh independent read-only review.
+Respect live tool/model limits; if delegation is unavailable, report that limitation
+and continue safely.
 
 ## Read when relevant
 

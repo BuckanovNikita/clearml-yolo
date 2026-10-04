@@ -25,6 +25,7 @@ def _native() -> dict[str, Any]:
     groups: list[Any] = ["_self_", {"ultralytics": "_defaults"}]
     fields: dict[str, Any] = {"ultralytics": stage_settings(native_defaults(), "train")}
     groups.append({"ultralytics_predict": "_defaults"})
+    groups.append({"override hydra/launcher": "cy_queue"})
     fields["ultralytics_predict"] = prediction_defaults()
     return {"hydra_defaults": groups, **fields}
 
@@ -40,13 +41,15 @@ def register_configs() -> None:
     store(
         HydraConf(
             job=JobConf(chdir=False), run=RunDir(dir=HYDRA_RUN_DIR),
-            sweep=SweepDir(dir="${cy_home:}/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}"),
+            sweep=SweepDir(dir="${cy_home:}/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}-${cy_run_token:}"),
         )
     )
     tracking = builds(ClearMLConfig, populate_full_signature=True)
     publishing = builds(FiftyOneConfig, populate_full_signature=True)
     evaluation = builds(EvaluationConfig, populate_full_signature=True)
     model = builds(ModelRef, populate_full_signature=True)
+    store({"_target_": "hydra_plugins.cy_queue.launcher.QueueLauncher"},
+          group="hydra/launcher", name="cy_queue")
     store({}, group="ultralytics", name="_defaults")
     store({}, group="ultralytics_predict", name="_defaults")
     store(

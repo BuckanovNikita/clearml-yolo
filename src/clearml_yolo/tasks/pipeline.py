@@ -17,6 +17,7 @@ from clearml_yolo.dataset import apply_dataset_policy
 from clearml_yolo.dataset_cache import dataset_cache_root
 from clearml_yolo.dataset_export import DatasetFormat
 from clearml_yolo.filesystem import model_weights_path, runs_root
+from clearml_yolo.gpu_runtime import training_finished
 from clearml_yolo.native_config import prediction_settings
 from clearml_yolo.publishing import Publisher, create_publisher
 from clearml_yolo.publishing.models import FiftyOneConfig
@@ -159,6 +160,7 @@ def _train_from_ground_truth(
         required_splits=required_splits,
     )
     record_run_configuration(task, {"prediction_data_overrides": prediction_data_overrides})
+    training_finished()
     return trained.weights, trained.cleaned_ground_truth
 
 

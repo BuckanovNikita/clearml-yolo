@@ -13,6 +13,7 @@ configuration, output, tracking and evaluation rules formerly listed in `AGENTS.
 |---|---|---|
 | Commands and output routing | [CLI](../specs/001-release-030/contracts/cli.md) | [Entrypoints and checks](../pyproject.toml), [output identity](../src/clearml_yolo/run_identity.py), [pipeline](../src/clearml_yolo/tasks/pipeline.py) |
 | Filesystem defaults and explicit destinations | [Filesystem ownership](filesystem-policy.md) | [Workspace policy](../src/clearml_yolo/filesystem.py), [native runtime](../src/clearml_yolo/native_runtime.py) |
+| GPU queue, device demand and queued execution | [Queue state](../specs/013-gpu-experiment-queue/contracts/queue-state.md), [execution and launcher](../specs/013-gpu-experiment-queue/contracts/execution.md) | [Resource probe](../src/clearml_yolo/gpu_resources.py), [queue](../src/clearml_yolo/gpu_queue.py), [runtime transition](../src/clearml_yolo/gpu_runtime.py), [supervisor](../src/clearml_yolo/apps/execution.py), [worker](../src/clearml_yolo/apps/job_worker.py), [Hydra launcher](../src/hydra_plugins/cy_queue/launcher.py) |
 | Native training and prediction groups | [Native configuration](../specs/005-explicit-detection-config/contracts/native-configuration.md), [example layout](../specs/007-detection-config-cleanup/contracts/configuration-and-artifacts.md) | [Native settings](../src/clearml_yolo/native_config.py), [registration](../src/clearml_yolo/configs.py), [export](../src/clearml_yolo/config_tree.py) |
 | CSV training and dataset cache | [Dataset inputs](../specs/004-ground-truth-training/contracts/cli.md), [current publication](../specs/008-dataset-clearml-tracking/contracts/publication.md) | [Training](../src/clearml_yolo/tasks/train.py), [cache](../src/clearml_yolo/dataset_cache.py) |
 | Configuration resolution and remote replay | [File resolution](../specs/009-resolved-config-uploads/contracts/configuration-files.md), [tracking and recovery](../specs/010-native-clearml-integration/contracts/tracking-publication.md) | [Resolution](../src/clearml_yolo/apps/config_resolution.py), [session adapter](../src/clearml_yolo/clearml_session.py) |
@@ -27,6 +28,13 @@ Native model commands use complete top-level `ultralytics` and `ultralytics_pred
 groups. Prediction reads its resolved group; visible references provide inheritance.
 Raw wrapper `cfg`, non-null native `cfg`, nested stage-native mappings and duplicate
 native comparison inference fields are unsupported and fail ordinary strict validation.
+
+The five model commands derive whole-GPU demand from those native groups and use the maintained
+user-wide FIFO queue. Requested device values remain provenance; admitted children use concrete
+local indices. Strict head-of-line admission, fail-closed NVML availability, native liveness locks,
+pre-ClearML waiting, pipeline N-to-one contraction, and BasicSweeper semantics are defined by the
+[queue](../specs/013-gpu-experiment-queue/contracts/queue-state.md) and
+[execution](../specs/013-gpu-experiment-queue/contracts/execution.md) contracts.
 
 ClearML publications follow the current inventory, not old artifact counts. Native
 YAML, NDJSON, archives, manifests and diagnostic/publication receipts remain local.
