@@ -50,3 +50,11 @@ and supports BasicSweeper. Its plugin package is included in the distribution be
 
 Other sweepers, a persistent daemon, priority, bypass, remote launchers, cross-host coordination,
 and MIG scheduling are outside this contract.
+
+## Launch ownership
+
+Top-level launches with `LOCAL_RANK` set to a value other than `-1` require project owner
+provenance and otherwise fail before queue registration or task creation. External rank-bearing
+launchers are unsupported. Native descendants are recognized by both `CY_CLEARML_OWNER_PID`
+and `CY_CLEARML_OWNER_TASK_ID`, with an owner PID different from the current process. A generic
+rank variable alone cannot suppress invocation ownership.

@@ -61,7 +61,9 @@ def _publish_split(
         for name, table_path in tables.items():
             publish_table(task, name, table_path)
     report_table(task, artifact_names.METRICS_SECTION, split, per_class)
-    report_scalars(task, f"{artifact_names.METRICS_SECTION}_{split}", summary)
+    report_scalars(
+        task, f"{artifact_names.METRICS_SECTION}_{artifact_names.split_component(split)}", summary
+    )
 
 
 def _methodology_frame(values: dict[str, Any]) -> pd.DataFrame:
@@ -235,11 +237,14 @@ def compute_metrics(
             suffix=split,
             methodology=evaluation.model_dump(mode="json"),
         )
-        evaluation_path = destination / f"evaluation_{split}.json"
+        evaluation_path = destination / f"evaluation_{artifact_names.split_component(split)}.json"
         evaluation_path.write_text(
             evaluated.evaluation_payload.model_dump_json(indent=2), encoding="utf-8"
         )
-        workbook_path = destination / f"{artifact_names.EVALUATION_PREFIX}_{split}.xlsx"
+        workbook_path = (
+            destination
+            / f"{artifact_names.EVALUATION_PREFIX}_{artifact_names.split_component(split)}.xlsx"
+        )
         tables = _write_evaluation_workbook(
             workbook_path,
             evaluated,

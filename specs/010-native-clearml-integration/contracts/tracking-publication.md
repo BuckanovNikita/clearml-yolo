@@ -44,3 +44,14 @@ from the role-marked best Output Model. Missing or malformed current publication
 Existing remote override, resolution, secret redaction and local execution-copy behavior remain intact.
 
 Any computation, callback, journal, upload, flush or interruption error fails command/task and preserves local diagnostics. Prior telemetry on a failed task is valid partial evidence, never a completion signal. Historical tasks are not modified.
+
+Failure finalization closes the invocation-owned SDK handle before marking failure through a
+fresh task handle. This prevents the SDK status monitor from treating the application's own
+failure transition as an external abort. Finalization errors and local filesystem cleanup errors are logged by type without replacing
+the original computation/upload/flush/interruption exception. If SDK closure itself fails, safe
+monitor shutdown cannot be established and the failed remote transition is not guaranteed.
+
+Canonical executable configuration preserves explicit empty strings, lists and mappings, including
+native `classes=[]`. Empty optional result provenance is still omitted. Redaction affects published
+snapshots rather than executable inputs and includes AWS `X-Amz-Signature` and Google
+`X-Goog-Signature` mapping/query keys along with existing credential fields.

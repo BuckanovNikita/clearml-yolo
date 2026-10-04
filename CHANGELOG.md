@@ -3,6 +3,11 @@
 
 ## Unreleased
 
+### Documentation
+
+- Use Sol orchestration and refresh GPU changelog
+  ([`c7b77b8`](https://github.com/BuckanovNikita/clearml-yolo/commit/c7b77b83abc9b84c7ea21382b97d02e8d795aba4))
+
 ### Features
 
 - **gpu**: Add user-wide FIFO experiment queue

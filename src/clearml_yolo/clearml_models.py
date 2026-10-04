@@ -33,11 +33,12 @@ def _task(task_id: str) -> Any:
 
 
 def _anchored(task_name: str | None) -> str | None:
-    """Pin a name to the whole task name, leaving an already-anchored pattern alone."""
+    """Group a user regex and require the entire task name to match."""
     if not task_name:
         return None
-    start = task_name if task_name.startswith("^") else f"^{task_name}"
-    return start if start.endswith("$") else f"{start}$"
+    # PCRE accepts a final newline before \Z; the assertion makes the end strict
+    # in both MongoDB and Python regex engines.
+    return rf"\A(?:{task_name})\Z(?![\s\S])"
 
 
 def latest_completed_task_id(
@@ -59,7 +60,7 @@ def latest_completed_task_id(
     tasks: list[Any] = Task.get_tasks(
         project_name=project_name,
         task_name=_anchored(task_name),
-        tags=list(tags) if tags else None,
+        tags=(["__$all", *tags] if len(tags) > 1 else list(tags)) if tags else None,
         task_filter={
             "status": ["completed", "published"],
             "order_by": ["-completed", "-last_update"],

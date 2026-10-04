@@ -112,8 +112,14 @@ def build_reports(
 
     candidate_reader = MetricsReader(candidate_path)
     baseline_reader = MetricsReader(baseline_path)
-    dev_path = destination / f"{artifact_names.REPORT_DEV_PREFIX}_{split}.xlsx"
-    business_path = destination / f"{artifact_names.REPORT_BUSINESS_PREFIX}_{split}.xlsx"
+    dev_path = (
+        destination
+        / f"{artifact_names.REPORT_DEV_PREFIX}_{artifact_names.split_component(split)}.xlsx"
+    )
+    business_path = (
+        destination
+        / f"{artifact_names.REPORT_BUSINESS_PREFIX}_{artifact_names.split_component(split)}.xlsx"
+    )
     DevReportBuilder(candidate_reader, baseline_reader, config).build(dev_path)
     BusinessReportBuilder(candidate_reader, baseline_reader, config).build(business_path)
 

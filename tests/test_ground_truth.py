@@ -267,3 +267,29 @@ def test_tracked_conversion_publishes_the_expanded_output_path(
     assert result == selected
     assert published == [selected]
     assert selected.is_file()
+
+
+@pytest.mark.parametrize("orientation", [1, 6, 8])
+def test_converted_exif_boxes_survive_csv_validation(tmp_path: Path, orientation: int) -> None:
+    from clearml_yolo.dataset_records import validate_ground_truth
+    from clearml_yolo.ground_truth import _split_rows
+
+    images = tmp_path / "images"
+    labels = tmp_path / "labels"
+    images.mkdir()
+    labels.mkdir()
+    image = images / "oriented.jpg"
+    exif = Image.Exif()
+    exif[274] = orientation
+    Image.new("RGB", (20, 30)).save(image, exif=exif)
+    (labels / "oriented.txt").write_text("0 0.5 0.5 1 1\n")
+    rows, _ = _split_rows([image], "train", {0: "object"})
+    val_image = images / "val.jpg"
+    val_image.write_bytes(image.read_bytes())
+    (labels / "val.txt").write_text("0 0.5 0.5 1 1\n")
+    val_rows, _ = _split_rows([val_image], "val", {0: "object"})
+    rows.extend(val_rows)
+    truth = tmp_path / "truth.csv"
+    pd.DataFrame(rows).to_csv(truth, index=False)
+    validated = validate_ground_truth(truth, required_splits=("train",))
+    assert len(validated.images[0].boxes) == 1

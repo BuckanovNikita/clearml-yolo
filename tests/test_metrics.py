@@ -606,3 +606,127 @@ def test_unsupported_split_inputs_fail_clearly(
             splits=["train"],
             fiftyone=FiftyOneConfig(enabled=False),
         )
+
+
+def test_arbitrary_logical_split_keeps_outputs_inside_destination(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    predictions, ground_truth = _write_inputs(tmp_path)
+    split = "../../../escape/actual"
+    frame = pd.read_csv(ground_truth)
+    frame.loc[frame["split"] == "test", "split"] = split
+    frame.to_csv(ground_truth, index=False)
+    monkeypatch.setattr("clearml_yolo.tasks.metrics.init_task", lambda *_args, **_kwargs: None)
+    destination = tmp_path / "metrics"
+    result = compute_metrics(
+        predictions, ground_truth, destination,
+        clearml=object(),  # type: ignore[arg-type]
+        evaluation=EvaluationConfig(), splits=[split],
+        fiftyone=FiftyOneConfig(enabled=False),
+    )
+    assert result.dashboards[split].parent == destination
+    assert result.dashboards[split].is_file()
+    assert result.evaluations[split].parent == destination
+    assert not (tmp_path / "escape").exists()
+
+
+@pytest.mark.parametrize("already_suffixed", [False, True])
+def test_dashboard_plot_contract_accepts_legacy_and_suffixed_outputs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, already_suffixed: bool,
+) -> None:
+    from digital_metrics.reporting import get_dashboards
+
+    from clearml_yolo.artifact_names import PLOT_METRICS
+    from clearml_yolo.comparison import scoring
+
+    original = get_dashboards
+
+    def dashboard(*args: Any, **kwargs: Any) -> Any:
+        result = original(*args, **kwargs)
+        if already_suffixed:
+            directory = Path(kwargs["path"])
+            suffix = kwargs["suffix"]
+            for metric in PLOT_METRICS:
+                legacy = directory / f"{metric}_confidence_intervals.png"
+                suffixed = directory / f"{metric}_confidence_intervals_{suffix}.png"
+                if legacy.is_file():
+                    legacy.replace(suffixed)
+        return result
+
+    monkeypatch.setattr(scoring, "get_dashboards", dashboard)
+    monkeypatch.setattr("clearml_yolo.tasks.metrics.init_task", lambda *_args, **_kwargs: None)
+    predictions, ground_truth = _write_inputs(tmp_path)
+    result = compute_metrics(
+        predictions, ground_truth, tmp_path / "metrics",
+        clearml=object(),  # type: ignore[arg-type]
+        evaluation=EvaluationConfig(), splits=["test"],
+        fiftyone=FiftyOneConfig(enabled=False),
+    )
+    assert result.dashboards["test"].is_file()
+    assert (tmp_path / "metrics" / "recall_confidence_intervals_test.png").is_file()
+
+
+@pytest.mark.parametrize("already_suffixed", [False, True])
+@pytest.mark.parametrize("suppress_recall", [False, True])
+def test_reused_destination_requires_fresh_confidence_plots(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    already_suffixed: bool, suppress_recall: bool,
+) -> None:
+    from digital_metrics.reporting import get_dashboards
+
+    from clearml_yolo.artifact_names import PLOT_METRICS
+    from clearml_yolo.comparison import scoring
+
+    destination = tmp_path / "metrics"
+    destination.mkdir()
+    stale = b"old confidence plot"
+    other_split = destination / "recall_confidence_intervals_val.png"
+    unrelated = destination / "notes.txt"
+    other_split.write_bytes(stale)
+    unrelated.write_bytes(stale)
+    for metric in PLOT_METRICS:
+        for suffix in ("", "_test"):
+            (destination / f"{metric}_confidence_intervals{suffix}.png").write_bytes(stale)
+
+    def dashboard(*args: Any, **kwargs: Any) -> Any:
+        producer = tmp_path / "producer"
+        producer.mkdir()
+        result = get_dashboards(*args, **(kwargs | {"path": str(producer)}))
+        directory = Path(kwargs["path"])
+        for path in producer.iterdir():
+            metric = next(
+                (
+                    name for name in PLOT_METRICS
+                    if path.name.startswith(f"{name}_confidence_intervals")
+                ),
+                None,
+            )
+            if metric is None:
+                path.replace(directory / path.name)
+            elif not (suppress_recall and metric == "recall"):
+                suffix = "_test" if already_suffixed else ""
+                path.replace(directory / f"{metric}_confidence_intervals{suffix}.png")
+        return result
+
+    monkeypatch.setattr(scoring, "get_dashboards", dashboard)
+    monkeypatch.setattr("clearml_yolo.tasks.metrics.init_task", lambda *_args, **_kwargs: None)
+    predictions, ground_truth = _write_inputs(tmp_path)
+
+    def run() -> None:
+        compute_metrics(
+            predictions, ground_truth, destination,
+            clearml=object(),  # type: ignore[arg-type]
+            evaluation=EvaluationConfig(), splits=["test"],
+            fiftyone=FiftyOneConfig(enabled=False),
+        )
+
+    if suppress_recall:
+        with pytest.raises(FileNotFoundError, match="Required confidence interval plot"):
+            run()
+    else:
+        run()
+        for metric in PLOT_METRICS:
+            plot = destination / f"{metric}_confidence_intervals_test.png"
+            assert plot.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+    assert other_split.read_bytes() == stale
+    assert unrelated.read_bytes() == stale

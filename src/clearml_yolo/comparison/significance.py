@@ -12,6 +12,7 @@ supplies recall's confidence interval only and deliberately returns a NaN p-valu
 the recall hypothesis cannot be counted twice in the Benjamini-Hochberg family.
 """
 
+import math
 from collections.abc import Sequence
 
 import numpy as np
@@ -248,6 +249,12 @@ def bootstrap_recall_delta(
     return interval.model_copy(update={"p_value": float("nan")})
 
 
+def validate_q(q: float) -> None:
+    """Reject unsupported false discovery probabilities before computation."""
+    if not math.isfinite(q) or not 0 <= q <= 1:
+        raise ValueError("q must be a finite probability in [0, 1]")
+
+
 def adjust_benjamini_hochberg(p_values: Sequence[float], q: float = 0.05) -> BHResult:
     """Control the false discovery rate across every class-by-metric test in a split.
 
@@ -255,6 +262,7 @@ def adjust_benjamini_hochberg(p_values: Sequence[float], q: float = 0.05) -> BHR
     in would inflate its size and distort the ranking - then mapped back as NaN so the
     output stays aligned to the input order.
     """
+    validate_q(q)
     raw = np.asarray(p_values, dtype=float)
     defined = np.isfinite(raw)
     adjusted = np.full(raw.shape, np.nan)

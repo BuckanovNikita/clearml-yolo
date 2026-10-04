@@ -36,10 +36,23 @@ def release_training_memory() -> None:
 
 def _is_worker() -> bool:
     owner_pid = os.environ.get(OWNER_PID_ENV)
-    if owner_pid and owner_pid != str(os.getpid()):
+    if owner_pid and os.environ.get(OWNER_TASK_ENV) and owner_pid != str(os.getpid()):
         return True
     local_rank = os.environ.get("LOCAL_RANK")
-    return local_rank is not None and local_rank != "-1"
+    if (
+        local_rank is not None
+        and local_rank != "-1"
+        and not (owner_pid and os.environ.get(OWNER_TASK_ENV))
+    ):
+        raise ValueError(
+            "Top-level LOCAL_RANK launches are unsupported; use the project GPU launcher"
+        )
+    return False
+
+
+def validate_owner_environment() -> None:
+    """Reject rank-bearing external launches before scheduling or native startup."""
+    _is_worker()
 
 
 def _installed_callbacks(integration: Any) -> dict[str, Any]:
@@ -157,8 +170,13 @@ def native_runtime() -> Iterator[None]:
     had_clearml = hasattr(integration, "clearml")
     original_clearml = getattr(integration, "clearml", None)
     original_paths = {key: SETTINGS[key] for key in ("datasets_dir", "weights_dir", "runs_dir")}
-    original_globals = (utils.DATASETS_DIR, utils.WEIGHTS_DIR, utils.RUNS_DIR,
-                        dataset_paths.DATASETS_DIR, ddp_paths.USER_CONFIG_DIR)
+    original_globals = (
+        utils.DATASETS_DIR,
+        utils.WEIGHTS_DIR,
+        utils.RUNS_DIR,
+        dataset_paths.DATASETS_DIR,
+        ddp_paths.USER_CONFIG_DIR,
+    )
     with TemporaryDirectory(prefix="cy-native-", dir=temporary_root()) as directory:
         os.environ["YOLO_CONFIG_DIR"] = directory
         try:
@@ -189,8 +207,13 @@ def native_runtime() -> Iterator[None]:
             dict.__setitem__(SETTINGS, "clearml", original_setting)
             for key, value in original_paths.items():
                 dict.__setitem__(SETTINGS, key, value)
-            (utils.DATASETS_DIR, utils.WEIGHTS_DIR, utils.RUNS_DIR,
-             dataset_paths.DATASETS_DIR, ddp_paths.USER_CONFIG_DIR) = original_globals
+            (
+                utils.DATASETS_DIR,
+                utils.WEIGHTS_DIR,
+                utils.RUNS_DIR,
+                dataset_paths.DATASETS_DIR,
+                ddp_paths.USER_CONFIG_DIR,
+            ) = original_globals
             integration.callbacks = original_callbacks
             _restore_attribute(integration, "Task", had_task, original_task)
             _restore_attribute(integration, "clearml", had_clearml, original_clearml)

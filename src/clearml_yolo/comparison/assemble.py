@@ -25,6 +25,7 @@ from clearml_yolo.comparison.significance import (
     bootstrap_precision_delta,
     bootstrap_recall_delta,
     mcnemar_recall,
+    validate_q,
 )
 from clearml_yolo.progress import track
 
@@ -107,6 +108,7 @@ def _test_pair(
 
 def _verdict(delta: float, adjusted_p: float, q: float) -> str:
     """A change counts only once Benjamini-Hochberg has cleared it at the family level."""
+    validate_q(q)
     if math.isnan(adjusted_p) or math.isnan(delta) or adjusted_p > q or delta == 0:
         return NOT_SIGNIFICANT
     return IMPROVED if delta > 0 else DEGRADED

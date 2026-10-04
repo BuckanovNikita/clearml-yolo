@@ -66,14 +66,16 @@ def _fiftyone_inputs() -> dict[str, object]:
     # Read explicit data selections without changing the dependency's configuration paths.
     source = Path(os.environ.get("FIFTYONE_CONFIG_PATH") or
                   Path.home() / ".fiftyone" / "config.json").expanduser()
-    if not source.is_file():
-        return {}
     try:
+        if not source.is_file():
+            return {}
         values = json.loads(source.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        raise ValueError("FiftyOne configuration is not valid JSON") from None
-    if not isinstance(values, dict):
-        raise TypeError("FiftyOne configuration must be a mapping")
+        if not isinstance(values, dict):
+            logger.warning("Optional FiftyOne configuration must be a mapping; using defaults")
+            return {}
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        logger.warning("Cannot read optional FiftyOne configuration; using defaults")
+        return {}
     return {str(key): value for key, value in values.items()}
 
 

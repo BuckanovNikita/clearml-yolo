@@ -13,7 +13,7 @@ from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol, cast
+from typing import Any, Literal, Protocol, cast
 
 import numpy as np
 import pandas as pd
@@ -30,9 +30,9 @@ from digital_metrics.scoring import (
 )
 from digital_metrics.validation import validate_dataframes
 from loguru import logger
-from pydantic import BaseModel, ConfigDict, JsonValue
+from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
-from clearml_yolo.artifact_names import PLOT_METRICS
+from clearml_yolo.artifact_names import PLOT_METRICS, split_component
 from clearml_yolo.comparison.evaluation_payload import (
     EvaluationBox,
     EvaluationBoxStatus,
@@ -49,9 +49,9 @@ class EvaluationConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    iou_threshold: float = 0.5
-    matching_strategy: str = "iou_prior"
-    ap_method: str = "interp"
+    iou_threshold: float = Field(default=0.5, ge=0, le=1, allow_inf_nan=False)
+    matching_strategy: Literal["greedy", "hungarian", "iou_prior"] = "iou_prior"
+    ap_method: Literal["interp", "continuous"] = "interp"
     confidence_optimization: str = "per_class"
     skip_cohen_kappa: bool = True
     preprocess: bool = False
@@ -87,9 +87,7 @@ def validate_thresholds(
         raise ValueError(f"Confidence thresholds must be finite for class(es): {nonfinite}")
     outside = sorted(name for name, value in normalized.items() if not 0.0 <= value <= 1.0)
     if outside:
-        raise ValueError(
-            f"Confidence thresholds must be within [0, 1] for class(es): {outside}"
-        )
+        raise ValueError(f"Confidence thresholds must be within [0, 1] for class(es): {outside}")
     return normalized
 
 
@@ -174,9 +172,7 @@ def build_evaluation_payload(
     records = [match for class_matches in sliced.values() for match in class_matches]
     tp_gt_indices = {match.gt_index for match in records if match.type == "TP"}
     pred_statuses: dict[int, EvaluationBoxStatus] = {
-        match.pred_index: _match_status(match.type)
-        for match in records
-        if match.pred_index != -1
+        match.pred_index: _match_status(match.type) for match in records if match.pred_index != -1
     }
 
     scoped_gt = ground_truth[ground_truth["image_name"].isin(image_names)]
@@ -306,6 +302,9 @@ def calibrate_thresholds(
     confidence_optimization: str,
 ) -> dict[str, float]:
     """Calibrate once on one split, preserving empty images in the match scope."""
+    EvaluationConfig.model_validate(
+        {"iou_threshold": iou_threshold, "matching_strategy": matching_strategy}
+    )
     try:
         calibration_gt = _split_ground_truth(ground_truth, calibration_split)
     except ValueError as error:
@@ -387,12 +386,8 @@ def _outcome_from_matches(
 def _visualization_frames(
     gt_df: pd.DataFrame, preds_df: pd.DataFrame, outcome: SplitOutcome
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    gt_types = outcome.gt_status.set_index("gt_index")["detected"].map(
-        {True: "TP", False: "FN"}
-    )
-    pred_types = outcome.pred_status.set_index("pred_index")["is_tp"].map(
-        {True: "TP", False: "FP"}
-    )
+    gt_types = outcome.gt_status.set_index("gt_index")["detected"].map({True: "TP", False: "FN"})
+    pred_types = outcome.pred_status.set_index("pred_index")["is_tp"].map({True: "TP", False: "FP"})
     gt = gt_df.copy()
     gt["predict_type"] = [gt_types.get(index, "FN") for index in gt.index]
     preds = preds_df.copy()
@@ -419,6 +414,13 @@ def evaluate_split(
     methodology: Mapping[str, JsonValue] | None = None,
 ) -> EvaluatedSplit:
     """Score a split at an already-frozen mapping and write its dashboards."""
+    EvaluationConfig.model_validate(
+        {
+            "iou_threshold": iou_threshold,
+            "matching_strategy": matching_strategy,
+            "ap_method": ap_method,
+        }
+    )
     if not skip_cohen_kappa:
         raise ValueError("Fixed evaluation currently requires skip_cohen_kappa=True")
     required = classes if required_classes is None else required_classes
@@ -471,7 +473,14 @@ def evaluate_split(
     )
     if not visible_metrics:
         raise ValueError(f"Split {split!r} has no classes that can be written to a dashboard")
+    suffix = split_component(suffix)
     output_dir.mkdir(parents=True, exist_ok=True)
+    # These API-owned outputs must come from this evaluation under either producer convention.
+    for metric_name in PLOT_METRICS:
+        for plot_suffix in ("", f"_{suffix}"):
+            (output_dir / f"{metric_name}_confidence_intervals{plot_suffix}.png").unlink(
+                missing_ok=True
+            )
     dashboard, dtrk_dashboard = get_dashboards(
         visible_metrics,
         ground_truth,
@@ -487,7 +496,12 @@ def evaluate_split(
     for metric_name in PLOT_METRICS:
         generated = output_dir / f"{metric_name}_confidence_intervals.png"
         preserved = output_dir / f"{metric_name}_confidence_intervals_{suffix}.png"
-        generated.replace(preserved)
+        if not preserved.is_file():
+            if not generated.is_file():
+                raise FileNotFoundError(
+                    f"Required confidence interval plot is missing: {preserved}"
+                )
+            generated.replace(preserved)
         plot_paths[metric_name] = preserved
     confusion_matrix_path = output_dir / f"matrix_{suffix}.xlsx"
     gt_matches, pred_matches = _visualization_frames(gt_df, predictions, outcome)
@@ -534,6 +548,9 @@ def score_split(
     false positive also carries a ``gt_index``, but that box's real status is
     recorded by its own TP or FN record.
     """
+    EvaluationConfig.model_validate(
+        {"iou_threshold": iou_threshold, "matching_strategy": matching_strategy}
+    )
     for frame_name, frame in (("Ground-truth", gt_df), ("Prediction", preds_df)):
         if not frame.index.is_unique:
             raise ValueError(

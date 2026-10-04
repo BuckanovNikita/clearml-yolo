@@ -34,3 +34,8 @@ height produced by native image-boundary clipping. Publication retains these row
 confidence values, and original CSV indices without filtering or enlarging boxes.
 Reversed coordinates, non-finite coordinates, and confidence outside finite `[0, 1]`
 are rejected. Labelled ground-truth boxes must have strictly positive width and height.
+
+Malformed JSON, non-mapping JSON and unreadable optional FiftyOne configuration warn and fall
+back to filesystem defaults during CLI initialization. Explicit directory environment selections
+remain authoritative. Help, config export and computation can proceed; enabled visualization
+still uses the optional warning/no-op publisher boundary if the backend rejects its configuration.

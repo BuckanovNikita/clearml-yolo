@@ -253,7 +253,7 @@ def test_expected_artifact_must_be_uploaded_before_completion(
         run()
 
     assert task.failed[0]["status_reason"] == "ArtifactUploadError"
-    assert task.events[-2:] == ["failed", "close"]
+    assert task.events[-2:] == ["close", "failed"]
 
 
 def test_upload_fulfils_a_predeclared_stage_artifact(
@@ -429,6 +429,8 @@ def test_worker_never_creates_a_task_or_uploads(
 ) -> None:
     task_type, task = fake_clearml
     monkeypatch.setenv("LOCAL_RANK", "0")
+    monkeypatch.setenv("CY_CLEARML_OWNER_PID", str(os.getpid() + 1))
+    monkeypatch.setenv("CY_CLEARML_OWNER_TASK_ID", "parent-task")
 
     with invocation(ClearMLConfig(), "train") as owner:
         assert owner is None
@@ -564,7 +566,7 @@ def test_invalid_source_yaml_fails_without_echoing_its_contents(
 
     assert "do-not-echo" not in str(raised.value)
     assert task.configurations == []
-    assert task.events[-2:] == ["failed", "close"]
+    assert task.events[-2:] == ["close", "failed"]
 
 
 def test_source_json_is_sanitized_without_changing_non_secret_values(
@@ -1181,3 +1183,67 @@ def test_configuration_file_redacts_aliases_with_secret_provenance_from_context(
             assert "probe-private-value" not in stored
             assert YAML(typ="safe").load(stored) == {"copy": "<redacted>"}
     assert source.read_bytes() == original
+
+
+def test_replay_preserves_explicit_empty_executable_values(
+    fake_clearml: tuple[type[Any], FakeTask],
+) -> None:
+    with invocation(ClearMLConfig(), "predict") as owner:
+        values = {"ultralytics_predict": {"classes": [], "source": "", "nested": {}}, "splits": []}
+        assert replay_configuration(owner, values) == values
+        stored = record_run_configuration(owner, {"ultralytics_predict": {"classes": []}})
+        assert stored["ultralytics_predict"]["classes"] == []
+
+
+def test_cleanup_failure_retains_original_exception(
+    fake_clearml: tuple[type[Any], FakeTask], monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, task = fake_clearml
+    original = ValueError("original computation failure")
+
+    def failed_close() -> None:
+        raise RuntimeError("cleanup failed")
+
+    monkeypatch.setattr(task, "close", failed_close)
+    with (
+        pytest.raises(ValueError, match="original computation failure") as captured,
+        invocation(ClearMLConfig(), "report"),
+    ):
+        raise original
+    assert captured.value is original
+    assert task.failed == []
+
+
+def test_local_cleanup_oserror_does_not_mask_original_failure(
+    fake_clearml: tuple[type[Any], FakeTask], monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from clearml_yolo.clearml_session import _InvocationState
+
+    original = ValueError("computation failed")
+
+    def cleanup(_self: _InvocationState) -> None:
+        raise PermissionError("cleanup denied")
+
+    monkeypatch.setattr(_InvocationState, "cleanup", cleanup)
+    with (
+        pytest.raises(ValueError, match="computation failed") as captured,
+        invocation(ClearMLConfig(), "report"),
+    ):
+        raise original
+    assert captured.value is original
+
+
+def test_local_cleanup_oserror_propagates_after_otherwise_successful_call(
+    fake_clearml: tuple[type[Any], FakeTask], monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from clearml_yolo.clearml_session import _InvocationState
+
+    def cleanup(_self: _InvocationState) -> None:
+        raise PermissionError("cleanup denied")
+
+    monkeypatch.setattr(_InvocationState, "cleanup", cleanup)
+    with (
+        pytest.raises(PermissionError, match="cleanup denied"),
+        invocation(ClearMLConfig(), "report"),
+    ):
+        pass
