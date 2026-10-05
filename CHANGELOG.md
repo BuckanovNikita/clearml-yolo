@@ -1,7 +1,12 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.14.0 (2026-10-05)
+
+### Bug Fixes
+
+- Resolve reviewed tracking evaluation and queue defects
+  ([`347344d`](https://github.com/BuckanovNikita/clearml-yolo/commit/347344d875013ba11ff4dea89e3a1789c65631c2))
 
 ### Documentation
 
