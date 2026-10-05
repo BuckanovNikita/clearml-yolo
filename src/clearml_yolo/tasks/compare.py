@@ -35,6 +35,7 @@ from clearml_yolo.comparison.scoring import (
     EvaluationConfig,
     classes_from_ground_truth,
     evaluate_split,
+    filter_invalid_prediction_boxes,
     prepare_ground_truth,
     prepare_predictions,
     validate_split_membership,
@@ -364,7 +365,7 @@ def _scored(
         Path(evidence.save_dir), destination, role=role, split=split
     )
     prepared_truth = prepare_ground_truth(ground_truth, deduplicate=evaluation.preprocess)
-    raw_predictions = predictions.copy().reset_index(drop=True)
+    raw_predictions = filter_invalid_prediction_boxes(predictions.reset_index(drop=True))
     prepared_predictions = prepare_predictions(
         raw_predictions,
         preprocess_conf_threshold=evaluation.preprocess_preds_conf_threshold,

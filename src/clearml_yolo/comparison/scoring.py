@@ -28,8 +28,9 @@ from digital_metrics.scoring import (
     get_confusion_matrix,
     slice_by_conf,
 )
-from digital_metrics.validation import validate_dataframes
+from digital_metrics.validation import REQUIRED_COLS_GT, validate_dataframes
 from loguru import logger
+from numpy.typing import NDArray
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
 from clearml_yolo.artifact_names import PLOT_METRICS, split_component
@@ -272,6 +273,73 @@ def prepare_ground_truth(ground_truth: pd.DataFrame, *, deduplicate: bool) -> pd
         duplicate_positions, _ = find_duplicates_bboxes(compute_iou_matrix(boxes, boxes))
         duplicates.extend(image.iloc[duplicate_positions].index.tolist())
     return frame.drop(duplicates).reset_index(drop=True)
+
+
+def _prediction_coordinates(
+    boxes: pd.DataFrame,
+) -> tuple[NDArray[np.float64], NDArray[np.bool_]]:
+    """Use upstream float conversion, isolating malformed cells only on failure."""
+    nonnumeric = np.zeros(len(boxes), dtype=bool)
+    try:
+        return boxes.to_numpy(dtype=float, na_value=np.nan), nonnumeric
+    except (TypeError, ValueError):
+        coordinates = np.full(boxes.shape, np.nan)
+        for row_index, row in enumerate(boxes.itertuples(index=False, name=None)):
+            for column_index, value in enumerate(row):
+                try:
+                    coordinates[row_index, column_index] = float(value)
+                except (TypeError, ValueError):
+                    nonnumeric[row_index] = True
+        return coordinates, nonnumeric
+
+
+def filter_invalid_prediction_boxes(predictions: pd.DataFrame) -> pd.DataFrame:
+    """Copy valid geometry for evaluation without changing raw prediction artifacts.
+
+    Counts use the first applicable reason per row. Required-column errors remain
+    the upstream validator's responsibility; only invalid coordinate cells and
+    nonpositive extents are tolerated here.
+    """
+    if predictions.empty or not {*BBOX_COLUMNS, "image_name"}.issubset(predictions.columns):
+        return predictions.copy()
+    boxes = predictions[BBOX_COLUMNS]
+    coordinates, nonnumeric = _prediction_coordinates(boxes)
+    missing = boxes.isna().any(axis=1).to_numpy()
+    nonnumeric &= ~missing
+    nonfinite = ~np.isfinite(coordinates).all(axis=1) & ~missing & ~nonnumeric
+    finite = ~(missing | nonnumeric | nonfinite)
+    reversed_corners = (coordinates[:, 2:] < coordinates[:, :2]).any(axis=1) & finite
+    zero_area = (
+        (coordinates[:, 2:] == coordinates[:, :2]).any(axis=1) & finite & ~reversed_corners
+    )
+    invalid = missing | nonnumeric | nonfinite | reversed_corners | zero_area
+    if invalid.any():
+        # Only geometry is recoverable: invalid rows must still fail upstream's
+        # confidence, label and schema checks. This copy never enters scoring.
+        validation_coordinates = coordinates.copy()
+        validation_coordinates[invalid] = (0.0, 0.0, 1.0, 1.0)
+        validation_predictions = predictions.assign(
+            **{column: validation_coordinates[:, i] for i, column in enumerate(BBOX_COLUMNS)}
+        )
+        validate_dataframes(
+            validation_predictions, pd.DataFrame(columns=sorted(REQUIRED_COLS_GT))
+        )
+        reasons = {
+            "missing": int(missing.sum()),
+            "nonnumeric": int(nonnumeric.sum()),
+            "nonfinite": int(nonfinite.sum()),
+            "reversed_corners": int(reversed_corners.sum()),
+            "zero_area": int(zero_area.sum()),
+        }
+        sample = predictions.loc[invalid, "image_name"].drop_duplicates().head(5).tolist()
+        logger.warning(
+            "Dropped {} of {} prediction boxes with invalid geometry: {}; image sample: {}",
+            int(invalid.sum()),
+            len(predictions),
+            ", ".join(f"{reason}={count}" for reason, count in reasons.items() if count),
+            sample,
+        )
+    return predictions.iloc[np.flatnonzero(~invalid)].copy()
 
 
 def prepare_predictions(

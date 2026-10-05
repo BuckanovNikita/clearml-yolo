@@ -78,6 +78,19 @@ replace the command input.
 
 ## Evaluation input and output safety
 
+Validation, metrics and comparison drop invalid prediction geometry from an in-memory
+evaluation copy before confidence/NMS preprocessing, threshold calibration and mAP.
+Missing, nonnumeric or non-finite coordinate cells, reversed corners and zero-width or
+zero-height boxes are excluded. One warning per input frame gives dropped/total row
+counts, mutually exclusive reason counts (missing, nonnumeric, non-finite, reversed,
+then zero-area) and up to five affected image names. Empty input needs no warning.
+Raw prediction CSVs remain unchanged. Valid low-confidence or NMS-suppressed boxes
+still enter mAP through the geometry-filtered raw copy; fixed-threshold scoring uses
+the prepared copy, with match indices referring to that same prepared frame.
+If all predictions are dropped, evaluation continues with empty predictions and counts
+unmatched ground-truth boxes as false negatives. Ground-truth validation, required-column
+schema errors and other validation rules remain unchanged.
+
 Logical split names remain unchanged in manifests, evaluation payloads and result mapping keys.
 Every split-derived filename and artifact component uses UTF-8 percent encoding for unsafe
 characters, including path separators, percent signs and dots. Common train/val/test names retain

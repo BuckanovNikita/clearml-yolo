@@ -49,6 +49,11 @@ manifests/payloads/configuration and PNG diagnostics retain their formats. The m
 [publication inventory](../specs/008-dataset-clearml-tracking/contracts/publication.md)
 defines the current names and destinations.
 
+Validation, metrics and comparison warn and drop invalid prediction geometry before
+preprocessing, calibration and mAP, preserving raw CSVs. All-invalid predictions are
+scored as empty, with unmatched ground truth counted as false negatives. See the
+[evaluation safety contract](../specs/001-release-030/contracts/cli.md#evaluation-input-and-output-safety).
+
 Pipeline comparison uses the current `test` images. Standalone `cy-compare` defaults to
 `split=test` and accepts another split present in the current ground truth. Both models
 use the selected split under the same inference/evaluation settings; comparison does
