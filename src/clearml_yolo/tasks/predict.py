@@ -10,10 +10,14 @@ from pydantic import BaseModel, Field
 from clearml_yolo import artifact_names
 from clearml_yolo.clearml_models import resolve_weights
 from clearml_yolo.clearml_report import report_table
+from clearml_yolo.clearml_results import (
+    file_digest,
+    register_predictions,
+    write_prediction_provenance,
+)
 from clearml_yolo.clearml_session import (
     ClearMLConfig,
     init_task,
-    publish_table,
     record_run_configuration,
     task_identity,
 )
@@ -78,6 +82,8 @@ def predict(
     if selected is None:
         raise ValueError("Prediction requires weights=<checkpoint> or ultralytics_predict.model")
     checkpoint = resolve_weights(selected)
+    checkpoint_path = Path(checkpoint)
+    checkpoint_hash = file_digest(checkpoint_path) if checkpoint_path.is_file() else None
     resolution = resolution_of(checkpoint, settings.get("imgsz"))
     settings["imgsz"] = resolution.scored_at
     report_table(
@@ -111,9 +117,18 @@ def predict(
     frame = pd.concat(frames, ignore_index=True).reindex(columns=PREDICTION_COLUMNS)
 
     frame.to_csv(output_path, index=False)
+    recorded_hash = write_prediction_provenance(output_path, checkpoint_path)
+    if recorded_hash != checkpoint_hash:
+        raise ValueError("Checkpoint changed while producing predictions")
+    register_predictions(
+        task,
+        Path(ground_truth),
+        output_path,
+        output_dir=output_path.parent,
+        model_id=f"checkpoint:{recorded_hash}" if recorded_hash else str(checkpoint),
+        splits=splits,
+    )
     if task is not None:
-        publish_table(task, artifact_names.PREDICTIONS, output_path)
-        publish_table(task, artifact_names.GROUND_TRUTH, Path(ground_truth))
         record_run_configuration(
             task,
             {

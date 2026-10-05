@@ -19,7 +19,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Self
+from typing import Any, Self, cast
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from loguru import logger
@@ -66,10 +66,15 @@ def resolve_task_name(config: ClearMLConfig, stage: str) -> str:
 
 
 def task_identity(task: Any) -> tuple[str, str, str]:
-    """Read the active SDK identity, including remote overrides and project hierarchy."""
+    """Snapshot routing identity once; display renaming never relocates files."""
+    active = _ACTIVE_INVOCATION.get()
+    if active is not None and task is active.task and active.routing_identity is not None:
+        return active.routing_identity
     values = (task.get_project_name(), task.name, task.id)
     if any(not isinstance(value, str) or not value for value in values):
         raise ValueError("Active ClearML task requires a project name, task name and ID")
+    if active is not None and task is active.task:
+        active.routing_identity = values
     return values
 
 
@@ -109,6 +114,9 @@ class _InvocationState:
     config_resolver: Callable[[Any], Any] | None = None
     config_file_count: int = 0
     execution_config_paths: list[Path] = field(default_factory=list)
+    finalizers: list[Callable[[], None]] = field(default_factory=list)
+    resources: dict[str, object] = field(default_factory=dict)
+    routing_identity: tuple[str, str, str] | None = None
 
     def enter_stage(self, stage: str) -> None:
         self.current_stage = stage
@@ -172,7 +180,12 @@ def _is_worker() -> bool:
 def _sensitive_key(key: object) -> bool:
     normalized = str(key).lower().replace("-", "_")
     return normalized in {
-        "auth", "authentication", "sig", "signature", "x_amz_signature", "x_goog_signature"
+        "auth",
+        "authentication",
+        "sig",
+        "signature",
+        "x_amz_signature",
+        "x_goog_signature",
     } or any(
         marker in normalized
         for marker in (
@@ -274,6 +287,8 @@ def _active_state(task: Any, operation: str) -> _InvocationState:
 
 
 def _finalize(state: _InvocationState) -> None:
+    for finalize in state.finalizers:
+        finalize()
     missing = [
         artifact.name for artifact in state.artifacts if artifact.required and not artifact.uploaded
     ]
@@ -533,6 +548,25 @@ def publish_table(task: Any, name: str, path: Path) -> None:
     active.table_remote_names.add(remote_name)
     record.uploaded = True
     logger.debug("Published canonical table {} as {}", name, remote_name)
+
+
+def invocation_resource[T](task: Any, key: str, factory: Callable[[], T]) -> T:
+    """Share an adapter-owned resource only within this owner invocation.
+
+    Adapters own unique keys and their factory types; the registry intentionally
+    knows no domain/resource types so dependency direction stays explicit.
+    """
+    active = _active_state(task, "Invocation resource access")
+    if key not in active.resources:
+        active.resources[key] = factory()
+    return cast(T, active.resources[key])
+
+
+def register_finalizer(task: Any, callback: Callable[[], None]) -> None:
+    """Finish required publications before checking artifacts, models and flush."""
+    if _is_worker():
+        return
+    _active_state(task, "Publication finalizer registration").finalizers.append(callback)
 
 
 def register_model_barrier(task: Any, verifier: Callable[[], None]) -> None:

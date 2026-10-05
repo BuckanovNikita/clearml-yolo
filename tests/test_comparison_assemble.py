@@ -24,7 +24,7 @@ from clearml_yolo.comparison.assemble import (
     ComparisonTables,
     build_comparison_rows,
 )
-from clearml_yolo.comparison.scoring import ClassCounts, SplitOutcome
+from clearml_yolo.comparison.scoring import ClassCounts, EvaluatedSplit, SplitOutcome
 from clearml_yolo.comparison.workbook import COMPARISON_COLUMNS, write_comparison_workbook
 
 
@@ -595,7 +595,7 @@ def _assert_recovered_sources(configurations: dict[str, Any], legacy_role: str |
 
 def _stub_comparison_publication(
     monkeypatch: pytest.MonkeyPatch,
-) -> tuple[dict[str, object], dict[str, Any], list[str]]:
+) -> tuple[dict[str, object], dict[str, Any], list[str], list[dict[str, Any]]]:
     uploads: dict[str, object] = {}
     configurations: dict[str, Any] = {}
     monkeypatch.setattr(
@@ -604,6 +604,23 @@ def _stub_comparison_publication(
         raising=False,
     )
     expected: list[str] = []
+    evaluations: list[dict[str, Any]] = []
+
+    def publish_evaluation(
+        _task: object, evaluated: EvaluatedSplit, truth: Path, predictions: Path, **kwargs: Any
+    ) -> None:
+        # The invocation-owned adapter is tested separately; this boundary records
+        # the exact scored populations handed off by comparison.
+        evaluations.append(
+            {
+                "evaluated": evaluated,
+                "truth": truth,
+                "predictions": predictions,
+                **kwargs,
+            }
+        )
+
+    monkeypatch.setattr("clearml_yolo.tasks.compare.publish_evaluation", publish_evaluation)
 
     class FakeTask:
         id = "current-task"
@@ -625,7 +642,7 @@ def _stub_comparison_publication(
         "clearml_yolo.tasks.compare.expect_artifacts",
         lambda _task, names: expected.extend(names),
     )
-    return uploads, configurations, expected
+    return uploads, configurations, expected, evaluations
 
 
 def _recovered_comparison_models(
@@ -682,6 +699,32 @@ def _recovered_comparison_models(
     return models
 
 
+def _assert_evaluation_handoffs(
+    evaluations: list[dict[str, Any]],
+    truth: Path,
+    split: str,
+    dashboards: tuple[Path, Path],
+    prediction_paths: tuple[Path, Path],
+) -> None:
+    assert [call["role"] for call in evaluations] == [
+        "comparison_baseline",
+        "comparison_candidate",
+    ]
+    for call, dashboard, predictions in zip(
+        evaluations,
+        dashboards,
+        prediction_paths,
+        strict=True,
+    ):
+        assert call["truth"] == truth
+        assert call["predictions"] == predictions
+        assert call["output_dir"] == predictions.parent
+        assert call["evaluated"].dashboard_path == dashboard
+        assert call["evaluated"].dtrk_dashboard_path.is_file()
+        assert call["evaluated"].split == split
+        assert call["model_id"]
+
+
 @pytest.mark.parametrize("legacy_role", [None, "baseline", "candidate", "both"])
 @pytest.mark.parametrize("split", ["test", "val"])
 @pytest.mark.parametrize("override", [False, True])
@@ -734,7 +777,7 @@ def test_compare_dashboards_and_statistics_share_the_same_test_counts(
     membership: list[tuple[str, list[str]]] = []
 
     def fake_reinfer(
-        weights: Path, current: pd.DataFrame, selected_split: str, *_args: Any, **_kwargs: Any
+        weights: Path, current: pd.DataFrame, selected_split: str, output: Path, **_kwargs: Any
     ) -> tuple[pd.DataFrame, Any]:
         membership.append(
             (selected_split, current.loc[current["split"] == selected_split, "image_name"].tolist())
@@ -751,13 +794,13 @@ def test_compare_dashboards_and_statistics_share_the_same_test_counts(
         (save_dir / "labels").mkdir(parents=True, exist_ok=True)
         (save_dir / "labels" / "image.txt").write_text("prediction", encoding="utf-8")
         (save_dir / "image.jpg").write_bytes(b"must-not-upload")
-        frame.attrs["effective_args"] = {"device": f"normalized-{role}"}
-        frame.attrs["save_dir"] = str(save_dir)
+        frame.attrs.update(effective_args={"device": f"normalized-{role}"}, save_dir=str(save_dir))
+        frame.to_csv(output, index=False)
         return frame, VocabularyReport(
             model_classes=["cat"], unknown_to_model=[], unknown_to_ground_truth=[]
         )
 
-    uploads, configurations, expected = _stub_comparison_publication(monkeypatch)
+    uploads, configurations, expected, evaluations = _stub_comparison_publication(monkeypatch)
     monkeypatch.setattr("clearml_yolo.tasks.compare.reinfer_split", fake_reinfer)
     monkeypatch.setattr(
         "clearml_yolo.tasks.compare.resolution_of",
@@ -802,14 +845,17 @@ def test_compare_dashboards_and_statistics_share_the_same_test_counts(
     assert candidate.loc["cat", "confidence"] == threshold
     _assert_recovered_sources(configurations, legacy_role)
     assert set(uploads) == {
-        "ground_truth",
-        f"compare_predictions_baseline_{split}",
-        f"compare_predictions_candidate_{split}",
         f"compare_workbook_{split}",
         f"compare_workbook_{split}_excluded",
-        f"compare_workbook_{split}_methodology",
     }
     assert set(expected) == {f"compare_workbook_{split}"}
+    _assert_evaluation_handoffs(
+        evaluations,
+        truth_path,
+        split,
+        (result.baseline_dashboard, result.candidate_dashboard),
+        (result.baseline_predictions, result.candidate_predictions),
+    )
 
 
 def test_comparison_scoring_uses_the_full_evaluation_configuration(
@@ -1010,47 +1056,24 @@ def test_automatic_baseline_absence_still_evaluates_candidate(
         ],
     )
 
-    uploads: dict[str, object] = {}
-    configurations: dict[str, Any] = {}
-    monkeypatch.setattr(
-        "clearml_yolo.tasks.compare.record_run_configuration",
-        lambda _task, values: configurations.update(values),
-        raising=False,
-    )
-    expected: list[str] = []
-
-    class FakeTask:
-        id = "current-task"
-
-    monkeypatch.setattr(
-        "clearml_yolo.tasks.compare.init_task", lambda *_args, **_kwargs: FakeTask()
-    )
-    monkeypatch.setattr(
-        "clearml_yolo.tasks.compare.expect_artifacts",
-        lambda _task, names: expected.extend(names),
-    )
-    monkeypatch.setattr(
-        "clearml_yolo.tasks.compare.upload_artifact",
-        lambda _task, name, value: uploads.setdefault(name, value),
-    )
-    monkeypatch.setattr(
-        "clearml_yolo.tasks.compare.publish_table",
-        lambda _task, name, value, **kwargs: uploads.setdefault(name, value),
-        raising=False,
-    )
+    uploads, configurations, expected, evaluations = _stub_comparison_publication(monkeypatch)
     monkeypatch.setattr(
         "clearml_yolo.tasks.compare.latest_completed_task_id", lambda *_args, **_kwargs: None
     )
+
+    def fake_reinfer(
+        _weights: Path, _truth: pd.DataFrame, _split: str, output: Path, **_kwargs: Any
+    ) -> tuple[pd.DataFrame, VocabularyReport]:
+        predictions.to_csv(output, index=False)
+        return predictions, VocabularyReport(
+            model_classes=["cat"],
+            unknown_to_model=[],
+            unknown_to_ground_truth=[],
+        )
+
     monkeypatch.setattr(
         "clearml_yolo.tasks.compare.reinfer_split",
-        lambda *_args, **_kwargs: (
-            predictions,
-            VocabularyReport(
-                model_classes=["cat"],
-                unknown_to_model=[],
-                unknown_to_ground_truth=[],
-            ),
-        ),
+        fake_reinfer,
     )
     monkeypatch.setattr(
         "clearml_yolo.tasks.compare.resolution_of",
@@ -1073,14 +1096,22 @@ def test_automatic_baseline_absence_still_evaluates_candidate(
         "status": "skipped",
         "reason": "No completed ClearML task in project 'clearml-yolo' tagged ['prod']",
     }
-    assert set(uploads) == {
-        "ground_truth",
-        "compare_predictions_candidate_test",
-        "compare_evaluation_candidate_test",
-        "compare_evaluation_candidate_test_thresholds",
-        "compare_evaluation_candidate_test_methodology",
-    }
-    assert set(expected) == {"compare_evaluation_candidate_test"}
+    # Comparison itself has no paired artifact to publish; its candidate evaluation
+    # is handed to the canonical CSV/dashboard/interactive-plot owner.
+    assert uploads == {}
+    assert expected == []
+    assert len(evaluations) == 1
+    published = evaluations[0]
+    assert published["role"] == "comparison_candidate"
+    assert published["truth"] == truth_path
+    assert published["predictions"].parent == tmp_path / "comparison"
+    assert published["predictions"].name.startswith("candidate_predictions_test_")
+    assert published["predictions"].is_file()
+    assert published["evaluated"].dashboard_path.is_file()
+    assert published["evaluated"].dtrk_dashboard_path.is_file()
+    assert published["evaluated"].outcome.counts["cat"].tp == 1
+    assert published["evaluated"].confusion_matrix.counts
+    assert published["evaluated"].pr_curves[0].ap50 == pytest.approx(1)
 
 
 def test_shared_class_without_predictions_keeps_zero_counts_and_unavailable_tests() -> None:

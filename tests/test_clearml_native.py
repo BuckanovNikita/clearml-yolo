@@ -72,8 +72,8 @@ class _OutputModel:
     def __setattr__(self, name: str, value: Any) -> None:
         if name == "_record":
             object.__setattr__(self, name, value)
-        elif name == "comment":
-            self._record.comment = value
+        elif name in {"comment", "name"}:
+            setattr(self._record, name, value)
         else:
             object.__setattr__(self, name, value)
 
@@ -134,6 +134,20 @@ def native_sdk(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> tuple[_Task, 
     model_module.Framework = SimpleNamespace(pytorch="PyTorch")  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "clearml", module)
     monkeypatch.setitem(sys.modules, "clearml.model", model_module)
+    resources: dict[str, Any] = {}
+
+    def resource(_task: Any, key: str, factory: Callable[[], Any]) -> Any:
+        if key not in resources:
+            resources[key] = factory()
+        return resources[key]
+
+    monkeypatch.setattr("clearml_yolo.clearml_native.invocation_resource", resource)
+
+    def resolve(_task: Any, name: str, **kwargs: Any) -> str:
+        kwargs["write_model_name"](name)
+        return name
+
+    monkeypatch.setattr("clearml_yolo.clearml_native.resolve_model_name", resolve)
     return task, record, checkpoint
 
 
@@ -337,3 +351,73 @@ def test_completion_barrier_rechecks_downloaded_best_bytes(
     with pytest.raises(NativeModelError, match="does not match"):
         barriers[0]()
     assert checkpoint.read_bytes() == b"checkpoint"
+
+
+@pytest.mark.parametrize("race_stage", ["constructor", "update"])
+def test_native_name_write_race_retries_shared_suffix_without_new_model_or_path(
+    native_sdk: tuple[_Task, _Record, Path],
+    monkeypatch: pytest.MonkeyPatch,
+    race_stage: str,
+) -> None:
+    from clearml_yolo import clearml_naming
+    from clearml_yolo import clearml_native as native_module
+
+    task, record, checkpoint = native_sdk
+    competitors: list[str] = []
+    constructor_names: list[str] = []
+    barriers: list[Callable[[], None]] = []
+    suffixes = iter(["gentle-otter", "brave-badger"])
+    resources: dict[str, Any] = {}
+
+    def resource(_task: Any, key: str, factory: Callable[[], Any]) -> Any:
+        if key not in resources:
+            resources[key] = factory()
+        return resources[key]
+
+    monkeypatch.setattr(clearml_naming, "invocation_resource", resource)
+    monkeypatch.setattr(native_module, "invocation_resource", resource)
+    monkeypatch.setattr(clearml_naming, "record_run_configuration", lambda *_args: None)
+    monkeypatch.setattr(
+        clearml_naming, "task_identity", lambda _task: ("project", "training", "task-id")
+    )
+    monkeypatch.setattr(clearml_naming, "_task_collision", lambda *_args: False)
+    monkeypatch.setattr(
+        clearml_naming, "_model_collision", lambda _task, name, _model_id: name in competitors
+    )
+    monkeypatch.setattr(clearml_naming, "_readable_suffix", lambda: next(suffixes))
+    monkeypatch.setattr(native_module, "resolve_model_name", clearml_naming.resolve_model_name)
+    monkeypatch.setattr(
+        native_module, "register_model_barrier", lambda _task, callback: barriers.append(callback)
+    )
+    monkeypatch.setattr(task, "set_name", lambda name: setattr(task, "name", name), raising=False)
+    constructor = _OutputModel.__init__
+    setter = _OutputModel.__setattr__
+
+    def create(self: _OutputModel, **kwargs: Any) -> None:
+        constructor(self, **kwargs)
+        constructor_names.append(kwargs["name"])
+        competitors.append(kwargs["name"])
+
+    def update(self: _OutputModel, name: str, value: Any) -> None:
+        setter(self, name, value)
+        if race_stage == "update" and name == "name" and value == "detector-gentle-otter":
+            competitors.append(value)
+
+    monkeypatch.setattr(_OutputModel, "__init__", create)
+    monkeypatch.setattr(_OutputModel, "__setattr__", update)
+    model, trainer = _training_objects(checkpoint)
+    identity = (record.id, record.url)
+
+    model_id = finalize_native_model(task, model, trainer, "yolo11n.pt")
+
+    expected_suffix = "gentle-otter" if race_stage == "constructor" else "brave-badger"
+    assert record.name == f"detector-{expected_suffix}"
+    assert task.name == f"training-{expected_suffix}"
+    assert record.name not in competitors
+    assert constructor_names == ["detector"]
+    assert model_id == identity[0]
+    assert (record.id, record.url) == identity
+    assert trainer.args.name == "detector"
+    assert trainer.best == checkpoint
+    assert len(barriers) == 1
+    barriers[0]()

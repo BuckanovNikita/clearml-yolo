@@ -11,6 +11,7 @@ from omegaconf import DictConfig, OmegaConf, open_dict
 # Populate the shared ConfigStore in fresh CLI processes before Hydra composes examples.
 import clearml_yolo.configs  # noqa: F401
 from clearml_yolo.apps.config_resolution import resolve_config_file
+from clearml_yolo.clearml_naming import initialize_naming
 from clearml_yolo.clearml_session import (
     invocation,
     replay_configuration,
@@ -91,6 +92,7 @@ def execute_owned(name: str, config: DictConfig, function: Callable[..., Any]) -
             if "ultralytics" in config:
                 config.ultralytics = native
         validate_wrapper_keys(config, function)
+        initialize_naming(task)
         # Derive paths only after the owner exists; remote task names may differ.
         with open_dict(config):
             if "output_dir" in config and config.output_dir is None:

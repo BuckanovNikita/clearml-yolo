@@ -77,6 +77,29 @@ Available threshold precision is preserved, but historical architecture loading 
 The automatic baseline is the latest completed prod-tagged task excluding the current task;
 missing automatic baseline skips comparison, while invalid explicit references fail.
 
+Evaluation publication follows the
+[current result contract](../specs/014-evaluation-publication/contracts/publication.md):
+one invocation-owned `gt_csv` and combined `predicts_csv` retain original source rows,
+stable IDs, exclusions, thresholds and JSON pre/post-threshold relationships. Canonical
+CSVs assemble once before completion; prediction-only rows stay not evaluated.
+Publish original full/DTRK dashboards, exact validation thresholds and paired comparison/
+report workbooks with comparison exclusions. Duplicate evaluation summaries and separate
+match/threshold/methodology sidecars remain local. Missing automatic baseline retains
+candidate dashboards/plots and records its skip reason.
+
+Interactive confusion matrices show exact post-threshold counts and row/column/global
+percentages, preserving true-row/predicted-column orientation, class order/background
+and explicit zero denominators. Class PR uses the geometry-valid authoritative AP50
+population, confidence ordering and public matching; it is distinct from frozen-threshold
+confusion counts. Empty predictions with GT have AP50 zero; absent GT has unavailable
+recall/AP. Context/model/split/class identities prevent plot collisions.
+
+Project-local exact task/model name collisions, including archived records, receive a
+shared readable suffix after rechecking; unused requested names and output paths remain
+unchanged. Owned best models may receive full-precision validation thresholds only when
+calibration provenance matches the checkpoint actually used for prediction and remote
+readback verifies the metadata. Standalone metrics never creates or modifies models.
+
 ClearML is required for execution commands. One execution invocation owns exactly one task;
 nested stages reuse it and workers do not create tasks or upload artifacts.
 The invocation-owned task forwards normal stdout and stderr to its ClearML Console while it

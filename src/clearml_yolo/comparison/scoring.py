@@ -41,6 +41,9 @@ from clearml_yolo.comparison.evaluation_payload import (
     EvaluationMatchStatus,
     EvaluationPayload,
 )
+from clearml_yolo.comparison.pr_curves import build_pr_curves
+from clearml_yolo.result_export import assign_source_ids, build_result_rows
+from clearml_yolo.result_schema import ConfusionMatrixPayload, PRCurve
 
 BBOX_COLUMNS = ["bbox_x_tl", "bbox_y_tl", "bbox_x_br", "bbox_y_br"]
 
@@ -136,6 +139,9 @@ class EvaluatedSplit:
     gt_matches: pd.DataFrame
     pred_matches: pd.DataFrame
     evaluation_payload: EvaluationPayload
+    confusion_matrix: ConfusionMatrixPayload
+    pr_curves: list[PRCurve]
+    result_rows: pd.DataFrame
 
 
 def _match_status(value: str) -> EvaluationMatchStatus:
@@ -260,7 +266,8 @@ def _split_ground_truth(ground_truth: pd.DataFrame, split: str) -> pd.DataFrame:
 
 def prepare_ground_truth(ground_truth: pd.DataFrame, *, deduplicate: bool) -> pd.DataFrame:
     """Apply digital-metrics' optional duplicate-box preprocessing."""
-    frame = deepcopy(ground_truth)
+    frame = assign_source_ids(deepcopy(ground_truth), row_type="ground_truth")
+    frame = frame.reset_index(drop=True)
     validate_split_membership(frame)
     if not deduplicate:
         return frame.reset_index(drop=True)
@@ -355,7 +362,7 @@ def prepare_predictions(
         nms_containment_threshold=preprocess_nms_containment_threshold,
         nms_iou_threshold=preprocess_nms_iou_threshold,
     )
-    processed = preprocessor.process(predictions.copy())
+    processed = preprocessor.process(assign_source_ids(predictions, row_type="prediction"))
     return cast(pd.DataFrame, processed).reset_index(drop=True)
 
 
@@ -463,6 +470,45 @@ def _visualization_frames(
     return gt, preds
 
 
+def _lineage_frames(
+    ground_truth: pd.DataFrame,
+    raw_predictions: pd.DataFrame,
+    predictions: pd.DataFrame,
+    source_ground_truth: pd.DataFrame | None,
+    source_predictions: pd.DataFrame | None,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    source_gt = assign_source_ids(
+        ground_truth if source_ground_truth is None else source_ground_truth,
+        row_type="ground_truth",
+    )
+    source_preds = assign_source_ids(
+        raw_predictions if source_predictions is None else source_predictions,
+        row_type="prediction",
+    )
+    if source_ground_truth is None:
+        ground_truth = assign_source_ids(ground_truth, row_type="ground_truth")
+    if source_predictions is None:
+        predictions = assign_source_ids(predictions, row_type="prediction")
+    return ground_truth, predictions, source_gt, source_preds
+
+
+def _verify_pr_ap50(curves: list[PRCurve], metrics: Mapping[str, Any]) -> None:
+    """Keep the dependency's compute_map authoritative if reconstruction drifts."""
+    for curve in curves:
+        if curve.gt_count == 0:
+            continue
+        authoritative = float(metrics[curve.class_name].ap50)
+        # Both paths use the same float32 counts and public integrator. This
+        # tolerance admits a float32 rounding step, not a population mismatch.
+        if curve.ap50 is None or not math.isclose(
+            curve.ap50, authoritative, rel_tol=1e-7, abs_tol=1e-9,
+        ):
+            raise ValueError(
+                f"Reconstructed AP50 for class {curve.class_name!r} ({curve.ap50!r}) "
+                f"disagrees with authoritative compute_map AP50 ({authoritative!r})"
+            )
+
+
 def evaluate_split(
     ground_truth: pd.DataFrame,
     raw_predictions: pd.DataFrame,
@@ -480,6 +526,8 @@ def evaluate_split(
     suffix: str,
     dashboard_classes: set[str] | None = None,
     methodology: Mapping[str, JsonValue] | None = None,
+    source_ground_truth: pd.DataFrame | None = None,
+    source_predictions: pd.DataFrame | None = None,
 ) -> EvaluatedSplit:
     """Score a split at an already-frozen mapping and write its dashboards."""
     EvaluationConfig.model_validate(
@@ -493,6 +541,9 @@ def evaluate_split(
         raise ValueError("Fixed evaluation currently requires skip_cohen_kappa=True")
     required = classes if required_classes is None else required_classes
     normalized = validate_thresholds(thresholds, required)
+    ground_truth, predictions, source_gt, source_preds = _lineage_frames(
+        ground_truth, raw_predictions, predictions, source_ground_truth, source_predictions,
+    )
     gt_df = _split_ground_truth(ground_truth, split)
     validate_dataframes(predictions, gt_df)
     image_names = [str(value) for value in gt_df["image_name"].unique()]
@@ -522,6 +573,8 @@ def evaluate_split(
         methodology=payload_methodology,
     )
     metrics: dict[str, Any] = compute_metrics_from_matches(sliced, classes, normalized)
+    # Preserve authoritative AP inputs: prepared GT and geometry-valid predictions
+    # before optional confidence filtering/NMS. Raw source rows are export evidence.
     gt_boxes = gt_df.dropna(subset=BBOX_COLUMNS)
     compute_map(
         gt_boxes,
@@ -532,6 +585,17 @@ def evaluate_split(
         strategy=matching_strategy,
     )
     cm, class_labels = get_confusion_matrix(sliced, classes)
+    confusion_matrix = ConfusionMatrixPayload(labels=class_labels, counts=cm.tolist())
+    pr_curves = build_pr_curves(
+        gt_boxes, raw_predictions, classes=classes, image_names=image_names,
+        matching_strategy=matching_strategy, ap_method=ap_method,
+    )
+    _verify_pr_ap50(pr_curves, metrics)
+    result_rows = build_result_rows(
+        source_gt, source_preds, prepared_ground_truth=gt_df, prepared_predictions=predictions,
+        split=split, thresholds=normalized, matches_pre_threshold=matches,
+        matches_post_threshold=sliced,
+    )
     outcome = _outcome_from_matches(gt_df, predictions, classes, sliced)
 
     visible_metrics = (
@@ -588,6 +652,9 @@ def evaluate_split(
         gt_matches=gt_matches,
         pred_matches=pred_matches,
         evaluation_payload=evaluation_payload,
+        confusion_matrix=confusion_matrix,
+        pr_curves=pr_curves,
+        result_rows=result_rows,
     )
 
 

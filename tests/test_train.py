@@ -29,7 +29,7 @@ def native_publication_boundary(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "clearml_yolo.tasks.train.record_run_configuration", lambda *a: None, raising=False
     )
-    monkeypatch.setattr("clearml_yolo.tasks.train.publish_table", lambda *a: None, raising=False)
+    monkeypatch.setattr("clearml_yolo.tasks.train.register_ground_truth", lambda *a, **k: None)
 
 
 def test_missing_ground_truth_is_rejected_before_task_creation(
@@ -103,9 +103,8 @@ def test_csv_training_uses_prepared_data_and_returns_cleaned_ground_truth(
         lambda *args, **kwargs: calls["connections"].append((args, kwargs)) or alternate,
     )
     monkeypatch.setattr(
-        "clearml_yolo.tasks.train.publish_table",
-        lambda _task, name, value: calls["uploads"].append((name, value)),
-        raising=False,
+        "clearml_yolo.tasks.train.register_ground_truth",
+        lambda _task, truth, **kwargs: calls["uploads"].append((truth, kwargs["output_dir"])),
     )
     native_dir = tmp_path / "native"
     (native_dir / "weights").mkdir(parents=True)
@@ -153,7 +152,7 @@ def test_csv_training_uses_prepared_data_and_returns_cleaned_ground_truth(
     assert calls["native"]["compile"] is False
     assert calls["connections"][0][0][1:] == ("dataset", data)
     assert calls["connections"][0][1]["allow_remote_override"] is False
-    assert {name for name, _ in calls["uploads"]} == {"ground_truth"}
+    assert calls["uploads"] == [(cleaned, tmp_path)]
     assert calls["locked"] is False
     assert result.weights == native_dir / "weights/best.pt"
     assert result.cleaned_ground_truth == cleaned

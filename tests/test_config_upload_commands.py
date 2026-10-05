@@ -62,6 +62,7 @@ def test_file_resolver_sees_remote_inputs_and_derived_output(
     monkeypatch.setattr(hydra, "main", lambda **_kwargs: lambda fn: lambda: fn(config))
     monkeypatch.setattr(common, "native_runtime", nullcontext)
     monkeypatch.setattr(common, "invocation", owner)
+    monkeypatch.setattr(common, "initialize_naming", lambda _task: None)
     monkeypatch.setattr(common, "replay_configuration", replay)
 
     common.launch("report", command)

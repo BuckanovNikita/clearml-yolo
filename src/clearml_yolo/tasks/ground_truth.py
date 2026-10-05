@@ -2,12 +2,11 @@
 
 from pathlib import Path
 
+from clearml_yolo.clearml_results import register_ground_truth
 from clearml_yolo.clearml_session import (
     ClearMLConfig,
     connect_config_file,
-    expect_artifacts,
     init_task,
-    publish_table,
 )
 from clearml_yolo.ground_truth import build_ground_truth
 
@@ -20,8 +19,7 @@ def ground_truth(
     seed: int = 0,
 ) -> Path:
     task = init_task(clearml, stage="ground_truth")
-    expect_artifacts(task, ["ground_truth"])
     effective = connect_config_file(task, "dataset", Path(data_yaml))
     destination = build_ground_truth(str(effective), output, test_fraction=test_fraction, seed=seed)
-    publish_table(task, "ground_truth", destination)
+    register_ground_truth(task, destination, output_dir=destination.parent)
     return destination

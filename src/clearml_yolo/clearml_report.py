@@ -17,19 +17,199 @@ The constants below are the integration seam with the comparison frame: they nam
 columns this module reads out of it.
 """
 
-from collections.abc import Mapping
+import json
+from collections.abc import Mapping, Sequence
+from html import escape
 from numbers import Real
 from typing import Any, NamedTuple
+from urllib.parse import quote
 
 import pandas as pd
 from loguru import logger
 
 from clearml_yolo.clearml_session import Task
+from clearml_yolo.result_schema import ConfusionMatrixPayload, PRCurve, ResultContext
 
 COMPARISON_TABLE_TITLE = "comparison"
 DEGRADED_TABLE_TITLE = "comparison_degraded"
 METHODOLOGY_TABLE_TITLE = "comparison_methodology"
 ITERATION = 0
+
+
+def _plot_identity(context: ResultContext, *parts: str) -> str:
+    """Encode component boundaries reversibly, including slashes and Unicode labels."""
+    return quote(
+        json.dumps(
+            [context.context_id, context.model_id, context.split, *parts],
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
+        safe="",
+    )
+
+
+def _context_caption(context: ResultContext) -> str:
+    return " | ".join(
+        escape(value)
+        for value in (
+            context.context_id,
+            context.model_id,
+            context.split,
+        )
+    )
+
+
+def _caption_annotation(caption: str) -> dict[str, Any]:
+    # ClearML report_plotly replaces layout.title with series; annotations survive.
+    return {
+        "text": caption,
+        "xref": "paper",
+        "yref": "paper",
+        "x": 0.5,
+        "y": 1.15,
+        "showarrow": False,
+    }
+
+
+def _confusion_trace(matrix: ConfusionMatrixPayload, normalization: str) -> dict[str, Any]:
+    counts = matrix.counts
+    row_totals = [sum(row) for row in counts]
+    column_totals = [sum(row[index] for row in counts) for index in range(len(counts))]
+    total = sum(row_totals)
+    values: list[list[int | float]] = []
+    hover: list[list[list[int | str]]] = []
+    for row_index, row in enumerate(counts):
+        value_row: list[int | float] = []
+        hover_row: list[list[int | str]] = []
+        for column_index, count in enumerate(row):
+            denominator = {
+                "raw": total,
+                "row": row_totals[row_index],
+                "column": column_totals[column_index],
+                "global": total,
+            }[normalization]
+            value_row.append(
+                count
+                if normalization == "raw"
+                else (100 * count / denominator if denominator else 0)
+            )
+            hover_row.append([count, denominator, "observed" if denominator else "no observations"])
+        values.append(value_row)
+        hover.append(hover_row)
+    trace: dict[str, Any] = {
+        "type": "heatmap",
+        "x": list(range(len(counts))),
+        "y": list(range(len(counts))),
+        "z": values,
+        "customdata": hover,
+        "text": [
+            [
+                f"True: {escape(true)}<br>Predicted: {escape(predicted)}"
+                for predicted in matrix.labels
+            ]
+            for true in matrix.labels
+        ],
+        "colorscale": "Blues",
+        "hovertemplate": "%{text}<br>Count: %{customdata[0]}<br>Denominator: %{customdata[1]}"
+        "<br>%{customdata[2]}<br>Value: %{z}<extra></extra>",
+    }
+    if normalization != "raw":
+        trace.update(zmin=0, zmax=100, colorbar={"title": "Percent", "ticksuffix": "%"})
+    return trace
+
+
+def report_confusion_matrices(
+    task: Task,
+    context: ResultContext,
+    matrix: ConfusionMatrixPayload,
+) -> None:
+    """Publish exact counts and three normalizations of the same post-threshold matrix."""
+    if task is None:
+        return
+    axis = {
+        "tickmode": "array",
+        "tickvals": list(range(len(matrix.labels))),
+        "ticktext": matrix.labels,
+    }
+    for normalization in ("raw", "row", "column", "global"):
+        figure = {
+            "data": [_confusion_trace(matrix, normalization)],
+            "layout": {
+                "title": f"Confusion matrix ({normalization}) | {_context_caption(context)}",
+                "annotations": [_caption_annotation(_context_caption(context))],
+                "margin": {"t": 120},
+                "xaxis": {**axis, "title": "Predicted class"},
+                "yaxis": {**axis, "title": "True class", "autorange": "reversed"},
+            },
+        }
+        task.get_logger().report_plotly(
+            title=f"evaluation_confusion_{normalization}",
+            series=_plot_identity(context),
+            iteration=ITERATION,
+            figure=figure,
+        )
+
+
+def _pr_figure(context: ResultContext, curve: PRCurve) -> dict[str, Any]:
+    no_gt = curve.gt_count == 0
+    ap50 = None if no_gt else (curve.ap50 if curve.recall else 0.0)
+    ap_caption = "unavailable" if ap50 is None else str(ap50)
+    caption = (
+        f"PR | {escape(curve.class_name)} | AP50={ap_caption} | "
+        f"{escape(curve.integration_method)} | {_context_caption(context)}"
+    )
+    layout: dict[str, Any] = {
+        "title": caption,
+        "annotations": [_caption_annotation(caption)],
+        "margin": {"t": 120},
+        "xaxis": {"title": "Recall", "range": [0, 1]},
+        "yaxis": {"title": "Precision", "range": [0, 1]},
+    }
+    data: list[dict[str, Any]] = []
+    if not no_gt:
+        data.append(
+            {
+                "type": "scatter",
+                "mode": "lines+markers",
+                "name": escape(curve.class_name),
+                "x": curve.recall,
+                "y": curve.precision,
+                "customdata": [
+                    list(point) for point in zip(curve.confidence, curve.tp, curve.fp, strict=True)
+                ],
+                "hovertemplate": "Recall: %{x}<br>Precision: %{y}"
+                "<br>Confidence: %{customdata[0]}<br>Cumulative TP: %{customdata[1]}"
+                "<br>Cumulative FP: %{customdata[2]}<extra></extra>",
+            }
+        )
+    if no_gt or not curve.recall:
+        layout["annotations"].append(
+            {
+                "text": "No ground truth: recall unavailable"
+                if no_gt
+                else "No predictions: AP50=0",
+                "xref": "paper",
+                "yref": "paper",
+                "x": 0.5,
+                "y": 0.5,
+                "showarrow": False,
+            }
+        )
+    return {"data": data, "layout": layout}
+
+
+def report_pr_curves(task: Task, context: ResultContext, curves: Sequence[PRCurve]) -> None:
+    """Report class PR populations without constructing unavailable operating points."""
+    if task is None:
+        return
+    for curve in curves:
+        task.get_logger().report_plotly(
+            title="evaluation_pr",
+            series=_plot_identity(context, curve.class_name),
+            iteration=ITERATION,
+            figure=_pr_figure(context, curve),
+        )
+
 
 POOLED_COLUMN = "is_pooled"
 FAMILY_SIZE_KEY = "family_size"

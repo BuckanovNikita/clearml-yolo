@@ -19,6 +19,7 @@ from clearml_yolo.clearml_models import (
     resolve_task_model,
 )
 from clearml_yolo.clearml_report import report_comparison
+from clearml_yolo.clearml_results import file_digest, publish_evaluation
 from clearml_yolo.clearml_session import (
     ClearMLConfig,
     expect_artifacts,
@@ -46,6 +47,7 @@ from clearml_yolo.comparison.workbook import write_comparison_workbook
 from clearml_yolo.filesystem import write_path
 from clearml_yolo.inference import ImageNameMode, resolution_of, trained_imgsz
 from clearml_yolo.native_config import prediction_settings, stage_settings, write_native_yaml
+from clearml_yolo.result_export import assign_source_ids
 
 ModelSource = Literal["clearml", "local"]
 MANIFEST_NAME = "comparison_manifest.json"
@@ -364,6 +366,7 @@ def _scored(
     native_archive = _archive_native_outputs(
         Path(evidence.save_dir), destination, role=role, split=split
     )
+    predictions = assign_source_ids(predictions, row_type="prediction")
     prepared_truth = prepare_ground_truth(ground_truth, deduplicate=evaluation.preprocess)
     raw_predictions = filter_invalid_prediction_boxes(predictions.reset_index(drop=True))
     prepared_predictions = prepare_predictions(
@@ -395,6 +398,8 @@ def _scored(
         output_dir=destination,
         suffix=f"{role}_{split}",
         dashboard_classes=model_classes,
+        source_ground_truth=ground_truth,
+        source_predictions=predictions,
     )
     return evaluated, vocabulary, evidence, native_archive
 
@@ -474,14 +479,19 @@ def _source_configuration(model: ResolvedModel) -> dict[str, Any]:
 
 
 def _publish_comparison_tables(
-    task: Any, truth: Path, predictions: dict[str, Path], split: str
+    task: Any,
+    truth: Path,
+    contexts: dict[str, tuple[Path, EvaluatedSplit, ResolvedModel]],
 ) -> None:
-    if task is None:
-        return
-    publish_table(task, "ground_truth", truth)
-    for role, path in predictions.items():
-        publish_table(
-            task, f"compare_predictions_{role}_{artifact_names.split_component(split)}", path
+    for role, (path, evaluated, model) in contexts.items():
+        publish_evaluation(
+            task,
+            evaluated,
+            truth,
+            path,
+            output_dir=path.parent,
+            model_id=model.links.get("model_id") or f"checkpoint:{file_digest(model.weights)}",
+            role=f"comparison_{role}",
         )
 
 
@@ -552,12 +562,9 @@ def _skip_without_baseline(
                 },
             },
         )
-        _publish_comparison_tables(task, ground_truth_path, {"candidate": predictions}, split)
-        name = f"compare_evaluation_candidate_{artifact_names.split_component(split)}"
-        expect_artifacts(task, [name])
-        upload_artifact(task, name, workbook)
-        for name, table_path in tables.items():
-            publish_table(task, name, table_path)
+        _publish_comparison_tables(
+            task, ground_truth_path, {"candidate": (predictions, evaluated, candidate)}
+        )
 
 
 def _native_inference(
@@ -623,9 +630,13 @@ def compare(
         )
 
     ground_truth_path = Path(ground_truth)
-    truth = pd.read_csv(
-        ground_truth_path,
-        dtype={"image_name": str, "instance_label": str, "split": str},
+    truth = assign_source_ids(
+        pd.read_csv(
+            ground_truth_path,
+            dtype={"image_name": str, "instance_label": str, "split": str},
+            float_precision="round_trip",
+        ),
+        row_type="ground_truth",
     )
     validate_split_membership(truth)
     try:
@@ -773,16 +784,16 @@ def compare(
             task,
             ground_truth_path,
             {
-                "baseline": baseline_predictions,
-                "candidate": candidate_predictions,
+                "baseline": (baseline_predictions, baseline_evaluated, baseline),
+                "candidate": (candidate_predictions, candidate_evaluated, candidate),
             },
-            split,
         )
         name = artifact_names.per_split(artifact_names.COMPARISON_WORKBOOK_PREFIX, split)
         expect_artifacts(task, [name])
         upload_artifact(task, name, workbook)
         for name, table_path in csv_tables.items():
-            publish_table(task, name, table_path)
+            if name.endswith("_excluded"):
+                publish_table(task, name, table_path)
 
     degraded = _degraded(tables)
     return CompareResult(

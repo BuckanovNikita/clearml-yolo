@@ -649,7 +649,7 @@ def test_metric_split_upload_rejection_fails_owner_and_retains_payload(
     original = task.upload_artifact
 
     def reject_evaluation(**kwargs: Any) -> bool:
-        if kwargs["name"] == "metrics_evaluation_test":
+        if kwargs["name"] == "metrics_dashboard_full_test":
             return False
         return original(**kwargs)
 
@@ -657,7 +657,7 @@ def test_metric_split_upload_rejection_fails_owner_and_retains_payload(
     monkeypatch.setattr("clearml_yolo.tasks.metrics.report_table", lambda *a: None)
     monkeypatch.setattr("clearml_yolo.tasks.metrics.report_scalars", lambda *a: None)
     with (
-        pytest.raises(ArtifactUploadError, match="metrics_evaluation_test"),
+        pytest.raises(ArtifactUploadError, match="metrics_dashboard_full_test"),
         invocation(ClearMLConfig(), "metrics"),
     ):
         compute_metrics(

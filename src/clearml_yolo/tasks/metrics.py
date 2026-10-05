@@ -10,12 +10,16 @@ from loguru import logger
 from pydantic import BaseModel, Field
 
 from clearml_yolo import artifact_names
+from clearml_yolo.clearml_native import associate_calibration_thresholds, owned_native_model
 from clearml_yolo.clearml_report import report_scalars, report_table
+from clearml_yolo.clearml_results import (
+    prediction_checkpoint_hash,
+    publish_evaluation,
+    register_predictions,
+)
 from clearml_yolo.clearml_session import (
     ClearMLConfig,
-    expect_artifacts,
     init_task,
-    publish_table,
     record_run_configuration,
     upload_artifact,
 )
@@ -33,6 +37,7 @@ from clearml_yolo.filesystem import write_path
 from clearml_yolo.progress import track
 from clearml_yolo.publishing import create_publisher
 from clearml_yolo.publishing.models import FiftyOneConfig
+from clearml_yolo.result_export import assign_source_ids
 from clearml_yolo.tasks.publication import prepare_publisher, publish_results
 
 __all__ = ["EvaluationConfig"]
@@ -51,16 +56,18 @@ def _publish_split(
     task: Any,
     split: str,
     evaluated: EvaluatedSplit,
-    workbook_path: Path,
-    tables: dict[str, Path],
+    ground_truth: Path,
+    predictions: Path,
+    output_dir: Path,
 ) -> None:
     per_class, summary = summarize_metrics(evaluated.metrics)
-    if task is not None:
-        upload_artifact(
-            task, artifact_names.per_split(artifact_names.EVALUATION_PREFIX, split), workbook_path
-        )
-        for name, table_path in tables.items():
-            publish_table(task, name, table_path)
+    publish_evaluation(
+        task,
+        evaluated,
+        ground_truth,
+        predictions,
+        output_dir=output_dir,
+    )
     report_table(task, artifact_names.METRICS_SECTION, split, per_class)
     report_scalars(
         task, f"{artifact_names.METRICS_SECTION}_{artifact_names.split_component(split)}", summary
@@ -172,22 +179,33 @@ def compute_metrics(
         )
     if "all" in requested:
         raise ValueError("split='all' is unsupported for frozen evaluation; name concrete splits")
-    if task is not None:
-        expect_artifacts(
-            task,
-            [
-                artifact_names.per_split(artifact_names.EVALUATION_PREFIX, split)
-                for split in requested
-            ],
-        )
-
-    predictions_frame = pd.read_csv(predictions, dtype={"image_name": str, "instance_label": str})
-    ground_truth_frame = pd.read_csv(
-        ground_truth, dtype={"image_name": str, "instance_label": str, "split": str}
+    predictions_frame = assign_source_ids(
+        pd.read_csv(
+            predictions,
+            dtype={"image_name": str, "instance_label": str},
+            float_precision="round_trip",
+        ),
+        row_type="prediction",
     )
-    if task is not None:
-        publish_table(task, artifact_names.PREDICTIONS, Path(predictions))
-        publish_table(task, artifact_names.GROUND_TRUTH, Path(ground_truth))
+    ground_truth_frame = assign_source_ids(
+        pd.read_csv(
+            ground_truth,
+            dtype={"image_name": str, "instance_label": str, "split": str},
+            float_precision="round_trip",
+        ),
+        row_type="ground_truth",
+    )
+    available = set(ground_truth_frame["split"].dropna())
+    if missing := set(requested) - available:
+        raise ValueError(f"No ground-truth rows for splits {sorted(missing)}")
+    destination = write_path(output_dir)
+    represented_splits = ground_truth_frame.loc[
+        ground_truth_frame["image_name"].isin(predictions_frame["image_name"]), "split"
+    ].dropna()
+    export_splits = list(dict.fromkeys(["val", *requested, *map(str, represented_splits)]))
+    register_predictions(
+        task, Path(ground_truth), Path(predictions), output_dir=destination, splits=export_splits
+    )
     prepared_gt, raw_predictions, prepared_predictions, classes = _prepare(
         predictions_frame, ground_truth_frame, evaluation
     )
@@ -209,7 +227,13 @@ def compute_metrics(
         threshold_path, index=False, float_format="%.17g"
     )
     if task is not None:
-        publish_table(task, artifact_names.BEST_CONFIDENCES_VAL, threshold_path)
+        upload_artifact(task, artifact_names.BEST_CONFIDENCES_VAL, threshold_path)
+        if owned_native_model(task) is not None:
+            associate_calibration_thresholds(
+                task,
+                thresholds,
+                prediction_checkpoint_sha256=prediction_checkpoint_hash(Path(predictions)),
+            )
         record_run_configuration(
             task,
             {
@@ -237,6 +261,8 @@ def compute_metrics(
             output_dir=destination,
             suffix=split,
             methodology=evaluation.model_dump(mode="json"),
+            source_ground_truth=ground_truth_frame,
+            source_predictions=predictions_frame,
         )
         evaluation_path = destination / f"evaluation_{artifact_names.split_component(split)}.json"
         evaluation_path.write_text(
@@ -246,7 +272,7 @@ def compute_metrics(
             destination
             / f"{artifact_names.EVALUATION_PREFIX}_{artifact_names.split_component(split)}.xlsx"
         )
-        tables = _write_evaluation_workbook(
+        _write_evaluation_workbook(
             workbook_path,
             evaluated,
             methodology={
@@ -256,7 +282,7 @@ def compute_metrics(
                 "test_calibration": False,
             },
         )
-        _publish_split(task, split, evaluated, workbook_path, tables)
+        _publish_split(task, split, evaluated, Path(ground_truth), Path(predictions), destination)
         result.dashboards[split] = evaluated.dashboard_path
         result.best_confidences[split] = dict(evaluated.thresholds)
         result.evaluations[split] = evaluation_path

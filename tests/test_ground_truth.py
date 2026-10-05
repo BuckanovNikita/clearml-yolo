@@ -232,8 +232,7 @@ def test_tracked_conversion_uses_effective_dataset_configuration(
     override = tmp_path / "remote.yaml"
     output = tmp_path / "truth.csv"
     monkeypatch.setattr(stage, "init_task", lambda *args, **kwargs: object())
-    monkeypatch.setattr(stage, "expect_artifacts", lambda *args: None)
-    monkeypatch.setattr(stage, "publish_table", lambda *args: None)
+    monkeypatch.setattr(stage, "register_ground_truth", lambda *args, **kwargs: None)
     monkeypatch.setattr(stage, "connect_config_file", lambda *args: override)
 
     def convert(source: str, *_args: object, **_kwargs: object) -> Path:
@@ -260,9 +259,10 @@ def test_tracked_conversion_publishes_the_expanded_output_path(
     monkeypatch.setattr(Path, "home", lambda: selected.parent)
     published: list[Path] = []
     monkeypatch.setattr(stage, "init_task", lambda *args, **kwargs: object())
-    monkeypatch.setattr(stage, "expect_artifacts", lambda *args: None)
     monkeypatch.setattr(stage, "connect_config_file", lambda *args: dataset_yaml)
-    monkeypatch.setattr(stage, "publish_table", lambda _task, _name, path: published.append(path))
+    monkeypatch.setattr(
+        stage, "register_ground_truth", lambda _task, path, **kwargs: published.append(path)
+    )
     result = stage.ground_truth(str(dataset_yaml), "~/truth.csv", ClearMLConfig())
     assert result == selected
     assert published == [selected]

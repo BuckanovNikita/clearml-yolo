@@ -16,6 +16,7 @@ from clearml_yolo.publishing.models import FiftyOneConfig, PublicationReceipt
 from clearml_yolo.tasks import predict as predict_module
 from clearml_yolo.tasks.predict import predict
 from native_config_helpers import prediction_config
+from test_clearml_session import fake_clearml as fake_clearml  # noqa: PLC0414 - SDK fixture
 
 
 @pytest.fixture
@@ -40,7 +41,7 @@ def published(monkeypatch: pytest.MonkeyPatch) -> dict[str, pd.DataFrame]:
 
     monkeypatch.setattr(predict_module, "report_table", report_table)
     monkeypatch.setattr(predict_module, "init_task", lambda *_a, **_k: object())
-    monkeypatch.setattr(predict_module, "publish_table", lambda *_a, **_k: None)
+    monkeypatch.setattr(predict_module, "register_predictions", lambda *_a, **_k: None)
     monkeypatch.setattr(predict_module, "record_run_configuration", lambda *_a, **_k: None)
     monkeypatch.setattr(predict_module, "resolve_weights", lambda weights: weights)
     monkeypatch.setattr(
@@ -51,7 +52,7 @@ def published(monkeypatch: pytest.MonkeyPatch) -> dict[str, pd.DataFrame]:
 
 def _ground_truth(tmp_path: Path) -> Path:
     truth = tmp_path / "ground_truth.csv"
-    truth.write_text("image_path,split\na.png,test\n")
+    truth.write_text("image_name,image_path,split\na.png,a.png,test\n")
     return truth
 
 
@@ -201,16 +202,18 @@ def test_prediction_preflights_before_compute_and_publishes_exact_outputs(
     assert (tmp_path / "fiftyone_publication.json").is_file()
 
 
-def test_prediction_satisfies_its_registered_artifacts(
+def test_prediction_registers_its_context_for_deferred_canonical_publication(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     checkpoint_recording: Any,
     published: dict[str, pd.DataFrame],
 ) -> None:
     checkpoint_recording({"imgsz": 64})
-    published_names: list[str] = []
+    registered: list[tuple[Path, Path, dict[str, Any]]] = []
     monkeypatch.setattr(
-        predict_module, "publish_table", lambda task, name, value: published_names.append(name)
+        predict_module,
+        "register_predictions",
+        lambda _task, truth, predictions, **kwargs: registered.append((truth, predictions, kwargs)),
     )
     monkeypatch.setattr(
         predict_module,
@@ -218,7 +221,13 @@ def test_prediction_satisfies_its_registered_artifacts(
         lambda *_args: None,
     )
     _predict(tmp_path, 64)
-    assert published_names == [artifact_names.PREDICTIONS, "ground_truth"]
+    assert registered == [
+        (
+            tmp_path / "ground_truth.csv",
+            tmp_path / "predictions.csv",
+            {"output_dir": tmp_path, "model_id": "best.pt", "splits": None},
+        )
+    ]
 
 
 def test_empty_prediction_output_has_canonical_header_and_is_published(
@@ -228,15 +237,50 @@ def test_empty_prediction_output_has_canonical_header_and_is_published(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     checkpoint_recording({"imgsz": 64})
-    tables: dict[str, Path] = {}
+    registered: list[tuple[Path, Path]] = []
     monkeypatch.setattr(
-        predict_module, "publish_table", lambda _task, name, path: tables.setdefault(name, path)
+        predict_module,
+        "register_predictions",
+        lambda _task, truth, predictions, **_kwargs: registered.append((truth, predictions)),
     )
 
     result = _predict(tmp_path, 64)
 
-    assert set(tables) == {"ground_truth", artifact_names.PREDICTIONS}
+    assert registered == [(tmp_path / "ground_truth.csv", result.predictions)]
     assert list(pd.read_csv(result.predictions)) == PREDICTION_COLUMNS
+
+
+def test_invocation_uploads_canonical_prediction_and_gt_csvs_once_at_completion(
+    tmp_path: Path,
+    checkpoint_recording: Any,
+    published: dict[str, pd.DataFrame],
+    monkeypatch: pytest.MonkeyPatch,
+    fake_clearml: tuple[type[Any], Any],
+) -> None:
+    from clearml_yolo.clearml_results import register_predictions
+    from clearml_yolo.clearml_session import invocation
+
+    checkpoint_recording({"imgsz": 64})
+    _, task = fake_clearml
+    monkeypatch.setattr(predict_module, "init_task", lambda *_a, **_k: task)
+    monkeypatch.setattr(predict_module, "register_predictions", register_predictions)
+
+    with invocation(ClearMLConfig(), "predict"):
+        result = _predict(tmp_path, 64)
+        assert task.uploads == []
+
+    assert [item["name"] for item in task.uploads] == [
+        artifact_names.GROUND_TRUTH,
+        artifact_names.PREDICTIONS,
+    ]
+    gt = pd.read_csv(task.uploads[0]["artifact_object"])
+    combined = pd.read_csv(task.uploads[1]["artifact_object"])
+    assert gt["source_row_id"].tolist() == ["gt:0"]
+    assert combined["evaluation_status"].tolist() == ["not_evaluated"]
+    assert combined["row_type"].tolist() == ["gt"]
+    assert combined["matches_pre_threshold"].tolist() == ["[]"]
+    assert list(pd.read_csv(result.predictions)) == PREDICTION_COLUMNS
+    assert task.completed
 
 
 def test_prediction_settings_use_resolved_group_and_produced_checkpoint() -> None:
@@ -272,10 +316,7 @@ def test_prediction_model_uses_explicit_weights_or_resolved_null(
 ) -> None:
     from clearml_yolo.native_config import prediction_settings
 
-    assert (
-        prediction_settings(prediction_config(model=None), weights)["model"]
-        == expected
-    )
+    assert prediction_settings(prediction_config(model=None), weights)["model"] == expected
 
 
 def test_source_cannot_override_ground_truth_membership() -> None:

@@ -62,7 +62,9 @@ def test_training_policy_normalization_and_receipts_stay_out_of_artifacts(
     import clearml
     import ultralytics.models
 
-    from clearml_yolo.clearml_session import invocation, publish_table
+    from clearml_yolo import artifact_names
+    from clearml_yolo.clearml_results import register_ground_truth
+    from clearml_yolo.clearml_session import invocation
     from clearml_yolo.publishing.models import PublicationReceipt, PublicationRequest
     from clearml_yolo.tasks import train as training
     from clearml_yolo.tasks.publication import publish_results
@@ -92,6 +94,7 @@ def test_training_policy_normalization_and_receipts_stay_out_of_artifacts(
             self.trainer = SimpleNamespace(save_dir=native_output)
 
         def train(self, **settings: Any) -> None:
+            assert not (Path(settings["project"]) / settings["name"]).exists()
             assert settings["fraction"] == 1.0
             assert settings["classes"] is None
             self.trainer.args = SimpleNamespace(**(settings | {"batch": 8}))
@@ -145,7 +148,8 @@ def test_training_policy_normalization_and_receipts_stay_out_of_artifacts(
             ground_truth="source.csv",
             dataset_cache_dir=prepared.data.parent,
         )
-        publish_table(task, "metrics_ground_truth", truth)
+        register_ground_truth(task, truth, output_dir=tmp_path / "publication")
+        assert task.uploads == []
         assert (
             publish_results(
                 Publisher(), task, output_dir=tmp_path / "publication", ground_truth=truth
@@ -154,7 +158,7 @@ def test_training_policy_normalization_and_receipts_stay_out_of_artifacts(
         )
 
     assert result.weights == best
-    assert [item["name"] for item in task.uploads] == ["ground_truth"]
+    assert [item["name"] for item in task.uploads] == [artifact_names.GROUND_TRUTH]
     run = next(
         item["configuration"] for item in reversed(task.configurations) if item["name"] == "run"
     )
@@ -240,6 +244,7 @@ def test_remote_clone_replays_canonical_run_and_general(monkeypatch: Any) -> Non
     monkeypatch.setattr(hydra, "main", lambda **kwargs: lambda fn: lambda: fn(config))
     monkeypatch.setattr(common, "native_runtime", nullcontext)
     monkeypatch.setattr(common, "invocation", lambda *_args, **_kwargs: nullcontext(RemoteTask()))
+    monkeypatch.setattr(common, "initialize_naming", lambda _task: None)
     monkeypatch.setattr(common, "replay_configuration", replay)
     common.launch("train", command)
 
@@ -310,11 +315,13 @@ def test_remote_clone_does_not_replay_previous_owner_output_route(
     monkeypatch.setattr(hydra, "main", lambda **kwargs: lambda fn: lambda: fn(config))
     monkeypatch.setattr(common, "native_runtime", nullcontext)
     monkeypatch.setattr(common, "invocation", lambda *_args, **_kwargs: nullcontext(task))
+    monkeypatch.setattr(common, "initialize_naming", lambda _task: None)
     monkeypatch.setattr(common, "replay_configuration", lambda _task, values: values)
     monkeypatch.setattr(training, "init_task", lambda *_args, **_kwargs: task)
     monkeypatch.setenv("CY_HOME", str(tmp_path))
     monkeypatch.setattr(
-        training, "_prepare_csv_dataset",
+        training,
+        "_prepare_csv_dataset",
         lambda _task, settings, *_args: nullcontext((object(), settings)),
     )
     monkeypatch.setattr(training, "_execute_training", execute_training)
@@ -369,6 +376,69 @@ def test_current_save_dir_override_reaches_pipeline_conflict_validation(
     monkeypatch.setattr(hydra, "main", lambda **kwargs: lambda fn: lambda: fn(config))
     monkeypatch.setattr(common, "native_runtime", nullcontext)
     monkeypatch.setattr(common, "invocation", lambda *_args, **_kwargs: nullcontext(Task()))
+    monkeypatch.setattr(common, "initialize_naming", lambda _task: None)
     monkeypatch.setattr(common, "replay_configuration", lambda _task, values: values)
     with pytest.raises(ValueError, match="save_dir conflicts with pipeline run_dir"):
         common.launch("pipeline", command)
+
+
+def test_real_invocation_freezes_routing_before_collision_display_rename(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from contextlib import nullcontext
+
+    import clearml
+    from omegaconf import OmegaConf
+
+    from clearml_yolo.apps import common
+    from clearml_yolo.clearml_session import task_identity
+    from clearml_yolo.run_identity import task_run_dir
+    from test_clearml_session import FakeTask
+
+    class Task(FakeTask):
+        project = "project-id"
+
+        @staticmethod
+        def get_project_name() -> str:
+            return "project"
+
+        def set_name(self, name: str) -> None:
+            self.name = name
+
+    task = Task()
+    task.name = "requested/report"
+    monkeypatch.setattr(clearml.Task, "init", lambda **_kwargs: task)
+    monkeypatch.setattr(clearml.Task, "get_task", lambda **_kwargs: task)
+    monkeypatch.setattr(
+        clearml.Task,
+        "query_tasks",
+        lambda **_kwargs: [
+            {"id": "previous-task", "project": task.project, "name": "requested/report"},
+            {"id": task.id, "project": task.project, "name": task.name},
+        ],
+    )
+    monkeypatch.setattr(common, "native_runtime", nullcontext)
+    monkeypatch.setenv("CY_HOME", str(tmp_path))
+    monkeypatch.delenv("LOCAL_RANK", raising=False)
+    outputs: list[str | None] = []
+
+    def command(clearml: Any, output_dir: str | None) -> None:
+        outputs.append(output_dir)
+        assert task_identity(task) == ("project", "requested/report", task.id)
+
+    common.execute_owned(
+        "report",
+        OmegaConf.create({"clearml": ClearMLConfig().model_dump(), "output_dir": None}),
+        command,
+    )
+
+    assert task.name.startswith("requested/report-")
+    expected = task_run_dir(tmp_path / "runs", "project", "requested/report", task.id) / "report"
+    assert outputs == [str(expected)]
+    run = next(
+        item["configuration"] for item in reversed(task.configurations) if item["name"] == "run"
+    )
+    assert run["display_names"]["requested_task_name"] == "requested/report"
+    assert run["display_names"]["effective_task_name"] == task.name
+    assert run["clearml"]["task_name"] == ClearMLConfig().task_name
+    assert task.completed

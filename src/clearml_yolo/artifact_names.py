@@ -15,8 +15,8 @@ collapsible sections exist in the plots and scalars tabs, keyed by title — see
 
 from urllib.parse import quote
 
-PREDICTIONS = "predict_predictions"
-GROUND_TRUTH = "ground_truth"
+PREDICTIONS = "predicts_csv"
+GROUND_TRUTH = "gt_csv"
 FIFTYONE_PUBLICATION_FILE = "fiftyone_publication.json"
 
 # Not an artifact but a configuration object, which is a different tab and a different

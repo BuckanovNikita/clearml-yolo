@@ -1,7 +1,6 @@
 """Neutral evaluation payloads preserve exact fixed-threshold evidence."""
 
 from pathlib import Path
-from typing import Any
 
 import pandas as pd
 import pytest
@@ -181,33 +180,20 @@ def test_metrics_retains_local_payload_and_publishes_readable_workbook(
     predictions_path = tmp_path / "predictions.csv"
     ground_truth.to_csv(ground_truth_path, index=False)
     predictions.to_csv(predictions_path, index=False)
-    task = object()
-    monkeypatch.setattr("clearml_yolo.tasks.metrics.publish_table", lambda *args: None)
-    monkeypatch.setattr("clearml_yolo.tasks.metrics.record_run_configuration", lambda *args: None)
-    expected: list[str] = []
-    uploaded: dict[str, Any] = {}
-    monkeypatch.setattr("clearml_yolo.tasks.metrics.init_task", lambda *_args, **_kwargs: task)
-    monkeypatch.setattr(
-        "clearml_yolo.tasks.metrics.expect_artifacts",
-        lambda _task, names: expected.extend(names),
-    )
-    monkeypatch.setattr(
-        "clearml_yolo.tasks.metrics.upload_artifact",
-        lambda _task, name, value: uploaded.__setitem__(name, value),
-    )
-    monkeypatch.setattr("clearml_yolo.tasks.metrics.report_table", lambda *_args: None)
-    monkeypatch.setattr("clearml_yolo.tasks.metrics.report_scalars", lambda *_args: None)
+    from test_metrics import _metric_owner
 
-    result = compute_metrics(
-        predictions_path,
-        ground_truth_path,
-        tmp_path / "metrics",
-        clearml=object(),  # type: ignore[arg-type]
-        evaluation=EvaluationConfig(iou_threshold=0.5),
-        splits=["test"],
-        fiftyone=FiftyOneConfig(enabled=False),
-    )
+    with _metric_owner(monkeypatch) as task:
+        result = compute_metrics(
+            predictions_path,
+            ground_truth_path,
+            tmp_path / "metrics",
+            clearml=object(),  # type: ignore[arg-type]
+            evaluation=EvaluationConfig(iou_threshold=0.5),
+            splits=["test"],
+            fiftyone=FiftyOneConfig(enabled=False),
+        )
 
+    uploaded = {item["name"]: item["artifact_object"] for item in task.uploads}
     payload_path = result.evaluations["test"]
     payload = EvaluationPayload.model_validate_json(payload_path.read_text(encoding="utf-8"))
     assert payload_path == tmp_path / "metrics" / "evaluation_test.json"
@@ -217,7 +203,7 @@ def test_metrics_retains_local_payload_and_publishes_readable_workbook(
         (1, "TP"),
         (2, "filtered"),
     ]
-    assert "metrics_evaluation_test" in expected
-    workbook = uploaded["metrics_evaluation_test"]
+    assert "predicts_csv" in uploaded
+    workbook = uploaded["metrics_dashboard_full_test"]
     assert workbook.suffix == ".xlsx"
     assert payload_path not in uploaded.values()

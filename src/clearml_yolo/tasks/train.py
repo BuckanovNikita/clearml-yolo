@@ -9,11 +9,11 @@ from loguru import logger
 from pydantic import BaseModel, Field
 
 from clearml_yolo.clearml_native import finalize_native_model
+from clearml_yolo.clearml_results import register_ground_truth
 from clearml_yolo.clearml_session import (
     ClearMLConfig,
     connect_config_file,
     init_task,
-    publish_table,
     record_run_configuration,
     task_identity,
 )
@@ -73,7 +73,7 @@ def _prepare_csv_dataset(
         dataset_format,
         required_splits=tuple(required_splits or ["train", "val"]),
     ) as prepared:
-        publish_table(task, "ground_truth", prepared.ground_truth)
+        register_ground_truth(task, prepared.ground_truth, output_dir=project)
         effective, overrides = apply_dataset_policy(settings, prepared.data)
         record_run_configuration(task, {"training_data_overrides": overrides})
         connect_config_file(task, "dataset", prepared.data, allow_remote_override=False)

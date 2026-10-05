@@ -44,13 +44,27 @@ this branch.
    unchanged. Compare metrics, statistical results and report counts. Exercise `cy-val`,
    `cy-compare` and `cy-report` independently, including nondefault evaluation options.
 6. Force-download every required artifact and verify the explicit publication inventory.
-   Confirm every `metrics_evaluation_<split>.xlsx` contains only `summary`, `per_class` and
-   `confusion_matrix`, with `_ground_truth_matches.csv`, `_prediction_matches.csv`,
-   `_thresholds.csv` and `_methodology.csv` sidecars. Confirm a completed comparison workbook
-   contains only `Сравнение`, with `_excluded.csv` and `_methodology.csv`; for a skipped
-   automatic baseline, confirm the candidate workbook contains only `Classes` and `Summary`,
-   with `_thresholds.csv` and `_methodology.csv`. Verify JSON and PNG outputs retain their
-   established formats and that table deduplication still satisfies every required alias.
+   Use the [evaluation publication contract](../../../specs/014-evaluation-publication/contracts/publication.md)
+   for canonical names. Download `gt_csv` and `predicts_csv`; confirm one upload per
+   invocation, every original source row/ID, exclusions, strict threshold flags and JSON
+   pre/post-threshold relationships. Check standalone prediction is not evaluated and
+   comparison reinference contexts remain separate. Verify full/DTRK dashboard contents,
+   exact validation thresholds, paired `Сравнение` workbook/exclusions CSV and unchanged
+   developer/business reports. Missing automatic baseline must retain candidate
+   dashboards/plots and its recorded skip reason without fabricated paired outputs.
+   Confirm duplicate evaluation summaries and separate match/threshold/methodology
+   sidecars are absent from new uploads while necessary local diagnostics remain.
+   Inspect all four interactive confusion views for exact post-threshold counts, class
+   order/background, true-row/predicted-column orientation, percentage scaling and zero
+   denominators. Inspect class PR for authoritative prepared/deduplicated GT and
+   geometry-valid raw prediction populations, AP50 parity for both integration methods,
+   supported strategies/ties, confidence/cumulative TP/FP hover, empty predictions and
+   unavailable recall/AP without GT. Confirm context/model/split/class identities and
+   persistent AP/method annotations survive actual SDK publication.
+   Verify unused names remain intact and active/archived project-local collisions receive
+   shared task/model suffixes without changing IDs/paths. Check owned best-model threshold
+   metadata against exact val thresholds and actual prediction checkpoint SHA-256 with
+   fresh server readback; standalone metrics must not create or mutate models.
    Download the single native best Output Model, load it, and compare model fields with
    checkpoint/trainer data. Verify canonical run and native General parameters support
    replay; when used by the invocation, verify the consumed-dataset and explicit-report
