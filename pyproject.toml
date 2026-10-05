@@ -31,8 +31,8 @@ dependencies = [
     "openpyxl>=3.1",
     "tqdm>=4.66",
     # The external/ submodules track upstream main and pin resolved commits (see AGENTS.md).
-    "digital-metrics>=0.5.3",
-    "report-generator>=0.1.0",
+    "digital-metrics>=0.6.1",
+    "report-generator>=0.1.1",
     "ruamel-yaml>=0.18,<0.19",
 ]
 
