@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.14.3 (2026-10-05)
+
+### Bug Fixes
+
+- **compare**: Restore legacy ClearML artifact recovery
+  ([`db33015`](https://github.com/BuckanovNikita/clearml-yolo/commit/db33015eb1b5d88050ce6e592002e3abc0b14bd7))
+
+
 ## v0.14.2 (2026-10-05)
 
 ### Bug Fixes
