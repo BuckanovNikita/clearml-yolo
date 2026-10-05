@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.14.1 (2026-10-05)
+
+### Bug Fixes
+
+- **deps**: Require current metrics and report releases
+  ([`7af1db6`](https://github.com/BuckanovNikita/clearml-yolo/commit/7af1db6cf19b8d62d5b8529e74169861afe76c81))
+
+
 ## v0.14.0 (2026-10-05)
 
 ### Bug Fixes
