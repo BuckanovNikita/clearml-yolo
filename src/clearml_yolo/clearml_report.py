@@ -161,12 +161,10 @@ def _headline_values(
                 compared.name,
             )
         elif not pooled.empty:
-            # A nullable dtype yields pd.NA here, which float() refuses; the headline is
-            # reported as NaN rather than taking the whole report down with it.
+            # Missing comparisons have no numeric headline; preserve them in the table.
             pooled_delta = pd.to_numeric(pooled[compared.delta_column], errors="coerce").iloc[0]
-            values[f"pooled_delta_{compared.name}"] = (
-                float("nan") if pd.isna(pooled_delta) else float(pooled_delta)
-            )
+            if not pd.isna(pooled_delta):
+                values[f"pooled_delta_{compared.name}"] = float(pooled_delta)
 
     return values
 

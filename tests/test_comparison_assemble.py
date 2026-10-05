@@ -8,7 +8,7 @@ import math
 import zipfile
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 import pytest
@@ -199,7 +199,7 @@ def test_an_identical_model_is_never_called_changed() -> None:
     assert set(rows["recall_verdict"]) == {NOT_SIGNIFICANT}
 
 
-def test_a_class_the_baseline_cannot_predict_is_excluded_not_scored() -> None:
+def test_one_sided_class_keeps_metrics_but_is_excluded_from_statistics() -> None:
     """A model that never heard of a class has no recall on it, not a recall of zero."""
     tables = _tables(
         {"car": 20, "van": 20},
@@ -211,7 +211,15 @@ def test_a_class_the_baseline_cannot_predict_is_excluded_not_scored() -> None:
     excluded = tables.excluded
     assert list(excluded["class_name"]) == ["van"]
     assert list(excluded["reason"]) == [UNKNOWN_TO_BASELINE]
-    assert "van" not in set(tables.rows["class_name"])
+    van = tables.rows.set_index("class_name").loc["van"]
+    assert math.isnan(cast(float, van["tp_baseline"]))
+    assert math.isnan(cast(float, van["recall_baseline"]))
+    assert math.isnan(cast(float, van["threshold_baseline"]))
+    assert van["tp_candidate"] == 20
+    assert van["recall_candidate"] == 0.5
+    assert van["threshold_candidate"] == 0.45
+    assert van["recall_verdict"] == "unavailable"
+    assert tables.methodology["family_size"] == 2
 
 
 def test_a_class_neither_model_knows_is_not_blamed_on_the_new_one() -> None:
@@ -236,14 +244,40 @@ def test_the_pooled_row_is_judged_on_its_own_p_value() -> None:
     assert pooled["recall_verdict"] == IMPROVED
 
 
-def test_nothing_comparable_is_an_error_rather_than_an_empty_report() -> None:
-    with pytest.raises(ValueError, match="No class can be compared"):
-        _tables(
-            {"car": 20, "van": 20},
-            {"car": 20, "van": 20},
-            baseline_classes=set(),
-            candidate_classes=set(),
-        )
+def test_disjoint_vocabularies_produce_metrics_and_unavailable_pooled_row() -> None:
+    tables = _tables(
+        {"car": 0, "van": 20},
+        {"car": 20, "van": 0},
+        baseline_classes={"car", "unused_baseline"},
+        candidate_classes={"van", "unused_candidate"},
+    )
+    rows = tables.rows.set_index("class_name")
+    assert set(rows.index) == {"car", "van", "unused_baseline", "unused_candidate", "pooled"}
+    assert rows.loc["car", "recall_baseline"] == 0
+    assert math.isnan(cast(float, rows.loc["car", "recall_candidate"]))
+    assert rows.loc["van", "recall_candidate"] == 0
+    assert rows.loc["unused_candidate", "tp_candidate"] == 0
+    assert rows.loc["pooled", "recall_verdict"] == "unavailable"
+    assert math.isnan(cast(float, rows.loc["pooled", "tp_baseline"]))
+    assert tables.methodology["family_size"] == 0
+
+
+def test_pooled_tests_use_the_same_shared_classes_as_counts() -> None:
+    tables = _tables(
+        {"car": 4, "van": 36},
+        {"car": 36, "van": 4},
+        baseline_classes={"car"},
+        candidate_classes={"car", "van"},
+    )
+    rows = tables.rows.set_index("class_name")
+    pooled = rows.loc["pooled"]
+    car = rows.loc["car"]
+    assert pooled["tp_baseline"] == 4
+    assert pooled["tp_candidate"] == 36
+    for metric in ("precision", "recall"):
+        for suffix in ("delta", "p_value", "ci_lower", "ci_upper"):
+            assert pooled[f"{metric}_{suffix}"] == pytest.approx(car[f"{metric}_{suffix}"])
+    assert tables.methodology["family_size"] == 2
 
 
 def test_each_checkpoint_gets_its_own_prediction_cache(tmp_path: Path) -> None:
@@ -953,3 +987,58 @@ def test_automatic_baseline_absence_still_evaluates_candidate(
         "compare_evaluation_candidate_test_methodology",
     }
     assert set(expected) == {"compare_evaluation_candidate_test"}
+
+
+def test_shared_class_without_predictions_keeps_zero_counts_and_unavailable_tests() -> None:
+    baseline = _outcome(_flags({"car": 20, "van": 0}), _flags({"car": 20, "van": 0}))
+    candidate = _outcome(_flags({"car": 30, "van": 0}), _flags({"car": 30, "van": 0}))
+
+    def without_van_predictions(outcome: SplitOutcome) -> SplitOutcome:
+        return SplitOutcome(
+            counts={"car": outcome.counts["car"], "van": ClassCounts(fn=40)},
+            gt_status=outcome.gt_status,
+            pred_status=outcome.pred_status[outcome.pred_status["instance_label"] == "car"],
+        )
+
+    tables = build_comparison_rows(
+        without_van_predictions(baseline),
+        without_van_predictions(candidate),
+        thresholds_baseline={"car": 0.3, "van": 0.4},
+        thresholds_candidate={"car": 0.3, "van": 0.4},
+        images=IMAGES,
+        iterations=200,
+    )
+    rows = tables.rows.set_index("class_name")
+    assert rows.loc["van", "tp_baseline"] == 0
+    assert rows.loc["van", "recall_baseline"] == 0
+    assert rows.loc["van", "recall_verdict"] == "unavailable"
+    assert rows.loc["pooled", "fn_baseline"] == 20
+    assert rows.loc["pooled", "recall_delta"] == rows.loc["car", "recall_delta"]
+    assert tables.methodology["pooled_classes"] == ["car"]
+    assert tables.methodology["family_size"] == 2
+
+
+def test_disjoint_workbook_preserves_real_zero_and_unavailable_pooled_cells(tmp_path: Path) -> None:
+    from openpyxl import load_workbook  # type: ignore[import-untyped]
+
+    tables = _tables(
+        {"car": 0, "van": 20},
+        {"car": 20, "van": 0},
+        baseline_classes={"car"},
+        candidate_classes={"van"},
+    )
+    path = tmp_path / "disjoint.xlsx"
+    write_comparison_workbook(tables.rows, tables.excluded, tables.methodology, path)
+    sheet = load_workbook(path)["Сравнение"]
+    headers = [cell.value for cell in sheet[1]]
+
+    def cell(row: int, header: str) -> Any:
+        return sheet.cell(row=row, column=headers.index(header) + 1)
+
+    assert cell(2, "Recall прод").value == 0
+    assert cell(2, "Recall новая").value == "NA"
+    assert cell(3, "Recall новая").value == 0
+    assert cell(3, "Recall прод").value == "NA"
+    for header in ("TP прод", "Recall прод", "Δ Recall", "p BH (R)", "Вердикт (R)"):
+        assert cell(4, header).value == "NA"
+        assert cell(4, header).fill.fill_type is None

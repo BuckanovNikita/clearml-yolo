@@ -120,7 +120,7 @@ def _write(
     destination = tmp_path / "nested" / "comparison.xlsx"
     write_comparison_workbook(rows, excluded, methodology, destination)
     assert destination.is_file()
-    return pd.read_excel(destination, sheet_name=None)
+    return pd.read_excel(destination, sheet_name=None, keep_default_na=False)
 
 
 def test_sheet_names_and_headers(
@@ -228,7 +228,7 @@ def test_missing_values_never_render_as_nan_text(
     sheet = _write(tmp_path, rows, excluded, methodology)["Сравнение"]
     dog = sheet.loc[sheet["Класс"] == "dog"].iloc[0]
 
-    assert dog["Precision прод"] == "—"
+    assert dog["Precision прод"] == "NA"
     assert "nan" not in [str(value).lower() for value in sheet.to_numpy().ravel()]
 
 
@@ -303,3 +303,38 @@ def test_missing_canonical_column_is_rejected(
         write_comparison_workbook(
             rows.drop(columns=["recall_p_bh"]), excluded, methodology, tmp_path / "broken.xlsx"
         )
+
+
+def test_unavailable_values_and_verdicts_render_na_without_fill(tmp_path: Path) -> None:
+    row = _row("new", precision_baseline=float("nan"), precision_verdict="unavailable")
+    for column in (
+        "threshold_baseline",
+        "tp_baseline",
+        "fp_baseline",
+        "fn_baseline",
+        "precision_delta",
+        "precision_p_value",
+        "precision_p_bh",
+        "recall_baseline",
+        "recall_delta",
+        "recall_p_value",
+        "recall_p_bh",
+    ):
+        row[column] = float("nan")
+    row["recall_verdict"] = "unavailable"
+    row["tp_candidate"] = 0
+    path = tmp_path / "unavailable.xlsx"
+    write_comparison_workbook(pd.DataFrame([row]), pd.DataFrame(), {}, path)
+    sheet = load_workbook(path)["Сравнение"]
+    for header in (
+        "TP прод",
+        "Precision прод",
+        "Δ Precision",
+        "p BH (P)",
+        "Вердикт (P)",
+        "Вердикт (R)",
+    ):
+        cell = sheet.cell(row=2, column=EXPECTED_HEADERS.index(header) + 1)
+        assert cell.value == "NA"
+        assert cell.fill.fill_type is None
+    assert sheet.cell(row=2, column=EXPECTED_HEADERS.index("TP новая") + 1).value == 0

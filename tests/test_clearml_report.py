@@ -5,7 +5,6 @@ tables, scalars, single values and the warn-and-skip paths — is exercised with
 ClearML server or the SDK.
 """
 
-import math
 from collections.abc import Iterator
 from typing import Any
 
@@ -282,7 +281,7 @@ def test_rows_without_the_pooled_flag_skip_the_headline_but_keep_the_tables(
     assert len(task.get_logger().tables) == 2
 
 
-def test_a_missing_pooled_delta_is_reported_as_nan() -> None:
+def test_a_missing_pooled_delta_is_omitted() -> None:
     task = _FakeTask()
     rows = _comparison_rows()
     # A nullable dtype carries pd.NA rather than NaN, and float(pd.NA) raises.
@@ -291,7 +290,7 @@ def test_a_missing_pooled_delta_is_reported_as_nan() -> None:
     report_comparison(task, "test", rows, _METHODOLOGY)
 
     single_values = task.get_logger().single_values
-    assert math.isnan(single_values["test/pooled_delta_precision"])
+    assert "test/pooled_delta_precision" not in single_values
     assert single_values["test/pooled_delta_recall"] == pytest.approx(-0.02)
 
 
@@ -307,3 +306,27 @@ def test_rows_without_a_pooled_row_are_warned_about(warnings_log: list[str]) -> 
     assert not [name for name in single_values if name.startswith("test/pooled_delta")]
     # The per-class headline is unaffected by the absent pooled row.
     assert single_values["test/degraded_precision"] == 1.0
+
+
+def test_unavailable_class_verdicts_never_count_as_tested() -> None:
+    rows = _comparison_rows()
+    rows.loc[rows["class_name"] == "worm", ["precision_verdict", "recall_verdict"]] = "unavailable"
+    task = _FakeTask()
+    report_comparison(task, "test", rows, _METHODOLOGY)
+    assert task.get_logger().single_values["test/classes_tested"] == 4
+    assert task.get_logger().single_values["test/classes_excluded"] == 1
+
+
+def test_disjoint_comparison_reports_zero_tests_without_pooled_delta() -> None:
+    rows = _comparison_rows().copy()
+    for metric in ("precision", "recall"):
+        rows[f"{metric}_p_bh"] = float("nan")
+        rows[f"{metric}_delta"] = float("nan")
+        rows[f"{metric}_verdict"] = "unavailable"
+    task = _FakeTask()
+    report_comparison(task, "test", rows, {**_METHODOLOGY, "family_size": 0})
+    values = task.get_logger().single_values
+    assert values["test/classes_tested"] == 0
+    assert values["test/classes_excluded"] == 5
+    assert "test/pooled_delta_precision" not in values
+    assert "test/pooled_delta_recall" not in values

@@ -33,6 +33,7 @@ POOLED_FLAG = "is_pooled"
 IMPROVED = "improved"
 DEGRADED = "degraded"
 NOT_SIGNIFICANT = "not_significant"
+UNAVAILABLE = "unavailable"
 
 NO_GROUND_TRUTH = "Нет разметки в сплите"
 NO_PREDICTIONS = "Ни одна модель не предсказала класс"
@@ -109,7 +110,9 @@ def _test_pair(
 def _verdict(delta: float, adjusted_p: float, q: float) -> str:
     """A change counts only once Benjamini-Hochberg has cleared it at the family level."""
     validate_q(q)
-    if math.isnan(adjusted_p) or math.isnan(delta) or adjusted_p > q or delta == 0:
+    if math.isnan(adjusted_p) or math.isnan(delta):
+        return UNAVAILABLE
+    if adjusted_p > q or delta == 0:
         return NOT_SIGNIFICANT
     return IMPROVED if delta > 0 else DEGRADED
 
@@ -142,8 +145,8 @@ def _exclusion_reason(
 
 def _row(
     class_name: str,
-    baseline_counts: ClassCounts,
-    candidate_counts: ClassCounts,
+    baseline_counts: ClassCounts | None,
+    candidate_counts: ClassCounts | None,
     thresholds_baseline: dict[str, float],
     thresholds_candidate: dict[str, float],
     precision: TestResult,
@@ -155,24 +158,32 @@ def _row(
     return {
         "class_name": class_name,
         POOLED_FLAG: is_pooled,
-        "threshold_baseline": thresholds_baseline.get(class_name, math.nan),
-        "threshold_candidate": thresholds_candidate.get(class_name, math.nan),
-        "tp_baseline": baseline_counts.tp,
-        "fp_baseline": baseline_counts.fp,
-        "fn_baseline": baseline_counts.fn,
-        "tp_candidate": candidate_counts.tp,
-        "fp_candidate": candidate_counts.fp,
-        "fn_candidate": candidate_counts.fn,
-        "precision_baseline": _precision(baseline_counts),
-        "precision_candidate": _precision(candidate_counts),
+        "threshold_baseline": thresholds_baseline.get(class_name, math.nan)
+        if baseline_counts is not None
+        else math.nan,
+        "threshold_candidate": thresholds_candidate.get(class_name, math.nan)
+        if candidate_counts is not None
+        else math.nan,
+        "tp_baseline": baseline_counts.tp if baseline_counts is not None else math.nan,
+        "fp_baseline": baseline_counts.fp if baseline_counts is not None else math.nan,
+        "fn_baseline": baseline_counts.fn if baseline_counts is not None else math.nan,
+        "tp_candidate": candidate_counts.tp if candidate_counts is not None else math.nan,
+        "fp_candidate": candidate_counts.fp if candidate_counts is not None else math.nan,
+        "fn_candidate": candidate_counts.fn if candidate_counts is not None else math.nan,
+        "precision_baseline": _precision(baseline_counts)
+        if baseline_counts is not None
+        else math.nan,
+        "precision_candidate": _precision(candidate_counts)
+        if candidate_counts is not None
+        else math.nan,
         "precision_delta": precision.delta,
         "precision_ci_lower": precision.ci_lower,
         "precision_ci_upper": precision.ci_upper,
         "precision_p_value": precision.p_value,
         "precision_p_bh": math.nan,
-        "precision_verdict": NOT_SIGNIFICANT,
-        "recall_baseline": _recall(baseline_counts),
-        "recall_candidate": _recall(candidate_counts),
+        "precision_verdict": UNAVAILABLE,
+        "recall_baseline": _recall(baseline_counts) if baseline_counts is not None else math.nan,
+        "recall_candidate": _recall(candidate_counts) if candidate_counts is not None else math.nan,
         # The delta comes from McNemar's paired means, which is the test that decides the
         # verdict; the bootstrap supplies the interval around it.
         "recall_delta": recall_test.delta,
@@ -180,15 +191,24 @@ def _row(
         "recall_ci_upper": recall_interval.ci_upper,
         "recall_p_value": recall_test.p_value,
         "recall_p_bh": math.nan,
-        "recall_verdict": NOT_SIGNIFICANT,
+        "recall_verdict": UNAVAILABLE,
     }
 
 
 def _pooled_counts(counts: dict[str, ClassCounts], compared: Sequence[str]) -> ClassCounts:
     return ClassCounts(
-        tp=sum(counts[name].tp for name in compared),
-        fp=sum(counts[name].fp for name in compared),
-        fn=sum(counts[name].fn for name in compared),
+        tp=sum(counts.get(name, ClassCounts()).tp for name in compared),
+        fp=sum(counts.get(name, ClassCounts()).fp for name in compared),
+        fn=sum(counts.get(name, ClassCounts()).fn for name in compared),
+    )
+
+
+def _restricted_outcome(outcome: SplitOutcome, classes: Sequence[str]) -> SplitOutcome:
+    """Limit pooled counts and paired/bootstrap observations to the same classes."""
+    return SplitOutcome(
+        counts={name: outcome.counts.get(name, ClassCounts()) for name in classes},
+        gt_status=outcome.gt_status[outcome.gt_status["instance_label"].isin(classes)],
+        pred_status=outcome.pred_status[outcome.pred_status["instance_label"].isin(classes)],
     )
 
 
@@ -208,10 +228,11 @@ def build_comparison_rows(
     """Compare two scored outcomes of one split, class by class and then pooled.
 
     ``baseline_classes``/``candidate_classes`` are the checkpoints' own vocabularies. A
-    class one model cannot predict is excluded rather than scored, because a model that
-    never heard of a class does not have a recall of zero on it — it has no recall on it,
-    and reporting the former turns a vocabulary difference into a fake regression.
+    class one model cannot predict retains the supporting model's metrics and missing
+    values for the other model. Statistical tests and pooled statistics use only shared
+    eligible classes; exclusions explain noncomparability rather than hide metrics.
     """
+    validate_q(q)
     compared: list[str] = []
     excluded_rows: list[dict[str, str]] = []
     known_to_baseline = baseline_classes if baseline_classes is not None else set(baseline.counts)
@@ -219,7 +240,10 @@ def build_comparison_rows(
         candidate_classes if candidate_classes is not None else set(candidate.counts)
     )
 
-    for class_name in sorted(set(baseline.counts) | set(candidate.counts)):
+    display_classes = sorted(
+        set(baseline.counts) | set(candidate.counts) | known_to_baseline | known_to_candidate
+    )
+    for class_name in display_classes:
         reason = _exclusion_reason(
             class_name,
             baseline.counts.get(class_name, ClassCounts()),
@@ -232,22 +256,23 @@ def build_comparison_rows(
         else:
             excluded_rows.append({"class_name": class_name, "reason": reason})
 
-    if not compared:
-        raise ValueError(
-            "No class can be compared: every one is missing from a model's vocabulary, has "
-            f"no ground truth, or drew no predictions ({len(excluded_rows)} excluded)."
-        )
-
+    unavailable_test = TestResult(delta=math.nan, p_value=math.nan, n_baseline=0, n_candidate=0)
     rows: list[dict[str, object]] = []
-    for class_name in track(compared, "Testing classes", unit="class"):
-        precision, recall_interval, recall_test = _test_pair(
-            baseline, candidate, class_name, images, iterations=iterations, seed=seed
-        )
+    for class_name in track(display_classes, "Testing classes", unit="class"):
+        precision, recall_interval, recall_test = (unavailable_test,) * 3
+        if class_name in compared:
+            precision, recall_interval, recall_test = _test_pair(
+                baseline, candidate, class_name, images, iterations=iterations, seed=seed
+            )
         rows.append(
             _row(
                 class_name,
-                baseline.counts.get(class_name, ClassCounts()),
-                candidate.counts.get(class_name, ClassCounts()),
+                baseline.counts.get(class_name, ClassCounts())
+                if class_name in known_to_baseline
+                else None,
+                candidate.counts.get(class_name, ClassCounts())
+                if class_name in known_to_candidate
+                else None,
                 thresholds_baseline,
                 thresholds_candidate,
                 precision,
@@ -258,15 +283,23 @@ def build_comparison_rows(
         )
 
     frame = pd.DataFrame(rows)
-    family_size = _adjust_family(frame, q)
+    family_size = _adjust_family(frame, q) if rows else 0
 
-    pooled_precision, pooled_recall_interval, pooled_recall = _test_pair(
-        baseline, candidate, None, images, iterations=iterations, seed=seed
-    )
+    pooled_precision, pooled_recall_interval, pooled_recall = (unavailable_test,) * 3
+    if compared:
+        # Counts and tests must summarize the same shared eligible class population.
+        pooled_precision, pooled_recall_interval, pooled_recall = _test_pair(
+            _restricted_outcome(baseline, compared),
+            _restricted_outcome(candidate, compared),
+            None,
+            images,
+            iterations=iterations,
+            seed=seed,
+        )
     pooled = _row(
         "pooled",
-        _pooled_counts(baseline.counts, compared),
-        _pooled_counts(candidate.counts, compared),
+        _pooled_counts(baseline.counts, compared) if compared else None,
+        _pooled_counts(candidate.counts, compared) if compared else None,
         {},
         {},
         pooled_precision,
@@ -274,9 +307,7 @@ def build_comparison_rows(
         pooled_recall,
         is_pooled=True,
     )
-    # The pooled row is one hypothesis, not a family, so it is judged on its own raw
-    # p-value. Leaving it at "not significant" because it has no adjusted p-value would
-    # print that verdict beside a delta the per-class rows just called a degradation.
+    # Pooled hypotheses stay outside BH and are judged on their raw p-values.
     pooled["precision_verdict"] = _verdict(pooled_precision.delta, pooled_precision.p_value, q)
     pooled["recall_verdict"] = _verdict(pooled_recall.delta, pooled_recall.p_value, q)
     frame = pd.concat([frame, pd.DataFrame([pooled])], ignore_index=True)
@@ -291,6 +322,9 @@ def build_comparison_rows(
         "seed": seed,
         "images": len(images),
         "classes_compared": len(compared),
+        "pooled_classes": list(compared),
+        "display_population": "Union of model vocabularies and scored classes",
+        "pooled_population": "Shared statistically eligible classes",
         "classes_excluded": len(excluded_rows),
     }
     logger.info(

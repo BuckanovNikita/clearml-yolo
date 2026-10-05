@@ -17,7 +17,7 @@ COMPARISON_SHEET = "Сравнение"
 
 POOLED_LABEL = "Итого"
 NOT_APPLICABLE = "не применимо"
-MISSING_VALUE = "—"
+MISSING_VALUE = "NA"
 
 IMPROVED = "улучшение"
 DEGRADED = "деградация"
@@ -27,6 +27,7 @@ VERDICT_LABELS = {
     "improved": IMPROVED,
     "degraded": DEGRADED,
     "not_significant": NOT_SIGNIFICANT,
+    "unavailable": MISSING_VALUE,
 }
 
 DISPLAY_DECIMALS = 4
@@ -106,7 +107,9 @@ def _comparison_sheet(rows: pd.DataFrame) -> pd.DataFrame:
         frame[header] = frame[header].map(VERDICT_LABELS)
     for header in _BH_HEADERS:
         frame[header] = frame[header].astype(object)
-        frame.loc[pooled, header] = NOT_APPLICABLE
+        metric = "precision" if header == "p BH (P)" else "recall"
+        tested = ordered[f"{metric}_p_value"].notna().to_numpy()
+        frame.loc[pooled & tested, header] = NOT_APPLICABLE
     return frame
 
 
@@ -131,7 +134,7 @@ def _style_sheet(worksheet: Any, frame: pd.DataFrame, bold_last_row: bool) -> No
 def _rendered(value: object) -> str:
     """Stringify a methodology value without ever spelling a missing one as ``nan``."""
     if value is None or (isinstance(value, float) and math.isnan(value)):
-        return MISSING_VALUE
+        return "—"
     return str(value)
 
 

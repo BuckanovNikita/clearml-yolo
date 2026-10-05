@@ -56,6 +56,10 @@ not recalibrate thresholds. Reports consume that pair and its manifest split. So
 task/model links provide provenance; comparison retrieves weights and exact thresholds,
 and does not automatically import the source task's General or Configuration Objects
 over current comparison settings.
+All report workbooks preserve one-sided class metrics with `NA` for the unavailable
+model/comparison. Model averages and business verdict inputs use each model's own eligible
+classes; statistical comparisons use shared eligible classes. The maintained
+[CLI evaluation contract](../specs/001-release-030/contracts/cli.md) defines those populations.
 
 FiftyOne visualization is optional. Its setup or publication failures warn and continue
 the owning computation; setup failure disables visualization for that invocation.

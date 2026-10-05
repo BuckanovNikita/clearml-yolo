@@ -50,6 +50,16 @@ inputs fail. Task recovery uses the exact validation-threshold CSV; exact thresh
 on an explicit model reference remain authoritative.
 Reports consume the paired evaluated dashboards named by the local comparison manifest, not
 stored historical dashboards. Missing automatic baseline records a skipped comparison.
+Developer, business and statistical workbooks retain classes present in only one model.
+The supporting model keeps its measured values; unavailable model values and comparisons
+render as `NA`, never synthetic zeros. Developer/business training-count eligibility remains
+per model. Each model's averages and business verdict inputs use its own eligible classes,
+with population sizes disclosed; display placeholders do not enter those aggregates.
+Per-class differences require both operands. Statistical tests and pooled comparisons use
+the same shared eligible class population; untestable rows do not enter the BH family or
+receive a significance verdict. With no comparable classes, reports still show available
+metrics and mark pooled comparisons unavailable. Exclusions explain noncomparability rather
+than removing an otherwise eligible model's metrics.
 Standalone comparison uses the `evaluation` mapping; matching options are configured only as
 `evaluation.iou_threshold` and `evaluation.matching_strategy`.
 The pipeline forwards the full `metrics.evaluation` configuration to comparison.
