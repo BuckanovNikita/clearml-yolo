@@ -13,3 +13,20 @@
   Cleanup changes current behavior, not prior observations or upstream ownership.
 - **Decision**: Amend only the authorized constitution under `.specify/`. **Reason**:
   Installed workflow tooling and feature state are protected by repository instructions.
+
+## Approved recovery amendment decisions (2026-10-05)
+
+- **Decision**: Restore only task-backed checkpoint/threshold recovery per the
+  [recovery contract](contracts/task-recovery.md). **Rationale**: Existing published tasks need
+  fresh current-image comparison; restoring native-only training/config aliases is unnecessary.
+  **Alternative rejected**: Requiring republishing every source task or recalibrating thresholds.
+- **Decision**: Prefer explicit maps, then named threshold artifacts, then historical dashboards.
+  **Rationale**: Preserve the best available precision; dashboard rounding/provenance limits
+  must be visible. **Alternative rejected**: Swallowing malformed preferred sources and falling
+  back, or selecting thresholds according to the current comparison split.
+- **Decision**: Select a source once and use it for weights and provenance. **Rationale**:
+  Independent selection can mislabel the checkpoint actually compared. **Alternative rejected**:
+  Fabricated model links for artifacts or bulk downloads to guess a usable source.
+- **Decision**: Preserve the constitution/history without modifying `.specify/` under the
+  approved plan. **Rationale**: User approval narrowly supersedes the recorded recovery ban;
+  remaining governance and installed workflow files retain their existing scope.

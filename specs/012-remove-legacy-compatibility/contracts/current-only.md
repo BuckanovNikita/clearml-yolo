@@ -10,3 +10,9 @@
   overrides. Non-null native `cfg` remains unsupported.
 - `CLEARML_CACHE_DIR` remains canonical; the application does not map `TRAINS_CACHE_DIR`.
 - Current explicit run destinations, local checkpoints and exact supplied thresholds remain.
+
+## Recovery-only amendment (2026-10-05)
+
+The threshold-validation-CSV-only and current-best-Output-Model-only bullets above are
+superseded by [task-backed model recovery](task-recovery.md). They record the original cleanup
+intent. All other interface restrictions remain current; publication itself is unchanged.

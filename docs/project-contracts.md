@@ -64,9 +64,16 @@ Candidate thresholds are calibrated on validation once and frozen for evaluation
 comparison uses test; standalone `cy-compare` defaults to test and accepts a split override.
 Both models use identical current images from that split and matching inference settings.
 Reports consume their paired results and manifest split from `comparison_dir`. Historical
-dashboards are not comparison input. Source task/model links provide provenance; comparison
-retrieves weights and exact thresholds, without importing source configurations over the
-current comparison settings.
+dashboards provide only stored thresholds under the maintained
+[task recovery contract](../specs/012-remove-legacy-compatibility/contracts/task-recovery.md),
+with a warning about rounding and unavailable calibration provenance; their predictions/metrics
+are not comparison inputs. Explicit threshold maps take precedence. Ordered task recovery
+accepts named threshold payloads, then dashboards; present malformed sources fail strictly.
+Weights prefer uniquely identified best Output Models, then the logged last registered model;
+only tasks without Output Models use ordered checkpoint artifacts. One selection supplies
+weights and truthful source task/model or task/artifact provenance without invented model links.
+Current comparison settings remain authoritative; source configurations are not imported.
+Available threshold precision is preserved, but historical architecture loading is not guaranteed.
 The automatic baseline is the latest completed prod-tagged task excluding the current task;
 missing automatic baseline skips comparison, while invalid explicit references fail.
 

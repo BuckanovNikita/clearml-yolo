@@ -18,7 +18,7 @@ configuration, output, tracking and evaluation rules formerly listed in `AGENTS.
 | CSV training and dataset cache | [Dataset inputs](../specs/004-ground-truth-training/contracts/cli.md), [current publication](../specs/008-dataset-clearml-tracking/contracts/publication.md) | [Training](../src/clearml_yolo/tasks/train.py), [cache](../src/clearml_yolo/dataset_cache.py) |
 | Configuration resolution and remote replay | [File resolution](../specs/009-resolved-config-uploads/contracts/configuration-files.md), [tracking and recovery](../specs/010-native-clearml-integration/contracts/tracking-publication.md) | [Resolution](../src/clearml_yolo/apps/config_resolution.py), [session adapter](../src/clearml_yolo/clearml_session.py) |
 | Artifacts, native callbacks and task completion | [Publication inventory](../specs/008-dataset-clearml-tracking/contracts/publication.md), [native tracking](../specs/010-native-clearml-integration/contracts/tracking-publication.md), [model metadata](../specs/008-dataset-clearml-tracking/contracts/model-metadata.md) | [Artifact names](../src/clearml_yolo/artifact_names.py), [native runtime](../src/clearml_yolo/native_runtime.py), [model verification](../src/clearml_yolo/clearml_native.py), [DDP relay](../src/clearml_yolo/native_ddp.py) |
-| Evaluation, comparison, thresholds and reports | [Publication inventory](../specs/008-dataset-clearml-tracking/contracts/publication.md), [CLI evaluation contract](../specs/001-release-030/contracts/cli.md) | [Metrics](../src/clearml_yolo/tasks/metrics.py), [comparison](../src/clearml_yolo/tasks/compare.py), [comparison workbook](../src/clearml_yolo/comparison/workbook.py), [exact thresholds](../src/clearml_yolo/clearml_models.py), [paired reports](../src/clearml_yolo/tasks/report.py) |
+| Evaluation, comparison, thresholds and reports | [Task recovery](../specs/012-remove-legacy-compatibility/contracts/task-recovery.md), [Publication inventory](../specs/008-dataset-clearml-tracking/contracts/publication.md), [CLI evaluation contract](../specs/001-release-030/contracts/cli.md) | [Metrics](../src/clearml_yolo/tasks/metrics.py), [comparison](../src/clearml_yolo/tasks/compare.py), [comparison workbook](../src/clearml_yolo/comparison/workbook.py), [exact thresholds](../src/clearml_yolo/clearml_models.py), [paired reports](../src/clearml_yolo/tasks/report.py) |
 | FiftyOne publication | [Publisher](../specs/006-fiftyone-integration/contracts/publisher.md), [current inventory](../specs/008-dataset-clearml-tracking/contracts/publication.md) | [Owner publication](../src/clearml_yolo/tasks/publication.py), [replaceable adapter](../src/clearml_yolo/publishing/fiftyone_adapter.py) |
 | Local versioning, changelog and release hooks | [Local release](../specs/003-semantic-release/contracts/local-release.md) | [Release helper](../scripts/local_release.py), [hook configuration](../.pre-commit-config.yaml), [generated changelog](../CHANGELOG.md) |
 
@@ -53,9 +53,15 @@ Pipeline comparison uses the current `test` images. Standalone `cy-compare` defa
 `split=test` and accepts another split present in the current ground truth. Both models
 use the selected split under the same inference/evaluation settings; comparison does
 not recalibrate thresholds. Reports consume that pair and its manifest split. Source
-task/model links provide provenance; comparison retrieves weights and exact thresholds,
-and does not automatically import the source task's General or Configuration Objects
-over current comparison settings.
+task/model links or task/artifact identities provide provenance from the same checkpoint
+selection used for weights; artifact sources have no invented model link. The
+[recovery amendment](../specs/012-remove-legacy-compatibility/contracts/task-recovery.md)
+supersedes the 2026-10-02 current-only recovery restriction. Explicit maps take precedence,
+then ordered named threshold payloads and dashboards; dashboard recovery warns about
+rounding and unavailable calibration provenance. Present malformed sources fail strictly.
+Historical predictions and source General/Configuration Objects are not imported over
+current comparison settings. Available threshold precision is preserved; checkpoint
+architecture compatibility with the installed runtime is not guaranteed.
 All report workbooks preserve one-sided class metrics with `NA` for the unavailable
 model/comparison. Model averages and business verdict inputs use each model's own eligible
 classes; statistical comparisons use shared eligible classes. The maintained

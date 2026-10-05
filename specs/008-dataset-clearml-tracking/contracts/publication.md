@@ -61,3 +61,11 @@ Confidence plots published for an evaluation must be freshly generated. Before g
 the adapter clears only its known legacy unsuffixed and current-split confidence plot outputs;
 other split outputs and unrelated files remain intact. Both producer naming conventions are
 supported, and missing fresh required plots fail instead of reusing an older file.
+
+## Recovery compatibility (2026-10-05)
+
+The inventory above governs new publications. Reading existing task models follows
+[task-backed recovery](../../012-remove-legacy-compatibility/contracts/task-recovery.md),
+including ordered historical threshold/dashboard and checkpoint sources. These readers do
+not add legacy artifact uploads or rewrite historical tasks. Artifact-backed provenance records
+source task/artifact identity; it does not invent an Output Model link.

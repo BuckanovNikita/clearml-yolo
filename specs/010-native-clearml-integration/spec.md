@@ -17,6 +17,14 @@ records exercise paired current-test execution; they do not establish live non-t
 comparison. See the [documentation audit](../../docs/evidence/2026-09-30-instruction-contract-audit.md)
 for static checks and limitations.
 
+**Recovery compatibility amendment (2026-10-05)**: The approved
+[task recovery contract](../012-remove-legacy-compatibility/contracts/task-recovery.md)
+supersedes only current-only checkpoint/threshold recovery restrictions recorded above and
+below. Ordered historical threshold payloads, dashboards and checkpoint artifacts are supported
+without changing current publication. Explicit maps remain authoritative; present malformed
+sources fail, dashboard limitations warn, and both comparison positions use current images
+and frozen thresholds with truthful provenance. Completed history remains unchanged.
+
 ## Clarifications
 
 ### Session 2026-09-30

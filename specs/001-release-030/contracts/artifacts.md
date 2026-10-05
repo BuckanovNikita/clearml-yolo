@@ -24,4 +24,5 @@ retains comments and exact replay manifests; configuration artifacts are not pub
 
 See the complete [publication inventory](../../008-dataset-clearml-tracking/contracts/publication.md)
 and [native model mapping](../../008-dataset-clearml-tracking/contracts/model-metadata.md).
-Task recovery requires the current role-marked best Output Model and validation-threshold CSV.
+Task-backed recovery follows [the recovery amendment](../../012-remove-legacy-compatibility/contracts/task-recovery.md);
+current publication remains one native best Output Model and a full-precision validation CSV.

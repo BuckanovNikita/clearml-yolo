@@ -122,3 +122,61 @@ Maintainers no longer carry migration guides, old aliases or unused compatibilit
 - No commit, push, deployment, dependency revision change or old-data deletion is authorized.
 - Work uses a task branch in the shared checkout with explicit parallel file ownership;
   the existing local dependency-source overrides are preserved.
+
+## Approved recovery compatibility amendment (2026-10-05)
+
+**Status**: Implemented and verified with the scope and limitations recorded in
+[2026-10-05 verification](verification-2026-10-05.md) and the appended task ledger.
+The user-approved compatibility plan supersedes User Story 2, FR-003, SC-002 and the
+no-old-consumers assumption only for task-backed checkpoint/threshold recovery. Earlier
+completed tasks and [2026-10-02 verification](verification-2026-10-02.md) remain history.
+The constitution's current-only recovery wording conflicts with this amendment; the user's
+explicit approval governs this bounded scope and protected `.specify/` files remain unchanged.
+Training, configuration validation, publication, dependencies and deployment stay outside
+this amendment. The [recovery contract](contracts/task-recovery.md) is current authority.
+
+### User Story 4 - Compare previously published task models (Priority: P1)
+
+Users place older task references in either comparison position and obtain a fresh paired
+assessment on today's selected images using their stored frozen thresholds.
+
+**Independent Test**: Recover each supported threshold/checkpoint source, verify precedence,
+then compare historical baseline, historical candidate and both historical positions.
+
+**Acceptance Scenarios**:
+
+1. Given an explicit threshold map, it takes precedence over all task artifacts.
+2. Given supported task publications, recovery selects deterministically and preserves class
+   names and available threshold precision; dashboard recovery discloses rounding/provenance limits.
+3. Given a present malformed preferred source, an ambiguous best model or invalid selected
+   checkpoint, recovery fails with source context instead of choosing a different publication.
+4. Given either or both historical task references, inference uses the same current images
+   and settings and frozen recovered thresholds, without historical predictions/config import.
+5. Given artifact-backed weights, source provenance identifies task/artifact without inventing
+   a model link; selected weights and provenance always describe the same source.
+
+### Amendment requirements
+
+- **AR-001**: Explicit threshold overrides MUST take precedence; otherwise sources MUST use
+  the fixed validation-map, test-map, validation-dashboard, test-dashboard order and supported
+  representations in the recovery contract, independent of scoring split.
+- **AR-002**: Recovery MUST preserve class strings and available precision, reject invalid
+  sources strictly and warn for dashboard rounding and unavailable calibration provenance.
+- **AR-003**: Output models MUST use unique metadata-best, unique decoded `best.pt` basename,
+  then logged last-registered selection; ambiguity MUST fail, and artifacts MUST be considered
+  only with no output models, in the contracted order.
+- **AR-004**: Only the selected checkpoint MUST be downloaded and validated as an existing
+  `.pt`; one selection MUST determine weights and truthful task/model or task/artifact provenance.
+- **AR-005**: Both comparison positions MUST run current paired images and inference settings
+  with frozen thresholds, without historical predictions, source configuration import or
+  recalibration; unsupported architecture loading MUST remain an actionable limitation.
+- **AR-006**: Current publication and unrelated current-only interfaces MUST remain unchanged;
+  checks, documentation validation and independent review MUST record actual evidence.
+
+### Amendment success criteria
+
+- **AC-001**: Every supported source and precedence/error case has passing focused verification.
+- **AC-002**: Historical baseline, candidate and both-position scenarios produce fresh paired
+  current-image results with the exact available stored thresholds and truthful provenance.
+- **AC-003**: Changed contract links and examples validate; parent verification and fresh
+  independent review establish completion with native evidence limitations stated explicitly.

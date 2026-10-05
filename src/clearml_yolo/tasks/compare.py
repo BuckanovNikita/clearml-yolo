@@ -16,8 +16,7 @@ from clearml_yolo import artifact_names
 from clearml_yolo.clearml_models import (
     fetch_best_confidences,
     latest_completed_task_id,
-    resolve_task_weights,
-    source_model_links,
+    resolve_task_model,
 )
 from clearml_yolo.clearml_report import report_comparison
 from clearml_yolo.clearml_session import (
@@ -156,11 +155,12 @@ def _resolve_model(
     thresholds = (
         dict(model.thresholds) if model.thresholds is not None else fetch_best_confidences(task_id)
     )
+    weights, links = resolve_task_model(task_id)
     return ResolvedModel(
         source="clearml",
         task_id=task_id,
-        weights=resolve_task_weights(task_id),
-        links=source_model_links(task_id),
+        weights=weights,
+        links=links,
         thresholds=thresholds,
     )
 

@@ -35,12 +35,16 @@ No numbered YAML, train_data_overrides.json, configuration copies, replay manife
 
 ## Recovery and failure
 
-Replay uses the current task's canonical configuration. Model provenance records source
-task/model links and resolves source weights plus exact thresholds; it does not automatically
-fetch the source task's Configuration Objects or General parameters, and current comparison
-settings remain authoritative. Task recovery reads thresholds only from the validation CSV;
-exact maps supplied on explicit model references remain authoritative. Task weights come only
-from the role-marked best Output Model. Missing or malformed current publications fail actionably.
+Replay uses the current task's canonical configuration. Task-backed model recovery follows
+[the recovery amendment](../../012-remove-legacy-compatibility/contracts/task-recovery.md):
+explicit threshold maps are authoritative; ordered threshold payloads then dashboards provide
+stored thresholds, with dashboard rounding/calibration-provenance warnings. A present malformed
+source fails without fallback. Output models are preferred; ordered checkpoint artifacts apply
+only if no output models exist. One checkpoint selection determines both weights and source
+task/model links or task/artifact identity; artifacts have no fabricated model link. Recovery
+does not fetch historical predictions, Configuration Objects or General parameters over current
+comparison settings. Both positions use current images/settings and frozen thresholds; old
+architecture loading is not guaranteed. Current native publication stays unchanged.
 Existing remote override, resolution, secret redaction and local execution-copy behavior remain intact.
 
 Any computation, callback, journal, upload, flush or interruption error fails command/task and preserves local diagnostics. Prior telemetry on a failed task is valid partial evidence, never a completion signal. Historical tasks are not modified.

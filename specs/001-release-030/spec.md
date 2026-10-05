@@ -33,6 +33,14 @@ expected eight commands. Those requirements were implemented for the initial 0.3
 and then superseded by the linked features; their original intent is retained in the dated
 [plan](plan.md), [research](research.md), and [task ledger](tasks.md).
 
+**Recovery compatibility amendment (2026-10-05)**: The approved
+[task recovery contract](../012-remove-legacy-compatibility/contracts/task-recovery.md)
+supersedes only current-only checkpoint/threshold recovery restrictions recorded above and
+below. Ordered historical threshold payloads, dashboards and checkpoint artifacts are supported
+without changing current publication. Explicit maps remain authoritative; present malformed
+sources fail, dashboard limitations warn, and both comparison positions use current images
+and frozen thresholds with truthful provenance. Completed history remains unchanged.
+
 ## Context and inventory
 
 Detection practitioners need native model execution plus reproducible evaluation and

@@ -1,5 +1,6 @@
 """Reading a previous run's checkpoint and thresholds back out of ClearML."""
 
+import gzip
 import sys
 import types
 from pathlib import Path
@@ -15,6 +16,7 @@ from clearml_yolo.clearml_models import (
     looks_like_task_id,
     resolve_task_weights,
     resolve_weights,
+    source_model_links,
 )
 
 TASK_ID = "a" * 32
@@ -65,6 +67,9 @@ class FakeTask:
         self.name = "previous-run"
         self._models = models or {}
         self.artifacts = artifacts or {}
+
+    def get_output_log_web_page(self) -> str:
+        return "https://app.example/tasks/" + self.id
 
     def get_models(self) -> dict[str, list[FakeModel]]:
         return self._models
@@ -184,7 +189,7 @@ def test_weights_selects_best_even_when_registered_before_other_models(
     assert resolve_task_weights(TASK_ID) == best
 
 
-def test_weights_reject_an_uploaded_checkpoint_artifact_without_a_best_output_model(
+def test_weights_recover_an_uploaded_checkpoint_artifact_without_output_models(
     patch_clearml: Any, tmp_path: Path
 ) -> None:
     checkpoint = tmp_path / "manual.pt"
@@ -198,8 +203,7 @@ def test_weights_reject_an_uploaded_checkpoint_artifact_without_a_best_output_mo
         )
     )
 
-    with pytest.raises(ValueError, match="best Output Model"):
-        resolve_task_weights(TASK_ID)
+    assert resolve_task_weights(TASK_ID) == checkpoint
 
 
 def test_weights_do_not_download_checkpoint_artifacts(patch_clearml: Any) -> None:
@@ -207,28 +211,27 @@ def test_weights_do_not_download_checkpoint_artifacts(patch_clearml: Any) -> Non
         FakeTask(
             artifacts={
                 "metrics_predictions": ExplodingArtifact(),
-                "train_weights_best": ExplodingArtifact(),
+                "metrics_evaluation": ExplodingArtifact(),
             }
         )
     )
 
-    with pytest.raises(ValueError, match="best Output Model"):
+    with pytest.raises(ValueError, match="checkpoint"):
         resolve_task_weights(TASK_ID)
 
 
-def test_filename_only_best_output_model_is_rejected(patch_clearml: Any, tmp_path: Path) -> None:
+def test_filename_only_best_output_model_is_recovered(patch_clearml: Any, tmp_path: Path) -> None:
     checkpoint = tmp_path / "best.pt"
     checkpoint.write_bytes(b"")
     patch_clearml(FakeTask(models={"output": [FakeModel(str(checkpoint))]}))
 
-    with pytest.raises(ValueError, match="best Output Model"):
-        resolve_task_weights(TASK_ID)
+    assert resolve_task_weights(TASK_ID) == checkpoint
 
 
 def test_a_task_without_a_checkpoint_says_so(patch_clearml: Any) -> None:
     patch_clearml(FakeTask())
 
-    with pytest.raises(ValueError, match="best Output Model"):
+    with pytest.raises(ValueError, match="checkpoint"):
         resolve_task_weights(TASK_ID)
 
 
@@ -265,13 +268,12 @@ def test_thresholds_come_from_validation_csv_as_plain_floats(
         pytest.param(pd.DataFrame({"confidence": [0.25]}, index=["car"]), id="dataframe"),
     ],
 )
-def test_historical_threshold_payloads_are_rejected(patch_clearml: Any, payload: object) -> None:
+def test_historical_threshold_payloads_are_recovered(patch_clearml: Any, payload: object) -> None:
     patch_clearml(
         FakeTask(artifacts={"metrics_best_confidences_test": FakeArtifact(payload=payload)})
     )
 
-    with pytest.raises(ValueError, match=BEST_CONFIDENCES_VAL):
-        fetch_best_confidences(TASK_ID)
+    assert fetch_best_confidences(TASK_ID) == {"car": 0.25}
 
 
 def test_a_missing_threshold_artifact_names_the_current_artifact(patch_clearml: Any) -> None:
@@ -296,7 +298,9 @@ def test_ambiguous_native_best_models_fail(patch_clearml: Any, tmp_path: Path) -
         resolve_task_weights(TASK_ID)
 
 
-def test_validation_csv_is_the_only_threshold_source(patch_clearml: Any, tmp_path: Path) -> None:
+def test_validation_csv_precedes_historical_threshold_source(
+    patch_clearml: Any, tmp_path: Path
+) -> None:
     path = tmp_path / "thresholds.csv"
     value = 0.12345678901234566
     path.write_text(f"class_name,confidence\n001,{value:.17g}\n")
@@ -311,15 +315,14 @@ def test_validation_csv_is_the_only_threshold_source(patch_clearml: Any, tmp_pat
     assert fetch_best_confidences(TASK_ID) == {"001": value}
 
 
-def test_non_csv_current_threshold_artifact_is_rejected(patch_clearml: Any, tmp_path: Path) -> None:
+def test_json_current_threshold_artifact_is_recovered(patch_clearml: Any, tmp_path: Path) -> None:
     path = tmp_path / "thresholds.json"
     path.write_text('{"car": 0.9}')
     patch_clearml(
         FakeTask(artifacts={BEST_CONFIDENCES_VAL: FakeArtifact(str(path), payload={"car": 0.9})})
     )
 
-    with pytest.raises(ValueError, match="CSV"):
-        fetch_best_confidences(TASK_ID)
+    assert fetch_best_confidences(TASK_ID) == {"car": 0.9}
 
 
 @pytest.mark.parametrize(
@@ -353,3 +356,391 @@ def test_multiple_baseline_tags_use_all_operator(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setitem(sys.modules, "clearml", _recording_clearml_module(asked))
     latest_completed_task_id("detection", tags=["prod", "approved"])
     assert asked["tags"] == ["__$all", "prod", "approved"]
+
+
+@pytest.mark.parametrize("name", ["best_confidences_val", "best_confidences_test"])
+def test_unprefixed_threshold_aliases(patch_clearml: Any, name: str) -> None:
+    patch_clearml(FakeTask(artifacts={name: FakeArtifact(payload={"001": 0.12345678901234566})}))
+    assert fetch_best_confidences(TASK_ID) == {"001": 0.12345678901234566}
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        pd.Series([0.2], index=["001"]),
+        pd.DataFrame({"value": [0.2]}, index=["001"]),
+        '"{\\"001\\": 0.2}"',
+    ],
+)
+def test_threshold_payload_encodings(patch_clearml: Any, payload: Any) -> None:
+    patch_clearml(FakeTask(artifacts={"best_confidences_val": FakeArtifact(payload=payload)}))
+    assert fetch_best_confidences(TASK_ID) == {"001": 0.2}
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {},
+        {" ": 0.1},
+        {"car": float("inf")},
+        {"car": -0.1},
+        {"car": "no"},
+        pd.Series([0.1, 0.2], index=["car", "car"]),
+        pd.DataFrame({"other": [0.1], "metric": [0.2]}, index=["car"]),
+    ],
+)
+def test_bad_preferred_threshold_prevents_fallback(patch_clearml: Any, payload: Any) -> None:
+    patch_clearml(
+        FakeTask(
+            artifacts={
+                BEST_CONFIDENCES_VAL: FakeArtifact(payload=payload),
+                "best_confidences_test": FakeArtifact(payload={"car": 0.9}),
+            }
+        )
+    )
+    with pytest.raises(ValueError, match=BEST_CONFIDENCES_VAL):
+        fetch_best_confidences(TASK_ID)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "metrics_dashboard_full_val",
+        "dashboard_full_val",
+        "metrics_dashboard_full_test",
+        "dashboard_full_test",
+    ],
+)
+def test_dashboard_payload_fallback(patch_clearml: Any, name: str) -> None:
+    payload = pd.DataFrame({"confidence": [0.42], "recall": [0.8]}, index=["001"])
+    patch_clearml(FakeTask(artifacts={name: FakeArtifact(payload=payload)}))
+    assert fetch_best_confidences(TASK_ID) == {"001": 0.42}
+
+
+@pytest.mark.parametrize("suffix", [".csv", ".xlsx"])
+def test_dashboard_file_fallback_preserves_class_ids(
+    patch_clearml: Any, tmp_path: Path, suffix: str
+) -> None:
+    path = tmp_path / ("dashboard" + suffix)
+    frame = pd.DataFrame({"confidence": [0.42], "recall": [0.8]}, index=["001"])
+    if suffix == ".csv":
+        frame.to_csv(path)
+    else:
+        frame.to_excel(path)
+    patch_clearml(FakeTask(artifacts={"dashboard_full_test": FakeArtifact(str(path))}))
+    assert fetch_best_confidences(TASK_ID) == {"001": 0.42}
+
+
+def test_output_url_best_beats_registration_order(patch_clearml: Any, tmp_path: Path) -> None:
+    best = tmp_path / "download.pt"
+    best.touch()
+    model = FakeModel(str(best))
+    model.url = "https://files.example/nested/%62est.pt?download=1"
+    patch_clearml(FakeTask(models={"output": [model, FakeModel("last.pt")]}))
+    from clearml_yolo.clearml_models import resolve_task_model
+
+    path, links = resolve_task_model(TASK_ID)
+    assert path == best
+    assert links["model_id"] == model.id
+    assert links["model_url"] == model.url
+
+
+def test_last_output_fallback(patch_clearml: Any, tmp_path: Path) -> None:
+    last = tmp_path / "epoch.pt"
+    last.touch()
+    patch_clearml(FakeTask(models={"output": [FakeModel("first.pt"), FakeModel(str(last))]}))
+    assert resolve_task_weights(TASK_ID) == last
+
+
+def test_ambiguous_url_best_fails(patch_clearml: Any) -> None:
+    patch_clearml(FakeTask(models={"output": [FakeModel("a/best.pt"), FakeModel("b/best.pt")]}))
+    with pytest.raises(ValueError, match="Ambiguous"):
+        resolve_task_weights(TASK_ID)
+
+
+def test_artifact_priority_and_links(patch_clearml: Any, tmp_path: Path) -> None:
+    best = tmp_path / "best.pt"
+    best.touch()
+    task = FakeTask(
+        artifacts={
+            "train_weights_best.pt": FakeArtifact(str(best)),
+            "train_weights_best": ExplodingArtifact(),
+            "model": ExplodingArtifact(),
+        }
+    )
+    patch_clearml(task)
+    from clearml_yolo.clearml_models import resolve_task_model
+
+    path, links = resolve_task_model(TASK_ID)
+    assert path == best
+    assert links["artifact_name"] == "train_weights_best.pt"
+    assert links["task_id"] == TASK_ID
+    assert "model_id" not in links
+    assert source_model_links(TASK_ID) == links
+
+
+def test_output_models_prevent_artifact_fallback(patch_clearml: Any) -> None:
+    patch_clearml(
+        FakeTask(
+            models={"output": [FakeModel("missing.pt")]}, artifacts={"model": ExplodingArtifact()}
+        )
+    )
+    with pytest.raises(FileNotFoundError):
+        resolve_task_weights(TASK_ID)
+
+
+def test_non_pt_checkpoint_is_rejected(patch_clearml: Any, tmp_path: Path) -> None:
+    path = tmp_path / "model.bin"
+    path.touch()
+    patch_clearml(FakeTask(models={"output": [FakeModel(str(path), checkpoint_role="best")]}))
+    with pytest.raises(ValueError, match=r"\.pt"):
+        resolve_task_weights(TASK_ID)
+
+
+def test_sorted_pt_artifact_fallback(patch_clearml: Any, tmp_path: Path) -> None:
+    path = tmp_path / "a.pt"
+    path.touch()
+    patch_clearml(
+        FakeTask(artifacts={"z.pt": ExplodingArtifact(), "a.pt": FakeArtifact(str(path))})
+    )
+    assert resolve_task_weights(TASK_ID) == path
+
+
+@pytest.mark.parametrize(
+    ("preferred", "other"),
+    [
+        ("metrics_best_confidences_val", "best_confidences_val"),
+        ("best_confidences_val", "metrics_best_confidences_test"),
+        ("metrics_best_confidences_test", "best_confidences_test"),
+        ("best_confidences_test", "metrics_dashboard_full_val"),
+        ("metrics_dashboard_full_val", "dashboard_full_val"),
+        ("dashboard_full_val", "metrics_dashboard_full_test"),
+        ("metrics_dashboard_full_test", "dashboard_full_test"),
+    ],
+)
+def test_threshold_priority(patch_clearml: Any, preferred: str, other: str) -> None:
+    payload = pd.DataFrame({"confidence": [0.21]}, index=["001"])
+    patch_clearml(
+        FakeTask(artifacts={other: ExplodingArtifact(), preferred: FakeArtifact(payload=payload)})
+    )
+    assert fetch_best_confidences(TASK_ID) == {"001": 0.21}
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        pd.DataFrame({"other": [0.2]}, index=["001"]),
+        pd.DataFrame({"confidence": []}),
+        pd.DataFrame({"confidence": [0.1, 0.2]}, index=["car", "car"]),
+        pd.DataFrame({"confidence": [0.1]}, index=[""]),
+        pd.DataFrame({"confidence": [float("nan")]}, index=["car"]),
+    ],
+)
+def test_invalid_dashboard_prevents_fallback(patch_clearml: Any, payload: Any) -> None:
+    patch_clearml(
+        FakeTask(
+            artifacts={
+                "metrics_dashboard_full_val": FakeArtifact(payload=payload),
+                "dashboard_full_test": FakeArtifact(
+                    payload=pd.DataFrame({"confidence": [0.9]}, index=["car"])
+                ),
+            }
+        )
+    )
+    with pytest.raises(ValueError, match="metrics_dashboard_full_val"):
+        fetch_best_confidences(TASK_ID)
+
+
+@pytest.mark.parametrize(
+    "contents",
+    [
+        "class_name,confidence\ncar,0.1\ncar,0.2\n",
+        "class_name,recall\ncar,0.1\n",
+        "class_name,confidence\n,0.1\n",
+        "class_name,confidence\ncar,nan\n",
+        "class_name,confidence\n",
+    ],
+)
+def test_invalid_dashboard_csv_prevents_fallback(
+    patch_clearml: Any, tmp_path: Path, contents: str
+) -> None:
+    path = tmp_path / "dashboard.csv"
+    path.write_text(contents)
+    patch_clearml(
+        FakeTask(
+            artifacts={
+                "metrics_dashboard_full_val": FakeArtifact(str(path)),
+                "dashboard_full_test": ExplodingArtifact(),
+            }
+        )
+    )
+    with pytest.raises(ValueError, match="metrics_dashboard_full_val"):
+        fetch_best_confidences(TASK_ID)
+
+
+def test_inaccessible_preferred_threshold_prevents_fallback(patch_clearml: Any) -> None:
+    patch_clearml(
+        FakeTask(
+            artifacts={
+                BEST_CONFIDENCES_VAL: ExplodingArtifact(),
+                "dashboard_full_test": FakeArtifact(
+                    payload=pd.DataFrame({"confidence": [0.9]}, index=["car"])
+                ),
+            }
+        )
+    )
+    with pytest.raises(ValueError, match=BEST_CONFIDENCES_VAL):
+        fetch_best_confidences(TASK_ID)
+
+
+@pytest.mark.parametrize("payload", ['{"car": 0.1, "car": 0.2}', {"car": True}])
+def test_ambiguous_or_boolean_threshold_payload_fails(patch_clearml: Any, payload: Any) -> None:
+    patch_clearml(FakeTask(artifacts={BEST_CONFIDENCES_VAL: FakeArtifact(payload=payload)}))
+    with pytest.raises(ValueError, match=BEST_CONFIDENCES_VAL):
+        fetch_best_confidences(TASK_ID)
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["train_weights_best.pt", "train_weights_best", "best.pt", "best", "model", "checkpoint"],
+)
+def test_all_checkpoint_aliases(patch_clearml: Any, tmp_path: Path, name: str) -> None:
+    path = tmp_path / "download.pt"
+    path.touch()
+    patch_clearml(FakeTask(artifacts={name: FakeArtifact(str(path))}))
+    assert resolve_task_weights(TASK_ID) == path
+
+
+def test_failed_preferred_checkpoint_artifact_prevents_fallback(patch_clearml: Any) -> None:
+    patch_clearml(
+        FakeTask(
+            artifacts={"train_weights_best.pt": ExplodingArtifact(), "model": ExplodingArtifact()}
+        )
+    )
+    with pytest.raises(ValueError, match=r"train_weights_best\.pt"):
+        resolve_task_weights(TASK_ID)
+
+
+def test_metadata_beats_ambiguous_best_urls(patch_clearml: Any, tmp_path: Path) -> None:
+    path = tmp_path / "marked.pt"
+    path.touch()
+    patch_clearml(
+        FakeTask(
+            models={
+                "output": [
+                    FakeModel("a/best.pt"),
+                    FakeModel("b/best.pt"),
+                    FakeModel(str(path), checkpoint_role="best"),
+                ]
+            }
+        )
+    )
+    assert resolve_task_weights(TASK_ID) == path
+
+
+def test_atomic_checkpoint_provenance_snapshot(patch_clearml: Any, tmp_path: Path) -> None:
+    from clearml_yolo.clearml_models import resolve_task_model
+
+    class ChangingTask(FakeTask):
+        @override
+        def get_models(self) -> dict[str, list[FakeModel]]:
+            models = super().get_models()
+            self._models = {"output": [FakeModel("changed.pt")]}
+            return models
+
+    path = tmp_path / "selected.pt"
+    path.touch()
+    patch_clearml(ChangingTask(models={"output": [FakeModel(str(path), checkpoint_role="best")]}))
+    selected, links = resolve_task_model(TASK_ID)
+    assert selected == path
+    assert links["model_id"] == "selected"
+
+
+def test_dashboard_warning_records_precision_and_provenance(patch_clearml: Any) -> None:
+    from loguru import logger
+
+    messages: list[str] = []
+    sink = logger.add(lambda message: messages.append(str(message)), level="WARNING")
+    try:
+        patch_clearml(
+            FakeTask(
+                artifacts={
+                    "dashboard_full_test": FakeArtifact(
+                        payload=pd.DataFrame({"confidence": [0.2]}, index=["car"])
+                    )
+                }
+            )
+        )
+        assert fetch_best_confidences(TASK_ID) == {"car": 0.2}
+    finally:
+        logger.remove(sink)
+    assert any(
+        "dashboard_full_test" in message and "precision" in message and "provenance" in message
+        for message in messages
+    )
+
+
+def test_clearml_dataframe_gzip_preserves_ids_and_precision(
+    patch_clearml: Any, tmp_path: Path
+) -> None:
+    path = tmp_path / "thresholds.csv.gz"
+    value = 0.12345678901234566
+    with gzip.open(path, "wt", encoding="utf-8") as stream:
+        stream.write(f",confidence\n001,{value:.17g}\n")
+    patch_clearml(FakeTask(artifacts={BEST_CONFIDENCES_VAL: FakeArtifact(str(path))}))
+    assert fetch_best_confidences(TASK_ID) == {"001": value}
+
+
+@pytest.mark.parametrize(
+    ("preferred", "other"),
+    [
+        ("train_weights_best.pt", "train_weights_best"),
+        ("train_weights_best", "best.pt"),
+        ("best.pt", "best"),
+        ("best", "model"),
+        ("model", "checkpoint"),
+        ("checkpoint", "a.pt"),
+    ],
+)
+def test_checkpoint_alias_priority(
+    patch_clearml: Any, tmp_path: Path, preferred: str, other: str
+) -> None:
+    path = tmp_path / "selected.pt"
+    path.touch()
+    patch_clearml(
+        FakeTask(artifacts={other: ExplodingArtifact(), preferred: FakeArtifact(str(path))})
+    )
+    assert resolve_task_weights(TASK_ID) == path
+
+
+def test_output_download_none_prevents_fallback(patch_clearml: Any) -> None:
+    patch_clearml(
+        FakeTask(models={"output": [FakeModel("")]}, artifacts={"model": ExplodingArtifact()})
+    )
+    with pytest.raises(ValueError, match="no local file"):
+        resolve_task_weights(TASK_ID)
+
+
+def test_output_download_error_prevents_fallback(patch_clearml: Any) -> None:
+    class FailingModel(FakeModel):
+        @override
+        def get_local_copy(self) -> str:
+            raise RuntimeError("remote unavailable")
+
+    patch_clearml(
+        FakeTask(
+            models={"output": [FailingModel("selected.pt")]},
+            artifacts={"model": ExplodingArtifact()},
+        )
+    )
+    with pytest.raises(ValueError, match=r"selected.*remote unavailable"):
+        resolve_task_weights(TASK_ID)
+
+
+def test_threshold_csv_single_value_column_can_precede_class_column(
+    patch_clearml: Any, tmp_path: Path
+) -> None:
+    path = tmp_path / "thresholds.csv"
+    path.write_text("value,class_name\n0.12345678901234566,001\n")
+    patch_clearml(FakeTask(artifacts={BEST_CONFIDENCES_VAL: FakeArtifact(str(path))}))
+    assert fetch_best_confidences(TASK_ID) == {"001": 0.12345678901234566}

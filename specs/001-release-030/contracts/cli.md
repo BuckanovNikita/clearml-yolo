@@ -46,8 +46,9 @@ publishes to FiftyOne.
 Comparison takes baseline_model/candidate_model references, current ground_truth, ultralytics, ultralytics_predict,
 a standalone split override (default `test`) and statistical options. Automatic baseline is latest completed prod excluding
 current task. Explicit local models require weights and exact thresholds; explicit invalid
-inputs fail. Task recovery uses the exact validation-threshold CSV; exact thresholds supplied
-on an explicit model reference remain authoritative.
+inputs fail. Explicit threshold maps remain authoritative; task weights and stored thresholds
+follow the [recovery contract](../../012-remove-legacy-compatibility/contracts/task-recovery.md),
+including historical payload/checkpoint alternatives and dashboard precision warnings.
 Reports consume the paired evaluated dashboards named by the local comparison manifest, not
 stored historical dashboards. Missing automatic baseline records a skipped comparison.
 Developer, business and statistical workbooks retain classes present in only one model.

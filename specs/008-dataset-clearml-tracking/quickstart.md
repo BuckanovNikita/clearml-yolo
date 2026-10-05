@@ -51,7 +51,10 @@ and PNG diagnostics retain their existing formats.
 Use a completed test-owned baseline tagged prod and run another candidate; compare source
 links, frozen exact validation thresholds, paired image membership and reports. Exercise
 cy-val, cy-compare and cy-report separately with the generated examples. Also compare explicit
-local models with exact thresholds, and verify historical-only task publications are rejected.
+local models with exact thresholds, and verify supported historical task sources under the
+[recovery amendment](../012-remove-legacy-compatibility/contracts/task-recovery.md). Exercise
+either/both historical positions, preferred-source failures, frozen thresholds and truthful
+artifact provenance; dashboard recovery must warn about rounding/calibration provenance.
 
 Inject rejected artifact/model upload, missing callback registration, flush failure and
 interruption in isolated invocations; none may complete successfully. Record dated portable

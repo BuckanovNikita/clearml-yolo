@@ -8,6 +8,7 @@ import math
 import zipfile
 from collections.abc import Callable
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast
 
 import pandas as pd
@@ -562,12 +563,8 @@ def test_resolved_clearml_model_keeps_exact_task_id(
     checkpoint.write_bytes(b"weights")
     task_id = "a" * 32
     monkeypatch.setattr(
-        "clearml_yolo.tasks.compare.resolve_task_weights", lambda _task_id: checkpoint
-    )
-    monkeypatch.setattr(
-        "clearml_yolo.tasks.compare.source_model_links",
-        lambda task_id: {"task_id": task_id},
-        raising=False,
+        "clearml_yolo.tasks.compare.resolve_task_model",
+        lambda task_id: (checkpoint, {"task_id": task_id}),
     )
     monkeypatch.setattr(
         "clearml_yolo.tasks.compare.fetch_best_confidences",
@@ -584,67 +581,21 @@ def test_resolved_clearml_model_keeps_exact_task_id(
     assert resolved.task_id == task_id
 
 
-def test_compare_dashboards_and_statistics_share_the_same_test_counts(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    from clearml_yolo.clearml_session import ClearMLConfig
-    from clearml_yolo.comparison.reinfer import VocabularyReport
-    from clearml_yolo.inference import ScoredResolution
-    from clearml_yolo.tasks.compare import InferenceConfig, ModelRef, compare
+def _assert_recovered_sources(configurations: dict[str, Any], legacy_role: str | None) -> None:
+    if legacy_role is not None:
+        for role in ("baseline", "candidate"):
+            source = configurations["comparison"][role]
+            assert source["task_id"] == role
+            if legacy_role in (role, "both"):
+                assert "model_id" not in source
+                assert source["artifact_name"] == "model"
+            else:
+                assert source["model_id"] == f"{role}-model"
 
-    baseline_weights, candidate_weights = tmp_path / "baseline.pt", tmp_path / "candidate.pt"
-    baseline_weights.write_bytes(b"baseline")
-    candidate_weights.write_bytes(b"candidate")
-    image, empty = tmp_path / "image.jpg", tmp_path / "empty.jpg"
-    image.write_bytes(b"image")
-    empty.write_bytes(b"empty")
-    truth = pd.DataFrame(
-        [
-            ("image.jpg", str(image), "cat", 0.0, 0.0, 10.0, 10.0, "test"),
-            ("empty.jpg", str(empty), None, None, None, None, None, "test"),
-        ],
-        columns=[
-            "image_name",
-            "image_path",
-            "instance_label",
-            "bbox_x_tl",
-            "bbox_y_tl",
-            "bbox_x_br",
-            "bbox_y_br",
-            "split",
-        ],
-    )
-    truth_path = tmp_path / "truth.csv"
-    truth.to_csv(truth_path, index=False)
-    columns = [
-        "image_name",
-        "instance_label",
-        "bbox_x_tl",
-        "bbox_y_tl",
-        "bbox_x_br",
-        "bbox_y_br",
-        "confidence",
-    ]
 
-    def fake_reinfer(weights: Path, *_args: Any, **_kwargs: Any) -> tuple[pd.DataFrame, Any]:
-        rows = []
-        if Path(weights).name == "candidate.pt":
-            rows = [
-                ("image.jpg", "cat", 0.0, 0.0, 10.0, 10.0, 0.9),
-                ("empty.jpg", "cat", 20.0, 20.0, 30.0, 30.0, 0.8),
-            ]
-        frame = pd.DataFrame(rows, columns=columns)
-        role = "candidate" if Path(weights).name == "candidate.pt" else "baseline"
-        save_dir = tmp_path / "comparison" / "native" / f"{role}_test"
-        (save_dir / "labels").mkdir(parents=True, exist_ok=True)
-        (save_dir / "labels" / "image.txt").write_text("prediction", encoding="utf-8")
-        (save_dir / "image.jpg").write_bytes(b"must-not-upload")
-        frame.attrs["effective_args"] = {"device": f"normalized-{role}"}
-        frame.attrs["save_dir"] = str(save_dir)
-        return frame, VocabularyReport(
-            model_classes=["cat"], unknown_to_model=[], unknown_to_ground_truth=[]
-        )
-
+def _stub_comparison_publication(
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[dict[str, object], dict[str, Any], list[str]]:
     uploads: dict[str, object] = {}
     configurations: dict[str, Any] = {}
     monkeypatch.setattr(
@@ -674,6 +625,139 @@ def test_compare_dashboards_and_statistics_share_the_same_test_counts(
         "clearml_yolo.tasks.compare.expect_artifacts",
         lambda _task, names: expected.extend(names),
     )
+    return uploads, configurations, expected
+
+
+def _recovered_comparison_models(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    legacy_role: str | None,
+    override: bool,
+    baseline_weights: Path,
+    candidate_weights: Path,
+) -> dict[str, Any]:
+    from clearml_yolo.tasks.compare import ModelRef
+
+    models = {
+        role: ModelRef(source="local", weights=weights, thresholds={"cat": 0.5})
+        for role, weights in [("baseline", baseline_weights), ("candidate", candidate_weights)]
+    }
+    if legacy_role is not None:
+        threshold_file = tmp_path / "thresholds.csv"
+        threshold_file.write_text("class_name,confidence\ncat,0.5\n", encoding="utf-8")
+        sources = {}
+        for role, weights in [("baseline", baseline_weights), ("candidate", candidate_weights)]:
+            output = SimpleNamespace(
+                id=f"{role}-model",
+                url=f"https://files.example/{role}.pt",
+                get_metadata=lambda _key: "best",
+                get_local_copy=lambda weights=weights: str(weights),
+            )
+            artifacts = (
+                {
+                    "model": SimpleNamespace(get_local_copy=lambda weights=weights: str(weights)),
+                    "dashboard_full_test": SimpleNamespace(
+                        get=lambda: pd.DataFrame({"confidence": [0.5]}, index=["cat"]),
+                        get_local_copy=lambda: "",
+                    ),
+                }
+                if legacy_role in (role, "both")
+                else {
+                    "metrics_best_confidences_val": SimpleNamespace(
+                        get_local_copy=lambda: str(threshold_file)
+                    )
+                }
+            )
+            outputs = [] if legacy_role in (role, "both") else [output]
+            sources[role] = SimpleNamespace(
+                id=role,
+                name=role,
+                artifacts=artifacts,
+                get_models=lambda outputs=outputs: {"output": outputs},
+                get_output_log_web_page=lambda role=role: f"https://clearml.example/{role}",
+            )
+            models[role] = ModelRef(task_id=role, thresholds={"cat": 0.7} if override else None)
+        monkeypatch.setattr("clearml_yolo.clearml_models._task", sources.__getitem__)
+
+    return models
+
+
+@pytest.mark.parametrize("legacy_role", [None, "baseline", "candidate", "both"])
+@pytest.mark.parametrize("split", ["test", "val"])
+@pytest.mark.parametrize("override", [False, True])
+def test_compare_dashboards_and_statistics_share_the_same_test_counts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    legacy_role: str | None,
+    split: str,
+    override: bool,
+) -> None:
+    from clearml_yolo.clearml_session import ClearMLConfig
+    from clearml_yolo.comparison.reinfer import VocabularyReport
+    from clearml_yolo.inference import ScoredResolution
+    from clearml_yolo.tasks.compare import InferenceConfig, compare
+
+    baseline_weights, candidate_weights = tmp_path / "baseline.pt", tmp_path / "candidate.pt"
+    baseline_weights.write_bytes(b"baseline")
+    candidate_weights.write_bytes(b"candidate")
+    image, empty = tmp_path / "image.jpg", tmp_path / "empty.jpg"
+    image.write_bytes(b"image")
+    empty.write_bytes(b"empty")
+    truth = pd.DataFrame(
+        [
+            ("image.jpg", str(image), "cat", 0.0, 0.0, 10.0, 10.0, split),
+            ("empty.jpg", str(empty), None, None, None, None, None, split),
+        ],
+        columns=[
+            "image_name",
+            "image_path",
+            "instance_label",
+            "bbox_x_tl",
+            "bbox_y_tl",
+            "bbox_x_br",
+            "bbox_y_br",
+            "split",
+        ],
+    )
+    truth_path = tmp_path / "truth.csv"
+    truth.to_csv(truth_path, index=False)
+    columns = [
+        "image_name",
+        "instance_label",
+        "bbox_x_tl",
+        "bbox_y_tl",
+        "bbox_x_br",
+        "bbox_y_br",
+        "confidence",
+    ]
+
+    membership: list[tuple[str, list[str]]] = []
+
+    def fake_reinfer(
+        weights: Path, current: pd.DataFrame, selected_split: str, *_args: Any, **_kwargs: Any
+    ) -> tuple[pd.DataFrame, Any]:
+        membership.append(
+            (selected_split, current.loc[current["split"] == selected_split, "image_name"].tolist())
+        )
+        rows = []
+        if Path(weights).name == "candidate.pt":
+            rows = [
+                ("image.jpg", "cat", 0.0, 0.0, 10.0, 10.0, 0.9),
+                ("empty.jpg", "cat", 20.0, 20.0, 30.0, 30.0, 0.8),
+            ]
+        frame = pd.DataFrame(rows, columns=columns)
+        role = "candidate" if Path(weights).name == "candidate.pt" else "baseline"
+        save_dir = tmp_path / "comparison" / "native" / f"{role}_{split}"
+        (save_dir / "labels").mkdir(parents=True, exist_ok=True)
+        (save_dir / "labels" / "image.txt").write_text("prediction", encoding="utf-8")
+        (save_dir / "image.jpg").write_bytes(b"must-not-upload")
+        frame.attrs["effective_args"] = {"device": f"normalized-{role}"}
+        frame.attrs["save_dir"] = str(save_dir)
+        return frame, VocabularyReport(
+            model_classes=["cat"], unknown_to_model=[], unknown_to_ground_truth=[]
+        )
+
+    uploads, configurations, expected = _stub_comparison_publication(monkeypatch)
     monkeypatch.setattr("clearml_yolo.tasks.compare.reinfer_split", fake_reinfer)
     monkeypatch.setattr(
         "clearml_yolo.tasks.compare.resolution_of",
@@ -681,14 +765,19 @@ def test_compare_dashboards_and_statistics_share_the_same_test_counts(
     )
     monkeypatch.setattr("clearml_yolo.tasks.compare.trained_imgsz", lambda *_args: 640)
 
+    models = _recovered_comparison_models(
+        tmp_path, monkeypatch, legacy_role, override, baseline_weights, candidate_weights
+    )
+
     result = compare(
-        ModelRef(source="local", weights=baseline_weights, thresholds={"cat": 0.5}),
-        ModelRef(source="local", weights=candidate_weights, thresholds={"cat": 0.5}),
+        models["baseline"],
+        models["candidate"],
         truth_path,
         tmp_path / "comparison",
         ClearMLConfig(),
         InferenceConfig(conf=0.001, iou=0.7, imgsz=640, batch=1, device="cpu"),
         bootstrap_iterations=20,
+        split=split,
     )
 
     assert result is not None
@@ -707,15 +796,20 @@ def test_compare_dashboards_and_statistics_share_the_same_test_counts(
         candidate.loc["cat", "fn"],
     ) == (row["TP новая"], row["FP новая"], row["FN новая"])
     assert candidate.loc["cat", "fp"] == 1
+    assert membership == [(split, ["image.jpg", "empty.jpg"])] * 2
+    threshold = 0.7 if override and legacy_role is not None else 0.5
+    assert baseline.loc["cat", "confidence"] == threshold
+    assert candidate.loc["cat", "confidence"] == threshold
+    _assert_recovered_sources(configurations, legacy_role)
     assert set(uploads) == {
         "ground_truth",
-        "compare_predictions_baseline_test",
-        "compare_predictions_candidate_test",
-        "compare_workbook_test",
-        "compare_workbook_test_excluded",
-        "compare_workbook_test_methodology",
+        f"compare_predictions_baseline_{split}",
+        f"compare_predictions_candidate_{split}",
+        f"compare_workbook_{split}",
+        f"compare_workbook_{split}_excluded",
+        f"compare_workbook_{split}_methodology",
     }
-    assert set(expected) == {"compare_workbook_test"}
+    assert set(expected) == {f"compare_workbook_{split}"}
 
 
 def test_comparison_scoring_uses_the_full_evaluation_configuration(

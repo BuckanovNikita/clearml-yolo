@@ -11,6 +11,14 @@ ground truth for every training run and limits task recovery to the role-marked 
 Model plus the validation-threshold CSV. References below to native-only training or historical
 publication readers are superseded; completed implementation history remains unchanged.
 
+**Recovery compatibility amendment (2026-10-05)**: The approved
+[task recovery contract](../012-remove-legacy-compatibility/contracts/task-recovery.md)
+supersedes only current-only checkpoint/threshold recovery restrictions recorded above and
+below. Ordered historical threshold payloads, dashboards and checkpoint artifacts are supported
+without changing current publication. Explicit maps remain authoritative; present malformed
+sources fail, dashboard limitations warn, and both comparison positions use current images
+and frozen thresholds with truthful provenance. Completed history remains unchanged.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Reuse prepared datasets (Priority: P1)
