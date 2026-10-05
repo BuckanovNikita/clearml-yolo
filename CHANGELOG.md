@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.14.2 (2026-10-05)
+
+### Bug Fixes
+
+- **reports**: Retain metrics for new and deleted classes
+  ([`b535aa8`](https://github.com/BuckanovNikita/clearml-yolo/commit/b535aa804bcb40f2b8cb05b9fb42fd874a4df4ee))
+
+
 ## v0.14.1 (2026-10-05)
 
 ### Bug Fixes
