@@ -13,6 +13,8 @@ collapsible sections exist in the plots and scalars tabs, keyed by title — see
 :mod:`clearml_yolo.clearml_report`.
 """
 
+from urllib.parse import quote
+
 PREDICTIONS = "predict_predictions"
 GROUND_TRUTH = "ground_truth"
 FIFTYONE_PUBLICATION_FILE = "fiftyone_publication.json"
@@ -51,4 +53,9 @@ def per_split(prefix: str, split: str) -> str:
     Every stage of a pipeline run shares a single ClearML task, so a split suffix is what
     keeps three evaluations of the same model from overwriting each other.
     """
-    return f"{prefix}_{split}"
+    return f"{prefix}_{split_component(split)}"
+
+
+def split_component(split: str) -> str:
+    """Encode a logical split as one portable filename/artifact component."""
+    return quote(split, safe="-_", encoding="utf-8").replace(".", "%2E")

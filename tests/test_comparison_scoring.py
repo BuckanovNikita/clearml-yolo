@@ -6,7 +6,7 @@ import pytest
 from clearml_yolo.comparison.scoring import ClassCounts, score_split, validate_thresholds
 
 GT_COLUMNS = ["image_name", "instance_label", "bbox_x_tl", "bbox_y_tl", "bbox_x_br", "bbox_y_br"]
-GtRow = tuple[str, str | None, float, float, float, float]
+GtRow = tuple[str, str | None, float | None, float | None, float | None, float | None]
 PredRow = tuple[str, str, float, float, float, float, float]
 
 
@@ -249,7 +249,7 @@ def test_labels_outside_the_scored_classes_are_excluded_without_crashing() -> No
         [
             ("img1.jpg", "cat", 0.0, 0.0, 10.0, 10.0),
             ("img2.jpg", "bird", 20.0, 20.0, 30.0, 30.0),
-            ("img3.jpg", None, 40.0, 40.0, 50.0, 50.0),
+            ("img3.jpg", None, None, None, None, None),
         ],
         index=[0, 1, 2],
     )

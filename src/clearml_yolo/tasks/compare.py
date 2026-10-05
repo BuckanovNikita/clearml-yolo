@@ -41,6 +41,7 @@ from clearml_yolo.comparison.scoring import (
     validate_split_membership,
     validate_thresholds,
 )
+from clearml_yolo.comparison.significance import validate_q
 from clearml_yolo.comparison.workbook import write_comparison_workbook
 from clearml_yolo.filesystem import write_path
 from clearml_yolo.inference import ImageNameMode, resolution_of, trained_imgsz
@@ -153,9 +154,7 @@ def _resolve_model(
         automatic_absence_is_skip=automatic_absence_is_skip,
     )
     thresholds = (
-        dict(model.thresholds)
-        if model.thresholds is not None
-        else fetch_best_confidences(task_id)
+        dict(model.thresholds) if model.thresholds is not None else fetch_best_confidences(task_id)
     )
     return ResolvedModel(
         source="clearml",
@@ -254,7 +253,7 @@ def _prediction_cache(
         identity = f"{identity}:{stat.st_size}:{stat.st_mtime_ns}"
     settings = json.dumps(inference.model_dump(mode="json"), sort_keys=True, ensure_ascii=True)
     digest = hashlib.sha256(f"{identity}:{settings}:{split_fingerprint}".encode()).hexdigest()[:12]
-    return destination / f"{role}_predictions_{split}_{digest}.csv"
+    return destination / f"{role}_predictions_{artifact_names.split_component(split)}_{digest}.csv"
 
 
 def _split_fingerprint(ground_truth: pd.DataFrame, split: str) -> str:
@@ -314,7 +313,7 @@ def _scored(
 ) -> tuple[EvaluatedSplit, VocabularyReport, InferenceEvidence, Path]:
     del task  # Scoring retains local replay evidence; its caller owns publication.
     native_project = destination / "native"
-    native_name = f"{role}_{split}"
+    native_name = f"{role}_{artifact_names.split_component(split)}"
     predictions, vocabulary = reinfer_split(
         weights,
         ground_truth,
@@ -349,13 +348,14 @@ def _scored(
         }
     )
     write_native_yaml(
-        destination / f"ultralytics_predict_{role}_{split}.yaml",
+        destination / f"ultralytics_predict_{role}_{artifact_names.split_component(split)}.yaml",
         {key: value for key, value in evidence.effective_args.items() if key != "image_name"}
         | {"model": str(weights), "mode": "predict"},
         "predict",
     )
     write_native_yaml(
-        destination / f"ultralytics_predict_{role}_{split}_requested.yaml",
+        destination
+        / f"ultralytics_predict_{role}_{artifact_names.split_component(split)}_requested.yaml",
         {key: value for key, value in evidence.requested_args.items() if key != "image_name"}
         | {"model": str(weights), "mode": "predict"},
         "predict",
@@ -400,7 +400,7 @@ def _scored(
 
 def _archive_native_outputs(save_dir: Path, destination: Path, *, role: str, split: str) -> Path:
     """Archive native tabular/text outputs without copying source-derived images."""
-    archive = destination / f"native_outputs_{role}_{split}.zip"
+    archive = destination / f"native_outputs_{role}_{artifact_names.split_component(split)}.zip"
     allowed = {".csv", ".json", ".txt", ".yaml", ".yml"}
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
         if save_dir.is_dir():
@@ -479,7 +479,9 @@ def _publish_comparison_tables(
         return
     publish_table(task, "ground_truth", truth)
     for role, path in predictions.items():
-        publish_table(task, f"compare_predictions_{role}_{split}", path)
+        publish_table(
+            task, f"compare_predictions_{role}_{artifact_names.split_component(split)}", path
+        )
 
 
 def _skip_without_baseline(
@@ -518,7 +520,9 @@ def _skip_without_baseline(
         evaluation=evaluation,
         task=task,
     )
-    workbook = destination / f"compare_evaluation_candidate_{split}.xlsx"
+    workbook = (
+        destination / f"compare_evaluation_candidate_{artifact_names.split_component(split)}.xlsx"
+    )
     per_class, summary = summarize_metrics(evaluated.metrics)
     with pd.ExcelWriter(workbook, engine="openpyxl") as writer:
         per_class.to_excel(writer, sheet_name="Classes")
@@ -548,7 +552,7 @@ def _skip_without_baseline(
             },
         )
         _publish_comparison_tables(task, ground_truth_path, {"candidate": predictions}, split)
-        name = f"compare_evaluation_candidate_{split}"
+        name = f"compare_evaluation_candidate_{artifact_names.split_component(split)}"
         expect_artifacts(task, [name])
         upload_artifact(task, name, workbook)
         for name, table_path in tables.items():
@@ -598,6 +602,7 @@ def compare(
     ultralytics_predict: dict[str, Any] | None = None,
 ) -> CompareResult | None:
     """Evaluate both models once on current data and share those exact outcomes."""
+    validate_q(q)
     stage_settings(ultralytics or {}, "train")
     if isinstance(inference, dict):
         inference = _native_inference(inference, ultralytics_predict)
@@ -735,7 +740,9 @@ def compare(
             **evaluation_config.model_dump(),
         }
     )
-    workbook = destination / f"{artifact_names.COMPARISON_WORKBOOK_PREFIX}_{split}.xlsx"
+    workbook = destination / (
+        artifact_names.per_split(artifact_names.COMPARISON_WORKBOOK_PREFIX, split) + ".xlsx"
+    )
     csv_tables = write_comparison_workbook(
         tables.rows, tables.excluded, tables.methodology, workbook
     )

@@ -111,13 +111,13 @@ def test_a_task_name_matches_the_whole_name(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setitem(sys.modules, "clearml", _recording_clearml_module(asked))
 
     latest_completed_task_id("detection", task_name="yolo-v1")
-    assert asked["task_name"] == "^yolo-v1$"
+    assert asked["task_name"] == r"\A(?:yolo-v1)\Z(?![\s\S])"
 
     # A deliberate pattern still works, and an anchored one is not anchored twice.
     latest_completed_task_id("detection", task_name="yolo-v1.*")
-    assert asked["task_name"] == "^yolo-v1.*$"
+    assert asked["task_name"] == r"\A(?:yolo-v1.*)\Z(?![\s\S])"
     latest_completed_task_id("detection", task_name="^exact$")
-    assert asked["task_name"] == "^exact$"
+    assert asked["task_name"] == r"\A(?:^exact$)\Z(?![\s\S])"
     latest_completed_task_id("detection")
     assert asked["task_name"] is None
 
@@ -346,3 +346,10 @@ def test_invalid_threshold_csv_fails_without_historical_fallback(
     )
     with pytest.raises(ValueError, match=r"threshold|confidence|class"):
         fetch_best_confidences(TASK_ID)
+
+
+def test_multiple_baseline_tags_use_all_operator(monkeypatch: pytest.MonkeyPatch) -> None:
+    asked: dict[str, Any] = {}
+    monkeypatch.setitem(sys.modules, "clearml", _recording_clearml_module(asked))
+    latest_completed_task_id("detection", tags=["prod", "approved"])
+    assert asked["tags"] == ["__$all", "prod", "approved"]

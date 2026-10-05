@@ -152,3 +152,20 @@ def test_standalone_report_publishes_only_final_workbooks_and_report_configurati
     assert connected == [("report", config)]
     assert set(expected) == {"report_dev_test", "report_business_test"}
     assert set(uploads) == set(expected)
+
+
+def test_report_encodes_split_without_changing_logical_identity(
+    tmp_path: Path, report_generator: list[tuple[Path, Path]],
+) -> None:
+    comparison, candidate, baseline = _comparison_dir(tmp_path)
+    manifest_path = comparison / MANIFEST_NAME
+    manifest = ComparisonManifest.model_validate_json(manifest_path.read_text())
+    split = "../../../escape/actual"
+    manifest.split = split
+    manifest_path.write_text(manifest.model_dump_json())
+    destination = tmp_path / "reports"
+    result = report(comparison, destination, ClearMLConfig())
+    assert result.dev_reports[split].parent == destination
+    assert result.business_reports[split].parent == destination
+    assert result.dev_reports[split].is_file()
+    assert report_generator == [(candidate, baseline), (candidate, baseline)]

@@ -40,3 +40,9 @@ The child may contract an N-GPU reservation after verified training/model comple
 telemetry-confirmed DDP cleanup. Contraction retains the first assigned UUID and atomically releases
 the others. GPU prediction and comparison use child-local device `0`. The first remains reserved
 to job exit, including a CPU-only downstream phase. There is no mid-pipeline reacquisition.
+
+Telemetry is collected outside registry transactions. Admission and contraction then reread and
+validate current registry state under the lock; a concurrent change cannot be overwritten by the
+pre-probe state. A driver stall can delay the probing caller but cannot block unrelated queue
+registration, position, close or cleanup transactions. Active reservations have either their full
+requested cardinality or one retained device after contraction; intermediate sizes are corrupt.

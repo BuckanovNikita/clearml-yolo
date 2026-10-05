@@ -403,3 +403,90 @@ def test_concurrent_registry_writer_waits_for_short_transaction(tmp_path: Path) 
                 future.result(timeout=0.1)
         ticket = future.result(timeout=5)
         executor.submit(ticket.close).result(timeout=5)
+
+
+def test_stalled_telemetry_does_not_hold_registry_lock(tmp_path: Path) -> None:
+    import concurrent.futures
+    import threading
+
+    started = threading.Event()
+    release = threading.Event()
+
+    class BlockingInventory:
+        def snapshot(self) -> tuple[GPUDevice, ...]:
+            started.set()
+            assert release.wait(timeout=5)
+            return (GPUDevice("GPU-a", False),)
+
+    queue = GPUQueue(tmp_path, BlockingInventory())
+    ticket = queue.register(1, ("GPU-a",))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        admission = pool.submit(ticket.try_acquire)
+        try:
+            assert started.wait(timeout=2)
+            position = pool.submit(ticket.position)
+            assert position.result(timeout=0.5) == 1
+        finally:
+            release.set()
+            admission.result(timeout=2)
+            ticket.close()
+
+
+def test_admission_rereads_registry_after_telemetry(tmp_path: Path) -> None:
+    import concurrent.futures
+    import threading
+
+    started = threading.Event()
+    release = threading.Event()
+
+    class BlockingInventory:
+        def snapshot(self) -> tuple[GPUDevice, ...]:
+            started.set()
+            assert release.wait(timeout=5)
+            return (GPUDevice("GPU-a", False),)
+
+    queue = GPUQueue(tmp_path, BlockingInventory())
+    ticket = queue.register(1, ("GPU-a",))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        admission = pool.submit(ticket.try_acquire)
+        try:
+            assert started.wait(timeout=2)
+            ticket.close()
+        finally:
+            release.set()
+        with pytest.raises(ValueError, match="closed or missing"):
+            admission.result(timeout=2)
+    assert json.loads((tmp_path / "registry.json").read_text())["requests"] == []
+
+
+def test_stalled_contraction_does_not_hold_registry_lock(tmp_path: Path) -> None:
+    import concurrent.futures
+    import threading
+
+    started = threading.Event()
+    release = threading.Event()
+
+    class BlockingInventory:
+        block = False
+
+        def snapshot(self) -> tuple[GPUDevice, ...]:
+            if self.block:
+                started.set()
+                assert release.wait(timeout=5)
+            return (GPUDevice("GPU-a", False), GPUDevice("GPU-b", False))
+
+    inventory = BlockingInventory()
+    queue = GPUQueue(tmp_path, inventory)
+    ticket = queue.register(2, ("GPU-a", "GPU-b"))
+    assert ticket.try_acquire() == ("GPU-a", "GPU-b")
+    with queue.claim_worker(ticket.id) as claim:
+        inventory.block = True
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            contraction = pool.submit(claim.shrink)
+            try:
+                assert started.wait(timeout=2)
+                assert pool.submit(ticket.position).result(timeout=0.5) == 0
+            finally:
+                release.set()
+            assert contraction.result(timeout=2) == ("GPU-a",)
+    ticket.close()

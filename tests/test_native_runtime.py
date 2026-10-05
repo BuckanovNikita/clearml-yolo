@@ -198,6 +198,8 @@ def test_worker_disables_callbacks_and_writes_only_temporary_settings(
     original_setting = SETTINGS["clearml"]
     previous = os.environ.get("YOLO_CONFIG_DIR")
     monkeypatch.setenv("LOCAL_RANK", "0")
+    monkeypatch.setenv("CY_CLEARML_OWNER_PID", str(os.getpid() + 1))
+    monkeypatch.setenv("CY_CLEARML_OWNER_TASK_ID", "parent-task")
 
     with native_runtime():
         directory = Path(os.environ["YOLO_CONFIG_DIR"])

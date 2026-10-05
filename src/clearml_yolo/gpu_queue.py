@@ -64,7 +64,11 @@ class _Request:
     @classmethod
     def parse(cls, value: object) -> Self:
         if not isinstance(value, dict) or set(value) != {
-            "ticket", "count", "visible", "devices", "state"
+            "ticket",
+            "count",
+            "visible",
+            "devices",
+            "state",
         }:
             raise RuntimeError("GPU queue registry has an invalid request")
         ticket = _integer(value["ticket"], "ticket", minimum=1)
@@ -78,7 +82,7 @@ class _Request:
             raise RuntimeError("GPU queue registry has an inconsistent request")
         if state_value == "pending" and devices:
             raise RuntimeError("GPU queue registry has devices on a pending request")
-        if state_value == "active" and not 1 <= len(devices) <= count:
+        if state_value == "active" and len(devices) not in (1, count):
             raise RuntimeError("GPU queue registry has an invalid reservation size")
         return cls(ticket, count, visible, devices, state_value)
 
@@ -100,7 +104,9 @@ class _Registry:
     @classmethod
     def parse(cls, value: object) -> Self:
         if not isinstance(value, dict) or set(value) != {
-            "schema_version", "next_ticket", "requests"
+            "schema_version",
+            "next_ticket",
+            "requests",
         }:
             raise RuntimeError("GPU queue registry has an invalid layout")
         if value["schema_version"] != _SCHEMA_VERSION:
@@ -175,9 +181,7 @@ class GPUQueue:
                     "GPU queue supervisor liveness lock is unexpectedly held"
                 ) from None
             registry.next_ticket += 1
-            registry.requests.append(
-                _Request(ticket_number, count, visible, (), "pending")
-            )
+            registry.requests.append(_Request(ticket_number, count, visible, (), "pending"))
             try:
                 self._write_registry(registry)
             except BaseException:
@@ -220,23 +224,29 @@ class GPUQueue:
                 self._write_registry(registry)
             return request.devices
 
+    def _live_request(self, ticket_number: int) -> tuple[_Registry, _Request]:
+        """Read and validate a live request while the caller holds the transaction."""
+        registry = self._read_registry()
+        if self._reap_stale(registry):
+            self._write_registry(registry)
+        request = self._request(registry, ticket_number)
+        if request is None:
+            raise ValueError("GPU queue ticket is closed or missing")
+        return registry, request
+
     def _try_acquire(self, ticket_id: str) -> tuple[str, ...] | None:
         ticket_number = self._ticket_number(ticket_id)
         with self._locked_registry():
-            registry = self._read_registry()
-            changed = self._reap_stale(registry)
-            request = self._request(registry, ticket_number)
-            if request is None:
-                if changed:
-                    self._write_registry(registry)
-                raise ValueError("GPU queue ticket is closed or missing")
+            _, request = self._live_request(ticket_number)
             if request.state == "active":
-                if changed:
-                    self._write_registry(registry)
                 return request.devices
 
-            inventory = self._inventory.snapshot()
-            known, externally_busy = self._availability(inventory)
+        # Driver calls may block. Never hold the shared transaction while probing.
+        known, externally_busy = self._availability(self._inventory.snapshot())
+        with self._locked_registry():
+            registry, request = self._live_request(ticket_number)
+            if request.state == "active":
+                return request.devices
             occupied = {
                 device
                 for item in registry.requests
@@ -244,6 +254,7 @@ class GPUQueue:
                 for device in item.devices
             }
             occupied.update(externally_busy)
+            changed = False
             for pending in (item for item in registry.requests if item.state == "pending"):
                 available = tuple(
                     device
@@ -297,22 +308,21 @@ class GPUQueue:
     def _shrink(self, ticket_id: str) -> tuple[str, ...]:
         ticket_number = self._ticket_number(ticket_id)
         with self._locked_registry():
-            registry = self._read_registry()
-            changed = self._reap_stale(registry)
-            request = self._request(registry, ticket_number)
-            if request is None or request.state != "active":
-                if changed:
-                    self._write_registry(registry)
-                raise ValueError("GPU queue ticket is closed or missing")
+            _, request = self._live_request(ticket_number)
+            if request.state != "active":
+                raise ValueError("GPU queue ticket has not been admitted")
             if len(request.devices) <= 1:
-                if changed:
-                    self._write_registry(registry)
                 return request.devices
-            _, externally_busy = self._availability(self._inventory.snapshot())
+
+        known, externally_busy = self._availability(self._inventory.snapshot())
+        with self._locked_registry():
+            registry, request = self._live_request(ticket_number)
+            if request.state != "active":
+                raise ValueError("GPU queue ticket has not been admitted")
             surplus = request.devices[1:]
+            if any(device not in known for device in surplus):
+                raise RuntimeError("GPU queue cannot release a device with unknown telemetry")
             if any(device in externally_busy for device in surplus):
-                if changed:
-                    self._write_registry(registry)
                 raise RuntimeError("GPU queue cannot release a device with active compute users")
             request.devices = request.devices[:1]
             self._write_registry(registry)

@@ -18,12 +18,13 @@ from clearml_yolo.clearml_session import (
 )
 from clearml_yolo.filesystem import runs_root, write_path
 from clearml_yolo.native_config import requested_devices, stage_settings
-from clearml_yolo.native_runtime import native_runtime
+from clearml_yolo.native_runtime import native_runtime, validate_owner_environment
 from clearml_yolo.run_identity import task_run_dir
 
 
 def validate_wrapper_keys(config: DictConfig, function: Callable[..., Any]) -> None:
     """Validate the command schema, including keys introduced with Hydra's + syntax."""
+    validate_owner_environment()
     accepted = set(inspect.signature(function).parameters)
     unknown = set(config) - accepted
     if unknown:

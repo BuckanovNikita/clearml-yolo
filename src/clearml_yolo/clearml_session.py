@@ -155,15 +155,25 @@ class _SignalExit(SystemExit):
 
 def _is_worker() -> bool:
     owner_pid = os.environ.get(OWNER_PID_ENV)
-    if owner_pid and owner_pid != str(os.getpid()):
+    if owner_pid and os.environ.get(OWNER_TASK_ENV) and owner_pid != str(os.getpid()):
         return True
     local_rank = os.environ.get("LOCAL_RANK")
-    return local_rank is not None and local_rank != "-1"
+    if (
+        local_rank is not None
+        and local_rank != "-1"
+        and not (owner_pid and os.environ.get(OWNER_TASK_ENV))
+    ):
+        raise ValueError(
+            "Top-level LOCAL_RANK launches are unsupported; use the project GPU launcher"
+        )
+    return False
 
 
 def _sensitive_key(key: object) -> bool:
     normalized = str(key).lower().replace("-", "_")
-    return normalized in {"auth", "authentication", "sig", "signature"} or any(
+    return normalized in {
+        "auth", "authentication", "sig", "signature", "x_amz_signature", "x_goog_signature"
+    } or any(
         marker in normalized
         for marker in (
             "access_key",
@@ -386,16 +396,25 @@ def invocation(
     )
     previous_task_id = os.environ.get(OWNER_TASK_ENV)
     os.environ[OWNER_TASK_ENV] = str(task.id)
+    primary_error: BaseException | None = None
     try:
         if resolved_config is not None:
             _replay_initial_configuration(task, resolved_config)
         yield task
         _finalize(state)
     except BaseException as error:
+        primary_error = error
         try:
-            _mark_failed(task, error)
-        finally:
+            task_id = str(task.id)
             task.close()
+            from clearml import Task
+
+            closed_task: Any = Task.get_task(task_id=task_id)
+            _mark_failed(closed_task, error)
+        except Exception as finalization_error:  # noqa: BLE001 - preserve the original failure
+            logger.error(
+                "ClearML failure finalization failed: {}", type(finalization_error).__name__
+            )
         raise
     finally:
         if owns_signal:
@@ -403,7 +422,16 @@ def invocation(
         _restore_environment(OWNER_PID_ENV, previous_owner)
         _restore_environment(OWNER_TASK_ENV, previous_task_id)
         _ACTIVE_INVOCATION.reset(token)
+        _cleanup_invocation(state, primary_error)
+
+
+def _cleanup_invocation(state: _InvocationState, primary_error: BaseException | None) -> None:
+    try:
         state.cleanup()
+    except OSError as cleanup_error:
+        if primary_error is None:
+            raise
+        logger.error("Local failure cleanup failed: {}", type(cleanup_error).__name__)
 
 
 def init_task(config: ClearMLConfig, stage: str) -> Any:
@@ -545,11 +573,17 @@ _EMPTY = object()
 
 
 def record_run_configuration(task: Any, values: dict[str, Any]) -> dict[str, Any]:
-    """Merge sanitized meaningful values into the invocation's canonical run object."""
+    """Merge result provenance while preserving explicit native replay settings."""
     if _is_worker():
         return values
     active = _active_state(task, "Run configuration recording")
-    cleaned = _meaningful(sanitize_configuration(values))
+    sanitized = sanitize_configuration(values)
+    cleaned = _meaningful(sanitized)
+    if any(key in sanitized for key in ("ultralytics", "ultralytics_predict")):
+        cleaned = {} if cleaned is _EMPTY else cleaned
+        for key in ("ultralytics", "ultralytics_predict"):
+            if key in sanitized:
+                cleaned[key] = sanitized[key]
     if cleaned is _EMPTY:
         return dict(active.run_configuration)
     if not isinstance(cleaned, Mapping):
@@ -568,8 +602,8 @@ def replay_configuration(task: Any, values: dict[str, Any]) -> dict[str, Any]:
     if _is_worker():
         return values
     active = _active_state(task, "Run configuration replay")
-    cleaned = _meaningful(sanitize_configuration(values))
-    if cleaned is _EMPTY or not isinstance(cleaned, Mapping):
+    cleaned = sanitize_configuration(values)
+    if not cleaned or not isinstance(cleaned, Mapping):
         raise ValueError("Canonical run configuration must not be empty")
     connected = task.connect_configuration(
         configuration=dict(cleaned),
@@ -578,8 +612,8 @@ def replay_configuration(task: Any, values: dict[str, Any]) -> dict[str, Any]:
     )
     if not isinstance(connected, Mapping):
         raise TypeError("ClearML run configuration override must be a mapping")
-    effective = _meaningful(sanitize_configuration(connected))
-    if effective is _EMPTY or not isinstance(effective, Mapping):
+    effective = sanitize_configuration(connected)
+    if not effective or not isinstance(effective, Mapping):
         raise ValueError("Effective ClearML run configuration must not be empty")
     active.run_configuration = dict(effective)
     task.connect_configuration(

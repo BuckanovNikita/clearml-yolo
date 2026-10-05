@@ -56,3 +56,8 @@ Local dataset/configuration files follow the maintained
 [filesystem ownership contract](../../../docs/filesystem-policy.md). CSV preparation owns the
 native data reference and preserves source images. Invocation-owned resolved execution copies use
 workspace temporary storage and are not publication artifacts.
+
+Confidence plots published for an evaluation must be freshly generated. Before generation,
+the adapter clears only its known legacy unsuffixed and current-split confidence plot outputs;
+other split outputs and unrelated files remain intact. Both producer naming conventions are
+supported, and missing fresh required plots fail instead of reusing an older file.

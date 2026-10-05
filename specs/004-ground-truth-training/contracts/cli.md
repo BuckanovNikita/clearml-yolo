@@ -28,3 +28,9 @@ or `prediction_data_overrides`. Raw source dataset images are never uploaded as 
 owner-only native training/validation previews remain permitted. `TrainResult` returns required
 `cleaned_ground_truth` and `dataset_reference` paths so pipeline consumers receive actual
 prepared outputs. No stage creates a second tracking task.
+
+YOLO-to-CSV conversion uses installed Ultralytics EXIF-aware image dimensions, including JPEG
+orientations 6 and 8, without changing source bytes. Source label coordinates must be finite and
+within the native normalized tolerance `[-0.01, 1.01]`; box sizes must also be positive. Invalid
+source labels fail with their file and line instead of producing silently dropped annotations.
+Boxes crossing an image edge within that domain retain clipping behavior.

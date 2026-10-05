@@ -64,3 +64,17 @@ entries. NDJSON preserves original filename casing; flat names remain numbered. 
 immutable and corrections require explicit cache invalidation while not in use.
 `cy-train` requires `ground_truth`; `ultralytics.data` is prepared from that CSV and cannot
 replace the command input.
+
+## Evaluation input and output safety
+
+Logical split names remain unchanged in manifests, evaluation payloads and result mapping keys.
+Every split-derived filename and artifact component uses UTF-8 percent encoding for unsafe
+characters, including path separators, percent signs and dots. Common train/val/test names retain
+their existing spelling. This keeps outputs beneath their destination and avoids collisions with
+literal encoded-looking split names.
+
+Evaluation accepts matching strategies `greedy`, `hungarian`, `iou_prior` and AP methods `interp`,
+`continuous`; unsupported values fail. IoU and false-discovery `q` must be finite probabilities
+in the inclusive interval `[0, 1]`. Reusable scoring/statistical boundaries apply the same checks.
+Baseline lookup requires every ordinary requested tag using the SDK all-tags operator, excludes
+the current task and matches the entire task name with grouped regex anchoring.

@@ -156,6 +156,7 @@ def test_missing_remote_named_configuration_fails_without_artifact_fallback(
     remote = FakeTask()
     remote.local = False
     monkeypatch.setattr(clearml.Task, "init", lambda **_kwargs: remote)
+    monkeypatch.setattr(clearml.Task, "get_task", lambda **_kwargs: remote)
     monkeypatch.delenv("LOCAL_RANK", raising=False)
     with (
         pytest.raises(FileNotFoundError, match="Remote task has no attached configuration"),

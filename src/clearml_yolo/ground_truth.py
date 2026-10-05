@@ -6,13 +6,14 @@ by image name. Dataset roots, split entries and label locations are resolved wit
 ultralytics' own helpers so a plain ``data=`` yaml behaves exactly as it does in training.
 """
 
+import math
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 from loguru import logger
 from PIL import Image
-from ultralytics.data.utils import IMG_FORMATS, check_det_dataset, img2label_paths
+from ultralytics.data.utils import IMG_FORMATS, check_det_dataset, exif_size, img2label_paths
 
 from clearml_yolo.filesystem import write_path
 from clearml_yolo.progress import track
@@ -29,6 +30,8 @@ GROUND_TRUTH_COLUMNS = [
 ]
 SPLITS = ("train", "val", "test")
 DETECTION_LABEL_FIELDS = 5
+NORMALIZED_MIN = -0.01
+NORMALIZED_MAX = 1.01
 
 GroundTruthRow = dict[str, str | float | None]
 YoloBox = tuple[str, float, float, float, float]
@@ -93,6 +96,14 @@ def _parse_label_file(label_path: Path, names: dict[int, str]) -> list[YoloBox]:
                 f"{label_path}:{number} has a non-positive box size ({box_width} x "
                 f"{box_height}); such a box has no top-left/bottom-right corner"
             )
+        coordinates = (center_x, center_y, box_width, box_height)
+        if any(
+            not math.isfinite(value) or not NORMALIZED_MIN <= value <= NORMALIZED_MAX
+            for value in coordinates
+        ):
+            raise ValueError(
+                f"{label_path}:{number} has nonfinite or out-of-bounds normalized coordinates"
+            )
         if class_index not in names:
             raise ValueError(
                 f"{label_path}:{number} references class {class_index}, but the dataset "
@@ -105,7 +116,7 @@ def _parse_label_file(label_path: Path, names: dict[int, str]) -> list[YoloBox]:
 def _image_size(image: Path) -> tuple[int, int]:
     try:
         with Image.open(image) as opened:
-            width, height = opened.size
+            width, height = exif_size(opened)
     except OSError as error:
         raise ValueError(f"Cannot read the pixel size of {image}") from error
     return int(width), int(height)
