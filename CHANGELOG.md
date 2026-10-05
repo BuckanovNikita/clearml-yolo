@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.14.4 (2026-10-05)
+
+### Bug Fixes
+
+- **metrics**: Warn and drop invalid prediction geometry
+  ([`6cab994`](https://github.com/BuckanovNikita/clearml-yolo/commit/6cab9943da31c0f16be4398df91812be0db6717b))
+
+
 ## v0.14.3 (2026-10-05)
 
 ### Bug Fixes

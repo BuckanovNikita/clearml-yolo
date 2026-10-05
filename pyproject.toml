@@ -1,6 +1,6 @@
 [project]
 name = "clearml-yolo"
-version = "0.14.3"
+version = "0.14.4"
 description = "Composable hydra-zen apps for YOLO training, inference, metrics and model comparison reports"
 readme = "README.md"
 authors = [
