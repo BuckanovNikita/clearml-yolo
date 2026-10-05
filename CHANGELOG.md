@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.15.0 (2026-10-05)
+
+### Features
+
+- Publish complete evaluation evidence and interactive plots
+  ([`0946121`](https://github.com/BuckanovNikita/clearml-yolo/commit/0946121fd91edecaf873df1a074f8146e46d0480))
+
+
 ## v0.14.4 (2026-10-05)
 
 ### Bug Fixes
