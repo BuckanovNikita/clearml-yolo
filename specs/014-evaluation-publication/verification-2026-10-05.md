@@ -103,3 +103,19 @@ and recorded native/persistence evidence; no additional defects were found. All 
 Markdown files parsed successfully, with 98 local links/anchors validated and no whitespace
 or conflict-marker errors. Release preparation follows the documented commit procedure;
 Git version tags are the only publication mechanism.
+
+## Release
+
+Feature commit `0946121` passed ordinary hooks, with real FiftyOne persistence enabled.
+Release commit `fd7f24a` created annotated tag `v0.15.0` after ordinary commit checks and
+the recovery workflow's full post-commit validation. The first automatic preparation
+encountered the documented offline editable-dependency resolution limitation while local
+source overrides were absent. Recovery changed only the root project version in the
+lockfile and retained the generated changelog; all dependency records and external
+revisions remained unchanged. Exact local source overrides were restored unstaged after
+each attempt. No hooks were bypassed.
+
+Both final 0.15.0 distributions passed installation, all nine command helps, configuration
+generation and overwrite protection. Their installed Python source files matched the
+accepted checkout byte-for-byte. Only Git commits and the version tag are published;
+no package, release asset or deployment is part of this release.

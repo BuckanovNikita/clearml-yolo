@@ -29,7 +29,7 @@
 - [x] T013 Run pytest, Ruff, mypy, import-linter and required hooks; record evidence.
 - [x] T014 Verify native CPU/GPU execution, download ClearML artifacts/model, inspect plots/metadata/telemetry and clean task-owned resources.
 - [x] T015 Obtain fresh independent read-only review after parent verification; fix findings and reverify.
-- [ ] T016 Apply applicable Git-tag-only release workflow after acceptance; preserve local sources.
+- [x] T016 Apply applicable Git-tag-only release workflow after acceptance; preserve local sources.
 
 ## Dependencies
 

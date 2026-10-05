@@ -1,7 +1,7 @@
 # Feature Specification: Evaluation publication
 
 **Created**: 2026-10-05
-**Status**: Implemented and independently accepted; release pending
+**Status**: Implemented, independently accepted and released as v0.15.0
 **Input**: Parallel implementation: artifacts, confusion matrices and PR curves.
 
 ## User scenarios and testing
