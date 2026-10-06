@@ -51,8 +51,8 @@ subject to successful commit hooks and truthful reporting of the blocked push.
 - Annotated v0.17.1 resolves to the release commit. Its diff contains only version
   metadata, the root lockfile version and the generated changelog; dependency
   resolution is unchanged.
-- The first successful atomic SSH push created remote main and v0.17.1. Remote
-  ref readback confirmed main and the peeled tag at the release commit.
+- The first successful atomic SSH push created remote main and v0.17.1. Git
+  acknowledged both refs; subsequent remote readback attempts timed out.
 - Local source overrides were restored unstaged. No release lock or recovery record
   remains. The temporary release adapter and task-owned help output were removed.
 - Publication contains Git commits and a version tag only; no package assets were

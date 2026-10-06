@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record local dependency release verification
+  ([`4f8b033`](https://github.com/BuckanovNikita/clearml-yolo/commit/4f8b033e8dabe59968448fc61c814ee0f999c0a9))
+
+
 ## v0.17.1 (2026-10-06)
 
 ### Bug Fixes
