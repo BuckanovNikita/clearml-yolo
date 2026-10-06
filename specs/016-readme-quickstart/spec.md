@@ -102,3 +102,6 @@ migration comparison, DDP/queue and the requested FiftyOne integration note.
 Show a concrete cy-config workflow: generate with cy-init-config, put native training
 and prediction parameters in their respective group files, fill cy inputs/tracking,
 then run `cy --config-dir cy-config --config-name cy`.
+Make that generated-YAML workflow the primary quickstart, replacing the long inline
+argument example. Keep CLI overrides secondary. The user explicitly requests committing
+the documentation and publishing the next minor Git release (0.17.0 from 0.16.0).

@@ -10,35 +10,76 @@
 
 ## Быстрый старт
 
-### 1. Укажите разметку
-
-В команде ниже замените `./ground_truth.csv` на путь к вашему CSV с разметкой.
-`cy` сам подготовит из него данные для обучения и оценки.
-
-В столбце `split` должны быть непустые выборки `train`, `val` и `test`.
-`cy` использует это разбиение без изменений. Проверьте, что изображения доступны
-по путям из CSV: относительные пути считаются от каталога CSV.
-Описание столбцов и координат — в [формате входных данных](specs/004-ground-truth-training/contracts/cli.md).
-
-### 2. Запустите `cy`
+### 1. Создайте конфигурацию
 
 ```bash
-cy \
-  ground_truth=./ground_truth.csv \
-  ultralytics.model=yolo11n.pt \
-  ultralytics.epochs=100 \
-  ultralytics.imgsz=640 \
-  ultralytics.batch=16 \
-  ultralytics.device=-1 \
-  ultralytics_predict.device=-1 \
-  clearml.project_name=detection \
-  clearml.task_name=yolo11n-first-run \
-  clearml.tags='[quickstart]'
+cy-init-config cy-config
 ```
 
-Замените модель и параметры обучения на свои. В обоих параметрах `device`
-оставьте `-1`: свободное устройство выберет очередь. Как запросить несколько
-устройств для DDP, описано в разделе [«DDP и очередь»](#ddp-и-очередь).
+Команда создаст каталог `cy-config` с примерами настроек.
+Если каталог уже есть, существующие примеры сохранятся.
+
+### 2. Укажите разметку и имя эксперимента
+
+В `cy-config/cy.yaml` заполните `ground_truth` и секцию `clearml`:
+
+```yaml
+ground_truth: ./ground_truth.csv
+clearml:
+  project_name: detection
+  task_name: yolo11n-first-run
+  tags: [quickstart]
+```
+
+Замените путь к CSV, проект, имя задачи и теги на свои. Редактируйте эти поля
+в созданном файле, сохраняя остальные настройки и список `defaults`.
+Относительный путь `ground_truth` считается от каталога запуска команды.
+
+В CSV должны быть непустые выборки `train`, `val` и `test` в столбце `split`.
+`cy` использует это разбиение без изменений и сам готовит данные для обучения.
+Пути к изображениям внутри CSV считаются от каталога CSV.
+Описание столбцов и координат — в [формате входных данных](specs/004-ground-truth-training/contracts/cli.md).
+
+### 3. Перенесите параметры Ultralytics
+
+Параметры обучения запишите в `cy-config/ultralytics/default.yaml`. Например:
+
+```yaml
+model: yolo11n.pt
+epochs: 100
+imgsz: 640
+batch: 16
+device: -1
+```
+
+Параметры предсказаний — в `cy-config/ultralytics_predict/default.yaml`:
+
+```yaml
+batch: 8
+conf: 0.001
+iou: 0.7
+device: -1
+```
+
+Измените эти поля в созданных файлах, сохраняя остальные настройки.
+Пишите ключи без обёрток `ultralytics:` и `ultralytics_predict:`.
+Поля `data`, `source`, `project` и `name` из Ultralytics переносить не нужно:
+ими управляет `cy`. В обоих файлах оставьте `device: -1`, чтобы очередь
+выбрала свободное устройство. Для распределённого обучения см. [DDP и очередь](#ddp-и-очередь).
+
+### 4. Запустите `cy`
+
+```bash
+cy --config-dir cy-config --config-name cy
+```
+
+Для разового изменения параметра добавьте его к команде:
+
+```bash
+cy --config-dir cy-config --config-name cy ultralytics.epochs=50
+```
+
+Подробнее о YAML — в [описании конфигурации](specs/005-explicit-detection-config/contracts/native-configuration.md).
 
 ```mermaid
 flowchart TD
@@ -70,7 +111,7 @@ flowchart TD
 Чтобы выбрать модель сами, добавьте `compare.baseline_model.task_id=ID_ЗАДАЧИ`.
 Если указанную модель не удастся загрузить, команда завершится с ошибкой.
 
-### 3. Откройте результаты
+### 5. Откройте результаты
 
 В ClearML откройте проект `detection` и задачу `yolo11n-first-run`.
 Все результаты `cy` собраны в одной задаче.
@@ -108,7 +149,9 @@ flowchart TD
 ### Как перенести параметры
 
 Пишите параметры в формате `ключ=значение` — их читает Hydra.
-Для обучения используйте префикс `ultralytics.`, для предсказаний — `ultralytics_predict.`.
+Для разовых изменений в команде используйте префикс `ultralytics.` для обучения
+и `ultralytics_predict.` для предсказаний. В соответствующих YAML-файлах пишите
+те же ключи без префиксов, как в быстром старте.
 
 | В Ultralytics | В `cy` | Примечание |
 |---|---|---|
@@ -131,56 +174,10 @@ flowchart TD
   не управляют составом обучающего набора.
 - `resume` не поддерживается. Для нового обучения из готовых весов укажите
   `ultralytics.model=/path/to/best.pt`.
-- Вместо параметра Ultralytics `cfg` используйте YAML-конфигурацию из следующего раздела.
+- Вместо параметра Ultralytics `cfg` используйте файлы в `cy-config`, как в быстром старте.
 
 Чтобы сравнить результат с прежним запуском, проверьте версии библиотек,
 состав выборок и настройки обучения и предсказаний.
-
-## Конфигурация в YAML
-
-Создайте примеры в каталоге `cy-config`:
-
-```bash
-cy-init-config cy-config
-```
-
-В `cy-config/cy.yaml` укажите путь `ground_truth` к CSV с разметкой, а в секции
-`clearml` — проект, имя задачи и теги. Заполните остальные обязательные поля `???`, если они есть.
-
-Скопируйте параметры обучения из вашей конфигурации Ultralytics в
-`cy-config/ultralytics/default.yaml`. Например, задайте там:
-
-```yaml
-model: yolo11n.pt
-epochs: 100
-imgsz: 640
-batch: 16
-device: -1
-```
-
-Параметры предсказаний перенесите в `cy-config/ultralytics_predict/default.yaml`:
-
-```yaml
-batch: 8
-conf: 0.001
-iou: 0.7
-device: -1
-```
-
-Редактируйте эти поля в созданных файлах, сохраняя остальные настройки.
-Пишите ключи без обёрток `ultralytics:` и `ultralytics_predict:`.
-Поля `data`, `source`, `project` и `name` из Ultralytics переносить не нужно:
-ими управляет `cy`. Для DDP задайте `device: [-1, -1]` в файле обучения.
-
-Запустите команду с этой конфигурацией:
-
-```bash
-cy --config-dir cy-config --config-name cy
-```
-
-Параметры командной строки можно добавлять к этому запуску, например
-`ultralytics.epochs=50`. `cy-init-config` не перезаписывает существующие примеры.
-Подробнее — в [описании конфигурации](specs/005-explicit-detection-config/contracts/native-configuration.md).
 
 ## Остальные команды
 
@@ -205,11 +202,11 @@ cy --config-dir cy-config --config-name cy
 В параметрах `device` используйте `-1`, чтобы очередь выбрала свободное устройство.
 Номера физических устройств указывать не нужно.
 
-Для распределённого обучения (DDP) замените в основной команде
-`ultralytics.device=-1` на `ultralytics.device='[-1,-1]'`.
-Два значения `-1` запрашивают два устройства. DDP запускает сам Ultralytics;
-отдельный вызов `torchrun` не нужен. Для предсказаний оставьте
-`ultralytics_predict.device=-1` — им достаточно одного устройства.
+Для распределённого обучения (DDP) в `cy-config/ultralytics/default.yaml`
+замените `device: -1` на `device: [-1, -1]`. Два значения `-1` запрашивают
+два устройства. DDP запускает сам Ultralytics; отдельный вызов `torchrun` не нужен.
+В `cy-config/ultralytics_predict/default.yaml` оставьте `device: -1` —
+для предсказаний достаточно одного устройства.
 
 Очередь общая для запусков одного пользователя в пределах одной ОС.
 Запросы получают устройства в порядке поступления. DDP ждёт, пока освободятся

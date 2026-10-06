@@ -143,3 +143,33 @@ Markdown files and 19 local links/anchors passed, along with Bash/YAML syntax an
 `git diff --check`; no inbound links retain the removed installation anchor. No live
 training, ClearML or visualization execution was performed. Temporary outputs are
 removed after checks.
+
+## Follow-up: primary YAML workflow and explicit minor release
+
+Promoted cy-config generation, main input/tracking YAML, native training/prediction
+YAML and `cy --config-dir cy-config --config-name cy` into the primary numbered
+quickstart. Removed the competing inline-argument workflow and duplicate later YAML
+section. CLI overrides are secondary; DDP instructions now edit the training YAML.
+
+Generated the actual config tree in a temporary directory and applied all three README
+YAML snippets while retaining generated defaults. Primary launch, the epochs override
+and YAML DDP composition all passed with `--cfg job --resolve`. Assertions covered
+model, epochs 100/50, batches 16/8, inherited imgsz 640, explicit tracking/CSV input,
+automatic devices and two-device DDP demand. Four changed Markdown files and nine
+local links/anchors passed, along with Bash/YAML syntax and `git diff --check`.
+The diagram was not modified. No native training or service publication was performed.
+
+The user explicitly requested the next minor Git release, 0.17.0. Installed PSR's
+read-only `--minor --print` check confirmed that target. A temporary process adapter
+will supply `--minor` to the existing release helper, retaining its normal lock,
+recovery state, dependency validation, commit checks and annotated-tag verification.
+Tracked release tooling is unchanged. Fresh independent README review returned **ship**.
+
+Read-only release investigation found that resolving without local sources would
+search for digital-metrics in the registry. A real offline lock refresh in a temporary
+project with the exact saved sources succeeded; parsed comparison confirmed only the
+root version changes from 0.16.0 to 0.17.0. The release adapter will use this temporary
+snapshot for the helper's lock operation, validate it before copy-back, and preserve
+the sources-free repository metadata. UV_NO_SYNC=1 will make hook commands use the
+installed environment without dependency resolution; every quality hook still runs.
+Release results will be recorded after the checked tag is created.

@@ -54,3 +54,11 @@ T014 follows T013 and T015. Existing weights and frozen thresholds remain unchan
 
 - [x] T016 Remove general setup material from README.md, show direct cy commands, renumber steps, repair setup references in docs/development.md and the 001 quickstart, and validate documentation with independent review.
 - [x] T017 Add and verify README.md's cy-config generation, native-parameter YAML examples and exact cy launch command; include the result in final independent review.
+
+## Phase 8 — Primary YAML workflow and requested minor release
+
+- [x] T018 [US1] Promote generated YAML setup/launch in README.md, remove the competing inline workflow and align DDP guidance.
+- [x] T019 Validate README.md snippets, overrides, DDP composition, Markdown and links; record independent review in specs/016-readme-quickstart/verification-2026-10-06.md.
+- [ ] T020 Commit the accepted documentation and publish minor Git release 0.17.0 using repository release gates, without changing dependency revisions or publishing package assets.
+
+T019 follows T018; T020 follows accepted review and required release checks.

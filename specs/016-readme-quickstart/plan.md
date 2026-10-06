@@ -70,3 +70,8 @@ installation-anchor reference. Check direct command composition without executio
 Expand the YAML usage section with cy-config generation, native-key training/prediction
 examples and the exact requested launch command. Validate exported-and-edited YAML
 composition in a task-owned temporary directory without starting a ClearML task.
+Promote YAML generation/editing/launch to the primary numbered quickstart, with one
+secondary override example. Update DDP guidance to edit the native YAML files. Verify
+the exact snippets, generated defaults, ordinary/override/DDP composition and docs.
+After independent review, commit and create the explicitly requested minor Git release
+through existing release checks, preserving dependencies and local source overrides.
