@@ -1,7 +1,7 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.18.0 (2026-10-06)
 
 ### Documentation
 
@@ -10,6 +10,11 @@
 
 - Record local dependency release verification
   ([`4f8b033`](https://github.com/BuckanovNikita/clearml-yolo/commit/4f8b033e8dabe59968448fc61c814ee0f999c0a9))
+
+### Features
+
+- Add safe reflink image cache deduplication command
+  ([`d9d6fcd`](https://github.com/BuckanovNikita/clearml-yolo/commit/d9d6fcdf2d1f2a8ea986cf72e6dc2aa70d483497))
 
 
 ## v0.17.1 (2026-10-06)
