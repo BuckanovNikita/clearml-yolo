@@ -1,7 +1,7 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.17.0 (2026-10-06)
 
 ### Documentation
 
@@ -13,6 +13,9 @@
 
 - Focus README on cy quickstart and Ultralytics migration
   ([`952ba62`](https://github.com/BuckanovNikita/clearml-yolo/commit/952ba62686900582f9ea71f9afd49cdb71f5253e))
+
+- Make generated YAML the primary cy workflow
+  ([`fef18ba`](https://github.com/BuckanovNikita/clearml-yolo/commit/fef18bad78b739949befea9297048c6d59c3f361))
 
 - Record native FiftyOne evaluation release acceptance
   ([`ae1455c`](https://github.com/BuckanovNikita/clearml-yolo/commit/ae1455cc6d90d7f5eef5793181207593f6a2bb72))
