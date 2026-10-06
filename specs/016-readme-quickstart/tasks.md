@@ -41,3 +41,11 @@ covered by T003 through T007; no application tests or new runtime contracts are 
 
 T008, T009 and T012 share README ownership and precede T010; T011 follows parent validation.
 The follow-up requirements are fully covered without changing the runtime contract.
+
+## Phase 6 — Baseline inference clarification
+
+- [x] T013 [US2] Explain fresh baseline inference and metrics on the current ground_truth test split in README.md.
+- [x] T015 [US2] Describe FiftyOne visual inspection and shared metrics in README.md without enable/disable controls.
+- [x] T014 Validate the documentation against comparison code, check Markdown/links and obtain independent review; append evidence to specs/016-readme-quickstart/verification-2026-10-06.md.
+
+T014 follows T013 and T015. Existing weights and frozen thresholds remain unchanged.

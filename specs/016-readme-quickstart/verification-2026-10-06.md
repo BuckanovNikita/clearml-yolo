@@ -99,3 +99,22 @@ Follow-up checks:
   findings. It confirmed natural Russian phrasing, CSV-first onboarding, automatic
   device examples, queue semantics and frozen-lock setup. No live DDP, queue,
   training or ClearML execution is claimed by these documentation checks.
+
+## Follow-up: baseline re-inference and FiftyOne note
+
+Added an explicit README explanation and comparison-table entry for re-running the
+old model on the current ground-truth test data, recomputing metrics and retaining
+saved weights/frozen thresholds. Replaced FiftyOne on/off guidance with a short
+description of image, annotation, prediction and error inspection using the shared
+digital-metrics results. The existing viewing-guide link remains.
+
+Checked the prose against tasks/compare.py, comparison/reinfer.py and the maintained
+FiftyOne publication/evaluation guidance. Markdown parsing, existing link/anchor
+resolution, fence/whitespace checks and `git diff --check` passed. Commands and the
+diagram are unchanged, so configuration, rendering and native execution checks were
+not repeated. Initial independent review identified two overstatements: inference
+can reuse a cache on same-directory retries, and FiftyOne subset reports differ from
+full-split reports. README now scopes re-inference to new experiments, documents
+same-input/settings reuse with recomputed metrics, and qualifies parity to full splits.
+A fresh final independent review returned **ship**, confirming the corrected baseline
+inference/cache wording and full-split FiftyOne parity, with no remaining findings.

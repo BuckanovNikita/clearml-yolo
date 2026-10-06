@@ -55,3 +55,9 @@ No application code or maintained runtime contract changes are needed.
 Remove the README source-overrides block per subsequent user steering. Use frozen
 lockfile installation/execution, check it against clean committed metadata in a
 temporary checkout layout, and reconcile installation references in development/001.
+
+Clarify repeated baseline inference in the README comparison paragraph and table;
+verify against comparison execution and recovery contracts. Validate documentation
+and obtain a bounded independent review; no runtime change is needed.
+Also replace the FiftyOne enable/disable guidance with a concise capability note,
+retaining the link to the dedicated viewing guide.

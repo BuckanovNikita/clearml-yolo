@@ -84,3 +84,10 @@ Acceptance: the quickstart starts with CSV, has no conversion prerequisite, and 
 automatic device requests. DDP and queue behavior matches current implementation.
 The user also requested removal of the local source configuration block from README.
 Installation and execution must use the committed lock without requiring that edit.
+
+Further clarification: explicitly explain that each comparison reruns the old model
+on the current ground-truth test split and recomputes its metrics, rather than using
+historical predictions or scores. Preserve the distinction from retraining or threshold
+recalibration: saved weights and frozen thresholds remain in use.
+Add a concise FiftyOne integration note describing visual inspection and shared
+evaluation results; omit enabled/disabled controls from README.
