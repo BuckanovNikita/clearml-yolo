@@ -173,3 +173,20 @@ snapshot for the helper's lock operation, validate it before copy-back, and pres
 the sources-free repository metadata. UV_NO_SYNC=1 will make hook commands use the
 installed environment without dependency resolution; every quality hook still runs.
 Release results will be recorded after the checked tag is created.
+
+### Release result
+
+- Documentation commit: `fef18ba` (`docs: make generated YAML the primary cy workflow`).
+- Release commit: `ff5af62` (`chore(release): 0.17.0`); annotated `v0.17.0` points to it.
+- The normal release commit completed its required hooks successfully, including
+  Ruff, mypy, import-linter and pytest. No hook skip setting was present. A separate
+  duplicate application-suite run was not performed.
+- Release diff contains only pyproject.toml, uv.lock and generated CHANGELOG.md.
+  Parsed lock comparison confirmed all dependency/source data unchanged; only the
+  root project version increased. Exact local source overrides were restored unstaged.
+- No recovery record or release lock remains. No builds or package assets were published.
+- Atomic push of master and v0.17.0 succeeded through authenticated HTTPS after an
+  SSH connection timeout. The configured SSH remote was not changed.
+
+This documentation release does not claim new native training, DDP, queue or ClearML
+acceptance results. The functional scope is unchanged.
