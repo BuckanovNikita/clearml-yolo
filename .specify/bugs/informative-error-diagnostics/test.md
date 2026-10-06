@@ -27,8 +27,8 @@ Seven changed Markdown files and 18 local links passed structural/link/whitespac
 
 ## Residual risks
 
-The user's original backend failure remains unidentified. A first GPU invocation encountered an intermittent SDK model readback failure; no SDK/service changes were made and the fresh retry completed. Physical multi-GPU and interactive App/browser behavior were not exercised. Default pytest skips opt-in integration tests; the native FiftyOne subset was separately run against the test database. Early distribution checks used version 0.17.1 artifacts; final release packaging must be refreshed after the checked version commit.
+The user's original backend failure remains unidentified. A first GPU invocation encountered an intermittent SDK model readback failure; no SDK/service changes were made and the fresh retry completed. Physical multi-GPU and interactive App/browser behavior were not exercised. Default pytest skips opt-in integration tests; the native FiftyOne subset was separately run against the test database. Early distribution checks used version 0.17.1 artifacts; final 0.18.1 artifacts were subsequently rebuilt and verified against the checked release source.
 
 ## Recommendation
 
-The loss of useful diagnostic messages is resolved. Release publication still requires final independent review, documentation validation, normal commit/release hooks and final-version packaging/readback verification.
+The loss of useful diagnostic messages is resolved. Final independent review, documentation validation, normal commit/release hooks, final-version packaging and remote publication/readback are recorded in the [release evidence](../../../docs/evidence/2026-10-06-error-diagnostics-release.md).
