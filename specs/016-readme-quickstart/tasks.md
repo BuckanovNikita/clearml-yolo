@@ -30,3 +30,14 @@ follow the rewrite; T007 follows parent validation. A read-only investigation ru
 parallel with parent artifact preparation; agents own no writes. Deliver US1 first,
 then US2, then validate the combined documentation. All FR-001 through FR-006 are
 covered by T003 through T007; no application tests or new runtime contracts are needed.
+
+## Phase 5 — User follow-up and documentation validation
+
+- [x] T008 [US1] Make README.md start with existing ground_truth CSV; remove conversion from quickstart and diagram.
+- [x] T009 [US2] Edit Russian prose in README.md and replace hardware/manual device advice with DDP, queue and automatic -1 examples.
+- [x] T012 [US1] Remove the source-overrides block from README.md; validate frozen-lock setup and reconcile docs/development.md and specs/001-release-030/quickstart.md.
+- [x] T010 Validate changed Markdown, links, diagram and single-device/DDP configurations; append evidence to specs/016-readme-quickstart/verification-2026-10-06.md.
+- [x] T011 Obtain independent read-only review and record acceptance in specs/016-readme-quickstart/verification-2026-10-06.md.
+
+T008, T009 and T012 share README ownership and precede T010; T011 follows parent validation.
+The follow-up requirements are fully covered without changing the runtime contract.

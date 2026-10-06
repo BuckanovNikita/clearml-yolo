@@ -61,3 +61,41 @@ a fresh-machine dependency installation, data availability, training, GPU execut
 FiftyOne publication or ClearML uploads. No application test suite or live pipeline
 was required for this documentation-only change. Temporary tools and configuration
 outputs are task-owned and will be removed after verification.
+
+## Follow-up: CSV-first onboarding, Russian prose and automatic devices
+
+The user corrected the first revision: onboarding must accept an existing CSV through
+`ground_truth`, without requiring YOLO YAML conversion. README and its diagram now
+start from CSV/images; the converter is listed only as an optional auxiliary command.
+The comparison table still identifies native Ultralytics `data=data.yaml` as the old
+interface, not a wrapper prerequisite. Russian prose now uses direct instructions,
+familiar terms and fewer formal/redundant phrases.
+
+Further user steering removed hardware/GPU setup and manual-index advice. Wrapper
+examples use `-1`; native DDP requests use `[-1,-1]`. The queue section explains FIFO,
+atomic admission, delayed ClearML task creation and releasing all but one device after
+training. It does not claim that the runtime rejects physical-index syntax.
+
+The requested source-overrides block was removed from README. Installation now uses
+`uv sync --frozen` and examples use `uv run --frozen`, retaining the committed lockfile
+without requiring a pyproject edit. Related development/001 setup references were
+reconciled. The user's pre-existing local source overrides remain untouched.
+
+Follow-up checks:
+
+- In a task-owned temporary layout, committed pyproject.toml (without sources), the
+  unchanged lockfile and pinned dependency paths passed `uv sync --frozen --dry-run`.
+  This checks install planning; packages were not installed or downloaded by sync.
+- Six changed Markdown files parsed; 21 local links/anchors and Bash block syntax
+  passed. README assertions verify CSV-first onboarding, no source block and no
+  hardware/physical-index examples.
+- The main command and DDP variant resolved with `uv run --frozen --no-sync cy ...
+  --cfg job --resolve`. Scheduler demand and normalization verified one and two
+  automatic device requests respectively; inference remained `-1` in both cases.
+- Mermaid parsed and rendered all nine nodes in Chromium, with CSV as the starting
+  input. markdownlint reported zero issues with the same formatting exclusions as
+  above; `git diff --check` passed.
+- Final independent editorial/technical review returned **ship**, with no blocking
+  findings. It confirmed natural Russian phrasing, CSV-first onboarding, automatic
+  device examples, queue semantics and frozen-lock setup. No live DDP, queue,
+  training or ClearML execution is claimed by these documentation checks.

@@ -42,3 +42,16 @@ Use the approved plan without reopening design decisions. Spec Kit specify, plan
 tasks, analysis and implementation are proportionate documentation stages; hooks are
 empty. Do not run helpers that mutate installed .specify state. Execute tasks in order;
 investigation can run alongside artifact preparation, final review follows validation.
+
+## Follow-up plan — 2026-10-06
+
+Revise README.md for the user's CSV-first clarification and friendlier Russian wording.
+Remove conversion from onboarding and the diagram. Replace GPU setup/device-index
+guidance with automatic `-1` requests, repeated entries for native DDP and queue behavior.
+Update this feature's existing specification/tasks and append dated validation evidence;
+preserve prior completed history. Validate Markdown/links, changed diagram and actual
+single-device/DDP configuration composition, then obtain an independent read-only review.
+No application code or maintained runtime contract changes are needed.
+Remove the README source-overrides block per subsequent user steering. Use frozen
+lockfile installation/execution, check it against clean committed metadata in a
+temporary checkout layout, and reconcile installation references in development/001.

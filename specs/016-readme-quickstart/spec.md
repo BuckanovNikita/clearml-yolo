@@ -67,3 +67,20 @@ dependency overrides, unavailable ClearML storage, and differing native defaults
 Readers know YOLO detection datasets and have access to a ClearML server and storage.
 README remains Russian; workflow evidence remains English. No application changes,
 dependency updates or real training are required for this documentation change.
+
+## Follow-up clarification — 2026-10-06
+
+The user corrected the onboarding path: assume an existing ground-truth CSV, passed
+directly through `ground_truth`. Remove YOLO YAML conversion from the quickstart and
+diagram; retain the converter only as an optional auxiliary command. This supersedes
+the conversion-first language above without changing runtime input contracts.
+
+Make the Russian prose natural and friendly while preserving technical accuracy.
+Replace general GPU/hardware and manual device selection guidance with DDP and queue
+instructions. All wrapper device examples must use `-1`; show repeated `-1` entries
+for DDP. This is documentation guidance, not a new runtime validation restriction.
+
+Acceptance: the quickstart starts with CSV, has no conversion prerequisite, and uses
+automatic device requests. DDP and queue behavior matches current implementation.
+The user also requested removal of the local source configuration block from README.
+Installation and execution must use the committed lock without requiring that edit.

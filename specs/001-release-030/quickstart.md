@@ -1,8 +1,8 @@
 # Release validation guide
 
-Use Python/toolchain from pyproject.toml. Initialize the pinned submodules and add
-local source overrides using the [installation instructions](../../README.md#установка).
-Then run `uv sync --locked --group dev` and `uv run cy --help`. Both external
+Use Python/toolchain from pyproject.toml. Initialize the pinned submodules using
+the [installation instructions](../../README.md#установка).
+Then run `uv sync --frozen --group dev` and `uv run --frozen cy --help`. Both external
 dependencies are installed editable from `external/`.
 See [CLI](contracts/cli.md) and [artifacts](contracts/artifacts.md) for exact contracts.
 
