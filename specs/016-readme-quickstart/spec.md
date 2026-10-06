@@ -91,3 +91,14 @@ historical predictions or scores. Preserve the distinction from retraining or th
 recalibration: saved weights and frozen thresholds remain in use.
 Add a concise FiftyOne integration note describing visual inspection and shared
 evaluation results; omit enabled/disabled controls from README.
+Remove the clone/submodule checkout and `cd` block from README installation, as
+explicitly requested. The remaining instructions assume an available project checkout.
+Remove the ClearML initialization step as well; keep ClearML access as a prerequisite.
+Final steering supersedes these partial removals: assume all setup is complete.
+README must focus on cy use, with no installation, environment prerequisites,
+ClearML initialization, general setup troubleshooting or contributor navigation.
+Show the installed cy commands directly; retain cy inputs/configuration/results,
+migration comparison, DDP/queue and the requested FiftyOne integration note.
+Show a concrete cy-config workflow: generate with cy-init-config, put native training
+and prediction parameters in their respective group files, fill cy inputs/tracking,
+then run `cy --config-dir cy-config --config-name cy`.

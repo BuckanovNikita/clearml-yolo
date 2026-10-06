@@ -118,3 +118,28 @@ full-split reports. README now scopes re-inference to new experiments, documents
 same-input/settings reuse with recomputed metrics, and qualifies parity to full splits.
 A fresh final independent review returned **ship**, confirming the corrected baseline
 inference/cache wording and full-split FiftyOne parity, with no remaining findings.
+
+## Follow-up: assume setup is complete
+
+The user progressively removed clone instructions, ClearML initialization, then all
+general setup material. README now begins directly with data input and installed cy
+commands. Removed installation/environment prerequisites, setup troubleshooting and
+contributor navigation; retained cy-specific parameters/results, migration, DDP/queue
+and FiftyOne guidance. Updated development/001 references to avoid the removed README
+installation anchor. Early bounded removal reviews passed; a fresh final review of
+the combined change returned **ship** with no findings. No runtime behavior or
+dependency revisions changed.
+
+The final user addition provides `cy-init-config cy-config`, native training and
+prediction snippets for the respective generated group files, main input/tracking
+instructions and `cy --config-dir cy-config --config-name cy`.
+
+Validation generated cy-config in a task-owned temporary directory, applied the exact
+documented YAML snippets while preserving other settings, filled the CSV/tracking
+fields, then composed the exact launch command with `--cfg job --resolve`. Confirmed
+model, epochs, independent batches 16/8, inherited image size 640, prediction confidence
+0.001 and automatic devices -1. The direct main cy command also resolved. Eight changed
+Markdown files and 19 local links/anchors passed, along with Bash/YAML syntax and
+`git diff --check`; no inbound links retain the removed installation anchor. No live
+training, ClearML or visualization execution was performed. Temporary outputs are
+removed after checks.

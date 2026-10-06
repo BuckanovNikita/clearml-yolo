@@ -32,9 +32,8 @@ advances their checkouts when an upstream update is requested.
 Initialize them with `git submodule update --init --recursive` before `uv sync`.
 Local development installs them editable through uncommitted `[tool.uv.sources]`
 overrides, restored after each commit by the [commit procedure](#commit-procedure).
-The parent repository's gitlinks pin their revisions. The
-[README installation steps](../README.md#установка) use `uv sync --frozen` and
-`uv run --frozen` with the committed lockfile, without requiring source overrides.
+The parent repository's gitlinks pin their revisions. For setup without source
+overrides, use `uv sync --frozen` and `uv run --frozen` with the committed lockfile.
 Local development overrides are shown in the [commit procedure](#commit-procedure).
 Do not replace pinned submodules with moving Git branches as part of ordinary setup.
 

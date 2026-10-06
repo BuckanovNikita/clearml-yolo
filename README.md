@@ -10,39 +10,7 @@
 
 ## Быстрый старт
 
-Для запуска нужны `uv`, Python 3.12, CSV с разметкой, изображения и доступ к ClearML.
-
-### Установка
-
-Клонируйте проект вместе с закреплёнными версиями зависимостей:
-
-```bash
-git clone --recurse-submodules https://github.com/BuckanovNikita/clearml-yolo.git
-cd clearml-yolo
-```
-
-Теперь установите зависимости в версиях из `uv.lock`:
-
-```bash
-uv sync --frozen
-```
-
-Все команды ниже выполняйте из каталога проекта. Флаг `--frozen` сохраняет
-версии зависимостей из `uv.lock`.
-
-### 1. Настройте ClearML
-
-Если ClearML ещё не настроен, запустите:
-
-```bash
-uv run --frozen clearml-init
-```
-
-Введите адреса сервера и учётные данные из вашего ClearML. Для работы `cy`
-нужен доступ к API и хранилищу файлов. Сохраните ключи через `clearml-init`;
-в YAML проекта их добавлять не нужно.
-
-### 2. Укажите разметку
+### 1. Укажите разметку
 
 В команде ниже замените `./ground_truth.csv` на путь к вашему CSV с разметкой.
 `cy` сам подготовит из него данные для обучения и оценки.
@@ -52,10 +20,10 @@ uv run --frozen clearml-init
 по путям из CSV: относительные пути считаются от каталога CSV.
 Описание столбцов и координат — в [формате входных данных](specs/004-ground-truth-training/contracts/cli.md).
 
-### 3. Запустите `cy`
+### 2. Запустите `cy`
 
 ```bash
-uv run --frozen cy \
+cy \
   ground_truth=./ground_truth.csv \
   ultralytics.model=yolo11n.pt \
   ultralytics.epochs=100 \
@@ -102,7 +70,7 @@ flowchart TD
 Чтобы выбрать модель сами, добавьте `compare.baseline_model.task_id=ID_ЗАДАЧИ`.
 Если указанную модель не удастся загрузить, команда завершится с ошибкой.
 
-### 4. Откройте результаты
+### 3. Откройте результаты
 
 В ClearML откройте проект `detection` и задачу `yolo11n-first-run`.
 Все результаты `cy` собраны в одной задаче.
@@ -170,24 +138,48 @@ flowchart TD
 
 ## Конфигурация в YAML
 
-Создайте редактируемые примеры:
+Создайте примеры в каталоге `cy-config`:
 
 ```bash
-uv run --frozen cy-init-config ./conf
+cy-init-config cy-config
 ```
 
-Измените `conf/cy.yaml`, `conf/ultralytics/default.yaml` и при необходимости
-`conf/ultralytics_predict/default.yaml`. Заполните обязательные поля `???`, задайте
-проект и теги ClearML. В обеих группах `ultralytics` и `ultralytics_predict`
-задайте `device: -1`. Для DDP в обучающей группе укажите `device: [-1, -1]`.
-Затем запустите:
+В `cy-config/cy.yaml` укажите путь `ground_truth` к CSV с разметкой, а в секции
+`clearml` — проект, имя задачи и теги. Заполните остальные обязательные поля `???`, если они есть.
+
+Скопируйте параметры обучения из вашей конфигурации Ultralytics в
+`cy-config/ultralytics/default.yaml`. Например, задайте там:
+
+```yaml
+model: yolo11n.pt
+epochs: 100
+imgsz: 640
+batch: 16
+device: -1
+```
+
+Параметры предсказаний перенесите в `cy-config/ultralytics_predict/default.yaml`:
+
+```yaml
+batch: 8
+conf: 0.001
+iou: 0.7
+device: -1
+```
+
+Редактируйте эти поля в созданных файлах, сохраняя остальные настройки.
+Пишите ключи без обёрток `ultralytics:` и `ultralytics_predict:`.
+Поля `data`, `source`, `project` и `name` из Ultralytics переносить не нужно:
+ими управляет `cy`. Для DDP задайте `device: [-1, -1]` в файле обучения.
+
+Запустите команду с этой конфигурацией:
 
 ```bash
-uv run --frozen cy --config-dir=./conf --config-name=cy
+cy --config-dir cy-config --config-name cy
 ```
 
-`cy-init-config` работает без ClearML и не перезаписывает существующие примеры.
-Параметры командной строки можно добавлять к запуску с YAML.
+Параметры командной строки можно добавлять к этому запуску, например
+`ultralytics.epochs=50`. `cy-init-config` не перезаписывает существующие примеры.
 Подробнее — в [описании конфигурации](specs/005-explicit-detection-config/contracts/native-configuration.md).
 
 ## Остальные команды
@@ -247,11 +239,9 @@ uv run --frozen cy --config-dir=./conf --config-name=cy
 
 | Проблема | Что проверить |
 |---|---|
-| Нет доступа к ClearML или не загружаются файлы | Учётные данные, адреса API и доступ к хранилищу артефактов |
 | Не найдены изображения или выборка | Пути в CSV и наличие непустых `train`, `val`, `test` |
 | Ошибка конфигурации | Имя параметра и его группу; создайте актуальные примеры через `cy-init-config` в новом каталоге |
 | Запуск ждёт в очереди | Наличие свободных устройств и порядок запросов в очереди |
 | Нет отчётов по сравнению | Наличие завершённой базовой задачи с тегом `prod` в выбранном проекте |
 
 Полный список тем — в [документации проекта](docs/current-contracts.md).
-Проверки кода и работа с Git описаны в [руководстве разработчика](docs/development.md).

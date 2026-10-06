@@ -61,3 +61,12 @@ verify against comparison execution and recovery contracts. Validate documentati
 and obtain a bounded independent review; no runtime change is needed.
 Also replace the FiftyOne enable/disable guidance with a concise capability note,
 retaining the link to the dedicated viewing guide.
+Remove clone/checkout instructions from README; redirect the 001 validation guide's
+submodule setup link to existing development guidance. Check the resulting prose/links.
+Remove the subsequently selected clearml-init step and renumber the remaining steps.
+Apply final scope: remove all general setup material from README, use direct installed
+cy entrypoints, retain usage-specific guidance, and fix the development guide's removed
+installation-anchor reference. Check direct command composition without execution.
+Expand the YAML usage section with cy-config generation, native-key training/prediction
+examples and the exact requested launch command. Validate exported-and-edited YAML
+composition in a task-owned temporary directory without starting a ClearML task.

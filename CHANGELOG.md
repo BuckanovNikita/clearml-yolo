@@ -5,6 +5,9 @@
 
 ### Documentation
 
+- Clarify baseline re-inference and FiftyOne inspection
+  ([`1ee21e9`](https://github.com/BuckanovNikita/clearml-yolo/commit/1ee21e98b230d8ad281dd7a680776ab11d2bf525))
+
 - Focus README on cy quickstart and Ultralytics migration
   ([`952ba62`](https://github.com/BuckanovNikita/clearml-yolo/commit/952ba62686900582f9ea71f9afd49cdb71f5253e))
 

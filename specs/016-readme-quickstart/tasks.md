@@ -49,3 +49,8 @@ The follow-up requirements are fully covered without changing the runtime contra
 - [x] T014 Validate the documentation against comparison code, check Markdown/links and obtain independent review; append evidence to specs/016-readme-quickstart/verification-2026-10-06.md.
 
 T014 follows T013 and T015. Existing weights and frozen thresholds remain unchanged.
+
+## Phase 7 — Installation excerpt removal
+
+- [x] T016 Remove general setup material from README.md, show direct cy commands, renumber steps, repair setup references in docs/development.md and the 001 quickstart, and validate documentation with independent review.
+- [x] T017 Add and verify README.md's cy-config generation, native-parameter YAML examples and exact cy launch command; include the result in final independent review.
