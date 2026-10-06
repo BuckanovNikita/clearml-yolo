@@ -12,5 +12,5 @@
   and quickstarts; preserve historical evidence and README scope (FR-003; after T002).
 - [x] T004 Verify contents/imports, Markdown/links and repository checks; obtain
   independent review and record evidence (FR-002, FR-003; after T003).
-- [ ] T005 Commit through hooks, release 0.17.1 and push main plus the Git tag;
+- [x] T005 Commit through hooks, release 0.17.1 and push main plus the Git tag;
   restore local overrides (FR-004; after T004).
