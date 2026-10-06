@@ -432,3 +432,22 @@ print('lightweight import')
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == "lightweight import"
+
+
+def test_visibility_probe_failure_reports_exit_and_redacts_subprocess_stderr(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from clearml_yolo.gpu_resources import _probe_visible_uuids
+
+    def failed_probe(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            ["probe"],
+            7,
+            stdout="",
+            stderr="CUDA unavailable token=private-probe-token",
+        )
+
+    monkeypatch.setattr(subprocess, "run", failed_probe)
+    with pytest.raises(RuntimeError, match=r"exit 7.*CUDA unavailable") as caught:
+        _probe_visible_uuids()
+    assert "private-probe-token" not in str(caught.value)

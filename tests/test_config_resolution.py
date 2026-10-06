@@ -462,3 +462,30 @@ def test_dynamic_node_references_fail_before_publication(reference: str) -> None
             )
     finally:
         OmegaConf.clear_resolver("config_upload_dynamic_secret")
+
+
+@pytest.mark.parametrize("function_name", ["resolve_config_document", "resolve_config_file"])
+def test_resolution_failure_reports_type_without_private_payload(
+    monkeypatch: pytest.MonkeyPatch,
+    function_name: str,
+) -> None:
+    from loguru import logger
+
+    from clearml_yolo.apps import config_resolution
+
+    def failed_resolution(*args: Any, **kwargs: Any) -> Any:
+        raise ValueError("opaque-private-resolver-input")
+
+    monkeypatch.setattr(config_resolution, "_resolve_file", failed_resolution)
+    messages: list[str] = []
+    sink = logger.add(messages.append, level="DEBUG", format="{message}")
+    try:
+        with pytest.raises(ValueError, match="could not be resolved") as caught:
+            getattr(config_resolution, function_name)({"copy": "${secret}"})
+    finally:
+        logger.remove(sink)
+    output = "".join(messages)
+    assert "ValueError" in str(caught.value)
+    assert "ValueError" in output
+    assert "opaque-private-resolver-input" not in output + str(caught.value)
+    assert caught.value.__suppress_context__

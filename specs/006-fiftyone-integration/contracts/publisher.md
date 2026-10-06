@@ -19,6 +19,14 @@ Request construction, publication, local receipt writes, and visualization run-l
 recording are optional: their errors cannot fail otherwise successful computation.
 Cancellation and process-exit signals retain their normal interruption behavior.
 
+Warnings identify the failed operation (`factory`, `preflight`, `prepare_request`,
+`publish`, `write_receipt`, or `record_configuration`), exception type and redacted
+message/cause, with available task and path context. DEBUG adds stack locations
+without source excerpts or local-variable values. Credential-bearing URLs and
+sensitive labeled values are redacted before logging. Loguru's existing DEBUG
+default remains; `LOGURU_LEVEL=INFO` selects concise output. Caller-owned sinks
+are not replaced. No-receipt results remain a warning without successful publication.
+
 Receipt fields map semantic names (`predictions`, `matched_ground_truth`,
 `matched_predictions`, `evaluated_predictions`, `predicted`, `evaluated`, `tp`, `fp`, `fn`) to stored sample
 fields. Run namespaces use the full SHA-256 of the task ID; `dataset.info.cy_runs`

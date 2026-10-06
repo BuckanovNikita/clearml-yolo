@@ -1247,3 +1247,40 @@ def test_local_cleanup_oserror_propagates_after_otherwise_successful_call(
         invocation(ClearMLConfig(), "report"),
     ):
         pass
+
+
+@pytest.mark.parametrize("failure_stage", ["finalization", "local_cleanup"])
+def test_secondary_failure_diagnostics_preserve_primary_and_redact_credentials(
+    fake_clearml: tuple[type[Any], FakeTask],
+    monkeypatch: pytest.MonkeyPatch,
+    failure_stage: str,
+) -> None:
+    from loguru import logger
+
+    from clearml_yolo.clearml_session import _InvocationState
+
+    _, task = fake_clearml
+    original = ValueError("primary failure")
+
+    def fail(*args: Any) -> None:
+        raise PermissionError("filesystem denied access token=private-cleanup-token")
+
+    if failure_stage == "finalization":
+        monkeypatch.setattr(task, "close", fail)
+    else:
+        monkeypatch.setattr(_InvocationState, "cleanup", fail)
+    messages: list[str] = []
+    sink = logger.add(messages.append, level="DEBUG", format="{message}")
+    try:
+        with (
+            pytest.raises(ValueError, match="primary failure") as caught,
+            invocation(ClearMLConfig(), "report"),
+        ):
+            raise original
+    finally:
+        logger.remove(sink)
+    assert caught.value is original
+    output = "".join(messages)
+    assert "PermissionError" in output
+    assert "filesystem denied access" in output
+    assert "private-cleanup-token" not in output

@@ -4,11 +4,11 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Literal
 
-from loguru import logger
 from pydantic import JsonValue
 
 from clearml_yolo import artifact_names
 from clearml_yolo.clearml_session import record_run_configuration
+from clearml_yolo.diagnostics import log_exception
 from clearml_yolo.publishing import NoOpPublisher, Publisher, create_publisher
 from clearml_yolo.publishing.models import (
     FiftyOneConfig,
@@ -27,14 +27,16 @@ def prepare_publisher(
 ) -> Publisher:
     """Preflight optional visualization; disable it with a warning if unavailable."""
     selected = config if task is not None else FiftyOneConfig(enabled=False)
+    operation = "factory"
     try:
         publisher = factory(selected)
+        operation = "preflight"
         publisher.preflight()
     except Exception as error:  # noqa: BLE001 - optional backends have varied exception types
-        # Backend error messages can contain credential-bearing database URIs.
-        logger.warning(
-            "FiftyOne visualization setup failed; continuing without visualization: {}",
-            type(error).__name__,
+        log_exception(
+            "FiftyOne visualization setup failed; continuing without visualization",
+            error,
+            context={"operation": operation},
         )
         return NoOpPublisher()
     return publisher
@@ -56,7 +58,10 @@ def publish_results(
     """Publish optional visualization without failing the computation on backend errors."""
     if not publisher.enabled:
         return None
+    operation = "prepare_request"
+    context: dict[str, object] = {"ground_truth": ground_truth, "output_dir": output_dir}
     try:
+        context["task_id"] = str(task.id)
         request = PublicationRequest(
             task_id=str(task.id),
             ground_truth=Path(ground_truth),
@@ -69,17 +74,22 @@ def publish_results(
             evaluations=evaluations or {},
             metadata=metadata or {},
         )
+        operation = "publish"
         receipt = publisher.publish(request)
         if receipt is None:
-            logger.warning(
-                "FiftyOne visualization publication failed; continuing task: "
-                "backend returned no receipt"
+            log_exception(
+                "FiftyOne visualization publication failed; continuing task",
+                RuntimeError("backend returned no receipt"),
+                context={**context, "operation": operation},
             )
             return None
+        operation = "write_receipt"
         destination = Path(output_dir)
-        destination.mkdir(parents=True, exist_ok=True)
         receipt_path = destination / artifact_names.FIFTYONE_PUBLICATION_FILE
+        context["path"] = receipt_path
+        destination.mkdir(parents=True, exist_ok=True)
         receipt_path.write_text(receipt.model_dump_json(indent=2), encoding="utf-8")
+        operation = "record_configuration"
         record_run_configuration(
             task,
             {
@@ -94,9 +104,10 @@ def publish_results(
             },
         )
     except Exception as error:  # noqa: BLE001 - visualization failures must not fail computation
-        logger.warning(
-            "FiftyOne visualization publication failed; continuing task: {}",
-            type(error).__name__,
+        log_exception(
+            "FiftyOne visualization publication failed; continuing task",
+            error,
+            context={**context, "operation": operation},
         )
         return None
     return receipt

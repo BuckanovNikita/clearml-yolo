@@ -5,7 +5,7 @@ import re
 from collections import Counter
 from collections.abc import Mapping
 from copy import deepcopy
-from typing import Any, cast
+from typing import Any, NoReturn, cast
 
 from omegaconf import DictConfig, OmegaConf
 from omegaconf.errors import OmegaConfBaseException
@@ -13,6 +13,7 @@ from omegaconf.grammar.gen.OmegaConfGrammarParser import OmegaConfGrammarParser
 from omegaconf.grammar_parser import parse
 
 from clearml_yolo.clearml_session import ResolvedConfigFile, configuration_secrets
+from clearml_yolo.diagnostics import exception_summary, log_exception, redact_text
 
 _REFERENCE = re.compile(r"\$\{([^{}:]+)\}\Z")
 
@@ -268,8 +269,8 @@ def resolve_config_document(
     """Resolve original file fields once, preserving native resolver arguments."""
     try:
         return _resolve_file(document, command_config, provenance=False).values
-    except (OmegaConfBaseException, KeyError, IndexError, TypeError, ValueError):
-        raise ValueError("Configuration values could not be resolved") from None
+    except (OmegaConfBaseException, KeyError, IndexError, TypeError, ValueError) as error:
+        _resolution_failure(error)
 
 
 def resolve_config_file(
@@ -278,6 +279,25 @@ def resolve_config_file(
     """Resolve file values and retain credential provenance only for sanitization."""
     try:
         return _resolve_file(document, command_config, provenance=True)
-    except (OmegaConfBaseException, KeyError, IndexError, TypeError, ValueError):
-        # Resolver diagnostics can contain private values or arguments.
-        raise ValueError("Configuration values could not be resolved") from None
+    except (OmegaConfBaseException, KeyError, IndexError, TypeError, ValueError) as error:
+        _resolution_failure(error)
+
+
+def _resolution_failure(error: BaseException) -> NoReturn:
+    # Resolver messages and arguments may contain private values.
+    context: dict[str, object] = {}
+    if isinstance(error, OmegaConfBaseException) and isinstance(error.full_key, str):
+        context["field"] = error.full_key
+    log_exception(
+        "Configuration values could not be resolved",
+        error,
+        level="DEBUG",
+        context=context,
+        include_message=False,
+    )
+    field = f" (field {redact_text(str(context['field']))})" if context else ""
+    raise ValueError(
+        "Configuration values could not be resolved: "
+        + exception_summary(error, include_message=False)
+        + field
+    ) from None

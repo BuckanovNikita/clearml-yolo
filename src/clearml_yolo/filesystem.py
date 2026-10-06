@@ -9,6 +9,8 @@ from pathlib import Path
 
 from loguru import logger
 
+from clearml_yolo.diagnostics import log_exception, redact_text
+
 _WARNED_HOME_PATHS: set[Path] = set()
 _NATIVE_WEIGHTS: ContextVar[Path | None] = ContextVar("cy_native_weights", default=None)
 
@@ -64,17 +66,25 @@ def temporary_root() -> Path:
 
 def _fiftyone_inputs() -> dict[str, object]:
     # Read explicit data selections without changing the dependency's configuration paths.
-    source = Path(os.environ.get("FIFTYONE_CONFIG_PATH") or
-                  Path.home() / ".fiftyone" / "config.json").expanduser()
+    source = Path(
+        os.environ.get("FIFTYONE_CONFIG_PATH") or Path.home() / ".fiftyone" / "config.json"
+    ).expanduser()
     try:
         if not source.is_file():
             return {}
         values = json.loads(source.read_text(encoding="utf-8"))
         if not isinstance(values, dict):
-            logger.warning("Optional FiftyOne configuration must be a mapping; using defaults")
+            logger.warning(
+                "Optional FiftyOne configuration must be a mapping; using defaults: {}",
+                redact_text(str(source)),
+            )
             return {}
-    except (OSError, UnicodeError, json.JSONDecodeError):
-        logger.warning("Cannot read optional FiftyOne configuration; using defaults")
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        log_exception(
+            "Cannot read optional FiftyOne configuration; using defaults",
+            error,
+            context={"source": source},
+        )
         return {}
     return {str(key): value for key, value in values.items()}
 

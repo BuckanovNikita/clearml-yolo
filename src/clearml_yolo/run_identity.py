@@ -8,6 +8,7 @@ from urllib.parse import quote
 
 from loguru import logger
 
+from clearml_yolo.diagnostics import log_exception
 from clearml_yolo.filesystem import write_path
 
 # The symlink beside the run directories that always names the newest of them, so the
@@ -114,6 +115,8 @@ def point_latest_at(root: Path, run_dir: Path) -> None:
         pending.symlink_to(run_dir)
         pending.replace(latest)
     except OSError as error:
-        logger.warning("Could not point {} at {}: {}", latest, run_dir, error)
+        log_exception(
+            "Could not update latest run link", error, context={"link": latest, "target": run_dir}
+        )
         with suppress(OSError):
             pending.unlink(missing_ok=True)

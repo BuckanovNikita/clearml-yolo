@@ -290,3 +290,24 @@ assert not (Path.cwd() / 'old-cache').exists()
         check=False, capture_output=True, text=True,
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_optional_config_read_reports_reason_and_source(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from clearml_yolo.filesystem import _fiftyone_inputs
+
+    source = tmp_path / "private-config.json"
+    source.write_bytes(b"\xff")
+    monkeypatch.setenv("FIFTYONE_CONFIG_PATH", str(source))
+    messages: list[str] = []
+    sink = logger.add(messages.append, level="DEBUG", format="{message}")
+    try:
+        assert _fiftyone_inputs() == {}
+    finally:
+        logger.remove(sink)
+    output = "".join(messages)
+    assert "UnicodeDecodeError" in output
+    assert str(source) in output
+    assert "invalid start byte" in output

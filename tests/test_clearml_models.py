@@ -744,3 +744,29 @@ def test_threshold_csv_single_value_column_can_precede_class_column(
     path.write_text("value,class_name\n0.12345678901234566,001\n")
     patch_clearml(FakeTask(artifacts={BEST_CONFIDENCES_VAL: FakeArtifact(str(path))}))
     assert fetch_best_confidences(TASK_ID) == {"001": 0.12345678901234566}
+
+
+def test_checkpoint_download_failure_redacts_sdk_credentials(patch_clearml: Any) -> None:
+    from loguru import logger
+
+    class FailingModel(FakeModel):
+        @override
+        def get_local_copy(self) -> str:
+            raise OSError(
+                "download refused https://user:private-password@host/model?token=private-token"
+            )
+
+    patch_clearml(FakeTask(models={"output": [FailingModel("selected.pt")]}))
+    messages: list[str] = []
+    sink = logger.add(messages.append, level="DEBUG", format="{message}")
+    try:
+        with pytest.raises(ValueError, match="download refused") as caught:
+            resolve_task_weights(TASK_ID)
+    finally:
+        logger.remove(sink)
+    output = str(caught.value) + "".join(messages)
+    assert "OSError" in output
+    assert TASK_ID in output
+    assert "private-password" not in output
+    assert "private-token" not in output
+    assert caught.value.__suppress_context__

@@ -116,7 +116,11 @@ are uploaded, verified and flushed. Fail task and command on computation, upload
 errors while retaining local output. Keep credentials out of published configuration and
 failure status. Native owner-only training/validation image previews are permitted.
 FiftyOne visualization is optional: setup and publication errors warn and cannot fail
-otherwise successful computation or the ClearML task. Required artifacts/model uploads
+otherwise successful computation or the ClearML task. Project-owned caught-error
+logging includes redacted operation/context and cause summaries, with stack locations
+at DEBUG (the existing default); INFO omits those stacks. Diagnostic stacks exclude
+locals and source excerpts. Opaque configuration payloads and failure-status fields
+retain conservative suppression. Required artifacts/model uploads
 and flush verification retain their failure behavior.
 Use the shared CSV-addressed dataset cache outside run outputs; source images are immutable.
 Standalone `cy-train` requires `ground_truth`; prepared dataset paths returned by training are

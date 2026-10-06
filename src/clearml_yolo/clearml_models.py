@@ -13,6 +13,7 @@ import pandas as pd
 from loguru import logger
 
 from clearml_yolo.artifact_names import BEST_CONFIDENCES_VAL
+from clearml_yolo.diagnostics import exception_summary, log_exception, redact_text
 from clearml_yolo.filesystem import model_weights_path
 
 # ClearML ids are 32 lowercase hex characters. Recognising them by shape is what lets
@@ -155,10 +156,17 @@ def resolve_task_model(task_id: str) -> tuple[Path, dict[str, str]]:
     identity = links.get("artifact_name", links.get("model_id", "checkpoint"))
     try:
         checkpoint = selected.get_local_copy()
-    except Exception as error:  # opaque SDK download boundary
+    except Exception as error:  # noqa: BLE001 - opaque SDK download boundary
+        log_exception(
+            "Checkpoint download failed",
+            error,
+            level="DEBUG",
+            context={"task_id": task_id, "checkpoint": identity},
+        )
         raise ValueError(
-            f"Cannot download checkpoint {identity!r} on task {task_id}: {error}"
-        ) from error
+            redact_text(f"Cannot download checkpoint {identity!r} on task {task_id}: ")
+            + exception_summary(error)
+        ) from None
     if not checkpoint:
         raise ValueError(f"Checkpoint {identity!r} on task {task_id} returned no local file")
     path = Path(checkpoint)
@@ -318,11 +326,20 @@ def fetch_best_confidences(task_id: str) -> dict[str, float]:
         dashboard = name in _DASHBOARD_ARTIFACTS
         try:
             thresholds = _artifact_thresholds(task.artifacts[name], dashboard=dashboard)
-        except Exception as error:  # report the selected SDK/file source
+        except Exception as error:  # noqa: BLE001 - report selected SDK/file source
+            log_exception(
+                "Confidence threshold recovery failed",
+                error,
+                level="DEBUG",
+                context={"task_id": task_id, "artifact": name},
+            )
             raise ValueError(
-                f"Cannot recover confidence thresholds from artifact {name!r} "
-                f"on ClearML task {task_id}: {error}"
-            ) from error
+                redact_text(
+                    f"Cannot recover confidence thresholds from artifact {name!r} "
+                    f"on ClearML task {task_id}: "
+                )
+                + exception_summary(error)
+            ) from None
         if dashboard:
             logger.warning(
                 "Recovered thresholds of task {} from legacy dashboard {!r}; "

@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from importlib import import_module
 from typing import Any, Protocol, cast
 
+from clearml_yolo.diagnostics import exception_summary, log_exception, redact_text
+
 _CUDA_PROBE_TIMEOUT_SECONDS = 30.0
 
 
@@ -180,11 +182,23 @@ def _probe_visible_uuids() -> tuple[str, ...]:
         ) from error
     if result.returncode:
         detail = result.stderr.strip() or f"metadata probe exited {result.returncode}"
-        raise RuntimeError(f"CUDA visibility probe failed: {detail}")
+        raise RuntimeError(
+            f"CUDA visibility probe failed (exit {result.returncode}): {redact_text(detail)}"
+        )
     try:
         loaded = json.loads(result.stdout)
     except json.JSONDecodeError as error:
-        raise RuntimeError("CUDA visibility probe returned invalid JSON") from error
+        log_exception(
+            "CUDA visibility probe returned invalid JSON",
+            error,
+            level="DEBUG",
+            context={"line": error.lineno, "column": error.colno},
+            include_message=False,
+        )
+        raise RuntimeError(
+            "CUDA visibility probe returned invalid JSON: "
+            + exception_summary(error, include_message=False)
+        ) from None
     if not isinstance(loaded, list) or any(not isinstance(value, str) for value in loaded):
         raise RuntimeError("CUDA visibility probe returned an invalid UUID list")
     if any(value.startswith("MIG-") for value in loaded):

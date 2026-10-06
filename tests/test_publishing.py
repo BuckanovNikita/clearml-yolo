@@ -142,6 +142,8 @@ def test_visualization_setup_failure_warns_and_disables_publication(
     result = prepare_publisher(SimpleNamespace(id="task"), FiftyOneConfig(), factory=factory)
     assert result.enabled is False
     assert any("FiftyOne visualization setup failed" in warning for warning in warnings_log)
+    expected = "visualization backend unavailable" if stage == "factory" else "database unavailable"
+    assert any(expected in warning and f"operation={stage}" in warning for warning in warnings_log)
 
 
 @pytest.mark.parametrize("failure", [ValueError("invalid box"), OSError("database write failed")])
@@ -165,6 +167,11 @@ def test_visualization_publication_failure_warns_without_success_receipt(
     assert result is None
     assert not (tmp_path / "fiftyone_publication.json").exists()
     assert any(type(failure).__name__ in warning for warning in warnings_log)
+    assert any(str(failure) in warning for warning in warnings_log)
+    assert any("operation=publish" in warning for warning in warnings_log)
+    assert any(
+        "task_id=task" in warning and "ground_truth=gt.csv" in warning for warning in warnings_log
+    )
 
 
 @pytest.mark.parametrize("stage", ["factory", "preflight", "publication"])
@@ -247,6 +254,12 @@ def test_visualization_receipt_failure_does_not_fail_computation(
     )
     assert result is None
     assert any("FiftyOne visualization publication failed" in warning for warning in warnings_log)
+    operation = {
+        "receipt": "write_receipt",
+        "run_configuration": "record_configuration",
+        "missing_receipt": "publish",
+    }[failure_stage]
+    assert any(f"operation={operation}" in warning for warning in warnings_log)
 
 
 @pytest.mark.parametrize("stage", ["preflight", "publish"])
@@ -288,3 +301,34 @@ def test_visualization_failure_allows_clearml_task_completion(
     assert task.closed is True
     assert [upload["name"] for upload in task.uploads] == ["predictions"]
     assert predictions.is_file()
+
+
+def test_publication_request_failure_identifies_input_without_calling_backend(
+    tmp_path: Path, warnings_log: list[str]
+) -> None:
+    from clearml_yolo.tasks.publication import publish_results
+
+    class Publisher:
+        enabled = True
+
+        def publish(self, _request: object) -> None:
+            pytest.fail("invalid request must not reach backend")
+
+        def preflight(self) -> None:
+            pass
+
+    assert (
+        publish_results(
+            Publisher(),
+            SimpleNamespace(id=""),
+            output_dir=tmp_path,
+            ground_truth="gt.csv",
+        )
+        is None
+    )
+    assert any(
+        "operation=prepare_request" in entry
+        and "ground_truth=gt.csv" in entry
+        and "ValidationError" in entry
+        for entry in warnings_log
+    )

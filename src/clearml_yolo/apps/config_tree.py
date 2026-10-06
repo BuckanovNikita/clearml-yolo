@@ -15,7 +15,18 @@ def main() -> None:
     try:
         dump_config_tree(arguments.directory, overwrite=arguments.force)
     except OSError as error:
-        parser.error(str(error))
+        from clearml_yolo.diagnostics import exception_summary, log_exception, redact_text
+
+        log_exception(
+            "Cannot initialize configuration directory",
+            error,
+            level="DEBUG",
+            context={"destination": arguments.directory},
+        )
+        parser.error(
+            f"Cannot initialize configuration directory {redact_text(arguments.directory)}: "
+            + exception_summary(error)
+        )
 
 
 if __name__ == "__main__":

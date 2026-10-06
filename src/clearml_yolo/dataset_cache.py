@@ -16,6 +16,7 @@ from pydantic import BaseModel, ValidationError
 
 from clearml_yolo.dataset import PreparedDataset, prepare_dataset
 from clearml_yolo.dataset_export import DatasetFormat
+from clearml_yolo.diagnostics import log_exception
 from clearml_yolo.filesystem import cy_home, write_path
 
 PREPARATION_VERSION = 1
@@ -63,7 +64,16 @@ def _safe_relative(value: str) -> Path | None:
 def _read_json_object(path: Path) -> dict[str, Any] | None:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+    except FileNotFoundError:
+        return None
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        log_exception(
+            "Ignoring unreadable dataset cache metadata",
+            error,
+            level="DEBUG",
+            context={"source": path},
+            include_message=isinstance(error, OSError),
+        )
         return None
     return value if isinstance(value, dict) else None
 
@@ -79,7 +89,16 @@ def _read_completion(
         completion = _Completion.model_validate_json(
             (entry / _COMPLETION_FILE).read_text(encoding="utf-8")
         )
-    except (OSError, UnicodeDecodeError, ValidationError, ValueError):
+    except FileNotFoundError:
+        return None
+    except (OSError, UnicodeDecodeError, ValidationError, ValueError) as error:
+        log_exception(
+            "Ignoring invalid dataset cache completion",
+            error,
+            level="DEBUG",
+            context={"entry": entry},
+            include_message=isinstance(error, OSError),
+        )
         return None
     expected = (PREPARATION_VERSION, identity, input_sha256, dataset_format)
     actual = (
@@ -139,7 +158,14 @@ def _validated_splits(
         return None
     try:
         split_counts = {str(name): int(count) for name, count in raw_splits.items()}
-    except (TypeError, ValueError):
+    except (TypeError, ValueError) as error:
+        log_exception(
+            "Ignoring invalid dataset cache split counts",
+            error,
+            level="DEBUG",
+            context={"entry": entry},
+            include_message=False,
+        )
         return None
     observed: Counter[str] = Counter()
     for item in images:
@@ -153,7 +179,16 @@ def _validated_splits(
 def _valid_data_yaml(entry: Path, splits: dict[str, int] | None) -> bool:
     try:
         data = yaml.safe_load((entry / "data.yaml").read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, yaml.YAMLError):
+    except FileNotFoundError:
+        return False
+    except (OSError, UnicodeDecodeError, yaml.YAMLError) as error:
+        log_exception(
+            "Ignoring unreadable dataset cache native configuration",
+            error,
+            level="DEBUG",
+            context={"entry": entry},
+            include_message=isinstance(error, OSError),
+        )
         return False
     manifest = _read_json_object(entry / "preparation.json")
     if not isinstance(data, dict) or manifest is None or not splits:

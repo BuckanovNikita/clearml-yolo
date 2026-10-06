@@ -184,6 +184,7 @@ layers = [
     "clearml_yolo.result_schema",
     "clearml_yolo.run_identity",
     "clearml_yolo.filesystem",
+    "clearml_yolo.diagnostics",
 ]
 
 [[tool.importlinter.contracts]]

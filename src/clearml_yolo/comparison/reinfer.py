@@ -19,6 +19,7 @@ from loguru import logger
 from pydantic import BaseModel, Field
 
 from clearml_yolo.clearml_session import sanitize_configuration
+from clearml_yolo.diagnostics import log_exception
 from clearml_yolo.filesystem import model_weights_path
 from clearml_yolo.inference import predict_on_images
 from clearml_yolo.native_config import write_native_yaml
@@ -189,7 +190,12 @@ def _read_cache(output: Path, native_project: Path) -> pd.DataFrame | None:
     try:
         evidence = InferenceEvidence.model_validate_json(metadata.read_text(encoding="utf-8"))
     except (OSError, ValueError, json.JSONDecodeError) as error:
-        logger.warning("Ignoring prediction cache with invalid provenance {}: {}", metadata, error)
+        log_exception(
+            "Ignoring prediction cache with invalid provenance",
+            error,
+            context={"metadata": metadata},
+            include_message=False,
+        )
         return None
     if not Path(evidence.save_dir).resolve().is_relative_to(native_project.resolve()):
         logger.warning(

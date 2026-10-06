@@ -13,6 +13,8 @@ from loguru import logger
 from PIL import Image
 from pydantic import BaseModel
 
+from clearml_yolo.diagnostics import log_exception
+
 REQUIRED_COLUMNS = (
     "image_name",
     "image_path",
@@ -242,14 +244,15 @@ def _read_image_size(row: _CsvRow, source: Path) -> tuple[int, int]:
                     if image.getexif().get(274) in {6, 8}:
                         width, height = height, width
                 except (OSError, SyntaxError, TypeError, ValueError) as error:
-                    logger.warning(
-                        "Could not read EXIF orientation for image {!r} at {}: {}; "
-                        "using decoded dimensions {} x {}",
-                        row.image_name,
-                        row.image_path,
+                    log_exception(
+                        "Could not read EXIF orientation; using decoded dimensions",
                         error,
-                        width,
-                        height,
+                        context={
+                            "image": row.image_name,
+                            "source": row.image_path,
+                            "width": width,
+                            "height": height,
+                        },
                     )
     except (OSError, SyntaxError) as error:
         raise ValueError(

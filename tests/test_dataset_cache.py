@@ -433,3 +433,31 @@ def test_cache_rebuilds_invalid_native_yaml(tmp_path: Path, corruption: dict[str
         first.data.write_text(yaml.safe_dump(valid | corruption))
     with cached_dataset(source, tmp_path / "cache") as reused:
         assert yaml.safe_load(reused.data.read_text()) == valid
+
+
+def test_dataset_cache_missing_metadata_is_quiet_but_permission_failure_diagnosed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from loguru import logger
+
+    from clearml_yolo.dataset_cache import _read_json_object
+
+    source = tmp_path / "preparation.json"
+    messages: list[str] = []
+    sink = logger.add(messages.append, level="DEBUG", format="{message}")
+    try:
+        assert _read_json_object(source) is None
+        assert messages == []
+
+        def denied(*args: Any, **kwargs: Any) -> str:
+            raise PermissionError("cache file access denied")
+
+        monkeypatch.setattr(Path, "read_text", denied)
+        assert _read_json_object(source) is None
+    finally:
+        logger.remove(sink)
+    output = "".join(messages)
+    assert "PermissionError" in output
+    assert "cache file access denied" in output
+    assert str(source) in output

@@ -29,6 +29,7 @@ from ruamel.yaml.comments import CommentedMap, CommentedSeq
 from ruamel.yaml.error import YAMLError
 from ruamel.yaml.tokens import CommentToken
 
+from clearml_yolo.diagnostics import exception_summary, log_exception
 from clearml_yolo.filesystem import temporary_root
 
 OWNER_PID_ENV = "CY_CLEARML_OWNER_PID"
@@ -427,8 +428,11 @@ def invocation(
             closed_task: Any = Task.get_task(task_id=task_id)
             _mark_failed(closed_task, error)
         except Exception as finalization_error:  # noqa: BLE001 - preserve the original failure
-            logger.error(
-                "ClearML failure finalization failed: {}", type(finalization_error).__name__
+            log_exception(
+                "ClearML failure finalization failed",
+                finalization_error,
+                level="ERROR",
+                context={"task_id": str(task.id)},
             )
         raise
     finally:
@@ -446,7 +450,7 @@ def _cleanup_invocation(state: _InvocationState, primary_error: BaseException | 
     except OSError as cleanup_error:
         if primary_error is None:
             raise
-        logger.error("Local failure cleanup failed: {}", type(cleanup_error).__name__)
+        log_exception("Local failure cleanup failed", cleanup_error, level="ERROR")
 
 
 def init_task(config: ClearMLConfig, stage: str) -> Any:
@@ -819,10 +823,29 @@ def _load_config_document(path: Path, yaml: YAML) -> Any:
         if suffix in {".yaml", ".yml"}:
             return yaml.load(path.read_text(encoding="utf-8"))
         raise ValueError(f"Unsupported configuration file format: {path.suffix or '<none>'}")
-    except json.JSONDecodeError:
-        raise ValueError(f"Invalid JSON configuration file: {path}") from None
-    except YAMLError:
-        raise ValueError(f"Invalid YAML configuration file: {path}") from None
+    except json.JSONDecodeError as error:
+        log_exception(
+            "Invalid JSON configuration file",
+            error,
+            level="DEBUG",
+            context={"source": path, "line": error.lineno, "column": error.colno},
+            include_message=False,
+        )
+        raise ValueError(
+            f"Invalid JSON configuration file: {path} (line {error.lineno}, column {error.colno})"
+        ) from None
+    except YAMLError as error:
+        log_exception(
+            "Invalid YAML configuration file",
+            error,
+            level="DEBUG",
+            context={"source": path},
+            include_message=False,
+        )
+        raise ValueError(
+            f"Invalid YAML configuration file: {path}: "
+            + exception_summary(error, include_message=False)
+        ) from None
 
 
 def _prepared_config_file(state: _InvocationState, path: Path) -> tuple[Path, Path]:
@@ -846,8 +869,18 @@ def _prepared_config_file(state: _InvocationState, path: Path) -> tuple[Path, Pa
             if isinstance(resolved, ResolvedConfigFile):
                 provenance_secrets = resolved.secrets
                 resolved = resolved.values
-        except Exception:  # noqa: BLE001 - opaque resolver errors can contain credentials
-            raise ValueError("Configuration values could not be resolved") from None
+        except Exception as error:  # noqa: BLE001 - opaque resolver errors can contain credentials
+            log_exception(
+                "Configuration values could not be resolved",
+                error,
+                level="DEBUG",
+                context={"source": path},
+                include_message=False,
+            )
+            raise ValueError(
+                "Configuration values could not be resolved: "
+                + exception_summary(error, include_message=False)
+            ) from None
 
     try:
         effective = _update_yaml_values(content, resolved) if suffix != ".json" else resolved
@@ -861,8 +894,18 @@ def _prepared_config_file(state: _InvocationState, path: Path) -> tuple[Path, Pa
             copy.deepcopy(effective), _configuration_secrets(resolved) | provenance_secrets
         )
         _write_config_document(sanitized_path, sanitized, yaml)
-    except Exception:  # noqa: BLE001 - parser/serializer details can contain credentials
-        raise ValueError("Configuration file could not be prepared") from None
+    except Exception as error:  # noqa: BLE001 - parser/serializer details can contain credentials
+        log_exception(
+            "Configuration file could not be prepared",
+            error,
+            level="DEBUG",
+            context={"source": path},
+            include_message=False,
+        )
+        raise ValueError(
+            "Configuration file could not be prepared: "
+            + exception_summary(error, include_message=False)
+        ) from None
     return execution_path, sanitized_path
 
 

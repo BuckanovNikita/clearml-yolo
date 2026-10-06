@@ -2,7 +2,7 @@
 
 from importlib.metadata import distribution
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import pytest
 from hydra import compose, initialize_config_dir, initialize_config_module
@@ -287,3 +287,28 @@ def test_example_sections_comment_controlled_keys_only_in_examples(
         render_native_yaml({str(key): value for key, value in resolved.items()}, stage)
     )
     assert controlled <= runtime.keys()
+
+
+def test_cli_empty_oserror_reports_operation_destination_and_type(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    import sys
+
+    from clearml_yolo import config_tree
+    from clearml_yolo.apps.config_tree import main
+
+    def fail(*args: Any, **kwargs: Any) -> None:
+        raise OSError
+
+    destination = tmp_path / "configuration"
+    monkeypatch.setattr(config_tree, "dump_config_tree", fail)
+    monkeypatch.setattr(sys, "argv", ["cy-init-config", str(destination)])
+    with pytest.raises(SystemExit) as caught:
+        main()
+    assert caught.value.code == 2
+    output = capsys.readouterr().err
+    assert "Cannot initialize configuration directory" in output
+    assert str(destination) in output
+    assert "OSError" in output
