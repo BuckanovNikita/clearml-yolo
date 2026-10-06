@@ -1,12 +1,17 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.16.0 (2026-10-06)
 
 ### Documentation
 
 - Record evaluation publication release acceptance
   ([`d2ef6c1`](https://github.com/BuckanovNikita/clearml-yolo/commit/d2ef6c1ccfa43367e3fa791f5d00d31934f3f1b4))
+
+### Features
+
+- Publish native FiftyOne evaluation results and reports
+  ([`60ab70b`](https://github.com/BuckanovNikita/clearml-yolo/commit/60ab70bf90fffab7747f0f53ab2e0e67ac08b764))
 
 
 ## v0.15.0 (2026-10-05)
