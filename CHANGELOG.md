@@ -1,7 +1,12 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.17.1 (2026-10-06)
+
+### Bug Fixes
+
+- **deps**: Use local dependency copies instead of submodules
+  ([`5b49ec9`](https://github.com/BuckanovNikita/clearml-yolo/commit/5b49ec9370654607d17ec9def4fdca55e32d9403))
 
 ### Documentation
 
