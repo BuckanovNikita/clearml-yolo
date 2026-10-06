@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v0.18.1 (2026-10-06)
+
+### Bug Fixes
+
+- Preserve actionable error diagnostics across library
+  ([`34053b9`](https://github.com/BuckanovNikita/clearml-yolo/commit/34053b9e451c1717f4f06847bb9945761a90720a))
+
+### Documentation
+
+- Record cache deduplication release verification
+  ([`52184cd`](https://github.com/BuckanovNikita/clearml-yolo/commit/52184cdf3afe652c4ec22839c9332021f09cfb03))
+
+
 ## v0.18.0 (2026-10-06)
 
 ### Documentation
