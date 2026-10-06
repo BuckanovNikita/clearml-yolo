@@ -14,8 +14,21 @@ to choose a dataset namespace. `cy-init-config CONFIG_DIRECTORY` exports these d
 
 After successful visualization publication, inspect `fiftyone_publication.json` for
 the dataset name, task-specific field names and `evaluation_keys` split-to-evaluation mapping.
-The canonical run link includes the same evaluation keys; prediction-only imports have none. Open the dataset manually as shown
-in [README.md](../../README.md#fiftyone).
+The canonical run link includes the same evaluation keys; prediction-only imports have none.
+Open the dataset manually, replacing the receipt path with your run's path:
+
+```python
+import json
+
+import fiftyone as fo
+
+with open("runs/my-run/fiftyone_publication.json", encoding="utf-8") as stream:
+    receipt = json.load(stream)
+dataset = fo.load_dataset(receipt["dataset_name"])
+session = fo.launch_app(dataset)
+session.wait()
+```
+
 Samples preserve `image_name`, `split`, and referenced image paths. Keep media available
 at those paths. Unchanged effective GT CSV bytes reuse the imported samples; changing
 resolved paths for the same identity fails. Image bytes are assumed immutable.

@@ -31,11 +31,11 @@ Both track upstream `main` through `.gitmodules`; `git submodule update --remote
 advances their checkouts when an upstream update is requested.
 Initialize them with `git submodule update --init --recursive` before `uv sync`.
 Local development installs them editable through uncommitted `[tool.uv.sources]`
-overrides, restored after each commit by the [commit procedure](#commit-procedure); the parent repository's
-gitlinks pin their revisions. For installations without submodules,
-users can select Git URLs and branches per README.md. Git sources use
-`branch = "main"` (or `master` for a user-selected repository); `uv.lock` records
-the resolved commits.
+overrides, restored after each commit by the [commit procedure](#commit-procedure).
+The parent repository's gitlinks pin their revisions. Follow the
+[README installation steps](../README.md#установка) to add the local source section
+before `uv sync --locked`. Do not replace pinned submodules with moving Git branches
+as part of ordinary setup.
 
 `digital-metrics` is an external dependency. Keep it pinned to the approved upstream
 revision. Do not change its source, checkout, dependency reference or locked revision
@@ -55,8 +55,7 @@ from `pyproject.toml`, including its comments and the local editable overrides:
 
 ```toml
 [tool.uv.sources]
-# Local development uses the pinned submodules. For other environments, replace
-# these with Git sources via `uv add`; see the installation instructions in README.md.
+# Local development uses the pinned submodules.
 digital-metrics = { path = "external/digital-metrics", editable = true }
 report-generator = { path = "external/report-generator", editable = true }
 ```
@@ -72,3 +71,31 @@ without staging it. Keep the section absent throughout any automatic release com
 Restore it on failed or interrupted commit attempts as well; remove it again before
 retrying. Verify that the working copy has the local overrides and that a successful
 commit contains no `[tool.uv.sources]` section.
+
+## Local releases
+
+After installing dependencies, install both repository hooks:
+
+```bash
+uv run --locked --no-sync python scripts/local_release.py --install-hooks
+```
+
+The installer preserves unrelated hooks and refuses to overwrite an existing custom
+post-commit hook. Pre-commit regenerates CHANGELOG.md from committed history. If that
+changes the file, inspect and stage the generated change, then retry the commit.
+Do not edit the generated changelog by hand.
+
+On master, the post-commit hook evaluates unreleased Conventional Commits. Release
+changes produce a checked version commit and an annotated version tag. Documentation
+commits alone do not bump the version. A failed post-commit hook does not undo the
+original commit; inspect its output. To retry or check the release workflow manually:
+
+```bash
+uv run --locked --no-sync python scripts/local_release.py
+```
+
+After checking the result, push the branch and any newly created version tag explicitly.
+Publish Git tags only; do not upload package assets. The
+[release contract](../specs/003-semantic-release/contracts/local-release.md) describes
+version policy, dirty-tree deferral, concurrency and recovery. The
+[validation guide](../specs/003-semantic-release/quickstart.md) covers checks and changelog refresh.

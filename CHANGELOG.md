@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record native FiftyOne evaluation release acceptance
+  ([`ae1455c`](https://github.com/BuckanovNikita/clearml-yolo/commit/ae1455cc6d90d7f5eef5793181207593f6a2bb72))
+
+
 ## v0.16.0 (2026-10-06)
 
 ### Documentation

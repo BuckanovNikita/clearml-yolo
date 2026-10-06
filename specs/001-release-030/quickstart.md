@@ -1,9 +1,9 @@
 # Release validation guide
 
-Use Python/toolchain from pyproject.toml. Run `git submodule update --init --recursive`,
-then `uv sync --locked --group dev` and `uv run cy --help`. Both external dependencies
-are installed editable from `external/`. For installations without submodules, select
-Git sources using the [installation instructions](../../README.md#установка).
+Use Python/toolchain from pyproject.toml. Initialize the pinned submodules and add
+local source overrides using the [installation instructions](../../README.md#установка).
+Then run `uv sync --locked --group dev` and `uv run cy --help`. Both external
+dependencies are installed editable from `external/`.
 See [CLI](contracts/cli.md) and [artifacts](contracts/artifacts.md) for exact contracts.
 
 1. Run pytest, Ruff, mypy, import-linter and applicable pre-commit checks.

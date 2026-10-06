@@ -21,7 +21,7 @@ uv run pre-commit run --all-files
 
 Expected: fixture commits produce checked metadata/changelog commits and annotated tags; negative
 cases preserve history and local work. See [the contract](contracts/local-release.md)
-for retry behavior and [the README](../../README.md) for contributor instructions.
+for retry behavior and [the development guide](../../docs/development.md) for contributor instructions.
 
 Pre-commit regenerates CHANGELOG.md from existing history; if it changes, review and
 stage the file, then retry the commit. Release preparation includes that commit's own

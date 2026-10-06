@@ -1,0 +1,69 @@
+# Feature Specification: README quickstart
+
+**Created**: 2026-10-06
+**Status**: Approved for implementation in conversation
+**Input**: Rewrite the Russian README around the primary cy command and migration
+from a manual Ultralytics, digital-metrics and report-generator workflow. The user
+selected a comparison table without a second executable manual scenario.
+
+## User Scenarios & Testing
+
+### User Story 1 — Run the pipeline (Priority: P1)
+
+An existing Ultralytics user needs a short path from a YOLO dataset to pipeline results.
+This is the primary purpose of the README.
+
+**Independent Test**: Follow installation, tracking setup, data conversion and the
+main command; inspect configuration without running training.
+
+**Acceptance Scenarios**:
+
+1. Given a YOLO dataset, the reader can identify prerequisites, prepare input and
+   configure one pipeline invocation without consulting internal contracts.
+2. Given a completed invocation, the reader knows where weights and evaluation
+   outputs are stored and why paired reports may be absent.
+
+### User Story 2 — Map an existing workflow (Priority: P2)
+
+A user running the underlying libraries manually needs to see which steps cy connects.
+
+**Independent Test**: Read the comparison and parameter tables, then locate each
+standalone command and the relevant detailed documentation.
+
+**Acceptance Scenarios**:
+
+1. Each pipeline step identifies its manual library and wrapper behavior.
+2. The reader can distinguish training and prediction settings and find limitations.
+
+### Edge Cases
+
+Missing test split, missing automatic baseline, CPU-only execution, existing local
+dependency overrides, unavailable ClearML storage, and differing native defaults.
+
+## Requirements
+
+- **FR-001**: Lead with a Russian quickstart for cy, including installation, required
+  tracking, data preparation, explicit model/device/project/tags and result locations.
+- **FR-002**: Explain all manual pipeline steps through one comparison table using
+  the actual underlying libraries, without a second manual executable scenario.
+- **FR-003**: Provide a parameter mapping, one pipeline diagram, brief descriptions
+  of other commands and links to detailed guidance.
+- **FR-004**: Explain migration differences and conditional comparison/report outputs;
+  do not imply identical results under differing data or settings.
+- **FR-005**: Use short direct sentences, one action per step and stable terminology;
+  interpret 80% ASD-STE100 as a style preference, not formal conformance.
+- **FR-006**: Preserve application behavior, pinned dependencies, unrelated work and
+  useful documentation destinations; validate examples and documentation.
+
+## Success Criteria
+
+- **SC-001**: One main pipeline example covers the complete primary journey.
+- **SC-002**: All nine entrypoints are discoverable; every local link resolves.
+- **SC-003**: Examples resolve against the current configuration; review finds no
+  unsupported claims about automatic reports, data equivalence or installation.
+
+## Assumptions
+
+Readers know YOLO detection datasets and have access to a ClearML server and storage.
+README remains Russian; workflow evidence remains English. No application changes,
+dependency updates or real training are required for this documentation change.
