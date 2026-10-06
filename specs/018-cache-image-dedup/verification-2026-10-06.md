@@ -57,3 +57,25 @@ configuration supplies the unchanged release helper's root-only version update. 
 parsed dependency records must exactly match the existing lockfile before use.
 SSH and HTTPS GitHub connections timed out during preparation; remote publication is
 not established by these local checks.
+
+## Local release result
+
+- Feature commit: `d9d6fcd`; release commit: `699dfbc`.
+- Ordinary feature and release hooks passed, including full pytest runs.
+- Annotated `v0.18.0` resolves to the release commit. The release diff contains only
+  project/root-lock version metadata and generated changelog; dependency records are unchanged.
+- Frozen dev sync installed version 0.18.0; installed command help passed afterward.
+- Exact local source overrides were restored unstaged. No release lock/recovery record
+  remains; the temporary offline-lock project, process adapter and message files were removed.
+- The first atomic HTTPS push timed out. Subsequent readback showed the remote master
+  unchanged and no v0.18.0 tag. A bounded retry is recorded separately below.
+
+## Publication result
+
+The bounded HTTPS retry also timed out. The subsequent atomic SSH push succeeded:
+Git acknowledged master advancing from `ff5af62` to `699dfbc` and creation of `v0.18.0`.
+A separate SSH readback timed out afterward; publication is established by the successful
+push acknowledgement, not by an independent remote readback. Only Git commits and the
+version tag were published; no package assets or deployments were created.
+Final Markdown parsing, whitespace, local link targets and heading anchors passed for
+all 14 affected documents. The task ledger records implementation and release completion.

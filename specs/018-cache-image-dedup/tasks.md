@@ -16,4 +16,5 @@
   docs/current-contracts.md and specs/001-release-030/contracts/cli.md (depends T002, T003).
 - [x] T006 Validate Markdown, local links and changed examples; record dated evidence
   (depends T004, T005).
-- [ ] T007 Complete authorized checked commit and Git-tag-only release (depends T006).
+- [x] T007 Complete authorized checked commit and local annotated release (depends T006).
+- [x] T008 Push the branch and release tag only; record remote acknowledgement and readback (depends T007).
