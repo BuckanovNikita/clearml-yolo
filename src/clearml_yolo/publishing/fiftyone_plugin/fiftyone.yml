@@ -1,0 +1,8 @@
+name: "@clearml-yolo/evaluation"
+description: Exact imported digital-metrics evaluation navigation and original AP/PR reports
+version: "1.0.0"
+fiftyone:
+  version: ">=1.22,<2"
+panels:
+  - native_evaluation
+  - evaluation_reports

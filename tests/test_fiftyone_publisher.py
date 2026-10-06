@@ -1,6 +1,8 @@
 """Opt-in persistence checks against a real, explicitly isolated FiftyOne database."""
 
 import os
+import subprocess
+import sys
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -292,3 +294,110 @@ def test_changed_csv_creates_new_dataset_and_preserves_original(
     assert second.ground_truth_sha256 != first.ground_truth_sha256
     assert backend.load_dataset(first.dataset_name)[str(tmp_path / "001.png")].split == "val"
     assert backend.load_dataset(second.dataset_name)[str(tmp_path / "001.png")].split == "train"
+
+
+def test_native_evaluation_is_registered_and_task_retry_removes_stale_splits(
+    tmp_path: Path, publisher: Any, backend: Any, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from clearml_yolo.comparison.evaluation_payload import (
+        EvaluationBox,
+        EvaluationMatch,
+        EvaluationPayload,
+    )
+
+    truth = write_truth(tmp_path)
+    payload = EvaluationPayload(
+        split="val", image_names=["001.png"], thresholds={"01": 0.5},
+        ground_truth=[EvaluationBox(
+            index=0, image_name="001.png", label="01", box=(10, 5, 50, 25), status="TP",
+        )],
+        predictions=[
+            EvaluationBox(
+                index=8, image_name="001.png", label="01", box=(10, 5, 50, 25),
+                confidence=0.8, status="TP",
+            ),
+            EvaluationBox(
+                index=9, image_name="001.png", label="01", box=(0, 0, 5, 5),
+                confidence=0.1, status="filtered",
+            ),
+        ],
+        matches=[EvaluationMatch(
+            gt_index=0, pred_index=8, gt_label="01", pred_label="01", confidence=0.8,
+            iou=1.0, status="TP",
+        )],
+        methodology={"iou_threshold": 0.5, "matching_strategy": "hungarian"},
+    )
+    path = tmp_path / "evaluation_val.json"
+    path.write_text(payload.model_dump_json())
+    request = PublicationRequest(task_id="native", ground_truth=truth, evaluations={"val": path})
+    first = publisher.publish(request)
+    assert "val" in first.evaluation_keys
+    key = first.evaluation_keys["val"]
+    dataset = backend.load_dataset(first.dataset_name)
+    assert dataset.list_evaluations() == [key]
+    results = dataset.load_evaluation_results(key)
+    assert results.metrics()["precision"] == 1.0
+    assert len(dataset.load_evaluation_view(key)) == 1
+    sample = dataset[str(tmp_path / "001.png")]
+    pred = sample[first.fields["evaluated_predictions"]].detections[0]
+    assert list(results.ypred_ids) == [pred.id]
+    assert pred[key] == "tp"
+    assert sample[key + "_tp"] == 1
+    assert len(dataset.to_evaluation_patches(key)) == 1
+    assert len(sample[first.fields["matched_predictions"]].detections) == 2
+    assert len(sample[first.fields["evaluated_predictions"]].detections) == 1
+    _assert_native_fresh_process(first.dataset_name, key)
+    other = publisher.publish(request.model_copy(update={"task_id": "other"}))
+    dataset.rename_evaluation(key, "renamed_evaluation")
+    retry = publisher.publish(request)
+    dataset.reload()
+    assert "renamed_evaluation" not in dataset.list_evaluations()
+    assert set(dataset.list_evaluations()) == {key, other.evaluation_keys["val"]}
+    refreshed = dataset.load_evaluation_results(key, cache=False)
+    sample = dataset[str(tmp_path / "001.png")]
+    assert list(refreshed.ypred_ids) == [
+        sample[retry.fields["evaluated_predictions"]].detections[0].id,
+    ]
+    _assert_interrupted_native_retry(publisher, dataset, request, first, monkeypatch)
+    removed = publisher.publish(request.model_copy(update={"evaluations": {}}))
+    dataset.reload()
+    assert removed.evaluation_keys == {}
+    assert dataset.list_evaluations() == [other.evaluation_keys["val"]]
+
+
+def _assert_native_fresh_process(dataset_name: str, key: str) -> None:
+    loaded = subprocess.run(  # noqa: S603 - fixed code and task-owned test dataset
+        [sys.executable, "-c", (
+            "import sys; import fiftyone as fo; "
+            "d=fo.load_dataset(sys.argv[1]); r=d.load_evaluation_results(sys.argv[2]); "
+            "assert r.tp_fp_fn() == (1,0,0); "
+            "assert r.source_payload.predictions[1].status == 'filtered'; "
+            "assert len(d.to_evaluation_patches(sys.argv[2])) == 1"
+        ), dataset_name, key],
+        check=False, capture_output=True, text=True,
+    )
+    assert loaded.returncode == 0, loaded.stderr
+
+
+def _assert_interrupted_native_retry(
+    publisher: Any, dataset: Any, request: PublicationRequest, receipt: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from clearml_yolo.publishing import fiftyone_adapter
+
+    original = fiftyone_adapter._publish_evaluations
+
+    def interrupted(*args: Any, **kwargs: Any) -> dict[str, str]:
+        original(*args, **kwargs)
+        raise RuntimeError("interrupted native evaluation")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(fiftyone_adapter, "_publish_evaluations", interrupted)
+        with pytest.raises(RuntimeError, match="interrupted native evaluation"):
+            publisher.publish(request)
+    dataset.reload()
+    assert dataset.info["cy_runs"][receipt.run_key]["complete"] is False
+    repaired = publisher.publish(request)
+    assert repaired.evaluation_keys == receipt.evaluation_keys
+    dataset.reload()
+    assert dataset.info["cy_runs"][receipt.run_key]["complete"] is True

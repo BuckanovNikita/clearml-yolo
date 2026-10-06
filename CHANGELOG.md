@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record evaluation publication release acceptance
+  ([`d2ef6c1`](https://github.com/BuckanovNikita/clearml-yolo/commit/d2ef6c1ccfa43367e3fa791f5d00d31934f3f1b4))
+
+
 ## v0.15.0 (2026-10-05)
 
 ### Features

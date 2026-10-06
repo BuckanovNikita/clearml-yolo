@@ -89,6 +89,7 @@ def publish_results(
                     "dataset_reused": receipt.dataset_reused,
                     "sample_count": receipt.sample_count,
                     "fields": receipt.fields,
+                    "evaluation_keys": receipt.evaluation_keys,
                 }
             },
         )

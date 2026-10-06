@@ -282,7 +282,11 @@ type = "forbidden"
 source_modules = ["clearml_yolo"]
 forbidden_modules = ["fiftyone"]
 allow_indirect_imports = true
-ignore_imports = ["clearml_yolo.publishing.fiftyone_adapter -> fiftyone"]
+ignore_imports = [
+    "clearml_yolo.publishing.fiftyone_adapter -> fiftyone",
+    "clearml_yolo.publishing.fiftyone_evaluation -> fiftyone",
+    "clearml_yolo.publishing.fiftyone_panel -> fiftyone",
+]
 
 [[tool.importlinter.contracts]]
 name = "Publication has no tracking or execution side effects"

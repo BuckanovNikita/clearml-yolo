@@ -72,6 +72,7 @@ def test_fiftyone_receipt_stays_local_and_is_linked_from_run_configuration(
         dataset_reused=True,
         sample_count=3,
         fields={"predictions": "predictions_publication-task"},
+        evaluation_keys={"val": "eval_validation"},
         dataset_complete=True,
         run_complete=True,
         payload_paths={},
@@ -111,6 +112,7 @@ def test_fiftyone_receipt_stays_local_and_is_linked_from_run_configuration(
                 "dataset_reused": True,
                 "sample_count": 3,
                 "fields": {"predictions": "predictions_publication-task"},
+                "evaluation_keys": {"val": "eval_validation"},
             }
         }
     ]

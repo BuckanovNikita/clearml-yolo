@@ -19,7 +19,7 @@ configuration, output, tracking and evaluation rules formerly listed in `AGENTS.
 | Configuration resolution and remote replay | [File resolution](../specs/009-resolved-config-uploads/contracts/configuration-files.md), [tracking and recovery](../specs/010-native-clearml-integration/contracts/tracking-publication.md) | [Resolution](../src/clearml_yolo/apps/config_resolution.py), [session adapter](../src/clearml_yolo/clearml_session.py) |
 | Artifacts, native callbacks and task completion | [Publication inventory](../specs/008-dataset-clearml-tracking/contracts/publication.md), [evaluation publication](../specs/014-evaluation-publication/contracts/publication.md), [native tracking](../specs/010-native-clearml-integration/contracts/tracking-publication.md), [model metadata](../specs/008-dataset-clearml-tracking/contracts/model-metadata.md) | [Artifact names](../src/clearml_yolo/artifact_names.py), [native runtime](../src/clearml_yolo/native_runtime.py), [model verification](../src/clearml_yolo/clearml_native.py), [display naming](../src/clearml_yolo/clearml_naming.py), [result bundle](../src/clearml_yolo/clearml_results.py), [DDP relay](../src/clearml_yolo/native_ddp.py) |
 | Evaluation, comparison, thresholds and reports | [Task recovery](../specs/012-remove-legacy-compatibility/contracts/task-recovery.md), [evaluation publication](../specs/014-evaluation-publication/contracts/publication.md), [Publication inventory](../specs/008-dataset-clearml-tracking/contracts/publication.md), [CLI evaluation contract](../specs/001-release-030/contracts/cli.md) | [Metrics](../src/clearml_yolo/tasks/metrics.py), [comparison](../src/clearml_yolo/tasks/compare.py), [comparison workbook](../src/clearml_yolo/comparison/workbook.py), [exact thresholds](../src/clearml_yolo/clearml_models.py), [source lineage](../src/clearml_yolo/result_export.py), [neutral payloads](../src/clearml_yolo/result_schema.py), [interactive reporting](../src/clearml_yolo/clearml_report.py), [paired reports](../src/clearml_yolo/tasks/report.py) |
-| FiftyOne publication | [Publisher](../specs/006-fiftyone-integration/contracts/publisher.md), [current inventory](../specs/008-dataset-clearml-tracking/contracts/publication.md) | [Owner publication](../src/clearml_yolo/tasks/publication.py), [replaceable adapter](../src/clearml_yolo/publishing/fiftyone_adapter.py) |
+| FiftyOne publication | [Publisher](../specs/006-fiftyone-integration/contracts/publisher.md), [native evaluations](../specs/015-fiftyone-native-evaluations/contracts/native-evaluation.md), [current inventory](../specs/008-dataset-clearml-tracking/contracts/publication.md) | [Owner publication](../src/clearml_yolo/tasks/publication.py), [replaceable adapter](../src/clearml_yolo/publishing/fiftyone_adapter.py) |
 | Local versioning, changelog and release hooks | [Local release](../specs/003-semantic-release/contracts/local-release.md) | [Release helper](../scripts/local_release.py), [hook configuration](../.pre-commit-config.yaml), [generated changelog](../CHANGELOG.md) |
 
 ## Changes that must propagate
@@ -89,7 +89,16 @@ classes; statistical comparisons use shared eligible classes. The maintained
 
 FiftyOne visualization is optional. Its setup or publication failures warn and continue
 the owning computation; setup failure disables visualization for that invocation.
-Successful publication retains one local receipt and the canonical run link. Raw
+Successful publication retains one local receipt and the canonical run link, including
+`evaluation_keys` for each evaluated split. Native evaluation registration consumes exact
+source matches without rematching and persists original confusion/PR50/AP reports.
+Native predictions use `evaluated_predictions`, excluding filtered boxes; the
+`matched_predictions` audit overlay retains them without native evaluated status.
+The explicit `@clearml-yolo/evaluation` extension supplies `native_evaluation` and
+`evaluation_reports`; install it in the server/backend environment and restart App.
+No global automatic install or historical migration occurs. Restricted subsets expose
+fixed-threshold counts with unavailable AP/PR; mAR is unavailable. Legacy payloads with
+no report remain readable with missing report values unavailable. Raw
 predictions preserve finite, ordered zero-area boxes from native clipping and their
 CSV indices; publication does not filter inference data or change metric inputs.
 See the [publisher contract](../specs/006-fiftyone-integration/contracts/publisher.md).

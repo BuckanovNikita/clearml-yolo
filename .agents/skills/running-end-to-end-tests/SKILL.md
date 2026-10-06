@@ -77,6 +77,21 @@ this branch.
    remain local. Inspect the workspace after success and injected failure for owned temporary files.
    Explicit output/cache paths outside `CY_HOME` must remain selected; a physical-home destination
    warns without rejection or relocation.
+   For enabled FiftyOne publication, verify one local owner receipt and canonical run
+   link with per-split `evaluation_keys`. Confirm native evaluations register existing
+   source matches without rematching, preserve backgrounds/filtered overlays, and survive
+   fresh-process reload. Confirm `matched_predictions` retains filtered audit labels,
+   `evaluated_predictions` excludes them, and native patches do not count them as FP. Check exact wrong-class/duplicate counts and confusion cells,
+   persisted label click-through, native rename/delete, interrupted same-task retry and
+   concurrent-task isolation against the
+   [native evaluation contract](../../../specs/015-fiftyone-native-evaluations/contracts/native-evaluation.md).
+   Explicitly install `@clearml-yolo/evaluation` in the server/backend Python environment
+   using `install_evaluation_plugin()` and restart App; publication must not install it.
+   Inspect `native_evaluation` and `evaluation_reports` for original PR50 and
+   AP50/AP75/AP50_95 parity, no-GT unavailable/empty-prediction zero AP, unavailable mAR
+   and subset AP/PR, and full-report restoration after exiting a subset. Historical
+   payloads without reports remain readable; only new publication/reruns add native
+   results. Exercise disabled isolation and optional-publication warning behavior.
 7. Check artifact/model upload rejection, callback-registration failure, flush failure and
    interruption with isolated test invocations. Each must fail
    the command and task while retaining local diagnostics until intentional cleanup.

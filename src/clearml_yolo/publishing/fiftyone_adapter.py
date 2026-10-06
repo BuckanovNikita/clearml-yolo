@@ -49,6 +49,7 @@ def _fields(run_key: str) -> dict[str, str]:
             "predictions",
             "matched_ground_truth",
             "matched_predictions",
+            "evaluated_predictions",
             "predicted",
             "evaluated",
             "tp",
@@ -193,6 +194,12 @@ def _write_run(
     raw: dict[str, list[PublicationBox]],
     overlay: _Overlay,
 ) -> None:
+    for field in (
+        "predictions", "matched_ground_truth", "matched_predictions", "evaluated_predictions",
+    ):
+        dataset.add_sample_field(
+            fields[field], fo.EmbeddedDocumentField, embedded_doc_type=fo.Detections,
+        )
     for field in ("tp", "fp", "fn"):
         dataset.add_sample_field(fields[field], fo.IntField)
     dataset.add_sample_field(fields["predicted"], fo.BooleanField)
@@ -216,6 +223,14 @@ def _write_run(
                 _evaluated_detection(fo, box, matches, width, height) for box, matches in pred
             ]
         )
+        # Native patch views include every unmatched prediction, regardless of its
+        # status. Keep filtered evidence in matched_predictions, outside this field.
+        sample[fields["evaluated_predictions"]] = fo.Detections(
+            detections=[
+                _evaluated_detection(fo, box, matches, width, height)
+                for box, matches in pred if box.status != "filtered"
+            ]
+        )
         for status, boxes in (("TP", pred), ("FP", pred), ("FN", gt)):
             sample[fields[status.lower()]] = (
                 sum(box.status == status for box, _ in boxes) if name in overlay.images else None
@@ -230,6 +245,32 @@ def _prediction_membership(request: PublicationRequest, split: str, has_boxes: b
         return split in request.prediction_splits
     # A standalone CSV has no row for zero detections, so absence cannot prove inference ran.
     return True if has_boxes else None
+
+
+def _remove_evaluations(dataset: Any, run_key: str) -> None:
+    """Delete only this publisher run's evaluations, including user-renamed keys."""
+    for key in dataset.list_evaluations():
+        config = dataset.get_evaluation_info(key).config
+        # Config is a dynamic third-party record; older/non-project records have no owner.
+        if config.method == "digital_metrics" and getattr(config, "cy_run_key", None) == run_key:
+            dataset.delete_evaluation(key)
+
+
+def _publish_evaluations(
+    fo: Any, dataset: Any, fields: dict[str, str], payloads: list[EvaluationPayload], run_key: str,
+) -> dict[str, str]:
+    from clearml_yolo.publishing.fiftyone_evaluation import publish_evaluation
+
+    keys: dict[str, str] = {}
+    for payload in payloads:
+        key = f"eval_{run_key}_{_digest(payload.split)}"
+        view = dataset.match(fo.ViewField("image_name").is_in(payload.image_names))
+        publish_evaluation(
+            dataset, view, payload, key, fields["matched_ground_truth"],
+            fields["evaluated_predictions"], run_key=run_key,
+        )
+        keys[payload.split] = key
+    return keys
 
 
 class FiftyOnePublisher:
@@ -282,9 +323,12 @@ class FiftyOnePublisher:
             info.setdefault("cy_runs", {})[run_key] = run
             dataset.info = info
             dataset.save()
+            _remove_evaluations(dataset, run_key)
             _write_run(fo, dataset, fields, request, raw, _Overlay(payloads))
             dataset.add_dynamic_sample_fields()
+            evaluation_keys = _publish_evaluations(fo, dataset, fields, payloads, run_key)
             info = deepcopy(dataset.info)
+            info["cy_runs"][run_key]["evaluation_keys"] = evaluation_keys
             info["cy_runs"][run_key]["complete"] = True
             dataset.info = info
             dataset.save()
@@ -297,6 +341,7 @@ class FiftyOnePublisher:
             dataset_reused=reused,
             sample_count=len(snapshot.images),
             fields=fields,
+            evaluation_keys=evaluation_keys,
             dataset_complete=True,
             run_complete=True,
             payload_paths=_payload_paths(request),

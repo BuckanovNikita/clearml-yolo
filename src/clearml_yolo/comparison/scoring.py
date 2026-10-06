@@ -35,11 +35,13 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
 from clearml_yolo.artifact_names import PLOT_METRICS, split_component
 from clearml_yolo.comparison.evaluation_payload import (
+    ClassAveragePrecision,
     EvaluationBox,
     EvaluationBoxStatus,
     EvaluationMatch,
     EvaluationMatchStatus,
     EvaluationPayload,
+    EvaluationReport,
 )
 from clearml_yolo.comparison.pr_curves import build_pr_curves
 from clearml_yolo.result_export import assign_source_ids, build_result_rows
@@ -591,6 +593,19 @@ def evaluate_split(
         matching_strategy=matching_strategy, ap_method=ap_method,
     )
     _verify_pr_ap50(pr_curves, metrics)
+    evaluation_payload.report = EvaluationReport(
+        classes=list(classes),
+        confusion_matrix=confusion_matrix,
+        pr_curves=pr_curves,
+        average_precisions={
+            curve.class_name: ClassAveragePrecision(
+                ap50=float(metrics[curve.class_name].ap50) if curve.gt_count else None,
+                ap75=float(metrics[curve.class_name].ap75) if curve.gt_count else None,
+                ap50_95=float(metrics[curve.class_name].ap50_95) if curve.gt_count else None,
+            )
+            for curve in pr_curves
+        },
+    )
     result_rows = build_result_rows(
         source_gt, source_preds, prepared_ground_truth=gt_df, prepared_predictions=predictions,
         split=split, thresholds=normalized, matches_pre_threshold=matches,

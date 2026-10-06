@@ -35,6 +35,7 @@ class PublicationReceipt(BaseModel):
     dataset_reused: bool
     sample_count: int
     fields: dict[str, str]
+    evaluation_keys: dict[str, str] = Field(default_factory=dict)
     dataset_complete: bool
     run_complete: bool
     payload_paths: dict[str, Path]

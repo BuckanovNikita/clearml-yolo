@@ -26,6 +26,22 @@
   errors produce warnings and may skip visualization; computation continues. Native
   collapsed boxes may be visualized without changing predictions or metric inputs.
 
+### Session 2026-10-06 — native evaluation amendment
+
+[Feature 015](../015-fiftyone-native-evaluations/spec.md) supersedes the original
+prohibition on FiftyOne evaluation registration and adapter-only imports. Native
+backend/result/plugin modules may register persisted evaluations from existing matches;
+rematching remains prohibited. Per-split evaluation keys extend receipts and run links.
+Native evaluations use the active `evaluated_predictions` field, excluding `filtered`
+boxes; `matched_predictions` retains the complete audit overlay. Optional versioned
+reports retain original PR50 and AP50/AP75/AP50_95 values. The
+explicitly installed App extension preserves exact wrong-class counts/navigation and
+shows unavailable mAR/subset AP. Existing runs upgrade only through publication/reruns;
+old payloads without reports remain readable. Original implementation and dated evidence
+below describe their historical scope; the [current publisher contract](contracts/publisher.md)
+and [native evaluation contract](../015-fiftyone-native-evaluations/contracts/native-evaluation.md)
+govern the amended behavior.
+
 ### User Story 1 - Review an eligible run (Priority: P1)
 
 An ML operator runs `cy`, `cy-predict`, or `cy-metrics` with default configuration and receives a local persistent visual-review dataset whose samples reference the existing image media and retain `image_name` and `split`, including backgrounds.
@@ -90,7 +106,7 @@ A reviewer sees raw predictions separately from run-specific evaluated ground tr
 
 - **FR-001**: The main installation MUST declare FiftyOne, and configuration MUST expose `fiftyone.enabled=true` and `fiftyone.dataset_prefix="clearml-yolo"` for `cy`, `cy-predict`, and `cy-metrics` only.
 - **FR-002**: When disabled, eligible commands MUST select a no-op publisher that imports no FiftyOne module and performs no FiftyOne state operation.
-- **FR-003**: Only `clearml_yolo.publishing`'s FiftyOne adapter MAY import FiftyOne; a typed replaceable neutral publisher boundary MUST accept persistent evaluation data without requiring FiftyOne types.
+- **FR-003**: Only optional modules under `clearml_yolo.publishing` MAY import FiftyOne; a typed replaceable neutral publisher boundary MUST accept persistent evaluation data without requiring FiftyOne types.
 - **FR-004**: Publication MUST use a local persistent database, reference existing resolved image media without copying it, and MUST NOT launch a FiftyOne UI.
 - **FR-005**: The reusable dataset key MUST include dataset prefix, adapter schema version, and effective GT CSV SHA256. Stored dataset identity MUST include resolved media-path identity, and source GT SHA256 MUST be retained as provenance when cleaning changes GT.
 - **FR-006**: Dataset reuse MUST validate each resolved path identity; matching completed imports MUST be reused and any mismatch MUST fail rather than silently merge.
@@ -98,7 +114,8 @@ A reviewer sees raw predictions separately from run-specific evaluated ground tr
 - **FR-008**: Every run field MUST be namespaced by its ClearML task ID. The same task retry MUST be idempotent, and completion markers MUST distinguish durable dataset import from a task's durable run publication.
 - **FR-009**: A per-dataset local file lock MUST serialize publishers. Recovery MUST limit mutation to the current task's incomplete run scope and MUST preserve completed or in-progress other-task data.
 - **FR-010**: The neutral persisted `EvaluationPayload` MUST be Pydantic, schema version 1, and contain split, image names, thresholds, ground truth, predictions, and matches. Each box MUST retain index, image name, label, `(x1,y1,x2,y2)`, optional confidence, and status; each match MUST retain nullable GT/pred indices, labels, confidence, IoU, and status.
-- **FR-011**: Metrics MUST produce the neutral payload from exact digital-metrics fixed-threshold matching. It MUST retain TP/FP/FN/filtered labels, indices, and IoU, separate raw predictions from run-specific evaluated GT/predictions, and MUST NOT rematch or use FiftyOne evaluation.
+- **FR-011**: Metrics MUST produce the neutral payload from exact digital-metrics fixed-threshold matching. It MUST retain TP/FP/FN/filtered labels, indices, and IoU, separate raw predictions from run-specific evaluated GT/predictions, and MUST NOT rematch. Native FiftyOne evaluations MAY register those existing results
+  without invoking matching or changing the source report (2026-10-06 amendment).
 - **FR-012**: `MetricsResult` MUST expose paths to neutral persisted evaluation payloads; external `digital-metrics` MUST NOT be modified or monkeypatched.
 - **FR-013**: The pipeline MUST publish once after its applicable results are ready; nested
   prediction/metrics publication MUST be disabled. Standalone `cy-predict` and `cy-metrics`
