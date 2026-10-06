@@ -1,8 +1,0 @@
-[submodule "external/digital-metrics"]
-	path = external/digital-metrics
-	url = https://github.com/Wasilkas/digital-metrics
-	branch = main
-[submodule "external/report-generator"]
-	path = external/report-generator
-	url = https://github.com/Wasilkas/report-generator
-	branch = main

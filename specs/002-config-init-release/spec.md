@@ -132,3 +132,11 @@ types, unavailable integration services, and an already-published tag.
 - Local examples deliberately preserve missing inputs rather than selecting a user's dataset or device.
 - The user explicitly authorized including the concurrent dependency/submodule and skill
   changes. The isolated release checkout contains the combined approved snapshot.
+
+## Dependency setup amendment — 2026-10-06
+
+[Local dependency copies](../017-local-dependency-copies/spec.md) supersede the
+submodule and gitlink requirements in FR-010. Preserve approved upstream contents
+in ignored local directories with the existing editable paths. The
+[development guide](../../docs/development.md#external-dependencies) owns current
+setup and approved revisions; prior completed tasks remain historical evidence.

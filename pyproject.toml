@@ -30,7 +30,7 @@ dependencies = [
     "scipy>=1.11",
     "openpyxl>=3.1",
     "tqdm>=4.66",
-    # The external/ submodules track upstream main and pin resolved commits (see AGENTS.md).
+    # Local dependency copies live in external/; see docs/development.md.
     "digital-metrics>=0.6.1",
     "report-generator>=0.1.2",
     "ruamel-yaml>=0.18,<0.19",
@@ -316,7 +316,7 @@ enable_error_code = [
     "unimported-reveal",
     "unused-awaitable",
 ]
-# Submodules are external dependencies, so they are not ours to type-check.
+# Local copies are external dependencies, so they are not ours to type-check.
 exclude = ["^external/", "^(outputs|runs|multirun|build|dist)/"]
 
 [[tool.mypy.overrides]]

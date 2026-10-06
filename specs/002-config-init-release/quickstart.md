@@ -1,14 +1,15 @@
 # Validation Guide
 
-Use Python 3.12 and the locked project environment:
+Use Python 3.12 and the locked project environment. Populate the approved local
+dependency copies following the [development guide](../../docs/development.md#external-dependencies)
+first; current setup no longer uses submodules.
 
 ```bash
-git submodule update --init --recursive
-uv sync --locked --group dev
-uv run cy-init-config ./conf
-uv run cy-train --config-dir=./conf --config-name=cy-train --cfg job \
+uv sync --frozen --group dev
+uv run --frozen cy-init-config ./conf
+uv run --frozen cy-train --config-dir=./conf --config-name=cy-train --cfg job \
   ground_truth=ground_truth.csv
-uv run cy --config-dir=./conf --config-name=cy --cfg job \
+uv run --frozen cy --config-dir=./conf --config-name=cy --cfg job \
   ground_truth=ground_truth.csv
 ```
 
@@ -20,17 +21,17 @@ initialization: it must fail without replacing examples. Use `--force` only to d
 edits to generated files. Unrelated files must survive.
 
 ```bash
-uv run pytest
-uv run ruff check .
-uv run mypy .
-uv run lint-imports
-uv run pre-commit run --all-files
+uv run --frozen pytest
+uv run --frozen ruff check .
+uv run --frozen mypy .
+uv run --frozen lint-imports
+uv run --frozen pre-commit run --all-files
 uv build
 ```
 
 Install the wheel and source archive into separate fresh environments, supplying the
 exact upstream Git requirements in the [release notes](../../docs/releases/0.3.0.md).
-These installations must not depend on editable submodule paths. Check all nine
+These installations must not depend on editable local dependency paths. Check all nine
 command helps, example generation, collision/force behavior, and
 composition through all eight execution commands. Scan first-party Python for the
 prohibited import. Do not scan or modify external dependency checkouts.

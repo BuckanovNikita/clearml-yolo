@@ -26,16 +26,32 @@ dated real-run evidence and the
 
 ## External dependencies
 
-`digital-metrics` and `report-generator` live in `external/` as Git submodules.
-Both track upstream `main` through `.gitmodules`; `git submodule update --remote`
-advances their checkouts when an upstream update is requested.
-Initialize them with `git submodule update --init --recursive` before `uv sync`.
-Local development installs them editable through uncommitted `[tool.uv.sources]`
-overrides, restored after each commit by the [commit procedure](#commit-procedure).
-The parent repository's gitlinks pin their revisions. For setup without source
-overrides, use `uv sync --frozen` and `uv run --frozen` with the committed lockfile.
-Local development overrides are shown in the [commit procedure](#commit-procedure).
-Do not replace pinned submodules with moving Git branches as part of ordinary setup.
+`digital-metrics` and `report-generator` live in ignored local directories under
+`external/`. They are ordinary source copies, not parent-repository submodules.
+Copy the approved source trees to `external/digital-metrics` and
+`external/report-generator` before installing dependencies. Independent clones at
+these paths also work; do not add their contents or Git metadata to this repository.
+
+| Dependency | Upstream | Approved source revision |
+| --- | --- | --- |
+| digital-metrics | [repository](https://github.com/Wasilkas/digital-metrics) | `7c6dfa98cc052ce0202f11655839078534182d77` |
+| report-generator | [repository](https://github.com/Wasilkas/report-generator) | `8ddd0f7f11d25367f4e71ace77524ebb72257699` |
+
+The committed lockfile installs both paths editable; it does not store their source
+contents or enforce their Git revisions. Keep the approved copies available for all
+syncs and runs. A fresh checkout does not download them automatically. Once populated:
+
+```bash
+uv sync --frozen --dev
+uv run --frozen cy --help
+```
+
+For local dependency resolution, use the uncommitted `[tool.uv.sources]` overrides
+below. Restore them after each commit using the [commit procedure](#commit-procedure).
+Do not update upstream source revisions during ordinary setup. Existing submodule
+users should preserve their populated source trees before switching to this revision;
+remove only their obsolete `.git` pointer files and local `submodule.*` configuration.
+Retaining `.git/modules/` preserves old dependency history for recovery.
 
 `digital-metrics` is an external dependency. Keep it pinned to the approved upstream
 revision. Do not change its source, checkout, dependency reference or locked revision
@@ -55,7 +71,7 @@ from `pyproject.toml`, including its comments and the local editable overrides:
 
 ```toml
 [tool.uv.sources]
-# Local development uses the pinned submodules.
+# Local development uses ordinary dependency copies.
 digital-metrics = { path = "external/digital-metrics", editable = true }
 report-generator = { path = "external/report-generator", editable = true }
 ```
@@ -64,7 +80,7 @@ Preserve the exact local section before removing it. Stage only the section remo
 and other authorized changes; verify that the staged `pyproject.toml` has no
 `[tool.uv.sources]` section. Preserve unrelated staged and unstaged edits. Run the
 applicable commit checks without bypassing hooks. This temporary removal does not
-authorize dependency resolution, changes to `uv.lock`, or submodule updates.
+authorize dependency resolution, changes to `uv.lock`, or dependency source updates.
 
 After the commit command and its hooks finish, restore the saved section locally
 without staging it. Keep the section absent throughout any automatic release commit.

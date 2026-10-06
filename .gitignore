@@ -25,3 +25,7 @@ ground_truth.csv
 dist/
 build/
 .env*
+
+# Local editable dependency copies
+/external/digital-metrics/
+/external/report-generator/

@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record YAML quickstart minor release verification
+  ([`2cbbd3b`](https://github.com/BuckanovNikita/clearml-yolo/commit/2cbbd3b6b90e77cdfa99b2ab2eed250951766f63))
+
+
 ## v0.17.0 (2026-10-06)
 
 ### Documentation

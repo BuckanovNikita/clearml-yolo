@@ -1,10 +1,11 @@
 # Quickstart Validation
 
-Initialize the existing pinned submodules, then install dependencies and hooks:
+Populate the approved local dependency copies as described in the
+[development guide](../../docs/development.md#external-dependencies), then install
+dependencies and hooks:
 
 ```bash
-git submodule update --init --recursive
-uv sync --locked --dev
+uv sync --frozen --dev
 uv run --locked --no-sync python scripts/local_release.py --install-hooks
 ```
 
@@ -12,11 +13,11 @@ Installation creates pre-commit and post-commit hooks without creating a release
 Use temporary repositories through the acceptance suite, not throwaway commits on master:
 
 ```bash
-uv run pytest tests/test_local_release.py
-uv run ruff check .
-uv run mypy .
-uv run lint-imports
-uv run pre-commit run --all-files
+uv run --frozen pytest tests/test_local_release.py
+uv run --frozen ruff check .
+uv run --frozen mypy .
+uv run --frozen lint-imports
+uv run --frozen pre-commit run --all-files
 ```
 
 Expected: fixture commits produce checked metadata/changelog commits and annotated tags; negative
