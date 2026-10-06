@@ -7,10 +7,14 @@ and implementation evidence by topic; this summary does not replace those contra
 `cy` runs the pipeline; `cy-train`, `cy-predict`, `cy-val`, `cy-metrics`, `cy-report`,
 `cy-compare`, and `cy-ground-truth` run individual stages.
 
-Nine entrypoints: `cy`, `cy-train`, `cy-predict`, `cy-val`, `cy-metrics`,
-`cy-report`, `cy-compare`, `cy-ground-truth`, and `cy-init-config`.
+Entrypoints: `cy`, `cy-train`, `cy-predict`, `cy-val`, `cy-metrics`,
+`cy-report`, `cy-compare`, `cy-ground-truth`, `cy-init-config`, and `cy-dedup`.
 `cy-init-config DIRECTORY [--force]` writes editable examples for the eight execution
 commands without creating a ClearML task.
+`cy-dedup [DIRECTORY] [--dry-run]` is local cache maintenance without application startup
+or tracking. It reflinks identical same-named images, preserving paths and content;
+unsupported reflinks are reported skips. See the
+[deduplication contract](../specs/018-cache-image-dedup/contracts/cli.md).
 
 Native model settings use top-level Hydra groups `ultralytics` and `ultralytics_predict`
 for all model commands. The shared group covers detection-relevant installed upstream defaults; prediction

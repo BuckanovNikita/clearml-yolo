@@ -1,7 +1,8 @@
 # Filesystem ownership
 
-All nine commands initialize application-owned filesystem defaults before importing execution
-dependencies.
+The execution commands and `cy-init-config` initialize application-owned filesystem defaults
+before importing execution dependencies. `cy-dedup` only resolves its selected cache root;
+it does not initialize application directories or dependency settings.
 `CY_HOME` defaults to the launch working directory. An absolute value selects another
 workspace; a relative value is resolved against the launch directory once. Changing the
 process working directory later does not change the captured root. Explicit relative
@@ -88,3 +89,16 @@ run-directory cleanup.
 
 Existing caches are not migrated or deleted. Changing `CY_HOME` changes automatic paths;
 explicit paths and read-only inputs remain independent of it.
+
+## Explicit image deduplication
+
+`cy-dedup [DIRECTORY] [--dry-run]` performs opt-in maintenance of an idle cache, defaulting
+to `CY_HOME/.cache`. Same-named, byte-identical regular images may share filesystem blocks
+using Linux reflinks. Paths and contents remain intact and subsequent writes are independent.
+The command replaces a destination atomically through a temporary sibling, preserving its
+mode, ownership, atime/mtime and extended attributes; inode, ctime and birth time can change.
+Reads may update access times. Symlinks are excluded. Unsupported platforms/filesystems and
+cross-device candidates are reported skips; unexpected I/O failures return nonzero.
+Dry-run creates and replaces nothing. See the maintained
+[deduplication contract](../specs/018-cache-image-dedup/contracts/cli.md) for file selection,
+failure behavior and the idle-cache requirement.

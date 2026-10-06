@@ -1,7 +1,13 @@
 # CLI and configuration contract
 
-Nine entrypoints: cy, cy-train, cy-predict, cy-val, cy-metrics, cy-report, cy-compare,
-cy-ground-truth and cy-init-config.
+Entrypoints: cy, cy-train, cy-predict, cy-val, cy-metrics, cy-report, cy-compare,
+cy-ground-truth, cy-init-config and cy-dedup.
+
+`cy-dedup [DIRECTORY] [--dry-run]` is standalone cache maintenance without ClearML or
+model initialization. It defaults to `CY_HOME/.cache` (launch directory when CY_HOME
+is unset), matches exact filenames plus equal contents, and replaces duplicates with
+reflinks where supported. Unsupported operations are skips; unexpected I/O errors fail.
+See the maintained [deduplication contract](../../018-cache-image-dedup/contracts/cli.md).
 
 `cy-init-config DIRECTORY [--force]` creates missing parent directories and writes one
 editable YAML per execution command, named after that command (including `cy-val.yaml`).

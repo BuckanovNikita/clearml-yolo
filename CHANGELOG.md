@@ -5,6 +5,9 @@
 
 ### Documentation
 
+- Clarify release push verification
+  ([`4044c72`](https://github.com/BuckanovNikita/clearml-yolo/commit/4044c72870e5940365637373da4420866f2042aa))
+
 - Record local dependency release verification
   ([`4f8b033`](https://github.com/BuckanovNikita/clearml-yolo/commit/4f8b033e8dabe59968448fc61c814ee0f999c0a9))
 

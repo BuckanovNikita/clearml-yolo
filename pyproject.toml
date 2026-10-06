@@ -46,6 +46,7 @@ cy-compare = "clearml_yolo.apps.compare:main"
 cy-ground-truth = "clearml_yolo.apps.ground_truth:main"
 cy-val = "clearml_yolo.apps.val:main"
 cy-init-config = "clearml_yolo.apps.config_tree:main"
+cy-dedup = "clearml_yolo.dedup_cli:main"
 
 [build-system]
 requires = ["uv_build>=0.11.32,<0.12.0"]
@@ -160,6 +161,8 @@ name = "Package layers"
 type = "layers"
 layers = [
     "clearml_yolo.apps",
+    "clearml_yolo.dedup_cli",
+    "clearml_yolo.dedup",
     "clearml_yolo.config_tree",
     "clearml_yolo.configs",
     "clearml_yolo.tasks",
@@ -214,6 +217,8 @@ modules = [
 name = "The ClearML SDK stays behind the clearml_* adapters"
 type = "forbidden"
 source_modules = [
+    "clearml_yolo.dedup",
+    "clearml_yolo.dedup_cli",
     "clearml_yolo.dataset_cache",
     "clearml_yolo.dataset",
     "clearml_yolo.dataset_export",
@@ -235,6 +240,8 @@ allow_indirect_imports = true
 name = "The domain does not know it is configured by hydra"
 type = "forbidden"
 source_modules = [
+    "clearml_yolo.dedup",
+    "clearml_yolo.dedup_cli",
     "clearml_yolo.dataset_cache",
     "clearml_yolo.dataset",
     "clearml_yolo.dataset_export",
@@ -256,6 +263,8 @@ allow_indirect_imports = true
 name = "Model weights are only ever loaded in one place"
 type = "forbidden"
 source_modules = [
+    "clearml_yolo.dedup",
+    "clearml_yolo.dedup_cli",
     "clearml_yolo.dataset_cache",
     "clearml_yolo.dataset",
     "clearml_yolo.dataset_export",
