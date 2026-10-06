@@ -2,7 +2,7 @@
 
 **Feature Branch**: `master`
 **Created**: 2026-10-06
-**Status**: Approved for implementation
+**Status**: Implemented and verified; released in v0.16.0
 **Input**: Imported predictions must provide the native FiftyOne evaluation experience.
 
 ## User Scenarios & Testing

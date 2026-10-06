@@ -25,4 +25,4 @@
 
 ## Release
 
-- [ ] T012 Run commit/release hooks and publish Git commits/version tag only.
+- [x] T012 Run commit/release hooks and publish Git commits/version tag only.

@@ -79,3 +79,22 @@ after the browser-discovered matrix correction. No actionable findings remained.
 All 15 changed/new Markdown files parsed and 91 local links/anchors validated.
 Documented plugin installation was exercised in the isolated App. Task-owned App,
 browser and disposable MongoDB were stopped; the shared test UI dataset was deleted.
+
+## Release
+
+Feature commit `60ab70b` passed ordinary hooks with real FiftyOne persistence enabled.
+The changelog hook first regenerated committed history; its reviewed output was staged
+and the commit retried with all hooks passing. Release commit `d33dcaf` created annotated
+tag `v0.16.0` after ordinary checks and the recovery workflow's full final validation.
+Both commits and the tag were pushed to origin.
+
+Automatic preparation encountered the previously observed offline dependency-resolution
+limitation with local source overrides absent. Recovery changed only the root version in
+`uv.lock`, retained the generated release metadata and verified that every dependency
+record and external revision was unchanged. Exact local source overrides were restored
+unstaged after every attempt. No hooks were bypassed.
+
+Final 0.16.0 wheel and sdist installations passed all nine command helps, plugin resource
+checks, configuration generation and overwrite protection. All 70 installed Python and
+plugin resource files matched the accepted checkout byte-for-byte. Distributions were
+built only for verification; no package, release asset or deployment was published.
