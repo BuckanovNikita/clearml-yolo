@@ -71,3 +71,20 @@ Machine-specific logs, actual plot payloads, screenshots, task identifiers, down
 artifacts/models and cleanup records are retained with the global environment skill;
 packaging logs and distributions remain in task-owned temporary evidence. This document
 records portable acceptance outcomes only.
+
+## Release result
+
+Feature commit `a6a78e8` passed the ordinary commit hooks. Automatic release metadata
+preparation could not resolve the local dependency after the required temporary source
+override removal. Restoring the exact overrides allowed the real offline lock refresh;
+inspection confirmed only the root project version changed, with every dependency record
+unchanged. Recovery used the existing metadata/checksum validators and ordinary quality
+hooks before creating release commit `0a41b3c` and annotated tag `v0.19.1`. Independent
+read-only review confirmed the recovery preserved the release invariants. No quality hook
+was bypassed, no upstream dependency changed, and local overrides were restored unstaged.
+
+Final 0.19.1 wheel and source archives matched all 74 Python source files byte-for-byte.
+Both passed fresh-environment installation, all ten helps, configuration generation and
+overwrite protection, including guards against task creation. Frozen development sync
+and installed command help also passed. Publication is limited to Git commits and the
+version tag; no package assets or deployments are included.
