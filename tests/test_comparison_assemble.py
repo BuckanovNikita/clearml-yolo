@@ -26,6 +26,7 @@ from clearml_yolo.comparison.assemble import (
 )
 from clearml_yolo.comparison.scoring import ClassCounts, EvaluatedSplit, SplitOutcome
 from clearml_yolo.comparison.workbook import COMPARISON_COLUMNS, write_comparison_workbook
+from clearml_yolo.workbook_identity import read_dashboard
 
 
 def _settled(**overrides: Any) -> Any:
@@ -401,7 +402,9 @@ def test_comparing_a_model_against_itself_is_refused(
     checkpoint = tmp_path / "best.pt"
     checkpoint.write_bytes(b"")
     monkeypatch.setattr("clearml_yolo.tasks.compare.init_task", lambda *_args, **_kwargs: None)
-    same = ModelRef(source="local", weights=checkpoint, thresholds={"car": 0.4})
+    same = ModelRef(
+        source="local", label="fixture detector", weights=checkpoint, thresholds={"car": 0.4}
+    )
     (tmp_path / "gt.csv").write_text("image_name,split\na.png,test\n", encoding="utf-8")
 
     with pytest.raises(ValueError, match="same checkpoint"):
@@ -564,7 +567,14 @@ def test_resolved_clearml_model_keeps_exact_task_id(
     task_id = "a" * 32
     monkeypatch.setattr(
         "clearml_yolo.tasks.compare.resolve_task_model",
-        lambda task_id: (checkpoint, {"task_id": task_id}),
+        lambda task_id: (
+            checkpoint,
+            {
+                "task_id": task_id,
+                "model_name": "source-detector",
+                "training_task_id": task_id,
+            },
+        ),
     )
     monkeypatch.setattr(
         "clearml_yolo.tasks.compare.fetch_best_confidences",
@@ -628,7 +638,9 @@ def _stub_comparison_publication(
     monkeypatch.setattr(
         "clearml_yolo.tasks.compare.init_task", lambda *_args, **_kwargs: FakeTask()
     )
-    monkeypatch.setattr("clearml_yolo.tasks.compare.report_comparison", lambda *_args: None)
+    monkeypatch.setattr(
+        "clearml_yolo.tasks.compare.report_comparison", lambda *_args, **_kwargs: None
+    )
     monkeypatch.setattr(
         "clearml_yolo.tasks.compare.upload_artifact",
         lambda _task, name, value: uploads.setdefault(name, value),
@@ -656,7 +668,9 @@ def _recovered_comparison_models(
     from clearml_yolo.tasks.compare import ModelRef
 
     models = {
-        role: ModelRef(source="local", weights=weights, thresholds={"cat": 0.5})
+        role: ModelRef(
+            source="local", label=f"fixture {role}", weights=weights, thresholds={"cat": 0.5}
+        )
         for role, weights in [("baseline", baseline_weights), ("candidate", candidate_weights)]
     }
     if legacy_role is not None:
@@ -667,7 +681,7 @@ def _recovered_comparison_models(
             output = SimpleNamespace(
                 id=f"{role}-model",
                 url=f"https://files.example/{role}.pt",
-                get_metadata=lambda _key: "best",
+                get_metadata=lambda key: "best" if key == "clearml_yolo_checkpoint_role" else None,
                 get_local_copy=lambda weights=weights: str(weights),
             )
             artifacts = (
@@ -824,9 +838,9 @@ def test_compare_dashboards_and_statistics_share_the_same_test_counts(
     )
 
     assert result is not None
-    baseline = pd.read_excel(result.baseline_dashboard, index_col=0)
-    candidate = pd.read_excel(result.candidate_dashboard, index_col=0)
-    statistics = pd.read_excel(result.workbook, sheet_name="Сравнение")
+    baseline = read_dashboard(result.baseline_dashboard, index_col=0)
+    candidate = read_dashboard(result.candidate_dashboard, index_col=0)
+    statistics = read_dashboard(result.workbook, sheet_name="Сравнение")
     row = statistics[statistics["Класс"] == "cat"].iloc[0]
     assert (baseline.loc["cat", "tp"], baseline.loc["cat", "fp"], baseline.loc["cat", "fn"]) == (
         row["TP прод"],
@@ -904,6 +918,7 @@ def test_comparison_scoring_uses_the_full_evaluation_configuration(
     native_dir = tmp_path / "native" / "candidate_test"
     raw_predictions.attrs["effective_args"] = {"device": "cpu"}
     raw_predictions.attrs["save_dir"] = str(native_dir)
+    raw_predictions.to_csv(tmp_path / "candidate_predictions.csv", index=False)
     monkeypatch.setattr(
         "clearml_yolo.tasks.compare.reinfer_split",
         lambda *_args, **_kwargs: (
@@ -989,6 +1004,7 @@ def test_prediction_only_class_requires_its_saved_threshold(
         ],
     )
     predictions.attrs["save_dir"] = str(tmp_path / "native" / "candidate_test")
+    predictions.to_csv(tmp_path / "candidate_predictions.csv", index=False)
     monkeypatch.setattr(
         "clearml_yolo.tasks.compare.reinfer_split",
         lambda *_args, **_kwargs: (
@@ -1082,7 +1098,9 @@ def test_automatic_baseline_absence_still_evaluates_candidate(
 
     result = compare(
         ModelRef(),
-        ModelRef(source="local", weights=candidate, thresholds={"cat": 0.5}),
+        ModelRef(
+            source="local", label="fixture candidate", weights=candidate, thresholds={"cat": 0.5}
+        ),
         truth_path,
         tmp_path / "comparison",
         ClearMLConfig(),

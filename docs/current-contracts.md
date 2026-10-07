@@ -66,6 +66,16 @@ current IDs; shared readable suffixes are rechecked without changing paths or mo
 Calibration thresholds may enrich only an invocation-owned best model after checkpoint
 hash association and metadata readback. Standalone metrics never mutates models.
 
+New evaluation/report outputs carry the finalized source model name and full original
+training task ID through checkpoint/prediction hash bindings, contexts and manifests.
+Stored provenance wins over fallback labels; inputs without provenance require explicit
+labels and display unavailable training provenance without registering a model.
+The [identity presentation contract](../specs/014-evaluation-publication/contracts/publication.md#source-identity-on-new-results)
+defines entrypoint labels, every worksheet/plot caption and repeated printed banners.
+Workbooks normalize horizontal print width to one page while preserving original body
+styles/formulas and explicit row breaks. Project adapters expose original layouts to
+report/threshold readers; pinned dependencies and historical artifacts are unchanged.
+
 Validation, metrics and comparison warn and drop invalid prediction geometry before
 preprocessing, calibration and mAP, preserving raw CSVs. All-invalid predictions are
 scored as empty, with unmatched ground truth counted as false negatives. See the

@@ -19,6 +19,7 @@ from clearml_yolo.clearml_session import (
     register_model_barrier,
     sanitize_configuration,
 )
+from clearml_yolo.model_identity import ModelIdentity, write_checkpoint_identity
 
 
 class NativeModelError(ArtifactUploadError):
@@ -35,6 +36,7 @@ class OwnedNativeModel:
     writable: Any
     expected_metadata: dict[str, dict[str, str]]
     verify: Callable[[], None]
+    identity: ModelIdentity
 
 
 @dataclass
@@ -174,6 +176,7 @@ def _metadata(
         "clearml_yolo_checkpoint_role": "best",
         "clearml_yolo_checkpoint_filename": checkpoint.name,
         "clearml_yolo_checkpoint_sha256": checkpoint_hash,
+        "clearml_yolo_training_task_id": str(task.id),
         "clearml_yolo_architecture_reference": str(sanitize_configuration(str(architecture))),
         "clearml_yolo_version": _package_version("clearml-yolo"),
         "clearml_version": _package_version("clearml"),
@@ -348,9 +351,17 @@ def finalize_native_model(task: Any, model: Any, trainer: Any, architecture: Any
         )
 
     verify()
+    identity = ModelIdentity(
+        model_name=name, training_task_id=str(task.id),
+        checkpoint_sha256=checkpoint_hash, model_id=model_id,
+    )
+    write_checkpoint_identity(checkpoint, identity)
     _register_owned_model(
         task,
-        OwnedNativeModel(model_id, checkpoint_hash, expected_url, writable, metadata, verify),
+        OwnedNativeModel(
+            model_id, checkpoint_hash, expected_url, writable, metadata, verify,
+            identity,
+        ),
     )
     register_model_barrier(task, verify)
     return model_id

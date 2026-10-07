@@ -16,6 +16,7 @@ from clearml_yolo.publishing.models import (
     PublicationRequest,
 )
 from clearml_yolo.tasks.metrics import EvaluationConfig, MetricsResult, _prepare, compute_metrics
+from clearml_yolo.workbook_identity import read_dashboard
 from test_clearml_session import FakeTask
 
 
@@ -30,10 +31,15 @@ def _metric_owner(monkeypatch: pytest.MonkeyPatch) -> Iterator[FakeTask]:
     task = FakeTask()
     monkeypatch.setattr(clearml.Task, "init", lambda **_kwargs: task)
     monkeypatch.setattr(clearml.Task, "get_task", lambda **_kwargs: task)
-    monkeypatch.setattr(task, "get_logger", lambda: SimpleNamespace(
-        report_plotly=lambda **_kwargs: None,
-    ), raising=False)
-    monkeypatch.setattr(module, "report_table", lambda *_args: None)
+    monkeypatch.setattr(
+        task,
+        "get_logger",
+        lambda: SimpleNamespace(
+            report_plotly=lambda **_kwargs: None,
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(module, "report_table", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(module, "report_scalars", lambda *_args: None)
     with invocation(ClearMLConfig(), "metrics"):
         yield task
@@ -100,11 +106,12 @@ def test_candidate_threshold_is_calibrated_on_val_and_reused_for_test(
         splits=["val", "test"],
         calibration_split="val",
         fiftyone=FiftyOneConfig(enabled=False),
+        model_label="fixture detector",
     )
 
     assert result.best_confidences["val"] == {"cat": 0.8}
     assert result.best_confidences["test"] == {"cat": 0.8}
-    test = pd.read_excel(result.dashboards["test"], index_col=0)
+    test = read_dashboard(result.dashboards["test"], index_col=0)
     assert test.loc["cat", "confidence"] == pytest.approx(0.8)
     assert test.loc["cat", "tp"] == 0
     assert test.loc["cat", "fn"] == 1
@@ -132,6 +139,7 @@ def test_match_tables_preserve_excel_illegal_characters_in_csv(
         evaluation=EvaluationConfig(),
         splits=["test"],
         fiftyone=FiftyOneConfig(enabled=False),
+        model_label="fixture detector",
     )
 
     matches = pd.read_csv(result.output_dir / "metrics_evaluation_test_prediction_matches.csv")
@@ -196,6 +204,7 @@ def test_test_only_evaluation_still_requires_validation_membership(
             splits=["test"],
             calibration_split="val",
             fiftyone=FiftyOneConfig(enabled=False),
+            model_label="fixture detector",
         )
 
 
@@ -215,6 +224,7 @@ def test_calibration_split_must_be_validation(
             splits=["test"],
             calibration_split="test",
             fiftyone=FiftyOneConfig(enabled=False),
+            model_label="fixture detector",
         )
 
 
@@ -236,6 +246,7 @@ def test_one_image_cannot_belong_to_validation_and_test(
             evaluation=EvaluationConfig(),
             splits=["test"],
             fiftyone=FiftyOneConfig(enabled=False),
+            model_label="fixture detector",
         )
 
 
@@ -294,6 +305,7 @@ def test_numeric_image_identifiers_remain_text_when_loaded(
             evaluation=EvaluationConfig(),
             splits=["test"],
             fiftyone=FiftyOneConfig(enabled=False),
+            model_label="fixture detector",
         )
 
     assert seen["predictions"]["image_name"].iloc[0] == "000000000009"
@@ -366,6 +378,7 @@ def test_metrics_preflights_before_scoring_and_publishes_evaluation_payloads(
         splits=["test"],
         calibration_split="val",
         fiftyone=FiftyOneConfig(),
+        model_label="fixture detector",
     )
 
     assert events == ["preflight", "compute", "publish"]
@@ -387,7 +400,6 @@ def test_metrics_publishes_only_canonical_tables_and_readable_workbooks(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, zero_predictions: bool
 ) -> None:
 
-
     predictions, ground_truth = _write_inputs(tmp_path)
     truth = pd.read_csv(ground_truth)
     train = truth[truth.split == "val"].assign(
@@ -400,8 +412,13 @@ def test_metrics_publishes_only_canonical_tables_and_readable_workbooks(
     (frame.iloc[:0] if zero_predictions else frame).to_csv(predictions, index=False)
     with _metric_owner(monkeypatch) as task:
         result = compute_metrics(
-            predictions, ground_truth, tmp_path / "metrics", ClearMLConfig(), EvaluationConfig(),
+            predictions,
+            ground_truth,
+            tmp_path / "metrics",
+            ClearMLConfig(),
+            EvaluationConfig(),
             fiftyone=FiftyOneConfig(enabled=False),
+            model_label="fixture detector",
         )
     uploads = {item["name"]: item["artifact_object"] for item in task.uploads}
     _assert_readable_metrics_evidence(result, uploads, zero_predictions)
@@ -413,9 +430,14 @@ def _assert_readable_metrics_evidence(
     from clearml_yolo.comparison.evaluation_payload import EvaluationPayload
 
     assert set(uploads) == {
-        "gt_csv", "predicts_csv", "metrics_best_confidences_val",
-        *{f"metrics_dashboard_{kind}_{split}"
-          for split in ("train", "val", "test") for kind in ("full", "dtrk")},
+        "gt_csv",
+        "predicts_csv",
+        "metrics_best_confidences_val",
+        *{
+            f"metrics_dashboard_{kind}_{split}"
+            for split in ("train", "val", "test")
+            for kind in ("full", "dtrk")
+        },
     }
     combined = pd.read_csv(uploads["predicts_csv"])
     assert set(combined["split"]) == {"train", "val", "test"}
@@ -433,7 +455,7 @@ def _assert_readable_metrics_evidence(
         workbook = uploads[f"metrics_dashboard_full_{split}"]
         assert workbook == result.dashboards[split]
         assert workbook.is_file()
-        original = pd.read_excel(workbook, index_col=0)
+        original = read_dashboard(workbook, index_col=0)
         assert "cat" in original.index
         dtrk = uploads[f"metrics_dashboard_dtrk_{split}"]
         assert dtrk.is_file()
@@ -478,15 +500,25 @@ def test_metrics_publishes_frozen_validation_thresholds_even_without_val_output(
     pd.concat([truth, unused], ignore_index=True).to_csv(ground_truth, index=False)
     with _metric_owner(monkeypatch) as task:
         compute_metrics(
-            predictions, ground_truth, tmp_path / "metrics", ClearMLConfig(), EvaluationConfig(),
-            splits=["test"], fiftyone=FiftyOneConfig(enabled=False),
+            predictions,
+            ground_truth,
+            tmp_path / "metrics",
+            ClearMLConfig(),
+            EvaluationConfig(),
+            splits=["test"],
+            fiftyone=FiftyOneConfig(enabled=False),
+            model_label="fixture detector",
         )
     assert {item["name"] for item in task.uploads} == {
-        "gt_csv", "predicts_csv", "metrics_best_confidences_val",
-        "metrics_dashboard_full_test", "metrics_dashboard_dtrk_test",
+        "gt_csv",
+        "predicts_csv",
+        "metrics_best_confidences_val",
+        "metrics_dashboard_full_test",
+        "metrics_dashboard_dtrk_test",
     }
-    combined_path = next(item["artifact_object"] for item in task.uploads
-                         if item["name"] == "predicts_csv")
+    combined_path = next(
+        item["artifact_object"] for item in task.uploads if item["name"] == "predicts_csv"
+    )
     assert set(pd.read_csv(combined_path)["split"]) == {"val", "test"}
 
 
@@ -509,6 +541,7 @@ def test_validation_threshold_csv_keeps_full_float_precision(
             EvaluationConfig(),
             splits=["test"],
             fiftyone=FiftyOneConfig(enabled=False),
+            model_label="fixture detector",
         )
 
     uploads = {item["name"]: item["artifact_object"] for item in task.uploads}
@@ -545,6 +578,7 @@ def test_missing_required_plot_fails_even_without_tracking(
             EvaluationConfig(),
             splits=["test"],
             fiftyone=FiftyOneConfig(enabled=False),
+            model_label="fixture detector",
         )
 
 
@@ -565,11 +599,13 @@ def test_unsupported_split_inputs_fail_clearly(
             EvaluationConfig(),
             splits=["train"],
             fiftyone=FiftyOneConfig(enabled=False),
+            model_label="fixture detector",
         )
 
 
 def test_arbitrary_logical_split_keeps_outputs_inside_destination(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     predictions, ground_truth = _write_inputs(tmp_path)
     split = "../../../escape/actual"
@@ -579,10 +615,14 @@ def test_arbitrary_logical_split_keeps_outputs_inside_destination(
     monkeypatch.setattr("clearml_yolo.tasks.metrics.init_task", lambda *_args, **_kwargs: None)
     destination = tmp_path / "metrics"
     result = compute_metrics(
-        predictions, ground_truth, destination,
+        predictions,
+        ground_truth,
+        destination,
         clearml=object(),  # type: ignore[arg-type]
-        evaluation=EvaluationConfig(), splits=[split],
+        evaluation=EvaluationConfig(),
+        splits=[split],
         fiftyone=FiftyOneConfig(enabled=False),
+        model_label="fixture detector",
     )
     assert result.dashboards[split].parent == destination
     assert result.dashboards[split].is_file()
@@ -592,7 +632,9 @@ def test_arbitrary_logical_split_keeps_outputs_inside_destination(
 
 @pytest.mark.parametrize("already_suffixed", [False, True])
 def test_dashboard_plot_contract_accepts_legacy_and_suffixed_outputs(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, already_suffixed: bool,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    already_suffixed: bool,
 ) -> None:
     from digital_metrics.reporting import get_dashboards
 
@@ -617,10 +659,14 @@ def test_dashboard_plot_contract_accepts_legacy_and_suffixed_outputs(
     monkeypatch.setattr("clearml_yolo.tasks.metrics.init_task", lambda *_args, **_kwargs: None)
     predictions, ground_truth = _write_inputs(tmp_path)
     result = compute_metrics(
-        predictions, ground_truth, tmp_path / "metrics",
+        predictions,
+        ground_truth,
+        tmp_path / "metrics",
         clearml=object(),  # type: ignore[arg-type]
-        evaluation=EvaluationConfig(), splits=["test"],
+        evaluation=EvaluationConfig(),
+        splits=["test"],
         fiftyone=FiftyOneConfig(enabled=False),
+        model_label="fixture detector",
     )
     assert result.dashboards["test"].is_file()
     assert (tmp_path / "metrics" / "recall_confidence_intervals_test.png").is_file()
@@ -629,8 +675,10 @@ def test_dashboard_plot_contract_accepts_legacy_and_suffixed_outputs(
 @pytest.mark.parametrize("already_suffixed", [False, True])
 @pytest.mark.parametrize("suppress_recall", [False, True])
 def test_reused_destination_requires_fresh_confidence_plots(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-    already_suffixed: bool, suppress_recall: bool,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    already_suffixed: bool,
+    suppress_recall: bool,
 ) -> None:
     from digital_metrics.reporting import get_dashboards
 
@@ -656,7 +704,8 @@ def test_reused_destination_requires_fresh_confidence_plots(
         for path in producer.iterdir():
             metric = next(
                 (
-                    name for name in PLOT_METRICS
+                    name
+                    for name in PLOT_METRICS
                     if path.name.startswith(f"{name}_confidence_intervals")
                 ),
                 None,
@@ -674,10 +723,14 @@ def test_reused_destination_requires_fresh_confidence_plots(
 
     def run() -> None:
         compute_metrics(
-            predictions, ground_truth, destination,
+            predictions,
+            ground_truth,
+            destination,
             clearml=object(),  # type: ignore[arg-type]
-            evaluation=EvaluationConfig(), splits=["test"],
+            evaluation=EvaluationConfig(),
+            splits=["test"],
             fiftyone=FiftyOneConfig(enabled=False),
+            model_label="fixture detector",
         )
 
     if suppress_recall:

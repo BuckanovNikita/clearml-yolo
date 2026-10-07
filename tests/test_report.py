@@ -77,7 +77,13 @@ def test_report_builds_both_formats_from_manifest_pair(
 ) -> None:
     comparison, candidate, baseline = _comparison_dir(tmp_path)
 
-    result = report(comparison, tmp_path / "reports", ClearMLConfig())
+    result = report(
+        comparison,
+        tmp_path / "reports",
+        ClearMLConfig(),
+        baseline_label="fixture baseline",
+        candidate_label="fixture candidate",
+    )
 
     assert result.dev_reports["test"].is_file()
     assert result.business_reports["test"].is_file()
@@ -86,7 +92,13 @@ def test_report_builds_both_formats_from_manifest_pair(
 
 def test_missing_comparison_manifest_fails_explicitly(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError, match=MANIFEST_NAME):
-        report(tmp_path / "comparison", tmp_path / "reports", ClearMLConfig())
+        report(
+            tmp_path / "comparison",
+            tmp_path / "reports",
+            ClearMLConfig(),
+            baseline_label="fixture baseline",
+            candidate_label="fixture candidate",
+        )
 
 
 def test_missing_paired_dashboard_fails_explicitly(
@@ -96,7 +108,13 @@ def test_missing_paired_dashboard_fails_explicitly(
     baseline.unlink()
 
     with pytest.raises(FileNotFoundError, match="baseline dashboard"):
-        report(comparison, tmp_path / "reports", ClearMLConfig())
+        report(
+            comparison,
+            tmp_path / "reports",
+            ClearMLConfig(),
+            baseline_label="fixture baseline",
+            candidate_label="fixture candidate",
+        )
 
 
 def test_build_reports_preserves_candidate_minus_baseline_order(
@@ -111,6 +129,8 @@ def test_build_reports_preserves_candidate_minus_baseline_order(
         tmp_path / "reports",
         ClearMLConfig(),
         split="test",
+        baseline_label="fixture baseline",
+        candidate_label="fixture candidate",
     )
 
     assert report_generator == [(candidate, baseline), (candidate, baseline)]
@@ -147,7 +167,14 @@ def test_standalone_report_publishes_only_final_workbooks_and_report_configurati
 
     monkeypatch.setattr("clearml_yolo.tasks.report.connect_config_file", connect)
 
-    report(comparison, tmp_path / "reports", ClearMLConfig(), config)
+    report(
+        comparison,
+        tmp_path / "reports",
+        ClearMLConfig(),
+        config,
+        baseline_label="fixture baseline",
+        candidate_label="fixture candidate",
+    )
 
     assert connected == [("report", config)]
     assert set(expected) == {"report_dev_test", "report_business_test"}
@@ -155,7 +182,8 @@ def test_standalone_report_publishes_only_final_workbooks_and_report_configurati
 
 
 def test_report_encodes_split_without_changing_logical_identity(
-    tmp_path: Path, report_generator: list[tuple[Path, Path]],
+    tmp_path: Path,
+    report_generator: list[tuple[Path, Path]],
 ) -> None:
     comparison, candidate, baseline = _comparison_dir(tmp_path)
     manifest_path = comparison / MANIFEST_NAME
@@ -164,7 +192,13 @@ def test_report_encodes_split_without_changing_logical_identity(
     manifest.split = split
     manifest_path.write_text(manifest.model_dump_json())
     destination = tmp_path / "reports"
-    result = report(comparison, destination, ClearMLConfig())
+    result = report(
+        comparison,
+        destination,
+        ClearMLConfig(),
+        baseline_label="fixture baseline",
+        candidate_label="fixture candidate",
+    )
     assert result.dev_reports[split].parent == destination
     assert result.business_reports[split].parent == destination
     assert result.dev_reports[split].is_file()

@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record error diagnostics release verification
+  ([`50c2347`](https://github.com/BuckanovNikita/clearml-yolo/commit/50c234792c768c964c6f9707906c55ddb56d08df))
+
+
 ## v0.18.1 (2026-10-06)
 
 ### Bug Fixes

@@ -18,6 +18,7 @@ from clearml_yolo.clearml_session import (
 )
 from clearml_yolo.comparison.scoring import EvaluatedSplit
 from clearml_yolo.filesystem import write_path
+from clearml_yolo.model_identity import ModelIdentity
 from clearml_yolo.result_export import (
     assign_source_ids,
     build_ground_truth_rows,
@@ -36,12 +37,20 @@ def _provenance_path(predictions: Path) -> Path:
     return predictions.with_suffix(predictions.suffix + ".provenance.json")
 
 
-def write_prediction_provenance(predictions: Path, checkpoint: Path) -> str | None:
+def write_prediction_provenance(
+    predictions: Path, checkpoint: Path, model_identity: ModelIdentity | None = None,
+) -> str | None:
     """Bind prediction bytes to a local checkpoint, when one is available."""
     checkpoint_hash = file_digest(checkpoint) if checkpoint.is_file() else None
+    if model_identity is not None and model_identity.checkpoint_sha256 != checkpoint_hash:
+        raise ValueError("Model identity does not match prediction checkpoint bytes")
     _provenance_path(predictions).write_text(
         json.dumps(
-            {"predictions_sha256": file_digest(predictions), "checkpoint_sha256": checkpoint_hash},
+            {
+                "predictions_sha256": file_digest(predictions),
+                "checkpoint_sha256": checkpoint_hash,
+                "model_identity": model_identity.model_dump() if model_identity else None,
+            },
             sort_keys=True,
         )
         + "\n",
@@ -70,6 +79,21 @@ def prediction_checkpoint_hash(predictions: Path) -> str | None:
     return digest
 
 
+def prediction_model_identity(predictions: Path) -> ModelIdentity | None:
+    """Read only source identity associated with these exact prediction bytes."""
+    checkpoint_hash = prediction_checkpoint_hash(predictions)
+    path = _provenance_path(predictions)
+    if not path.is_file():
+        return None
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if payload.get("model_identity") is None:
+        return None
+    identity = ModelIdentity.model_validate(payload["model_identity"])
+    if identity.checkpoint_sha256 != checkpoint_hash:
+        raise ValueError("Prediction model identity does not match its checkpoint association")
+    return identity
+
+
 def _read_rows(path: Path) -> pd.DataFrame:
     return pd.read_csv(
         path,
@@ -81,6 +105,9 @@ def _read_rows(path: Path) -> pd.DataFrame:
             "object_id": str,
             "context_id": str,
             "model_id": str,
+            "model_name": str,
+            "training_task_id": str,
+            "checkpoint_sha256": str,
         },
         float_precision="round_trip",
     )
@@ -119,7 +146,14 @@ class _ResultBundle:
         key = (context.context_id, context.split)
         encoded = json.dumps(key, ensure_ascii=False).encode()
         path = self.directory / "contexts" / f"{hashlib.sha256(encoded).hexdigest()}.csv"
-        output = rows.assign(**context.model_dump())
+        values = context.model_dump(exclude={"model_identity"})
+        if context.model_identity is not None:
+            values.update(
+                model_name=context.model_identity.model_name,
+                training_task_id=context.model_identity.training_task_id,
+                checkpoint_sha256=context.model_identity.checkpoint_sha256,
+            )
+        output = rows.assign(**values)
         _atomic_csv(output, path)
         self.contexts[key] = context, path
         # Persist the index too: failures leave both the shards and their identities.
@@ -169,7 +203,8 @@ def _context_id(predictions: Path, role: str) -> str:
 
 
 def _context(
-    bundle: _ResultBundle, predictions: Path, role: str, split: str, model_id: str | None
+    bundle: _ResultBundle, predictions: Path, role: str, split: str, model_id: str | None,
+    model_identity: ModelIdentity | None = None,
 ) -> ResultContext:
     identity = _context_id(predictions, role)
     existing = bundle.contexts.get((identity, split))
@@ -177,8 +212,13 @@ def _context(
         previous = existing[0]
         if model_id is not None and model_id != previous.model_id:
             raise ValueError("Prediction context cannot change model identity")
+        if model_identity is not None and previous.model_identity != model_identity:
+            raise ValueError("Prediction context cannot change source identity")
         return previous
-    return ResultContext(context_id=identity, model_id=model_id or "unidentified", split=split)
+    return ResultContext(
+        context_id=identity, model_id=model_id or "unidentified", split=split,
+        model_identity=model_identity,
+    )
 
 
 def register_predictions(
@@ -190,6 +230,7 @@ def register_predictions(
     model_id: str | None = None,
     role: str = "prediction",
     splits: list[str] | None = None,
+    model_identity: ModelIdentity | None = None,
 ) -> None:
     """Persist not-evaluated rows until a later evaluation enriches the same context."""
     if task is None:
@@ -197,11 +238,12 @@ def register_predictions(
     bundle = _bundle(task, output_dir)
     truth = bundle.set_truth(ground_truth)
     source = assign_source_ids(_read_rows(predictions), row_type="prediction")
+    model_identity = model_identity or prediction_model_identity(predictions)
     if model_id is None and (checkpoint_hash := prediction_checkpoint_hash(predictions)):
         model_id = f"checkpoint:{checkpoint_hash}"
     selected = splits if splits is not None else list(truth["split"].dropna().unique())
     for split in selected:
-        context = _context(bundle, predictions, role, str(split), model_id)
+        context = _context(bundle, predictions, role, str(split), model_id, model_identity)
         if (context.context_id, context.split) in bundle.contexts:
             continue
         scoped_truth = truth[truth["split"] == split]
@@ -219,7 +261,9 @@ def register_predictions(
     scoped_images = truth.loc[truth["split"].isin(selected), "image_name"]
     outside = source[~source["image_name"].isin(scoped_images)]
     if not outside.empty:
-        context = _context(bundle, predictions, f"{role}:unassigned", "unassigned", model_id)
+        context = _context(
+            bundle, predictions, f"{role}:unassigned", "unassigned", model_id, model_identity,
+        )
         rows = build_prediction_rows(outside, split=context.split)
         rows["exclusion_reason"] = "outside_selected_splits"
         bundle.put(context, rows)
@@ -240,7 +284,9 @@ def publish_evaluation(
         return
     bundle = _bundle(task, output_dir)
     bundle.set_truth(ground_truth)
-    context = _context(bundle, predictions, role, evaluated.split, model_id)
+    context = _context(
+        bundle, predictions, role, evaluated.split, model_id, evaluated.model_identity,
+    )
     bundle.put(context, evaluated.result_rows)
     stem = "metrics" if role == "prediction" else role
     names = {

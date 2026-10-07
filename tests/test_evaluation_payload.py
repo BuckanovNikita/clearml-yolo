@@ -191,6 +191,7 @@ def test_metrics_retains_local_payload_and_publishes_readable_workbook(
             evaluation=EvaluationConfig(iou_threshold=0.5),
             splits=["test"],
             fiftyone=FiftyOneConfig(enabled=False),
+            model_label="test model",
         )
 
     uploaded = {item["name"]: item["artifact_object"] for item in task.uploads}

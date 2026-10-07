@@ -21,6 +21,7 @@ import json
 from collections.abc import Mapping, Sequence
 from html import escape
 from numbers import Real
+from textwrap import wrap
 from typing import Any, NamedTuple
 from urllib.parse import quote
 
@@ -28,6 +29,7 @@ import pandas as pd
 from loguru import logger
 
 from clearml_yolo.clearml_session import Task
+from clearml_yolo.model_identity import ModelIdentity
 from clearml_yolo.result_schema import ConfusionMatrixPayload, PRCurve, ResultContext
 
 COMPARISON_TABLE_TITLE = "comparison"
@@ -49,13 +51,21 @@ def _plot_identity(context: ResultContext, *parts: str) -> str:
 
 
 def _context_caption(context: ResultContext) -> str:
-    return " | ".join(
+    scope = " | ".join(
         escape(value)
         for value in (
             context.context_id,
             context.model_id,
             context.split,
         )
+    )
+    identity = context.model_identity
+    if identity is None:
+        return scope
+    lines = [f"Model: {identity.model_name}",
+             f"Training task: {identity.training_task_id or 'unavailable'}"]
+    return scope + "<br>" + "<br>".join(
+        escape(line) for value in lines for line in wrap(value, width=100)
     )
 
 
@@ -66,7 +76,9 @@ def _caption_annotation(caption: str) -> dict[str, Any]:
         "xref": "paper",
         "yref": "paper",
         "x": 0.5,
-        "y": 1.15,
+        "y": 1.02,
+        "yanchor": "bottom",
+        "font": {"size": 11},
         "showarrow": False,
     }
 
@@ -132,12 +144,13 @@ def report_confusion_matrices(
         "ticktext": matrix.labels,
     }
     for normalization in ("raw", "row", "column", "global"):
+        caption = _context_caption(context)
         figure = {
             "data": [_confusion_trace(matrix, normalization)],
             "layout": {
-                "title": f"Confusion matrix ({normalization}) | {_context_caption(context)}",
-                "annotations": [_caption_annotation(_context_caption(context))],
-                "margin": {"t": 120},
+                "title": f"Confusion matrix ({normalization}) | {caption}",
+                "annotations": [_caption_annotation(caption)],
+                "margin": {"t": max(120, 24 * (caption.count("<br>") + 1) + 20)},
                 "xaxis": {**axis, "title": "Predicted class"},
                 "yaxis": {**axis, "title": "True class", "autorange": "reversed"},
             },
@@ -161,7 +174,7 @@ def _pr_figure(context: ResultContext, curve: PRCurve) -> dict[str, Any]:
     layout: dict[str, Any] = {
         "title": caption,
         "annotations": [_caption_annotation(caption)],
-        "margin": {"t": 120},
+        "margin": {"t": max(120, 24 * (caption.count("<br>") + 1) + 20)},
         "xaxis": {"title": "Recall", "range": [0, 1]},
         "yaxis": {"title": "Precision", "range": [0, 1]},
     }
@@ -239,12 +252,34 @@ COMPARED_METRICS = (
 )
 
 
-def report_table(task: Task, title: str, series: str, frame: pd.DataFrame) -> None:
+def report_table(
+    task: Task, title: str, series: str, frame: pd.DataFrame,
+    *, identities: Mapping[str, ModelIdentity] | None = None,
+) -> None:
     """Publish a DataFrame as a ClearML table plot, skipping distributed workers."""
     if task is None:
         return
+    display_frame = frame.copy() if identities else frame
+    for role, identity in (identities or {}).items():
+        display_frame[f"{role}_model_name"] = identity.model_name
+        display_frame[f"{role}_training_task_id"] = identity.training_task_id or "unavailable"
+    options: dict[str, Any] = {}
+    if identities:
+        caption = "<br>".join(
+            escape(line)
+            for role, identity in identities.items()
+            for value in (
+                f"{role}: {identity.model_name}",
+                f"Training task: {identity.training_task_id or 'unavailable'}",
+            )
+            for line in wrap(value, width=100)
+        )
+        options["extra_layout"] = {
+            "annotations": [_caption_annotation(caption)],
+            "margin": {"t": max(120, 24 * (caption.count("<br>") + 1) + 20)},
+        }
     task.get_logger().report_table(
-        title=title, series=series, iteration=ITERATION, table_plot=frame
+        title=title, series=series, iteration=ITERATION, table_plot=display_frame, **options,
     )
     logger.debug("Reported table {}/{} ({} rows)", title, series, len(frame))
 
@@ -350,7 +385,8 @@ def _headline_values(
 
 
 def report_comparison(
-    task: Task, split: str, rows: pd.DataFrame, methodology: Mapping[str, object]
+    task: Task, split: str, rows: pd.DataFrame, methodology: Mapping[str, object],
+    *, identities: Mapping[str, ModelIdentity] | None = None,
 ) -> None:
     """Publish one split's comparison: the tables, the headline numbers and the method.
 
@@ -363,15 +399,19 @@ def report_comparison(
     if task is None:
         return
 
-    report_table(task, COMPARISON_TABLE_TITLE, split, rows)
+    report_table(task, COMPARISON_TABLE_TITLE, split, rows, identities=identities)
+    display_methodology = dict(methodology)
+    for role, identity in (identities or {}).items():
+        display_methodology[f"{role}_model_name"] = identity.model_name
+        display_methodology[f"{role}_training_task_id"] = identity.training_task_id or "unavailable"
     report_table(
         task,
         METHODOLOGY_TABLE_TITLE,
         split,
         pd.DataFrame(
             {
-                "parameter": [str(key) for key in methodology],
-                "value": [str(value) for value in methodology.values()],
+                "parameter": [str(key) for key in display_methodology],
+                "value": [str(value) for value in display_methodology.values()],
             }
         ),
     )
@@ -396,7 +436,7 @@ def report_comparison(
     verdicts = _verdicts(per_class)
 
     degraded = _degraded_classes(per_class, verdicts)
-    report_table(task, DEGRADED_TABLE_TITLE, split, degraded)
+    report_table(task, DEGRADED_TABLE_TITLE, split, degraded, identities=identities)
     if not degraded.empty:
         logger.warning("Split {!r}: {} class(es) significantly degraded", split, len(degraded))
 

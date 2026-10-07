@@ -4,6 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
+from clearml_yolo.model_identity import ModelIdentity
 from clearml_yolo.result_schema import ConfusionMatrixPayload, PRCurve
 
 EvaluationBoxStatus = Literal["TP", "FP", "FN", "filtered"]
@@ -73,3 +74,4 @@ class EvaluationPayload(BaseModel):
     matches: list[EvaluationMatch]
     methodology: dict[str, JsonValue] = Field(default_factory=dict)
     report: EvaluationReport | None = None
+    model_identity: ModelIdentity | None = None

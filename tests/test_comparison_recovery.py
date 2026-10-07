@@ -16,13 +16,13 @@ def test_weights_and_provenance_use_one_source_snapshot(
     selected = SimpleNamespace(
         id="selected-model",
         url="https://files.example/selected.pt",
-        get_metadata=lambda _key: "best",
+        get_metadata=lambda key: "best" if key == "clearml_yolo_checkpoint_role" else None,
         get_local_copy=lambda: str(checkpoint),
     )
     later = SimpleNamespace(
         id="later-model",
         url="https://files.example/later.pt",
-        get_metadata=lambda _key: "best",
+        get_metadata=lambda key: "best" if key == "clearml_yolo_checkpoint_role" else None,
     )
     snapshots = iter([{"output": [selected]}, {"output": [later]}])
     task = SimpleNamespace(

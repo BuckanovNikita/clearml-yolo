@@ -19,7 +19,13 @@ from clearml_yolo.clearml_models import (
     resolve_task_model,
 )
 from clearml_yolo.clearml_report import report_comparison
-from clearml_yolo.clearml_results import file_digest, publish_evaluation
+from clearml_yolo.clearml_results import (
+    file_digest,
+    prediction_checkpoint_hash,
+    prediction_model_identity,
+    publish_evaluation,
+    write_prediction_provenance,
+)
 from clearml_yolo.clearml_session import (
     ClearMLConfig,
     expect_artifacts,
@@ -46,8 +52,14 @@ from clearml_yolo.comparison.significance import validate_q
 from clearml_yolo.comparison.workbook import write_comparison_workbook
 from clearml_yolo.filesystem import write_path
 from clearml_yolo.inference import ImageNameMode, resolution_of, trained_imgsz
+from clearml_yolo.model_identity import (
+    ModelIdentity,
+    read_checkpoint_identity,
+    require_model_identity,
+)
 from clearml_yolo.native_config import prediction_settings, stage_settings, write_native_yaml
 from clearml_yolo.result_export import assign_source_ids
+from clearml_yolo.workbook_identity import annotate_workbook
 
 ModelSource = Literal["clearml", "local"]
 MANIFEST_NAME = "comparison_manifest.json"
@@ -69,6 +81,7 @@ class ModelRef(BaseModel):
     tags: list[str] = Field(default_factory=lambda: ["prod"])
     weights: Path | None = None
     thresholds: dict[str, float] | None = None
+    label: str | None = None
 
     @model_validator(mode="after")
     def _validate_source(self) -> Self:
@@ -94,6 +107,7 @@ class ResolvedModel(BaseModel):
     thresholds: dict[str, float]
     task_id: str | None = None
     links: dict[str, str] = Field(default_factory=dict)
+    identity: ModelIdentity | None = None
 
 
 def _is_automatic_baseline(model: ModelRef) -> bool:
@@ -146,7 +160,11 @@ def _resolve_model(
         if not model.weights.is_file():
             raise FileNotFoundError(f"Local checkpoint does not exist: {model.weights}")
         return ResolvedModel(
-            source="local", weights=model.weights, thresholds=dict(model.thresholds)
+            source="local", weights=model.weights, thresholds=dict(model.thresholds),
+            identity=require_model_identity(
+                read_checkpoint_identity(model.weights), model.label,
+                checkpoint_hash=file_digest(model.weights),
+            ),
         )
 
     task_id = _resolved_task_id(
@@ -165,6 +183,10 @@ def _resolve_model(
         weights=weights,
         links=links,
         thresholds=thresholds,
+        identity=require_model_identity(
+            ModelIdentity.from_provenance(links) if "model_name" in links else None,
+            model.label,
+        ),
     )
 
 
@@ -226,6 +248,8 @@ class ComparisonManifest(BaseModel):
     baseline_predictions: str
     candidate_predictions: str
     statistical_workbook: str
+    baseline_identity: ModelIdentity | None = None
+    candidate_identity: ModelIdentity | None = None
 
 
 class CompareResult(BaseModel):
@@ -313,8 +337,11 @@ def _scored(
     *,
     evaluation: EvaluationConfig,
     task: Any = None,
+    model_identity: ModelIdentity | None = None,
 ) -> tuple[EvaluatedSplit, VocabularyReport, InferenceEvidence, Path]:
     del task  # Scoring retains local replay evidence; its caller owns publication.
+    if inference.reuse_existing and output.is_file():
+        _validate_cached_identity(output, weights, model_identity)
     native_project = destination / "native"
     native_name = f"{role}_{artifact_names.split_component(split)}"
     predictions, vocabulary = reinfer_split(
@@ -333,6 +360,7 @@ def _scored(
         native_kwargs=inference.ultralytics,
         reuse_existing=inference.reuse_existing,
     )
+    write_prediction_provenance(output, weights, model_identity)
     fallback_args = {
         **inference.model_dump(mode="json", exclude={"reuse_existing", "ultralytics"}),
         **inference.ultralytics,
@@ -400,8 +428,21 @@ def _scored(
         dashboard_classes=model_classes,
         source_ground_truth=ground_truth,
         source_predictions=predictions,
+        model_identity=model_identity,
     )
     return evaluated, vocabulary, evidence, native_archive
+
+
+def _validate_cached_identity(
+    predictions: Path, weights: Path, identity: ModelIdentity | None,
+) -> None:
+    """Reject stale source metadata before cached bytes can be reused or rebound."""
+    previous = prediction_model_identity(predictions)
+    checkpoint_hash = prediction_checkpoint_hash(predictions)
+    if checkpoint_hash is not None and checkpoint_hash != file_digest(weights):
+        raise ValueError("Cached prediction provenance refers to a different checkpoint")
+    if previous is not None and previous != identity:
+        raise ValueError("Cached prediction source identity does not match the selected model")
 
 
 def _archive_native_outputs(save_dir: Path, destination: Path, *, role: str, split: str) -> Path:
@@ -464,6 +505,8 @@ def _write_manifest(
         baseline_predictions=baseline_predictions.name,
         candidate_predictions=candidate_predictions.name,
         statistical_workbook=workbook.name,
+        baseline_identity=baseline.model_identity,
+        candidate_identity=candidate.model_identity,
     )
     path = destination / MANIFEST_NAME
     path.write_text(manifest.model_dump_json(indent=2), encoding="utf-8")
@@ -473,7 +516,8 @@ def _write_manifest(
 def _source_configuration(model: ResolvedModel) -> dict[str, Any]:
     return dict(
         sanitize_configuration(
-            model.links or {"source": model.source, "weights": str(model.weights)}
+            (model.links or {"source": model.source, "weights": str(model.weights)})
+            | {"model_identity": model.identity.model_dump(mode="json") if model.identity else None}
         )
     )
 
@@ -530,6 +574,7 @@ def _skip_without_baseline(
         classes,
         evaluation=evaluation,
         task=task,
+        model_identity=candidate.identity,
     )
     workbook = (
         destination / f"compare_evaluation_candidate_{artifact_names.split_component(split)}.xlsx"
@@ -538,6 +583,8 @@ def _skip_without_baseline(
     with pd.ExcelWriter(workbook, engine="openpyxl") as writer:
         per_class.to_excel(writer, sheet_name="Classes")
         pd.DataFrame([summary]).to_excel(writer, sheet_name="Summary", index=False)
+    if candidate.identity is not None:
+        annotate_workbook(workbook, {"candidate": candidate.identity})
     tables: dict[str, Path] = {}
     for title, frame in {
         "thresholds": pd.DataFrame(
@@ -705,6 +752,7 @@ def compare(
         classes,
         evaluation=evaluation_config,
         task=task,
+        model_identity=baseline.identity,
     )
     (
         candidate_evaluated,
@@ -723,6 +771,7 @@ def compare(
         classes,
         evaluation=evaluation_config,
         task=task,
+        model_identity=candidate.identity,
     )
 
     tables = build_comparison_rows(
@@ -758,7 +807,12 @@ def compare(
     csv_tables = write_comparison_workbook(
         tables.rows, tables.excluded, tables.methodology, workbook
     )
-    report_comparison(task, split, tables.rows, tables.methodology)
+    identities = {
+        role: model.identity for role, model in (("baseline", baseline), ("candidate", candidate))
+        if model.identity is not None
+    }
+    annotate_workbook(workbook, identities)
+    report_comparison(task, split, tables.rows, tables.methodology, identities=identities)
     manifest = _write_manifest(
         destination,
         split,

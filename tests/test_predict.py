@@ -12,6 +12,7 @@ import pytest
 from clearml_yolo import artifact_names
 from clearml_yolo.clearml_session import ClearMLConfig
 from clearml_yolo.inference import PREDICTION_COLUMNS
+from clearml_yolo.model_identity import ModelIdentity
 from clearml_yolo.publishing.models import FiftyOneConfig, PublicationReceipt
 from clearml_yolo.tasks import predict as predict_module
 from clearml_yolo.tasks.predict import predict
@@ -36,14 +37,22 @@ def published(monkeypatch: pytest.MonkeyPatch) -> dict[str, pd.DataFrame]:
     """Everything the stage would have published to ClearML, keyed by section/series."""
     tables: dict[str, pd.DataFrame] = {}
 
-    def report_table(_: object, title: str, series: str, frame: pd.DataFrame) -> None:
+    def report_table(
+        _: object,
+        title: str,
+        series: str,
+        frame: pd.DataFrame,
+        **_kwargs: Any,
+    ) -> None:
         tables[f"{title}/{series}"] = frame
 
     monkeypatch.setattr(predict_module, "report_table", report_table)
     monkeypatch.setattr(predict_module, "init_task", lambda *_a, **_k: object())
     monkeypatch.setattr(predict_module, "register_predictions", lambda *_a, **_k: None)
     monkeypatch.setattr(predict_module, "record_run_configuration", lambda *_a, **_k: None)
-    monkeypatch.setattr(predict_module, "resolve_weights", lambda weights: weights)
+    monkeypatch.setattr(
+        predict_module, "resolve_weights_with_identity", lambda weights: (weights, None)
+    )
     monkeypatch.setattr(
         predict_module, "predict_on_images", lambda *_, **__: pd.DataFrame({"image_name": []})
     )
@@ -56,7 +65,12 @@ def _ground_truth(tmp_path: Path) -> Path:
     return truth
 
 
-def _predict(tmp_path: Path, imgsz: int | None) -> Any:
+def _predict(
+    tmp_path: Path,
+    imgsz: int | None,
+    *,
+    model_label: str | None = "fixture detector",
+) -> Any:
     return predict(
         weights="best.pt",
         ground_truth=_ground_truth(tmp_path),
@@ -65,6 +79,7 @@ def _predict(tmp_path: Path, imgsz: int | None) -> Any:
         ultralytics={},
         ultralytics_predict=prediction_config(imgsz=imgsz, device="cpu", batch=1),
         fiftyone=FiftyOneConfig(enabled=False),
+        model_label=model_label,
     )
 
 
@@ -127,6 +142,7 @@ def test_splits_are_inferred_separately_for_reproducible_test_batches(
         ["val", "test"],
         ultralytics_predict=prediction_config(),
         fiftyone=FiftyOneConfig(enabled=False),
+        model_label="fixture detector",
     )
     assert calls == [["z.png"], ["a.png", "b.png"]]
 
@@ -188,6 +204,7 @@ def test_prediction_preflights_before_compute_and_publishes_exact_outputs(
         splits=["test"],
         ultralytics_predict=prediction_config(imgsz=64, device="cpu", batch=1),
         fiftyone=FiftyOneConfig(),
+        model_label="fixture detector",
     )
 
     assert events == ["preflight", "compute", "publish"]
@@ -225,7 +242,12 @@ def test_prediction_registers_its_context_for_deferred_canonical_publication(
         (
             tmp_path / "ground_truth.csv",
             tmp_path / "predictions.csv",
-            {"output_dir": tmp_path, "model_id": "best.pt", "splits": None},
+            {
+                "output_dir": tmp_path,
+                "model_id": "best.pt",
+                "splits": None,
+                "model_identity": ModelIdentity(model_name="fixture detector"),
+            },
         )
     ]
 

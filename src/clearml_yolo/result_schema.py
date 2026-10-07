@@ -4,6 +4,8 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
+from clearml_yolo.model_identity import ModelIdentity
+
 
 class ResultContext(BaseModel):
     """One model's evaluation of one split within an invocation."""
@@ -13,6 +15,7 @@ class ResultContext(BaseModel):
     context_id: str
     model_id: str
     split: str
+    model_identity: ModelIdentity | None = None
 
 
 class ConfusionMatrixPayload(BaseModel):

@@ -67,3 +67,28 @@ another current split. Reports consume the new paired results and manifest split
 does not fetch historical predictions or import source General/Configuration Objects over
 current comparison settings. Current runs still publish one native best Output Model and
 one full-precision validation threshold CSV; recovery does not rewrite source tasks.
+
+## Identity retained by new results
+
+New evaluations carry the selected source's finalized model name, full original
+training task ID, checkpoint SHA-256 and registered model ID when available.
+Output-model recovery reads stored identity metadata and checks its original-task
+association; available checkpoint hash metadata must match downloaded bytes. For
+historical records without identity metadata, use the selected source model/task's
+display name and known original training association. Artifact-only recovery records
+its source task identity without fabricating a registered model ID. Never substitute
+the current comparison or reporting task as the training source.
+
+Local checkpoint sidecars are validated against checkpoint bytes. For an unknown local
+reference, `baseline_model.label` and `candidate_model.label` supply independent fallback
+names; stored source provenance takes precedence. Missing provenance and missing labels
+fail explicitly. An unknown source displays `Training task: unavailable`, without
+registering a model. Reports over historical comparison manifests accept `baseline_label`
+and `candidate_label` when the manifest and dashboards have no stored identity.
+
+Annotated XLSX dashboards and historical unannotated dashboards are readable through
+project adapters that expose the original metric layout. Threshold recovery keeps its
+ordered source selection, class labels and available precision; banners are not metric
+rows. Pinned dependencies and existing source tasks/artifacts remain unchanged. The
+[publication contract](../../014-evaluation-publication/contracts/publication.md#source-identity-on-new-results)
+defines presentation on newly produced reports.

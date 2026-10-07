@@ -14,6 +14,7 @@ from clearml_yolo.clearml_native import associate_calibration_thresholds, owned_
 from clearml_yolo.clearml_report import report_scalars, report_table
 from clearml_yolo.clearml_results import (
     prediction_checkpoint_hash,
+    prediction_model_identity,
     publish_evaluation,
     register_predictions,
 )
@@ -34,11 +35,13 @@ from clearml_yolo.comparison.scoring import (
     prepare_predictions,
 )
 from clearml_yolo.filesystem import write_path
+from clearml_yolo.model_identity import require_model_identity
 from clearml_yolo.progress import track
 from clearml_yolo.publishing import create_publisher
 from clearml_yolo.publishing.models import FiftyOneConfig
 from clearml_yolo.result_export import assign_source_ids
 from clearml_yolo.tasks.publication import prepare_publisher, publish_results
+from clearml_yolo.workbook_identity import annotate_workbook, read_dashboard
 
 __all__ = ["EvaluationConfig"]
 
@@ -68,7 +71,10 @@ def _publish_split(
         predictions,
         output_dir=output_dir,
     )
-    report_table(task, artifact_names.METRICS_SECTION, split, per_class)
+    report_table(
+        task, artifact_names.METRICS_SECTION, split, per_class,
+        identities={"model": evaluated.model_identity} if evaluated.model_identity else None,
+    )
     report_scalars(
         task, f"{artifact_names.METRICS_SECTION}_{artifact_names.split_component(split)}", summary
     )
@@ -108,7 +114,7 @@ def _write_evaluation_workbook(
             f"actual={sorted(evaluated.plot_paths)}"
         )
     per_class, summary = summarize_metrics(evaluated.metrics)
-    confusion = pd.read_excel(evaluated.confusion_matrix_path, index_col=0)
+    confusion = read_dashboard(evaluated.confusion_matrix_path, index_col=0)
     thresholds = pd.DataFrame(
         sorted(evaluated.thresholds.items()), columns=["class_name", "confidence"]
     )
@@ -119,6 +125,8 @@ def _write_evaluation_workbook(
         summary_frame.to_excel(writer, sheet_name="summary", index=False)
         per_class_frame.to_excel(writer, sheet_name="per_class", index=False)
         confusion.to_excel(writer, sheet_name="confusion_matrix")
+    if evaluated.model_identity is not None:
+        annotate_workbook(path, {"model": evaluated.model_identity})
     tables: dict[str, Path] = {}
     for title, frame in {
         "ground_truth_matches": evaluated.gt_matches,
@@ -168,10 +176,15 @@ def compute_metrics(
     splits: list[str] | None = None,
     calibration_split: str | None = "val",
     fiftyone: FiftyOneConfig | None = None,
+    model_label: str | None = None,
 ) -> MetricsResult:
     """Calibrate once on validation and score requested splits at that exact mapping."""
     task = init_task(clearml, stage="metrics")
     publisher = prepare_publisher(task, fiftyone, factory=create_publisher)
+    identity = require_model_identity(
+        prediction_model_identity(Path(predictions)), model_label,
+        checkpoint_hash=prediction_checkpoint_hash(Path(predictions)),
+    )
     requested = list(dict.fromkeys(splits or ["train", "val", "test"]))
     if calibration_split != "val":
         raise ValueError(
@@ -204,7 +217,8 @@ def compute_metrics(
     ].dropna()
     export_splits = list(dict.fromkeys(["val", *requested, *map(str, represented_splits)]))
     register_predictions(
-        task, Path(ground_truth), Path(predictions), output_dir=destination, splits=export_splits
+        task, Path(ground_truth), Path(predictions), output_dir=destination, splits=export_splits,
+        model_identity=identity,
     )
     prepared_gt, raw_predictions, prepared_predictions, classes = _prepare(
         predictions_frame, ground_truth_frame, evaluation
@@ -241,6 +255,7 @@ def compute_metrics(
                     **evaluation.model_dump(mode="json"),
                     "calibration_split": "val",
                     "evaluated_splits": requested,
+                    "model_identity": identity.model_dump(mode="json"),
                 }
             },
         )
@@ -263,6 +278,7 @@ def compute_metrics(
             methodology=evaluation.model_dump(mode="json"),
             source_ground_truth=ground_truth_frame,
             source_predictions=predictions_frame,
+            model_identity=identity,
         )
         evaluation_path = destination / f"evaluation_{artifact_names.split_component(split)}.json"
         evaluation_path.write_text(

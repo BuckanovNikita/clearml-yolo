@@ -8,6 +8,7 @@ import pytest
 
 from clearml_yolo import clearml_results as results
 from clearml_yolo.clearml_session import ClearMLConfig, invocation
+from clearml_yolo.model_identity import ModelIdentity
 from test_clearml_session import FakeTask
 from test_clearml_session import fake_clearml as owner_fixture
 
@@ -110,3 +111,47 @@ def test_raw_predictions_outside_split_population_remain_exported(
     outside = predicted[predicted["image_name"] == "outside.jpg"].iloc[0]
     assert outside["evaluation_status"] == "not_evaluated"
     assert pd.isna(outside["is_below_threshold"])
+
+
+def test_source_identity_survives_context_csv_and_manifest(
+    owner: tuple[type[Any], FakeTask], tmp_path: Path,
+) -> None:
+    _, task = owner
+    truth, predictions = _inputs(tmp_path)
+    checkpoint = tmp_path / "best.pt"
+    checkpoint.write_bytes(b"trained model")
+    identity = ModelIdentity(
+        model_name="=001 Unicode model", training_task_id="00000000000000000000000000000001",
+        checkpoint_sha256=results.file_digest(checkpoint),
+    )
+    results.write_prediction_provenance(predictions, checkpoint, identity)
+    assert results.prediction_model_identity(predictions) == identity
+    with invocation(ClearMLConfig(), "metrics"):
+        results.register_predictions(task, truth, predictions, output_dir=tmp_path)
+    frame = pd.read_csv(
+        task.uploads[1]["artifact_object"], dtype={"training_task_id": str, "model_name": str},
+    )
+    assert set(frame["model_name"]) == {identity.model_name}
+    assert set(frame["training_task_id"]) == {identity.training_task_id}
+    manifest = (tmp_path / "result_publication/contexts.json").read_text()
+    assert identity.training_task_id is not None
+    assert identity.training_task_id in manifest
+    assert str(task.id) != identity.training_task_id
+
+
+def test_prediction_identity_rejects_changed_checkpoint_association(tmp_path: Path) -> None:
+    import json
+
+    _, predictions = _inputs(tmp_path)
+    checkpoint = tmp_path / "best.pt"
+    checkpoint.write_bytes(b"trained model")
+    identity = ModelIdentity(
+        model_name="model", checkpoint_sha256=results.file_digest(checkpoint),
+    )
+    results.write_prediction_provenance(predictions, checkpoint, identity)
+    sidecar = predictions.with_suffix(".csv.provenance.json")
+    data = json.loads(sidecar.read_text())
+    data["model_identity"]["checkpoint_sha256"] = "0" * 64
+    sidecar.write_text(json.dumps(data))
+    with pytest.raises(ValueError, match="checkpoint association"):
+        results.prediction_model_identity(predictions)

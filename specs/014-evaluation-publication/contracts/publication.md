@@ -146,6 +146,50 @@ Standalone metrics never creates or mutates a model. Calibration provenance iden
 the SHA-256 of the checkpoint actually used for prediction; a caller-provided path alone
 is insufficient.
 
+## Source identity on new results
+
+Every newly produced evaluation dashboard and report carries the evaluated model's
+finalized display name and full original training task ID. Source identity also travels
+through local prediction provenance, durable result contexts, evaluation payloads and
+paired comparison manifests. The reporting task's ID cannot replace the source training
+task ID. Available checkpoint and prediction hashes bind that identity to the actual
+bytes; stale sidecars or inconsistent associations fail explicitly. See the
+[model metadata contract](../../008-dataset-clearml-tracking/contracts/model-metadata.md)
+and [task recovery contract](../../012-remove-legacy-compatibility/contracts/task-recovery.md).
+
+Stored provenance takes precedence over custom fallback labels. Inputs without provenance
+require a nonempty label: `model_label` for standalone prediction, validation and metrics,
+or a pipeline with training disabled; `baseline_model.label` and `candidate_model.label`
+for local comparison references; `baseline_label` and `candidate_label` for reports over
+legacy manifests without identity. Labels do not register a model or invent an identifier;
+unknown training provenance is shown as `Training task: unavailable`.
+
+Each worksheet in full/DTRK/confusion, evaluation, statistical, developer and business
+workbooks has a literal identity banner. Paired workbooks identify baseline and candidate
+separately. Long names wrap without truncation; Unicode and formula-like prefixes remain
+literal text. Banner rows repeat on printed pages and print width is normalized to
+`fitToWidth=1`, preventing horizontal pages from omitting identity. Original body values,
+styles, headings, formulas, merged ranges, filters, frozen panes, print areas and explicit
+row breaks retain their meaning after coordinate translation. Existing print-title rows
+and columns remain included; Excel recalculates automatic pagination for the banner.
+
+Project readers adapt annotated workbooks to their preserved original metric layout for
+threshold recovery and report generation. Historical unannotated workbooks remain readable.
+The original metric data is retained in an embedded original-layout workbook. A package
+fingerprint validates annotated workbook parts before readers expose that original;
+editing or resaving a decorated XLSX is rejected on ingestion rather than silently using
+stale original metrics. Regenerate the workbook from source inputs to change its contents.
+The adapters do not modify pinned dependencies or source files. Body metrics, eligible
+class populations, output paths and artifact keys remain unchanged.
+
+Interactive full/DTRK and comparison tables identify their source models in display-only
+columns. Confusion/PR and generated evaluation plots include visible model/training-task
+captions. Plotly escapes user text; persistent annotations survive SDK title replacement.
+Plot identities and metric populations remain unchanged. Raster character coverage depends
+on available fonts. Native Ultralytics training diagnostics retain native formatting.
+These requirements apply to new files and publications; historical ClearML artifacts are
+not rewritten.
+
 ## Failure and verification boundaries
 
 Register expected publications before finalization. Owner callbacks assemble canonical

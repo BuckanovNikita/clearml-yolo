@@ -15,6 +15,7 @@ from loguru import logger
 from clearml_yolo.artifact_names import BEST_CONFIDENCES_VAL
 from clearml_yolo.diagnostics import exception_summary, log_exception, redact_text
 from clearml_yolo.filesystem import model_weights_path
+from clearml_yolo.model_identity import ModelIdentity, checkpoint_sha256, read_checkpoint_identity
 
 # ClearML ids are 32 lowercase hex characters. Recognising them by shape is what lets
 # `weights=` accept either a checkpoint on disk or a task, without a second config key
@@ -128,6 +129,20 @@ def _select_checkpoint(task: Any) -> tuple[Any, dict[str, str]]:
     model = best_output_model(task)
     if model is not None:
         links.update(model_id=str(model.id), model_url=str(model.url))
+        original_task = getattr(model, "original_task", None)
+        stored_task = model.get_metadata("clearml_yolo_training_task_id")
+        if stored_task and original_task and str(stored_task) != str(original_task):
+            raise ValueError("Checkpoint training identity disagrees with its original task")
+        source_identity = ModelIdentity(
+            model_name=str(
+                model.get_metadata("clearml_yolo_effective_model_name")
+                or getattr(model, "name", None) or task.name
+            ),
+            training_task_id=str(stored_task or original_task or task.id),
+            checkpoint_sha256=model.get_metadata("clearml_yolo_checkpoint_sha256"),
+            model_id=str(model.id),
+        )
+        links.update(source_identity.model_dump(exclude_none=True))
         return model, links
     artifacts = task.artifacts
     names = [*_CHECKPOINT_ARTIFACTS, *sorted(name for name in artifacts if name.endswith(".pt"))]
@@ -139,6 +154,7 @@ def _select_checkpoint(task: Any) -> tuple[Any, dict[str, str]]:
             artifact_url = getattr(artifact, "url", None)
             if artifact_url:
                 links["artifact_url"] = str(artifact_url)
+            links.update(model_name=str(task.name), training_task_id=str(task.id))
             return artifact, links
     raise ValueError(f"ClearML task {task.id} ({task.name}) has no recoverable checkpoint")
 
@@ -176,6 +192,10 @@ def resolve_task_model(task_id: str) -> tuple[Path, dict[str, str]]:
         raise FileNotFoundError(
             f"Checkpoint {identity!r} on task {task_id} returned {path}, but it is not a file"
         )
+    downloaded_hash = checkpoint_sha256(path)
+    if links.get("checkpoint_sha256") not in {None, downloaded_hash}:
+        raise ValueError(f"Checkpoint {identity!r} on task {task_id} failed SHA-256 verification")
+    links["checkpoint_sha256"] = downloaded_hash
     logger.info("Checkpoint of task {} ({}): {}", task_id, task.name, path)
     return path, links
 
@@ -198,6 +218,44 @@ def resolve_weights(weights: str | Path) -> str | Path:
         return resolve_task_weights(text)
     # Native downloads use the workspace, while existing and explicit file paths stay intact.
     return model_weights_path(weights)
+
+
+def resolve_weights_with_identity(
+    weights: str | Path,
+) -> tuple[str | Path, ModelIdentity | None]:
+    """Resolve one checkpoint and retain its original source identity."""
+    text = str(weights)
+    if not Path(text).exists() and looks_like_task_id(text):
+        path, links = resolve_task_model(text)
+        return path, ModelIdentity.from_provenance(links)
+    if text.startswith("clearml://"):
+        from clearml import Model
+
+        model = Model(model_id=text.removeprefix("clearml://"))
+        local = model.get_local_copy()
+        if not local or not Path(local).is_file():
+            raise FileNotFoundError("ClearML model did not return a local checkpoint")
+        path = Path(local)
+        actual_hash = checkpoint_sha256(path)
+        stored_hash = model.get_metadata("clearml_yolo_checkpoint_sha256")
+        if stored_hash and stored_hash != actual_hash:
+            raise ValueError("ClearML model checkpoint failed SHA-256 verification")
+        original_task = model.original_task
+        stored_task = model.get_metadata("clearml_yolo_training_task_id")
+        if stored_task and original_task and str(stored_task) != str(original_task):
+            raise ValueError("Checkpoint training identity disagrees with its original task")
+        identity = ModelIdentity(
+            model_name=str(model.get_metadata("clearml_yolo_effective_model_name") or model.name),
+            training_task_id=(
+                str(stored_task or original_task) if stored_task or original_task else None
+            ),
+            checkpoint_sha256=actual_hash,
+            model_id=str(model.id),
+        )
+        return path, identity
+    resolved = resolve_weights(weights)
+    path = Path(resolved)
+    return resolved, read_checkpoint_identity(path) if path.is_file() else None
 
 
 _THRESHOLD_ARTIFACTS = (
@@ -307,8 +365,10 @@ def _artifact_thresholds(artifact: Any, *, dashboard: bool) -> dict[str, float]:
         if suffix == ".csv" or path.name.lower().endswith(".csv.gz"):
             return _threshold_csv(path, dashboard=dashboard)
         if suffix == ".xlsx":
+            from clearml_yolo.workbook_identity import read_dashboard
+
             # Read the class index as strings before pandas can coerce numeric-looking IDs.
-            frame = pd.read_excel(path, dtype=str, keep_default_na=False)
+            frame = read_dashboard(path, dtype=str, keep_default_na=False)
             if "class_name" not in frame.columns and len(frame.columns):
                 frame = frame.set_index(frame.columns[0])
             return _table_thresholds(frame, dashboard=dashboard)

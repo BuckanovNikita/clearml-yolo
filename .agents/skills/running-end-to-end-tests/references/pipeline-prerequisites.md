@@ -49,3 +49,14 @@ or separate operating-system instances.
 Full comparison requires validation/test data and exact baseline thresholds. Candidate
 thresholds come from validation only. Both checkpoints must use the same current test
 image membership and inference settings; reports consume the resulting `comparison_dir`.
+
+Preserve checkpoint `.identity.json` and prediction `.provenance.json` sidecars when
+moving local inputs. Stored identity takes precedence over a fallback label and hashes
+must match the consumed checkpoint/prediction bytes. For inputs without identity, set
+`model_label` on prediction, validation, metrics or a pipeline with training disabled;
+use `baseline_model.label`/`candidate_model.label` for local comparison references and
+`baseline_label`/`candidate_label` for reports over legacy manifests. Such labels retain
+`Training task: unavailable` and do not register models. Include source-identity readback,
+real workbook banners/print titles and plot captions in acceptance; use project workbook
+adapters when checking metric values beneath banners. See the
+[identity contract](../../../../specs/014-evaluation-publication/contracts/publication.md#source-identity-on-new-results).

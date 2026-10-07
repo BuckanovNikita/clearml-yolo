@@ -14,6 +14,7 @@
 | Versions | installed ClearML, Ultralytics, Torch and project | SDK metadata |
 | Input shape/settings | trainer effective args (imgsz/channels where known) | SDK metadata |
 | Requested/effective names | invocation naming state | `clearml_yolo_requested_model_name` / `clearml_yolo_effective_model_name` string metadata |
+| Source training identity | finalized model name, original training task and verified checkpoint | Persist effective name, `clearml_yolo_training_task_id` and checkpoint SHA-256; retain optional registered model ID |
 | Calibrated class thresholds | full-precision validation calibration from prediction checkpoint | Owned best model only, after checkpoint association and remote readback |
 | IDs/timestamps | ClearML server | Never write fabricated values |
 
@@ -52,6 +53,25 @@ adjective–noun suffix is shared by the experiment and its owned best model; re
 recheck for up to 20 generated suffixes, then fail rather than accepting a collision.
 Clones resolve names afresh. Display names do not change output paths, checkpoint URLs,
 model IDs, task/project association or model count.
+
+New evaluations retain the finalized model name and full source training task ID,
+not the task that happens to predict, evaluate or report. Training writes the verified
+identity beside the local checkpoint as `<checkpoint>.identity.json`; its
+`checkpoint_sha256` must match the actual checkpoint bytes. Stored or recovered
+identity wins over a custom fallback label. Task-backed downloads verify available
+checkpoint hash metadata and retain the identity of the selected source. A stale
+sidecar, hash mismatch or conflicting original training task is an error.
+
+Prediction writes `<predictions.csv>.provenance.json`, binding `model_identity` and
+`checkpoint_sha256` to `predictions_sha256`. Evaluation validates that binding before
+using the identity. Local sidecars remain local computation/recovery evidence; this
+does not add artifact keys or register a model for standalone inputs.
+
+When a local checkpoint or prediction table has no stored identity, require a custom
+label. It supplies a display name with `Training task: unavailable`; it does not
+invent a training task, model ID, uniqueness claim or native model registration.
+See the [publication identity contract](../../014-evaluation-publication/contracts/publication.md#source-identity-on-new-results)
+for entrypoint labels and workbook/plot presentation.
 
 Only an invocation-owned, already verified native best model can receive calibration
 metadata. Standalone metrics has no owned model handle and must skip this association;

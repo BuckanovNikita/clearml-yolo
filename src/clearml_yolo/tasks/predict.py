@@ -8,7 +8,7 @@ from loguru import logger
 from pydantic import BaseModel, Field
 
 from clearml_yolo import artifact_names
-from clearml_yolo.clearml_models import resolve_weights
+from clearml_yolo.clearml_models import resolve_weights_with_identity
 from clearml_yolo.clearml_report import report_table
 from clearml_yolo.clearml_results import (
     file_digest,
@@ -29,6 +29,7 @@ from clearml_yolo.inference import (
     predict_on_images,
     resolution_of,
 )
+from clearml_yolo.model_identity import ModelIdentity, require_model_identity
 from clearml_yolo.native_config import (
     prediction_settings,
     requested_settings,
@@ -45,6 +46,7 @@ class PredictResult(BaseModel):
     predictions: Path
     resolution: ScoredResolution
     effective_args: dict[str, Any] = Field(default_factory=dict)
+    model_identity: ModelIdentity | None = None
 
 
 def images_to_score(ground_truth: pd.DataFrame, splits: list[str] | None) -> list[str]:
@@ -73,6 +75,7 @@ def predict(
     image_name: ImageNameMode = "name",
     ultralytics_predict: dict[str, Any] | None = None,
     fiftyone: FiftyOneConfig | None = None,
+    model_label: str | None = None,
 ) -> PredictResult:
     task = init_task(clearml, stage="predict")
     publisher = prepare_publisher(task, fiftyone, factory=create_publisher)
@@ -81,9 +84,10 @@ def predict(
     selected = settings.pop("model", None)
     if selected is None:
         raise ValueError("Prediction requires weights=<checkpoint> or ultralytics_predict.model")
-    checkpoint = resolve_weights(selected)
+    checkpoint, source_identity = resolve_weights_with_identity(selected)
     checkpoint_path = Path(checkpoint)
     checkpoint_hash = file_digest(checkpoint_path) if checkpoint_path.is_file() else None
+    identity = require_model_identity(source_identity, model_label, checkpoint_hash=checkpoint_hash)
     resolution = resolution_of(checkpoint, settings.get("imgsz"))
     settings["imgsz"] = resolution.scored_at
     report_table(
@@ -91,6 +95,7 @@ def predict(
         artifact_names.PREDICT_SECTION,
         artifact_names.RESOLUTION_SERIES,
         resolution.as_table(),
+        identities={"model": identity},
     )
     if output is None:
         directory = task_run_dir(runs_root(), *task_identity(task))
@@ -117,7 +122,7 @@ def predict(
     frame = pd.concat(frames, ignore_index=True).reindex(columns=PREDICTION_COLUMNS)
 
     frame.to_csv(output_path, index=False)
-    recorded_hash = write_prediction_provenance(output_path, checkpoint_path)
+    recorded_hash = write_prediction_provenance(output_path, checkpoint_path, identity)
     if recorded_hash != checkpoint_hash:
         raise ValueError("Checkpoint changed while producing predictions")
     register_predictions(
@@ -127,6 +132,7 @@ def predict(
         output_dir=output_path.parent,
         model_id=f"checkpoint:{recorded_hash}" if recorded_hash else str(checkpoint),
         splits=splits,
+        model_identity=identity,
     )
     if task is not None:
         record_run_configuration(
@@ -134,6 +140,7 @@ def predict(
             {
                 "prediction_result": {
                     "model": str(checkpoint),
+                    "model_identity": identity.model_dump(mode="json"),
                     "native_normalization": _native_changes(settings, frames[0]),
                 }
             },
@@ -155,7 +162,10 @@ def predict(
         metadata={"model": str(checkpoint)},
     )
     logger.info("Wrote {} predictions to {}", len(frame), output_path)
-    return PredictResult(predictions=output_path, resolution=resolution, effective_args=effective)
+    return PredictResult(
+        predictions=output_path, resolution=resolution, effective_args=effective,
+        model_identity=identity,
+    )
 
 
 def _native_changes(settings: dict[str, Any], frame: pd.DataFrame) -> dict[str, Any]:

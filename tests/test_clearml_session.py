@@ -654,7 +654,7 @@ def test_metric_split_upload_rejection_fails_owner_and_retains_payload(
         return original(**kwargs)
 
     monkeypatch.setattr(task, "upload_artifact", reject_evaluation)
-    monkeypatch.setattr("clearml_yolo.tasks.metrics.report_table", lambda *a: None)
+    monkeypatch.setattr("clearml_yolo.tasks.metrics.report_table", lambda *a, **kw: None)
     monkeypatch.setattr("clearml_yolo.tasks.metrics.report_scalars", lambda *a: None)
     with (
         pytest.raises(ArtifactUploadError, match="metrics_dashboard_full_test"),
@@ -668,6 +668,7 @@ def test_metric_split_upload_rejection_fails_owner_and_retains_payload(
             EvaluationConfig(),
             splits=["test"],
             fiftyone=FiftyOneConfig(enabled=False),
+            model_label="test model",
         )
     assert task.failed
     assert not task.completed

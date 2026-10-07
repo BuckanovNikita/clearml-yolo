@@ -19,6 +19,7 @@ def validate(
     evaluation: EvaluationConfig,
     splits: list[str] | None = None,
     ultralytics_predict: dict[str, Any] | None = None,
+    model_label: str | None = None,
 ) -> MetricsResult:
     init_task(clearml, stage="val")
     selected = list(dict.fromkeys(splits or ["train", "val", "test"]))
@@ -32,6 +33,7 @@ def validate(
         ultralytics_predict=ultralytics_predict,
         splits=list(dict.fromkeys(["val", *selected])),
         fiftyone=FiftyOneConfig(enabled=False),
+        model_label=model_label,
     )
     return compute_metrics(
         predicted.predictions,
@@ -42,4 +44,5 @@ def validate(
         splits=selected,
         calibration_split="val",
         fiftyone=FiftyOneConfig(enabled=False),
+        model_label=model_label,
     )

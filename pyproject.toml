@@ -181,7 +181,9 @@ layers = [
     "clearml_yolo.clearml_naming",
     "clearml_yolo.native_config | clearml_yolo.clearml_session | clearml_yolo.progress | clearml_yolo.artifact_names",
     "clearml_yolo.result_export",
+    "clearml_yolo.workbook_identity",
     "clearml_yolo.result_schema",
+    "clearml_yolo.model_identity",
     "clearml_yolo.run_identity",
     "clearml_yolo.filesystem",
     "clearml_yolo.diagnostics",
@@ -303,6 +305,13 @@ name = "Publication has no tracking or execution side effects"
 type = "forbidden"
 source_modules = ["clearml_yolo.publishing"]
 forbidden_modules = ["clearml", "clearml_yolo.clearml_session", "clearml_yolo.tasks", "hydra", "hydra_zen", "omegaconf", "ultralytics", "torch"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Model identity and workbook adapters remain neutral"
+type = "forbidden"
+source_modules = ["clearml_yolo.model_identity", "clearml_yolo.workbook_identity"]
+forbidden_modules = ["clearml", "hydra", "hydra_zen", "omegaconf", "ultralytics", "torch"]
 allow_indirect_imports = true
 
 [tool.mypy]

@@ -67,6 +67,7 @@ def register_configs() -> None:
         make_config(
             **_native(),
             weights=None,
+            model_label=None,
             ground_truth=MISSING,
             output=None,
             splits=None,
@@ -80,6 +81,7 @@ def register_configs() -> None:
         make_config(
             **_native(),
             weights=None,
+            model_label=None,
             ground_truth=MISSING,
             output_dir=None,
             splits=["train", "val", "test"],
@@ -91,6 +93,7 @@ def register_configs() -> None:
     store(
         make_config(
             predictions=MISSING,
+            model_label=None,
             ground_truth=MISSING,
             output_dir=None,
             splits=["train", "val", "test"],
@@ -104,6 +107,8 @@ def register_configs() -> None:
     store(
         make_config(
             comparison_dir=MISSING,
+            baseline_label=None,
+            candidate_label=None,
             output_dir=None,
             report_config_path=None,
             clearml=tracking,
@@ -149,6 +154,7 @@ def register_configs() -> None:
             dataset_format="ndjson",
             dataset_cache_dir=None,
             weights=None,
+            model_label=None,
             run_id=None,
             run_dir=None,
             skip_train=False,

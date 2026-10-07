@@ -18,6 +18,8 @@ from clearml_yolo.clearml_models import (
     resolve_weights,
     source_model_links,
 )
+from clearml_yolo.model_identity import ModelIdentity
+from clearml_yolo.workbook_identity import annotate_workbook
 
 TASK_ID = "a" * 32
 
@@ -476,7 +478,9 @@ def test_artifact_priority_and_links(patch_clearml: Any, tmp_path: Path) -> None
     assert links["artifact_name"] == "train_weights_best.pt"
     assert links["task_id"] == TASK_ID
     assert "model_id" not in links
-    assert source_model_links(TASK_ID) == links
+    assert source_model_links(TASK_ID) == {
+        key: value for key, value in links.items() if key != "checkpoint_sha256"
+    }
 
 
 def test_output_models_prevent_artifact_fallback(patch_clearml: Any) -> None:
@@ -770,3 +774,13 @@ def test_checkpoint_download_failure_redacts_sdk_credentials(patch_clearml: Any)
     assert "private-password" not in output
     assert "private-token" not in output
     assert caught.value.__suppress_context__
+
+
+def test_annotated_dashboard_threshold_recovery_preserves_numeric_class_ids(
+    patch_clearml: Any, tmp_path: Path,
+) -> None:
+    path = tmp_path / "dashboard.xlsx"
+    pd.DataFrame({"confidence": [0.37, 0.81]}, index=["001", "Ω"]).to_excel(path)
+    annotate_workbook(path, {"model": ModelIdentity(model_name="=custom Ω")})
+    patch_clearml(FakeTask(artifacts={"metrics_dashboard_full_val": FakeArtifact(str(path))}))
+    assert fetch_best_confidences(TASK_ID) == {"001": 0.37, "Ω": 0.81}

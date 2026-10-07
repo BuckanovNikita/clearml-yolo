@@ -100,6 +100,7 @@ def _compare_and_report(
     report_config: dict[str, Any],
     skip_report: bool,
     candidate_task_id: str | None = None,
+    model_label: str | None = None,
 ) -> dict[str, Any]:
     if candidate_task_id is None:
         local_weights = model_weights_path(checkpoint)
@@ -108,7 +109,9 @@ def _compare_and_report(
                 "Local comparison requires a filesystem checkpoint; "
                 "resolve remote weights before comparison"
             )
-        candidate = ModelRef(source="local", weights=local_weights, thresholds=thresholds)
+        candidate = ModelRef(
+            source="local", weights=local_weights, thresholds=thresholds, label=model_label,
+        )
     else:
         candidate = ModelRef(source="clearml", task_id=candidate_task_id)
     task = init_task(clearml, stage="compare")
@@ -216,6 +219,7 @@ def run_pipeline(
     skip_report: bool = False,
     skip_compare: bool = False,
     fiftyone: FiftyOneConfig | None = None,
+    model_label: str | None = None,
 ) -> dict[str, Any]:
     """Pass real producer outputs to consumers and preserve files on any failure."""
     task = init_task(clearml, stage="pipeline")
@@ -281,6 +285,7 @@ def run_pipeline(
             splits=prediction_splits,
             ultralytics_predict=predict_params,
             fiftyone=FiftyOneConfig(enabled=False),
+            model_label=model_label,
         )
         predictions = predicted.predictions
         results["predictions"] = predictions
@@ -294,6 +299,7 @@ def run_pipeline(
             clearml,
             splits=splits,
             fiftyone=FiftyOneConfig(enabled=False),
+            model_label=model_label,
             **metrics_cfg,
         )
         thresholds = next(iter(evaluated.best_confidences.values()))
@@ -318,6 +324,7 @@ def run_pipeline(
                 report_cfg,
                 skip_report,
                 candidate_task_id=str(task.id) if not skip_train else None,
+                model_label=model_label,
             )
         )
     elif not skip_report:

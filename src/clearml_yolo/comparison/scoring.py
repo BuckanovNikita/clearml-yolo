@@ -13,6 +13,7 @@ from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
+from textwrap import wrap
 from typing import Any, Literal, Protocol, cast
 
 import numpy as np
@@ -20,7 +21,7 @@ import pandas as pd
 from digital_metrics.engines import compute_metrics_from_matches
 from digital_metrics.matching import compute_iou_matrix, find_duplicates_bboxes, match_boxes
 from digital_metrics.preprocess import PredictionPreprocessor
-from digital_metrics.reporting import get_dashboards
+from digital_metrics.reporting import get_dashboards, plot_confidence_intervals
 from digital_metrics.scoring import (
     compute_map,
     find_best_confidences,
@@ -44,8 +45,10 @@ from clearml_yolo.comparison.evaluation_payload import (
     EvaluationReport,
 )
 from clearml_yolo.comparison.pr_curves import build_pr_curves
+from clearml_yolo.model_identity import ModelIdentity
 from clearml_yolo.result_export import assign_source_ids, build_result_rows
 from clearml_yolo.result_schema import ConfusionMatrixPayload, PRCurve
+from clearml_yolo.workbook_identity import annotate_workbook
 
 BBOX_COLUMNS = ["bbox_x_tl", "bbox_y_tl", "bbox_x_br", "bbox_y_br"]
 
@@ -144,6 +147,7 @@ class EvaluatedSplit:
     confusion_matrix: ConfusionMatrixPayload
     pr_curves: list[PRCurve]
     result_rows: pd.DataFrame
+    model_identity: ModelIdentity | None = None
 
 
 def _match_status(value: str) -> EvaluationMatchStatus:
@@ -176,6 +180,7 @@ def build_evaluation_payload(
     thresholds: dict[str, float],
     sliced: Mapping[str, list[MatchRecord]],
     methodology: Mapping[str, JsonValue] | None = None,
+    model_identity: ModelIdentity | None = None,
 ) -> EvaluationPayload:
     """Convert the exact sliced match result into a neutral persisted payload."""
     records = [match for class_matches in sliced.values() for match in class_matches]
@@ -230,6 +235,7 @@ def build_evaluation_payload(
         predictions=prediction_boxes,
         matches=payload_matches,
         methodology=dict(methodology or {}),
+        model_identity=model_identity,
     )
 
 
@@ -530,6 +536,7 @@ def evaluate_split(
     methodology: Mapping[str, JsonValue] | None = None,
     source_ground_truth: pd.DataFrame | None = None,
     source_predictions: pd.DataFrame | None = None,
+    model_identity: ModelIdentity | None = None,
 ) -> EvaluatedSplit:
     """Score a split at an already-frozen mapping and write its dashboards."""
     EvaluationConfig.model_validate(
@@ -573,6 +580,7 @@ def evaluate_split(
         thresholds=normalized,
         sliced=sliced,
         methodology=payload_methodology,
+        model_identity=model_identity,
     )
     metrics: dict[str, Any] = compute_metrics_from_matches(sliced, classes, normalized)
     # Preserve authoritative AP inputs: prepared GT and geometry-valid predictions
@@ -651,6 +659,10 @@ def evaluate_split(
             generated.replace(preserved)
         plot_paths[metric_name] = preserved
     confusion_matrix_path = output_dir / f"matrix_{suffix}.xlsx"
+    _annotate_outputs(
+        visible_metrics, plot_paths, (dashboard_path, dtrk_path, confusion_matrix_path),
+        model_identity,
+    )
     gt_matches, pred_matches = _visualization_frames(gt_df, predictions, outcome)
     return EvaluatedSplit(
         split=split,
@@ -670,7 +682,45 @@ def evaluate_split(
         confusion_matrix=confusion_matrix,
         pr_curves=pr_curves,
         result_rows=result_rows,
+        model_identity=model_identity,
     )
+
+
+def _annotate_outputs(
+    metrics: dict[str, Any], plot_paths: dict[str, Path], workbooks: tuple[Path, ...],
+    identity: ModelIdentity | None,
+) -> None:
+    if identity is None:
+        return
+    for metric_name, path in plot_paths.items():
+        _write_identity_plot(metrics, metric_name, path, identity)
+    for workbook in workbooks:
+        annotate_workbook(workbook, {"model": identity})
+
+
+def _write_identity_plot(
+    metrics: dict[str, Any], metric_name: str, path: Path, identity: ModelIdentity,
+) -> None:
+    """Annotate a public producer figure before the final local PNG export.
+
+    The upstream save_path API returns a closed Figure, which remains editable
+    and exportable. Passing save_path avoids its interactive show branch.
+    """
+    figure, _ = plot_confidence_intervals(
+        metrics=metrics, metric=metric_name, confidence_level=0.95,
+        save_path=str(path), figsize=(12, 8),
+    )
+    if figure is None:
+        raise ValueError(f"No figure was produced for {metric_name!r}")
+    caption = (
+        f"Model: {identity.model_name}\n"
+        f"Training task: {identity.training_task_id or 'unavailable'}"
+    )
+    wrapped_caption = "\n".join(
+        line for value in caption.splitlines() for line in wrap(value, width=100)
+    )
+    figure.suptitle(wrapped_caption, y=1.03, va="bottom", fontsize=10, parse_math=False)
+    figure.savefig(path, bbox_inches="tight", dpi=300, metadata={"Model identity": caption})
 
 
 def score_split(

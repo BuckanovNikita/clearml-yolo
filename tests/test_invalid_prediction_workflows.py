@@ -15,6 +15,7 @@ from clearml_yolo.publishing.models import FiftyOneConfig
 from clearml_yolo.tasks.compare import SettledInference, _scored
 from clearml_yolo.tasks.metrics import MetricsResult, compute_metrics
 from clearml_yolo.tasks.val import validate
+from clearml_yolo.workbook_identity import read_dashboard
 from native_config_helpers import prediction_config
 
 BOX_COLUMNS = ["bbox_x_tl", "bbox_y_tl", "bbox_x_br", "bbox_y_br"]
@@ -68,7 +69,7 @@ def _assert_payload(payload: EvaluationPayload, all_invalid: bool) -> None:
 
 
 def _assert_metrics(result: MetricsResult, all_invalid: bool) -> None:
-    dashboard = pd.read_excel(result.dashboards["test"], index_col=0)
+    dashboard = read_dashboard(result.dashboards["test"], index_col=0)
     assert cast(pd.Series, dashboard.loc["cat", ["tp", "fp", "fn"]]).tolist() == (
         [0, 0, 1] if all_invalid else [1, 1, 0]
     )
@@ -94,6 +95,7 @@ def test_metrics_scores_valid_boxes_without_rewriting_raw_csv(
         evaluation=EvaluationConfig(),
         splits=["test"],
         fiftyone=FiftyOneConfig(enabled=False),
+        model_label="test model",
     )
 
     assert predictions.read_bytes() == original
@@ -129,6 +131,7 @@ def test_validation_routes_native_invalid_boxes_through_real_metrics(
         ultralytics_predict=prediction_config(imgsz=imgsz, device="cpu"),
         evaluation=EvaluationConfig(),
         splits=["test"],
+        model_label="test model",
     )
 
     assert observed_sizes == [imgsz, imgsz]
@@ -213,9 +216,10 @@ def test_filtered_predictions_still_score_raw_map_identically_to_clean_input(
             evaluation=EvaluationConfig(preprocess_preds_conf_threshold=0.95),
             splits=["test"],
             fiftyone=FiftyOneConfig(enabled=False),
+            model_label="test model",
         )
         assert path.read_bytes() == original
         _assert_metrics(result, all_invalid=True)
-        dashboards.append(pd.read_excel(result.dashboards["test"], index_col=0))
+        dashboards.append(read_dashboard(result.dashboards["test"], index_col=0))
     pd.testing.assert_frame_equal(dashboards[0], dashboards[1])
     assert cast(float, dashboards[0].loc["cat", "ap50"]) > 0.9

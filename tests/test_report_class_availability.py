@@ -10,6 +10,7 @@ from report_generator.config import Config
 from clearml_yolo.clearml_session import ClearMLConfig
 from clearml_yolo.tasks.compare import MANIFEST_NAME, ComparisonManifest
 from clearml_yolo.tasks.report import report
+from clearml_yolo.workbook_identity import deannotated_workbook, workbook_identities
 
 
 @pytest.mark.parametrize("shared", [True, False])
@@ -45,13 +46,23 @@ def test_report_preserves_one_sided_metrics_with_real_builders(
         statistical_workbook="comparison.xlsx",
     )
     (comparison / MANIFEST_NAME).write_text(manifest.model_dump_json(), encoding="utf-8")
-    result = report(comparison, tmp_path / "reports", ClearMLConfig())
+    result = report(
+        comparison,
+        tmp_path / "reports",
+        ClearMLConfig(),
+        baseline_label="fixture baseline",
+        candidate_label="fixture candidate",
+    )
     config = Config.load()
     for business, path in (
         (False, result.dev_reports["test"]),
         (True, result.business_reports["test"]),
     ):
-        workbook = load_workbook(path)
+        identities = workbook_identities(path)
+        assert identities["baseline"].model_name == "fixture baseline"
+        assert identities["candidate"].model_name == "fixture candidate"
+        with deannotated_workbook(path) as original:
+            workbook = load_workbook(original)
         metric = (
             config.business.column_translations.get("f1_score", "f1_score")
             if business
@@ -77,3 +88,4 @@ def test_report_preserves_one_sided_metrics_with_real_builders(
             cell = sheet.cell(rows[label], column)
             assert cell.value == "NA"
             assert cell.fill.patternType is None
+        workbook.close()
