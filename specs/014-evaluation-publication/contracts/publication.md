@@ -64,8 +64,8 @@ with duplicate summary workbooks.
 | ground-truth | `gt_csv` |
 | train | `gt_csv`, native best Output Model and native telemetry |
 | predict | `gt_csv`, `predicts_csv` with not-evaluated prediction rows |
-| metrics / val | `gt_csv`, `predicts_csv`, `metrics_best_confidences_val` when calibrated, `metrics_dashboard_full_SPLIT`, `metrics_dashboard_dtrk_SPLIT`, interactive plots for each evaluated context |
-| compare with baseline | `gt_csv`, `predicts_csv`, candidate/baseline full/DTRK dashboards per split, `compare_workbook_SPLIT`, `compare_workbook_SPLIT_excluded`, interactive plots and comparison telemetry |
+| metrics / val | `gt_csv`, `predicts_csv`, `metrics_best_confidences_val` when calibrated, `metrics_dashboard_full_SPLIT`, `metrics_dashboard_dtrk_SPLIT`, current-model confusion charts per evaluated split and PR on test |
+| compare with baseline | `gt_csv`, `predicts_csv`, candidate/baseline full/DTRK dashboards per split, `compare_workbook_SPLIT`, `compare_workbook_SPLIT_excluded`, candidate charts and comparison headline single values |
 | compare without automatic baseline | `gt_csv`, `predicts_csv`, candidate full/DTRK dashboards and interactive plots, recorded comparison skip reason |
 | report | `report_dev_SPLIT`, `report_business_SPLIT` |
 | pipeline | Union of enabled stages, with canonical CSVs assembled once and the three paired comparison/report workbooks preserved |
@@ -85,7 +85,7 @@ Pipeline comparison remains test; standalone comparison uses its selected split.
 Combined metrics exports retain calibration and requested splits, plus any other splits
 represented by source predictions. They do not invent contexts for unused GT-only splits.
 
-Configuration/provenance, existing comparison plots, native telemetry and optional
+Configuration/provenance, comparison headline single values, native non-PR telemetry and optional
 FiftyOne link/local receipt remain. Local diagnostics, manifests, match tables, threshold
 and methodology files may still support computation/recovery. New publications exclude
 raw prediction artifacts, duplicate `metrics_evaluation_*` summary workbooks, separate
@@ -95,8 +95,10 @@ Historical artifact-backed recovery follows the
 
 ## Interactive confusion matrices
 
-For each context, four `report_plotly` heatmaps show the exact same post-threshold integer
-counts: raw, row-normalized, column-normalized and globally normalized. Rows are true
+For each current-model split, one `report_plotly` chart titled `Confusion matrix` contains
+four selectable heatmaps of the exact same post-threshold integer counts: `Counts`,
+`Row %`, `Column %` and `Overall %`. Counts is initially visible and exactly one heatmap
+is visible at a time. Rows are true
 classes; columns are predicted classes. Preserve producer class order and background;
 numeric/Unicode labels remain distinct. Numeric axis positions with explicit label ticks
 prevent implicit lexical sorting of numeric-looking class names.
@@ -108,8 +110,10 @@ payload. The renderer does not rerun matching or derive counts from rounded dash
 
 ## Interactive precision–recall curves
 
-Publish one class/context PR plot at IoU 0.50 with recall on X and precision on Y, both
-bounded to [0, 1]. Reconstruct the same geometry-valid population, confidence ordering,
+Publish one current-model chart titled `Precision-recall` for `test` only, combining all
+classes as legend-toggleable traces at IoU 0.50, with recall on X and precision on Y,
+both bounded to [0, 1]. No train/validation PR chart is published. Reconstruct the same
+geometry-valid population, confidence ordering,
 matching and precision integration used by authoritative `compute_map`, using public
 matching APIs without modifying the pinned dependency. AP50 parity must be checked for
 both integration methods, supported matching strategies, confidence ties and empty cases.
@@ -119,17 +123,32 @@ prediction preprocessing/NMS and class threshold filtering. Float32 boxes/cumula
 follow authoritative computation. PR is not the frozen-threshold confusion-matrix
 population.
 
-Display AP50, integration method, class and context/model/split identity. Hover includes
-confidence and cumulative TP/FP for each actual observation. Ground truth with no
-predictions has an empty curve and AP50 zero. No ground truth means unavailable recall
-and AP50, with an annotation and no invented point. Do not overlay an operating point
+Display each class, AP50 and integration method in its trace legend; hover also includes
+recall, precision, confidence and cumulative TP/FP for each actual observation. Ground
+truth with no predictions has AP50 zero and `No predictions` in its class legend.
+No ground truth means unavailable recall and AP50, with `No ground truth: recall
+unavailable` in the legend. Null-gap traces keep these classes visible in the legend
+without numerical points; they do not fabricate observations. Do not overlay an operating point
 from a different population and do not publish a PR CSV artifact.
 
-Plot identities encode context/model/split/class components reversibly, so separators,
-numeric labels and Unicode cannot overwrite another context. The adapter submits plain
+The [readable presentation amendment](../../020-readable-evaluation-plots/contracts/plots.md)
+supersedes the original encoded plot identities and per-class/per-normalization charts.
+Both chart types use series `model display name · split`, with `Current model` when the
+display identity is unavailable. An invocation-local registry reuses a checkpoint/split
+slot across prediction and comparison-candidate publication; without checkpoint association
+it uses model ID, then context identity. Distinct sources with colliding visible labels
+receive readable stage suffixes (`Prediction`, `Comparison candidate`) and ordinal suffixes.
+Internal context/model IDs, checkpoint hashes and training task IDs remain in provenance,
+not visible chart captions. Numeric/Unicode class labels retain their identities.
+The adapter submits plain
 Plotly-compatible dictionaries through the SDK without a new plotting dependency.
 ClearML replaces plot titles with series names, so persistent annotations retain
-human-readable context and AP/method metadata.
+human-readable model/split captions; trace legends and hover retain AP/method metadata.
+Comparison-baseline charts and comparison, degraded-class and methodology tables are
+excluded from ClearML Plots. Baseline durable rows, dashboards, paired workbooks, exclusion
+CSVs and comparison headline single values remain published. Native training callback
+PR images are validation results and are excluded; other native figures, previews, scalars,
+model uploads and owner-only DDP replay remain intact.
 
 ## Experiment and model display names
 
@@ -182,11 +201,13 @@ stale original metrics. Regenerate the workbook from source inputs to change its
 The adapters do not modify pinned dependencies or source files. Body metrics, eligible
 class populations, output paths and artifact keys remain unchanged.
 
-Interactive full/DTRK and comparison tables identify their source models in display-only
-columns. Confusion/PR and generated evaluation plots include visible model/training-task
-captions. Plotly escapes user text; persistent annotations survive SDK title replacement.
-Plot identities and metric populations remain unchanged. Raster character coverage depends
-on available fonts. Native Ultralytics training diagnostics retain native formatting.
+Generated local evaluation raster plots retain model/training-task captions. Current
+ClearML confusion/PR captions use readable model/split labels under the
+[presentation amendment](../../020-readable-evaluation-plots/contracts/plots.md); they omit
+internal identifiers. Comparison tables remain in downloadable reports, outside Plots.
+Plotly escapes user text; persistent annotations survive SDK title replacement. Metric
+populations remain unchanged. Raster character coverage depends on available fonts.
+Native Ultralytics non-PR training diagnostics retain native formatting.
 These requirements apply to new files and publications; historical ClearML artifacts are
 not rewritten.
 

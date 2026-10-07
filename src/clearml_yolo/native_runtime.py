@@ -128,6 +128,31 @@ def _write_inherited_settings(settings: Any, get_user_config_dir: Any) -> None:
     settings_path.write_text(json.dumps(inherited), encoding="utf-8")
 
 
+def _without_training_pr(callback: Callable[[Any], None]) -> Callable[[Any], None]:
+    def publish(trainer: Any) -> None:
+        # Native training PR comes from validation. Test PR is published by the
+        # project evaluation adapter; retain all other installed callback behavior.
+        trainer_plots = trainer.plots
+        validator_plots = trainer.validator.plots
+        try:
+            trainer.plots = {
+                path: value
+                for path, value in trainer_plots.items()
+                if not Path(path).stem.endswith("PR_curve")
+            }
+            trainer.validator.plots = {
+                path: value
+                for path, value in validator_plots.items()
+                if not Path(path).stem.endswith("PR_curve")
+            }
+            callback(trainer)
+        finally:
+            trainer.plots = trainer_plots
+            trainer.validator.plots = validator_plots
+
+    return publish
+
+
 def _enable_owner(integration: Any, settings: Any) -> None:
     import clearml
     from clearml import Task
@@ -139,6 +164,7 @@ def _enable_owner(integration: Any, settings: Any) -> None:
     callbacks["on_pretrain_routine_start"] = _checked_pretrain(
         integration, callbacks["on_pretrain_routine_start"]
     )
+    callbacks["on_train_end"] = _without_training_pr(callbacks["on_train_end"])
     integration.callbacks = callbacks
 
 

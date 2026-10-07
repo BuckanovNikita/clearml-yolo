@@ -54,13 +54,26 @@ this branch.
    dashboards/plots and its recorded skip reason without fabricated paired outputs.
    Confirm duplicate evaluation summaries and separate match/threshold/methodology
    sidecars are absent from new uploads while necessary local diagnostics remain.
-   Inspect all four interactive confusion views for exact post-threshold counts, class
-   order/background, true-row/predicted-column orientation, percentage scaling and zero
-   denominators. Inspect class PR for authoritative prepared/deduplicated GT and
+   Inspect one current-model `Confusion matrix` chart per evaluated split. In a browser,
+   select `Counts`, `Row %`, `Column %` and `Overall %`; verify Counts is initially active,
+   exactly one heatmap is visible, exact post-threshold counts, class order/background,
+   true-row/predicted-column orientation, percentage scaling and zero denominators.
+   Inspect one `Precision-recall` chart on test only, combining all classes. Toggle class
+   traces through the legend; inspect AP50/method legends and observation hover.
+   Inspect PR for authoritative prepared/deduplicated GT and
    geometry-valid raw prediction populations, AP50 parity for both integration methods,
    supported strategies/ties, confidence/cumulative TP/FP hover, empty predictions and
-   unavailable recall/AP without GT. Confirm context/model/split/class identities and
-   persistent AP/method annotations survive actual SDK publication.
+   unavailable recall/AP without GT. Empty classes retain null-gap traces and explicit
+   class-legend status without numerical points; confirm their legend entries remain visible
+   and toggleable in the actual browser. Confirm readable model/split series and
+   persistent captions survive actual SDK publication without context/model IDs,
+   checkpoint hashes or training task IDs. Repeat checkpoint/split publication across
+   prediction and comparison candidate and verify slot reuse; check unknown identity and
+   colliding names use readable fallback/stage/ordinal labels. Verify zero baseline chart
+   events, zero comparison/degraded-class/methodology table events and zero non-test PR
+   events, while baseline CSV contexts, dashboards, paired reports and headline single
+   values remain available. Use the
+   [readable plot contract](../../../specs/020-readable-evaluation-plots/contracts/plots.md).
    Verify unused names remain intact and active/archived project-local collisions receive
    shared task/model suffixes without changing IDs/paths. Check owned best-model threshold
    metadata against exact val thresholds and actual prediction checkpoint SHA-256 with
@@ -70,7 +83,9 @@ this branch.
    replay; when used by the invocation, verify the consumed-dataset and explicit-report
    configurations too. Inspect native Scalars, Plots and Debug
    Samples. Confirm one task per invocation, owner-only training/validation callbacks,
-   and no duplicate checkpoint artifacts.
+   and no duplicate checkpoint artifacts. Enable native plots and verify native validation
+   PR images are excluded while other native figures, previews, scalars and the single best
+   model remain; exercise callback failure cleanup and the same filter in DDP owner replay.
    Repeat CSV training against one dataset cache: filenames and extension casing remain
    intact, image copies and NDJSON conversion do not repeat, source bytes remain unchanged,
    and the returned prepared paths are present. Internal manifests and diagnostic receipts
@@ -100,7 +115,7 @@ this branch.
    Clean up only owned resources per that environment's instructions.
 
 Build and install both distributions in fresh environments for release acceptance.
-Verify all nine command helps and documented configuration examples.
+Verify all ten command helps and documented configuration examples.
 Check `cy-init-config` generation and overwrite protection without a ClearML task.
 CPU and single-GPU runs are required release gates; report an unavailable device as
 an unverified gate. Describe physical multi-GPU execution as unverified unless exercised.

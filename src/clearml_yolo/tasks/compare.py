@@ -812,7 +812,7 @@ def compare(
         if model.identity is not None
     }
     annotate_workbook(workbook, identities)
-    report_comparison(task, split, tables.rows, tables.methodology, identities=identities)
+    report_comparison(task, split, tables.rows, tables.methodology)
     manifest = _write_manifest(
         destination,
         split,

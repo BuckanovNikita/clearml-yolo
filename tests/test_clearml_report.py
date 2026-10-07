@@ -13,9 +13,6 @@ import pytest
 from loguru import logger
 
 from clearml_yolo.clearml_report import (
-    COMPARISON_TABLE_TITLE,
-    DEGRADED_TABLE_TITLE,
-    METHODOLOGY_TABLE_TITLE,
     report_comparison,
     report_scalars,
     report_table,
@@ -139,40 +136,11 @@ def test_report_scalars_reports_one_series_per_value() -> None:
     ]
 
 
-def test_report_comparison_publishes_the_table_and_the_methodology() -> None:
+def test_report_comparison_keeps_previous_models_out_of_plots() -> None:
     task = _FakeTask()
-
     report_comparison(task, "test", _comparison_rows(), _METHODOLOGY)
-
-    tables = {table["title"]: table for table in task.get_logger().tables}
-    assert set(tables) == {COMPARISON_TABLE_TITLE, DEGRADED_TABLE_TITLE, METHODOLOGY_TABLE_TITLE}
-    assert tables[COMPARISON_TABLE_TITLE]["series"] == "test"
-    assert len(tables[COMPARISON_TABLE_TITLE]["frame"]) == 6
-
-    methodology_frame = tables[METHODOLOGY_TABLE_TITLE]["frame"]
-    assert list(methodology_frame.columns) == ["parameter", "value"]
-    assert dict(zip(methodology_frame["parameter"], methodology_frame["value"], strict=True)) == {
-        "tests": "['mcnemar', 'fisher']",
-        "family_size": "7",
-        "q": "0.05",
-        "seed": "42",
-        "threshold_source": "frozen/baseline",
-        "weights_source": "clearml://task/abc",
-        "images": "128",
-    }
-
-
-def test_degraded_classes_are_named_in_their_own_table() -> None:
-    task = _FakeTask()
-
-    report_comparison(task, "test", _comparison_rows(), _METHODOLOGY)
-
-    (degraded,) = [
-        table for table in task.get_logger().tables if table["title"] == DEGRADED_TABLE_TITLE
-    ]
-    assert degraded["series"] == "test"
-    # 'cat' degraded on recall, 'dog' on precision; the pooled row is never listed.
-    assert list(degraded["frame"]["class_name"]) == ["cat", "dog"]
+    assert task.get_logger().tables == []
+    assert task.get_logger().single_values
 
 
 def test_headline_values_count_verdicts_of_per_class_rows_only(warnings_log: list[str]) -> None:
@@ -246,11 +214,10 @@ def test_missing_columns_are_warned_about_and_skipped(warnings_log: list[str]) -
     # no precision hypothesis, so three of the five remain.
     assert single_values["test/classes_tested"] == 3.0
     assert single_values["test/classes_excluded"] == 2.0
-    # The tables are still published: reporting never fails on a partial frame.
-    assert len(task.get_logger().tables) == 3
+    assert task.get_logger().tables == []
 
 
-def test_rows_without_any_verdict_column_still_publish_the_tables(
+def test_rows_without_any_verdict_column_still_publish_headlines(
     warnings_log: list[str],
 ) -> None:
     task = _FakeTask()
@@ -259,14 +226,11 @@ def test_rows_without_any_verdict_column_still_publish_the_tables(
     report_comparison(task, "test", rows, _METHODOLOGY)
 
     assert "'precision_verdict'" in "\n".join(_missing_column_warnings(warnings_log))
-    (degraded,) = [
-        table for table in task.get_logger().tables if table["title"] == DEGRADED_TABLE_TITLE
-    ]
-    assert degraded["frame"].empty
+    assert task.get_logger().tables == []
     assert task.get_logger().single_values["test/classes_tested"] == 4.0
 
 
-def test_rows_without_the_pooled_flag_skip_the_headline_but_keep_the_tables(
+def test_rows_without_the_pooled_flag_skip_the_headline(
     warnings_log: list[str],
 ) -> None:
     # Without is_pooled the pooled row cannot be told from a class, and counting it as one
@@ -278,7 +242,7 @@ def test_rows_without_the_pooled_flag_skip_the_headline_but_keep_the_tables(
 
     assert "'is_pooled'" in "\n".join(_missing_column_warnings(warnings_log))
     assert task.get_logger().single_values == {}
-    assert len(task.get_logger().tables) == 2
+    assert task.get_logger().tables == []
 
 
 def test_a_missing_pooled_delta_is_omitted() -> None:

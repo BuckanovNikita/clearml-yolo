@@ -91,12 +91,20 @@ report workbooks with comparison exclusions. Duplicate evaluation summaries and 
 match/threshold/methodology sidecars remain local. Missing automatic baseline retains
 candidate dashboards/plots and records its skip reason.
 
-Interactive confusion matrices show exact post-threshold counts and row/column/global
-percentages, preserving true-row/predicted-column orientation, class order/background
-and explicit zero denominators. Class PR uses the geometry-valid authoritative AP50
+Current-model `Confusion matrix` charts select Counts, Row %, Column % or Overall %,
+preserving exact post-threshold counts, true-row/predicted-column orientation, class
+order/background and explicit zero denominators. `Precision-recall` combines all class
+traces on test only, with AP/method legends and confidence/cumulative TP/FP hover.
+Class PR uses the geometry-valid authoritative AP50
 population, confidence ordering and public matching; it is distinct from frozen-threshold
 confusion counts. Empty predictions with GT have AP50 zero; absent GT has unavailable
-recall/AP. Context/model/split/class identities prevent plot collisions.
+recall/AP; null-gap traces retain explicit class-legend status without numerical points. Visible labels
+use model name/split without internal IDs or hashes. Invocation-local checkpoint/split
+slots repeat; model/context fallback and readable stage/ordinal suffixes prevent collisions.
+Baseline charts and comparison tables are excluded from Plots; baseline rows/dashboards,
+paired workbooks and headline single values remain published. Native callback validation
+PR images are excluded while other native output and DDP owner replay are preserved.
+See the [readable plot contract](../specs/020-readable-evaluation-plots/contracts/plots.md).
 
 Project-local exact task/model name collisions, including archived records, receive a
 shared readable suffix after rechecking; unused requested names and output paths remain

@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record model identity release verification
+  ([`b0ace6e`](https://github.com/BuckanovNikita/clearml-yolo/commit/b0ace6ef97d0166f02d967cd18af511fd8c0e020))
+
+
 ## v0.19.0 (2026-10-07)
 
 ### Documentation

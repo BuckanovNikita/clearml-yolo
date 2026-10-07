@@ -6,6 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
 
+import matplotlib.pyplot as plt
 import pytest
 
 from clearml_yolo.native_ddp import native_ddp_relay
@@ -17,6 +18,7 @@ class _Logger:
         self.scalars: list[tuple[str, str, float, int]] = []
         self.values: dict[str, float] = {}
         self.images: list[tuple[str, bytes]] = []
+        self.figures: list[str] = []
 
     def report_scalar(self, title: str, series: str, value: float, iteration: int) -> None:
         self.scalars.append((title, series, value, iteration))
@@ -28,8 +30,9 @@ class _Logger:
         path = Path(kwargs["local_path"])
         self.images.append((path.name, path.read_bytes()))
 
-    def report_matplotlib_figure(self, **_kwargs: Any) -> None:
-        return None
+    def report_matplotlib_figure(self, **kwargs: Any) -> None:
+        self.figures.append(kwargs["title"])
+        plt.close(kwargs["figure"])
 
 
 class _Task:
@@ -80,7 +83,11 @@ class _Model:
 
 
 def _capture_events(
-    model: _Model, output: Path, before_finish: Callable[[], None] | None = None
+    model: _Model,
+    output: Path,
+    before_finish: Callable[[], None] | None = None,
+    *,
+    plots: bool = False,
 ) -> Path:
     output.mkdir(parents=True)
     trainer = SimpleNamespace(
@@ -116,6 +123,18 @@ def _capture_events(
     trainer.validator = SimpleNamespace(
         plots={}, metrics=SimpleNamespace(results_dict={"metrics/mAP50(B)": 0.8})
     )
+    if plots:
+        figure = plt.figure()
+        for owner, name in (
+            (trainer, "results.png"),
+            (trainer, "BoxPR_curve.png"),
+            (trainer.validator, "confusion_matrix.png"),
+            (trainer.validator, "MaskPR_curve.png"),
+        ):
+            path = output / name
+            figure.savefig(path)
+            owner.plots[path] = {}
+        plt.close(figure)
     _invoke(model, "on_train_end", trainer)
     return best
 
@@ -152,7 +171,7 @@ def test_ddp_rank_zero_events_replay_installed_callbacks_in_owner(
     with native_runtime(), native_ddp_relay(task, model) as relay:
         monkeypatch.setenv(OWNER_PID_ENV, "worker-owner-pid")
         monkeypatch.setattr("ultralytics.utils.RANK", 0)
-        best = _capture_events(model, tmp_path / "train")
+        best = _capture_events(model, tmp_path / "train", plots=True)
         monkeypatch.setenv(OWNER_PID_ENV, str(os.getpid()))
         parent = SimpleNamespace(ddp=True, args=SimpleNamespace())
         model.trainer = parent
@@ -173,6 +192,7 @@ def test_ddp_rank_zero_events_replay_installed_callbacks_in_owner(
     }
     assert task.output_models == [(str(best), "ddp-run", False)]
     assert task.logger.images == [("val_batch0_labels.jpg", b"original-preview")]
+    assert task.logger.figures == ["results", "confusion_matrix"]
     assert model.callbacks == original
 
 

@@ -2,7 +2,14 @@
 
 ## Public execution interfaces
 
-All existing commands/options remain unchanged. Each execution invocation owns one ClearML task; pipeline stages reuse it. Native metric names, epoch indices and plotting choices remain authoritative.
+All existing commands/options remain unchanged. Each execution invocation owns one ClearML task;
+pipeline stages reuse it. Native metric names and epoch indices remain authoritative.
+The [readable plot amendment](../../020-readable-evaluation-plots/contracts/plots.md)
+excludes native validation PR images from ClearML Plots. The project owner callback adapter
+filters `*PR_curve` entries from trainer/validator plot mappings only during the installed
+`on_train_end` callback and restores those mappings even on failure. It preserves other
+native figures, image previews, scalars, best-model uploads and callback state; DDP owner
+replay uses the same adapter. Upstream callback functions and local native plot files remain intact.
 
 ## Distributed telemetry
 
@@ -25,7 +32,7 @@ the task closes, or guarantee forwarding from DDP subprocess streams.
 | Destination | Permitted contents |
 |---|---|
 | Console | Raw stdout and stderr captured during the invocation-owned task lifetime, including native YOLO output. |
-| Scalars / Plots / Debug Samples | Installed native training/validation telemetry and project performance visualization. |
+| Scalars / Plots / Debug Samples | Native non-PR training/validation telemetry; current-model confusion charts and test-only grouped PR; training/validation previews. Comparison headline single values remain outside Plots. |
 | Output Model | One native best checkpoint, verified before successful completion. |
 | Artifacts | Canonical ground truth, prediction, frozen validation-threshold CSVs; evaluation/comparison workbooks; final performance reports. |
 | Configuration Objects / General | Sanitized execution settings, dataset overrides, source references, normalization and meaningful provenance. |
@@ -44,7 +51,7 @@ only if no output models exist. One checkpoint selection determines both weights
 task/model links or task/artifact identity; artifacts have no fabricated model link. Recovery
 does not fetch historical predictions, Configuration Objects or General parameters over current
 comparison settings. Both positions use current images/settings and frozen thresholds; old
-architecture loading is not guaranteed. Current native publication stays unchanged.
+architecture loading is not guaranteed. Native publication follows the PR exclusion above.
 Existing remote override, resolution, secret redaction and local execution-copy behavior remain intact.
 
 Any computation, callback, journal, upload, flush or interruption error fails command/task and preserves local diagnostics. Prior telemetry on a failed task is valid partial evidence, never a completion signal. Historical tasks are not modified.

@@ -8,9 +8,13 @@
   confidence: list[float], tp: list[int], fp: list[int], gt_count: int,
   ap50: float | None, integration_method: str)`; points have equal lengths.
 
-`clearml_report.py` adds `report_confusion_matrices(task, context, matrix)` and
-`report_pr_curves(task, context, curves)`. Use raw Plotly-compatible dictionaries with
-SDK `report_plotly`; no new plotting dependency. task=None is a no-op.
+`clearml_report.py` exposes `report_confusion_matrices(task, context, matrix, *,
+display_label: str | None = None)` and `report_pr_curves(task, context, curves, *,
+display_label: str | None = None)`. Existing direct callers remain valid; absent display
+labels use the model display name or `Current model`, plus split. One confusion chart
+selects four normalizations; one test-only PR chart combines class traces. Use raw
+Plotly-compatible dictionaries with SDK `report_plotly`; no new plotting dependency.
+task=None is a no-op.
 
 `scoring.EvaluatedSplit` gains `confusion_matrix`, `pr_curves` and `result_rows`.
 `result_rows` is a context-neutral combined frame for its split with original fields,
@@ -30,6 +34,12 @@ the neutral export frames.
 prediction contexts keyed by source path/role/split, enrichment on evaluation, deterministic
 final assembly and once-only `gt_csv`/`predicts_csv` uploads. Completion expectations are
 registered before publication; callbacks execute before artifact/model barriers and flush.
+The bundle also allocates invocation-local readable display slots by checkpoint/split,
+then model ID/split, then context/split. Repeated sources reuse labels; visible collisions
+receive readable stage/ordinal suffixes. `publish_evaluation` retains baseline durable
+rows and dashboard uploads but skips its chart calls; PR calls require `split=test`.
+`report_comparison` publishes headline single values without table plots. See the
+[presentation contract](../../020-readable-evaluation-plots/contracts/plots.md).
 
 `clearml_naming` owns naming state and public collision resolution using SDK queries,
 including archived project-local tasks/models and excluding current IDs.
@@ -49,12 +59,12 @@ must identify the checkpoint hash used by prediction, not merely a caller-claime
 - predict: effective GT and combined not-evaluated prediction context.
 - metrics/val: GT, combined contexts, metrics_best_confidences_val, full/DTRK per
   evaluated split and interactive plots.
-- compare: GT, separate reinference contexts, full/DTRK and interactive plots per
-  model/split; comparison workbook plus exclusions when paired, candidate-only outputs
+- compare: GT, separate reinference contexts, full/DTRK per model/split, current-candidate
+  confusion charts and test-only grouped PR; comparison workbook plus exclusions when paired, candidate-only outputs
   and recorded skip reason when automatic baseline is absent.
 - report: existing developer/business report workbooks only.
 - pipeline: union of enabled stages, CSVs once; test comparison/report workbooks unchanged.
 
-Keep local diagnostics, configuration/provenance, comparison plots and optional FiftyOne
+Keep local diagnostics, configuration/provenance, comparison headline single values and optional FiftyOne
 receipt/link. Stop publishing duplicate evaluation summary workbooks, separate matches,
 per-split threshold/methodology sidecars and raw prediction artifacts.

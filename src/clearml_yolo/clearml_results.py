@@ -38,7 +38,9 @@ def _provenance_path(predictions: Path) -> Path:
 
 
 def write_prediction_provenance(
-    predictions: Path, checkpoint: Path, model_identity: ModelIdentity | None = None,
+    predictions: Path,
+    checkpoint: Path,
+    model_identity: ModelIdentity | None = None,
 ) -> str | None:
     """Bind prediction bytes to a local checkpoint, when one is available."""
     checkpoint_hash = file_digest(checkpoint) if checkpoint.is_file() else None
@@ -127,6 +129,37 @@ class _ResultBundle:
     truth: Path | None = None
     contexts: dict[tuple[str, str], tuple[ResultContext, Path]] = field(default_factory=dict)
     prediction_expected: bool = False
+    plot_slots: dict[tuple[str, str, str], str] = field(default_factory=dict)
+
+    def display_label(self, context: ResultContext, predictions: Path, role: str) -> str:
+        identity = context.model_identity
+        checkpoint = identity.checkpoint_sha256 if identity else None
+        checkpoint = checkpoint or prediction_checkpoint_hash(predictions)
+        model_id = (identity.model_id if identity else None) or context.model_id
+        if checkpoint:
+            source = ("checkpoint", checkpoint, context.split)
+        elif model_id and model_id != "unidentified":
+            source = ("model", model_id, context.split)
+        else:
+            source = ("context", context.context_id, context.split)
+        existing = self.plot_slots.get(source)
+        if existing is not None:
+            return existing
+        name = identity.model_name if identity else "Current model"
+        base = f"{name} · {context.split}"
+        label = base
+        if label in self.plot_slots.values():
+            stage = {
+                "prediction": "Prediction",
+                "comparison_candidate": "Comparison candidate",
+            }.get(role, "Evaluation")
+            label = f"{base} · {stage}"
+            ordinal = 2
+            while label in self.plot_slots.values():
+                label = f"{base} · {stage} {ordinal}"
+                ordinal += 1
+        self.plot_slots[source] = label
+        return label
 
     def set_truth(self, path: Path) -> pd.DataFrame:
         frame = assign_source_ids(_read_rows(path), row_type="ground_truth")
@@ -203,7 +236,11 @@ def _context_id(predictions: Path, role: str) -> str:
 
 
 def _context(
-    bundle: _ResultBundle, predictions: Path, role: str, split: str, model_id: str | None,
+    bundle: _ResultBundle,
+    predictions: Path,
+    role: str,
+    split: str,
+    model_id: str | None,
     model_identity: ModelIdentity | None = None,
 ) -> ResultContext:
     identity = _context_id(predictions, role)
@@ -216,7 +253,9 @@ def _context(
             raise ValueError("Prediction context cannot change source identity")
         return previous
     return ResultContext(
-        context_id=identity, model_id=model_id or "unidentified", split=split,
+        context_id=identity,
+        model_id=model_id or "unidentified",
+        split=split,
         model_identity=model_identity,
     )
 
@@ -262,7 +301,12 @@ def register_predictions(
     outside = source[~source["image_name"].isin(scoped_images)]
     if not outside.empty:
         context = _context(
-            bundle, predictions, f"{role}:unassigned", "unassigned", model_id, model_identity,
+            bundle,
+            predictions,
+            f"{role}:unassigned",
+            "unassigned",
+            model_id,
+            model_identity,
         )
         rows = build_prediction_rows(outside, split=context.split)
         rows["exclusion_reason"] = "outside_selected_splits"
@@ -285,7 +329,12 @@ def publish_evaluation(
     bundle = _bundle(task, output_dir)
     bundle.set_truth(ground_truth)
     context = _context(
-        bundle, predictions, role, evaluated.split, model_id, evaluated.model_identity,
+        bundle,
+        predictions,
+        role,
+        evaluated.split,
+        model_id,
+        evaluated.model_identity,
     )
     bundle.put(context, evaluated.result_rows)
     stem = "metrics" if role == "prediction" else role
@@ -300,5 +349,13 @@ def publish_evaluation(
     expect_artifacts(task, list(names))
     for name, path in names.items():
         upload_artifact(task, name, path)
-    report_confusion_matrices(task, context, evaluated.confusion_matrix)
-    report_pr_curves(task, context, evaluated.pr_curves)
+    if role != "comparison_baseline":
+        display_label = bundle.display_label(context, predictions, role)
+        report_confusion_matrices(
+            task,
+            context,
+            evaluated.confusion_matrix,
+            display_label=display_label,
+        )
+        if context.split == "test":
+            report_pr_curves(task, context, evaluated.pr_curves, display_label=display_label)

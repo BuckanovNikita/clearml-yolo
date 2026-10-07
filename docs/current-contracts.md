@@ -19,7 +19,7 @@ configuration, output, tracking and evaluation rules formerly listed in `AGENTS.
 | CSV training and dataset cache | [Dataset inputs](../specs/004-ground-truth-training/contracts/cli.md), [current publication](../specs/008-dataset-clearml-tracking/contracts/publication.md) | [Training](../src/clearml_yolo/tasks/train.py), [cache](../src/clearml_yolo/dataset_cache.py) |
 | Configuration resolution and remote replay | [File resolution](../specs/009-resolved-config-uploads/contracts/configuration-files.md), [tracking and recovery](../specs/010-native-clearml-integration/contracts/tracking-publication.md) | [Resolution](../src/clearml_yolo/apps/config_resolution.py), [session adapter](../src/clearml_yolo/clearml_session.py) |
 | Artifacts, native callbacks and task completion | [Publication inventory](../specs/008-dataset-clearml-tracking/contracts/publication.md), [evaluation publication](../specs/014-evaluation-publication/contracts/publication.md), [native tracking](../specs/010-native-clearml-integration/contracts/tracking-publication.md), [model metadata](../specs/008-dataset-clearml-tracking/contracts/model-metadata.md) | [Artifact names](../src/clearml_yolo/artifact_names.py), [native runtime](../src/clearml_yolo/native_runtime.py), [model verification](../src/clearml_yolo/clearml_native.py), [display naming](../src/clearml_yolo/clearml_naming.py), [result bundle](../src/clearml_yolo/clearml_results.py), [DDP relay](../src/clearml_yolo/native_ddp.py) |
-| Evaluation, comparison, thresholds and reports | [Task recovery](../specs/012-remove-legacy-compatibility/contracts/task-recovery.md), [evaluation publication](../specs/014-evaluation-publication/contracts/publication.md), [Publication inventory](../specs/008-dataset-clearml-tracking/contracts/publication.md), [CLI evaluation contract](../specs/001-release-030/contracts/cli.md) | [Metrics](../src/clearml_yolo/tasks/metrics.py), [comparison](../src/clearml_yolo/tasks/compare.py), [comparison workbook](../src/clearml_yolo/comparison/workbook.py), [exact thresholds](../src/clearml_yolo/clearml_models.py), [source lineage](../src/clearml_yolo/result_export.py), [neutral payloads](../src/clearml_yolo/result_schema.py), [interactive reporting](../src/clearml_yolo/clearml_report.py), [paired reports](../src/clearml_yolo/tasks/report.py) |
+| Evaluation, comparison, thresholds and reports | [Task recovery](../specs/012-remove-legacy-compatibility/contracts/task-recovery.md), [evaluation publication](../specs/014-evaluation-publication/contracts/publication.md), [readable plots](../specs/020-readable-evaluation-plots/contracts/plots.md), [Publication inventory](../specs/008-dataset-clearml-tracking/contracts/publication.md), [CLI evaluation contract](../specs/001-release-030/contracts/cli.md) | [Metrics](../src/clearml_yolo/tasks/metrics.py), [comparison](../src/clearml_yolo/tasks/compare.py), [comparison workbook](../src/clearml_yolo/comparison/workbook.py), [exact thresholds](../src/clearml_yolo/clearml_models.py), [source lineage](../src/clearml_yolo/result_export.py), [neutral payloads](../src/clearml_yolo/result_schema.py), [interactive reporting](../src/clearml_yolo/clearml_report.py), [paired reports](../src/clearml_yolo/tasks/report.py) |
 | FiftyOne publication | [Publisher](../specs/006-fiftyone-integration/contracts/publisher.md), [native evaluations](../specs/015-fiftyone-native-evaluations/contracts/native-evaluation.md), [current inventory](../specs/008-dataset-clearml-tracking/contracts/publication.md) | [Owner publication](../src/clearml_yolo/tasks/publication.py), [replaceable adapter](../src/clearml_yolo/publishing/fiftyone_adapter.py) |
 | Local dependency sources | [Development setup](development.md#external-dependencies), [local copies](../specs/017-local-dependency-copies/spec.md) | [Ignore rules](../.gitignore), [package configuration](../pyproject.toml), [editable lock](../uv.lock) |
 | Local versioning, changelog and release hooks | [Local release](../specs/003-semantic-release/contracts/local-release.md) | [Release helper](../scripts/local_release.py), [hook configuration](../.pre-commit-config.yaml), [generated changelog](../CHANGELOG.md) |
@@ -42,7 +42,9 @@ ClearML publications follow the current inventory, not old artifact counts. Nati
 YAML, NDJSON, archives, manifests and diagnostic/publication receipts remain local.
 Consumed dataset and explicit report configurations are Configuration Objects; canonical
 `run` and native `General` support replay. Configuration copies are not artifacts.
-Native owner callbacks may publish training/validation previews. Workers do not publish.
+Native owner callbacks may publish training/validation previews and non-PR plots; native
+validation PR uploads are filtered with callback state restored on success/failure.
+Workers do not publish.
 The native best checkpoint uses one Output Model, verified before completion.
 
 The [evaluation publication amendment](../specs/014-evaluation-publication/contracts/publication.md)
@@ -53,13 +55,21 @@ XLSX; exact validation thresholds and comparison exclusions remain CSV. Duplicat
 summaries and separate match/threshold/methodology sidecars stay local. Missing automatic
 baseline publishes candidate dashboards/plots and records its skip reason.
 
-Each model/split context has four interactive confusion views of exact post-threshold
-counts and class PR at IoU 0.50. Matrix rows are true labels, columns predicted labels;
+Each current-model split has one `Confusion matrix` chart with selectable `Counts`,
+`Row %`, `Column %` and `Overall %` views of exact post-threshold counts; Counts is default.
+One `Precision-recall` chart combines class traces at IoU 0.50 on test only.
+Baseline charts and comparison/degraded-class/methodology tables are excluded from Plots;
+baseline dashboards/rows, paired reports and headline single values remain available.
+Matrix rows are true labels, columns predicted labels;
 normalization preserves counts/order/background and shows zero-denominator observations.
 PR uses authoritative geometry-valid AP populations and public matching, with AP50 parity
 checks for methods, strategies and ties. No GT has unavailable recall/AP; GT without
-predictions has empty PR/AP50 zero. Plot identities preserve context/model/split/class
-components reversibly, including numeric and Unicode labels.
+predictions has empty PR/AP50 zero. Empty populations have explicit class-legend status
+and null-gap traces without numerical points. Class legends retain AP/method; hover retains confidence and cumulative
+TP/FP. Readable model/split series omit internal IDs and hashes; checkpoint/split slots
+are reused, with model/context fallback and readable stage/ordinal collision suffixes.
+Numeric and Unicode class labels remain distinct. See the
+[presentation amendment](../specs/020-readable-evaluation-plots/contracts/plots.md).
 
 Project-local exact display-name collisions include archived tasks/models and exclude
 current IDs; shared readable suffixes are rechecked without changing paths or model IDs.
@@ -71,7 +81,8 @@ training task ID through checkpoint/prediction hash bindings, contexts and manif
 Stored provenance wins over fallback labels; inputs without provenance require explicit
 labels and display unavailable training provenance without registering a model.
 The [identity presentation contract](../specs/014-evaluation-publication/contracts/publication.md#source-identity-on-new-results)
-defines entrypoint labels, every worksheet/plot caption and repeated printed banners.
+defines entrypoint labels, worksheet/local raster captions and repeated printed banners;
+the readable plot amendment governs current ClearML chart captions.
 Workbooks normalize horizontal print width to one page while preserving original body
 styles/formulas and explicit row breaks. Project adapters expose original layouts to
 report/threshold readers; pinned dependencies and historical artifacts are unchanged.

@@ -82,7 +82,7 @@ def test_real_exports_and_payload_retain_identity(
         workbook.close()
 
 
-def test_plotly_captions_are_escaped_and_keep_plot_identity() -> None:
+def test_plotly_captions_are_escaped_without_internal_ids() -> None:
     identity = ModelIdentity(model_name="=1 <b>猫 & model</b>", training_task_id="full-task-id")
     context = ResultContext(context_id="candidate", model_id="weights", split="test",
                             model_identity=identity)
@@ -96,9 +96,10 @@ def test_plotly_captions_are_escaped_and_keep_plot_identity() -> None:
         report_pr_curves(target, scope, [curve])
     for plot, old_plot in zip(task.plots, old_task.plots, strict=True):
         caption = plot["figure"]["layout"]["annotations"][0]["text"]
-        assert "Model: =1 &lt;b&gt;猫 &amp; model&lt;/b&gt;" in caption
-        assert "Training task: full-task-id" in caption
-        assert plot["series"] == old_plot["series"]
+        assert "=1 &lt;b&gt;猫 &amp; model&lt;/b&gt;" in caption
+        assert "full-task-id" not in caption
+        assert plot["series"] == "=1 <b>猫 & model</b> · test"
+        assert old_plot["series"] == "Current model · test"
         assert plot["figure"]["data"] == old_plot["figure"]["data"]
 
 
@@ -127,7 +128,7 @@ def test_empty_comparison_table_keeps_both_identities_visible() -> None:
     caption = reported["extra_layout"]["annotations"][0]["text"]
     assert "baseline: Old &lt;model&gt;" in caption
     assert "candidate: New 模型" in caption
-    assert "Training task: full-old-id" in caption
-    assert "Training task: full-new-id" in caption
+    assert "full-old-id" not in caption
+    assert "full-new-id" not in caption
     assert reported["title"] == "degraded_classes"
     assert reported["series"] == "test"

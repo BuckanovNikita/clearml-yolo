@@ -1,5 +1,6 @@
 """Canonical CSVs preserve contexts and upload once at owner completion."""
 
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -8,11 +9,64 @@ import pytest
 
 from clearml_yolo import clearml_results as results
 from clearml_yolo.clearml_session import ClearMLConfig, invocation
+from clearml_yolo.comparison.scoring import (
+    EvaluatedSplit,
+    evaluate_split,
+    prepare_ground_truth,
+)
 from clearml_yolo.model_identity import ModelIdentity
+from clearml_yolo.result_schema import ResultContext
 from test_clearml_session import FakeTask
 from test_clearml_session import fake_clearml as owner_fixture
 
 owner = owner_fixture
+
+
+@pytest.fixture
+def plot_calls(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, ResultContext, str | None]]:
+    calls: list[tuple[str, ResultContext, str | None]] = []
+
+    def confusion(
+        _task: Any,
+        context: ResultContext,
+        _payload: Any,
+        *,
+        display_label: str | None = None,
+    ) -> None:
+        calls.append(("confusion", context, display_label))
+
+    def pr(
+        _task: Any,
+        context: ResultContext,
+        _payload: Any,
+        *,
+        display_label: str | None = None,
+    ) -> None:
+        calls.append(("pr", context, display_label))
+
+    monkeypatch.setattr(results, "report_confusion_matrices", confusion)
+    monkeypatch.setattr(results, "report_pr_curves", pr)
+    return calls
+
+
+def _evaluation(truth: Path, predictions: Path, output: Path) -> EvaluatedSplit:
+    ground_truth = prepare_ground_truth(pd.read_csv(truth), deduplicate=False)
+    raw = pd.read_csv(predictions)
+    return evaluate_split(
+        ground_truth,
+        raw,
+        raw,
+        split="test",
+        classes=["01", "猫"],
+        thresholds={"01": 0.1, "猫": 0.1},
+        required_classes=None,
+        iou_threshold=0.5,
+        matching_strategy="iou_prior",
+        ap_method="interp",
+        skip_cohen_kappa=True,
+        output_dir=output,
+        suffix="test",
+    )
 
 
 def _inputs(root: Path) -> tuple[Path, Path]:
@@ -114,14 +168,16 @@ def test_raw_predictions_outside_split_population_remain_exported(
 
 
 def test_source_identity_survives_context_csv_and_manifest(
-    owner: tuple[type[Any], FakeTask], tmp_path: Path,
+    owner: tuple[type[Any], FakeTask],
+    tmp_path: Path,
 ) -> None:
     _, task = owner
     truth, predictions = _inputs(tmp_path)
     checkpoint = tmp_path / "best.pt"
     checkpoint.write_bytes(b"trained model")
     identity = ModelIdentity(
-        model_name="=001 Unicode model", training_task_id="00000000000000000000000000000001",
+        model_name="=001 Unicode model",
+        training_task_id="00000000000000000000000000000001",
         checkpoint_sha256=results.file_digest(checkpoint),
     )
     results.write_prediction_provenance(predictions, checkpoint, identity)
@@ -129,7 +185,8 @@ def test_source_identity_survives_context_csv_and_manifest(
     with invocation(ClearMLConfig(), "metrics"):
         results.register_predictions(task, truth, predictions, output_dir=tmp_path)
     frame = pd.read_csv(
-        task.uploads[1]["artifact_object"], dtype={"training_task_id": str, "model_name": str},
+        task.uploads[1]["artifact_object"],
+        dtype={"training_task_id": str, "model_name": str},
     )
     assert set(frame["model_name"]) == {identity.model_name}
     assert set(frame["training_task_id"]) == {identity.training_task_id}
@@ -146,7 +203,8 @@ def test_prediction_identity_rejects_changed_checkpoint_association(tmp_path: Pa
     checkpoint = tmp_path / "best.pt"
     checkpoint.write_bytes(b"trained model")
     identity = ModelIdentity(
-        model_name="model", checkpoint_sha256=results.file_digest(checkpoint),
+        model_name="model",
+        checkpoint_sha256=results.file_digest(checkpoint),
     )
     results.write_prediction_provenance(predictions, checkpoint, identity)
     sidecar = predictions.with_suffix(".csv.provenance.json")
@@ -155,3 +213,116 @@ def test_prediction_identity_rejects_changed_checkpoint_association(tmp_path: Pa
     sidecar.write_text(json.dumps(data))
     with pytest.raises(ValueError, match="checkpoint association"):
         results.prediction_model_identity(predictions)
+
+
+def test_baseline_keeps_artifacts_and_provenance_without_plots(
+    owner: tuple[type[Any], FakeTask],
+    tmp_path: Path,
+    plot_calls: list[tuple[str, ResultContext, str | None]],
+) -> None:
+    _, task = owner
+    truth, predictions = _inputs(tmp_path)
+    identity = ModelIdentity(
+        model_name="Previous model",
+        checkpoint_sha256="a" * 64,
+        training_task_id="previous-training-task",
+    )
+    evaluated = replace(_evaluation(truth, predictions, tmp_path), model_identity=identity)
+    with invocation(ClearMLConfig(), "compare"):
+        results.publish_evaluation(
+            task, evaluated, truth, predictions, output_dir=tmp_path, role="comparison_baseline"
+        )
+    assert plot_calls == []
+    assert [upload["name"] for upload in task.uploads] == [
+        "comparison_baseline_dashboard_full_test",
+        "comparison_baseline_dashboard_dtrk_test",
+        "gt_csv",
+        "predicts_csv",
+    ]
+    frame = pd.read_csv(task.uploads[-1]["artifact_object"])
+    assert set(frame["model_name"]) == {"Previous model"}
+    assert set(frame["checkpoint_sha256"]) == {"a" * 64}
+    assert set(frame["training_task_id"]) == {"previous-training-task"}
+
+
+def test_checkpoint_slots_repeat_and_collisions_have_readable_suffixes(
+    owner: tuple[type[Any], FakeTask],
+    tmp_path: Path,
+    plot_calls: list[tuple[str, ResultContext, str | None]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Repeated dashboard names are independently rejected by the artifact owner;
+    # isolate that transport rule while exercising the chart publication boundary.
+    monkeypatch.setattr(results, "expect_artifacts", lambda *_args: None)
+    monkeypatch.setattr(results, "upload_artifact", lambda *_args: None)
+    _, task = owner
+    truth, predictions = _inputs(tmp_path)
+    evaluated = _evaluation(truth, predictions, tmp_path)
+    cases = [
+        ("a", "prediction", "test"),
+        ("a", "comparison_candidate", "test"),
+        ("b", "comparison_candidate", "test"),
+        ("c", "comparison_candidate", "test"),
+        ("a", "prediction", "val"),
+    ]
+    with invocation(ClearMLConfig(), "pipeline"):
+        for index, (checkpoint, role, split) in enumerate(cases):
+            source = tmp_path / f"predictions-{index}.csv"
+            source.write_bytes(predictions.read_bytes())
+            identity = ModelIdentity(model_name="猫 01", checkpoint_sha256=checkpoint * 64)
+            value = replace(evaluated, split=split, model_identity=identity)
+            results.publish_evaluation(task, value, truth, source, output_dir=tmp_path, role=role)
+    assert [label for kind, _, label in plot_calls if kind == "confusion"] == [
+        "猫 01 · test",
+        "猫 01 · test",
+        "猫 01 · test · Comparison candidate",
+        "猫 01 · test · Comparison candidate 2",
+        "猫 01 · val",
+    ]
+    assert len([kind for kind, _, _ in plot_calls if kind == "pr"]) == 4
+
+
+def test_unknown_contexts_do_not_overwrite_and_provenance_reuses_slots(
+    owner: tuple[type[Any], FakeTask],
+    tmp_path: Path,
+    plot_calls: list[tuple[str, ResultContext, str | None]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(results, "expect_artifacts", lambda *_args: None)
+    monkeypatch.setattr(results, "upload_artifact", lambda *_args: None)
+    _, task = owner
+    truth, predictions = _inputs(tmp_path)
+    evaluated = _evaluation(truth, predictions, tmp_path)
+    checkpoint = tmp_path / "best.pt"
+    checkpoint.write_bytes(b"same checkpoint")
+    with invocation(ClearMLConfig(), "pipeline"):
+        for index in range(8):
+            source = tmp_path / f"unknown-{index}.csv"
+            source.write_bytes(predictions.read_bytes())
+            if index in (2, 3):
+                results.write_prediction_provenance(source, checkpoint)
+            model_id = "model-one" if index in (4, 5) else "model-two" if index == 6 else None
+            value = (
+                replace(
+                    evaluated,
+                    model_identity=ModelIdentity(
+                        model_name="Current model",
+                        model_id="model-two",
+                    ),
+                )
+                if index == 7
+                else evaluated
+            )
+            results.publish_evaluation(
+                task, value, truth, source, output_dir=tmp_path, model_id=model_id
+            )
+    assert [label for kind, _, label in plot_calls if kind == "confusion"] == [
+        "Current model · test",
+        "Current model · test · Prediction",
+        "Current model · test · Prediction 2",
+        "Current model · test · Prediction 2",
+        "Current model · test · Prediction 3",
+        "Current model · test · Prediction 3",
+        "Current model · test · Prediction 4",
+        "Current model · test · Prediction 4",
+    ]

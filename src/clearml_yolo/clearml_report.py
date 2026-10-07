@@ -1,29 +1,14 @@
-"""Publish the model comparison to ClearML in a form a reviewer can read in place.
+"""Publish readable current-model plots and comparison headline values to ClearML.
 
-Uploading spreadsheets is not reporting: a reviewer should be able to answer "did this
-model get better?" from the ClearML scalar panel, and audit *how* that was decided from
-the methodology table next to it, without downloading anything.
-
-Regressions lead. The significance tests are two-sided, so degradation is in the data;
-the degraded counts are reported before the improved ones and the degraded classes get
-their own table, because a model that improves twelve classes while breaking three must
-never read as an unqualified win.
-
-Every entry point is a no-op when ``task`` is ``None`` (a distributed worker).
-A missing optional presentation column emits a warning; required artifact failures
-are handled by the invocation owner.
-
-The constants below are the integration seam with the comparison frame: they name the
-columns this module reads out of it.
+Detailed comparisons remain downloadable reports. Every entry point is a no-op for
+workers (task=None); rendering never recomputes evaluation observations.
 """
 
-import json
 from collections.abc import Mapping, Sequence
 from html import escape
 from numbers import Real
 from textwrap import wrap
 from typing import Any, NamedTuple
-from urllib.parse import quote
 
 import pandas as pd
 from loguru import logger
@@ -32,41 +17,14 @@ from clearml_yolo.clearml_session import Task
 from clearml_yolo.model_identity import ModelIdentity
 from clearml_yolo.result_schema import ConfusionMatrixPayload, PRCurve, ResultContext
 
-COMPARISON_TABLE_TITLE = "comparison"
-DEGRADED_TABLE_TITLE = "comparison_degraded"
-METHODOLOGY_TABLE_TITLE = "comparison_methodology"
 ITERATION = 0
 
 
-def _plot_identity(context: ResultContext, *parts: str) -> str:
-    """Encode component boundaries reversibly, including slashes and Unicode labels."""
-    return quote(
-        json.dumps(
-            [context.context_id, context.model_id, context.split, *parts],
-            ensure_ascii=False,
-            separators=(",", ":"),
-        ),
-        safe="",
-    )
-
-
-def _context_caption(context: ResultContext) -> str:
-    scope = " | ".join(
-        escape(value)
-        for value in (
-            context.context_id,
-            context.model_id,
-            context.split,
-        )
-    )
-    identity = context.model_identity
-    if identity is None:
-        return scope
-    lines = [f"Model: {identity.model_name}",
-             f"Training task: {identity.training_task_id or 'unavailable'}"]
-    return scope + "<br>" + "<br>".join(
-        escape(line) for value in lines for line in wrap(value, width=100)
-    )
+def _display_label(context: ResultContext, display_label: str | None) -> str:
+    if display_label is not None:
+        return display_label
+    name = context.model_identity.model_name if context.model_identity else "Current model"
+    return f"{name} · {context.split}"
 
 
 def _caption_annotation(caption: str) -> dict[str, Any]:
@@ -134,94 +92,101 @@ def report_confusion_matrices(
     task: Task,
     context: ResultContext,
     matrix: ConfusionMatrixPayload,
+    *,
+    display_label: str | None = None,
 ) -> None:
-    """Publish exact counts and three normalizations of the same post-threshold matrix."""
+    """Publish one heatmap with selectable normalizations of the exact same counts."""
     if task is None:
         return
     axis = {
         "tickmode": "array",
         "tickvals": list(range(len(matrix.labels))),
-        "ticktext": matrix.labels,
+        "ticktext": [escape(label) for label in matrix.labels],
     }
-    for normalization in ("raw", "row", "column", "global"):
-        caption = _context_caption(context)
-        figure = {
-            "data": [_confusion_trace(matrix, normalization)],
-            "layout": {
-                "title": f"Confusion matrix ({normalization}) | {caption}",
-                "annotations": [_caption_annotation(caption)],
-                "margin": {"t": max(120, 24 * (caption.count("<br>") + 1) + 20)},
-                "xaxis": {**axis, "title": "Predicted class"},
-                "yaxis": {**axis, "title": "True class", "autorange": "reversed"},
-            },
-        }
-        task.get_logger().report_plotly(
-            title=f"evaluation_confusion_{normalization}",
-            series=_plot_identity(context),
-            iteration=ITERATION,
-            figure=figure,
-        )
+    modes = (("raw", "Counts"), ("row", "Row %"), ("column", "Column %"),
+             ("global", "Overall %"))
+    label = _display_label(context, display_label)
+    caption = escape(label)
+    data = [
+        {**_confusion_trace(matrix, mode), "visible": index == 0, "name": name}
+        for index, (mode, name) in enumerate(modes)
+    ]
+    figure = {
+        "data": data,
+        "layout": {
+            "title": caption,
+            "annotations": [_caption_annotation(caption)],
+            "margin": {"t": 120},
+            "xaxis": {**axis, "title": "Predicted class"},
+            "yaxis": {**axis, "title": "True class", "autorange": "reversed"},
+            "updatemenus": [{
+                "type": "dropdown", "active": 0, "x": 0, "y": 1.18,
+                "buttons": [
+                    {"label": name, "method": "restyle",
+                     "args": [{"visible": [i == index for i in range(len(modes))]}]}
+                    for index, (_, name) in enumerate(modes)
+                ],
+            }],
+        },
+    }
+    task.get_logger().report_plotly(
+        title="Confusion matrix", series=label, iteration=ITERATION, figure=figure,
+    )
 
 
-def _pr_figure(context: ResultContext, curve: PRCurve) -> dict[str, Any]:
+def _pr_trace(curve: PRCurve) -> dict[str, Any]:
     no_gt = curve.gt_count == 0
     ap50 = None if no_gt else (curve.ap50 if curve.recall else 0.0)
-    ap_caption = "unavailable" if ap50 is None else str(ap50)
-    caption = (
-        f"PR | {escape(curve.class_name)} | AP50={ap_caption} | "
-        f"{escape(curve.integration_method)} | {_context_caption(context)}"
-    )
-    layout: dict[str, Any] = {
-        "title": caption,
-        "annotations": [_caption_annotation(caption)],
-        "margin": {"t": max(120, 24 * (caption.count("<br>") + 1) + 20)},
-        "xaxis": {"title": "Recall", "range": [0, 1]},
-        "yaxis": {"title": "Precision", "range": [0, 1]},
+    ap_caption = "unavailable" if ap50 is None else f"{ap50:.6g}"
+    name = f"{escape(curve.class_name)} · AP50={ap_caption} ({escape(curve.integration_method)})"
+    if no_gt:
+        name += " · No ground truth: recall unavailable"
+    elif not curve.recall:
+        name += " · No predictions"
+    return {
+        "type": "scatter", "mode": "lines+markers", "name": name,
+        # A null gap keeps the legend visible in Plotly without plotting a point.
+        "x": [None] if no_gt or not curve.recall else curve.recall,
+        "y": [None] if no_gt or not curve.precision else curve.precision,
+        "customdata": [] if no_gt else [
+            list(point) for point in zip(curve.confidence, curve.tp, curve.fp, strict=True)
+        ],
+        "meta": [escape(curve.class_name), ap50, escape(curve.integration_method)],
+        "hovertemplate": "Class: %{meta[0]}<br>AP50: %{meta[1]}<br>Method: %{meta[2]}"
+        "<br>Recall: %{x}<br>Precision: %{y}<br>Confidence: %{customdata[0]}"
+        "<br>Cumulative TP: %{customdata[1]}<br>Cumulative FP: %{customdata[2]}<extra></extra>",
     }
-    data: list[dict[str, Any]] = []
-    if not no_gt:
-        data.append(
-            {
-                "type": "scatter",
-                "mode": "lines+markers",
-                "name": escape(curve.class_name),
-                "x": curve.recall,
-                "y": curve.precision,
-                "customdata": [
-                    list(point) for point in zip(curve.confidence, curve.tp, curve.fp, strict=True)
-                ],
-                "hovertemplate": "Recall: %{x}<br>Precision: %{y}"
-                "<br>Confidence: %{customdata[0]}<br>Cumulative TP: %{customdata[1]}"
-                "<br>Cumulative FP: %{customdata[2]}<extra></extra>",
-            }
-        )
-    if no_gt or not curve.recall:
-        layout["annotations"].append(
-            {
-                "text": "No ground truth: recall unavailable"
-                if no_gt
-                else "No predictions: AP50=0",
-                "xref": "paper",
-                "yref": "paper",
-                "x": 0.5,
-                "y": 0.5,
-                "showarrow": False,
-            }
-        )
-    return {"data": data, "layout": layout}
 
 
-def report_pr_curves(task: Task, context: ResultContext, curves: Sequence[PRCurve]) -> None:
-    """Report class PR populations without constructing unavailable operating points."""
-    if task is None:
+def report_pr_curves(
+    task: Task, context: ResultContext, curves: Sequence[PRCurve],
+    *, display_label: str | None = None,
+) -> None:
+    """Group current test PR classes; empty populations never invent operating points."""
+    if task is None or context.split != "test":
         return
-    for curve in curves:
-        task.get_logger().report_plotly(
-            title="evaluation_pr",
-            series=_plot_identity(context, curve.class_name),
-            iteration=ITERATION,
-            figure=_pr_figure(context, curve),
-        )
+    label = _display_label(context, display_label)
+    caption = f"{escape(label)} · IoU 0.50"
+    annotations = [_caption_annotation(caption)]
+    if not curves:
+        annotations.append({
+            "text": "No classes available", "xref": "paper", "yref": "paper",
+            "x": 0.5, "y": 0.5, "showarrow": False,
+        })
+    figure = {
+        "data": [_pr_trace(curve) for curve in curves],
+        "layout": {
+            "title": caption, "annotations": annotations,
+            "margin": {"t": 90, "b": 80},
+            "xaxis": {"title": "Recall", "range": [0, 1]},
+            "yaxis": {"title": "Precision", "range": [0, 1]},
+            "showlegend": True,
+            "legend": {"title": {"text": "Class · AP50 (method)"}},
+        },
+    }
+    task.get_logger().report_plotly(
+        title="Precision-recall", series=label, iteration=ITERATION, figure=figure,
+    )
 
 
 POOLED_COLUMN = "is_pooled"
@@ -268,11 +233,7 @@ def report_table(
         caption = "<br>".join(
             escape(line)
             for role, identity in identities.items()
-            for value in (
-                f"{role}: {identity.model_name}",
-                f"Training task: {identity.training_task_id or 'unavailable'}",
-            )
-            for line in wrap(value, width=100)
+            for line in wrap(f"{role}: {identity.model_name}", width=100)
         )
         options["extra_layout"] = {
             "annotations": [_caption_annotation(caption)],
@@ -386,35 +347,10 @@ def _headline_values(
 
 def report_comparison(
     task: Task, split: str, rows: pd.DataFrame, methodology: Mapping[str, object],
-    *, identities: Mapping[str, ModelIdentity] | None = None,
 ) -> None:
-    """Publish one split's comparison: the tables, the headline numbers and the method.
-
-    ``rows`` is the per-class comparison frame — one row per class plus the pooled row,
-    which is the one flagged by ``is_pooled``; ``methodology`` records how the comparison
-    was decided (tests used, BH family size, q, seed, threshold and weights sources,
-    counts). Three tables are published — the full comparison, the classes that
-    significantly degraded, and the methodology — alongside the headline single values.
-    """
+    """Publish comparison headline values outside Plots; detailed reports stay artifacts."""
     if task is None:
         return
-
-    report_table(task, COMPARISON_TABLE_TITLE, split, rows, identities=identities)
-    display_methodology = dict(methodology)
-    for role, identity in (identities or {}).items():
-        display_methodology[f"{role}_model_name"] = identity.model_name
-        display_methodology[f"{role}_training_task_id"] = identity.training_task_id or "unavailable"
-    report_table(
-        task,
-        METHODOLOGY_TABLE_TITLE,
-        split,
-        pd.DataFrame(
-            {
-                "parameter": [str(key) for key in display_methodology],
-                "value": [str(value) for value in display_methodology.values()],
-            }
-        ),
-    )
 
     if POOLED_COLUMN not in rows.columns:
         logger.warning(
@@ -436,7 +372,6 @@ def report_comparison(
     verdicts = _verdicts(per_class)
 
     degraded = _degraded_classes(per_class, verdicts)
-    report_table(task, DEGRADED_TABLE_TITLE, split, degraded, identities=identities)
     if not degraded.empty:
         logger.warning("Split {!r}: {} class(es) significantly degraded", split, len(degraded))
 
