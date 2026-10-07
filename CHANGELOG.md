@@ -1,7 +1,12 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.19.1 (2026-10-07)
+
+### Bug Fixes
+
+- Group readable current-model evaluation plots
+  ([`a6a78e8`](https://github.com/BuckanovNikita/clearml-yolo/commit/a6a78e895cb84a2fc960d4b3f91e8327f2ea3e89))
 
 ### Documentation
 
