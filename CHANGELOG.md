@@ -1,12 +1,21 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.19.0 (2026-10-07)
 
 ### Documentation
 
 - Record error diagnostics release verification
   ([`50c2347`](https://github.com/BuckanovNikita/clearml-yolo/commit/50c234792c768c964c6f9707906c55ddb56d08df))
+
+### Features
+
+- Identify source models on every dashboard and report
+  ([`79828ba`](https://github.com/BuckanovNikita/clearml-yolo/commit/79828baecea646f3dbe17b0d69195cf2598fcb45))
+
+### Breaking Changes
+
+- Inputs without stored model provenance require an explicit label.
 
 
 ## v0.18.1 (2026-10-06)
