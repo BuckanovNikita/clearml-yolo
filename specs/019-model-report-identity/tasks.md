@@ -23,9 +23,9 @@
 
 ## Verification and documentation
 
-- [ ] T010 Run repository gates and native CPU/GPU publication acceptance; record specs/019-model-report-identity/verification-2026-10-07.md.
+- [x] T010 Run repository gates and native CPU/GPU publication acceptance; record specs/019-model-report-identity/verification-2026-10-07.md.
 - [x] T011 Update README.md, docs/current-contracts.md, affected publication/recovery/model metadata contracts, and feature quickstart; validate Markdown, links, and examples.
-- [ ] T012 Obtain fresh independent review, address findings, and complete authorized release workflow from docs/development.md.
+- [x] T012 Obtain fresh independent review, address findings, and complete authorized release workflow from docs/development.md.
 
 ## Dependencies and parallel work
 

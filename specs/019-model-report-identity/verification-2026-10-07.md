@@ -108,7 +108,8 @@ late-download issue was confirmed to exist before this change and was not expand
 into this feature's scope.
 
 Wheel and source distributions were built and installed in separate fresh environments;
-all ten command helps passed in each. Final-version builds follow release metadata.
+all ten command helps passed in each, including the final 0.19.0 builds. Each generated
+ten configuration files and correctly refused an overwrite without permission.
 The ordinary feature/release hooks run against the installed frozen environment with
 `UV_NO_SYNC=1` while the exact local source overrides are temporarily absent. No hooks
 are bypassed. The existing offline root-version lock refresh uses a disposable source
@@ -119,4 +120,19 @@ fixture setup errors: the temporary offline-lock adapter intercepted fixture
 repositories as well as the real project. The adapter is now restricted to this
 repository's exact working directory; other commands use the real tool unchanged.
 No feature/release commit was created by that failed attempt, and local overrides
-were restored. The release fixtures and complete hooks are rerun before acceptance.
+were restored. The release fixtures and complete hooks passed on the corrected rerun.
+
+## Release result
+
+- The corrected temporary adapter passed all 35 release-fixture tests.
+- Feature commit `79828ba` and release commit `c7784c3` passed all ordinary hooks.
+  Each final full suite reported 1,270 passed, 30 skipped, zero failures/errors.
+- Annotated tag `v0.19.0` resolves to `c7784c3`. Release changes are limited to the
+  project/root-lock version and generated changelog; dependency records are unchanged.
+- Frozen dev sync installed 0.19.0, and installed command help passed. Both final
+  distributions passed the acceptance described above.
+- The atomic SSH push succeeded: Git acknowledged `master` advancing from `50c2347`
+  to `c7784c3` and creation of `v0.19.0`. Only Git commits and the version tag were
+  published; no package assets, registry packages or deployments were created.
+- Exact local source overrides were restored unstaged. No release lock/recovery
+  record remains. Task-owned package environments and native run resources were removed.
