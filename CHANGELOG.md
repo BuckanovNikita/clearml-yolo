@@ -1,12 +1,22 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.20.0 (2026-10-08)
 
 ### Documentation
 
 - Record readable plot release verification
   ([`72334f4`](https://github.com/BuckanovNikita/clearml-yolo/commit/72334f4a1668f1e73719d920593ac4ce4c48824c))
+
+### Features
+
+- Enforce clean architecture and Pandera validation
+  ([`493f039`](https://github.com/BuckanovNikita/clearml-yolo/commit/493f0399fc10c2f99ac072335115f754176baa14))
+
+### Breaking Changes
+
+- Python modules moved to the new architecture packages; regenerate saved Hydra configuration and
+  pass explicit workflow dependencies.
 
 
 ## v0.19.1 (2026-10-07)
