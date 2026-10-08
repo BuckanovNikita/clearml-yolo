@@ -10,13 +10,13 @@ from openpyxl.styles import Font  # type: ignore[import-untyped]
 from openpyxl.worksheet.pagebreak import Break  # type: ignore[import-untyped]
 from openpyxl.worksheet.table import Table  # type: ignore[import-untyped]
 
-from clearml_yolo.model_identity import ModelIdentity
-from clearml_yolo.workbook_identity import (
+from clearml_yolo.adapters.reporting.workbook_identity import (
     annotate_workbook,
     deannotated_workbook,
     read_dashboard,
     workbook_identities,
 )
+from clearml_yolo.core.identity import ModelIdentity
 
 
 def _complex_workbook(path: Path) -> None:

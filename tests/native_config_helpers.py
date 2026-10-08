@@ -4,7 +4,7 @@ from typing import Any
 
 from omegaconf import OmegaConf
 
-from clearml_yolo.native_config import native_defaults, prediction_defaults, stage_settings
+from clearml_yolo.adapters.yolo.config import native_defaults, prediction_defaults, stage_settings
 
 
 def training_settings(**overrides: Any) -> dict[str, Any]:

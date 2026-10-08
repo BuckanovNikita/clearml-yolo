@@ -5,13 +5,14 @@ from pathlib import Path
 import pytest
 from omegaconf import OmegaConf
 
+from clearml_yolo.application.ports import WorkflowDependencies
+from workflow_dependencies import workflow_dependencies as workflow_dependencies  # noqa: PLC0414
 
-@pytest.mark.parametrize(
-    "key", ["unknown_option", "iou_threshold", "matching_strategy"]
-)
+
+@pytest.mark.parametrize("key", ["unknown_option", "iou_threshold", "matching_strategy"])
 def test_added_unknown_wrapper_keys_are_not_silently_ignored(key: str) -> None:
-    from clearml_yolo.apps.common import validate_wrapper_keys
-    from clearml_yolo.tasks.train import train
+    from clearml_yolo.application.use_cases.train import train
+    from clearml_yolo.entrypoints.hydra.validation import validate_wrapper_keys
 
     config = OmegaConf.create({"ultralytics": {}, "clearml": {}, key: True})
     with pytest.raises(ValueError, match="Unsupported wrapper"):
@@ -21,7 +22,7 @@ def test_added_unknown_wrapper_keys_are_not_silently_ignored(key: str) -> None:
 def test_tracking_disabled_option_is_rejected() -> None:
     from pydantic import ValidationError
 
-    from clearml_yolo.clearml_session import ClearMLConfig
+    from clearml_yolo.adapters.clearml.session import ClearMLConfig
 
     with pytest.raises(ValidationError, match="Extra inputs"):
         ClearMLConfig.model_validate({"enabled": False})
@@ -30,7 +31,7 @@ def test_tracking_disabled_option_is_rejected() -> None:
 def test_file_backed_group_and_cli_preserve_precedence(tmp_path: Path) -> None:
     from hydra import compose, initialize_config_dir
 
-    from clearml_yolo.config_tree import dump_config_tree
+    from clearml_yolo.entrypoints.hydra.config_tree import dump_config_tree
 
     dump_config_tree(tmp_path)
     (tmp_path / "ultralytics/default.yaml").write_text("epochs: 3\nbatch: 2\n")
@@ -76,7 +77,7 @@ def test_standalone_compare_exposes_shared_evaluation_defaults() -> None:
         defaults = compose(config_name="compare")
         overridden = compose(config_name="compare", overrides=["evaluation.ap_method=continuous"])
 
-    from clearml_yolo.comparison.scoring import EvaluationConfig
+    from clearml_yolo.core.evaluation.models import EvaluationConfig
 
     values = OmegaConf.to_container(defaults.evaluation)
     assert isinstance(values, dict)
@@ -86,8 +87,8 @@ def test_standalone_compare_exposes_shared_evaluation_defaults() -> None:
 
 
 def test_unknown_inference_settings_are_rejected() -> None:
-    from clearml_yolo.apps.common import validate_wrapper_keys
-    from clearml_yolo.tasks.compare import compare
+    from clearml_yolo.application.use_cases.compare import compare
+    from clearml_yolo.entrypoints.hydra.validation import validate_wrapper_keys
 
     config = OmegaConf.create({"inference": {"batch": 4}})
     with pytest.raises(ValueError, match="Unsupported inference settings"):
@@ -96,12 +97,17 @@ def test_unknown_inference_settings_are_rejected() -> None:
 
 @pytest.mark.parametrize("key", ["model", "project", "name"])
 def test_comparison_rejects_owned_prediction_overrides(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, key: str
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    key: str,
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
-    from clearml_yolo.clearml_session import ClearMLConfig
-    from clearml_yolo.tasks import compare as module
+    from clearml_yolo.adapters.clearml.session import ClearMLConfig
+    from clearml_yolo.application.use_cases import compare as module
 
-    monkeypatch.setattr(module, "init_task", lambda *a, **k: pytest.fail("created task"))
+    monkeypatch.setattr(
+        workflow_dependencies.tracking, "init_task", lambda *a, **k: pytest.fail("created task")
+    )
     with pytest.raises(ValueError, match="owned by comparison"):
         module.compare(
             module.ModelRef(),
@@ -111,4 +117,5 @@ def test_comparison_rejects_owned_prediction_overrides(
             ClearMLConfig(),
             {},
             ultralytics_predict={key: "conflicting"},
+            deps=workflow_dependencies,
         )

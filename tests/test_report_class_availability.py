@@ -7,10 +7,16 @@ import pytest
 from openpyxl import load_workbook  # type: ignore[import-untyped]
 from report_generator.config import Config
 
-from clearml_yolo.clearml_session import ClearMLConfig
-from clearml_yolo.tasks.compare import MANIFEST_NAME, ComparisonManifest
-from clearml_yolo.tasks.report import report
-from clearml_yolo.workbook_identity import deannotated_workbook, workbook_identities
+from clearml_yolo.adapters.clearml.session import ClearMLConfig
+from clearml_yolo.adapters.reporting.workbook_identity import (
+    deannotated_workbook,
+    workbook_identities,
+)
+from clearml_yolo.application.ports import WorkflowDependencies
+from clearml_yolo.application.use_cases.compare import MANIFEST_NAME, ComparisonManifest
+from clearml_yolo.application.use_cases.report import report
+from workflow_dependencies import patch_workflow
+from workflow_dependencies import workflow_dependencies as workflow_dependencies  # noqa: PLC0414
 
 
 @pytest.mark.parametrize("shared", [True, False])
@@ -18,8 +24,14 @@ def test_report_preserves_one_sided_metrics_with_real_builders(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     shared: bool,
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
-    monkeypatch.setattr("clearml_yolo.tasks.report.init_task", lambda *_a, **_kw: None)
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.report.init_task",
+        lambda *_a, **_kw: None,
+    )
     comparison = tmp_path / "comparison"
     comparison.mkdir()
     for model, unique, values in (
@@ -52,6 +64,7 @@ def test_report_preserves_one_sided_metrics_with_real_builders(
         ClearMLConfig(),
         baseline_label="fixture baseline",
         candidate_label="fixture candidate",
+        deps=workflow_dependencies,
     )
     config = Config.load()
     for business, path in (

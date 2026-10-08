@@ -1,0 +1,1 @@
+"""Visual publication adapters."""

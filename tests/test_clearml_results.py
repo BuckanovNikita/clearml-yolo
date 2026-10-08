@@ -7,23 +7,30 @@ from typing import Any
 import pandas as pd
 import pytest
 
-from clearml_yolo import clearml_results as results
-from clearml_yolo.clearml_session import ClearMLConfig, invocation
-from clearml_yolo.comparison.scoring import (
-    EvaluatedSplit,
-    evaluate_split,
+from clearml_yolo.adapters.clearml import results
+from clearml_yolo.adapters.clearml.session import ClearMLConfig, invocation
+from clearml_yolo.adapters.evaluation.scoring import (
     prepare_ground_truth,
 )
-from clearml_yolo.model_identity import ModelIdentity
-from clearml_yolo.result_schema import ResultContext
+from clearml_yolo.application.evaluation import evaluate_split
+from clearml_yolo.application.ports import WorkflowDependencies
+from clearml_yolo.core.evaluation.models import EvaluatedSplit
+from clearml_yolo.core.evaluation.schema import ResultContext
+from clearml_yolo.core.identity import ModelIdentity
 from test_clearml_session import FakeTask
 from test_clearml_session import fake_clearml as owner_fixture
+from workflow_dependencies import patch_workflow
+from workflow_dependencies import (
+    workflow_dependencies as workflow_dependencies,  # noqa: PLC0414 - fixture export
+)
 
 owner = owner_fixture
 
 
 @pytest.fixture
-def plot_calls(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, ResultContext, str | None]]:
+def plot_calls(
+    monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
+) -> list[tuple[str, ResultContext, str | None]]:
     calls: list[tuple[str, ResultContext, str | None]] = []
 
     def confusion(
@@ -44,12 +51,16 @@ def plot_calls(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, ResultContext
     ) -> None:
         calls.append(("pr", context, display_label))
 
-    monkeypatch.setattr(results, "report_confusion_matrices", confusion)
-    monkeypatch.setattr(results, "report_pr_curves", pr)
+    patch_workflow(
+        monkeypatch, workflow_dependencies, results, "report_confusion_matrices", confusion
+    )
+    patch_workflow(monkeypatch, workflow_dependencies, results, "report_pr_curves", pr)
     return calls
 
 
-def _evaluation(truth: Path, predictions: Path, output: Path) -> EvaluatedSplit:
+def _evaluation(
+    truth: Path, predictions: Path, output: Path, workflow_dependencies: WorkflowDependencies
+) -> EvaluatedSplit:
     ground_truth = prepare_ground_truth(pd.read_csv(truth), deduplicate=False)
     raw = pd.read_csv(predictions)
     return evaluate_split(
@@ -66,6 +77,7 @@ def _evaluation(truth: Path, predictions: Path, output: Path) -> EvaluatedSplit:
         skip_cohen_kappa=True,
         output_dir=output,
         suffix="test",
+        deps=workflow_dependencies,
     )
 
 
@@ -219,6 +231,7 @@ def test_baseline_keeps_artifacts_and_provenance_without_plots(
     owner: tuple[type[Any], FakeTask],
     tmp_path: Path,
     plot_calls: list[tuple[str, ResultContext, str | None]],
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
     _, task = owner
     truth, predictions = _inputs(tmp_path)
@@ -227,7 +240,10 @@ def test_baseline_keeps_artifacts_and_provenance_without_plots(
         checkpoint_sha256="a" * 64,
         training_task_id="previous-training-task",
     )
-    evaluated = replace(_evaluation(truth, predictions, tmp_path), model_identity=identity)
+    evaluated = replace(
+        _evaluation(truth, predictions, tmp_path, workflow_dependencies=workflow_dependencies),
+        model_identity=identity,
+    )
     with invocation(ClearMLConfig(), "compare"):
         results.publish_evaluation(
             task, evaluated, truth, predictions, output_dir=tmp_path, role="comparison_baseline"
@@ -250,14 +266,21 @@ def test_checkpoint_slots_repeat_and_collisions_have_readable_suffixes(
     tmp_path: Path,
     plot_calls: list[tuple[str, ResultContext, str | None]],
     monkeypatch: pytest.MonkeyPatch,
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
     # Repeated dashboard names are independently rejected by the artifact owner;
     # isolate that transport rule while exercising the chart publication boundary.
-    monkeypatch.setattr(results, "expect_artifacts", lambda *_args: None)
-    monkeypatch.setattr(results, "upload_artifact", lambda *_args: None)
+    patch_workflow(
+        monkeypatch, workflow_dependencies, results, "expect_artifacts", lambda *_args: None
+    )
+    patch_workflow(
+        monkeypatch, workflow_dependencies, results, "upload_artifact", lambda *_args: None
+    )
     _, task = owner
     truth, predictions = _inputs(tmp_path)
-    evaluated = _evaluation(truth, predictions, tmp_path)
+    evaluated = _evaluation(
+        truth, predictions, tmp_path, workflow_dependencies=workflow_dependencies
+    )
     cases = [
         ("a", "prediction", "test"),
         ("a", "comparison_candidate", "test"),
@@ -287,12 +310,19 @@ def test_unknown_contexts_do_not_overwrite_and_provenance_reuses_slots(
     tmp_path: Path,
     plot_calls: list[tuple[str, ResultContext, str | None]],
     monkeypatch: pytest.MonkeyPatch,
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
-    monkeypatch.setattr(results, "expect_artifacts", lambda *_args: None)
-    monkeypatch.setattr(results, "upload_artifact", lambda *_args: None)
+    patch_workflow(
+        monkeypatch, workflow_dependencies, results, "expect_artifacts", lambda *_args: None
+    )
+    patch_workflow(
+        monkeypatch, workflow_dependencies, results, "upload_artifact", lambda *_args: None
+    )
     _, task = owner
     truth, predictions = _inputs(tmp_path)
-    evaluated = _evaluation(truth, predictions, tmp_path)
+    evaluated = _evaluation(
+        truth, predictions, tmp_path, workflow_dependencies=workflow_dependencies
+    )
     checkpoint = tmp_path / "best.pt"
     checkpoint.write_bytes(b"same checkpoint")
     with invocation(ClearMLConfig(), "pipeline"):

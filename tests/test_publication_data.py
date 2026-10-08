@@ -22,7 +22,7 @@ def write_truth(folder: Path) -> Path:
 
 
 def test_snapshot_preserves_duplicates_background_and_string_labels(tmp_path: Path) -> None:
-    from clearml_yolo.publishing.data import read_snapshot
+    from clearml_yolo.adapters.storage.publication_data import read_snapshot
 
     snapshot = read_snapshot(write_truth(tmp_path))
     assert snapshot.images["001.png"].split == "val"
@@ -34,7 +34,7 @@ def test_snapshot_preserves_duplicates_background_and_string_labels(tmp_path: Pa
 
 
 def test_relocated_identical_csv_has_same_hash_but_different_paths(tmp_path: Path) -> None:
-    from clearml_yolo.publishing.data import read_snapshot
+    from clearml_yolo.adapters.storage.publication_data import read_snapshot
 
     first = read_snapshot(write_truth(tmp_path / "a"))
     second = read_snapshot(write_truth(tmp_path / "b"))
@@ -45,7 +45,7 @@ def test_relocated_identical_csv_has_same_hash_but_different_paths(tmp_path: Pat
 def test_snapshot_does_not_open_image_media(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from clearml_yolo.publishing.data import read_snapshot
+    from clearml_yolo.adapters.storage.publication_data import read_snapshot
 
     truth = write_truth(tmp_path)
     monkeypatch.setattr(Image, "open", lambda *a, **k: pytest.fail("cache hit opened an image"))
@@ -53,13 +53,13 @@ def test_snapshot_does_not_open_image_media(
 
 
 def test_box_normalization_retains_absolute_extent() -> None:
-    from clearml_yolo.publishing.data import normalize_box
+    from clearml_yolo.adapters.storage.publication_data import normalize_box
 
     assert normalize_box((10, 5, 50, 25), 100, 50) == [0.1, 0.1, 0.4, 0.4]
 
 
 def test_conflicting_split_is_rejected(tmp_path: Path) -> None:
-    from clearml_yolo.publishing.data import read_snapshot
+    from clearml_yolo.adapters.storage.publication_data import read_snapshot
 
     path = write_truth(tmp_path)
     with path.open("a") as stream:
@@ -71,7 +71,7 @@ def test_conflicting_split_is_rejected(tmp_path: Path) -> None:
 def test_snapshot_hash_identifies_the_bytes_parsed_during_concurrent_update(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from clearml_yolo.publishing import data
+    from clearml_yolo.adapters.storage import publication_data as data
 
     truth = write_truth(tmp_path)
     original_bytes = truth.read_bytes()
@@ -90,7 +90,11 @@ def test_snapshot_hash_identifies_the_bytes_parsed_during_concurrent_update(
 
 @pytest.mark.parametrize("mode", ["stem", "path"])
 def test_prediction_names_follow_standalone_inference_mode(tmp_path: Path, mode: str) -> None:
-    from clearml_yolo.publishing.data import prediction_aliases, read_predictions, read_snapshot
+    from clearml_yolo.adapters.storage.publication_data import (
+        prediction_aliases,
+        read_predictions,
+        read_snapshot,
+    )
 
     snapshot = read_snapshot(write_truth(tmp_path))
     prediction_name = "001" if mode == "stem" else str(tmp_path / "001.png")
@@ -115,7 +119,7 @@ def test_prediction_names_follow_standalone_inference_mode(tmp_path: Path, mode:
 def test_predictions_preserve_collapsed_native_boxes_at_row_225(
     tmp_path: Path, box: tuple[float, float, float, float]
 ) -> None:
-    from clearml_yolo.publishing.data import normalize_box, read_predictions
+    from clearml_yolo.adapters.storage.publication_data import normalize_box, read_predictions
 
     path = tmp_path / "predictions.csv"
     path.write_text(
@@ -141,7 +145,7 @@ def test_predictions_preserve_collapsed_native_boxes_at_row_225(
     ["40,5,10,25", "10,25,40,5", "nan,5,40,25", "10,5,inf,25"],
 )
 def test_predictions_reject_reversed_or_nonfinite_boxes(tmp_path: Path, coordinates: str) -> None:
-    from clearml_yolo.publishing.data import read_predictions
+    from clearml_yolo.adapters.storage.publication_data import read_predictions
 
     path = tmp_path / "predictions.csv"
     path.write_text(
@@ -153,7 +157,7 @@ def test_predictions_reject_reversed_or_nonfinite_boxes(tmp_path: Path, coordina
 
 
 def test_invalid_prediction_error_identifies_the_offending_record(tmp_path: Path) -> None:
-    from clearml_yolo.publishing.data import read_predictions
+    from clearml_yolo.adapters.storage.publication_data import read_predictions
 
     path = tmp_path / "predictions.csv"
     path.write_text(
@@ -177,7 +181,7 @@ def test_invalid_prediction_error_identifies_the_offending_record(tmp_path: Path
 def test_collapsed_predictions_still_require_valid_confidence(
     tmp_path: Path, confidence: str
 ) -> None:
-    from clearml_yolo.publishing.data import read_predictions
+    from clearml_yolo.adapters.storage.publication_data import read_predictions
 
     path = tmp_path / "predictions.csv"
     path.write_text(
@@ -190,7 +194,7 @@ def test_collapsed_predictions_still_require_valid_confidence(
 
 @pytest.mark.parametrize("coordinates", ["10,50,40,50", "100,5,100,25", "100,50,100,50"])
 def test_ground_truth_rejects_collapsed_boxes(tmp_path: Path, coordinates: str) -> None:
-    from clearml_yolo.publishing.data import read_snapshot
+    from clearml_yolo.adapters.storage.publication_data import read_snapshot
 
     path = tmp_path / "gt.csv"
     path.write_text(

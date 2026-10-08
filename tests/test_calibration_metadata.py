@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from clearml_yolo.clearml_native import (
+from clearml_yolo.adapters.clearml.native import (
     NativeModelError,
     associate_calibration_thresholds,
     finalize_native_model,
@@ -32,7 +32,7 @@ def owned_model(
     task, record, checkpoint = native_sdk
     barriers: list[Callable[[], None]] = []
     monkeypatch.setattr(
-        "clearml_yolo.clearml_native.register_model_barrier",
+        "clearml_yolo.adapters.clearml.native.register_model_barrier",
         lambda _owner, callback: barriers.append(callback),
     )
     model, trainer = _training_objects(checkpoint)
@@ -172,10 +172,12 @@ def test_finalization_retains_requested_training_name_and_checkpoint_path(
         return effective_name
 
     monkeypatch.setattr(
-        "clearml_yolo.clearml_native.resolve_model_name",
+        "clearml_yolo.adapters.clearml.native.resolve_model_name",
         resolve,
     )
-    monkeypatch.setattr("clearml_yolo.clearml_native.register_model_barrier", lambda *_args: None)
+    monkeypatch.setattr(
+        "clearml_yolo.adapters.clearml.native.register_model_barrier", lambda *_args: None
+    )
     model, trainer = _training_objects(checkpoint)
     model_id = finalize_native_model(task, model, trainer, "yolo11n.pt")
     assert model_id == "model-id"

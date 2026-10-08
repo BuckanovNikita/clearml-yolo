@@ -9,8 +9,12 @@ from typing import Any, cast
 import matplotlib.pyplot as plt
 import pytest
 
-from clearml_yolo.native_ddp import native_ddp_relay
-from clearml_yolo.native_runtime import OWNER_PID_ENV, OWNER_TASK_ENV, native_runtime
+from clearml_yolo.adapters.integrations.native_ddp import native_ddp_relay
+from clearml_yolo.adapters.integrations.native_runtime import (
+    OWNER_PID_ENV,
+    OWNER_TASK_ENV,
+    native_runtime,
+)
 
 
 class _Logger:
@@ -153,7 +157,7 @@ def test_ddp_rank_zero_events_replay_installed_callbacks_in_owner(
     task = _Task()
     _Task.current = task
     monkeypatch.setattr(clearml, "Task", _Task)
-    monkeypatch.setattr("clearml_yolo.clearml_session.active_task", lambda: task)
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.session.active_task", lambda: task)
     monkeypatch.setattr(
         torch_utils,
         "model_info_for_loggers",
@@ -204,7 +208,7 @@ def test_ddp_replay_refuses_incomplete_events_before_best_publication(
     import clearml
 
     monkeypatch.setattr(clearml, "Task", _Task)
-    monkeypatch.setattr("clearml_yolo.clearml_session.active_task", lambda: task)
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.session.active_task", lambda: task)
     monkeypatch.setenv(OWNER_PID_ENV, str(os.getpid()))
     monkeypatch.setenv(OWNER_TASK_ENV, task.id)
     model = _Model()
@@ -229,7 +233,7 @@ def test_single_process_replay_is_noop_and_does_not_duplicate_native_publication
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     task = _Task()
-    monkeypatch.setattr("clearml_yolo.clearml_session.active_task", lambda: task)
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.session.active_task", lambda: task)
     monkeypatch.setenv(OWNER_PID_ENV, str(os.getpid()))
     monkeypatch.setenv(OWNER_TASK_ENV, task.id)
     model = _Model()
@@ -273,8 +277,10 @@ def test_ddp_reports_epoch_before_replay_with_invocation_context(
 
     monkeypatch.setattr(task.logger, "report_scalar", report)
     monkeypatch.setattr(clearml, "Task", _Task)
-    monkeypatch.setattr("clearml_yolo.clearml_session.active_task", owner.get)
-    monkeypatch.setattr("clearml_yolo.native_ddp._worker_rank_zero", lambda: True)
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.session.active_task", owner.get)
+    monkeypatch.setattr(
+        "clearml_yolo.adapters.integrations.native_ddp._worker_rank_zero", lambda: True
+    )
     monkeypatch.setattr(torch_utils, "model_info_for_loggers", lambda _trainer: {})
     monkeypatch.setenv(OWNER_PID_ENV, str(os.getpid()))
     monkeypatch.setenv(OWNER_TASK_ENV, task.id)
@@ -306,8 +312,10 @@ def test_ddp_final_replay_cannot_publish_best_twice(
     task = _Task()
     _Task.current = task
     monkeypatch.setattr(clearml, "Task", _Task)
-    monkeypatch.setattr("clearml_yolo.clearml_session.active_task", lambda: task)
-    monkeypatch.setattr("clearml_yolo.native_ddp._worker_rank_zero", lambda: True)
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.session.active_task", lambda: task)
+    monkeypatch.setattr(
+        "clearml_yolo.adapters.integrations.native_ddp._worker_rank_zero", lambda: True
+    )
     monkeypatch.setattr(torch_utils, "model_info_for_loggers", lambda _trainer: {})
     monkeypatch.setenv(OWNER_PID_ENV, str(os.getpid()))
     monkeypatch.setenv(OWNER_TASK_ENV, task.id)
@@ -334,7 +342,7 @@ def test_ddp_partial_record_waits_for_newline_and_interruption_stops_consumer(
     task = _Task()
     _Task.current = task
     monkeypatch.setattr(clearml, "Task", _Task)
-    monkeypatch.setattr("clearml_yolo.clearml_session.active_task", lambda: task)
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.session.active_task", lambda: task)
     monkeypatch.setenv(OWNER_PID_ENV, str(os.getpid()))
     monkeypatch.setenv(OWNER_TASK_ENV, task.id)
     reported = Event()
@@ -395,8 +403,10 @@ def test_ddp_live_callback_failure_reaches_caller_and_stops_publication(
 
     monkeypatch.setattr(task.logger, "report_scalar", fail_scalar)
     monkeypatch.setattr(clearml, "Task", _Task)
-    monkeypatch.setattr("clearml_yolo.clearml_session.active_task", lambda: task)
-    monkeypatch.setattr("clearml_yolo.native_ddp._worker_rank_zero", lambda: True)
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.session.active_task", lambda: task)
+    monkeypatch.setattr(
+        "clearml_yolo.adapters.integrations.native_ddp._worker_rank_zero", lambda: True
+    )
     monkeypatch.setattr(torch_utils, "model_info_for_loggers", lambda _trainer: {})
     monkeypatch.setenv(OWNER_PID_ENV, str(os.getpid()))
     monkeypatch.setenv(OWNER_TASK_ENV, task.id)
@@ -424,7 +434,7 @@ def test_ddp_corrupt_or_unterminated_journal_never_publishes_best(
     task = _Task()
     _Task.current = task
     monkeypatch.setattr(clearml, "Task", _Task)
-    monkeypatch.setattr("clearml_yolo.clearml_session.active_task", lambda: task)
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.session.active_task", lambda: task)
     monkeypatch.setenv(OWNER_PID_ENV, str(os.getpid()))
     monkeypatch.setenv(OWNER_TASK_ENV, task.id)
     model = _Model()
@@ -454,8 +464,10 @@ def test_ddp_incomplete_final_state_fails_before_best_upload(
     task = _Task()
     _Task.current = task
     monkeypatch.setattr(clearml, "Task", _Task)
-    monkeypatch.setattr("clearml_yolo.clearml_session.active_task", lambda: task)
-    monkeypatch.setattr("clearml_yolo.native_ddp._worker_rank_zero", lambda: True)
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.session.active_task", lambda: task)
+    monkeypatch.setattr(
+        "clearml_yolo.adapters.integrations.native_ddp._worker_rank_zero", lambda: True
+    )
     monkeypatch.setattr(torch_utils, "model_info_for_loggers", lambda _trainer: {})
     monkeypatch.setenv(OWNER_PID_ENV, str(os.getpid()))
     monkeypatch.setenv(OWNER_TASK_ENV, task.id)
@@ -499,8 +511,10 @@ def test_ddp_malformed_epoch_state_fails_before_best_upload(
     task = _Task()
     _Task.current = task
     monkeypatch.setattr(clearml, "Task", _Task)
-    monkeypatch.setattr("clearml_yolo.clearml_session.active_task", lambda: task)
-    monkeypatch.setattr("clearml_yolo.native_ddp._worker_rank_zero", lambda: True)
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.session.active_task", lambda: task)
+    monkeypatch.setattr(
+        "clearml_yolo.adapters.integrations.native_ddp._worker_rank_zero", lambda: True
+    )
     monkeypatch.setattr(torch_utils, "model_info_for_loggers", lambda _trainer: {})
     monkeypatch.setenv(OWNER_PID_ENV, str(os.getpid()))
     monkeypatch.setenv(OWNER_TASK_ENV, task.id)

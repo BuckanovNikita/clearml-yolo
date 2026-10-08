@@ -6,14 +6,18 @@ from typing import Any
 
 import pytest
 
-from clearml_yolo import clearml_models
-from clearml_yolo.clearml_native import NativeModelError, finalize_native_model, owned_native_model
-from clearml_yolo.model_identity import (
-    ModelIdentity,
+from clearml_yolo.adapters.clearml import models as clearml_models
+from clearml_yolo.adapters.clearml.native import (
+    NativeModelError,
+    finalize_native_model,
+    owned_native_model,
+)
+from clearml_yolo.adapters.storage.identity import (
     checkpoint_sha256,
     read_checkpoint_identity,
     write_checkpoint_identity,
 )
+from clearml_yolo.core.identity import ModelIdentity
 from test_clearml_native import _Record, _Task, _training_objects
 from test_clearml_native import native_sdk as native_sdk  # noqa: PLC0414 - shared pytest fixture
 
@@ -29,8 +33,10 @@ def test_finalized_name_and_full_training_identity_are_durable(
         kwargs["write_model_name"]("detector-calm-otter")
         return "detector-calm-otter"
 
-    monkeypatch.setattr("clearml_yolo.clearml_native.resolve_model_name", unique_name)
-    monkeypatch.setattr("clearml_yolo.clearml_native.register_model_barrier", lambda *_args: None)
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.native.resolve_model_name", unique_name)
+    monkeypatch.setattr(
+        "clearml_yolo.adapters.clearml.native.register_model_barrier", lambda *_args: None
+    )
     model, trainer = _training_objects(checkpoint)
     finalize_native_model(task, model, trainer, "yolo11n.pt")
     owned = owned_native_model(task)
@@ -68,13 +74,19 @@ def test_recovery_preserves_original_training_task_in_foreign_task(
         "clearml_yolo_checkpoint_sha256": checkpoint_sha256(checkpoint),
     }
     source = SimpleNamespace(
-        id="source-model", name="old-name", original_task="a" * 32,
-        url="https://files.example/best.pt", get_metadata=metadata.get,
+        id="source-model",
+        name="old-name",
+        original_task="a" * 32,
+        url="https://files.example/best.pt",
+        get_metadata=metadata.get,
         get_local_copy=lambda: str(checkpoint),
     )
     task = SimpleNamespace(
-        id="b" * 32, name="foreign-report", artifacts={},
-        get_models=lambda: {"output": [source]}, get_output_log_web_page=lambda: "url",
+        id="b" * 32,
+        name="foreign-report",
+        artifacts={},
+        get_models=lambda: {"output": [source]},
+        get_output_log_web_page=lambda: "url",
     )
     monkeypatch.setattr(clearml_models, "_task", lambda _: task)
     path, identity = clearml_models.resolve_weights_with_identity(task.id)
@@ -98,9 +110,11 @@ def test_legacy_artifact_identity_has_no_invented_model_id(
     checkpoint = tmp_path / "best.pt"
     checkpoint.write_bytes(b"legacy")
     task = SimpleNamespace(
-        id="a" * 32, name="legacy-training",
+        id="a" * 32,
+        name="legacy-training",
         artifacts={"best.pt": SimpleNamespace(get_local_copy=lambda: str(checkpoint))},
-        get_models=lambda: {"output": []}, get_output_log_web_page=lambda: "url",
+        get_models=lambda: {"output": []},
+        get_output_log_web_page=lambda: "url",
     )
     monkeypatch.setattr(clearml_models, "_task", lambda _: task)
     _, identity = clearml_models.resolve_weights_with_identity(task.id)
@@ -125,8 +139,11 @@ def test_model_uri_identity_recovers_without_reporting_task(
         return str(checkpoint)
 
     model = SimpleNamespace(
-        id="remote-model", name="remote-detector", original_task="a" * 32,
-        get_local_copy=download, get_metadata=lambda _: None,
+        id="remote-model",
+        name="remote-detector",
+        original_task="a" * 32,
+        get_local_copy=download,
+        get_metadata=lambda _: None,
     )
     sdk = types.ModuleType("clearml")
     sdk.Model = lambda model_id: model  # type: ignore[attr-defined]

@@ -7,7 +7,7 @@ import pytest
 from loguru import logger
 from PIL import Image
 
-from clearml_yolo.dataset_records import validate_ground_truth
+from clearml_yolo.adapters.storage.dataset_records import validate_ground_truth
 
 COLUMNS = [
     "image_name",

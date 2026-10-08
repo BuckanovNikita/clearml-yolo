@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from clearml_yolo.native_config import Stage, native_defaults, write_native_yaml
+from clearml_yolo.adapters.yolo.config import Stage, native_defaults, write_native_yaml
 
 
 @pytest.mark.parametrize("stage", ["train", "predict"])

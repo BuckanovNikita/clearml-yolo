@@ -7,26 +7,32 @@ import pandas as pd
 import pytest
 from openpyxl import load_workbook  # type: ignore[import-untyped]
 
-from clearml_yolo.clearml_results import write_prediction_provenance
-from clearml_yolo.clearml_session import ClearMLConfig
-from clearml_yolo.model_identity import (
-    ModelIdentity,
+from clearml_yolo.adapters.clearml.results import write_prediction_provenance
+from clearml_yolo.adapters.clearml.session import ClearMLConfig
+from clearml_yolo.adapters.reporting.workbook_identity import annotate_workbook, workbook_identities
+from clearml_yolo.adapters.storage.identity import (
     checkpoint_sha256,
-    require_model_identity,
     write_checkpoint_identity,
 )
-from clearml_yolo.publishing.models import FiftyOneConfig
-from clearml_yolo.tasks import predict as predict_module
-from clearml_yolo.tasks.compare import ModelRef, _resolve_model
-from clearml_yolo.tasks.metrics import EvaluationConfig, compute_metrics
-from clearml_yolo.tasks.report import report
-from clearml_yolo.workbook_identity import annotate_workbook, workbook_identities
+from clearml_yolo.application.ports import WorkflowDependencies
+from clearml_yolo.application.use_cases import predict as predict_module
+from clearml_yolo.application.use_cases.compare import ModelRef, _resolve_model
+from clearml_yolo.application.use_cases.metrics import EvaluationConfig, compute_metrics
+from clearml_yolo.application.use_cases.report import report
+from clearml_yolo.core.identity import ModelIdentity, require_model_identity
+from clearml_yolo.core.publication import FiftyOneConfig
 from test_metrics import _write_inputs
 from test_predict import _predict
-from test_predict import checkpoint_recording as checkpoint_recording  # noqa: PLC0414
-from test_predict import published as published  # noqa: PLC0414
+from test_predict import (
+    checkpoint_recording as checkpoint_recording,  # noqa: PLC0414 - fixture export
+)
+from test_predict import published as published  # noqa: PLC0414 - fixture export
 from test_report import _comparison_dir
-from test_report import report_generator as report_generator  # noqa: PLC0414
+from test_report import report_generator as report_generator  # noqa: PLC0414 - fixture export
+from workflow_dependencies import patch_workflow
+from workflow_dependencies import (
+    workflow_dependencies as workflow_dependencies,  # noqa: PLC0414 - fixture export
+)
 
 
 @pytest.mark.parametrize("label", [None, "", "  "])
@@ -43,10 +49,14 @@ def test_custom_label_does_not_invent_training_task() -> None:
 
 
 def test_metrics_legacy_csv_requires_label_before_reading(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
-    monkeypatch.setattr("clearml_yolo.tasks.metrics.init_task", lambda *_args, **_kwargs: None)
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.metrics.init_task",
+        lambda *_args, **_kwargs: None,
+    )
     with pytest.raises(ValueError, match="model_label"):
         compute_metrics(
             tmp_path / "legacy.csv",
@@ -54,6 +64,7 @@ def test_metrics_legacy_csv_requires_label_before_reading(
             tmp_path / "metrics",
             ClearMLConfig(),
             EvaluationConfig(),
+            deps=workflow_dependencies,
         )
 
 
@@ -62,6 +73,7 @@ def test_predict_keeps_recovered_training_identity_over_custom_label(
     monkeypatch: pytest.MonkeyPatch,
     checkpoint_recording: Any,
     published: dict[str, pd.DataFrame],
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
     checkpoint = tmp_path / "best.pt"
     checkpoint.write_bytes(b"verified checkpoint")
@@ -71,13 +83,15 @@ def test_predict_keeps_recovered_training_identity_over_custom_label(
         checkpoint_sha256=checkpoint_sha256(checkpoint),
         model_id="trained-model",
     )
-    monkeypatch.setattr(
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
         predict_module,
         "resolve_weights_with_identity",
         lambda _: (checkpoint, identity),
     )
     checkpoint_recording({"imgsz": 64})
-    result = _predict(tmp_path, 64)
+    result = _predict(tmp_path, 64, workflow_dependencies=workflow_dependencies)
     assert result.model_identity == identity
 
 
@@ -85,15 +99,17 @@ def test_predict_unknown_checkpoint_requires_label(
     tmp_path: Path,
     checkpoint_recording: Any,
     published: dict[str, pd.DataFrame],
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
     checkpoint_recording({"imgsz": 64})
     with pytest.raises(ValueError, match="model_label"):
-        _predict(tmp_path, 64, model_label=None)
+        _predict(tmp_path, 64, model_label=None, workflow_dependencies=workflow_dependencies)
 
 
 def test_report_retains_distinct_source_tasks_and_visible_names(
     tmp_path: Path,
     report_generator: list[tuple[Path, Path]],
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
     comparison, candidate, baseline = _comparison_dir(tmp_path)
     identities = {
@@ -108,6 +124,7 @@ def test_report_retains_distinct_source_tasks_and_visible_names(
         ClearMLConfig(),
         baseline_label="wrong baseline",
         candidate_label="wrong candidate",
+        deps=workflow_dependencies,
     )
     for path in [*result.dev_reports.values(), *result.business_reports.values()]:
         assert workbook_identities(path) == identities
@@ -129,13 +146,16 @@ def test_report_retains_distinct_source_tasks_and_visible_names(
 def test_legacy_report_workbooks_require_explicit_labels(
     tmp_path: Path,
     report_generator: list[tuple[Path, Path]],
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
     comparison, _, _ = _comparison_dir(tmp_path)
     with pytest.raises(ValueError, match="model_label"):
-        report(comparison, tmp_path / "reports", ClearMLConfig())
+        report(comparison, tmp_path / "reports", ClearMLConfig(), deps=workflow_dependencies)
 
 
-def test_local_comparison_without_provenance_requires_label(tmp_path: Path) -> None:
+def test_local_comparison_without_provenance_requires_label(
+    tmp_path: Path, workflow_dependencies: WorkflowDependencies
+) -> None:
     checkpoint = tmp_path / "legacy.pt"
     checkpoint.write_bytes(b"legacy")
     with pytest.raises(ValueError, match="label"):
@@ -144,10 +164,13 @@ def test_local_comparison_without_provenance_requires_label(tmp_path: Path) -> N
             "project",
             exclude_task_id=None,
             automatic_absence_is_skip=False,
+            deps=workflow_dependencies,
         )
 
 
-def test_local_comparison_preserves_checkpoint_source_over_label(tmp_path: Path) -> None:
+def test_local_comparison_preserves_checkpoint_source_over_label(
+    tmp_path: Path, workflow_dependencies: WorkflowDependencies
+) -> None:
     checkpoint = tmp_path / "best.pt"
     checkpoint.write_bytes(b"known training checkpoint")
     identity = ModelIdentity(
@@ -158,21 +181,18 @@ def test_local_comparison_preserves_checkpoint_source_over_label(tmp_path: Path)
     write_checkpoint_identity(checkpoint, identity)
     resolved = _resolve_model(
         ModelRef(
-            source="local",
-            weights=checkpoint,
-            thresholds={"cat": 0.5},
-            label="ignored label",
+            source="local", weights=checkpoint, thresholds={"cat": 0.5}, label="ignored label"
         ),
         "project",
         exclude_task_id=None,
         automatic_absence_is_skip=False,
+        deps=workflow_dependencies,
     )
     assert resolved.identity == identity
 
 
 def test_metrics_retains_prediction_source_identity_in_dashboard(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
     predictions, truth = _write_inputs(tmp_path)
     checkpoint = tmp_path / "best.pt"
@@ -183,7 +203,12 @@ def test_metrics_retains_prediction_source_identity_in_dashboard(
         checkpoint_sha256=checkpoint_sha256(checkpoint),
     )
     write_prediction_provenance(predictions, checkpoint, identity)
-    monkeypatch.setattr("clearml_yolo.tasks.metrics.init_task", lambda *_args, **_kwargs: None)
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.metrics.init_task",
+        lambda *_args, **_kwargs: None,
+    )
     result = compute_metrics(
         predictions,
         truth,
@@ -193,5 +218,6 @@ def test_metrics_retains_prediction_source_identity_in_dashboard(
         splits=["test"],
         model_label="ignored custom label",
         fiftyone=FiftyOneConfig(enabled=False),
+        deps=workflow_dependencies,
     )
     assert workbook_identities(result.dashboards["test"]) == {"model": identity}

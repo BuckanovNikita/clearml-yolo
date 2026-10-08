@@ -7,7 +7,11 @@ from typing import override
 import pytest
 from loguru import logger
 
-from clearml_yolo.diagnostics import exception_summary, log_exception, redact_text
+from clearml_yolo.adapters.observability.diagnostics import (
+    exception_summary,
+    log_exception,
+    redact_text,
+)
 
 
 @contextmanager

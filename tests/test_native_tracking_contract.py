@@ -7,7 +7,7 @@ from typing import Any
 import matplotlib.pyplot as plt
 import pytest
 
-from clearml_yolo.native_runtime import native_runtime
+from clearml_yolo.adapters.integrations.native_runtime import native_runtime
 
 
 class RecordingLogger:

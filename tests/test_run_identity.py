@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 from loguru import logger
 
-from clearml_yolo import run_identity
-from clearml_yolo.run_identity import (
+from clearml_yolo.adapters.storage import run_identity
+from clearml_yolo.adapters.storage.run_identity import (
     LATEST_LINK_NAME,
     point_latest_at,
     resolve_run_dir,
@@ -211,7 +211,7 @@ def test_a_filesystem_that_refuses_symlinks_costs_a_warning_and_not_the_run(
 
 
 def test_task_output_root_encodes_names_and_retains_task_id(tmp_path: Path) -> None:
-    from clearml_yolo.run_identity import task_run_dir
+    from clearml_yolo.adapters.storage.run_identity import task_run_dir
 
     root = task_run_dir(tmp_path, "team/project", "../task\\name", "abc123")
     assert root == tmp_path / "team%2Fproject" / "%2E%2E%2Ftask%5Cname-abc123"
@@ -220,7 +220,7 @@ def test_task_output_root_encodes_names_and_retains_task_id(tmp_path: Path) -> N
 
 @pytest.mark.parametrize("name", ["..", ".", "CON", "NUL", "a/b", "a\\b", "a: ", "кот"])
 def test_task_output_components_are_portable(tmp_path: Path, name: str) -> None:
-    from clearml_yolo.run_identity import task_run_dir
+    from clearml_yolo.adapters.storage.run_identity import task_run_dir
 
     root = task_run_dir(tmp_path, name, name, "id")
     assert root.parent.parent == tmp_path
@@ -231,7 +231,7 @@ def test_task_output_components_are_portable(tmp_path: Path, name: str) -> None:
 def test_task_identity_adapter_reads_active_values() -> None:
     from types import SimpleNamespace
 
-    from clearml_yolo.clearml_session import task_identity
+    from clearml_yolo.adapters.clearml.session import task_identity
 
     task = SimpleNamespace(
         id="active-id", name="actual task", get_project_name=lambda: "actual/project"
@@ -243,7 +243,7 @@ def test_task_identity_adapter_reads_active_values() -> None:
 def test_latest_project_does_not_collide_with_convenience_link(
     tmp_path: Path, existing_latest: bool
 ) -> None:
-    from clearml_yolo.run_identity import task_run_dir
+    from clearml_yolo.adapters.storage.run_identity import task_run_dir
 
     root = tmp_path / "runs"
     root.mkdir()

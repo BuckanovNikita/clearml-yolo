@@ -7,14 +7,20 @@ import pytest
 from digital_metrics.matching import match_boxes
 from digital_metrics.scoring import slice_by_conf
 
-from clearml_yolo.comparison.evaluation_payload import (
+from clearml_yolo.adapters.evaluation.scoring import build_evaluation_payload
+from clearml_yolo.application.contracts import ClearMLConfig
+from clearml_yolo.application.ports import WorkflowDependencies
+from clearml_yolo.application.use_cases.metrics import compute_metrics
+from clearml_yolo.core.evaluation.models import EvaluationConfig
+from clearml_yolo.core.evaluation.payload import (
     EvaluationBox,
     EvaluationMatch,
     EvaluationPayload,
 )
-from clearml_yolo.comparison.scoring import build_evaluation_payload
-from clearml_yolo.publishing.models import FiftyOneConfig
-from clearml_yolo.tasks.metrics import EvaluationConfig, compute_metrics
+from clearml_yolo.core.publication import FiftyOneConfig
+from workflow_dependencies import (
+    workflow_dependencies as workflow_dependencies,  # noqa: PLC0414 - fixture export
+)
 
 GT_COLUMNS = [
     "image_name",
@@ -149,7 +155,7 @@ def test_payload_uses_sliced_matches_and_preserves_backgrounds_and_filtered_boxe
 
 
 def test_metrics_retains_local_payload_and_publishes_readable_workbook(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
     ground_truth = pd.DataFrame(
         [
@@ -182,16 +188,17 @@ def test_metrics_retains_local_payload_and_publishes_readable_workbook(
     predictions.to_csv(predictions_path, index=False)
     from test_metrics import _metric_owner
 
-    with _metric_owner(monkeypatch) as task:
+    with _metric_owner(monkeypatch, workflow_dependencies=workflow_dependencies) as task:
         result = compute_metrics(
             predictions_path,
             ground_truth_path,
             tmp_path / "metrics",
-            clearml=object(),  # type: ignore[arg-type]
+            clearml=ClearMLConfig(),
             evaluation=EvaluationConfig(iou_threshold=0.5),
             splits=["test"],
             fiftyone=FiftyOneConfig(enabled=False),
             model_label="test model",
+            deps=workflow_dependencies,
         )
 
     uploaded = {item["name"]: item["artifact_object"] for item in task.uploads}

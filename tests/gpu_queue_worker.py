@@ -5,8 +5,8 @@ import json
 import sys
 from pathlib import Path
 
-from clearml_yolo.gpu_queue import GPUQueue
-from clearml_yolo.gpu_resources import GPUDevice
+from clearml_yolo.adapters.runtime.gpu_queue import GPUQueue
+from clearml_yolo.adapters.runtime.gpu_resources import GPUDevice
 
 
 class MetadataInventory:

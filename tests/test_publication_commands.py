@@ -6,18 +6,24 @@ from typing import Any
 
 import pytest
 
-from clearml_yolo.clearml_session import ClearMLConfig
-from clearml_yolo.dataset import PreparedDataset
-from clearml_yolo.publishing import NoOpPublisher
-from clearml_yolo.publishing.models import FiftyOneConfig
-from clearml_yolo.tasks.metrics import EvaluationConfig, MetricsResult
+from clearml_yolo.adapters.clearml.session import ClearMLConfig
+from clearml_yolo.adapters.fiftyone.noop import NoOpPublisher
+from clearml_yolo.adapters.storage.dataset import PreparedDataset
+from clearml_yolo.application.ports import WorkflowDependencies
+from clearml_yolo.application.use_cases.metrics import EvaluationConfig, MetricsResult
+from clearml_yolo.core.publication import FiftyOneConfig
+from workflow_dependencies import patch_workflow
+from workflow_dependencies import (
+    workflow_dependencies as workflow_dependencies,  # noqa: PLC0414 - fixture export
+)
 
 
-def test_worker_publication_is_disabled_without_reading_task_identity(tmp_path: Path) -> None:
-    from clearml_yolo.tasks.publication import prepare_publisher, publish_results
+def test_worker_publication_is_disabled_without_reading_task_identity(
+    tmp_path: Path, workflow_dependencies: WorkflowDependencies
+) -> None:
+    from clearml_yolo.application.use_cases.publication import prepare_publisher, publish_results
 
-    publisher = prepare_publisher(None, FiftyOneConfig(enabled=True))
-
+    publisher = prepare_publisher(None, FiftyOneConfig(enabled=True), deps=workflow_dependencies)
     assert isinstance(publisher, NoOpPublisher)
     assert (
         publish_results(
@@ -25,6 +31,7 @@ def test_worker_publication_is_disabled_without_reading_task_identity(tmp_path: 
             None,
             output_dir=tmp_path / "must-not-be-created",
             ground_truth=tmp_path / "missing.csv",
+            deps=workflow_dependencies,
         )
         is None
     )
@@ -53,7 +60,10 @@ def publication_dataset(tmp_path: Path) -> PreparedDataset:
 
 
 def test_training_policy_normalization_and_receipts_stay_out_of_artifacts(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, publication_dataset: PreparedDataset
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    publication_dataset: PreparedDataset,
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
     from collections.abc import Iterator
     from contextlib import contextmanager, nullcontext
@@ -62,18 +72,20 @@ def test_training_policy_normalization_and_receipts_stay_out_of_artifacts(
     import clearml
     import ultralytics.models
 
-    from clearml_yolo import artifact_names
-    from clearml_yolo.clearml_results import register_ground_truth
-    from clearml_yolo.clearml_session import invocation
-    from clearml_yolo.publishing.models import PublicationReceipt, PublicationRequest
-    from clearml_yolo.tasks import train as training
-    from clearml_yolo.tasks.publication import publish_results
+    from clearml_yolo.adapters.clearml.results import register_ground_truth
+    from clearml_yolo.adapters.clearml.session import invocation
+    from clearml_yolo.application.use_cases import train as training
+    from clearml_yolo.application.use_cases.publication import publish_results
+    from clearml_yolo.core import artifact_names
+    from clearml_yolo.core.publication import PublicationReceipt, PublicationRequest
     from native_config_helpers import training_settings
     from test_clearml_session import FakeTask
 
     task = FakeTask()
-    monkeypatch.setattr(clearml.Task, "init", lambda **_kwargs: task)
-    monkeypatch.setattr(clearml.Task, "get_task", lambda **_kwargs: task)
+    patch_workflow(monkeypatch, workflow_dependencies, clearml.Task, "init", lambda **_kwargs: task)
+    patch_workflow(
+        monkeypatch, workflow_dependencies, clearml.Task, "get_task", lambda **_kwargs: task
+    )
     monkeypatch.delenv("LOCAL_RANK", raising=False)
     prepared = publication_dataset
     truth = prepared.ground_truth
@@ -97,7 +109,7 @@ def test_training_policy_normalization_and_receipts_stay_out_of_artifacts(
             assert not (Path(settings["project"]) / settings["name"]).exists()
             assert settings["fraction"] == 1.0
             assert settings["classes"] is None
-            self.trainer.args = SimpleNamespace(**(settings | {"batch": 8}))
+            self.trainer.args = SimpleNamespace(**settings | {"batch": 8})
 
     receipt = PublicationReceipt(
         dataset_name="model-performance",
@@ -125,10 +137,14 @@ def test_training_policy_normalization_and_receipts_stay_out_of_artifacts(
             assert request.ground_truth == truth
             return receipt
 
-    monkeypatch.setattr(training, "cached_dataset", dataset)
-    monkeypatch.setattr(ultralytics.models, "YOLO", Model)
-    monkeypatch.setattr(training, "finalize_native_model", lambda *_args: None)
-    monkeypatch.setattr(
+    patch_workflow(monkeypatch, workflow_dependencies, training, "cached_dataset", dataset)
+    patch_workflow(monkeypatch, workflow_dependencies, ultralytics.models, "YOLO", Model)
+    patch_workflow(
+        monkeypatch, workflow_dependencies, training, "finalize_native_model", lambda *_args: None
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
         training,
         "native_ddp_relay",
         lambda *_args: nullcontext(SimpleNamespace(replay=lambda _trainer: None)),
@@ -147,16 +163,20 @@ def test_training_policy_normalization_and_receipts_stay_out_of_artifacts(
             ClearMLConfig(),
             ground_truth="source.csv",
             dataset_cache_dir=prepared.data.parent,
+            deps=workflow_dependencies,
         )
         register_ground_truth(task, truth, output_dir=tmp_path / "publication")
         assert task.uploads == []
         assert (
             publish_results(
-                Publisher(), task, output_dir=tmp_path / "publication", ground_truth=truth
+                Publisher(),
+                task,
+                output_dir=tmp_path / "publication",
+                ground_truth=truth,
+                deps=workflow_dependencies,
             )
             == receipt
         )
-
     assert result.weights == best
     assert [item["name"] for item in task.uploads] == [artifact_names.GROUND_TRUTH]
     run = next(
@@ -173,14 +193,20 @@ def test_training_policy_normalization_and_receipts_stay_out_of_artifacts(
 
 
 def test_validation_disables_nested_prediction_and_metrics_publication(
-    tmp_path: Path, monkeypatch: Any
+    tmp_path: Path, monkeypatch: Any, workflow_dependencies: WorkflowDependencies
 ) -> None:
-    from clearml_yolo.tasks import val
+    from clearml_yolo.application.use_cases import val
 
     nested: list[FiftyOneConfig] = []
     predictions = tmp_path / "predictions.csv"
     expected = MetricsResult(output_dir=tmp_path / "metrics")
-    monkeypatch.setattr(val, "init_task", lambda *_args, **_kwargs: SimpleNamespace(id="val-task"))
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        val,
+        "init_task",
+        lambda *_args, **_kwargs: SimpleNamespace(id="val-task"),
+    )
 
     def predict(*_args: Any, **kwargs: Any) -> SimpleNamespace:
         assert set(kwargs["splits"]) == {"train", "val", "test"}
@@ -192,9 +218,8 @@ def test_validation_disables_nested_prediction_and_metrics_publication(
         nested.append(kwargs["fiftyone"])
         return expected
 
-    monkeypatch.setattr(val, "predict", predict)
-    monkeypatch.setattr(val, "compute_metrics", metrics)
-
+    patch_workflow(monkeypatch, workflow_dependencies, val, "predict", predict)
+    patch_workflow(monkeypatch, workflow_dependencies, val, "compute_metrics", metrics)
     result = val.validate(
         weights="best.pt",
         ground_truth=tmp_path / "truth.csv",
@@ -202,20 +227,22 @@ def test_validation_disables_nested_prediction_and_metrics_publication(
         clearml=ClearMLConfig(),
         ultralytics={},
         evaluation=EvaluationConfig(),
+        deps=workflow_dependencies,
     )
-
     assert result is expected
     assert len(nested) == 2
     assert all(not config.enabled for config in nested)
 
 
-def test_remote_clone_replays_canonical_run_and_general(monkeypatch: Any) -> None:
+def test_remote_clone_replays_canonical_run_and_general(
+    monkeypatch: Any, workflow_dependencies: WorkflowDependencies
+) -> None:
     from contextlib import nullcontext
 
     import hydra
     from omegaconf import OmegaConf
 
-    from clearml_yolo.apps import common
+    from clearml_yolo.entrypoints.hydra import common
     from native_config_helpers import training_settings
 
     config = OmegaConf.create(
@@ -241,13 +268,26 @@ def test_remote_clone_replays_canonical_run_and_general(monkeypatch: Any) -> Non
     def command(clearml: Any, ground_truth: str, ultralytics: dict[str, Any]) -> None:
         executed.append((ground_truth, ultralytics["epochs"]))
 
-    monkeypatch.setattr(hydra, "main", lambda **kwargs: lambda fn: lambda: fn(config))
-    monkeypatch.setattr(common, "native_runtime", nullcontext)
-    monkeypatch.setattr(common, "invocation", lambda *_args, **_kwargs: nullcontext(RemoteTask()))
-    monkeypatch.setattr(common, "initialize_naming", lambda _task: None)
-    monkeypatch.setattr(common, "replay_configuration", replay)
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        hydra,
+        "main",
+        lambda **kwargs: lambda fn: lambda: fn(config),
+    )
+    patch_workflow(monkeypatch, workflow_dependencies, common, "native_runtime", nullcontext)
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        common,
+        "invocation",
+        lambda *_args, **_kwargs: nullcontext(RemoteTask()),
+    )
+    patch_workflow(
+        monkeypatch, workflow_dependencies, common, "initialize_naming", lambda _task: None
+    )
+    patch_workflow(monkeypatch, workflow_dependencies, common, "replay_configuration", replay)
     common.launch("train", command)
-
     assert executed == [("remote.csv", 17)]
     assert inputs == [{"clearml": {}, "ground_truth": "local.csv"}]
 
@@ -255,17 +295,21 @@ def test_remote_clone_replays_canonical_run_and_general(monkeypatch: Any) -> Non
 @pytest.mark.parametrize("stage", ["train", "pipeline"])
 @pytest.mark.parametrize("explicit_route", [False, True])
 def test_remote_clone_does_not_replay_previous_owner_output_route(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, stage: str, explicit_route: bool
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    stage: str,
+    explicit_route: bool,
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
     from contextlib import nullcontext
 
     import hydra
     from omegaconf import OmegaConf
 
-    from clearml_yolo.apps import common
-    from clearml_yolo.run_identity import safe_path_component, task_run_dir
-    from clearml_yolo.tasks import train as training
-    from clearml_yolo.tasks.pipeline import routed_native
+    from clearml_yolo.adapters.storage.run_identity import safe_path_component, task_run_dir
+    from clearml_yolo.application.use_cases import train as training
+    from clearml_yolo.application.use_cases.pipeline import routed_native
+    from clearml_yolo.entrypoints.hydra import common
     from native_config_helpers import training_settings
 
     project = tmp_path / "new-run" / "detect"
@@ -289,7 +333,6 @@ def test_remote_clone_does_not_replay_previous_owner_output_route(
 
         @staticmethod
         def connect(values: dict[str, Any], **_kwargs: Any) -> dict[str, Any]:
-            # The SDK mutates this mapping with the source task's effective General.
             values.update(
                 epochs=17,
                 project="/previous/run/detect",
@@ -301,7 +344,12 @@ def test_remote_clone_does_not_replay_previous_owner_output_route(
     task = RemoteTask()
 
     def execute_training(
-        _task: Any, _architecture: Any, settings: dict[str, Any], _prepared: Any
+        _task: Any,
+        _architecture: Any,
+        settings: dict[str, Any],
+        _prepared: Any,
+        *,
+        deps: WorkflowDependencies,
     ) -> Any:
         executed.append(settings)
         return None
@@ -310,23 +358,50 @@ def test_remote_clone_does_not_replay_previous_owner_output_route(
         if stage == "pipeline":
             executed.append(routed_native(ultralytics, project, "train"))
         else:
-            training.train(ultralytics, ClearMLConfig(), ground_truth="truth.csv")
+            training.train(
+                ultralytics, ClearMLConfig(), ground_truth="truth.csv", deps=workflow_dependencies
+            )
 
-    monkeypatch.setattr(hydra, "main", lambda **kwargs: lambda fn: lambda: fn(config))
-    monkeypatch.setattr(common, "native_runtime", nullcontext)
-    monkeypatch.setattr(common, "invocation", lambda *_args, **_kwargs: nullcontext(task))
-    monkeypatch.setattr(common, "initialize_naming", lambda _task: None)
-    monkeypatch.setattr(common, "replay_configuration", lambda _task, values: values)
-    monkeypatch.setattr(training, "init_task", lambda *_args, **_kwargs: task)
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        hydra,
+        "main",
+        lambda **kwargs: lambda fn: lambda: fn(config),
+    )
+    patch_workflow(monkeypatch, workflow_dependencies, common, "native_runtime", nullcontext)
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        common,
+        "invocation",
+        lambda *_args, **_kwargs: nullcontext(task),
+    )
+    patch_workflow(
+        monkeypatch, workflow_dependencies, common, "initialize_naming", lambda _task: None
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        common,
+        "replay_configuration",
+        lambda _task, values: values,
+    )
+    patch_workflow(
+        monkeypatch, workflow_dependencies, training, "init_task", lambda *_args, **_kwargs: task
+    )
     monkeypatch.setenv("CY_HOME", str(tmp_path))
-    monkeypatch.setattr(
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
         training,
         "_prepare_csv_dataset",
-        lambda _task, settings, *_args: nullcontext((object(), settings)),
+        lambda _task, settings, *_args, **_kwargs: nullcontext((object(), settings)),
     )
-    monkeypatch.setattr(training, "_execute_training", execute_training)
+    patch_workflow(
+        monkeypatch, workflow_dependencies, training, "_execute_training", execute_training
+    )
     common.launch(stage, command)
-
     assert len(executed) == 1
     actual = executed[0]
     assert actual["epochs"] == 17
@@ -343,15 +418,19 @@ def test_remote_clone_does_not_replay_previous_owner_output_route(
 @pytest.mark.parametrize("remote", [False, True])
 @pytest.mark.parametrize("save_dir", [None, "explicit-output"])
 def test_current_save_dir_override_reaches_pipeline_conflict_validation(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, remote: bool, save_dir: str | None
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    remote: bool,
+    save_dir: str | None,
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
     from contextlib import nullcontext
 
     import hydra
     from omegaconf import OmegaConf
 
-    from clearml_yolo.apps import common
-    from clearml_yolo.tasks.pipeline import routed_native
+    from clearml_yolo.application.use_cases.pipeline import routed_native
+    from clearml_yolo.entrypoints.hydra import common
     from native_config_helpers import training_settings
 
     config = OmegaConf.create(
@@ -373,26 +452,46 @@ def test_current_save_dir_override_reaches_pipeline_conflict_validation(
         assert ultralytics["save_dir"] == save_dir
         routed_native(ultralytics, tmp_path / "detect", "train")
 
-    monkeypatch.setattr(hydra, "main", lambda **kwargs: lambda fn: lambda: fn(config))
-    monkeypatch.setattr(common, "native_runtime", nullcontext)
-    monkeypatch.setattr(common, "invocation", lambda *_args, **_kwargs: nullcontext(Task()))
-    monkeypatch.setattr(common, "initialize_naming", lambda _task: None)
-    monkeypatch.setattr(common, "replay_configuration", lambda _task, values: values)
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        hydra,
+        "main",
+        lambda **kwargs: lambda fn: lambda: fn(config),
+    )
+    patch_workflow(monkeypatch, workflow_dependencies, common, "native_runtime", nullcontext)
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        common,
+        "invocation",
+        lambda *_args, **_kwargs: nullcontext(Task()),
+    )
+    patch_workflow(
+        monkeypatch, workflow_dependencies, common, "initialize_naming", lambda _task: None
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        common,
+        "replay_configuration",
+        lambda _task, values: values,
+    )
     with pytest.raises(ValueError, match="save_dir conflicts with pipeline run_dir"):
         common.launch("pipeline", command)
 
 
 def test_real_invocation_freezes_routing_before_collision_display_rename(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, workflow_dependencies: WorkflowDependencies
 ) -> None:
     from contextlib import nullcontext
 
     import clearml
     from omegaconf import OmegaConf
 
-    from clearml_yolo.apps import common
-    from clearml_yolo.clearml_session import task_identity
-    from clearml_yolo.run_identity import task_run_dir
+    from clearml_yolo.adapters.clearml.session import task_identity
+    from clearml_yolo.adapters.storage.run_identity import task_run_dir
+    from clearml_yolo.entrypoints.hydra import common
     from test_clearml_session import FakeTask
 
     class Task(FakeTask):
@@ -407,9 +506,13 @@ def test_real_invocation_freezes_routing_before_collision_display_rename(
 
     task = Task()
     task.name = "requested/report"
-    monkeypatch.setattr(clearml.Task, "init", lambda **_kwargs: task)
-    monkeypatch.setattr(clearml.Task, "get_task", lambda **_kwargs: task)
-    monkeypatch.setattr(
+    patch_workflow(monkeypatch, workflow_dependencies, clearml.Task, "init", lambda **_kwargs: task)
+    patch_workflow(
+        monkeypatch, workflow_dependencies, clearml.Task, "get_task", lambda **_kwargs: task
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
         clearml.Task,
         "query_tasks",
         lambda **_kwargs: [
@@ -417,7 +520,7 @@ def test_real_invocation_freezes_routing_before_collision_display_rename(
             {"id": task.id, "project": task.project, "name": task.name},
         ],
     )
-    monkeypatch.setattr(common, "native_runtime", nullcontext)
+    patch_workflow(monkeypatch, workflow_dependencies, common, "native_runtime", nullcontext)
     monkeypatch.setenv("CY_HOME", str(tmp_path))
     monkeypatch.delenv("LOCAL_RANK", raising=False)
     outputs: list[str | None] = []
@@ -431,7 +534,6 @@ def test_real_invocation_freezes_routing_before_collision_display_rename(
         OmegaConf.create({"clearml": ClearMLConfig().model_dump(), "output_dir": None}),
         command,
     )
-
     assert task.name.startswith("requested/report-")
     expected = task_run_dir(tmp_path / "runs", "project", "requested/report", task.id) / "report"
     assert outputs == [str(expected)]

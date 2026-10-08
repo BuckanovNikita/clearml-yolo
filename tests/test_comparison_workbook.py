@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 from openpyxl import load_workbook  # type: ignore[import-untyped]
 
-from clearml_yolo.comparison.workbook import write_comparison_workbook
+from clearml_yolo.adapters.reporting.comparison_workbook import write_comparison_workbook
 
 EXPECTED_HEADERS = [
     "Класс",

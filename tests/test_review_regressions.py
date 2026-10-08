@@ -10,16 +10,19 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from clearml_yolo import artifact_names
-from clearml_yolo.clearml_models import _anchored
-from clearml_yolo.clearml_session import configuration_secrets, sanitize_configuration
-from clearml_yolo.comparison.assemble import _verdict
-from clearml_yolo.comparison.scoring import EvaluationConfig
-from clearml_yolo.comparison.significance import adjust_benjamini_hochberg
-from clearml_yolo.filesystem import _fiftyone_inputs
-from clearml_yolo.gpu_queue import _Request
-from clearml_yolo.ground_truth import _image_size, _parse_label_file
-from clearml_yolo.native_runtime import _is_worker
+from clearml_yolo.adapters.clearml.models import _anchored
+from clearml_yolo.adapters.clearml.session import configuration_secrets, sanitize_configuration
+from clearml_yolo.adapters.integrations.native_runtime import _is_worker
+from clearml_yolo.adapters.runtime.gpu_queue import _Request
+from clearml_yolo.adapters.storage.filesystem import _fiftyone_inputs
+from clearml_yolo.adapters.yolo.ground_truth import _image_size, _parse_label_file
+from clearml_yolo.core import artifact_names
+from clearml_yolo.core.comparison.assemble import _verdict
+from clearml_yolo.core.comparison.significance import adjust_benjamini_hochberg
+from clearml_yolo.core.evaluation.models import EvaluationConfig
+from workflow_dependencies import (
+    workflow_dependencies as workflow_dependencies,  # noqa: PLC0414 - fixture export
+)
 
 
 @pytest.mark.parametrize("name", ["alpha-junk", "junk-beta", "alpha\n"])
@@ -32,6 +35,8 @@ def test_provider_signature_storage_redaction(key: str) -> None:
     raw = {"url": f"https://example.test/object?{key}=private&safe=yes", key: "private"}
     sanitized = sanitize_configuration(raw)
     assert "private" not in json.dumps(sanitized)
+    assert isinstance(sanitized, dict)
+    assert isinstance(sanitized["url"], str)
     assert "safe=yes" in sanitized["url"]
     assert "private" in configuration_secrets(raw)
     assert raw[key] == "private"
@@ -79,7 +84,7 @@ def test_ground_truth_uses_native_exif_dimensions(tmp_path: Path, orientation: i
 def test_ground_truth_rejects_invalid_coordinates(tmp_path: Path, coordinates: str) -> None:
     label = tmp_path / "image.txt"
     label.write_text(f"0 {coordinates}\n")
-    with pytest.raises(ValueError, match=r"image\.txt:1"):
+    with pytest.raises(ValueError, match="image\\.txt:1"):
         _parse_label_file(label, {0: "object"})
 
 
@@ -131,7 +136,7 @@ def test_significance_accepts_probability_endpoints(q: float) -> None:
     "coordinates", ["-0.01 0.5 0.2 0.2", "1.01 0.5 0.2 0.2", "0.5 0.5 1.01 1.01"]
 )
 def test_ground_truth_preserves_native_coordinate_tolerance(
-    tmp_path: Path, coordinates: str,
+    tmp_path: Path, coordinates: str
 ) -> None:
     label = tmp_path / "image.txt"
     label.write_text(f"0 {coordinates}\n")
@@ -139,22 +144,23 @@ def test_ground_truth_preserves_native_coordinate_tolerance(
 
 
 @pytest.mark.parametrize(
-    ("name", "matched"),
-    [("alpha", True), ("beta", True), ("alpha\n", False), ("junk-beta", False)],
+    ("name", "matched"), [("alpha", True), ("beta", True), ("alpha\n", False), ("junk-beta", False)]
 )
 def test_baseline_whole_name_anchor_with_pcre(name: str, matched: bool) -> None:
     """ClearML passes regexes to MongoDB's PCRE engine, whose end anchor permits a final newline."""
     grep = shutil.which("grep")
     if grep is None:
         pytest.skip("PCRE oracle requires grep with -Pz support")
-    probe = subprocess.run(  # noqa: S603 - fixed executable/options, synthetic input only
-        [grep, "-Pzq", ""], input=b"probe", capture_output=True, check=False,
+    probe = subprocess.run(  # noqa: S603 - controlled grep PCRE capability probe
+        [grep, "-Pzq", ""], input=b"probe", capture_output=True, check=False
     )
     if probe.returncode != 0:
         pytest.skip("grep does not support the PCRE whole-record oracle")
-    result = subprocess.run(  # noqa: S603 - fixed executable/options, synthetic input only
+    result = subprocess.run(  # noqa: S603 - controlled grep PCRE oracle
         [grep, "-Pzq", _anchored("alpha|beta") or ""],
-        input=name.encode(), capture_output=True, check=False,
+        input=name.encode(),
+        capture_output=True,
+        check=False,
     )
     assert result.returncode in (0, 1), result.stderr.decode()
     assert (result.returncode == 0) is matched

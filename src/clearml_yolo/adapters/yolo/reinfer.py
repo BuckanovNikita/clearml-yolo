@@ -1,0 +1,314 @@
+"""Re-run a previous model's weights over the *current* test split.
+
+Comparing a new model against the baseline's stored dashboards compares numbers
+computed on a different set of images; the only apples-to-apples baseline is the
+old checkpoint scored on today's images, by the same inference code the new model
+went through (``clearml_yolo.adapters.yolo.inference.predict_on_images``, which the predict
+stage also calls).
+"""
+
+import json
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from pathlib import Path
+from tempfile import NamedTemporaryFile
+from typing import IO
+
+import pandas as pd
+from loguru import logger
+
+from clearml_yolo.adapters.observability.diagnostics import log_exception
+from clearml_yolo.adapters.storage.filesystem import model_weights_path
+from clearml_yolo.adapters.yolo.config import write_native_yaml
+from clearml_yolo.adapters.yolo.inference import predict_on_images
+from clearml_yolo.application.contracts import (
+    InferenceEvidence as InferenceEvidence,  # noqa: PLC0414 - typed adapter interface
+)
+from clearml_yolo.application.contracts import (
+    VocabularyReport as VocabularyReport,  # noqa: PLC0414 - typed adapter interface
+)
+from clearml_yolo.core.redaction import sanitize_configuration
+
+Predictor = Callable[..., pd.DataFrame]
+ClassNameLoader = Callable[[str | Path], dict[int, str]]
+
+_REQUIRED_COLUMNS = ("split", "image_path", "instance_label")
+_MAX_REPORTED_PATHS = 5
+# Numeric-looking identifiers (COCO stems, "0001") would come back as int64 and stop
+# joining to the ground truth, so the cached frame must reload as the model produced it.
+_CACHED_TEXT_COLUMNS = {"image_name": str, "instance_label": str}
+_OWNED_NATIVE_KEYS = {
+    "batch",
+    "conf",
+    "device",
+    "image_name",
+    "imgsz",
+    "iou",
+    "mode",
+    "model",
+    "name",
+    "project",
+    "save_dir",
+    "source",
+    "stream",
+    "task",
+}
+
+
+
+
+
+
+def _model_class_names(weights: str | Path) -> dict[int, str]:
+    from ultralytics.models import YOLO
+
+    # Checkpoint labels remain authoritative even when remote model metadata exists.
+    names: dict[int, str] = YOLO(str(model_weights_path(weights))).names
+    return names
+
+
+def _select_split(ground_truth: pd.DataFrame, split: str) -> pd.DataFrame:
+    missing_columns = [name for name in _REQUIRED_COLUMNS if name not in ground_truth.columns]
+    if missing_columns:
+        raise ValueError(
+            f"Ground truth is missing the column(s) {missing_columns}; re-inference needs "
+            f"the current split's own images. Got columns: {sorted(ground_truth.columns)}"
+        )
+
+    rows = ground_truth[ground_truth["split"] == split]
+    if rows.empty:
+        available = sorted({str(value) for value in ground_truth["split"].unique()})
+        raise ValueError(f"Split {split!r} has no ground-truth rows; available splits: {available}")
+    return rows
+
+
+def _existing_image_paths(split_rows: pd.DataFrame, split: str) -> list[str]:
+    paths = sorted(str(path) for path in split_rows["image_path"].dropna().unique())
+    missing = [path for path in paths if not Path(path).is_file()]
+    if missing:
+        # Dropping unreadable images instead would shrink the scored set and surface
+        # later as a recall drop that reads like a model regression.
+        shown = missing[:_MAX_REPORTED_PATHS]
+        suffix = "" if len(missing) <= _MAX_REPORTED_PATHS else f" (+{len(missing) - len(shown)})"
+        raise ValueError(
+            f"{len(missing)} of {len(paths)} images of split {split!r} do not exist on disk: "
+            f"{shown}{suffix}"
+        )
+    return paths
+
+
+def _vocabulary_report(
+    model_names: dict[int, str], split_labels: "pd.Series[str]"
+) -> VocabularyReport:
+    model_classes = [model_names[index] for index in sorted(model_names)]
+    ground_truth_classes = {str(label) for label in split_labels.dropna().unique()}
+    return VocabularyReport(
+        model_classes=model_classes,
+        unknown_to_model=sorted(ground_truth_classes - set(model_classes)),
+        unknown_to_ground_truth=sorted(set(model_classes) - ground_truth_classes),
+    )
+
+
+def _metadata_path(output: Path) -> Path:
+    return output.with_suffix(".metadata.json")
+
+
+def _evidence(predictions: pd.DataFrame, fallback: dict[str, object]) -> InferenceEvidence:
+    effective = predictions.attrs.get("effective_args", fallback)
+    if not isinstance(effective, dict):
+        effective = fallback
+    save_dir = predictions.attrs.get(
+        "save_dir", str(Path(str(fallback["project"])) / str(fallback["name"]))
+    )
+    evidence = InferenceEvidence.model_validate(
+        {
+            "effective_args": sanitize_configuration(effective),
+            "save_dir": str(save_dir),
+            "requested_args": sanitize_configuration(
+                predictions.attrs.get("requested_args", fallback)
+            ),
+            "normalized_imgsz": predictions.attrs.get("normalized_imgsz"),
+            "checkpoint_design": sanitize_configuration(
+                predictions.attrs.get("checkpoint_design", {})
+            ),
+        }
+    )
+    native_root = Path(str(fallback["project"])).resolve()
+    actual_output = Path(evidence.save_dir).resolve()
+    if not actual_output.is_relative_to(native_root):
+        raise ValueError(
+            f"Native inference wrote outside the comparison directory: {actual_output} "
+            f"is not below {native_root}"
+        )
+    predictions.attrs.update(evidence.model_dump())
+    return evidence
+
+
+@contextmanager
+def _atomic_text(output: Path) -> Iterator[IO[str]]:
+    """Keep rename atomic across filesystems and remove only our own temporary file."""
+    temporary: Path | None = None
+    try:
+        with NamedTemporaryFile("w", dir=output.parent, delete=False, encoding="utf-8") as handle:
+            temporary = Path(handle.name)
+            yield handle.file
+        temporary.replace(output)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def _write_cache(predictions: pd.DataFrame, output: Path, evidence: InferenceEvidence) -> None:
+    """Publish the cache in one step, because a peer run may be reading it.
+
+    This file is keyed by the baseline's hash rather than by the run, so two runs
+    comparing against the same model share it. Written in place, a reader's ``is_file()``
+    is satisfied by a file still being appended to, and the short prediction set it gets
+    back does not fail — it scores as a recall drop, which reads as a model regression.
+    """
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with _atomic_text(output) as handle:
+        predictions.to_csv(handle, index=False)
+    metadata = _metadata_path(output)
+    with _atomic_text(metadata) as handle:
+        handle.write(evidence.model_dump_json(indent=2))
+
+
+def _read_cache(output: Path, native_project: Path) -> pd.DataFrame | None:
+    metadata = _metadata_path(output)
+    if not output.is_file() or not metadata.is_file():
+        return None
+    try:
+        evidence = InferenceEvidence.model_validate_json(metadata.read_text(encoding="utf-8"))
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        log_exception(
+            "Ignoring prediction cache with invalid provenance",
+            error,
+            context={"metadata": metadata},
+            include_message=False,
+        )
+        return None
+    if not Path(evidence.save_dir).resolve().is_relative_to(native_project.resolve()):
+        logger.warning(
+            "Ignoring prediction cache whose native output {} is outside {}",
+            evidence.save_dir,
+            native_project,
+        )
+        return None
+    source = evidence.effective_args.get("source")
+    if not isinstance(source, str) or not Path(source).is_file():
+        logger.warning("Ignoring prediction cache without a retained source manifest: {}", output)
+        return None
+    # Exact float replay preserves detections at the frozen confidence threshold.
+    predictions = pd.read_csv(output, dtype=_CACHED_TEXT_COLUMNS, float_precision="round_trip")
+    predictions.attrs.update(evidence.model_dump())
+    return predictions
+
+
+def reinfer_split(
+    weights: str | Path,
+    ground_truth: pd.DataFrame,
+    split: str,
+    output: Path,
+    *,
+    conf: float | None,
+    iou: float,
+    imgsz: int | list[int],
+    batch: int,
+    device: str | int | list[int] | None,
+    image_name: str,
+    native_project: Path,
+    native_name: str,
+    native_kwargs: dict[str, object] | None = None,
+    reuse_existing: bool = True,
+    predictor: Predictor = predict_on_images,
+    class_names: ClassNameLoader = _model_class_names,
+) -> tuple[pd.DataFrame, VocabularyReport]:
+    """Score ``weights`` on the images of ``split`` in ``ground_truth``.
+
+    The images come from the current ground truth, never from the baseline task's
+    stored predictions — that substitution is the bug this whole comparison exists to
+    remove. Inference settings must be the ones the new model was predicted with.
+
+    ``predictor`` and ``class_names`` are the two seams that keep everything except
+    the inference itself testable without a GPU: the class vocabulary cannot be
+    recovered from the predictions (only detected classes appear there), so the
+    checkpoint's name map is loaded separately.
+
+    Raises:
+        ValueError: If the split is empty, the required columns are absent, or any of
+            the split's images is missing on disk.
+    """
+    duplicate_native_keys = sorted(_OWNED_NATIVE_KEYS & set(native_kwargs or {}))
+    if duplicate_native_keys:
+        raise ValueError(
+            "native_kwargs cannot override comparison-owned inference key(s): "
+            f"{duplicate_native_keys}"
+        )
+    split_rows = _select_split(ground_truth, split)
+    image_paths = _existing_image_paths(split_rows, split)
+
+    cached = _read_cache(output, native_project) if reuse_existing else None
+    if cached is not None:
+        predictions = cached
+        logger.info(
+            "Reusing {} cached baseline predictions for split {!r} from {}",
+            len(predictions),
+            split,
+            output,
+        )
+    else:
+        settings: dict[str, object] = {
+            "conf": conf,
+            "iou": iou,
+            "imgsz": imgsz,
+            "batch": batch,
+            "device": device,
+            "image_name": image_name,
+            "project": str(native_project.resolve()),
+            "name": native_name,
+            "task": "detect",
+            "mode": "predict",
+            **(native_kwargs or {}),
+        }
+        manifest_dir = output.parent / "prediction_inputs" / native_name / output.stem
+        manifest_dir.mkdir(parents=True, exist_ok=True)
+        manifest = manifest_dir / "images.txt"
+        manifest.write_text(
+            "\n".join(str(Path(path).absolute()) for path in image_paths), encoding="utf-8"
+        )
+        write_native_yaml(
+            output.parent / f"ultralytics_predict_{native_name}.yaml",
+            {key: value for key, value in settings.items() if key != "image_name"}
+            | {"source": str(manifest.resolve()), "model": str(weights), "mode": "predict"},
+            "predict",
+        )
+        predictions = predictor(
+            weights,
+            image_paths,
+            manifest_dir=manifest_dir,
+            **settings,
+        )
+        effective = dict(predictions.attrs.get("effective_args", settings))
+        effective.update(source=str(manifest.resolve()), model=str(weights), mode="predict")
+        predictions.attrs["effective_args"] = effective
+        evidence = _evidence(predictions, settings)
+        _write_cache(predictions, output, evidence)
+        logger.info(
+            "Re-inferred {} baseline predictions over {} images of split {!r} into {}",
+            len(predictions),
+            len(image_paths),
+            split,
+            output,
+        )
+
+    vocabulary = _vocabulary_report(class_names(weights), split_rows["instance_label"])
+    if vocabulary.unknown_to_model:
+        logger.warning(
+            "Checkpoint {} cannot predict {} class(es) present in split {!r}: {}",
+            Path(weights).name,
+            len(vocabulary.unknown_to_model),
+            split,
+            vocabulary.unknown_to_model,
+        )
+    return predictions, vocabulary

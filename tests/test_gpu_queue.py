@@ -9,8 +9,8 @@ from pathlib import Path
 
 import pytest
 
-from clearml_yolo.gpu_queue import GPUQueue, queue_root
-from clearml_yolo.gpu_resources import GPUDevice
+from clearml_yolo.adapters.runtime.gpu_queue import GPUQueue, queue_root
+from clearml_yolo.adapters.runtime.gpu_resources import GPUDevice
 
 
 class MutableInventory:

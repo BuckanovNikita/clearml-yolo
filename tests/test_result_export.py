@@ -7,8 +7,8 @@ import pytest
 from digital_metrics.matching import match_boxes
 from digital_metrics.scoring import slice_by_conf
 
-from clearml_yolo.comparison.scoring import prepare_ground_truth, prepare_predictions
-from clearml_yolo.result_export import (
+from clearml_yolo.adapters.evaluation.scoring import prepare_ground_truth, prepare_predictions
+from clearml_yolo.core.evaluation.result_rows import (
     assign_source_ids,
     build_ground_truth_rows,
     build_prediction_rows,

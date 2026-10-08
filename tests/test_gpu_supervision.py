@@ -55,7 +55,7 @@ def _config() -> Any:
 
 
 def _sweep_job(tmp_path: Path, receipt: object | None) -> Any:
-    from clearml_yolo.apps.execution import ModelJob
+    from clearml_yolo.entrypoints.hydra.execution import ModelJob
 
     temporary = TemporaryDirectory(prefix="receipt-", dir=tmp_path)
     if receipt is not None:
@@ -105,7 +105,7 @@ def test_missing_or_invalid_sweep_receipt_is_failed(tmp_path: Path, receipt: obj
 
 
 def test_model_job_close_attempts_every_owned_cleanup() -> None:
-    from clearml_yolo.apps import execution
+    from clearml_yolo.entrypoints.hydra import execution
 
     events: list[str] = []
 
@@ -136,7 +136,7 @@ def test_model_job_close_attempts_every_owned_cleanup() -> None:
 def test_failed_process_cancellation_preserves_ticket_and_payload(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from clearml_yolo.apps import execution
+    from clearml_yolo.entrypoints.hydra import execution
 
     process = FinishedProcess(None)
 
@@ -164,7 +164,7 @@ def test_failed_process_cancellation_preserves_ticket_and_payload(
 
 
 def test_run_jobs_closes_all_jobs_when_one_cleanup_fails() -> None:
-    from clearml_yolo.apps.execution import run_jobs
+    from clearml_yolo.entrypoints.hydra.execution import run_jobs
 
     events: list[str] = []
 
@@ -200,7 +200,7 @@ def test_run_jobs_closes_all_jobs_when_one_cleanup_fails() -> None:
 def test_posix_timeout_tolerates_process_exit_before_group_lookup(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from clearml_yolo.apps import execution
+    from clearml_yolo.entrypoints.hydra import execution
 
     process = TimeoutRaceProcess()
 
@@ -218,7 +218,7 @@ def test_posix_timeout_tolerates_process_exit_before_group_lookup(
 def test_windows_cancellation_uses_owned_process_tree(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from clearml_yolo.apps import execution
+    from clearml_yolo.entrypoints.hydra import execution
 
     process = FinishedProcess(None)
     calls: list[object] = []
@@ -243,7 +243,7 @@ def test_windows_cancellation_uses_owned_process_tree(
 def test_process_tree_is_attached_before_start_gate_opens(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from clearml_yolo.apps import execution
+    from clearml_yolo.entrypoints.hydra import execution
 
     process = FinishedProcess()
     typed_process = cast(subprocess.Popen[Any], process)
@@ -292,7 +292,7 @@ def _process_running(pid: int) -> bool:
 def test_posix_cancellation_kills_surviving_descendants(
     tmp_path: Path, root_exits_first: bool
 ) -> None:
-    from clearml_yolo.apps import execution
+    from clearml_yolo.entrypoints.hydra import execution
 
     child_pid_path = tmp_path / "child.pid"
     child_script = (
@@ -337,7 +337,7 @@ def test_posix_cancellation_kills_surviving_descendants(
 def test_restore_hydra_config_accepts_composed_environment_group() -> None:
     from hydra.conf import HydraConf
 
-    from clearml_yolo.apps.execution import restore_hydra_config
+    from clearml_yolo.entrypoints.hydra.execution import restore_hydra_config
 
     config = OmegaConf.create(
         {
@@ -356,7 +356,7 @@ def test_restore_hydra_config_accepts_composed_environment_group() -> None:
 
 
 def test_effective_configuration_does_not_expand_smaller_replay_request() -> None:
-    from clearml_yolo.apps.execution import effective_configuration
+    from clearml_yolo.entrypoints.hydra.execution import effective_configuration
 
     requested = OmegaConf.create(
         {"ultralytics": {"device": 7}, "ultralytics_predict": {"device": "cuda"}}

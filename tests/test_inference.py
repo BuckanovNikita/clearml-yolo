@@ -15,7 +15,7 @@ import numpy as np
 import pytest
 from loguru import logger
 
-from clearml_yolo.inference import (
+from clearml_yolo.adapters.yolo.inference import (
     PREDICTION_COLUMNS,
     predict_on_images,
     resolution_of,

@@ -41,7 +41,7 @@ def test_installed_command_creates_examples(
 
 @pytest.mark.parametrize(("command", "config_name"), COMMANDS.items())
 def test_examples_round_trip_through_hydra(tmp_path: Path, command: str, config_name: str) -> None:
-    from clearml_yolo.config_tree import dump_config_tree
+    from clearml_yolo.entrypoints.hydra.config_tree import dump_config_tree
 
     dump_config_tree(tmp_path)
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
@@ -54,7 +54,7 @@ def test_examples_round_trip_through_hydra(tmp_path: Path, command: str, config_
 
 
 def test_generated_pipeline_accepts_inputs_and_native_overrides(tmp_path: Path) -> None:
-    from clearml_yolo.config_tree import dump_config_tree
+    from clearml_yolo.entrypoints.hydra.config_tree import dump_config_tree
 
     dump_config_tree(tmp_path)
     with initialize_config_dir(config_dir=str(tmp_path), version_base="1.3"):
@@ -78,7 +78,7 @@ def test_generated_pipeline_accepts_inputs_and_native_overrides(tmp_path: Path) 
 
 @pytest.mark.parametrize("command", ["cy", "cy-train"])
 def test_generated_csv_training_example_accepts_both_formats(tmp_path: Path, command: str) -> None:
-    from clearml_yolo.config_tree import dump_config_tree
+    from clearml_yolo.entrypoints.hydra.config_tree import dump_config_tree
 
     dump_config_tree(tmp_path)
     for dataset_format in ("ndjson", "flat"):
@@ -94,7 +94,7 @@ def test_generated_csv_training_example_accepts_both_formats(tmp_path: Path, com
 
 
 def test_existing_config_prevents_all_writes(tmp_path: Path) -> None:
-    from clearml_yolo.config_tree import dump_config_tree
+    from clearml_yolo.entrypoints.hydra.config_tree import dump_config_tree
 
     existing = tmp_path / "cy-ground-truth.yaml"
     existing.write_text("# My edited config\n", encoding="utf-8")
@@ -107,7 +107,7 @@ def test_existing_config_prevents_all_writes(tmp_path: Path) -> None:
 def test_force_replaces_examples_and_preserves_unrelated_files(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from clearml_yolo.apps.config_tree import main
+    from clearml_yolo.entrypoints.config_tree import main
 
     example = tmp_path / "cy.yaml"
     example.write_text("# Old example\n", encoding="utf-8")
@@ -122,7 +122,7 @@ def test_force_replaces_examples_and_preserves_unrelated_files(
 def test_cli_reports_write_errors_without_traceback(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    from clearml_yolo.apps.config_tree import main
+    from clearml_yolo.entrypoints.config_tree import main
 
     target = tmp_path / "file"
     target.write_text("existing data", encoding="utf-8")
@@ -135,7 +135,7 @@ def test_cli_reports_write_errors_without_traceback(
 
 
 def test_dangling_symlink_is_not_followed(tmp_path: Path) -> None:
-    from clearml_yolo.config_tree import dump_config_tree
+    from clearml_yolo.entrypoints.hydra.config_tree import dump_config_tree
 
     external = tmp_path / "external.yaml"
     target = tmp_path / "configs"
@@ -150,7 +150,7 @@ def test_dangling_symlink_is_not_followed(tmp_path: Path) -> None:
 def test_force_rejects_nonregular_destinations_before_writing(
     tmp_path: Path, destination_kind: str
 ) -> None:
-    from clearml_yolo.config_tree import dump_config_tree
+    from clearml_yolo.entrypoints.hydra.config_tree import dump_config_tree
 
     target = tmp_path / "configs"
     target.mkdir()
@@ -172,8 +172,8 @@ def test_force_rejects_nonregular_destinations_before_writing(
 
 
 def test_upstream_can_be_pasted_unchanged_into_group(tmp_path: Path) -> None:
-    from clearml_yolo.config_tree import dump_config_tree
-    from clearml_yolo.native_config import native_template
+    from clearml_yolo.adapters.yolo.config import native_template
+    from clearml_yolo.entrypoints.hydra.config_tree import dump_config_tree
 
     dump_config_tree(tmp_path)
     (tmp_path / "ultralytics/default.yaml").write_text(native_template())
@@ -184,7 +184,7 @@ def test_upstream_can_be_pasted_unchanged_into_group(tmp_path: Path) -> None:
 
 
 def test_group_directory_symlink_is_rejected(tmp_path: Path) -> None:
-    from clearml_yolo.config_tree import dump_config_tree
+    from clearml_yolo.entrypoints.hydra.config_tree import dump_config_tree
 
     target = tmp_path / "configs"
     target.mkdir()
@@ -204,14 +204,14 @@ def test_generated_examples_load_in_fresh_cli_process(
     import subprocess
     import sys
 
-    from clearml_yolo.config_tree import dump_config_tree
+    from clearml_yolo.entrypoints.hydra.config_tree import dump_config_tree
 
     dump_config_tree(tmp_path)
     result = subprocess.run(  # noqa: S603 - fixed project modules and generated test paths
         [
             sys.executable,
             "-m",
-            f"clearml_yolo.apps.{config_name}",
+            f"clearml_yolo.entrypoints.{config_name}",
             "--config-dir",
             str(tmp_path),
             "--config-name",
@@ -232,8 +232,8 @@ def test_generated_examples_load_in_fresh_cli_process(
 def test_prediction_export_lists_complete_references_and_stage_values(tmp_path: Path) -> None:
     import yaml
 
-    from clearml_yolo.config_tree import dump_config_tree
-    from clearml_yolo.native_config import PREDICT_KEYS, native_defaults
+    from clearml_yolo.adapters.yolo.config import PREDICT_KEYS, native_defaults
+    from clearml_yolo.entrypoints.hydra.config_tree import dump_config_tree
 
     dump_config_tree(tmp_path)
     prediction = yaml.safe_load((tmp_path / "ultralytics_predict/default.yaml").read_text())
@@ -260,8 +260,8 @@ def test_example_sections_comment_controlled_keys_only_in_examples(
 ) -> None:
     import yaml
 
-    from clearml_yolo.config_tree import dump_config_tree
-    from clearml_yolo.native_config import native_template, render_native_yaml
+    from clearml_yolo.adapters.yolo.config import native_template, render_native_yaml
+    from clearml_yolo.entrypoints.hydra.config_tree import dump_config_tree
 
     dump_config_tree(tmp_path)
     group = "ultralytics" if stage == "train" else "ultralytics_predict"
@@ -296,8 +296,8 @@ def test_cli_empty_oserror_reports_operation_destination_and_type(
 ) -> None:
     import sys
 
-    from clearml_yolo import config_tree
-    from clearml_yolo.apps.config_tree import main
+    from clearml_yolo.entrypoints.config_tree import main
+    from clearml_yolo.entrypoints.hydra import config_tree
 
     def fail(*args: Any, **kwargs: Any) -> None:
         raise OSError

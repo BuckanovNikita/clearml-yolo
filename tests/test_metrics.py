@@ -9,38 +9,52 @@ from typing import Any
 import pandas as pd
 import pytest
 
-from clearml_yolo.clearml_session import ClearMLConfig, invocation
-from clearml_yolo.publishing.models import (
-    FiftyOneConfig,
-    PublicationReceipt,
-    PublicationRequest,
+from clearml_yolo.adapters.clearml.session import ClearMLConfig, invocation
+from clearml_yolo.adapters.reporting.workbook_identity import read_dashboard
+from clearml_yolo.application.ports import WorkflowDependencies
+from clearml_yolo.application.use_cases.metrics import (
+    EvaluationConfig,
+    MetricsResult,
+    _prepare,
+    compute_metrics,
 )
-from clearml_yolo.tasks.metrics import EvaluationConfig, MetricsResult, _prepare, compute_metrics
-from clearml_yolo.workbook_identity import read_dashboard
+from clearml_yolo.core.publication import FiftyOneConfig, PublicationReceipt, PublicationRequest
 from test_clearml_session import FakeTask
+from workflow_dependencies import patch_workflow
+from workflow_dependencies import (
+    workflow_dependencies as workflow_dependencies,  # noqa: PLC0414 - fixture export
+)
 
 
 @contextmanager
-def _metric_owner(monkeypatch: pytest.MonkeyPatch) -> Iterator[FakeTask]:
+def _metric_owner(
+    monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
+) -> Iterator[FakeTask]:
     from types import SimpleNamespace
 
     import clearml
 
-    from clearml_yolo.tasks import metrics as module
+    from clearml_yolo.application.use_cases import metrics as module
 
     task = FakeTask()
-    monkeypatch.setattr(clearml.Task, "init", lambda **_kwargs: task)
-    monkeypatch.setattr(clearml.Task, "get_task", lambda **_kwargs: task)
-    monkeypatch.setattr(
+    patch_workflow(monkeypatch, workflow_dependencies, clearml.Task, "init", lambda **_kwargs: task)
+    patch_workflow(
+        monkeypatch, workflow_dependencies, clearml.Task, "get_task", lambda **_kwargs: task
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
         task,
         "get_logger",
-        lambda: SimpleNamespace(
-            report_plotly=lambda **_kwargs: None,
-        ),
+        lambda: SimpleNamespace(report_plotly=lambda **_kwargs: None),
         raising=False,
     )
-    monkeypatch.setattr(module, "report_table", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(module, "report_scalars", lambda *_args: None)
+    patch_workflow(
+        monkeypatch, workflow_dependencies, module, "report_table", lambda *_args, **_kwargs: None
+    )
+    patch_workflow(
+        monkeypatch, workflow_dependencies, module, "report_scalars", lambda *_args: None
+    )
     with invocation(ClearMLConfig(), "metrics"):
         yield task
 
@@ -88,27 +102,31 @@ def _write_inputs(tmp_path: Path) -> tuple[Path, Path]:
     ground_truth_path = tmp_path / "ground_truth.csv"
     predictions.to_csv(predictions_path, index=False)
     ground_truth.to_csv(ground_truth_path, index=False)
-    return predictions_path, ground_truth_path
+    return (predictions_path, ground_truth_path)
 
 
 def test_candidate_threshold_is_calibrated_on_val_and_reused_for_test(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
     predictions, ground_truth = _write_inputs(tmp_path)
-    monkeypatch.setattr("clearml_yolo.tasks.metrics.init_task", lambda *_args, **_kwargs: None)
-
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.metrics.init_task",
+        lambda *_args, **_kwargs: None,
+    )
     result = compute_metrics(
         predictions,
         ground_truth,
         tmp_path / "metrics",
-        clearml=object(),  # type: ignore[arg-type]
+        clearml=ClearMLConfig(),
         evaluation=EvaluationConfig(),
         splits=["val", "test"],
         calibration_split="val",
         fiftyone=FiftyOneConfig(enabled=False),
         model_label="fixture detector",
+        deps=workflow_dependencies,
     )
-
     assert result.best_confidences["val"] == {"cat": 0.8}
     assert result.best_confidences["test"] == {"cat": 0.8}
     test = read_dashboard(result.dashboards["test"], index_col=0)
@@ -123,39 +141,48 @@ def test_candidate_threshold_is_calibrated_on_val_and_reused_for_test(
 
 
 def test_match_tables_preserve_excel_illegal_characters_in_csv(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
     predictions, ground_truth = _write_inputs(tmp_path)
     frame = pd.read_csv(predictions)
     frame["diagnostic"] = "detail\x01with control character"
     frame.to_csv(predictions, index=False)
-    monkeypatch.setattr("clearml_yolo.tasks.metrics.init_task", lambda *_args, **_kwargs: None)
-
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.metrics.init_task",
+        lambda *_args, **_kwargs: None,
+    )
     result = compute_metrics(
         predictions,
         ground_truth,
         tmp_path / "metrics",
-        clearml=object(),  # type: ignore[arg-type]
+        clearml=ClearMLConfig(),
         evaluation=EvaluationConfig(),
         splits=["test"],
         fiftyone=FiftyOneConfig(enabled=False),
         model_label="fixture detector",
+        deps=workflow_dependencies,
     )
-
     matches = pd.read_csv(result.output_dir / "metrics_evaluation_test_prediction_matches.csv")
     assert list(matches["diagnostic"]) == ["detail\x01with control character"] * 4
     assert list(matches["predict_type"]) == ["filtered"] * 4
 
 
-def test_match_table_larger_than_an_excel_sheet_is_saved_as_csv(tmp_path: Path) -> None:
+def test_match_table_larger_than_an_excel_sheet_is_saved_as_csv(
+    tmp_path: Path, workflow_dependencies: WorkflowDependencies
+) -> None:
     from dataclasses import replace
 
-    from clearml_yolo.comparison.scoring import evaluate_split
-    from clearml_yolo.tasks.metrics import _write_evaluation_workbook
+    from clearml_yolo.application.evaluation import evaluate_split
+    from clearml_yolo.application.use_cases.metrics import _write_evaluation_workbook
 
     predictions_path, truth_path = _write_inputs(tmp_path)
     truth, raw, predictions, classes = _prepare(
-        pd.read_csv(predictions_path), pd.read_csv(truth_path), EvaluationConfig()
+        pd.read_csv(predictions_path),
+        pd.read_csv(truth_path),
+        EvaluationConfig(),
+        deps=workflow_dependencies,
     )
     evaluated = evaluate_split(
         truth,
@@ -171,13 +198,14 @@ def test_match_table_larger_than_an_excel_sheet_is_saved_as_csv(tmp_path: Path) 
         skip_cohen_kappa=True,
         output_dir=tmp_path,
         suffix="test",
+        deps=workflow_dependencies,
     )
-    rows = 1_048_577
+    rows = 1048577
     evaluated = replace(evaluated, pred_matches=pd.DataFrame({"pred_index": pd.RangeIndex(rows)}))
     workbook = tmp_path / "metrics_evaluation_test.xlsx"
-
-    tables = _write_evaluation_workbook(workbook, evaluated, methodology={})
-
+    tables = _write_evaluation_workbook(
+        workbook, evaluated, methodology={}, deps=workflow_dependencies
+    )
     matches = pd.read_csv(tables["metrics_evaluation_test_prediction_matches"])
     assert len(matches) == rows
     assert matches.iloc[0].to_dict() == {"pred_index": 0}
@@ -186,92 +214,105 @@ def test_match_table_larger_than_an_excel_sheet_is_saved_as_csv(tmp_path: Path) 
 
 
 def test_test_only_evaluation_still_requires_validation_membership(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
     predictions, ground_truth = _write_inputs(tmp_path)
     frame = pd.read_csv(ground_truth)
     frame = frame[frame["split"] == "test"]
     frame.to_csv(ground_truth, index=False)
-    monkeypatch.setattr("clearml_yolo.tasks.metrics.init_task", lambda *_args, **_kwargs: None)
-
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.metrics.init_task",
+        lambda *_args, **_kwargs: None,
+    )
     with pytest.raises(ValueError, match="calibration split 'val'"):
         compute_metrics(
             predictions,
             ground_truth,
             tmp_path / "metrics",
-            clearml=object(),  # type: ignore[arg-type]
+            clearml=ClearMLConfig(),
             evaluation=EvaluationConfig(),
             splits=["test"],
             calibration_split="val",
             fiftyone=FiftyOneConfig(enabled=False),
             model_label="fixture detector",
+            deps=workflow_dependencies,
         )
 
 
 def test_calibration_split_must_be_validation(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
     predictions, ground_truth = _write_inputs(tmp_path)
-    monkeypatch.setattr("clearml_yolo.tasks.metrics.init_task", lambda *_args, **_kwargs: None)
-
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.metrics.init_task",
+        lambda *_args, **_kwargs: None,
+    )
     with pytest.raises(ValueError, match="exactly 'val'"):
         compute_metrics(
             predictions,
             ground_truth,
             tmp_path / "metrics",
-            clearml=object(),  # type: ignore[arg-type]
+            clearml=ClearMLConfig(),
             evaluation=EvaluationConfig(),
             splits=["test"],
             calibration_split="test",
             fiftyone=FiftyOneConfig(enabled=False),
             model_label="fixture detector",
+            deps=workflow_dependencies,
         )
 
 
 def test_one_image_cannot_belong_to_validation_and_test(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
     predictions, ground_truth = _write_inputs(tmp_path)
     frame = pd.read_csv(ground_truth)
     frame.loc[frame["split"] == "test", "image_name"] = "val.jpg"
     frame.to_csv(ground_truth, index=False)
-    monkeypatch.setattr("clearml_yolo.tasks.metrics.init_task", lambda *_args, **_kwargs: None)
-
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.metrics.init_task",
+        lambda *_args, **_kwargs: None,
+    )
     with pytest.raises(ValueError, match=r"both val and test.*val\.jpg"):
         compute_metrics(
             predictions,
             ground_truth,
             tmp_path / "metrics",
-            clearml=object(),  # type: ignore[arg-type]
+            clearml=ClearMLConfig(),
             evaluation=EvaluationConfig(),
             splits=["test"],
             fiftyone=FiftyOneConfig(enabled=False),
             model_label="fixture detector",
+            deps=workflow_dependencies,
         )
 
 
-def test_prediction_only_classes_are_preserved_for_false_positive_accounting() -> None:
+def test_prediction_only_classes_are_preserved_for_false_positive_accounting(
+    workflow_dependencies: WorkflowDependencies,
+) -> None:
     ground_truth = pd.DataFrame(
-        [("val.jpg", "/images/val.jpg", "cat", 0, 0, 10, 10, "val")],
-        columns=GT_COLUMNS,
+        [("val.jpg", "/images/val.jpg", "cat", 0, 0, 10, 10, "val")], columns=GT_COLUMNS
     )
     predictions = pd.DataFrame(
-        [
-            ("val.jpg", "cat", 0, 0, 10, 10, 0.8),
-            ("val.jpg", "bird", 20, 20, 30, 30, 0.7),
-        ],
+        [("val.jpg", "cat", 0, 0, 10, 10, 0.8), ("val.jpg", "bird", 20, 20, 30, 30, 0.7)],
         columns=PRED_COLUMNS,
     )
-
-    _, raw, prepared, classes = _prepare(predictions, ground_truth, EvaluationConfig())
-
+    _, raw, prepared, classes = _prepare(
+        predictions, ground_truth, EvaluationConfig(), deps=workflow_dependencies
+    )
     assert classes == ["bird", "cat"]
     assert list(raw["instance_label"]) == ["cat", "bird"]
     assert list(prepared["instance_label"]) == ["cat", "bird"]
 
 
 def test_numeric_image_identifiers_remain_text_when_loaded(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
     predictions, ground_truth = _write_inputs(tmp_path)
     prediction_frame = pd.read_csv(predictions).assign(
@@ -288,36 +329,48 @@ def test_numeric_image_identifiers_remain_text_when_loaded(
         prediction_data: pd.DataFrame,
         truth_data: pd.DataFrame,
         _config: EvaluationConfig,
+        *,
+        deps: WorkflowDependencies,
     ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, list[str]]:
+        assert deps is workflow_dependencies
         seen["predictions"] = prediction_data
         seen["ground_truth"] = truth_data
         raise RuntimeError("captured")
 
-    monkeypatch.setattr("clearml_yolo.tasks.metrics.init_task", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr("clearml_yolo.tasks.metrics._prepare", capture)
-
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.metrics.init_task",
+        lambda *_args, **_kwargs: None,
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.metrics._prepare",
+        capture,
+    )
     with pytest.raises(RuntimeError, match="captured"):
         compute_metrics(
             predictions,
             ground_truth,
             tmp_path / "metrics",
-            clearml=object(),  # type: ignore[arg-type]
+            clearml=ClearMLConfig(),
             evaluation=EvaluationConfig(),
             splits=["test"],
             fiftyone=FiftyOneConfig(enabled=False),
             model_label="fixture detector",
+            deps=workflow_dependencies,
         )
-
     assert seen["predictions"]["image_name"].iloc[0] == "000000000009"
     assert seen["ground_truth"]["image_name"].iloc[0] == "000000000009"
 
 
 def test_metrics_preflights_before_scoring_and_publishes_evaluation_payloads(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
     from types import SimpleNamespace
 
-    from clearml_yolo.tasks import metrics as metrics_module
+    from clearml_yolo.application.use_cases import metrics as metrics_module
 
     predictions, ground_truth = _write_inputs(tmp_path)
     task = SimpleNamespace(id="metrics-task")
@@ -349,26 +402,82 @@ def test_metrics_preflights_before_scoring_and_publishes_evaluation_payloads(
                 fields={"evaluation_test": "evaluation_test_metrics-task"},
             )
 
-    monkeypatch.setattr(metrics_module, "init_task", lambda *_args, **_kwargs: task)
-    monkeypatch.setattr(metrics_module, "create_publisher", lambda _config: FakePublisher())
-    monkeypatch.setattr(metrics_module, "register_predictions", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(metrics_module, "publish_evaluation", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(metrics_module, "owned_native_model", lambda *_args: None)
-    monkeypatch.setattr(metrics_module, "upload_artifact", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(metrics_module, "record_run_configuration", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(metrics_module, "report_table", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(metrics_module, "report_scalars", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(
-        "clearml_yolo.tasks.publication.record_run_configuration", lambda *_args: None
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        metrics_module,
+        "init_task",
+        lambda *_args, **_kwargs: task,
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        metrics_module,
+        "create_publisher",
+        lambda _config: FakePublisher(),
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        metrics_module,
+        "register_predictions",
+        lambda *_args, **_kwargs: None,
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        metrics_module,
+        "publish_evaluation",
+        lambda *_args, **_kwargs: None,
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        metrics_module,
+        "owned_native_model",
+        lambda *_args: None,
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        metrics_module,
+        "upload_artifact",
+        lambda *_args, **_kwargs: None,
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        metrics_module,
+        "record_run_configuration",
+        lambda *_args, **_kwargs: None,
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        metrics_module,
+        "report_table",
+        lambda *_args, **_kwargs: None,
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        metrics_module,
+        "report_scalars",
+        lambda *_args, **_kwargs: None,
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.publication.record_run_configuration",
+        lambda *_args: None,
     )
 
-    def prepare(*args: object, **kwargs: object) -> object:
+    def prepare(*args: Any, **kwargs: Any) -> Any:
         events.append("compute")
-        return original_prepare(*args, **kwargs)  # type: ignore[arg-type]
+        return original_prepare(*args, **kwargs)
 
-    monkeypatch.setattr(metrics_module, "_prepare", prepare)
+    patch_workflow(monkeypatch, workflow_dependencies, metrics_module, "_prepare", prepare)
     evaluation = EvaluationConfig()
-
     result = compute_metrics(
         predictions,
         ground_truth,
@@ -379,8 +488,8 @@ def test_metrics_preflights_before_scoring_and_publishes_evaluation_payloads(
         calibration_split="val",
         fiftyone=FiftyOneConfig(),
         model_label="fixture detector",
+        deps=workflow_dependencies,
     )
-
     assert events == ["preflight", "compute", "publish"]
     request = requests[0]
     assert request.task_id == "metrics-task"
@@ -397,9 +506,11 @@ def test_metrics_preflights_before_scoring_and_publishes_evaluation_payloads(
 
 @pytest.mark.parametrize("zero_predictions", [False, True])
 def test_metrics_publishes_only_canonical_tables_and_readable_workbooks(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, zero_predictions: bool
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    zero_predictions: bool,
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
-
     predictions, ground_truth = _write_inputs(tmp_path)
     truth = pd.read_csv(ground_truth)
     train = truth[truth.split == "val"].assign(
@@ -410,7 +521,7 @@ def test_metrics_publishes_only_canonical_tables_and_readable_workbooks(
     train_predictions = frame[frame.image_name == "val.jpg"].assign(image_name="train.jpg")
     frame = pd.concat([train_predictions, frame], ignore_index=True)
     (frame.iloc[:0] if zero_predictions else frame).to_csv(predictions, index=False)
-    with _metric_owner(monkeypatch) as task:
+    with _metric_owner(monkeypatch, workflow_dependencies) as task:
         result = compute_metrics(
             predictions,
             ground_truth,
@@ -419,6 +530,7 @@ def test_metrics_publishes_only_canonical_tables_and_readable_workbooks(
             EvaluationConfig(),
             fiftyone=FiftyOneConfig(enabled=False),
             model_label="fixture detector",
+            deps=workflow_dependencies,
         )
     uploads = {item["name"]: item["artifact_object"] for item in task.uploads}
     _assert_readable_metrics_evidence(result, uploads, zero_predictions)
@@ -427,7 +539,7 @@ def test_metrics_publishes_only_canonical_tables_and_readable_workbooks(
 def _assert_readable_metrics_evidence(
     result: MetricsResult, uploads: dict[str, Any], zero_predictions: bool
 ) -> None:
-    from clearml_yolo.comparison.evaluation_payload import EvaluationPayload
+    from clearml_yolo.core.evaluation.payload import EvaluationPayload
 
     assert set(uploads) == {
         "gt_csv",
@@ -492,13 +604,13 @@ def _assert_readable_metrics_evidence(
 
 
 def test_metrics_publishes_frozen_validation_thresholds_even_without_val_output(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
     predictions, ground_truth = _write_inputs(tmp_path)
     truth = pd.read_csv(ground_truth)
     unused = truth.iloc[[0]].assign(split="train", image_name="unused.jpg")
     pd.concat([truth, unused], ignore_index=True).to_csv(ground_truth, index=False)
-    with _metric_owner(monkeypatch) as task:
+    with _metric_owner(monkeypatch, workflow_dependencies) as task:
         compute_metrics(
             predictions,
             ground_truth,
@@ -508,6 +620,7 @@ def test_metrics_publishes_frozen_validation_thresholds_even_without_val_output(
             splits=["test"],
             fiftyone=FiftyOneConfig(enabled=False),
             model_label="fixture detector",
+            deps=workflow_dependencies,
         )
     assert {item["name"] for item in task.uploads} == {
         "gt_csv",
@@ -523,16 +636,19 @@ def test_metrics_publishes_frozen_validation_thresholds_even_without_val_output(
 
 
 def test_validation_threshold_csv_keeps_full_float_precision(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
-    from clearml_yolo.tasks import metrics as module
+    from clearml_yolo.application.use_cases import metrics as module
 
     predictions, ground_truth = _write_inputs(tmp_path)
-    monkeypatch.setattr(
-        module, "calibrate_thresholds", lambda *_args, **_kwargs: {"cat": 0.12345678901234566}
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        module,
+        "calibrate_thresholds",
+        lambda *_args, **_kwargs: {"cat": 0.12345678901234566},
     )
-
-    with _metric_owner(monkeypatch) as task:
+    with _metric_owner(monkeypatch, workflow_dependencies) as task:
         compute_metrics(
             predictions,
             ground_truth,
@@ -542,23 +658,24 @@ def test_validation_threshold_csv_keeps_full_float_precision(
             splits=["test"],
             fiftyone=FiftyOneConfig(enabled=False),
             model_label="fixture detector",
+            deps=workflow_dependencies,
         )
-
     uploads = {item["name"]: item["artifact_object"] for item in task.uploads}
-    assert uploads["metrics_best_confidences_val"].read_text(encoding="utf-8") == (
-        "class_name,confidence\ncat,0.12345678901234566\n"
+    assert (
+        uploads["metrics_best_confidences_val"].read_text(encoding="utf-8")
+        == "class_name,confidence\ncat,0.12345678901234566\n"
     )
 
 
 def test_missing_required_plot_fails_even_without_tracking(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
     from typing import Any
 
-    from clearml_yolo.tasks import metrics as module
+    from clearml_yolo.application.use_cases import metrics as module
 
     predictions, ground_truth = _write_inputs(tmp_path)
-    from clearml_yolo.comparison.scoring import evaluate_split
+    from clearml_yolo.application.evaluation import evaluate_split
 
     original = evaluate_split
 
@@ -567,8 +684,8 @@ def test_missing_required_plot_fails_even_without_tracking(
         evaluated.plot_paths.pop("recall")
         return evaluated
 
-    monkeypatch.setattr(module, "init_task", lambda *a, **k: None)
-    monkeypatch.setattr(module, "evaluate_split", missing_plot)
+    patch_workflow(monkeypatch, workflow_dependencies, module, "init_task", lambda *a, **k: None)
+    patch_workflow(monkeypatch, workflow_dependencies, module, "evaluate_split", missing_plot)
     with pytest.raises(ValueError, match="inventory"):
         compute_metrics(
             predictions,
@@ -579,17 +696,26 @@ def test_missing_required_plot_fails_even_without_tracking(
             splits=["test"],
             fiftyone=FiftyOneConfig(enabled=False),
             model_label="fixture detector",
+            deps=workflow_dependencies,
         )
 
 
 @pytest.mark.parametrize("case", ["missing", "empty"])
 def test_unsupported_split_inputs_fail_clearly(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, case: str
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    case: str,
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
     predictions, ground_truth = _write_inputs(tmp_path)
     if case == "empty":
         pd.read_csv(ground_truth).iloc[:0].to_csv(ground_truth, index=False)
-    monkeypatch.setattr("clearml_yolo.tasks.metrics.init_task", lambda *a, **k: None)
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.metrics.init_task",
+        lambda *a, **k: None,
+    )
     with pytest.raises(ValueError, match=r"(?i)no ground-truth rows|no labelled objects"):
         compute_metrics(
             predictions,
@@ -600,29 +726,35 @@ def test_unsupported_split_inputs_fail_clearly(
             splits=["train"],
             fiftyone=FiftyOneConfig(enabled=False),
             model_label="fixture detector",
+            deps=workflow_dependencies,
         )
 
 
 def test_arbitrary_logical_split_keeps_outputs_inside_destination(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
     predictions, ground_truth = _write_inputs(tmp_path)
     split = "../../../escape/actual"
     frame = pd.read_csv(ground_truth)
     frame.loc[frame["split"] == "test", "split"] = split
     frame.to_csv(ground_truth, index=False)
-    monkeypatch.setattr("clearml_yolo.tasks.metrics.init_task", lambda *_args, **_kwargs: None)
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.metrics.init_task",
+        lambda *_args, **_kwargs: None,
+    )
     destination = tmp_path / "metrics"
     result = compute_metrics(
         predictions,
         ground_truth,
         destination,
-        clearml=object(),  # type: ignore[arg-type]
+        clearml=ClearMLConfig(),
         evaluation=EvaluationConfig(),
         splits=[split],
         fiftyone=FiftyOneConfig(enabled=False),
         model_label="fixture detector",
+        deps=workflow_dependencies,
     )
     assert result.dashboards[split].parent == destination
     assert result.dashboards[split].is_file()
@@ -635,11 +767,12 @@ def test_dashboard_plot_contract_accepts_legacy_and_suffixed_outputs(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     already_suffixed: bool,
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
     from digital_metrics.reporting import get_dashboards
 
-    from clearml_yolo.artifact_names import PLOT_METRICS
-    from clearml_yolo.comparison import scoring
+    from clearml_yolo.adapters.reporting import evaluation as scoring
+    from clearml_yolo.core.artifact_names import PLOT_METRICS
 
     original = get_dashboards
 
@@ -655,18 +788,24 @@ def test_dashboard_plot_contract_accepts_legacy_and_suffixed_outputs(
                     legacy.replace(suffixed)
         return result
 
-    monkeypatch.setattr(scoring, "get_dashboards", dashboard)
-    monkeypatch.setattr("clearml_yolo.tasks.metrics.init_task", lambda *_args, **_kwargs: None)
+    patch_workflow(monkeypatch, workflow_dependencies, scoring, "get_dashboards", dashboard)
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.metrics.init_task",
+        lambda *_args, **_kwargs: None,
+    )
     predictions, ground_truth = _write_inputs(tmp_path)
     result = compute_metrics(
         predictions,
         ground_truth,
         tmp_path / "metrics",
-        clearml=object(),  # type: ignore[arg-type]
+        clearml=ClearMLConfig(),
         evaluation=EvaluationConfig(),
         splits=["test"],
         fiftyone=FiftyOneConfig(enabled=False),
         model_label="fixture detector",
+        deps=workflow_dependencies,
     )
     assert result.dashboards["test"].is_file()
     assert (tmp_path / "metrics" / "recall_confidence_intervals_test.png").is_file()
@@ -679,11 +818,12 @@ def test_reused_destination_requires_fresh_confidence_plots(
     monkeypatch: pytest.MonkeyPatch,
     already_suffixed: bool,
     suppress_recall: bool,
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
     from digital_metrics.reporting import get_dashboards
 
-    from clearml_yolo.artifact_names import PLOT_METRICS
-    from clearml_yolo.comparison import scoring
+    from clearml_yolo.adapters.reporting import evaluation as scoring
+    from clearml_yolo.core.artifact_names import PLOT_METRICS
 
     destination = tmp_path / "metrics"
     destination.mkdir()
@@ -699,7 +839,7 @@ def test_reused_destination_requires_fresh_confidence_plots(
     def dashboard(*args: Any, **kwargs: Any) -> Any:
         producer = tmp_path / "producer"
         producer.mkdir()
-        result = get_dashboards(*args, **(kwargs | {"path": str(producer)}))
+        result = get_dashboards(*args, **kwargs | {"path": str(producer)})
         directory = Path(kwargs["path"])
         for path in producer.iterdir():
             metric = next(
@@ -717,8 +857,13 @@ def test_reused_destination_requires_fresh_confidence_plots(
                 path.replace(directory / f"{metric}_confidence_intervals{suffix}.png")
         return result
 
-    monkeypatch.setattr(scoring, "get_dashboards", dashboard)
-    monkeypatch.setattr("clearml_yolo.tasks.metrics.init_task", lambda *_args, **_kwargs: None)
+    patch_workflow(monkeypatch, workflow_dependencies, scoring, "get_dashboards", dashboard)
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.metrics.init_task",
+        lambda *_args, **_kwargs: None,
+    )
     predictions, ground_truth = _write_inputs(tmp_path)
 
     def run() -> None:
@@ -726,11 +871,12 @@ def test_reused_destination_requires_fresh_confidence_plots(
             predictions,
             ground_truth,
             destination,
-            clearml=object(),  # type: ignore[arg-type]
+            clearml=ClearMLConfig(),
             evaluation=EvaluationConfig(),
             splits=["test"],
             fiftyone=FiftyOneConfig(enabled=False),
             model_label="fixture detector",
+            deps=workflow_dependencies,
         )
 
     if suppress_recall:

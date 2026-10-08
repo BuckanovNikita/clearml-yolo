@@ -4,12 +4,19 @@ import pandas as pd
 import pytest
 from loguru import logger
 
-from clearml_yolo.comparison.scoring import calibrate_thresholds
-from clearml_yolo.tasks.metrics import EvaluationConfig, _prepare
+from clearml_yolo.adapters.evaluation.scoring import calibrate_thresholds
+from clearml_yolo.application.ports import WorkflowDependencies
+from clearml_yolo.application.use_cases.metrics import EvaluationConfig, _prepare
+from workflow_dependencies import workflow_dependencies as workflow_dependencies  # noqa: PLC0414
 
 COLUMNS = [
-    "image_name", "instance_label", "bbox_x_tl", "bbox_y_tl",
-    "bbox_x_br", "bbox_y_br", "confidence",
+    "image_name",
+    "instance_label",
+    "bbox_x_tl",
+    "bbox_y_tl",
+    "bbox_x_br",
+    "bbox_y_br",
+    "confidence",
 ]
 
 
@@ -21,7 +28,9 @@ def _truth() -> pd.DataFrame:
 
 
 @pytest.mark.parametrize("preprocess", [False, True])
-def test_geometry_filter_keeps_valid_predictions_and_reports_reasons(preprocess: bool) -> None:
+def test_geometry_filter_keeps_valid_predictions_and_reports_reasons(
+    preprocess: bool, workflow_dependencies: WorkflowDependencies
+) -> None:
     predictions = pd.DataFrame(
         [
             ("zero.jpg", "cat", 0, 0, 0, 10, 0.9),
@@ -31,7 +40,8 @@ def test_geometry_filter_keeps_valid_predictions_and_reports_reasons(preprocess:
             ("text.jpg", "cat", "bad", 0, 10, 10, 0.9),
             ("infinite.jpg", "cat", 0, 0, float("inf"), 10, 0.9),
             ("low.jpg", "cat", 20, 20, 30, 30, 0.1),
-        ], columns=COLUMNS,
+        ],
+        columns=COLUMNS,
     )
     original = predictions.copy(deep=True)
     warnings: list[str] = []
@@ -42,7 +52,9 @@ def test_geometry_filter_keeps_valid_predictions_and_reports_reasons(preprocess:
         preprocess_preds_nms_iou_threshold=0.9 if preprocess else None,
     )
     try:
-        _, raw, prepared, classes = _prepare(predictions, _truth(), config)
+        _, raw, prepared, classes = _prepare(
+            predictions, _truth(), config, deps=workflow_dependencies
+        )
     finally:
         logger.remove(sink)
 
@@ -62,25 +74,39 @@ def test_geometry_filter_keeps_valid_predictions_and_reports_reasons(preprocess:
 
 @pytest.mark.parametrize("column", COLUMNS[2:6])
 @pytest.mark.parametrize("value", [None, pd.NA, float("nan"), float("inf"), -float("inf"), "bad"])
-def test_invalid_coordinate_cells_leave_empty_predictions(column: str, value: object) -> None:
+def test_invalid_coordinate_cells_leave_empty_predictions(
+    column: str, value: object, workflow_dependencies: WorkflowDependencies
+) -> None:
     predictions = pd.DataFrame(
-        [("valid.jpg", "cat", 0, 0, 10, 10, 0.8)], columns=COLUMNS,
+        [("valid.jpg", "cat", 0, 0, 10, 10, 0.8)],
+        columns=COLUMNS,
     ).astype({column: object})
     predictions[column] = pd.Series([value], dtype=object)
-    gt, raw, prepared, classes = _prepare(predictions, _truth(), EvaluationConfig())
+    gt, raw, prepared, classes = _prepare(
+        predictions, _truth(), EvaluationConfig(), deps=workflow_dependencies
+    )
     assert raw.empty
     assert prepared.empty
     assert list(raw.columns) == COLUMNS
     assert calibrate_thresholds(
-        gt, prepared, calibration_split="val", classes=classes, iou_threshold=0.5,
-        matching_strategy="iou_prior", confidence_optimization="per_class",
+        gt,
+        prepared,
+        calibration_split="val",
+        classes=classes,
+        iou_threshold=0.5,
+        matching_strategy="iou_prior",
+        confidence_optimization="per_class",
     ) == {"cat": 0.0}
 
 
 @pytest.mark.parametrize("corners", [(0, 0, 0, 10), (0, 0, 10, 0), (10, 0, 0, 10), (0, 10, 10, 0)])
-def test_nonpositive_extent_is_dropped(corners: tuple[int, int, int, int]) -> None:
+def test_nonpositive_extent_is_dropped(
+    corners: tuple[int, int, int, int], workflow_dependencies: WorkflowDependencies
+) -> None:
     predictions = pd.DataFrame([("valid.jpg", "cat", *corners, 0.8)], columns=COLUMNS)
-    _, raw, prepared, _ = _prepare(predictions, _truth(), EvaluationConfig())
+    _, raw, prepared, _ = _prepare(
+        predictions, _truth(), EvaluationConfig(), deps=workflow_dependencies
+    )
     assert raw.empty
     assert prepared.empty
 
@@ -88,31 +114,40 @@ def test_nonpositive_extent_is_dropped(corners: tuple[int, int, int, int]) -> No
 @pytest.mark.parametrize("right_corner", ["10", "1_0", "\u0661\u0660"])
 @pytest.mark.parametrize("invalid_sibling", [False, True])
 def test_valid_numeric_strings_keep_scoring_and_unrelated_validation(
-    right_corner: str, invalid_sibling: bool,
+    right_corner: str, invalid_sibling: bool, workflow_dependencies: WorkflowDependencies
 ) -> None:
     predictions = pd.DataFrame(
-        [("valid.jpg", "cat", "0", "0", right_corner, "10", 0.8)], columns=COLUMNS,
+        [("valid.jpg", "cat", "0", "0", right_corner, "10", 0.8)],
+        columns=COLUMNS,
     )
     if invalid_sibling:
         predictions = pd.concat([predictions, predictions.assign(bbox_x_tl="bad")])
-    gt, raw, prepared, classes = _prepare(predictions, _truth(), EvaluationConfig())
+    gt, raw, prepared, classes = _prepare(
+        predictions, _truth(), EvaluationConfig(), deps=workflow_dependencies
+    )
     assert len(raw) == len(prepared) == 1
     assert calibrate_thresholds(
-        gt, prepared, calibration_split="val", classes=classes, iou_threshold=0.5,
-        matching_strategy="iou_prior", confidence_optimization="per_class",
+        gt,
+        prepared,
+        calibration_split="val",
+        classes=classes,
+        iou_threshold=0.5,
+        matching_strategy="iou_prior",
+        confidence_optimization="per_class",
     ) == {"cat": 0.8}
     predictions["confidence"] = float("nan")
     with pytest.raises(ValueError, match="confidence"):
-        _prepare(predictions, _truth(), EvaluationConfig())
+        _prepare(predictions, _truth(), EvaluationConfig(), deps=workflow_dependencies)
 
 
 def test_geometry_filter_preserves_indices_extras_and_limits_warning_sample() -> None:
-    from clearml_yolo.comparison.scoring import filter_invalid_prediction_boxes
+    from clearml_yolo.adapters.evaluation.scoring import filter_invalid_prediction_boxes
 
     predictions = pd.DataFrame(
         [(f"bad-{i}.jpg", "cat", 0, 0, 0, 10, 0.8) for i in range(8)]
         + [("valid.jpg", "cat", 0, 0, 10, 10, 0.8)],
-        columns=COLUMNS, index=list(range(100, 109)),
+        columns=COLUMNS,
+        index=list(range(100, 109)),
     ).assign(extra="retained")
     warnings: list[str] = []
     sink = logger.add(lambda message: warnings.append(str(message)), level="WARNING")
@@ -130,25 +165,36 @@ def test_geometry_filter_preserves_indices_extras_and_limits_warning_sample() ->
 
 
 @pytest.mark.parametrize("column", ["bbox_x_br", "image_name", "confidence"])
-def test_missing_required_columns_still_fail(column: str) -> None:
+def test_missing_required_columns_still_fail(
+    column: str, workflow_dependencies: WorkflowDependencies
+) -> None:
     predictions = pd.DataFrame(
-        [("valid.jpg", "cat", 0, 0, 10, 10, 0.8)], columns=COLUMNS,
+        [("valid.jpg", "cat", 0, 0, 10, 10, 0.8)],
+        columns=COLUMNS,
     ).drop(columns=column)
     with pytest.raises(ValueError, match="missing columns"):
-        _prepare(predictions, _truth(), EvaluationConfig())
+        _prepare(predictions, _truth(), EvaluationConfig(), deps=workflow_dependencies)
 
 
-def test_invalid_ground_truth_still_fails_after_dropping_predictions() -> None:
+def test_invalid_ground_truth_still_fails_after_dropping_predictions(
+    workflow_dependencies: WorkflowDependencies,
+) -> None:
     predictions = pd.DataFrame(
-        [("valid.jpg", "cat", 0, 0, 0, 10, 0.8)], columns=COLUMNS,
+        [("valid.jpg", "cat", 0, 0, 0, 10, 0.8)],
+        columns=COLUMNS,
     )
     gt, _, prepared, classes = _prepare(
-        predictions, _truth().assign(bbox_x_br=0), EvaluationConfig(),
+        predictions, _truth().assign(bbox_x_br=0), EvaluationConfig(), deps=workflow_dependencies
     )
     with pytest.raises(ValueError, match="Ground-truth boxes"):
         calibrate_thresholds(
-            gt, prepared, calibration_split="val", classes=classes, iou_threshold=0.5,
-            matching_strategy="iou_prior", confidence_optimization="per_class",
+            gt,
+            prepared,
+            calibration_split="val",
+            classes=classes,
+            iou_threshold=0.5,
+            matching_strategy="iou_prior",
+            confidence_optimization="per_class",
         )
 
 
@@ -165,11 +211,12 @@ def test_invalid_ground_truth_still_fails_after_dropping_predictions() -> None:
     ],
 )
 def test_dropped_geometry_does_not_hide_unrelated_validation_errors(
-    column: str, value: object, message: str,
+    column: str, value: object, message: str, workflow_dependencies: WorkflowDependencies
 ) -> None:
     predictions = pd.DataFrame(
-        [("valid.jpg", "cat", 0, 0, 0, 10, 0.8)], columns=COLUMNS,
+        [("valid.jpg", "cat", 0, 0, 0, 10, 0.8)],
+        columns=COLUMNS,
     )
     predictions[column] = pd.Series([value], dtype=object)
     with pytest.raises(ValueError, match=message):
-        _prepare(predictions, _truth(), EvaluationConfig())
+        _prepare(predictions, _truth(), EvaluationConfig(), deps=workflow_dependencies)

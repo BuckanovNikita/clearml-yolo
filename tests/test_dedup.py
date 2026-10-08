@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from clearml_yolo import dedup
+from clearml_yolo.adapters.storage import dedup
 
 
 def pair(tmp_path: Path) -> tuple[Path, Path]:

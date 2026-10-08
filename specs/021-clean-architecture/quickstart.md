@@ -1,0 +1,3 @@
+# Verification guide
+
+Use the project uv environment and approved external sources. Run pytest, Ruff, strict mypy and lint-imports, then build/install distributions and all command helps. Generate new YAML with cy-init-config into an empty directory and transfer settings from old examples without overwriting them. Follow the repository E2E skill for isolated tagged CPU/GPU baseline/candidate runs, downloaded artifacts/model verification, optional visualization and required failure paths. See the current contract index for output inventories; record actual results and unavailable gates in dated evidence.

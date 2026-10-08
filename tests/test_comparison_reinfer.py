@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 from loguru import logger
 
-from clearml_yolo.comparison.reinfer import VocabularyReport, reinfer_split
+from clearml_yolo.adapters.yolo.reinfer import VocabularyReport, reinfer_split
 
 PREDICTION_COLUMNS = [
     "image_name",
@@ -292,6 +292,26 @@ def test_cache_sidecar_restores_actual_native_arguments_and_output_location(
     assert second.attrs["effective_args"] == first.attrs["effective_args"]
     assert second.attrs["save_dir"] == first.attrs["save_dir"]
     assert output.with_suffix(".metadata.json").is_file()
+
+
+def test_cached_confidence_preserves_exact_frozen_threshold_without_inference(
+    ground_truth: pd.DataFrame, tmp_path: Path
+) -> None:
+    """A CSV replay must retain detections exactly at the frozen operating point."""
+    threshold = 0.006217078305780888
+    predictor = RecordingPredictor()
+
+    def predict_at_threshold(weights: Any, image_paths: list[str], **kwargs: Any) -> pd.DataFrame:
+        return predictor(weights, image_paths, **kwargs).assign(confidence=threshold)
+
+    output = tmp_path / "preds.csv"
+    fresh, _ = _reinfer(ground_truth, output, predict_at_threshold)
+    cached, _ = _reinfer(ground_truth, output, _explode)
+
+    assert len(predictor.calls) == 1
+    assert len(fresh.loc[fresh["confidence"] >= threshold]) == 2
+    assert len(cached.loc[cached["confidence"] >= threshold]) == 2
+    pd.testing.assert_frame_equal(fresh, cached, check_exact=True)
 
 
 def test_cache_without_provenance_sidecar_is_not_reused(

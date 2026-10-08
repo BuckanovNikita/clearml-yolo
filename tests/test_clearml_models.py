@@ -9,8 +9,7 @@ from typing import Any, override
 import pandas as pd
 import pytest
 
-from clearml_yolo.artifact_names import BEST_CONFIDENCES_VAL
-from clearml_yolo.clearml_models import (
+from clearml_yolo.adapters.clearml.models import (
     fetch_best_confidences,
     latest_completed_task_id,
     looks_like_task_id,
@@ -18,8 +17,9 @@ from clearml_yolo.clearml_models import (
     resolve_weights,
     source_model_links,
 )
-from clearml_yolo.model_identity import ModelIdentity
-from clearml_yolo.workbook_identity import annotate_workbook
+from clearml_yolo.adapters.reporting.workbook_identity import annotate_workbook
+from clearml_yolo.core.artifact_names import BEST_CONFIDENCES_VAL
+from clearml_yolo.core.identity import ModelIdentity
 
 TASK_ID = "a" * 32
 
@@ -439,7 +439,7 @@ def test_output_url_best_beats_registration_order(patch_clearml: Any, tmp_path: 
     model = FakeModel(str(best))
     model.url = "https://files.example/nested/%62est.pt?download=1"
     patch_clearml(FakeTask(models={"output": [model, FakeModel("last.pt")]}))
-    from clearml_yolo.clearml_models import resolve_task_model
+    from clearml_yolo.adapters.clearml.models import resolve_task_model
 
     path, links = resolve_task_model(TASK_ID)
     assert path == best
@@ -471,7 +471,7 @@ def test_artifact_priority_and_links(patch_clearml: Any, tmp_path: Path) -> None
         }
     )
     patch_clearml(task)
-    from clearml_yolo.clearml_models import resolve_task_model
+    from clearml_yolo.adapters.clearml.models import resolve_task_model
 
     path, links = resolve_task_model(TASK_ID)
     assert path == best
@@ -643,7 +643,7 @@ def test_metadata_beats_ambiguous_best_urls(patch_clearml: Any, tmp_path: Path) 
 
 
 def test_atomic_checkpoint_provenance_snapshot(patch_clearml: Any, tmp_path: Path) -> None:
-    from clearml_yolo.clearml_models import resolve_task_model
+    from clearml_yolo.adapters.clearml.models import resolve_task_model
 
     class ChangingTask(FakeTask):
         @override
@@ -777,7 +777,8 @@ def test_checkpoint_download_failure_redacts_sdk_credentials(patch_clearml: Any)
 
 
 def test_annotated_dashboard_threshold_recovery_preserves_numeric_class_ids(
-    patch_clearml: Any, tmp_path: Path,
+    patch_clearml: Any,
+    tmp_path: Path,
 ) -> None:
     path = tmp_path / "dashboard.xlsx"
     pd.DataFrame({"confidence": [0.37, 0.81]}, index=["001", "Ω"]).to_excel(path)

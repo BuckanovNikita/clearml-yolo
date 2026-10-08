@@ -6,7 +6,7 @@ from hydra.errors import ConfigCompositionException
 from hydra_zen import store
 from omegaconf import OmegaConf
 
-import clearml_yolo.configs  # noqa: F401
+import clearml_yolo.entrypoints.hydra.configs  # noqa: F401
 
 
 @pytest.fixture(autouse=True)
@@ -67,7 +67,7 @@ def test_training_exposes_the_same_prediction_group_without_changing_train_value
 
 
 def test_composed_prediction_uses_produced_checkpoint_and_shared_resolution() -> None:
-    from clearml_yolo.native_config import prediction_settings
+    from clearml_yolo.adapters.yolo.config import prediction_settings
 
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
         config = compose(
@@ -82,7 +82,7 @@ def test_composed_prediction_uses_produced_checkpoint_and_shared_resolution() ->
 
 
 def test_resolved_prediction_does_not_inherit_batch_or_save_implicitly() -> None:
-    from clearml_yolo.native_config import prediction_settings
+    from clearml_yolo.adapters.yolo.config import prediction_settings
 
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
         config = compose(config_name="pipeline", overrides=["ultralytics.batch=32"])

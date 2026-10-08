@@ -12,16 +12,18 @@ the maintained source of truth; changes MUST NOT weaken them merely to silence a
   `typing.Self` for methods returning their receiver, and quoted forward references or
   stub-only generics where runtime evaluation is unsupported. Modules MUST use absolute
   imports and configured import ordering, Python target and line-length limit.
-- Functions MUST declare parameter and return types. Configuration and validated data models
-  MUST use Pydantic where validation is required, following existing model conventions.
+- Functions MUST declare parameter and return types. Configuration and validated structured records
+  MUST use Pydantic. Dataframe validation MUST use explicit Pandera schemas, preserving
+  the maintained input and recoverable-row policies.
   Mutable model defaults MUST use factories.
 - Project-owned interfaces MUST use explicit typed access. `Any`, dynamic attribute access,
   and casts MUST be limited to boundaries that require them, such as opaque third-party
   objects or Hydra composition. Non-obvious boundary assumptions MUST be explained.
 - Lint and typing suppressions MUST name the specific rule or error code. Their reason MUST
   be clear from adjacent code or an explanation; blanket suppressions are not acceptable.
-- Application logging MUST use Loguru. CLI output MUST preserve its existing contract,
-  including Rich rendering where used. Comments and log messages MUST be in English.
+- Application logging MUST use Loguru through the observability adapter and injected
+  application ports. CLI output MUST preserve its existing contract, including Rich
+  rendering where used. Comments and log messages MUST be in English.
 - Exceptions MUST be handled at a boundary able to recover or report the failure, using
   specific exception types where possible. Unexpected failures MUST NOT be silently discarded.
 - Names and function boundaries MUST express purpose. Comments and docstrings MUST explain
@@ -34,31 +36,27 @@ the pipeline.
 
 ### II. Enforced Module Boundaries
 
-Changes MUST preserve every import-linter contract in [pyproject.toml](../../pyproject.toml),
-including package layers, task layers, comparison layers, independent app entrypoints, and
-forbidden external imports. The package dependency direction is:
+All runtime modules MUST be classified under core, application, adapters or entrypoints;
+`hydra_plugins.cy_queue` remains a separately checked launcher integration. The dependency
+direction is entrypoints -> adapters -> application ports/contracts -> core. Application
+use cases MUST depend on ports/contracts and core rather than concrete adapters. Adapters
+MUST NOT depend on application use cases or entrypoints. Cross-adapter integration bridges
+MUST be explicit. Import-linter and architecture tests MUST enforce exhaustive
+classification, SDK ownership, transitive core/application isolation, independent command
+entrypoints and acyclic helpers.
 
-```text
-apps -> config_tree -> configs -> tasks -> comparison -> domain modules -> run_identity
-```
-
-App entrypoints MUST remain independent and delegate work to tasks or domain modules.
-`configs` MUST build task configuration from above `tasks`; tasks MUST NOT depend on config
-registration. Direct ClearML SDK access MUST remain in the ClearML adapters and permitted
-tasks. Domain modules MUST remain independent of Hydra, hydra-zen, and OmegaConf as specified
-by the contracts. `run_identity` MUST remain a filesystem-only bottom layer.
-
-Torch, Ultralytics, and ClearML imports MUST stay behind the established permitted boundaries
-and be deferred to use where needed to preserve responsive CLI startup. Code that only
-resolves parameter names or configuration MUST NOT load model dependencies.
-
-These boundaries keep orchestration, external services, and expensive model operations out
-of independently testable domain code.
+Core permits the standard library, Pydantic, Pandera, pandas, NumPy and SciPy, with no
+filesystem/network/process effects or SDK objects. Configuration resolution, model loading,
+tracking, storage, reporting and process admission belong at explicit outer interfaces.
+Package initialization MUST be inert; runtime initialization is explicit at invocation.
+Torch, Ultralytics and ClearML imports MUST be deferred to use where necessary to retain
+responsive help/configuration commands. The composition root MUST inject concrete adapters;
+application use cases MUST NOT construct them or obtain them through a global locator.
 
 ### III. Configuration and Run Ownership
 
 Hydra applications MUST share centralized hydra-zen registration in
-[configs.py](../../src/clearml_yolo/configs.py). Standalone and pipeline stage configurations
+[Hydra configuration](../../src/clearml_yolo/entrypoints/hydra/configs.py). Standalone and pipeline stage configurations
 MUST derive from the same task contracts rather than duplicate independently maintained
 parameter definitions.
 
@@ -197,6 +195,15 @@ Historical checkpoint artifacts and threshold payloads MUST NOT provide recovery
 
 ## Governance
 
+Amendment 8.0.0 implements the user-approved full clean-architecture redesign and Pandera
+validation. Principles I–III replace the historical flat module ordering with exhaustive
+core/application/adapter/entrypoint contracts and define Pydantic for records versus
+Pandera for dataframes. Existing CLI fields, numerical behavior, publication and resource
+ownership contracts remain unchanged. Old Python import paths are removed; generated
+YAML with old configuration-model targets must be regenerated. No legacy path translation
+or upstream source changes are authorized by this amendment. Historical amendments below
+remain a dated record, not a requirement to preserve removed Python paths.
+
 Amendment 7.0.0 implements the explicitly approved GPU experiment queue. Principle III replaces
 the blanket runtime-scheduling prohibition with a narrow permission for a user-wide, local,
 whole-NVIDIA-device FIFO scheduler derived from native settings. It requires atomic reservations,
@@ -259,4 +266,4 @@ that deliberately alters a governing rule MUST include an explicit amendment rat
 quietly weakening checks. Constitution updates MUST remain confined to this document;
 dependent template or implementation changes require their own authorized work.
 
-**Version**: 7.0.0 | **Ratified**: 2026-09-19 | **Last Amended**: 2026-10-02
+**Version**: 8.0.0 | **Ratified**: 2026-09-19 | **Last Amended**: 2026-10-08

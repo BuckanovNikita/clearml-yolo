@@ -24,7 +24,7 @@ def _process_cache_consumer(
     start: Any,
     results: Any,
 ) -> None:
-    from clearml_yolo.dataset_cache import cached_dataset
+    from clearml_yolo.adapters.storage.dataset_cache import cached_dataset
 
     original_copy = shutil.copyfile
 
@@ -55,7 +55,7 @@ def _process_interrupted_builder(
     cache_dir: str,
     staging_ready: Any,
 ) -> None:
-    import clearml_yolo.dataset_cache as cache
+    import clearml_yolo.adapters.storage.dataset_cache as cache
 
     def stall_in_staging(*args: Any, **kwargs: Any) -> Any:
         staging = Path(args[1])
@@ -112,7 +112,7 @@ def _source(directory: Path, *, include_test: bool = False) -> Path:
 def test_cache_hit_reuses_completed_files_without_preparation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import clearml_yolo.dataset_cache as cache
+    import clearml_yolo.adapters.storage.dataset_cache as cache
 
     source = _source(tmp_path / "input")
     cache_dir = tmp_path / "cache"
@@ -130,7 +130,7 @@ def test_cache_hit_reuses_completed_files_without_preparation(
 
 
 def test_changed_csv_bytes_or_format_create_distinct_entries(tmp_path: Path) -> None:
-    from clearml_yolo.dataset_cache import cached_dataset
+    from clearml_yolo.adapters.storage.dataset_cache import cached_dataset
 
     source = _source(tmp_path / "input")
     cache_dir = tmp_path / "cache"
@@ -146,7 +146,7 @@ def test_changed_csv_bytes_or_format_create_distinct_entries(tmp_path: Path) -> 
 
 
 def test_identical_csv_bytes_at_another_path_reuse_one_entry(tmp_path: Path) -> None:
-    from clearml_yolo.dataset_cache import cached_dataset
+    from clearml_yolo.adapters.storage.dataset_cache import cached_dataset
 
     source = _source(tmp_path / "input")
     moved = tmp_path / "copy" / "truth.csv"
@@ -163,7 +163,7 @@ def test_identical_csv_bytes_at_another_path_reuse_one_entry(tmp_path: Path) -> 
 def test_concurrent_requests_build_once_and_serialize_consumers(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from clearml_yolo.dataset_cache import cached_dataset
+    from clearml_yolo.adapters.storage.dataset_cache import cached_dataset
 
     source = _source(tmp_path / "input")
     cache_dir = tmp_path / "cache"
@@ -203,7 +203,7 @@ def test_concurrent_requests_build_once_and_serialize_consumers(
 
 
 def test_different_entries_can_be_consumed_concurrently(tmp_path: Path) -> None:
-    from clearml_yolo.dataset_cache import cached_dataset
+    from clearml_yolo.adapters.storage.dataset_cache import cached_dataset
 
     first_source = _source(tmp_path / "first")
     second_source = _source(tmp_path / "second")
@@ -263,7 +263,7 @@ def test_separate_processes_build_once_and_serialize_consumers(tmp_path: Path) -
 
 
 def test_terminated_builder_leaves_no_consumable_partial_entry(tmp_path: Path) -> None:
-    from clearml_yolo.dataset_cache import cached_dataset
+    from clearml_yolo.adapters.storage.dataset_cache import cached_dataset
 
     source = _source(tmp_path / "input")
     cache_dir = tmp_path / "cache"
@@ -294,11 +294,11 @@ def test_terminated_builder_leaves_no_consumable_partial_entry(tmp_path: Path) -
 def test_failed_build_is_cleaned_and_retry_can_publish(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import clearml_yolo.dataset_cache as cache
+    import clearml_yolo.adapters.storage.dataset_cache as cache
 
     source = _source(tmp_path / "input")
     cache_dir = tmp_path / "cache"
-    from clearml_yolo.dataset import prepare_dataset as original_prepare
+    from clearml_yolo.adapters.storage.dataset import prepare_dataset as original_prepare
 
     attempts = 0
 
@@ -325,7 +325,7 @@ def test_failed_build_is_cleaned_and_retry_can_publish(
 def test_corrupt_complete_entry_is_rebuilt_under_lock(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import clearml_yolo.dataset_cache as cache
+    import clearml_yolo.adapters.storage.dataset_cache as cache
 
     source = _source(tmp_path / "input")
     cache_dir = tmp_path / "cache"
@@ -333,7 +333,7 @@ def test_corrupt_complete_entry_is_rebuilt_under_lock(
         first.ground_truth.unlink()
         root = first.data.parent
 
-    from clearml_yolo.dataset import prepare_dataset as original_prepare
+    from clearml_yolo.adapters.storage.dataset import prepare_dataset as original_prepare
 
     rebuilds = 0
 
@@ -352,11 +352,11 @@ def test_corrupt_complete_entry_is_rebuilt_under_lock(
 def test_csv_change_during_preparation_uses_the_bytes_that_defined_the_identity(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import clearml_yolo.dataset_cache as cache
+    import clearml_yolo.adapters.storage.dataset_cache as cache
 
     source = _source(tmp_path / "input")
     cache_dir = tmp_path / "cache"
-    from clearml_yolo.dataset import prepare_dataset as original_prepare
+    from clearml_yolo.adapters.storage.dataset import prepare_dataset as original_prepare
 
     original_bytes = source.read_bytes()
 
@@ -376,7 +376,7 @@ def test_csv_change_during_preparation_uses_the_bytes_that_defined_the_identity(
 
 
 def test_completion_paths_are_final_and_requested_splits_are_validated(tmp_path: Path) -> None:
-    from clearml_yolo.dataset_cache import cached_dataset
+    from clearml_yolo.adapters.storage.dataset_cache import cached_dataset
 
     source = _source(tmp_path / "input", include_test=True)
     cache_dir = tmp_path / "cache"
@@ -393,7 +393,7 @@ def test_completion_paths_are_final_and_requested_splits_are_validated(tmp_path:
 
 
 def test_missing_requested_split_fails_without_complete_entry(tmp_path: Path) -> None:
-    from clearml_yolo.dataset_cache import cached_dataset
+    from clearml_yolo.adapters.storage.dataset_cache import cached_dataset
 
     source = _source(tmp_path / "input")
     cache_dir = tmp_path / "cache"
@@ -409,7 +409,7 @@ def test_missing_requested_split_fails_without_complete_entry(tmp_path: Path) ->
 def test_default_cache_root_uses_workspace_despite_xdg_cache_home(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from clearml_yolo.dataset_cache import cached_dataset
+    from clearml_yolo.adapters.storage.dataset_cache import cached_dataset
 
     source = _source(tmp_path / "input")
     xdg = tmp_path / "xdg"
@@ -425,7 +425,7 @@ def test_default_cache_root_uses_workspace_despite_xdg_cache_home(
 
 @pytest.mark.parametrize("corruption", [{"train": "images/missing"}, {"names": {}}])
 def test_cache_rebuilds_invalid_native_yaml(tmp_path: Path, corruption: dict[str, Any]) -> None:
-    from clearml_yolo.dataset_cache import cached_dataset
+    from clearml_yolo.adapters.storage.dataset_cache import cached_dataset
 
     source = _source(tmp_path / "input")
     with cached_dataset(source, tmp_path / "cache") as first:
@@ -441,7 +441,7 @@ def test_dataset_cache_missing_metadata_is_quiet_but_permission_failure_diagnose
 ) -> None:
     from loguru import logger
 
-    from clearml_yolo.dataset_cache import _read_json_object
+    from clearml_yolo.adapters.storage.dataset_cache import _read_json_object
 
     source = tmp_path / "preparation.json"
     messages: list[str] = []

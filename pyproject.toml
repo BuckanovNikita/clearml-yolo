@@ -25,7 +25,9 @@ dependencies = [
     "pydantic>=2",
     "pyyaml>=6",
     "loguru>=0.7",
-    "pandas>=2.0",
+    "pandas>=2.1.1",
+    "numpy>=1.24.4",
+    "pandera[pandas]>=0.34.1,<0.35",
     "pillow>=10",
     "scipy>=1.11",
     "openpyxl>=3.1",
@@ -37,16 +39,16 @@ dependencies = [
 ]
 
 [project.scripts]
-cy = "clearml_yolo.apps.pipeline:main"
-cy-train = "clearml_yolo.apps.train:main"
-cy-predict = "clearml_yolo.apps.predict:main"
-cy-metrics = "clearml_yolo.apps.metrics:main"
-cy-report = "clearml_yolo.apps.report:main"
-cy-compare = "clearml_yolo.apps.compare:main"
-cy-ground-truth = "clearml_yolo.apps.ground_truth:main"
-cy-val = "clearml_yolo.apps.val:main"
-cy-init-config = "clearml_yolo.apps.config_tree:main"
-cy-dedup = "clearml_yolo.dedup_cli:main"
+cy = "clearml_yolo.entrypoints.pipeline:main"
+cy-train = "clearml_yolo.entrypoints.train:main"
+cy-predict = "clearml_yolo.entrypoints.predict:main"
+cy-metrics = "clearml_yolo.entrypoints.metrics:main"
+cy-report = "clearml_yolo.entrypoints.report:main"
+cy-compare = "clearml_yolo.entrypoints.compare:main"
+cy-ground-truth = "clearml_yolo.entrypoints.ground_truth:main"
+cy-val = "clearml_yolo.entrypoints.val:main"
+cy-init-config = "clearml_yolo.entrypoints.config_tree:main"
+cy-dedup = "clearml_yolo.entrypoints.dedup:main"
 
 [build-system]
 requires = ["uv_build>=0.11.32,<0.12.0"]
@@ -153,166 +155,355 @@ known-first-party = ["clearml_yolo"]
 max-complexity = 10
 
 [tool.importlinter]
-root_packages = ["clearml_yolo"]
+root_packages = ["clearml_yolo", "hydra_plugins.cy_queue"]
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
-name = "Package layers"
+name = "Clean architecture inward layers"
 type = "layers"
 layers = [
-    "clearml_yolo.apps",
-    "clearml_yolo.dedup_cli",
-    "clearml_yolo.dedup",
-    "clearml_yolo.config_tree",
-    "clearml_yolo.configs",
-    "clearml_yolo.tasks",
-    "clearml_yolo.publishing",
-    "clearml_yolo.clearml_results",
-    "clearml_yolo.comparison",
-    "clearml_yolo.dataset_cache",
-    "clearml_yolo.dataset",
-    "clearml_yolo.dataset_export",
-    "clearml_yolo.dataset_records",
-    "clearml_yolo.native_ddp",
-    "clearml_yolo.gpu_runtime",
-    "clearml_yolo.gpu_queue",
-    "clearml_yolo.gpu_resources",
-    "clearml_yolo.inference | clearml_yolo.ground_truth | clearml_yolo.clearml_models | clearml_yolo.clearml_report | clearml_yolo.clearml_native | clearml_yolo.native_runtime",
-    "clearml_yolo.clearml_naming",
-    "clearml_yolo.native_config | clearml_yolo.clearml_session | clearml_yolo.progress | clearml_yolo.artifact_names",
-    "clearml_yolo.result_export",
-    "clearml_yolo.workbook_identity",
-    "clearml_yolo.result_schema",
-    "clearml_yolo.model_identity",
-    "clearml_yolo.run_identity",
-    "clearml_yolo.filesystem",
-    "clearml_yolo.diagnostics",
+    "hydra_plugins.cy_queue",
+    "clearml_yolo.entrypoints",
+    "clearml_yolo.adapters",
+    "clearml_yolo.application",
+    "clearml_yolo.core",
 ]
 
 [[tool.importlinter.contracts]]
-name = "Task layers"
+name = "Adapters depend only on application ports and contracts"
+type = "forbidden"
+source_modules = ["clearml_yolo.adapters"]
+forbidden_modules = ["clearml_yolo.application.use_cases", "clearml_yolo.application.evaluation"]
+
+[[tool.importlinter.contracts]]
+name = "Application command composition is inward and acyclic"
 type = "layers"
-containers = ["clearml_yolo.tasks"]
+containers = ["clearml_yolo.application.use_cases"]
 layers = ["pipeline", "val | report", "metrics", "compare | predict | train | ground_truth", "publication"]
 
 [[tool.importlinter.contracts]]
-name = "Comparison layers"
-type = "layers"
-containers = ["clearml_yolo.comparison"]
-layers = ["assemble", "reinfer | workbook | scoring | significance", "pr_curves", "evaluation_payload"]
-
-[[tool.importlinter.contracts]]
-name = "Every app entrypoint stands alone"
+name = "Every command entrypoint stands alone"
 type = "independence"
 modules = [
-    "clearml_yolo.apps.compare",
-    "clearml_yolo.apps.config_tree",
-    "clearml_yolo.apps.ground_truth",
-    "clearml_yolo.apps.metrics",
-    "clearml_yolo.apps.pipeline",
-    "clearml_yolo.apps.predict",
-    "clearml_yolo.apps.report",
-    "clearml_yolo.apps.train",
-    "clearml_yolo.apps.val",
+    "clearml_yolo.entrypoints.compare",
+    "clearml_yolo.entrypoints.config_tree",
+    "clearml_yolo.entrypoints.dedup",
+    "clearml_yolo.entrypoints.ground_truth",
+    "clearml_yolo.entrypoints.metrics",
+    "clearml_yolo.entrypoints.pipeline",
+    "clearml_yolo.entrypoints.predict",
+    "clearml_yolo.entrypoints.report",
+    "clearml_yolo.entrypoints.train",
+    "clearml_yolo.entrypoints.val",
 ]
 
 [[tool.importlinter.contracts]]
-name = "The ClearML SDK stays behind the clearml_* adapters"
+name = "ultralytics SDK has explicit owners"
 type = "forbidden"
-source_modules = [
-    "clearml_yolo.dedup",
-    "clearml_yolo.dedup_cli",
-    "clearml_yolo.dataset_cache",
-    "clearml_yolo.dataset",
-    "clearml_yolo.dataset_export",
-    "clearml_yolo.dataset_records",
-    "clearml_yolo.apps",
-    "clearml_yolo.config_tree",
-    "clearml_yolo.comparison",
-    "clearml_yolo.configs",
-    "clearml_yolo.inference",
-    "clearml_yolo.ground_truth",
-    "clearml_yolo.progress",
-    "clearml_yolo.artifact_names",
-    "clearml_yolo.run_identity",
+source_modules = ["clearml_yolo", "hydra_plugins.cy_queue"]
+forbidden_modules = ["ultralytics"]
+allow_indirect_imports = true
+ignore_imports = [
+    "clearml_yolo.adapters.integrations.native_ddp -> ultralytics",
+    "clearml_yolo.adapters.integrations.native_runtime -> ultralytics",
+    "clearml_yolo.adapters.integrations.training -> ultralytics",
+    "clearml_yolo.adapters.yolo.ground_truth -> ultralytics",
+    "clearml_yolo.adapters.yolo.inference -> ultralytics",
+    "clearml_yolo.adapters.yolo.reinfer -> ultralytics",
 ]
+
+[[tool.importlinter.contracts]]
+name = "torch SDK has explicit owners"
+type = "forbidden"
+source_modules = ["clearml_yolo", "hydra_plugins.cy_queue"]
+forbidden_modules = ["torch"]
+allow_indirect_imports = true
+ignore_imports = [
+    "clearml_yolo.adapters.integrations.native_runtime -> torch",
+    "clearml_yolo.adapters.runtime.gpu_probe -> torch",
+]
+
+[[tool.importlinter.contracts]]
+name = "clearml SDK has explicit owners"
+type = "forbidden"
+source_modules = ["clearml_yolo", "hydra_plugins.cy_queue"]
 forbidden_modules = ["clearml"]
 allow_indirect_imports = true
-
-[[tool.importlinter.contracts]]
-name = "The domain does not know it is configured by hydra"
-type = "forbidden"
-source_modules = [
-    "clearml_yolo.dedup",
-    "clearml_yolo.dedup_cli",
-    "clearml_yolo.dataset_cache",
-    "clearml_yolo.dataset",
-    "clearml_yolo.dataset_export",
-    "clearml_yolo.dataset_records",
-    "clearml_yolo.comparison",
-    "clearml_yolo.inference",
-    "clearml_yolo.ground_truth",
-    "clearml_yolo.progress",
-    "clearml_yolo.artifact_names",
-    "clearml_yolo.clearml_session",
-    "clearml_yolo.clearml_models",
-    "clearml_yolo.clearml_report",
-    "clearml_yolo.run_identity",
+ignore_imports = [
+    "clearml_yolo.adapters.clearml.models -> clearml",
+    "clearml_yolo.adapters.clearml.naming -> clearml",
+    "clearml_yolo.adapters.clearml.native -> clearml",
+    "clearml_yolo.adapters.clearml.session -> clearml",
+    "clearml_yolo.adapters.integrations.native_runtime -> clearml",
 ]
-forbidden_modules = ["hydra", "hydra_zen", "omegaconf"]
-allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
-name = "Model weights are only ever loaded in one place"
+name = "digital_metrics SDK has explicit owners"
 type = "forbidden"
-source_modules = [
-    "clearml_yolo.dedup",
-    "clearml_yolo.dedup_cli",
-    "clearml_yolo.dataset_cache",
-    "clearml_yolo.dataset",
-    "clearml_yolo.dataset_export",
-    "clearml_yolo.dataset_records",
-    "clearml_yolo.apps",
-    "clearml_yolo.config_tree",
-    "clearml_yolo.configs",
-    "clearml_yolo.clearml_session",
-    "clearml_yolo.clearml_models",
-    "clearml_yolo.clearml_report",
-    "clearml_yolo.progress",
-    "clearml_yolo.artifact_names",
-    "clearml_yolo.tasks.pipeline",
-    "clearml_yolo.tasks.metrics",
-    "clearml_yolo.tasks.report",
-    "clearml_yolo.run_identity",
+source_modules = ["clearml_yolo", "hydra_plugins.cy_queue"]
+forbidden_modules = ["digital_metrics"]
+allow_indirect_imports = true
+ignore_imports = [
+    "clearml_yolo.adapters.evaluation.pr_curves -> digital_metrics",
+    "clearml_yolo.adapters.evaluation.scoring -> digital_metrics",
+    "clearml_yolo.adapters.reporting.evaluation -> digital_metrics",
 ]
-forbidden_modules = ["ultralytics", "torch"]
-allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
-name = "FiftyOne stays behind its replaceable adapter"
+name = "report_generator SDK has explicit owners"
 type = "forbidden"
-source_modules = ["clearml_yolo"]
+source_modules = ["clearml_yolo", "hydra_plugins.cy_queue"]
+forbidden_modules = ["report_generator"]
+allow_indirect_imports = true
+ignore_imports = [
+    "clearml_yolo.adapters.reporting.reports -> report_generator",
+]
+
+[[tool.importlinter.contracts]]
+name = "fiftyone SDK has explicit owners"
+type = "forbidden"
+source_modules = ["clearml_yolo", "hydra_plugins.cy_queue"]
 forbidden_modules = ["fiftyone"]
 allow_indirect_imports = true
 ignore_imports = [
-    "clearml_yolo.publishing.fiftyone_adapter -> fiftyone",
-    "clearml_yolo.publishing.fiftyone_evaluation -> fiftyone",
-    "clearml_yolo.publishing.fiftyone_panel -> fiftyone",
+    "clearml_yolo.adapters.fiftyone.evaluation -> fiftyone",
+    "clearml_yolo.adapters.fiftyone.panel -> fiftyone",
+    "clearml_yolo.adapters.fiftyone.publisher -> fiftyone",
 ]
 
 [[tool.importlinter.contracts]]
-name = "Publication has no tracking or execution side effects"
+name = "hydra SDK has explicit owners"
 type = "forbidden"
-source_modules = ["clearml_yolo.publishing"]
-forbidden_modules = ["clearml", "clearml_yolo.clearml_session", "clearml_yolo.tasks", "hydra", "hydra_zen", "omegaconf", "ultralytics", "torch"]
+source_modules = ["clearml_yolo", "hydra_plugins.cy_queue"]
+forbidden_modules = ["hydra"]
+allow_indirect_imports = true
+ignore_imports = [
+    "clearml_yolo.entrypoints.hydra.common -> hydra",
+    "clearml_yolo.entrypoints.hydra.config_tree -> hydra",
+    "clearml_yolo.entrypoints.hydra.configs -> hydra",
+    "clearml_yolo.entrypoints.hydra.execution -> hydra",
+    "clearml_yolo.entrypoints.hydra.worker -> hydra",
+    "hydra_plugins.cy_queue.launcher -> hydra",
+]
+
+[[tool.importlinter.contracts]]
+name = "hydra_zen SDK has explicit owners"
+type = "forbidden"
+source_modules = ["clearml_yolo", "hydra_plugins.cy_queue"]
+forbidden_modules = ["hydra_zen"]
+allow_indirect_imports = true
+ignore_imports = [
+    "clearml_yolo.entrypoints.hydra.common -> hydra_zen",
+    "clearml_yolo.entrypoints.hydra.config_tree -> hydra_zen",
+    "clearml_yolo.entrypoints.hydra.configs -> hydra_zen",
+]
+
+[[tool.importlinter.contracts]]
+name = "omegaconf SDK has explicit owners"
+type = "forbidden"
+source_modules = ["clearml_yolo", "hydra_plugins.cy_queue"]
+forbidden_modules = ["omegaconf"]
+allow_indirect_imports = true
+ignore_imports = [
+    "clearml_yolo.entrypoints.hydra.common -> omegaconf",
+    "clearml_yolo.entrypoints.hydra.config_resolution -> omegaconf",
+    "clearml_yolo.entrypoints.hydra.config_tree -> omegaconf",
+    "clearml_yolo.entrypoints.hydra.configs -> omegaconf",
+    "clearml_yolo.entrypoints.hydra.execution -> omegaconf",
+    "clearml_yolo.entrypoints.hydra.validation -> omegaconf",
+    "clearml_yolo.entrypoints.hydra.worker -> omegaconf",
+    "hydra_plugins.cy_queue.launcher -> omegaconf",
+]
+
+[[tool.importlinter.contracts]]
+name = "Core and application have no logging or rendering dependency"
+type = "forbidden"
+source_modules = ["clearml_yolo.core", "clearml_yolo.application"]
+forbidden_modules = ["loguru", "matplotlib", "PIL", "openpyxl", "requests", "filelock"]
+
+[[tool.importlinter.contracts]]
+name = "storage adapter peer ownership"
+type = "forbidden"
+source_modules = ["clearml_yolo.adapters.storage"]
+forbidden_modules = [
+    "clearml_yolo.adapters.clearml",
+    "clearml_yolo.adapters.evaluation",
+    "clearml_yolo.adapters.fiftyone",
+    "clearml_yolo.adapters.integrations",
+    "clearml_yolo.adapters.reporting",
+    "clearml_yolo.adapters.runtime",
+    "clearml_yolo.adapters.yolo",
+]
 allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
-name = "Model identity and workbook adapters remain neutral"
+name = "observability adapter peer ownership"
 type = "forbidden"
-source_modules = ["clearml_yolo.model_identity", "clearml_yolo.workbook_identity"]
-forbidden_modules = ["clearml", "hydra", "hydra_zen", "omegaconf", "ultralytics", "torch"]
+source_modules = ["clearml_yolo.adapters.observability"]
+forbidden_modules = [
+    "clearml_yolo.adapters.clearml",
+    "clearml_yolo.adapters.evaluation",
+    "clearml_yolo.adapters.fiftyone",
+    "clearml_yolo.adapters.integrations",
+    "clearml_yolo.adapters.reporting",
+    "clearml_yolo.adapters.runtime",
+    "clearml_yolo.adapters.storage",
+    "clearml_yolo.adapters.yolo",
+]
 allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "yolo adapter peer ownership"
+type = "forbidden"
+source_modules = ["clearml_yolo.adapters.yolo"]
+forbidden_modules = [
+    "clearml_yolo.adapters.clearml",
+    "clearml_yolo.adapters.evaluation",
+    "clearml_yolo.adapters.fiftyone",
+    "clearml_yolo.adapters.integrations",
+    "clearml_yolo.adapters.reporting",
+    "clearml_yolo.adapters.runtime",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "evaluation adapter peer ownership"
+type = "forbidden"
+source_modules = ["clearml_yolo.adapters.evaluation"]
+forbidden_modules = [
+    "clearml_yolo.adapters.clearml",
+    "clearml_yolo.adapters.fiftyone",
+    "clearml_yolo.adapters.integrations",
+    "clearml_yolo.adapters.observability",
+    "clearml_yolo.adapters.reporting",
+    "clearml_yolo.adapters.runtime",
+    "clearml_yolo.adapters.storage",
+    "clearml_yolo.adapters.yolo",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "reporting adapter peer ownership"
+type = "forbidden"
+source_modules = ["clearml_yolo.adapters.reporting"]
+forbidden_modules = [
+    "clearml_yolo.adapters.clearml",
+    "clearml_yolo.adapters.evaluation",
+    "clearml_yolo.adapters.fiftyone",
+    "clearml_yolo.adapters.integrations",
+    "clearml_yolo.adapters.runtime",
+    "clearml_yolo.adapters.yolo",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "clearml adapter peer ownership"
+type = "forbidden"
+source_modules = ["clearml_yolo.adapters.clearml"]
+forbidden_modules = [
+    "clearml_yolo.adapters.evaluation",
+    "clearml_yolo.adapters.fiftyone",
+    "clearml_yolo.adapters.integrations",
+    "clearml_yolo.adapters.reporting",
+    "clearml_yolo.adapters.runtime",
+    "clearml_yolo.adapters.yolo",
+]
+allow_indirect_imports = true
+ignore_imports = [
+    "clearml_yolo.adapters.clearml.models -> clearml_yolo.adapters.reporting.workbook_identity",
+]
+
+[[tool.importlinter.contracts]]
+name = "fiftyone adapter peer ownership"
+type = "forbidden"
+source_modules = ["clearml_yolo.adapters.fiftyone"]
+forbidden_modules = [
+    "clearml_yolo.adapters.clearml",
+    "clearml_yolo.adapters.evaluation",
+    "clearml_yolo.adapters.integrations",
+    "clearml_yolo.adapters.observability",
+    "clearml_yolo.adapters.reporting",
+    "clearml_yolo.adapters.runtime",
+    "clearml_yolo.adapters.storage",
+    "clearml_yolo.adapters.yolo",
+]
+allow_indirect_imports = true
+ignore_imports = [
+    "clearml_yolo.adapters.fiftyone.publisher -> clearml_yolo.adapters.storage.publication_data",
+]
+
+[[tool.importlinter.contracts]]
+name = "runtime adapter peer ownership"
+type = "forbidden"
+source_modules = ["clearml_yolo.adapters.runtime"]
+forbidden_modules = [
+    "clearml_yolo.adapters.clearml",
+    "clearml_yolo.adapters.evaluation",
+    "clearml_yolo.adapters.fiftyone",
+    "clearml_yolo.adapters.integrations",
+    "clearml_yolo.adapters.reporting",
+    "clearml_yolo.adapters.storage",
+    "clearml_yolo.adapters.yolo",
+]
+allow_indirect_imports = true
+ignore_imports = [
+    "clearml_yolo.adapters.runtime.gpu_runtime -> clearml_yolo.adapters.clearml.session",
+    "clearml_yolo.adapters.runtime.gpu_runtime -> clearml_yolo.adapters.integrations.native_runtime",
+]
+
+[[tool.importlinter.contracts]]
+name = "integrations adapter peer ownership"
+type = "forbidden"
+source_modules = ["clearml_yolo.adapters.integrations"]
+forbidden_modules = [
+    "clearml_yolo.adapters.clearml",
+    "clearml_yolo.adapters.evaluation",
+    "clearml_yolo.adapters.fiftyone",
+    "clearml_yolo.adapters.reporting",
+    "clearml_yolo.adapters.runtime",
+    "clearml_yolo.adapters.yolo",
+]
+allow_indirect_imports = true
+ignore_imports = [
+    "clearml_yolo.adapters.integrations.native_ddp -> clearml_yolo.adapters.clearml.session",
+    "clearml_yolo.adapters.integrations.native_runtime -> clearml_yolo.adapters.clearml.session",
+    "clearml_yolo.adapters.integrations.training -> clearml_yolo.adapters.clearml.native",
+    "clearml_yolo.adapters.integrations.training -> clearml_yolo.adapters.clearml.session",
+    "clearml_yolo.adapters.integrations.training -> clearml_yolo.adapters.yolo.config",
+]
+
+[[tool.importlinter.contracts]]
+name = "openpyxl SDK has explicit owners"
+type = "forbidden"
+source_modules = ["clearml_yolo", "hydra_plugins.cy_queue"]
+forbidden_modules = ["openpyxl"]
+allow_indirect_imports = true
+ignore_imports = [
+    "clearml_yolo.adapters.reporting.comparison_workbook -> openpyxl",
+    "clearml_yolo.adapters.reporting.workbook_identity -> openpyxl",
+]
+
+[[tool.importlinter.contracts]]
+name = "Exhaustive root layer classification"
+type = "layers"
+containers = ["clearml_yolo"]
+layers = ["entrypoints", "adapters", "application", "core"]
+exhaustive = true
+
+[[tool.importlinter.contracts]]
+name = "Exhaustive adapter responsibility classification"
+type = "layers"
+containers = ["clearml_yolo.adapters"]
+# Peers share a classification level; the peer contracts enforce their allowed edges.
+layers = ["storage:observability:yolo:evaluation:reporting:clearml:fiftyone:runtime:integrations"]
+exhaustive = true
+
+[[tool.importlinter.contracts]]
+name = "Exhaustive application classification"
+type = "layers"
+containers = ["clearml_yolo.application"]
+layers = ["use_cases", "evaluation", "ports", "contracts"]
+exhaustive = true
 
 [tool.mypy]
 python_version = "3.12"

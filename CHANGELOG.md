@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record readable plot release verification
+  ([`72334f4`](https://github.com/BuckanovNikita/clearml-yolo/commit/72334f4a1668f1e73719d920593ac4ce4c48824c))
+
+
 ## v0.19.1 (2026-10-07)
 
 ### Bug Fixes

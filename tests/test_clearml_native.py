@@ -10,7 +10,7 @@ from typing import Any, ClassVar, override
 
 import pytest
 
-from clearml_yolo.clearml_native import NativeModelError, finalize_native_model
+from clearml_yolo.adapters.clearml.native import NativeModelError, finalize_native_model
 
 
 class _Record:
@@ -141,13 +141,13 @@ def native_sdk(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> tuple[_Task, 
             resources[key] = factory()
         return resources[key]
 
-    monkeypatch.setattr("clearml_yolo.clearml_native.invocation_resource", resource)
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.native.invocation_resource", resource)
 
     def resolve(_task: Any, name: str, **kwargs: Any) -> str:
         kwargs["write_model_name"](name)
         return name
 
-    monkeypatch.setattr("clearml_yolo.clearml_native.resolve_model_name", resolve)
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.native.resolve_model_name", resolve)
     return task, record, checkpoint
 
 
@@ -169,7 +169,7 @@ def test_finalize_enriches_and_registers_the_same_verified_native_model(
     task, record, checkpoint = native_sdk
     registered: list[Any] = []
     monkeypatch.setattr(
-        "clearml_yolo.clearml_native.register_model_barrier",
+        "clearml_yolo.adapters.clearml.native.register_model_barrier",
         lambda owner, verifier: registered.append((owner, verifier)),
     )
     model, trainer = _training_objects(checkpoint)
@@ -205,7 +205,9 @@ def test_finalize_rejects_ambiguous_native_outputs(
     task, _, checkpoint = native_sdk
     other = _Record("other-id", checkpoint)
     task.records[other.id] = other
-    monkeypatch.setattr("clearml_yolo.clearml_native.register_model_barrier", lambda *_args: None)
+    monkeypatch.setattr(
+        "clearml_yolo.adapters.clearml.native.register_model_barrier", lambda *_args: None
+    )
     model, trainer = _training_objects(checkpoint)
 
     with pytest.raises(NativeModelError, match="exactly one"):
@@ -218,7 +220,9 @@ def test_finalize_rejects_failed_native_upload_placeholder(
     task, record, checkpoint = native_sdk
     record.url = "failed_uploading"
     record.metadata["clearml_yolo_checkpoint_role"] = {"value": "best", "type": "str"}
-    monkeypatch.setattr("clearml_yolo.clearml_native.register_model_barrier", lambda *_args: None)
+    monkeypatch.setattr(
+        "clearml_yolo.adapters.clearml.native.register_model_barrier", lambda *_args: None
+    )
     model, trainer = _training_objects(checkpoint)
 
     with pytest.raises(NativeModelError, match="upload"):
@@ -230,7 +234,9 @@ def test_finalize_rejects_a_download_that_does_not_match_best(
 ) -> None:
     task, record, checkpoint = native_sdk
     record.local.write_bytes(b"different")
-    monkeypatch.setattr("clearml_yolo.clearml_native.register_model_barrier", lambda *_args: None)
+    monkeypatch.setattr(
+        "clearml_yolo.adapters.clearml.native.register_model_barrier", lambda *_args: None
+    )
     model, trainer = _training_objects(checkpoint)
 
     with pytest.raises(NativeModelError, match="does not match"):
@@ -242,7 +248,9 @@ def test_finalize_rejects_metadata_update_failure(
 ) -> None:
     task, _, checkpoint = native_sdk
     _OutputModel.metadata_result = False
-    monkeypatch.setattr("clearml_yolo.clearml_native.register_model_barrier", lambda *_args: None)
+    monkeypatch.setattr(
+        "clearml_yolo.adapters.clearml.native.register_model_barrier", lambda *_args: None
+    )
     model, trainer = _training_objects(checkpoint)
 
     with pytest.raises(NativeModelError, match="metadata"):
@@ -253,7 +261,9 @@ def test_finalize_rejects_duplicate_label_names(
     native_sdk: tuple[_Task, _Record, Path], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     task, _, checkpoint = native_sdk
-    monkeypatch.setattr("clearml_yolo.clearml_native.register_model_barrier", lambda *_args: None)
+    monkeypatch.setattr(
+        "clearml_yolo.adapters.clearml.native.register_model_barrier", lambda *_args: None
+    )
     model, trainer = _training_objects(checkpoint)
     model.names = {0: "cat", 1: "cat"}
 
@@ -265,7 +275,9 @@ def test_finalize_sanitizes_design_and_architecture_reference(
     native_sdk: tuple[_Task, _Record, Path], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     task, record, checkpoint = native_sdk
-    monkeypatch.setattr("clearml_yolo.clearml_native.register_model_barrier", lambda *_args: None)
+    monkeypatch.setattr(
+        "clearml_yolo.adapters.clearml.native.register_model_barrier", lambda *_args: None
+    )
     model, trainer = _training_objects(checkpoint)
     sensitive = "hid" + "den"
     model.model.yaml["token"] = sensitive
@@ -293,8 +305,10 @@ def test_unknown_package_version_is_omitted_from_metadata(
     def unavailable(_name: str) -> str:
         raise PackageNotFoundError
 
-    monkeypatch.setattr("clearml_yolo.clearml_native.version", unavailable)
-    monkeypatch.setattr("clearml_yolo.clearml_native.register_model_barrier", lambda *_args: None)
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.native.version", unavailable)
+    monkeypatch.setattr(
+        "clearml_yolo.adapters.clearml.native.register_model_barrier", lambda *_args: None
+    )
     model, trainer = _training_objects(checkpoint)
     finalize_native_model(task, model, trainer, "yolo11n.pt")
     assert not any(key.endswith("_version") for key in record.metadata)
@@ -340,7 +354,7 @@ def test_completion_barrier_rechecks_downloaded_best_bytes(
     task, record, checkpoint = native_sdk
     barriers: list[Callable[[], None]] = []
     monkeypatch.setattr(
-        "clearml_yolo.clearml_native.register_model_barrier",
+        "clearml_yolo.adapters.clearml.native.register_model_barrier",
         lambda _owner, verifier: barriers.append(verifier),
     )
     model, trainer = _training_objects(checkpoint)
@@ -359,8 +373,8 @@ def test_native_name_write_race_retries_shared_suffix_without_new_model_or_path(
     monkeypatch: pytest.MonkeyPatch,
     race_stage: str,
 ) -> None:
-    from clearml_yolo import clearml_naming
-    from clearml_yolo import clearml_native as native_module
+    from clearml_yolo.adapters.clearml import naming as clearml_naming
+    from clearml_yolo.adapters.clearml import native as native_module
 
     task, record, checkpoint = native_sdk
     competitors: list[str] = []

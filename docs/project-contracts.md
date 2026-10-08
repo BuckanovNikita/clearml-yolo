@@ -16,6 +16,17 @@ or tracking. It reflinks identical same-named images, preserving paths and conte
 unsupported reflinks are reported skips. See the
 [deduplication contract](../specs/018-cache-image-dedup/contracts/cli.md).
 
+Python imports follow `core`, `application`, `adapters` and `entrypoints` boundaries.
+Public workflows receive explicit typed dependencies from CLI composition; Hydra
+conversion and external SDK access stay outside the application. Pandera owns pure
+stage validation, with storage adapters retaining lexical input handling and original
+rows. Evaluation adapters retain the pinned scientific algorithms and convert outputs
+to project-owned records; reporting adapters generate the original artifacts.
+The [Python import migration](python-import-migration.md) documents the module cutover,
+explicit programmatic dependencies and regeneration of saved YAML targets. Command
+names, ordinary overrides, CSVs and durable output/publication contracts retain their
+existing behavior.
+
 Native model settings use top-level Hydra groups `ultralytics` and `ultralytics_predict`
 for all model commands. The shared group covers detection-relevant installed upstream defaults; prediction
 inherits applicable values through visible configuration references, preserving explicit nulls

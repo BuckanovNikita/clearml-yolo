@@ -5,6 +5,7 @@ The tests lean on the contracts the consumers pin: the column set in
 """
 
 import math
+import os
 import zipfile
 from collections.abc import Callable
 from pathlib import Path
@@ -14,8 +15,14 @@ from typing import Any, cast
 import pandas as pd
 import pytest
 
-from clearml_yolo.clearml_report import COMPARED_METRICS, POOLED_COLUMN
-from clearml_yolo.comparison.assemble import (
+from clearml_yolo.adapters.clearml.report import COMPARED_METRICS, POOLED_COLUMN
+from clearml_yolo.adapters.reporting.comparison_workbook import (
+    COMPARISON_COLUMNS,
+    write_comparison_workbook,
+)
+from clearml_yolo.adapters.reporting.workbook_identity import read_dashboard
+from clearml_yolo.application.ports import WorkflowDependencies
+from clearml_yolo.core.comparison.assemble import (
     DEGRADED,
     IMPROVED,
     NOT_SIGNIFICANT,
@@ -24,14 +31,16 @@ from clearml_yolo.comparison.assemble import (
     ComparisonTables,
     build_comparison_rows,
 )
-from clearml_yolo.comparison.scoring import ClassCounts, EvaluatedSplit, SplitOutcome
-from clearml_yolo.comparison.workbook import COMPARISON_COLUMNS, write_comparison_workbook
-from clearml_yolo.workbook_identity import read_dashboard
+from clearml_yolo.core.evaluation.models import ClassCounts, EvaluatedSplit, SplitOutcome
+from workflow_dependencies import patch_workflow
+from workflow_dependencies import (
+    workflow_dependencies as workflow_dependencies,  # noqa: PLC0414 - fixture export
+)
 
 
 def _settled(**overrides: Any) -> Any:
     """Inference settings with every "decide this for me" already decided."""
-    from clearml_yolo.tasks.compare import SettledInference
+    from clearml_yolo.application.use_cases.compare import SettledInference
 
     return SettledInference(
         conf=0.001,
@@ -282,13 +291,15 @@ def test_pooled_tests_use_the_same_shared_classes_as_counts() -> None:
     assert tables.methodology["family_size"] == 2
 
 
-def test_each_checkpoint_gets_its_own_prediction_cache(tmp_path: Path) -> None:
+def test_each_checkpoint_gets_its_own_prediction_cache(
+    tmp_path: Path, workflow_dependencies: WorkflowDependencies
+) -> None:
     """Two comparisons in one directory must not score each other's detections.
 
     Keyed on the role alone, a rerun reused the previous run's predictions for whatever
     checkpoint it was now given.
     """
-    from clearml_yolo.tasks.compare import SettledInference, _prediction_cache
+    from clearml_yolo.application.use_cases.compare import SettledInference, _prediction_cache
 
     settings = _settled(device="0")
     first = tmp_path / "a.pt"
@@ -297,7 +308,9 @@ def test_each_checkpoint_gets_its_own_prediction_cache(tmp_path: Path) -> None:
     second.write_bytes(b"two-different-length")
 
     def cache(weights: Path, inference: SettledInference = settings) -> Path:
-        return _prediction_cache(tmp_path, "baseline", "test", weights, inference)
+        return _prediction_cache(
+            tmp_path, "baseline", "test", weights, inference, deps=workflow_dependencies
+        )
 
     assert cache(first) != cache(second)
     # The same checkpoint must still hit its cache, or nothing is ever reused.
@@ -308,14 +321,16 @@ def test_each_checkpoint_gets_its_own_prediction_cache(tmp_path: Path) -> None:
     assert cache(first) != before
 
 
-def test_a_cache_is_not_reused_across_inference_settings(tmp_path: Path) -> None:
+def test_a_cache_is_not_reused_across_inference_settings(
+    tmp_path: Path, workflow_dependencies: WorkflowDependencies
+) -> None:
     """Predictions taken at one confidence, resolution or precision are not the same boxes.
 
     The cache survives a rerun, so without the settings in its key a comparison could score
     one model's detections against the other's taken at a different operating point — a
     warm FP32 cache against fresh FP16 detections, say.
     """
-    from clearml_yolo.tasks.compare import _prediction_cache
+    from clearml_yolo.application.use_cases.compare import _prediction_cache
 
     checkpoint = tmp_path / "best.pt"
     checkpoint.write_bytes(b"weights")
@@ -332,13 +347,99 @@ def test_a_cache_is_not_reused_across_inference_settings(tmp_path: Path) -> None
         baseline.model_copy(update={"batch": 32}),
         baseline.model_copy(update={"ultralytics": {"half": True}}),
     ):
-        assert _prediction_cache(tmp_path, "baseline", "test", checkpoint, changed) != (
-            _prediction_cache(tmp_path, "baseline", "test", checkpoint, baseline)
+        assert _prediction_cache(
+            tmp_path, "baseline", "test", checkpoint, changed, deps=workflow_dependencies
+        ) != (
+            _prediction_cache(
+                tmp_path, "baseline", "test", checkpoint, baseline, deps=workflow_dependencies
+            )
         )
 
 
-def test_immutable_images_are_not_hashed_for_prediction_cache(tmp_path: Path) -> None:
-    from clearml_yolo.tasks.compare import _prediction_cache, _split_fingerprint
+def test_cache_reuse_control_does_not_change_prediction_identity(
+    tmp_path: Path,
+    workflow_dependencies: WorkflowDependencies,
+) -> None:
+    from clearml_yolo.application.use_cases.compare import _prediction_cache
+
+    checkpoint = tmp_path / "best.pt"
+    checkpoint.write_bytes(b"weights")
+    fresh = _settled(device="cpu", reuse_existing=False)
+    reused = fresh.model_copy(update={"reuse_existing": True})
+    produced = _prediction_cache(
+        tmp_path,
+        "candidate",
+        "test",
+        checkpoint,
+        fresh,
+        split_fingerprint="current-images",
+        deps=workflow_dependencies,
+    )
+    produced.write_text("image_name,confidence\na,0.9\n", encoding="utf-8")
+    recovered = _prediction_cache(
+        tmp_path,
+        "candidate",
+        "test",
+        checkpoint,
+        reused,
+        split_fingerprint="current-images",
+        deps=workflow_dependencies,
+    )
+    assert recovered == produced
+    assert recovered.read_text(encoding="utf-8") == "image_name,confidence\na,0.9\n"
+
+
+def test_checkpoint_touch_preserves_prediction_cache(
+    tmp_path: Path, workflow_dependencies: WorkflowDependencies
+) -> None:
+    """ClearML refreshes cache-file mtimes even when checkpoint bytes are unchanged."""
+    from clearml_yolo.application.use_cases.compare import _prediction_cache
+
+    checkpoint = tmp_path / "best.pt"
+    checkpoint.write_bytes(b"weights")
+    settings = _settled(device="cpu")
+    produced = _prediction_cache(
+        tmp_path, "candidate", "test", checkpoint, settings, deps=workflow_dependencies
+    )
+    produced.write_text("image_name,confidence\na,0.9\n", encoding="utf-8")
+    original = checkpoint.stat()
+    os.utime(checkpoint, ns=(original.st_atime_ns, original.st_mtime_ns + 1_000_000_000))
+    assert checkpoint.stat().st_mtime_ns != original.st_mtime_ns
+
+    recovered = _prediction_cache(
+        tmp_path, "candidate", "test", checkpoint, settings, deps=workflow_dependencies
+    )
+    assert recovered == produced
+    assert recovered.read_text(encoding="utf-8") == "image_name,confidence\na,0.9\n"
+
+
+def test_checkpoint_content_change_invalidates_cache_with_preserved_metadata(
+    tmp_path: Path, workflow_dependencies: WorkflowDependencies
+) -> None:
+    from clearml_yolo.application.use_cases.compare import _prediction_cache
+
+    checkpoint = tmp_path / "best.pt"
+    checkpoint.write_bytes(b"first-model")
+    settings = _settled(device="cpu")
+    before = _prediction_cache(
+        tmp_path, "candidate", "test", checkpoint, settings, deps=workflow_dependencies
+    )
+    original = checkpoint.stat()
+    checkpoint.write_bytes(b"other-model")
+    os.utime(checkpoint, ns=(original.st_atime_ns, original.st_mtime_ns))
+    replaced = checkpoint.stat()
+    assert replaced.st_size == original.st_size
+    assert replaced.st_mtime_ns == original.st_mtime_ns
+
+    assert _prediction_cache(
+        tmp_path, "candidate", "test", checkpoint, settings, deps=workflow_dependencies
+    ) != before
+
+
+def test_immutable_images_are_not_hashed_for_prediction_cache(
+    tmp_path: Path, workflow_dependencies: WorkflowDependencies
+) -> None:
+    from clearml_yolo.application.use_cases.compare import _prediction_cache, _split_fingerprint
 
     checkpoint = tmp_path / "best.pt"
     checkpoint.write_bytes(b"weights")
@@ -346,19 +447,33 @@ def test_immutable_images_are_not_hashed_for_prediction_cache(tmp_path: Path) ->
     image.write_bytes(b"first")
     truth = pd.DataFrame([{"image_name": "image.jpg", "image_path": str(image), "split": "test"}])
     before = _prediction_cache(
-        tmp_path, "baseline", "test", checkpoint, _settled(), _split_fingerprint(truth, "test")
+        tmp_path,
+        "baseline",
+        "test",
+        checkpoint,
+        _settled(),
+        _split_fingerprint(truth, "test", deps=workflow_dependencies),
+        deps=workflow_dependencies,
     )
 
     image.write_bytes(b"second")
     after = _prediction_cache(
-        tmp_path, "baseline", "test", checkpoint, _settled(), _split_fingerprint(truth, "test")
+        tmp_path,
+        "baseline",
+        "test",
+        checkpoint,
+        _settled(),
+        _split_fingerprint(truth, "test", deps=workflow_dependencies),
+        deps=workflow_dependencies,
     )
 
     assert before == after
 
 
-def test_native_output_archive_excludes_source_derived_images(tmp_path: Path) -> None:
-    from clearml_yolo.tasks.compare import _archive_native_outputs
+def test_native_output_archive_excludes_source_derived_images(
+    tmp_path: Path, workflow_dependencies: WorkflowDependencies
+) -> None:
+    from clearml_yolo.application.use_cases.compare import _archive_native_outputs
 
     native = tmp_path / "native"
     (native / "labels").mkdir(parents=True)
@@ -373,7 +488,9 @@ def test_native_output_archive_excludes_source_derived_images(tmp_path: Path) ->
     )
     (native / "image.jpg").write_bytes(b"derived-image")
 
-    archive = _archive_native_outputs(native, tmp_path, role="candidate", split="test")
+    archive = _archive_native_outputs(
+        native, tmp_path, role="candidate", split="test", deps=workflow_dependencies
+    )
 
     with zipfile.ZipFile(archive) as bundle:
         assert bundle.namelist() == [
@@ -393,15 +510,20 @@ def test_native_output_archive_excludes_source_derived_images(tmp_path: Path) ->
 
 
 def test_comparing_a_model_against_itself_is_refused(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
     """Two lookups can land on one task; every delta is then zero, which reads as a result."""
-    from clearml_yolo.clearml_session import ClearMLConfig
-    from clearml_yolo.tasks.compare import InferenceConfig, ModelRef, compare
+    from clearml_yolo.adapters.clearml.session import ClearMLConfig
+    from clearml_yolo.application.use_cases.compare import InferenceConfig, ModelRef, compare
 
     checkpoint = tmp_path / "best.pt"
     checkpoint.write_bytes(b"")
-    monkeypatch.setattr("clearml_yolo.tasks.compare.init_task", lambda *_args, **_kwargs: None)
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.compare.init_task",
+        lambda *_args, **_kwargs: None,
+    )
     same = ModelRef(
         source="local", label="fixture detector", weights=checkpoint, thresholds={"car": 0.4}
     )
@@ -415,6 +537,7 @@ def test_comparing_a_model_against_itself_is_refused(
             output_dir=tmp_path / "out",
             clearml=ClearMLConfig(),
             inference=InferenceConfig(conf=0.001, iou=0.7, imgsz=640, batch=1, device="cpu"),
+            deps=workflow_dependencies,
         )
 
 
@@ -430,7 +553,7 @@ def test_thresholds_are_carried_through_per_model() -> None:
 def test_local_model_requires_checkpoint_and_exact_thresholds() -> None:
     from pydantic import ValidationError
 
-    from clearml_yolo.tasks.compare import ModelRef
+    from clearml_yolo.application.use_cases.compare import ModelRef
 
     with pytest.raises(ValidationError, match="weights"):
         ModelRef(source="local", thresholds={"car": 0.4})
@@ -441,7 +564,7 @@ def test_local_model_requires_checkpoint_and_exact_thresholds() -> None:
 def test_model_reference_rejects_checkpoint_fields_from_the_other_source() -> None:
     from pydantic import ValidationError
 
-    from clearml_yolo.tasks.compare import ModelRef
+    from clearml_yolo.application.use_cases.compare import ModelRef
 
     with pytest.raises(ValidationError, match=r"source='clearml'.*weights"):
         ModelRef(source="clearml", weights=Path("best.pt"))
@@ -467,8 +590,8 @@ def test_input_models_reject_unknown_override_names(
 ) -> None:
     from pydantic import ValidationError
 
-    from clearml_yolo.comparison.scoring import EvaluationConfig
-    from clearml_yolo.tasks.compare import InferenceConfig, ModelRef
+    from clearml_yolo.application.use_cases.compare import InferenceConfig, ModelRef
+    from clearml_yolo.core.evaluation.models import EvaluationConfig
 
     validators: dict[str, Callable[[object], object]] = {
         "evaluation": EvaluationConfig.model_validate,
@@ -482,7 +605,7 @@ def test_input_models_reject_unknown_override_names(
 def test_inference_image_name_mode_rejects_unknown_fallback() -> None:
     from pydantic import ValidationError
 
-    from clearml_yolo.tasks.compare import InferenceConfig
+    from clearml_yolo.application.use_cases.compare import InferenceConfig
 
     with pytest.raises(ValidationError, match="image_name"):
         InferenceConfig(
@@ -498,7 +621,7 @@ def test_inference_image_name_mode_rejects_unknown_fallback() -> None:
 def test_nonfinite_model_threshold_is_rejected() -> None:
     from pydantic import ValidationError
 
-    from clearml_yolo.tasks.compare import ModelRef
+    from clearml_yolo.application.use_cases.compare import ModelRef
 
     with pytest.raises(ValidationError, match="finite"):
         ModelRef(source="local", weights=Path("best.pt"), thresholds={"car": float("nan")})
@@ -508,7 +631,7 @@ def test_nonfinite_model_threshold_is_rejected() -> None:
 def test_inference_native_mapping_cannot_override_owned_keys(key: str) -> None:
     from pydantic import ValidationError
 
-    from clearml_yolo.tasks.compare import InferenceConfig
+    from clearml_yolo.application.use_cases.compare import InferenceConfig
 
     with pytest.raises(ValidationError, match=key):
         InferenceConfig(
@@ -525,17 +648,22 @@ def test_inference_native_mapping_cannot_override_owned_keys(key: str) -> None:
     ],
 )
 def test_explicit_missing_baseline_is_an_error(
-    explicit: dict[str, object], monkeypatch: pytest.MonkeyPatch
+    explicit: dict[str, object],
+    monkeypatch: pytest.MonkeyPatch,
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
-    from clearml_yolo.tasks.compare import (
+    from clearml_yolo.application.use_cases.compare import (
         ModelRef,
         NoBaselineModelError,
         _is_automatic_baseline,
         _resolve_model,
     )
 
-    monkeypatch.setattr(
-        "clearml_yolo.tasks.compare.latest_completed_task_id", lambda *_args, **_kwargs: None
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.compare.latest_completed_task_id",
+        lambda *_args, **_kwargs: None,
     )
 
     model = ModelRef.model_validate(explicit)
@@ -546,27 +674,30 @@ def test_explicit_missing_baseline_is_an_error(
             "fallback-project",
             exclude_task_id="current-task",
             automatic_absence_is_skip=_is_automatic_baseline(model),
+            deps=workflow_dependencies,
         )
 
     assert not isinstance(error.value, NoBaselineModelError)
 
 
 def test_default_missing_baseline_is_the_only_skippable_lookup() -> None:
-    from clearml_yolo.tasks.compare import ModelRef, _is_automatic_baseline
+    from clearml_yolo.application.use_cases.compare import ModelRef, _is_automatic_baseline
 
     assert _is_automatic_baseline(ModelRef())
 
 
 def test_resolved_clearml_model_keeps_exact_task_id(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
-    from clearml_yolo.tasks.compare import ModelRef, _resolve_model
+    from clearml_yolo.application.use_cases.compare import ModelRef, _resolve_model
 
     checkpoint = tmp_path / "best.pt"
     checkpoint.write_bytes(b"weights")
     task_id = "a" * 32
-    monkeypatch.setattr(
-        "clearml_yolo.tasks.compare.resolve_task_model",
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.compare.resolve_task_model",
         lambda task_id: (
             checkpoint,
             {
@@ -576,8 +707,10 @@ def test_resolved_clearml_model_keeps_exact_task_id(
             },
         ),
     )
-    monkeypatch.setattr(
-        "clearml_yolo.tasks.compare.fetch_best_confidences",
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.compare.fetch_best_confidences",
         lambda _task_id: {"cat": 0.5},
     )
 
@@ -586,6 +719,7 @@ def test_resolved_clearml_model_keeps_exact_task_id(
         "project",
         exclude_task_id=None,
         automatic_absence_is_skip=False,
+        deps=workflow_dependencies,
     )
 
     assert resolved.task_id == task_id
@@ -604,12 +738,14 @@ def _assert_recovered_sources(configurations: dict[str, Any], legacy_role: str |
 
 
 def _stub_comparison_publication(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> tuple[dict[str, object], dict[str, Any], list[str], list[dict[str, Any]]]:
     uploads: dict[str, object] = {}
     configurations: dict[str, Any] = {}
-    monkeypatch.setattr(
-        "clearml_yolo.tasks.compare.record_run_configuration",
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.compare.record_run_configuration",
         lambda _task, values: configurations.update(values),
         raising=False,
     )
@@ -630,28 +766,45 @@ def _stub_comparison_publication(
             }
         )
 
-    monkeypatch.setattr("clearml_yolo.tasks.compare.publish_evaluation", publish_evaluation)
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.compare.publish_evaluation",
+        publish_evaluation,
+    )
 
     class FakeTask:
         id = "current-task"
 
-    monkeypatch.setattr(
-        "clearml_yolo.tasks.compare.init_task", lambda *_args, **_kwargs: FakeTask()
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.compare.init_task",
+        lambda *_args, **_kwargs: FakeTask(),
     )
-    monkeypatch.setattr(
-        "clearml_yolo.tasks.compare.report_comparison", lambda *_args, **_kwargs: None
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.compare.report_comparison",
+        lambda *_args, **_kwargs: None,
     )
-    monkeypatch.setattr(
-        "clearml_yolo.tasks.compare.upload_artifact",
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.compare.upload_artifact",
         lambda _task, name, value: uploads.setdefault(name, value),
     )
-    monkeypatch.setattr(
-        "clearml_yolo.tasks.compare.publish_table",
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.compare.publish_table",
         lambda _task, name, value, **kwargs: uploads.setdefault(name, value),
         raising=False,
     )
-    monkeypatch.setattr(
-        "clearml_yolo.tasks.compare.expect_artifacts",
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.compare.expect_artifacts",
         lambda _task, names: expected.extend(names),
     )
     return uploads, configurations, expected, evaluations
@@ -664,8 +817,9 @@ def _recovered_comparison_models(
     override: bool,
     baseline_weights: Path,
     candidate_weights: Path,
+    workflow_dependencies: WorkflowDependencies,
 ) -> dict[str, Any]:
-    from clearml_yolo.tasks.compare import ModelRef
+    from clearml_yolo.application.use_cases.compare import ModelRef
 
     models = {
         role: ModelRef(
@@ -708,7 +862,12 @@ def _recovered_comparison_models(
                 get_output_log_web_page=lambda role=role: f"https://clearml.example/{role}",
             )
             models[role] = ModelRef(task_id=role, thresholds={"cat": 0.7} if override else None)
-        monkeypatch.setattr("clearml_yolo.clearml_models._task", sources.__getitem__)
+        patch_workflow(
+            monkeypatch,
+            workflow_dependencies,
+            "clearml_yolo.adapters.clearml.models._task",
+            sources.__getitem__,
+        )
 
     return models
 
@@ -748,11 +907,12 @@ def test_compare_dashboards_and_statistics_share_the_same_test_counts(
     legacy_role: str | None,
     split: str,
     override: bool,
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
-    from clearml_yolo.clearml_session import ClearMLConfig
-    from clearml_yolo.comparison.reinfer import VocabularyReport
-    from clearml_yolo.inference import ScoredResolution
-    from clearml_yolo.tasks.compare import InferenceConfig, compare
+    from clearml_yolo.adapters.clearml.session import ClearMLConfig
+    from clearml_yolo.adapters.yolo.inference import ScoredResolution
+    from clearml_yolo.adapters.yolo.reinfer import VocabularyReport
+    from clearml_yolo.application.use_cases.compare import InferenceConfig, compare
 
     baseline_weights, candidate_weights = tmp_path / "baseline.pt", tmp_path / "candidate.pt"
     baseline_weights.write_bytes(b"baseline")
@@ -814,16 +974,36 @@ def test_compare_dashboards_and_statistics_share_the_same_test_counts(
             model_classes=["cat"], unknown_to_model=[], unknown_to_ground_truth=[]
         )
 
-    uploads, configurations, expected, evaluations = _stub_comparison_publication(monkeypatch)
-    monkeypatch.setattr("clearml_yolo.tasks.compare.reinfer_split", fake_reinfer)
-    monkeypatch.setattr(
-        "clearml_yolo.tasks.compare.resolution_of",
+    uploads, configurations, expected, evaluations = _stub_comparison_publication(
+        monkeypatch, workflow_dependencies=workflow_dependencies
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.compare.reinfer_split",
+        fake_reinfer,
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.compare.resolution_of",
         lambda *_args, **_kwargs: ScoredResolution(trained_at=640, scored_at=640),
     )
-    monkeypatch.setattr("clearml_yolo.tasks.compare.trained_imgsz", lambda *_args: 640)
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.compare.trained_imgsz",
+        lambda *_args: 640,
+    )
 
     models = _recovered_comparison_models(
-        tmp_path, monkeypatch, legacy_role, override, baseline_weights, candidate_weights
+        tmp_path,
+        monkeypatch,
+        legacy_role,
+        override,
+        baseline_weights,
+        candidate_weights,
+        workflow_dependencies=workflow_dependencies,
     )
 
     result = compare(
@@ -835,6 +1015,7 @@ def test_compare_dashboards_and_statistics_share_the_same_test_counts(
         InferenceConfig(conf=0.001, iou=0.7, imgsz=640, batch=1, device="cpu"),
         bootstrap_iterations=20,
         split=split,
+        deps=workflow_dependencies,
     )
 
     assert result is not None
@@ -873,11 +1054,12 @@ def test_compare_dashboards_and_statistics_share_the_same_test_counts(
 
 
 def test_comparison_scoring_uses_the_full_evaluation_configuration(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
-    from clearml_yolo.comparison.reinfer import VocabularyReport
-    from clearml_yolo.comparison.scoring import EvaluationConfig, evaluate_split
-    from clearml_yolo.tasks.compare import _scored
+    from clearml_yolo.adapters.evaluation.scoring import compute_evaluation
+    from clearml_yolo.adapters.yolo.reinfer import VocabularyReport
+    from clearml_yolo.application.use_cases.compare import _scored
+    from clearml_yolo.core.evaluation.models import EvaluationConfig
 
     image, empty = tmp_path / "image.jpg", tmp_path / "empty.jpg"
     image.write_bytes(b"image")
@@ -919,8 +1101,10 @@ def test_comparison_scoring_uses_the_full_evaluation_configuration(
     raw_predictions.attrs["effective_args"] = {"device": "cpu"}
     raw_predictions.attrs["save_dir"] = str(native_dir)
     raw_predictions.to_csv(tmp_path / "candidate_predictions.csv", index=False)
-    monkeypatch.setattr(
-        "clearml_yolo.tasks.compare.reinfer_split",
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.compare.reinfer_split",
         lambda *_args, **_kwargs: (
             raw_predictions,
             VocabularyReport(
@@ -932,9 +1116,14 @@ def test_comparison_scoring_uses_the_full_evaluation_configuration(
 
     def observed_evaluation(*args: Any, **kwargs: Any) -> Any:
         calls.append((args, kwargs))
-        return evaluate_split(*args, **kwargs)
+        return compute_evaluation(*args, **kwargs)
 
-    monkeypatch.setattr("clearml_yolo.tasks.compare.evaluate_split", observed_evaluation)
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.compare.compute_evaluation",
+        observed_evaluation,
+    )
     weights = tmp_path / "candidate.pt"
     weights.write_bytes(b"candidate")
 
@@ -955,6 +1144,7 @@ def test_comparison_scoring_uses_the_full_evaluation_configuration(
             preprocess=True,
             preprocess_preds_conf_threshold=0.5,
         ),
+        deps=workflow_dependencies,
     )
 
     args, kwargs = calls[0]
@@ -970,11 +1160,11 @@ def test_comparison_scoring_uses_the_full_evaluation_configuration(
 
 
 def test_prediction_only_class_requires_its_saved_threshold(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
-    from clearml_yolo.comparison.reinfer import VocabularyReport
-    from clearml_yolo.comparison.scoring import EvaluationConfig
-    from clearml_yolo.tasks.compare import _scored
+    from clearml_yolo.adapters.yolo.reinfer import VocabularyReport
+    from clearml_yolo.application.use_cases.compare import _scored
+    from clearml_yolo.core.evaluation.models import EvaluationConfig
 
     image = tmp_path / "image.jpg"
     image.write_bytes(b"image")
@@ -1005,8 +1195,10 @@ def test_prediction_only_class_requires_its_saved_threshold(
     )
     predictions.attrs["save_dir"] = str(tmp_path / "native" / "candidate_test")
     predictions.to_csv(tmp_path / "candidate_predictions.csv", index=False)
-    monkeypatch.setattr(
-        "clearml_yolo.tasks.compare.reinfer_split",
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.compare.reinfer_split",
         lambda *_args, **_kwargs: (
             predictions,
             VocabularyReport(
@@ -1029,16 +1221,17 @@ def test_prediction_only_class_requires_its_saved_threshold(
             {"cat": 0.5},
             ["cat"],
             evaluation=EvaluationConfig(),
+            deps=workflow_dependencies,
         )
 
 
 def test_automatic_baseline_absence_still_evaluates_candidate(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
-    from clearml_yolo.clearml_session import ClearMLConfig
-    from clearml_yolo.comparison.reinfer import VocabularyReport
-    from clearml_yolo.inference import ScoredResolution
-    from clearml_yolo.tasks.compare import InferenceConfig, ModelRef, compare
+    from clearml_yolo.adapters.clearml.session import ClearMLConfig
+    from clearml_yolo.adapters.yolo.inference import ScoredResolution
+    from clearml_yolo.adapters.yolo.reinfer import VocabularyReport
+    from clearml_yolo.application.use_cases.compare import InferenceConfig, ModelRef, compare
 
     candidate = tmp_path / "candidate.pt"
     candidate.write_bytes(b"candidate")
@@ -1072,9 +1265,14 @@ def test_automatic_baseline_absence_still_evaluates_candidate(
         ],
     )
 
-    uploads, configurations, expected, evaluations = _stub_comparison_publication(monkeypatch)
-    monkeypatch.setattr(
-        "clearml_yolo.tasks.compare.latest_completed_task_id", lambda *_args, **_kwargs: None
+    uploads, configurations, expected, evaluations = _stub_comparison_publication(
+        monkeypatch, workflow_dependencies=workflow_dependencies
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.compare.latest_completed_task_id",
+        lambda *_args, **_kwargs: None,
     )
 
     def fake_reinfer(
@@ -1087,12 +1285,16 @@ def test_automatic_baseline_absence_still_evaluates_candidate(
             unknown_to_ground_truth=[],
         )
 
-    monkeypatch.setattr(
-        "clearml_yolo.tasks.compare.reinfer_split",
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.compare.reinfer_split",
         fake_reinfer,
     )
-    monkeypatch.setattr(
-        "clearml_yolo.tasks.compare.resolution_of",
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.compare.resolution_of",
         lambda *_args, **_kwargs: ScoredResolution(trained_at=640, scored_at=640),
     )
 
@@ -1106,6 +1308,7 @@ def test_automatic_baseline_absence_still_evaluates_candidate(
         ClearMLConfig(),
         InferenceConfig(conf=0.001, iou=0.7, imgsz=640, batch=1, device="cpu"),
         bootstrap_iterations=20,
+        deps=workflow_dependencies,
     )
 
     assert result is None

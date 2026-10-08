@@ -8,8 +8,8 @@ import yaml
 from PIL import Image
 from ultralytics.data.utils import check_det_dataset
 
-from clearml_yolo.dataset_export import DatasetFormat, export_dataset
-from clearml_yolo.dataset_records import Box, ImageRecord, Split, ValidatedDataset
+from clearml_yolo.adapters.storage.dataset_export import DatasetFormat, export_dataset
+from clearml_yolo.core.datasets import Box, ImageRecord, Split, ValidatedDataset
 
 
 def _image(path: Path, color: tuple[int, int, int]) -> Path:

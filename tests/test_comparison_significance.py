@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from clearml_yolo.comparison.significance import (
+from clearml_yolo.core.comparison.significance import (
     adjust_benjamini_hochberg,
     bootstrap_precision_delta,
     bootstrap_recall_delta,

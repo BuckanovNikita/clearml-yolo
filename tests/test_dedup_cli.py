@@ -17,7 +17,7 @@ def _run(
     if cy_home is not None:
         environment["CY_HOME"] = cy_home
     return subprocess.run(  # noqa: S603 -- fixed interpreter/module and test-owned arguments
-        [sys.executable, "-m", "clearml_yolo.dedup_cli", *arguments],
+        [sys.executable, "-m", "clearml_yolo.entrypoints.dedup", *arguments],
         cwd=directory, env=environment, capture_output=True, text=True, check=False,
     )
 
@@ -68,14 +68,14 @@ def test_installed_command_has_lightweight_entrypoint() -> None:
         if item.group == "console_scripts" and item.name == "cy-dedup"
     ]
     assert len(entrypoints) == 1
-    assert entrypoints[0].load().__module__ == "clearml_yolo.dedup_cli"
+    assert entrypoints[0].load().__module__ == "clearml_yolo.entrypoints.dedup"
 
 
 def test_operational_failure_reports_nonzero_and_preserves_images(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
 ) -> None:
-    from clearml_yolo import dedup
-    from clearml_yolo.dedup_cli import main
+    from clearml_yolo.adapters.storage import dedup
+    from clearml_yolo.entrypoints.dedup import main
 
     (tmp_path / "a").mkdir()
     (tmp_path / "b").mkdir()
@@ -101,8 +101,10 @@ def test_operational_failure_reports_nonzero_and_preserves_images(
 
 def test_command_does_not_import_execution_dependencies(tmp_path: Path) -> None:
     script = (
-        "import sys; from clearml_yolo.dedup_cli import main; main(); "
-        "assert not {'clearml', 'torch', 'ultralytics', 'hydra', 'clearml_yolo.apps'} "
+        "import sys; from clearml_yolo.entrypoints.dedup import main; main(); "
+        "assert not {'clearml', 'torch', 'ultralytics', 'hydra', "
+        "'clearml_yolo.entrypoints.hydra', 'clearml_yolo.entrypoints.composition', "
+        "'clearml_yolo.application'} "
         ".intersection(sys.modules)"
     )
     result = subprocess.run(  # noqa: S603 -- fixed script and test-owned directory

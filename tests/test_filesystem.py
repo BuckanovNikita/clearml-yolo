@@ -9,17 +9,36 @@ from pathlib import Path
 import pytest
 from loguru import logger
 
-from clearml_yolo.dataset_cache import dataset_cache_root
-from clearml_yolo.filesystem import model_weights_path, native_weights_directory, write_path
+from clearml_yolo.adapters.storage.dataset_cache import dataset_cache_root
+from clearml_yolo.adapters.storage.filesystem import (
+    model_weights_path,
+    native_weights_directory,
+    write_path,
+)
 
 
 def _environment() -> dict[str, str]:
     environment = dict(os.environ)
     for name in tuple(environment):
-        if name.startswith(("CY_HOME", "XDG_", "YOLO_CONFIG_DIR", "CLEARML_CACHE_DIR",
-                            "TRAINS_CACHE_DIR", "MPLCONFIGDIR", "TORCH_HOME", "TORCH_EXTENSIONS",
-                            "TORCHINDUCTOR_", "TRITON_CACHE", "CUDA_CACHE", "NUMBA_CACHE",
-                            "HF_HOME", "FIFTYONE_", "ETA_")) or name in {"TMPDIR", "TMP", "TEMP"}:
+        if name.startswith(
+            (
+                "CY_HOME",
+                "XDG_",
+                "YOLO_CONFIG_DIR",
+                "CLEARML_CACHE_DIR",
+                "TRAINS_CACHE_DIR",
+                "MPLCONFIGDIR",
+                "TORCH_HOME",
+                "TORCH_EXTENSIONS",
+                "TORCHINDUCTOR_",
+                "TRITON_CACHE",
+                "CUDA_CACHE",
+                "NUMBA_CACHE",
+                "HF_HOME",
+                "FIFTYONE_",
+                "ETA_",
+            )
+        ) or name in {"TMPDIR", "TMP", "TEMP"}:
             environment.pop(name)
     environment.pop("PYTHONDONTWRITEBYTECODE", None)
     environment.pop("PYTHONPYCACHEPREFIX", None)
@@ -38,13 +57,28 @@ def test_startup_preserves_general_cache_and_temporary_settings(
 ) -> None:
     environment = _environment()
     names = (
-        "XDG_CACHE_HOME", "XDG_CONFIG_HOME", "MPLCONFIGDIR", "TORCH_HOME",
-        "TORCH_EXTENSIONS_DIR", "TORCHINDUCTOR_CACHE_DIR", "TRITON_CACHE_DIR",
-        "CUDA_CACHE_PATH", "NUMBA_CACHE_DIR", "HF_HOME", "PYTHONPYCACHEPREFIX",
-        "FIFTYONE_MODEL_ZOO_DIR", "FIFTYONE_PLUGINS_DIR", "ETA_CONFIG_DIR",
-        "ETA_OUTPUT_DIR", "TMPDIR", "TMP", "TEMP",
-        "FIFTYONE_CONFIG_PATH", "FIFTYONE_APP_CONFIG_PATH",
-        "FIFTYONE_ANNOTATION_CONFIG_PATH", "FIFTYONE_EVALUATION_CONFIG_PATH",
+        "XDG_CACHE_HOME",
+        "XDG_CONFIG_HOME",
+        "MPLCONFIGDIR",
+        "TORCH_HOME",
+        "TORCH_EXTENSIONS_DIR",
+        "TORCHINDUCTOR_CACHE_DIR",
+        "TRITON_CACHE_DIR",
+        "CUDA_CACHE_PATH",
+        "NUMBA_CACHE_DIR",
+        "HF_HOME",
+        "PYTHONPYCACHEPREFIX",
+        "FIFTYONE_MODEL_ZOO_DIR",
+        "FIFTYONE_PLUGINS_DIR",
+        "ETA_CONFIG_DIR",
+        "ETA_OUTPUT_DIR",
+        "TMPDIR",
+        "TMP",
+        "TEMP",
+        "FIFTYONE_CONFIG_PATH",
+        "FIFTYONE_APP_CONFIG_PATH",
+        "FIFTYONE_ANNOTATION_CONFIG_PATH",
+        "FIFTYONE_EVALUATION_CONFIG_PATH",
     )
     if explicit:
         environment.update({name: str(tmp_path / "selected" / name) for name in names})
@@ -54,7 +88,8 @@ names = json.loads(sys.argv[1])
 before = {name: os.environ.get(name) for name in names}
 bytecode_before = sys.pycache_prefix
 temp_before = tempfile.gettempdir()
-import clearml_yolo.apps.config_tree
+from clearml_yolo.adapters.storage.filesystem import initialize_filesystem
+initialize_filesystem()
 after = {name: os.environ.get(name) for name in names}
 assert after == before, (before, after)
 assert sys.pycache_prefix == bytecode_before
@@ -65,8 +100,12 @@ assert {path.name for path in (Path.cwd() / '.cache').iterdir()} == {'clearml', 
 print('general defaults preserved')
 """
     result = subprocess.run(  # noqa: S603 - fixed script in a fresh process
-        [sys.executable, "-B", "-c", script, json.dumps(names)], cwd=tmp_path,
-        env=environment, check=False, capture_output=True, text=True,
+        [sys.executable, "-B", "-c", script, json.dumps(names)],
+        cwd=tmp_path,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
     )
     assert result.returncode == 0, result.stderr
     assert "general defaults preserved" in result.stdout
@@ -82,7 +121,9 @@ def test_dataset_default_ignores_general_xdg_cache(
     assert dataset_cache_root(tmp_path / "chosen") == tmp_path / "chosen"
 
 
-@pytest.mark.parametrize("value", ["ul://user/project/model", "http://host/model", "s3://bucket/m.pt"])
+@pytest.mark.parametrize(
+    "value", ["ul://user/project/model", "http://host/model", "s3://bucket/m.pt"]
+)
 def test_remote_model_references_keep_their_scheme(value: str) -> None:
     assert model_weights_path(value) == value
 
@@ -110,15 +151,20 @@ def test_config_entrypoint_initializes_paths_before_dependency_imports(
     script = """
 import json, os
 from pathlib import Path
-import clearml_yolo.apps.config_tree
+from clearml_yolo.adapters.storage.filesystem import initialize_filesystem
+initialize_filesystem()
 os.chdir(Path.cwd().parent)
 print(json.dumps({name: os.environ.get(name) for name in
     ('CY_HOME', 'YOLO_CONFIG_DIR', 'CLEARML_CACHE_DIR', 'FIFTYONE_DATABASE_DIR',
      'FIFTYONE_DEFAULT_DATASET_DIR', 'FIFTYONE_DATASET_ZOO_DIR')}))
 """
     result = subprocess.run(  # noqa: S603 - current interpreter and a fixed test script
-        [sys.executable, "-c", script], cwd=tmp_path, env=environment,
-        check=True, capture_output=True, text=True,
+        [sys.executable, "-c", script],
+        cwd=tmp_path,
+        env=environment,
+        check=True,
+        capture_output=True,
+        text=True,
     )
     paths = json.loads(result.stdout)
     assert paths["CY_HOME"] == str(expected)
@@ -168,29 +214,42 @@ def test_explicit_dependency_paths_and_temp_settings_are_preserved(tmp_path: Pat
     workspace = tmp_path / "workspace"
     selected = tmp_path / "explicit"
     selected.mkdir()
-    environment.update(CY_HOME=str(workspace), XDG_CACHE_HOME=str(selected), TMP=str(selected),
-                       CLEARML_CACHE_DIR=str(selected / "clearml"))
+    environment.update(
+        CY_HOME=str(workspace),
+        XDG_CACHE_HOME=str(selected),
+        TMP=str(selected),
+        CLEARML_CACHE_DIR=str(selected / "clearml"),
+    )
     script = """
 import json, os, tempfile
-import clearml_yolo.apps.config_tree
-from clearml_yolo.dataset_cache import dataset_cache_root
+from clearml_yolo.adapters.storage.filesystem import initialize_filesystem
+initialize_filesystem()
+from clearml_yolo.adapters.storage.dataset_cache import dataset_cache_root
 print(json.dumps([str(dataset_cache_root(None)), os.environ['CLEARML_CACHE_DIR'],
                   tempfile.gettempdir()]))
 """
     result = subprocess.run(  # noqa: S603 - current interpreter and a fixed test script
-        [sys.executable, "-c", script], cwd=tmp_path, env=environment,
-        check=True, capture_output=True, text=True,
+        [sys.executable, "-c", script],
+        cwd=tmp_path,
+        env=environment,
+        check=True,
+        capture_output=True,
+        text=True,
     )
-    assert json.loads(result.stdout) == [str(workspace / ".cache" / "clearml-yolo" / "datasets"),
-                                       str(selected / "clearml"), str(selected)]
+    assert json.loads(result.stdout) == [
+        str(workspace / ".cache" / "clearml-yolo" / "datasets"),
+        str(selected / "clearml"),
+        str(selected),
+    ]
 
 
 def test_native_and_publication_data_storage_stays_in_workspace(tmp_path: Path) -> None:
     script = """
 from pathlib import Path
 root = Path.cwd().resolve()
-import clearml_yolo.apps.config_tree
-from clearml_yolo.native_runtime import native_runtime
+from clearml_yolo.adapters.storage.filesystem import initialize_filesystem
+initialize_filesystem()
+from clearml_yolo.adapters.integrations.native_runtime import native_runtime
 with native_runtime():
     import matplotlib.pyplot
     from clearml.config import get_cache_dir
@@ -211,8 +270,13 @@ print('startup passed')
     environment = _environment()
     environment["HOME"] = str(tmp_path / "home")
     result = subprocess.run(  # noqa: S603 - fixed script with task-owned home and workspace
-        [sys.executable, "-c", script], cwd=tmp_path, env=environment,
-        check=False, capture_output=True, text=True, timeout=60,
+        [sys.executable, "-c", script],
+        cwd=tmp_path,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=60,
     )
     assert result.returncode == 0, result.stderr
     assert "startup passed" in result.stdout
@@ -228,11 +292,16 @@ def test_existing_fiftyone_configuration_remains_a_read_only_input(
     configs.mkdir(parents=True)
     selected = tmp_path / "explicit_database"
     source = (tmp_path if explicit_config else configs) / "config.json"
-    source.write_text(json.dumps({
-        "database_dir": str(selected), "database_name": "chosen",
-        "default_dataset_dir": str(tmp_path / "configured_datasets"),
-        "dataset_zoo_dir": str(tmp_path / "configured_zoo"),
-    }))
+    source.write_text(
+        json.dumps(
+            {
+                "database_dir": str(selected),
+                "database_name": "chosen",
+                "default_dataset_dir": str(tmp_path / "configured_datasets"),
+                "dataset_zoo_dir": str(tmp_path / "configured_zoo"),
+            }
+        )
+    )
     original = source.read_bytes()
     environment = _environment()
     if explicit_config:
@@ -241,7 +310,7 @@ def test_existing_fiftyone_configuration_remains_a_read_only_input(
     script = """
 import json, os, sys
 from pathlib import Path
-import clearml_yolo.filesystem as policy
+import clearml_yolo.adapters.storage.filesystem as policy
 policy.Path.home = staticmethod(lambda: Path(sys.argv[1]))
 policy.initialize_filesystem()
 print(json.dumps([os.environ.get('FIFTYONE_CONFIG_PATH'), os.environ['FIFTYONE_DATABASE_DIR'],
@@ -249,20 +318,28 @@ print(json.dumps([os.environ.get('FIFTYONE_CONFIG_PATH'), os.environ['FIFTYONE_D
                   os.environ['FIFTYONE_DATASET_ZOO_DIR']]))
 """
     result = subprocess.run(  # noqa: S603 - fixed script and task-owned fixture paths
-        [sys.executable, "-c", script, str(fake_home)], cwd=tmp_path, env=environment,
-        check=True, capture_output=True, text=True,
+        [sys.executable, "-c", script, str(fake_home)],
+        cwd=tmp_path,
+        env=environment,
+        check=True,
+        capture_output=True,
+        text=True,
     )
-    assert json.loads(result.stdout) == [str(source) if explicit_config else None, str(selected),
-                                       str(tmp_path / "configured_datasets"),
-                                       str(tmp_path / "explicit_zoo")]
+    assert json.loads(result.stdout) == [
+        str(source) if explicit_config else None,
+        str(selected),
+        str(tmp_path / "configured_datasets"),
+        str(tmp_path / "explicit_zoo"),
+    ]
     assert source.read_bytes() == original
 
 
 def test_atomic_publication_cleans_partial_output_on_failure(tmp_path: Path) -> None:
-    from clearml_yolo.comparison.reinfer import _atomic_text
+    from clearml_yolo.adapters.yolo.reinfer import _atomic_text
 
     output = tmp_path / "predictions.csv"
     output.write_text("existing result\n")
+
     def fail_serialization() -> None:
         with _atomic_text(output) as stream:
             stream.write("partial result\n")
@@ -280,14 +357,18 @@ def test_cache_initialization_uses_only_canonical_setting(tmp_path: Path) -> Non
     script = """
 import os
 from pathlib import Path
-from clearml_yolo.filesystem import initialize_filesystem
+from clearml_yolo.adapters.storage.filesystem import initialize_filesystem
 initialize_filesystem()
 assert Path(os.environ['CLEARML_CACHE_DIR']) == Path.cwd() / '.cache/clearml'
 assert not (Path.cwd() / 'old-cache').exists()
 """
     result = subprocess.run(  # noqa: S603 - fixed script and isolated environment
-        [sys.executable, "-B", "-c", script], cwd=tmp_path, env=environment,
-        check=False, capture_output=True, text=True,
+        [sys.executable, "-B", "-c", script],
+        cwd=tmp_path,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
     )
     assert result.returncode == 0, result.stderr
 
@@ -296,7 +377,7 @@ def test_optional_config_read_reports_reason_and_source(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from clearml_yolo.filesystem import _fiftyone_inputs
+    from clearml_yolo.adapters.storage.filesystem import _fiftyone_inputs
 
     source = tmp_path / "private-config.json"
     source.write_bytes(b"\xff")

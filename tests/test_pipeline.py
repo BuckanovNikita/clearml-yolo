@@ -1,16 +1,23 @@
 """Pipeline routing rejects conflicting native and stage-owned outputs."""
 
 from datetime import UTC, datetime
+from functools import partial
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from clearml_yolo.clearml_session import ClearMLConfig
-from clearml_yolo.publishing.models import FiftyOneConfig, PublicationReceipt
-from clearml_yolo.tasks.pipeline import routed_native
+import clearml_yolo.entrypoints.hydra.configs  # noqa: F401 - register Hydra configs
+from clearml_yolo.adapters.clearml.session import ClearMLConfig
+from clearml_yolo.application.ports import WorkflowDependencies
+from clearml_yolo.application.use_cases.pipeline import routed_native
+from clearml_yolo.core.publication import FiftyOneConfig, PublicationReceipt
 from native_config_helpers import prediction_config, training_settings
 from test_clearml_report import warnings_log as warnings_log  # noqa: PLC0414 - fixture export
+from workflow_dependencies import patch_workflow
+from workflow_dependencies import (
+    workflow_dependencies as workflow_dependencies,  # noqa: PLC0414 - fixture export
+)
 
 
 def test_routing_fills_only_output_ownership(tmp_path: Path) -> None:
@@ -27,8 +34,7 @@ def test_conflicting_native_routing_fails(tmp_path: Path, settings: dict[str, st
 
 
 def test_hydra_pipeline_passes_real_stage_objects(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
     from types import SimpleNamespace
     from typing import Any
@@ -36,14 +42,23 @@ def test_hydra_pipeline_passes_real_stage_objects(
     from hydra import compose, initialize_config_module
     from hydra_zen import store, zen
 
-    import clearml_yolo.configs  # noqa: F401
-    from clearml_yolo.tasks import pipeline
+    from clearml_yolo.application.use_cases import pipeline
 
     calls: list[Any] = []
-    monkeypatch.setattr(pipeline, "init_task", lambda *a, **k: object())
-    monkeypatch.setattr(pipeline, "record_run_configuration", lambda *a, **k: None)
-    monkeypatch.setattr(pipeline, "point_latest_at", lambda *a: None)
-    monkeypatch.setattr(
+    patch_workflow(
+        monkeypatch, workflow_dependencies, pipeline, "init_task", lambda *a, **k: object()
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        pipeline,
+        "record_run_configuration",
+        lambda *a, **k: None,
+    )
+    patch_workflow(monkeypatch, workflow_dependencies, pipeline, "point_latest_at", lambda *a: None)
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
         pipeline,
         "run_training",
         lambda params, tracking, **kwargs: SimpleNamespace(
@@ -52,7 +67,9 @@ def test_hydra_pipeline_passes_real_stage_objects(
             dataset_reference=tmp_path / "data.yaml",
         ),
     )
-    monkeypatch.setattr(
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
         pipeline,
         "run_prediction",
         lambda *a, **k: SimpleNamespace(predictions=tmp_path / "predictions.csv"),
@@ -65,7 +82,7 @@ def test_hydra_pipeline_passes_real_stage_objects(
             best_confidences={"val": {"cat": 0.5}, "test": {"cat": 0.5}}, evaluations={}
         )
 
-    monkeypatch.setattr(pipeline, "compute_metrics", evaluate)
+    patch_workflow(monkeypatch, workflow_dependencies, pipeline, "compute_metrics", evaluate)
     store.add_to_hydra_store(overwrite_ok=True)
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
         config = compose(
@@ -78,23 +95,33 @@ def test_hydra_pipeline_passes_real_stage_objects(
                 "fiftyone.enabled=false",
             ],
         )
-    result = zen(pipeline.run_pipeline)(config)
+    result = zen(partial(pipeline.run_pipeline, deps=workflow_dependencies))(config)
     assert result["weights"] == tmp_path / "actual.pt"
     assert calls[0].iou_threshold == 0.5
 
 
 def test_pipeline_routes_cleaned_truth_and_prediction_policy_after_csv_training(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
     from types import SimpleNamespace
 
-    from clearml_yolo.tasks import pipeline
+    from clearml_yolo.application.use_cases import pipeline
 
     cleaned = tmp_path / "cleaned.csv"
     calls: dict[str, Any] = {"truth": [], "uploads": []}
-    monkeypatch.setattr(pipeline, "init_task", lambda *args, **kwargs: object())
-    monkeypatch.setattr(pipeline, "point_latest_at", lambda *args, **kwargs: None)
-    monkeypatch.setattr(
+    patch_workflow(
+        monkeypatch, workflow_dependencies, pipeline, "init_task", lambda *args, **kwargs: object()
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        pipeline,
+        "point_latest_at",
+        lambda *args, **kwargs: None,
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
         pipeline,
         "record_run_configuration",
         lambda _task, values: calls["uploads"].extend(values.items()),
@@ -121,10 +148,9 @@ def test_pipeline_routes_cleaned_truth_and_prediction_policy_after_csv_training(
         Path(args[2]).mkdir(parents=True)
         return SimpleNamespace(best_confidences={"val": {"cat": 0.5}}, evaluations={})
 
-    monkeypatch.setattr(pipeline, "run_training", training)
-    monkeypatch.setattr(pipeline, "run_prediction", prediction)
-    monkeypatch.setattr(pipeline, "compute_metrics", metrics)
-
+    patch_workflow(monkeypatch, workflow_dependencies, pipeline, "run_training", training)
+    patch_workflow(monkeypatch, workflow_dependencies, pipeline, "run_prediction", prediction)
+    patch_workflow(monkeypatch, workflow_dependencies, pipeline, "compute_metrics", metrics)
     pipeline.run_pipeline(
         ultralytics=training_settings()
         | {"model": "architecture.pt", "classes": [1], "task": "detect"},
@@ -140,26 +166,22 @@ def test_pipeline_routes_cleaned_truth_and_prediction_policy_after_csv_training(
         skip_compare=True,
         skip_report=True,
         fiftyone=FiftyOneConfig(enabled=False),
+        deps=workflow_dependencies,
     )
-
     assert calls["truth"] == [cleaned, cleaned]
     assert (
         "prediction_data_overrides",
-        {
-            "ultralytics_predict": {
-                "classes": {"requested": [0], "effective": None},
-            },
-        },
+        {"ultralytics_predict": {"classes": {"requested": [0], "effective": None}}},
     ) in calls["uploads"]
 
 
 def test_pipeline_preflights_once_and_publishes_effective_outputs(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
     from types import SimpleNamespace
 
-    from clearml_yolo.tasks import pipeline
-    from clearml_yolo.tasks.metrics import EvaluationConfig
+    from clearml_yolo.application.use_cases import pipeline
+    from clearml_yolo.application.use_cases.metrics import EvaluationConfig
 
     source = tmp_path / "source.csv"
     source.write_text("image_name,image_path,split\na,a.jpg,val\n", encoding="utf-8")
@@ -196,12 +218,31 @@ def test_pipeline_preflights_once_and_publishes_effective_outputs(
                 fields={"evaluation_test": "evaluation_test_pipeline-task"},
             )
 
-    monkeypatch.setattr(pipeline, "init_task", lambda *_args, **_kwargs: task)
-    monkeypatch.setattr(pipeline, "create_publisher", lambda _config: FakePublisher())
-    monkeypatch.setattr(pipeline, "point_latest_at", lambda *_args: None)
-    monkeypatch.setattr(pipeline, "record_run_configuration", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(
-        "clearml_yolo.tasks.publication.record_run_configuration", lambda *_args: None
+    patch_workflow(
+        monkeypatch, workflow_dependencies, pipeline, "init_task", lambda *_args, **_kwargs: task
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        pipeline,
+        "create_publisher",
+        lambda _config: FakePublisher(),
+    )
+    patch_workflow(
+        monkeypatch, workflow_dependencies, pipeline, "point_latest_at", lambda *_args: None
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        pipeline,
+        "record_run_configuration",
+        lambda *_args, **_kwargs: None,
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.publication.record_run_configuration",
+        lambda *_args: None,
     )
 
     def train(*_args: Any, **_kwargs: Any) -> SimpleNamespace:
@@ -221,15 +262,13 @@ def test_pipeline_preflights_once_and_publishes_effective_outputs(
         evaluation_path.parent.mkdir(parents=True)
         evaluation_path.write_text("{}", encoding="utf-8")
         return SimpleNamespace(
-            best_confidences={"test": {"cat": 0.5}},
-            evaluations={"test": evaluation_path},
+            best_confidences={"test": {"cat": 0.5}}, evaluations={"test": evaluation_path}
         )
 
-    monkeypatch.setattr(pipeline, "run_training", train)
-    monkeypatch.setattr(pipeline, "run_prediction", predict)
-    monkeypatch.setattr(pipeline, "compute_metrics", metrics)
+    patch_workflow(monkeypatch, workflow_dependencies, pipeline, "run_training", train)
+    patch_workflow(monkeypatch, workflow_dependencies, pipeline, "run_prediction", predict)
+    patch_workflow(monkeypatch, workflow_dependencies, pipeline, "compute_metrics", metrics)
     evaluation = EvaluationConfig()
-
     pipeline.run_pipeline(
         ultralytics=training_settings() | {"model": "architecture.pt"},
         ultralytics_predict=prediction_config(),
@@ -243,8 +282,8 @@ def test_pipeline_preflights_once_and_publishes_effective_outputs(
         skip_compare=True,
         skip_report=True,
         fiftyone=FiftyOneConfig(),
+        deps=workflow_dependencies,
     )
-
     assert events == ["preflight", "train", "publish"]
     assert len(nested) == 2
     assert all(not config.enabled for config in nested)
@@ -264,12 +303,15 @@ def test_pipeline_preflights_once_and_publishes_effective_outputs(
 
 @pytest.mark.parametrize("existing", [False, True])
 def test_pipeline_publishes_only_existing_predictions_when_prediction_is_skipped(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, existing: bool
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    existing: bool,
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
     from types import SimpleNamespace
 
-    from clearml_yolo.tasks import pipeline
-    from clearml_yolo.tasks.metrics import EvaluationConfig
+    from clearml_yolo.application.use_cases import pipeline
+    from clearml_yolo.application.use_cases.metrics import EvaluationConfig
 
     predictions = tmp_path / "predictions.csv"
     if existing:
@@ -299,15 +341,29 @@ def test_pipeline_publishes_only_existing_predictions_when_prediction_is_skipped
                 fields={},
             )
 
-    monkeypatch.setattr(
-        pipeline, "init_task", lambda *_args, **_kwargs: SimpleNamespace(id="pipeline-task")
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        pipeline,
+        "init_task",
+        lambda *_args, **_kwargs: SimpleNamespace(id="pipeline-task"),
     )
-    monkeypatch.setattr(pipeline, "create_publisher", lambda _config: FakePublisher())
-    monkeypatch.setattr(pipeline, "point_latest_at", lambda *_args: None)
-    monkeypatch.setattr(
-        "clearml_yolo.tasks.publication.record_run_configuration", lambda *_args: None
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        pipeline,
+        "create_publisher",
+        lambda _config: FakePublisher(),
     )
-
+    patch_workflow(
+        monkeypatch, workflow_dependencies, pipeline, "point_latest_at", lambda *_args: None
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.publication.record_run_configuration",
+        lambda *_args: None,
+    )
     pipeline.run_pipeline(
         ultralytics=training_settings(),
         ultralytics_predict=prediction_config(),
@@ -325,19 +381,22 @@ def test_pipeline_publishes_only_existing_predictions_when_prediction_is_skipped
         skip_compare=True,
         skip_report=True,
         fiftyone=FiftyOneConfig(),
+        deps=workflow_dependencies,
     )
-
     assert requests[0].predictions == (predictions if existing else None)
     assert requests[0].prediction_splits is None
 
 
 def test_pipeline_publication_failure_warns_and_preserves_predictions(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, warnings_log: list[str]
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    warnings_log: list[str],
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
     from types import SimpleNamespace
 
-    from clearml_yolo.tasks import pipeline
-    from clearml_yolo.tasks.metrics import EvaluationConfig
+    from clearml_yolo.application.use_cases import pipeline
+    from clearml_yolo.application.use_cases.metrics import EvaluationConfig
 
     predictions = tmp_path / "predictions.csv"
 
@@ -350,19 +409,30 @@ def test_pipeline_publication_failure_warns_and_preserves_predictions(
         def publish(self, _request: Any) -> PublicationReceipt:
             raise RuntimeError("publication failed")
 
-    monkeypatch.setattr(
-        pipeline, "init_task", lambda *_args, **_kwargs: SimpleNamespace(id="pipeline-task")
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        pipeline,
+        "init_task",
+        lambda *_args, **_kwargs: SimpleNamespace(id="pipeline-task"),
     )
-    monkeypatch.setattr(pipeline, "create_publisher", lambda _config: FailingPublisher())
-    monkeypatch.setattr(pipeline, "point_latest_at", lambda *_args: None)
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        pipeline,
+        "create_publisher",
+        lambda _config: FailingPublisher(),
+    )
+    patch_workflow(
+        monkeypatch, workflow_dependencies, pipeline, "point_latest_at", lambda *_args: None
+    )
 
     def predict(*_args: Any, **kwargs: Any) -> SimpleNamespace:
         assert not kwargs["fiftyone"].enabled
         predictions.write_text("image_name\na\n", encoding="utf-8")
         return SimpleNamespace(predictions=predictions)
 
-    monkeypatch.setattr(pipeline, "run_prediction", predict)
-
+    patch_workflow(monkeypatch, workflow_dependencies, pipeline, "run_prediction", predict)
     pipeline.run_pipeline(
         ultralytics=training_settings(),
         ultralytics_predict=prediction_config(),
@@ -379,8 +449,8 @@ def test_pipeline_publication_failure_warns_and_preserves_predictions(
         skip_compare=True,
         skip_report=True,
         fiftyone=FiftyOneConfig(),
+        deps=workflow_dependencies,
     )
-
     assert predictions.read_text(encoding="utf-8") == "image_name\na\n"
     assert not (tmp_path / "fiftyone_publication.json").exists()
     assert any("publication failed" in warning for warning in warnings_log)
@@ -388,26 +458,29 @@ def test_pipeline_publication_failure_warns_and_preserves_predictions(
 
 @pytest.mark.parametrize("explicit", ["none", "run_dir", "run_id"])
 def test_pipeline_uses_active_task_root_and_preserves_explicit_routing(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, explicit: str
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    explicit: str,
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
     from types import SimpleNamespace
 
-    from clearml_yolo.tasks import pipeline
+    from clearml_yolo.application.use_cases import pipeline
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("CY_HOME", str(tmp_path))
     task = SimpleNamespace(
         name="actual/task", id="unique-id", get_project_name=lambda: "team/project"
     )
-    monkeypatch.setattr(pipeline, "init_task", lambda *a, **k: task)
-    monkeypatch.setattr(pipeline, "point_latest_at", lambda *a: None)
+    patch_workflow(monkeypatch, workflow_dependencies, pipeline, "init_task", lambda *a, **k: task)
+    patch_workflow(monkeypatch, workflow_dependencies, pipeline, "point_latest_at", lambda *a: None)
     captured: dict[str, Any] = {}
 
     def predict(*args: Any, **kwargs: Any) -> SimpleNamespace:
         captured.update(kwargs)
         return SimpleNamespace(predictions=args[2])
 
-    monkeypatch.setattr(pipeline, "run_prediction", predict)
+    patch_workflow(monkeypatch, workflow_dependencies, pipeline, "run_prediction", predict)
     run_dir = tmp_path / "explicit" if explicit == "run_dir" else None
     run_id = "custom" if explicit == "run_id" else None
     result = pipeline.run_pipeline(
@@ -426,6 +499,7 @@ def test_pipeline_uses_active_task_root_and_preserves_explicit_routing(
         skip_compare=True,
         skip_report=True,
         fiftyone=FiftyOneConfig(enabled=False),
+        deps=workflow_dependencies,
     )
     expected = {
         "none": tmp_path / "runs/team%2Fproject/actual%2Ftask-unique-id",
@@ -441,44 +515,74 @@ def test_pipeline_uses_active_task_root_and_preserves_explicit_routing(
 
 @pytest.mark.parametrize(
     "reference",
-    ["s3://bucket/model.pt", "https://example.com/model.pt", "ul://user/project/model",
-     "./explicit-model.pt", "bare-model.pt"],
+    [
+        "s3://bucket/model.pt",
+        "https://example.com/model.pt",
+        "ul://user/project/model",
+        "./explicit-model.pt",
+        "bare-model.pt",
+    ],
 )
 def test_pipeline_preserves_model_reference_at_prediction_handoff(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, reference: str
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    reference: str,
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
     from types import SimpleNamespace
 
-    from clearml_yolo.tasks import pipeline
+    from clearml_yolo.application.use_cases import pipeline
 
     monkeypatch.setenv("CY_HOME", str(tmp_path))
-    monkeypatch.setattr(pipeline, "init_task", lambda *_args, **_kwargs: object())
-    monkeypatch.setattr(pipeline, "point_latest_at", lambda *_args: None)
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        pipeline,
+        "init_task",
+        lambda *_args, **_kwargs: object(),
+    )
+    patch_workflow(
+        monkeypatch, workflow_dependencies, pipeline, "point_latest_at", lambda *_args: None
+    )
     received: list[str | Path] = []
 
     def predict(
-        weights: str | Path, _truth: str | Path, output: str | Path,
-        *_args: object, **_kwargs: object,
+        weights: str | Path,
+        _truth: str | Path,
+        output: str | Path,
+        *_args: object,
+        **_kwargs: object,
     ) -> SimpleNamespace:
         received.append(weights)
         return SimpleNamespace(predictions=Path(output))
 
-    monkeypatch.setattr(pipeline, "run_prediction", predict)
+    patch_workflow(monkeypatch, workflow_dependencies, pipeline, "run_prediction", predict)
     pipeline.run_pipeline(
-        training_settings(), prediction_config(), {}, {}, {}, ClearMLConfig(), "truth.csv",
-        run_dir=tmp_path / "run", weights=reference,
-        skip_train=True, skip_metrics=True, skip_compare=True, skip_report=True,
+        training_settings(),
+        prediction_config(),
+        {},
+        {},
+        {},
+        ClearMLConfig(),
+        "truth.csv",
+        run_dir=tmp_path / "run",
+        weights=reference,
+        skip_train=True,
+        skip_metrics=True,
+        skip_compare=True,
+        skip_report=True,
         fiftyone=FiftyOneConfig(enabled=False),
+        deps=workflow_dependencies,
     )
     assert received == [reference]
 
 
 def test_pipeline_comparison_reuses_the_workspace_bare_checkpoint(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
-    from clearml_yolo.tasks import pipeline
-    from clearml_yolo.tasks.compare import InferenceConfig, ModelRef
-    from clearml_yolo.tasks.metrics import EvaluationConfig
+    from clearml_yolo.application.use_cases import pipeline
+    from clearml_yolo.application.use_cases.compare import InferenceConfig, ModelRef
+    from clearml_yolo.application.use_cases.metrics import EvaluationConfig
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("CY_HOME", str(tmp_path))
@@ -486,48 +590,82 @@ def test_pipeline_comparison_reuses_the_workspace_bare_checkpoint(
     checkpoint.parent.mkdir(parents=True)
     checkpoint.write_bytes(b"downloaded native checkpoint")
     received: list[ModelRef] = []
-    monkeypatch.setattr(pipeline, "init_task", lambda *_args, **_kwargs: object())
-    monkeypatch.setattr(
-        pipeline, "run_comparison", lambda **kwargs: received.append(kwargs["candidate_model"])
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        pipeline,
+        "init_task",
+        lambda *_args, **_kwargs: object(),
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        pipeline,
+        "run_comparison",
+        lambda **kwargs: received.append(kwargs["candidate_model"]),
     )
     pipeline._compare_and_report(
-        {}, "model.pt", {"cat": 0.3}, tmp_path / "truth.csv", tmp_path,
+        {},
+        "model.pt",
+        {"cat": 0.3},
+        tmp_path / "truth.csv",
+        tmp_path,
         ClearMLConfig(),
         InferenceConfig(conf=0.001, iou=0.7, imgsz=96, batch=1, device="cpu"),
-        EvaluationConfig(), {}, True,
+        EvaluationConfig(),
+        {},
+        True,
+        deps=workflow_dependencies,
     )
     assert received[0].weights == checkpoint
 
 
-def test_pipeline_local_comparison_rejects_unresolved_remote_references(tmp_path: Path) -> None:
-    from clearml_yolo.tasks import pipeline
-    from clearml_yolo.tasks.compare import InferenceConfig
-    from clearml_yolo.tasks.metrics import EvaluationConfig
+def test_pipeline_local_comparison_rejects_unresolved_remote_references(
+    tmp_path: Path, workflow_dependencies: WorkflowDependencies
+) -> None:
+    from clearml_yolo.application.use_cases import pipeline
+    from clearml_yolo.application.use_cases.compare import InferenceConfig
+    from clearml_yolo.application.use_cases.metrics import EvaluationConfig
 
     with pytest.raises(ValueError, match="resolve remote weights before comparison"):
         pipeline._compare_and_report(
-            {}, "s3://bucket/model.pt", {"cat": 0.3}, tmp_path / "truth.csv", tmp_path,
+            {},
+            "s3://bucket/model.pt",
+            {"cat": 0.3},
+            tmp_path / "truth.csv",
+            tmp_path,
             ClearMLConfig(),
             InferenceConfig(conf=0.001, iou=0.7, imgsz=96, batch=1, device="cpu"),
-            EvaluationConfig(), {}, True,
+            EvaluationConfig(),
+            {},
+            True,
+            deps=workflow_dependencies,
         )
 
 
 def test_pipeline_comparison_uses_its_native_candidate_source_task(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
     from types import SimpleNamespace
 
-    from clearml_yolo.tasks import pipeline
-    from clearml_yolo.tasks.compare import InferenceConfig, ModelRef
-    from clearml_yolo.tasks.metrics import EvaluationConfig
+    from clearml_yolo.application.use_cases import pipeline
+    from clearml_yolo.application.use_cases.compare import InferenceConfig, ModelRef
+    from clearml_yolo.application.use_cases.metrics import EvaluationConfig
 
     received: list[ModelRef] = []
-    monkeypatch.setattr(
-        pipeline, "init_task", lambda *_args, **_kwargs: SimpleNamespace(id="owner")
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        pipeline,
+        "init_task",
+        lambda *_args, **_kwargs: SimpleNamespace(id="owner"),
     )
-    monkeypatch.setattr(
-        pipeline, "run_comparison", lambda **kwargs: received.append(kwargs["candidate_model"])
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        pipeline,
+        "run_comparison",
+        lambda **kwargs: received.append(kwargs["candidate_model"]),
     )
     pipeline._compare_and_report(
         {},
@@ -541,6 +679,7 @@ def test_pipeline_comparison_uses_its_native_candidate_source_task(
         {},
         True,
         candidate_task_id="owner",
+        deps=workflow_dependencies,
     )
     assert received[0].source == "clearml"
     assert received[0].task_id == "owner"
@@ -549,12 +688,17 @@ def test_pipeline_comparison_uses_its_native_candidate_source_task(
 
 @pytest.mark.parametrize("explicit", [False, True])
 def test_cache_cannot_live_inside_pipeline_run(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, explicit: bool
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    explicit: bool,
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
-    from clearml_yolo.tasks import pipeline
+    from clearml_yolo.application.use_cases import pipeline
 
     monkeypatch.setenv("CY_HOME", str(tmp_path))
-    monkeypatch.setattr(pipeline, "init_task", lambda *a, **k: object())
+    patch_workflow(
+        monkeypatch, workflow_dependencies, pipeline, "init_task", lambda *a, **k: object()
+    )
     with pytest.raises(ValueError, match="outside run_dir"):
         pipeline.run_pipeline(
             ground_truth="source.csv",
@@ -567,4 +711,5 @@ def test_cache_cannot_live_inside_pipeline_run(
             compare={},
             dataset_cache_dir=tmp_path / "cache" if explicit else None,
             fiftyone=FiftyOneConfig(enabled=False),
+            deps=workflow_dependencies,
         )

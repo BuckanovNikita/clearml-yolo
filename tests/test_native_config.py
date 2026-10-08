@@ -8,7 +8,7 @@ import yaml
 
 
 def test_stage_templates_preserve_all_upstream_comments() -> None:
-    from clearml_yolo.native_config import native_template, render_native_yaml
+    from clearml_yolo.adapters.yolo.config import native_template, render_native_yaml
 
     original = native_template()
     for stage in ("train", "predict"):
@@ -23,7 +23,7 @@ def test_stage_templates_preserve_all_upstream_comments() -> None:
 
 
 def test_complete_upstream_mapping_is_filtered_for_prediction() -> None:
-    from clearml_yolo.native_config import native_defaults, stage_settings
+    from clearml_yolo.adapters.yolo.config import native_defaults, stage_settings
 
     settings = stage_settings(native_defaults(), "predict")
     assert settings["batch"] == 16
@@ -34,7 +34,7 @@ def test_complete_upstream_mapping_is_filtered_for_prediction() -> None:
 
 
 def test_unknown_and_raw_cfg_fail() -> None:
-    from clearml_yolo.native_config import stage_settings
+    from clearml_yolo.adapters.yolo.config import stage_settings
 
     with pytest.raises(ValueError, match="Unknown"):
         stage_settings({"not_a_native_parameter": 1}, "train")
@@ -43,7 +43,7 @@ def test_unknown_and_raw_cfg_fail() -> None:
 
 
 def test_export_has_no_hydra_wrapper_and_keeps_null(tmp_path: Path) -> None:
-    from clearml_yolo.native_config import write_native_yaml
+    from clearml_yolo.adapters.yolo.config import write_native_yaml
 
     path = write_native_yaml(tmp_path / "native.yaml", {"conf": None, "device": "cpu"}, "predict")
     values = yaml.safe_load(path.read_text())
@@ -53,7 +53,7 @@ def test_export_has_no_hydra_wrapper_and_keeps_null(tmp_path: Path) -> None:
 
 
 def test_prediction_only_rendering_options_are_commented_in_training() -> None:
-    from clearml_yolo.native_config import native_defaults, render_native_yaml
+    from clearml_yolo.adapters.yolo.config import native_defaults, render_native_yaml
 
     values = yaml.safe_load(render_native_yaml(native_defaults(), "train"))
     assert {"retina_masks", "save_crop", "show_boxes", "line_width"}.isdisjoint(values)
@@ -61,7 +61,7 @@ def test_prediction_only_rendering_options_are_commented_in_training() -> None:
 
 
 def test_project_defaults_are_explicit() -> None:
-    from clearml_yolo.native_config import native_defaults
+    from clearml_yolo.adapters.yolo.config import native_defaults
 
     defaults = native_defaults()
     assert {key: defaults[key] for key in ("imgsz", "compile", "nms", "model")} == {
@@ -74,7 +74,7 @@ def test_project_defaults_are_explicit() -> None:
 
 @pytest.mark.parametrize("stage", ["train", "predict"])
 def test_irrelevant_detection_parameters_are_commented(stage: Literal["train", "predict"]) -> None:
-    from clearml_yolo.native_config import native_defaults, render_native_yaml
+    from clearml_yolo.adapters.yolo.config import native_defaults, render_native_yaml
 
     rendered = render_native_yaml(native_defaults(), stage)
     values = yaml.safe_load(rendered)
@@ -106,21 +106,21 @@ def test_irrelevant_detection_parameters_are_commented(stage: Literal["train", "
 
 
 def test_partial_render_does_not_invent_unobserved_values() -> None:
-    from clearml_yolo.native_config import render_native_yaml
+    from clearml_yolo.adapters.yolo.config import render_native_yaml
 
     assert yaml.safe_load(render_native_yaml({"imgsz": 906}, "predict")) == {"imgsz": 906}
 
 
 @pytest.mark.parametrize("alias", ["end2end", "half", "int8", "keras"])
 def test_unrecognized_native_keys_fail_strict_validation(alias: str) -> None:
-    from clearml_yolo.native_config import stage_settings
+    from clearml_yolo.adapters.yolo.config import stage_settings
 
     with pytest.raises(ValueError, match=r"Unknown Ultralytics parameters"):
         stage_settings({alias: True}, "predict")
 
 
 def test_prediction_settings_reject_sparse_or_missing_section() -> None:
-    from clearml_yolo.native_config import prediction_settings
+    from clearml_yolo.adapters.yolo.config import prediction_settings
 
     for overrides in ({}, {"conf": 0.1}):
         with pytest.raises(ValueError, match=r"complete|Missing"):
@@ -128,7 +128,7 @@ def test_prediction_settings_reject_sparse_or_missing_section() -> None:
 
 
 def test_execution_validates_stage_and_image_size() -> None:
-    from clearml_yolo import native_config
+    from clearml_yolo.adapters.yolo import config as native_config
 
     assert hasattr(native_config, "execution_settings")
     defaults = native_config.native_defaults()
@@ -148,14 +148,14 @@ def test_execution_validates_stage_and_image_size() -> None:
 
 
 def test_native_training_list_size_is_not_wrapper_normalized() -> None:
-    from clearml_yolo.native_config import execution_settings, native_defaults
+    from clearml_yolo.adapters.yolo.config import execution_settings, native_defaults
 
     values = execution_settings(native_defaults() | {"imgsz": [906, 640]}, "train")
     assert values["imgsz"] == [906, 640]
 
 
 def test_classification_covers_template_once_and_preserves_detection_losses() -> None:
-    from clearml_yolo.native_config import (
+    from clearml_yolo.adapters.yolo.config import (
         INACTIVE_KEYS,
         PREDICT_KEYS,
         TRAIN_KEYS,

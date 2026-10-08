@@ -5,9 +5,9 @@ from typing import Any
 
 import pytest
 
-from clearml_yolo.clearml_report import report_confusion_matrices, report_pr_curves
-from clearml_yolo.model_identity import ModelIdentity
-from clearml_yolo.result_schema import ConfusionMatrixPayload, PRCurve, ResultContext
+from clearml_yolo.adapters.clearml.report import report_confusion_matrices, report_pr_curves
+from clearml_yolo.core.evaluation.schema import ConfusionMatrixPayload, PRCurve, ResultContext
+from clearml_yolo.core.identity import ModelIdentity
 
 
 class RecordingTask:
@@ -22,7 +22,9 @@ class RecordingTask:
 
 
 CONTEXT = ResultContext(
-    context_id="candidate:opaque-context", model_id="opaque-model-id", split="test",
+    context_id="candidate:opaque-context",
+    model_id="opaque-model-id",
+    split="test",
     model_identity=ModelIdentity(model_name="Road detector 猫", training_task_id="opaque-task-id"),
 )
 
@@ -137,10 +139,20 @@ def test_pr_empty_populations_keep_legend_without_numerical_points(gt_count: int
 
 def test_pr_classes_share_one_chart_without_identifiers() -> None:
     task = RecordingTask()
-    curves = [PRCurve(
-        class_name=name, recall=[0.5], precision=[1], confidence=[0.9], tp=[1], fp=[0],
-        gt_count=2, ap50=0.5, integration_method="continuous",
-    ) for name in ["10", "2", "猫/%", "<car>"]]
+    curves = [
+        PRCurve(
+            class_name=name,
+            recall=[0.5],
+            precision=[1],
+            confidence=[0.9],
+            tp=[1],
+            fp=[0],
+            gt_count=2,
+            ap50=0.5,
+            integration_method="continuous",
+        )
+        for name in ["10", "2", "猫/%", "<car>"]
+    ]
     report_pr_curves(task, CONTEXT, curves)
     assert len(task.plots) == 1
     plot = task.plots[0]
@@ -158,8 +170,15 @@ def test_pr_classes_share_one_chart_without_identifiers() -> None:
 def test_pr_is_test_only(split: str) -> None:
     task = RecordingTask()
     curve = PRCurve(
-        class_name="car", recall=[1], precision=[1], confidence=[0.9], tp=[1], fp=[0],
-        gt_count=1, ap50=1, integration_method="continuous",
+        class_name="car",
+        recall=[1],
+        precision=[1],
+        confidence=[0.9],
+        tp=[1],
+        fp=[0],
+        gt_count=1,
+        ap50=1,
+        integration_method="continuous",
     )
     report_pr_curves(task, CONTEXT.model_copy(update={"split": split}), [curve])
     assert task.plots == []

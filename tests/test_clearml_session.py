@@ -14,7 +14,7 @@ import pandas as pd
 import pytest
 from ruamel.yaml import YAML
 
-from clearml_yolo.clearml_session import (
+from clearml_yolo.adapters.clearml.session import (
     DEFAULT_PROJECT_NAME,
     ArtifactUploadError,
     ClearMLConfig,
@@ -28,6 +28,9 @@ from clearml_yolo.clearml_session import (
     replay_configuration,
     upload_artifact,
 )
+from clearml_yolo.application.ports import WorkflowDependencies
+from workflow_dependencies import patch_workflow
+from workflow_dependencies import workflow_dependencies as workflow_dependencies  # noqa: PLC0414
 
 
 def test_harness_environment_does_not_rewrite_tracking_configuration(
@@ -195,7 +198,7 @@ import sys
 from pathlib import Path
 
 from loguru import logger
-from clearml_yolo.clearml_session import ClearMLConfig, invocation
+from clearml_yolo.adapters.clearml.session import ClearMLConfig, invocation
 
 try:
     with invocation(ClearMLConfig(project_name='console-regression'), 'predict') as task:
@@ -621,7 +624,7 @@ def test_remote_configuration_can_replace_missing_original(
 
 
 def test_common_authentication_shapes_are_redacted() -> None:
-    from clearml_yolo.clearml_session import sanitize_configuration
+    from clearml_yolo.adapters.clearml.session import sanitize_configuration
 
     value = {
         "headers": {"Authorization": "Bearer credential", "Content-Type": "application/json"},
@@ -638,10 +641,13 @@ def test_common_authentication_shapes_are_redacted() -> None:
 
 
 def test_metric_split_upload_rejection_fails_owner_and_retains_payload(
-    fake_clearml: tuple[type[Any], FakeTask], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    fake_clearml: tuple[type[Any], FakeTask],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
-    from clearml_yolo.publishing.models import FiftyOneConfig
-    from clearml_yolo.tasks.metrics import EvaluationConfig, compute_metrics
+    from clearml_yolo.application.use_cases.metrics import EvaluationConfig, compute_metrics
+    from clearml_yolo.core.publication import FiftyOneConfig
     from test_metrics import _write_inputs
 
     _, task = fake_clearml
@@ -654,8 +660,18 @@ def test_metric_split_upload_rejection_fails_owner_and_retains_payload(
         return original(**kwargs)
 
     monkeypatch.setattr(task, "upload_artifact", reject_evaluation)
-    monkeypatch.setattr("clearml_yolo.tasks.metrics.report_table", lambda *a, **kw: None)
-    monkeypatch.setattr("clearml_yolo.tasks.metrics.report_scalars", lambda *a: None)
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.metrics.report_table",
+        lambda *a, **kw: None,
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.metrics.report_scalars",
+        lambda *a: None,
+    )
     with (
         pytest.raises(ArtifactUploadError, match="metrics_dashboard_full_test"),
         invocation(ClearMLConfig(), "metrics"),
@@ -669,6 +685,7 @@ def test_metric_split_upload_rejection_fails_owner_and_retains_payload(
             splits=["test"],
             fiftyone=FiftyOneConfig(enabled=False),
             model_label="test model",
+            deps=workflow_dependencies,
         )
     assert task.failed
     assert not task.completed
@@ -867,7 +884,7 @@ def test_run_replay_redacts_storage_without_rewriting_execution_credentials(
 
 
 def _resolve_attachment(document: Any) -> Any:
-    from clearml_yolo.apps.config_resolution import resolve_config_document
+    from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_document
 
     return resolve_config_document(document, {"run_dir": "runs/effective", "batch": 8})
 
@@ -1169,7 +1186,7 @@ def test_configuration_file_redacts_aliases_with_secret_provenance_from_context(
     original = source.read_bytes()
 
     def resolve_private(document: Any) -> Any:
-        from clearml_yolo.apps.config_resolution import resolve_config_file
+        from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_file
 
         context = (
             {"auth": {"password": "probe-private-value"}} if reference == "${auth.password}" else {}
@@ -1197,7 +1214,8 @@ def test_replay_preserves_explicit_empty_executable_values(
 
 
 def test_cleanup_failure_retains_original_exception(
-    fake_clearml: tuple[type[Any], FakeTask], monkeypatch: pytest.MonkeyPatch,
+    fake_clearml: tuple[type[Any], FakeTask],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _, task = fake_clearml
     original = ValueError("original computation failure")
@@ -1216,9 +1234,10 @@ def test_cleanup_failure_retains_original_exception(
 
 
 def test_local_cleanup_oserror_does_not_mask_original_failure(
-    fake_clearml: tuple[type[Any], FakeTask], monkeypatch: pytest.MonkeyPatch,
+    fake_clearml: tuple[type[Any], FakeTask],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from clearml_yolo.clearml_session import _InvocationState
+    from clearml_yolo.adapters.clearml.session import _InvocationState
 
     original = ValueError("computation failed")
 
@@ -1235,9 +1254,10 @@ def test_local_cleanup_oserror_does_not_mask_original_failure(
 
 
 def test_local_cleanup_oserror_propagates_after_otherwise_successful_call(
-    fake_clearml: tuple[type[Any], FakeTask], monkeypatch: pytest.MonkeyPatch,
+    fake_clearml: tuple[type[Any], FakeTask],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from clearml_yolo.clearml_session import _InvocationState
+    from clearml_yolo.adapters.clearml.session import _InvocationState
 
     def cleanup(_self: _InvocationState) -> None:
         raise PermissionError("cleanup denied")
@@ -1258,7 +1278,7 @@ def test_secondary_failure_diagnostics_preserve_primary_and_redact_credentials(
 ) -> None:
     from loguru import logger
 
-    from clearml_yolo.clearml_session import _InvocationState
+    from clearml_yolo.adapters.clearml.session import _InvocationState
 
     _, task = fake_clearml
     original = ValueError("primary failure")

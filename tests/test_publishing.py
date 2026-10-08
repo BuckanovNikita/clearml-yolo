@@ -10,22 +10,28 @@ import pytest
 from hydra import compose, initialize_config_module
 from hydra_zen import store
 
+import clearml_yolo.entrypoints.hydra.configs  # noqa: F401 - register Hydra configs
+from clearml_yolo.application.ports import WorkflowDependencies
 from test_clearml_report import warnings_log as warnings_log  # noqa: PLC0414 - fixture export
+from workflow_dependencies import patch_workflow
+from workflow_dependencies import (
+    workflow_dependencies as workflow_dependencies,  # noqa: PLC0414 - fixture export
+)
 
 
 def test_disabled_publisher_does_not_import_fiftyone(tmp_path: Path) -> None:
     code = """
 import sys
 from pathlib import Path
-from clearml_yolo.publishing import create_publisher
-from clearml_yolo.publishing.models import FiftyOneConfig, PublicationRequest
+from clearml_yolo.entrypoints.composition import create_publisher
+from clearml_yolo.core.publication import FiftyOneConfig, PublicationRequest
 publisher = create_publisher(FiftyOneConfig(enabled=False))
 publisher.preflight()
 request = PublicationRequest(task_id='test', ground_truth=Path('missing.csv'))
 assert publisher.publish(request) is None
 assert not any(name == 'fiftyone' or name.startswith('fiftyone.') for name in sys.modules)
 """
-    result = subprocess.run(  # noqa: S603 - fixed interpreter and test-owned source
+    result = subprocess.run(  # noqa: S603 - controlled Python import probe
         [sys.executable, "-c", code], cwd=tmp_path, capture_output=True, text=True, check=False
     )
     assert result.returncode == 0, result.stderr
@@ -34,7 +40,6 @@ assert not any(name == 'fiftyone' or name.startswith('fiftyone.') for name in sy
 
 @pytest.mark.parametrize("command", ["pipeline", "predict", "metrics"])
 def test_publishing_enabled_by_default_and_can_be_disabled(command: str) -> None:
-    import clearml_yolo.configs  # noqa: F401
 
     store.add_to_hydra_store(overwrite_ok=True)
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
@@ -47,7 +52,6 @@ def test_publishing_enabled_by_default_and_can_be_disabled(command: str) -> None
 
 @pytest.mark.parametrize("command", ["train", "val", "compare", "report", "ground_truth"])
 def test_other_commands_do_not_enable_publishing(command: str) -> None:
-    import clearml_yolo.configs  # noqa: F401
 
     store.add_to_hydra_store(overwrite_ok=True)
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
@@ -56,12 +60,12 @@ def test_other_commands_do_not_enable_publishing(command: str) -> None:
 
 
 def test_fiftyone_receipt_stays_local_and_is_linked_from_run_configuration(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
     from datetime import UTC, datetime
 
-    from clearml_yolo.publishing.models import PublicationReceipt
-    from clearml_yolo.tasks import publication
+    from clearml_yolo.application.use_cases import publication
+    from clearml_yolo.core.publication import PublicationReceipt
 
     receipt = PublicationReceipt(
         dataset_name="clearml-yolo-fixture",
@@ -89,19 +93,20 @@ def test_fiftyone_receipt_stays_local_and_is_linked_from_run_configuration(
         def publish(self, _request: object) -> PublicationReceipt:
             return receipt
 
-    monkeypatch.setattr(
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
         publication,
         "record_run_configuration",
         lambda _task, values: recorded.append(values),
     )
-
     result = publication.publish_results(
         Publisher(),
         type("Task", (), {"id": "publication-task"})(),
         output_dir=tmp_path,
         ground_truth=tmp_path / "ground_truth.csv",
+        deps=workflow_dependencies,
     )
-
     assert result == receipt
     assert (tmp_path / "fiftyone_publication.json").is_file()
     assert recorded == [
@@ -120,10 +125,10 @@ def test_fiftyone_receipt_stays_local_and_is_linked_from_run_configuration(
 
 @pytest.mark.parametrize("stage", ["factory", "preflight"])
 def test_visualization_setup_failure_warns_and_disables_publication(
-    stage: str, warnings_log: list[str]
+    stage: str, warnings_log: list[str], workflow_dependencies: WorkflowDependencies
 ) -> None:
-    from clearml_yolo.publishing.models import FiftyOneConfig
-    from clearml_yolo.tasks.publication import prepare_publisher
+    from clearml_yolo.application.use_cases.publication import prepare_publisher
+    from clearml_yolo.core.publication import FiftyOneConfig
 
     class FailingPublisher:
         enabled = True
@@ -139,7 +144,9 @@ def test_visualization_setup_failure_warns_and_disables_publication(
             raise ImportError("visualization backend unavailable")
         return FailingPublisher()
 
-    result = prepare_publisher(SimpleNamespace(id="task"), FiftyOneConfig(), factory=factory)
+    result = prepare_publisher(
+        SimpleNamespace(id="task"), FiftyOneConfig(), factory=factory, deps=workflow_dependencies
+    )
     assert result.enabled is False
     assert any("FiftyOne visualization setup failed" in warning for warning in warnings_log)
     expected = "visualization backend unavailable" if stage == "factory" else "database unavailable"
@@ -148,9 +155,12 @@ def test_visualization_setup_failure_warns_and_disables_publication(
 
 @pytest.mark.parametrize("failure", [ValueError("invalid box"), OSError("database write failed")])
 def test_visualization_publication_failure_warns_without_success_receipt(
-    tmp_path: Path, failure: Exception, warnings_log: list[str]
+    tmp_path: Path,
+    failure: Exception,
+    warnings_log: list[str],
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
-    from clearml_yolo.tasks.publication import publish_results
+    from clearml_yolo.application.use_cases.publication import publish_results
 
     class FailingPublisher:
         enabled = True
@@ -162,7 +172,11 @@ def test_visualization_publication_failure_warns_without_success_receipt(
             raise failure
 
     result = publish_results(
-        FailingPublisher(), SimpleNamespace(id="task"), output_dir=tmp_path, ground_truth="gt.csv"
+        FailingPublisher(),
+        SimpleNamespace(id="task"),
+        output_dir=tmp_path,
+        ground_truth="gt.csv",
+        deps=workflow_dependencies,
     )
     assert result is None
     assert not (tmp_path / "fiftyone_publication.json").exists()
@@ -176,10 +190,10 @@ def test_visualization_publication_failure_warns_without_success_receipt(
 
 @pytest.mark.parametrize("stage", ["factory", "preflight", "publication"])
 def test_visualization_warnings_do_not_expose_backend_credentials(
-    tmp_path: Path, stage: str, warnings_log: list[str]
+    tmp_path: Path, stage: str, warnings_log: list[str], workflow_dependencies: WorkflowDependencies
 ) -> None:
-    from clearml_yolo.publishing.models import FiftyOneConfig
-    from clearml_yolo.tasks.publication import prepare_publisher, publish_results
+    from clearml_yolo.application.use_cases.publication import prepare_publisher, publish_results
+    from clearml_yolo.core.publication import FiftyOneConfig
 
     failure = RuntimeError("mongodb://user:private-password@host/?authSource=admin")
 
@@ -199,8 +213,15 @@ def test_visualization_warnings_do_not_expose_backend_credentials(
         return FailingPublisher()
 
     task = SimpleNamespace(id="task")
-    publisher = prepare_publisher(task, FiftyOneConfig(), factory=factory)
-    assert publish_results(publisher, task, output_dir=tmp_path, ground_truth="gt.csv") is None
+    publisher = prepare_publisher(
+        task, FiftyOneConfig(), factory=factory, deps=workflow_dependencies
+    )
+    assert (
+        publish_results(
+            publisher, task, output_dir=tmp_path, ground_truth="gt.csv", deps=workflow_dependencies
+        )
+        is None
+    )
     assert any("RuntimeError" in warning for warning in warnings_log)
     assert all("private-password" not in warning for warning in warnings_log)
     assert all("mongodb://" not in warning for warning in warnings_log)
@@ -212,11 +233,12 @@ def test_visualization_receipt_failure_does_not_fail_computation(
     monkeypatch: pytest.MonkeyPatch,
     failure_stage: str,
     warnings_log: list[str],
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
     from datetime import UTC, datetime
 
-    from clearml_yolo.publishing.models import PublicationReceipt
-    from clearml_yolo.tasks import publication
+    from clearml_yolo.application.use_cases import publication
+    from clearml_yolo.core.publication import PublicationReceipt
 
     receipt = PublicationReceipt(
         dataset_name="visualization",
@@ -245,12 +267,18 @@ def test_visualization_receipt_failure_does_not_fail_computation(
     def fail_record(*_args: Any) -> None:
         raise RuntimeError("visualization link unavailable")
 
-    monkeypatch.setattr(publication, "record_run_configuration", fail_record)
+    patch_workflow(
+        monkeypatch, workflow_dependencies, publication, "record_run_configuration", fail_record
+    )
     destination = tmp_path / "output"
     if failure_stage == "receipt":
         destination.write_text("existing file")
     result = publication.publish_results(
-        Publisher(), SimpleNamespace(id="task"), output_dir=destination, ground_truth="gt.csv"
+        Publisher(),
+        SimpleNamespace(id="task"),
+        output_dir=destination,
+        ground_truth="gt.csv",
+        deps=workflow_dependencies,
     )
     assert result is None
     assert any("FiftyOne visualization publication failed" in warning for warning in warnings_log)
@@ -264,18 +292,23 @@ def test_visualization_receipt_failure_does_not_fail_computation(
 
 @pytest.mark.parametrize("stage", ["preflight", "publish"])
 def test_visualization_failure_allows_clearml_task_completion(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, stage: str
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    stage: str,
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
     import clearml
 
-    from clearml_yolo.clearml_session import ClearMLConfig, invocation, upload_artifact
-    from clearml_yolo.publishing.models import FiftyOneConfig
-    from clearml_yolo.tasks.publication import prepare_publisher, publish_results
+    from clearml_yolo.adapters.clearml.session import ClearMLConfig, invocation, upload_artifact
+    from clearml_yolo.application.use_cases.publication import prepare_publisher, publish_results
+    from clearml_yolo.core.publication import FiftyOneConfig
     from test_clearml_session import FakeTask
 
     task = FakeTask()
-    monkeypatch.setattr(clearml.Task, "init", lambda **_kwargs: task)
-    monkeypatch.setattr(clearml.Task, "get_task", lambda **_kwargs: task)
+    patch_workflow(monkeypatch, workflow_dependencies, clearml.Task, "init", lambda **_kwargs: task)
+    patch_workflow(
+        monkeypatch, workflow_dependencies, clearml.Task, "get_task", lambda **_kwargs: task
+    )
     monkeypatch.delenv("LOCAL_RANK", raising=False)
     predictions = tmp_path / "predictions.csv"
     predictions.write_text("image_name\nexample.jpg\n")
@@ -291,10 +324,22 @@ def test_visualization_failure_allows_clearml_task_completion(
             raise ValueError("invalid visualization box")
 
     with invocation(ClearMLConfig(), "predict") as owner:
-        publisher = prepare_publisher(owner, FiftyOneConfig(), factory=lambda _: FailingPublisher())
+        publisher = prepare_publisher(
+            owner,
+            FiftyOneConfig(),
+            factory=lambda _: FailingPublisher(),
+            deps=workflow_dependencies,
+        )
         upload_artifact(owner, "predictions", predictions)
         assert (
-            publish_results(publisher, owner, output_dir=tmp_path, ground_truth="gt.csv") is None
+            publish_results(
+                publisher,
+                owner,
+                output_dir=tmp_path,
+                ground_truth="gt.csv",
+                deps=workflow_dependencies,
+            )
+            is None
         )
     assert task.failed == []
     assert task.completed == [{"ignore_errors": False, "force": True}]
@@ -304,9 +349,9 @@ def test_visualization_failure_allows_clearml_task_completion(
 
 
 def test_publication_request_failure_identifies_input_without_calling_backend(
-    tmp_path: Path, warnings_log: list[str]
+    tmp_path: Path, warnings_log: list[str], workflow_dependencies: WorkflowDependencies
 ) -> None:
-    from clearml_yolo.tasks.publication import publish_results
+    from clearml_yolo.application.use_cases.publication import publish_results
 
     class Publisher:
         enabled = True
@@ -323,12 +368,13 @@ def test_publication_request_failure_identifies_input_without_calling_backend(
             SimpleNamespace(id=""),
             output_dir=tmp_path,
             ground_truth="gt.csv",
+            deps=workflow_dependencies,
         )
         is None
     )
     assert any(
         "operation=prepare_request" in entry
         and "ground_truth=gt.csv" in entry
-        and "ValidationError" in entry
+        and ("ValidationError" in entry)
         for entry in warnings_log
     )

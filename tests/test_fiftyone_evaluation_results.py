@@ -10,13 +10,13 @@ from uuid import uuid4
 
 import pytest
 
-from clearml_yolo.comparison.evaluation_payload import EvaluationPayload
+from clearml_yolo.core.evaluation.payload import EvaluationPayload
 
 
 @pytest.fixture
 def native(monkeypatch: pytest.MonkeyPatch) -> Any:
     monkeypatch.setenv("FIFTYONE_DISABLE_SERVICES", "1")
-    from clearml_yolo.publishing import fiftyone_evaluation
+    from clearml_yolo.adapters.fiftyone import evaluation as fiftyone_evaluation
 
     return fiftyone_evaluation
 

@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 
-from clearml_yolo import clearml_naming
+from clearml_yolo.adapters.clearml import naming as clearml_naming
 
 
 @pytest.fixture

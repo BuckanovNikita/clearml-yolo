@@ -10,19 +10,19 @@ from uuid import uuid4
 
 import pytest
 
-from clearml_yolo.comparison.evaluation_payload import EvaluationReport
+from clearml_yolo.core.evaluation.payload import EvaluationReport
 from test_fiftyone_evaluation_results import payload as source_payload
 
 payload = source_payload
 
 
 def test_panel_module_is_available() -> None:
-    assert importlib.util.find_spec("clearml_yolo.publishing.fiftyone_panel") is not None
+    assert importlib.util.find_spec("clearml_yolo.adapters.fiftyone.panel") is not None
 
 
 @pytest.mark.skipif(os.environ.get("CY_TEST_FIFTYONE") != "1", reason="Isolated FiftyOne required")
 def test_report_keeps_source_precision_and_marks_subset_unavailable() -> None:
-    from clearml_yolo.publishing.fiftyone_panel import report_data
+    from clearml_yolo.adapters.fiftyone.panel import report_data
 
     report = EvaluationReport.model_validate(
         {
@@ -81,7 +81,7 @@ def dataset() -> Iterator[Any]:
 def test_exact_view_removes_unrelated_same_class_labels(dataset: Any, tmp_path: Path) -> None:
     import fiftyone as fo
 
-    from clearml_yolo.publishing.fiftyone_panel import select_evaluation_labels
+    from clearml_yolo.adapters.fiftyone.panel import select_evaluation_labels
 
     truth = [fo.Detection(label="a"), fo.Detection(label="a")]
     predictions = [fo.Detection(label="b"), fo.Detection(label="b")]
@@ -103,7 +103,7 @@ def test_exact_view_removes_unrelated_same_class_labels(dataset: Any, tmp_path: 
 def evaluated(dataset: Any, payload: Any, tmp_path: Path) -> Any:
     import fiftyone as fo
 
-    from clearml_yolo.publishing.fiftyone_evaluation import publish_evaluation
+    from clearml_yolo.adapters.fiftyone.evaluation import publish_evaluation
 
     truth = [fo.Detection(label=box.label, dm_index=box.index) for box in payload.ground_truth]
     predictions = [
@@ -145,7 +145,7 @@ def _panel_data(ctx: Any) -> dict[str, Any]:
 
 
 def test_native_headlines_and_reports_render_with_real_panel_context(evaluated: Any) -> None:
-    from clearml_yolo.publishing.fiftyone_panel import EvaluationReportsPanel, NativeEvaluationPanel
+    from clearml_yolo.adapters.fiftyone.panel import EvaluationReportsPanel, NativeEvaluationPanel
 
     native = NativeEvaluationPanel()
     data = native.get_evaluation_data_cacheable(_context(evaluated))
@@ -165,7 +165,7 @@ def test_native_headlines_and_reports_render_with_real_panel_context(evaluated: 
 def test_exact_matrix_callback_emits_view_with_only_associated_labels(evaluated: Any) -> None:
     from fiftyone.core.view import DatasetView
 
-    from clearml_yolo.publishing.fiftyone_panel import NativeEvaluationPanel
+    from clearml_yolo.adapters.fiftyone.panel import NativeEvaluationPanel
 
     ctx = _context(evaluated, params={"type": "matrix", "options": {"x": "dog", "y": "background"}})
     NativeEvaluationPanel().load_view(ctx)
@@ -182,7 +182,7 @@ def test_plugin_explicit_install_registers_both_panels(
     from fiftyone.plugins.context import PluginContext
     from fiftyone.plugins.definitions import PluginDefinition
 
-    from clearml_yolo.publishing.fiftyone_panel import install_evaluation_plugin
+    from clearml_yolo.adapters.fiftyone.panel import install_evaluation_plugin
 
     monkeypatch.setattr(fo.config, "plugins_dir", str(tmp_path / "plugins"))
     installed = install_evaluation_plugin()
@@ -204,8 +204,8 @@ def test_matrix_comparison_selects_exact_labels_from_both_runs(
     import fiftyone as fo
     from fiftyone.core.view import DatasetView
 
-    from clearml_yolo.publishing.fiftyone_evaluation import publish_evaluation
-    from clearml_yolo.publishing.fiftyone_panel import NativeEvaluationPanel
+    from clearml_yolo.adapters.fiftyone.evaluation import publish_evaluation
+    from clearml_yolo.adapters.fiftyone.panel import NativeEvaluationPanel
 
     sample = evaluated.first()
     sample["other_pred"] = fo.Detections(
@@ -246,7 +246,7 @@ def test_status_callback_selects_exact_source_labels(
 ) -> None:
     from fiftyone.core.view import DatasetView
 
-    from clearml_yolo.publishing.fiftyone_panel import NativeEvaluationPanel
+    from clearml_yolo.adapters.fiftyone.panel import NativeEvaluationPanel
 
     ctx = _context(evaluated, params={"type": "field", "options": {"field": status}})
     NativeEvaluationPanel().load_view(ctx)
@@ -256,7 +256,7 @@ def test_status_callback_selects_exact_source_labels(
 
 
 def test_project_callbacks_ignore_stale_native_result_cache(evaluated: Any) -> None:
-    from clearml_yolo.publishing.fiftyone_panel import NativeEvaluationPanel
+    from clearml_yolo.adapters.fiftyone.panel import NativeEvaluationPanel
 
     cached = evaluated.load_evaluation_results("imported")
     cached.source_data["matches"] = []
@@ -272,7 +272,7 @@ def test_project_callbacks_ignore_stale_native_result_cache(evaluated: Any) -> N
 
 
 def test_native_rename_delete_refreshes_panel_state(evaluated: Any) -> None:
-    from clearml_yolo.publishing.fiftyone_panel import NativeEvaluationPanel
+    from clearml_yolo.adapters.fiftyone.panel import NativeEvaluationPanel
 
     panel = NativeEvaluationPanel()
     ctx = _context(evaluated, params={"old_name": "imported", "new_name": "renamed"})
@@ -286,7 +286,7 @@ def test_native_rename_delete_refreshes_panel_state(evaluated: Any) -> None:
 
 
 def test_removed_scenario_reports_unavailable_without_crashing(evaluated: Any) -> None:
-    from clearml_yolo.publishing.fiftyone_panel import NativeEvaluationPanel
+    from clearml_yolo.adapters.fiftyone.panel import NativeEvaluationPanel
 
     ctx = _context(evaluated, params={"id": "removed", "refresh_cache": True})
     NativeEvaluationPanel().load_scenario(ctx)
@@ -297,8 +297,8 @@ def test_removed_scenario_reports_unavailable_without_crashing(evaluated: Any) -
 def test_wrong_class_cell_selects_only_its_exact_pair(evaluated: Any, payload: Any) -> None:
     from fiftyone.core.view import DatasetView
 
-    from clearml_yolo.publishing.fiftyone_evaluation import publish_evaluation
-    from clearml_yolo.publishing.fiftyone_panel import NativeEvaluationPanel
+    from clearml_yolo.adapters.fiftyone.evaluation import publish_evaluation
+    from clearml_yolo.adapters.fiftyone.panel import NativeEvaluationPanel
 
     # A wrong-class prediction claims GT 1 before its duplicate same-class FP.
     changed = payload.model_copy(deep=True)
@@ -318,7 +318,7 @@ def test_wrong_class_cell_selects_only_its_exact_pair(evaluated: Any, payload: A
 def test_stock_evaluation_retains_builtin_counts(dataset: Any, tmp_path: Path) -> None:
     import fiftyone as fo
 
-    from clearml_yolo.publishing.fiftyone_panel import NativeEvaluationPanel
+    from clearml_yolo.adapters.fiftyone.panel import NativeEvaluationPanel
 
     dataset.add_sample(
         fo.Sample(
@@ -341,7 +341,7 @@ def test_stock_evaluation_retains_builtin_counts(dataset: Any, tmp_path: Path) -
 
 
 def test_native_matrix_includes_classes_with_zero_diagonal(evaluated: Any, payload: Any) -> None:
-    from clearml_yolo.publishing.fiftyone_panel import NativeEvaluationPanel
+    from clearml_yolo.adapters.fiftyone.panel import NativeEvaluationPanel
 
     panel = NativeEvaluationPanel()
     ctx = _context(evaluated)
@@ -361,7 +361,7 @@ def test_native_matrix_includes_classes_with_zero_diagonal(evaluated: Any, paylo
 
 
 def test_empty_and_unit_confusion_colorscales_are_finite(evaluated: Any) -> None:
-    from clearml_yolo.publishing.fiftyone_panel import NativeEvaluationPanel
+    from clearml_yolo.adapters.fiftyone.panel import NativeEvaluationPanel
 
     panel = NativeEvaluationPanel()
     results = evaluated.load_evaluation_results("imported", cache=False)

@@ -6,7 +6,9 @@ import pandas as pd
 import pytest
 from PIL import Image
 
-from clearml_yolo.ground_truth import GROUND_TRUTH_COLUMNS, build_ground_truth
+from clearml_yolo.adapters.yolo.ground_truth import GROUND_TRUTH_COLUMNS, build_ground_truth
+from clearml_yolo.application.ports import WorkflowDependencies
+from workflow_dependencies import workflow_dependencies as workflow_dependencies  # noqa: PLC0414
 
 TRAIN_IMAGE_SIZE = (100, 50)
 VAL_IMAGE_SIZE = (200, 100)
@@ -224,46 +226,67 @@ def test_invalid_test_fraction_is_rejected(dataset_yaml: Path, tmp_path: Path) -
 def test_tracked_conversion_uses_effective_dataset_configuration(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
-    from clearml_yolo.clearml_session import ClearMLConfig
-    from clearml_yolo.tasks import ground_truth as stage
+    from clearml_yolo.adapters.clearml.session import ClearMLConfig
+    from clearml_yolo.application.use_cases import ground_truth as stage
 
     calls: list[str] = []
     override = tmp_path / "remote.yaml"
     output = tmp_path / "truth.csv"
-    monkeypatch.setattr(stage, "init_task", lambda *args, **kwargs: object())
-    monkeypatch.setattr(stage, "register_ground_truth", lambda *args, **kwargs: None)
-    monkeypatch.setattr(stage, "connect_config_file", lambda *args: override)
+    monkeypatch.setattr(
+        workflow_dependencies.tracking, "init_task", lambda *args, **kwargs: object()
+    )
+    monkeypatch.setattr(
+        workflow_dependencies.tracking, "register_ground_truth", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        workflow_dependencies.tracking, "connect_config_file", lambda *args: override
+    )
 
     def convert(source: str, *_args: object, **_kwargs: object) -> Path:
         calls.append(source)
         return output
 
-    monkeypatch.setattr(stage, "build_ground_truth", convert)
-    stage.ground_truth("missing-original.yaml", str(output), ClearMLConfig())
+    monkeypatch.setattr(workflow_dependencies.dataset, "build_ground_truth", convert)
+    stage.ground_truth(
+        "missing-original.yaml", str(output), ClearMLConfig(), deps=workflow_dependencies
+    )
     assert calls == [str(override)]
 
 
 def test_tracked_conversion_publishes_the_expanded_output_path(
-    dataset_yaml: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    dataset_yaml: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
-    from clearml_yolo.clearml_session import ClearMLConfig
-    from clearml_yolo.tasks import ground_truth as stage
+    from clearml_yolo.adapters.clearml.session import ClearMLConfig
+    from clearml_yolo.application.use_cases import ground_truth as stage
 
     selected = tmp_path / "home/truth.csv"
     original_expanduser = Path.expanduser
     monkeypatch.setattr(
-        Path, "expanduser",
+        Path,
+        "expanduser",
         lambda path: selected if str(path) == "~/truth.csv" else original_expanduser(path),
     )
     monkeypatch.setattr(Path, "home", lambda: selected.parent)
     published: list[Path] = []
-    monkeypatch.setattr(stage, "init_task", lambda *args, **kwargs: object())
-    monkeypatch.setattr(stage, "connect_config_file", lambda *args: dataset_yaml)
     monkeypatch.setattr(
-        stage, "register_ground_truth", lambda _task, path, **kwargs: published.append(path)
+        workflow_dependencies.tracking, "init_task", lambda *args, **kwargs: object()
     )
-    result = stage.ground_truth(str(dataset_yaml), "~/truth.csv", ClearMLConfig())
+    monkeypatch.setattr(
+        workflow_dependencies.tracking, "connect_config_file", lambda *args: dataset_yaml
+    )
+    monkeypatch.setattr(
+        workflow_dependencies.tracking,
+        "register_ground_truth",
+        lambda _task, path, **kwargs: published.append(path),
+    )
+    result = stage.ground_truth(
+        str(dataset_yaml), "~/truth.csv", ClearMLConfig(), deps=workflow_dependencies
+    )
     assert result == selected
     assert published == [selected]
     assert selected.is_file()
@@ -271,8 +294,8 @@ def test_tracked_conversion_publishes_the_expanded_output_path(
 
 @pytest.mark.parametrize("orientation", [1, 6, 8])
 def test_converted_exif_boxes_survive_csv_validation(tmp_path: Path, orientation: int) -> None:
-    from clearml_yolo.dataset_records import validate_ground_truth
-    from clearml_yolo.ground_truth import _split_rows
+    from clearml_yolo.adapters.storage.dataset_records import validate_ground_truth
+    from clearml_yolo.adapters.yolo.ground_truth import _split_rows
 
     images = tmp_path / "images"
     labels = tmp_path / "labels"

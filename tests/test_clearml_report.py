@@ -12,7 +12,7 @@ import pandas as pd
 import pytest
 from loguru import logger
 
-from clearml_yolo.clearml_report import (
+from clearml_yolo.adapters.clearml.report import (
     report_comparison,
     report_scalars,
     report_table,

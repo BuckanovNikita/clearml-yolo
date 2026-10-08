@@ -7,16 +7,19 @@ from typing import Any, cast
 import pandas as pd
 import pytest
 
-from clearml_yolo.clearml_session import ClearMLConfig
-from clearml_yolo.comparison.evaluation_payload import EvaluationPayload
-from clearml_yolo.comparison.reinfer import reinfer_split
-from clearml_yolo.comparison.scoring import EvaluationConfig
-from clearml_yolo.publishing.models import FiftyOneConfig
-from clearml_yolo.tasks.compare import SettledInference, _scored
-from clearml_yolo.tasks.metrics import MetricsResult, compute_metrics
-from clearml_yolo.tasks.val import validate
-from clearml_yolo.workbook_identity import read_dashboard
+from clearml_yolo.adapters.clearml.session import ClearMLConfig
+from clearml_yolo.adapters.reporting.workbook_identity import read_dashboard
+from clearml_yolo.adapters.yolo.reinfer import reinfer_split
+from clearml_yolo.application.ports import WorkflowDependencies
+from clearml_yolo.application.use_cases.compare import SettledInference, _scored
+from clearml_yolo.application.use_cases.metrics import MetricsResult, compute_metrics
+from clearml_yolo.application.use_cases.val import validate
+from clearml_yolo.core.evaluation.models import EvaluationConfig
+from clearml_yolo.core.evaluation.payload import EvaluationPayload
+from clearml_yolo.core.publication import FiftyOneConfig
 from native_config_helpers import prediction_config
+from workflow_dependencies import patch_workflow
+from workflow_dependencies import workflow_dependencies as workflow_dependencies  # noqa: PLC0414
 
 BOX_COLUMNS = ["bbox_x_tl", "bbox_y_tl", "bbox_x_br", "bbox_y_br"]
 PRED_COLUMNS = ["image_name", "instance_label", *BOX_COLUMNS, "confidence"]
@@ -79,13 +82,21 @@ def _assert_metrics(result: MetricsResult, all_invalid: bool) -> None:
 
 @pytest.mark.parametrize("all_invalid", [False, True], ids=["mixed", "all-invalid"])
 def test_metrics_scores_valid_boxes_without_rewriting_raw_csv(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, all_invalid: bool
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    all_invalid: bool,
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
     _, truth_path = _inputs(tmp_path)
     predictions = tmp_path / "predictions.csv"
     _predictions(["val.jpg", "test.jpg"], all_invalid).to_csv(predictions, index=False)
     original = predictions.read_bytes()
-    monkeypatch.setattr("clearml_yolo.tasks.metrics.init_task", lambda *_args, **_kwargs: None)
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.metrics.init_task",
+        lambda *_args, **_kwargs: None,
+    )
 
     result = compute_metrics(
         predictions,
@@ -96,6 +107,7 @@ def test_metrics_scores_valid_boxes_without_rewriting_raw_csv(
         splits=["test"],
         fiftyone=FiftyOneConfig(enabled=False),
         model_label="test model",
+        deps=workflow_dependencies,
     )
 
     assert predictions.read_bytes() == original
@@ -105,7 +117,11 @@ def test_metrics_scores_valid_boxes_without_rewriting_raw_csv(
 @pytest.mark.parametrize("imgsz", [640, 960])
 @pytest.mark.parametrize("all_invalid", [False, True], ids=["mixed", "all-invalid"])
 def test_validation_routes_native_invalid_boxes_through_real_metrics(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, imgsz: int, all_invalid: bool
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    imgsz: int,
+    all_invalid: bool,
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
     _, truth_path = _inputs(tmp_path)
     weights = tmp_path / "weights.pt"
@@ -117,9 +133,19 @@ def test_validation_routes_native_invalid_boxes_through_real_metrics(
         return _predictions([Path(path).name for path in paths], all_invalid)
 
     for module in ("val", "predict", "metrics"):
-        monkeypatch.setattr(f"clearml_yolo.tasks.{module}.init_task", lambda *_a, **_kw: None)
-    monkeypatch.setattr("clearml_yolo.inference.trained_imgsz", lambda _weights: 640)
-    monkeypatch.setattr("clearml_yolo.tasks.predict.predict_on_images", predictor)
+        patch_workflow(
+            monkeypatch,
+            workflow_dependencies,
+            f"clearml_yolo.application.use_cases.{module}.init_task",
+            lambda *_a, **_kw: None,
+        )
+    monkeypatch.setattr("clearml_yolo.adapters.yolo.inference.trained_imgsz", lambda _weights: 640)
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.predict.predict_on_images",
+        predictor,
+    )
     destination = tmp_path / "validation"
 
     result = validate(
@@ -132,6 +158,7 @@ def test_validation_routes_native_invalid_boxes_through_real_metrics(
         evaluation=EvaluationConfig(),
         splits=["test"],
         model_label="test model",
+        deps=workflow_dependencies,
     )
 
     assert observed_sizes == [imgsz, imgsz]
@@ -144,7 +171,11 @@ def test_validation_routes_native_invalid_boxes_through_real_metrics(
 @pytest.mark.parametrize("imgsz", [640, 960])
 @pytest.mark.parametrize("all_invalid", [False, True], ids=["mixed", "all-invalid"])
 def test_comparison_scores_invalid_native_output_and_preserves_cache(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, imgsz: int, all_invalid: bool
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    imgsz: int,
+    all_invalid: bool,
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
     truth, _ = _inputs(tmp_path)
     source_truth = truth.copy(deep=True)
@@ -156,8 +187,10 @@ def test_comparison_scores_invalid_native_output_and_preserves_cache(
         observed_sizes.append(kwargs["imgsz"])
         return expected.copy(deep=True)
 
-    monkeypatch.setattr(
-        "clearml_yolo.tasks.compare.reinfer_split",
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.compare.reinfer_split",
         partial(reinfer_split, predictor=predictor, class_names=lambda _weights: {0: "cat"}),
     )
     output = tmp_path / "predictions.csv"
@@ -180,6 +213,7 @@ def test_comparison_scores_invalid_native_output_and_preserves_cache(
         {"cat": 0.5},
         ["cat"],
         evaluation=EvaluationConfig(),
+        deps=workflow_dependencies,
     )
 
     assert observed_sizes == [imgsz]
@@ -197,12 +231,17 @@ def test_comparison_scores_invalid_native_output_and_preserves_cache(
 
 
 def test_filtered_predictions_still_score_raw_map_identically_to_clean_input(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
     _, truth_path = _inputs(tmp_path)
     dirty = _predictions(["val.jpg", "test.jpg"], all_invalid=False)
     clean = dirty[dirty["confidence"] == 0.9].copy()
-    monkeypatch.setattr("clearml_yolo.tasks.metrics.init_task", lambda *_args, **_kwargs: None)
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.metrics.init_task",
+        lambda *_args, **_kwargs: None,
+    )
     dashboards: list[pd.DataFrame] = []
     for name, frame in (("dirty", dirty), ("clean", clean)):
         path = tmp_path / f"{name}.csv"
@@ -217,6 +256,7 @@ def test_filtered_predictions_still_score_raw_map_identically_to_clean_input(
             splits=["test"],
             fiftyone=FiftyOneConfig(enabled=False),
             model_label="test model",
+            deps=workflow_dependencies,
         )
         assert path.read_bytes() == original
         _assert_metrics(result, all_invalid=True)

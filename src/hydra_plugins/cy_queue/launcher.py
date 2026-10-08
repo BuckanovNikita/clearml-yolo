@@ -27,7 +27,7 @@ class QueueLauncher(Launcher):
     def launch(
         self, job_overrides: Sequence[Sequence[str]], initial_job_idx: int
     ) -> Sequence[JobReturn]:
-        from clearml_yolo.apps.execution import ModelJob, entrypoint, run_jobs
+        from clearml_yolo.entrypoints.hydra.execution import ModelJob, entrypoint, run_jobs
 
         if self.config is None or self.hydra_context is None:
             raise RuntimeError("Queue launcher has not been set up")

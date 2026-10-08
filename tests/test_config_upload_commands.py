@@ -8,15 +8,20 @@ import hydra
 import pytest
 from omegaconf import OmegaConf
 
-from clearml_yolo.apps import common
-from clearml_yolo.clearml_session import ResolvedConfigFile
-from clearml_yolo.filesystem import runs_root
-from clearml_yolo.run_identity import task_run_dir
+from clearml_yolo.adapters.clearml.session import ResolvedConfigFile
+from clearml_yolo.adapters.storage.filesystem import runs_root
+from clearml_yolo.adapters.storage.run_identity import task_run_dir
+from clearml_yolo.application.ports import WorkflowDependencies
+from clearml_yolo.entrypoints.hydra import common
 from test_clearml_session import FakeTask
+from workflow_dependencies import patch_workflow
+from workflow_dependencies import (
+    workflow_dependencies as workflow_dependencies,  # noqa: PLC0414 - fixture export
+)
 
 
 def test_file_resolver_sees_remote_inputs_and_derived_output(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
     config = OmegaConf.create(
         {"clearml": {"task_name": "source"}, "weights": "local.pt", "output_dir": None}
@@ -59,14 +64,20 @@ def test_file_resolver_sees_remote_inputs_and_derived_output(
         assert isinstance(resolved_file, ResolvedConfigFile)
         attached.append(resolved_file.values)
 
-    monkeypatch.setattr(hydra, "main", lambda **_kwargs: lambda fn: lambda: fn(config))
-    monkeypatch.setattr(common, "native_runtime", nullcontext)
-    monkeypatch.setattr(common, "invocation", owner)
-    monkeypatch.setattr(common, "initialize_naming", lambda _task: None)
-    monkeypatch.setattr(common, "replay_configuration", replay)
-
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        hydra,
+        "main",
+        lambda **_kwargs: lambda fn: lambda: fn(config),
+    )
+    patch_workflow(monkeypatch, workflow_dependencies, common, "native_runtime", nullcontext)
+    patch_workflow(monkeypatch, workflow_dependencies, common, "invocation", owner)
+    patch_workflow(
+        monkeypatch, workflow_dependencies, common, "initialize_naming", lambda _task: None
+    )
+    patch_workflow(monkeypatch, workflow_dependencies, common, "replay_configuration", replay)
     common.launch("report", command)
-
     assert attached == [
         {
             "artifact_dir": str(
@@ -79,11 +90,11 @@ def test_file_resolver_sees_remote_inputs_and_derived_output(
 
 
 def test_numbered_configuration_copies_and_overrides_replay_without_artifacts(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
     import clearml
 
-    from clearml_yolo.clearml_session import (
+    from clearml_yolo.adapters.clearml.session import (
         ClearMLConfig,
         connect_config_file,
         invocation,
@@ -97,8 +108,12 @@ def test_numbered_configuration_copies_and_overrides_replay_without_artifacts(
     remote = FakeTask()
     remote.local = False
     selected = local
-    monkeypatch.setattr(clearml.Task, "init", lambda **_kwargs: selected)
-    monkeypatch.setattr(clearml.Task, "get_task", lambda **_kwargs: selected)
+    patch_workflow(
+        monkeypatch, workflow_dependencies, clearml.Task, "init", lambda **_kwargs: selected
+    )
+    patch_workflow(
+        monkeypatch, workflow_dependencies, clearml.Task, "get_task", lambda **_kwargs: selected
+    )
     monkeypatch.delenv("LOCAL_RANK", raising=False)
     copies: list[tuple[str, Path, str]] = []
 
@@ -108,7 +123,7 @@ def test_numbered_configuration_copies_and_overrides_replay_without_artifacts(
             copies.append((kwargs["name"], configuration, configuration.read_text()))
         return configuration
 
-    monkeypatch.setattr(local, "connect_configuration", attach)
+    patch_workflow(monkeypatch, workflow_dependencies, local, "connect_configuration", attach)
     overrides = {"fraction": {"requested": 0.5, "effective": 1.0}}
     normalization = {"batch": {"requested": -1, "effective": 8}}
     with invocation(ClearMLConfig(), "train") as task:
@@ -122,10 +137,9 @@ def test_numbered_configuration_copies_and_overrides_replay_without_artifacts(
                 "training_normalization": normalization,
             },
         )
-
-    assert any(path.name == "0038.yaml" for _, path, _ in copies)
+    assert any((path.name == "0038.yaml" for _, path, _ in copies))
     assert {name for name, _, _ in copies} == {"dataset"}
-    assert all(not path.exists() for _, path, _ in copies)
+    assert all((not path.exists() for _, path, _ in copies))
     assert local.uploads == []
     assert run["training_data_overrides"] == overrides
     assert run["training_normalization"] == normalization
@@ -135,36 +149,37 @@ def test_numbered_configuration_copies_and_overrides_replay_without_artifacts(
     selected = remote
     remote.configuration_result = remote_source
     remote.run_configuration_result = run
-
     with invocation(ClearMLConfig(), "train") as task:
         recovered = connect_config_file(task, "dataset", source)
         assert recovered == remote_source
         assert recovered.read_text() == remote_source.read_text()
         effective = replay_configuration(task, {"ground_truth": "placeholder.csv"})
-
     assert effective == run
     assert remote.uploads == []
     assert {entry["name"] for entry in remote.configurations} == {"dataset", "run"}
 
 
 def test_missing_remote_named_configuration_fails_without_artifact_fallback(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
     import clearml
 
-    from clearml_yolo.clearml_session import ClearMLConfig, connect_config_file, invocation
+    from clearml_yolo.adapters.clearml.session import ClearMLConfig, connect_config_file, invocation
 
     remote = FakeTask()
     remote.local = False
-    monkeypatch.setattr(clearml.Task, "init", lambda **_kwargs: remote)
-    monkeypatch.setattr(clearml.Task, "get_task", lambda **_kwargs: remote)
+    patch_workflow(
+        monkeypatch, workflow_dependencies, clearml.Task, "init", lambda **_kwargs: remote
+    )
+    patch_workflow(
+        monkeypatch, workflow_dependencies, clearml.Task, "get_task", lambda **_kwargs: remote
+    )
     monkeypatch.delenv("LOCAL_RANK", raising=False)
     with (
         pytest.raises(FileNotFoundError, match="Remote task has no attached configuration"),
         invocation(ClearMLConfig(), "train") as task,
     ):
         connect_config_file(task, "dataset", tmp_path / "missing.yaml")
-
     assert remote.failed
     assert not remote.completed
     assert remote.uploads == []

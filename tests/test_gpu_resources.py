@@ -11,7 +11,7 @@ from typing import Any, override
 
 import pytest
 
-from clearml_yolo.gpu_resources import (
+from clearml_yolo.adapters.runtime.gpu_resources import (
     GPUDevice,
     GPUInventory,
     device_count,
@@ -418,7 +418,7 @@ def test_visible_reports_metadata_probe_timeout(monkeypatch: pytest.MonkeyPatch)
 def test_importing_gpu_resources_does_not_start_native_cuda_modules(tmp_path: Path) -> None:
     script = """
 import sys
-import clearml_yolo.gpu_resources
+import clearml_yolo.adapters.runtime.gpu_resources
 assert 'torch' not in sys.modules
 assert 'ultralytics' not in sys.modules
 print('lightweight import')
@@ -437,7 +437,7 @@ print('lightweight import')
 def test_visibility_probe_failure_reports_exit_and_redacts_subprocess_stderr(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from clearml_yolo.gpu_resources import _probe_visible_uuids
+    from clearml_yolo.adapters.runtime.gpu_resources import _probe_visible_uuids
 
     def failed_probe(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[str]:
         return subprocess.CompletedProcess(

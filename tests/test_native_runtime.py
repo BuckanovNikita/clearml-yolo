@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from clearml_yolo.native_runtime import OWNER_TASK_ENV, native_runtime
+from clearml_yolo.adapters.integrations.native_runtime import OWNER_TASK_ENV, native_runtime
 
 
 def test_owner_enables_every_installed_callback_and_restores_globals(
@@ -72,7 +72,7 @@ def test_pretrain_wrapper_rejects_missing_general_registration(
 
     owner = Task()
     Task.current = owner
-    monkeypatch.setattr("clearml_yolo.clearml_session.active_task", lambda: owner)
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.session.active_task", lambda: owner)
     monkeypatch.setattr(integration, "on_pretrain_routine_start", lambda _trainer: None)
     monkeypatch.setattr(clearml, "Task", Task)
     monkeypatch.setenv(OWNER_TASK_ENV, "task-id")
@@ -111,7 +111,7 @@ def test_pretrain_wrapper_rejects_a_different_current_task(
     def foreign_task() -> object:
         return object()
 
-    monkeypatch.setattr("clearml_yolo.clearml_session.active_task", foreign_task)
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.session.active_task", foreign_task)
     monkeypatch.setattr(integration, "on_pretrain_routine_start", invoked.append)
     monkeypatch.setattr(clearml, "Task", Task)
     monkeypatch.setenv(OWNER_TASK_ENV, "task-id")
@@ -152,7 +152,7 @@ def test_pretrain_wrapper_propagates_native_swallowed_failure_with_existing_gene
         invoked.append(trainer)
         vars(integration)["LOGGER"].warning("ClearML installed but not initialized correctly")
 
-    monkeypatch.setattr("clearml_yolo.clearml_session.active_task", lambda: owner)
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.session.active_task", lambda: owner)
     monkeypatch.setattr(integration, "on_pretrain_routine_start", swallowed_failure)
     monkeypatch.setattr(clearml, "Task", Task)
     monkeypatch.setenv(OWNER_TASK_ENV, "task-id")
@@ -243,7 +243,7 @@ def test_native_general_redacts_credentials_without_changing_training_args(
         args=SimpleNamespace(model="https://host/m.pt?token=secret", epochs=1)
     )
     original_connect = owner.connect
-    monkeypatch.setattr("clearml_yolo.clearml_session.active_task", lambda: owner)
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.session.active_task", lambda: owner)
     monkeypatch.setattr(clearml, "Task", Task)
     monkeypatch.setattr(
         integration,

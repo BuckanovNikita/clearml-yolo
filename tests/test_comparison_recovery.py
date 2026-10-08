@@ -5,11 +5,16 @@ from types import SimpleNamespace
 
 import pytest
 
-from clearml_yolo.tasks.compare import ModelRef, _resolve_model
+from clearml_yolo.application.ports import WorkflowDependencies
+from clearml_yolo.application.use_cases.compare import ModelRef, _resolve_model
+from workflow_dependencies import patch_workflow
+from workflow_dependencies import (
+    workflow_dependencies as workflow_dependencies,  # noqa: PLC0414 - fixture export
+)
 
 
 def test_weights_and_provenance_use_one_source_snapshot(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
     checkpoint = tmp_path / "selected.pt"
     checkpoint.write_bytes(b"selected weights")
@@ -31,16 +36,19 @@ def test_weights_and_provenance_use_one_source_snapshot(
         get_models=lambda: next(snapshots),
         get_output_log_web_page=lambda: "https://clearml.example/source-task",
     )
-    monkeypatch.setattr("clearml_yolo.clearml_models._task", lambda _task_id: task)
-
-    # Explicit thresholds also prove that recovery never accesses missing artifacts.
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.adapters.clearml.models._task",
+        lambda _task_id: task,
+    )
     resolved = _resolve_model(
         ModelRef(task_id="source-task", thresholds={"001": 0.1234567890123456}),
         "project",
         exclude_task_id=None,
         automatic_absence_is_skip=False,
+        deps=workflow_dependencies,
     )
-
     assert resolved.weights == checkpoint
     assert resolved.links["model_id"] == "selected-model"
     assert resolved.links["model_url"] == "https://files.example/selected.pt"

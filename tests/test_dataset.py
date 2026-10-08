@@ -39,7 +39,7 @@ def test_preparation_retains_clean_truth_and_nonimage_artifacts(
     tmp_path: Path,
     dataset_format: Any,
 ) -> None:
-    from clearml_yolo.dataset import prepare_dataset
+    from clearml_yolo.adapters.storage.dataset import prepare_dataset
 
     source = _source(tmp_path / "input")
     original = source.read_bytes()
@@ -68,7 +68,7 @@ def test_preparation_retains_clean_truth_and_nonimage_artifacts(
 
 
 def test_preparation_refuses_reused_directory(tmp_path: Path) -> None:
-    from clearml_yolo.dataset import prepare_dataset
+    from clearml_yolo.adapters.storage.dataset import prepare_dataset
 
     source = _source(tmp_path / "input")
     output = tmp_path / "prepared"
@@ -81,7 +81,7 @@ def test_preparation_refuses_reused_directory(tmp_path: Path) -> None:
 
 
 def test_invalid_format_fails_without_output(tmp_path: Path) -> None:
-    from clearml_yolo.dataset import prepare_dataset
+    from clearml_yolo.adapters.storage.dataset import prepare_dataset
 
     source = _source(tmp_path / "input")
     with pytest.raises(ValueError, match=r"ndjson.*flat"):
@@ -90,7 +90,7 @@ def test_invalid_format_fails_without_output(tmp_path: Path) -> None:
 
 
 def test_ndjson_preparation_preserves_original_basename_and_extension_case(tmp_path: Path) -> None:
-    from clearml_yolo.dataset import prepare_dataset
+    from clearml_yolo.adapters.storage.dataset import prepare_dataset
 
     source = _source(tmp_path / "input")
     rows = list(csv.DictReader(source.open()))
@@ -116,7 +116,7 @@ def test_ndjson_preparation_preserves_original_basename_and_extension_case(tmp_p
 
 
 def test_data_policy_records_owned_changes_and_preserves_native_controls(tmp_path: Path) -> None:
-    from clearml_yolo.dataset import apply_dataset_policy
+    from clearml_yolo.adapters.storage.dataset import apply_dataset_policy
 
     requested = {
         "data": "old.yaml",
@@ -150,14 +150,14 @@ def test_data_policy_records_owned_changes_and_preserves_native_controls(tmp_pat
 
 @pytest.mark.parametrize("resume", [True, "old.pt"])
 def test_resume_cannot_restore_other_data(tmp_path: Path, resume: Any) -> None:
-    from clearml_yolo.dataset import apply_dataset_policy
+    from clearml_yolo.adapters.storage.dataset import apply_dataset_policy
 
     with pytest.raises(ValueError, match="resume"):
         apply_dataset_policy({"resume": resume}, tmp_path / "data.yaml")
 
 
 def test_prediction_policy_keeps_inference_controls() -> None:
-    from clearml_yolo.dataset import apply_dataset_policy
+    from clearml_yolo.adapters.storage.dataset import apply_dataset_policy
 
     settings, overrides = apply_dataset_policy({"classes": [1], "conf": 0.02, "imgsz": 96})
     assert settings == {"classes": None, "conf": 0.02, "imgsz": 96, "task": "detect"}
@@ -165,7 +165,7 @@ def test_prediction_policy_keeps_inference_controls() -> None:
 
 
 def test_unsupported_task_rejected() -> None:
-    from clearml_yolo.dataset import apply_dataset_policy
+    from clearml_yolo.adapters.storage.dataset import apply_dataset_policy
 
     with pytest.raises(ValueError, match="detect"):
         apply_dataset_policy({"task": "segment"})
@@ -174,7 +174,7 @@ def test_unsupported_task_rejected() -> None:
 def test_csv_policy_satisfies_installed_native_configuration(tmp_path: Path) -> None:
     from ultralytics.cfg import get_cfg
 
-    from clearml_yolo.dataset import apply_dataset_policy
+    from clearml_yolo.adapters.storage.dataset import apply_dataset_policy
 
     settings, _ = apply_dataset_policy({"cls_remap": True}, tmp_path / "data.yaml")
     native = get_cfg(overrides=settings)

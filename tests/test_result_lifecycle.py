@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from clearml_yolo import clearml_session as session
+from clearml_yolo.adapters.clearml import session
 from test_clearml_session import FakeTask
 from test_clearml_session import fake_clearml as owner_fixture
 

@@ -24,7 +24,7 @@ def _execute_fixture(
     function(**{str(key): value for key, value in values.items()})
 
 
-# ``python -m clearml_yolo.apps.job_worker`` binds execute_owned before importing the
+# ``python -m clearml_yolo.entrypoints.hydra.worker`` binds execute_owned before importing the
 # payload function. Patch that private worker boundary only inside the test child.
 sys.modules["__main__"].__dict__["execute_owned"] = _execute_fixture
 

@@ -72,6 +72,18 @@ rename remains atomic when the output is on another filesystem. These files are 
 on serialization, replacement or interruption errors as well as success. Other application-owned
 temporary storage uses `.tmp/` without changing process-wide temporary directory settings.
 
+## Python ownership
+
+Filesystem operations live in storage/runtime adapters and the outer entrypoints.
+Pure core identity, evaluation, redaction and DataFrame validation modules carry values
+without reading or writing files. Application workflows route file operations through
+explicit ports; report rendering writes its own owned artifacts through reporting
+adapters. CLI composition initializes workspace policy before execution dependencies;
+ordinary package imports do not initialize directories or configure global logging.
+Programmatic callers select initialization and invocation ownership explicitly; see
+[Python import migration](python-import-migration.md). These Python boundaries preserve
+the destinations and cleanup rules in this document.
+
 ## Launch boundary
 
 This policy routes application-owned writes and the named dependency storage needed for native

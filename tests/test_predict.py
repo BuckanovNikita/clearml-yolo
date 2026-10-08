@@ -9,15 +9,20 @@ from typing import Any
 import pandas as pd
 import pytest
 
-from clearml_yolo import artifact_names
-from clearml_yolo.clearml_session import ClearMLConfig
-from clearml_yolo.inference import PREDICTION_COLUMNS
-from clearml_yolo.model_identity import ModelIdentity
-from clearml_yolo.publishing.models import FiftyOneConfig, PublicationReceipt
-from clearml_yolo.tasks import predict as predict_module
-from clearml_yolo.tasks.predict import predict
+from clearml_yolo.adapters.clearml.session import ClearMLConfig
+from clearml_yolo.adapters.yolo.inference import PREDICTION_COLUMNS
+from clearml_yolo.application.ports import WorkflowDependencies
+from clearml_yolo.application.use_cases import predict as predict_module
+from clearml_yolo.application.use_cases.predict import predict
+from clearml_yolo.core import artifact_names
+from clearml_yolo.core.identity import ModelIdentity
+from clearml_yolo.core.publication import FiftyOneConfig, PublicationReceipt
 from native_config_helpers import prediction_config
-from test_clearml_session import fake_clearml as fake_clearml  # noqa: PLC0414 - SDK fixture
+from test_clearml_session import fake_clearml as fake_clearml  # noqa: PLC0414 - fixture export
+from workflow_dependencies import patch_workflow
+from workflow_dependencies import (
+    workflow_dependencies as workflow_dependencies,  # noqa: PLC0414 - fixture export
+)
 
 
 @pytest.fixture
@@ -33,28 +38,48 @@ def checkpoint_recording(monkeypatch: pytest.MonkeyPatch) -> Any:
 
 
 @pytest.fixture
-def published(monkeypatch: pytest.MonkeyPatch) -> dict[str, pd.DataFrame]:
+def published(
+    monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
+) -> dict[str, pd.DataFrame]:
     """Everything the stage would have published to ClearML, keyed by section/series."""
     tables: dict[str, pd.DataFrame] = {}
 
     def report_table(
-        _: object,
-        title: str,
-        series: str,
-        frame: pd.DataFrame,
-        **_kwargs: Any,
+        _: object, title: str, series: str, frame: pd.DataFrame, **_kwargs: Any
     ) -> None:
         tables[f"{title}/{series}"] = frame
 
-    monkeypatch.setattr(predict_module, "report_table", report_table)
-    monkeypatch.setattr(predict_module, "init_task", lambda *_a, **_k: object())
-    monkeypatch.setattr(predict_module, "register_predictions", lambda *_a, **_k: None)
-    monkeypatch.setattr(predict_module, "record_run_configuration", lambda *_a, **_k: None)
-    monkeypatch.setattr(
-        predict_module, "resolve_weights_with_identity", lambda weights: (weights, None)
+    patch_workflow(monkeypatch, workflow_dependencies, predict_module, "report_table", report_table)
+    patch_workflow(
+        monkeypatch, workflow_dependencies, predict_module, "init_task", lambda *_a, **_k: object()
     )
-    monkeypatch.setattr(
-        predict_module, "predict_on_images", lambda *_, **__: pd.DataFrame({"image_name": []})
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        predict_module,
+        "register_predictions",
+        lambda *_a, **_k: None,
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        predict_module,
+        "record_run_configuration",
+        lambda *_a, **_k: None,
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        predict_module,
+        "resolve_weights_with_identity",
+        lambda weights: (weights, None),
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        predict_module,
+        "predict_on_images",
+        lambda *_, **__: pd.DataFrame({"image_name": []}),
     )
     return tables
 
@@ -68,6 +93,7 @@ def _ground_truth(tmp_path: Path) -> Path:
 def _predict(
     tmp_path: Path,
     imgsz: int | None,
+    workflow_dependencies: WorkflowDependencies,
     *,
     model_label: str | None = "fixture detector",
 ) -> Any:
@@ -80,18 +106,20 @@ def _predict(
         ultralytics_predict=prediction_config(imgsz=imgsz, device="cpu", batch=1),
         fiftyone=FiftyOneConfig(enabled=False),
         model_label=model_label,
+        deps=workflow_dependencies,
     )
 
 
 def test_the_scale_inference_ran_at_reaches_the_run_record(
-    tmp_path: Path, checkpoint_recording: Any, published: dict[str, pd.DataFrame]
+    tmp_path: Path,
+    checkpoint_recording: Any,
+    published: dict[str, pd.DataFrame],
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
     """ClearML captures the warning in the console log, where an hour of a run buries it.
     The table is the same fact somewhere a reviewer can find it later."""
     checkpoint_recording({"imgsz": 1280})
-
-    _predict(tmp_path, 640)
-
+    _predict(tmp_path, 640, workflow_dependencies=workflow_dependencies)
     section = f"{artifact_names.PREDICT_SECTION}/{artifact_names.RESOLUTION_SERIES}"
     rows = published[section]
     assert dict(zip(rows["parameter"], rows["value"], strict=True)) == {
@@ -102,14 +130,15 @@ def test_the_scale_inference_ran_at_reaches_the_run_record(
 
 
 def test_the_resolution_travels_with_the_predictions(
-    tmp_path: Path, checkpoint_recording: Any, published: dict[str, pd.DataFrame]
+    tmp_path: Path,
+    checkpoint_recording: Any,
+    published: dict[str, pd.DataFrame],
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
     """The report stage publishes numbers measured at this scale, and reopening the
     checkpoint to ask a second time is how the two would come to disagree."""
     checkpoint_recording({"imgsz": 1280})
-
-    result = _predict(tmp_path, 1280)
-
+    result = _predict(tmp_path, 1280, workflow_dependencies=workflow_dependencies)
     assert result.predictions == tmp_path / "predictions.csv"
     assert result.resolution.scored_at == 1280
     assert not result.resolution.was_trained_elsewhere
@@ -120,6 +149,7 @@ def test_splits_are_inferred_separately_for_reproducible_test_batches(
     monkeypatch: pytest.MonkeyPatch,
     checkpoint_recording: Any,
     published: dict[str, pd.DataFrame],
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
     checkpoint_recording({"imgsz": 64})
     truth = tmp_path / "truth.csv"
@@ -132,7 +162,7 @@ def test_splits_are_inferred_separately_for_reproducible_test_batches(
         assert kwargs["name"] == "predict"
         return pd.DataFrame({"image_name": paths})
 
-    monkeypatch.setattr(predict_module, "predict_on_images", infer)
+    patch_workflow(monkeypatch, workflow_dependencies, predict_module, "predict_on_images", infer)
     predict(
         "best.pt",
         truth,
@@ -143,6 +173,7 @@ def test_splits_are_inferred_separately_for_reproducible_test_batches(
         ultralytics_predict=prediction_config(),
         fiftyone=FiftyOneConfig(enabled=False),
         model_label="fixture detector",
+        deps=workflow_dependencies,
     )
     assert calls == [["z.png"], ["a.png", "b.png"]]
 
@@ -152,6 +183,7 @@ def test_prediction_preflights_before_compute_and_publishes_exact_outputs(
     monkeypatch: pytest.MonkeyPatch,
     checkpoint_recording: Any,
     published: dict[str, pd.DataFrame],
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
     checkpoint_recording({"imgsz": 64})
     task = types.SimpleNamespace(id="predict-task")
@@ -182,19 +214,29 @@ def test_prediction_preflights_before_compute_and_publishes_exact_outputs(
                 fields={"predictions": "predictions_predict-task"},
             )
 
-    monkeypatch.setattr(predict_module, "init_task", lambda *_a, **_k: task)
-    monkeypatch.setattr(predict_module, "create_publisher", lambda _config: FakePublisher())
+    patch_workflow(
+        monkeypatch, workflow_dependencies, predict_module, "init_task", lambda *_a, **_k: task
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        predict_module,
+        "create_publisher",
+        lambda _config: FakePublisher(),
+    )
 
     def infer(*_: Any, **__: Any) -> pd.DataFrame:
         events.append("compute")
         return pd.DataFrame({"image_name": []})
 
-    monkeypatch.setattr(predict_module, "predict_on_images", infer)
-    monkeypatch.setattr(
-        "clearml_yolo.tasks.publication.record_run_configuration", lambda *_args: None
+    patch_workflow(monkeypatch, workflow_dependencies, predict_module, "predict_on_images", infer)
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.publication.record_run_configuration",
+        lambda *_args: None,
     )
     truth = _ground_truth(tmp_path)
-
     predict(
         weights="best.pt",
         ground_truth=truth,
@@ -205,8 +247,8 @@ def test_prediction_preflights_before_compute_and_publishes_exact_outputs(
         ultralytics_predict=prediction_config(imgsz=64, device="cpu", batch=1),
         fiftyone=FiftyOneConfig(),
         model_label="fixture detector",
+        deps=workflow_dependencies,
     )
-
     assert events == ["preflight", "compute", "publish"]
     request = requests[0]
     assert request.task_id == "predict-task"
@@ -224,20 +266,25 @@ def test_prediction_registers_its_context_for_deferred_canonical_publication(
     monkeypatch: pytest.MonkeyPatch,
     checkpoint_recording: Any,
     published: dict[str, pd.DataFrame],
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
     checkpoint_recording({"imgsz": 64})
     registered: list[tuple[Path, Path, dict[str, Any]]] = []
-    monkeypatch.setattr(
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
         predict_module,
         "register_predictions",
         lambda _task, truth, predictions, **kwargs: registered.append((truth, predictions, kwargs)),
     )
-    monkeypatch.setattr(
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
         predict_module,
         "record_run_configuration",
         lambda *_args: None,
     )
-    _predict(tmp_path, 64)
+    _predict(tmp_path, 64, workflow_dependencies=workflow_dependencies)
     assert registered == [
         (
             tmp_path / "ground_truth.csv",
@@ -257,17 +304,18 @@ def test_empty_prediction_output_has_canonical_header_and_is_published(
     checkpoint_recording: Any,
     published: dict[str, pd.DataFrame],
     monkeypatch: pytest.MonkeyPatch,
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
     checkpoint_recording({"imgsz": 64})
     registered: list[tuple[Path, Path]] = []
-    monkeypatch.setattr(
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
         predict_module,
         "register_predictions",
         lambda _task, truth, predictions, **_kwargs: registered.append((truth, predictions)),
     )
-
-    result = _predict(tmp_path, 64)
-
+    result = _predict(tmp_path, 64, workflow_dependencies=workflow_dependencies)
     assert registered == [(tmp_path / "ground_truth.csv", result.predictions)]
     assert list(pd.read_csv(result.predictions)) == PREDICTION_COLUMNS
 
@@ -278,19 +326,26 @@ def test_invocation_uploads_canonical_prediction_and_gt_csvs_once_at_completion(
     published: dict[str, pd.DataFrame],
     monkeypatch: pytest.MonkeyPatch,
     fake_clearml: tuple[type[Any], Any],
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
-    from clearml_yolo.clearml_results import register_predictions
-    from clearml_yolo.clearml_session import invocation
+    from clearml_yolo.adapters.clearml.results import register_predictions
+    from clearml_yolo.adapters.clearml.session import invocation
 
     checkpoint_recording({"imgsz": 64})
     _, task = fake_clearml
-    monkeypatch.setattr(predict_module, "init_task", lambda *_a, **_k: task)
-    monkeypatch.setattr(predict_module, "register_predictions", register_predictions)
-
+    patch_workflow(
+        monkeypatch, workflow_dependencies, predict_module, "init_task", lambda *_a, **_k: task
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        predict_module,
+        "register_predictions",
+        register_predictions,
+    )
     with invocation(ClearMLConfig(), "predict"):
-        result = _predict(tmp_path, 64)
+        result = _predict(tmp_path, 64, workflow_dependencies=workflow_dependencies)
         assert task.uploads == []
-
     assert [item["name"] for item in task.uploads] == [
         artifact_names.GROUND_TRUTH,
         artifact_names.PREDICTIONS,
@@ -306,12 +361,9 @@ def test_invocation_uploads_canonical_prediction_and_gt_csvs_once_at_completion(
 
 
 def test_prediction_settings_use_resolved_group_and_produced_checkpoint() -> None:
-    from clearml_yolo.native_config import prediction_settings
+    from clearml_yolo.adapters.yolo.config import prediction_settings
 
-    settings = prediction_settings(
-        prediction_config(batch=4, conf=0.001, imgsz=640),
-        "best.pt",
-    )
+    settings = prediction_settings(prediction_config(batch=4, conf=0.001, imgsz=640), "best.pt")
     assert settings["model"] == "best.pt"
     assert settings["batch"] == 4
     assert settings["imgsz"] == 640
@@ -319,14 +371,14 @@ def test_prediction_settings_use_resolved_group_and_produced_checkpoint() -> Non
 
 
 def test_prediction_explicit_model_conflict_fails() -> None:
-    from clearml_yolo.native_config import prediction_settings
+    from clearml_yolo.adapters.yolo.config import prediction_settings
 
-    with pytest.raises(ValueError, match=r"ultralytics_predict\.model"):
+    with pytest.raises(ValueError, match="ultralytics_predict\\.model"):
         prediction_settings(prediction_config(model="different.pt"), "best.pt")
 
 
 def test_prediction_autobatch_requires_override() -> None:
-    from clearml_yolo.native_config import prediction_settings
+    from clearml_yolo.adapters.yolo.config import prediction_settings
 
     with pytest.raises(ValueError, match="batch"):
         prediction_settings(prediction_config(batch=-1), "best.pt")
@@ -336,13 +388,13 @@ def test_prediction_autobatch_requires_override() -> None:
 def test_prediction_model_uses_explicit_weights_or_resolved_null(
     weights: str | None, expected: str | None
 ) -> None:
-    from clearml_yolo.native_config import prediction_settings
+    from clearml_yolo.adapters.yolo.config import prediction_settings
 
     assert prediction_settings(prediction_config(model=None), weights)["model"] == expected
 
 
 def test_source_cannot_override_ground_truth_membership() -> None:
-    from clearml_yolo.native_config import prediction_settings
+    from clearml_yolo.adapters.yolo.config import prediction_settings
 
     with pytest.raises(ValueError, match="ground_truth"):
         prediction_settings(prediction_config(source="different-images.txt"))
@@ -353,6 +405,7 @@ def test_native_failure_preserves_replay_config_and_manifest(
     monkeypatch: pytest.MonkeyPatch,
     checkpoint_recording: Any,
     published: dict[str, pd.DataFrame],
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
     import yaml
 
@@ -361,9 +414,9 @@ def test_native_failure_preserves_replay_config_and_manifest(
     def fail(*args: Any, **kwargs: Any) -> pd.DataFrame:
         raise RuntimeError("native failure")
 
-    monkeypatch.setattr(predict_module, "predict_on_images", fail)
+    patch_workflow(monkeypatch, workflow_dependencies, predict_module, "predict_on_images", fail)
     with pytest.raises(RuntimeError, match="native failure"):
-        _predict(tmp_path, 64)
+        _predict(tmp_path, 64, workflow_dependencies=workflow_dependencies)
     settings = yaml.safe_load((tmp_path / "ultralytics_predict.yaml").read_text())
     assert settings["model"] == "best.pt"
     assert Path(settings["source"]).is_file()
@@ -376,11 +429,16 @@ def test_prediction_run_records_only_meaningful_native_changes(
     published: dict[str, pd.DataFrame],
     monkeypatch: pytest.MonkeyPatch,
     changed: bool,
+    workflow_dependencies: WorkflowDependencies,
 ) -> None:
     checkpoint_recording({"imgsz": 64})
     recorded: list[dict[str, Any]] = []
-    monkeypatch.setattr(
-        predict_module, "record_run_configuration", lambda _t, values: recorded.append(values)
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        predict_module,
+        "record_run_configuration",
+        lambda _t, values: recorded.append(values),
     )
 
     def infer(*_args: Any, **settings: Any) -> pd.DataFrame:
@@ -389,8 +447,8 @@ def test_prediction_run_records_only_meaningful_native_changes(
         frame.attrs["normalized_imgsz"] = [96, 96] if changed else [64, 64]
         return frame
 
-    monkeypatch.setattr(predict_module, "predict_on_images", infer)
-    _predict(tmp_path, 64)
+    patch_workflow(monkeypatch, workflow_dependencies, predict_module, "predict_on_images", infer)
+    _predict(tmp_path, 64, workflow_dependencies=workflow_dependencies)
     result = recorded[0]["prediction_result"]
     assert result["model"] == "best.pt"
     assert "requested" not in result

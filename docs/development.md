@@ -24,6 +24,22 @@ The mocked suite cannot prove native training, a GPU or ClearML uploads; those r
 dated real-run evidence and the
 [end-to-end skill](../.agents/skills/running-end-to-end-tests/SKILL.md).
 
+## Python integration and architecture
+
+Use the [Python import migration](python-import-migration.md) when updating scripts or
+saved Hydra targets. Workflows live in `application.use_cases` and require an explicit
+`WorkflowDependencies` value. The composition root in `entrypoints.composition` creates
+one dependency bundle per invocation; tests inject their own ports. Scientific core
+code may use NumPy, pandas, SciPy, Pydantic and Pandera, but owns no SDK calls, logging
+configuration, rendering or filesystem effects. Keep the pinned `digital-metrics`
+algorithms in evaluation adapters and copy exact values into core evaluation records.
+
+Run `lint-imports` and the architecture tests when changing imports, package initializers,
+composition or subprocess/plugin targets. Updating a dependency boundary also requires
+regenerated YAML checks and installed command helps, including the Hydra launcher,
+worker, GPU probe, DDP callback and FiftyOne extension targets. Update maintained code
+links and migration guidance; preserve completed feature history as dated intent.
+
 ## External dependencies
 
 `digital-metrics` and `report-generator` live in ignored local directories under

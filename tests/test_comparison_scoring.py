@@ -3,7 +3,9 @@
 import pandas as pd
 import pytest
 
-from clearml_yolo.comparison.scoring import ClassCounts, score_split, validate_thresholds
+from clearml_yolo.adapters.evaluation.scoring import score_split
+from clearml_yolo.core.evaluation.models import ClassCounts
+from clearml_yolo.core.evaluation.policy import validate_thresholds
 
 GT_COLUMNS = ["image_name", "instance_label", "bbox_x_tl", "bbox_y_tl", "bbox_x_br", "bbox_y_br"]
 GtRow = tuple[str, str | None, float | None, float | None, float | None, float | None]

@@ -12,7 +12,7 @@ from uuid import uuid4
 import pytest
 from PIL import Image
 
-from clearml_yolo.publishing.models import FiftyOneConfig, PublicationRequest
+from clearml_yolo.core.publication import FiftyOneConfig, PublicationRequest
 from test_publication_data import write_truth
 
 pytestmark = pytest.mark.skipif(
@@ -32,7 +32,7 @@ def backend() -> Any:
 
 @pytest.fixture
 def publisher(backend: Any) -> Iterator[Any]:
-    from clearml_yolo.publishing import create_publisher
+    from clearml_yolo.entrypoints.composition import create_publisher
 
     prefix = f"cy-test-{uuid4().hex}"
     instance = create_publisher(FiftyOneConfig(dataset_prefix=prefix))
@@ -164,7 +164,7 @@ def test_incomplete_import_is_repaired(
 def test_evaluated_fields_keep_exact_matches_and_scope(
     tmp_path: Path, publisher: Any, backend: Any
 ) -> None:
-    from clearml_yolo.comparison.evaluation_payload import (
+    from clearml_yolo.core.evaluation.payload import (
         EvaluationBox,
         EvaluationMatch,
         EvaluationPayload,
@@ -214,7 +214,7 @@ def test_evaluated_fields_keep_exact_matches_and_scope(
         "evaluation_val": path.resolve(),
     }
     assert receipt.published_at.utcoffset() is not None
-    from clearml_yolo.publishing.models import PublicationReceipt
+    from clearml_yolo.core.publication import PublicationReceipt
 
     assert PublicationReceipt.model_validate_json(receipt.model_dump_json()) == receipt
     dataset = backend.load_dataset(receipt.dataset_name)
@@ -251,7 +251,7 @@ def test_concurrent_runs_share_one_complete_dataset(
 def test_run_failure_marks_incomplete_then_retry_preserves_other_run(
     tmp_path: Path, publisher: Any, backend: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from clearml_yolo.publishing import fiftyone_adapter
+    from clearml_yolo.adapters.fiftyone import publisher as fiftyone_adapter
 
     truth = write_truth(tmp_path)
     first = publisher.publish(PublicationRequest(task_id="first", ground_truth=truth))
@@ -299,7 +299,7 @@ def test_changed_csv_creates_new_dataset_and_preserves_original(
 def test_native_evaluation_is_registered_and_task_retry_removes_stale_splits(
     tmp_path: Path, publisher: Any, backend: Any, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from clearml_yolo.comparison.evaluation_payload import (
+    from clearml_yolo.core.evaluation.payload import (
         EvaluationBox,
         EvaluationMatch,
         EvaluationPayload,
@@ -383,7 +383,7 @@ def _assert_interrupted_native_retry(
     publisher: Any, dataset: Any, request: PublicationRequest, receipt: Any,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from clearml_yolo.publishing import fiftyone_adapter
+    from clearml_yolo.adapters.fiftyone import publisher as fiftyone_adapter
 
     original = fiftyone_adapter._publish_evaluations
 

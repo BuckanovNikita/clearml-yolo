@@ -14,9 +14,9 @@ from hydra.types import HydraContext, TaskFunction
 from hydra_zen import store
 from omegaconf import DictConfig, OmegaConf, open_dict
 
-import clearml_yolo.configs  # noqa: F401
-from clearml_yolo.apps import execution
-from clearml_yolo.apps.execution import ModelJob, run_jobs
+import clearml_yolo.entrypoints.hydra.configs  # noqa: F401
+from clearml_yolo.entrypoints.hydra import execution
+from clearml_yolo.entrypoints.hydra.execution import ModelJob, run_jobs
 from hydra_plugins.cy_queue.launcher import QueueLauncher
 from hydra_queue_fixture import record_job
 

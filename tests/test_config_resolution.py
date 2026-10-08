@@ -16,7 +16,7 @@ def typed_resolver() -> Iterator[None]:
 
 
 def test_file_values_resolve_nested_lists_relative_references_and_types() -> None:
-    from clearml_yolo.apps.config_resolution import resolve_config_document
+    from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_document
 
     document = {
         "count": 3,
@@ -45,7 +45,7 @@ def test_file_values_resolve_nested_lists_relative_references_and_types() -> Non
 def test_file_roots_replace_context_wholesale_and_only_file_roots_are_returned(
     as_omegaconf: bool,
 ) -> None:
-    from clearml_yolo.apps.config_resolution import resolve_config_document
+    from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_document
 
     document = {"settings": {"size": 960}, "size": "${settings.size}", "path": "${run_dir}"}
     context: Any = {
@@ -71,7 +71,7 @@ def test_file_roots_replace_context_wholesale_and_only_file_roots_are_returned(
 
 
 def test_context_containers_referenced_by_file_values_keep_their_contained_fields() -> None:
-    from clearml_yolo.apps.config_resolution import resolve_config_document
+    from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_document
 
     assert resolve_config_document(
         {"native": "${ultralytics}"},
@@ -80,7 +80,7 @@ def test_context_containers_referenced_by_file_values_keep_their_contained_field
 
 
 def test_root_list_resolves_local_indexes_and_command_values() -> None:
-    from clearml_yolo.apps.config_resolution import resolve_config_document
+    from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_document
 
     document = [{"size": 960}, "${0.size}", {"output": "${run_dir}", "size": "${..0.size}"}]
 
@@ -92,7 +92,7 @@ def test_root_list_resolves_local_indexes_and_command_values() -> None:
 
 
 def test_numeric_yaml_mapping_keys_are_preserved_alongside_string_numeric_references() -> None:
-    from clearml_yolo.apps.config_resolution import resolve_config_document
+    from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_document
 
     assert resolve_config_document(
         {"names": {0: "box"}, "string_names": {"0": "package"}, "label": "${string_names.0}"}
@@ -108,7 +108,7 @@ def test_numeric_yaml_mapping_keys_are_preserved_alongside_string_numeric_refere
     [(None, None), (False, False), (19, 19), ("plain", "plain"), ("${batch}", 8)],
 )
 def test_scalar_document_preserves_its_resolved_type(document: Any, expected: Any) -> None:
-    from clearml_yolo.apps.config_resolution import resolve_config_document
+    from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_document
 
     assert resolve_config_document(document, {"batch": 8}) == expected
 
@@ -116,7 +116,7 @@ def test_scalar_document_preserves_its_resolved_type(document: Any, expected: An
 def test_environment_and_registered_resolvers_resolve_once(
     monkeypatch: pytest.MonkeyPatch, typed_resolver: None
 ) -> None:
-    from clearml_yolo.apps.config_resolution import resolve_config_document
+    from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_document
 
     monkeypatch.setenv("CY_CONFIG_UPLOAD_TEST_VALUE", "private-fixture-value")
 
@@ -133,7 +133,7 @@ def test_environment_and_registered_resolvers_resolve_once(
 def test_environment_cannot_introduce_unresolved_active_values(
     monkeypatch: pytest.MonkeyPatch, environment_value: str
 ) -> None:
-    from clearml_yolo.apps.config_resolution import resolve_config_document
+    from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_document
 
     monkeypatch.setenv("CY_NESTED_UPLOAD_TEST", environment_value)
 
@@ -145,7 +145,7 @@ def test_environment_cannot_introduce_unresolved_active_values(
 def test_registered_resolver_cannot_introduce_interpolation_or_be_evaluated_twice(
     resolver_value: Any,
 ) -> None:
-    from clearml_yolo.apps.config_resolution import resolve_config_document
+    from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_document
 
     calls = 0
 
@@ -165,7 +165,7 @@ def test_registered_resolver_cannot_introduce_interpolation_or_be_evaluated_twic
 
 
 def test_escaped_literal_survives_file_and_command_aliases() -> None:
-    from clearml_yolo.apps.config_resolution import resolve_config_document
+    from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_document
 
     assert resolve_config_document(
         {
@@ -185,7 +185,7 @@ def test_escaped_literal_survives_file_and_command_aliases() -> None:
 
 @pytest.mark.parametrize("argument", ["${literal}", r'"\${missing}"'])
 def test_registered_resolver_receives_native_literal_argument(argument: str) -> None:
-    from clearml_yolo.apps.config_resolution import resolve_config_document
+    from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_document
 
     OmegaConf.register_new_resolver("config_upload_length", len)
     try:
@@ -197,7 +197,7 @@ def test_registered_resolver_receives_native_literal_argument(argument: str) -> 
 
 
 def test_transformed_literal_resolver_output_fails_safely() -> None:
-    from clearml_yolo.apps.config_resolution import resolve_config_document
+    from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_document
 
     OmegaConf.register_new_resolver("config_upload_upper", str.upper)
     try:
@@ -211,7 +211,7 @@ def test_transformed_literal_resolver_output_fails_safely() -> None:
 
 @pytest.mark.parametrize("resolver_value", [("${base}",), ("???",)])
 def test_tuple_resolver_outputs_are_checked_recursively(resolver_value: Any) -> None:
-    from clearml_yolo.apps.config_resolution import resolve_config_document
+    from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_document
 
     OmegaConf.register_new_resolver("config_upload_tuple", lambda: resolver_value)
     try:
@@ -222,7 +222,7 @@ def test_tuple_resolver_outputs_are_checked_recursively(resolver_value: Any) -> 
 
 
 def test_concrete_tuple_resolver_output_is_a_primitive_list() -> None:
-    from clearml_yolo.apps.config_resolution import resolve_config_document
+    from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_document
 
     OmegaConf.register_new_resolver("config_upload_tuple", lambda: (3, False, None))
     try:
@@ -234,7 +234,7 @@ def test_concrete_tuple_resolver_output_is_a_primitive_list() -> None:
 
 
 def test_file_metadata_tracks_context_credentials_without_uploading_context() -> None:
-    from clearml_yolo.apps.config_resolution import resolve_config_file
+    from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_file
 
     result = resolve_config_file(
         {"copy": "${auth.password}"}, {"auth": {"password": "context-private-value"}}
@@ -252,7 +252,7 @@ def test_file_metadata_tracks_context_credentials_without_uploading_context() ->
 def test_file_metadata_tracks_sensitive_environment_aliases(
     monkeypatch: pytest.MonkeyPatch, expression: str
 ) -> None:
-    from clearml_yolo.apps.config_resolution import resolve_config_file
+    from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_file
 
     monkeypatch.setenv("APP_SECRET_KEY", "environment-private-value")
     result = resolve_config_file({"copy": expression}, {"env_name": "APP_SECRET_KEY"})
@@ -263,7 +263,7 @@ def test_file_metadata_tracks_sensitive_environment_aliases(
 
 
 def test_benign_environment_path_is_not_secret_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
-    from clearml_yolo.apps.config_resolution import resolve_config_file
+    from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_file
 
     monkeypatch.setenv("CY_DATASET_PATH", "/dataset/images")
     result = resolve_config_file({"dataset": "${oc.env:CY_DATASET_PATH}"})
@@ -276,7 +276,7 @@ def test_benign_environment_path_is_not_secret_metadata(monkeypatch: pytest.Monk
 def test_sensitive_environment_name_from_resolver_is_inventory_without_reevaluation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from clearml_yolo.apps.config_resolution import resolve_config_file
+    from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_file
 
     monkeypatch.setenv("CY_API_SECRET", "dynamic-environment-private-value")
     calls = 0
@@ -299,7 +299,7 @@ def test_sensitive_environment_name_from_resolver_is_inventory_without_reevaluat
 
 
 def test_secret_metadata_does_not_reevaluate_registered_resolver() -> None:
-    from clearml_yolo.apps.config_resolution import resolve_config_file
+    from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_file
 
     calls = 0
 
@@ -327,7 +327,7 @@ def test_secret_metadata_does_not_reevaluate_registered_resolver() -> None:
 def test_unsupported_resolver_results_cannot_escape_plain_tree_validation(
     resolver_value: Any,
 ) -> None:
-    from clearml_yolo.apps.config_resolution import resolve_config_document
+    from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_document
 
     OmegaConf.register_new_resolver("config_upload_unsupported", lambda: resolver_value)
     try:
@@ -353,13 +353,13 @@ def test_unsupported_resolver_results_cannot_escape_plain_tree_validation(
 def test_mixed_literal_text_and_embedded_reference_provenance(
     document: Any, expected: Any
 ) -> None:
-    from clearml_yolo.apps.config_resolution import resolve_config_document
+    from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_document
 
     assert resolve_config_document(document) == expected
 
 
 def test_embedded_secret_reference_is_inventoried_without_second_resolver_call() -> None:
-    from clearml_yolo.apps.config_resolution import resolve_config_file
+    from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_file
 
     calls = 0
 
@@ -384,7 +384,7 @@ def test_embedded_secret_reference_is_inventoried_without_second_resolver_call()
 
 
 def test_unused_context_resolver_is_not_executed_for_secret_inventory() -> None:
-    from clearml_yolo.apps.config_resolution import resolve_config_file
+    from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_file
 
     def unused() -> str:
         pytest.fail("Unused registered code must not run for redaction metadata")
@@ -401,7 +401,7 @@ def test_unused_context_resolver_is_not_executed_for_secret_inventory() -> None:
 
 
 def test_transformed_secret_still_inventories_concrete_context_credentials() -> None:
-    from clearml_yolo.apps.config_resolution import resolve_config_file
+    from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_file
 
     OmegaConf.register_new_resolver("config_upload_sensitive_length", len)
     try:
@@ -432,7 +432,7 @@ def test_transformed_secret_still_inventories_concrete_context_credentials() -> 
 def test_resolution_failure_is_confidential_and_does_not_modify_inputs(
     document: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from clearml_yolo.apps.config_resolution import resolve_config_document
+    from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_document
 
     monkeypatch.delenv("CY_CONFIG_UPLOAD_ABSENT_SECRET", raising=False)
     original = deepcopy(document)
@@ -451,7 +451,7 @@ def test_resolution_failure_is_confidential_and_does_not_modify_inputs(
 
 @pytest.mark.parametrize("reference", ["${${key}}", "prefix-${${key}}"])
 def test_dynamic_node_references_fail_before_publication(reference: str) -> None:
-    from clearml_yolo.apps.config_resolution import resolve_config_file
+    from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_file
 
     OmegaConf.register_new_resolver("config_upload_dynamic_secret", lambda: "dynamic-private-value")
     try:
@@ -471,7 +471,7 @@ def test_resolution_failure_reports_type_without_private_payload(
 ) -> None:
     from loguru import logger
 
-    from clearml_yolo.apps import config_resolution
+    from clearml_yolo.entrypoints.hydra import config_resolution
 
     def failed_resolution(*args: Any, **kwargs: Any) -> Any:
         raise ValueError("opaque-private-resolver-input")
