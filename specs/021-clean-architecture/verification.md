@@ -124,5 +124,26 @@ tasks, one project, workspace and 16 identified SDK cache copies. Raw API invent
 and owned process/queue checks were empty; this follow-up created no models, datasets
 or services. It used no GPU queue ticket.
 
-Final stable hooks, convergence and release remain pending at this evidence checkpoint.
 Physical multi-GPU execution is not established by the single-GPU run or mocked tests.
+
+## Final closure
+
+Stable `pre-commit run --all-files --verbose` passed, including **1,390 pytest passes,
+30 skips and 52 warnings**, Ruff, strict mypy and all 27 import contracts. The checked
+source commit is `493f039`; the checked release commit is `6f50507`. Both their commit
+hooks and the release recovery's all-files validation passed. Separate wheel and sdist
+installs from the exact `0.20.0` release source passed version, ten-command help,
+configuration regeneration, inert import, removed legacy module and plugin resource
+checks. The main environment was synchronized to `0.20.0` from the frozen lockfile.
+
+Automatic release preparation could not resolve the local-only `digital-metrics`
+dependency after the required local source section was removed. The documented recovery
+procedure refreshed only the root project version with the local overrides restored,
+then removed those overrides before the checked release commit. Metadata validation
+confirmed no dependency/source changes, and the generated changelog checksum was recorded
+before recovery validation and tagging. Exact local overrides were restored afterward.
+
+`master` and annotated Git tag `v0.20.0` were pushed. The tag points to `6f50507`.
+The final convergence audit covered nine functional requirements, four success criteria,
+three user stories and the plan's six phases. No buildable gaps or new convergence tasks
+remain. The explicit physical multi-GPU limitation above remains unchanged.

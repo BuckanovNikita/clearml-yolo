@@ -13,7 +13,7 @@
 ## Phase 3 — Integration
 - [X] T007 Integrate relocated entrypoints, native callbacks/worker/probe/plugin targets and remove helper cycles (FR-005, FR-007, FR-008).
 - [X] T008 Enforce exhaustive layers, SDK owners, transitive isolation and negative architecture tests (FR-001–FR-003).
-- [ ] T009 Run affected and full pytest, Ruff, mypy, lint-imports; fix task-caused failures without weakening checks (SC-001, SC-002).
+- [X] T009 Run affected and full pytest, Ruff, mypy, lint-imports; fix task-caused failures without weakening checks (SC-001, SC-002).
 
 ## Phase 4 — Documentation
 - [X] T010 Update architecture/migration guidance, README, contract index, current code links and constitution; validate Markdown/links/examples (FR-009, SC-004; depends T003–T008).
@@ -21,7 +21,7 @@
 ## Phase 5 — Acceptance and release
 - [X] T011 Build/install wheel and sdist, exercise command helps and regenerated configs (SC-004).
 - [X] T012 Verify real CPU/GPU/ClearML/FiftyOne/comparison/upload failure contracts and owned-resource cleanup; record dated evidence (SC-003).
-- [ ] T013 Obtain fresh independent final review, converge against spec/plan/tasks, satisfy hooks and complete authorized release commits/tag pushes (FR-009).
+- [X] T013 Obtain fresh independent final review, converge against spec/plan/tasks, satisfy hooks and complete authorized release commits/tag pushes (FR-009).
 
 ## Execution ledger
 2026-10-08: approved conversational plan materialized. Isolated worktree created; baseline tests running. Existing local uv.sources preserved. No workflow extension hooks configured.
@@ -50,3 +50,11 @@ rows, source relationships, workbook cells and published confusion/PR data. Infe
 cache CSV/metadata bytes and timestamps were unchanged; provenance sidecars retained
 identical bytes. Both native tags are closed with raw API, queue and process cleanup
 proof. See verification.md. Final stable hooks and release remain under T009/T013.
+
+2026-10-08: Stable all-files hooks passed with 1,390 tests passed, 30 skipped and
+52 warnings. Source commit 493f039 and release commit 6f50507 passed all required
+commit/recovery hooks. Version 0.20.0 wheel and sdist installation checks passed.
+Master and annotated tag v0.20.0 were pushed. The documented release recovery path
+handled local-only dependency resolution with no dependency changes. Buildable intent
+across FR-001–FR-009, SC-001–SC-004 and all three user stories is satisfied; no new
+convergence tasks remain. Physical multi-GPU execution remains explicitly unverified.
