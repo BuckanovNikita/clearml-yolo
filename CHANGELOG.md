@@ -3,6 +3,11 @@
 
 ## Unreleased
 
+### Chores
+
+- Add zombie process listing helper
+  ([`3f236ff`](https://github.com/BuckanovNikita/clearml-yolo/commit/3f236ff4f552576f9e0ef5742f77cf89bdc08a09))
+
 ### Documentation
 
 - Record clean architecture release verification

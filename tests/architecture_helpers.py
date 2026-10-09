@@ -10,7 +10,7 @@ from pathlib import Path
 
 import grimp
 
-PROJECT_ROOTS = ("clearml_yolo", "hydra_plugins.cy_queue")
+PROJECT_ROOTS = ("clearml_yolo",)
 ADAPTER_RESPONSIBILITIES = {
     "storage",
     "yolo",
@@ -65,11 +65,11 @@ SDK_OWNERS = {
     "report_generator": ("clearml_yolo.adapters.reporting",),
     "openpyxl": ("clearml_yolo.adapters.reporting",),
     "fiftyone": ("clearml_yolo.adapters.fiftyone",),
-    "hydra": ("clearml_yolo.entrypoints.hydra", "hydra_plugins.cy_queue"),
+    "hydra": ("clearml_yolo.entrypoints.hydra",),
     "hydra_zen": ("clearml_yolo.entrypoints.hydra",),
-    "omegaconf": ("clearml_yolo.entrypoints.hydra", "hydra_plugins.cy_queue"),
+    "omegaconf": ("clearml_yolo.entrypoints.hydra",),
 }
-# The probe reads CUDA visibility in a fresh disposable process before scheduling.
+# The probe reads CUDA visibility in a fresh disposable process before waiting for free GPUs.
 SDK_EXCEPTIONS = {("clearml_yolo.adapters.runtime.gpu_probe", "torch")}
 ADAPTER_PEERS = {
     "storage": {"observability"},
@@ -86,11 +86,6 @@ ADAPTER_PEERS = {
 PEER_EXCEPTIONS = {
     ("clearml_yolo.adapters.clearml.models", "clearml_yolo.adapters.reporting.workbook_identity"),
     ("clearml_yolo.adapters.fiftyone.publisher", "clearml_yolo.adapters.storage.publication_data"),
-    ("clearml_yolo.adapters.runtime.gpu_runtime", "clearml_yolo.adapters.clearml.session"),
-    (
-        "clearml_yolo.adapters.runtime.gpu_runtime",
-        "clearml_yolo.adapters.integrations.native_runtime",
-    ),
     ("clearml_yolo.adapters.integrations.native_runtime", "clearml_yolo.adapters.clearml.session"),
     ("clearml_yolo.adapters.integrations.native_ddp", "clearml_yolo.adapters.clearml.session"),
     ("clearml_yolo.adapters.integrations.training", "clearml_yolo.adapters.clearml.session"),
@@ -146,8 +141,6 @@ def within(module: str, prefix: str) -> bool:
 
 
 def layer(module: str) -> str | None:
-    if within(module, "hydra_plugins.cy_queue"):
-        return "entrypoints"
     pieces = module.split(".")
     if module == "clearml_yolo":
         return "root"

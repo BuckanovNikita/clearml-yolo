@@ -1,4 +1,4 @@
-"""Validate public command arguments before scheduling or invoking workflows."""
+"""Validate public command arguments before waiting for GPUs or invoking workflows."""
 
 import inspect
 from collections.abc import Callable

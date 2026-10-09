@@ -8,7 +8,7 @@ import sys
 def _uuid(value: object) -> str:
     uuid = str(value)
     if uuid.startswith("MIG-"):
-        raise RuntimeError("MIG devices are unsupported by the GPU queue")
+        raise RuntimeError("MIG devices are unsupported by GPU availability waiting")
     return uuid if uuid.startswith("GPU-") else f"GPU-{uuid}"
 
 
@@ -16,7 +16,7 @@ def main() -> None:
     """Print visible physical UUIDs in CUDA logical-device order."""
     inherited = os.environ.get("CUDA_VISIBLE_DEVICES", "")
     if any(token.strip().startswith("MIG-") for token in inherited.split(",")):
-        raise RuntimeError("MIG devices are unsupported by the GPU queue")
+        raise RuntimeError("MIG devices are unsupported by GPU availability waiting")
 
     import torch
 

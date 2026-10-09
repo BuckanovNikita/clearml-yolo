@@ -65,6 +65,9 @@ from clearml_yolo.adapters.evaluation.scoring import (
     prepare_predictions as _evaluation_prepare_predictions,
 )
 from clearml_yolo.adapters.fiftyone.noop import NoOpPublisher
+from clearml_yolo.adapters.integrations.native_runtime import (
+    release_training_memory as _resources_training_finished,
+)
 from clearml_yolo.adapters.integrations.training import execute_training as _execute_training
 from clearml_yolo.adapters.observability.diagnostics import (
     log as _resources_log,
@@ -98,9 +101,6 @@ from clearml_yolo.adapters.reporting.workbook_identity import (
 )
 from clearml_yolo.adapters.reporting.workbook_identity import (
     workbook_identities as _renderer_workbook_identities,
-)
-from clearml_yolo.adapters.runtime.gpu_runtime import (
-    training_finished as _resources_training_finished,
 )
 from clearml_yolo.adapters.storage.dataset import (
     apply_dataset_policy as _dataset_apply_dataset_policy,

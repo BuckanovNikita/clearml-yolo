@@ -1,5 +1,10 @@
 # Queue state contract
 
+> Historical contract: queue-specific requirements are superseded by
+> [feature 022 GPU execution](../../022-simple-gpu-wait/contracts/execution.md).
+> Current execution uses stateless availability polling and the calling process;
+> this document retains the former design as historical evidence.
+
 ## Location
 
 The queue registry is user-wide for one operating-system instance and does not use `CY_HOME`.

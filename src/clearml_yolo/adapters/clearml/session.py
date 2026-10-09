@@ -166,7 +166,7 @@ def _is_worker() -> bool:
         and not (owner_pid and os.environ.get(OWNER_TASK_ENV))
     ):
         raise ValueError(
-            "Top-level LOCAL_RANK launches are unsupported; use the project GPU launcher"
+            "Top-level LOCAL_RANK launches are unsupported; invoke the cy command directly"
         )
     return False
 

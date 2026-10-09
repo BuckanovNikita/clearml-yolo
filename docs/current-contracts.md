@@ -15,7 +15,7 @@ configuration, output, tracking and evaluation rules formerly listed in `AGENTS.
 | Commands and output routing | [CLI](../specs/001-release-030/contracts/cli.md) | [Entrypoints and checks](../pyproject.toml), [output identity](../src/clearml_yolo/adapters/storage/run_identity.py), [pipeline](../src/clearml_yolo/application/use_cases/pipeline.py) |
 | Filesystem defaults and explicit destinations | [Filesystem ownership](filesystem-policy.md) | [Workspace policy](../src/clearml_yolo/adapters/storage/filesystem.py), [native runtime](../src/clearml_yolo/adapters/integrations/native_runtime.py) |
 | Explicit image cache deduplication | [Deduplication CLI](../specs/018-cache-image-dedup/contracts/cli.md) | [Command](../src/clearml_yolo/entrypoints/dedup.py), [cache implementation](../src/clearml_yolo/adapters/storage/dedup.py) |
-| GPU queue, device demand and queued execution | [Queue state](../specs/013-gpu-experiment-queue/contracts/queue-state.md), [execution and launcher](../specs/013-gpu-experiment-queue/contracts/execution.md) | [Resource probe](../src/clearml_yolo/adapters/runtime/gpu_resources.py), [queue](../src/clearml_yolo/adapters/runtime/gpu_queue.py), [runtime transition](../src/clearml_yolo/adapters/runtime/gpu_runtime.py), [supervisor](../src/clearml_yolo/entrypoints/hydra/execution.py), [worker](../src/clearml_yolo/entrypoints/hydra/worker.py), [Hydra launcher](../src/hydra_plugins/cy_queue/launcher.py) |
+| GPU availability, device demand and direct execution | [GPU execution](../specs/022-simple-gpu-wait/contracts/execution.md), [quickstart](../specs/022-simple-gpu-wait/quickstart.md) | [Resource probe](../src/clearml_yolo/adapters/runtime/gpu_resources.py), [GPU wait](../src/clearml_yolo/adapters/runtime/gpu_wait.py), [configuration translation](../src/clearml_yolo/entrypoints/hydra/execution.py), [invocation](../src/clearml_yolo/entrypoints/hydra/common.py) |
 | Native training and prediction groups | [Native configuration](../specs/005-explicit-detection-config/contracts/native-configuration.md), [example layout](../specs/007-detection-config-cleanup/contracts/configuration-and-artifacts.md) | [Native settings](../src/clearml_yolo/adapters/yolo/config.py), [registration](../src/clearml_yolo/entrypoints/hydra/configs.py), [export](../src/clearml_yolo/entrypoints/hydra/config_tree.py) |
 | CSV training and dataset cache | [Dataset inputs](../specs/004-ground-truth-training/contracts/cli.md), [current publication](../specs/008-dataset-clearml-tracking/contracts/publication.md) | [Training](../src/clearml_yolo/application/use_cases/train.py), [cache](../src/clearml_yolo/adapters/storage/dataset_cache.py) |
 | Configuration resolution and remote replay | [File resolution](../specs/009-resolved-config-uploads/contracts/configuration-files.md), [tracking and recovery](../specs/010-native-clearml-integration/contracts/tracking-publication.md) | [Resolution](../src/clearml_yolo/entrypoints/hydra/config_resolution.py), [session adapter](../src/clearml_yolo/adapters/clearml/session.py) |
@@ -47,12 +47,16 @@ groups. Prediction reads its resolved group; visible references provide inherita
 Raw wrapper `cfg`, non-null native `cfg`, nested stage-native mappings and duplicate
 native comparison inference fields are unsupported and fail ordinary strict validation.
 
-The five model commands derive whole-GPU demand from those native groups and use the maintained
-user-wide FIFO queue. Requested device values remain provenance; admitted children use concrete
-local indices. Strict head-of-line admission, fail-closed NVML availability, native liveness locks,
-pre-ClearML waiting, pipeline N-to-one contraction, and BasicSweeper semantics are defined by the
-[queue](../specs/013-gpu-experiment-queue/contracts/queue-state.md) and
-[execution](../specs/013-gpu-experiment-queue/contracts/execution.md) contracts.
+The five model commands derive whole-GPU demand from native groups and poll availability
+before ClearML/native initialization. The calling process executes directly; selected logical
+indices follow inherited CUDA visibility. Requested values and effective devices remain separate.
+CPU/MPS bypass inventory. Fail-closed NVML, own-PID reuse, demand validation, native DDP ownership,
+memory cleanup and sequential standard BasicLauncher behavior are defined by the
+[GPU execution contract](../specs/022-simple-gpu-wait/contracts/execution.md).
+Feature 022 supersedes feature 013 FIFO/reservation/child execution requirements and the
+queue-specific constitution amendment. Historical artifacts remain unchanged apart from
+supersession notices; no queue data is read, migrated or deleted. Availability is not an
+exclusive allocation, and simultaneous commands can select the same GPU.
 
 ClearML publications follow the current inventory, not old artifact counts. Native
 YAML, NDJSON, archives, manifests and diagnostic/publication receipts remain local.
@@ -60,7 +64,7 @@ Consumed dataset and explicit report configurations are Configuration Objects; c
 `run` and native `General` support replay. Configuration copies are not artifacts.
 Native owner callbacks may publish training/validation previews and non-PR plots; native
 validation PR uploads are filtered with callback state restored on success/failure.
-Workers do not publish.
+Native DDP descendants do not publish.
 The native best checkpoint uses one Output Model, verified before completion.
 
 The [evaluation publication amendment](../specs/014-evaluation-publication/contracts/publication.md)

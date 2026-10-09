@@ -36,7 +36,10 @@ this branch.
 3. Build ground truth from a small YOLO dataset with disjoint validation/test images,
    including an empty image in each split. Exercise the top-level `ultralytics` and
    `ultralytics_predict` groups through locally editable generated YAML, with explicit
-   CPU and available GPU devices.
+   CPU and available GPU devices. Verify stateless busy-to-free GPU waiting before task
+   creation, direct calling-process execution and a sequential standard BasicLauncher
+   sweep with separate tasks and normal failure propagation. Availability is not a
+   reservation; do not infer exclusive GPU ownership from a successful wait.
 4. Run a candidate without a baseline; verify evaluation succeeds and comparison is
    skipped. Promote a completed baseline with a `prod` tag, run a candidate and verify
    both checkpoints infer the same current test images under matching settings.

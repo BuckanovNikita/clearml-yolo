@@ -1,6 +1,7 @@
 """GPU demand and whole-device inventory without native model runtime imports."""
 
 import json
+import os
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
@@ -82,7 +83,7 @@ def _string_device_count(value: str) -> int:
 
 
 def device_count(value: object) -> int:
-    """Derive scheduler demand from one native Ultralytics device selector."""
+    """Derive GPU demand from one native Ultralytics device selector."""
     if value is None:
         return 1
     if isinstance(value, bool):
@@ -102,7 +103,7 @@ def device_count(value: object) -> int:
 
 
 def normalized_device(value: object) -> object:
-    """Replace written GPU identities with anonymous scheduler demand entries."""
+    """Replace written GPU identities with anonymous device-count entries."""
     count = device_count(value)
     if count:
         return [-1] * count
@@ -112,7 +113,7 @@ def normalized_device(value: object) -> object:
 
 
 def execution_devices(count: int) -> list[int]:
-    """Return concrete child-local CUDA ordinals after visibility assignment."""
+    """Return the first concrete logical CUDA ordinals for a device count."""
     if isinstance(count, bool) or not isinstance(count, int):
         raise TypeError(f"GPU count must be an integer: {count!r}")
     if count < 0:
@@ -143,7 +144,7 @@ def _skip(config: Mapping[str, Any], key: str) -> bool:
 
 
 def job_request(command: str, config: Mapping[str, Any]) -> int:
-    """Derive the up-front GPU reservation for one resolved command configuration."""
+    """Derive up-front GPU demand for one resolved command configuration."""
     if command == "train":
         return device_count(_group_device(config, "ultralytics"))
     if command in {"predict", "val", "compare"}:
@@ -206,7 +207,7 @@ def _probe_visible_uuids() -> tuple[str, ...]:
     if not isinstance(loaded, list) or any(not isinstance(value, str) for value in loaded):
         raise RuntimeError("CUDA visibility probe returned an invalid UUID list")
     if any(value.startswith("MIG-") for value in loaded):
-        raise RuntimeError("MIG devices are unsupported by the GPU queue")
+        raise RuntimeError("MIG devices are unsupported by GPU availability waiting")
     if len(set(loaded)) != len(loaded):
         raise RuntimeError("CUDA visibility probe returned duplicate GPU UUIDs")
     return tuple(loaded)
@@ -216,7 +217,7 @@ class GPUInventory:
     """Read whole-GPU telemetry and inherited CUDA visibility without pinning ordinals."""
 
     def snapshot(self) -> tuple[GPUDevice, ...]:
-        """Return every physical whole GPU; unknown process telemetry fails closed."""
+        """Return whole GPUs occupied by other PIDs; unknown telemetry fails closed."""
         nvml = _nvml()
         initialized = False
         try:
@@ -231,14 +232,27 @@ class GPUInventory:
                 except nvml.NVMLError_NotSupported:
                     current_mig_mode = nvml.NVML_DEVICE_MIG_DISABLE
                 if current_mig_mode != nvml.NVML_DEVICE_MIG_DISABLE:
-                    raise RuntimeError(f"MIG-enabled GPU {uuid} is unsupported by the GPU queue")
+                    raise RuntimeError(
+                        f"MIG-enabled GPU {uuid} is unsupported by GPU availability waiting"
+                    )
                 try:
-                    busy = bool(nvml.nvmlDeviceGetComputeRunningProcesses(handle))
+                    processes = nvml.nvmlDeviceGetComputeRunningProcesses(handle)
                 except nvml.NVMLError_NotSupported as error:
                     raise RuntimeError(
                         f"GPU {uuid} compute process telemetry is unsupported; "
                         "cannot determine safe availability"
                     ) from error
+                busy = False
+                for process in processes:
+                    # NVML returns opaque binding records; validate their PID before
+                    # ignoring our retained CUDA context from a previous local job.
+                    pid = getattr(process, "pid", None)
+                    if isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0:
+                        raise RuntimeError(
+                            f"GPU {uuid} compute process telemetry returned an invalid PID; "
+                            "cannot determine safe availability"
+                        )
+                    busy = busy or pid != os.getpid()
                 devices.append(GPUDevice(uuid=uuid, busy=busy))
             return tuple(devices)
         finally:

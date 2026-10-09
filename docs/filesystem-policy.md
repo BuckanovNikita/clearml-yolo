@@ -37,14 +37,11 @@ paths, and `TMPDIR`/`TMP`/`TEMP` plus `tempfile` defaults keep their ordinary en
 library behavior. Caller-provided values for those settings remain untouched. Application-owned
 temporary resources still select `CY_HOME/.tmp` directly.
 
-The GPU queue is application-owned state but intentionally lives outside `CY_HOME` so commands
-from different workspaces coordinate. On Unix-like systems its root is
-`$XDG_STATE_HOME/clearml-yolo/queue`, falling back to
-`~/.local/state/clearml-yolo/queue`; on Windows it is
-`%LOCALAPPDATA%\clearml-yolo\queue`. There is no public queue-root option. Tests may inject an
-isolated internal root. The registry, transaction lock, and supervisor/child native liveness locks
-belong to this state root. Do not delete or edit them while jobs are pending or running. Recovery
-uses native lock ownership; entry age and PID are not reclaim authority.
+GPU availability waiting is stateless and creates no queue directory, tickets, registry or
+reservation locks. Historical queue directories under
+`${XDG_STATE_HOME:-~/.local/state}/clearml-yolo/queue` on Unix-like systems or
+`%LOCALAPPDATA%\clearml-yolo\queue` on Windows are untouched and unused; this change does
+not migrate or delete them.
 
 Write destinations resolving physically beneath the home directory produce a warning,
 once per resolved destination in a process. Warnings do not reject, relocate or override
@@ -64,7 +61,7 @@ native cache for bare checkpoint names.
 
 Resolved execution configurations live in owned temporary storage. Untransformed configurations
 retain their original input path. Invocation cleanup removes
-owned temporary copies on success, failure or interruption. Native workers inherit the
+owned temporary copies on success, failure or interruption. Native DDP descendants inherit the
 root and scoped settings, and their DDP launcher files are inside the owned runtime directory.
 
 Atomic comparison cache publication uses temporary files beside the selected output so
@@ -92,12 +89,12 @@ scripts or plugins. Python bytecode, external runners such as uv, pytest and pre
 general dependency caches/configuration use their standard settings. A caller that needs broader
 isolation must configure those tools in its launcher.
 
-For queued model commands, the supervisor reads direct NVML inventory/process telemetry and uses a
-metadata-only subprocess solely to map inherited `CUDA_VISIBLE_DEVICES` values to stable GPU UUIDs.
-It waits without a ClearML task or native GPU context. An admitted fresh child receives assigned
-UUIDs as its visible set and uses child-local native indices. Queue state remains outside run output
-and owned temporary execution copies; child exit releases remaining reservations independently of
-run-directory cleanup.
+For GPU model commands, the invoking process reads NVML inventory/process telemetry and uses a
+metadata-only subprocess solely to map inherited `CUDA_VISIBLE_DEVICES` to stable GPU UUIDs.
+It waits before ClearML task creation and native GPU context initialization, then executes directly
+using selected logical indices in inherited visibility order. CUDA visibility is not rewritten.
+Waiting creates no persistent state and gives no exclusive allocation guarantee. Native DDP
+subprocesses remain part of training; no queued execution child or supervisor is created.
 
 Existing caches are not migrated or deleted. Changing `CY_HOME` changes automatic paths;
 explicit paths and read-only inputs remain independent of it.

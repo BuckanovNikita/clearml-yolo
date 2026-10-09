@@ -13,7 +13,6 @@ from PIL import Image
 from clearml_yolo.adapters.clearml.models import _anchored
 from clearml_yolo.adapters.clearml.session import configuration_secrets, sanitize_configuration
 from clearml_yolo.adapters.integrations.native_runtime import _is_worker
-from clearml_yolo.adapters.runtime.gpu_queue import _Request
 from clearml_yolo.adapters.storage.filesystem import _fiftyone_inputs
 from clearml_yolo.adapters.yolo.ground_truth import _image_size, _parse_label_file
 from clearml_yolo.core import artifact_names
@@ -103,19 +102,6 @@ def test_ownerless_rank_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LOCAL_RANK", "0")
     with pytest.raises(ValueError, match="LOCAL_RANK"):
         _is_worker()
-
-
-def test_impossible_partial_reservation_is_rejected() -> None:
-    with pytest.raises(RuntimeError, match="reservation size"):
-        _Request.parse(
-            {
-                "ticket": 1,
-                "count": 3,
-                "visible": ["a", "b", "c"],
-                "devices": ["a", "b"],
-                "state": "active",
-            }
-        )
 
 
 def test_split_artifact_component_is_safe_and_collision_free() -> None:

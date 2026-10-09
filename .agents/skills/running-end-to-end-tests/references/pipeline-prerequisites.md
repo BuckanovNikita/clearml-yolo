@@ -32,19 +32,24 @@ stages require explicit inputs. `cy-init-config DIRECTORY [--force]` writes only
 editable configuration examples without creating a ClearML task.
 
 Select native `device`, `batch`, `amp` and `compile` settings for the environment. The five model
-commands derive whole-GPU demand from native `device` and coordinate through a user-wide, same-OS
-strict FIFO queue. There is no separate GPU-count setting. A training integer means one GPU, a list
+commands derive whole-GPU demand from native `device` and poll availability before native/ClearML
+initialization. There is no separate GPU-count setting. A training integer means one GPU, a list
 uses its length, every automatic `-1` contributes one, null/empty/`cuda` means one, and `cpu`/`mps`
-means zero. GPU inference requires one device; a pipeline reserves the maximum training/inference
-demand before starting. Keep inherited `CUDA_VISIBLE_DEVICES` accurate for the test environment.
+means zero. GPU inference requires one device; a pipeline waits for the maximum training/inference
+demand. Keep inherited `CUDA_VISIBLE_DEVICES` accurate for the test environment; selected logical
+indices follow its order without rewriting it.
 
-Before a native queue test, establish that the request does not exceed the visible whole-GPU set
-and that unrelated compute processes do not own candidate devices. Waiting occurs before ClearML
-task creation and native GPU context. Multi-GPU acceptance must observe verified training/DDP
-cleanup before N-1 reservations are released, then confirm prediction and comparison use retained
-child-local device `0` through job exit. Record physical multi-GPU execution as unverified when it
-was not exercised. The application does not tune batches and does not coordinate MIG, remote hosts,
-or separate operating-system instances.
+Before a native wait test, establish that the request fits the visible whole-GPU set and that
+unrelated compute processes do not own candidate devices. Verify busy-to-free waiting, no task
+while waiting, interruption and direct calling-process execution. CPU/MPS bypass NVIDIA telemetry.
+The own PID is ignored for sequential jobs; other compute users and unavailable telemetry prevent
+selection. Availability gives no reservation or fairness guarantee between concurrent commands.
+Multi-GPU acceptance must observe native training/DDP cleanup and confirm prediction/comparison
+use the first selected logical device. A standard BasicLauncher sweep must execute sequentially
+with separate tasks, Hydra output/environment/chdir behavior and normal failure propagation.
+Record physical multi-GPU execution as unverified when it was not exercised. No queue state is
+created or consumed; old state remains untouched. The application does not tune batches or support
+MIG. See the [GPU execution contract](../../../../specs/022-simple-gpu-wait/contracts/execution.md).
 
 Full comparison requires validation/test data and exact baseline thresholds. Candidate
 thresholds come from validation only. Both checkpoints must use the same current test

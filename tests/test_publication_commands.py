@@ -246,7 +246,7 @@ def test_remote_clone_replays_canonical_run_and_general(
     from native_config_helpers import training_settings
 
     config = OmegaConf.create(
-        {"clearml": {}, "ground_truth": "local.csv", "ultralytics": training_settings()}
+        {"clearml": {}, "ground_truth": "local.csv", "ultralytics": training_settings(device="cpu")}
     )
     inputs: list[dict[str, Any]] = []
     executed: list[tuple[str, int]] = []
@@ -313,10 +313,12 @@ def test_remote_clone_does_not_replay_previous_owner_output_route(
     from native_config_helpers import training_settings
 
     project = tmp_path / "new-run" / "detect"
-    requested = training_settings()
+    requested = training_settings(device="cpu")
     if explicit_route:
         requested.update(project=str(project), name="train")
-    config = OmegaConf.create({"clearml": {}, "ultralytics": requested})
+    config = OmegaConf.create(
+        {"clearml": {}, "ultralytics": requested, "ultralytics_predict": {"device": "cpu"}}
+    )
     executed: list[dict[str, Any]] = []
 
     class RemoteTask:
@@ -354,7 +356,9 @@ def test_remote_clone_does_not_replay_previous_owner_output_route(
         executed.append(settings)
         return None
 
-    def command(clearml: Any, ultralytics: dict[str, Any]) -> None:
+    def command(
+        clearml: Any, ultralytics: dict[str, Any], ultralytics_predict: dict[str, Any]
+    ) -> None:
         if stage == "pipeline":
             executed.append(routed_native(ultralytics, project, "train"))
         else:
@@ -434,7 +438,11 @@ def test_current_save_dir_override_reaches_pipeline_conflict_validation(
     from native_config_helpers import training_settings
 
     config = OmegaConf.create(
-        {"clearml": {}, "ultralytics": training_settings() | {"save_dir": save_dir}}
+        {
+            "clearml": {},
+            "ultralytics": training_settings(device="cpu") | {"save_dir": save_dir},
+            "ultralytics_predict": {"device": "cpu"},
+        }
     )
 
     class Task:
@@ -447,7 +455,9 @@ def test_current_save_dir_override_reaches_pipeline_conflict_validation(
             values.update(project="/old/detect", name="old", save_dir="/old/detect/old")
             return values
 
-    def command(clearml: Any, ultralytics: dict[str, Any]) -> None:
+    def command(
+        clearml: Any, ultralytics: dict[str, Any], ultralytics_predict: dict[str, Any]
+    ) -> None:
         assert "save_dir" in ultralytics
         assert ultralytics["save_dir"] == save_dir
         routed_native(ultralytics, tmp_path / "detect", "train")

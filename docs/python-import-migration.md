@@ -28,7 +28,7 @@ The table below also identifies interfaces extracted beyond a mechanical move.
 | `clearml_*` integrations | `clearml_yolo.adapters.clearml` modules named in the migration map |
 | `publishing.models` and FiftyOne integration | `clearml_yolo.core.publication` and `clearml_yolo.adapters.fiftyone` |
 | Filesystem/dataset/cache/run operations | `clearml_yolo.adapters.storage` modules named in the migration map |
-| GPU queue/probe/runtime operations | `clearml_yolo.adapters.runtime` |
+| GPU visibility probe and stateless availability wait | `clearml_yolo.adapters.runtime.gpu_resources`, `gpu_probe`, `gpu_wait`; former queue/runtime modules removed |
 | Native training, DDP and mixed integration lifecycle | `clearml_yolo.adapters.integrations` |
 
 Import project-owned records from their defining modules. Package initializers remain
@@ -53,12 +53,14 @@ examples, so carry custom paths, task identity, tags, model settings and other o
 from the backup into the new files. Preserve the new `defaults` and Python targets.
 A fresh directory is another way to compare regenerated examples before replacing files.
 Do not copy obsolete `_target_` strings back into the new tree. Workflow dependencies
-are composed by the launcher and are not a user YAML setting.
+are composed by the invocation entrypoint and are not a user YAML setting.
 
 Update handwritten dotted targets in notebooks, scripts, custom Hydra groups, callbacks
 and plugin integrations using the migration map. Repository-managed entrypoints,
-Hydra launcher/worker, GPU probe, DDP callbacks and FiftyOne extension targets follow
-the new locations. Historical ClearML files are retained as evidence; this release does
+GPU probe, DDP callbacks and FiftyOne extension targets follow the new locations.
+Remove saved overrides targeting `hydra_plugins.cy_queue`; local multiruns now use
+Hydra's standard sequential BasicLauncher. Queue, queued worker and GPU reservation
+runtime imports are removed, with no compatibility aliases. Historical ClearML files are retained as evidence; this release does
 not rewrite remote artifacts or infer old training provenance.
 
 Comparison caches now identify checkpoints by content and exclude the reuse-policy

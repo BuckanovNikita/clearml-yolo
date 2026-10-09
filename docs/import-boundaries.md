@@ -1,7 +1,8 @@
 # Import boundaries
 
 Runtime modules belong to `core`, `application`, a named adapter responsibility,
-or `entrypoints`. The shipped `hydra_plugins.cy_queue` launcher is an outer entrypoint.
+or `entrypoints`. Local multiruns use Hydra's standard BasicLauncher; no project
+launcher plugin is shipped.
 The public `clearml_yolo` package root contains no imports or startup operations.
 Legacy Python paths are removed; regenerate Hydra examples after the cutover.
 Import-linter's exhaustive container contracts classify every root child, adapter
@@ -21,7 +22,7 @@ graphs and run both project checks and actual configured import-linter contracts
 
 | Source | Project dependencies |
 |---|---|
-| Entry points and Hydra launcher | Entry point helpers, adapters, application, core |
+| Entry points | Entry point helpers, adapters, application, core |
 | Adapters | Approved adapter peers, application contracts/ports, core |
 | Application | Application workflows/helpers, core |
 | Core | Core only |
@@ -52,7 +53,7 @@ dependencies are forbidden in both application and core.
 | report-generator | Reporting adapters |
 | OpenPyXL | Reporting adapters |
 | FiftyOne | FiftyOne adapters |
-| Hydra, hydra-zen and OmegaConf | Hydra entrypoint helpers; launcher for Hydra/OmegaConf |
+| Hydra, hydra-zen and OmegaConf | Hydra entrypoint helpers |
 
 The exact imports listed in `ignore_imports` are the permitted ownership edges,
 including imports used only for type checking. New SDK imports require a matching
@@ -61,8 +62,8 @@ cannot silently accumulate. Indirect SDK use through an approved adapter is norm
 the layer rules still prevent a core or application module from reaching that adapter.
 
 `adapters.runtime.gpu_probe -> torch` is the one metadata-probe exception: the
-scheduler launches this disposable process to map inherited GPU visibility before
-admission. It performs no model inference or training.
+GPU wait launches this disposable process to map inherited GPU visibility before
+native execution. It performs no model inference or training.
 
 ## Adapter peers
 
@@ -85,14 +86,14 @@ of SDK ownership:
   from recovered workbooks without report generation.
 - `fiftyone.publisher -> storage.publication_data` reads immutable publication
   CSV snapshots without training-dataset preparation or image validation.
-- `runtime.gpu_runtime -> clearml.session` records effective devices;
-  `runtime.gpu_runtime -> integrations.native_runtime` releases native training
-  memory before handing the retained GPU to downstream work.
 - `integrations.native_runtime` and `integrations.native_ddp` use `clearml.session`
   to coordinate invocation ownership and owner-only tracking callbacks.
 - `integrations.training` uses `clearml.native`, `clearml.session` and `yolo.config`
   to bridge native training callbacks, tracking/model registration and requested
   versus effective native settings.
+
+The composition root binds `integrations.native_runtime` training-memory release
+directly to the execution resource port for downstream work and invocation cleanup.
 
 Evaluation cannot import reporting or tracking; it returns scientific outputs that
 the composition root routes to separate writers. FiftyOne publication cannot import
@@ -106,9 +107,9 @@ functions or re-export pure records. They cannot eagerly load protected SDKs or
 execute startup operations. The public root is also imported in a fresh interpreter
 to verify that no scientific library, framework or SDK is pulled in by that import.
 
-Architecture checks inventory console scripts and literal subprocess worker, CUDA
-probe and Hydra launcher targets. They also export and compose the generated Hydra
-examples to inspect targets created by `hydra_zen.builds`. Target modules and named
+Architecture checks inventory console scripts and the literal CUDA metadata-probe
+subprocess target; removed worker and project Hydra launcher targets must not remain.
+They also export and compose the generated Hydra examples to inspect targets created by `hydra_zen.builds`. Target modules and named
 attributes must exist in the shipped source tree; legacy aliases and missing targets
 fail. These static checks complement command-help and installed-package verification
 described in [development procedures](development.md).

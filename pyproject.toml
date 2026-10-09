@@ -55,7 +55,7 @@ requires = ["uv_build>=0.11.32,<0.12.0"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
-module-name = ["clearml_yolo", "hydra_plugins.cy_queue"]
+module-name = ["clearml_yolo"]
 
 [dependency-groups]
 dev = [
@@ -155,14 +155,13 @@ known-first-party = ["clearml_yolo"]
 max-complexity = 10
 
 [tool.importlinter]
-root_packages = ["clearml_yolo", "hydra_plugins.cy_queue"]
+root_packages = ["clearml_yolo"]
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
 name = "Clean architecture inward layers"
 type = "layers"
 layers = [
-    "hydra_plugins.cy_queue",
     "clearml_yolo.entrypoints",
     "clearml_yolo.adapters",
     "clearml_yolo.application",
@@ -200,7 +199,7 @@ modules = [
 [[tool.importlinter.contracts]]
 name = "ultralytics SDK has explicit owners"
 type = "forbidden"
-source_modules = ["clearml_yolo", "hydra_plugins.cy_queue"]
+source_modules = ["clearml_yolo"]
 forbidden_modules = ["ultralytics"]
 allow_indirect_imports = true
 ignore_imports = [
@@ -215,7 +214,7 @@ ignore_imports = [
 [[tool.importlinter.contracts]]
 name = "torch SDK has explicit owners"
 type = "forbidden"
-source_modules = ["clearml_yolo", "hydra_plugins.cy_queue"]
+source_modules = ["clearml_yolo"]
 forbidden_modules = ["torch"]
 allow_indirect_imports = true
 ignore_imports = [
@@ -226,7 +225,7 @@ ignore_imports = [
 [[tool.importlinter.contracts]]
 name = "clearml SDK has explicit owners"
 type = "forbidden"
-source_modules = ["clearml_yolo", "hydra_plugins.cy_queue"]
+source_modules = ["clearml_yolo"]
 forbidden_modules = ["clearml"]
 allow_indirect_imports = true
 ignore_imports = [
@@ -240,7 +239,7 @@ ignore_imports = [
 [[tool.importlinter.contracts]]
 name = "digital_metrics SDK has explicit owners"
 type = "forbidden"
-source_modules = ["clearml_yolo", "hydra_plugins.cy_queue"]
+source_modules = ["clearml_yolo"]
 forbidden_modules = ["digital_metrics"]
 allow_indirect_imports = true
 ignore_imports = [
@@ -252,7 +251,7 @@ ignore_imports = [
 [[tool.importlinter.contracts]]
 name = "report_generator SDK has explicit owners"
 type = "forbidden"
-source_modules = ["clearml_yolo", "hydra_plugins.cy_queue"]
+source_modules = ["clearml_yolo"]
 forbidden_modules = ["report_generator"]
 allow_indirect_imports = true
 ignore_imports = [
@@ -262,7 +261,7 @@ ignore_imports = [
 [[tool.importlinter.contracts]]
 name = "fiftyone SDK has explicit owners"
 type = "forbidden"
-source_modules = ["clearml_yolo", "hydra_plugins.cy_queue"]
+source_modules = ["clearml_yolo"]
 forbidden_modules = ["fiftyone"]
 allow_indirect_imports = true
 ignore_imports = [
@@ -274,22 +273,19 @@ ignore_imports = [
 [[tool.importlinter.contracts]]
 name = "hydra SDK has explicit owners"
 type = "forbidden"
-source_modules = ["clearml_yolo", "hydra_plugins.cy_queue"]
+source_modules = ["clearml_yolo"]
 forbidden_modules = ["hydra"]
 allow_indirect_imports = true
 ignore_imports = [
     "clearml_yolo.entrypoints.hydra.common -> hydra",
     "clearml_yolo.entrypoints.hydra.config_tree -> hydra",
     "clearml_yolo.entrypoints.hydra.configs -> hydra",
-    "clearml_yolo.entrypoints.hydra.execution -> hydra",
-    "clearml_yolo.entrypoints.hydra.worker -> hydra",
-    "hydra_plugins.cy_queue.launcher -> hydra",
 ]
 
 [[tool.importlinter.contracts]]
 name = "hydra_zen SDK has explicit owners"
 type = "forbidden"
-source_modules = ["clearml_yolo", "hydra_plugins.cy_queue"]
+source_modules = ["clearml_yolo"]
 forbidden_modules = ["hydra_zen"]
 allow_indirect_imports = true
 ignore_imports = [
@@ -301,7 +297,7 @@ ignore_imports = [
 [[tool.importlinter.contracts]]
 name = "omegaconf SDK has explicit owners"
 type = "forbidden"
-source_modules = ["clearml_yolo", "hydra_plugins.cy_queue"]
+source_modules = ["clearml_yolo"]
 forbidden_modules = ["omegaconf"]
 allow_indirect_imports = true
 ignore_imports = [
@@ -311,8 +307,6 @@ ignore_imports = [
     "clearml_yolo.entrypoints.hydra.configs -> omegaconf",
     "clearml_yolo.entrypoints.hydra.execution -> omegaconf",
     "clearml_yolo.entrypoints.hydra.validation -> omegaconf",
-    "clearml_yolo.entrypoints.hydra.worker -> omegaconf",
-    "hydra_plugins.cy_queue.launcher -> omegaconf",
 ]
 
 [[tool.importlinter.contracts]]
@@ -447,8 +441,6 @@ forbidden_modules = [
 ]
 allow_indirect_imports = true
 ignore_imports = [
-    "clearml_yolo.adapters.runtime.gpu_runtime -> clearml_yolo.adapters.clearml.session",
-    "clearml_yolo.adapters.runtime.gpu_runtime -> clearml_yolo.adapters.integrations.native_runtime",
 ]
 
 [[tool.importlinter.contracts]]
@@ -475,7 +467,7 @@ ignore_imports = [
 [[tool.importlinter.contracts]]
 name = "openpyxl SDK has explicit owners"
 type = "forbidden"
-source_modules = ["clearml_yolo", "hydra_plugins.cy_queue"]
+source_modules = ["clearml_yolo"]
 forbidden_modules = ["openpyxl"]
 allow_indirect_imports = true
 ignore_imports = [

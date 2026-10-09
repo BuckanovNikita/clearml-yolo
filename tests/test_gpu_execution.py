@@ -1,8 +1,5 @@
-"""Process supervision preserves child lifetime and failure status."""
+"""Direct GPU execution preserves native settings and invocation ownership."""
 
-import os
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -15,54 +12,27 @@ from workflow_dependencies import patch_workflow
 from workflow_dependencies import workflow_dependencies as workflow_dependencies  # noqa: PLC0414
 
 
-def test_model_commands_choose_concurrent_queue_launcher() -> None:
+def test_model_commands_choose_standard_sequential_launcher() -> None:
     import clearml_yolo.entrypoints.hydra.configs  # noqa: F401
 
     store.add_to_hydra_store(overwrite_ok=True)
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
         for command in ("pipeline", "train", "predict", "val", "compare"):
             config = compose(config_name=command, return_hydra_config=True)
-            assert config.hydra.launcher._target_ == "hydra_plugins.cy_queue.launcher.QueueLauncher"
+            assert config.hydra.launcher._target_ == (
+                "hydra._internal.core_plugins.basic_launcher.BasicLauncher"
+            )
 
 
-def test_supervisor_waits_for_child_and_preserves_environment(tmp_path: Path) -> None:
-    from clearml_yolo.entrypoints.hydra.execution import wait_process
-
-    destination = tmp_path / "child.txt"
-    script = "import os,pathlib,sys; pathlib.Path(sys.argv[1]).write_text(os.environ['JOB_DEVICE'])"
-    process = subprocess.Popen(  # noqa: S603 - current interpreter and task-owned test script
-        [sys.executable, "-c", script, str(destination)],
-        env=os.environ | {"JOB_DEVICE": "GPU-a"},
-    )
-    assert wait_process(process) == 0
-    assert process.returncode == 0
-    assert destination.read_text() == "GPU-a"
-
-
-def test_supervisor_reports_failed_child() -> None:
-    from clearml_yolo.entrypoints.hydra.execution import wait_process
-
-    process = subprocess.Popen([sys.executable, "-c", "raise SystemExit(7)"])
-    assert wait_process(process) == 7
-
-
-def test_cancellation_reaps_owned_child(monkeypatch: pytest.MonkeyPatch) -> None:
-    from clearml_yolo.entrypoints.hydra.execution import cancel_process
-
-    process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
-    cancel_process(process)
-    assert process.poll() is not None
-
-
-def test_effective_configuration_uses_reserved_ordinals_without_changing_request() -> None:
+def test_effective_configuration_uses_selected_ordinals_without_changing_request() -> None:
     from clearml_yolo.entrypoints.hydra.execution import effective_configuration
 
     requested = OmegaConf.create(
         {"ultralytics": {"device": [5, 7]}, "ultralytics_predict": {"device": [-1, -1]}}
     )
-    effective = effective_configuration(requested, ("GPU-a", "GPU-b"))
-    assert list(effective.ultralytics.device) == [0, 1]
-    assert list(effective.ultralytics_predict.device) == [0]
+    effective = effective_configuration(requested, (1, 3))
+    assert list(effective.ultralytics.device) == [1, 3]
+    assert list(effective.ultralytics_predict.device) == [1]
     assert list(requested.ultralytics.device) == [5, 7]
 
 
@@ -72,7 +42,7 @@ def test_effective_configuration_preserves_explicit_cpu_inference() -> None:
     requested = OmegaConf.create(
         {"ultralytics": {"device": [4, 9]}, "ultralytics_predict": {"device": "cpu"}}
     )
-    effective = effective_configuration(requested, ("GPU-a", "GPU-b"))
+    effective = effective_configuration(requested, (1, 3))
     assert effective.ultralytics_predict.device == "cpu"
 
 
@@ -89,14 +59,13 @@ def test_training_transition_runs_before_pipeline_prediction(
         test_hydra_pipeline_passes_real_stage_objects(tmp_path, monkeypatch, workflow_dependencies)
 
 
-def test_replay_cannot_turn_cpu_worker_into_unreserved_gpu_job() -> None:
-    from clearml_yolo.adapters.runtime.gpu_runtime import reservation
+def test_replay_cannot_increase_gpu_demand_after_availability_check() -> None:
     from clearml_yolo.application.use_cases.predict import predict
     from clearml_yolo.entrypoints.hydra.common import _execute_assigned
 
-    with reservation(None), pytest.raises(ValueError, match="admitted reservation"):
+    with pytest.raises(ValueError, match="available selection"):
         _execute_assigned(
-            "predict", OmegaConf.create({"ultralytics_predict": {"device": [0]}}), predict, None
+            "predict", OmegaConf.create({"ultralytics_predict": {"device": [0]}}), predict, None, ()
         )
 
 

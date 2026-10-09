@@ -18,7 +18,7 @@ _REQUESTED_DEVICES: ContextVar[dict[str, Any] | None] = ContextVar(
 
 @contextmanager
 def requested_devices(values: dict[str, Any]) -> Iterator[None]:
-    """Preserve device intent while the scheduler supplies native execution ordinals."""
+    """Preserve device intent while availability checks select native execution ordinals."""
     token = _REQUESTED_DEVICES.set(values)
     try:
         yield

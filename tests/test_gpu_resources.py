@@ -1,6 +1,7 @@
 """GPU requests use native device semantics without initializing CUDA in the owner."""
 
 import json
+import os
 import subprocess
 import sys
 from collections.abc import Sequence
@@ -90,13 +91,11 @@ def test_device_count_rejects_ambiguous_or_malformed_values(value: object) -> No
         ("mps:0", "mps:0"),
     ],
 )
-def test_normalized_device_requests_scheduler_selected_gpus(
-    value: object, expected: object
-) -> None:
+def test_normalized_device_requests_available_gpus(value: object, expected: object) -> None:
     assert normalized_device(value) == expected
 
 
-def test_execution_devices_are_logical_indices_inside_the_assigned_visibility() -> None:
+def test_execution_devices_are_the_first_logical_indices() -> None:
     assert execution_devices(0) == []
     assert execution_devices(3) == [0, 1, 2]
 
@@ -303,6 +302,38 @@ def test_snapshot_reports_unsupported_process_telemetry_as_an_actionable_failure
     _install_nvml(monkeypatch, fake)
 
     with pytest.raises(RuntimeError, match=r"GPU-a.*process telemetry.*unsupported"):
+        GPUInventory().snapshot()
+    assert fake.shutdown
+
+
+def test_snapshot_ignores_only_the_invoking_process_cuda_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    owner_pid = os.getpid()
+    fake = _FakeNVML(
+        uuids=("GPU-a", "GPU-b"),
+        processes=(
+            (SimpleNamespace(pid=owner_pid),),
+            (SimpleNamespace(pid=owner_pid), SimpleNamespace(pid=owner_pid + 1)),
+        ),
+    )
+    _install_nvml(monkeypatch, fake)
+
+    assert GPUInventory().snapshot() == (
+        GPUDevice("GPU-a", busy=False),
+        GPUDevice("GPU-b", busy=True),
+    )
+    assert fake.shutdown
+
+
+@pytest.mark.parametrize("pid", [None, "unknown", 0, -1, True])
+def test_snapshot_rejects_invalid_compute_pid_telemetry(
+    monkeypatch: pytest.MonkeyPatch, pid: object
+) -> None:
+    fake = _FakeNVML(uuids=("GPU-a",), processes=((SimpleNamespace(pid=pid),),))
+    _install_nvml(monkeypatch, fake)
+
+    with pytest.raises(RuntimeError, match=r"GPU-a.*process telemetry"):
         GPUInventory().snapshot()
     assert fake.shutdown
 

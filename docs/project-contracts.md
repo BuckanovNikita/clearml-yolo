@@ -43,32 +43,33 @@ Effective native YAML and retained prediction manifests support replay; YAML is 
 locally with comments preserved; canonical run/dataset/report configurations and native General
 parameters support ClearML replay without artifact copies.
 Pass device, batch, AMP, compilation and native augmentation options through the native groups.
-The five model commands use a user-wide, same-OS FIFO scheduler for whole NVIDIA GPUs. Demand
-comes only from native device settings: a training integer is one GPU, a list uses its length,
-each automatic `-1` contributes one without binding that written ID, null/empty/`cuda` is one,
-and `cpu`/`mps` is zero. GPU inference is one device. A pipeline reserves the maximum of training
-and enabled GPU-inference demand before starting.
+The five model commands poll whole-NVIDIA-GPU availability before native execution and ClearML
+initialization, then execute in the calling process. Demand comes only from native device
+settings: a training integer is one GPU, a list uses its length, each automatic `-1` contributes
+one without binding that written ID, null/empty/`cuda` is one, and `cpu`/`mps` is zero. GPU
+inference is one device. A pipeline waits for the maximum of training and enabled GPU-inference
+demand. There is no separate count setting.
 
-Admission is strict head-of-line FIFO and reserves N devices atomically; later requests do not
-bypass a blocked valid head, while successive heads may run concurrently when each fits. A demand
-larger than the supported visible set fails before enqueue. NVML excludes external compute users
-and unknown telemetry fails closed. Inherited visibility is mapped to stable UUIDs in an isolated
-metadata subprocess. Waiting precedes ClearML task creation and native GPU context. Each admitted
-fresh child owns one task and receives concrete child-local native devices; requested and effective
-device records remain separate.
+An isolated metadata subprocess maps inherited visibility to stable UUIDs without initializing
+CUDA in the invoking process. NVML excludes other compute users and unknown telemetry fails
+closed; only the invoking PID is ignored so sequential jobs can reuse their own retained context.
+Demand exceeding the supported visible whole-GPU set, unsupported MIG and lost visibility fail
+clearly. Selected logical indices follow inherited visibility order; `CUDA_VISIBLE_DEVICES` is
+not rewritten. Training uses all selected devices required by its demand, and GPU prediction,
+validation and comparison use the first selected device. Native training-memory cleanup remains.
+Requested settings and effective devices are recorded separately under `gpu_selection`.
 
-After verified training and telemetry-confirmed DDP cleanup, a pipeline retains its first assigned
-GPU, atomically releases N-1, and routes GPU prediction and comparison to local device 0. The first
-remains reserved until child exit, including CPU-only downstream work. The scheduler has no daemon,
-TTL/PID-only reclaim,
-priority, bypass, separate count setting, MIG support, or cross-host/cross-OS coordination. The
-project still does not provide batch tuning, custom augmentation JSON, `--force-gpu`, or disabled
-tracking. Unsupported options fail rather than being silently ignored.
+There are no tickets, reservations, queue registry, worker supervision, FIFO fairness or exclusive
+allocation guarantees. Simultaneous commands may observe the same free GPU. Historical queue data
+is untouched and unused. CPU/MPS and non-model commands bypass GPU telemetry. The project does
+not provide batch tuning, custom augmentation JSON, `--force-gpu`, disabled tracking or MIG
+support. Unsupported options fail rather than being silently ignored.
 
-The five model commands default to the queue-aware local Hydra launcher for BasicSweeper. It starts
-fresh children as FIFO capacity permits, preserves callbacks, job environment, per-job directory
-and chdir behavior, and returns ordered `JobReturn` statuses. Any failed child makes the invocation
-nonzero and releases its reservations.
+Local Hydra multiruns use the standard sequential BasicLauncher with BasicSweeper, preserving
+callbacks, job environment, per-job output directory, configured chdir and normal exceptions.
+The [GPU execution contract](../specs/022-simple-gpu-wait/contracts/execution.md) supersedes
+feature 013 queue requirements and the queue-specific constitution amendment; their dated
+history remains evidence of the former design.
 
 `run_dir` owns output routing for `cy`. Pipeline stages cannot use conflicting stage output
 paths or conflicting native training project/name. Standalone output-producing commands use
@@ -124,7 +125,7 @@ calibration provenance matches the checkpoint actually used for prediction and r
 readback verifies the metadata. Standalone metrics never creates or modifies models.
 
 ClearML is required for execution commands. One execution invocation owns exactly one task;
-nested stages reuse it and workers do not create tasks or upload artifacts.
+nested stages reuse it and native DDP descendants do not create tasks or upload artifacts.
 The invocation-owned task forwards normal stdout and stderr to its ClearML Console while it
 is active, including native YOLO output. Console streams are raw; credential sanitization
 applies to published configuration. Argument-parser and framework auto-capture remain

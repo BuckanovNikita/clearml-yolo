@@ -36,9 +36,10 @@ algorithms in evaluation adapters and copy exact values into core evaluation rec
 
 Run `lint-imports` and the architecture tests when changing imports, package initializers,
 composition or subprocess/plugin targets. Updating a dependency boundary also requires
-regenerated YAML checks and installed command helps, including the Hydra launcher,
-worker, GPU probe, DDP callback and FiftyOne extension targets. Update maintained code
-links and migration guidance; preserve completed feature history as dated intent.
+regenerated YAML checks and installed command helps, including the GPU probe, DDP
+callback and FiftyOne extension targets. Check distributions contain no removed queue
+worker or project Hydra launcher plugin, and test standard sequential BasicLauncher sweeps.
+Update maintained code links and migration guidance; preserve completed feature history as dated intent.
 
 ## External dependencies
 

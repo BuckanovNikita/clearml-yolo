@@ -23,7 +23,7 @@ SRC = ROOT / "src"
 @pytest.fixture(scope="module")
 def graph() -> grimp.ImportGraph:
     imported = grimp.build_graph(
-        "clearml_yolo", "hydra_plugins.cy_queue", include_external_packages=True, cache_dir=None
+        "clearml_yolo", include_external_packages=True, cache_dir=None
     )
     architecture.add_dynamic_imports(imported, SRC)
     return imported
@@ -201,9 +201,9 @@ def test_runtime_targets_resolve_to_shipped_modules_and_no_legacy_paths(
     graph: grimp.ImportGraph,
 ) -> None:
     targets = architecture.runtime_targets(SRC, ROOT / "pyproject.toml")
-    assert "clearml_yolo.entrypoints.hydra.worker" in targets
+    assert "clearml_yolo.entrypoints.hydra.worker" not in targets
     assert "clearml_yolo.adapters.runtime.gpu_probe" in targets
-    assert "hydra_plugins.cy_queue.launcher.QueueLauncher" in targets
+    assert "hydra_plugins.cy_queue.launcher.QueueLauncher" not in targets
     assert architecture.target_findings(targets, graph, SRC) == []
     migration = json.loads((ROOT / "specs/021-clean-architecture/migration-map.json").read_text())
     assert not set(migration).intersection(graph.modules)

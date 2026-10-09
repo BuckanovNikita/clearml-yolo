@@ -22,7 +22,7 @@ def test_command_invocation_injects_bundle_without_changing_serializable_functio
 
     original_signature = inspect.signature(workflow)
     monkeypatch.setattr(composition, "build_dependencies", lambda: workflow_dependencies)
-    _execute_assigned("metrics", OmegaConf.create({"value": 7}), workflow, None)
+    _execute_assigned("metrics", OmegaConf.create({"value": 7}), workflow, None, ())
 
     assert observed == [(7, workflow_dependencies)]
     assert inspect.signature(workflow) == original_signature
