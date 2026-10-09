@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record clean architecture release verification
+  ([`95f560d`](https://github.com/BuckanovNikita/clearml-yolo/commit/95f560d96e31a3eb4aa1c0416518301802f09105))
+
+
 ## v0.20.0 (2026-10-08)
 
 ### Documentation
