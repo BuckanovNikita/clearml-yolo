@@ -23,9 +23,16 @@
 
 - [x] T009 [P] Update maintained GPU/CLI/filesystem/architecture/verification guidance and
   README; annotate superseded feature 013 contracts (depends on final implementation).
-- [ ] T010 Run affected/full checks, generated YAML and command helps, native CPU/GPU
+- [x] T010 Run affected/full checks, generated YAML and command helps, native CPU/GPU
   execution and distribution checks; record outcomes and limitations (depends on T005–T009).
-- [ ] T011 Validate changed Markdown/local links/examples and inspect full combined diff;
+- [x] T011 Validate changed Markdown/local links/examples and inspect full combined diff;
   obtain fresh independent review (depends on T010).
 - [ ] T012 Follow applicable release workflow only after release gates pass; publish Git
   tags only and restore local source overrides (depends on T011).
+  Cancelled by the user's explicit no-commit instruction. The implementation commit
+  already exists locally; no release commit, tag or push was completed. Partial release
+  metadata and staging were removed on resume, preserving local dependency overrides.
+  The subsequent explicit “commit and push” request reauthorized completion of this task.
+
+Implementation, verification and documentation are complete. The reauthorized release
+and publication are pending. See [verification.md](verification.md).

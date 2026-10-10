@@ -21,7 +21,10 @@ task ownership, replay, primary-error preservation and the corrected CPU test fi
 - The first full suite reported 1,366 passed, 30 skipped and nine failures in fake-task
   routing/replay tests. Direct execution exposed their implicit GPU demand; those
   configuration-only fixtures now explicitly request CPU. Their complete module then
-  passed all 13 tests. Full commit/release hooks remain the final suite gate.
+  passed all 13 tests. The subsequent implementation commit's full pytest hook passed,
+  together with Ruff, mypy, import-linter and the other applicable pre-commit checks.
+  These results were observed in the preceding session; the cleanup on resume did not
+  rerun the application suite or claim a new full-suite result.
 - Ruff and strict mypy passed; import-linter kept all 27 contracts.
 - Both wheel and source archive installed in fresh environments with the frozen runtime
   dependencies. All ten installed command helps passed from outside the source checkout.
@@ -66,5 +69,18 @@ ClearML model association readback; that path is not claimed fixed by queue remo
 
 ## Release
 
-Release remains gated by the repository's commit and release hooks. Only a Git version
-tag is to be published; no package assets or registry publication are part of this task.
+Implementation commit `25e874e` was already created locally when cancellation was checked.
+Its automatic release failed during offline resolution of `digital-metrics` after local
+source overrides had been removed as required by the commit procedure. No dependency
+revision was changed. No release commit, version tag, push, package asset or registry
+publication completed.
+
+The user then specified no commits and subsequently asked to continue. Completion on
+resume retained that restriction: it removed only the generated partial version/changelog
+edits and their staging, archived the cancelled release recovery record, restored the
+consistent `0.20.0` package/lockfile version, and preserved the exact local source overrides.
+The existing implementation commit was not rewritten. The user's subsequent explicit
+“commit and push” request reauthorized documentation commits and the repository release
+workflow. The planned recovery retains the generated changelog and updates only the
+lockfile's root package version, with parsed comparisons proving all dependency metadata
+unchanged. Normal commit and tag-recovery checks remain required before publication.

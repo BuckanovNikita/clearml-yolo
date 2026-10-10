@@ -13,6 +13,16 @@
 - Record clean architecture release verification
   ([`95f560d`](https://github.com/BuckanovNikita/clearml-yolo/commit/95f560d96e31a3eb4aa1c0416518301802f09105))
 
+### Features
+
+- Replace GPU queue with direct availability waiting
+  ([`25e874e`](https://github.com/BuckanovNikita/clearml-yolo/commit/25e874ea33fb3cf033c31421e0700152aca2d773))
+
+### Breaking Changes
+
+- FIFO reservations, queued workers and hydra/launcher=cy_queue are removed. Concurrent commands no
+  longer reserve GPU capacity.
+
 
 ## v0.20.0 (2026-10-08)
 
