@@ -1,7 +1,7 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.21.0 (2026-10-10)
 
 ### Chores
 
@@ -12,6 +12,9 @@
 
 - Record clean architecture release verification
   ([`95f560d`](https://github.com/BuckanovNikita/clearml-yolo/commit/95f560d96e31a3eb4aa1c0416518301802f09105))
+
+- Record GPU queue removal verification
+  ([`d405e86`](https://github.com/BuckanovNikita/clearml-yolo/commit/d405e86a57496ebc6da916d360acfb5bd10fa344))
 
 ### Features
 
