@@ -13,6 +13,8 @@ from loguru import logger
 from openpyxl.styles import Font, PatternFill  # type: ignore[import-untyped]
 from openpyxl.utils import get_column_letter  # type: ignore[import-untyped]
 
+from clearml_yolo.adapters.observability.tracing import trace_operation
+
 COMPARISON_SHEET = "Сравнение"
 
 POOLED_LABEL = "Итого"
@@ -149,6 +151,7 @@ def _paint_verdicts(worksheet: Any, frame: pd.DataFrame) -> None:
                 worksheet.cell(row=row_number, column=column).fill = fill
 
 
+@trace_operation("report.comparison.workbook")
 def write_comparison_workbook(
     rows: pd.DataFrame,
     excluded: pd.DataFrame,

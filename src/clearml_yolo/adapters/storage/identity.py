@@ -3,9 +3,11 @@
 import hashlib
 from pathlib import Path
 
+from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.core.identity import ModelIdentity
 
 
+@trace_operation("storage.checkpoint.hash")
 def checkpoint_sha256(path: Path) -> str:
     """Hash actual checkpoint bytes with bounded memory."""
     digest = hashlib.sha256()
@@ -14,6 +16,8 @@ def checkpoint_sha256(path: Path) -> str:
             digest.update(chunk)
     return digest.hexdigest()
 
+
+@trace_operation("storage.checkpoint.identity.write")
 def write_checkpoint_identity(path: Path, identity: ModelIdentity) -> Path:
     """Persist checkpoint identity beside local weights after checking their bytes."""
     actual_hash = checkpoint_sha256(path)
@@ -23,6 +27,8 @@ def write_checkpoint_identity(path: Path, identity: ModelIdentity) -> Path:
     sidecar.write_text(identity.model_dump_json(indent=2) + "\n", encoding="utf-8")
     return sidecar
 
+
+@trace_operation("storage.checkpoint.identity.read")
 def read_checkpoint_identity(path: Path) -> ModelIdentity | None:
     """Recover a local checkpoint's known source, rejecting stale association."""
     sidecar = path.with_name(path.name + ".identity.json")

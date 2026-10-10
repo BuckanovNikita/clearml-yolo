@@ -10,6 +10,7 @@ from pathlib import Path
 from loguru import logger
 
 from clearml_yolo.adapters.observability.diagnostics import log_exception, redact_text
+from clearml_yolo.adapters.observability.tracing import trace_operation
 
 _WARNED_HOME_PATHS: set[Path] = set()
 _NATIVE_WEIGHTS: ContextVar[Path | None] = ContextVar("cy_native_weights", default=None)
@@ -89,6 +90,7 @@ def _fiftyone_inputs() -> dict[str, object]:
     return {str(key): value for key, value in values.items()}
 
 
+@trace_operation("storage.filesystem.initialize")
 def initialize_filesystem() -> None:
     """Set project data defaults before import, preserving explicit environment settings.
 

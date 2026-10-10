@@ -5,6 +5,9 @@
 
 ### Documentation
 
+- Record CPU DDP verification completion
+  ([`ea276cd`](https://github.com/BuckanovNikita/clearml-yolo/commit/ea276cd3bdf8aa1da3cef2d2d2dfec3f0ef1f648))
+
 - Record GPU waiting release completion
   ([`0040f8e`](https://github.com/BuckanovNikita/clearml-yolo/commit/0040f8e8f9fd073a69a2fa8a0cd1052861d781dc))
 

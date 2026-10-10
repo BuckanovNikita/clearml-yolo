@@ -24,12 +24,15 @@ Ultralytics YOLO training, prediction, validation, metrics, reports and comparis
 ## Collaboration
 
 For completion work, load `$sol-orchestration` and use native subagents in
-parallel with the primary agent. Assign bounded independent work with explicit file
+parallel with the primary agent. Implementation plans must identify dependency-aware
+parallel workstreams for independent investigation, implementation, testing and review
+while the parent progresses. Assign bounded independent work with explicit file
 ownership, dependencies and acceptance evidence; a small change can use a read-only
 review. Subagents must not delegate further. The primary agent inspects the combined
 diff and owns final verification, followed by a fresh independent read-only review.
-Respect live tool/model limits; if delegation is unavailable, report that limitation
-and continue safely.
+Respect live tool/model/concurrency limits and planning restrictions; document inherently
+sequential dependencies. If delegation is unavailable, report that limitation and
+continue safely.
 
 ## Read when relevant
 

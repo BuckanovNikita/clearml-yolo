@@ -11,6 +11,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 from loguru import logger
 
+from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.storage.dataset_export import (
     DatasetFormat,
     export_dataset,
@@ -34,8 +35,7 @@ _COLUMNS = (
 )
 
 
-
-
+@trace_operation("storage.dataset.truth.write")
 def _write_cleaned_truth(records: ValidatedDataset, path: Path) -> None:
     with path.open("x", newline="", encoding="utf-8") as stream:
         writer = csv.writer(stream)
@@ -58,6 +58,7 @@ def _write_cleaned_truth(records: ValidatedDataset, path: Path) -> None:
                 )
 
 
+@trace_operation("storage.dataset.source.snapshot")
 def _snapshot_csv(source: Path, source_bytes: bytes) -> str:
     """Resolve relative image paths while preserving the captured CSV rows."""
     rows = list(csv.reader(io.StringIO(source_bytes.decode("utf-8"), newline="")))
@@ -76,6 +77,7 @@ def _snapshot_csv(source: Path, source_bytes: bytes) -> str:
     return snapshot.getvalue()
 
 
+@trace_operation("storage.dataset.source.validate")
 def _validate_source(
     source: Path,
     directory: Path,
@@ -136,6 +138,7 @@ def _preparation_record(
     }
 
 
+@trace_operation("storage.dataset.prepare")
 def prepare_dataset(
     source: str | Path,
     directory: Path,
@@ -159,7 +162,10 @@ def prepare_dataset(
     manifest.write_text(json.dumps(metadata, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     data = export_dataset(records, directory, dataset_format)
     labels = directory / "labels.zip"
-    with ZipFile(labels, "x", compression=ZIP_DEFLATED) as archive:
+    with (
+        trace_operation("storage.dataset.labels.archive", context={"path": str(labels)}),
+        ZipFile(labels, "x", compression=ZIP_DEFLATED) as archive,
+    ):
         for label in sorted((directory / "labels").rglob("*.txt")):
             archive.write(label, label.relative_to(directory).as_posix())
     artifacts = [ground_truth, manifest, data, labels]

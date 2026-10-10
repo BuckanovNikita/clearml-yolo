@@ -18,6 +18,7 @@ import pandas as pd
 from loguru import logger
 
 from clearml_yolo.adapters.observability.diagnostics import log_exception
+from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.storage.filesystem import model_weights_path
 from clearml_yolo.adapters.yolo.config import write_native_yaml
 from clearml_yolo.adapters.yolo.inference import predict_on_images
@@ -55,15 +56,12 @@ _OWNED_NATIVE_KEYS = {
 }
 
 
-
-
-
-
 def _model_class_names(weights: str | Path) -> dict[int, str]:
-    from ultralytics.models import YOLO
+    with trace_operation("yolo.vocabulary.load", context={"path": str(weights)}):
+        from ultralytics.models import YOLO
 
-    # Checkpoint labels remain authoritative even when remote model metadata exists.
-    names: dict[int, str] = YOLO(str(model_weights_path(weights))).names
+        # Checkpoint labels remain authoritative even when remote model metadata exists.
+        names: dict[int, str] = YOLO(str(model_weights_path(weights))).names
     return names
 
 
@@ -205,6 +203,7 @@ def _read_cache(output: Path, native_project: Path) -> pd.DataFrame | None:
     return predictions
 
 
+@trace_operation("yolo.reinfer")
 def reinfer_split(
     weights: str | Path,
     ground_truth: pd.DataFrame,
@@ -248,15 +247,17 @@ def reinfer_split(
     split_rows = _select_split(ground_truth, split)
     image_paths = _existing_image_paths(split_rows, split)
 
-    cached = _read_cache(output, native_project) if reuse_existing else None
+    with trace_operation("yolo.cache.read", context={"path": str(output), "cache": reuse_existing}):
+        cached = _read_cache(output, native_project) if reuse_existing else None
     if cached is not None:
-        predictions = cached
-        logger.info(
-            "Reusing {} cached baseline predictions for split {!r} from {}",
-            len(predictions),
-            split,
-            output,
-        )
+        with trace_operation("yolo.cache.hit", context={"split": split, "path": str(output)}):
+            predictions = cached
+            logger.info(
+                "Reusing {} cached baseline predictions for split {!r} from {}",
+                len(predictions),
+                split,
+                output,
+            )
     else:
         settings: dict[str, object] = {
             "conf": conf,
@@ -283,17 +284,23 @@ def reinfer_split(
             | {"source": str(manifest.resolve()), "model": str(weights), "mode": "predict"},
             "predict",
         )
-        predictions = predictor(
-            weights,
-            image_paths,
-            manifest_dir=manifest_dir,
-            **settings,
-        )
+        with trace_operation(
+            "yolo.cache.miss.inference", context={"split": split, "images": len(image_paths)}
+        ):
+            predictions = predictor(
+                weights,
+                image_paths,
+                manifest_dir=manifest_dir,
+                **settings,
+            )
         effective = dict(predictions.attrs.get("effective_args", settings))
         effective.update(source=str(manifest.resolve()), model=str(weights), mode="predict")
         predictions.attrs["effective_args"] = effective
         evidence = _evidence(predictions, settings)
-        _write_cache(predictions, output, evidence)
+        with trace_operation(
+            "yolo.cache.write", context={"path": str(output), "rows": len(predictions)}
+        ):
+            _write_cache(predictions, output, evidence)
         logger.info(
             "Re-inferred {} baseline predictions over {} images of split {!r} into {}",
             len(predictions),

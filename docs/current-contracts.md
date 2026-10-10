@@ -22,6 +22,7 @@ configuration, output, tracking and evaluation rules formerly listed in `AGENTS.
 | Artifacts, native callbacks and task completion | [Publication inventory](../specs/008-dataset-clearml-tracking/contracts/publication.md), [evaluation publication](../specs/014-evaluation-publication/contracts/publication.md), [native tracking](../specs/010-native-clearml-integration/contracts/tracking-publication.md), [model metadata](../specs/008-dataset-clearml-tracking/contracts/model-metadata.md) | [Artifact names](../src/clearml_yolo/core/artifact_names.py), [native runtime](../src/clearml_yolo/adapters/integrations/native_runtime.py), [model verification](../src/clearml_yolo/adapters/clearml/native.py), [display naming](../src/clearml_yolo/adapters/clearml/naming.py), [result bundle](../src/clearml_yolo/adapters/clearml/results.py), [DDP relay](../src/clearml_yolo/adapters/integrations/native_ddp.py) |
 | Evaluation, comparison, thresholds and reports | [Task recovery](../specs/012-remove-legacy-compatibility/contracts/task-recovery.md), [evaluation publication](../specs/014-evaluation-publication/contracts/publication.md), [readable plots](../specs/020-readable-evaluation-plots/contracts/plots.md), [Publication inventory](../specs/008-dataset-clearml-tracking/contracts/publication.md), [CLI evaluation contract](../specs/001-release-030/contracts/cli.md) | [Metrics](../src/clearml_yolo/application/use_cases/metrics.py), [comparison](../src/clearml_yolo/application/use_cases/compare.py), [comparison workbook](../src/clearml_yolo/adapters/reporting/comparison_workbook.py), [exact thresholds](../src/clearml_yolo/adapters/clearml/models.py), [source lineage](../src/clearml_yolo/core/evaluation/result_rows.py), [neutral payloads](../src/clearml_yolo/core/evaluation/schema.py), [interactive reporting](../src/clearml_yolo/adapters/clearml/report.py), [paired reports](../src/clearml_yolo/application/use_cases/report.py) |
 | FiftyOne publication | [Publisher](../specs/006-fiftyone-integration/contracts/publisher.md), [native evaluations](../specs/015-fiftyone-native-evaluations/contracts/native-evaluation.md), [current inventory](../specs/008-dataset-clearml-tracking/contracts/publication.md) | [Owner publication](../src/clearml_yolo/application/use_cases/publication.py), [replaceable adapter](../src/clearml_yolo/adapters/fiftyone/publisher.py) |
+| Operation diagnostics and stalled-run capture | [Diagnostics](diagnostics.md) | [Tracing and watchdog](../src/clearml_yolo/adapters/observability/tracing.py), [execution resource port](../src/clearml_yolo/application/ports.py), [composition](../src/clearml_yolo/entrypoints/composition.py), [GPU wait](../src/clearml_yolo/adapters/runtime/gpu_wait.py), [native cleanup](../src/clearml_yolo/adapters/integrations/native_runtime.py) |
 | Local dependency sources | [Development setup](development.md#external-dependencies), [local copies](../specs/017-local-dependency-copies/spec.md) | [Ignore rules](../.gitignore), [package configuration](../pyproject.toml), [editable lock](../uv.lock) |
 | Local versioning, changelog and release hooks | [Local release](../specs/003-semantic-release/contracts/local-release.md) | [Release helper](../scripts/local_release.py), [hook configuration](../.pre-commit-config.yaml), [generated changelog](../CHANGELOG.md) |
 
@@ -33,6 +34,16 @@ composition supplies them outside Hydra configuration. Old module paths and save
 Python `_target_` strings must migrate together; no compatibility aliases remain.
 Regenerate editable YAML after backing up custom overrides as described in the
 [import migration](python-import-migration.md).
+
+`LOGURU_LEVEL=TRACE` enables the maintained [operation diagnostic contract](diagnostics.md):
+lifecycle records preserve caller Loguru sinks; a separate watchdog writes 30-second
+per-thread deepest-operation heartbeats and 60-second changed grouped location-only
+stacks to captured stderr, bounded to eight groups and 12 frames. Scalar context is
+redacted and bounded; full configuration/data/locals/source dumps are excluded.
+Application workflows access tracing through the execution-resource port; evaluation
+and FiftyOne adapters may depend on observability. Keep operation coverage and this
+guide current when blocking boundaries change. Cleanup and `command.return` are
+observable without altering execution, retry, timeout or GPU allocation policy.
 
 Pandera validates scientific DataFrames by stage without coercing, dropping or
 renumbering source rows. Storage adapters retain lexical CSV interpretation and

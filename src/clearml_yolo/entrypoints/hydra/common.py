@@ -24,6 +24,7 @@ from clearml_yolo.adapters.integrations.native_runtime import (
     release_training_memory,
 )
 from clearml_yolo.adapters.observability.diagnostics import log_exception
+from clearml_yolo.adapters.observability.tracing import trace_command, trace_operation
 from clearml_yolo.adapters.runtime.gpu_resources import job_request
 from clearml_yolo.adapters.runtime.gpu_wait import wait_for_available_gpus
 from clearml_yolo.adapters.storage.filesystem import initialize_filesystem, runs_root, write_path
@@ -60,19 +61,23 @@ def _gpu_cleanup(enabled: bool) -> Iterator[None]:
                 log_exception("Native GPU memory cleanup failed", error, level="ERROR")
 
 
+@trace_operation("invocation.execute")
 def execute_owned(name: str, config: DictConfig, function: Callable[..., Any]) -> None:
     """Wait for free GPUs, then execute directly under one invocation-owned task."""
     from hydra.core.hydra_config import HydraConfig
 
-    initialize_filesystem()
-    if HydraConfig.initialized():
-        write_path(HydraConfig.get().runtime.output_dir)
-    validate_wrapper_keys(config, function)
-    resolved = OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
+    with trace_operation("filesystem.initialize"):
+        initialize_filesystem()
+        if HydraConfig.initialized():
+            write_path(HydraConfig.get().runtime.output_dir)
+    with trace_operation("configuration.resolve", context={"stage": name}):
+        validate_wrapper_keys(config, function)
+        resolved = OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
     if not isinstance(resolved, dict):
         raise TypeError("Resolved command configuration must be a mapping")
     inputs = {str(key): value for key, value in resolved.items()}
-    devices = wait_for_available_gpus(job_request(name, inputs))
+    with trace_operation("execution.gpu_wait", context={"stage": name}):
+        devices = wait_for_available_gpus(job_request(name, inputs))
     # Initialize native imports before ClearML starts background package detection;
     # concurrent torch submodule discovery can observe a partially loaded package.
     with (
@@ -143,10 +148,13 @@ def _execute_assigned(
         )
     with requested_devices(requests):
         if "deps" in inspect.signature(function).parameters:
-            from clearml_yolo.entrypoints.composition import build_dependencies
+            with trace_operation("configuration.dependencies"):
+                from clearml_yolo.entrypoints.composition import build_dependencies
+
+                dependencies = build_dependencies()
 
             # Supply concrete capabilities outside the public Hydra configuration.
-            bound = partial(function, deps=build_dependencies())
+            bound = partial(function, deps=dependencies)
             zen(bound, exclude="deps")(effective)
         else:
             zen(function)(effective)
@@ -154,8 +162,13 @@ def _execute_assigned(
 
 def launch(name: str, function: Callable[..., Any]) -> None:
     """Compose and execute directly, including Hydra's standard sequential multirun."""
-    initialize_filesystem()
-    store.add_to_hydra_store(overwrite_ok=True)
+    trace_command(name)(_launch)(name, function)
+
+
+def _launch(name: str, function: Callable[..., Any]) -> None:
+    with trace_operation("configuration.startup", context={"stage": name}):
+        initialize_filesystem()
+        store.add_to_hydra_store(overwrite_ok=True)
 
     @hydra.main(config_name=name, config_path=None, version_base="1.3")
     def execute(config: DictConfig) -> None:

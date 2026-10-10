@@ -12,6 +12,7 @@ from digital_metrics.scoring import compute_ap
 from digital_metrics.validation import normalize_image_ids, validate_dataframes, validate_option
 from numpy.typing import NDArray
 
+from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.core.evaluation.schema import PRCurve
 
 _BOX_COLUMNS = ["bbox_x_tl", "bbox_y_tl", "bbox_x_br", "bbox_y_br"]
@@ -45,6 +46,7 @@ def _true_positive_flags(
     return tp
 
 
+@trace_operation("evaluation.pr.curves")
 def build_pr_curves(
     ground_truth: pd.DataFrame,
     predictions: pd.DataFrame,

@@ -25,9 +25,10 @@ def prepare_publisher(
     selected = config if task is not None else FiftyOneConfig(enabled=False)
     operation = "factory"
     try:
-        publisher = factory(selected)
-        operation = "preflight"
-        publisher.preflight()
+        with deps.resources.trace_operation("publication.prepare"):
+            publisher = factory(selected)
+            operation = "preflight"
+            publisher.preflight()
     except Exception as error:  # noqa: BLE001 - optional backends must not fail computation
         deps.resources.log_exception(
             "FiftyOne visualization setup failed; continuing without visualization",
@@ -74,7 +75,8 @@ def publish_results(
             metadata=metadata or {},
         )
         operation = "publish"
-        receipt = publisher.publish(request)
+        with deps.resources.trace_operation("publication.publish"):
+            receipt = publisher.publish(request)
         if receipt is None:
             deps.resources.log_exception(
                 "FiftyOne visualization publication failed; continuing task",

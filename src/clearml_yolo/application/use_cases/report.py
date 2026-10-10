@@ -85,57 +85,65 @@ def build_reports(
     deps: WorkflowDependencies,
 ) -> ReportResult:
     """Render both established workbook formats from the same evaluated pair."""
-    candidate_path = Path(candidate_dashboard)
-    baseline_path = Path(baseline_dashboard)
-    for path, description in (
-        (candidate_path, "candidate dashboard"),
-        (baseline_path, "baseline dashboard"),
-    ):
-        if not deps.storage.is_file(path):
-            raise FileNotFoundError(f"Comparison {description} does not exist: {path}")
-    task = deps.tracking.init_task(clearml, stage="report")
-    destination = deps.storage.write_path(output_dir)
-    deps.storage.mkdir(destination, parents=True, exist_ok=True)
-    manifest_path = Path(comparison_manifest) if comparison_manifest is not None else None
-    expected = [
-        artifact_names.per_split(artifact_names.REPORT_DEV_PREFIX, split),
-        artifact_names.per_split(artifact_names.REPORT_BUSINESS_PREFIX, split),
-    ]
-    if manifest_path is not None and (not deps.storage.is_file(manifest_path)):
-        raise FileNotFoundError(f"Comparison manifest does not exist: {manifest_path}")
-    if task is not None:
-        deps.tracking.expect_artifacts(task, expected)
-    effective_config_path: str | Path | None = report_config_path
-    if report_config_path is not None and task is not None:
-        effective_config_path = deps.tracking.connect_config_file(
-            task, "report", Path(report_config_path)
+    with deps.resources.trace_operation("workflow.report", context={"split": split}):
+        candidate_path = Path(candidate_dashboard)
+        baseline_path = Path(baseline_dashboard)
+        for path, description in (
+            (candidate_path, "candidate dashboard"),
+            (baseline_path, "baseline dashboard"),
+        ):
+            if not deps.storage.is_file(path):
+                raise FileNotFoundError(f"Comparison {description} does not exist: {path}")
+        task = deps.tracking.init_task(clearml, stage="report")
+        destination = deps.storage.write_path(output_dir)
+        deps.storage.mkdir(destination, parents=True, exist_ok=True)
+        manifest_path = Path(comparison_manifest) if comparison_manifest is not None else None
+        expected = [
+            artifact_names.per_split(artifact_names.REPORT_DEV_PREFIX, split),
+            artifact_names.per_split(artifact_names.REPORT_BUSINESS_PREFIX, split),
+        ]
+        if manifest_path is not None and (not deps.storage.is_file(manifest_path)):
+            raise FileNotFoundError(f"Comparison manifest does not exist: {manifest_path}")
+        if task is not None:
+            deps.tracking.expect_artifacts(task, expected)
+        effective_config_path: str | Path | None = report_config_path
+        if report_config_path is not None and task is not None:
+            effective_config_path = deps.tracking.connect_config_file(
+                task, "report", Path(report_config_path)
+            )
+        identities = {
+            "baseline": _report_identity(
+                baseline_path, "baseline", baseline_identity, baseline_label, deps=deps
+            ),
+            "candidate": _report_identity(
+                candidate_path, "candidate", candidate_identity, candidate_label, deps=deps
+            ),
+        }
+        dev_path = (
+            destination
+            / f"{artifact_names.REPORT_DEV_PREFIX}_{artifact_names.split_component(split)}.xlsx"
         )
-    identities = {
-        "baseline": _report_identity(
-            baseline_path, "baseline", baseline_identity, baseline_label, deps=deps
-        ),
-        "candidate": _report_identity(
-            candidate_path, "candidate", candidate_identity, candidate_label, deps=deps
-        ),
-    }
-    dev_path = (
-        destination
-        / f"{artifact_names.REPORT_DEV_PREFIX}_{artifact_names.split_component(split)}.xlsx"
-    )
-    business_path = (
-        destination
-        / f"{artifact_names.REPORT_BUSINESS_PREFIX}_{artifact_names.split_component(split)}.xlsx"
-    )
-    deps.renderer.build_reports(
-        candidate_path, baseline_path, dev_path, business_path, effective_config_path
-    )
-    deps.renderer.annotate_workbook(dev_path, identities)
-    deps.renderer.annotate_workbook(business_path, identities)
-    result = ReportResult(dev_reports={split: dev_path}, business_reports={split: business_path})
-    deps.resources.log("INFO", "Split {!r}: {} and {}", split, dev_path.name, business_path.name)
-    if task is not None:
-        _upload_reports(task, split, dev_path, business_path, deps=deps)
-    return result
+        business_path = (
+            destination
+            / (
+                f"{artifact_names.REPORT_BUSINESS_PREFIX}_"
+                f"{artifact_names.split_component(split)}.xlsx"
+            )
+        )
+        deps.renderer.build_reports(
+            candidate_path, baseline_path, dev_path, business_path, effective_config_path
+        )
+        deps.renderer.annotate_workbook(dev_path, identities)
+        deps.renderer.annotate_workbook(business_path, identities)
+        result = ReportResult(
+            dev_reports={split: dev_path}, business_reports={split: business_path}
+        )
+        deps.resources.log(
+            "INFO", "Split {!r}: {} and {}", split, dev_path.name, business_path.name
+        )
+        if task is not None:
+            _upload_reports(task, split, dev_path, business_path, deps=deps)
+        return result
 
 
 def _report_identity(

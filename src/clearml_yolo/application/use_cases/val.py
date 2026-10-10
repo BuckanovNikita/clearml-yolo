@@ -24,30 +24,31 @@ def validate(
     *,
     deps: WorkflowDependencies,
 ) -> MetricsResult:
-    deps.tracking.init_task(clearml, stage="val")
-    selected = list(dict.fromkeys(splits or ["train", "val", "test"]))
-    destination = deps.storage.write_path(output_dir)
-    predicted = predict(
-        weights,
-        ground_truth,
-        destination / "predictions.csv",
-        clearml,
-        ultralytics,
-        ultralytics_predict=ultralytics_predict,
-        splits=list(dict.fromkeys(["val", *selected])),
-        fiftyone=FiftyOneConfig(enabled=False),
-        model_label=model_label,
-        deps=deps,
-    )
-    return compute_metrics(
-        predicted.predictions,
-        ground_truth,
-        destination / "metrics",
-        clearml,
-        evaluation,
-        splits=selected,
-        calibration_split="val",
-        fiftyone=FiftyOneConfig(enabled=False),
-        model_label=model_label,
-        deps=deps,
-    )
+    with deps.resources.trace_operation("workflow.val"):
+        deps.tracking.init_task(clearml, stage="val")
+        selected = list(dict.fromkeys(splits or ["train", "val", "test"]))
+        destination = deps.storage.write_path(output_dir)
+        predicted = predict(
+            weights,
+            ground_truth,
+            destination / "predictions.csv",
+            clearml,
+            ultralytics,
+            ultralytics_predict=ultralytics_predict,
+            splits=list(dict.fromkeys(["val", *selected])),
+            fiftyone=FiftyOneConfig(enabled=False),
+            model_label=model_label,
+            deps=deps,
+        )
+        return compute_metrics(
+            predicted.predictions,
+            ground_truth,
+            destination / "metrics",
+            clearml,
+            evaluation,
+            splits=selected,
+            calibration_split="val",
+            fiftyone=FiftyOneConfig(enabled=False),
+            model_label=model_label,
+            deps=deps,
+        )

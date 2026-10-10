@@ -13,7 +13,7 @@ import re
 import signal
 import threading
 from collections.abc import Callable, Iterator, Mapping
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -28,6 +28,7 @@ from ruamel.yaml.error import YAMLError
 from ruamel.yaml.tokens import CommentToken
 
 from clearml_yolo.adapters.observability.diagnostics import exception_summary, log_exception
+from clearml_yolo.adapters.observability.tracing import trace_operation, trace_task
 from clearml_yolo.adapters.storage.filesystem import temporary_root
 from clearml_yolo.application.contracts import (
     ClearMLConfig as ClearMLConfig,  # noqa: PLC0414 - typed adapter interface
@@ -50,8 +51,6 @@ DEFAULT_PROJECT_NAME = "clearml-yolo"
 
 # Keep the SDK opaque at the adapter boundary so reporting modules need no SDK import.
 Task = Any
-
-
 
 
 def resolve_task_name(config: ClearMLConfig, stage: str) -> str:
@@ -171,12 +170,6 @@ def _is_worker() -> bool:
     return False
 
 
-
-
-
-
-
-
 def _failure_name(error: BaseException) -> str:
     if isinstance(error, _SignalExit):
         try:
@@ -191,22 +184,24 @@ def _mark_failed(task: Any, error: BaseException) -> None:
     # Arbitrary exception text can contain URLs, headers, or credentials in formats
     # that cannot be exhaustively redacted. Keep full diagnostics in local output.
     message = f"{reason}: invocation failed; see local diagnostics for details"
-    task.mark_failed(
-        ignore_errors=False,
-        force=True,
-        status_reason=reason,
-        status_message=message,
-    )
+    with trace_operation("clearml.task.mark_failed", cleanup=True):
+        task.mark_failed(
+            ignore_errors=False,
+            force=True,
+            status_reason=reason,
+            status_message=message,
+        )
 
 
 def _sync_upload(task: Any, name: str, artifact_object: Any) -> None:
-    accepted = task.upload_artifact(
-        name=name,
-        artifact_object=artifact_object,
-        wait_on_upload=True,
-    )
-    if accepted is not True:
-        raise ArtifactUploadError(f"ClearML rejected required artifact {name!r}")
+    with trace_operation("clearml.artifact.upload", context={"artifact": name}):
+        accepted = task.upload_artifact(
+            name=name,
+            artifact_object=artifact_object,
+            wait_on_upload=True,
+        )
+        if accepted is not True:
+            raise ArtifactUploadError(f"ClearML rejected required artifact {name!r}")
 
 
 def _active_state(task: Any, operation: str) -> _InvocationState:
@@ -218,7 +213,8 @@ def _active_state(task: Any, operation: str) -> _InvocationState:
 
 def _finalize(state: _InvocationState) -> None:
     for finalize in state.finalizers:
-        finalize()
+        with trace_operation("clearml.publication.finalizer"):
+            finalize()
     missing = [
         artifact.name for artifact in state.artifacts if artifact.required and not artifact.uploaded
     ]
@@ -227,22 +223,34 @@ def _finalize(state: _InvocationState) -> None:
     if state.model_barriers:
         from clearml import OutputModel
 
-        OutputModel.wait_for_uploads()
-    if state.task.flush(wait_for_uploads=True) is not True:
-        raise ArtifactUploadError("ClearML flush did not confirm completion")
+        with trace_operation("clearml.model.wait_uploads"):
+            OutputModel.wait_for_uploads()
+    with trace_operation("clearml.task.flush"):
+        if state.task.flush(wait_for_uploads=True) is not True:
+            raise ArtifactUploadError("ClearML flush did not confirm completion")
     if state.model_barriers:
-        state.task.reload()
+        with trace_operation("clearml.task.reload"):
+            state.task.reload()
         for verify in state.model_barriers:
-            verify()
+            with trace_operation("clearml.model.verify"):
+                verify()
     # close() waits for repository detection and shuts down the status monitor.
     # Marking completed first makes that monitor interpret our own success as an
     # external abort while background configuration uploads are still running.
-    task_id = str(state.task.id)
-    state.task.close()
+    with trace_operation("clearml.task.terminal", cleanup=True):
+        closed_task = _close_task(state.task)
+        with trace_operation("clearml.task.mark_completed", cleanup=True):
+            closed_task.mark_completed(ignore_errors=False, force=True)
+
+
+def _close_task(task: Any) -> Any:
+    task_id = str(task.id)
+    with trace_operation("clearml.task.close", cleanup=True):
+        task.close()
     from clearml import Task
 
-    closed_task: Any = Task.get_task(task_id=task_id)
-    closed_task.mark_completed(ignore_errors=False, force=True)
+    with trace_operation("clearml.task.readback", cleanup=True):
+        return Task.get_task(task_id=task_id)
 
 
 def _exit_on_signal(signum: int, _frame: Any) -> None:
@@ -290,92 +298,109 @@ def invocation(
 
     from clearml import Task
 
-    task: Any = Task.init(
-        project_name=config.project_name,
-        task_name=resolve_task_name(config, stage),
-        task_type=config.task_type,
-        tags=config.tags or None,
-        output_uri=config.output_uri,
-        reuse_last_task_id=False,
-        auto_connect_arg_parser=False,
-        # Capture both streams: native output and Loguru's default stderr sink
-        # belong to the same invocation-owned ClearML console.
-        auto_connect_streams=True,
-        # Repository auto-detection uploads arbitrary checkout diffs outside our
-        # sanitized provenance contract. Disable it along with framework captures.
-        auto_connect_frameworks=dict.fromkeys(
-            (
-                "detect_repository",
-                "hydra",
-                "scikit",
-                "joblib",
-                "matplotlib",
-                "tensorflow",
-                "tensorboard",
-                "tfdefines",
-                "pytorch",
-                "megengine",
-                "xgboost",
-                "catboost",
-                "fastai",
-                "lightgbm",
-                "gradio",
-            ),
-            False,
-        ),
-    )
-    state = _InvocationState(
-        task=task, stages=[stage], current_stage=stage, config_resolver=config_resolver
-    )
-    token = _ACTIVE_INVOCATION.set(state)
-    previous_owner = os.environ.get(OWNER_PID_ENV)
-    os.environ[OWNER_PID_ENV] = str(os.getpid())
-    if owns_signal:
-        signal.signal(signal.SIGTERM, _exit_on_signal)
-
-    logger.info(
-        "ClearML task {} created: project={!r} name={!r}",
-        task.id,
-        config.project_name,
-        resolve_task_name(config, stage),
-    )
-    previous_task_id = os.environ.get(OWNER_TASK_ENV)
-    os.environ[OWNER_TASK_ENV] = str(task.id)
-    primary_error: BaseException | None = None
-    try:
+    with ExitStack() as stack:
+        with trace_operation("clearml.task.create", context={"stage": stage}):
+            task: Any = Task.init(
+                project_name=config.project_name,
+                task_name=resolve_task_name(config, stage),
+                task_type=config.task_type,
+                tags=config.tags or None,
+                output_uri=config.output_uri,
+                reuse_last_task_id=False,
+                auto_connect_arg_parser=False,
+                # Capture both streams: native output and Loguru's default stderr sink
+                # belong to the same invocation-owned ClearML console.
+                auto_connect_streams=True,
+                # Repository auto-detection uploads arbitrary checkout diffs outside our
+                # sanitized provenance contract. Disable it along with framework captures.
+                auto_connect_frameworks=dict.fromkeys(
+                    (
+                        "detect_repository",
+                        "hydra",
+                        "scikit",
+                        "joblib",
+                        "matplotlib",
+                        "tensorflow",
+                        "tensorboard",
+                        "tfdefines",
+                        "pytorch",
+                        "megengine",
+                        "xgboost",
+                        "catboost",
+                        "fastai",
+                        "lightgbm",
+                        "gradio",
+                    ),
+                    False,
+                ),
+            )
+            state = stack.enter_context(
+                _task_owner(task, config, stage, config_resolver, owns_signal, previous_sigterm)
+            )
         if resolved_config is not None:
             _replay_initial_configuration(task, resolved_config)
         yield task
         _finalize(state)
-    except BaseException as error:
-        primary_error = error
-        try:
-            task_id = str(task.id)
-            task.close()
-            from clearml import Task
 
-            closed_task: Any = Task.get_task(task_id=task_id)
-            _mark_failed(closed_task, error)
-        except Exception as finalization_error:  # noqa: BLE001 - preserve the original failure
-            log_exception(
-                "ClearML failure finalization failed",
-                finalization_error,
-                level="ERROR",
-                context={"task_id": str(task.id)},
-            )
-        raise
-    finally:
+
+@contextmanager
+def _task_owner(
+    task: Any,
+    config: ClearMLConfig,
+    stage: str,
+    config_resolver: Callable[[Any], Any] | None,
+    owns_signal: bool,
+    previous_sigterm: Any,
+) -> Iterator[_InvocationState]:
+    """Register terminal handling before task creation diagnostics can interrupt."""
+    with trace_task(str(task.id)):
+        state = _InvocationState(
+            task=task, stages=[stage], current_stage=stage, config_resolver=config_resolver
+        )
+        token = _ACTIVE_INVOCATION.set(state)
+        previous_owner = os.environ.get(OWNER_PID_ENV)
+        os.environ[OWNER_PID_ENV] = str(os.getpid())
         if owns_signal:
-            signal.signal(signal.SIGTERM, previous_sigterm)
-        _restore_environment(OWNER_PID_ENV, previous_owner)
-        _restore_environment(OWNER_TASK_ENV, previous_task_id)
-        _ACTIVE_INVOCATION.reset(token)
-        _cleanup_invocation(state, primary_error)
+            signal.signal(signal.SIGTERM, _exit_on_signal)
+
+        previous_task_id = os.environ.get(OWNER_TASK_ENV)
+        os.environ[OWNER_TASK_ENV] = str(task.id)
+        primary_error: BaseException | None = None
+        try:
+            logger.info(
+                "ClearML task {} created: project={!r} name={!r}",
+                task.id,
+                config.project_name,
+                resolve_task_name(config, stage),
+            )
+            yield state
+        except BaseException as error:
+            primary_error = error
+            try:
+                with trace_operation("clearml.task.failure_cleanup", cleanup=True):
+                    closed_task = _close_task(task)
+                    _mark_failed(closed_task, error)
+            except Exception as finalization_error:  # noqa: BLE001 - preserve the original failure
+                log_exception(
+                    "ClearML failure finalization failed",
+                    finalization_error,
+                    level="ERROR",
+                    context={"task_id": str(task.id)},
+                )
+            raise
+        finally:
+            if owns_signal:
+                signal.signal(signal.SIGTERM, previous_sigterm)
+            _restore_environment(OWNER_PID_ENV, previous_owner)
+            _restore_environment(OWNER_TASK_ENV, previous_task_id)
+            _ACTIVE_INVOCATION.reset(token)
+            _cleanup_invocation(state, primary_error)
 
 
 def _cleanup_invocation(state: _InvocationState, primary_error: BaseException | None) -> None:
     try:
-        state.cleanup()
+        with trace_operation("clearml.temporary.cleanup", cleanup=True):
+            state.cleanup()
     except OSError as cleanup_error:
         if primary_error is None:
             raise
@@ -539,6 +564,7 @@ def _merge_configuration(target: dict[str, Any], update: Mapping[str, Any]) -> N
 _EMPTY = object()
 
 
+@trace_operation("clearml.configuration.record")
 def record_run_configuration(task: Any, values: dict[str, Any]) -> dict[str, Any]:
     """Merge result provenance while preserving explicit native replay settings."""
     if _is_worker():
@@ -556,14 +582,16 @@ def record_run_configuration(task: Any, values: dict[str, Any]) -> dict[str, Any
     if not isinstance(cleaned, Mapping):
         raise TypeError("Run configuration must be a mapping")
     _merge_configuration(active.run_configuration, cleaned)
-    task.connect_configuration(
-        configuration=active.run_configuration,
-        name="run",
-        ignore_remote_overrides=True,
-    )
+    with trace_operation("clearml.configuration.connect"):
+        task.connect_configuration(
+            configuration=active.run_configuration,
+            name="run",
+            ignore_remote_overrides=True,
+        )
     return dict(active.run_configuration)
 
 
+@trace_operation("clearml.configuration.replay")
 def replay_configuration(task: Any, values: dict[str, Any]) -> dict[str, Any]:
     """Resolve a clone's canonical run object and freeze it for this invocation."""
     if _is_worker():
@@ -572,22 +600,24 @@ def replay_configuration(task: Any, values: dict[str, Any]) -> dict[str, Any]:
     cleaned = sanitize_configuration(values)
     if not cleaned or not isinstance(cleaned, Mapping):
         raise ValueError("Canonical run configuration must not be empty")
-    connected = task.connect_configuration(
-        configuration=dict(cleaned),
-        name="run",
-        ignore_remote_overrides=False,
-    )
+    with trace_operation("clearml.configuration.connect"):
+        connected = task.connect_configuration(
+            configuration=dict(cleaned),
+            name="run",
+            ignore_remote_overrides=False,
+        )
     if not isinstance(connected, Mapping):
         raise TypeError("ClearML run configuration override must be a mapping")
     effective = sanitize_configuration(connected)
     if not effective or not isinstance(effective, Mapping):
         raise ValueError("Effective ClearML run configuration must not be empty")
     active.run_configuration = dict(effective)
-    task.connect_configuration(
-        configuration=active.run_configuration,
-        name="run",
-        ignore_remote_overrides=True,
-    )
+    with trace_operation("clearml.configuration.connect"):
+        task.connect_configuration(
+            configuration=active.run_configuration,
+            name="run",
+            ignore_remote_overrides=True,
+        )
     # Redaction is a storage boundary, not a mutation of executable inputs.
     return dict(values if task.running_locally() else connected)
 
@@ -777,6 +807,7 @@ def _load_config_document(path: Path, yaml: YAML) -> Any:
         ) from None
 
 
+@trace_operation("clearml.configuration.prepare")
 def _prepared_config_file(state: _InvocationState, path: Path) -> tuple[Path, Path]:
     """Resolve once, then produce separate executable and sanitized storage inputs."""
     yaml = YAML(typ="rt")
@@ -838,6 +869,7 @@ def _prepared_config_file(state: _InvocationState, path: Path) -> tuple[Path, Pa
     return execution_path, sanitized_path
 
 
+@trace_operation("clearml.configuration.file")
 def connect_config_file(
     task: Any, name: str, path: Path, *, allow_remote_override: bool = True
 ) -> Path:
@@ -866,22 +898,24 @@ def connect_config_file(
         execution_path = path
     else:
         raise FileNotFoundError(f"Configuration file does not exist: {path}")
-    connected = Path(
-        task.connect_configuration(
-            configuration=sanitized_path,
-            name=name,
-            ignore_remote_overrides=not allow_remote_override,
+    with trace_operation("clearml.configuration.connect"):
+        connected = Path(
+            task.connect_configuration(
+                configuration=sanitized_path,
+                name=name,
+                ignore_remote_overrides=not allow_remote_override,
+            )
         )
-    )
     if connected == sanitized_path and not path.is_file():
         raise FileNotFoundError(f"Remote task has no attached configuration for {path}")
     if connected != sanitized_path:
         execution_path, sanitized_path = _prepared_config_file(active, connected)
-    task.connect_configuration(
-        configuration=sanitized_path,
-        name=name,
-        ignore_remote_overrides=True,
-    )
+    with trace_operation("clearml.configuration.connect"):
+        task.connect_configuration(
+            configuration=sanitized_path,
+            name=name,
+            ignore_remote_overrides=True,
+        )
     logger.info("Connected {} to ClearML as configuration {!r}", path, name)
     # Sanitization is for storage, not model execution: preserve local source values
     # (including externally managed credentials) or use the clone's effective source.

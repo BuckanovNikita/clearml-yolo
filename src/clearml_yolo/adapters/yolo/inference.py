@@ -13,6 +13,7 @@ import pandas as pd
 from loguru import logger
 
 from clearml_yolo.adapters.observability.progress import track
+from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.storage.filesystem import model_weights_path, temporary_root
 from clearml_yolo.adapters.yolo.config import execution_settings, requested_settings
 from clearml_yolo.application.contracts import (
@@ -36,13 +37,12 @@ PREDICTION_COLUMNS = [
 _MAX_REPORTED_PATHS = 5
 
 
-
-
 def trained_imgsz(weights: str | Path) -> int | None:
     """Read checkpoint training resolution for diagnostics, never configuration defaults."""
-    from ultralytics.nn.tasks import torch_safe_load
+    with trace_operation("yolo.checkpoint.load", context={"path": str(weights)}):
+        from ultralytics.nn.tasks import torch_safe_load
 
-    checkpoint, _ = torch_safe_load(str(weights))  # type: ignore[no-untyped-call]
+        checkpoint, _ = torch_safe_load(str(weights))  # type: ignore[no-untyped-call]
     recorded = checkpoint.get("train_args", {}).get("imgsz")
     if isinstance(recorded, int):
         return recorded
@@ -134,6 +134,7 @@ def _refuse_unscored(by_absolute: dict[str, str], scored: set[str]) -> None:
     )
 
 
+@trace_operation("yolo.predict")
 def predict_on_images(
     weights: str | Path,
     image_paths: Sequence[str],
@@ -160,9 +161,10 @@ def predict_on_images(
         logger.info("Predicted 0 boxes over 0 images")
         return pd.DataFrame(columns=PREDICTION_COLUMNS)
 
-    from ultralytics.models import YOLO
+    with trace_operation("yolo.model.load", context={"path": str(weights)}):
+        from ultralytics.models import YOLO
 
-    model = YOLO(str(model_weights_path(weights)))
+        model = YOLO(str(model_weights_path(weights)))
     if model.task != "detect":
         raise ValueError(f"Prediction requires a detection model; loaded task={model.task!r}")
     names: dict[int, str] = model.names
@@ -181,12 +183,13 @@ def predict_on_images(
         manifest, by_absolute = _write_manifest(paths, workspace)
         # Ultralytics types predict as returning `list[Results] | Tensor` regardless of
         # `stream`, so the annotation has to be widened rather than narrowed.
-        results: Any = model.predict(source=manifest, stream=True, **settings)
-        for result in track(results, "Inference", total=len(paths), unit="img"):
-            scored.add(result.path)
-            boxes = result.boxes
-            if boxes is not None and len(boxes) > 0:
-                rows.extend(_detection_rows(by_absolute[result.path], boxes, names, image_name))
+        with trace_operation("yolo.inference.stream", context={"images": len(paths)}):
+            results: Any = model.predict(source=manifest, stream=True, **settings)
+            for result in track(results, "Inference", total=len(paths), unit="img"):
+                scored.add(result.path)
+                boxes = result.boxes
+                if boxes is not None and len(boxes) > 0:
+                    rows.extend(_detection_rows(by_absolute[result.path], boxes, names, image_name))
 
     _refuse_unscored(by_absolute, scored)
     logger.info("Predicted {} boxes over {} images", len(rows), len(scored))

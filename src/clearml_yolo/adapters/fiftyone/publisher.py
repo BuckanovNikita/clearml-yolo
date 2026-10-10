@@ -3,6 +3,7 @@
 import hashlib
 import json
 from collections import defaultdict
+from contextlib import ExitStack
 from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
@@ -11,6 +12,7 @@ from typing import Any
 from filelock import FileLock
 from PIL import Image
 
+from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.storage.publication_data import (
     DatasetSnapshot,
     PublicationBox,
@@ -106,8 +108,9 @@ def _dataset(fo: Any, name: str, snapshot: DatasetSnapshot) -> tuple[Any, bool]:
         "media_identity_sha256": _digest(json.dumps(snapshot.membership, sort_keys=True)),
     }
     if fo.dataset_exists(name):
-        dataset = fo.load_dataset(name)
-        dataset.reload()
+        with trace_operation("fiftyone.dataset.load"):
+            dataset = fo.load_dataset(name)
+            dataset.reload()
         stored = dataset.info.get("cy_dataset", {})
         if any(stored.get(key) != value for key, value in identity.items()):
             raise ValueError(
@@ -115,10 +118,11 @@ def _dataset(fo: Any, name: str, snapshot: DatasetSnapshot) -> tuple[Any, bool]:
                 "use the original media paths or a different fiftyone.dataset_prefix"
             )
     else:
-        dataset = fo.Dataset(name, persistent=True)
-        stored = {**identity, "complete": False}
-        dataset.info = {"cy_dataset": stored, "cy_runs": {}}
-        dataset.save()
+        with trace_operation("fiftyone.dataset.create"):
+            dataset = fo.Dataset(name, persistent=True)
+            stored = {**identity, "complete": False}
+            dataset.info = {"cy_dataset": stored, "cy_runs": {}}
+            dataset.save()
     existing = {sample.image_name: sample for sample in dataset.iter_samples()}
     for image_name, sample in existing.items():
         record = snapshot.images.get(image_name)
@@ -130,13 +134,14 @@ def _dataset(fo: Any, name: str, snapshot: DatasetSnapshot) -> tuple[Any, bool]:
     if reused and len(existing) != len(snapshot.images):
         raise ValueError("Completed FiftyOne dataset has missing samples; use a new dataset_prefix")
     if not reused:
-        for image_name, record in snapshot.images.items():
-            if image_name not in existing:
-                dataset.add_sample(_new_sample(fo, image_name, record), dynamic=True)
-        info = deepcopy(dataset.info)
-        info["cy_dataset"]["complete"] = True
-        dataset.info = info
-        dataset.save()
+        with trace_operation("fiftyone.samples.write", context={"images": len(snapshot.images)}):
+            for image_name, record in snapshot.images.items():
+                if image_name not in existing:
+                    dataset.add_sample(_new_sample(fo, image_name, record), dynamic=True)
+            info = deepcopy(dataset.info)
+            info["cy_dataset"]["complete"] = True
+            dataset.info = info
+            dataset.save()
     return dataset, reused
 
 
@@ -296,7 +301,10 @@ class FiftyOnePublisher:
 
     def preflight(self) -> None:
         try:
-            _backend().list_datasets()
+            with trace_operation("fiftyone.backend.import"):
+                fo = _backend()
+            with trace_operation("fiftyone.datasets.list"):
+                fo.list_datasets()
         except ImportError as error:
             raise RuntimeError(
                 "FiftyOne publishing requires the project dependencies; run uv sync, "
@@ -304,25 +312,36 @@ class FiftyOnePublisher:
             ) from error
 
     def publish(self, request: PublicationRequest) -> PublicationReceipt:
-        snapshot = read_snapshot(request.ground_truth)
-        raw = read_predictions(
-            request.predictions, prediction_aliases(snapshot, request.prediction_image_name)
-        )
-        payloads = _load_evaluations(request, snapshot)
+        with trace_operation("fiftyone.snapshot", context={"path": str(request.ground_truth)}):
+            snapshot = read_snapshot(request.ground_truth)
+        with trace_operation("fiftyone.predictions"):
+            raw = read_predictions(
+                request.predictions, prediction_aliases(snapshot, request.prediction_image_name)
+            )
+        with trace_operation(
+            "fiftyone.evaluations.load", context={"count": len(request.evaluations)}
+        ):
+            payloads = _load_evaluations(request, snapshot)
         source = request.source_ground_truth
-        source_hash = (
-            file_hash(source)
-            if source is not None and source.resolve() != request.ground_truth.resolve()
-            else snapshot.sha256
-        )
+        with trace_operation("fiftyone.source.hash"):
+            source_hash = (
+                file_hash(source)
+                if source is not None and source.resolve() != request.ground_truth.resolve()
+                else snapshot.sha256
+            )
         name = f"{self.config.dataset_prefix}-v{SCHEMA_VERSION}-{snapshot.sha256}"
         run_key = "run_" + _digest(request.task_id)
         fields = _fields(run_key)
-        fo = _backend()
+        with trace_operation("fiftyone.backend.import"):
+            fo = _backend()
         locks = Path(fo.config.database_dir) / "clearml-yolo-locks"
         locks.mkdir(parents=True, exist_ok=True)
-        with FileLock(locks / f"{_digest(name)}.lock"):
-            dataset, reused = _dataset(fo, name, snapshot)
+        lock = FileLock(locks / f"{_digest(name)}.lock")
+        with ExitStack() as acquired:
+            with trace_operation("fiftyone.lock.acquire", context={"path": str(lock.lock_file)}):
+                acquired.enter_context(lock)
+            with trace_operation("fiftyone.dataset", context={"images": len(snapshot.images)}):
+                dataset, reused = _dataset(fo, name, snapshot)
             run = {
                 "task_id": request.task_id,
                 "complete": False,
@@ -337,16 +356,24 @@ class FiftyOnePublisher:
             info = deepcopy(dataset.info)
             info.setdefault("cy_runs", {})[run_key] = run
             dataset.info = info
-            dataset.save()
-            _remove_evaluations(dataset, run_key)
-            _write_run(fo, dataset, fields, request, raw, _Overlay(payloads))
-            dataset.add_dynamic_sample_fields()
+            with trace_operation("fiftyone.run.start.save", context={"task_id": request.task_id}):
+                dataset.save()
+            with trace_operation("fiftyone.evaluations.remove"):
+                _remove_evaluations(dataset, run_key)
+            with trace_operation(
+                "fiftyone.overlays.write", context={"images": len(snapshot.images)}
+            ):
+                _write_run(fo, dataset, fields, request, raw, _Overlay(payloads))
+                dataset.add_dynamic_sample_fields()
             evaluation_keys = _publish_evaluations(fo, dataset, fields, payloads, run_key)
             info = deepcopy(dataset.info)
             info["cy_runs"][run_key]["evaluation_keys"] = evaluation_keys
             info["cy_runs"][run_key]["complete"] = True
             dataset.info = info
-            dataset.save()
+            with trace_operation(
+                "fiftyone.run.complete.save", context={"task_id": request.task_id}
+            ):
+                dataset.save()
         return PublicationReceipt(
             dataset_name=name,
             task_id=request.task_id,

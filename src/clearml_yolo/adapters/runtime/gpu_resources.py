@@ -14,6 +14,7 @@ from clearml_yolo.adapters.observability.diagnostics import (
     log_exception,
     redact_text,
 )
+from clearml_yolo.adapters.observability.tracing import trace_operation
 
 _CUDA_PROBE_TIMEOUT_SECONDS = 30.0
 
@@ -172,6 +173,7 @@ def _uuid(value: str | bytes) -> str:
     return decoded
 
 
+@trace_operation("gpu.visibility_probe")
 def _probe_visible_uuids() -> tuple[str, ...]:
     try:
         result = subprocess.run(
@@ -216,6 +218,7 @@ def _probe_visible_uuids() -> tuple[str, ...]:
 class GPUInventory:
     """Read whole-GPU telemetry and inherited CUDA visibility without pinning ordinals."""
 
+    @trace_operation("gpu.inventory")
     def snapshot(self) -> tuple[GPUDevice, ...]:
         """Return whole GPUs occupied by other PIDs; unknown telemetry fails closed."""
         nvml = _nvml()
@@ -259,6 +262,7 @@ class GPUInventory:
             if initialized:
                 nvml.nvmlShutdown()
 
+    @trace_operation("gpu.visibility")
     def visible(self) -> tuple[str, ...]:
         """Return supported whole-GPU UUIDs in inherited CUDA logical order."""
         visible = _probe_visible_uuids()

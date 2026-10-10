@@ -296,6 +296,10 @@ class RunStorage(Protocol):
 
 
 class ExecutionResources(Protocol):
+    def trace_operation(
+        self, name: str, *, context: Mapping[str, object] | None = None
+    ) -> AbstractContextManager[None]: ...
+
     def log(self, level: str, message: str, *args: object) -> None: ...
 
     def progress_callback(

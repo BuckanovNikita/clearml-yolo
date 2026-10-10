@@ -6,6 +6,7 @@ from typing import Any
 
 import pandas as pd
 
+from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.reporting.evaluation import summarize_evaluation as summarize_metrics
 from clearml_yolo.adapters.reporting.workbook_identity import (
     annotate_workbook,
@@ -14,6 +15,7 @@ from clearml_yolo.adapters.reporting.workbook_identity import (
 from clearml_yolo.core.evaluation.models import EvaluatedSplit
 
 
+@trace_operation("report.candidate.workbook")
 def write_candidate_workbook(
     path: Path, per_class: pd.DataFrame, summary: dict[str, float]
 ) -> None:
@@ -23,6 +25,7 @@ def write_candidate_workbook(
         pd.DataFrame([summary]).to_excel(writer, sheet_name="Summary", index=False)
 
 
+@trace_operation("report.evaluation.workbook")
 def write_evaluation_workbook(
     path: Path, evaluated: EvaluatedSplit, *, methodology: dict[str, Any]
 ) -> dict[str, Path]:

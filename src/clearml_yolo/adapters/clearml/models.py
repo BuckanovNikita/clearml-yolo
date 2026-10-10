@@ -17,6 +17,7 @@ from clearml_yolo.adapters.observability.diagnostics import (
     log_exception,
     redact_text,
 )
+from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.storage.filesystem import model_weights_path
 from clearml_yolo.adapters.storage.identity import checkpoint_sha256, read_checkpoint_identity
 from clearml_yolo.core.artifact_names import BEST_CONFIDENCES_VAL
@@ -34,6 +35,7 @@ def looks_like_task_id(value: str) -> bool:
     )
 
 
+@trace_operation("clearml.task.lookup")
 def _task(task_id: str) -> Any:
     from clearml import Task
 
@@ -52,6 +54,7 @@ def _anchored(task_name: str | None) -> str | None:
     return rf"\A(?:{task_name})\Z(?![\s\S])"
 
 
+@trace_operation("clearml.task.query")
 def latest_completed_task_id(
     project_name: str,
     task_name: str | None = None,
@@ -91,6 +94,7 @@ def latest_completed_task_id(
     return task_id
 
 
+@trace_operation("clearml.model.select")
 def best_output_model(task: Any) -> Any | None:
     """Select one output by role, historical filename, then registration order."""
     outputs: list[Any] = list(task.get_models().get("output") or [])
@@ -171,13 +175,15 @@ def source_model_links(task_id: str) -> dict[str, str]:
     return links
 
 
+@trace_operation("clearml.checkpoint.resolve")
 def resolve_task_model(task_id: str) -> tuple[Path, dict[str, str]]:
     """Download one selected checkpoint and return its matching source provenance."""
     task = _task(task_id)
     selected, links = _select_checkpoint(task)
     identity = links.get("artifact_name", links.get("model_id", "checkpoint"))
     try:
-        checkpoint = selected.get_local_copy()
+        with trace_operation("clearml.checkpoint.download"):
+            checkpoint = selected.get_local_copy()
     except Exception as error:  # noqa: BLE001 - opaque SDK download boundary
         log_exception(
             "Checkpoint download failed",
@@ -363,8 +369,10 @@ def _threshold_payload(payload: Any, *, dashboard: bool) -> dict[str, float]:
     raise ValueError("Unsupported threshold payload; require class-indexed confidence values")
 
 
+@trace_operation("clearml.thresholds.recover")
 def _artifact_thresholds(artifact: Any, *, dashboard: bool) -> dict[str, float]:
-    local = artifact.get_local_copy()
+    with trace_operation("clearml.thresholds.download"):
+        local = artifact.get_local_copy()
     if local:
         path = Path(local)
         suffix = path.suffix.lower()
@@ -380,7 +388,8 @@ def _artifact_thresholds(artifact: Any, *, dashboard: bool) -> dict[str, float]:
             return _table_thresholds(frame, dashboard=dashboard)
         if suffix == ".json":
             return _threshold_payload(path.read_text(encoding="utf-8"), dashboard=dashboard)
-    return _threshold_payload(artifact.get(), dashboard=dashboard)
+    with trace_operation("clearml.thresholds.readback"):
+        return _threshold_payload(artifact.get(), dashboard=dashboard)
 
 
 def fetch_best_confidences(task_id: str) -> dict[str, float]:

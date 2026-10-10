@@ -17,6 +17,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import BinaryIO
 
+from clearml_yolo.adapters.observability.tracing import trace_operation
+
 IMAGE_EXTENSIONS = frozenset(
     {".bmp", ".dng", ".jpeg", ".jpg", ".mpo", ".png", ".tif", ".tiff", ".webp", ".pfm", ".heic"}
 )
@@ -75,6 +77,7 @@ def _open(file: _File) -> Iterator[BinaryIO]:
         yield stream
 
 
+@trace_operation("storage.dedup.scan")
 def _scan(directory: Path, result: DedupResult) -> list[_File]:
     files: list[_File] = []
     pending = [directory]
@@ -217,6 +220,7 @@ def _replace(source: _File, destination: _File) -> None:
             temporary.unlink(missing_ok=True)
 
 
+@trace_operation("storage.dedup")
 def deduplicate(directory: Path, *, dry_run: bool = False) -> DedupResult:
     """Reflink byte-identical regular images sharing an exact basename.
 

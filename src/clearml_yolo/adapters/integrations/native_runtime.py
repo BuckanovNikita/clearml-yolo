@@ -6,8 +6,9 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, cast
+from typing import Any, cast, override
 
+from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.storage.filesystem import (
     cy_home,
     initialize_filesystem,
@@ -20,18 +21,23 @@ OWNER_PID_ENV = "CY_CLEARML_OWNER_PID"
 OWNER_TASK_ENV = "CY_CLEARML_OWNER_TASK_ID"
 
 
+@trace_operation("gpu.memory.release", cleanup=True)
 def release_training_memory() -> None:
     """Drop unreachable trainers and unused allocations before releasing their devices."""
     import gc
 
-    import torch
+    with trace_operation("native.import.torch", cleanup=True):
+        import torch
 
-    gc.collect()
+    with trace_operation("gpu.memory.collect", cleanup=True):
+        gc.collect()
     # Torch exposes this runtime predicate without a typed signature.
     initialized = cast(Callable[[], bool], torch.cuda.is_initialized)
     if initialized():
-        torch.cuda.synchronize()
-        torch.cuda.empty_cache()
+        with trace_operation("gpu.memory.synchronize", cleanup=True):
+            torch.cuda.synchronize()
+        with trace_operation("gpu.memory.empty_cache", cleanup=True):
+            torch.cuda.empty_cache()
 
 
 def _is_worker() -> bool:
@@ -175,15 +181,45 @@ def _restore_attribute(target: Any, name: str, existed: bool, value: Any) -> Non
         delattr(target, name)
 
 
+class _NativeTemporaryDirectory(TemporaryDirectory[str]):
+    """Keep tempfile cleanup semantics while exposing its actual exit boundary."""
+
+    @override
+    def cleanup(self) -> None:
+        with trace_operation("native.runtime.directory.cleanup", cleanup=True):
+            super().cleanup()
+
+
+def _configure_native_paths(
+    settings: Any, utils: Any, dataset_paths: Any, ddp_paths: Any, directory: str
+) -> None:
+    # Native path globals are opaque third-party attributes without typed interfaces.
+    for key, folder in (
+        ("datasets_dir", cy_home() / ".cache/ultralytics/datasets"),
+        ("weights_dir", cy_home() / ".cache/ultralytics/weights"),
+        ("runs_dir", cy_home() / "runs"),
+    ):
+        selected = folder if settings[key] == settings.defaults[key] else settings[key]
+        path = write_path(selected).resolve()
+        path.mkdir(parents=True, exist_ok=True)
+        dict.__setitem__(settings, key, str(path))
+    utils.DATASETS_DIR = dataset_paths.DATASETS_DIR = Path(settings["datasets_dir"])
+    utils.WEIGHTS_DIR = Path(settings["weights_dir"])
+    utils.RUNS_DIR = Path(settings["runs_dir"])
+    ddp_paths.USER_CONFIG_DIR = Path(directory) / "Ultralytics"
+    ddp_paths.USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+
+
 @contextmanager
 def native_runtime() -> Iterator[None]:
     """Enable native callbacks only for the owner and restore every modified global."""
-    initialize_filesystem()
-    previous = os.environ.get("YOLO_CONFIG_DIR")
-    from ultralytics import utils
-    from ultralytics.data import utils as dataset_utils
-    from ultralytics.utils import SETTINGS, dist, get_user_config_dir
-    from ultralytics.utils.callbacks import clearml as integration
+    with trace_operation("native.runtime.import"):
+        initialize_filesystem()
+        previous = os.environ.get("YOLO_CONFIG_DIR")
+        from ultralytics import utils
+        from ultralytics.data import utils as dataset_utils
+        from ultralytics.utils import SETTINGS, dist, get_user_config_dir
+        from ultralytics.utils.callbacks import clearml as integration
 
     # These native runtime globals exist upstream but are not exported by its type interface.
     dataset_paths: Any = dataset_utils
@@ -203,47 +239,36 @@ def native_runtime() -> Iterator[None]:
         dataset_paths.DATASETS_DIR,
         ddp_paths.USER_CONFIG_DIR,
     )
-    with TemporaryDirectory(prefix="cy-native-", dir=temporary_root()) as directory:
+    with _NativeTemporaryDirectory(prefix="cy-native-", dir=temporary_root()) as directory:
         os.environ["YOLO_CONFIG_DIR"] = directory
         try:
-            for key, folder in (
-                ("datasets_dir", cy_home() / ".cache/ultralytics/datasets"),
-                ("weights_dir", cy_home() / ".cache/ultralytics/weights"),
-                ("runs_dir", cy_home() / "runs"),
-            ):
-                selected = folder if SETTINGS[key] == SETTINGS.defaults[key] else SETTINGS[key]
-                path = write_path(selected).resolve()
-                path.mkdir(parents=True, exist_ok=True)
-                dict.__setitem__(SETTINGS, key, str(path))
-            utils.DATASETS_DIR = dataset_paths.DATASETS_DIR = Path(SETTINGS["datasets_dir"])
-            utils.WEIGHTS_DIR = Path(SETTINGS["weights_dir"])
-            utils.RUNS_DIR = Path(SETTINGS["runs_dir"])
-            ddp_paths.USER_CONFIG_DIR = Path(directory) / "Ultralytics"
-            ddp_paths.USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-            _write_inherited_settings(SETTINGS, get_user_config_dir)
-            if _is_worker():
-                dict.__setitem__(SETTINGS, "clearml", False)
-                integration.callbacks = {}
-            else:
-                _enable_owner(integration, SETTINGS)
+            with trace_operation("native.runtime.setup"):
+                _configure_native_paths(SETTINGS, utils, dataset_paths, ddp_paths, directory)
+                _write_inherited_settings(SETTINGS, get_user_config_dir)
+                if _is_worker():
+                    dict.__setitem__(SETTINGS, "clearml", False)
+                    integration.callbacks = {}
+                else:
+                    _enable_owner(integration, SETTINGS)
             with native_weights_directory(Path(SETTINGS["weights_dir"])):
                 yield
         finally:
-            # Bypass SettingsManager persistence: only process memory is restored.
-            dict.__setitem__(SETTINGS, "clearml", original_setting)
-            for key, value in original_paths.items():
-                dict.__setitem__(SETTINGS, key, value)
-            (
-                utils.DATASETS_DIR,
-                utils.WEIGHTS_DIR,
-                utils.RUNS_DIR,
-                dataset_paths.DATASETS_DIR,
-                ddp_paths.USER_CONFIG_DIR,
-            ) = original_globals
-            integration.callbacks = original_callbacks
-            _restore_attribute(integration, "Task", had_task, original_task)
-            _restore_attribute(integration, "clearml", had_clearml, original_clearml)
-            if previous is None:
-                os.environ.pop("YOLO_CONFIG_DIR", None)
-            else:
-                os.environ["YOLO_CONFIG_DIR"] = previous
+            with trace_operation("native.runtime.restore", cleanup=True):
+                # Bypass SettingsManager persistence: only process memory is restored.
+                dict.__setitem__(SETTINGS, "clearml", original_setting)
+                for key, value in original_paths.items():
+                    dict.__setitem__(SETTINGS, key, value)
+                (
+                    utils.DATASETS_DIR,
+                    utils.WEIGHTS_DIR,
+                    utils.RUNS_DIR,
+                    dataset_paths.DATASETS_DIR,
+                    ddp_paths.USER_CONFIG_DIR,
+                ) = original_globals
+                integration.callbacks = original_callbacks
+                _restore_attribute(integration, "Task", had_task, original_task)
+                _restore_attribute(integration, "clearml", had_clearml, original_clearml)
+                if previous is None:
+                    os.environ.pop("YOLO_CONFIG_DIR", None)
+                else:
+                    os.environ["YOLO_CONFIG_DIR"] = previous

@@ -9,6 +9,7 @@ from pathlib import Path
 import pandas as pd
 from pydantic import BaseModel, Field
 
+from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.core.validation import ValidationStage, validate_dataframe
 
 BOX_COLUMNS = ("bbox_x_tl", "bbox_y_tl", "bbox_x_br", "bbox_y_br")
@@ -37,11 +38,13 @@ class DatasetSnapshot(BaseModel):
         return {name: (str(image.path), image.split) for name, image in self.images.items()}
 
 
+@trace_operation("storage.publication.hash")
 def file_hash(path: Path) -> str:
     with path.open("rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
+@trace_operation("storage.publication.csv.read")
 def _read_csv(
     path: Path, required: set[str], *, content: bytes | None = None
 ) -> list[dict[str, str]]:
@@ -80,6 +83,7 @@ def _box(row: dict[str, str], index: int, *, allow_collapsed: bool = False) -> P
     )
 
 
+@trace_operation("storage.publication.snapshot")
 def read_snapshot(path: Path) -> DatasetSnapshot:
     source = path.expanduser().resolve()
     # Hash precisely the bytes being parsed, even if the producer replaces the file.
@@ -129,6 +133,7 @@ def prediction_aliases(snapshot: DatasetSnapshot, mode: str) -> dict[str, str]:
     return aliases
 
 
+@trace_operation("storage.publication.predictions")
 def read_predictions(path: Path | None, aliases: dict[str, str]) -> dict[str, list[PublicationBox]]:
     grouped: dict[str, list[PublicationBox]] = {}
     if path is None:
@@ -143,8 +148,10 @@ def read_predictions(path: Path | None, aliases: dict[str, str]) -> dict[str, li
             )
         # Native boundary clipping can collapse boxes; retain raw detections and CSV indices.
         grouped.setdefault(name, []).append(_box(row, index, allow_collapsed=True))
-    validate_dataframe(pd.DataFrame(rows) if rows else pd.DataFrame(columns=sorted(required)),
-                       ValidationStage.PUBLICATION_PREDICTIONS)
+    validate_dataframe(
+        pd.DataFrame(rows) if rows else pd.DataFrame(columns=sorted(required)),
+        ValidationStage.PUBLICATION_PREDICTIONS,
+    )
     return grouped
 
 

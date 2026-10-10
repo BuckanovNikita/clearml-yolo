@@ -15,6 +15,7 @@ from clearml_yolo.adapters.clearml.session import (
     register_finalizer,
     upload_artifact,
 )
+from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.storage.filesystem import write_path
 from clearml_yolo.core import artifact_names
 from clearml_yolo.core.evaluation.models import EvaluatedSplit
@@ -115,6 +116,7 @@ def _read_rows(path: Path) -> pd.DataFrame:
     )
 
 
+@trace_operation("clearml.results.csv.write")
 def _atomic_csv(frame: pd.DataFrame, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     pending = path.with_suffix(".pending")
@@ -204,14 +206,16 @@ class _ResultBundle:
             encoding="utf-8",
         )
 
+    @trace_operation("clearml.results.finalize")
     def finalize(self) -> None:
         if self.truth is not None:
             upload_artifact(self.task, artifact_names.GROUND_TRUTH, self.truth)
         if self.prediction_expected:
-            frames = [_read_rows(path) for _, (_, path) in sorted(self.contexts.items())]
-            combined = pd.concat(frames, ignore_index=True)
-            destination = self.directory / "predicts_csv.csv"
-            _atomic_csv(combined, destination)
+            with trace_operation("clearml.results.csv.assemble"):
+                frames = [_read_rows(path) for _, (_, path) in sorted(self.contexts.items())]
+                combined = pd.concat(frames, ignore_index=True)
+                destination = self.directory / "predicts_csv.csv"
+                _atomic_csv(combined, destination)
             upload_artifact(self.task, artifact_names.PREDICTIONS, destination)
 
 

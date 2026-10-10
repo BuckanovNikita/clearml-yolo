@@ -16,6 +16,7 @@ from fiftyone.utils.eval.detection import (
     DetectionResults,
 )
 
+from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.core.evaluation.payload import (
     EvaluationBox,
     EvaluationMatch,
@@ -529,8 +530,9 @@ def publish_evaluation(
 ) -> DigitalMetricsDetectionResults:
     """Register and persist one already-written split; caller owns old-run cleanup."""
     del dataset  # The view retains its root dataset and exact saved scope.
-    gt_ids = _label_ids(view, gt_field)
-    pred_ids = _label_ids(view, pred_field)
+    with trace_operation("fiftyone.evaluation.labels.scan", context={"split": payload.split}):
+        gt_ids = _label_ids(view, gt_field)
+        pred_ids = _label_ids(view, pred_field)
     iou = payload.methodology.get("iou_threshold")
     if iou is not None and not isinstance(iou, (int, float)):
         raise ValueError("Evaluation methodology iou_threshold must be numeric")
@@ -555,9 +557,15 @@ def publish_evaluation(
         prediction_ids={str(k): v for k, v in pred_ids.items()},
         backend=backend,
     )
-    backend.register_run(view, eval_key, overwrite=False)
-    backend.register_samples(view, eval_key, dynamic=True)
-    _write_native_fields(view, payload, eval_key, gt_field, pred_field, matches)
-    backend.save_run_results(view, eval_key, results)
-    backend.add_fields_to_sidebar_group(view, eval_key)
+    with trace_operation("fiftyone.evaluation.register", context={"split": payload.split}):
+        backend.register_run(view, eval_key, overwrite=False)
+        backend.register_samples(view, eval_key, dynamic=True)
+    with trace_operation(
+        "fiftyone.evaluation.samples.write",
+        context={"split": payload.split, "images": len(payload.image_names)},
+    ):
+        _write_native_fields(view, payload, eval_key, gt_field, pred_field, matches)
+    with trace_operation("fiftyone.evaluation.results.save", context={"split": payload.split}):
+        backend.save_run_results(view, eval_key, results)
+        backend.add_fields_to_sidebar_group(view, eval_key)
     return results

@@ -19,6 +19,7 @@ from clearml_yolo.adapters.clearml.session import (
     register_model_barrier,
     sanitize_configuration,
 )
+from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.storage.identity import write_checkpoint_identity
 from clearml_yolo.core.identity import ModelIdentity
 
@@ -125,12 +126,14 @@ def _validate_association(task: Any, native: Any) -> str:
     return url
 
 
+@trace_operation("clearml.model.download_verify")
 def _download_hash(native: Any) -> str:
-    local = native.get_local_copy(
-        extract_archive=False,
-        raise_on_error=True,
-        force_download=True,
-    )
+    with trace_operation("clearml.model.download"):
+        local = native.get_local_copy(
+            extract_archive=False,
+            raise_on_error=True,
+            force_download=True,
+        )
     path = Path(str(local))
     if not path.is_file() or path.stat().st_size == 0:
         raise NativeModelError("Native best model did not download to a nonempty file")
@@ -203,6 +206,7 @@ def _metadata(
     }
 
 
+@trace_operation("clearml.model.verify")
 def _verify_model(
     task: Any,
     model_id: str,
@@ -222,7 +226,8 @@ def _verify_model(
     outputs = _output_models(task)
     if set(outputs) != expected_outputs:
         raise NativeModelError("Native output model set changed during metadata enrichment")
-    fresh = Model(model_id=model_id)
+    with trace_operation("clearml.model.readback"):
+        fresh = Model(model_id=model_id)
     if str(fresh.id) != model_id:
         raise NativeModelError("Fresh model lookup returned a different model ID")
     if _validate_association(task, fresh) != expected_url:
@@ -246,7 +251,8 @@ def _verify_model(
 
 
 def _verify_custom_metadata(model: Any, metadata: dict[str, dict[str, str]]) -> None:
-    stored_metadata = model.get_all_metadata()
+    with trace_operation("clearml.model.metadata.readback"):
+        stored_metadata = model.get_all_metadata()
     if not isinstance(stored_metadata, Mapping):
         raise NativeModelError("Native output model custom metadata failed verification")
     if any(
@@ -257,6 +263,7 @@ def _verify_custom_metadata(model: Any, metadata: dict[str, dict[str, str]]) -> 
         raise NativeModelError("Native output model custom metadata failed verification")
 
 
+@trace_operation("clearml.model.name")
 def _name_native_model(
     task: Any,
     model_id: str,
@@ -274,16 +281,17 @@ def _name_native_model(
     def write_name(name: str) -> None:
         nonlocal writable
         if writable is None:
-            writable = OutputModel(
-                task=task,
-                base_model_id=model_id,
-                name=name,
-                config_text=design,
-                label_enumeration=labels,
-                tags=tags,
-                comment=comment,
-                framework=Framework.pytorch,
-            )
+            with trace_operation("clearml.model.reopen"):
+                writable = OutputModel(
+                    task=task,
+                    base_model_id=model_id,
+                    name=name,
+                    config_text=design,
+                    label_enumeration=labels,
+                    tags=tags,
+                    comment=comment,
+                    framework=Framework.pytorch,
+                )
         else:
             writable.name = name
         if str(writable.id) != model_id:
@@ -293,6 +301,7 @@ def _name_native_model(
     return writable, name
 
 
+@trace_operation("clearml.model.finalize")
 def finalize_native_model(task: Any, model: Any, trainer: Any, architecture: Any) -> str:
     """Enrich Ultralytics' native best record and register its completion barrier."""
     if task is None:
@@ -303,10 +312,13 @@ def finalize_native_model(task: Any, model: Any, trainer: Any, architecture: Any
 
     from clearml import OutputModel
 
-    OutputModel.wait_for_uploads()
-    if task.flush(wait_for_uploads=True) is not True:
-        raise NativeModelError("ClearML flush did not confirm native best-model upload")
-    task.reload()
+    with trace_operation("clearml.model.wait_uploads"):
+        OutputModel.wait_for_uploads()
+    with trace_operation("clearml.task.flush"):
+        if task.flush(wait_for_uploads=True) is not True:
+            raise NativeModelError("ClearML flush did not confirm native best-model upload")
+    with trace_operation("clearml.task.reload"):
+        task.reload()
     native, expected_outputs = _best_output(task)
     expected_url = _validate_association(task, native)
     checkpoint_hash = _sha256(checkpoint)
@@ -330,9 +342,11 @@ def finalize_native_model(task: Any, model: Any, trainer: Any, architecture: Any
         clearml_yolo_effective_model_name={"value": name, "type": "str"},
     )
     writable.comment = comment
-    if writable.set_all_metadata(metadata, replace=False) is not True:
-        raise NativeModelError("ClearML rejected native output model metadata")
-    task.reload()
+    with trace_operation("clearml.model.metadata.write"):
+        if writable.set_all_metadata(metadata, replace=False) is not True:
+            raise NativeModelError("ClearML rejected native output model metadata")
+    with trace_operation("clearml.task.reload"):
+        task.reload()
     if set(_output_models(task)) != expected_outputs:
         raise NativeModelError("Native output model set changed during metadata enrichment")
 
@@ -407,6 +421,7 @@ def _calibration_metadata(
     return metadata
 
 
+@trace_operation("clearml.model.calibration")
 def associate_calibration_thresholds(
     task: Any,
     thresholds: Mapping[str, float],
@@ -433,12 +448,14 @@ def associate_calibration_thresholds(
         )
     metadata = _calibration_metadata(thresholds, prediction_checkpoint_sha256)
     owned.verify()
-    if owned.writable.set_all_metadata(metadata, replace=False) is not True:
-        raise NativeModelError("ClearML rejected native output model calibration metadata")
+    with trace_operation("clearml.model.metadata.write"):
+        if owned.writable.set_all_metadata(metadata, replace=False) is not True:
+            raise NativeModelError("ClearML rejected native output model calibration metadata")
 
     from clearml import Model
 
-    fresh = Model(model_id=owned.model_id)
+    with trace_operation("clearml.model.readback"):
+        fresh = Model(model_id=owned.model_id)
     if str(fresh.id) != owned.model_id:
         raise NativeModelError("Calibration readback returned a different native model ID")
     if _validate_association(task, fresh) != owned.checkpoint_url:

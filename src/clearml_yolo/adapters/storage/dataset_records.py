@@ -13,6 +13,7 @@ from loguru import logger
 from PIL import Image
 
 from clearml_yolo.adapters.observability.diagnostics import log_exception
+from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.core.datasets import (
     Box,
     ImageRecord,
@@ -52,6 +53,7 @@ NATIVE_IMAGE_EXTENSIONS = frozenset(
     }
 )
 MINIMUM_IMAGE_DIMENSION = 10
+
 
 @dataclass(frozen=True)
 class _CsvRow:
@@ -160,6 +162,7 @@ def _claim_identity(
         path_owners[row.image_path] = (row.image_name, row.split)
 
 
+@trace_operation("storage.dataset.csv.read")
 def _read_rows(source: Path) -> list[_CsvRow]:
     rows: list[_CsvRow] = []
     signatures: set[tuple[str, ...]] = set()
@@ -180,12 +183,22 @@ def _read_rows(source: Path) -> list[_CsvRow]:
 
     if not rows:
         raise ValueError(f"{source}: CSV contains no data rows")
-    validate_dataframe(pd.DataFrame([
-        {"image_name": row.image_name, "image_path": str(row.image_path),
-         "instance_label": row.label, **dict(zip(REQUIRED_COLUMNS[3:7], row.coordinates,
-                                                strict=True)), "split": row.split}
-        for row in rows
-    ], index=[row.number for row in rows]), ValidationStage.RAW_GROUND_TRUTH)
+    validate_dataframe(
+        pd.DataFrame(
+            [
+                {
+                    "image_name": row.image_name,
+                    "image_path": str(row.image_path),
+                    "instance_label": row.label,
+                    **dict(zip(REQUIRED_COLUMNS[3:7], row.coordinates, strict=True)),
+                    "split": row.split,
+                }
+                for row in rows
+            ],
+            index=[row.number for row in rows],
+        ),
+        ValidationStage.RAW_GROUND_TRUTH,
+    )
     return rows
 
 
@@ -250,8 +263,6 @@ def _read_image_size(row: _CsvRow, source: Path) -> tuple[int, int]:
     return int(width), int(height)
 
 
-
-
 def _validate_requested_splits(required_splits: tuple[str, ...]) -> set[str]:
     unsupported = sorted(set(required_splits) - set(SPLITS))
     if unsupported:
@@ -265,28 +276,39 @@ def _validate_prepared_images(images: list[ImageRecord]) -> None:
     prepared_rows: list[dict[str, str | int | float | None]] = []
     for image in images:
         common: dict[str, str | int | float | None] = {
-            "image_name": image.name, "image_path": str(image.path),
-            "split": image.split, "width": image.width, "height": image.height,
+            "image_name": image.name,
+            "image_path": str(image.path),
+            "split": image.split,
+            "width": image.width,
+            "height": image.height,
         }
         if not image.boxes:
-            prepared_rows.append({**common, "instance_label": None,
-                                  **dict.fromkeys(REQUIRED_COLUMNS[3:7])})
+            prepared_rows.append(
+                {**common, "instance_label": None, **dict.fromkeys(REQUIRED_COLUMNS[3:7])}
+            )
         prepared_rows.extend(
-            {**common, "instance_label": box.label,
-             "bbox_x_tl": box.x1, "bbox_y_tl": box.y1,
-             "bbox_x_br": box.x2, "bbox_y_br": box.y2}
+            {
+                **common,
+                "instance_label": box.label,
+                "bbox_x_tl": box.x1,
+                "bbox_y_tl": box.y1,
+                "bbox_x_br": box.x2,
+                "bbox_y_br": box.y2,
+            }
             for box in image.boxes
         )
     validate_dataframe(pd.DataFrame(prepared_rows), ValidationStage.TRAINING_GROUND_TRUTH)
 
 
+@trace_operation("storage.dataset.validate")
 def validate_ground_truth(
     source: str | Path, required_splits: tuple[str, ...] = ("train", "val")
 ) -> ValidatedDataset:
     """Read and validate a detection CSV without modifying its source data."""
     required = _validate_requested_splits(required_splits)
     source_path = Path(source).expanduser().resolve()
-    input_sha256 = hashlib.sha256(source_path.read_bytes()).hexdigest()
+    with trace_operation("storage.dataset.source.hash", context={"path": str(source_path)}):
+        input_sha256 = hashlib.sha256(source_path.read_bytes()).hexdigest()
     rows = _read_rows(source_path)
     grouped = _group_rows(rows, source_path)
 

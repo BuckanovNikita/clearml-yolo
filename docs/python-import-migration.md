@@ -39,6 +39,16 @@ with [typed ports](../src/clearml_yolo/application/ports.py) defining workflow c
 Dependency bundles are supplied per invocation; workflows do not discover them through
 a cache, service locator or global setter.
 
+Opt-in operation diagnostics live in
+[`adapters.observability.tracing`](../src/clearml_yolo/adapters/observability/tracing.py).
+Application workflows request them through `ExecutionResources.trace_operation` in
+`WorkflowDependencies.resources`; an alternative dependency implementation should
+provide a context manager with the same outcome-preserving behavior, including a
+no-op implementation when tracing is not needed. Evaluation and FiftyOne adapters
+may import observability directly; scientific core code remains independent of it.
+Caller logging sinks are preserved. See [diagnostics](diagnostics.md) for TRACE setup,
+watchdog output and scheduling limits.
+
 ## Regenerate saved configuration
 
 Back up the entire editable configuration tree before replacing generated files:

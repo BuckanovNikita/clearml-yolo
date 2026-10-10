@@ -31,6 +31,7 @@ def requested_settings(settings: dict[str, Any], stage: Stage) -> dict[str, Any]
     group = "ultralytics" if stage == "train" else "ultralytics_predict"
     return settings | {"device": values[group]} if group in values else dict(settings)
 
+
 # Classify keys explicitly: a dependency upgrade must not silently assign new settings
 # to a stage. Training includes the validator run inside the native trainer.
 SHARED_KEYS = frozenset(

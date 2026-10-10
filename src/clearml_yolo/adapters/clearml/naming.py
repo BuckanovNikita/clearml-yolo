@@ -12,6 +12,7 @@ from clearml_yolo.adapters.clearml.session import (
     record_run_configuration,
     task_identity,
 )
+from clearml_yolo.adapters.observability.tracing import trace_operation
 
 MAX_NAME_ATTEMPTS = 20
 _ADJECTIVES = (
@@ -91,6 +92,7 @@ def _display_name(requested: str, suffix: str | None) -> str:
     return requested if suffix is None else f"{requested}-{suffix}"
 
 
+@trace_operation("clearml.naming.task_query")
 def _task_collision(task: Any, name: str) -> bool:
     from clearml import Task
 
@@ -112,6 +114,7 @@ def _task_collision(task: Any, name: str) -> bool:
     )
 
 
+@trace_operation("clearml.naming.model_query")
 def _model_collision(task: Any, name: str, model_id: str | None) -> bool:
     from clearml import Model
 
@@ -140,6 +143,7 @@ def _occupied(task: Any, state: NamingState, suffix: str | None, model_id: str |
     return task_occupied or model_occupied
 
 
+@trace_operation("clearml.naming.resolve")
 def _resolve(
     task: Any,
     state: NamingState,
@@ -154,7 +158,8 @@ def _resolve(
             continue
         task_name = _display_name(state.requested_task_name, suffix)
         if task.name != task_name:
-            task.set_name(task_name)
+            with trace_operation("clearml.naming.task_write"):
+                task.set_name(task_name)
         if task.name != task_name:
             raise NameResolutionError("ClearML rejected the effective experiment name")
         model_name = (
@@ -163,7 +168,8 @@ def _resolve(
             else None
         )
         if write_model_name is not None and model_name is not None:
-            write_model_name(model_name)
+            with trace_operation("clearml.naming.model_write"):
+                write_model_name(model_name)
         # Check again after the write: concurrent invocations can choose the same candidate.
         if _occupied(task, state, suffix, model_id):
             continue

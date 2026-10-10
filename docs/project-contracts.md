@@ -145,3 +145,15 @@ and flush verification retain their failure behavior.
 Use the shared CSV-addressed dataset cache outside run outputs; source images are immutable.
 Standalone `cy-train` requires `ground_truth`; prepared dataset paths returned by training are
 always present. Direct native-dataset training and native staging are not supported.
+
+
+Opt-in `LOGURU_LEVEL=TRACE` diagnostics identify blocking operations through lifecycle
+records, 30-second deepest-operation heartbeats and 60-second changed grouped Python
+thread snapshots. The watchdog writes to captured stderr independently of Loguru;
+caller sinks are preserved. Diagnostics use bounded redacted scalar context and
+location-only stacks, without configuration/data/locals/source dumps. Execution policy,
+GPU availability semantics and failure propagation stay unchanged. Command tracing
+covers cleanup and ends with `command.return`, which is not a success assertion.
+Application workflows use the execution-resource tracing port; evaluation and FiftyOne
+adapters may import the observability adapter. See [diagnostics](diagnostics.md) for
+capture, record interpretation, output bounds and native scheduling limits.

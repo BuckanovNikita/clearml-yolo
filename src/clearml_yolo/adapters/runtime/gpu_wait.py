@@ -4,12 +4,14 @@ import time
 
 from loguru import logger
 
+from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.runtime.gpu_resources import GPUInventory
 
 _POLL_SECONDS = 1.0
 _LOG_SECONDS = 30.0
 
 
+@trace_operation("gpu.wait")
 def wait_for_available_gpus(
     count: int, *, inventory: GPUInventory | None = None
 ) -> tuple[int, ...]:
@@ -36,7 +38,12 @@ def wait_for_available_gpus(
             raise RuntimeError(f"GPU visibility was lost for physical GPU UUIDs: {missing}")
         available = tuple(index for index, uuid in enumerate(visible) if not physical[uuid].busy)
         if len(available) >= count:
-            return available[:count]
+            selected = available[:count]
+            with trace_operation(
+                "gpu.selected",
+                context={"requested": count, "selected": ",".join(map(str, selected))},
+            ):
+                return selected
         now = time.monotonic()
         if last_log is None or now - last_log >= _LOG_SECONDS:
             logger.info(

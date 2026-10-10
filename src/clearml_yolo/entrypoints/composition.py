@@ -79,6 +79,9 @@ from clearml_yolo.adapters.observability.progress import (
     progress_callback as _resources_progress_callback,
 )
 from clearml_yolo.adapters.observability.progress import track as _resources_track
+from clearml_yolo.adapters.observability.tracing import (
+    trace_operation as _resources_trace_operation,
+)
 from clearml_yolo.adapters.reporting.comparison_workbook import (
     write_comparison_workbook as _renderer_write_comparison_workbook,
 )
@@ -227,6 +230,7 @@ class _RunStorage:
 
 
 class _ExecutionResources:
+    trace_operation = staticmethod(_resources_trace_operation)
     log = staticmethod(_resources_log)
     progress_callback = staticmethod(_resources_progress_callback)
     log_exception = staticmethod(_resources_log_exception)

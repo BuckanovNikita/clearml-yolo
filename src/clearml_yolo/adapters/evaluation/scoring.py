@@ -31,6 +31,7 @@ from numpy.typing import NDArray
 from pydantic import JsonValue
 
 from clearml_yolo.adapters.evaluation.pr_curves import build_pr_curves
+from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.core.evaluation.models import (
     ClassCounts,
     ComputedEvaluation,
@@ -195,6 +196,7 @@ def _split_ground_truth(ground_truth: pd.DataFrame, split: str) -> pd.DataFrame:
     return selected
 
 
+@trace_operation("evaluation.ground_truth.prepare")
 def prepare_ground_truth(ground_truth: pd.DataFrame, *, deduplicate: bool) -> pd.DataFrame:
     """Apply digital-metrics' optional duplicate-box preprocessing."""
     frame = assign_source_ids(deepcopy(ground_truth), row_type="ground_truth")
@@ -277,6 +279,7 @@ def filter_invalid_prediction_boxes(predictions: pd.DataFrame) -> pd.DataFrame:
     return predictions.iloc[np.flatnonzero(~invalid)].copy()
 
 
+@trace_operation("evaluation.predictions.prepare")
 def prepare_predictions(
     predictions: pd.DataFrame,
     *,
@@ -294,6 +297,7 @@ def prepare_predictions(
     return cast(pd.DataFrame, processed).reset_index(drop=True)
 
 
+@trace_operation("evaluation.calibration")
 def calibrate_thresholds(
     ground_truth: pd.DataFrame,
     predictions: pd.DataFrame,
@@ -316,23 +320,28 @@ def calibrate_thresholds(
         ) from error
     validate_dataframes(predictions, calibration_gt)
     image_names = [str(value) for value in calibration_gt["image_name"].unique()]
-    matches = match_boxes(
-        calibration_gt,
-        predictions,
-        iou_threshold,
-        strategy=matching_strategy,
-        split_image_names=image_names,
-    )
-    if confidence_optimization == "global":
-        threshold = find_best_global_confidence(matches, classes)
-        calibrated = dict.fromkeys(classes, threshold)
-    elif confidence_optimization == "per_class":
-        calibrated = find_best_confidences(matches, classes)
-    else:
-        raise ValueError(
-            "confidence_optimization must be 'per_class' or 'global', got "
-            f"{confidence_optimization!r}"
+    with trace_operation(
+        "evaluation.calibration.match",
+        context={"split": calibration_split, "images": len(image_names), "rows": len(predictions)},
+    ):
+        matches = match_boxes(
+            calibration_gt,
+            predictions,
+            iou_threshold,
+            strategy=matching_strategy,
+            split_image_names=image_names,
         )
+    with trace_operation("evaluation.calibration.optimize", context={"classes": len(classes)}):
+        if confidence_optimization == "global":
+            threshold = find_best_global_confidence(matches, classes)
+            calibrated = dict.fromkeys(classes, threshold)
+        elif confidence_optimization == "per_class":
+            calibrated = find_best_confidences(matches, classes)
+        else:
+            raise ValueError(
+                "confidence_optimization must be 'per_class' or 'global', got "
+                f"{confidence_optimization!r}"
+            )
     return validate_thresholds(calibrated, classes)
 
 
@@ -440,6 +449,7 @@ def _verify_pr_ap50(curves: list[PRCurve], metrics: Mapping[str, _BackendMetrics
             )
 
 
+@trace_operation("evaluation.compute")
 def compute_evaluation(
     ground_truth: pd.DataFrame,
     raw_predictions: pd.DataFrame,
@@ -483,13 +493,17 @@ def compute_evaluation(
     predictions = validate_dataframe(predictions, "evaluation_predictions")
     raw_predictions = validate_dataframe(raw_predictions, "evaluation_predictions")
     image_names = [str(value) for value in gt_df["image_name"].unique()]
-    matches = match_boxes(
-        gt_df,
-        predictions,
-        iou_threshold,
-        strategy=matching_strategy,
-        split_image_names=image_names,
-    )
+    with trace_operation(
+        "evaluation.match",
+        context={"split": split, "images": len(image_names), "rows": len(predictions)},
+    ):
+        matches = match_boxes(
+            gt_df,
+            predictions,
+            iou_threshold,
+            strategy=matching_strategy,
+            split_image_names=image_names,
+        )
     sliced = cast(dict[str, list[MatchRecord]], slice_by_conf(matches, classes, normalized))
     payload_methodology: dict[str, JsonValue] = {
         "iou_threshold": iou_threshold,
@@ -509,30 +523,36 @@ def compute_evaluation(
         methodology=payload_methodology,
         model_identity=model_identity,
     )
-    metrics = cast(
-        dict[str, _BackendMetrics], compute_metrics_from_matches(sliced, classes, normalized)
-    )
+    with trace_operation("evaluation.metrics", context={"split": split, "classes": len(classes)}):
+        metrics = cast(
+            dict[str, _BackendMetrics], compute_metrics_from_matches(sliced, classes, normalized)
+        )
     # Preserve authoritative AP inputs: prepared GT and geometry-valid predictions
     # before optional confidence filtering/NMS. Raw source rows are export evidence.
     gt_boxes = gt_df.dropna(subset=BBOX_COLUMNS)
-    compute_map(
-        gt_boxes,
-        raw_predictions,
-        metrics,
-        image_names,
-        method=ap_method,
-        strategy=matching_strategy,
-    )
+    with trace_operation(
+        "evaluation.ap",
+        context={"split": split, "images": len(image_names), "classes": len(classes)},
+    ):
+        compute_map(
+            gt_boxes,
+            raw_predictions,
+            metrics,
+            image_names,
+            method=ap_method,
+            strategy=matching_strategy,
+        )
     cm, class_labels = get_confusion_matrix(sliced, classes)
     confusion_matrix = ConfusionMatrixPayload(labels=class_labels, counts=cm.tolist())
-    pr_curves = build_pr_curves(
-        gt_boxes,
-        raw_predictions,
-        classes=classes,
-        image_names=image_names,
-        matching_strategy=matching_strategy,
-        ap_method=ap_method,
-    )
+    with trace_operation("evaluation.pr", context={"split": split, "classes": len(classes)}):
+        pr_curves = build_pr_curves(
+            gt_boxes,
+            raw_predictions,
+            classes=classes,
+            image_names=image_names,
+            matching_strategy=matching_strategy,
+            ap_method=ap_method,
+        )
     _verify_pr_ap50(pr_curves, metrics)
     evaluation_payload.report = EvaluationReport(
         classes=list(classes),
@@ -547,16 +567,17 @@ def compute_evaluation(
             for curve in pr_curves
         },
     )
-    result_rows = build_result_rows(
-        source_gt,
-        source_preds,
-        prepared_ground_truth=gt_df,
-        prepared_predictions=predictions,
-        split=split,
-        thresholds=normalized,
-        matches_pre_threshold=_match_values(matches),
-        matches_post_threshold=_match_values(sliced),
-    )
+    with trace_operation("evaluation.result_rows", context={"split": split}):
+        result_rows = build_result_rows(
+            source_gt,
+            source_preds,
+            prepared_ground_truth=gt_df,
+            prepared_predictions=predictions,
+            split=split,
+            thresholds=normalized,
+            matches_pre_threshold=_match_values(matches),
+            matches_post_threshold=_match_values(sliced),
+        )
     outcome = _outcome_from_matches(gt_df, predictions, classes, sliced)
 
     gt_matches, pred_matches = _visualization_frames(gt_df, predictions, outcome)

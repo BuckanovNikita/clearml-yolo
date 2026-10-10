@@ -5,7 +5,7 @@ import json
 import shutil
 from collections import Counter
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -15,6 +15,7 @@ from filelock import FileLock
 from pydantic import BaseModel, ValidationError
 
 from clearml_yolo.adapters.observability.diagnostics import log_exception
+from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.storage.dataset import PreparedDataset, prepare_dataset
 from clearml_yolo.adapters.storage.dataset_export import DatasetFormat
 from clearml_yolo.adapters.storage.filesystem import cy_home, write_path
@@ -213,6 +214,7 @@ def _artifact_paths(entry: Path, values: list[str], required_paths: set[Path]) -
     return artifacts
 
 
+@trace_operation("storage.cache.validate")
 def _load_completed(
     entry: Path,
     *,
@@ -279,6 +281,7 @@ def _remove_cache_owned_path(path: Path) -> None:
         shutil.rmtree(path)
 
 
+@trace_operation("storage.cache.paths.finalize")
 def _rewrite_final_paths(staging: Path, entry: Path) -> None:
     data_path = staging / "data.yaml"
     data = yaml.safe_load(data_path.read_text(encoding="utf-8"))
@@ -318,6 +321,7 @@ def _rewrite_final_paths(staging: Path, entry: Path) -> None:
     )
 
 
+@trace_operation("storage.cache.publish")
 def _publish_entry(
     source: Path,
     source_bytes: bytes,
@@ -379,8 +383,10 @@ def cached_dataset(
             + "; expected train, val, or test"
         )
     source_path = Path(source).expanduser().resolve()
-    source_bytes = source_path.read_bytes()
-    input_sha256 = hashlib.sha256(source_bytes).hexdigest()
+    with trace_operation("storage.cache.source.read", context={"path": str(source_path)}):
+        source_bytes = source_path.read_bytes()
+    with trace_operation("storage.cache.source.hash", context={"bytes": len(source_bytes)}):
+        input_sha256 = hashlib.sha256(source_bytes).hexdigest()
     identity = _identity(input_sha256, dataset_format)
     root = dataset_cache_root(cache_dir)
     root.mkdir(parents=True, exist_ok=True)
@@ -389,32 +395,10 @@ def cached_dataset(
     entry = root / identity
     lock = FileLock(lock_root / f"{identity}.lock")
 
-    with lock:
-        prepared = _load_completed(
-            entry,
-            identity=identity,
-            input_sha256=input_sha256,
-            dataset_format=dataset_format,
-            required_splits=required_splits,
-        )
-        if prepared is None:
-            _remove_cache_owned_path(entry)
-            for stale in root.glob(f".{identity}.staging-*"):
-                _remove_cache_owned_path(stale)
-            staging = root / f".{identity}.staging-{uuid4().hex}"
-            try:
-                _publish_entry(
-                    source_path,
-                    source_bytes,
-                    staging,
-                    entry,
-                    identity=identity,
-                    input_sha256=input_sha256,
-                    dataset_format=dataset_format,
-                    required_splits=required_splits,
-                )
-            finally:
-                _remove_cache_owned_path(staging)
+    with ExitStack() as stack:
+        with trace_operation("storage.cache.lock.acquire", context={"path": str(entry)}):
+            stack.enter_context(lock)
+        with trace_operation("storage.cache.lock.lifetime", context={"path": str(entry)}):
             prepared = _load_completed(
                 entry,
                 identity=identity,
@@ -423,6 +407,37 @@ def cached_dataset(
                 required_splits=required_splits,
             )
             if prepared is None:
-                _remove_cache_owned_path(entry)
-                raise RuntimeError(f"Prepared dataset cache entry failed validation: {entry}")
-        yield prepared
+                with trace_operation("storage.cache.miss", context={"format": dataset_format}):
+                    _remove_cache_owned_path(entry)
+                    for stale in root.glob(f".{identity}.staging-*"):
+                        _remove_cache_owned_path(stale)
+                    staging = root / f".{identity}.staging-{uuid4().hex}"
+                    try:
+                        _publish_entry(
+                            source_path,
+                            source_bytes,
+                            staging,
+                            entry,
+                            identity=identity,
+                            input_sha256=input_sha256,
+                            dataset_format=dataset_format,
+                            required_splits=required_splits,
+                        )
+                    finally:
+                        _remove_cache_owned_path(staging)
+                    prepared = _load_completed(
+                        entry,
+                        identity=identity,
+                        input_sha256=input_sha256,
+                        dataset_format=dataset_format,
+                        required_splits=required_splits,
+                    )
+                    if prepared is None:
+                        _remove_cache_owned_path(entry)
+                        raise RuntimeError(
+                            f"Prepared dataset cache entry failed validation: {entry}"
+                        )
+            else:
+                with trace_operation("storage.cache.hit", context={"format": dataset_format}):
+                    pass
+            yield prepared

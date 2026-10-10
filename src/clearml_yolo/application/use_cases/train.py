@@ -87,19 +87,28 @@ def train(
     deps: WorkflowDependencies,
 ) -> TrainResult:
     """Train from CSV ground truth; native callbacks own training publications."""
-    task = deps.tracking.init_task(clearml, stage="train")
-    deps.model.stage_settings(ultralytics_predict or {}, "predict")
-    settings = deps.model.execution_settings(ultralytics, "train")
-    architecture = settings.pop("model")
-    if not architecture:
-        raise ValueError("Set ultralytics.model explicitly; no training model fallback is provided")
-    settings["mode"] = "train"
-    settings["project"] = str(_project_of_this_run(settings.get("project"), task, deps=deps))
-    settings["name"] = settings.get("name") or deps.storage.safe_path_component(
-        deps.tracking.task_identity(task)[1]
-    )
-    deps.storage.write_path(Path(settings["project"]) / str(settings["name"]))
-    with _prepare_csv_dataset(
-        task, settings, ground_truth, dataset_format, required_splits, dataset_cache_dir, deps=deps
-    ) as (prepared, effective):
-        return _execute_training(task, architecture, effective, prepared, deps=deps)
+    with deps.resources.trace_operation("workflow.train"):
+        task = deps.tracking.init_task(clearml, stage="train")
+        deps.model.stage_settings(ultralytics_predict or {}, "predict")
+        settings = deps.model.execution_settings(ultralytics, "train")
+        architecture = settings.pop("model")
+        if not architecture:
+            raise ValueError(
+                "Set ultralytics.model explicitly; no training model fallback is provided"
+            )
+        settings["mode"] = "train"
+        settings["project"] = str(_project_of_this_run(settings.get("project"), task, deps=deps))
+        settings["name"] = settings.get("name") or deps.storage.safe_path_component(
+            deps.tracking.task_identity(task)[1]
+        )
+        deps.storage.write_path(Path(settings["project"]) / str(settings["name"]))
+        with _prepare_csv_dataset(
+            task,
+            settings,
+            ground_truth,
+            dataset_format,
+            required_splits,
+            dataset_cache_dir,
+            deps=deps,
+        ) as (prepared, effective):
+            return _execute_training(task, architecture, effective, prepared, deps=deps)

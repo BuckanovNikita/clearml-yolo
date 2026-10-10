@@ -16,6 +16,7 @@ from PIL import Image
 from ultralytics.data.utils import IMG_FORMATS, check_det_dataset, exif_size, img2label_paths
 
 from clearml_yolo.adapters.observability.progress import track
+from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.storage.filesystem import write_path
 
 GROUND_TRUTH_COLUMNS = [
@@ -217,6 +218,7 @@ def _reject_duplicate_image_names(images: dict[str, list[Path]]) -> None:
         )
 
 
+@trace_operation("yolo.ground_truth.build")
 def build_ground_truth(
     data_yaml: str | Path,
     output: str | Path,

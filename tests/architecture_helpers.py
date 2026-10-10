@@ -75,10 +75,10 @@ ADAPTER_PEERS = {
     "storage": {"observability"},
     "observability": set(),
     "yolo": {"storage", "observability"},
-    "evaluation": set(),
+    "evaluation": {"observability"},
     "reporting": {"storage", "observability"},
     "clearml": {"storage", "observability"},
-    "fiftyone": set(),
+    "fiftyone": {"observability"},
     "runtime": {"observability"},
     "integrations": {"storage", "observability"},
 }

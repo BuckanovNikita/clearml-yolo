@@ -15,6 +15,7 @@ from typing import Any, Self, cast
 from uuid import uuid4
 
 from clearml_yolo.adapters.integrations.native_runtime import OWNER_PID_ENV, OWNER_TASK_ENV
+from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.storage.filesystem import temporary_root
 
 _EVENTS = (
@@ -214,34 +215,47 @@ class NativeDDPRelay:
         self._args: SimpleNamespace | None = None
 
     def __enter__(self) -> Self:
-        for event in _EVENTS:
-            callback = partial(_capture_event, event=event, journal=str(self._directory))
-            self._model.add_callback(event, callback)
-            self._registered.append((event, callback))
-        context = copy_context()
-        self._thread = Thread(
-            target=context.run,
-            args=(self._consume_live,),
-            name="cy-native-ddp-relay",
-            daemon=True,
-        )
-        self._thread.start()
-        return self
+        try:
+            with trace_operation("ddp.relay.start"):
+                for event in _EVENTS:
+                    callback = partial(_capture_event, event=event, journal=str(self._directory))
+                    self._model.add_callback(event, callback)
+                    self._registered.append((event, callback))
+                # Bind the invocation context when creating the thread, including its trace task ID.
+                context = copy_context()
+                self._thread = Thread(
+                    target=context.run,
+                    args=(self._consume_live,),
+                    name="cy-native-ddp-relay",
+                    daemon=True,
+                )
+                self._thread.start()
+        except BaseException:
+            # Roll back resources even if the startup trace terminal sink interrupts.
+            try:
+                self._stop_consumer()
+            finally:
+                self._remove_callbacks()
+            raise
+        else:
+            return self
 
     def _consume_live(self) -> None:
         # Callback exceptions belong to the invocation boundary, never to a detached
         # thread's stderr. Training may finish, but cannot finalize successfully.
         try:
-            while not self._stop.wait(0.25):
-                trainer = getattr(self._model, "trainer", None)
-                if getattr(trainer, "ddp", False):
-                    self._consume()
+            with trace_operation("ddp.consumer", context={"stage": "train"}):
+                while not self._stop.wait(0.25):
+                    trainer = getattr(self._model, "trainer", None)
+                    if getattr(trainer, "ddp", False):
+                        self._consume()
         except BaseException as error:  # noqa: BLE001 - relay all failures to the owner boundary
             self._failure = error
 
+    @trace_operation("ddp.relay.join", cleanup=True)
     def _stop_consumer(self) -> None:
         self._stop.set()
-        if self._thread is not None:
+        if self._thread is not None and self._thread.ident is not None:
             self._thread.join()
 
     def _callbacks(self) -> dict[str, Any]:
@@ -297,7 +311,12 @@ class NativeDDPRelay:
                 "Native DDP event output is incomplete: effective arguments are missing"
             )
         view = _ReplayTrainer(record, self._args)
-        with _recorded_model_info(record.get("model_info")):
+        with (
+            trace_operation(
+                "ddp.callback", context={"event": str(record["event"]), "stage": "train"}
+            ),
+            _recorded_model_info(record.get("model_info")),
+        ):
             self._callbacks()[str(record["event"])](view)
 
     def _remove_callbacks(self) -> None:
@@ -306,14 +325,17 @@ class NativeDDPRelay:
             self._model.callbacks[event] = [item for item in callbacks if item is not callback]
         self._registered.clear()
 
+    @trace_operation("ddp.relay.cleanup", cleanup=True)
     def __exit__(
         self,
         error_type: type[BaseException] | None,
         _error: BaseException | None,
         _traceback: TracebackType | None,
     ) -> None:
-        self._stop_consumer()
-        self._remove_callbacks()
+        try:
+            self._stop_consumer()
+        finally:
+            self._remove_callbacks()
         if error_type is None and self._failure is not None:
             raise self._failure
         trainer = getattr(self._model, "trainer", None)
@@ -362,6 +384,7 @@ class NativeDDPRelay:
         if os.environ.get(OWNER_TASK_ENV) != str(task.id):
             raise RuntimeError("Native DDP callback task identity changed")
 
+    @trace_operation("ddp.relay.replay")
     def replay(self, trainer: Any) -> None:
         """Replay complete DDP rank-zero events and apply effective worker state to the parent."""
         if self._attempted:

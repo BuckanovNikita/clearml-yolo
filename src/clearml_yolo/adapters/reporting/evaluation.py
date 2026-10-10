@@ -10,6 +10,7 @@ from digital_metrics import summarize_metrics
 from digital_metrics.reporting import get_dashboards, plot_confidence_intervals
 from digital_metrics.types import Metrics
 
+from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.reporting.workbook_identity import annotate_workbook
 from clearml_yolo.core.artifact_names import PLOT_METRICS, split_component
 from clearml_yolo.core.evaluation.models import (
@@ -20,6 +21,7 @@ from clearml_yolo.core.evaluation.models import (
 from clearml_yolo.core.identity import ModelIdentity
 
 
+@trace_operation("report.evaluation.render")
 def render_evaluation(
     computed: ComputedEvaluation,
     *,
@@ -59,15 +61,23 @@ def render_evaluation(
             (output_dir / f"{metric_name}_confidence_intervals{plot_suffix}.png").unlink(
                 missing_ok=True
             )
-    dashboard, dtrk_dashboard = get_dashboards(
-        visible_metrics,
-        computed.ground_truth,
-        np.asarray(computed.confusion_matrix.counts),
-        computed.confusion_matrix.labels,
-        suffix=suffix,
-        save_to_excel=True,
-        path=str(output_dir),
-    )
+    with trace_operation(
+        "report.dashboards.render",
+        context={
+            "split": computed.split,
+            "classes": len(visible_metrics),
+            "destination": str(output_dir),
+        },
+    ):
+        dashboard, dtrk_dashboard = get_dashboards(
+            visible_metrics,
+            computed.ground_truth,
+            np.asarray(computed.confusion_matrix.counts),
+            computed.confusion_matrix.labels,
+            suffix=suffix,
+            save_to_excel=True,
+            path=str(output_dir),
+        )
     dashboard_path = output_dir / f"full_dashboard_{suffix}.xlsx"
     dtrk_path = output_dir / f"метрики_дтрк_{suffix}.xlsx"
     plot_paths: dict[str, Path] = {}
@@ -123,13 +133,16 @@ def _write_identity_plot(
     The upstream save_path API returns a closed Figure, which remains editable
     and exportable. Passing save_path avoids its interactive show branch.
     """
-    figure, _ = plot_confidence_intervals(
-        metrics=metrics,
-        metric=metric_name,
-        confidence_level=0.95,
-        save_path=str(path),
-        figsize=(12, 8),
-    )
+    with trace_operation(
+        "report.plot.render", context={"artifact": metric_name, "path": str(path)}
+    ):
+        figure, _ = plot_confidence_intervals(
+            metrics=metrics,
+            metric=metric_name,
+            confidence_level=0.95,
+            save_path=str(path),
+            figsize=(12, 8),
+        )
     if figure is None:
         raise ValueError(f"No figure was produced for {metric_name!r}")
     caption = (
@@ -139,7 +152,8 @@ def _write_identity_plot(
         line for value in caption.splitlines() for line in wrap(value, width=100)
     )
     figure.suptitle(wrapped_caption, y=1.03, va="bottom", fontsize=10, parse_math=False)
-    figure.savefig(path, bbox_inches="tight", dpi=300, metadata={"Model identity": caption})
+    with trace_operation("report.plot.save", context={"path": str(path)}):
+        figure.savefig(path, bbox_inches="tight", dpi=300, metadata={"Model identity": caption})
 
 
 def summarize_evaluation(

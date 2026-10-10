@@ -2,7 +2,10 @@
 
 import argparse
 
+from clearml_yolo.adapters.observability.tracing import trace_command, trace_operation
 
+
+@trace_command("init-config")
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directory", help="directory for example YAML configurations")
@@ -13,7 +16,8 @@ def main() -> None:
     from clearml_yolo.entrypoints.hydra.config_tree import dump_config_tree
 
     try:
-        dump_config_tree(arguments.directory, overwrite=arguments.force)
+        with trace_operation("configuration.export", context={"destination": arguments.directory}):
+            dump_config_tree(arguments.directory, overwrite=arguments.force)
     except OSError as error:
         from clearml_yolo.adapters.observability.diagnostics import (
             exception_summary,

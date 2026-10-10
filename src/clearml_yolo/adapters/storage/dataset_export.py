@@ -11,6 +11,7 @@ from pathlib import Path
 
 import yaml
 
+from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.application.contracts import (
     DatasetFormat as DatasetFormat,  # noqa: PLC0414 - typed adapter interface
 )
@@ -89,6 +90,7 @@ def _export_image(
     )
 
 
+@trace_operation("storage.dataset.convert")
 def _export_images(
     records: ValidatedDataset, dataset_format: DatasetFormat
 ) -> tuple[_ExportImage, ...]:
@@ -140,6 +142,7 @@ def _image_json(image: _ExportImage) -> str:
     return prefix[:-1] + f',"annotations":{{"boxes":[{boxes}]}}}}'
 
 
+@trace_operation("storage.dataset.ndjson.write")
 def _write_ndjson(path: Path, names: dict[int, str], images: tuple[_ExportImage, ...]) -> None:
     header = {"type": "dataset", "task": "detect", "path": ".", "class_names": names}
     lines = [json.dumps(header, ensure_ascii=False, separators=(",", ":"))]
@@ -180,6 +183,7 @@ def _label_text(boxes: tuple[_ExportBox, ...]) -> str:
     return "\n".join(lines) + ("\n" if lines else "")
 
 
+@trace_operation("storage.dataset.materialize")
 def _materialize(directory: Path, images: tuple[_ExportImage, ...]) -> None:
     _prepare_directories(directory)
     for image in images:
@@ -188,6 +192,7 @@ def _materialize(directory: Path, images: tuple[_ExportImage, ...]) -> None:
         label_path.write_text(_label_text(image.boxes), encoding="utf-8")
 
 
+@trace_operation("storage.dataset.yaml.write")
 def _write_yaml(directory: Path, names: dict[int, str], images: tuple[_ExportImage, ...]) -> Path:
     data_path = directory / "data.yaml"
     data: dict[str, object] = {
@@ -204,6 +209,7 @@ def _write_yaml(directory: Path, names: dict[int, str], images: tuple[_ExportIma
     return data_path
 
 
+@trace_operation("storage.dataset.export")
 def export_dataset(
     records: ValidatedDataset, directory: Path, dataset_format: DatasetFormat
 ) -> Path:

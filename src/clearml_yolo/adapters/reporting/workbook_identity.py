@@ -30,6 +30,7 @@ from openpyxl.utils.cell import (  # type: ignore[import-untyped]
     get_column_letter,
 )
 
+from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.core.identity import ModelIdentity
 
 _S = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
@@ -143,6 +144,7 @@ def deannotated_workbook(path: str | Path) -> Iterator[Path]:
         yield original
 
 
+@trace_operation("report.dashboard.read")
 def read_dashboard(path: str | Path, **kwargs: Any) -> pd.DataFrame:
     """Read historical or annotated digital-metrics dashboards with pandas."""
     with deannotated_workbook(path) as source:
@@ -509,6 +511,7 @@ def _add_metadata(
     entries[_META] = _xml(metadata)
 
 
+@trace_operation("report.workbook.annotate")
 def annotate_workbook(path: str | Path, identities: Mapping[str, ModelIdentity]) -> None:
     """Prepend literal, full identities on every sheet and repeat them in print.
 

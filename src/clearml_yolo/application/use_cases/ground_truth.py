@@ -15,10 +15,11 @@ def ground_truth(
     *,
     deps: WorkflowDependencies,
 ) -> Path:
-    task = deps.tracking.init_task(clearml, stage="ground_truth")
-    effective = deps.tracking.connect_config_file(task, "dataset", Path(data_yaml))
-    destination = deps.dataset.build_ground_truth(
-        str(effective), output, test_fraction=test_fraction, seed=seed
-    )
-    deps.tracking.register_ground_truth(task, destination, output_dir=destination.parent)
-    return destination
+    with deps.resources.trace_operation("workflow.ground_truth"):
+        task = deps.tracking.init_task(clearml, stage="ground_truth")
+        effective = deps.tracking.connect_config_file(task, "dataset", Path(data_yaml))
+        destination = deps.dataset.build_ground_truth(
+            str(effective), output, test_fraction=test_fraction, seed=seed
+        )
+        deps.tracking.register_ground_truth(task, destination, output_dir=destination.parent)
+        return destination

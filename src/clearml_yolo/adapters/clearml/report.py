@@ -14,6 +14,7 @@ import pandas as pd
 from loguru import logger
 
 from clearml_yolo.adapters.clearml.session import Task
+from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.core.evaluation.schema import ConfusionMatrixPayload, PRCurve, ResultContext
 from clearml_yolo.core.identity import ModelIdentity
 
@@ -88,6 +89,7 @@ def _confusion_trace(matrix: ConfusionMatrixPayload, normalization: str) -> dict
     return trace
 
 
+@trace_operation("clearml.report_confusion_matrices")
 def report_confusion_matrices(
     task: Task,
     context: ResultContext,
@@ -170,6 +172,7 @@ def _pr_trace(curve: PRCurve) -> dict[str, Any]:
     }
 
 
+@trace_operation("clearml.report_pr_curves")
 def report_pr_curves(
     task: Task,
     context: ResultContext,
@@ -242,6 +245,7 @@ COMPARED_METRICS = (
 )
 
 
+@trace_operation("clearml.report_table")
 def report_table(
     task: Task,
     title: str,
@@ -278,6 +282,7 @@ def report_table(
     logger.debug("Reported table {}/{} ({} rows)", title, series, len(frame))
 
 
+@trace_operation("clearml.report_scalars")
 def report_scalars(task: Task, title: str, values: Mapping[str, float]) -> None:
     """Publish named values as one ClearML scalar plot, one series per name."""
     if task is None:
@@ -378,6 +383,7 @@ def _headline_values(
     return values
 
 
+@trace_operation("clearml.report_comparison")
 def report_comparison(
     task: Task,
     split: str,

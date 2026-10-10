@@ -4,7 +4,10 @@ import argparse
 import sys
 from pathlib import Path
 
+from clearml_yolo.adapters.observability.tracing import trace_command
 
+
+@trace_command("dedup")
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
