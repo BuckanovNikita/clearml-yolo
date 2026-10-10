@@ -97,7 +97,7 @@ owner event order, native checkpoint inference and failed-run resource lifetime.
 
 ## Phase 10: Verification and documentation
 
-- [ ] T025 Run focused CPU acceptance, existing relay/publication regressions, default pytest, Ruff, strict mypy, import-linter and applicable commit checks; record exact commands, outcomes, cleanup evidence and accelerator-launch/NCCL/AMP/real-upload limitations in docs/evidence/2026-10-10-cpu-ddp.md (FR-012–FR-017, SC-006–SC-008).
+- [x] T025 Run focused CPU acceptance, existing relay/publication regressions, default pytest, Ruff, strict mypy, import-linter and applicable commit checks; record exact commands, outcomes, cleanup evidence and accelerator-launch/NCCL/AMP/real-upload limitations in docs/evidence/2026-10-10-cpu-ddp.md (FR-012–FR-017, SC-006–SC-008).
 - [x] T026 Update docs/development.md and specs/010-native-clearml-integration/quickstart.md plus additive spec/plan intent; validate changed Markdown/local links and selection examples against integrated tests; record README/current-contract/publication-contract/integration-skill review with the concrete no-change reason that this test-only developer harness changes no public execution or publication contract (FR-016, FR-017).
 - [x] T027 Inspect the combined implementation and documentation diff, obtain a fresh independent read-only review, resolve findings and converge specs/010-native-clearml-integration/tasks.md against docs/evidence/2026-10-10-cpu-ddp.md before final completion status (FR-012–FR-017).
 

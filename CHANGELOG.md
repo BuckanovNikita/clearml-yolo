@@ -8,6 +8,11 @@
 - Record GPU waiting release completion
   ([`0040f8e`](https://github.com/BuckanovNikita/clearml-yolo/commit/0040f8e8f9fd073a69a2fa8a0cd1052861d781dc))
 
+### Testing
+
+- Cover native YOLO DDP with CPU ranks
+  ([`03df7e7`](https://github.com/BuckanovNikita/clearml-yolo/commit/03df7e7e015f8b5dd34a393ac4270c848299f8a5))
+
 
 ## v0.21.0 (2026-10-10)
 
