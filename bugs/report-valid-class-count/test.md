@@ -4,7 +4,7 @@
 - **Tested**: 2026-10-10
 - **Assessment**: [assessment.md](assessment.md)
 - **Fix**: [fix.md](fix.md)
-- **Result**: verified for report generation; release checks recorded below
+- **Result**: verified
 
 ## Reproduction and regression checks
 
@@ -45,5 +45,7 @@ reports. No shared service was started or stopped.
 ## Release checks
 
 The initial full suite passed: 1,379 passed, 30 skipped. The subsequent translation
-corrections passed the affected tests above and are subject to the normal final
-commit checks. Release outcomes will be appended after completion.
+corrections passed the affected tests above. Implementation commit `59c5aad` then
+passed every applicable normal commit hook, including the full pytest suite,
+Ruff, mypy and import-linter. No checks were bypassed. Git-tag publication follows
+the repository release workflow; its outcome is reported separately at completion.
