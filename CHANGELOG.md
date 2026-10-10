@@ -11,6 +11,11 @@
 - Record GPU waiting release completion
   ([`0040f8e`](https://github.com/BuckanovNikita/clearml-yolo/commit/0040f8e8f9fd073a69a2fa8a0cd1052861d781dc))
 
+### Features
+
+- **observability**: Add readable opt-in TRACE diagnostics
+  ([`8ca7d6b`](https://github.com/BuckanovNikita/clearml-yolo/commit/8ca7d6bc37a0a28ba2c53eeb73c0b9d51ab58a99))
+
 ### Testing
 
 - Cover native YOLO DDP with CPU ranks

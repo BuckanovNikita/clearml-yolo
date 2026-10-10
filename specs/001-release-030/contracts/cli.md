@@ -67,6 +67,14 @@ the same shared eligible class population; untestable rows do not enter the BH f
 receive a significance verdict. With no comparable classes, reports still show available
 metrics and mark pooled comparisons unavailable. Exclusions explain noncomparability rather
 than removing an otherwise eligible model's metrics.
+Developer/business metric sheets put availability counts in a compact two-column summary
+below the table, legends and population note, instead of `<metric> coverage` columns.
+Labels use `<metric>-valid-class-count`, with AP labels `AP50`, `AP75` and `AP50-95`.
+Values retain `valid/eligible` counts: finite zeros are valid, unavailable metrics give
+`0/N`, and empty populations give `0/0`. Model summaries use their own eligible classes;
+the difference summary uses shared eligible classes with finite differences. Missing
+metric cells remain `NA`. This layout applies before identity annotation to new reports;
+source dashboards and historical workbooks remain unchanged.
 Standalone comparison uses the `evaluation` mapping; matching options are configured only as
 `evaluation.iou_threshold` and `evaluation.matching_strategy`.
 The pipeline forwards the full `metrics.evaluation` configuration to comparison.

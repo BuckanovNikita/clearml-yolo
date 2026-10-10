@@ -140,6 +140,10 @@ All report workbooks preserve one-sided class metrics with `NA` for the unavaila
 model/comparison. Model averages and business verdict inputs use each model's own eligible
 classes; statistical comparisons use shared eligible classes. The maintained
 [CLI evaluation contract](../specs/001-release-030/contracts/cli.md) defines those populations.
+Developer/business reports show aggregate availability below each metric table as
+`<metric>-valid-class-count` (for example `AP50-valid-class-count: 18/20`), preserving
+finite-value counts including zero. Coverage columns and their empty class-row cells
+are removed; missing actual metric values remain `NA`.
 
 FiftyOne visualization is optional. Its setup or publication failures warn and continue
 the owning computation; setup failure disables visualization for that invocation.

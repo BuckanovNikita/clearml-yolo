@@ -125,6 +125,19 @@ were reproduced, corrected and re-reviewed; the parent independently checked fin
 source hashes, balanced events and cleanup ordering. Exact publication lockfiles for both
 native campaigns were also confirmed absent within their removed task-owned run directories.
 
+The feature commit passed every normal hook, including the full pytest gate. During
+release preparation, remote master advanced to v0.21.1 with a separately validated
+report-layout fix. The task-owned pending release attempt was stopped and archived,
+then both histories were merged without replacing remote work. The sole source conflict
+retained the incoming class-count formatting and existing TRACE scopes, adding an
+aggregate class-count formatting span. Parent integration checks passed **77 tests**,
+Ruff, mypy (194 files), and all 27 import contracts. This report-only integration follows
+the native campaign above; native training/publication/lifecycle source was unchanged.
+Six actual workbook-layout tests also passed with TRACE enabled; merged documentation
+checks passed for 19 Markdown files and 158 links/anchors. A fresh merge reviewer compared
+both parents, confirmed all incoming implementation and prior TRACE source was preserved,
+independently passed the 77-test selection and returned **ship**.
+
 The checked Git-tag-only release remains pending. The repository commit/release hooks
 repeat the required checks on the final committed content. Physical
 multi-GPU execution and the full historical product UI campaign were not performed for this

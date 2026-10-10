@@ -15,7 +15,7 @@ while dated native evidence separately establishes actual execution.
 | Files and snapshots | storage filesystem init, text/CSV ports, checkpoint hash/identity, native archive, publication data, aggregate dedup | test_trace_storage; existing filesystem/identity/dedup tests |
 | Prediction/reinference | YOLO checkpoint/model/vocabulary loads, full lazy inference stream, cache read/hit/miss/write | test_trace_compute; existing inference/reinfer tests; native pipeline |
 | Evaluation/calibration | preprocessing, matching, threshold optimization, metric counts, AP, PR, result rows | test_trace_compute; existing scientific/evaluation suites |
-| Comparison/reporting | application paired scoring/bootstrap; reporting workbook/dashboard/plot/render/save and developer/business builders | comparison/reporting suites; paired native pipeline |
+| Comparison/reporting | application paired scoring/bootstrap; reporting workbook/dashboard/plot/render/save, developer/business builders and class-count layout compaction | comparison/reporting suites; paired native pipeline; merged report-layout tests in TRACE mode |
 | ClearML startup/configuration | task creation, task/model lookup/naming, sanitized configuration prepare/connect/record/replay | test_trace_clearml; session/models/naming suites |
 | Downloads/model verification | checkpoint/threshold downloads, model reopen/readback/metadata/waits/hash verification | test_trace_clearml; native model suite and real downloaded checkpoints |
 | Final publication | finalizers, CSV assembly/write, each upload, wait/flush/reload/verify, close/readback/mark status, temporary cleanup | test_trace_clearml; stalled-close subprocess; native terminal readback |
