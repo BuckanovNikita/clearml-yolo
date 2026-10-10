@@ -472,6 +472,7 @@ forbidden_modules = ["openpyxl"]
 allow_indirect_imports = true
 ignore_imports = [
     "clearml_yolo.adapters.reporting.comparison_workbook -> openpyxl",
+    "clearml_yolo.adapters.reporting.report_layout -> openpyxl",
     "clearml_yolo.adapters.reporting.workbook_identity -> openpyxl",
 ]
 

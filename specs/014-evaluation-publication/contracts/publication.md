@@ -74,7 +74,10 @@ Comparison dashboard keys are `comparison_candidate_dashboard_full_SPLIT`,
 `comparison_candidate_dashboard_dtrk_SPLIT`, `comparison_baseline_dashboard_full_SPLIT`
 and `comparison_baseline_dashboard_dtrk_SPLIT`. The paired comparison workbook retains
 its `Сравнение` sheet; excluded classes are its `_excluded` CSV. Developer/business
-report workbooks retain their existing formats. A missing automatic baseline does not
+report workbooks retain their metric tables, with aggregate availability moved to compact
+`<metric>-valid-class-count` summaries under the
+[CLI report contract](../../001-release-030/contracts/cli.md).
+A missing automatic baseline does not
 fabricate baseline metrics, comparison results or paired reports; explicit invalid model
 references still fail.
 
@@ -191,6 +194,8 @@ literal text. Banner rows repeat on printed pages and print width is normalized 
 styles, headings, formulas, merged ranges, filters, frozen panes, print areas and explicit
 row breaks retain their meaning after coordinate translation. Existing print-title rows
 and columns remain included; Excel recalculates automatic pagination for the banner.
+For developer/business reports, the compact valid-class-count layout above is applied
+before annotation; preservation and embedded original contents refer to that layout.
 
 Project readers adapt annotated workbooks to their preserved original metric layout for
 threshold recovery and report generation. Historical unannotated workbooks remain readable.

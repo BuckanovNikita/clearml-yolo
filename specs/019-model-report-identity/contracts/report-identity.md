@@ -30,3 +30,8 @@ Artifact names and output paths remain stable. Repository adapters recognize ann
 and unannotated dashboards for report generation and threshold recovery. The pinned
 dependencies and historical ClearML artifacts remain untouched. Metric values,
 formulas, headings, styles, and model-specific class populations remain intact.
+
+The [current report layout](../../001-release-030/contracts/cli.md) moves aggregate
+availability out of developer/business metric columns into compact
+`<metric>-valid-class-count` summaries. Apply this layout before identity annotation;
+the annotated and embedded original workbooks both retain those summaries.

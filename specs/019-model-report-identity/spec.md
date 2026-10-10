@@ -4,6 +4,11 @@
 **Status**: Approved intent; implementation in progress
 **Input**: User-approved plan, “Model identity on every dashboard and report”.
 
+**Presentation amendment (2026-10-10)**: The
+[current report contract](../001-release-030/contracts/cli.md) moves availability
+columns into valid-class-count summaries before identity annotation. Preservation
+requirements below apply to that presentation; metric values and populations do not change.
+
 ## User Scenarios & Testing
 
 ### User Story 1 - Identify a trained model (Priority: P1)

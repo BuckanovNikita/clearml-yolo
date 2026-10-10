@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+from report_generator.config import Config
 
 from clearml_yolo.adapters.clearml.session import ClearMLConfig
 from clearml_yolo.application.ports import WorkflowDependencies
@@ -41,8 +42,8 @@ def report_generator(
 
     class FakeConfig:
         @staticmethod
-        def load(*_: object) -> dict[str, object]:
-            return {}
+        def load(*_: object) -> object:
+            return Config.load()
 
     def install(name: str, attribute: str, value: object) -> None:
         module = types.ModuleType(name)
