@@ -1,7 +1,15 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.22.0 (2026-10-10)
+
+
+## v0.21.1 (2026-10-10)
+
+### Bug Fixes
+
+- **report**: Present valid class counts below metric tables
+  ([`59c5aad`](https://github.com/BuckanovNikita/clearml-yolo/commit/59c5aad11f5324d03406e80495b5f41f77b50bf5))
 
 ### Documentation
 
@@ -10,6 +18,9 @@
 
 - Record GPU waiting release completion
   ([`0040f8e`](https://github.com/BuckanovNikita/clearml-yolo/commit/0040f8e8f9fd073a69a2fa8a0cd1052861d781dc))
+
+- Record report layout verification
+  ([`29404e5`](https://github.com/BuckanovNikita/clearml-yolo/commit/29404e5a560ee20127d6a57f43b08887ff097288))
 
 ### Features
 
