@@ -73,7 +73,7 @@ Implementation commit `25e874e` was already created locally when cancellation wa
 Its automatic release failed during offline resolution of `digital-metrics` after local
 source overrides had been removed as required by the commit procedure. No dependency
 revision was changed. No release commit, version tag, push, package asset or registry
-publication completed.
+publication completed during that attempt.
 
 The user then specified no commits and subsequently asked to continue. Completion on
 resume retained that restriction: it removed only the generated partial version/changelog
@@ -81,6 +81,12 @@ edits and their staging, archived the cancelled release recovery record, restore
 consistent `0.20.0` package/lockfile version, and preserved the exact local source overrides.
 The existing implementation commit was not rewritten. The user's subsequent explicit
 “commit and push” request reauthorized documentation commits and the repository release
-workflow. The planned recovery retains the generated changelog and updates only the
-lockfile's root package version, with parsed comparisons proving all dependency metadata
-unchanged. Normal commit and tag-recovery checks remain required before publication.
+workflow. Recovery retained the generated changelog and updated only the lockfile's root
+package version; independent parsed comparisons verified that all dependency metadata
+remained unchanged. Release commit `0b3479d` passed the normal commit checks, including
+the full pytest suite. The tag-recovery hook also passed its required all-files checks
+before creating annotated tag `v0.21.0`.
+
+`master` and `v0.21.0` were pushed via SSH. No package assets or registry publication
+were performed. Exact local source overrides were restored unstaged, the staging area
+was empty, and the completed recovery record and lock were removed by the release helper.

@@ -27,12 +27,14 @@
   execution and distribution checks; record outcomes and limitations (depends on T005–T009).
 - [x] T011 Validate changed Markdown/local links/examples and inspect full combined diff;
   obtain fresh independent review (depends on T010).
-- [ ] T012 Follow applicable release workflow only after release gates pass; publish Git
+- [x] T012 Follow applicable release workflow only after release gates pass; publish Git
   tags only and restore local source overrides (depends on T011).
   Cancelled by the user's explicit no-commit instruction. The implementation commit
-  already exists locally; no release commit, tag or push was completed. Partial release
-  metadata and staging were removed on resume, preserving local dependency overrides.
+  already existed locally; no release commit, tag or push completed during that attempt.
+  Partial release metadata and staging were removed on resume, preserving local dependency overrides.
   The subsequent explicit “commit and push” request reauthorized completion of this task.
+  Release commit `0b3479d` passed commit and recovery checks; `master` and annotated
+  tag `v0.21.0` were pushed. Exact local dependency overrides were restored unstaged.
 
-Implementation, verification and documentation are complete. The reauthorized release
-and publication are pending. See [verification.md](verification.md).
+Implementation, verification, documentation and Git-tag publication are complete.
+See [verification.md](verification.md).
