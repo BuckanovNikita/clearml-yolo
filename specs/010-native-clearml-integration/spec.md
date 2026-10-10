@@ -152,3 +152,57 @@ from current-task configuration and follows compared models' source-task provena
 ## Assumptions
 
 Installed native callback behavior defines metric series and epoch numbering. No custom batch telemetry, new CLI options, historical deletion, commit, push or release is included. Real execution and mocked tests are reported separately.
+
+## CPU distributed verification amendment — 2026-10-10
+
+The approved amendment adds local regression evidence for User Stories 1 and 2 and
+FR-001–FR-005 without changing application interfaces or publication contracts. The
+completed implementation and acceptance history above remains a dated record. The
+new tasks in [tasks.md](tasks.md) track this amendment separately; dated execution
+evidence belongs in `docs/evidence/2026-10-10-cpu-ddp.md`.
+
+A developer can run real distributed native YOLO training on CPU to detect relay,
+checkpoint and worker-lifecycle regressions during ordinary repository checks. The
+tracking boundary uses a local recording task; no ClearML service, network access,
+accelerator, pretrained-weight download or shared dataset is required.
+
+### Additional verification requirements
+
+- **FR-012**: Successful local acceptance MUST execute real native YOLO training and
+  validation in both two-rank and four-rank CPU process groups, with actual distributed
+  model wrapping, changed model parameters, matching parameters across ranks and
+  disjoint, collectively complete training-sampler partitions.
+- **FR-013**: The harness MUST preserve installed native training, validation and
+  checkpoint loops. CPU adaptations MUST remain test-only and limited to device
+  setup, distributed wrapping and final evaluation; production relay behavior MUST
+  execute without replacement.
+- **FR-014**: During successful training, the invocation owner MUST record native
+  epoch telemetry before completion, in journal order and exactly once. Workers
+  MUST perform no task creation or publication. Exactly one best-checkpoint record
+  MUST be associated with the local recording task, and the actual native checkpoint
+  MUST load for inference. This local record does not establish a remote upload.
+- **FR-015**: Injected rank-zero, nonzero-rank and owner-callback failures MUST fail
+  acceptance, suppress successful terminal model recording and leave no owned
+  worker, descendant or relay consumer running. The local harness MUST enforce
+  bounded termination rather than hang indefinitely.
+- **FR-016**: The CPU distributed suite MUST run in default pytest and commit checks,
+  with a marker for focused selection. Only unsupported Linux/WSL or unavailable
+  Gloo prerequisites MAY cause a skip; execution failures MUST remain failures.
+- **FR-017**: Existing malformed-journal, missing-checkpoint and duplicate-owner unit
+  regressions MUST remain. Documentation and evidence MUST distinguish local CPU
+  training from accelerator launch, NCCL, AMP and actual ClearML upload verification.
+
+### Additional acceptance outcomes
+
+- **SC-006**: Two-rank and four-rank successful scenarios each demonstrate native
+  optimizer updates, synchronized final parameters, valid sampler partitions, live
+  owner telemetry and one inference-loadable best checkpoint.
+- **SC-007**: Each injected worker or owner failure terminates within the harness
+  deadline, records no successful final best-model event and leaves no owned activity.
+- **SC-008**: Default collection includes the CPU distributed tests, and focused
+  marker selection executes the same scenarios without changing application settings.
+
+This amendment authorizes test and developer-documentation implementation. It does
+not authorize dependency changes, production CPU-DDP support or deployment. The
+current task's explicit commit/release authorization governs completion; the historical
+no-commit statement above describes the original 2026-09-30 implementation scope.

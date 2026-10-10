@@ -536,6 +536,7 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = ["--strict-markers", "--strict-config"]
+markers = ["ddp_cpu: real multi-rank CPU YOLO training and native relay integration"]
 
 [tool.semantic_release]
 commit_parser = "conventional"

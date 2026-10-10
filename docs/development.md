@@ -24,6 +24,40 @@ The mocked suite cannot prove native training, a GPU or ClearML uploads; those r
 dated real-run evidence and the
 [end-to-end skill](../.agents/skills/running-end-to-end-tests/SKILL.md).
 
+### Native CPU distributed regression tests
+
+The `ddp_cpu` suite runs real native YOLO training, validation and checkpoint creation
+in two-rank and four-rank CPU/Gloo process groups. It is included in `uv run pytest`
+and the existing pytest commit hook. To select it directly:
+
+```bash
+uv run pytest -m ddp_cpu
+uv run pytest tests/test_native_ddp_cpu.py
+```
+
+Use the existing repository environment on Linux or WSL with Torch distributed/Gloo
+support. Only unsupported platform or unavailable Gloo prerequisites may skip;
+native runtime, process and callback failures remain failures. The suite creates
+isolated synthetic data and randomly initialized models from the installed local
+YOLOv8n architecture YAML, with no pretrained download, network access, GPU or
+ClearML service requirement. Tests use a local recording task at the tracking
+boundary while exercising the production owner relay.
+
+Successful scenarios verify actual CPU/Gloo/DDP processes, parameter updates and
+cross-rank synchronization, sampler partitions, live ordered owner-only telemetry
+and one inference-loadable native best checkpoint. Worker and owner-callback
+failure scenarios verify failed completion and cleanup of owned processes,
+descendants and relay activity. Scenario execution is bounded by a 180-second
+deadline and a 30-second process-group timeout; cleanup allows five seconds for
+graceful shutdown before terminating only the owned process tree.
+
+Test-only trainer adaptations retain installed native loops and do not add a
+production CPU distributed launcher. Local task recordings establish callback
+behavior and model association. Accelerator launch, NCCL, AMP and actual ClearML
+uploads/downloads require separate acceptance. See the
+[CPU validation guide](../specs/010-native-clearml-integration/quickstart.md#cpu-distributed-regression-acceptance--2026-10-10-amendment)
+for scope and evidence requirements; keep observed results in dated evidence.
+
 ## Python integration and architecture
 
 Use the [Python import migration](python-import-migration.md) when updating scripts or

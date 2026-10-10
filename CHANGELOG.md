@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record GPU waiting release completion
+  ([`0040f8e`](https://github.com/BuckanovNikita/clearml-yolo/commit/0040f8e8f9fd073a69a2fa8a0cd1052861d781dc))
+
+
 ## v0.21.0 (2026-10-10)
 
 ### Chores

@@ -69,3 +69,85 @@ Assessment intake/research/define/shape/decide → specify → clarify → plan 
 ## Complexity Tracking
 
 No constitution deviations. A scoped journal consumer thread is necessary for progress during blocking native DDP training; completion-only replay does not satisfy the requirement.
+
+## CPU distributed verification amendment — 2026-10-10
+
+This additive plan implements FR-012–FR-017 and SC-006–SC-008 from the amended
+[specification](spec.md#cpu-distributed-verification-amendment--2026-10-10).
+Existing checked tasks and real-service evidence retain their original scope.
+The approved scope is tests and developer guidance only: no new public APIs,
+dependencies or production adaptations.
+
+### Native execution and isolation
+
+Generate an isolated synthetic detection dataset with eight training images, eight
+validation images, 64-pixel image size and one class. Use the installed local
+YOLOv8n architecture YAML with random initialization, two epochs and global batch
+size eight. Set dataloader workers to zero; disable AMP, compilation, plots and
+augmentation. Use real Torch distributed CPU/Gloo processes at world sizes two
+and four and the installed native DetectionTrainer loops.
+
+Test-only trainer adaptations cover CPU device setup, CPU DDP wrapping and final
+evaluation. Preserve native optimizer, sampler, validation, callback and checkpoint
+behavior; do not patch dependency source or add a production CPU-DDP launcher.
+Worker diagnostics prove actual PID/rank identity, CPU tensors, Gloo, DDP wrapping,
+optimizer parameter changes, matching final rank parameters and epoch sampler
+partitions. Native final-best validation may reuse an epoch number; verify event
+identity/order without incorrectly treating that epoch index as a duplicate.
+
+The owner runs the production relay with a local recording task and observes native
+telemetry while workers remain live. Local recordings prove callback ownership and
+one best-model association; loading that actual checkpoint proves inference
+compatibility. They do not prove ClearML SDK uploads, backend delivery or download
+barriers. Worker processes cannot create tasks or publish.
+
+### Failures and resource lifetime
+
+Inject failures after epoch zero in rank zero and a nonzero rank, and inject an
+owner publication callback failure. Verify a failed outcome, no successful terminal
+best-model record and complete owned-process/thread cleanup. Use a 30-second Gloo
+process-group timeout, a 180-second per-scenario deadline and a five-second graceful
+shutdown window followed by termination of only the scenario-owned process tree.
+Retain unit cases for malformed journals, missing checkpoints and duplicate owner
+events; real distributed tests complement those controlled failure cases.
+
+Prerequisite checks may skip only unsupported Linux/WSL platforms or unavailable
+Torch distributed/Gloo support. Native runtime, worker and callback failures are
+test failures. Register `ddp_cpu` without a default exclusion: both `uv run pytest`
+and the existing pytest commit hook execute the suite. Focused selection uses
+`uv run pytest -m ddp_cpu`.
+
+### Ownership, dependencies and verification
+
+- Worker agent owns `tests/ddp_cpu_worker.py` and `tests/ddp_cpu_trainer.py`.
+- Parent owns `tests/test_native_ddp_cpu.py`, `tests/ddp_cpu_harness.py`,
+  `tests/ddp_cpu_launcher.py`, `tests/ddp_cpu_recording.py`, marker registration and
+  integrated verification.
+- Documentation agent owns additive changes to this feature's `spec.md`, `plan.md`,
+  `tasks.md`, `quickstart.md` and `docs/development.md`.
+- Parent owns dated evidence, final task status and a fresh independent read-only
+  review after integrating disjoint results. Bounded agents do not delegate further.
+
+Run focused CPU acceptance, existing relay/publication regressions, default pytest,
+Ruff, strict mypy and import-linter, followed by applicable commit checks without
+bypassing hooks. Record outcomes and limitations in
+`docs/evidence/2026-10-10-cpu-ddp.md`; do not record observed timings/counts in
+evergreen guidance. Accelerator launcher behavior, NCCL, AMP and real ClearML
+uploads remain outside this amendment's acceptance evidence.
+
+### Documentation stage and constitution check
+
+Update `docs/development.md` and this feature's `quickstart.md` for prerequisites,
+default/focused collection, failure behavior and evidence limits. Validate changed
+Markdown, local links and documented selection commands after test integration.
+Review README, current contract index, native publication contracts and integration
+skills against the actual diff. No changes are planned there because public command,
+configuration, native publication and real-service acceptance contracts remain
+unchanged; this amendment documents a developer regression harness. Record that
+review outcome in the task ledger and dated evidence.
+
+Constitution check: test-only CPU adaptations preserve production delegation to
+Ultralytics and installed dependency pins. Isolated paths, explicit owned-resource
+cleanup, native execution evidence and truthful local-recording limits satisfy the
+verification and collaboration principles. Existing workflow artifacts are reused;
+no installed Spec Kit tooling or completed history is rewritten.
