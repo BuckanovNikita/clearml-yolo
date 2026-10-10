@@ -116,7 +116,7 @@ command/tee failure. Feature documents and standing instruction links are checke
 before commit: **12 Markdown files, 137 local links/anchors and 14 fenced blocks** passed.
 No installed Spec Kit tooling, `.specify/` files or dependency revisions changed.
 
-## Independent acceptance and remaining release gate
+## Independent acceptance and release
 
 The fresh final read-only reviewer returned **ship** after independently running **96 tests**
 and an additional **13-case interruption matrix**, inspecting ownership, rollback, nested
@@ -138,7 +138,29 @@ checks passed for 19 Markdown files and 158 links/anchors. A fresh merge reviewe
 both parents, confirmed all incoming implementation and prior TRACE source was preserved,
 independently passed the 77-test selection and returned **ship**.
 
-The checked Git-tag-only release remains pending. The repository commit/release hooks
-repeat the required checks on the final committed content. Physical
-multi-GPU execution and the full historical product UI campaign were not performed for this
+The merged source commit `11e2d9d` passed all normal commit gates, including full pytest.
+Automatic release preparation encountered the existing offline dependency-cache limitation
+for digital-metrics. Documented recovery updated only the root package version in uv.lock;
+the parent compared the complete parsed lock against the original baseline and confirmed
+every dependency/source record was unchanged. No release tooling or hooks were bypassed.
+
+Release commit `a1b225b1984f9ed4a6735b5b9128553fa17be27e` passed the normal release
+commit checks and the separate all-files recovery validation, including full pytest,
+Ruff, mypy, import-linter and the applicable formatting/configuration checks. The hook
+created annotated tag **v0.22.0**. Both master and that tag were pushed atomically over
+SSH on 2026-10-10; no package assets or registry publication were performed.
+
+Wheel and sdist were built from an archive of that immutable release commit and installed
+non-editably into separate fresh virtual environments. Both passed all ten command helps,
+configuration generation, protected overwrite rejection and forced regeneration. Installed
+version and tracing source hashes matched the archived release; the parent subsequently
+verified that the annotated tag resolves to the tested commit and produces the identical
+archive. Approved existing dependencies were reused, so fresh-machine dependency resolution
+remains unverified. Task-owned packaging virtual environments were removed after checking
+that no processes used them; distribution artifacts and verification evidence were retained.
+
+The exact original local uv sources table was restored unstaged, the release contains no
+local source overrides, and CLAUDE.md remains a relative symlink to AGENTS.md. The release
+lock and recovery record were removed by the successful workflow. Physical multi-GPU
+execution and the full historical product UI campaign were not performed for this
 diagnostic feature; native CPU DDP and single-GPU execution are the applicable evidence.

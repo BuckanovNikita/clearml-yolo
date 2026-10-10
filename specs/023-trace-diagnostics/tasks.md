@@ -30,4 +30,4 @@
 
 - [X] T013 Parent: required static/full/native checks and combined-diff review.
 - [X] T014 Fresh read-only review; resolve findings, verify and re-review material corrections.
-- [ ] T015 Parent: authorized checked release commit/tag/push; restore exact local uv sources.
+- [X] T015 Parent: authorized checked release commit/tag/push; restore exact local uv sources.
