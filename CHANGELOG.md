@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record TRACE release verification
+  ([`60738a7`](https://github.com/BuckanovNikita/clearml-yolo/commit/60738a7fb8ce634eef25d53ce23b42b90e2f9232))
+
+
 ## v0.22.0 (2026-10-10)
 
 

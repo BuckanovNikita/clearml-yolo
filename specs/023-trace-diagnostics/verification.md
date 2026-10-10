@@ -164,3 +164,41 @@ local source overrides, and CLAUDE.md remains a relative symlink to AGENTS.md. T
 lock and recovery record were removed by the successful workflow. Physical multi-GPU
 execution and the full historical product UI campaign were not performed for this
 diagnostic feature; native CPU DDP and single-GPU execution are the applicable evidence.
+
+## Concurrent GPU follow-up — 2026-10-10
+
+The user subsequently requested three simultaneous GPU pipelines with one running and
+two waiting. **That acceptance condition failed.** Two three-process campaigns used the
+unchanged released runtime, one visible GPU and the same small native dataset/settings
+described above. No external serialization or patched availability probe was introduced.
+
+| Campaign | Process launch spread | GPU selection spread | GPU waiters | Command exits |
+| --- | --- | --- | --- | --- |
+| Shared dataset cache | 0.721 ms | 103 ms | 0 | 1, 0, 0 |
+| Separate dataset caches | 1.160 ms | 124 ms | 0 | 0, 1, 0 |
+
+Every command selected logical GPU 0 before native initialization. Shared-cache locking
+serialized the first campaign's training; the separate-cache campaign had all three native
+CUDA training spans overlap for 11.641 seconds. All six commands exited, so these runs
+did not reproduce a hang. They do not establish successful concurrency acceptance.
+
+One command in each campaign failed after GPU computation, at different ClearML model
+publication/finalization boundaries: first a model reload with a missing ID, then an SDK
+task query whose response task collection was null. Original API responses were not
+captured; the failures' root causes and any causal connection to concurrency remain
+unverified. TRACE identified the failing operations and subsequent closure.
+
+The current GPU contract provides an availability snapshot without reservation and
+explicitly allows concurrent commands to select the same free device. Thus it does not
+guarantee the requested one-runner/two-waiter behavior. Compute-process telemetry also
+returned empty lists throughout this follow-up, including overlapping native CUDA work;
+those samples cannot prove GPU ownership or release in the tested environment.
+
+The first observation harness stopped on a nonzero child exit before independent remote
+readback. The second failed to map a renamed task to its launch label after collecting
+all child exits. These harness limitations are separate from the two application failures;
+complete fresh server-status and artifact-download verification is not claimed for this
+follow-up. Exact commands, logs, timestamps, source hashes and cleanup evidence are archived
+in the global environment skill's dated GPU-concurrency evidence. All six CLI processes
+exited; both exact tagged projects/tasks, owned FiftyOne datasets and invocation workspaces
+were removed. Source/dependency files and existing workloads were unchanged.
