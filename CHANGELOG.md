@@ -1,7 +1,7 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.23.0 (2026-10-11)
 
 ### Documentation
 
@@ -10,6 +10,11 @@
 
 - Record TRACE release verification
   ([`60738a7`](https://github.com/BuckanovNikita/clearml-yolo/commit/60738a7fb8ce634eef25d53ce23b42b90e2f9232))
+
+### Features
+
+- Restore controlled GPU scheduling and isolate runtime state
+  ([`27cec1e`](https://github.com/BuckanovNikita/clearml-yolo/commit/27cec1e0b7684e4a871fe5f848864b23c7d63c95))
 
 
 ## v0.22.0 (2026-10-10)
