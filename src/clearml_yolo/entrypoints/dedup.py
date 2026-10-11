@@ -4,18 +4,26 @@ import argparse
 import sys
 from pathlib import Path
 
-from clearml_yolo.adapters.observability.tracing import trace_command
 
-
-@trace_command("dedup")
 def main() -> None:
+    # This filesystem-only tool loads no SDK configuration; its atomic temporary
+    # files are owned and cleaned beside their selected destination.
+    from clearml_yolo.adapters.observability.tracing import trace_command
+
+    trace_command("dedup")(_main)()
+
+
+def _main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "directory", nargs="?", type=Path,
+        "directory",
+        nargs="?",
+        type=Path,
         help="cache to scan (default: CY_HOME/.cache or .cache in the current directory)",
     )
     parser.add_argument(
-        "--dry-run", action="store_true",
+        "--dry-run",
+        action="store_true",
         help="report duplicate candidates without creating or replacing files",
     )
     arguments = parser.parse_args()

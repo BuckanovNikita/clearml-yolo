@@ -6,7 +6,8 @@ This feature contract records the current surface used by implementation and tes
 ## Public selection rules
 
 - `CY_HOME` selects the automatic workspace and defaults to the launch working directory.
-- Explicit command paths and supported dependency environment variables retain their values.
+- Explicit data/output/cache paths retain their values. Library configuration selectors must
+  resolve inside the physical project root, including through symlinks; outside selectors fail.
 - `dataset_cache_dir=null` always uses the workspace cache and ignores ambient `XDG_CACHE_HOME`;
   an explicit `dataset_cache_dir` remains authoritative.
 - Existing or explicitly pathed checkpoints remain inputs. An absent bare `.pt` name uses the
@@ -28,9 +29,14 @@ This feature contract records the current surface used by implementation and tes
 | FiftyOne datasets, dataset zoo and database | `$CY_HOME/.cache/fiftyone` |
 | Owned temporary work | `$CY_HOME/.tmp` |
 
-General XDG, Python bytecode, Torch/CUDA/Triton/Numba/Hugging Face/Matplotlib, ETA,
-FiftyOne model-zoo/plugins/config and generic process/tempfile defaults keep their ordinary
-environment or library behavior. Application-owned temporary helpers select `.tmp` directly.
+Feature 024 routes exercised XDG and SDK configuration/cache settings into the project.
+The stdlib bootstrap runs before SDK imports. Matplotlib/fontconfig, Torch/CUDA/Triton,
+Numba/Hugging Face, Python bytecode, ETA, Requests/netrc, AWS and all five FiftyOne
+configuration selectors use project-owned paths. `TMPDIR`/`TMP`/`TEMP` and `tempfile`
+are scoped to an invocation arena through native work, publication, uploads and task
+finalization. Cleanup requires no live owned participant; abandoned recovery requires
+identity/liveness and lease evidence. Shared user-wide GPU queue locks/registry stay
+outside the arena and are captured before project XDG overrides.
 
 ## Source and publication invariants
 
@@ -39,11 +45,13 @@ environment or library behavior. Application-owned temporary helpers select `.tm
 - Sanitized Configuration Objects retain supported source fields.
 - Adjacent comparison temporary files exist only for same-filesystem atomic replacement and are
   removed on every exit path.
-- Existing user configuration is read-only. Explicit FiftyOne data paths remain selected.
+- Ambient home/system configuration is not read. Explicit project configuration is preserved.
+  Explicit FiftyOne data paths remain selected.
   `CLEARML_CACHE_DIR` is the supported explicit ClearML cache setting. `HOME` is unchanged.
 
 ## Boundary
 
 The contract governs automatic paths owned by clearml-yolo and the named dependency data stores.
-External scripts, plugins, runners and the interpreter retain their general defaults. Callers
-may configure them explicitly when broader isolation is required.
+External scripts, plugins and runners remain outside the command boundary. Package defaults
+and OS runtime assets remain available. Imports stay inert; programmatic callers explicitly
+establish runtime initialization and invocation ownership.

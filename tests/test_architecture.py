@@ -23,7 +23,7 @@ SRC = ROOT / "src"
 @pytest.fixture(scope="module")
 def graph() -> grimp.ImportGraph:
     imported = grimp.build_graph(
-        "clearml_yolo", include_external_packages=True, cache_dir=None
+        "clearml_yolo", "hydra_plugins.cy_queue", include_external_packages=True, cache_dir=None
     )
     architecture.add_dynamic_imports(imported, SRC)
     return imported
@@ -201,9 +201,9 @@ def test_runtime_targets_resolve_to_shipped_modules_and_no_legacy_paths(
     graph: grimp.ImportGraph,
 ) -> None:
     targets = architecture.runtime_targets(SRC, ROOT / "pyproject.toml")
-    assert "clearml_yolo.entrypoints.hydra.worker" not in targets
+    assert "clearml_yolo.entrypoints.hydra.worker" in targets
     assert "clearml_yolo.adapters.runtime.gpu_probe" in targets
-    assert "hydra_plugins.cy_queue.launcher.QueueLauncher" not in targets
+    assert "hydra_plugins.cy_queue.launcher.QueueLauncher" in targets
     assert architecture.target_findings(targets, graph, SRC) == []
     migration = json.loads((ROOT / "specs/021-clean-architecture/migration-map.json").read_text())
     assert not set(migration).intersection(graph.modules)
@@ -353,9 +353,10 @@ def test_generated_hydra_targets_resolve_after_export_and_composition(
     from hydra import compose, initialize_config_dir
     from omegaconf import OmegaConf
 
-    from clearml_yolo.entrypoints.hydra.config_tree import dump_config_tree
+    from clearml_yolo.entrypoints.hydra.config_tree import COMMAND_OF_CONFIG, dump_config_tree
 
-    dump_config_tree(tmp_path)
+    for command in COMMAND_OF_CONFIG.values():
+        dump_config_tree(tmp_path, command=command, overwrite=True)
     targets: set[str] = set()
     for path in tmp_path.glob("cy*.yaml"):
         with initialize_config_dir(config_dir=str(tmp_path), version_base="1.3"):

@@ -2,13 +2,44 @@
 
 import argparse
 
-from clearml_yolo.adapters.observability.tracing import trace_command, trace_operation
+from clearml_yolo.adapters.runtime.bootstrap import (
+    initialize_runtime_environment,
+    runtime_environment,
+)
 
 
-@trace_command("init-config")
 def main() -> None:
+    initialize_runtime_environment()
+    from clearml_yolo.adapters.observability.tracing import trace_command
+
+    trace_command("init-config")(_owned_main)()
+
+
+def _owned_main() -> None:
+    with runtime_environment():
+        _main()
+
+
+def _main() -> None:
+    from clearml_yolo.adapters.observability.tracing import trace_operation
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directory", help="directory for example YAML configurations")
+    parser.add_argument(
+        "--command",
+        choices=(
+            "cy",
+            "cy-train",
+            "cy-predict",
+            "cy-val",
+            "cy-metrics",
+            "cy-report",
+            "cy-compare",
+            "cy-ground-truth",
+        ),
+        default="cy",
+        help="execution command to configure (default: cy)",
+    )
     parser.add_argument("--force", action="store_true", help="overwrite existing example files")
     arguments = parser.parse_args()
 
@@ -17,7 +48,9 @@ def main() -> None:
 
     try:
         with trace_operation("configuration.export", context={"destination": arguments.directory}):
-            dump_config_tree(arguments.directory, overwrite=arguments.force)
+            dump_config_tree(
+                arguments.directory, command=arguments.command, overwrite=arguments.force
+            )
     except OSError as error:
         from clearml_yolo.adapters.observability.diagnostics import (
             exception_summary,

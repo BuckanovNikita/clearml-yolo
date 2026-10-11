@@ -9,13 +9,14 @@ is unset), matches exact filenames plus equal contents, and replaces duplicates 
 reflinks where supported. Unsupported operations are skips; unexpected I/O errors fail.
 See the maintained [deduplication contract](../../018-cache-image-dedup/contracts/cli.md).
 
-`cy-init-config DIRECTORY [--force]` creates missing parent directories and writes one
-editable YAML per execution command, named after that command (including `cy-val.yaml`).
+`cy-init-config DIRECTORY [--command NAME] [--force]` creates missing parent directories
+and writes exactly one selected execution wrapper, named after that command (default `cy`).
 Examples compose with `COMMAND --config-dir DIRECTORY --config-name COMMAND` and preserve
-current defaults, native groups and required `???` inputs. It also writes
-`ultralytics/default.yaml` and `ultralytics_predict/default.yaml`. Comments explain input
+current defaults and required `???` inputs. All five model commands also write
+`ultralytics/default.yaml` and `ultralytics_predict/default.yaml`; the three non-model
+commands need only their wrapper. All eight execution names are accepted. Comments explain input
 paths and native overrides. Initialization is local only: no ClearML task or model execution.
-Existing example paths are checked before any writes; without `--force`, collisions fail.
+Only selected example paths/parents are checked before writes; without `--force`, collisions fail.
 `--force` replaces regular example files, preserves unrelated files and rejects symlink or
 directory destinations. Filesystem errors produce a nonzero exit with a CLI error message.
 

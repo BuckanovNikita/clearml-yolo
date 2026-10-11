@@ -48,9 +48,9 @@ def _environment(root: Path) -> dict[str, str]:
         OPENBLAS_NUM_THREADS="1",
         GLOO_SOCKET_IFNAME="lo",
         YOLO_OFFLINE="true",
-        YOLO_CONFIG_DIR=str(root / "settings"),
+        YOLO_CONFIG_DIR=str(root / "workspace/.config"),
         CY_HOME=str(root / "workspace"),
-        MPLCONFIGDIR=str(root / "matplotlib"),
+        MPLCONFIGDIR=str(root / "workspace/.config/matplotlib"),
         MPLBACKEND="Agg",
         PYTHONUNBUFFERED="1",
     )

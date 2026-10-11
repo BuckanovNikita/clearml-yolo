@@ -29,17 +29,22 @@ this branch.
    pre-commit hooks for release or commit work.
 2. Configure an isolated ClearML project and output directory. Pass project name and
    tags explicitly. Set `CY_HOME` to the task-owned invocation workspace for project data and
-   owned temporary files per the filesystem contract. General runner/library caches and
-   interpreter temporary/bytecode settings retain their defaults unless explicitly selected.
+   owned temporary files per the filesystem contract. Bootstrap must install project-owned
+   library configuration/cache selectors before SDK imports and scope interpreter scratch
+   through final uploads/task closure. External runners remain outside that boundary.
    Keep credentials
    out of files and logs; native callback image previews are permitted.
 3. Build ground truth from a small YOLO dataset with disjoint validation/test images,
    including an empty image in each split. Exercise the top-level `ultralytics` and
    `ultralytics_predict` groups through locally editable generated YAML, with explicit
-   CPU and available GPU devices. Verify stateless busy-to-free GPU waiting before task
-   creation, direct calling-process execution and a sequential standard BasicLauncher
-   sweep with separate tasks and normal failure propagation. Availability is not a
-   reservation; do not infer exclusive GPU ownership from a successful wait.
+   CPU and available GPU devices. Verify all four queue/autogpu modes: queued automatic
+   admission (one runner/two waiters on one GPU), direct busy-to-free waiting, exact
+   queued identity/order and native pass-through without project GPU telemetry. Require
+   no task while waiting. Test shared cross-project reservations, cancellation without
+   premature release, replay admission limits, and multi-GPU contraction when available.
+   Verify concurrent queued Hydra sweeps, sequential queue-disabled BasicLauncher sweeps
+   and mixed-mode rejection before admission, preserving job/task/failure behavior.
+   Direct availability waiting is not an exclusive reservation.
 4. Run a candidate without a baseline; verify evaluation succeeds and comparison is
    skipped. Promote a completed baseline with a `prod` tag, run a candidate and verify
    both checkpoints infer the same current test images under matching settings.
@@ -94,7 +99,12 @@ this branch.
    and the returned prepared paths are present. Internal manifests and diagnostic receipts
    remain local. Inspect the workspace after success and injected failure for owned temporary files.
    Explicit output/cache paths outside `CY_HOME` must remain selected; a physical-home destination
-   warns without rejection or relocation.
+   warns without rejection or relocation. Seed conflicting home/system library configs and
+   trace real subprocess config reads; require project-only selectors before SDK imports.
+   Outside-project config overrides must fail. Check leaked library scratch after success,
+   failure and cancellation, including finalization/uploads; preserve live concurrent arenas,
+   partial publication state and durable data. Shared queue locks remain outside the arena.
+   Retained scratch/unsafe worker cleanup is a reported failure or limitation, never a pass.
    For enabled FiftyOne publication, verify one local owner receipt and canonical run
    link with per-split `evaluation_keys`. Confirm native evaluations register existing
    source matches without rematching, preserve backgrounds/filtered overlays, and survive
@@ -109,7 +119,12 @@ this branch.
    AP50/AP75/AP50_95 parity, no-GT unavailable/empty-prediction zero AP, unavailable mAR
    and subset AP/PR, and full-report restoration after exiting a subset. Historical
    payloads without reports remain readable; only new publication/reruns add native
-   results. Exercise disabled isolation and optional-publication warning behavior.
+   results. Exercise disabled publication and warn-and-continue behavior. Inject real
+   worker hangs/crashes during import, database access, locking, writes and shutdown.
+   Require finite preflight/publication/lock deadlines (defaults 60/900/30 seconds),
+   operation timeout plus at most ten seconds cleanup, no GPU/task/queue ownership in
+   publication children, and no success without zero exit plus a matching complete receipt.
+   Preserve cancellation semantics. Containment does not confirm the original hang cause.
 7. Check artifact/model upload rejection, callback-registration failure, flush failure and
    interruption with isolated test invocations. Each must fail
    the command and task while retaining local diagnostics until intentional cleanup.
@@ -119,6 +134,8 @@ this branch.
 
 Build and install both distributions in fresh environments for release acceptance.
 Verify all ten command helps and documented configuration examples.
-Check `cy-init-config` generation and overwrite protection without a ClearML task.
+Check all eight `cy-init-config --command` selections and omitted selection (only `cy`),
+both native groups on all five model commands, non-model wrapper-only inventory,
+composition, selected-file overwrite protection and unrelated-file preservation without a task.
 CPU and single-GPU runs are required release gates; report an unavailable device as
 an unverified gate. Describe physical multi-GPU execution as unverified unless exercised.

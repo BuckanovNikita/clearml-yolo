@@ -10,7 +10,7 @@ from pathlib import Path
 
 import grimp
 
-PROJECT_ROOTS = ("clearml_yolo",)
+PROJECT_ROOTS = ("clearml_yolo", "hydra_plugins.cy_queue")
 ADAPTER_RESPONSIBILITIES = {
     "storage",
     "yolo",
@@ -61,13 +61,15 @@ SDK_OWNERS = {
         "clearml_yolo.adapters.integrations.native_runtime",
         "clearml_yolo.adapters.integrations.training",
     ),
+    "botocore": ("clearml_yolo.adapters.clearml.configuration",),
     "digital_metrics": ("clearml_yolo.adapters.evaluation", "clearml_yolo.adapters.reporting"),
     "report_generator": ("clearml_yolo.adapters.reporting",),
     "openpyxl": ("clearml_yolo.adapters.reporting",),
     "fiftyone": ("clearml_yolo.adapters.fiftyone",),
-    "hydra": ("clearml_yolo.entrypoints.hydra",),
+    "eta": ("clearml_yolo.adapters.fiftyone.compatibility",),
+    "hydra": ("clearml_yolo.entrypoints.hydra", "hydra_plugins.cy_queue"),
     "hydra_zen": ("clearml_yolo.entrypoints.hydra",),
-    "omegaconf": ("clearml_yolo.entrypoints.hydra",),
+    "omegaconf": ("clearml_yolo.entrypoints.hydra", "hydra_plugins.cy_queue"),
 }
 # The probe reads CUDA visibility in a fresh disposable process before waiting for free GPUs.
 SDK_EXCEPTIONS = {("clearml_yolo.adapters.runtime.gpu_probe", "torch")}
@@ -84,6 +86,19 @@ ADAPTER_PEERS = {
 }
 # These edges implement explicit cross-adapter coordination or data conversion.
 PEER_EXCEPTIONS = {
+    ("clearml_yolo.adapters.storage.filesystem", "clearml_yolo.adapters.runtime.bootstrap"),
+    ("clearml_yolo.adapters.reporting.reports", "clearml_yolo.adapters.runtime.bootstrap"),
+    (
+        "clearml_yolo.adapters.integrations.native_runtime",
+        "clearml_yolo.adapters.runtime.bootstrap",
+    ),
+    ("clearml_yolo.adapters.fiftyone.worker", "clearml_yolo.adapters.runtime.bootstrap"),
+    ("clearml_yolo.adapters.fiftyone.bounded", "clearml_yolo.adapters.runtime.bootstrap"),
+    ("clearml_yolo.adapters.runtime.gpu_runtime", "clearml_yolo.adapters.clearml.session"),
+    (
+        "clearml_yolo.adapters.runtime.gpu_runtime",
+        "clearml_yolo.adapters.integrations.native_runtime",
+    ),
     ("clearml_yolo.adapters.clearml.models", "clearml_yolo.adapters.reporting.workbook_identity"),
     ("clearml_yolo.adapters.fiftyone.publisher", "clearml_yolo.adapters.storage.publication_data"),
     ("clearml_yolo.adapters.integrations.native_runtime", "clearml_yolo.adapters.clearml.session"),
@@ -141,6 +156,8 @@ def within(module: str, prefix: str) -> bool:
 
 
 def layer(module: str) -> str | None:
+    if within(module, "hydra_plugins.cy_queue"):
+        return "entrypoints"
     pieces = module.split(".")
     if module == "clearml_yolo":
         return "root"

@@ -55,7 +55,7 @@ requires = ["uv_build>=0.11.32,<0.12.0"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
-module-name = ["clearml_yolo"]
+module-name = ["clearml_yolo", "hydra_plugins.cy_queue"]
 
 [dependency-groups]
 dev = [
@@ -155,7 +155,7 @@ known-first-party = ["clearml_yolo"]
 max-complexity = 10
 
 [tool.importlinter]
-root_packages = ["clearml_yolo"]
+root_packages = ["clearml_yolo", "hydra_plugins.cy_queue"]
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
@@ -229,11 +229,32 @@ source_modules = ["clearml_yolo"]
 forbidden_modules = ["clearml"]
 allow_indirect_imports = true
 ignore_imports = [
+    "clearml_yolo.adapters.clearml.configuration -> clearml",
     "clearml_yolo.adapters.clearml.models -> clearml",
     "clearml_yolo.adapters.clearml.naming -> clearml",
     "clearml_yolo.adapters.clearml.native -> clearml",
     "clearml_yolo.adapters.clearml.session -> clearml",
     "clearml_yolo.adapters.integrations.native_runtime -> clearml",
+]
+
+[[tool.importlinter.contracts]]
+name = "botocore SDK has explicit owners"
+type = "forbidden"
+source_modules = ["clearml_yolo"]
+forbidden_modules = ["botocore"]
+allow_indirect_imports = true
+ignore_imports = [
+    "clearml_yolo.adapters.clearml.configuration -> botocore",
+]
+
+[[tool.importlinter.contracts]]
+name = "eta SDK has explicit owners"
+type = "forbidden"
+source_modules = ["clearml_yolo"]
+forbidden_modules = ["eta"]
+allow_indirect_imports = true
+ignore_imports = [
+    "clearml_yolo.adapters.fiftyone.compatibility -> eta",
 ]
 
 [[tool.importlinter.contracts]]
@@ -280,6 +301,8 @@ ignore_imports = [
     "clearml_yolo.entrypoints.hydra.common -> hydra",
     "clearml_yolo.entrypoints.hydra.config_tree -> hydra",
     "clearml_yolo.entrypoints.hydra.configs -> hydra",
+    "clearml_yolo.entrypoints.hydra.execution -> hydra",
+    "clearml_yolo.entrypoints.hydra.worker -> hydra",
 ]
 
 [[tool.importlinter.contracts]]
@@ -307,6 +330,7 @@ ignore_imports = [
     "clearml_yolo.entrypoints.hydra.configs -> omegaconf",
     "clearml_yolo.entrypoints.hydra.execution -> omegaconf",
     "clearml_yolo.entrypoints.hydra.validation -> omegaconf",
+    "clearml_yolo.entrypoints.hydra.worker -> omegaconf",
 ]
 
 [[tool.importlinter.contracts]]
@@ -329,6 +353,9 @@ forbidden_modules = [
     "clearml_yolo.adapters.yolo",
 ]
 allow_indirect_imports = true
+ignore_imports = [
+    "clearml_yolo.adapters.storage.filesystem -> clearml_yolo.adapters.runtime.bootstrap",
+]
 
 [[tool.importlinter.contracts]]
 name = "observability adapter peer ownership"
@@ -388,6 +415,9 @@ forbidden_modules = [
     "clearml_yolo.adapters.yolo",
 ]
 allow_indirect_imports = true
+ignore_imports = [
+    "clearml_yolo.adapters.reporting.reports -> clearml_yolo.adapters.runtime.bootstrap",
+]
 
 [[tool.importlinter.contracts]]
 name = "clearml adapter peer ownership"
@@ -421,6 +451,8 @@ forbidden_modules = [
 ]
 allow_indirect_imports = true
 ignore_imports = [
+    "clearml_yolo.adapters.fiftyone.worker -> clearml_yolo.adapters.runtime.bootstrap",
+    "clearml_yolo.adapters.fiftyone.bounded -> clearml_yolo.adapters.runtime.bootstrap",
     "clearml_yolo.adapters.fiftyone.publisher -> clearml_yolo.adapters.storage.publication_data",
 ]
 
@@ -439,6 +471,8 @@ forbidden_modules = [
 ]
 allow_indirect_imports = true
 ignore_imports = [
+    "clearml_yolo.adapters.runtime.gpu_runtime -> clearml_yolo.adapters.clearml.session",
+    "clearml_yolo.adapters.runtime.gpu_runtime -> clearml_yolo.adapters.integrations.native_runtime",
 ]
 
 [[tool.importlinter.contracts]]
@@ -457,6 +491,7 @@ allow_indirect_imports = true
 ignore_imports = [
     "clearml_yolo.adapters.integrations.native_ddp -> clearml_yolo.adapters.clearml.session",
     "clearml_yolo.adapters.integrations.native_runtime -> clearml_yolo.adapters.clearml.session",
+    "clearml_yolo.adapters.integrations.native_runtime -> clearml_yolo.adapters.runtime.bootstrap",
     "clearml_yolo.adapters.integrations.training -> clearml_yolo.adapters.clearml.native",
     "clearml_yolo.adapters.integrations.training -> clearml_yolo.adapters.clearml.session",
     "clearml_yolo.adapters.integrations.training -> clearml_yolo.adapters.yolo.config",
@@ -529,6 +564,7 @@ module = [
     "scipy.*",
     "tqdm.*",
     "fiftyone.*",
+    "eta.*",
 ]
 ignore_missing_imports = true
 

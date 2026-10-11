@@ -296,13 +296,20 @@ def _publish_evaluations(
 class FiftyOnePublisher:
     enabled = True
 
-    def __init__(self, config: FiftyOneConfig) -> None:
+    def __init__(self, config: FiftyOneConfig, *, phase_path: Path | None = None) -> None:
         self.config = config
+        self._phase_path = phase_path
+
+    def _phase(self, phase: str) -> None:
+        if self._phase_path is not None:
+            self._phase_path.write_text(phase, encoding="utf-8")
 
     def preflight(self) -> None:
+        self._phase("import")
         try:
             with trace_operation("fiftyone.backend.import"):
                 fo = _backend()
+            self._phase("database")
             with trace_operation("fiftyone.datasets.list"):
                 fo.list_datasets()
         except ImportError as error:
@@ -312,17 +319,21 @@ class FiftyOnePublisher:
             ) from error
 
     def publish(self, request: PublicationRequest) -> PublicationReceipt:
+        self._phase("snapshot")
         with trace_operation("fiftyone.snapshot", context={"path": str(request.ground_truth)}):
             snapshot = read_snapshot(request.ground_truth)
+        self._phase("predictions")
         with trace_operation("fiftyone.predictions"):
             raw = read_predictions(
                 request.predictions, prediction_aliases(snapshot, request.prediction_image_name)
             )
+        self._phase("evaluations")
         with trace_operation(
             "fiftyone.evaluations.load", context={"count": len(request.evaluations)}
         ):
             payloads = _load_evaluations(request, snapshot)
         source = request.source_ground_truth
+        self._phase("source")
         with trace_operation("fiftyone.source.hash"):
             source_hash = (
                 file_hash(source)
@@ -332,14 +343,17 @@ class FiftyOnePublisher:
         name = f"{self.config.dataset_prefix}-v{SCHEMA_VERSION}-{snapshot.sha256}"
         run_key = "run_" + _digest(request.task_id)
         fields = _fields(run_key)
+        self._phase("import")
         with trace_operation("fiftyone.backend.import"):
             fo = _backend()
+        self._phase("lock")
         locks = Path(fo.config.database_dir) / "clearml-yolo-locks"
         locks.mkdir(parents=True, exist_ok=True)
         lock = FileLock(locks / f"{_digest(name)}.lock")
         with ExitStack() as acquired:
             with trace_operation("fiftyone.lock.acquire", context={"path": str(lock.lock_file)}):
-                acquired.enter_context(lock)
+                acquired.enter_context(lock.acquire(timeout=self.config.lock_timeout_seconds))
+            self._phase("write")
             with trace_operation("fiftyone.dataset", context={"images": len(snapshot.images)}):
                 dataset, reused = _dataset(fo, name, snapshot)
             run = {

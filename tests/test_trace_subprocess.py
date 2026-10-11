@@ -99,6 +99,8 @@ def test_watchdog_covers_actual_invocation_closure_and_command_return() -> None:
         sdk.Task.get_task.return_value = task
         sdk.OutputModel = Mock()
         sys.modules["clearml"] = sdk
+        from clearml_yolo.adapters.clearml import session
+        session.configure_sdk_state = lambda: None
         @tracing.trace_command("closure")
         def run():
             with invocation(ClearMLConfig(), "test"):

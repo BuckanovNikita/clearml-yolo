@@ -30,8 +30,12 @@ A shared training model is replaced for prediction by the produced checkpoint; c
 explicit prediction model selections fail. Comparison uses identical native inference settings
 for both roles. `cy-val` remains prediction plus existing calibration/evaluation.
 
-`cy-init-config DIRECTORY [--force]` protects all ten generated files and their parent paths
-before writes; force replaces regular generated files only, never symlinks or directories.
+`cy-init-config DIRECTORY [--command NAME] [--force]` writes exactly one selected
+wrapper (default `cy`) plus both native groups for any of the five model commands.
+`cy-metrics`, `cy-report` and `cy-ground-truth` write only their wrapper. Only selected
+files/parents are preflighted; unrelated files remain unchanged. Force replaces regular
+selected files only, never symlinks or directories. See
+[selected export](../../../docs/runtime-isolation.md#selected-configuration-export).
 Initialization creates no task and imports no model runtime. Example-only commenting leaves
 Hydra composition and runtime records complete; see the
 [example/routing contract](../../007-detection-config-cleanup/contracts/configuration-and-artifacts.md).

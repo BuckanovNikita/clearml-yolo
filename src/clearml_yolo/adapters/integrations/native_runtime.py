@@ -9,6 +9,10 @@ from tempfile import TemporaryDirectory
 from typing import Any, cast, override
 
 from clearml_yolo.adapters.observability.tracing import trace_operation
+from clearml_yolo.adapters.runtime.bootstrap import (
+    project_configuration_imports,
+    runtime_environment,
+)
 from clearml_yolo.adapters.storage.filesystem import (
     cy_home,
     initialize_filesystem,
@@ -212,8 +216,15 @@ def _configure_native_paths(
 
 @contextmanager
 def native_runtime() -> Iterator[None]:
+    """Scope SDK paths and scratch for direct programmatic use as well as the CLI."""
+    with runtime_environment(), _configured_native_runtime():
+        yield
+
+
+@contextmanager
+def _configured_native_runtime() -> Iterator[None]:
     """Enable native callbacks only for the owner and restore every modified global."""
-    with trace_operation("native.runtime.import"):
+    with trace_operation("native.runtime.import"), project_configuration_imports():
         initialize_filesystem()
         previous = os.environ.get("YOLO_CONFIG_DIR")
         from ultralytics import utils

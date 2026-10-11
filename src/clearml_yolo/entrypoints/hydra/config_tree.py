@@ -86,42 +86,49 @@ def _check_destinations(paths: list[Path], *, overwrite: bool) -> None:
                 raise FileExistsError(f"{path} is not a regular file; choose another directory.")
 
 
-def dump_config_tree(directory: str | Path, *, overwrite: bool = False) -> list[Path]:
-    """Write one example per pipeline/stage command, preserving existing files by default."""
+def dump_config_tree(
+    directory: str | Path, *, command: str = "cy", overwrite: bool = False
+) -> list[Path]:
+    """Write the selected command and its required groups, preserving files by default."""
+    config_of_command = {public: schema for schema, public in COMMAND_OF_CONFIG.items()}
+    if command not in config_of_command:
+        raise ValueError(f"Unknown command {command!r}; choose from {', '.join(config_of_command)}")
+    config_name = config_of_command[command]
     target = write_path(directory)
-    paths = [target / f"{command}.yaml" for command in COMMAND_OF_CONFIG.values()]
-    paths.extend(target / name / "default.yaml" for name in ("ultralytics", "ultralytics_predict"))
+    paths = [target / f"{command}.yaml"]
+    if config_name in NATIVE_COMMANDS:
+        paths.append(target / "ultralytics" / "default.yaml")
+    if config_name in PREDICTION_COMMANDS:
+        paths.append(target / "ultralytics_predict" / "default.yaml")
     _check_destinations(paths, overwrite=overwrite)
 
     store.add_to_hydra_store(overwrite_ok=True)
-    contents = []
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
-        for config_name, command in COMMAND_OF_CONFIG.items():
-            config = compose(config_name=config_name)
-            # Reference the registered command schema to keep inherited values lazy;
-            # group YAML remains plain native YAML and can be pasted unchanged.
-            values = OmegaConf.to_container(config, resolve=False)
-            if not isinstance(values, dict):
-                raise TypeError("Command configuration must be a mapping")
-            values.pop("ultralytics", None)
-            values.pop("ultralytics_predict", None)
-            defaults: list[object] = [config_name]
-            if config_name in NATIVE_COMMANDS:
-                defaults.append({"override /ultralytics": "default"})
-            if config_name in PREDICTION_COMMANDS:
-                defaults.append({"override /ultralytics_predict": "default"})
-            defaults.append("_self_")
-            example = OmegaConf.create({"defaults": defaults, **values})
-            contents.append(
-                _header(config_name, command, target) + OmegaConf.to_yaml(example, resolve=False)
-            )
-    contents.extend(
-        [
-            render_native_yaml(native_defaults(), "train", example=True),
-            "# Shared references remain editable; use a literal to override a reference.\n"
-            + render_native_yaml(prediction_defaults(), "predict", example=True),
+        config = compose(config_name=config_name)
+        # Reference the registered command schema to keep inherited values lazy;
+        # group YAML remains plain native YAML and can be pasted unchanged.
+        values = OmegaConf.to_container(config, resolve=False)
+        if not isinstance(values, dict):
+            raise TypeError("Command configuration must be a mapping")
+        values.pop("ultralytics", None)
+        values.pop("ultralytics_predict", None)
+        defaults: list[object] = [config_name]
+        if config_name in NATIVE_COMMANDS:
+            defaults.append({"override /ultralytics": "default"})
+        if config_name in PREDICTION_COMMANDS:
+            defaults.append({"override /ultralytics_predict": "default"})
+        defaults.append("_self_")
+        example = OmegaConf.create({"defaults": defaults, **values})
+        contents = [
+            _header(config_name, command, target) + OmegaConf.to_yaml(example, resolve=False)
         ]
-    )
+    if config_name in NATIVE_COMMANDS:
+        contents.append(render_native_yaml(native_defaults(), "train", example=True))
+    if config_name in PREDICTION_COMMANDS:
+        contents.append(
+            "# Shared references remain editable; use a literal to override a reference.\n"
+            + render_native_yaml(prediction_defaults(), "predict", example=True)
+        )
 
     target.mkdir(parents=True, exist_ok=True)
     for path, content in zip(paths, contents, strict=True):

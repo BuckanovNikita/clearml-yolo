@@ -32,10 +32,10 @@ def backend() -> Any:
 
 @pytest.fixture
 def publisher(backend: Any) -> Iterator[Any]:
-    from clearml_yolo.entrypoints.composition import create_publisher
+    from clearml_yolo.adapters.fiftyone.publisher import FiftyOnePublisher
 
     prefix = f"cy-test-{uuid4().hex}"
-    instance = create_publisher(FiftyOneConfig(dataset_prefix=prefix))
+    instance = FiftyOnePublisher(FiftyOneConfig(dataset_prefix=prefix))
     instance.preflight()
     try:
         yield instance

@@ -1,87 +1,87 @@
-# GPU waiting and direct execution contract
+# GPU execution and scheduling contract
 
-This contract supersedes the queue-specific requirements in feature 013 and the
-FIFO/reservation/queued-child constitution amendment. Historical specifications,
-completed tasks and dated evidence retain the former design; the
-[current contract index](../../../docs/current-contracts.md) identifies current authority.
+Feature 024 restores full scheduling and adds independent controls to the former
+feature 022 direct-wait behavior. This maintained contract, the
+[queue state contract](../../013-gpu-experiment-queue/contracts/queue-state.md) and
+[runtime isolation](../../../docs/runtime-isolation.md) govern current execution.
+Completed feature specifications, task ledgers and dated evidence preserve history.
 
-## Routing and availability
+## Execution controls
 
-`cy`, `cy-train`, `cy-predict`, `cy-val` and `cy-compare` derive GPU demand from
-native device settings. Positive demand polls supported visible whole-NVIDIA-GPU
-availability before native GPU initialization and ClearML task creation. CPU/MPS
-and non-model commands bypass NVIDIA inventory and proceed through their existing
-invocation boundaries. Interrupting the wait creates no ClearML task.
+`cy`, `cy-train`, `cy-predict`, `cy-val` and `cy-compare` expose validated
+`queue.enabled` and `autogpu.enabled`, both defaulting to true. They are launch
+controls, not workflow or native Ultralytics arguments.
 
-NVML inventory and compute-process telemetry fail closed when unavailable or
-unsupported. The isolated metadata-only GPU probe maps inherited CUDA visibility
-to stable whole-GPU UUIDs without initializing the invoking process's CUDA context.
-Unsupported MIG, lost visibility and demand exceeding the supported visible set
-fail clearly instead of waiting indefinitely. A GPU with another compute process is
-busy; only the invoking PID is ignored so sequential jobs can reuse their own
-retained CUDA context. This is process availability, not a free-memory threshold.
+| `queue.enabled` | `autogpu.enabled` | GPU behavior |
+|---|---|---|
+| true | true | FIFO admission, atomic whole-GPU UUID reservation, automatic selection and a fresh supervised execution child |
+| false | true | Stateless availability wait, automatic selection and calling-process execution |
+| true | false | Exact native selectors, reservation of the enabled-phase UUID union and supervised execution |
+| false | false | Native device settings pass through unchanged; no project GPU discovery, availability wait or device replacement |
 
-When enough GPUs are available, select logical indices in inherited visibility
-order. Do not rewrite `CUDA_VISIBLE_DEVICES`. A metadata probe and native Ultralytics
-DDP descendants can be subprocesses; model workflows execute in the calling process.
-Waiting uses no queue registry, tickets, reservation, liveness locks or job supervisor.
-There is no FIFO fairness, concurrency control or exclusive allocation guarantee:
-simultaneous commands can observe and select the same free GPU.
+CPU/MPS-only and non-model commands bypass GPU scheduling. Waiting/admission occurs
+before ClearML task creation and native CUDA initialization. Interrupting the wait
+creates no task. Neither control disables required ClearML tracking.
 
-## Demand and effective settings
+## Automatic selection
 
-| Native training device intent | GPU demand |
-|---|---:|
-| nonnegative integer such as `2` | 1 |
-| list such as `[0,1]` | 2 |
-| automatic integer/list entry `-1` | 1 per entry |
-| comma-separated GPU selectors | Number of entries |
-| null, empty string, or `cuda` | 1 |
-| `cpu` or supported `mps` selector | 0 |
+GPU demand comes only from native device settings: a training integer requests one
+GPU; a list or comma-separated selector requests its length; each automatic `-1`
+contributes one. Null, empty or `cuda` requests one; CPU/MPS requests zero. Written
+IDs express demand rather than pinned identity in automatic mode. GPU inference
+requires one device; pipeline demand is the maximum of enabled training and inference
+demand. There is no separate count setting or batch tuning.
 
-Written GPU identifiers express a count rather than pinning physical devices.
-GPU-backed prediction, validation and comparison require one GPU. Pipeline demand
-is the maximum of enabled training demand and enabled downstream inference demand;
-there is no separate count setting. Native training receives the selected logical
-indices required by its demand. GPU inference receives the first selected logical
-index, which need not be `0`. Explicit CPU/MPS settings remain CPU/MPS.
+NVML inventory/process telemetry and an isolated metadata probe map inherited CUDA
+visibility to whole-GPU UUIDs without initializing CUDA in the invoking process.
+Unknown telemetry fails closed; MIG, lost visibility and requests larger than the
+supported visible set fail clearly. Only the invoking PID is ignored for direct
+sequential reuse; other compute processes make a GPU busy. Selection uses visibility
+order, rather than a free-memory threshold. Direct waiting creates no reservation
+or fairness guarantee and simultaneous direct commands may select the same GPU.
+If a pending queued request loses a visible UUID, its supervisor reports the failure
+and closes its own ticket so healthy followers can advance. A follower does not remove
+another live supervisor's ticket.
 
-Native training-memory cleanup remains between training and downstream work and
-after GPU invocations. It releases model allocations; no scheduler reservation or
-capacity-contraction step exists.
+## Reservations and exact mode
 
-## Provenance, tracking and failures
+Queued execution uses the compatible user-wide registry v1, FIFO tickets, atomic
+UUID reservations, process-liveness ownership and fresh execution children. Reuse
+shared state across projects; corrupt/incompatible state fails closed without
+migration or deletion. Reserve only supported visible whole GPUs. Cancellation
+terminates and reaps owned native descendants before releasing their capacity;
+never advertise capacity while owned GPU work may remain alive.
 
-Requested configuration stays separate from translated effective configuration.
-Training retains `ultralytics_requested.yaml`; prediction retains
-`ultralytics_predict[_<index>]_requested.yaml` alongside effective YAML. Comparison
-retains its role/split requested snapshots. Canonical run configuration records
-`gpu_selection` with `selected_devices`, `requested_devices` and `effective_devices`;
-there are no reserved UUIDs or scheduler phases. Selected devices are logical indices
-within inherited visibility. ClearML replay cannot increase demand beyond the
-availability selection made before task creation; reject such a replay before native
-execution.
+With automatic selection disabled, queue mode requires concrete native selectors.
+Resolve them against inherited visibility, reserve the UUID union of enabled
+training/inference phases, and preserve requested training identity and order through
+child-local remapping. Ambiguous selectors such as `-1`, null or `cuda` fail before
+admission. Training and inference may select different GPUs; reserve their union.
+Native memory cleanup precedes contraction; release training-only devices and retain
+the downstream inference device without changing visibility after CUDA initialization.
 
-Each invocation owns one ClearML task. Preserve native callbacks, requested/effective
-records, artifact/model publication, outputs, failure reporting and completion.
-Nested stages reuse the invocation; native DDP descendants do not own tasks or uploads.
-Workflow exceptions propagate directly without conversion to worker exit receipts
-or queue-cleanup exceptions. Existing native cleanup and task finalization still apply.
+Requested/effective native snapshots and canonical `gpu_selection` remain separate.
+Queued `gpu_selection` includes admitted `reserved_uuids`; contraction records retained
+UUIDs and the inference phase under `gpu_scheduler`. ClearML replay cannot change
+launch policy, select identities outside the admission or exceed admitted capacity.
+Invalid replay fails before native execution. The supervised child owns one task;
+nested stages reuse it, while native DDP descendants do not own tasks or uploads.
+Required computation, upload, flush and interruption failures remain failures.
 
 ## Hydra and launch ownership
 
-Local multiruns use Hydra's standard sequential BasicLauncher with BasicSweeper.
-Preserve callbacks, job environment, per-job output directory, configured chdir,
-ordered job results and normal failure propagation. Each job waits and executes in
-the launcher process. No project launcher plugin or queued worker is distributed.
+Queued model multiruns use the distributed `hydra_plugins.cy_queue` launcher with
+BasicSweeper. Submit in Hydra order; run admitted children concurrently as capacity
+permits. Preserve callbacks, job environment, output directory, configured chdir,
+ordered `JobReturn` results and nonzero failure outcomes. Queue-disabled multiruns
+use standard sequential BasicLauncher. A sweep mixing queue modes is rejected
+before admission. External/remote launchers, cross-host coordination, MIG, persistent
+daemons and priority scheduling remain unsupported.
 
-Top-level launches with `LOCAL_RANK` other than `-1` require native owner provenance;
-otherwise reject them before task creation. External rank-bearing launchers remain
-unsupported. Recognize native descendants through both `CY_CLEARML_OWNER_PID` and
-`CY_CLEARML_OWNER_TASK_ID`, with the owner PID different from the current process.
-A generic rank variable alone cannot suppress invocation ownership.
+Top-level launches with `LOCAL_RANK` other than `-1` require native owner provenance
+or fail before admission/task creation. Native descendants require both
+`CY_CLEARML_OWNER_PID` and `CY_CLEARML_OWNER_TASK_ID`, with a different owner PID.
+A rank variable alone cannot suppress task ownership.
 
-Historical queue directories are untouched and unused. No migration, deletion or
-replacement coordination service is part of this change. The former remote hang
-investigation remains deferred; queue removal does not establish that SDK shutdown
-or FiftyOne publication hangs are fixed.
+The original remote hang remains unconfirmed. Scheduling restoration and bounded
+optional-publication failures do not establish its root cause.

@@ -22,10 +22,12 @@ def _environment() -> dict[str, str]:
     for name in tuple(environment):
         if name.startswith(
             (
-                "CY_HOME",
+                "CY_",
                 "XDG_",
                 "YOLO_CONFIG_DIR",
                 "CLEARML_CACHE_DIR",
+                "CLEARML_CONFIG",
+                "TRAINS_CONFIG",
                 "TRAINS_CACHE_DIR",
                 "MPLCONFIGDIR",
                 "TORCH_HOME",
@@ -37,8 +39,18 @@ def _environment() -> dict[str, str]:
                 "HF_HOME",
                 "FIFTYONE_",
                 "ETA_",
+                "FONTCONFIG",
             )
-        ) or name in {"TMPDIR", "TMP", "TEMP"}:
+        ) or name in {
+            "TMPDIR",
+            "TMP",
+            "TEMP",
+            "NETRC",
+            "AWS_CONFIG_FILE",
+            "AWS_SHARED_CREDENTIALS_FILE",
+            "BOTO_CONFIG",
+            "MATPLOTLIBRC",
+        }:
             environment.pop(name)
     environment.pop("PYTHONDONTWRITEBYTECODE", None)
     environment.pop("PYTHONPYCACHEPREFIX", None)
@@ -52,7 +64,7 @@ def test_dataset_default_uses_cy_home(tmp_path: Path, monkeypatch: pytest.Monkey
 
 
 @pytest.mark.parametrize("explicit", [False, True])
-def test_startup_preserves_general_cache_and_temporary_settings(
+def test_startup_installs_local_library_paths_and_preserves_unscoped_temp(
     tmp_path: Path, explicit: bool
 ) -> None:
     environment = _environment()
@@ -79,11 +91,13 @@ def test_startup_preserves_general_cache_and_temporary_settings(
         "FIFTYONE_APP_CONFIG_PATH",
         "FIFTYONE_ANNOTATION_CONFIG_PATH",
         "FIFTYONE_EVALUATION_CONFIG_PATH",
+        "FIFTYONE_BRAIN_CONFIG_PATH",
     )
     if explicit:
         environment.update({name: str(tmp_path / "selected" / name) for name in names})
     script = """
 import json, os, sys, tempfile
+from pathlib import Path
 names = json.loads(sys.argv[1])
 before = {name: os.environ.get(name) for name in names}
 bytecode_before = sys.pycache_prefix
@@ -91,13 +105,14 @@ temp_before = tempfile.gettempdir()
 from clearml_yolo.adapters.storage.filesystem import initialize_filesystem
 initialize_filesystem()
 after = {name: os.environ.get(name) for name in names}
-assert after == before, (before, after)
-assert sys.pycache_prefix == bytecode_before
+assert all(Path(value).is_relative_to(Path.cwd()) for name, value in after.items()
+           if name not in ('TMPDIR', 'TMP', 'TEMP'))
+if before['FIFTYONE_CONFIG_PATH']:
+    assert after == before
+assert sys.pycache_prefix == os.environ['PYTHONPYCACHEPREFIX']
 assert tempfile.gettempdir() == temp_before
 from pathlib import Path
-assert not (Path.cwd() / 'selected').exists()
-assert {path.name for path in (Path.cwd() / '.cache').iterdir()} == {'clearml', 'fiftyone'}
-print('general defaults preserved')
+print('local defaults installed')
 """
     result = subprocess.run(  # noqa: S603 - fixed script in a fresh process
         [sys.executable, "-B", "-c", script, json.dumps(names)],
@@ -108,7 +123,7 @@ print('general defaults preserved')
         text=True,
     )
     assert result.returncode == 0, result.stderr
-    assert "general defaults preserved" in result.stdout
+    assert "local defaults installed" in result.stdout
 
 
 def test_dataset_default_ignores_general_xdg_cache(
@@ -216,7 +231,7 @@ def test_explicit_dependency_paths_and_temp_settings_are_preserved(tmp_path: Pat
     selected.mkdir()
     environment.update(
         CY_HOME=str(workspace),
-        XDG_CACHE_HOME=str(selected),
+        XDG_CACHE_HOME=str(workspace / ".cache"),
         TMP=str(selected),
         CLEARML_CACHE_DIR=str(selected / "clearml"),
     )
@@ -284,7 +299,7 @@ print('startup passed')
 
 
 @pytest.mark.parametrize("explicit_config", [False, True])
-def test_existing_fiftyone_configuration_remains_a_read_only_input(
+def test_only_project_fiftyone_configuration_is_a_read_only_input(
     tmp_path: Path, explicit_config: bool
 ) -> None:
     fake_home = tmp_path / "home"
@@ -326,9 +341,11 @@ print(json.dumps([os.environ.get('FIFTYONE_CONFIG_PATH'), os.environ['FIFTYONE_D
         text=True,
     )
     assert json.loads(result.stdout) == [
-        str(source) if explicit_config else None,
-        str(selected),
-        str(tmp_path / "configured_datasets"),
+        str(source) if explicit_config else str(tmp_path / ".config/fiftyone/config.json"),
+        str(selected) if explicit_config else str(tmp_path / ".cache/fiftyone/database"),
+        str(tmp_path / "configured_datasets")
+        if explicit_config
+        else str(tmp_path / ".cache/fiftyone/datasets"),
         str(tmp_path / "explicit_zoo"),
     ]
     assert source.read_bytes() == original
@@ -381,6 +398,7 @@ def test_optional_config_read_reports_reason_and_source(
 
     source = tmp_path / "private-config.json"
     source.write_bytes(b"\xff")
+    monkeypatch.setenv("CY_HOME", str(tmp_path))
     monkeypatch.setenv("FIFTYONE_CONFIG_PATH", str(source))
     messages: list[str] = []
     sink = logger.add(messages.append, level="DEBUG", format="{message}")

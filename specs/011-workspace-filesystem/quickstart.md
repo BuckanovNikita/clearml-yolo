@@ -1,5 +1,11 @@
 # Validation quickstart: Workspace-owned filesystem defaults
 
+> Current execution and configuration are amended by feature 024. Use the maintained
+> [GPU quickstart](../022-simple-gpu-wait/quickstart.md),
+> [runtime isolation](../../docs/runtime-isolation.md) and
+> [filesystem policy](../../docs/filesystem-policy.md); original feature checks below
+> do not establish current acceptance.
+
 ## Isolated workspace
 
 Choose a task-owned directory. Runner cache settings are optional and remain caller-owned:
@@ -13,11 +19,14 @@ uv run cy-train --help
 Inspect `workspace/`: application runs, Hydra outputs, the prepared CSV dataset cache, named
 Ultralytics/ClearML/FiftyOne stores and owned temporary work must use the locations in
 [the filesystem contract](contracts/filesystem-ownership.md). General XDG, Python, compute-library
-and process temp defaults must remain unchanged. A normal exit must not leave invocation-owned
+and process temp settings must resolve to project-owned locations during execution.
+`HOME` and external runner settings remain unchanged. A normal exit must not leave invocation-owned
 directories in `.tmp`.
 
-Set `UV_CACHE_DIR`, `PYTHONPYCACHEPREFIX`, `TMPDIR` or other runner/library settings explicitly in
-the launcher only when the validation environment itself requires broader isolation.
+Set external runner settings such as `UV_CACHE_DIR` explicitly when needed. Library
+configuration/cache selectors must resolve within `CY_HOME`; outside selectors fail.
+Seed conflicting global configs and trace config access; preserve explicit data destinations
+and other invocations while checking leaked-library scratch cleanup on failure/cancellation.
 
 ## Explicit destination compatibility
 
@@ -33,7 +42,7 @@ path. Test symlinks in both directions when validating home classification. Do n
 or user-owned destination for destructive fixtures.
 
 Also validate that `dataset_cache_dir=null` selects
-`$CY_HOME/.cache/clearml-yolo/datasets` even with an ambient `XDG_CACHE_HOME`, while an explicit
+`$CY_HOME/.cache/clearml-yolo/datasets` even with a custom project-local `XDG_CACHE_HOME`, while an explicit
 `dataset_cache_dir` remains selected.
 
 ## Training source safety

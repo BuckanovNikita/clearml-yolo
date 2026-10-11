@@ -2,7 +2,7 @@
 
 import inspect
 import sys
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from functools import partial
 from typing import Any
@@ -25,7 +25,10 @@ from clearml_yolo.adapters.integrations.native_runtime import (
 )
 from clearml_yolo.adapters.observability.diagnostics import log_exception
 from clearml_yolo.adapters.observability.tracing import trace_command, trace_operation
+from clearml_yolo.adapters.runtime.bootstrap import runtime_environment
 from clearml_yolo.adapters.runtime.gpu_resources import job_request
+from clearml_yolo.adapters.runtime.gpu_runtime import assigned_devices, exact_selection, scheduled
+from clearml_yolo.adapters.runtime.gpu_scheduling import execution_controls
 from clearml_yolo.adapters.runtime.gpu_wait import wait_for_available_gpus
 from clearml_yolo.adapters.storage.filesystem import initialize_filesystem, runs_root, write_path
 from clearml_yolo.adapters.storage.run_identity import task_run_dir
@@ -61,6 +64,22 @@ def _gpu_cleanup(enabled: bool) -> Iterator[None]:
                 log_exception("Native GPU memory cleanup failed", error, level="ERROR")
 
 
+def _selected_devices(
+    name: str, inputs: dict[str, Any], *, automatic: bool
+) -> tuple[int, ...] | tuple[str, ...]:
+    if scheduled():
+        return assigned_devices()
+    if automatic:
+        return wait_for_available_gpus(job_request(name, inputs))
+    return ()
+
+
+def _validate_replay_policy(policy: Mapping[str, Any], replay: dict[str, Any]) -> None:
+    for key, value in policy.items():
+        if key in replay and replay[key] != value:
+            raise ValueError(f"ClearML replay cannot change launch control {key}")
+
+
 @trace_operation("invocation.execute")
 def execute_owned(name: str, config: DictConfig, function: Callable[..., Any]) -> None:
     """Wait for free GPUs, then execute directly under one invocation-owned task."""
@@ -77,7 +96,8 @@ def execute_owned(name: str, config: DictConfig, function: Callable[..., Any]) -
         raise TypeError("Resolved command configuration must be a mapping")
     inputs = {str(key): value for key, value in resolved.items()}
     with trace_operation("execution.gpu_wait", context={"stage": name}):
-        devices = wait_for_available_gpus(job_request(name, inputs))
+        _, automatic = execution_controls(inputs)
+        devices = _selected_devices(name, inputs, automatic=automatic)
     # Initialize native imports before ClearML starts background package detection;
     # concurrent torch submodule discovery can observe a partially loaded package.
     with (
@@ -87,10 +107,14 @@ def execute_owned(name: str, config: DictConfig, function: Callable[..., Any]) -
             name,
             config_resolver=lambda document: resolve_config_file(document, config),
         ) as task,
-        _gpu_cleanup(bool(devices)),
+        _gpu_cleanup(bool(devices) or not automatic),
     ):
+        policy: dict[str, Any] = {
+            key: inputs.pop(key) for key in ("queue", "autogpu") if key in inputs
+        }
         native = dict(inputs.pop("ultralytics", {}))
         replay = replay_configuration(task, inputs)
+        _validate_replay_policy(policy, replay)
         # Run also contains result provenance; only command inputs are executable.
         accepted = set(inspect.signature(function).parameters) - {"deps"}
         replay = {key: value for key, value in replay.items() if key in accepted}
@@ -123,7 +147,7 @@ def _execute_assigned(
     config: DictConfig,
     function: Callable[..., Any],
     task: Any,
-    devices: tuple[int, ...],
+    devices: tuple[int, ...] | tuple[str, ...],
 ) -> None:
     from clearml_yolo.adapters.clearml.session import record_run_configuration
     from clearml_yolo.entrypoints.hydra.execution import effective_configuration
@@ -131,16 +155,34 @@ def _execute_assigned(
     resolved_job = OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
     if not isinstance(resolved_job, dict):
         raise TypeError("Command configuration must be a mapping")
-    if job_request(name, {str(k): v for k, v in resolved_job.items()}) > len(devices):
+    _, automatic = execution_controls({str(key): value for key, value in resolved_job.items()})
+    if (automatic or scheduled()) and job_request(
+        name, {str(k): v for k, v in resolved_job.items()}
+    ) > len(devices):
         raise ValueError("ClearML replay requires more GPUs than the available selection")
-    effective = effective_configuration(config, devices)
+    selection = exact_selection()
+    if selection is not None:
+        from clearml_yolo.entrypoints.hydra.execution import exact_effective_configuration
+
+        effective = exact_effective_configuration(name, config, selection, assigned_devices())
+    else:
+        effective = effective_configuration(config, devices)
+    with open_dict(effective):
+        effective.pop("queue", None)
+        effective.pop("autogpu", None)
     requests = _device_values(config)
+    if "queue" in config or "autogpu" in config:
+        record_run_configuration(
+            task,
+            {"execution_policy": {"queue": execution_controls(config)[0], "autogpu": automatic}},
+        )
     if devices:
         record_run_configuration(
             task,
             {
                 "gpu_selection": {
                     "selected_devices": list(devices),
+                    "reserved_uuids": list(devices) if scheduled() else [],
                     "requested_devices": requests,
                     "effective_devices": _device_values(effective),
                 }
@@ -161,17 +203,29 @@ def _execute_assigned(
 
 
 def launch(name: str, function: Callable[..., Any]) -> None:
-    """Compose and execute directly, including Hydra's standard sequential multirun."""
-    trace_command(name)(_launch)(name, function)
+    """Compose and execute within one owned runtime lifetime."""
+    trace_command(name)(_launch_owned)(name, function)
+
+
+def _launch_owned(name: str, function: Callable[..., Any]) -> None:
+    with runtime_environment():
+        _launch(name, function)
 
 
 def _launch(name: str, function: Callable[..., Any]) -> None:
+    from clearml_yolo.entrypoints.hydra.configs import NATIVE_COMMANDS
+    from clearml_yolo.entrypoints.hydra.execution import configure_entrypoint, schedule_single
+
     with trace_operation("configuration.startup", context={"stage": name}):
         initialize_filesystem()
+        configure_entrypoint(name, function)
         store.add_to_hydra_store(overwrite_ok=True)
 
     @hydra.main(config_name=name, config_path=None, version_base="1.3")
     def execute(config: DictConfig) -> None:
-        execute_owned(name, config, function)
+        if name in NATIVE_COMMANDS and execution_controls(config)[0] and not scheduled():
+            schedule_single(name, function, config)
+        else:
+            execute_owned(name, config, function)
 
     execute()

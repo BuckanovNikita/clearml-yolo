@@ -28,7 +28,9 @@ The table below also identifies interfaces extracted beyond a mechanical move.
 | `clearml_*` integrations | `clearml_yolo.adapters.clearml` modules named in the migration map |
 | `publishing.models` and FiftyOne integration | `clearml_yolo.core.publication` and `clearml_yolo.adapters.fiftyone` |
 | Filesystem/dataset/cache/run operations | `clearml_yolo.adapters.storage` modules named in the migration map |
-| GPU visibility probe and stateless availability wait | `clearml_yolo.adapters.runtime.gpu_resources`, `gpu_probe`, `gpu_wait`; former queue/runtime modules removed |
+| GPU probe, selection, FIFO reservations and supervised runtime | `clearml_yolo.adapters.runtime.gpu_resources`, `gpu_probe`, `gpu_wait`, `gpu_queue`, `gpu_runtime`, `gpu_scheduling`; `clearml_yolo.entrypoints.hydra.execution` and `worker` |
+| Pre-import configuration and invocation scratch | `clearml_yolo.adapters.runtime.bootstrap` |
+| ClearML session-cache and botocore customer-model SDK constants | `clearml_yolo.adapters.clearml.configuration` |
 | Native training, DDP and mixed integration lifecycle | `clearml_yolo.adapters.integrations` |
 
 Import project-owned records from their defining modules. Package initializers remain
@@ -62,16 +64,23 @@ Choose a backup destination that does not already exist. `--force` replaces gene
 examples, so carry custom paths, task identity, tags, model settings and other overrides
 from the backup into the new files. Preserve the new `defaults` and Python targets.
 A fresh directory is another way to compare regenerated examples before replacing files.
+Export defaults to `cy` only; regenerate each other wrapper with `--command`, for example
+`cy-init-config metrics-config --command cy-metrics`, then run it with
+`cy-metrics --config-dir metrics-config --config-name cy-metrics`. All five model
+commands also export both native groups; back them up before a forced export.
 Do not copy obsolete `_target_` strings back into the new tree. Workflow dependencies
 are composed by the invocation entrypoint and are not a user YAML setting.
 
 Update handwritten dotted targets in notebooks, scripts, custom Hydra groups, callbacks
 and plugin integrations using the migration map. Repository-managed entrypoints,
 GPU probe, DDP callbacks and FiftyOne extension targets follow the new locations.
-Remove saved overrides targeting `hydra_plugins.cy_queue`; local multiruns now use
-Hydra's standard sequential BasicLauncher. Queue, queued worker and GPU reservation
-runtime imports are removed, with no compatibility aliases. Historical ClearML files are retained as evidence; this release does
-not rewrite remote artifacts or infer old training provenance.
+Regenerate saved launcher defaults rather than restoring obsolete queue-removal
+assumptions. `hydra_plugins.cy_queue` is distributed again for queued model commands;
+`queue.enabled=false` selects sequential BasicLauncher. Queue and automatic selection
+are independent controls; both false is native pass-through. See the
+[GPU execution contract](../specs/022-simple-gpu-wait/contracts/execution.md).
+Historical ClearML files remain evidence; this release does not rewrite remote artifacts
+or infer old training provenance.
 
 Comparison caches now identify checkpoints by content and exclude the reuse-policy
 flag from their keys. The first comparison after upgrading regenerates predictions
@@ -79,6 +88,19 @@ under the new keys. Subsequent runs retain cache hits when ClearML refreshes che
 timestamps, and cached CSV parsing preserves exact confidence values at frozen thresholds.
 
 ## Explicit programmatic dependencies
+
+`native_runtime()` also scopes project configuration and scratch when called directly,
+restoring process environment and temporary settings on exit. Nested CLI use reuses
+the invocation arena; an embedding application still owns the wider task/publication
+lifetime. `cy-dedup` needs no SDK bootstrap and keeps its atomic temporary files beside
+the selected destination.
+
+Import SDK dependencies only inside `project_configuration_imports()` after bootstrap.
+Explicit relative SDK data paths resolve against the launch directory before its temporary
+cwd change. Once SDK configuration is loaded, the process remains bound to that `CY_HOME`
+after scope exit; use a fresh process to select another project. Environment restoration
+does not reset SDK-held settings. ClearML invocation configures project session/cache
+constants through its owned configuration adapter before task creation.
 
 A full metrics workflow still requires a ClearML invocation owner. Select initialization
 at the outer boundary and pass the dependency bundle explicitly:
@@ -90,32 +112,36 @@ from clearml_yolo.application.contracts import MetricsResult
 
 
 def run_metrics() -> MetricsResult:
-    from clearml_yolo.adapters.storage.filesystem import initialize_filesystem
-
-    initialize_filesystem()
-    from clearml_yolo.adapters.clearml.session import invocation
-    from clearml_yolo.application.contracts import ClearMLConfig
-    from clearml_yolo.application.use_cases.metrics import compute_metrics
-    from clearml_yolo.core.evaluation.models import EvaluationConfig
-    from clearml_yolo.core.publication import FiftyOneConfig
-    from clearml_yolo.entrypoints.composition import build_dependencies
-
-    tracking = ClearMLConfig(
-        project_name="detection", task_name="metrics", tags=["evaluation"]
+    from clearml_yolo.adapters.runtime.bootstrap import (
+        project_configuration_imports,
+        runtime_environment,
     )
-    deps = build_dependencies()
-    with invocation(tracking, "metrics"):
-        return compute_metrics(
-            predictions=Path("predictions.csv"),
-            ground_truth=Path("ground_truth.csv"),
-            output_dir=Path("metrics"),
-            clearml=tracking,
-            evaluation=EvaluationConfig(),
-            splits=["test"],
-            fiftyone=FiftyOneConfig(enabled=False),
-            model_label="local detector",
-            deps=deps,
+
+    with runtime_environment():
+        with project_configuration_imports():
+            from clearml_yolo.adapters.clearml.session import invocation
+            from clearml_yolo.application.contracts import ClearMLConfig
+            from clearml_yolo.application.use_cases.metrics import compute_metrics
+            from clearml_yolo.core.evaluation.models import EvaluationConfig
+            from clearml_yolo.core.publication import FiftyOneConfig
+            from clearml_yolo.entrypoints.composition import build_dependencies
+
+        tracking = ClearMLConfig(
+            project_name="detection", task_name="metrics", tags=["evaluation"]
         )
+        deps = build_dependencies()
+        with invocation(tracking, "metrics"):
+            return compute_metrics(
+                predictions=Path("predictions.csv"),
+                ground_truth=Path("ground_truth.csv"),
+                output_dir=Path("metrics"),
+                clearml=tracking,
+                evaluation=EvaluationConfig(),
+                splits=["test"],
+                fiftyone=FiftyOneConfig(enabled=False),
+                model_label="local detector",
+                deps=deps,
+            )
 ```
 
 Inputs must contain the validation population needed for calibration; requested test

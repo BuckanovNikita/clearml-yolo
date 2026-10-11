@@ -8,7 +8,17 @@ The owner writes the returned receipt to its output directory and records its me
 dataset/run link in the canonical run Configuration Object. The receipt remains local and is
 not uploaded as a ClearML artifact. No FiftyOne or ClearML objects cross the publisher interface.
 
-`NoOpPublisher` imports no FiftyOne. The optional publishing adapter/backend/plugin
+`NoOpPublisher` imports no FiftyOne. Enabled command composition uses a bounded adapter
+with a fresh worker for each preflight/publication operation. Finite positive deadlines
+are `preflight_timeout_seconds=60`, `publish_timeout_seconds=900` and
+`lock_timeout_seconds=30`; operation deadlines cover import and worker shutdown.
+Workers have no GPU visibility, queue lease or ClearML ownership. Success requires zero
+exit and a matching operation/task result with complete receipt; timeout/crash/malformed
+results warn and preserve computation. Cleanup allows five seconds graceful termination
+and five seconds forced reaping; unsafe cleanup is reported. Preserve partial persistent
+state for retry. See [runtime isolation](../../../docs/runtime-isolation.md).
+
+The optional publishing adapter/backend/plugin
 modules contain FiftyOne imports and record
 one sample per image, raw predictions separate from evaluated fields, and
 task-ID-namespaced run fields. Native evaluation registration is permitted; it consumes
@@ -80,7 +90,20 @@ it in the same server Python environment as the backend and `clearml-yolo`, then
 App:
 
 ```bash
-uv run python -c 'from clearml_yolo.publishing.fiftyone_panel import install_evaluation_plugin; print(install_evaluation_plugin())'
+uv run python <<'PYTHON'
+from clearml_yolo.adapters.runtime.bootstrap import (
+    project_configuration_imports,
+    runtime_environment,
+)
+
+with runtime_environment():
+    from clearml_yolo.adapters.fiftyone.compatibility import isolated_constants
+
+    with isolated_constants(), project_configuration_imports():
+        from clearml_yolo.adapters.fiftyone.panel import install_evaluation_plugin
+
+    print(install_evaluation_plugin())
+PYTHON
 ```
 
 Publication does not globally install the plugin. Existing runs gain native evaluations

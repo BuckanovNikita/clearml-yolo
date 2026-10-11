@@ -7,6 +7,10 @@ Provide a supported local MongoDB server through FiftyOne's bundled service or
 `FIFTYONE_DATABASE_URI`. Set `FIFTYONE_DATABASE_DIR` to the local database/lock directory.
 Publishers accessing the same database on this machine must share that lock directory.
 
+Runtime bootstrap reads only project-owned SDK config beneath `CY_HOME/.config`;
+keep `HOME` unchanged. A separate App process should use the same explicit project
+configuration/data selectors; it does not inherit a completed CLI invocation scope.
+
 `cy`, `cy-predict`, and `cy-metrics` enable publication by default. Existing required
 command inputs and ClearML configuration still apply. Use `fiftyone.enabled=false`
 to select the dependency-free no-op layer, or `fiftyone.dataset_prefix=my-project`
@@ -20,13 +24,22 @@ Open the dataset manually, replacing the receipt path with your run's path:
 ```python
 import json
 
-import fiftyone as fo
+from clearml_yolo.adapters.runtime.bootstrap import (
+    project_configuration_imports,
+    runtime_environment,
+)
 
-with open("runs/my-run/fiftyone_publication.json", encoding="utf-8") as stream:
-    receipt = json.load(stream)
-dataset = fo.load_dataset(receipt["dataset_name"])
-session = fo.launch_app(dataset)
-session.wait()
+with runtime_environment():
+    from clearml_yolo.adapters.fiftyone.compatibility import isolated_constants
+
+    with isolated_constants(), project_configuration_imports():
+        import fiftyone as fo
+
+    with open("runs/my-run/fiftyone_publication.json", encoding="utf-8") as stream:
+        receipt = json.load(stream)
+    dataset = fo.load_dataset(receipt["dataset_name"])
+    session = fo.launch_app(dataset)
+    session.wait()
 ```
 
 Samples preserve `image_name`, `split`, and referenced image paths. Keep media available
@@ -45,7 +58,12 @@ Visualization is optional: backend setup, database, invalid-data and receipt/boo
 errors warn and leave computation running. Setup failure disables visualization for
 the invocation. A failed adapter publication produces no successful receipt; incomplete
 database state may be repaired by retrying the same task's publication. Normal cancellation
-still interrupts the invocation.
+still interrupts the invocation. Fresh workers bound setup/import/exit and publication
+with `fiftyone.preflight_timeout_seconds=60` and `fiftyone.publish_timeout_seconds=900`;
+`fiftyone.lock_timeout_seconds=30` bounds lock acquisition. Finite positive overrides
+only. Zero exit plus a matching complete receipt is required for success; timed-out
+workers are terminated/reaped with bounded cleanup. This verifies containment, not
+the root cause of the original unconfirmed remote hang.
 
 ## Native evaluations in App
 
@@ -54,7 +72,20 @@ server. Explicitly install its `@clearml-yolo/evaluation` App extension in that 
 environment and restart App:
 
 ```bash
-uv run python -c 'from clearml_yolo.publishing.fiftyone_panel import install_evaluation_plugin; print(install_evaluation_plugin())'
+uv run python <<'PYTHON'
+from clearml_yolo.adapters.runtime.bootstrap import (
+    project_configuration_imports,
+    runtime_environment,
+)
+
+with runtime_environment():
+    from clearml_yolo.adapters.fiftyone.compatibility import isolated_constants
+
+    with isolated_constants(), project_configuration_imports():
+        from clearml_yolo.adapters.fiftyone.panel import install_evaluation_plugin
+
+    print(install_evaluation_plugin())
+PYTHON
 ```
 
 Publication never installs the plugin globally. Open `native_evaluation` to inspect

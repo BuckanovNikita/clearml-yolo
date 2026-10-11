@@ -9,8 +9,10 @@ and implementation evidence by topic; this summary does not replace those contra
 
 Entrypoints: `cy`, `cy-train`, `cy-predict`, `cy-val`, `cy-metrics`,
 `cy-report`, `cy-compare`, `cy-ground-truth`, `cy-init-config`, and `cy-dedup`.
-`cy-init-config DIRECTORY [--force]` writes editable examples for the eight execution
-commands without creating a ClearML task.
+`cy-init-config DIRECTORY [--command NAME] [--force]` writes one selected execution
+wrapper (default `cy`) and its required native groups without a ClearML task. All five
+model commands require both native groups; non-model commands require neither.
+See [selected export and runtime isolation](runtime-isolation.md).
 `cy-dedup [DIRECTORY] [--dry-run]` is local cache maintenance without application startup
 or tracking. It reflinks identical same-named images, preserving paths and content;
 unsupported reflinks are reported skips. See the
@@ -43,33 +45,37 @@ Effective native YAML and retained prediction manifests support replay; YAML is 
 locally with comments preserved; canonical run/dataset/report configurations and native General
 parameters support ClearML replay without artifact copies.
 Pass device, batch, AMP, compilation and native augmentation options through the native groups.
-The five model commands poll whole-NVIDIA-GPU availability before native execution and ClearML
-initialization, then execute in the calling process. Demand comes only from native device
-settings: a training integer is one GPU, a list uses its length, each automatic `-1` contributes
-one without binding that written ID, null/empty/`cuda` is one, and `cpu`/`mps` is zero. GPU
-inference is one device. A pipeline waits for the maximum of training and enabled GPU-inference
-demand. There is no separate count setting.
+The five model commands expose `queue.enabled` and `autogpu.enabled`, both default true.
+Queued automatic execution restores FIFO, atomic whole-GPU UUID reservations, supervised
+children, liveness recovery, reservation contraction and concurrent Hydra sweeps. Queue off
+with automatic selection on preserves direct availability waiting; queue on with automatic
+selection off reserves exact enabled-phase identities; both off preserves native settings
+without project GPU discovery, waits or replacement. CPU/MPS and non-model commands bypass
+GPU telemetry. Controls are execution policy, never workflow arguments. Neither disables tracking.
 
-An isolated metadata subprocess maps inherited visibility to stable UUIDs without initializing
-CUDA in the invoking process. NVML excludes other compute users and unknown telemetry fails
-closed; only the invoking PID is ignored so sequential jobs can reuse their own retained context.
-Demand exceeding the supported visible whole-GPU set, unsupported MIG and lost visibility fail
-clearly. Selected logical indices follow inherited visibility order; `CUDA_VISIBLE_DEVICES` is
-not rewritten. Training uses all selected devices required by its demand, and GPU prediction,
-validation and comparison use the first selected device. Native training-memory cleanup remains.
-Requested settings and effective devices are recorded separately under `gpu_selection`.
+Automatic demand derives from native settings: a training integer is one GPU, a list uses
+its length, every `-1` contributes one, null/empty/`cuda` is one and CPU/MPS is zero.
+Inference needs one device; pipeline demand is the maximum of enabled phases. Exact queued
+mode requires concrete selectors, reserves the training/inference UUID union and preserves
+training order and inference identity through child-local remapping. Native cleanup precedes
+contraction; release training-only capacity while retaining the downstream device.
 
-There are no tickets, reservations, queue registry, worker supervision, FIFO fairness or exclusive
-allocation guarantees. Simultaneous commands may observe the same free GPU. Historical queue data
-is untouched and unused. CPU/MPS and non-model commands bypass GPU telemetry. The project does
-not provide batch tuning, custom augmentation JSON, `--force-gpu`, disabled tracking or MIG
-support. Unsupported options fail rather than being silently ignored.
+NVML and a metadata-only subprocess resolve supported whole-GPU visibility before ClearML
+and native initialization. Unknown telemetry, unsupported MIG, lost visibility and excessive
+demand fail clearly. Shared compatible queue state remains outside project configuration and
+invocation scratch. Corrupt/incompatible state fails closed without migration or deletion.
+Cancellation reaps owned GPU descendants before releasing capacity. Direct automatic waits
+remain stateless and give no exclusive allocation guarantee. Requested/effective devices and
+queued reservations are recorded separately under `gpu_selection`; replay cannot change launch
+policy or exceed admitted identities/capacity.
 
-Local Hydra multiruns use the standard sequential BasicLauncher with BasicSweeper, preserving
-callbacks, job environment, per-job output directory, configured chdir and normal exceptions.
-The [GPU execution contract](../specs/022-simple-gpu-wait/contracts/execution.md) supersedes
-feature 013 queue requirements and the queue-specific constitution amendment; their dated
-history remains evidence of the former design.
+Queued local multiruns use the project concurrent launcher with BasicSweeper; queue-disabled
+multiruns use sequential BasicLauncher. Preserve callbacks, job environment/output/chdir,
+ordered results and failure outcomes; mixed queue-mode sweeps fail before admission.
+The [GPU execution contract](../specs/022-simple-gpu-wait/contracts/execution.md), amended by
+[feature 024](../specs/024-runtime-isolation/spec.md), governs all four modes. Historical
+feature 013/022 intent and dated evidence remain preserved. Batch tuning, custom augmentation
+JSON, `--force-gpu`, disabled tracking and MIG are unsupported.
 
 `run_dir` owns output routing for `cy`. Pipeline stages cannot use conflicting stage output
 paths or conflicting native training project/name. Standalone output-producing commands use
@@ -136,7 +142,10 @@ are uploaded, verified and flushed. Fail task and command on computation, upload
 errors while retaining local output. Keep credentials out of published configuration and
 failure status. Native owner-only training/validation image previews are permitted.
 FiftyOne visualization is optional: setup and publication errors warn and cannot fail
-otherwise successful computation or the ClearML task. Project-owned caught-error
+otherwise successful computation or the ClearML task. Fresh isolated workers bound imports,
+publication and shutdown with finite positive preflight/publication/lock timeouts of 60/900/30
+seconds; success requires zero exit and a matching complete receipt. See
+[runtime isolation](runtime-isolation.md). Project-owned caught-error
 logging includes redacted operation/context and cause summaries, with stack locations
 at DEBUG (the existing default); INFO omits those stacks. Diagnostic stacks exclude
 locals and source excerpts. Opaque configuration payloads and failure-status fields

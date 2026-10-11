@@ -12,7 +12,7 @@ from workflow_dependencies import patch_workflow
 from workflow_dependencies import workflow_dependencies as workflow_dependencies  # noqa: PLC0414
 
 
-def test_model_commands_choose_standard_sequential_launcher() -> None:
+def test_model_commands_choose_supervised_queue_launcher_by_default() -> None:
     import clearml_yolo.entrypoints.hydra.configs  # noqa: F401
 
     store.add_to_hydra_store(overwrite_ok=True)
@@ -20,7 +20,7 @@ def test_model_commands_choose_standard_sequential_launcher() -> None:
         for command in ("pipeline", "train", "predict", "val", "compare"):
             config = compose(config_name=command, return_hydra_config=True)
             assert config.hydra.launcher._target_ == (
-                "hydra._internal.core_plugins.basic_launcher.BasicLauncher"
+                "hydra_plugins.cy_queue.launcher.QueueLauncher"
             )
 
 

@@ -9,7 +9,14 @@ These groups still compose complete configurations; supported CLI overrides rema
 Runtime YAML includes actual derived values, including project, name, source, model and data.
 The two requested device groups remain independent. Under queued GPU execution, their requested
 values are preserved separately while the effective child configuration uses assigned local native
-indices; GPU prediction and comparison use retained child-local device 0.
+indices; automatic GPU prediction uses the retained child-local device 0. Exact queued mode
+preserves the selected physical device and training order through remapping. Both execution
+controls false preserves native settings. See the
+[current execution contract](../../022-simple-gpu-wait/contracts/execution.md).
+
+`cy-init-config DIRECTORY [--command NAME] [--force]` defaults to only `cy` plus its
+two native groups. All five model selections include both groups; the three non-model
+selections produce only their wrapper. Selected destinations alone participate in preflight.
 
 Implicit roots: runs/<encoded-project>/<encoded-task>-<encoded-task-id>/ using the active
 ClearML task. Explicit run_dir wins; explicit run_id retains runs/<run_id>. Standalone

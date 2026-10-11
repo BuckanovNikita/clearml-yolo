@@ -287,6 +287,10 @@ def test_remote_clone_replays_canonical_run_and_general(
         monkeypatch, workflow_dependencies, common, "initialize_naming", lambda _task: None
     )
     patch_workflow(monkeypatch, workflow_dependencies, common, "replay_configuration", replay)
+    config["queue"] = {"enabled": False}
+    monkeypatch.setattr(
+        "clearml_yolo.adapters.clearml.session.record_run_configuration", lambda *args: None
+    )
     common.launch("train", command)
     assert executed == [("remote.csv", 17)]
     assert inputs == [{"clearml": {}, "ground_truth": "local.csv"}]
@@ -405,6 +409,10 @@ def test_remote_clone_does_not_replay_previous_owner_output_route(
     patch_workflow(
         monkeypatch, workflow_dependencies, training, "_execute_training", execute_training
     )
+    config["queue"] = {"enabled": False}
+    monkeypatch.setattr(
+        "clearml_yolo.adapters.clearml.session.record_run_configuration", lambda *args: None
+    )
     common.launch(stage, command)
     assert len(executed) == 1
     actual = executed[0]
@@ -486,6 +494,10 @@ def test_current_save_dir_override_reaches_pipeline_conflict_validation(
         common,
         "replay_configuration",
         lambda _task, values: values,
+    )
+    config["queue"] = {"enabled": False}
+    monkeypatch.setattr(
+        "clearml_yolo.adapters.clearml.session.record_run_configuration", lambda *args: None
     )
     with pytest.raises(ValueError, match="save_dir conflicts with pipeline run_dir"):
         common.launch("pipeline", command)

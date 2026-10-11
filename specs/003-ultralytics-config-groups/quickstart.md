@@ -2,8 +2,10 @@
 
 ## Lightweight checks
 
-Generate into a fresh temporary directory using `uv run cy-init-config DIRECTORY`. Verify eight
-command YAML files and two native group files; replace the shared group with the installed
+Generate each selection into its own fresh directory with
+`uv run cy-init-config DIRECTORY --command COMMAND`. Omission selects only `cy`.
+Verify exactly one wrapper, plus both native groups for each of five model commands,
+and no groups for the three non-model commands. Replace the shared group with the installed
 upstream YAML. Compose all five model commands with `--cfg job` and ordinary shared/prediction
 overrides; composition must not execute a model or create a task.
 

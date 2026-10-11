@@ -10,6 +10,9 @@ class FiftyOneConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     enabled: bool = True
+    preflight_timeout_seconds: float = Field(default=60.0, gt=0, allow_inf_nan=False)
+    publish_timeout_seconds: float = Field(default=900.0, gt=0, allow_inf_nan=False)
+    lock_timeout_seconds: float = Field(default=30.0, gt=0, allow_inf_nan=False)
     dataset_prefix: str = Field(default="clearml-yolo", pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$")
 
 

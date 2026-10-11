@@ -27,6 +27,7 @@ from ruamel.yaml.comments import CommentedMap, CommentedSeq
 from ruamel.yaml.error import YAMLError
 from ruamel.yaml.tokens import CommentToken
 
+from clearml_yolo.adapters.clearml.configuration import configure_sdk_state
 from clearml_yolo.adapters.observability.diagnostics import exception_summary, log_exception
 from clearml_yolo.adapters.observability.tracing import trace_operation, trace_task
 from clearml_yolo.adapters.storage.filesystem import temporary_root
@@ -293,6 +294,7 @@ def invocation(
             active.current_stage = previous_stage
         return
 
+    configure_sdk_state()
     owns_signal = threading.current_thread() is threading.main_thread()
     previous_sigterm: Any = signal.getsignal(signal.SIGTERM) if owns_signal else None
 

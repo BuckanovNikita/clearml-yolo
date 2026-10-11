@@ -134,6 +134,9 @@ def fake_clearml(monkeypatch: pytest.MonkeyPatch) -> tuple[type[Any], FakeTask]:
 
     module.OutputModel = OutputModel  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "clearml", module)
+    monkeypatch.setattr(
+        "clearml_yolo.adapters.clearml.session.configure_sdk_state", lambda: None
+    )
     return Task, task
 
 

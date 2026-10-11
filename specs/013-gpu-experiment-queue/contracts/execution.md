@@ -1,9 +1,9 @@
 # Queued execution and Hydra launcher contract
 
-> Historical contract: queue-specific requirements are superseded by
-> [feature 022 GPU execution](../../022-simple-gpu-wait/contracts/execution.md).
-> Current execution uses stateless availability polling and the calling process;
-> this document retains the former design as historical evidence.
+> Feature 024 restores the compatible queue protocol described here and amends it
+> with independent execution controls and exact device selection. The maintained
+> [GPU execution contract](../../022-simple-gpu-wait/contracts/execution.md) defines
+> the four modes, replay and cancellation rules. Completed feature history is preserved.
 
 ## Command routing
 
@@ -20,7 +20,8 @@ configuration records the translated values.
 Training retains `ultralytics_requested.yaml`; prediction retains
 `ultralytics_predict[_<index>]_requested.yaml` alongside effective YAML. Comparison preserves its
 role/split requested snapshots. Canonical run configuration records requested devices, effective
-local devices, reserved UUIDs and phase. A ClearML replay that increases demand beyond the admitted
+local devices and reserved UUIDs under `gpu_selection`; contraction records inference
+phase and retained UUIDs under `gpu_scheduler`. A ClearML replay that increases demand beyond the admitted
 reservation fails before native execution.
 
 The child owns exactly one ClearML task and the current callback, publication, failure, flush, and
@@ -53,7 +54,11 @@ and supports BasicSweeper. Its plugin package is included in the distribution be
 - Return one `JobReturn` per submitted job in the original order.
 - Preserve each job's success or failure and make any failure produce a nonzero command outcome.
 
-Other sweepers, a persistent daemon, priority, bypass, remote launchers, cross-host coordination,
+`queue.enabled=false` uses sequential BasicLauncher; mixed queue-mode sweeps fail
+before admission. `autogpu.enabled=false` requires exact selectors, reserves the enabled-phase
+UUID union and preserves training order/inference identity through child-local remapping.
+Both false bypasses project GPU discovery/waiting/replacement. Other sweepers, a persistent daemon,
+priority, remote launchers, cross-host coordination,
 and MIG scheduling are outside this contract.
 
 ## Launch ownership

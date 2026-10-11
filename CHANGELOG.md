@@ -5,6 +5,9 @@
 
 ### Documentation
 
+- Record simultaneous GPU verification failure
+  ([`59b5caa`](https://github.com/BuckanovNikita/clearml-yolo/commit/59b5caa2aadef2a25e7a1ad489504e4bc5a96d36))
+
 - Record TRACE release verification
   ([`60738a7`](https://github.com/BuckanovNikita/clearml-yolo/commit/60738a7fb8ce634eef25d53ce23b42b90e2f9232))
 

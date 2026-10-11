@@ -96,7 +96,9 @@ A stalled native call that holds Python's interpreter lock, a stopped process, o
 stderr can delay output: the 30/60-second intervals are sampling defaults, not execution
 deadlines. Thread locations describe Python boundaries rather than native C/CUDA stacks.
 Tracing diagnoses a stall; it does not unblock SDK/native work or add cancellation,
-timeouts, retries, GPU reservations or allocation guarantees.
+timeouts, retries, GPU reservations or allocation guarantees. Independent execution
+controls and bounded FiftyOne workers are defined by [runtime isolation](runtime-isolation.md);
+those features do not make TRACE itself a deadline or establish the original hang cause.
 
 Project-generated context and locations use the existing credential redaction policy.
 They omit full configurations, argument dumps, DataFrame contents, image inventories,

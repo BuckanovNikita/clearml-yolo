@@ -91,6 +91,7 @@ def test_ground_truth_rejects_invalid_coordinates(tmp_path: Path, coordinates: s
 def test_optional_fiftyone_configuration_falls_back(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, content: str
 ) -> None:
+    monkeypatch.setenv("CY_HOME", str(tmp_path))
     config = tmp_path / "config.json"
     config.write_text(content)
     monkeypatch.setenv("FIFTYONE_CONFIG_PATH", str(config))

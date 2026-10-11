@@ -33,7 +33,7 @@ def test_installed_command_creates_examples(
     monkeypatch.setattr("sys.argv", ["cy-init-config", str(target)])
     entrypoints[0].load()()
     assert {path.name for path in target.iterdir()} == {
-        *[f"{command}.yaml" for command in COMMANDS],
+        "cy.yaml",
         "ultralytics",
         "ultralytics_predict",
     }
@@ -43,7 +43,7 @@ def test_installed_command_creates_examples(
 def test_examples_round_trip_through_hydra(tmp_path: Path, command: str, config_name: str) -> None:
     from clearml_yolo.entrypoints.hydra.config_tree import dump_config_tree
 
-    dump_config_tree(tmp_path)
+    dump_config_tree(tmp_path, command=command)
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
         builtin = compose(config_name=config_name)
     assert "clearml" in builtin
@@ -80,7 +80,7 @@ def test_generated_pipeline_accepts_inputs_and_native_overrides(tmp_path: Path) 
 def test_generated_csv_training_example_accepts_both_formats(tmp_path: Path, command: str) -> None:
     from clearml_yolo.entrypoints.hydra.config_tree import dump_config_tree
 
-    dump_config_tree(tmp_path)
+    dump_config_tree(tmp_path, command=command)
     for dataset_format in ("ndjson", "flat"):
         with initialize_config_dir(config_dir=str(tmp_path), version_base="1.3"):
             config = compose(
@@ -96,7 +96,7 @@ def test_generated_csv_training_example_accepts_both_formats(tmp_path: Path, com
 def test_existing_config_prevents_all_writes(tmp_path: Path) -> None:
     from clearml_yolo.entrypoints.hydra.config_tree import dump_config_tree
 
-    existing = tmp_path / "cy-ground-truth.yaml"
+    existing = tmp_path / "cy.yaml"
     existing.write_text("# My edited config\n", encoding="utf-8")
     with pytest.raises(FileExistsError, match="--force"):
         dump_config_tree(tmp_path)
@@ -154,7 +154,7 @@ def test_force_rejects_nonregular_destinations_before_writing(
 
     target = tmp_path / "configs"
     target.mkdir()
-    example = target / "cy-ground-truth.yaml"
+    example = target / "cy.yaml"
     external = tmp_path / "external.yaml"
     if destination_kind == "directory":
         example.mkdir()
@@ -206,7 +206,7 @@ def test_generated_examples_load_in_fresh_cli_process(
 
     from clearml_yolo.entrypoints.hydra.config_tree import dump_config_tree
 
-    dump_config_tree(tmp_path)
+    dump_config_tree(tmp_path, command=command)
     result = subprocess.run(  # noqa: S603 - fixed project modules and generated test paths
         [
             sys.executable,
@@ -312,3 +312,108 @@ def test_cli_empty_oserror_reports_operation_destination_and_type(
     assert "Cannot initialize configuration directory" in output
     assert str(destination) in output
     assert "OSError" in output
+
+
+@pytest.mark.parametrize("command", COMMANDS)
+def test_selection_writes_only_required_outputs(tmp_path: Path, command: str) -> None:
+    from clearml_yolo.entrypoints.hydra.config_tree import dump_config_tree
+
+    written = dump_config_tree(tmp_path, command=command)
+    expected = {f"{command}.yaml"}
+    if command in {"cy", "cy-train", "cy-predict", "cy-val", "cy-compare"}:
+        expected |= {"ultralytics/default.yaml", "ultralytics_predict/default.yaml"}
+    assert {str(path.relative_to(tmp_path)) for path in written} == expected
+    assert {str(path.relative_to(tmp_path)) for path in tmp_path.rglob("*.yaml")} == expected
+
+
+def test_unselected_command_files_do_not_block_or_change(tmp_path: Path) -> None:
+    from clearml_yolo.entrypoints.hydra.config_tree import dump_config_tree
+
+    existing = tmp_path / "cy-ground-truth.yaml"
+    existing.write_text("# User configuration\n", encoding="utf-8")
+    dump_config_tree(tmp_path)
+    dump_config_tree(tmp_path, overwrite=True)
+    assert existing.read_text(encoding="utf-8") == "# User configuration\n"
+
+
+def test_shared_group_collision_prevents_selected_wrapper_write(tmp_path: Path) -> None:
+    from clearml_yolo.entrypoints.hydra.config_tree import dump_config_tree
+
+    dump_config_tree(tmp_path, command="cy-train")
+    before = {path: path.read_bytes() for path in tmp_path.rglob("*.yaml")}
+    with pytest.raises(FileExistsError, match="--force"):
+        dump_config_tree(tmp_path, command="cy-predict")
+    assert not (tmp_path / "cy-predict.yaml").exists()
+    assert {path: path.read_bytes() for path in tmp_path.rglob("*.yaml")} == before
+    dump_config_tree(tmp_path, command="cy-predict", overwrite=True)
+    assert (tmp_path / "cy-predict.yaml").exists()
+    assert (tmp_path / "cy-train.yaml").read_bytes() == before[tmp_path / "cy-train.yaml"]
+
+
+def test_nonmodel_selection_ignores_shared_group_collisions(tmp_path: Path) -> None:
+    from clearml_yolo.entrypoints.hydra.config_tree import dump_config_tree
+
+    (tmp_path / "ultralytics").write_text("# Unrelated file\n", encoding="utf-8")
+    dump_config_tree(tmp_path, command="cy-metrics")
+    assert (tmp_path / "ultralytics").read_text() == "# Unrelated file\n"
+
+
+def test_invalid_selector_creates_no_output(tmp_path: Path) -> None:
+    from clearml_yolo.entrypoints.hydra.config_tree import dump_config_tree
+
+    target = tmp_path / "new-directory"
+    with pytest.raises(ValueError, match="command"):
+        dump_config_tree(target, command="train")
+    assert not target.exists()
+
+
+def test_cli_selector_and_invalid_choice(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from clearml_yolo.entrypoints.config_tree import main
+
+    target = tmp_path / "selected"
+    monkeypatch.setattr("sys.argv", ["cy-init-config", str(target), "--command", "cy-report"])
+    main()
+    assert [path.name for path in target.iterdir()] == ["cy-report.yaml"]
+    invalid_target = tmp_path / "invalid"
+    monkeypatch.setattr("sys.argv", ["cy-init-config", str(invalid_target), "--command", "report"])
+    with pytest.raises(SystemExit) as caught:
+        main()
+    assert caught.value.code == 2
+    assert not invalid_target.exists()
+
+
+@pytest.mark.parametrize("command", COMMANDS)
+def test_export_does_not_import_task_or_model_runtime(tmp_path: Path, command: str) -> None:
+    import subprocess
+    import sys
+
+    script = """
+import importlib.abc
+import sys
+
+class RejectRuntime(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        forbidden = (
+            'clearml', 'torch', 'ultralytics', 'fiftyone',
+            'clearml_yolo.entrypoints.composition',
+            'clearml_yolo.application.use_cases',
+            'clearml_yolo.adapters.runtime.gpu_runtime',
+        )
+        if any(fullname == name or fullname.startswith(name + '.') for name in forbidden):
+            raise AssertionError('Configuration export imported runtime: ' + fullname)
+        return None
+
+sys.meta_path.insert(0, RejectRuntime())
+from clearml_yolo.entrypoints.config_tree import main
+sys.argv = ['cy-init-config', sys.argv[1], '--command', sys.argv[2]]
+main()
+"""
+    result = subprocess.run(  # noqa: S603 - fixed import guard and isolated test paths
+        [sys.executable, "-c", script, str(tmp_path), command],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    assert (tmp_path / f"{command}.yaml").is_file()

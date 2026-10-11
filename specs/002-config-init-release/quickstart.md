@@ -7,7 +7,8 @@ first; current setup no longer uses submodules.
 ```bash
 uv sync --frozen --group dev
 uv run --frozen cy-init-config ./conf
-uv run --frozen cy-train --config-dir=./conf --config-name=cy-train --cfg job \
+uv run --frozen cy-init-config ./train-conf --command cy-train
+uv run --frozen cy-train --config-dir=./train-conf --config-name=cy-train --cfg job \
   ground_truth=ground_truth.csv
 uv run --frozen cy --config-dir=./conf --config-name=cy --cfg job \
   ground_truth=ground_truth.csv
@@ -16,7 +17,10 @@ uv run --frozen cy --config-dir=./conf --config-name=cy --cfg job \
 The last two commands only compose settings. They do not train or create a task.
 Replace required inputs and set explicit ClearML identity before real execution.
 
-Initialization writes eight command examples and the two native group files. Repeat
+Default initialization writes only `cy.yaml` and both native groups. `--command`
+selects one of eight wrappers; all five model commands include both groups, other
+commands include no native files. Use a fresh directory for each selection, or back
+up shared groups before force replacement. Repeat
 initialization: it must fail without replacing examples. Use `--force` only to discard
 edits to generated files. Unrelated files must survive.
 

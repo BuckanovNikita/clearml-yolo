@@ -144,6 +144,7 @@ assert "DIRECT_MARKER" not in os.environ
             sys.executable,
             str(script),
             "--multirun",
+            "queue.enabled=false",
             "model_label=first,second",
             "ground_truth=unused.csv",
             "ultralytics_predict.device=cpu",

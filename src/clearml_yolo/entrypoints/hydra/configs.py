@@ -25,6 +25,9 @@ def _native() -> dict[str, Any]:
     fields: dict[str, Any] = {"ultralytics": stage_settings(native_defaults(), "train")}
     groups.append({"ultralytics_predict": "_defaults"})
     fields["ultralytics_predict"] = prediction_defaults()
+    fields["queue"] = make_config(enabled=True)
+    fields["autogpu"] = make_config(enabled=True)
+    groups.append({"override hydra/launcher": "cy_queue"})
     return {"hydra_defaults": groups, **fields}
 
 
@@ -38,9 +41,17 @@ def register_configs() -> None:
     OmegaConf.register_new_resolver("cy_home", lambda: str(cy_home()), replace=True)
     store(
         HydraConf(
-            job=JobConf(chdir=False), run=RunDir(dir=HYDRA_RUN_DIR),
-            sweep=SweepDir(dir="${cy_home:}/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}-${cy_run_token:}"),
+            job=JobConf(chdir=False),
+            run=RunDir(dir=HYDRA_RUN_DIR),
+            sweep=SweepDir(
+                dir="${cy_home:}/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}-${cy_run_token:}"
+            ),
         )
+    )
+    store(
+        {"_target_": "hydra_plugins.cy_queue.launcher.QueueLauncher"},
+        group="hydra/launcher",
+        name="cy_queue",
     )
     tracking = builds(ClearMLConfig, populate_full_signature=True)
     publishing = builds(FiftyOneConfig, populate_full_signature=True)

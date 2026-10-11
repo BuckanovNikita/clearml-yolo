@@ -1,14 +1,14 @@
 # Queue state contract
 
-> Historical contract: queue-specific requirements are superseded by
-> [feature 022 GPU execution](../../022-simple-gpu-wait/contracts/execution.md).
-> Current execution uses stateless availability polling and the calling process;
-> this document retains the former design as historical evidence.
+> Feature 024 restores the compatible queue protocol described here and amends it
+> with independent execution controls and exact device selection. The maintained
+> [GPU execution contract](../../022-simple-gpu-wait/contracts/execution.md) defines
+> the four modes, replay and cancellation rules. Completed feature history is preserved.
 
 ## Location
 
 The queue registry is user-wide for one operating-system instance and does not use `CY_HOME`.
-Default roots are:
+Capture the inherited user-wide state root before project XDG overrides. Default roots are:
 
 - Unix-like: `${XDG_STATE_HOME:-~/.local/state}/clearml-yolo/queue`
 - Windows: `%LOCALAPPDATA%/clearml-yolo/queue`

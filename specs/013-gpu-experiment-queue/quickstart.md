@@ -1,5 +1,11 @@
 # Quickstart: validate the GPU experiment queue
 
+> Current execution and configuration are amended by feature 024. Use the maintained
+> [GPU quickstart](../022-simple-gpu-wait/quickstart.md),
+> [runtime isolation](../../docs/runtime-isolation.md) and
+> [filesystem policy](../../docs/filesystem-policy.md); original feature checks below
+> do not establish current acceptance.
+
 This guide defines acceptance scenarios. Do not describe native GPU, DDP, ClearML, or upload
 behavior as verified until the commands have run and their outcomes are recorded in dated evidence.
 
@@ -15,7 +21,7 @@ behavior as verified until the commands have run and their outcomes are recorded
 ## Deterministic acceptance
 
 ```bash
-uv run pytest tests/test_gpu_resources.py tests/test_gpu_queue.py tests/test_gpu_execution.py tests/test_hydra_queue_launcher.py tests/test_pipeline.py
+uv run pytest tests/test_gpu_resources.py tests/test_gpu_queue.py tests/test_execution_controls.py tests/test_gpu_supervision.py tests/test_hydra_queue_launcher.py tests/test_pipeline.py
 uv run ruff check .
 uv run mypy .
 uv run lint-imports

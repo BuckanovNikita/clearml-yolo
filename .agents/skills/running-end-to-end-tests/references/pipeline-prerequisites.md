@@ -1,13 +1,16 @@
 # Pipeline prerequisites
 
 Use Python and dependencies from `pyproject.toml` and `uv.lock`. Configure ClearML through
-its supported SDK environment variables or user configuration before real execution.
+explicit supported SDK environment variables or ignored project configuration before
+real execution; ambient home/system library configuration is not read.
 Infrastructure access, resource capacity and cleanup are supplied by the environment,
 not this repository.
 
 Set `CY_HOME` to the invocation workspace (default: launch working directory) for project
-datasets, task outputs and owned temporary files. General runner/library caches and Python
-bytecode retain their normal defaults. Explicit output/cache paths remain valid elsewhere;
+datasets, task outputs, runtime library config/cache and invocation-owned scratch.
+A stdlib bootstrap runs before SDK imports, preserves `HOME`, confines library config
+selectors to the physical project root and scopes temporary files through finalization/uploads.
+External runners retain their own defaults. Explicit output/cache paths remain valid elsewhere;
 physically home-resident project write destinations warn without rejection. Follow the
 [filesystem contract](../../../../docs/filesystem-policy.md).
 Preserve source images and existing user configuration.
@@ -28,28 +31,38 @@ Raw `cfg` loading and nested `train.ultralytics`/`predict.ultralytics` are remov
 ClearML is required for execution commands. Pass `clearml.project_name` and
 `clearml.tags` explicitly when isolating runs. `run_dir` routes pipeline output;
 conflicting stage paths or native training `project`/`name` values fail. Standalone
-stages require explicit inputs. `cy-init-config DIRECTORY [--force]` writes only
-editable configuration examples without creating a ClearML task.
+stages require explicit inputs. `cy-init-config DIRECTORY [--command NAME] [--force]`
+writes one selected wrapper (default `cy`) without creating a task. Five model commands
+include both native groups; `cy-metrics`, `cy-report` and `cy-ground-truth` do not.
+Only selected files/parents participate in overwrite checks.
 
-Select native `device`, `batch`, `amp` and `compile` settings for the environment. The five model
-commands derive whole-GPU demand from native `device` and poll availability before native/ClearML
-initialization. There is no separate GPU-count setting. A training integer means one GPU, a list
-uses its length, every automatic `-1` contributes one, null/empty/`cuda` means one, and `cpu`/`mps`
-means zero. GPU inference requires one device; a pipeline waits for the maximum training/inference
-demand. Keep inherited `CUDA_VISIBLE_DEVICES` accurate for the test environment; selected logical
-indices follow its order without rewriting it.
+Select native `device`, `batch`, `amp` and `compile` for the environment. Five model
+commands default `queue.enabled=true` and `autogpu.enabled=true`: whole-GPU FIFO
+reservations, fresh supervised children and automatic selection. Queue disabled retains
+direct availability waiting; automatic selection disabled retains exact queued identities
+and training order using the enabled-phase UUID union. Both disabled preserves native
+settings without project GPU discovery/waiting/replacement. CPU/MPS bypass telemetry.
+Automatic mode treats native IDs as demand: one for an integer/null/empty/`cuda`, list
+length for lists, one per `-1`, zero for CPU/MPS; GPU inference requires one. No separate
+GPU-count setting. Exact queued mode requires concrete selectors within inherited CUDA
+visibility and rejects ambiguous automatic values. Neither switch disables tracking.
 
-Before a native wait test, establish that the request fits the visible whole-GPU set and that
-unrelated compute processes do not own candidate devices. Verify busy-to-free waiting, no task
-while waiting, interruption and direct calling-process execution. CPU/MPS bypass NVIDIA telemetry.
-The own PID is ignored for sequential jobs; other compute users and unavailable telemetry prevent
-selection. Availability gives no reservation or fairness guarantee between concurrent commands.
-Multi-GPU acceptance must observe native training/DDP cleanup and confirm prediction/comparison
-use the first selected logical device. A standard BasicLauncher sweep must execute sequentially
-with separate tasks, Hydra output/environment/chdir behavior and normal failure propagation.
-Record physical multi-GPU execution as unverified when it was not exercised. No queue state is
-created or consumed; old state remains untouched. The application does not tune batches or support
-MIG. See the [GPU execution contract](../../../../specs/022-simple-gpu-wait/contracts/execution.md).
+Before acceptance, establish sufficient whole-GPU visibility and preserve unrelated compute
+users. Verify no task while waiting, one runner/two waiters on one GPU, interruption with
+owned process cleanup before capacity release, compatible cross-project coordination and
+replay admission limits. Verify multi-GPU cleanup/contraction retains the intended inference
+device; record physical multi-GPU execution unverified when unavailable. Queued sweeps use
+the concurrent project launcher; queue-disabled sweeps use sequential BasicLauncher.
+Mixed queue modes fail before admission. Unknown telemetry, unsupported MIG and excessive
+demand fail clearly in scheduling modes. See the
+[GPU execution contract](../../../../specs/022-simple-gpu-wait/contracts/execution.md).
+
+Optional FiftyOne workers use finite preflight/publication/lock deadlines of 60/900/30
+seconds and no GPU/queue/ClearML ownership. Fault injection must prove bounded import,
+work and shutdown plus at most ten seconds cleanup; publication success requires zero
+exit and a matching complete receipt. Errors warn and preserve computation; cancellation
+remains cancellation. Project config access tracing and scratch cleanup are required
+acceptance evidence. See [runtime isolation](../../../../docs/runtime-isolation.md).
 
 Full comparison requires validation/test data and exact baseline thresholds. Candidate
 thresholds come from validation only. Both checkpoints must use the same current test
