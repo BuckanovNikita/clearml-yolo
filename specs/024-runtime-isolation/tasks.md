@@ -40,7 +40,7 @@
 - [x] T018 Update README.md, docs/project-contracts.md, docs/current-contracts.md and docs/filesystem-policy.md.
 - [x] T019 Update affected contracts, development/import/migration guidance and .agents/skills/running-end-to-end-tests guidance; preserve historical evidence.
 - [x] T020 Validate changed Markdown/local links/examples and record results in verification.md.
-- [ ] T021 Follow docs/development.md commit/release procedure, preserve local uv sources, and publish only checked branch/version tags.
+- [x] T021 Follow docs/development.md commit/release procedure, preserve local uv sources, and publish only checked branch/version tags.
 
 ## Dependencies and parallel execution
 

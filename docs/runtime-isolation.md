@@ -85,8 +85,10 @@ locations. Leaving a runtime scope restores environment and temporary settings b
 does not undo that binding; selecting another `CY_HOME` requires a fresh process.
 The [ClearML configuration adapter](../src/clearml_yolo/adapters/clearml/configuration.py)
 owns compatibility with SDK constants lacking environment selectors: its session cache
-is `.cache/clearml/session`, and botocore's customer model directory is
-`.config/aws/models`. Unsupported constant interfaces fail closed before task creation;
+follows `XDG_CACHE_HOME/clearml/session`, and botocore's customer model directory follows
+`XDG_CONFIG_HOME/aws/models`. Their defaults under `CY_HOME` are
+`.cache/clearml/session` and `.config/aws/models`; custom XDG roots must pass project
+containment validation. Unsupported constant interfaces fail closed before task creation;
 packaged botocore models remain available. These selections persist through SDK shutdown.
 Shared GPU queue coordination is outside invocation scratch and
 is not a library configuration source. External runners such as uv and pytest are

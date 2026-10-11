@@ -1,7 +1,7 @@
 # Verification — 2026-10-11
 
-Implementation, native acceptance and fresh independent final review are complete.
-Release checks remain pending. No dependency pins changed.
+Implementation, native acceptance, fresh independent final review and release are
+complete. Checked Git tag `v0.23.0` and `master` were pushed. No dependency pins changed.
 
 ## Completed evidence
 
@@ -12,7 +12,7 @@ Release checks remain pending. No dependency pins changed.
   parent/live-child ownership, recovery, outside-project configuration rejection and
   environment rollback on initialization failure.
 - Bounded FiftyOne process tests cover phase hangs, failures, cancellation, redaction,
-  receipt identity and unsafe cleanup retention. Final integrated count pending.
+  receipt identity and unsafe cleanup retention, included in both final full-suite passes.
 - Native CPU/Gloo distributed regression: all five scenarios passed (two/four ranks,
   both rank failure cases and owner callback failure).
 - Final parent pre-commit verification: the full pytest suite, Ruff, strict mypy and
@@ -67,10 +67,9 @@ fixture was corrected and the 98 affected tests passed again. Final full-suite
 verification then passed through the repository pytest hook; neither earlier failed
 full run is reported as passing.
 
-## Pending acceptance
+## Validation limits
 
-Release remains pending. Native
-Windows, physical multi-GPU and the WSL busy-to-idle transition are unverified. The
+Native Windows, physical multi-GPU and the WSL busy-to-idle transition are unverified. The
 original hang's root cause remains unconfirmed; bounded failure evidence does not
 establish that cause.
 Machine-specific commands/logs and service identity are retained outside this repository.
@@ -114,3 +113,26 @@ The final wheel and sdist each matched all 117 Python modules and included plugi
 configuration. Fresh installations passed 20 installed-origin checks, 20 command
 helps and four representative exports/compositions. The complete eight-command
 matrix had already passed in both installation formats before these path guards.
+
+## Release closure
+
+- Feature commit `27cec1e` and release commit `39b8665` each passed all applicable
+  pre-commit checks. Each final pytest run had 1,681 passes, 30 skips and no failures
+  or errors; Ruff, strict mypy and import-linter also passed.
+- Offline release preparation initially failed because temporarily removing local
+  sources made `digital-metrics` unavailable to the resolver. Restoring the preserved
+  sources allowed the version-only lock refresh. Repository metadata validation
+  confirmed that neither dependency pins nor sources changed, and the checked
+  commit/tag sequence resumed with overrides absent throughout the hooks.
+- The final `0.23.0` wheel and sdist matched all 117 source modules and included
+  plugin configuration. Distribution metadata reports `0.23.0` in both formats.
+- Annotated tag `v0.23.0` targets `39b8665`; it and `master` were pushed together.
+  Only Git refs were published. Local dependency overrides were restored exactly
+  and remain unstaged. The local environment was refreshed from the frozen lock.
+- The task-owned implementation worktree and duplicate native evidence scratch were
+  removed. Native acceptance resources had already been cleaned, with verification
+  evidence retained externally. Final documentation clarifies that SDK cache paths
+  follow validated XDG roots; the listed project paths are defaults.
+- Independent closure review validated three Markdown files, five local links,
+  two shell examples, balanced fences and whitespace, and cross-checked both JUnit
+  reports and the published release refs. No blockers remained.
