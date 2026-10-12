@@ -1,5 +1,18 @@
 # Native Configuration Contract
 
+This contract governs the default `model=ultralytics` selection. The approved
+[multi-model amendment](../../025-multi-model-backends/contracts/backend.md) adds
+independent typed `model.train`/`model.predict` groups for DEIMv2, RF-DETR and Faster
+R-CNN, while retaining the YOLO defaults and precedence below. Export configuration
+is governed by the [Faster R-CNN export contract](../../025-multi-model-backends/contracts/export.md).
+With a new backend selected, changed settings in either inactive YOLO group fail before
+admission; use the selected model's typed groups instead. Unchanged composed YOLO defaults
+remain compatible. Mixed comparison dispatch rejects unsupported population overrides
+rather than applying different filters to the two models.
+With YOLO selected, changed `model.train` or `model.predict` values likewise fail before
+admission; use `ultralytics` or `ultralytics_predict` respectively. Unchanged model schema
+defaults support mixed-sweep composition without configuring the YOLO trainer or predictor.
+
 ## Public groups
 
 ultralytics owns detection training and its internal validation. ultralytics_predict owns

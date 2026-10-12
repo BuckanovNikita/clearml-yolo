@@ -574,9 +574,12 @@ def record_run_configuration(task: Any, values: dict[str, Any]) -> dict[str, Any
     active = _active_state(task, "Run configuration recording")
     sanitized = sanitize_configuration(values)
     cleaned = _meaningful(sanitized)
-    if any(key in sanitized for key in ("ultralytics", "ultralytics_predict")):
+    # Export evidence mirrors its published sidecar: an empty plugin inventory or
+    # detection list is meaningful and must survive configuration recording.
+    preserve_empty = ("ultralytics", "ultralytics_predict", "export_result")
+    if any(key in sanitized for key in preserve_empty):
         cleaned = {} if cleaned is _EMPTY else cleaned
-        for key in ("ultralytics", "ultralytics_predict"):
+        for key in preserve_empty:
             if key in sanitized:
                 cleaned[key] = sanitized[key]
     if cleaned is _EMPTY:
@@ -585,10 +588,10 @@ def record_run_configuration(task: Any, values: dict[str, Any]) -> dict[str, Any
         raise TypeError("Run configuration must be a mapping")
     _merge_configuration(active.run_configuration, cleaned)
     with trace_operation("clearml.configuration.connect"):
-        task.connect_configuration(
-            configuration=active.run_configuration,
+        task.set_configuration_object(
             name="run",
-            ignore_remote_overrides=True,
+            config_dict=_plain_config_document(active.run_configuration),
+            config_type="dictionary",
         )
     return dict(active.run_configuration)
 
@@ -599,29 +602,33 @@ def replay_configuration(task: Any, values: dict[str, Any]) -> dict[str, Any]:
     if _is_worker():
         return values
     active = _active_state(task, "Run configuration replay")
-    cleaned = sanitize_configuration(values)
-    if not cleaned or not isinstance(cleaned, Mapping):
+    if not values:
         raise ValueError("Canonical run configuration must not be empty")
-    with trace_operation("clearml.configuration.connect"):
-        connected = task.connect_configuration(
-            configuration=dict(cleaned),
-            name="run",
-            ignore_remote_overrides=False,
-        )
-    if not isinstance(connected, Mapping):
+    # Canonical replay must not inherit the SDK's ignore-override parameter or
+    # expose connected proxy containers to Hydra/application configuration.
+    canonical = None
+    if not task.running_locally():
+        with trace_operation("clearml.configuration.read"):
+            canonical = task.get_configuration_object_as_dict("run")
+            # The SDK also returns None for a present empty text blob. Only an
+            # absent canonical object may fall back to executable CLI defaults.
+            if canonical is None and task.get_configuration_object("run") is not None:
+                raise ValueError("Effective ClearML run configuration must not be empty")
+    effective = values if canonical is None else canonical
+    if not isinstance(effective, Mapping):
         raise TypeError("ClearML run configuration override must be a mapping")
-    effective = sanitize_configuration(connected)
-    if not effective or not isinstance(effective, Mapping):
+    if not effective:
         raise ValueError("Effective ClearML run configuration must not be empty")
-    active.run_configuration = dict(effective)
+    executable = _plain_config_document(effective)
+    active.run_configuration = sanitize_configuration(executable)
     with trace_operation("clearml.configuration.connect"):
-        task.connect_configuration(
-            configuration=active.run_configuration,
+        task.set_configuration_object(
             name="run",
-            ignore_remote_overrides=True,
+            config_dict=_plain_config_document(active.run_configuration),
+            config_type="dictionary",
         )
     # Redaction is a storage boundary, not a mutation of executable inputs.
-    return dict(values if task.running_locally() else connected)
+    return cast(dict[str, Any], executable)
 
 
 def _configuration_secrets(value: Any, *, sensitive: bool = False) -> set[str]:
@@ -719,7 +726,7 @@ def _plain_config_document(value: Any) -> Any:
         return {
             _plain_config_document(key): _plain_config_document(item) for key, item in value.items()
         }
-    if isinstance(value, list):
+    if isinstance(value, (list, tuple)):
         return [_plain_config_document(item) for item in value]
     if isinstance(value, str):
         return str(value)

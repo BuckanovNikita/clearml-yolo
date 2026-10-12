@@ -141,6 +141,67 @@ def require_clean(root: Path) -> None:
         )
 
 
+def versioned_lock_bytes(content: bytes, package_index: int, old: str, new: str) -> bytes:
+    """Edit one canonical uv package table without reserializing unrelated TOML."""
+    sections = re.split(rb"(?m)(?=^\[\[package\]\][ \t]*(?:#[^\r\n]*)?\r?$)", content)
+    if package_index + 1 >= len(sections):
+        raise ReleaseError("Lockfile root package table cannot be located unambiguously.")
+    section = sections[package_index + 1]
+    end = section.find(b"\n[", len(b"[[package]]"))
+    header = section if end == -1 else section[:end]
+    pattern = (
+        rb"(?m)^[ \t]*version[ \t]*=[ \t]*([\"'])(?P<value>"
+        + re.escape(old.encode())
+        + rb")\1(?=[ \t]*(?:#[^\r\n]*)?\r?$)"
+    )
+    matches = list(re.finditer(pattern, header))
+    if len(matches) != 1:
+        raise ReleaseError("Lockfile root version token cannot be located unambiguously.")
+    start, end = matches[0].span("value")
+    sections[package_index + 1] = section[:start] + new.encode() + section[end:]
+    return b"".join(sections)
+
+
+def refresh_lock_version(root: Path, attempt: Attempt) -> None:
+    """Update only the checked source commit's root version, without resolving dependencies."""
+    project = tomllib.loads(git(root, "show", f"{attempt.source}:pyproject.toml"))["project"]
+    path = root / "uv.lock"
+    content = path.read_bytes()
+    if git(root, "hash-object", "--no-filters", str(path)) != git(
+        root, "rev-parse", f"{attempt.source}:uv.lock"
+    ):
+        raise ReleaseError(
+            "Lockfile changed from the recorded source commit; inspect retained files."
+        )
+    before = tomllib.loads(content.decode())
+    matches = [
+        (index, package)
+        for index, package in enumerate(before.get("package", []))
+        if package.get("name") == project["name"]
+    ]
+    if len(matches) != 1:
+        raise ReleaseError("Lockfile must contain exactly one root project package.")
+    index, package = matches[0]
+    # uv uses virtual roots for projects without a build system, including release fixtures.
+    if package.get("source") not in ({"editable": "."}, {"virtual": "."}):
+        raise ReleaseError("Lockfile root package must refer to the current project directory.")
+    old = project["version"]
+    if package.get("version") != old:
+        raise ReleaseError(
+            "Lockfile root version differs from the recorded source project version."
+        )
+    updated = versioned_lock_bytes(content, index, old, attempt.version)
+    after = tomllib.loads(updated.decode())
+    after["package"][index]["version"] = old
+    if after != before:
+        raise ReleaseError(
+            "Lockfile update changed dependencies or metadata beyond the root version."
+        )
+    if path.read_bytes() != content or git(root, "rev-parse", "HEAD") != attempt.source:
+        raise ReleaseError("Lockfile or source commit changed during version preparation.")
+    path.write_bytes(updated)
+
+
 def validate_metadata(root: Path, attempt: Attempt) -> None:
     """Allow only the root project version to change in either parsed TOML document."""
     project_before = tomllib.loads(git(root, "show", f"{attempt.source}:pyproject.toml"))
@@ -281,7 +342,7 @@ def refresh_changelog(root: Path) -> bool:
 
 def prepare_commit(root: Path, attempt: Attempt) -> Attempt:
     semantic_release(root)
-    run(root, "uv", "lock", "--offline")
+    refresh_lock_version(root, attempt)
     validate_metadata(root, attempt)
     paths = git(root, "diff", "HEAD", "--name-only").splitlines()
     if not git(root, "ls-files", "--", "CHANGELOG.md"):

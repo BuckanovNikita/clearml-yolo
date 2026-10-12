@@ -74,11 +74,15 @@ regenerated YAML checks and installed command helps, including the GPU probe, DD
 callback and FiftyOne extension targets. Check distributions include the supervised queue worker, bounded FiftyOne worker and
 project Hydra launcher plugin. Verify all four execution modes, concurrent queued sweeps,
 sequential queue-disabled BasicLauncher sweeps and mixed-mode rejection before admission.
-Check selected config export for all eight commands, isolated project configuration and
+Check selected config export for every supported command/model selection, isolated project configuration and
 invocation scratch cleanup, including failure/cancellation. Fault-inject real subprocess
 hangs during import, publication and shutdown; require bounded optional warnings and
 validated receipts, rather than inferred success. See [runtime isolation](runtime-isolation.md).
 Update maintained code links and migration guidance; preserve completed feature history as dated intent.
+For detector/export changes, include the optional dependencies and acceptance matrices in
+the [model guide](multi-model-backends.md) and [deployment guide](tensorrt-deployment.md).
+Use `uv run --frozen --no-sync` for verification in a deliberately prepared optional-backend
+environment so a default sync does not remove its installed extras.
 
 ## External dependencies
 
@@ -159,7 +163,10 @@ Do not edit the generated changelog by hand.
 
 On master, the post-commit hook evaluates unreleased Conventional Commits. Release
 changes produce a checked version commit and an annotated version tag. Documentation
-commits alone do not bump the version. A failed post-commit hook does not undo the
+commits alone do not bump the version. Release preparation updates only the root
+package version in `uv.lock`; it does not resolve dependencies. The committed dependency
+sources, versions and metadata remain unchanged while local source overrides are absent.
+A failed post-commit hook does not undo the
 original commit; inspect its output. To retry or check the release workflow manually:
 
 ```bash

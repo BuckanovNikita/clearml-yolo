@@ -4,7 +4,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from clearml_yolo.adapters.runtime.gpu_resources import device_count
+from clearml_yolo.adapters.runtime.gpu_resources import device_count, execution_phases
+from clearml_yolo.core.execution import ExecutionPhase
 
 
 def execution_controls(config: Mapping[str, Any]) -> tuple[bool, bool]:
@@ -50,27 +51,9 @@ def _exact_ordinals(value: object) -> tuple[int, ...]:
     return values
 
 
-def _enabled_groups(command: str, config: Mapping[str, Any]) -> tuple[str, ...]:
-    if command == "train":
-        return ("ultralytics",)
-    if command in {"predict", "val", "compare"}:
-        return ("ultralytics_predict",)
-    if command == "pipeline":
-        groups: list[str] = []
-        if not config.get("skip_train", False):
-            groups.append("ultralytics")
-        if not config.get("skip_predict", False) or not config.get("skip_compare", False):
-            groups.append("ultralytics_predict")
-        return tuple(groups)
-    return ()
-
-
-def _group_ids(group: str, config: Mapping[str, Any], visible: tuple[str, ...]) -> tuple[str, ...]:
-    native = config.get(group, {})
-    if not isinstance(native, Mapping):
-        raise TypeError(f"{group} must be a mapping")
-    ordinals = _exact_ordinals(native.get("device"))
-    if group == "ultralytics_predict" and len(ordinals) > 1:
+def _phase_ids(phase: ExecutionPhase, visible: tuple[str, ...]) -> tuple[str, ...]:
+    ordinals = _exact_ordinals(phase.device)
+    if phase.kind != "train" and len(ordinals) > 1:
         raise ValueError("Queued manual inference requires one exact GPU ordinal")
     if any(ordinal >= len(visible) for ordinal in ordinals):
         raise ValueError("Exact GPU ordinal exceeds inherited CUDA visibility")
@@ -81,13 +64,12 @@ def exact_request(
     command: str, config: Mapping[str, Any], visible: tuple[str, ...]
 ) -> ExactSelection:
     """Reserve every enabled phase identity, keeping downstream inference first."""
-    groups = _enabled_groups(command, config)
+    phases = execution_phases(command, config)
     ordered: list[str] = []
-    for group in ("ultralytics_predict", "ultralytics"):
-        if group in groups:
-            for uuid in _group_ids(group, config, visible):
-                if uuid not in ordered:
-                    ordered.append(uuid)
+    for phase in sorted(phases, key=lambda item: item.kind == "train"):
+        for uuid in _phase_ids(phase, visible):
+            if uuid not in ordered:
+                ordered.append(uuid)
     return ExactSelection(visible, tuple(ordered))
 
 
@@ -99,8 +81,8 @@ def exact_device_ordinals(
 ) -> dict[str, list[int]]:
     """Validate replay identities and return fixed child CUDA ordinal replacements."""
     result: dict[str, list[int]] = {}
-    for group in _enabled_groups(command, config):
-        identities = _group_ids(group, config, selection.visible)
+    for phase in execution_phases(command, config):
+        identities = _phase_ids(phase, selection.visible)
         if any(
             identity not in admitted or identity not in selection.devices for identity in identities
         ):
@@ -108,5 +90,7 @@ def exact_device_ordinals(
                 "ClearML replay requires a GPU identity outside the admitted selection"
             )
         if identities:
-            result[group] = [selection.devices.index(identity) for identity in identities]
+            result[phase.settings_path] = [
+                selection.devices.index(identity) for identity in identities
+            ]
     return result

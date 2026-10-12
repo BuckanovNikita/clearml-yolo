@@ -15,7 +15,7 @@ from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.storage.dataset_export import (
     DatasetFormat,
     export_dataset,
-    exported_image_filename,
+    exported_image_path,
 )
 from clearml_yolo.adapters.storage.dataset_records import validate_ground_truth
 from clearml_yolo.application.contracts import (
@@ -127,10 +127,7 @@ def _preparation_record(
                 "height": image.height,
                 "boxes": len(image.boxes),
                 "generated_path": str(
-                    directory
-                    / "images"
-                    / image.split
-                    / exported_image_filename(image, index, dataset_format)
+                    directory / exported_image_path(image, index, dataset_format)
                 ),
             }
             for index, image in enumerate(records.images, start=1)
@@ -148,8 +145,8 @@ def prepare_dataset(
     source_bytes: bytes | None = None,
 ) -> PreparedDataset:
     """Reserve fresh output, clean once, and export the requested native representation."""
-    if dataset_format not in {"ndjson", "flat"}:
-        raise ValueError("dataset_format must be one of: ndjson, flat")
+    if dataset_format not in {"ndjson", "flat", "coco"}:
+        raise ValueError("dataset_format must be one of: ndjson, flat, coco")
     directory = directory.expanduser().absolute()
     # Exclusive reservation rejects stale files and symlinks instead of reusing another run.
     directory.mkdir(parents=True, exist_ok=False)
@@ -166,7 +163,12 @@ def prepare_dataset(
         trace_operation("storage.dataset.labels.archive", context={"path": str(labels)}),
         ZipFile(labels, "x", compression=ZIP_DEFLATED) as archive,
     ):
-        for label in sorted((directory / "labels").rglob("*.txt")):
+        annotation_files = (
+            directory.glob("*/_annotations.coco.json")
+            if dataset_format == "coco"
+            else (directory / "labels").rglob("*.txt")
+        )
+        for label in sorted(annotation_files):
             archive.write(label, label.relative_to(directory).as_posix())
     artifacts = [ground_truth, manifest, data, labels]
     if dataset_format == "ndjson":

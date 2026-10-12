@@ -133,9 +133,37 @@ this branch.
    Clean up only owned resources per that environment's instructions.
 
 Build and install both distributions in fresh environments for release acceptance.
-Verify all ten command helps and documented configuration examples.
-Check all eight `cy-init-config --command` selections and omitted selection (only `cy`),
-both native groups on all five model commands, non-model wrapper-only inventory,
+Verify every installed command help and documented configuration example.
+Check every `cy-init-config --command` selection and omitted selection (only `cy`),
+both YOLO groups on existing model commands, selected new-model group inventory,
+Faster R-CNN-only `cy-export`, non-model wrapper-only inventory,
 composition, selected-file overwrite protection and unrelated-file preservation without a task.
 CPU and single-GPU runs are required release gates; report an unavailable device as
 an unverified gate. Describe physical multi-GPU execution as unverified unless exercised.
+
+## Multi-model and deployment acceptance
+
+When detector integration changes, follow the
+[multi-model acceptance guide](../../../specs/025-multi-model-backends/quickstart.md)
+and its backend/export contracts in addition to the shared workflow checks above.
+Exercise every advertised preset with real short training, pretrained initialization,
+best selection, standalone copied/downloaded checkpoint reload, prediction and validation.
+Use non-square images, exact string labels and empty-image records. Check one owner task,
+one best Output Model, descriptor/hash integrity, telemetry and required upload/flush failure
+behavior. Synthetic random-weight smoke tests establish execution only.
+
+Run new-family comparisons against YOLO and another native family on identical current
+images with frozen thresholds. Inspect independent backend routing, common device/settings,
+checkpoint-owned vocabulary and recorded effective preprocessing. Verify raw-reference
+assertions, cache separation and checkpoint/source conflicts. Repeat all four execution
+modes, replay guards, mixed-family sweeps, cancellation and owned-process cleanup.
+
+For every Faster R-CNN preset and FP32/FP16, generate the actual ONNX graph, build the
+engine and execute all required size/batch cases, profile transitions, empty/crowded inputs
+and rejection cases. Separately execute in a fresh runtime without Torch or ClearML.
+Freeze labeled corpus/checkpoint bytes and actual evaluator source identity; require
+meaningful nonzero native mAP and the documented precision-specific mAP loss limits.
+Report preprocessing, class-aware detection matching, unavailable raw tensors, latency
+and scoped memory evidence separately. A quality report alone does not prove standalone
+execution or all numerical/scene cases. CUDA 11.8 deployment requires separate target
+evidence; a newer-CUDA local engine does not prove target compatibility.

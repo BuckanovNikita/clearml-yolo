@@ -8,9 +8,18 @@ Completed feature specifications, task ledgers and dated evidence preserve histo
 
 ## Execution controls
 
-`cy`, `cy-train`, `cy-predict`, `cy-val` and `cy-compare` expose validated
+`cy`, `cy-train`, `cy-predict`, `cy-val`, `cy-compare` and `cy-export` expose validated
 `queue.enabled` and `autogpu.enabled`, both defaulting to true. They are launch
-controls, not workflow or native Ultralytics arguments.
+controls, not workflow or native model arguments.
+
+Phase descriptions choose device paths without importing SDKs: YOLO uses the existing
+native groups; new detectors use `model.train.device` and `model.predict.device`;
+export uses `export.device`. CPU/FP32 ONNX generation has zero GPU demand. Engine build
+and verification require one explicit GPU selector and reject CPU. Backend validation
+may reject unsupported multi-device execution without weakening scheduling guarantees.
+The [multi-model contract](../../025-multi-model-backends/contracts/backend.md) preserves
+all four modes below. Replay materializes typed defaults before remapping and may not
+switch between initialized YOLO and new-detector runtime families.
 
 | `queue.enabled` | `autogpu.enabled` | GPU behavior |
 |---|---|---|

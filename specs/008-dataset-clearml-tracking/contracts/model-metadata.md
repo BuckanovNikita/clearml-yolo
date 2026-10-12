@@ -5,13 +5,13 @@
 | Name | requested native name, project-local collision resolution and best checkpoint role | Update existing native record; share experiment suffix when needed |
 | Task/project | invocation task | Preserve native association |
 | Framework | actual PyTorch checkpoint | PyTorch framework |
-| Architecture/design | trained model YAML and architecture reference | model design/config text |
+| Architecture/design | trained YOLO YAML or native detector descriptor | model design/config text |
 | Label enumeration | checkpoint/trained model names | SDK label-to-integer mapping |
 | Tags | invocation task tags plus best-checkpoint role | No production tag invented |
 | Description | actual training task/checkpoint role | Concise factual description |
 | Lineage | known source input model if registered | Preserve known association; otherwise absent |
-| Checkpoint role/file/hash | actual best.pt | SDK metadata; role=best |
-| Versions | installed ClearML, Ultralytics, Torch and project | SDK metadata |
+| Checkpoint role/file/hash | actual selected best checkpoint | SDK metadata; role=best |
+| Versions | installed ClearML, model backend, Torch and project | SDK metadata and native descriptor |
 | Input shape/settings | trainer effective args (imgsz/channels where known) | SDK metadata |
 | Requested/effective names | invocation naming state | `clearml_yolo_requested_model_name` / `clearml_yolo_effective_model_name` string metadata |
 | Source training identity | finalized model name, original training task and verified checkpoint | Persist effective name, `clearml_yolo_training_task_id` and checkpoint SHA-256; retain optional registered model ID |
@@ -28,6 +28,15 @@ including artifact fallback only when the source task has no Output Models. Arti
 fallback does not satisfy a new native invocation's model-completion requirement.
 The invocation requires successful native registration and verified remote weights before
 completion; missing registration must not create a wrapper fallback model.
+
+For DEIMv2, RF-DETR and Faster R-CNN, the project-owned detector publisher creates the
+single Output Model directly because those native trainers have no project ClearML model
+callback. It uploads the descriptor-bound checkpoint once, verifies association and a fresh
+download hash, then registers the same finalization/calibration barrier. The design and
+`clearml_yolo_checkpoint_descriptor` metadata carry backend, preset, exact foreground labels,
+preprocessing and source/dependency identity. No synthetic Ultralytics trainer is used.
+This is the [multi-model amendment](../../025-multi-model-backends/contracts/backend.md);
+the existing YOLO callback path and its no-fallback rule remain unchanged.
 
 ## Installed SDK contract
 

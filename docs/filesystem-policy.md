@@ -1,6 +1,6 @@
 # Filesystem ownership
 
-The eight application execution commands and `cy-init-config` establish a stdlib-only
+The application execution commands and `cy-init-config` establish a stdlib-only
 runtime boundary before importing SDKs. Ordinary package imports remain inert. `CY_HOME` defaults to the launch working
 directory; a relative value resolves once against that directory, and an absolute value
 selects another project root. Later Hydra chdir does not change the captured root.
@@ -49,6 +49,7 @@ rather than imposing an OS sandbox on arbitrary user scripts/plugins.
 | FiftyOne plugins and ETA config | `.config/fiftyone/plugins`, `.config/eta` |
 | Matplotlib/fontconfig selectors | `.config/matplotlib`, `.config/fontconfig` |
 | Torch, Triton, CUDA, Numba, Hugging Face, Keras and Python bytecode | Named subdirectories of `.cache` |
+| `RF_HOME`, `ROBOFLOW_HOME` | `.cache/rfdetr`, `.cache/roboflow` |
 | Requests `NETRC`, AWS config/credentials and `BOTO_CONFIG` | `.config/netrc`, `.config/aws`, `.config/boto.cfg` |
 | `AWS_DATA_PATH` and botocore customer model overrides | `.config/aws/models` |
 

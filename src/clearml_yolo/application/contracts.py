@@ -8,9 +8,10 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from clearml_yolo.core.evaluation.policy import validate_thresholds
 from clearml_yolo.core.identity import ModelIdentity
+from clearml_yolo.core.models import BackendName, ModelConfig, Preprocessing
 
 DEFAULT_PROJECT_NAME = "clearml-yolo"
-DatasetFormat = Literal["ndjson", "flat"]
+DatasetFormat = Literal["ndjson", "flat", "coco"]
 ImageNameMode = Literal["name", "stem", "path"]
 ModelSource = Literal["clearml", "local"]
 PREDICTION_COLUMNS = [
@@ -55,7 +56,7 @@ class PreparedDataset(BaseModel):
 class ScoredResolution(BaseModel):
     """Checkpoint training size and requested inference size, before native normalization."""
 
-    trained_at: int | None
+    trained_at: int | list[int] | None
     scored_at: int | list[int]
 
     @property
@@ -153,9 +154,24 @@ class ModelRef(BaseModel):
     weights: Path | None = None
     thresholds: dict[str, float] | None = None
     label: str | None = None
+    backend: BackendName | None = None
+    preset: str | None = None
+    source_dir: Path | None = None
+    class_names: tuple[str, ...] | None = None
+    preprocessing: Preprocessing | None = None
 
     @model_validator(mode="after")
     def _validate_source(self) -> Self:
+        if (self.backend is None) != (self.preset is None):
+            raise ValueError("Checkpoint backend and preset must be specified together")
+        if self.backend is not None:
+            ModelConfig.model_validate(
+                {"backend": self.backend, "preset": self.preset, "source_dir": self.source_dir}
+            )
+        elif any(
+            value is not None for value in (self.source_dir, self.class_names, self.preprocessing)
+        ):
+            raise ValueError("Raw checkpoint metadata requires backend and preset")
         if self.source == "local":
             if self.weights is None:
                 raise ValueError("source='local' requires weights")
@@ -179,6 +195,7 @@ class ResolvedModel(BaseModel):
     task_id: str | None = None
     links: dict[str, str] = Field(default_factory=dict)
     identity: ModelIdentity | None = None
+    backend_assertions: dict[str, Any] = Field(default_factory=dict)
 
 
 class InferenceConfig(BaseModel):

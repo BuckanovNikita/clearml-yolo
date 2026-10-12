@@ -1,14 +1,32 @@
 # clearml-yolo
 
-`cy` обучает YOLO, получает предсказания и считает метрики. Если есть модель
+`cy` обучает модели детекции, получает предсказания и считает метрики. Если есть модель
 для сравнения, команда сравнит результаты и подготовит отчёты. Для запуска нужны
 изображения и CSV с разметкой — передайте его через `ground_truth`.
 
-Обучение и предсказания выполняет **Ultralytics**, метрики считает **digital-metrics**,
+По умолчанию обучение и предсказания выполняет **Ultralytics YOLO**. Через группу
+`model` также выбираются **DEIMv2**, **RF-DETR** и **Faster R-CNN** с современными
+backbone. Метрики считает **digital-metrics**,
 отчёты создаёт **report-generator**. `cy` вызывает эти библиотеки по порядку
 и сохраняет настройки и результаты в ClearML.
 
-## Быстрый старт
+## Установка
+
+Нужен Python 3.12. Подготовьте утверждённые локальные копии `digital-metrics` и
+`report-generator` по [инструкции установки](docs/development.md#external-dependencies),
+затем установите зависимости из корня проекта:
+
+```bash
+uv sync --frozen
+```
+
+Для DEIMv2, RF-DETR и Faster R-CNN добавьте `--extra detectors`, для ONNX — также
+`--extra export`. DEIMv2 требует отдельный checkout исходников на зафиксированной
+ревизии; TensorRT устанавливается отдельно. Подробности —
+[модели и настройка](docs/multi-model-backends.md) и
+[развёртывание TensorRT](docs/tensorrt-deployment.md).
+
+## Быстрый старт с YOLO
 
 ### 1. Создайте конфигурацию
 
@@ -25,8 +43,9 @@ cy-init-config predict-config --command cy-predict
 ```
 
 Допустимы `cy`, `cy-train`, `cy-predict`, `cy-val`, `cy-metrics`, `cy-report`,
-`cy-compare` и `cy-ground-truth`. Все пять команд с моделями создают обе нативные
-группы; остальные — только свой YAML. Используйте имя команды как `--config-name`.
+`cy-compare`, `cy-ground-truth` и `cy-export`. Пять команд с YOLO создают обе нативные
+группы; команды работы с таблицами — только свой YAML. `cy-export` по умолчанию
+выбирает Faster R-CNN. Используйте имя команды как `--config-name`.
 Существующий выбранный файл вызывает ошибку; `--force` заменяет обычные файлы.
 Файлы других команд не изменяются.
 
@@ -140,6 +159,57 @@ flowchart TD
 Для каждого запуска используйте новый каталог. Если загрузка обязательных файлов
 в ClearML не удалась, команда сообщит об ошибке. Локальные файлы сохранятся.
 
+## DEIMv2, RF-DETR и Faster R-CNN
+
+Выберите модель при создании конфигурации:
+
+```bash
+uv sync --frozen --extra detectors
+cy-init-config detector-config --command cy --model rfdetr/small
+```
+
+Будут созданы `detector-config/cy.yaml` и `detector-config/model/rfdetr/small.yaml`.
+В первом укажите `ground_truth` и настройки ClearML, во втором — секции `train`
+и `predict`. Для этих моделей параметры имеют префиксы `model.train.` и
+`model.predict.`. Например:
+
+```bash
+cy --config-dir detector-config --config-name cy \
+  ground_truth=./ground_truth.csv model.train.epochs=20 \
+  model.train.device=-1 model.predict.device=-1 \
+  clearml.project_name=detection clearml.task_name=rfdetr-small \
+  'clearml.tags=[rfdetr,experiment]'
+```
+
+| Семейство | Значения `model=` |
+|---|---|
+| DEIMv2 | `deimv2/s`, `deimv2/m`, `deimv2/l`, `deimv2/x` |
+| RF-DETR | `rfdetr/nano`, `rfdetr/small`, `rfdetr/medium`, `rfdetr/large` |
+| Faster R-CNN + ResNet FPN | `fasterrcnn/resnet50_fpn`, `fasterrcnn/resnet101_fpn` |
+| Faster R-CNN + ConvNeXt/Swin | `fasterrcnn/convnext_tiny`, `fasterrcnn/swin_tiny` |
+| Faster R-CNN + DINO | `fasterrcnn/dinov2_small`, `fasterrcnn/dinov3_small` |
+
+CSV и общие этапы оценки сохраняются; данные COCO для новых моделей готовятся
+автоматически. По умолчанию запрашивается pretrained-инициализация. DEIMv2 требует
+`model.source_dir` с утверждённой ревизией и явный `model.train.weights` либо
+`model.train.backbone_weights`. Для CPU задайте обоим этапам `device=cpu`.
+Новые адаптеры поддерживают CPU и один CUDA GPU; DDP для них пока не реализован.
+Неизвестные настройки, несовместимые веса и отсутствующие pretrained-ресурсы
+вызывают ошибку без подмены модели или скрытого случайного старта.
+
+Лучший нативный чекпойнт передаётся предсказаниям, калибровке и сравнению.
+Его метаданные содержат архитектуру, классы и preprocessing; базовая модель
+сравнения выбирается независимо. Для внешних весов без этих сведений нужны
+явные поля `ModelRef`. Настройки, ограничения разрешения и примеры приведены в
+[руководстве по моделям](docs/multi-model-backends.md).
+
+Для Faster R-CNN добавлена команда `cy-export`: ONNX на CPU, сборка и проверка
+TensorRT на GPU. Отдельный runner не требует Torch и не создаёт задачу ClearML.
+См. [руководство развёртывания](docs/tensorrt-deployment.md).
+Результаты нативной приёмки пресетов, скачивания моделей из ClearML и проверки
+матрицы TensorRT, включая оставшиеся ограничения, находятся в
+[журнале проверки](specs/025-multi-model-backends/verification.md).
+
 ## Переход с Ultralytics и ручных скриптов
 
 Если сейчас вы вызываете библиотеки из CLI или Python-скрипта, таблица поможет
@@ -201,6 +271,7 @@ flowchart TD
 | `cy-val` | Получить предсказания, подобрать пороги на `val` и оценить готовую модель |
 | `cy-metrics` | Рассчитать метрики по готовым таблицам |
 | `cy-compare` | Сравнить две модели на текущих изображениях; по умолчанию на `test` |
+| `cy-export` | Экспортировать Faster R-CNN в ONNX, собрать или проверить TensorRT engine |
 | `cy-report` | Создать отчёты из готового парного сравнения |
 | `cy-ground-truth` | Дополнительная утилита: получить CSV из YOLO-разметки, если готового CSV ещё нет |
 | `cy-init-config` | Создать примеры YAML для команд |
@@ -301,7 +372,8 @@ atime/mtime и расширенные атрибуты сохраняются п
 При автоматическом выборе используйте `device: -1`; номера задают количество,
 а не закрепляют физическое устройство. Видимость задаёт `CUDA_VISIBLE_DEVICES`.
 Для DDP задайте обучению `device: [-1, -1]`, предсказаниям оставьте `device: -1`.
-Ultralytics сам запускает DDP. После очистки памяти обучения резерв сокращается
+Это режим Ultralytics: новые адаптеры принимают один GPU. Ultralytics сам запускает DDP.
+После очистки памяти обучения резерв сокращается
 до GPU для предсказаний и сравнения. CPU/MPS обходят планирование GPU.
 
 | `queue.enabled` | `autogpu.enabled` | Поведение |
@@ -401,6 +473,7 @@ Python-код теперь использует пакеты `core`, `applicatio
 | Ошибка конфигурации | Имя параметра и его группу; создайте актуальные примеры через `cy-init-config` в новом каталоге |
 | Запуск ждёт GPU | Наличие достаточного числа видимых GPU без других вычислительных процессов; доступность NVML |
 | Нет отчётов по сравнению | Наличие завершённой базовой задачи с тегом `prod` в выбранном проекте |
+| `Task.query_tasks` падает при `tasks=None` | Сохраните журнал; проверьте [диагностику транспорта и поточный режим отчётности ClearML](docs/multi-model-backends.md#clearml-reporting-transport-errors) |
 
 Предупреждения о сбоях содержат операцию, тип и описание ошибки, причину и
 относящиеся к ней пути или идентификаторы. Например, `operation=write_receipt`

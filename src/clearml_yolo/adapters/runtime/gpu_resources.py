@@ -7,7 +7,7 @@ import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from importlib import import_module
-from typing import Any, Protocol, cast
+from typing import Any, Literal, Protocol, cast
 
 from clearml_yolo.adapters.observability.diagnostics import (
     exception_summary,
@@ -15,6 +15,7 @@ from clearml_yolo.adapters.observability.diagnostics import (
     redact_text,
 )
 from clearml_yolo.adapters.observability.tracing import trace_operation
+from clearml_yolo.core.execution import ExecutionPhase
 
 _CUDA_PROBE_TIMEOUT_SECONDS = 30.0
 
@@ -84,7 +85,7 @@ def _string_device_count(value: str) -> int:
 
 
 def device_count(value: object) -> int:
-    """Derive GPU demand from one native Ultralytics device selector."""
+    """Derive GPU demand from one native device selector."""
     if value is None:
         return 1
     if isinstance(value, bool):
@@ -129,12 +130,60 @@ def _mapping(config: Mapping[str, Any], key: str) -> Mapping[str, Any]:
     return value
 
 
-def _group_device(config: Mapping[str, Any], key: str) -> object:
-    return _mapping(config, key).get("device")
+def _settings(config: Mapping[str, Any], path: str) -> Mapping[str, Any] | None:
+    current = config
+    for key in path.split("."):
+        if key not in current:
+            return None
+        value = current[key]
+        if not isinstance(value, Mapping):
+            raise TypeError(f"{path} configuration must be a mapping")
+        current = value
+    return current
 
 
-def _inference_request(value: object) -> int:
-    return min(device_count(value), 1)
+def _model_paths(config: Mapping[str, Any]) -> tuple[str, str]:
+    backend = _mapping(config, "model").get("backend", "ultralytics")
+    if backend == "ultralytics":
+        return "ultralytics", "ultralytics_predict"
+    if backend not in {"deimv2", "rfdetr", "fasterrcnn"}:
+        raise ValueError(f"Unsupported model backend for GPU scheduling: {backend!r}")
+    return "model.train", "model.predict"
+
+
+def _model_phase(
+    config: Mapping[str, Any], kind: Literal["train", "predict"], path: str
+) -> ExecutionPhase:
+    settings = _settings(config, path)
+    return ExecutionPhase(
+        kind=kind, settings_path=path, device=settings.get("device") if settings else None
+    )
+
+
+def _export_phase(config: Mapping[str, Any]) -> ExecutionPhase:
+    settings = _mapping(config, "export")
+    operation = settings.get("operation", "onnx")
+    if operation not in {"onnx", "build", "verify"}:
+        raise ValueError(f"Unsupported export operation: {operation!r}")
+    device = settings.get("device", "cpu")
+    count = device_count(device)
+    implicit_device = device is None or (isinstance(device, str) and not device.strip())
+    if count > 1 or (operation != "onnx" and (implicit_device or count != 1)):
+        raise ValueError(f"export.{operation} requires one explicit GPU device")
+    return ExecutionPhase(kind="export", settings_path="export", device=device)
+
+
+def configured_phases(config: Mapping[str, Any]) -> tuple[ExecutionPhase, ...]:
+    """Describe present native setting groups for provenance and automatic remapping."""
+    training, prediction = _model_paths(config)
+    phases: list[ExecutionPhase] = []
+    if _settings(config, training) is not None:
+        phases.append(_model_phase(config, "train", training))
+    if _settings(config, prediction) is not None:
+        phases.append(_model_phase(config, "predict", prediction))
+    if "export" in config:
+        phases.append(_export_phase(config))
+    return tuple(phases)
 
 
 def _skip(config: Mapping[str, Any], key: str) -> bool:
@@ -144,26 +193,35 @@ def _skip(config: Mapping[str, Any], key: str) -> bool:
     return value
 
 
-def job_request(command: str, config: Mapping[str, Any]) -> int:
-    """Derive up-front GPU demand for one resolved command configuration."""
-    if command == "train":
-        return device_count(_group_device(config, "ultralytics"))
-    if command in {"predict", "val", "compare"}:
-        return _inference_request(_group_device(config, "ultralytics_predict"))
-    if command == "pipeline":
-        training = (
-            0 if _skip(config, "skip_train") else device_count(_group_device(config, "ultralytics"))
-        )
-        inference_enabled = not _skip(config, "skip_predict") or not _skip(config, "skip_compare")
-        inference = (
-            _inference_request(_group_device(config, "ultralytics_predict"))
-            if inference_enabled
-            else 0
-        )
-        return max(training, inference)
+def execution_phases(command: str, config: Mapping[str, Any]) -> tuple[ExecutionPhase, ...]:
+    """Describe only the command's enabled work without importing any native runtime."""
     if command in {"metrics", "report", "ground_truth", "init_config"}:
-        return 0
+        return ()
+    if command == "export":
+        return (_export_phase(config),)
+    training, prediction = _model_paths(config)
+    if command == "train":
+        return (_model_phase(config, "train", training),)
+    if command in {"predict", "val", "compare"}:
+        return (_model_phase(config, "predict", prediction),)
+    if command == "pipeline":
+        phases: list[ExecutionPhase] = []
+        if not _skip(config, "skip_train"):
+            phases.append(_model_phase(config, "train", training))
+        inference_enabled = not _skip(config, "skip_predict") or not _skip(config, "skip_compare")
+        if inference_enabled:
+            phases.append(_model_phase(config, "predict", prediction))
+        return tuple(phases)
     raise ValueError(f"Unknown command for GPU request: {command!r}")
+
+
+def job_request(command: str, config: Mapping[str, Any]) -> int:
+    """Derive the maximum enabled-phase GPU demand from lightweight setting records."""
+    demands = (
+        device_count(phase.device) if phase.kind == "train" else min(device_count(phase.device), 1)
+        for phase in execution_phases(command, config)
+    )
+    return max(demands, default=0)
 
 
 def _uuid(value: str | bytes) -> str:

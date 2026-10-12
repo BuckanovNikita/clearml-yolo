@@ -18,10 +18,10 @@ Preserve source images and existing user configuration.
 Build the ground-truth CSV before stages that consume it:
 
 ```bash
-uv run cy-ground-truth data_yaml=data.yaml output=ground_truth.csv
+uv run --frozen --no-sync cy-ground-truth data_yaml=data.yaml output=ground_truth.csv
 ```
 
-`cy` composes the packaged wrapper configuration. Generate examples with
+`cy` composes the packaged wrapper configuration. For default YOLO, generate examples with
 `cy-init-config configs`, then paste native YAML into `configs/ultralytics/default.yaml`.
 Prediction overrides live in `configs/ultralytics_predict/default.yaml`. Invoke generated
 examples with `--config-dir configs --config-name cy`; override shared values with
@@ -31,13 +31,23 @@ Raw `cfg` loading and nested `train.ultralytics`/`predict.ultralytics` are remov
 ClearML is required for execution commands. Pass `clearml.project_name` and
 `clearml.tags` explicitly when isolating runs. `run_dir` routes pipeline output;
 conflicting stage paths or native training `project`/`name` values fail. Standalone
-stages require explicit inputs. `cy-init-config DIRECTORY [--command NAME] [--force]`
-writes one selected wrapper (default `cy`) without creating a task. Five model commands
-include both native groups; `cy-metrics`, `cy-report` and `cy-ground-truth` do not.
+stages require explicit inputs. `cy-init-config DIRECTORY [--command NAME] [--model PRESET] [--force]`
+writes one selected wrapper (default `cy`) without creating a task. Existing model commands
+include both native groups for default YOLO; new detector selections write only their
+`model/<backend>/<preset>.yaml`. `cy-export` defaults to Faster R-CNN ResNet-50-FPN and
+accepts only Faster R-CNN presets; `cy-metrics`, `cy-report` and `cy-ground-truth` use no model group.
 Only selected files/parents participate in overwrite checks.
 
-Select native `device`, `batch`, `amp` and `compile` for the environment. Five model
-commands default `queue.enabled=true` and `autogpu.enabled=true`: whole-GPU FIFO
+New detectors use typed `model.train` and `model.predict` settings, derive COCO working
+data from the same CSV and require the optional detector dependencies. DEIMv2 also requires
+its verified source checkout and compatible explicit pretrained assets. Follow the
+[model guide](../../../../docs/multi-model-backends.md) for presets and restrictions and
+the [multi-model acceptance guide](../../../../specs/025-multi-model-backends/quickstart.md)
+for the native/download/comparison matrices. Use `uv run --frozen --no-sync` after preparing
+an optional-backend environment so verification does not remove its installed extras.
+
+Select the backend's supported device, batch and precision controls for the environment.
+Model commands and `cy-export` default `queue.enabled=true` and `autogpu.enabled=true`: whole-GPU FIFO
 reservations, fresh supervised children and automatic selection. Queue disabled retains
 direct availability waiting; automatic selection disabled retains exact queued identities
 and training order using the enabled-phase UUID union. Both disabled preserves native
@@ -46,6 +56,7 @@ Automatic mode treats native IDs as demand: one for an integer/null/empty/`cuda`
 length for lists, one per `-1`, zero for CPU/MPS; GPU inference requires one. No separate
 GPU-count setting. Exact queued mode requires concrete selectors within inherited CUDA
 visibility and rejects ambiguous automatic values. Neither switch disables tracking.
+CPU ONNX export has zero GPU demand; engine build and verification require one GPU.
 
 Before acceptance, establish sufficient whole-GPU visibility and preserve unrelated compute
 users. Verify no task while waiting, one runner/two waiters on one GPU, interruption with
@@ -78,3 +89,9 @@ use `baseline_model.label`/`candidate_model.label` for local comparison referenc
 real workbook banners/print titles and plot captions in acceptance; use project workbook
 adapters when checking metric values beneath banners. See the
 [identity contract](../../../../specs/014-evaluation-publication/contracts/publication.md#source-identity-on-new-results).
+
+Native detector metadata is embedded in the checkpoint archive, so standalone copies retain
+backend, preset, foreground labels and preprocessing even without a `.model.json` sidecar.
+When present, that sidecar's hash must match. This descriptor is distinct from training
+provenance in `.identity.json`. Raw comparison checkpoints need explicit backend, preset,
+class strings and preprocessing assertions, plus DEIM source access when applicable.

@@ -12,6 +12,7 @@ import grimp
 import pytest
 from importlinter.configuration import configure
 from importlinter.contracts.forbidden import ForbiddenContract
+from importlinter.contracts.independence import IndependenceContract
 from importlinter.contracts.layers import LayersContract
 
 import architecture_helpers as architecture
@@ -65,6 +66,15 @@ def test_actual_graph_obeys_classification_direction_sdk_ownership_and_cycles(
         ("clearml_yolo.adapters.yolo.inference", "fiftyone", "SDK ownership"),
         ("clearml_yolo.adapters.storage.dataset", "hydra", "SDK ownership"),
         ("clearml_yolo.entrypoints.composition", "torch", "SDK ownership"),
+        ("clearml_yolo.adapters.export.metadata", "torch", "SDK ownership"),
+        ("clearml_yolo.adapters.export.metadata", "timm", "SDK ownership"),
+        ("clearml_yolo.adapters.storage.checkpoint", "torchvision", "SDK ownership"),
+        ("clearml_yolo.adapters.deim.backend", "rfdetr", "SDK ownership"),
+        ("clearml_yolo.adapters.rfdetr.backend", "timm", "SDK ownership"),
+        ("clearml_yolo.adapters.fasterrcnn.backend", "pytorch_lightning", "SDK ownership"),
+        ("clearml_yolo.application.contracts", "pycocotools", "SDK ownership"),
+        ("clearml_yolo.adapters.clearml.detectors", "onnx", "SDK ownership"),
+        ("clearml_yolo.entrypoints.composition", "tensorrt", "SDK ownership"),
     ],
 )
 def test_injected_forbidden_dependencies_are_rejected(
@@ -228,10 +238,10 @@ def test_legacy_missing_module_and_missing_attribute_targets_are_rejected(
     assert architecture.target_findings({target}, graph, SRC)
 
 
-def test_all_ten_console_commands_are_independent_entrypoints(graph: grimp.ImportGraph) -> None:
+def test_all_console_commands_are_independent_entrypoints(graph: grimp.ImportGraph) -> None:
     config = tomllib.loads((ROOT / "pyproject.toml").read_text())
     commands = {target.split(":")[0] for target in config["project"]["scripts"].values()}
-    assert len(commands) == 10
+    assert commands == {f"clearml_yolo.entrypoints.{name}" for name in architecture.COMMANDS}
     for importer in commands:
         for imported in commands - {importer}:
             assert graph.find_shortest_chain(importer, imported) is None, (importer, imported)
@@ -246,6 +256,41 @@ def test_all_ten_console_commands_are_independent_entrypoints(graph: grimp.Impor
             "clearml_yolo.adapters.yolo.inference",
         ),
         ("clearml SDK has explicit owners", "clearml_yolo.application.contracts", "clearml"),
+        (
+            "torchvision SDK has explicit owners",
+            "clearml_yolo.application.contracts",
+            "torchvision",
+        ),
+        ("timm SDK has explicit owners", "clearml_yolo.adapters.rfdetr.backend", "timm"),
+        ("timm SDK has explicit owners", "clearml_yolo.adapters.export.metadata", "timm"),
+        ("rfdetr SDK has explicit owners", "clearml_yolo.adapters.deim.backend", "rfdetr"),
+        (
+            "pytorch_lightning SDK has explicit owners",
+            "clearml_yolo.application.contracts",
+            "pytorch_lightning",
+        ),
+        (
+            "pycocotools SDK has explicit owners",
+            "clearml_yolo.application.contracts",
+            "pycocotools",
+        ),
+        ("onnx SDK has explicit owners", "clearml_yolo.adapters.clearml.detectors", "onnx"),
+        ("tensorrt SDK has explicit owners", "clearml_yolo.entrypoints.composition", "tensorrt"),
+        (
+            "export adapter peer ownership",
+            "clearml_yolo.adapters.export.metadata",
+            "clearml_yolo.adapters.fasterrcnn.model",
+        ),
+        (
+            "export adapter peer ownership",
+            "clearml_yolo.adapters.export.verification",
+            "clearml_yolo.adapters.fasterrcnn.inference",
+        ),
+        (
+            "Every command entrypoint stands alone",
+            "clearml_yolo.entrypoints.export",
+            "clearml_yolo.entrypoints.train",
+        ),
         (
             "Core and application have no logging or rendering dependency",
             "clearml_yolo.application.contracts",
@@ -267,13 +312,30 @@ def test_actual_configured_import_linter_contract_rejects_mutated_graph(
         key: str(value).lower() if isinstance(value, bool) else value
         for key, value in options.items()
     }
-    contract_class = LayersContract if options["type"] == "layers" else ForbiddenContract
+    contract_classes: dict[str, type[LayersContract | ForbiddenContract | IndependenceContract]] = {
+        "layers": LayersContract,
+        "forbidden": ForbiddenContract,
+        "independence": IndependenceContract,
+    }
+    contract_class = contract_classes[options["type"]]
     contract = contract_class(name=name, session_options=session, contract_options=parsed_options)
     actual = contract.check(deepcopy(graph), verbose=False)
     assert actual.kept
     mutated = deepcopy(graph)
     mutated.add_import(importer=importer, imported=imported)
     assert not contract.check(mutated, verbose=False).kept
+
+
+def test_lazy_import_allowances_match_real_dynamic_edges(graph: grimp.ImportGraph) -> None:
+    config = tomllib.loads((ROOT / "pyproject.toml").read_text())
+    for contract in config["tool"]["importlinter"]["contracts"]:
+        if contract.get("unmatched_ignore_imports_alerting") != "none":
+            continue
+        # import-linter omits import_module calls. Its exact optional allowances
+        # must still exist in our AST-enriched graph, so stale exceptions fail.
+        for edge in contract.get("ignore_imports", []):
+            importer, imported = edge.split(" -> ")
+            assert imported in graph.find_modules_directly_imported_by(importer), edge
 
 
 @pytest.mark.parametrize(
@@ -336,6 +398,11 @@ def test_actual_application_uses_ports_for_io() -> None:
         ("clearml_yolo.adapters.evaluation.scoring", "clearml_yolo.adapters.clearml.session"),
         ("clearml_yolo.adapters.storage.dataset", "clearml_yolo.adapters.yolo.inference"),
         ("clearml_yolo.adapters.fiftyone.publisher", "clearml_yolo.adapters.clearml.session"),
+        ("clearml_yolo.adapters.deim.backend", "clearml_yolo.adapters.rfdetr.backend"),
+        ("clearml_yolo.adapters.fasterrcnn.training", "clearml_yolo.adapters.clearml.detectors"),
+        ("clearml_yolo.adapters.storage.checkpoint", "clearml_yolo.adapters.fasterrcnn.model"),
+        ("clearml_yolo.adapters.export.metadata", "clearml_yolo.adapters.fasterrcnn.model"),
+        ("clearml_yolo.adapters.yolo.inference", "clearml_yolo.adapters.export.onnx"),
     ],
 )
 def test_adapter_peer_escapes_are_rejected(importer: str, imported: str) -> None:
@@ -380,11 +447,14 @@ def test_initializer_cannot_eagerly_load_sdk_through_internal_reexport(tmp_path:
     assert "ultralytics" in findings[0]
 
 
-def test_dynamic_sdk_import_is_checked_at_its_owner(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "sdk", ["clearml", "torchvision", "timm", "rfdetr", "pytorch_lightning", "onnx", "tensorrt"]
+)
+def test_dynamic_sdk_import_is_checked_at_its_owner(tmp_path: Path, sdk: str) -> None:
     package = tmp_path / "clearml_yolo/adapters/storage"
     package.mkdir(parents=True)
     (package / "helper.py").write_text(
-        "from importlib import import_module\nclient = import_module('clearml')\n"
+        f"from importlib import import_module\nclient = import_module({sdk!r})\n"
     )
     candidate = grimp.ImportGraph()
     candidate.add_module("clearml_yolo.adapters.storage.helper")

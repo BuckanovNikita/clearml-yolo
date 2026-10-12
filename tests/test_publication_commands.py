@@ -180,7 +180,7 @@ def test_training_policy_normalization_and_receipts_stay_out_of_artifacts(
     assert result.weights == best
     assert [item["name"] for item in task.uploads] == [artifact_names.GROUND_TRUTH]
     run = next(
-        item["configuration"] for item in reversed(task.configurations) if item["name"] == "run"
+        item["config_dict"] for item in reversed(task.configurations) if item["name"] == "run"
     )
     assert run["training_data_overrides"]["fraction"] == {"requested": 0.5, "effective": 1.0}
     assert run["training_data_overrides"]["classes"] == {"requested": [0], "effective": None}
@@ -560,7 +560,7 @@ def test_real_invocation_freezes_routing_before_collision_display_rename(
     expected = task_run_dir(tmp_path / "runs", "project", "requested/report", task.id) / "report"
     assert outputs == [str(expected)]
     run = next(
-        item["configuration"] for item in reversed(task.configurations) if item["name"] == "run"
+        item["config_dict"] for item in reversed(task.configurations) if item["name"] == "run"
     )
     assert run["display_names"]["requested_task_name"] == "requested/report"
     assert run["display_names"]["effective_task_name"] == task.name

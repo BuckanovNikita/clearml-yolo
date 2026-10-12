@@ -42,6 +42,12 @@ publication occurs. Manual pushes explicitly name the desired tag. Release prepa
 uses PSR's versioned changelog rendering, including the source commit. Recovery metadata
 stores its SHA-256 before the checked commit; validation rejects changed content.
 
+The lockfile refresh updates only the unique root project's version token, preserving
+all other bytes. It requires the unchanged source-commit lockfile, matching old project
+version and a local root source. It performs no dependency resolution; protected local
+dependency nodes remain intact when commit-time source overrides are absent. A missing
+or ambiguous root, mismatched version or concurrent change fails before the lock write.
+
 A failed metadata preparation leaves files for inspection. Resolve the reported cause,
 inspect the diff, and finish only the intended version changes and prepared changelog as
 `chore(release): VERSION`. The installed hook then revalidates that matching release

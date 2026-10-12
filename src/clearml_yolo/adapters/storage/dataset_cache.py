@@ -177,7 +177,9 @@ def _validated_splits(
     return split_counts if dict(observed) == split_counts else None
 
 
-def _valid_data_yaml(entry: Path, splits: dict[str, int] | None) -> bool:
+def _valid_data_yaml(
+    entry: Path, splits: dict[str, int] | None, dataset_format: DatasetFormat
+) -> bool:
     try:
         data = yaml.safe_load((entry / "data.yaml").read_text(encoding="utf-8"))
     except FileNotFoundError:
@@ -200,7 +202,15 @@ def _valid_data_yaml(entry: Path, splits: dict[str, int] | None) -> bool:
         and isinstance(names, dict)
         and bool(names)
         and {str(key): value for key, value in names.items()} == manifest.get("class_names")
-        and all(data.get(split) == f"images/{split}" for split in splits)
+        and all(
+            data.get(split)
+            == (
+                ("valid" if split == "val" else split)
+                if dataset_format == "coco"
+                else f"images/{split}"
+            )
+            for split in splits
+        )
     )
 
 
@@ -243,6 +253,8 @@ def _load_completed(
     }
     if dataset_format == "ndjson":
         minimum.add("dataset.ndjson")
+    elif dataset_format == "coco":
+        minimum.update(f"{split}/_annotations.coco.json" for split in ("train", "valid", "test"))
     if not minimum.issubset(completion.required_files):
         return None
     splits = _validated_splits(
@@ -251,7 +263,7 @@ def _load_completed(
         dataset_format=dataset_format,
         required_paths=required_paths,
     )
-    if splits != completion.split_counts or not _valid_data_yaml(entry, splits):
+    if splits != completion.split_counts or not _valid_data_yaml(entry, splits, dataset_format):
         return None
 
     missing_splits = sorted(
@@ -373,8 +385,8 @@ def cached_dataset(
     required_splits: tuple[str, ...] = ("train", "val"),
 ) -> Iterator[PreparedDataset]:
     """Yield one reusable prepared dataset while holding its native-consumer lock."""
-    if dataset_format not in {"ndjson", "flat"}:
-        raise ValueError("dataset_format must be one of: ndjson, flat")
+    if dataset_format not in {"ndjson", "flat", "coco"}:
+        raise ValueError("dataset_format must be one of: ndjson, flat, coco")
     unsupported_splits = sorted(set(required_splits) - _SUPPORTED_SPLITS)
     if unsupported_splits:
         raise ValueError(

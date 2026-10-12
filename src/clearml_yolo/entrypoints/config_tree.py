@@ -36,11 +36,15 @@ def _main() -> None:
             "cy-report",
             "cy-compare",
             "cy-ground-truth",
+            "cy-export",
         ),
         default="cy",
         help="execution command to configure (default: cy)",
     )
     parser.add_argument("--force", action="store_true", help="overwrite existing example files")
+    parser.add_argument(
+        "--model", help="model preset (default: ultralytics; Faster R-CNN for cy-export)"
+    )
     arguments = parser.parse_args()
 
     # Initialization is local file generation; it needs neither a task nor model runtime.
@@ -49,9 +53,12 @@ def _main() -> None:
     try:
         with trace_operation("configuration.export", context={"destination": arguments.directory}):
             dump_config_tree(
-                arguments.directory, command=arguments.command, overwrite=arguments.force
+                arguments.directory,
+                command=arguments.command,
+                model=arguments.model,
+                overwrite=arguments.force,
             )
-    except OSError as error:
+    except (OSError, ValueError) as error:
         from clearml_yolo.adapters.observability.diagnostics import (
             exception_summary,
             log_exception,

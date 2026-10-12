@@ -22,11 +22,14 @@ from clearml_yolo.adapters.storage.filesystem import model_weights_path
 from clearml_yolo.adapters.storage.identity import checkpoint_sha256, read_checkpoint_identity
 from clearml_yolo.core.artifact_names import BEST_CONFIDENCES_VAL
 from clearml_yolo.core.identity import ModelIdentity
+from clearml_yolo.core.models import CheckpointMetadata
 
 # ClearML ids are 32 lowercase hex characters. Recognising them by shape is what lets
 # `weights=` accept either a checkpoint on disk or a task, without a second config key
 # that could contradict the first.
 TASK_ID_LENGTH = 32
+_CHECKPOINT_SUFFIXES = frozenset({".pt", ".pth", ".ckpt"})
+_BEST_CHECKPOINT_NAMES = frozenset(f"best{suffix}" for suffix in _CHECKPOINT_SUFFIXES)
 
 
 def looks_like_task_id(value: str) -> bool:
@@ -106,10 +109,14 @@ def best_output_model(task: Any) -> Any | None:
     if candidates:
         return candidates[0]
     candidates = [
-        model for model in outputs if Path(unquote(urlsplit(str(model.url)).path)).name == "best.pt"
+        model
+        for model in outputs
+        if Path(unquote(urlsplit(str(model.url)).path)).name in _BEST_CHECKPOINT_NAMES
     ]
     if len(candidates) > 1:
-        raise ValueError(f"Ambiguous best.pt output models on ClearML task {task.id}")
+        raise ValueError(
+            f"Ambiguous best checkpoint filename output models on ClearML task {task.id}"
+        )
     if candidates:
         return candidates[0]
     if outputs:
@@ -124,8 +131,12 @@ def best_output_model(task: Any) -> Any | None:
 
 _CHECKPOINT_ARTIFACTS = (
     "train_weights_best.pt",
+    "train_weights_best.pth",
+    "train_weights_best.ckpt",
     "train_weights_best",
     "best.pt",
+    "best.pth",
+    "best.ckpt",
     "best",
     "model",
     "checkpoint",
@@ -155,7 +166,10 @@ def _select_checkpoint(task: Any) -> tuple[Any, dict[str, str]]:
         links.update(source_identity.model_dump(exclude_none=True))
         return model, links
     artifacts = task.artifacts
-    names = [*_CHECKPOINT_ARTIFACTS, *sorted(name for name in artifacts if name.endswith(".pt"))]
+    names = [
+        *_CHECKPOINT_ARTIFACTS,
+        *sorted(name for name in artifacts if Path(name).suffix.lower() in _CHECKPOINT_SUFFIXES),
+    ]
     for name in names:
         if name in artifacts:
             artifact = artifacts[name]
@@ -175,8 +189,34 @@ def source_model_links(task_id: str) -> dict[str, str]:
     return links
 
 
+def _validate_downloaded_checkpoint(
+    path: Path, source: str, raw_metadata: CheckpointMetadata | None = None
+) -> None:
+    from clearml_yolo.adapters.storage.checkpoint import read_checkpoint_descriptor
+
+    if not path.is_file():
+        raise FileNotFoundError(f"Checkpoint {source} returned {path}, but it is not a file")
+    descriptor = read_checkpoint_descriptor(path)
+    if raw_metadata is not None:
+        if raw_metadata.backend == "ultralytics":
+            raise ValueError("Raw detector metadata must select a native detector family")
+        fields = {"backend", "preset", "class_names", "preprocessing"}
+        if descriptor is not None and descriptor.model_dump(
+            include=fields
+        ) != raw_metadata.model_dump(include=fields):
+            raise ValueError("Raw model assertions disagree with the checkpoint descriptor")
+    if path.suffix.lower() not in _CHECKPOINT_SUFFIXES or (
+        path.suffix.lower() != ".pt" and descriptor is None and raw_metadata is None
+    ):
+        raise ValueError(
+            f"Checkpoint {source} must be a .pt file or a described .pth/.ckpt detector: {path}"
+        )
+
+
 @trace_operation("clearml.checkpoint.resolve")
-def resolve_task_model(task_id: str) -> tuple[Path, dict[str, str]]:
+def resolve_task_model(
+    task_id: str, *, raw_metadata: CheckpointMetadata | None = None
+) -> tuple[Path, dict[str, str]]:
     """Download one selected checkpoint and return its matching source provenance."""
     task = _task(task_id)
     selected, links = _select_checkpoint(task)
@@ -198,12 +238,7 @@ def resolve_task_model(task_id: str) -> tuple[Path, dict[str, str]]:
     if not checkpoint:
         raise ValueError(f"Checkpoint {identity!r} on task {task_id} returned no local file")
     path = Path(checkpoint)
-    if path.suffix.lower() != ".pt":
-        raise ValueError(f"Checkpoint {identity!r} on task {task_id} must be a .pt file: {path}")
-    if not path.is_file():
-        raise FileNotFoundError(
-            f"Checkpoint {identity!r} on task {task_id} returned {path}, but it is not a file"
-        )
+    _validate_downloaded_checkpoint(path, f"{identity!r} on task {task_id}", raw_metadata)
     downloaded_hash = checkpoint_sha256(path)
     if links.get("checkpoint_sha256") not in {None, downloaded_hash}:
         raise ValueError(f"Checkpoint {identity!r} on task {task_id} failed SHA-256 verification")
@@ -248,6 +283,7 @@ def resolve_weights_with_identity(
         if not local or not Path(local).is_file():
             raise FileNotFoundError("ClearML model did not return a local checkpoint")
         path = Path(local)
+        _validate_downloaded_checkpoint(path, f"from model {model.id}")
         actual_hash = checkpoint_sha256(path)
         stored_hash = model.get_metadata("clearml_yolo_checkpoint_sha256")
         if stored_hash and stored_hash != actual_hash:

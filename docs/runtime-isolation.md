@@ -9,11 +9,13 @@ remains evidence of its original implementation, rather than current acceptance.
 
 ## Selected configuration export
 
-`cy-init-config DIRECTORY [--command NAME] [--force]` accepts `cy`, `cy-train`,
-`cy-predict`, `cy-val`, `cy-metrics`, `cy-report`, `cy-compare` and `cy-ground-truth`.
+`cy-init-config DIRECTORY [--command NAME] [--model PRESET] [--force]` accepts `cy`, `cy-train`,
+`cy-predict`, `cy-val`, `cy-metrics`, `cy-report`, `cy-compare`, `cy-ground-truth` and `cy-export`.
 The default is `cy`. Each invocation writes exactly one `<command>.yaml` wrapper.
-The five model commands also write `ultralytics/default.yaml` and
-`ultralytics_predict/default.yaml`; the other three require no native group files.
+The five existing model commands default to YOLO and also write `ultralytics/default.yaml`
+and `ultralytics_predict/default.yaml`. A new-detector selection instead writes
+`model/<backend>/<preset>.yaml`; `cy-export` defaults to `fasterrcnn/resnet50_fpn` and accepts
+only Faster R-CNN. Metrics, report and ground-truth commands require no model group files.
 Only selected destinations and their parents participate in overwrite preflight.
 Unrelated files remain unchanged. Existing selected files fail without `--force`;
 force replaces regular files only, never symlinks or directories. No ClearML task
@@ -27,7 +29,7 @@ cy-metrics --config-dir metrics-config --config-name cy-metrics --help
 
 Back up custom YAML before regenerating each command; see
 [configuration migration](python-import-migration.md#regenerate-saved-configuration).
-`dump_config_tree(directory, *, command="cy", overwrite=False)` exposes the same
+`dump_config_tree(directory, *, command="cy", model=None, overwrite=False)` exposes the same
 selection for Python callers.
 
 ## Optional FiftyOne operations
@@ -62,7 +64,7 @@ Fault injection verifies bounded failure behavior independently of that incident
 
 ## Runtime boundary
 
-The eight application commands and `cy-init-config` establish project configuration
+The application execution commands and `cy-init-config` establish project configuration
 through a stdlib-only bootstrap before SDK imports. `cy-dedup` loads no SDKs or
 configuration, creates no application directories and keeps its cleaned atomic
 temporary files beside the selected destination. Package imports remain inert. The command's owned runtime scope includes execution,
@@ -70,6 +72,14 @@ native descendants, optional publication, required uploads, task finalization an
 cleanup. `native_runtime()` scopes environment and scratch for direct programmatic
 use too, restores settings on exit and reuses an outer CLI arena when present.
 `command.return` follows cleanup and is not a success assertion.
+
+New detector selection uses `detector_runtime()` after admission, with the same owned arena
+and ClearML finalization boundaries. RF-DETR and Roboflow configuration roots are set inside
+`CY_HOME` before SDK import. DEIM uses the verified private source loader and restores the
+ambient pycocotools module identities around upstream import/dataset construction. Different
+detector families running concurrently require separate processes; the temporary DEIM module
+alias boundary is sequential. Replay validates the model before device remapping and rejects
+switching between initialized YOLO and new-detector runtime families.
 
 The boundary preserves `HOME`, package defaults and OS runtime assets. Configuration
 selectors resolve inside the physical `CY_HOME` root; symlinks cannot bypass that

@@ -12,7 +12,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import IO
+from typing import IO, Any, Literal
 
 import pandas as pd
 from loguru import logger
@@ -38,22 +38,24 @@ _MAX_REPORTED_PATHS = 5
 # Numeric-looking identifiers (COCO stems, "0001") would come back as int64 and stop
 # joining to the ground truth, so the cached frame must reload as the model produced it.
 _CACHED_TEXT_COLUMNS = {"image_name": str, "instance_label": str}
-_OWNED_NATIVE_KEYS = {
-    "batch",
-    "conf",
-    "device",
-    "image_name",
-    "imgsz",
-    "iou",
-    "mode",
-    "model",
-    "name",
-    "project",
-    "save_dir",
-    "source",
-    "stream",
-    "task",
-}
+COMPARISON_KEYS = frozenset(
+    {
+        "batch",
+        "conf",
+        "device",
+        "image_name",
+        "imgsz",
+        "iou",
+        "mode",
+        "model",
+        "name",
+        "project",
+        "save_dir",
+        "source",
+        "stream",
+        "task",
+    }
+)
 
 
 def _model_class_names(weights: str | Path) -> dict[int, str]:
@@ -222,6 +224,9 @@ def reinfer_split(
     reuse_existing: bool = True,
     predictor: Predictor = predict_on_images,
     class_names: ClassNameLoader = _model_class_names,
+    write_settings: Callable[
+        [Path, dict[str, Any], Literal["train", "predict"]], Path
+    ] = write_native_yaml,
 ) -> tuple[pd.DataFrame, VocabularyReport]:
     """Score ``weights`` on the images of ``split`` in ``ground_truth``.
 
@@ -238,7 +243,7 @@ def reinfer_split(
         ValueError: If the split is empty, the required columns are absent, or any of
             the split's images is missing on disk.
     """
-    duplicate_native_keys = sorted(_OWNED_NATIVE_KEYS & set(native_kwargs or {}))
+    duplicate_native_keys = sorted(COMPARISON_KEYS & set(native_kwargs or {}))
     if duplicate_native_keys:
         raise ValueError(
             "native_kwargs cannot override comparison-owned inference key(s): "
@@ -278,7 +283,7 @@ def reinfer_split(
         manifest.write_text(
             "\n".join(str(Path(path).absolute()) for path in image_paths), encoding="utf-8"
         )
-        write_native_yaml(
+        write_settings(
             output.parent / f"ultralytics_predict_{native_name}.yaml",
             {key: value for key, value in settings.items() if key != "image_name"}
             | {"source": str(manifest.resolve()), "model": str(weights), "mode": "predict"},

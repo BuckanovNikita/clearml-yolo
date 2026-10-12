@@ -8,7 +8,7 @@ from hydra.core.hydra_config import HydraConfig
 from hydra.core.utils import JobReturn
 from hydra.plugins.launcher import Launcher
 from hydra.types import HydraContext, TaskFunction
-from omegaconf import DictConfig, open_dict, read_write
+from omegaconf import DictConfig, OmegaConf, open_dict, read_write
 
 
 class QueueLauncher(Launcher):
@@ -88,9 +88,18 @@ class QueueLauncher(Launcher):
 
         if self.config is None or self.hydra_context is None:
             raise RuntimeError("Queue launcher has not been set up")
-        params = self.config.hydra.sweeper.get("params") or {}
-        arguments = [f"{key}={value}" for key, value in params.items()]
-        arguments.extend(str(value) for value in self.config.hydra.overrides.task)
+        configured_params = self.config.hydra.sweeper.get("params")
+        params = (
+            OmegaConf.to_container(configured_params, resolve=False)
+            if configured_params is not None
+            else {}
+        )
+        # These are override expressions; resolve them only in each composed job.
+        task_overrides = OmegaConf.to_container(self.config.hydra.overrides.task, resolve=False)
+        if not isinstance(params, dict) or not isinstance(task_overrides, list):
+            raise TypeError("Hydra sweep parameters and task overrides must be a mapping and list")
+        arguments = [f"{key!s}={value}" for key, value in params.items()]
+        arguments.extend(str(value) for value in task_overrides)
         parser = OverridesParser.create(config_loader=self.hydra_context.config_loader)
         overrides = parser.parse_overrides(arguments)
         if not any(override.is_sweep_override() for override in overrides):

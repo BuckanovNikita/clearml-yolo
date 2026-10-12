@@ -1,4 +1,4 @@
-"""Local release acceptance tests use real Git, PSR, uv and installed hooks."""
+"""Local release acceptance tests use real Git, PSR and installed hooks."""
 
 import json
 import os
@@ -64,7 +64,11 @@ def release_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         '[project]\nname = "release-fixture"\nversion = "0.3.0"\n'
         'requires-python = ">=3.12"\n[tool.semantic_release]' + policy
     )
-    command(repo, "uv", "lock", "--offline")
+    (repo / "uv.lock").write_text(
+        'version = 1\nrevision = 3\nrequires-python = ">=3.12"\n\n'
+        '[[package]]\nname = "release-fixture"\nversion = "0.3.0"\n'
+        'source = { virtual = "." }\n'
+    )
     # Use the real post-commit hook definition, substituting only the already-installed
     # interpreter so fixture projects need no environment installation or network.
     config = yaml.safe_load((ROOT / ".pre-commit-config.yaml").read_text())
@@ -101,6 +105,103 @@ def release_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     command(repo, sys.executable, str(HELPER), "--install-hooks")
     assert git(repo, "tag", "--list") == "v0.3.0"
     return repo
+
+
+@pytest.fixture
+def protected_release_repo(release_repo: Path) -> Path:
+    repo = release_repo
+    git(repo, "switch", "-c", "feature/protected-lock")
+    project = repo / "pyproject.toml"
+    project.write_text(
+        project.read_text().replace(
+            'requires-python = ">=3.12"\n',
+            'requires-python = ">=3.12"\n'
+            'dependencies = ["digital-metrics>=0.6.1", "report-generator>=0.1.2"]\n',
+        )
+    )
+    (repo / "uv.lock").write_bytes(
+        b'version = 1\r\nrevision = 3\r\nrequires-python = ">=3.12"\r\n\r\n'
+        b"# Preserve dependency versions, source paths and metadata verbatim.\r\n"
+        b'[[package]]\r\nname = "digital-metrics"\r\nversion = "0.6.1"\r\n'
+        b'source = { editable = "external/digital-metrics" }\r\n\r\n'
+        b'[[package]]\r\nname = "release-fixture"\r\n'
+        b"version = '0.3.0' # Only this version changes.\r\n"
+        b'source = { editable = "." }\r\n'
+        b'dependencies = [{ name = "digital-metrics" }, { name = "report-generator" }]\r\n'
+        b"[package.metadata]\r\nrequires-dist = [\r\n"
+        b'    { name = "digital-metrics", editable = "external/digital-metrics" },\r\n'
+        b'    { name = "report-generator", editable = "external/report-generator" },\r\n'
+        b']\r\n\r\n[[package]]\r\nname = "report-generator"\r\nversion = "0.1.2"\r\n'
+        b'source = { editable = "external/report-generator" }\r\n'
+    )
+    git(repo, "add", "pyproject.toml", "uv.lock")
+    git(repo, "commit", "-m", "fix: retain approved editable dependencies")
+    git(repo, "switch", "master")
+    git(repo, "merge", "--ff-only", "feature/protected-lock")
+    return repo
+
+
+def test_release_preserves_protected_lock_without_resolving(
+    protected_release_repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.syspath_prepend(str(ROOT))
+    from scripts import local_release
+
+    repo = protected_release_repo
+    before = (repo / "uv.lock").read_bytes()
+    original = local_release.run
+
+    def without_resolution(root: Path, *args: str) -> str:
+        if args[:2] == ("uv", "lock"):
+            pytest.fail("Release must not resolve protected dependencies")
+        return original(root, *args)
+
+    monkeypatch.setattr(local_release, "run", without_resolution)
+    local_release.release(repo)
+    assert (repo / "uv.lock").read_bytes() == before.replace(
+        b"version = '0.3.0' # Only this version changes.",
+        b"version = '0.3.1' # Only this version changes.",
+    )
+    assert "sources" not in tomllib.loads((repo / "pyproject.toml").read_text())["tool"].get(
+        "uv", {}
+    )
+    assert git(repo, "cat-file", "-t", "v0.3.1") == "tag"
+    assert git(repo, "rev-parse", "v0.3.1^{commit}") == git(repo, "rev-parse", "HEAD")
+    assert (repo / ".git/checks").read_text().splitlines() == ["0.3.0", "0.3.1"]
+
+
+@pytest.mark.parametrize(
+    "invalid",
+    ["missing", "duplicate", "old-version", "source", "dependency-drift", "comment-drift"],
+)
+def test_lock_refresh_rejects_invalid_source_without_writing(
+    protected_release_repo: Path, monkeypatch: pytest.MonkeyPatch, invalid: str
+) -> None:
+    monkeypatch.syspath_prepend(str(ROOT))
+    from scripts import local_release
+
+    repo = protected_release_repo
+    path = repo / "uv.lock"
+    content = path.read_bytes()
+    replacements = {
+        "missing": (b'name = "release-fixture"', b'name = "another-project"'),
+        "duplicate": (b'name = "report-generator"\r\n', b'name = "release-fixture"\r\n'),
+        "old-version": (b"version = '0.3.0'", b"version = '0.2.0'"),
+        "source": (b'editable = "."', b'editable = "../another-project"'),
+        "dependency-drift": (b'version = "0.6.1"', b'version = "0.6.2"'),
+        "comment-drift": (b"# Preserve dependency", b"# Unreviewed dependency"),
+    }
+    path.write_bytes(content.replace(*replacements[invalid]))
+    # Malformed committed roots must also fail, not merely dirty worktrees.
+    if invalid in {"missing", "duplicate", "old-version", "source"}:
+        git(repo, "switch", "-c", "feature/invalid-lock")
+        git(repo, "add", "uv.lock")
+        git(repo, "commit", "-m", "chore: invalid lock fixture")
+    before = path.read_bytes()
+    attempt = local_release.Attempt(source=git(repo, "rev-parse", "HEAD"), version="0.3.1")
+    with pytest.raises(local_release.ReleaseError, match="Lockfile"):
+        local_release.refresh_lock_version(repo, attempt)
+    assert path.read_bytes() == before
 
 
 @pytest.mark.parametrize(
@@ -339,16 +440,14 @@ def test_lock_refresh_cannot_upgrade_dependencies(
     commit(repo, "fix: test dependency drift")
     git(repo, "switch", "master")
     git(repo, "merge", "--ff-only", "feature/fix")
-    original = local_release.run
+    original = local_release.refresh_lock_version
 
-    def drifting_lock(root: Path, *args: str) -> str:
-        output = original(root, *args)
-        if args[:2] == ("uv", "lock"):
-            with (root / "uv.lock").open("a") as stream:
-                stream.write('\n[[package]]\nname = "unexpected"\nversion = "9.9.9"\n')
-        return output
+    def drifting_lock(root: Path, attempt: local_release.Attempt) -> None:
+        original(root, attempt)
+        with (root / "uv.lock").open("a") as stream:
+            stream.write('\n[[package]]\nname = "unexpected"\nversion = "9.9.9"\n')
 
-    monkeypatch.setattr(local_release, "run", drifting_lock)
+    monkeypatch.setattr(local_release, "refresh_lock_version", drifting_lock)
     with pytest.raises(local_release.ReleaseError, match="changed dependencies"):
         local_release.release(repo)
     assert git(repo, "tag", "--list") == "v0.3.0"

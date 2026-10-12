@@ -23,7 +23,12 @@ from omegaconf import DictConfig, OmegaConf, open_dict
 
 from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.runtime.gpu_queue import GPUQueue, Ticket
-from clearml_yolo.adapters.runtime.gpu_resources import GPUInventory, device_count, job_request
+from clearml_yolo.adapters.runtime.gpu_resources import (
+    GPUInventory,
+    configured_phases,
+    device_count,
+    job_request,
+)
 from clearml_yolo.adapters.runtime.gpu_scheduling import (
     ExactSelection,
     exact_device_ordinals,
@@ -31,6 +36,7 @@ from clearml_yolo.adapters.runtime.gpu_scheduling import (
     execution_controls,
 )
 from clearml_yolo.adapters.storage.filesystem import temporary_root
+from clearml_yolo.entrypoints.hydra.validation import materialize_model_config
 
 POLL_SECONDS = 0.5
 _ENTRYPOINT: tuple[str, Callable[..., Any]] | None = None
@@ -54,16 +60,18 @@ def effective_configuration(
 ) -> DictConfig:
     """Translate requests to reserved child ordinals without rewriting provenance."""
     effective = deepcopy(config)
+    materialize_model_config(effective)
     if not devices:
         return effective
     with open_dict(effective):
-        for group, limit in (("ultralytics", len(devices)), ("ultralytics_predict", 1)):
-            if group in effective:
-                count = min(device_count(effective[group].get("device")), limit)
-                if count:
-                    effective[group].device = (
-                        list(devices[:count]) if isinstance(devices[0], int) else list(range(count))
-                    )
+        for phase in configured_phases(effective):
+            limit = len(devices) if phase.kind == "train" else 1
+            count = min(device_count(phase.device), limit)
+            if count:
+                ordinals = (
+                    list(devices[:count]) if isinstance(devices[0], int) else list(range(count))
+                )
+                OmegaConf.update(effective, f"{phase.settings_path}.device", ordinals)
     return effective
 
 
@@ -75,9 +83,12 @@ def exact_effective_configuration(
 ) -> DictConfig:
     """Apply validated identity-preserving ordinal replacements at the Hydra boundary."""
     effective = deepcopy(config)
+    materialize_model_config(effective)
     with open_dict(effective):
-        for group, devices in exact_device_ordinals(command, config, selection, admitted).items():
-            effective[group].device = devices
+        for group, devices in exact_device_ordinals(
+            command, effective, selection, admitted
+        ).items():
+            OmegaConf.update(effective, f"{group}.device", devices)
     return effective
 
 
@@ -480,7 +491,10 @@ class ModelJob:
         self.result.cfg = _application_config(self.config)
         self.result.hydra_cfg = OmegaConf.masked_copy(self.config, "hydra")
         self.result.task_name = self.command
-        self.result.overrides = list(self.config.hydra.overrides.task)
+        overrides = OmegaConf.to_container(self.config.hydra.overrides.task, resolve=False)
+        if not isinstance(overrides, list):
+            raise TypeError("Hydra task overrides must be a list")
+        self.result.overrides = [str(value) for value in overrides]
         self.result.working_dir = self.launch_cwd
         failure: RuntimeError | None = None
         if self.sweep:

@@ -493,6 +493,8 @@ def _install_paths(root: Path) -> None:
         "HF_HOME": cache / "huggingface",
         "HF_HUB_CACHE": cache / "huggingface/hub",
         "HF_ASSETS_CACHE": cache / "huggingface/assets",
+        "RF_HOME": cache / "rfdetr",
+        "ROBOFLOW_HOME": cache / "roboflow",
         "PYTHONPYCACHEPREFIX": cache / "python",
         "KERAS_HOME": cache / "keras",
     }.items():

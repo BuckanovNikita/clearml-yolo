@@ -269,7 +269,7 @@ def _validate_requested_splits(required_splits: tuple[str, ...]) -> set[str]:
         raise ValueError(
             f"Unsupported required split(s): {', '.join(unsupported)}; expected train, val, or test"
         )
-    return {"train", "val", *required_splits}
+    return set(required_splits)
 
 
 def _validate_prepared_images(images: list[ImageRecord]) -> None:
@@ -300,12 +300,27 @@ def _validate_prepared_images(images: list[ImageRecord]) -> None:
     validate_dataframe(pd.DataFrame(prepared_rows), ValidationStage.TRAINING_GROUND_TRUTH)
 
 
+def _require_training_labels(images: list[ImageRecord], labels: list[str], source: Path) -> None:
+    training_labels = {
+        box.label for image in images if image.split == "train" for box in image.boxes
+    }
+    if not training_labels:
+        raise ValueError(f"{source}: at least one valid training box is required")
+    for label in sorted(set(labels) - training_labels):
+        logger.warning("Class {!r} has no valid training examples", label)
+
+
 @trace_operation("storage.dataset.validate")
 def validate_ground_truth(
-    source: str | Path, required_splits: tuple[str, ...] = ("train", "val")
+    source: str | Path,
+    required_splits: tuple[str, ...] = ("train", "val"),
+    *,
+    require_training: bool = True,
 ) -> ValidatedDataset:
-    """Read and validate a detection CSV without modifying its source data."""
+    """Validate source records; evaluation corpora may omit training populations."""
     required = _validate_requested_splits(required_splits)
+    if require_training:
+        required |= {"train", "val"}
     source_path = Path(source).expanduser().resolve()
     with trace_operation("storage.dataset.source.hash", context={"path": str(source_path)}):
         input_sha256 = hashlib.sha256(source_path.read_bytes()).hexdigest()
@@ -361,13 +376,8 @@ def validate_ground_truth(
             f"{source_path}: required split(s) contain no images: {', '.join(missing_splits)}"
         )
 
-    training_labels = {
-        box.label for image in images if image.split == "train" for box in image.boxes
-    }
-    if not training_labels:
-        raise ValueError(f"{source_path}: at least one valid training box is required")
-    for label in sorted(set(labels) - training_labels):
-        logger.warning("Class {!r} has no valid training examples", label)
+    if require_training:
+        _require_training_labels(images, labels, source_path)
 
     return ValidatedDataset(
         source=source_path,

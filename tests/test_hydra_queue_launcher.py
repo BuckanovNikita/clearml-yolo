@@ -9,11 +9,12 @@ from typing import cast
 
 import pytest
 from hydra import compose, initialize_config_module
+from hydra.core.global_hydra import GlobalHydra
 from hydra.core.hydra_config import HydraConfig
 from hydra.core.utils import JobStatus
-from hydra.types import HydraContext, TaskFunction
+from hydra.types import HydraContext, RunMode, TaskFunction
 from hydra_zen import store
-from omegaconf import DictConfig, OmegaConf, open_dict
+from omegaconf import DictConfig, OmegaConf, open_dict, read_write
 
 import clearml_yolo.entrypoints.hydra.configs  # noqa: F401
 from clearml_yolo.entrypoints.hydra import execution
@@ -172,6 +173,37 @@ def test_cpu_sweep_returns_ordered_failure_without_cancelling_siblings(tmp_path:
     assert _load(tmp_path / "receipt-5.json")["value"] == "completed"
 
 
+@pytest.mark.parametrize("existing_context", [False, True])
+@pytest.mark.parametrize("fail", [False, True])
+def test_completed_worker_keeps_literal_overrides_after_hydra_context_closes(
+    tmp_path: Path,
+    existing_context: bool,
+    fail: bool,
+) -> None:
+    config = _job_config(tmp_path, index=3, value="literal-result", fail=fail, delay=0.01)
+    overrides = [
+        'clearml.task_name="mixed-${hydra:job.num}"',
+        "output=${hydra:runtime.output_dir}/predictions.csv",
+    ]
+    with open_dict(config.hydra.overrides):
+        config.hydra.overrides.task = overrides
+    hydra = HydraConfig.instance()
+    previous = hydra.cfg
+    try:
+        hydra.cfg = None
+        if existing_context:
+            hydra.set_config(_job_config(tmp_path, index=99, value="stale-context"))
+        expected_context = hydra.cfg
+        result = run_jobs([ModelJob("predict", record_job, config, sweep=True)])[0]
+        assert hydra.cfg is expected_context
+        assert result.overrides == overrides
+        assert result.status == (JobStatus.FAILED if fail else JobStatus.COMPLETED)
+        assert result.working_dir == str(tmp_path / "outputs" / "3")
+        assert _load(tmp_path / "receipt-3.json")["value"] == "literal-result"
+    finally:
+        hydra.cfg = previous
+
+
 def test_queue_launcher_composes_and_submits_ordered_jobs_from_initial_index(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -319,6 +351,66 @@ def test_mixed_modes_in_later_batch_reject_before_first_admission(
         ["queue.enabled=true"],
         ["queue.enabled=false"],
     ]
+
+
+@pytest.mark.parametrize("origin", ["task", "params"])
+@pytest.mark.parametrize("existing_context", [False, True])
+def test_full_sweep_keeps_job_interpolations_literal_until_composition(
+    monkeypatch: pytest.MonkeyPatch, origin: str, existing_context: bool
+) -> None:
+    task_name = '"mixed-${hydra:job.num}-${model.backend}"'
+    weights = '"${oc.env:CY_TEST_WEIGHT_${model.backend}}"'
+    values = {"clearml.task_name": task_name, "weights": weights}
+    overrides = ["model=deimv2/s,rfdetr/nano", "queue.enabled=true"]
+    if origin == "task":
+        overrides.extend(f"{key}={value}" for key, value in values.items())
+    for backend in ("deimv2", "rfdetr"):
+        monkeypatch.setenv(f"CY_TEST_WEIGHT_{backend}", f"{backend}.pth")
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        loader = GlobalHydra.instance().config_loader()
+        initial = loader.load_configuration(
+            config_name="predict", overrides=overrides, run_mode=RunMode.MULTIRUN
+        )
+        if origin == "params":
+            with open_dict(initial.hydra.sweeper):
+                initial.hydra.sweeper.params = values
+        original = loader.load_sweep_config
+        jobs: list[DictConfig] = []
+
+        def load_job(config: DictConfig, job_overrides: list[str]) -> DictConfig:
+            assert f"clearml.task_name={task_name}" in job_overrides
+            assert f"weights={weights}" in job_overrides
+            job = original(config, job_overrides)
+            jobs.append(job)
+            return job
+
+        monkeypatch.setattr(loader, "load_sweep_config", load_job)
+        launcher = QueueLauncher()
+        launcher.setup(
+            hydra_context=cast(HydraContext, SimpleNamespace(config_loader=loader)),
+            task_function=cast(TaskFunction, record_job),
+            config=initial,
+        )
+        hydra = HydraConfig.instance()
+        previous = hydra.cfg
+        try:
+            hydra.cfg = None
+            if existing_context:
+                with open_dict(initial.hydra.job):
+                    initial.hydra.job.num = 99
+                hydra.set_config(initial)
+            expected = hydra.cfg
+            launcher._validate_full_sweep()
+            assert hydra.cfg is expected
+            assert len(jobs) == 2
+            for index, (job, backend) in enumerate(zip(jobs, ("deimv2", "rfdetr"), strict=True)):
+                with read_write(job.hydra.job), open_dict(job.hydra.job):
+                    job.hydra.job.num = index
+                hydra.set_config(job)
+                assert job.clearml.task_name == f"mixed-{index}-{backend}"
+                assert job.weights == f"{backend}.pth"
+        finally:
+            hydra.cfg = previous
 
 
 def test_fresh_worker_retains_trace_command_boundary(

@@ -5,13 +5,15 @@ behavior. Use the [current contract index](current-contracts.md) for maintained 
 and implementation evidence by topic; this summary does not replace those contracts.
 
 `cy` runs the pipeline; `cy-train`, `cy-predict`, `cy-val`, `cy-metrics`, `cy-report`,
-`cy-compare`, and `cy-ground-truth` run individual stages.
+`cy-compare`, and `cy-ground-truth` run individual stages. `cy-export` exports and verifies
+Faster R-CNN deployment bundles.
 
 Entrypoints: `cy`, `cy-train`, `cy-predict`, `cy-val`, `cy-metrics`,
-`cy-report`, `cy-compare`, `cy-ground-truth`, `cy-init-config`, and `cy-dedup`.
-`cy-init-config DIRECTORY [--command NAME] [--force]` writes one selected execution
-wrapper (default `cy`) and its required native groups without a ClearML task. All five
-model commands require both native groups; non-model commands require neither.
+`cy-report`, `cy-compare`, `cy-ground-truth`, `cy-export`, `cy-init-config`, and `cy-dedup`.
+`cy-init-config DIRECTORY [--command NAME] [--model PRESET] [--force]` writes one selected
+execution wrapper (default `cy`) and its required groups without a ClearML task. Default
+YOLO model commands retain both native groups. New detector selections write one model
+preset YAML; non-model commands require neither. Export defaults to Faster R-CNN ResNet-50-FPN.
 See [selected export and runtime isolation](runtime-isolation.md).
 `cy-dedup [DIRECTORY] [--dry-run]` is local cache maintenance without application startup
 or tracking. It reflinks identical same-named images, preserving paths and content;
@@ -29,8 +31,8 @@ explicit programmatic dependencies and regeneration of saved YAML targets. Comma
 names, ordinary overrides, CSVs and durable output/publication contracts retain their
 existing behavior.
 
-Native model settings use top-level Hydra groups `ultralytics` and `ultralytics_predict`
-for all model commands. The shared group covers detection-relevant installed upstream defaults; prediction
+The default `model=ultralytics` retains top-level Hydra groups `ultralytics` and
+`ultralytics_predict`. The shared group covers detection-relevant installed upstream defaults; prediction
 inherits applicable values through visible configuration references, preserving explicit nulls
 and overrides. Prediction execution reads only its resolved group. Project defaults are
 imgsz=960, compile=true and nms=true; prediction uses conf=0.001, batch=1, rect=true and
@@ -45,7 +47,7 @@ Effective native YAML and retained prediction manifests support replay; YAML is 
 locally with comments preserved; canonical run/dataset/report configurations and native General
 parameters support ClearML replay without artifact copies.
 Pass device, batch, AMP, compilation and native augmentation options through the native groups.
-The five model commands expose `queue.enabled` and `autogpu.enabled`, both default true.
+The model commands and `cy-export` expose `queue.enabled` and `autogpu.enabled`, both default true.
 Queued automatic execution restores FIFO, atomic whole-GPU UUID reservations, supervised
 children, liveness recovery, reservation contraction and concurrent Hydra sweeps. Queue off
 with automatic selection on preserves direct availability waiting; queue on with automatic
@@ -59,6 +61,33 @@ Inference needs one device; pipeline demand is the maximum of enabled phases. Ex
 mode requires concrete selectors, reserves the training/inference UUID union and preserves
 training order and inference identity through child-local remapping. Native cleanup precedes
 contraction; release training-only capacity while retaining the downstream device.
+
+New `model=deimv2/<preset>`, `model=rfdetr/<preset>` and `model=fasterrcnn/<preset>` groups
+own typed `model.train` and `model.predict` settings. Unsupported controls fail explicitly.
+Changed controls in inactive groups are rejected in both directions; YOLO settings belong
+in `ultralytics`/`ultralytics_predict`, and native settings belong in `model.train`/`model.predict`.
+Their composition derives immutable COCO datasets from the same validated CSV records;
+public labels retain exact strings and exclude detector background slots. A descriptor
+embedded in each owned checkpoint binds backend, preset, foreground vocabulary,
+preprocessing and source/dependency identity; its external record adds the checkpoint hash.
+See the [backend contract](../specs/025-multi-model-backends/contracts/backend.md) and
+[model guide](multi-model-backends.md) for presets, pretrained sources and limitations.
+
+Comparisons resolve each checkpoint independently, including YOLO/native pairs. Raw native
+references require explicit backend, preset, foreground labels and preprocessing; assertions
+cannot replace conflicting embedded metadata. Two references to the same checkpoint must
+agree on its resolved model metadata; their display labels and thresholds may differ.
+Cache identity includes those assertions.
+The shared comparison device and inference controls remain authoritative, with each backend's
+effective preprocessing recorded. Replay cannot switch between the YOLO and new-detector
+runtime families after initialization; relaunch with the requested selection instead.
+
+`cy-export` has separate CPU/FP32 ONNX, GPU engine-build and GPU verification operations.
+It publishes graph/engine metadata and verification evidence under one task without another
+trained Output Model. The [export contract](../specs/025-multi-model-backends/contracts/export.md)
+defines both dynamic profiles, standalone execution and numerical/quality gates. Verification
+uses a fixed labeled corpus with source-byte and actual evaluator identity. Local execution
+does not establish CUDA 11.8 target compatibility; consult dated acceptance evidence.
 
 NVML and a metadata-only subprocess resolve supported whole-GPU visibility before ClearML
 and native initialization. Unknown telemetry, unsupported MIG, lost visibility and excessive

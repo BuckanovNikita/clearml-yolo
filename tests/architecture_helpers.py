@@ -21,6 +21,10 @@ ADAPTER_RESPONSIBILITIES = {
     "runtime",
     "integrations",
     "observability",
+    "deim",
+    "rfdetr",
+    "fasterrcnn",
+    "export",
 }
 COMMANDS = {
     "pipeline",
@@ -33,6 +37,7 @@ COMMANDS = {
     "ground_truth",
     "config_tree",
     "dedup",
+    "export",
 }
 SCIENTIFIC = {"pydantic", "pandera", "pandas", "numpy", "scipy"}
 APPLICATION_EFFECT_DEPENDENCIES = {
@@ -55,7 +60,38 @@ SDK_OWNERS = {
         "clearml_yolo.adapters.integrations.native_runtime",
         "clearml_yolo.adapters.integrations.native_ddp",
         "clearml_yolo.adapters.integrations.training",
+        "clearml_yolo.adapters.deim.backend",
+        "clearml_yolo.adapters.rfdetr.backend",
+        "clearml_yolo.adapters.fasterrcnn.data",
+        "clearml_yolo.adapters.fasterrcnn.evaluation",
+        "clearml_yolo.adapters.fasterrcnn.inference",
+        "clearml_yolo.adapters.fasterrcnn.model",
+        "clearml_yolo.adapters.fasterrcnn.training",
+        "clearml_yolo.adapters.fasterrcnn.transform",
+        "clearml_yolo.adapters.export.onnx",
+        "clearml_yolo.adapters.export.positions",
+        "clearml_yolo.adapters.export.swin",
+        "clearml_yolo.adapters.export.tensors",
+        "clearml_yolo.adapters.export.verification",
     ),
+    "torchvision": (
+        "clearml_yolo.adapters.deim.backend",
+        "clearml_yolo.adapters.fasterrcnn.model",
+        "clearml_yolo.adapters.fasterrcnn.transform",
+        "clearml_yolo.adapters.export.tensors",
+    ),
+    "timm": (
+        "clearml_yolo.adapters.export.swin",
+        "clearml_yolo.adapters.fasterrcnn.model",
+    ),
+    "rfdetr": ("clearml_yolo.adapters.rfdetr.backend",),
+    "pytorch_lightning": ("clearml_yolo.adapters.rfdetr.backend",),
+    "pycocotools": (
+        "clearml_yolo.adapters.fasterrcnn.evaluation",
+        "clearml_yolo.adapters.export.quality",
+    ),
+    "onnx": ("clearml_yolo.adapters.export.onnx", "clearml_yolo.adapters.export.build"),
+    "tensorrt": ("clearml_yolo.adapters.export.build", "clearml_yolo.adapters.export.runtime"),
     "clearml": (
         "clearml_yolo.adapters.clearml",
         "clearml_yolo.adapters.integrations.native_runtime",
@@ -83,6 +119,10 @@ ADAPTER_PEERS = {
     "fiftyone": {"observability"},
     "runtime": {"observability"},
     "integrations": {"storage", "observability"},
+    "deim": {"observability"},
+    "rfdetr": {"observability"},
+    "fasterrcnn": {"observability"},
+    "export": {"observability"},
 }
 # These edges implement explicit cross-adapter coordination or data conversion.
 PEER_EXCEPTIONS = {
@@ -106,6 +146,33 @@ PEER_EXCEPTIONS = {
     ("clearml_yolo.adapters.integrations.training", "clearml_yolo.adapters.clearml.session"),
     ("clearml_yolo.adapters.integrations.training", "clearml_yolo.adapters.clearml.native"),
     ("clearml_yolo.adapters.integrations.training", "clearml_yolo.adapters.yolo.config"),
+    ("clearml_yolo.adapters.integrations.detectors", "clearml_yolo.adapters.yolo.config"),
+    ("clearml_yolo.adapters.integrations.detectors", "clearml_yolo.adapters.yolo.reinfer"),
+    ("clearml_yolo.adapters.integrations.detectors", "clearml_yolo.adapters.clearml.detectors"),
+    ("clearml_yolo.adapters.integrations.detectors", "clearml_yolo.adapters.deim.backend"),
+    ("clearml_yolo.adapters.integrations.detectors", "clearml_yolo.adapters.rfdetr.backend"),
+    ("clearml_yolo.adapters.integrations.detectors", "clearml_yolo.adapters.fasterrcnn.backend"),
+    ("clearml_yolo.adapters.export.onnx", "clearml_yolo.adapters.fasterrcnn.model"),
+    (
+        "clearml_yolo.adapters.integrations.export_operations",
+        "clearml_yolo.adapters.export.metadata",
+    ),
+    ("clearml_yolo.adapters.integrations.export_operations", "clearml_yolo.adapters.export.build"),
+    ("clearml_yolo.adapters.integrations.export_operations", "clearml_yolo.adapters.export.onnx"),
+    (
+        "clearml_yolo.adapters.integrations.export_operations",
+        "clearml_yolo.adapters.export.verification",
+    ),
+    ("clearml_yolo.adapters.export.verification", "clearml_yolo.adapters.fasterrcnn.model"),
+    ("clearml_yolo.adapters.export.verification", "clearml_yolo.adapters.storage.dataset_records"),
+    (
+        "clearml_yolo.adapters.integrations.export_operations",
+        "clearml_yolo.adapters.fasterrcnn.configuration",
+    ),
+    (
+        "clearml_yolo.adapters.integrations.export_operations",
+        "clearml_yolo.adapters.fasterrcnn.model",
+    ),
 }
 EFFECTFUL_CALLS = {
     "open",

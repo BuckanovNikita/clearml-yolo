@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record runtime isolation release verification
+  ([`2114714`](https://github.com/BuckanovNikita/clearml-yolo/commit/2114714c55b0367e38a5925982e30714532ec4d0))
+
+
 ## v0.23.0 (2026-10-11)
 
 ### Documentation

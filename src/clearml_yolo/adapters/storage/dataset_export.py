@@ -49,7 +49,7 @@ def exported_image_filename(image: ImageRecord, index: int, dataset_format: Data
     suffix = image.path.suffix.lower()
     if not suffix:
         raise ValueError(f"Image path has no file extension: {image.path}")
-    if dataset_format == "flat":
+    if dataset_format in {"flat", "coco"}:
         return f"{index:08d}{suffix}"
     if dataset_format != "ndjson":
         raise ValueError(
@@ -60,6 +60,56 @@ def exported_image_filename(image: ImageRecord, index: int, dataset_format: Data
     if "/" in image.name or "\\" in image.name:
         raise ValueError(f"NDJSON image name must be a safe basename: {image.name!r}")
     return image.name
+
+
+def exported_image_path(image: ImageRecord, index: int, dataset_format: DatasetFormat) -> Path:
+    filename = exported_image_filename(image, index, dataset_format)
+    if dataset_format == "coco":
+        return Path("valid" if image.split == "val" else image.split) / filename
+    return Path("images") / image.split / filename
+
+
+def _export_coco(records: ValidatedDataset, directory: Path) -> Path:
+    categories = [{"id": index, "name": name} for index, name in sorted(records.names.items())]
+    class_ids = {name: index for index, name in records.names.items()}
+    data: dict[str, object] = {"path": str(directory.resolve()), "names": records.names}
+    annotation_id = 0
+    for split in _SPLITS:
+        folder = "valid" if split == "val" else split
+        destination = directory / folder
+        destination.mkdir()
+        images: list[dict[str, object]] = []
+        annotations: list[dict[str, object]] = []
+        for index, image in enumerate(records.images, start=1):
+            if image.split != split:
+                continue
+            filename = exported_image_filename(image, index, "coco")
+            shutil.copyfile(image.path, destination / filename)
+            images.append(
+                {"id": index, "file_name": filename, "width": image.width, "height": image.height}
+            )
+            for box in image.boxes:
+                annotation_id += 1
+                width, height = box.x2 - box.x1, box.y2 - box.y1
+                annotations.append(
+                    {
+                        "id": annotation_id,
+                        "image_id": index,
+                        "category_id": class_ids[box.label],
+                        "bbox": [box.x1, box.y1, width, height],
+                        "area": width * height,
+                        "iscrowd": 0,
+                    }
+                )
+        payload = {"images": images, "annotations": annotations, "categories": categories}
+        (destination / "_annotations.coco.json").write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+        if images:
+            data[split] = folder
+    path = directory / "data.yaml"
+    path.write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True), encoding="utf-8")
+    return path
 
 
 def _export_image(
@@ -215,6 +265,8 @@ def export_dataset(
 ) -> Path:
     """Export canonical records and return the native YAML consumed by Ultralytics."""
     directory.mkdir(parents=True, exist_ok=True)
+    if dataset_format == "coco":
+        return _export_coco(records, directory)
     images = _export_images(records, dataset_format)
     if dataset_format == "ndjson":
         manifest = directory / "dataset.ndjson"

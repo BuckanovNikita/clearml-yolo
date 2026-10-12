@@ -12,17 +12,22 @@ from clearml_yolo.adapters.storage.filesystem import cy_home
 from clearml_yolo.adapters.yolo.config import native_defaults, prediction_defaults, stage_settings
 from clearml_yolo.application.contracts import ClearMLConfig, ModelRef
 from clearml_yolo.core.evaluation.models import EvaluationConfig
+from clearml_yolo.core.export_requests import ExportSettings
+from clearml_yolo.core.models import PRESETS, model_preset
 from clearml_yolo.core.publication import FiftyOneConfig
 
 RUN_STAMP_RESOLVER = "cy_run_token"
 HYDRA_RUN_DIR = "${cy_home:}/outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}-${cy_run_token:}"
-NATIVE_COMMANDS = frozenset({"train", "predict", "val", "pipeline", "compare"})
-PREDICTION_COMMANDS = NATIVE_COMMANDS
+PREDICTION_COMMANDS = frozenset({"train", "predict", "val", "pipeline", "compare"})
+NATIVE_COMMANDS = PREDICTION_COMMANDS | {"export"}
 
 
 def _native() -> dict[str, Any]:
-    groups: list[Any] = ["_self_", {"ultralytics": "_defaults"}]
-    fields: dict[str, Any] = {"ultralytics": stage_settings(native_defaults(), "train")}
+    groups: list[Any] = ["_self_", {"model": "ultralytics"}, {"ultralytics": "_defaults"}]
+    fields: dict[str, Any] = {
+        "model": {},
+        "ultralytics": stage_settings(native_defaults(), "train"),
+    }
     groups.append({"ultralytics_predict": "_defaults"})
     fields["ultralytics_predict"] = prediction_defaults()
     fields["queue"] = make_config(enabled=True)
@@ -36,7 +41,7 @@ def _token() -> str:
 
 
 def register_configs() -> None:
-    """Register all eight commands without importing model runtime dependencies."""
+    """Register application commands without importing model runtime dependencies."""
     OmegaConf.register_new_resolver(RUN_STAMP_RESOLVER, _token, replace=True)
     OmegaConf.register_new_resolver("cy_home", lambda: str(cy_home()), replace=True)
     store(
@@ -57,8 +62,39 @@ def register_configs() -> None:
     publishing = builds(FiftyOneConfig, populate_full_signature=True)
     evaluation = builds(EvaluationConfig, populate_full_signature=True)
     model = builds(ModelRef, populate_full_signature=True)
+    # Hydra composes the default group before expanding multirun model choices.
+    # Keep native override paths available in that root; YOLO still uses its own groups.
+    store(model_preset("ultralytics").model_dump(mode="json"), group="model", name="ultralytics")
+    for backend, presets in PRESETS.items():
+        if backend != "ultralytics":
+            for preset in presets:
+                selection = f"{backend}/{preset}"
+                store(
+                    model_preset(selection).model_dump(mode="json"),
+                    group=f"model/{backend}",
+                    name=preset,
+                    package="model",
+                )
     store({}, group="ultralytics", name="_defaults")
     store({}, group="ultralytics_predict", name="_defaults")
+    store(
+        make_config(
+            hydra_defaults=[
+                "_self_",
+                {"model": "fasterrcnn/resnet50_fpn"},
+                {"override hydra/launcher": "cy_queue"},
+            ],
+            model={},
+            export=ExportSettings().model_dump(mode="json"),
+            weights=None,
+            ground_truth=None,
+            output_dir=None,
+            clearml=tracking,
+            queue=make_config(enabled=True),
+            autogpu=make_config(enabled=True),
+        ),
+        name="export",
+    )
     store(
         make_config(
             **_native(),

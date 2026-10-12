@@ -9,6 +9,7 @@ from openpyxl.utils import column_index_from_string  # type: ignore[import-untyp
 from report_generator.config import Config
 
 from clearml_yolo.adapters.clearml.session import ClearMLConfig
+from clearml_yolo.adapters.reporting.metrics_reader import DashboardReader
 from clearml_yolo.adapters.reporting.reports import build_reports
 from clearml_yolo.adapters.reporting.workbook_identity import (
     deannotated_workbook,
@@ -118,6 +119,24 @@ def test_report_preserves_one_sided_metrics_with_real_builders(
 
 
 @pytest.mark.parametrize(
+    ("labels", "ids", "error"),
+    [
+        (["0001", "0001"], [1, 2], "Duplicate classes"),
+        (["0001", "1"], [1, 1], "ID values"),
+        (["0001", "1"], [1, None], "ID values"),
+        (["0001", "1"], [1, float("inf")], "ID values"),
+    ],
+)
+def test_dashboard_reader_rejects_ambiguous_class_or_id_rows(
+    tmp_path: Path, labels: list[str], ids: list[float | None], error: str
+) -> None:
+    path = tmp_path / "invalid.xlsx"
+    pd.DataFrame({"Класс": labels, "ID": ids}).to_excel(path, index=False)
+    with pytest.raises(ValueError, match=error):
+        DashboardReader(path).read()
+
+
+@pytest.mark.parametrize(
     ("ap50", "train_counts", "expected"),
     [
         ([0.0, 0.8], [30, 30], "2/2"),
@@ -192,4 +211,48 @@ def test_report_count_summary_preserves_values_and_custom_headers(
                     assert sheet.cell(rows["A"], column).number_format == "0.0000"
             if expected.startswith("0/"):
                 assert sheet.cell(rows["Среднее"], column).value == "NA"
+        workbook.close()
+
+
+def test_real_reports_preserve_lexical_classes_and_exclude_numeric_threshold_rows(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "lexical.xlsx"
+    labels = ["0001", "1", "NA", " 1 ", "0002", 0.5, "Среднее"]
+    pd.DataFrame(
+        {
+            "Класс": labels,
+            "Количество примеров train": [30, 30, 30, 30, 0, 30, 30],
+            "ap50": [0.1, 0.2, 0.3, 0.4, 0.5, 0.99, 0.99],
+            "f1_score": [0.2] * len(labels),
+            "perebrak": [0.1] * len(labels),
+            "nedobrak": [0.2] * len(labels),
+        }
+    ).to_excel(source, index=False)
+    original = source.read_bytes()
+    dev, business = tmp_path / "dev.xlsx", tmp_path / "business.xlsx"
+    build_reports(source, source, dev, business, None)
+    assert source.read_bytes() == original
+    config = Config.load()
+    for path in (dev, business):
+        workbook = load_workbook(path)
+        for sheet_name in (
+            config.sheet_names.model1,
+            config.sheet_names.model2,
+            config.sheet_names.comparison,
+        ):
+            sheet = workbook[sheet_name]
+            rows = {sheet.cell(row, 1).value: row for row in range(3, sheet.max_row + 1)}
+            assert {"0001", "1", "NA", " 1 "} <= rows.keys()
+            assert "0002" not in rows
+            assert 0.5 not in rows
+            assert sheet.cell(rows["AP50-valid-class-count"], 2).value == "4/4"
+            metric = "ap50"
+            if path == business:
+                metric = config.business.column_translations.get("ap50", "ap50")
+            column = [cell.value for cell in sheet[2]].index(metric) + 1
+            expected = 0.0 if sheet_name == config.sheet_names.comparison else 0.1
+            assert sheet.cell(rows["0001"], column).value == pytest.approx(expected)
+        excluded = workbook[config.sheet_names.excluded]
+        assert any(cell.value == "0002" for row in excluded for cell in row)
         workbook.close()

@@ -18,6 +18,8 @@ configuration, output, tracking and evaluation rules formerly listed in `AGENTS.
 | GPU scheduling, device demand and execution controls | [GPU execution](../specs/022-simple-gpu-wait/contracts/execution.md), [quickstart](../specs/022-simple-gpu-wait/quickstart.md) | [Resource probe](../src/clearml_yolo/adapters/runtime/gpu_resources.py), [GPU wait](../src/clearml_yolo/adapters/runtime/gpu_wait.py), [queue](../src/clearml_yolo/adapters/runtime/gpu_queue.py), [supervision](../src/clearml_yolo/entrypoints/hydra/execution.py), [launcher](../src/hydra_plugins/cy_queue/launcher.py), [configuration translation](../src/clearml_yolo/entrypoints/hydra/execution.py), [invocation](../src/clearml_yolo/entrypoints/hydra/common.py) |
 | Selected export and library isolation | [Runtime isolation](runtime-isolation.md), [feature 024](../specs/024-runtime-isolation/spec.md) | [Exporter](../src/clearml_yolo/entrypoints/hydra/config_tree.py), [bootstrap](../src/clearml_yolo/adapters/runtime/bootstrap.py), [bounded publisher](../src/clearml_yolo/adapters/fiftyone/bounded.py) |
 | Native training and prediction groups | [Native configuration](../specs/005-explicit-detection-config/contracts/native-configuration.md), [example layout](../specs/007-detection-config-cleanup/contracts/configuration-and-artifacts.md) | [Native settings](../src/clearml_yolo/adapters/yolo/config.py), [registration](../src/clearml_yolo/entrypoints/hydra/configs.py), [export](../src/clearml_yolo/entrypoints/hydra/config_tree.py) |
+| Detector families and portable checkpoints | [Backend contract](../specs/025-multi-model-backends/contracts/backend.md), [model guide](multi-model-backends.md) | [Typed models](../src/clearml_yolo/core/models.py), [backend routing](../src/clearml_yolo/adapters/integrations/detectors.py), [checkpoint binding](../src/clearml_yolo/adapters/storage/checkpoint.py), [owner publication](../src/clearml_yolo/adapters/clearml/detectors.py) |
+| Faster R-CNN ONNX/TensorRT export | [Export contract](../specs/025-multi-model-backends/contracts/export.md), [deployment guide](tensorrt-deployment.md) | [Export workflow](../src/clearml_yolo/application/use_cases/export.py), [composition](../src/clearml_yolo/adapters/integrations/export_operations.py), [engine build](../src/clearml_yolo/adapters/export/build.py), [FP16 tensor types](../src/clearml_yolo/adapters/export/precision.py), [attention precision](../src/clearml_yolo/adapters/export/attention_precision.py), [standalone runtime](../src/clearml_yolo/adapters/export/runtime.py), [quality verification](../src/clearml_yolo/adapters/export/verification.py) |
 | CSV training and dataset cache | [Dataset inputs](../specs/004-ground-truth-training/contracts/cli.md), [current publication](../specs/008-dataset-clearml-tracking/contracts/publication.md) | [Training](../src/clearml_yolo/application/use_cases/train.py), [cache](../src/clearml_yolo/adapters/storage/dataset_cache.py) |
 | Configuration resolution and remote replay | [File resolution](../specs/009-resolved-config-uploads/contracts/configuration-files.md), [tracking and recovery](../specs/010-native-clearml-integration/contracts/tracking-publication.md) | [Resolution](../src/clearml_yolo/entrypoints/hydra/config_resolution.py), [session adapter](../src/clearml_yolo/adapters/clearml/session.py) |
 | Artifacts, native callbacks and task completion | [Publication inventory](../specs/008-dataset-clearml-tracking/contracts/publication.md), [evaluation publication](../specs/014-evaluation-publication/contracts/publication.md), [native tracking](../specs/010-native-clearml-integration/contracts/tracking-publication.md), [model metadata](../specs/008-dataset-clearml-tracking/contracts/model-metadata.md) | [Artifact names](../src/clearml_yolo/core/artifact_names.py), [native runtime](../src/clearml_yolo/adapters/integrations/native_runtime.py), [model verification](../src/clearml_yolo/adapters/clearml/native.py), [display naming](../src/clearml_yolo/adapters/clearml/naming.py), [result bundle](../src/clearml_yolo/adapters/clearml/results.py), [DDP relay](../src/clearml_yolo/adapters/integrations/native_ddp.py) |
@@ -54,12 +56,20 @@ continues to allow finite ordered boxes collapsed by clipping. Evaluation comput
 returns project-owned metrics/matches/payloads; rendering alone writes dashboards and
 plots, and paired significance calculations use pure core records.
 
-Native model commands use complete top-level `ultralytics` and `ultralytics_predict`
+Default YOLO model commands use complete top-level `ultralytics` and `ultralytics_predict`
 groups. Prediction reads its resolved group; visible references provide inheritance.
 Raw wrapper `cfg`, non-null native `cfg`, nested stage-native mappings and duplicate
 native comparison inference fields are unsupported and fail ordinary strict validation.
 
-The five model commands default `queue.enabled=true` and `autogpu.enabled=true`.
+New detector groups own typed `model.train` and `model.predict` controls. DEIMv2, RF-DETR
+and Faster R-CNN share CSV-derived COCO preparation, canonical prediction records and
+evaluation policy. Embedded checkpoint metadata survives standalone copies/downloads;
+hash/selection conflicts fail before execution. Mixed comparisons resolve each checkpoint
+independently and preserve current image membership, frozen thresholds and the shared
+inference device. Explicit raw references add required vocabulary/preprocessing assertions.
+See the [multi-model contract](../specs/025-multi-model-backends/contracts/backend.md).
+
+The model commands and `cy-export` default `queue.enabled=true` and `autogpu.enabled=true`.
 FIFO reservations, supervised children and concurrent Hydra sweeps are restored; queue-off
 uses sequential BasicLauncher. Automatic direct mode waits without reservations; exact queued
 mode preserves native device identity/order and reserves the enabled-phase UUID union; both
@@ -79,12 +89,25 @@ The original remote hang is unconfirmed; containment does not establish its caus
 
 ClearML publications follow the current inventory, not old artifact counts. Native
 YAML, NDJSON, archives, manifests and diagnostic/publication receipts remain local.
-Consumed dataset and explicit report configurations are Configuration Objects; canonical
-`run` and native `General` support replay. Configuration copies are not artifacts.
+Consumed dataset and explicit report configurations are Configuration Objects. Canonical
+`run` supports replay through an explicit canonical-object read and a detached, sanitized
+snapshot write; inherited SDK connection flags and proxy containers do not control execution.
+YOLO retains its native `General` replay parameters. New detector
+families replay `run.model` and record sanitized effective native arguments in `General`
+as observed evidence, without applying remote overrides to that evidence. Configuration
+copies are not artifacts.
 Native owner callbacks may publish training/validation previews and non-PR plots; native
 validation PR uploads are filtered with callback state restored on success/failure.
 Native DDP descendants do not publish.
 The native best checkpoint uses one Output Model, verified before completion.
+
+`cy-export` retains its executable `export` settings and stores generated evidence under
+`export_result`, ignored during replay. It publishes operation-specific ONNX/engine,
+metadata and verification artifacts without registering another trained model. CPU ONNX
+has zero GPU demand; build/verify admit one device. The standalone runner validates hashes,
+runtime/plugins, profiles, tensor semantics and foreground classes. Numerical diagnostics
+and labeled-corpus mAP gates are separate; CUDA 11.8 target execution requires its own
+dated evidence and cannot be inferred from local newer-CUDA success.
 
 The [evaluation publication amendment](../specs/014-evaluation-publication/contracts/publication.md)
 defines invocation-owned `gt_csv`/`predicts_csv`, durable context enrichment, source lineage
@@ -144,6 +167,10 @@ rounding and unavailable calibration provenance. Present malformed sources fail 
 Historical predictions and source General/Configuration Objects are not imported over
 current comparison settings. Available threshold precision is preserved; checkpoint
 architecture compatibility with the installed runtime is not guaranteed.
+Developer/business report readers preserve original text class cells exactly, including
+numeric-looking labels such as `0001` and the literal label `NA`. Numeric Excel threshold
+footer cells are excluded by cell type. Class eligibility and excluded-class reporting
+still follow the selected report configuration; source workbooks remain unchanged.
 All report workbooks preserve one-sided class metrics with `NA` for the unavailable
 model/comparison. Model averages and business verdict inputs use each model's own eligible
 classes; statistical comparisons use shared eligible classes. The maintained

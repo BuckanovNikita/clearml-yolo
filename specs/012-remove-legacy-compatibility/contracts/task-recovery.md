@@ -39,26 +39,44 @@ validation-only calibration. Thresholds remain frozen; comparison never recalibr
 
 When output models are registered, choose a unique model whose metadata marks `best`.
 Multiple marked best models are ambiguous and fail. With no metadata-marked best, choose
-a unique output model whose URL-decoded URL basename is `best.pt`; multiple such models
+a unique output model whose URL-decoded URL basename is `best.pt`, `best.pth` or `best.ckpt`; multiple such models
 are ambiguous and fail. With neither marker, choose the last registered output model
 and log that fallback. Never choose checkpoint artifacts while any output model exists,
 and never download unselected output models.
 
 Only when no output models are registered, inspect task checkpoint artifacts in order:
-`train_weights_best.pt`, `train_weights_best`, `best.pt`, `best`, `model`, `checkpoint`,
-then other artifact names ending in `.pt`, sorted lexicographically. Select the first
-present candidate, download only it, and require an existing local `.pt` file. A selected
+`train_weights_best.pt`, `train_weights_best.pth`, `train_weights_best.ckpt`,
+`train_weights_best`, `best.pt`, `best.pth`, `best.ckpt`, `best`, `model`, `checkpoint`,
+then other artifact names ending in `.pt`, `.pth` or `.ckpt`, sorted lexicographically. Select the first
+present candidate, download only it, and require an existing local checkpoint. A selected
 source download or validation failure is actionable and does not try later candidates.
-Output-model downloads use the same existing local `.pt` validation.
+Output-model downloads, including `clearml://` references, use the same validation.
+Legacy `.pt` files remain supported. Ordinary task recovery and direct model-URI downloads
+require embedded detector metadata for `.pth` and `.ckpt`; available descriptor sidecars
+and remote hashes must match the downloaded bytes.
+
+A native `ModelRef` may instead supply complete typed `backend`, `preset`, `class_names`
+and `preprocessing` assertions. This supports raw checkpoints both locally and through
+task-backed references: the assertions accompany recovery of the selected Output Model
+or task artifact. The backend must select a native detector family, not `ultralytics`.
+Partial assertions do not relax checkpoint validation. Existing embedded metadata must
+agree with all four asserted fields, and sidecar/hash checks remain mandatory when
+available. Recovery preserves the downloaded bytes; it does not embed the assertions in
+the raw checkpoint. Later references to those bytes still need the complete assertions.
+Unasserted automatic task lookup and direct `clearml://` downloads retain the embedded
+metadata requirement. The
+[multi-model amendment](../../025-multi-model-backends/contracts/backend.md) extends these
+suffixes and best filenames without changing existing YOLO priority or threshold recovery.
 
 ## Provenance and comparison
 
 One selection result supplies both the downloaded weights and source provenance. An
 output-model result records the source task/model identity and links; an artifact result
 records the source task/artifact identity and has no fabricated model ID or model link.
-Checkpoint contents supply labels and architecture. Recovery does not guarantee that an
-old checkpoint architecture can load with the installed Ultralytics version; load errors
-remain actionable rather than being hidden by choosing another checkpoint.
+Checkpoint contents, their validated descriptor or complete native assertions supply
+labels and architecture. Recovery does not guarantee that an old checkpoint architecture
+can load with the installed backend version, including Ultralytics for legacy YOLO;
+load errors remain actionable rather than being hidden by choosing another checkpoint.
 
 Baseline and candidate both use the same current ground-truth split images and current
 inference/evaluation settings, including when either or both positions are historical

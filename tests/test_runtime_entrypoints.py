@@ -17,6 +17,7 @@ import pytest
         "report",
         "compare",
         "ground_truth",
+        "export",
         "config_tree",
         "dedup",
     ],
@@ -28,7 +29,8 @@ def test_console_import_is_inert(command: str) -> None:
             "-c",
             (
                 f"import clearml_yolo.entrypoints.{command}; import sys; "
-                "assert not ({'torch', 'ultralytics', 'clearml', 'matplotlib', 'loguru'} "
+                "assert not ({'torch', 'torchvision', 'rfdetr', 'timm', 'tensorrt', "
+                "'ultralytics', 'clearml', 'matplotlib', 'loguru'} "
                 "& sys.modules.keys())"
             ),
         ],

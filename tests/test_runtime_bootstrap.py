@@ -298,6 +298,8 @@ assert (Path(os.environ['CY_HOME']) / '.cache').exists()
         "NETRC",
         "AWS_CONFIG_FILE",
         "YOLO_CONFIG_DIR",
+        "RF_HOME",
+        "ROBOFLOW_HOME",
     ],
 )
 def test_external_config_and_symlink_escape_fail_closed(tmp_path: Path, name: str) -> None:
@@ -337,6 +339,23 @@ assert os.environ['AWS_ACCESS_KEY_ID'] == 'explicit-key'
 """,
         tmp_path,
         {"AWS_ACCESS_KEY_ID": "explicit-key"},
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_rfdetr_downloads_are_routed_to_the_project_cache(tmp_path: Path) -> None:
+    result = _run(
+        """
+import os
+from pathlib import Path
+from clearml_yolo.adapters.runtime.bootstrap import initialize_runtime_environment
+root = initialize_runtime_environment()
+for name in ('RF_HOME', 'ROBOFLOW_HOME'):
+    path = Path(os.environ[name])
+    assert path.is_dir(), name
+    assert path.resolve().is_relative_to(root), name
+""",
+        tmp_path,
     )
     assert result.returncode == 0, result.stderr
 

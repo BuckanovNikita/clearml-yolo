@@ -215,6 +215,17 @@ def _configure_native_paths(
 
 
 @contextmanager
+def detector_runtime() -> Iterator[None]:
+    """Initialize shared Torch paths before owner tracking starts package discovery."""
+    with runtime_environment():
+        with project_configuration_imports():
+            initialize_filesystem()
+            import torch  # noqa: F401 - finish native initialization before ClearML threads
+
+        yield
+
+
+@contextmanager
 def native_runtime() -> Iterator[None]:
     """Scope SDK paths and scratch for direct programmatic use as well as the CLI."""
     with runtime_environment(), _configured_native_runtime():

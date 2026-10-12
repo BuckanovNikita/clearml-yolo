@@ -6,6 +6,7 @@ import signal
 import subprocess
 import sys
 import types
+from collections import UserDict
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, ClassVar
@@ -60,7 +61,10 @@ class FakeTask:
         self.flush_result = True
         self.upload_result = True
         self.configuration_result: Path | None = None
-        self.run_configuration_result: dict[str, Any] | None = None
+        self.run_configuration_result: Any = None
+        self.configuration_reads: list[str] = []
+        self.run_configuration_text: str | None = None
+        self.ignore_remote_run_overrides = False
         self.closed = False
         self.local = True
         self.reload_count = 0
@@ -74,8 +78,21 @@ class FakeTask:
         if kwargs.get("ignore_remote_overrides"):
             return kwargs["configuration"]
         if kwargs.get("name") == "run":
+            if self.ignore_remote_run_overrides:
+                return kwargs["configuration"]
             return self.run_configuration_result or kwargs["configuration"]
         return self.configuration_result or kwargs["configuration"]
+
+    def get_configuration_object_as_dict(self, name: str) -> Any:
+        self.configuration_reads.append(name)
+        return self.run_configuration_result
+
+    def get_configuration_object(self, name: str) -> str | None:
+        assert name == "run"
+        return self.run_configuration_text
+
+    def set_configuration_object(self, **kwargs: Any) -> None:
+        self.configurations.append(kwargs)
 
     def flush(self, *, wait_for_uploads: bool) -> bool:
         assert wait_for_uploads is True
@@ -134,9 +151,7 @@ def fake_clearml(monkeypatch: pytest.MonkeyPatch) -> tuple[type[Any], FakeTask]:
 
     module.OutputModel = OutputModel  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "clearml", module)
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.clearml.session.configure_sdk_state", lambda: None
-    )
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.session.configure_sdk_state", lambda: None)
     return Task, task
 
 
@@ -182,15 +197,10 @@ def test_invocation_owns_one_task_and_nested_stages_reuse_it(
     assert [item["name"] for item in task.uploads] == ["train_best"]
     assert task.configurations == [
         {
-            "configuration": {"run_dir": "runs/example"},
+            "config_dict": {"run_dir": "runs/example"},
             "name": "run",
-            "ignore_remote_overrides": False,
-        },
-        {
-            "configuration": {"run_dir": "runs/example"},
-            "name": "run",
-            "ignore_remote_overrides": True,
-        },
+            "config_type": "dictionary",
+        }
     ]
 
 
@@ -461,7 +471,7 @@ def test_resolved_configuration_is_sanitized_recursively(
     with invocation(ClearMLConfig(), "train", resolved):
         pass
 
-    stored = task.configurations[-1]["configuration"]
+    stored = task.configurations[-1]["config_dict"]
     assert stored == {
         "clearml": {"access_key": "<redacted>", "secret_key": "<redacted>"},
         "endpoint": ("https://<redacted>@example.test/path?token=%3Credacted%3E&safe=yes&empty="),
@@ -762,7 +772,7 @@ def test_record_run_configuration_merges_sanitized_meaningful_values(
         "evaluation": {"iou": 0.0},
     }
     assert all(configuration["name"] == "run" for configuration in task.configurations)
-    assert task.configurations[-1]["configuration"] == merged
+    assert task.configurations[-1]["config_dict"] == merged
     assert task.uploads == []
 
 
@@ -775,6 +785,24 @@ def test_empty_run_configuration_contribution_is_a_noop(
         assert record_run_configuration(owner, {"normalization": {}}) == {}
 
     assert task.configurations == []
+
+
+@pytest.mark.parametrize(
+    "evidence",
+    [
+        {"operation": "onnx", "plugins": [], "engine_sha256": None},
+        {"operation": "verify", "cases": [{"detections": []}], "rejections": {}},
+    ],
+)
+def test_export_result_preserves_empty_evidence_fields(
+    evidence: dict[str, Any], fake_clearml: tuple[type[Any], FakeTask]
+) -> None:
+    _, task = fake_clearml
+    with invocation(ClearMLConfig(), "export") as owner:
+        stored = record_run_configuration(owner, {"export_result": evidence})
+
+    assert stored["export_result"] == evidence
+    assert task.configurations[-1]["config_dict"]["export_result"] == evidence
 
 
 def test_replay_configuration_returns_remote_canonical_mapping(
@@ -791,12 +819,14 @@ def test_replay_configuration_returns_remote_canonical_mapping(
         effective = replay_configuration(owner, {"wrapper": {"output": "local"}})
 
     assert effective == task.run_configuration_result
-    assert task.configurations[0]["ignore_remote_overrides"] is False
-    assert task.configurations[1] == {
-        "configuration": task.run_configuration_result,
-        "name": "run",
-        "ignore_remote_overrides": True,
-    }
+    assert task.configuration_reads == ["run"]
+    assert task.configurations == [
+        {
+            "config_dict": task.run_configuration_result,
+            "name": "run",
+            "config_type": "dictionary",
+        }
+    ]
 
 
 def test_model_barrier_waits_flushes_reloads_and_verifies_before_completion(
@@ -881,7 +911,7 @@ def test_run_replay_redacts_storage_without_rewriting_execution_credentials(
     with invocation(ClearMLConfig(), "predict") as owner:
         replayed = replay_configuration(owner, local)
     assert replayed == effective
-    stored = str(task.configurations[-1]["configuration"])
+    stored = str(task.configurations[-1]["config_dict"])
     assert "local-secret" not in stored
     assert "remote-secret" not in stored
 
@@ -1308,3 +1338,97 @@ def test_secondary_failure_diagnostics_preserve_primary_and_redact_credentials(
     assert "PermissionError" in output
     assert "filesystem denied access" in output
     assert "private-cleanup-token" not in output
+
+
+def test_remote_run_replay_bypasses_inherited_ignore_flag(
+    fake_clearml: tuple[type[Any], FakeTask],
+) -> None:
+    _, task = fake_clearml
+    task.local = False
+    task.ignore_remote_run_overrides = True
+    task.run_configuration_result = {"queue": {"enabled": True}, "model": {"backend": "deimv2"}}
+    with invocation(ClearMLConfig(), "predict") as owner:
+        replayed = replay_configuration(owner, {"queue": {"enabled": False}})
+    assert replayed == task.run_configuration_result
+    assert task.configuration_reads == ["run"]
+    assert all("ignore_remote_overrides" not in item for item in task.configurations)
+
+
+def test_run_replay_detaches_nested_proxies_before_storage_mutation(
+    fake_clearml: tuple[type[Any], FakeTask],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, task = fake_clearml
+    task.local = False
+    nested: UserDict[str, Any] = UserDict(
+        {"sizes": (UserDict({"width": 64}),), "token": "private-token"}
+    )
+    task.run_configuration_result = UserDict({"model": nested})
+    saved: list[dict[str, Any]] = []
+
+    def mutate_snapshot(**kwargs: Any) -> None:
+        snapshot = kwargs["config_dict"]
+        saved.append(json.loads(json.dumps(snapshot)))
+        snapshot["model"]["sizes"][0]["width"] = 999
+
+    monkeypatch.setattr(task, "set_configuration_object", mutate_snapshot)
+    with invocation(ClearMLConfig(), "predict") as owner:
+        replayed = replay_configuration(owner, {"model": {"sizes": []}})
+        merged = record_run_configuration(owner, {"prediction_result": {"rows": 1}})
+    assert type(replayed) is dict
+    assert type(replayed["model"]) is dict
+    assert type(replayed["model"]["sizes"]) is list
+    assert type(replayed["model"]["sizes"][0]) is dict
+    assert replayed["model"]["sizes"][0]["width"] == 64
+    assert replayed["model"]["token"] == nested["token"]
+    assert nested["sizes"][0]["width"] == 64
+    assert merged["model"]["sizes"][0]["width"] == 64
+    assert saved[-1]["model"]["token"] != nested["token"]
+    assert "private-token" not in json.dumps(saved)
+    assert saved[-1]["prediction_result"] == {"rows": 1}
+
+
+@pytest.mark.parametrize("remote", [False, True])
+def test_missing_remote_run_falls_back_without_redacting_executable_defaults(
+    fake_clearml: tuple[type[Any], FakeTask],
+    remote: bool,
+) -> None:
+    _, task = fake_clearml
+    task.local = not remote
+    local = {"token": "local-secret", "model": {"classes": []}}
+    with invocation(ClearMLConfig(), "predict") as owner:
+        assert replay_configuration(owner, local) == local
+    assert task.configuration_reads == (["run"] if remote else [])
+    assert task.configurations[-1]["config_dict"]["token"] != local["token"]
+    assert "local-secret" not in json.dumps(task.configurations)
+
+
+@pytest.mark.parametrize("canonical", [{}, [], "invalid"])
+def test_present_invalid_remote_run_never_falls_back(
+    fake_clearml: tuple[type[Any], FakeTask],
+    canonical: Any,
+) -> None:
+    _, task = fake_clearml
+    task.local = False
+    task.run_configuration_result = canonical
+    with pytest.raises((TypeError, ValueError)), invocation(ClearMLConfig(), "predict") as owner:
+        replay_configuration(owner, {"model": {"backend": "deimv2"}})
+    assert task.failed
+    assert task.configurations == []
+
+
+@pytest.mark.parametrize("text", ["", "   ", "\n"])
+def test_present_empty_remote_run_text_never_uses_defaults(
+    fake_clearml: tuple[type[Any], FakeTask],
+    text: str,
+) -> None:
+    _, task = fake_clearml
+    task.local = False
+    task.run_configuration_text = text
+    with (
+        pytest.raises(ValueError, match="must not be empty"),
+        invocation(ClearMLConfig(), "predict") as owner,
+    ):
+        replay_configuration(owner, {"model": {"backend": "deimv2"}})
+    assert task.failed
+    assert task.configurations == []

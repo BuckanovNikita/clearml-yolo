@@ -20,32 +20,30 @@ from clearml_yolo.adapters.clearml.session import (
     task_identity,
 )
 from clearml_yolo.adapters.integrations.native_runtime import (
+    detector_runtime,
     native_runtime,
     release_training_memory,
 )
 from clearml_yolo.adapters.observability.diagnostics import log_exception
 from clearml_yolo.adapters.observability.tracing import trace_command, trace_operation
 from clearml_yolo.adapters.runtime.bootstrap import runtime_environment
-from clearml_yolo.adapters.runtime.gpu_resources import job_request
+from clearml_yolo.adapters.runtime.gpu_resources import configured_phases, job_request
 from clearml_yolo.adapters.runtime.gpu_runtime import assigned_devices, exact_selection, scheduled
 from clearml_yolo.adapters.runtime.gpu_scheduling import execution_controls
 from clearml_yolo.adapters.runtime.gpu_wait import wait_for_available_gpus
 from clearml_yolo.adapters.storage.filesystem import initialize_filesystem, runs_root, write_path
 from clearml_yolo.adapters.storage.run_identity import task_run_dir
 from clearml_yolo.adapters.yolo.config import requested_devices
+from clearml_yolo.core.models import ModelConfig
 from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_file
-from clearml_yolo.entrypoints.hydra.validation import validate_wrapper_keys
+from clearml_yolo.entrypoints.hydra.validation import (
+    materialize_model_config,
+    validate_wrapper_keys,
+)
 
 
 def _device_values(config: DictConfig) -> dict[str, Any]:
-    result = {}
-    for group in ("ultralytics", "ultralytics_predict"):
-        if group in config:
-            values = OmegaConf.to_container(config[group], resolve=True)
-            if not isinstance(values, dict):
-                raise TypeError(f"{group} must be a mapping")
-            result[group] = values.get("device")
-    return result
+    return {phase.settings_path: phase.device for phase in configured_phases(config)}
 
 
 @contextmanager
@@ -80,6 +78,24 @@ def _validate_replay_policy(policy: Mapping[str, Any], replay: dict[str, Any]) -
             raise ValueError(f"ClearML replay cannot change launch control {key}")
 
 
+def _validate_replay_runtime(uses_detector: bool, replay: dict[str, Any]) -> None:
+    if "model" not in replay:
+        return
+    selected = ModelConfig.model_validate(replay["model"])
+    if (selected.backend != "ultralytics") != uses_detector:
+        model = (
+            "ultralytics"
+            if selected.backend == "ultralytics"
+            else f"{selected.backend}/{selected.preset}"
+        )
+        # Runtime setup precedes ClearML package discovery; replacing it mid-owner
+        # would lose callback and path isolation established for this invocation.
+        raise ValueError(
+            "ClearML replay cannot change the initialized runtime family. "
+            f"Relaunch with model={model} to initialize its matching runtime."
+        )
+
+
 @trace_operation("invocation.execute")
 def execute_owned(name: str, config: DictConfig, function: Callable[..., Any]) -> None:
     """Wait for free GPUs, then execute directly under one invocation-owned task."""
@@ -100,8 +116,13 @@ def execute_owned(name: str, config: DictConfig, function: Callable[..., Any]) -
         devices = _selected_devices(name, inputs, automatic=automatic)
     # Initialize native imports before ClearML starts background package detection;
     # concurrent torch submodule discovery can observe a partially loaded package.
+    model_values = inputs.get("model", {})
+    uses_detector = (
+        isinstance(model_values, dict)
+        and model_values.get("backend", "ultralytics") != "ultralytics"
+    )
     with (
-        native_runtime(),
+        detector_runtime() if uses_detector else native_runtime(),
         invocation(
             instantiate(config.clearml),
             name,
@@ -117,10 +138,20 @@ def execute_owned(name: str, config: DictConfig, function: Callable[..., Any]) -
         _validate_replay_policy(policy, replay)
         # Run also contains result provenance; only command inputs are executable.
         accepted = set(inspect.signature(function).parameters) - {"deps"}
+        if "model" in config:
+            accepted.add("model")
         replay = {key: value for key, value in replay.items() if key in accepted}
-        if native and not task.running_locally() and name in {"pipeline", "train"}:
+        _validate_replay_runtime(uses_detector, replay)
+        if (
+            not uses_detector
+            and native
+            and not task.running_locally()
+            and name in {"pipeline", "train"}
+        ):
             # General stores the previous trainer's effective output route. A clone
             # must derive its own route, retaining only current explicit requests.
+            # Detector General is observed evidence; its executable settings live
+            # under run.model and must never overwrite the inactive YOLO group.
             routing = {key: native[key] for key in ("project", "name", "save_dir") if key in native}
             native = dict(task.connect(native, name="General", ignore_remote_overrides=False))
             for key in ("project", "name", "save_dir"):
@@ -152,6 +183,7 @@ def _execute_assigned(
     from clearml_yolo.adapters.clearml.session import record_run_configuration
     from clearml_yolo.entrypoints.hydra.execution import effective_configuration
 
+    materialize_model_config(config)
     resolved_job = OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
     if not isinstance(resolved_job, dict):
         raise TypeError("Command configuration must be a mapping")
@@ -193,7 +225,28 @@ def _execute_assigned(
             with trace_operation("configuration.dependencies"):
                 from clearml_yolo.entrypoints.composition import build_dependencies
 
-                dependencies = build_dependencies()
+                selected = (
+                    ModelConfig.model_validate(
+                        OmegaConf.to_container(effective.model, resolve=True)
+                    )
+                    if "model" in effective
+                    else ModelConfig()
+                )
+                dependencies = (
+                    build_dependencies()
+                    if selected.backend == "ultralytics"
+                    else build_dependencies(selected)
+                )
+
+            with open_dict(effective):
+                effective.pop("model", None)
+                if selected.backend != "ultralytics" and name != "export":
+                    effective.ultralytics = selected.train.model_dump(mode="json") | {
+                        "model": selected.preset,
+                    }
+                    effective.ultralytics_predict = selected.predict.model_dump(mode="json")
+                    if "dataset_format" in effective:
+                        effective.dataset_format = "coco"
 
             # Supply concrete capabilities outside the public Hydra configuration.
             bound = partial(function, deps=dependencies)

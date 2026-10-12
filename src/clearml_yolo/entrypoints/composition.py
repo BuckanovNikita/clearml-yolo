@@ -1,6 +1,8 @@
 """Compose explicit workflow dependencies at the outer application boundary."""
 
+from contextlib import AbstractContextManager
 from pathlib import Path
+from typing import Any, override
 
 from clearml_yolo.adapters.clearml.models import (
     fetch_best_confidences as _repository_fetch_best_confidences,
@@ -146,10 +148,12 @@ from clearml_yolo.adapters.yolo.inference import predict_on_images as _model_pre
 from clearml_yolo.adapters.yolo.inference import resolution_of as _model_resolution_of
 from clearml_yolo.adapters.yolo.inference import trained_imgsz as _model_trained_imgsz
 from clearml_yolo.adapters.yolo.reinfer import reinfer_split as _model_reinfer_split
+from clearml_yolo.application.contracts import DatasetFormat, ModelRef, PreparedDataset
 from clearml_yolo.application.ports import (
     Publisher,
     WorkflowDependencies,
 )
+from clearml_yolo.core.models import ModelConfig
 from clearml_yolo.core.publication import FiftyOneConfig
 
 
@@ -160,11 +164,46 @@ def _has_owned_native_model(task: object) -> bool:
 class _DatasetStore:
     apply_dataset_policy = staticmethod(_dataset_apply_dataset_policy)
     build_ground_truth = staticmethod(_dataset_build_ground_truth)
-    cached_dataset = staticmethod(_dataset_cached_dataset)
     dataset_cache_root = staticmethod(_dataset_dataset_cache_root)
+
+    @staticmethod
+    def cached_dataset(
+        ground_truth: str | Path,
+        cache_dir: str | Path | None = None,
+        dataset_format: DatasetFormat = "ndjson",
+        required_splits: tuple[str, ...] = ("train", "val"),
+    ) -> AbstractContextManager[PreparedDataset]:
+        if dataset_format == "coco":
+            raise ValueError("Ultralytics training requires ndjson or flat dataset_format")
+        return _dataset_cached_dataset(
+            ground_truth, cache_dir, dataset_format, required_splits=required_splits
+        )
+
+
+class _DetectorDatasetStore(_DatasetStore):
+    @staticmethod
+    @override
+    def cached_dataset(
+        ground_truth: str | Path,
+        cache_dir: str | Path | None = None,
+        dataset_format: DatasetFormat = "ndjson",
+        required_splits: tuple[str, ...] = ("train", "val"),
+    ) -> AbstractContextManager[PreparedDataset]:
+        # Native adapters own their COCO representation, including callers that
+        # use the shared programmatic train API's legacy default argument.
+        del dataset_format
+        return _dataset_cached_dataset(
+            ground_truth, cache_dir, "coco", required_splits=required_splits
+        )
 
 
 class _ModelRunner:
+    @staticmethod
+    def bind_reference(weights: Path, reference: ModelRef) -> None:
+        del weights
+        if reference.backend not in {None, "ultralytics"}:
+            raise ValueError("A native detector reference requires the detector dispatcher")
+
     execution_settings = staticmethod(_model_execution_settings)
     predict_on_images = staticmethod(_model_predict_on_images)
     prediction_settings = staticmethod(_model_prediction_settings)
@@ -260,11 +299,15 @@ class _TrackingSession:
     has_owned_native_model = staticmethod(_has_owned_native_model)
 
 
-def build_dependencies() -> WorkflowDependencies:
+def build_dependencies(model: ModelConfig | dict[str, Any] | None = None) -> WorkflowDependencies:
     """Construct an independent dependency bundle for one command invocation."""
+    from clearml_yolo.adapters.integrations.detectors import DetectorRunner
+    from clearml_yolo.adapters.integrations.export_operations import DetectorExporter
+
+    selected = model if isinstance(model, ModelConfig) else ModelConfig.model_validate(model or {})
     return WorkflowDependencies(
-        dataset=_DatasetStore(),
-        model=_ModelRunner(),
+        dataset=_DatasetStore() if selected.backend == "ultralytics" else _DetectorDatasetStore(),
+        model=DetectorRunner(selected, _ModelRunner()),
         repository=_ModelRepository(),
         evaluation=_EvaluationEngine(),
         evaluation_writer=_EvaluationWriter(),
@@ -274,6 +317,7 @@ def build_dependencies() -> WorkflowDependencies:
         tracking=_TrackingSession(),
         publisher_factory=create_publisher,
         disabled_publisher=NoOpPublisher(),
+        exporter=DetectorExporter(selected),
     )
 
 

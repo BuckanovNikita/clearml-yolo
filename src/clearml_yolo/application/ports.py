@@ -14,6 +14,7 @@ from clearml_yolo.application.contracts import (
     ClearMLConfig,
     DatasetFormat,
     ImageNameMode,
+    ModelRef,
     PreparedDataset,
     ScoredResolution,
     TrainResult,
@@ -25,7 +26,9 @@ from clearml_yolo.core.evaluation.models import (
     EvaluatedSplit,
     EvaluationArtifacts,
 )
+from clearml_yolo.core.export_requests import ExportRequest, ExportResult
 from clearml_yolo.core.identity import ModelIdentity
+from clearml_yolo.core.models import CheckpointMetadata
 from clearml_yolo.core.publication import FiftyOneConfig, PublicationReceipt, PublicationRequest
 
 Stage = Literal["train", "predict"]
@@ -71,6 +74,8 @@ class DatasetStore(Protocol):
 
 
 class ModelRunner(Protocol):
+    def bind_reference(self, weights: Path, reference: ModelRef) -> None: ...
+
     def execution_settings(self, settings: dict[str, Any], stage: Stage) -> dict[str, Any]: ...
 
     def predict_on_images(
@@ -114,7 +119,7 @@ class ModelRunner(Protocol):
 
     def stage_settings(self, settings: dict[str, Any], stage: Stage) -> dict[str, Any]: ...
 
-    def trained_imgsz(self, weights: str | Path) -> int | None: ...
+    def trained_imgsz(self, weights: str | Path) -> int | list[int] | None: ...
 
     def write_native_yaml(self, path: Path, settings: dict[str, Any], stage: Stage) -> Path: ...
 
@@ -140,7 +145,9 @@ class ModelRepository(Protocol):
 
     def read_checkpoint_identity(self, path: Path) -> ModelIdentity | None: ...
 
-    def resolve_task_model(self, task_id: str) -> tuple[Path, dict[str, str]]: ...
+    def resolve_task_model(
+        self, task_id: str, *, raw_metadata: CheckpointMetadata | None = None
+    ) -> tuple[Path, dict[str, str]]: ...
 
     def resolve_weights_with_identity(
         self, weights: str | Path
@@ -417,6 +424,10 @@ class TrackingSession(Protocol):
     def has_owned_native_model(self, task: TaskHandle | None) -> bool: ...
 
 
+class DetectorExporter(Protocol):
+    def execute(self, request: ExportRequest, destination: Path) -> ExportResult: ...
+
+
 @dataclass(frozen=True)
 class WorkflowDependencies:
     dataset: DatasetStore
@@ -430,3 +441,4 @@ class WorkflowDependencies:
     tracking: TrackingSession
     publisher_factory: Callable[[FiftyOneConfig | None], Publisher]
     disabled_publisher: Publisher
+    exporter: DetectorExporter | None = None

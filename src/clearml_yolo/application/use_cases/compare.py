@@ -35,6 +35,7 @@ from clearml_yolo.core.evaluation.models import EvaluatedSplit, EvaluationConfig
 from clearml_yolo.core.evaluation.policy import classes_from_ground_truth, validate_split_membership
 from clearml_yolo.core.evaluation.result_rows import assign_source_ids
 from clearml_yolo.core.identity import ModelIdentity, require_model_identity
+from clearml_yolo.core.models import CheckpointMetadata
 from clearml_yolo.core.redaction import sanitize_configuration
 
 ModelSource = Literal["clearml", "local"]
@@ -80,6 +81,16 @@ def _resolved_task_id(
     raise ValueError(message)
 
 
+def _raw_metadata(model: ModelRef) -> CheckpointMetadata | None:
+    if model.backend in {None, "ultralytics"} or any(
+        value is None for value in (model.preset, model.class_names, model.preprocessing)
+    ):
+        return None
+    return CheckpointMetadata.model_validate(
+        model.model_dump(include={"backend", "preset", "class_names", "preprocessing"})
+    )
+
+
 def _resolve_model(
     model: ModelRef,
     fallback_project: str,
@@ -88,15 +99,22 @@ def _resolve_model(
     automatic_absence_is_skip: bool,
     deps: WorkflowDependencies,
 ) -> ResolvedModel:
+    assertions = model.model_dump(
+        mode="json",
+        include={"backend", "preset", "source_dir", "class_names", "preprocessing"},
+        exclude_none=True,
+    )
     if model.source == "local":
         if model.weights is None or model.thresholds is None:
             raise RuntimeError("Validated local model is missing weights or thresholds")
         if not deps.storage.is_file(model.weights):
             raise FileNotFoundError(f"Local checkpoint does not exist: {model.weights}")
+        deps.model.bind_reference(model.weights, model)
         return ResolvedModel(
             source="local",
             weights=model.weights,
             thresholds=dict(model.thresholds),
+            backend_assertions=assertions,
             identity=require_model_identity(
                 deps.repository.read_checkpoint_identity(model.weights),
                 model.label,
@@ -115,13 +133,20 @@ def _resolve_model(
         if model.thresholds is not None
         else deps.repository.fetch_best_confidences(task_id)
     )
-    weights, links = deps.repository.resolve_task_model(task_id)
+    metadata = _raw_metadata(model)
+    weights, links = (
+        deps.repository.resolve_task_model(task_id)
+        if metadata is None
+        else deps.repository.resolve_task_model(task_id, raw_metadata=metadata)
+    )
+    deps.model.bind_reference(weights, model)
     return ResolvedModel(
         source="clearml",
         task_id=task_id,
         weights=weights,
         links=links,
         thresholds=thresholds,
+        backend_assertions=assertions,
         identity=require_model_identity(
             ModelIdentity.from_provenance(links) if "model_name" in links else None, model.label
         ),
@@ -136,6 +161,7 @@ def _prediction_cache(
     inference: SettledInference,
     split_fingerprint: str = "",
     *,
+    backend_assertions: dict[str, Any] | None = None,
     deps: WorkflowDependencies,
 ) -> Path:
     identity = str(deps.storage.resolve(weights))
@@ -146,7 +172,8 @@ def _prediction_cache(
     # Cache policy selects whether to consume existing predictions; it does not
     # describe their scientific identity. All native settings remain authoritative.
     settings = json.dumps(
-        inference.model_dump(mode="json", exclude={"reuse_existing"}),
+        inference.model_dump(mode="json", exclude={"reuse_existing"})
+        | {"backend_assertions": backend_assertions or {}},
         sort_keys=True,
         ensure_ascii=True,
     )
@@ -371,7 +398,12 @@ def _source_configuration(model: ResolvedModel) -> dict[str, Any]:
         dict[str, Any],
         sanitize_configuration(
             (model.links or {"source": model.source, "weights": str(model.weights)})
-            | {"model_identity": model.identity.model_dump(mode="json") if model.identity else None}
+            | {
+                "model_identity": model.identity.model_dump(mode="json")
+                if model.identity
+                else None,
+                "backend_assertions": model.backend_assertions,
+            }
         ),
     )
 
@@ -414,7 +446,14 @@ def _skip_without_baseline(
         settled = _settled(inference, candidate.weights, None, deps=deps)
         fingerprint = _split_fingerprint(truth, split, deps=deps)
         predictions = _prediction_cache(
-            destination, "candidate", split, candidate.weights, settled, fingerprint, deps=deps
+            destination,
+            "candidate",
+            split,
+            candidate.weights,
+            settled,
+            fingerprint,
+            backend_assertions=candidate.backend_assertions,
+            deps=deps,
         )
         evaluated, _, _, _ = _scored(
             candidate.weights,
@@ -495,7 +534,18 @@ def _native_inference(
     fields = {
         key: settings[key] for key in ("conf", "iou", "imgsz", "batch", "device") if key in settings
     }
-    owned = {"model", "source", "stream", "project", "name", "save_dir", "mode", "task"}
+    owned = {
+        "model",
+        "backend",
+        "preset",
+        "source",
+        "stream",
+        "project",
+        "name",
+        "save_dir",
+        "mode",
+        "task",
+    }
     extras = {key: value for key, value in settings.items() if key not in {*fields, *owned}}
     return InferenceConfig(**inference, **fields, ultralytics=extras)
 
@@ -599,7 +649,14 @@ def compare(
         settled = _settled(inference, candidate.weights, baseline.weights, deps=deps)
         split_fingerprint = _split_fingerprint(truth, split, deps=deps)
         baseline_predictions = _prediction_cache(
-            destination, "baseline", split, baseline.weights, settled, split_fingerprint, deps=deps
+            destination,
+            "baseline",
+            split,
+            baseline.weights,
+            settled,
+            split_fingerprint,
+            backend_assertions=baseline.backend_assertions,
+            deps=deps,
         )
         candidate_predictions = _prediction_cache(
             destination,
@@ -608,6 +665,7 @@ def compare(
             candidate.weights,
             settled,
             split_fingerprint,
+            backend_assertions=candidate.backend_assertions,
             deps=deps,
         )
         baseline_evaluated, baseline_vocabulary, _baseline_evidence, _baseline_archive = _scored(

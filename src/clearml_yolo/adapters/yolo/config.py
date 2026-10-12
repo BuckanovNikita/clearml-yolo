@@ -26,9 +26,11 @@ def requested_devices(values: dict[str, Any]) -> Iterator[None]:
         _REQUESTED_DEVICES.reset(token)
 
 
-def requested_settings(settings: dict[str, Any], stage: Stage) -> dict[str, Any]:
+def requested_settings(
+    settings: dict[str, Any], stage: Stage, *, group: str | None = None
+) -> dict[str, Any]:
     values = _REQUESTED_DEVICES.get() or {}
-    group = "ultralytics" if stage == "train" else "ultralytics_predict"
+    group = group or ("ultralytics" if stage == "train" else "ultralytics_predict")
     return settings | {"device": values[group]} if group in values else dict(settings)
 
 
@@ -226,11 +228,11 @@ def execution_settings(settings: dict[str, Any], stage: Stage) -> dict[str, Any]
     return values
 
 
-def prediction_defaults() -> dict[str, Any]:
-    """Expose shared references and literal native prediction-only values."""
+def prediction_defaults(*, inherit: bool = True) -> dict[str, Any]:
+    """Expose prediction defaults, optionally resolving inherited training values."""
     defaults = native_defaults()
     values: dict[str, Any] = {
-        key: f"${{ultralytics.{key}}}" if key in TRAIN_KEYS else value
+        key: f"${{ultralytics.{key}}}" if inherit and key in TRAIN_KEYS else value
         for key, value in defaults.items()
         if key in PREDICT_KEYS
     }

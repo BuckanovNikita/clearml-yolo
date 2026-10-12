@@ -66,7 +66,18 @@ def _comparison_settings(settings: dict[str, Any]) -> InferenceConfig:
     fields = {
         key: settings[key] for key in ("conf", "iou", "imgsz", "batch", "device") if key in settings
     }
-    ignored = {"model", "source", "stream", "project", "name", "save_dir", "mode", "task"}
+    ignored = {
+        "model",
+        "backend",
+        "preset",
+        "source",
+        "stream",
+        "project",
+        "name",
+        "save_dir",
+        "mode",
+        "task",
+    }
     extras = {key: value for key, value in settings.items() if key not in {*fields, *ignored}}
     return InferenceConfig(**fields, ultralytics=extras)
 
@@ -301,7 +312,7 @@ def run_pipeline(
                 effective_ground_truth,
                 predictions,
                 clearml,
-                predict_params,
+                train_params,
                 splits=prediction_splits,
                 ultralytics_predict=predict_params,
                 fiftyone=FiftyOneConfig(enabled=False),

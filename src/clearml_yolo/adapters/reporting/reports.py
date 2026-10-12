@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from clearml_yolo.adapters.observability.tracing import trace_operation
+from clearml_yolo.adapters.reporting.metrics_reader import DashboardReader
 from clearml_yolo.adapters.reporting.report_layout import compact_report_counts
 from clearml_yolo.adapters.reporting.workbook_identity import (
     deannotated_workbook,
@@ -20,7 +21,6 @@ def build_reports(
 ) -> None:
     with trace_operation("report.backend.import"), project_configuration_imports():
         from report_generator.config import Config
-        from report_generator.core.reader import MetricsReader
         from report_generator.reports.business.builder import BusinessReportBuilder
         from report_generator.reports.dev.builder import DevReportBuilder
 
@@ -31,8 +31,8 @@ def build_reports(
         deannotated_workbook(baseline) as baseline_source,
     ):
         with trace_operation("report.workbooks.read"):
-            candidate_reader = MetricsReader(candidate_source)
-            baseline_reader = MetricsReader(baseline_source)
+            candidate_reader = DashboardReader(candidate_source)
+            baseline_reader = DashboardReader(baseline_source)
         with trace_operation("report.developer.build", context={"path": str(dev_path)}):
             DevReportBuilder(candidate_reader, baseline_reader, config).build(dev_path)
         with trace_operation("report.business.build", context={"path": str(business_path)}):

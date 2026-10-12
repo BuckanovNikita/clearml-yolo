@@ -19,6 +19,9 @@ Historical tasks and dated evidence retain their original names and contents.
 | `report_dev_SPLIT`, `report_business_SPLIT` | Final paired XLSX artifacts |
 | run, consumed dataset, explicit report configuration | Canonical Configuration Objects; native General owns training arguments |
 | Source links and meaningful requested/effective differences | Canonical run configuration, including missing automatic-baseline reason |
+| `export_onnx`, `export_engine` | Produced deployment graph or serialized engine, according to the export operation |
+| `export_metadata` | Checkpoint/graph/engine hashes, classes, preprocessing, inference policy, runtime/plugins and profiles |
+| `export_verification`, `export_corpus` | Verification report and fixed labeled corpus manifest from `cy-export export.operation=verify` |
 | Preparation records, NDJSON, label archives, native YAML, raw metrics/predictions, match/threshold/methodology tables, duplicate evaluation summaries, JSON/PNG diagnostics, comparison manifests, report inputs and publication receipts | Local files only; meaningful result links recorded in run configuration |
 
 `expect_artifacts(task, names)` and `upload_artifact(task, name, path)` remain strict.
@@ -44,10 +47,13 @@ dashboards + interactive plots + paired comparison workbook/exclusions when a ba
 exists. Missing automatic baseline retains candidate dashboards/plots and records the
 skip reason. Report publishes developer/business workbooks; ground-truth publishes GT;
 pipeline assembles canonical CSVs once. Training also records its consumed prepared-dataset
-Configuration Object. Config-init creates no task/publications.
+Configuration Object. Export publishes its operation-specific bundle and source identity
+without another trained Output Model. Detector COCO annotations and checkpoint descriptor
+sidecars remain local; the portable descriptor is embedded in the published checkpoint.
+Config-init creates no task/publications.
 
-Result-only sections such as `evaluation_result` and `fiftyone_result` stay separate from
-executable `evaluation` and `fiftyone` inputs. Remote clones ignore result-only roots and
+Result-only sections such as `evaluation_result`, `fiftyone_result` and `export_result`
+stay separate from executable `evaluation`, `fiftyone` and `export` inputs. Remote clones ignore result-only roots and
 reconstruct typed command inputs from canonical run settings plus native General.
 Prior owner-derived General project/name/save_dir never determine the clone output route;
 current explicit routing requests and the new invocation identity own those paths.

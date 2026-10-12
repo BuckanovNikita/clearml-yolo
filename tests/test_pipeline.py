@@ -139,7 +139,9 @@ def test_pipeline_routes_cleaned_truth_and_prediction_policy_after_csv_training(
 
     def prediction(*args: Any, **kwargs: Any) -> SimpleNamespace:
         calls["truth"].append(args[1])
-        assert args[4]["classes"] is None
+        # The training group remains independent; prediction's owned group has
+        # already applied CSV class policy and is the only inference input.
+        assert args[4]["classes"] == [1]
         assert kwargs["ultralytics_predict"]["classes"] is None
         return SimpleNamespace(predictions=tmp_path / "predictions.csv")
 
