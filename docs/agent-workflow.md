@@ -35,6 +35,59 @@ to the request while recording intent, tasks, verification, and documentation ou
   ask only for material missing information or a new scope decision. If a required
   skill is unavailable, report the gap accurately.
 
+### Mandatory module architecture planning and acceptance
+
+Use the shared `module-architecture-planning` skill for repository change planning,
+implementation, fixes, resumed work and acceptance. Apply it within the native workflow;
+do not copy its validator or modify installed Spec Kit skills, templates or `.specify/`
+files. If the skill is unavailable, report the missing gate rather than claiming it passed.
+
+Before implementation, inspect task-owned scope, current code and executable contracts.
+Record affected modules' responsibilities, interfaces and invariants, placement, allowed
+and forbidden dependencies, and effect ownership. Justify additions instead of creating
+pass-through modules. Map each affected module to executable boundary coverage in an
+adjacent `architecture.json` using the shared skill's record format; the native task ledger
+remains authoritative for status.
+
+| Workflow | Architecture placement and acceptance |
+|---|---|
+| Feature or refactor | Add an architecture section and linked record to `plan.md`, then dependent implementation, check and documentation tasks to `tasks.md`. Analyze coverage before implementation; reconcile it during verification. |
+| Bug | Add architecture decisions and the adjacent record to `assessment.md` remediation; record actual changes and acceptance in `fix.md` and `test.md`. Keep the bug workflow and verify the original failure path. |
+| Resumed work or converge | Compare current scope and code with existing decisions. Missing records or enforcement become explicit remaining tasks; preserve completed history and respect converge's append-only rules. Do not bulk-retrofit inactive plans. |
+| Documentation-only | Record `impact: none` with inspected paths and a concrete reason, then validate changed documentation. Runtime fixes and executable contract/checker changes require module impact even if imports stay unchanged. |
+| Planning-only or read-only | Return decisions, proposed record content and checks without artifact writes or mutating hooks. Optional stdin record validation is read-only; it does not establish implementation acceptance. |
+
+For this Python project, inspect the actual contracts in
+[pyproject.toml](../pyproject.toml) and [architecture tests](../tests/test_architecture.py),
+with the maintained [architecture guidance](development.md#python-integration-and-architecture).
+Reuse their relevant coverage for inward dependencies, exhaustive classification, SDK
+ownership, cycles, application/core effects, inert initializers and dynamic Hydra/plugin/
+worker targets. Account for type-only and dynamic imports and justified exact-edge
+exceptions; stale documentation counts are not coverage evidence. If enforcement is
+missing, plan scoped executable checks for affected modules and edges, including a
+negative case demonstrating that a prohibited dependency fails. Do not weaken rules,
+expand ignore lists or require an unrelated repository refactor to pass the gate.
+
+Resolve `scripts/validate_architecture.py` from the shared skill directory, supply the
+repository root explicitly and validate the record with `--phase plan` before
+implementation. The skill documents its command and record schema. Include concrete
+acceptance commands and expectations in the record and ledger. For runtime module work,
+run `uv run lint-imports` and `uv run pytest tests/test_architecture.py` separately,
+together with affected behavior and documentation checks and any scoped enforcement
+added by the task. These commands complement record validation.
+
+Before acceptance, inspect the complete task-owned diff, including additions, removals,
+renames, dependency configuration and composition targets. Reconcile it with module
+scope, contract coverage and completed tasks, and identify excluded unrelated work.
+Record actual dated check results and negative-case evidence. Review responsibilities,
+interface depth, dependency direction and inversion, effect ownership and justified
+exceptions against project rules; obtain the fresh independent review required by
+[AGENTS.md](../AGENTS.md) after integration and verification. Validate the reconciled
+record with `--phase acceptance`; missing, unavailable or failing required checks or
+review block acceptance. No-impact work needs its documentation checks outside the
+minimal record. The validator checks record structure and references; it neither runs
+recorded commands nor proves source quality, truthful evidence or exhaustive diff review.
+
 ### Mandatory documentation stage
 
 Every Spec Kit implementation or bug-fix workflow must complete a **Documentation

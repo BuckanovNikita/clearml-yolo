@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record GPU memory threshold release verification
+  ([`90e5a96`](https://github.com/BuckanovNikita/clearml-yolo/commit/90e5a96b6836304997c92ca7406012516e0984d5))
+
+
 ## v0.25.0 (2026-10-12)
 
 ### Documentation

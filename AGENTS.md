@@ -43,6 +43,7 @@ for every task.
 |---|---|
 | Change application behavior or configuration | [Project contract summary](docs/project-contracts.md), then affected topics in the [current contract index](docs/current-contracts.md) and their implementation evidence |
 | Set up dependencies, verify code or commit | Relevant sections of [development procedures](docs/development.md); read the commit procedure before every commit |
+| Plan, implement, fix, resume or accept repository changes | Shared `module-architecture-planning` skill and [architecture gate](docs/agent-workflow.md#mandatory-module-architecture-planning-and-acceptance) |
 | Run any Spec Kit stage, including planning or bug-source capture | [Agent workflow policy](docs/agent-workflow.md), then the applicable installed skills |
 | Verify native execution, training, GPU use or ClearML publication | [running-end-to-end-tests](.agents/skills/running-end-to-end-tests/SKILL.md); load `clearml-yolo-environment` when available for this machine |
 | Change contracts or their documentation | [Current contract index](docs/current-contracts.md#maintaining-consistency) and the [documentation stage](docs/agent-workflow.md#mandatory-documentation-stage) |

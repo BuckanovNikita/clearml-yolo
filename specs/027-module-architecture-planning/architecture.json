@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "task": "027-module-architecture-planning",
+  "scope": [
+    "AGENTS.md",
+    "docs/agent-workflow.md",
+    "specs/027-module-architecture-planning",
+    "CHANGELOG.md"
+  ],
+  "impact": "none",
+  "rationale": "Only agent workflow policy and native task documentation change. No runtime modules, dependency contracts, dynamic composition or executable architecture-checking tools are modified; existing pyproject.toml and tests/test_architecture.py coverage is referenced for future runtime work. The mandatory commit hook also regenerates documentation-only changelog entries from already committed history."
+}
