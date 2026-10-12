@@ -2,8 +2,9 @@
 
 This evidence covers the approved amendments to [feature 024](spec.md) and
 [feature 025](../025-multi-model-backends/spec.md), starting from release `v0.24.0`.
-Earlier verification remains historical evidence. Parent implementation, static/native acceptance, documentation and fresh independent
-review pass. Required commit/release gates remain pending.
+Earlier verification remains historical evidence. Implementation, static/native acceptance,
+documentation, fresh independent review and release gates passed. Git tag
+`v0.24.1` and its branch were published and remotely verified.
 
 ## Implementation and preservation
 
@@ -34,7 +35,7 @@ review pass. Required commit/release gates remain pending.
 | Lock resolution and prepared all-extras environment | Passed |
 | Installed dependency compatibility (`uv pip check`) | Passed, 267 installed packages |
 | Torchvision compiled NMS and ROIAlign | Passed on CPU and CUDA |
-| Full pytest, including native CPU/Gloo DDP | Passed: 2,115 tests, 30 optional skips; no failures |
+| Full pytest, including native CPU/Gloo DDP | Passed: 2,118 tests, 30 skips; no failures in the final commit and release gates |
 | Ruff | Passed |
 | Strict mypy | Passed, 277 sources |
 | Import-linter | Passed, 40 contracts |
@@ -48,6 +49,9 @@ by recognizing existing local files without redirecting unresolved model names. 
 pipeline/filesystem/publication/lock-tracing suite passed all 62 tests. Publication/workbook/
 ClearML scratch checks passed 230 tests. Failure-path tests now verify retained file contents
 and stopped consumers, rather than merely removing obsolete assertions.
+
+The full suite skipped 29 checks that require an isolated FiftyOne environment and one
+unsupported native reflink check. Separate live FiftyOne coverage is recorded below.
 
 An additional 16-test bootstrap run covered the expanded four-outcome overlapping-parent
 matrix. The CPU DDP helper now inspects retained invocation arenas instead of an obsolete
@@ -149,3 +153,19 @@ parent evidence after verification. Its bootstrap/cache/native-runtime suite pas
 tests; whitespace checks passed. The reviewer confirmed installed native trainer
 serialization and synchronous inference-manifest consumption. Verdict: **ship**, no
 actionable findings. Cross-host, hardware and acceptance-matrix limits remain as above.
+
+## Release delivery
+
+Implementation commit: `28b74f7`. Checked release commit:
+`6ab88075f47c2b4cec82fe33ae9a460e3b809de3`; annotated Git tag: `v0.24.1`.
+Both source and release commits passed the required hooks; the release suite repeated all
+2,118 passing tests with 30 skips. The branch and tag were pushed and their remote
+object IDs verified. No GitHub Release object or package assets were published.
+
+A clean archive of the release commit produced wheel and source distributions. Every
+packaged source file matched the committed archive byte for byte; both fresh installations
+reported the release version, imported the native trainer and passed command-help checks.
+The exact local uv source section was restored unstaged and is absent from committed
+metadata. Protected dependency lock entries remain unchanged. The final lockfile contains
+the five approved dependency upgrades and the root package version bump; release preparation
+changed only that root version.

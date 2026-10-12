@@ -59,7 +59,7 @@ verification; T021 requires passing checks, documentation and fresh review.
 - [x] T026 Run full static/pytest, native SDK/CPU DDP and applicable detector/GPU/export gates after feature 025 dependency integration; record evidence and NFS limitation.
 - [x] T027 Update README, filesystem/runtime/current contracts, migration and end-to-end guidance; validate Markdown, links and changed examples.
 - [x] T028 Obtain fresh independent review after integrated verification and resolve findings.
-- [ ] T029 Complete applicable commit/release gates and authorized Git-only publication, restoring exact local uv sources.
+- [x] T029 Complete applicable commit/release gates and authorized Git-only publication, restoring exact local uv sources.
 
 T023/T024 and feature 025 T059 are parallel. Parent T025 consumes T023 interfaces;
 T026 requires their combined implementation. T027 follows final behavior; T028 follows
