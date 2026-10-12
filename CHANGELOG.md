@@ -1,7 +1,12 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.24.1 (2026-10-12)
+
+### Bug Fixes
+
+- **runtime**: Restore file ownership boundaries and allow Torch 2.14
+  ([`28b74f7`](https://github.com/BuckanovNikita/clearml-yolo/commit/28b74f72054889c4b0706fecb8983c0ed6196235))
 
 ### Documentation
 
