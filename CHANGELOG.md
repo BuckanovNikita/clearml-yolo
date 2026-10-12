@@ -11,6 +11,11 @@
 - Require module architecture planning and acceptance
   ([`4aef37f`](https://github.com/BuckanovNikita/clearml-yolo/commit/4aef37f6adb04e3a2e2540b0cfc1dda12f7bba84))
 
+### Refactoring
+
+- Share evaluation statistics and workbook implementation
+  ([`55dcabd`](https://github.com/BuckanovNikita/clearml-yolo/commit/55dcabd87f002502f59fe55b8910f161be01da62))
+
 
 ## v0.25.0 (2026-10-12)
 

@@ -18,7 +18,8 @@
     "tests/test_metrics.py",
     "tests/test_report.py",
     "tests/test_scoring_evidence.py",
-    "docs/shared-evaluation-reporting.md"
+    "docs/shared-evaluation-reporting.md",
+    "CHANGELOG.md"
   ],
   "impact": "modules",
   "rules": "AGENTS.md, docs/agent-workflow.md and existing import-linter/test_architecture SDK ownership and inward dependency contracts remain authoritative.",
@@ -219,7 +220,7 @@
     {
       "id": "docs",
       "kind": "documentation",
-      "command": "python3 - <<'PY'\nfrom pathlib import Path\nimport re\nfrom urllib.parse import unquote\npaths = [Path(\"docs/development.md\"), Path(\"docs/current-contracts.md\"), Path(\"docs/shared-evaluation-reporting.md\"), *Path(\"specs/028-shared-extraction\").glob(\"*.md\")]\nfor path in paths:\n    content = path.read_text()\n    assert sum(line.startswith(\"```\") for line in content.splitlines()) % 2 == 0, path\n    for target in re.findall(r\"\\[[^\\]]+\\]\\(([^)]+)\\)\", content):\n        if \"://\" in target or target.startswith(\"#\"):\n            continue\n        target = unquote(target.split(\"#\", 1)[0])\n        assert (path.parent / target).exists(), (path, target)\nprint(f\"Validated Markdown fences and local links in {len(paths)} files\")\nPY",
+      "command": "python3 - <<'PY'\nfrom pathlib import Path\nimport re\nfrom urllib.parse import unquote\npaths = [Path(\"CHANGELOG.md\"), Path(\"docs/development.md\"), Path(\"docs/current-contracts.md\"), Path(\"docs/shared-evaluation-reporting.md\"), *Path(\"specs/028-shared-extraction\").glob(\"*.md\")]\nfor path in paths:\n    content = path.read_text()\n    assert sum(line.startswith(\"```\") for line in content.splitlines()) % 2 == 0, path\n    for target in re.findall(r\"\\[[^\\]]+\\]\\(([^)]+)\\)\", content):\n        if \"://\" in target or target.startswith(\"#\"):\n            continue\n        target = unquote(target.split(\"#\", 1)[0])\n        assert (path.parent / target).exists(), (path, target)\nprint(f\"Validated Markdown fences and local links in {len(paths)} files\")\nPY",
       "expectation": "Every task-owned Markdown file has balanced code fences and resolvable local link paths.",
       "result": {
         "status": "passed",

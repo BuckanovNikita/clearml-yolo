@@ -11,7 +11,9 @@ new evaluator, preserving the baseline.
 
 ## Executed checks
 
-All application commands used `uv run --frozen --no-sync` in the existing environment.
+The manual application checks below used `uv run --frozen --no-sync` in the existing
+environment. The final isolated commit also ran the repository's normal hooks, with
+dependency synchronization disabled and imports explicitly resolving its source tree.
 
 | Check | Result |
 |---|---|
@@ -56,7 +58,7 @@ unchanged, so no corresponding example changes are needed. Preserved unrelated s
 analysis configuration, runtime/gpu_queue.py, test and lockfile edits listed in plan.md.
 
 Independent integrated review, final architecture acceptance and delivery are recorded
-after their execution; this record does not assert those pending stages have passed.
+below after their execution.
 
 ## Independent integrated review — 2026-10-12
 
@@ -77,15 +79,29 @@ additions and removed duplicated implementations were inspected; unrelated stati
 analysis/runtime/test/configuration edits are excluded from task ownership.
 The library records cover their complete runtime modules, tests, fixtures and guides.
 Residual limits remain the representative fixture populations and offline execution
-scope documented above. Acceptance validators were run separately after this record.
+scope documented above. All three architecture acceptance validators passed separately
+after this review was recorded.
 
 ## Versioned delivery
 
-Digital-metrics release hooks passed and created 0.7.0 at `6e801be1564dce458294eb23592cc1aa0939c4d9`.
-Report-generator has no established release workflow; its task-scoped commit is
-`d10aa395d08f738e92e04e076cee93b3a993bf8f`. Its upstream push requires explicit permission under
-the user's standing no-release-workflow policy. Application commit/release work uses
-an isolated checkout containing only the task-owned diff, preserving the original
-workspace's unrelated changes and local editable source section. No GitHub Release
-object or package artifact is created. The lockfile dependency node changes only
-digital-metrics 0.6.1 to 0.7.0; other dependency/source metadata is retained.
+Digital-metrics release hooks passed and published main and annotated tag `v0.7.0`
+at `6e801be1564dce458294eb23592cc1aa0939c4d9`. Report-generator has no established
+release workflow; its task-scoped commit `d10aa395d08f738e92e04e076cee93b3a993bf8f`
+was published to main after the user's continuation of the pending push request.
+Both approved dependency revisions are available upstream.
+
+Application implementation commit `55dcabd87f002502f59fe55b8910f161be01da62` was
+created in an isolated checkout containing only task-owned changes. Normal commit
+hooks passed: whitespace/configuration checks, changelog generation, Ruff, mypy,
+import-linter, the full pytest suite including the new comparison tests, and the
+semantic release hook. The refactor does not trigger a version bump under the
+existing policy; the application remains at 0.25.0. The commit was fast-forwarded
+into the original workspace and published to master.
+
+All 21 captured preservation fingerprints matched after integration, including the
+shared configuration, lockfile and development guide containing unrelated changes.
+The committed pyproject has no local source section; the original working copy
+retains that section unstaged. No GitHub Release object or package artifact was
+created. The task-owned lockfile change is only digital-metrics 0.6.1 to 0.7.0;
+other dependency/source metadata is retained. Generated changelog changes follow
+the repository's existing hook and carry no module impact.

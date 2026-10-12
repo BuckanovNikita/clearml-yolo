@@ -28,7 +28,7 @@
 
 - [x] T013 Update docs/development.md and docs/current-contracts.md plus library API documentation; record dependency revisions deliberately.
 - [x] T014 Validate changed Markdown, links and command/config examples; record evidence.md.
-- [ ] T015 Complete applicable task-scoped commit/release workflow after required checks; preserve unrelated changes and publish Git tags only.
+- [x] T015 Complete applicable task-scoped commit/release workflow after required checks; preserve unrelated changes and publish Git tags only.
 
 Dependencies: T002/T003 precede implementation. T004/T005 and T008 are independent.
 T006/T007 follow metrics APIs; T009 follows reporting APIs. Integration and verification
