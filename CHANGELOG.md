@@ -1,12 +1,17 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.24.0 (2026-10-12)
 
 ### Documentation
 
 - Record runtime isolation release verification
   ([`2114714`](https://github.com/BuckanovNikita/clearml-yolo/commit/2114714c55b0367e38a5925982e30714532ec4d0))
+
+### Features
+
+- **models**: Add DEIMv2, RF-DETR and modern Faster R-CNN backends
+  ([`43f9e7d`](https://github.com/BuckanovNikita/clearml-yolo/commit/43f9e7dc85672bbb25f29e6abcb27344201ac443))
 
 
 ## v0.23.0 (2026-10-11)
