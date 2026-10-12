@@ -19,8 +19,9 @@ def _run() -> None:  # noqa: PLR0915 - deferred imports precede the worker lifec
     from omegaconf import DictConfig, OmegaConf, open_dict
 
     from clearml_yolo.adapters.runtime.gpu_queue import GPUQueue
+    from clearml_yolo.adapters.runtime.gpu_resources import GPUInventory
     from clearml_yolo.adapters.runtime.gpu_runtime import reservation
-    from clearml_yolo.adapters.runtime.gpu_scheduling import ExactSelection
+    from clearml_yolo.adapters.runtime.gpu_scheduling import ExactSelection, automatic_gpu_control
 
     global execute_owned  # noqa: PLW0603 - private worker injection boundary
     from clearml_yolo.entrypoints.hydra.common import execute_owned
@@ -47,7 +48,16 @@ def _run() -> None:  # noqa: PLR0915 - deferred imports precede the worker lifec
     config = restore_hydra_config(configuration)
     setup_globals()
     JobRuntime.instance().set("name", str(payload.command))
-    queue = GPUQueue(root=Path(payload.queue_root)) if payload.ticket is not None else None
+    queue = (
+        GPUQueue(
+            root=Path(payload.queue_root),
+            inventory=GPUInventory(
+                max_used_memory_gib=automatic_gpu_control(config).max_used_memory_gib
+            ),
+        )
+        if payload.ticket is not None
+        else None
+    )
     ownership = queue.claim_worker(str(payload.ticket)) if queue is not None else nullcontext(None)
     selection = (
         ExactSelection(tuple(payload.exact_visible), tuple(payload.exact_devices))

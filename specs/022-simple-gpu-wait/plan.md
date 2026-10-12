@@ -59,3 +59,32 @@ Use failing regression tests first, then affected/full pytest, Ruff, mypy, impor
 generated YAML and all command helps. Exercise direct real CPU/GPU command completion
 and sequential sweep behavior. Inspect distributions for absence of queue plugin/worker.
 Parent verifies the combined diff before a fresh independent read-only review.
+
+## Amendment plan: configurable memory availability (2026-10-12)
+
+Use an SDK-free Pydantic automatic-GPU control with a finite positive
+`max_used_memory_gib` default of 2.0. Query NVML total used bytes in GPUInventory,
+compare strictly below the binary GiB cutoff, and remove process-count eligibility.
+Keep GPUDevice's busy interface, visibility ordering and fail-closed telemetry.
+Wire the setting through Hydra composition/export, wrapper validation, direct waiting,
+queued admission, worker contraction and execution-policy provenance. Do not resolve
+dependencies or change installed workflow files.
+
+Shared queue policy must belong to the invoking job: preserve registry v1 by having
+each supervisor admit only its own FIFO-head ticket with its configured inventory.
+Other supervisors poll their own tickets; active reservations always exclude devices.
+Worker contraction uses the launch limit after existing native cleanup.
+Resolve queued policy with the job's Hydra context and environment, then freeze its
+validated values before worker transport; worker startup must not re-evaluate resolvers.
+
+Parent owns implementation, tests and documentation. A bounded read-only investigator
+checks independent configuration/queue risks in parallel. Regression tests precede
+implementation; integration and parent checks precede a fresh independent review.
+No concurrent writers or worktree are needed for this amendment.
+
+Documentation scope: maintained execution and queue-state contracts, project contract
+summary, README and GPU quickstart; append this spec/plan/task amendment and dated
+verification without rewriting completed history. Validate changed Markdown, local
+links, exported YAML and threshold override examples. Relevant tests cover inventory,
+direct/queued execution, queue sharing, replay, CPU bypass and configuration export;
+run repository lint/type/import and commit gates before the authorized Git-tag release.

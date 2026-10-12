@@ -24,7 +24,7 @@ def test_owned_execution_waits_before_runtime_and_keeps_original_failure(
     expected = RuntimeError("workflow failure")
     task = SimpleNamespace(running_locally=lambda: True)
 
-    def wait(count: int) -> tuple[int, ...]:
+    def wait(count: int, **kwargs: Any) -> tuple[int, ...]:
         events.append(("wait", count))
         return (2,)
 
@@ -78,7 +78,7 @@ def test_interruption_while_waiting_does_not_initialize_runtime_or_task(
 ) -> None:
     from clearml_yolo.entrypoints.hydra import common
 
-    def interrupt(count: int) -> tuple[int, ...]:
+    def interrupt(count: int, **kwargs: Any) -> tuple[int, ...]:
         raise KeyboardInterrupt
 
     monkeypatch.setattr(common, "initialize_filesystem", lambda: None)

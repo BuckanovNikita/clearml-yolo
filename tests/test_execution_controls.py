@@ -17,10 +17,13 @@ def test_model_schemas_enable_independent_execution_controls() -> None:
 
     store.add_to_hydra_store(overwrite_ok=True)
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
-        for name in ("pipeline", "train", "predict", "val", "compare"):
+        for name in ("pipeline", "train", "predict", "val", "compare", "export"):
             config = compose(config_name=name)
             assert config.queue.enabled is True
             assert config.autogpu.enabled is True
+            assert config.autogpu.max_used_memory_gib == 2.0
+            custom = compose(config_name=name, overrides=["autogpu.max_used_memory_gib=0.5"])
+            assert custom.autogpu.max_used_memory_gib == 0.5
             disabled = compose(
                 config_name=name, overrides=["queue.enabled=false", "autogpu.enabled=false"]
             )
@@ -68,7 +71,9 @@ def test_disabled_controls_preserve_native_device_without_probe(
     )
     common.execute_owned("predict", config, workflow)
     assert received == [(os.getpid(), -1)]
-    assert policies == [{"execution_policy": {"queue": False, "autogpu": False}}]
+    assert policies == [
+        {"execution_policy": {"queue": False, "autogpu": False, "max_used_memory_gib": 2.0}}
+    ]
 
 
 @pytest.mark.parametrize("setting", ["queue", "autogpu"])
@@ -80,3 +85,32 @@ def test_execution_controls_reject_unknown_options(setting: str) -> None:
     )
     with pytest.raises((ValueError, TypeError), match="typo"):
         validate_wrapper_keys(config, lambda ultralytics: None)
+
+
+@pytest.mark.parametrize("limit", [0, -1, float("nan"), float("inf"), True, "2", None])
+def test_memory_limit_rejects_invalid_configuration(limit: object) -> None:
+    from clearml_yolo.entrypoints.hydra.validation import validate_wrapper_keys
+
+    config = OmegaConf.create(
+        {
+            "ultralytics": {"device": "cpu"},
+            "autogpu": {"enabled": True, "max_used_memory_gib": limit},
+        }
+    )
+    with pytest.raises((ValueError, TypeError), match="max_used_memory_gib"):
+        validate_wrapper_keys(config, lambda ultralytics: None)
+
+
+@pytest.mark.parametrize("limit", [0.5, 2, 4.0])
+def test_memory_limit_is_accepted_by_execution_controls(limit: float) -> None:
+    from clearml_yolo.adapters.runtime.gpu_scheduling import execution_controls
+    from clearml_yolo.entrypoints.hydra.validation import validate_wrapper_keys
+
+    config = OmegaConf.create(
+        {
+            "ultralytics": {"device": "cpu"},
+            "autogpu": {"enabled": True, "max_used_memory_gib": limit},
+        }
+    )
+    validate_wrapper_keys(config, lambda ultralytics: None)
+    assert execution_controls(config) == (True, True)

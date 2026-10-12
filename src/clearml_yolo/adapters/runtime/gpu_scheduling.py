@@ -5,16 +5,27 @@ from dataclasses import dataclass
 from typing import Any
 
 from clearml_yolo.adapters.runtime.gpu_resources import device_count, execution_phases
-from clearml_yolo.core.execution import ExecutionPhase
+from clearml_yolo.core.execution import AutoGPUControl, ExecutionPhase
+
+
+def automatic_gpu_control(config: Mapping[str, Any]) -> AutoGPUControl:
+    """Validate the per-job availability policy, including legacy enabled-only groups."""
+    return AutoGPUControl.model_validate(config.get("autogpu", {}))
 
 
 def execution_controls(config: Mapping[str, Any]) -> tuple[bool, bool]:
+    """Read routing switches without resolving policy before Hydra's job context exists."""
     values: list[bool] = []
     for name in ("queue", "autogpu"):
         group = config.get(name, {"enabled": True})
-        if not isinstance(group, Mapping) or set(group) != {"enabled"}:
-            raise TypeError(f"{name} must contain only enabled")
-        enabled = group["enabled"]
+        allowed = {"enabled", "max_used_memory_gib"} if name == "autogpu" else {"enabled"}
+        if (
+            not isinstance(group, Mapping)
+            or set(group) - allowed
+            or (name == "queue" and "enabled" not in group)
+        ):
+            raise TypeError(f"{name} must contain only {', '.join(sorted(allowed))}")
+        enabled = group.get("enabled", True)
         if type(enabled) is not bool:
             raise TypeError(f"{name}.enabled must be boolean")
         values.append(enabled)

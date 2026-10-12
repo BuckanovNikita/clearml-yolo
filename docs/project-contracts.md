@@ -54,6 +54,11 @@ with automatic selection on preserves direct availability waiting; queue on with
 selection off reserves exact enabled-phase identities; both off preserves native settings
 without project GPU discovery, waits or replacement. CPU/MPS and non-model commands bypass
 GPU telemetry. Controls are execution policy, never workflow arguments. Neither disables tracking.
+`autogpu.max_used_memory_gib` defaults to 2.0 and accepts finite positive numbers.
+Availability means total NVML used memory is strictly below that GiB limit, regardless
+of process presence. Equality is busy; reservations still exclude devices. Each queue
+head's own supervisor applies its project limit; direct waits and worker contraction
+use the same setting. Replay cannot change it.
 
 Automatic demand derives from native settings: a training integer is one GPU, a list uses
 its length, every `-1` contributes one, null/empty/`cuda` is one and CPU/MPS is zero.

@@ -11,6 +11,21 @@ cy --config-dir cy-config --config-name cy ultralytics.device=-1 ultralytics_pre
 
 Both controls default true: wait for FIFO admission, reserve free visible whole GPUs
 and run a fresh supervised child. CUDA visibility determines available identities.
+A GPU qualifies when total NVML used memory is strictly below 2 GiB (2048 MiB),
+regardless of process presence. Equality is busy; reservations still exclude devices.
+Set a project-wide limit in the exported command YAML:
+
+```yaml
+autogpu:
+  enabled: true
+  max_used_memory_gib: 2.0
+```
+
+Override per invocation with `autogpu.max_used_memory_gib=1.5`. Use a finite positive
+number. This also controls exact queued selection; fully disabled scheduling does
+not probe GPUs. Run updated supervisors together so each uses its own project limit.
+For example, 1215 MiB and 409 MiB both qualify under the default 2048 MiB cutoff.
+
 CPU/MPS bypass scheduling. For native two-GPU DDP, Ultralytics launches its descendants:
 
 ```bash

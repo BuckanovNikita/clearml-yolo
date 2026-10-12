@@ -2,13 +2,23 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, StrictBool
+from pydantic import BaseModel, ConfigDict, Field, StrictBool
+
+DEFAULT_MAX_USED_MEMORY_GIB = 2.0
 
 
 class ExecutionControl(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     enabled: StrictBool = True
+
+
+class AutoGPUControl(ExecutionControl):
+    """Project availability policy; GiB denotes 1024**3 bytes of total used memory."""
+
+    max_used_memory_gib: float = Field(
+        default=DEFAULT_MAX_USED_MEMORY_GIB, strict=True, gt=0, allow_inf_nan=False
+    )
 
 
 class ExecutionPhase(BaseModel):

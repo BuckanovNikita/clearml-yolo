@@ -432,6 +432,9 @@ def test_exact_union_mapping_survives_fresh_worker_transport(
     from hydra_queue_fixture import record_exact_job
 
     class Inventory:
+        def __init__(self, *, max_used_memory_gib: float = 2.0) -> None:
+            self.max_used_memory_gib = max_used_memory_gib
+
         def visible(self) -> tuple[str, ...]:
             return ("GPU-a", "GPU-b", "GPU-c")
 

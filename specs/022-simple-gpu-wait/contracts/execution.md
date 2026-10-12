@@ -12,6 +12,14 @@ Completed feature specifications, task ledgers and dated evidence preserve histo
 `queue.enabled` and `autogpu.enabled`, both defaulting to true. They are launch
 controls, not workflow or native model arguments.
 
+`autogpu.max_used_memory_gib` is a finite positive numeric limit, default 2.0
+GiB (2048 MiB), configurable in project YAML or a Hydra override. Existing
+enabled-only configurations use that default. Booleans, strings, null, zero,
+negative and nonfinite values are invalid. The limit applies to direct automatic
+waiting and both queued modes, including exact selection.
+Queued launch resolves the policy in the job's Hydra context and environment, then
+transports concrete validated values so admission, contraction and recorded policy agree.
+
 Phase descriptions choose device paths without importing SDKs: YOLO uses the existing
 native groups; new detectors use `model.train.device` and `model.predict.device`;
 export uses `export.device`. CPU/FP32 ONNX generation has zero GPU demand. Engine build
@@ -41,12 +49,14 @@ IDs express demand rather than pinned identity in automatic mode. GPU inference
 requires one device; pipeline demand is the maximum of enabled training and inference
 demand. There is no separate count setting or batch tuning.
 
-NVML inventory/process telemetry and an isolated metadata probe map inherited CUDA
+NVML inventory/memory telemetry and an isolated metadata probe map inherited CUDA
 visibility to whole-GPU UUIDs without initializing CUDA in the invoking process.
 Unknown telemetry fails closed; MIG, lost visibility and requests larger than the
-supported visible set fail clearly. Only the invoking PID is ignored for direct
-sequential reuse; other compute processes make a GPU busy. Selection uses visibility
-order, rather than a free-memory threshold. Direct waiting creates no reservation
+supported visible set fail clearly. A GPU is free exactly when total NVML used bytes
+are below `autogpu.max_used_memory_gib * 1024**3`; equality is busy. This includes
+all allocations, including the invoking process and driver/graphics memory. Process
+presence and utilization do not affect eligibility. Selection keeps visibility order
+among eligible devices. Direct waiting creates no reservation
 or fairness guarantee and simultaneous direct commands may select the same GPU.
 If a pending queued request loses a visible UUID, its supervisor reports the failure
 and closes its own ticket so healthy followers can advance. A follower does not remove
@@ -56,7 +66,11 @@ another live supervisor's ticket.
 
 Queued execution uses the compatible user-wide registry v1, FIFO tickets, atomic
 UUID reservations, process-liveness ownership and fresh execution children. Reuse
-shared state across projects; corrupt/incompatible state fails closed without
+shared state across projects. Each pending head is admitted only by its own supervisor
+using its project limit; followers wait for that supervisor to poll. Active reservations
+exclude devices regardless of used memory. Participating supervisors must use the
+updated admission behavior for per-project limits; older versions may admit other
+tickets under the old policy. Corrupt/incompatible state fails closed without
 migration or deletion. Reserve only supported visible whole GPUs. Cancellation
 terminates and reaps owned native descendants before releasing their capacity;
 never advertise capacity while owned GPU work may remain alive.
@@ -66,13 +80,14 @@ Resolve them against inherited visibility, reserve the UUID union of enabled
 training/inference phases, and preserve requested training identity and order through
 child-local remapping. Ambiguous selectors such as `-1`, null or `cuda` fail before
 admission. Training and inference may select different GPUs; reserve their union.
-Native memory cleanup precedes contraction; release training-only devices and retain
+Native memory cleanup precedes contraction; surplus devices must be below the same
+launch-time memory limit. Release training-only devices and retain
 the downstream inference device without changing visibility after CUDA initialization.
 
 Requested/effective native snapshots and canonical `gpu_selection` remain separate.
 Queued `gpu_selection` includes admitted `reserved_uuids`; contraction records retained
 UUIDs and the inference phase under `gpu_scheduler`. ClearML replay cannot change
-launch policy, select identities outside the admission or exceed admitted capacity.
+launch policy (including the memory limit), select identities outside the admission or exceed admitted capacity.
 Invalid replay fails before native execution. The supervised child owns one task;
 nested stages reuse it, while native DDP descendants do not own tasks or uploads.
 Required computation, upload, flush and interruption failures remain failures.

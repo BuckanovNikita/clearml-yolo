@@ -22,7 +22,7 @@ _State = Literal["pending", "active"]
 
 
 class SnapshotProvider(Protocol):
-    """Provide current visible devices and external compute occupancy."""
+    """Provide current devices and availability under the invoking job's policy."""
 
     def snapshot(self) -> tuple[GPUDevice, ...]: ...
 
@@ -254,6 +254,11 @@ class GPUQueue:
             missing = [device for device in request.visible if device not in known]
             if missing:
                 raise RuntimeError(f"GPU visibility was lost for physical GPU UUIDs: {missing}")
+            # Each supervisor owns its availability policy. Never admit another
+            # project's ticket using this caller's memory threshold.
+            head = next(item for item in registry.requests if item.state == "pending")
+            if head is not request:
+                return None
             occupied = {
                 device
                 for item in registry.requests
@@ -261,24 +266,13 @@ class GPUQueue:
                 for device in item.devices
             }
             occupied.update(externally_busy)
-            changed = False
-            for pending in (item for item in registry.requests if item.state == "pending"):
-                if any(device not in known for device in pending.visible):
-                    break  # Its own supervisor reports the loss and closes its ticket.
-                available = tuple(
-                    device
-                    for device in pending.visible
-                    if device in known and device not in occupied
-                )
-                if len(available) < pending.count:
-                    break
-                pending.devices = available[: pending.count]
-                pending.state = "active"
-                occupied.update(pending.devices)
-                changed = True
-            if changed:
-                self._write_registry(registry)
-            return request.devices or None
+            available = tuple(device for device in request.visible if device not in occupied)
+            if len(available) < request.count:
+                return None
+            request.devices = available[: request.count]
+            request.state = "active"
+            self._write_registry(registry)
+            return request.devices
 
     def _close_ticket(self, ticket_id: str) -> None:
         ticket_number = self._ticket_number(ticket_id)
@@ -332,7 +326,7 @@ class GPUQueue:
             if any(device not in known for device in surplus):
                 raise RuntimeError("GPU queue cannot release a device with unknown telemetry")
             if any(device in externally_busy for device in surplus):
-                raise RuntimeError("GPU queue cannot release a device with active compute users")
+                raise RuntimeError("GPU queue cannot release a device at or above its memory limit")
             request.devices = request.devices[:1]
             self._write_registry(registry)
             return request.devices

@@ -38,3 +38,23 @@
 
 Implementation, verification, documentation and Git-tag publication are complete.
 See [verification.md](verification.md).
+
+## Amendment: configurable memory availability (2026-10-12)
+
+- [x] T013 [US3] Record FR-007–010 in spec.md and implementation/documentation scope in plan.md.
+- [x] T014 [US3] Add failing inventory boundary and settings/wiring regressions in tests/test_gpu_resources.py and tests/test_execution_controls.py.
+- [x] T015 [US3] Implement validated controls and memory inventory in src/clearml_yolo/core/execution.py and adapters/runtime/gpu_resources.py (T014).
+- [x] T016 [US3] Wire Hydra/direct/supervisor/worker settings and per-owner FIFO admission in src/clearml_yolo/entrypoints/hydra and adapters/runtime/gpu_queue.py (T015).
+- [x] T017 [US3] Verify per-project limits, reservations, contraction and bypass behavior in tests/test_gpu_queue.py and affected runtime/configuration tests (T016).
+
+### Documentation update and validation
+
+- [x] T018 Update README.md, docs/project-contracts.md, contracts/execution.md, quickstart.md and specs/013-gpu-experiment-queue/contracts/queue-state.md (T016).
+- [x] T019 Validate Markdown/links/exported YAML and run affected tests, lint, typing and import checks; record verification-memory-limit.md (T017–T018).
+- [x] T020 Obtain fresh independent read-only review of integrated changes and resolve findings (T019).
+- [ ] T021 Follow docs/development.md commit/release checks, preserve local source overrides and publish only authorized Git commits/tags (T020).
+
+Parallel work: read-only configuration/queue investigation alongside parent tests and
+implementation. Review follows integrated verification; release follows review.
+Analysis: FR-007/008 map to T014–015, FR-009/010 to T016–017, documentation to T018–019.
+All four requirements are covered; no unresolved ambiguity or constitution conflict.

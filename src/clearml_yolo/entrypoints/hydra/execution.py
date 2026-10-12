@@ -31,6 +31,7 @@ from clearml_yolo.adapters.runtime.gpu_resources import (
 )
 from clearml_yolo.adapters.runtime.gpu_scheduling import (
     ExactSelection,
+    automatic_gpu_control,
     exact_device_ordinals,
     exact_request,
     execution_controls,
@@ -392,27 +393,35 @@ class ModelJob:
 
     @trace_operation("queue.prepare")
     def prepare(self) -> None:
+        from hydra.core.utils import env_override
+
         from clearml_yolo.entrypoints.hydra.validation import validate_wrapper_keys
 
         application = _application_config(self.config)
         old_hydra = HydraConfig.instance().cfg
         try:
             HydraConfig.instance().set_config(self.config)
-            validate_wrapper_keys(application, self.function)
-            resolved = OmegaConf.to_container(application, resolve=True, throw_on_missing=True)
-            if not isinstance(resolved, dict):
-                raise TypeError("Command configuration must be a mapping")
-            inputs = {str(key): value for key, value in resolved.items()}
-            queued, automatic = execution_controls(inputs)
-            count = job_request(self.command, inputs) if queued else 0
+            env = {str(k): str(v) for k, v in self.config.hydra.job.env_set.items()}
+            with env_override(env):
+                validate_wrapper_keys(application, self.function)
+                resolved = OmegaConf.to_container(application, resolve=True, throw_on_missing=True)
+                if not isinstance(resolved, dict):
+                    raise TypeError("Command configuration must be a mapping")
+                inputs = {str(key): value for key, value in resolved.items()}
+                queued, automatic = execution_controls(inputs)
+                count = job_request(self.command, inputs) if queued else 0
+                if "autogpu" in self.config:
+                    # Freeze the admitted policy before transport: worker startup
+                    # has no Hydra context yet, and job resolvers may change later.
+                    with open_dict(self.config):
+                        self.config.autogpu = automatic_gpu_control(inputs).model_dump()
         finally:
             HydraConfig.instance().cfg = old_hydra
         if count:
-            inventory = GPUInventory()
+            inventory = GPUInventory(
+                max_used_memory_gib=automatic_gpu_control(inputs).max_used_memory_gib
+            )
             # The job's environment may further restrict its inherited device visibility.
-            from hydra.core.utils import env_override
-
-            env = {str(k): str(v) for k, v in self.config.hydra.job.env_set.items()}
             with env_override(env):
                 visible = inventory.visible()
             if not automatic:

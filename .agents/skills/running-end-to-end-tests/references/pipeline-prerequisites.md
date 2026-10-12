@@ -56,6 +56,12 @@ Automatic mode treats native IDs as demand: one for an integer/null/empty/`cuda`
 length for lists, one per `-1`, zero for CPU/MPS; GPU inference requires one. No separate
 GPU-count setting. Exact queued mode requires concrete selectors within inherited CUDA
 visibility and rejects ambiguous automatic values. Neither switch disables tracking.
+GPU availability uses total NVML used memory strictly below
+`autogpu.max_used_memory_gib` (default 2.0 GiB), regardless of process presence.
+Use a finite positive project YAML value or Hydra override. Verify default/custom
+limits in direct waiting, automatic/exact queue admission and worker contraction;
+active reservations remain unavailable. Run updated supervisors together so each
+applies only its own project's policy.
 CPU ONNX export has zero GPU demand; engine build and verification require one GPU.
 
 Before acceptance, establish sufficient whole-GPU visibility and preserve unrelated compute

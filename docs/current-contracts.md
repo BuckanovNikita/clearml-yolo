@@ -31,6 +31,11 @@ configuration, output, tracking and evaluation rules formerly listed in `AGENTS.
 
 ## Changes that must propagate
 
+GPU availability uses the configurable `autogpu.max_used_memory_gib` total-used-memory
+cutoff (default 2.0 GiB, strict less-than). Keep the maintained GPU execution/queue
+contracts, Hydra defaults, supervisor/worker/direct wiring and README consistent.
+Process-based availability in completed feature history is superseded.
+
 Python integrations use the `core`, `application`, `adapters` and `entrypoints`
 packages. Application workflows receive explicit `WorkflowDependencies`; CLI
 composition supplies them outside Hydra configuration. Old module paths and saved

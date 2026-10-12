@@ -27,9 +27,9 @@ from clearml_yolo.adapters.integrations.native_runtime import (
 from clearml_yolo.adapters.observability.diagnostics import log_exception
 from clearml_yolo.adapters.observability.tracing import trace_command, trace_operation
 from clearml_yolo.adapters.runtime.bootstrap import runtime_environment
-from clearml_yolo.adapters.runtime.gpu_resources import configured_phases, job_request
+from clearml_yolo.adapters.runtime.gpu_resources import GPUInventory, configured_phases, job_request
 from clearml_yolo.adapters.runtime.gpu_runtime import assigned_devices, exact_selection, scheduled
-from clearml_yolo.adapters.runtime.gpu_scheduling import execution_controls
+from clearml_yolo.adapters.runtime.gpu_scheduling import automatic_gpu_control, execution_controls
 from clearml_yolo.adapters.runtime.gpu_wait import wait_for_available_gpus
 from clearml_yolo.adapters.storage.filesystem import initialize_filesystem, runs_root, write_path
 from clearml_yolo.adapters.storage.run_identity import task_run_dir
@@ -76,7 +76,15 @@ def _selected_devices(
     if scheduled():
         return assigned_devices()
     if automatic:
-        return wait_for_available_gpus(job_request(name, inputs))
+        count = job_request(name, inputs)
+        if not count:
+            return ()
+        return wait_for_available_gpus(
+            count,
+            inventory=GPUInventory(
+                max_used_memory_gib=automatic_gpu_control(inputs).max_used_memory_gib
+            ),
+        )
     return ()
 
 
@@ -214,7 +222,13 @@ def _execute_assigned(
     if "queue" in config or "autogpu" in config:
         record_run_configuration(
             task,
-            {"execution_policy": {"queue": execution_controls(config)[0], "autogpu": automatic}},
+            {
+                "execution_policy": {
+                    "queue": execution_controls(config)[0],
+                    "autogpu": automatic,
+                    "max_used_memory_gib": automatic_gpu_control(config).max_used_memory_gib,
+                }
+            },
         )
     if devices:
         record_run_configuration(

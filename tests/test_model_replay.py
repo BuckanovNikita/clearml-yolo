@@ -31,7 +31,7 @@ def isolated_owner(monkeypatch: pytest.MonkeyPatch) -> list[str]:
     monkeypatch.setattr(common, "native_runtime", lambda: runtime("ultralytics"))
     monkeypatch.setattr(common, "detector_runtime", lambda: runtime("detector"))
     monkeypatch.setattr(common, "invocation", invocation)
-    monkeypatch.setattr(common, "wait_for_available_gpus", lambda count: (3,))
+    monkeypatch.setattr(common, "wait_for_available_gpus", lambda count, **kwargs: (3,))
     monkeypatch.setattr(common, "release_training_memory", lambda: None)
     monkeypatch.setattr(common, "initialize_naming", lambda task: events.append("naming"))
     monkeypatch.setattr(session, "record_run_configuration", lambda task, values: None)

@@ -66,3 +66,31 @@ execution order, outputs, device mapping and failure propagation.
   removed. The existing metadata-only visibility probe remains disposable.
 - The earlier remote hang investigation is deferred. FiftyOne publication and SDK
   shutdown remain separate potential causes; queue removal does not prove that hang fixed.
+
+## Amendment: configurable memory availability (2026-10-12)
+
+This amendment changes current availability under the restored feature 024 scheduler;
+the completed queue-removal history above is not a current scheduling requirement.
+
+### User story 3 — tolerate small GPU allocations (P1)
+
+Users can start jobs on visible GPUs with small existing allocations and customize
+the cutoff in project YAML or a Hydra override without changing application code.
+
+- **FR-007**: A GPU is free when total NVML used memory is strictly below
+  `autogpu.max_used_memory_gib`, default 2.0 GiB (2048 MiB). Process presence, identity
+  and utilization do not override this rule. Equality is busy.
+- **FR-008**: Accept finite positive numeric limits; reject zero, negative, nonfinite,
+  boolean, string and null values before admission. Existing enabled-only configs
+  retain the default. Export and all model commands expose the setting.
+- **FR-009**: Apply each job's limit to direct waiting and both queued modes, without
+  cross-project policy leakage, reservation overlap, visibility changes or replay
+  mutation. Preserve FIFO and compatible registry state.
+- **FR-010**: Unknown memory telemetry fails clearly. CPU/MPS and fully disabled
+  scheduling bypass probing. Owned native work must finish before contraction;
+  released capacity must satisfy the same memory limit.
+
+Acceptance: the supplied eight-card snapshot (1215, 3, 409, 3, 3, 3, 3, 3 MiB)
+qualifies all cards before visibility/reservations; three visible cards can be
+selected. Tests cover one byte below/equal/above the limit, custom fractional
+limits, malformed telemetry/configuration and different projects sharing the queue.

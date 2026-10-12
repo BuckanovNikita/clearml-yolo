@@ -8,7 +8,7 @@ from omegaconf import DictConfig, OmegaConf, open_dict
 
 from clearml_yolo.adapters.integrations.native_runtime import validate_owner_environment
 from clearml_yolo.adapters.yolo.config import native_defaults, prediction_defaults, stage_settings
-from clearml_yolo.core.execution import ExecutionControl
+from clearml_yolo.core.execution import AutoGPUControl, ExecutionControl
 from clearml_yolo.core.export_requests import ExportSettings
 from clearml_yolo.core.models import ModelConfig
 
@@ -87,7 +87,8 @@ def validate_wrapper_keys(config: DictConfig, function: Callable[..., Any]) -> N
         if control in config:
             values = dict(config[control])
             values.pop("_target_", None)
-            ExecutionControl.model_validate(values)
+            model_type = AutoGPUControl if control == "autogpu" else ExecutionControl
+            model_type.model_validate(values)
     for group in ("ultralytics", "ultralytics_predict"):
         if group in config:
             stage_settings(dict(config[group]), "train" if group == "ultralytics" else "predict")

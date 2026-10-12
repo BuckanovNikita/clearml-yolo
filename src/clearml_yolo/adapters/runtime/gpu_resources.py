@@ -1,7 +1,6 @@
 """GPU demand and whole-device inventory without native model runtime imports."""
 
 import json
-import os
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
@@ -15,14 +14,14 @@ from clearml_yolo.adapters.observability.diagnostics import (
     redact_text,
 )
 from clearml_yolo.adapters.observability.tracing import trace_operation
-from clearml_yolo.core.execution import ExecutionPhase
+from clearml_yolo.core.execution import DEFAULT_MAX_USED_MEMORY_GIB, AutoGPUControl, ExecutionPhase
 
 _CUDA_PROBE_TIMEOUT_SECONDS = 30.0
 
 
 @dataclass(frozen=True)
 class GPUDevice:
-    """A physical whole GPU and whether an external compute process occupies it."""
+    """A physical whole GPU and whether its used memory reaches the configured limit."""
 
     uuid: str
     busy: bool
@@ -44,9 +43,7 @@ class _NVML(Protocol):
 
     def nvmlDeviceGetMigMode(self, handle: Any) -> tuple[int, int]: ...  # noqa: N802
 
-    def nvmlDeviceGetComputeRunningProcesses(  # noqa: N802
-        self, handle: Any
-    ) -> Sequence[Any]: ...
+    def nvmlDeviceGetMemoryInfo(self, handle: Any) -> Any: ...  # noqa: N802
 
 
 def _nvml() -> _NVML:
@@ -276,9 +273,14 @@ def _probe_visible_uuids() -> tuple[str, ...]:
 class GPUInventory:
     """Read whole-GPU telemetry and inherited CUDA visibility without pinning ordinals."""
 
+    def __init__(self, *, max_used_memory_gib: float = DEFAULT_MAX_USED_MEMORY_GIB) -> None:
+        self.max_used_memory_gib = AutoGPUControl(
+            max_used_memory_gib=max_used_memory_gib
+        ).max_used_memory_gib
+
     @trace_operation("gpu.inventory")
     def snapshot(self) -> tuple[GPUDevice, ...]:
-        """Return whole GPUs occupied by other PIDs; unknown telemetry fails closed."""
+        """Compare total used memory against the limit; unknown telemetry fails closed."""
         nvml = _nvml()
         initialized = False
         try:
@@ -297,23 +299,21 @@ class GPUInventory:
                         f"MIG-enabled GPU {uuid} is unsupported by GPU availability waiting"
                     )
                 try:
-                    processes = nvml.nvmlDeviceGetComputeRunningProcesses(handle)
+                    memory = nvml.nvmlDeviceGetMemoryInfo(handle)
                 except nvml.NVMLError_NotSupported as error:
                     raise RuntimeError(
-                        f"GPU {uuid} compute process telemetry is unsupported; "
+                        f"GPU {uuid} memory telemetry is unsupported; "
                         "cannot determine safe availability"
                     ) from error
-                busy = False
-                for process in processes:
-                    # NVML returns opaque binding records; validate their PID before
-                    # ignoring our retained CUDA context from a previous local job.
-                    pid = getattr(process, "pid", None)
-                    if isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0:
-                        raise RuntimeError(
-                            f"GPU {uuid} compute process telemetry returned an invalid PID; "
-                            "cannot determine safe availability"
-                        )
-                    busy = busy or pid != os.getpid()
+                # NVML returns an opaque binding record; missing/invalid used bytes
+                # must not silently advertise a device as free.
+                used = getattr(memory, "used", None)
+                if isinstance(used, bool) or not isinstance(used, int) or used < 0:
+                    raise RuntimeError(
+                        f"GPU {uuid} memory telemetry returned invalid used bytes; "
+                        "cannot determine safe availability"
+                    )
+                busy = used >= self.max_used_memory_gib * 1024**3
                 devices.append(GPUDevice(uuid=uuid, busy=busy))
             return tuple(devices)
         finally:

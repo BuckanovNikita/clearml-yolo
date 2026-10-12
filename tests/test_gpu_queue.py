@@ -154,7 +154,8 @@ def test_disappeared_pending_gpu_fails_and_healthy_follower_can_advance(
     try:
         assert head.try_acquire() is None
         inventory.devices = (
-            GPUDevice(uuid="GPU-b", busy=False), GPUDevice(uuid="GPU-c", busy=False)
+            GPUDevice(uuid="GPU-b", busy=False),
+            GPUDevice(uuid="GPU-c", busy=False),
         )
         # Another supervisor must not delete or claim ownership of the lost head.
         assert follower.try_acquire() is None
@@ -623,3 +624,23 @@ def test_queue_root_uses_bootstrap_capture_after_xdg_rewrite(
     monkeypatch.setenv("CY_GPU_QUEUE_ROOT", str(expected))
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "project-state"))
     assert queue_root() == expected
+
+
+def test_supervisors_apply_only_their_own_availability_policy(tmp_path: Path) -> None:
+    strict = MutableInventory(GPUDevice("GPU-a", True), GPUDevice("GPU-b", False))
+    permissive = MutableInventory(GPUDevice("GPU-a", False), GPUDevice("GPU-b", False))
+    head = GPUQueue(root=tmp_path, inventory=strict).register(2, ("GPU-a", "GPU-b"))
+    follower = GPUQueue(root=tmp_path, inventory=permissive).register(1, ("GPU-a", "GPU-b"))
+    try:
+        assert follower.try_acquire() is None
+        assert head.devices == ()
+        assert head.try_acquire() is None
+        strict.devices = permissive.devices
+        assert head.try_acquire() == ("GPU-a", "GPU-b")
+        assert follower.devices == ()
+        assert follower.try_acquire() is None
+        head.close()
+        assert follower.try_acquire() == ("GPU-a",)
+    finally:
+        head.close()
+        follower.close()

@@ -1,10 +1,8 @@
 """GPU requests use native device semantics without initializing CUDA in the owner."""
 
 import json
-import os
 import subprocess
 import sys
-from collections.abc import Sequence
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 from types import SimpleNamespace
@@ -227,11 +225,11 @@ class _FakeNVML:
         self,
         *,
         uuids: tuple[str, ...],
-        processes: tuple[Sequence[object] | BaseException, ...],
+        used_memory: tuple[object, ...],
         mig_modes: tuple[int | BaseException, ...] | None = None,
     ) -> None:
         self.uuids = uuids
-        self.processes = processes
+        self.used_memory = used_memory
         self.mig_modes = mig_modes or (0,) * len(uuids)
         self.initialized = False
         self.shutdown = False
@@ -262,78 +260,84 @@ class _FakeNVML:
             raise value
         return value, value
 
-    def nvmlDeviceGetComputeRunningProcesses(  # noqa: N802 - mirrors pynvml's public API
-        self, handle: int
-    ) -> list[object]:
-        value = self.processes[handle]
+    def nvmlDeviceGetMemoryInfo(self, handle: int) -> object:  # noqa: N802
+        value = self.used_memory[handle]
         if isinstance(value, BaseException):
             raise value
-        return list(value)
+        return SimpleNamespace(used=value)
+
+    def nvmlDeviceGetComputeRunningProcesses(self, handle: int) -> list[object]:  # noqa: N802
+        pytest.fail("Process presence must not determine memory availability")
 
 
 def _install_nvml(monkeypatch: pytest.MonkeyPatch, fake: _FakeNVML) -> None:
     monkeypatch.setitem(sys.modules, "pynvml", fake)
 
 
-def test_snapshot_returns_all_physical_gpus_and_marks_external_compute_use(
+def test_snapshot_uses_total_memory_with_strict_default_boundary(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     fake = _FakeNVML(
-        uuids=("GPU-a", "GPU-b", "GPU-c"),
-        processes=((), (SimpleNamespace(pid=4711),), ()),
+        uuids=("GPU-a", "GPU-b", "GPU-c", "GPU-d"),
+        used_memory=(0, 2 * 1024**3 - 1, 2 * 1024**3, 2 * 1024**3 + 1),
     )
     _install_nvml(monkeypatch, fake)
-
     assert GPUInventory().snapshot() == (
-        GPUDevice(uuid="GPU-a", busy=False),
-        GPUDevice(uuid="GPU-b", busy=True),
-        GPUDevice(uuid="GPU-c", busy=False),
+        GPUDevice("GPU-a", False),
+        GPUDevice("GPU-b", False),
+        GPUDevice("GPU-c", True),
+        GPUDevice("GPU-d", True),
     )
     assert fake.shutdown
 
 
-def test_snapshot_reports_unsupported_process_telemetry_as_an_actionable_failure(
+def test_snapshot_accepts_reported_eight_card_memory_usage(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    uuids = tuple(f"GPU-{index}" for index in range(8))
     fake = _FakeNVML(
-        uuids=("GPU-a",),
-        processes=(_NotSupportedError("unsupported"),),
+        uuids=uuids,
+        used_memory=tuple(value * 1024**2 for value in (1215, 3, 409, 3, 3, 3, 3, 3)),
     )
     _install_nvml(monkeypatch, fake)
+    assert GPUInventory().snapshot() == tuple(GPUDevice(uuid, False) for uuid in uuids)
+    from clearml_yolo.adapters.runtime import gpu_resources
+    from clearml_yolo.adapters.runtime.gpu_wait import wait_for_available_gpus
 
-    with pytest.raises(RuntimeError, match=r"GPU-a.*process telemetry.*unsupported"):
+    # Reproduce a three-device request even when visibility includes the two
+    # cards with retained allocations from the user's report.
+    monkeypatch.setattr(gpu_resources, "_probe_visible_uuids", lambda: uuids[:3])
+    assert wait_for_available_gpus(3) == (0, 1, 2)
+
+
+def test_snapshot_applies_custom_fractional_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = _FakeNVML(
+        uuids=("GPU-a", "GPU-b", "GPU-c"),
+        used_memory=(512 * 1024**2 - 1, 512 * 1024**2, 512 * 1024**2 + 1),
+    )
+    _install_nvml(monkeypatch, fake)
+    assert GPUInventory(max_used_memory_gib=0.5).snapshot() == (
+        GPUDevice("GPU-a", False),
+        GPUDevice("GPU-b", True),
+        GPUDevice("GPU-c", True),
+    )
+
+
+def test_snapshot_reports_unsupported_memory_telemetry(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = _FakeNVML(uuids=("GPU-a",), used_memory=(_NotSupportedError("unsupported"),))
+    _install_nvml(monkeypatch, fake)
+    with pytest.raises(RuntimeError, match=r"GPU-a.*memory telemetry.*unsupported"):
         GPUInventory().snapshot()
     assert fake.shutdown
 
 
-def test_snapshot_ignores_only_the_invoking_process_cuda_context(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.parametrize("used", [None, "unknown", -1, True, 0.5])
+def test_snapshot_rejects_invalid_memory_telemetry(
+    monkeypatch: pytest.MonkeyPatch, used: object
 ) -> None:
-    owner_pid = os.getpid()
-    fake = _FakeNVML(
-        uuids=("GPU-a", "GPU-b"),
-        processes=(
-            (SimpleNamespace(pid=owner_pid),),
-            (SimpleNamespace(pid=owner_pid), SimpleNamespace(pid=owner_pid + 1)),
-        ),
-    )
+    fake = _FakeNVML(uuids=("GPU-a",), used_memory=(used,))
     _install_nvml(monkeypatch, fake)
-
-    assert GPUInventory().snapshot() == (
-        GPUDevice("GPU-a", busy=False),
-        GPUDevice("GPU-b", busy=True),
-    )
-    assert fake.shutdown
-
-
-@pytest.mark.parametrize("pid", [None, "unknown", 0, -1, True])
-def test_snapshot_rejects_invalid_compute_pid_telemetry(
-    monkeypatch: pytest.MonkeyPatch, pid: object
-) -> None:
-    fake = _FakeNVML(uuids=("GPU-a",), processes=((SimpleNamespace(pid=pid),),))
-    _install_nvml(monkeypatch, fake)
-
-    with pytest.raises(RuntimeError, match=r"GPU-a.*process telemetry"):
+    with pytest.raises(RuntimeError, match=r"GPU-a.*memory telemetry"):
         GPUInventory().snapshot()
     assert fake.shutdown
 
@@ -343,7 +347,7 @@ def test_snapshot_accepts_hardware_without_mig_capability(
 ) -> None:
     fake = _FakeNVML(
         uuids=("GPU-a",),
-        processes=((),),
+        used_memory=(0,),
         mig_modes=(_NotSupportedError("unsupported"),),
     )
     _install_nvml(monkeypatch, fake)
@@ -354,7 +358,7 @@ def test_snapshot_accepts_hardware_without_mig_capability(
 def test_snapshot_rejects_mig_enabled_hardware_clearly(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fake = _FakeNVML(uuids=("GPU-a",), processes=((),), mig_modes=(1,))
+    fake = _FakeNVML(uuids=("GPU-a",), used_memory=(0,), mig_modes=(1,))
     _install_nvml(monkeypatch, fake)
 
     with pytest.raises(RuntimeError, match="MIG"):
@@ -370,7 +374,7 @@ def test_snapshot_propagates_unexpected_nvml_errors_and_still_shuts_down(
         def nvmlDeviceGetUUID(self, handle: int) -> str:
             raise RuntimeError(f"failed UUID for {handle}")
 
-    fake = BrokenNVML(uuids=("GPU-a",), processes=((),))
+    fake = BrokenNVML(uuids=("GPU-a",), used_memory=(0,))
     _install_nvml(monkeypatch, fake)
 
     with pytest.raises(RuntimeError, match="failed UUID"):

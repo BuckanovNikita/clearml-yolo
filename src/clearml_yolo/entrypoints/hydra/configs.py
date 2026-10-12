@@ -12,6 +12,7 @@ from clearml_yolo.adapters.storage.filesystem import cy_home
 from clearml_yolo.adapters.yolo.config import native_defaults, prediction_defaults, stage_settings
 from clearml_yolo.application.contracts import ClearMLConfig, ModelRef
 from clearml_yolo.core.evaluation.models import EvaluationConfig
+from clearml_yolo.core.execution import AutoGPUControl
 from clearml_yolo.core.export_requests import ExportSettings
 from clearml_yolo.core.models import PRESETS, model_preset
 from clearml_yolo.core.publication import FiftyOneConfig
@@ -31,7 +32,7 @@ def _native() -> dict[str, Any]:
     groups.append({"ultralytics_predict": "_defaults"})
     fields["ultralytics_predict"] = prediction_defaults()
     fields["queue"] = make_config(enabled=True)
-    fields["autogpu"] = make_config(enabled=True)
+    fields["autogpu"] = AutoGPUControl().model_dump()
     groups.append({"override hydra/launcher": "cy_queue"})
     return {"hydra_defaults": groups, **fields}
 
@@ -91,7 +92,7 @@ def register_configs() -> None:
             output_dir=None,
             clearml=tracking,
             queue=make_config(enabled=True),
-            autogpu=make_config(enabled=True),
+            autogpu=AutoGPUControl().model_dump(),
         ),
         name="export",
     )

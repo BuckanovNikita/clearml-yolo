@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record YAML device serialization release verification
+  ([`370d321`](https://github.com/BuckanovNikita/clearml-yolo/commit/370d3211d152ca7eb7fedc1c979be2ef6e5538cf))
+
+
 ## v0.24.2 (2026-10-12)
 
 ### Bug Fixes
