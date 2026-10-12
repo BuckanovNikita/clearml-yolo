@@ -45,6 +45,7 @@ to foreign tickets; use updated supervisors together.
 Documentation reconciles the maintained GPU execution and queue-state contracts,
 README, project contract summary/index, quickstart and integration prerequisites.
 Completed historical workflow records remain unchanged, with dated amendments appended.
+
 ## Final checks
 
 The initial full suite passed 2148 tests with 30 skips. Subsequent review corrections
@@ -59,3 +60,21 @@ regenerated the changelog and attempted dependency resolution without local over
 it failed before code checks. Retry uses the established `UV_NO_SYNC=1` procedure
 against the verified environment with all hooks enabled. Exact source overrides are
 saved and restored around every attempt.
+
+## Release verification
+
+The final full-suite run passed 2156 tests with 30 skips and 54 warnings. Concurrent
+unrelated edits in the shared checkout caused its commit hook to reject the changing
+working tree despite the passing tests. The reviewed GPU patch was therefore committed
+in an isolated checkout, using the existing verified environment and all repository hooks.
+
+Source commit `1369bf0` and version commit `e0c7f90` passed the full commit checks,
+including Ruff, mypy, import-linter and pytest. The annotated Git tag `v0.25.0` and
+release commit were pushed to `origin/master` on 2026-10-12. No GitHub Release,
+package publication or deployment was performed. Release preparation changed only
+the root package version, root lockfile version and generated changelog.
+
+The source commit was fast-forwarded into the original checkout while preserving
+the unrelated static-analysis edits and exact local source overrides. The release
+checkout had no source overrides throughout either commit. The native GPU and
+remote three-GPU execution limitations above remain unchanged.

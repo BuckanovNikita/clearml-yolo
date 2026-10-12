@@ -52,7 +52,7 @@ See [verification.md](verification.md).
 - [x] T018 Update README.md, docs/project-contracts.md, contracts/execution.md, quickstart.md and specs/013-gpu-experiment-queue/contracts/queue-state.md (T016).
 - [x] T019 Validate Markdown/links/exported YAML and run affected tests, lint, typing and import checks; record verification-memory-limit.md (T017–T018).
 - [x] T020 Obtain fresh independent read-only review of integrated changes and resolve findings (T019).
-- [ ] T021 Follow docs/development.md commit/release checks, preserve local source overrides and publish only authorized Git commits/tags (T020).
+- [x] T021 Follow docs/development.md commit/release checks, preserve local source overrides and publish only authorized Git commits/tags (T020).
 
 Parallel work: read-only configuration/queue investigation alongside parent tests and
 implementation. Review follows integrated verification; release follows review.
