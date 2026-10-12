@@ -148,16 +148,28 @@ def test_lock_acquisition_failure_is_distinct_from_consumer_lifetime(
     original = Timeout("controlled-cache.lock")
 
     class FailedLock:
+        lock_file = "controlled-cache.lock"
+
         def __enter__(self) -> None:
             raise original
 
         def __exit__(self, *args: object) -> None:
             pytest.fail("Failed acquisition must not attempt lock exit")
 
-    monkeypatch.setattr(cache, "FileLock", lambda path: FailedLock())
-    with pytest.raises(Timeout) as caught, cached_dataset(source, tmp_path / "cache"):
+    def failed_lock(
+        path: Path, *, fallback_to_soft: bool, preserve_lock_file: bool
+    ) -> FailedLock:
+        assert not fallback_to_soft
+        assert preserve_lock_file
+        return FailedLock()
+
+    monkeypatch.setattr(cache, "FileLock", failed_lock)
+    with (
+        pytest.raises(RuntimeError, match="required native dataset cache lock") as caught,
+        cached_dataset(source, tmp_path / "cache"),
+    ):
         pytest.fail("Cache lock failure must precede consumer entry")
-    assert caught.value is original
+    assert caught.value.__cause__ is original
     assert any(
         message.startswith("FAILED storage.cache.lock.acquire ") for message in trace_messages
     )

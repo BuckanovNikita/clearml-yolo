@@ -72,7 +72,14 @@ def test_exit_and_matching_complete_receipt_are_required(
         publisher.preflight()
 
 
-def test_successful_preflight_uses_fresh_clean_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_successful_preflight_preserves_sdk_temp_and_owns_request_files(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("CY_HOME", str(tmp_path / "workspace"))
+    for key in ("TMPDIR", "TMP", "TEMP"):
+        directory = tmp_path / key
+        directory.mkdir()
+        monkeypatch.setenv(key, str(directory))
     for key in (
         "CUDA_VISIBLE_DEVICES",
         "NVIDIA_VISIBLE_DEVICES",
@@ -85,6 +92,8 @@ import sys,pathlib,json,os
 request=json.loads(pathlib.Path(sys.argv[1]).read_text())
 assert os.environ['CUDA_VISIBLE_DEVICES'] == ''
 assert os.environ['NVIDIA_VISIBLE_DEVICES'] == 'none'
+assert all(pathlib.Path(os.environ[k]).name == k for k in ('TMPDIR', 'TMP', 'TEMP'))
+assert pathlib.Path(sys.argv[1]).is_relative_to(pathlib.Path(os.environ['CY_HOME'])/'.tmp')
 assert not any(k.startswith(('CY_CLEARML_OWNER_', 'CY_GPU_QUEUE_')) for k in os.environ)
 response=dict(operation=request['operation'], operation_id=request['operation_id'],
     task_id=None, complete=True, receipt=None)
@@ -224,10 +233,7 @@ assert pathlib.Path(request['ground_truth']).parent == pathlib.Path.cwd()
     assert request.ground_truth == Path("truth.csv")
 
 
-def _deny_marker_updates(monkeypatch: pytest.MonkeyPatch, retained_reasons: list[str]) -> None:
-    from clearml_yolo.adapters.runtime import bootstrap
-
-    monkeypatch.setattr(bootstrap, "retain_current_arena", retained_reasons.append)
+def _deny_marker_updates(monkeypatch: pytest.MonkeyPatch) -> None:
     original_write = Path.write_text
 
     def restricted_write(
@@ -265,7 +271,6 @@ time.sleep(30)
         raise PermissionError("termination denied")
 
     monkeypatch.setattr(bounded._OwnedProcesses, "signal", denied)
-    retained_reasons: list[str] = []
     launched: list[subprocess.Popen[bytes]] = []
     original_init = bounded._OwnedProcesses.__init__
     original_wait = subprocess.Popen.wait
@@ -276,7 +281,7 @@ time.sleep(30)
 
     monkeypatch.setattr(bounded._OwnedProcesses, "__init__", recorded)
     if marker_update_denied:
-        _deny_marker_updates(monkeypatch, retained_reasons)
+        _deny_marker_updates(monkeypatch)
     if interrupted:
 
         def cancelled(process: subprocess.Popen[bytes], timeout: float | None = None) -> int:
@@ -300,7 +305,6 @@ time.sleep(30)
                 assert marker["version"] == 1
                 if marker_update_denied:
                     assert marker["owners"] == []
-                    assert retained_reasons
                 elif os.name == "posix":
                     assert pid in [owner["pid"] for owner in marker["owners"]]
                 assert launched[0].poll() is None

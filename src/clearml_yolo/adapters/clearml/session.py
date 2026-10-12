@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import signal
 import threading
 from collections.abc import Callable, Iterator, Mapping
@@ -17,7 +18,7 @@ from contextlib import ExitStack, contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
-from tempfile import TemporaryDirectory
+from tempfile import mkdtemp
 from typing import Any, cast
 from urllib.parse import parse_qsl, urlsplit
 
@@ -27,7 +28,6 @@ from ruamel.yaml.comments import CommentedMap, CommentedSeq
 from ruamel.yaml.error import YAMLError
 from ruamel.yaml.tokens import CommentToken
 
-from clearml_yolo.adapters.clearml.configuration import configure_sdk_state
 from clearml_yolo.adapters.observability.diagnostics import exception_summary, log_exception
 from clearml_yolo.adapters.observability.tracing import trace_operation, trace_task
 from clearml_yolo.adapters.storage.filesystem import temporary_root
@@ -104,7 +104,7 @@ class _InvocationState:
     table_remote_names: set[str] = field(default_factory=set)
     model_barriers: list[Callable[[], None]] = field(default_factory=list)
     run_configuration: dict[str, Any] = field(default_factory=dict)
-    config_directory: TemporaryDirectory[str] | None = None
+    config_directory: Path | None = None
     config_resolver: Callable[[Any], Any] | None = None
     config_file_count: int = 0
     execution_config_paths: list[Path] = field(default_factory=list)
@@ -119,10 +119,10 @@ class _InvocationState:
 
     def config_path(self, suffix: str) -> Path:
         if self.config_directory is None:
-            self.config_directory = TemporaryDirectory(
-                prefix="clearml-yolo-config-", dir=temporary_root()
+            self.config_directory = Path(
+                mkdtemp(prefix="clearml-yolo-config-", dir=temporary_root())
             )
-        path = Path(self.config_directory.name) / f"{self.config_file_count:04d}{suffix}"
+        path = self.config_directory / f"{self.config_file_count:04d}{suffix}"
         self.config_file_count += 1
         return path
 
@@ -135,7 +135,7 @@ class _InvocationState:
         for path in self.execution_config_paths:
             path.unlink(missing_ok=True)
         if self.config_directory is not None:
-            self.config_directory.cleanup()
+            shutil.rmtree(self.config_directory)
 
 
 _ACTIVE_INVOCATION: ContextVar[_InvocationState | None] = ContextVar(
@@ -294,7 +294,6 @@ def invocation(
             active.current_stage = previous_stage
         return
 
-    configure_sdk_state()
     owns_signal = threading.current_thread() is threading.main_thread()
     previous_sigterm: Any = signal.getsignal(signal.SIGTERM) if owns_signal else None
 
@@ -400,13 +399,11 @@ def _task_owner(
 
 
 def _cleanup_invocation(state: _InvocationState, primary_error: BaseException | None) -> None:
-    try:
-        with trace_operation("clearml.temporary.cleanup", cleanup=True):
-            state.cleanup()
-    except OSError as cleanup_error:
-        if primary_error is None:
-            raise
-        log_exception("Local failure cleanup failed", cleanup_error, level="ERROR")
+    if primary_error is not None:
+        # A failed close/upload may still have consumers; retain their input files.
+        return
+    with trace_operation("clearml.temporary.cleanup", cleanup=True):
+        state.cleanup()
 
 
 def init_task(config: ClearMLConfig, stage: str) -> Any:

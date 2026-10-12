@@ -31,6 +31,22 @@ def trace_messages(monkeypatch: pytest.MonkeyPatch) -> Iterator[list[str]]:
         logger.remove(sink)
 
 
+@pytest.fixture
+def configuration_source(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    monkeypatch.setenv("CY_HOME", str(tmp_path / "workspace"))
+    source = tmp_path / "config.yaml"
+    source.write_text("name: original\n", encoding="utf-8")
+    return source
+
+
+def _attach_configuration(task: FakeTask, source: Path) -> Path:
+    assert connect_config_file(task, "dataset", source) == source
+    owned = Path(task.configurations[0]["configuration"])
+    assert owned.is_file()
+    assert owned != source
+    return owned
+
+
 def test_owner_identity_survives_finalizers_and_cleanup(
     fake_clearml: tuple[type[Any], FakeTask], trace_messages: list[str]
 ) -> None:
@@ -61,7 +77,9 @@ def test_owner_identity_survives_finalizers_and_cleanup(
 
 
 def test_finalizer_failure_traces_failed_terminal_path_without_exception_text(
-    fake_clearml: tuple[type[Any], FakeTask], trace_messages: list[str]
+    fake_clearml: tuple[type[Any], FakeTask],
+    trace_messages: list[str],
+    configuration_source: Path,
 ) -> None:
     _, task = fake_clearml
     original = ValueError("token=private-finalizer-token")
@@ -69,20 +87,20 @@ def test_finalizer_failure_traces_failed_terminal_path_without_exception_text(
     def fail() -> None:
         raise original
 
-    with (
+    with (  # noqa: PT012 - retained input must be attached before finalization fails
         pytest.raises(ValueError, match="private-finalizer-token") as caught,
         invocation(ClearMLConfig(), "pipeline"),
     ):
+        owned = _attach_configuration(task, configuration_source)
         register_finalizer(task, fail)
     assert caught.value is original
     assert any(
         message.startswith("FAILED clearml.publication.finalizer ") for message in trace_messages
     )
     assert any(message.startswith("DONE clearml.task.mark_failed ") for message in trace_messages)
-    assert any(
-        message.startswith("DONE clearml.temporary.cleanup ") and "task=task-id " in message
-        for message in trace_messages
-    )
+    assert owned.read_text() == "name: original\n"
+    assert configuration_source.read_text() == "name: original\n"
+    assert not any(" clearml.temporary.cleanup " in message for message in trace_messages)
     assert all("private-finalizer-token" not in message for message in trace_messages)
     assert task.events == ["close", "failed"]
 
@@ -109,10 +127,11 @@ def test_successful_invocation_is_silent_without_trace_opt_in(
     assert not any("clearml.task." in message for message in trace_messages)
 
 
-def test_close_failure_preserves_primary_error_and_traces_cleanup(
+def test_close_failure_preserves_primary_error_and_retains_configuration(
     fake_clearml: tuple[type[Any], FakeTask],
     trace_messages: list[str],
     monkeypatch: pytest.MonkeyPatch,
+    configuration_source: Path,
 ) -> None:
     _, task = fake_clearml
     original = KeyboardInterrupt()
@@ -121,11 +140,17 @@ def test_close_failure_preserves_primary_error_and_traces_cleanup(
         raise OSError("token=private-close-token")
 
     monkeypatch.setattr(task, "close", fail)
-    with pytest.raises(KeyboardInterrupt) as caught, invocation(ClearMLConfig(), "pipeline"):
+    with (  # noqa: PT012 - retain input while checking body and close failures together
+        pytest.raises(KeyboardInterrupt) as caught,
+        invocation(ClearMLConfig(), "pipeline"),
+    ):
+        owned = _attach_configuration(task, configuration_source)
         raise original
     assert caught.value is original
     assert any(message.startswith("FAILED clearml.task.close ") for message in trace_messages)
-    assert any(message.startswith("DONE clearml.temporary.cleanup ") for message in trace_messages)
+    assert owned.read_text() == "name: original\n"
+    assert configuration_source.read_text() == "name: original\n"
+    assert not any(" clearml.temporary.cleanup " in message for message in trace_messages)
     assert all("private-close-token" not in message for message in trace_messages)
 
 
@@ -197,25 +222,29 @@ def test_creation_terminal_sink_interrupt_closes_and_fails_created_task(
     assert caught.value is original
     assert task.closed
     assert task.events == ["close", "failed"]
-    assert any(message.startswith("DONE clearml.temporary.cleanup ") for message in trace_messages)
+    assert not any(" clearml.temporary.cleanup " in message for message in trace_messages)
 
 
 def test_failure_close_sink_exit_preserves_primary_error_and_marks_failed(
     fake_clearml: tuple[type[Any], FakeTask],
     trace_messages: list[str],
     interrupt_sink: Callable[[str, BaseException], None],
+    configuration_source: Path,
 ) -> None:
     _, task = fake_clearml
     original = LookupError("original body failure")
     interrupt_sink("DONE clearml.task.close ", SystemExit(19))
-    with (
+    with (  # noqa: PT012 - attach retained input before exercising failure finalization
         pytest.raises(LookupError, match="original body failure") as caught,
         invocation(ClearMLConfig(), "pipeline"),
     ):
+        owned = _attach_configuration(task, configuration_source)
         raise original
     assert caught.value is original
     assert task.events == ["close", "failed"]
-    assert any(message.startswith("DONE clearml.temporary.cleanup ") for message in trace_messages)
+    assert owned.read_text() == "name: original\n"
+    assert configuration_source.read_text() == "name: original\n"
+    assert not any(" clearml.temporary.cleanup " in message for message in trace_messages)
 
 
 def test_cleanup_start_sink_exit_still_removes_owned_configuration(

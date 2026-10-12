@@ -60,8 +60,8 @@ detectors = [
     "rfdetr[train]==1.11.2",
     "tensorboard>=2.20",
     "timm>=1.0.24,<2",
-    "torch==2.13.0",
-    "torchvision==0.28.0",
+    "torch>=2.13.0",
+    "torchvision>=0.28.0",
 ]
 export = [
     "onnx==1.23.2",
@@ -224,6 +224,7 @@ allow_indirect_imports = true
 ignore_imports = [
     "clearml_yolo.adapters.integrations.native_ddp -> ultralytics",
     "clearml_yolo.adapters.integrations.native_runtime -> ultralytics",
+    "clearml_yolo.adapters.integrations.native_trainer -> ultralytics",
     "clearml_yolo.adapters.integrations.training -> ultralytics",
     "clearml_yolo.adapters.yolo.ground_truth -> ultralytics",
     "clearml_yolo.adapters.yolo.inference -> ultralytics",
@@ -258,7 +259,6 @@ source_modules = ["clearml_yolo"]
 forbidden_modules = ["clearml"]
 allow_indirect_imports = true
 ignore_imports = [
-    "clearml_yolo.adapters.clearml.configuration -> clearml",
     "clearml_yolo.adapters.clearml.detectors -> clearml",
     "clearml_yolo.adapters.clearml.models -> clearml",
     "clearml_yolo.adapters.clearml.naming -> clearml",
@@ -273,9 +273,6 @@ type = "forbidden"
 source_modules = ["clearml_yolo"]
 forbidden_modules = ["botocore"]
 allow_indirect_imports = true
-ignore_imports = [
-    "clearml_yolo.adapters.clearml.configuration -> botocore",
-]
 
 [[tool.importlinter.contracts]]
 name = "eta SDK has explicit owners"
@@ -283,9 +280,6 @@ type = "forbidden"
 source_modules = ["clearml_yolo"]
 forbidden_modules = ["eta"]
 allow_indirect_imports = true
-ignore_imports = [
-    "clearml_yolo.adapters.fiftyone.compatibility -> eta",
-]
 
 [[tool.importlinter.contracts]]
 name = "digital_metrics SDK has explicit owners"
@@ -465,9 +459,6 @@ forbidden_modules = [
     "clearml_yolo.adapters.yolo",
 ]
 allow_indirect_imports = true
-ignore_imports = [
-    "clearml_yolo.adapters.reporting.reports -> clearml_yolo.adapters.runtime.bootstrap",
-]
 
 [[tool.importlinter.contracts]]
 name = "clearml adapter peer ownership"
@@ -510,7 +501,7 @@ forbidden_modules = [
 allow_indirect_imports = true
 ignore_imports = [
     "clearml_yolo.adapters.fiftyone.worker -> clearml_yolo.adapters.runtime.bootstrap",
-    "clearml_yolo.adapters.fiftyone.bounded -> clearml_yolo.adapters.runtime.bootstrap",
+    "clearml_yolo.adapters.fiftyone.bounded -> clearml_yolo.adapters.storage.filesystem",
     "clearml_yolo.adapters.fiftyone.publisher -> clearml_yolo.adapters.storage.publication_data",
 ]
 

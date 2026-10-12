@@ -1,19 +1,19 @@
 # Pipeline prerequisites
 
-Use Python and dependencies from `pyproject.toml` and `uv.lock`. Configure ClearML through
-explicit supported SDK environment variables or ignored project configuration before
-real execution; ambient home/system library configuration is not read.
-Infrastructure access, resource capacity and cleanup are supplied by the environment,
-not this repository.
+Use Python and dependencies from `pyproject.toml` and `uv.lock`. Detector extras require
+Torch >=2.13.0 and Torchvision >=0.28.0, locked at 2.14.1/0.29.1. Configure ClearML
+through normal SDK environment/user configuration; external selectors are valid.
+Infrastructure access and resource capacity come from the environment, not this repository.
 
-Set `CY_HOME` to the invocation workspace (default: launch working directory) for project
-datasets, task outputs, runtime library config/cache and invocation-owned scratch.
-A stdlib bootstrap runs before SDK imports, preserves `HOME`, confines library config
-selectors to the physical project root and scopes temporary files through finalization/uploads.
-External runners retain their own defaults. Explicit output/cache paths remain valid elsewhere;
-physically home-resident project write destinations warn without rejection. Follow the
-[filesystem contract](../../../../docs/filesystem-policy.md).
-Preserve source images and existing user configuration.
+Set `CY_HOME` to the invocation workspace (default: launch directory) for project datasets,
+outputs and scratch. Bootstrap preserves SDK configuration/cache selectors, cwd discovery,
+credentials, bytecode and global temporary defaults. Project temporary callsites use an
+explicit directory; `CY_RUNTIME_TEMP_ROOT` may select an external parent. Arenas remain
+retained after every exit outcome, with no startup scans/recovery or recursive deletion.
+Deliberate maintenance requires an idle workspace and descendants. Invalid dataset entries
+are preserved and fail clearly; native lock failures have no soft fallback. See the
+[filesystem contract](../../../../docs/filesystem-policy.md). Preserve source images,
+existing user settings and old local SDK caches; reuse old local selectors explicitly.
 
 Build the ground-truth CSV before stages that consume it:
 
@@ -72,8 +72,9 @@ Optional FiftyOne workers use finite preflight/publication/lock deadlines of 60/
 seconds and no GPU/queue/ClearML ownership. Fault injection must prove bounded import,
 work and shutdown plus at most ten seconds cleanup; publication success requires zero
 exit and a matching complete receipt. Errors warn and preserve computation; cancellation
-remains cancellation. Project config access tracing and scratch cleanup are required
-acceptance evidence. See [runtime isolation](../../../../docs/runtime-isolation.md).
+remains cancellation. Normal SDK configuration discovery, unchanged selectors/global temp
+settings and retained project scratch are required acceptance evidence; process cleanup and
+receipt validation remain independent requirements. See [runtime isolation](../../../../docs/runtime-isolation.md).
 
 Full comparison requires validation/test data and exact baseline thresholds. Candidate
 thresholds come from validation only. Both checkpoints must use the same current test

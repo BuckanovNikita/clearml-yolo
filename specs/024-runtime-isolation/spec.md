@@ -1,5 +1,9 @@
 # Feature Specification: Controlled execution and library isolation
 
+**Current amendment (2026-10-12):** the file-ownership amendment below supersedes
+US4, FR-009–011 and the configuration/scratch portions of the original acceptance.
+The original approved text remains as implementation history.
+
 **Created**: 2026-10-11. **Status**: Approved for implementation by the user.
 
 ## User scenarios and testing
@@ -86,3 +90,27 @@ are not disposable scratch. No dependency source changes, deployment or asset up
 The user's accepted controls/isolation supersede former queue-bypass and ambient
 library-configuration restrictions. Preserve the dated constitution and installed
 `.specify` files; record current authority in this feature and maintained contracts.
+
+## File ownership amendment — 2026-10-12
+
+User-approved intent: keep generated Hydra configuration, prepared datasets, outputs,
+checkpoints, reports, manifests, execution snapshots and application-created scratch
+project-owned. Preserve explicit output selections. Third-party configuration,
+credentials, caches, downloads, datasets and databases use their native defaults and
+user overrides, including paths outside `CY_HOME`. Do not rewrite environment selectors,
+patch SDK path constants, change import cwd, or persist callback switches in SDK settings.
+
+Do not scan, recover or recursively remove invocation arenas at startup or shutdown.
+Residual scratch is retained for deliberate maintenance; hostnames, PIDs, age and locks
+do not prove exclusive ownership. Operation-specific cleanup requires completed
+consumers; uncertain shutdown retains scratch. Preserve owner-only callbacks and the
+existing per-host cross-project GPU coordination scope.
+
+Dataset preparation keeps atomic publication and persistent native locks without soft
+fallback. Invalid existing entries fail without modification; foreign staging directories
+are untouched. Only the current operation's unique staging directory may be cleaned.
+
+Acceptance includes actual overlapping processes sharing a workspace, delayed children,
+success/failure/cancellation and malformed/duplicate historical ownership records. Native
+SDK discovery and external selectors must work unchanged. Local concurrency does not
+establish two-machine NFS behavior; that claim requires a separate real NFS test.

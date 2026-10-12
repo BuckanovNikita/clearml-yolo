@@ -17,6 +17,8 @@ from clearml_yolo.application.contracts import PreparedDataset, TrainResult
 def execute_training(
     task: object, architecture: str | Path, settings: dict[str, Any], prepared: PreparedDataset
 ) -> TrainResult:
+    from clearml_yolo.adapters.integrations.native_trainer import OwnedDetectionTrainer
+
     with trace_operation("native.import.yolo"):
         from ultralytics.models import YOLO
 
@@ -32,7 +34,7 @@ def execute_training(
     )
     with native_ddp_relay(task, model) as relay:
         with trace_operation("training.native.train", context={"stage": "train"}):
-            model.train(**settings)
+            model.train(trainer=OwnedDetectionTrainer, **settings)
         trainer: Any = model.trainer
         relay.replay(trainer)
         directory = Path(trainer.save_dir)

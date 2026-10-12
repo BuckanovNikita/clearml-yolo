@@ -36,3 +36,14 @@ No extension hooks registered. Spec quality checklist: 6/6 satisfied.
   environment selectors. The owned ClearML configuration compatibility adapter checks
   their interfaces and redirects them to project paths before task creation, retaining
   installed model defaults and the selected paths through SDK shutdown.
+
+## File ownership consistency analysis — 2026-10-12
+
+The user-approved amendment explicitly supersedes the original library-isolation and
+arena-cleanup requirements; completed history is preserved. All requirements map to
+T023–T029, with dependency verification in feature 025 T059–T061. No material user
+ambiguity remains. Existing environment overrides are the only initial working change.
+No installed workflow tooling or external dependency source is modified. The main
+integration risk is fresh DDP workers: removing persisted temporary settings must retain
+owner-only callbacks. Cleanup on uncertain shutdown and native lock failure require
+behavioral regression evidence. NFS cannot be claimed from local subprocess tests.

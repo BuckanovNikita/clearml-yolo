@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from contextvars import copy_context
 from functools import partial
 from pathlib import Path
-from tempfile import TemporaryDirectory
+from tempfile import mkdtemp
 from threading import Event, Thread
 from types import SimpleNamespace, TracebackType
 from typing import Any, Self, cast
@@ -414,8 +414,8 @@ class NativeDDPRelay:
 @contextmanager
 def native_ddp_relay(task: Any, model: Any) -> Iterator[NativeDDPRelay]:
     """Yield replay storage that callers keep through native model finalization and flush."""
-    with (
-        TemporaryDirectory(prefix="cy-native-ddp-", dir=temporary_root()) as directory,
-        NativeDDPRelay(task, model, directory) as relay,
-    ):
+    directory = mkdtemp(prefix="cy-native-ddp-", dir=temporary_root())
+    # Callback uploads can outlive training, and failure may leave a worker active.
+    # Retain relay inputs instead of inferring that every consumer has finished.
+    with NativeDDPRelay(task, model, directory) as relay:
         yield relay

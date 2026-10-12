@@ -195,3 +195,12 @@ covers cleanup and ends with `command.return`, which is not a success assertion.
 Application workflows use the execution-resource tracing port; evaluation and FiftyOne
 adapters may import the observability adapter. See [diagnostics](diagnostics.md) for
 capture, record interpretation, output bounds and native scheduling limits.
+
+Project paths follow [filesystem ownership](filesystem-policy.md): `CY_HOME` owns outputs
+and the CSV dataset cache, while SDK configuration/cache/defaults remain discoverable
+through their normal environment and user settings. External selectors stay unchanged.
+Project temporary files receive explicit retained invocation arenas; global SDK temporary
+settings are unchanged. Startup performs no scratch recovery or recursive deletion. Native
+ClearML callback switches restore in memory without persisting user settings, including
+fresh DDP trainer scopes. Invalid dataset entries remain available for deliberate idle
+maintenance; unsupported native locks fail without a soft-lock fallback.

@@ -11,7 +11,7 @@ from typing import Any
 from uuid import uuid4
 
 import yaml
-from filelock import FileLock
+from filelock import FileLock, SoftFileLock
 from pydantic import BaseModel, ValidationError
 
 from clearml_yolo.adapters.observability.diagnostics import log_exception
@@ -286,7 +286,7 @@ def _load_completed(
     )
 
 
-def _remove_cache_owned_path(path: Path) -> None:
+def _remove_owned_staging(path: Path) -> None:
     if path.is_symlink() or path.is_file():
         path.unlink(missing_ok=True)
     elif path.exists():
@@ -405,11 +405,22 @@ def cached_dataset(
     lock_root = root / ".locks"
     lock_root.mkdir(exist_ok=True)
     entry = root / identity
-    lock = FileLock(lock_root / f"{identity}.lock")
+    if FileLock is SoftFileLock:
+        raise RuntimeError("Dataset cache requires native file locks; this platform has none")
+    lock = FileLock(
+        lock_root / f"{identity}.lock",
+        fallback_to_soft=False,
+        preserve_lock_file=True,
+    )
 
     with ExitStack() as stack:
         with trace_operation("storage.cache.lock.acquire", context={"path": str(entry)}):
-            stack.enter_context(lock)
+            try:
+                stack.enter_context(lock)
+            except (OSError, NotImplementedError) as error:
+                raise RuntimeError(
+                    f"Cannot acquire required native dataset cache lock: {lock.lock_file}"
+                ) from error
         with trace_operation("storage.cache.lock.lifetime", context={"path": str(entry)}):
             prepared = _load_completed(
                 entry,
@@ -420,15 +431,20 @@ def cached_dataset(
             )
             if prepared is None:
                 with trace_operation("storage.cache.miss", context={"format": dataset_format}):
-                    _remove_cache_owned_path(entry)
-                    for stale in root.glob(f".{identity}.staging-*"):
-                        _remove_cache_owned_path(stale)
+                    # Existing entries and peer staging have no ownership proof for deletion.
+                    if entry.exists() or entry.is_symlink():
+                        raise RuntimeError(
+                            f"Dataset cache entry is invalid and has been preserved: {entry}. "
+                            "Inspect it and explicitly repair or remove it while the cache is idle."
+                        )
                     staging = root / f".{identity}.staging-{uuid4().hex}"
+                    # Exclusive creation establishes ownership before enabling cleanup.
+                    staging.mkdir()
                     try:
                         _publish_entry(
                             source_path,
                             source_bytes,
-                            staging,
+                            staging / "dataset",
                             entry,
                             identity=identity,
                             input_sha256=input_sha256,
@@ -436,7 +452,7 @@ def cached_dataset(
                             required_splits=required_splits,
                         )
                     finally:
-                        _remove_cache_owned_path(staging)
+                        _remove_owned_staging(staging)
                     prepared = _load_completed(
                         entry,
                         identity=identity,
@@ -445,9 +461,9 @@ def cached_dataset(
                         required_splits=required_splits,
                     )
                     if prepared is None:
-                        _remove_cache_owned_path(entry)
                         raise RuntimeError(
-                            f"Prepared dataset cache entry failed validation: {entry}"
+                            "Prepared dataset cache entry failed validation "
+                            f"and has been preserved: {entry}"
                         )
             else:
                 with trace_operation("storage.cache.hit", context={"format": dataset_format}):

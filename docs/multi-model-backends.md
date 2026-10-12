@@ -22,7 +22,8 @@ source overrides intact. From the project checkout, install the optional detecto
 uv sync --frozen --extra detectors
 ```
 
-The `detectors` extra supplies the pinned Torch/Torchvision pair, RF-DETR training,
+The `detectors` extra requires Torch >=2.13.0 and Torchvision >=0.28.0; the committed
+lock selects Torch 2.14.1 and Torchvision 0.29.1. It also supplies RF-DETR training,
 timm and COCO evaluation dependencies declared in `pyproject.toml`. DEIMv2 additionally
 needs its verified source checkout below. For ONNX export and its checks, add `--extra export`:
 
@@ -296,9 +297,9 @@ configuration, read before SDK initialization:
 sdk.development.report_use_subprocess = false
 ```
 
-This is a ClearML SDK setting, not a Hydra override. Keep the selected `CLEARML_CONFIG_FILE`
-inside the invocation's physical project root (`CY_HOME` when selected); the application
-rejects an external config path. Preserve existing API settings and credentials, or supply
-them through the established environment. Changing the reporting worker leaves the
+This is a ClearML SDK setting, not a Hydra override. Select `CLEARML_CONFIG_FILE` through
+normal SDK configuration; external paths are valid and the application leaves the selector
+unchanged. Preserve existing API settings and credentials, or supply them through the
+established environment. Changing the reporting worker leaves the
 application's queue, GPU admission and native model workers under their existing contracts.
 Retry into a fresh output directory and require the normal publication checks to pass.

@@ -29,8 +29,7 @@ The table below also identifies interfaces extracted beyond a mechanical move.
 | `publishing.models` and FiftyOne integration | `clearml_yolo.core.publication` and `clearml_yolo.adapters.fiftyone` |
 | Filesystem/dataset/cache/run operations | `clearml_yolo.adapters.storage` modules named in the migration map |
 | GPU probe, selection, FIFO reservations and supervised runtime | `clearml_yolo.adapters.runtime.gpu_resources`, `gpu_probe`, `gpu_wait`, `gpu_queue`, `gpu_runtime`, `gpu_scheduling`; `clearml_yolo.entrypoints.hydra.execution` and `worker` |
-| Pre-import configuration and invocation scratch | `clearml_yolo.adapters.runtime.bootstrap` |
-| ClearML session-cache and botocore customer-model SDK constants | `clearml_yolo.adapters.clearml.configuration` |
+| Project workspace and retained invocation scratch | `clearml_yolo.adapters.runtime.bootstrap` |
 | Native training, DDP and mixed integration lifecycle | `clearml_yolo.adapters.integrations` |
 
 Import project-owned records from their defining modules. Package initializers remain
@@ -89,18 +88,21 @@ timestamps, and cached CSV parsing preserves exact confidence values at frozen t
 
 ## Explicit programmatic dependencies
 
-`native_runtime()` also scopes project configuration and scratch when called directly,
-restoring process environment and temporary settings on exit. Nested CLI use reuses
-the invocation arena; an embedding application still owns the wider task/publication
-lifetime. `cy-dedup` needs no SDK bootstrap and keeps its atomic temporary files beside
-the selected destination.
+`native_runtime()` supplies retained project scratch when called directly and restores
+its in-memory ClearML callback/settings switches on exit without modifying persisted
+Ultralytics settings. Nested CLI use reuses the invocation arena; an embedding application
+owns the wider task/publication lifetime. Fresh native DDP trainers scope worker callbacks
+during construction and training. `cy-dedup` needs no SDK bootstrap and keeps its atomic
+temporary files beside the selected destination.
 
-Import SDK dependencies only inside `project_configuration_imports()` after bootstrap.
-Explicit relative SDK data paths resolve against the launch directory before its temporary
-cwd change. Once SDK configuration is loaded, the process remains bound to that `CY_HOME`
-after scope exit; use a fresh process to select another project. Environment restoration
-does not reset SDK-held settings. ClearML invocation configures project session/cache
-constants through its owned configuration adapter before task creation.
+SDKs use normal imports, environment selectors, user settings, cwd discovery and caches.
+There is no project import-directory context, SDK constant substitution or process binding
+to a library configuration root. `CY_HOME` selects project paths; changing it does not reset
+SDK-held settings. External selectors and global temporary defaults remain unchanged.
+Use supported SDK selectors explicitly to reuse earlier project-local settings/cache files;
+see [filesystem ownership](filesystem-policy.md#reuse-earlier-project-local-library-paths).
+Project temporary files receive an explicit directory and invocation arenas are retained
+on every exit path. Remove selected old scratch only during deliberate idle maintenance.
 
 A full metrics workflow still requires a ClearML invocation owner. Select initialization
 at the outer boundary and pass the dependency bundle explicitly:
@@ -112,19 +114,15 @@ from clearml_yolo.application.contracts import MetricsResult
 
 
 def run_metrics() -> MetricsResult:
-    from clearml_yolo.adapters.runtime.bootstrap import (
-        project_configuration_imports,
-        runtime_environment,
-    )
+    from clearml_yolo.adapters.runtime.bootstrap import runtime_environment
 
     with runtime_environment():
-        with project_configuration_imports():
-            from clearml_yolo.adapters.clearml.session import invocation
-            from clearml_yolo.application.contracts import ClearMLConfig
-            from clearml_yolo.application.use_cases.metrics import compute_metrics
-            from clearml_yolo.core.evaluation.models import EvaluationConfig
-            from clearml_yolo.core.publication import FiftyOneConfig
-            from clearml_yolo.entrypoints.composition import build_dependencies
+        from clearml_yolo.adapters.clearml.session import invocation
+        from clearml_yolo.application.contracts import ClearMLConfig
+        from clearml_yolo.application.use_cases.metrics import compute_metrics
+        from clearml_yolo.core.evaluation.models import EvaluationConfig
+        from clearml_yolo.core.publication import FiftyOneConfig
+        from clearml_yolo.entrypoints.composition import build_dependencies
 
         tracking = ClearMLConfig(
             project_name="detection", task_name="metrics", tags=["evaluation"]

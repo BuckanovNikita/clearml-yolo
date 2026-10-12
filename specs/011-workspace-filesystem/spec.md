@@ -24,6 +24,19 @@ a write resolves physically beneath the user's home without rejecting or relocat
 > native-dataset training, native staging and the `TRAINS_CACHE_DIR` alias. CSV preparation owns
 > training data, and `CLEARML_CACHE_DIR` is the supported explicit ClearML cache setting.
 
+> **File ownership amendment (2026-10-12):** The current
+> [filesystem contract](contracts/filesystem-ownership.md) and
+> [runtime amendment](../024-runtime-isolation/spec.md#file-ownership-amendment--2026-10-12)
+> supersede SDK data/config/default routing and scratch deletion requirements below.
+> `CY_HOME` owns project outputs, CSV datasets and explicit invocation scratch only.
+> All library selectors/user configuration/cache/defaults remain discoverable and unchanged;
+> bare checkpoint names pass through to libraries. Global temporary settings are untouched.
+> Arenas are retained after every outcome without startup scans/recovery or recursive deletion.
+> Native callback switches restore in memory without settings-file writes, including fresh DDP
+> trainers. Invalid dataset entries remain preserved; native locks fail without soft fallback.
+> Earlier local SDK settings/caches require explicit opt-in, with no migration/deletion.
+> Historical scenarios, requirements and dated checks retain their original meaning only.
+
 ## Clarifications
 
 ### Session 2026-10-01

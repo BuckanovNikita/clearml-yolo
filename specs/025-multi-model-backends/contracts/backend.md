@@ -88,7 +88,7 @@ Developer/business report input adapters preserve exact text class labels, inclu
 leading zeros and literal `NA`, while excluding numeric threshold footer cells. Eligibility
 filters still apply and retain excluded classes explicitly; dependency sources are unchanged.
 
-## Scheduling and isolation
+## Scheduling and runtime ownership
 
 Lightweight train/predict/export phase descriptions identify enabled work, device setting
 paths and derived demand without importing SDKs. They feed existing supervisor, worker,
@@ -99,7 +99,12 @@ CPU execution bypasses GPU telemetry. Native pass-through with both controls fal
 settings intact. Mixed-family queued sweeps retain ordered results and concurrent admission;
 queue-disabled sweeps use sequential BasicLauncher; invalid mixed modes fail before admission.
 
-Generic runtime isolation spans the whole invocation and final uploads. Select only the
-required backend integration after admission. Finish/reap owned training descendants before
-memory cleanup or reservation contraction. Bounded FiftyOne workers, cancellation and
-task-owned cleanup remain unchanged; preserve unrelated services and durable data.
+Runtime ownership spans the invocation and final uploads. Select the required backend
+integration after admission while preserving normal SDK configuration/cache/defaults and
+external selectors. Project temporary files receive explicit invocation scratch; global SDK
+temp settings stay unchanged. Arenas are retained after every outcome without startup scans,
+recovery or recursive deletion. Finish/reap owned training descendants before memory cleanup
+or reservation contraction. Bounded FiftyOne workers and cancellation remain unchanged;
+preserve unrelated services and durable data. See
+[filesystem ownership](../../../docs/filesystem-policy.md) for idle maintenance and explicit
+reuse of earlier project-local SDK settings/cache paths.

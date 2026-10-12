@@ -2,16 +2,18 @@
 
 ## Prerequisites
 
-Initialize existing submodules and the repository's uv environment if needed. Do not advance external dependency revisions. Read AGENTS.md and the running-end-to-end-tests skill; load the applicable environment guidance for actual native acceptance. Use explicit ClearML project/tags and task-owned output directories.
+Use the approved external dependency copies and existing uv environment from
+[development setup](../../docs/development.md#external-dependencies). Do not advance
+external dependency revisions. Read AGENTS.md and the running-end-to-end-tests skill; load the applicable environment guidance for actual native acceptance. Use explicit ClearML project/tags and task-owned output directories.
 
 ## Repository checks
 
 ```bash
-uv run pytest tests/test_native_ddp.py tests/test_native_tracking_contract.py tests/test_publication_commands.py tests/test_config_upload_commands.py
-uv run pytest
-uv run ruff check .
-uv run mypy .
-uv run lint-imports
+uv run --frozen --no-sync pytest tests/test_native_ddp.py tests/test_native_tracking_contract.py tests/test_publication_commands.py tests/test_config_upload_commands.py
+uv run --frozen --no-sync pytest
+uv run --frozen --no-sync ruff check .
+uv run --frozen --no-sync mypy .
+uv run --frozen --no-sync lint-imports
 ```
 
 Expect early DDP epoch dispatch, exact-once final drain, deferred native terminal publication, context identity, partial-record buffering, failure propagation and cleanup coverage. Mocked tests do not establish native training or backend uploads.
@@ -26,9 +28,17 @@ evaluation under the current comparison settings (test for the pipeline). Confir
 train_data_overrides.json never appear as artifacts. Exercise physical DDP only if sufficient
 owned resources are available; otherwise record it as unverified, separate from simulated relay coverage.
 
+Verify native ClearML switches/callbacks restore in memory without writing Ultralytics settings.
+Fresh DDP trainers must scope construction and training even when user settings enable ClearML.
+Libraries retain ordinary user/environment configuration and external selectors. Project
+relay/manifest files receive explicit scratch paths while global SDK temp defaults remain
+unchanged. Arenas stay retained after success, failure or cancellation without startup scans
+or recursive deletion; descendant process cleanup remains required before GPU release.
+
 ## Evidence and cleanup
 
-Record commands, task IDs, observations, failures and limitations in dated verification evidence under this feature. Stop/join task-owned consumers and clean only resources created by the acceptance run. Leave pre-existing services/data intact. No commit, push or release is part of this guide.
+Record commands, task IDs, observations, failures and limitations in dated verification evidence under this feature. Stop/join task-owned consumers. Retain invocation arenas; any deliberate maintenance must
+confirm the workspace and descendants are idle and remove only selected task-owned resources. Leave pre-existing services/data intact. No commit, push or release is part of this guide.
 
 ## CPU distributed regression acceptance — 2026-10-10 amendment
 
@@ -48,9 +58,9 @@ YOLOv8n architecture YAML. No GPU, ClearML service, external dataset, network ac
 or pretrained-weight download is required.
 
 ```bash
-uv run pytest -m ddp_cpu
-uv run pytest tests/test_native_ddp_cpu.py
-uv run pytest
+uv run --frozen --no-sync pytest -m ddp_cpu
+uv run --frozen --no-sync pytest tests/test_native_ddp_cpu.py
+uv run --frozen --no-sync pytest
 ```
 
 The first two commands focus on the same CPU scenarios included by the last

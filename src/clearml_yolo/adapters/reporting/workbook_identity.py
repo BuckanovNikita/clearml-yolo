@@ -31,6 +31,7 @@ from openpyxl.utils.cell import (  # type: ignore[import-untyped]
 )
 
 from clearml_yolo.adapters.observability.tracing import trace_operation
+from clearml_yolo.adapters.storage.filesystem import temporary_root
 from clearml_yolo.core.identity import ModelIdentity
 
 _S = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
@@ -138,7 +139,7 @@ def deannotated_workbook(path: str | Path) -> Iterator[Path]:
     if _metadata(content) is None:
         yield source
         return
-    with TemporaryDirectory(prefix="clearml-yolo-dashboard-") as directory:
+    with TemporaryDirectory(prefix="clearml-yolo-dashboard-", dir=temporary_root()) as directory:
         original = Path(directory) / source.name
         original.write_bytes(_original(content))
         yield original

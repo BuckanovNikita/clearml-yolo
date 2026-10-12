@@ -7,9 +7,14 @@ Provide a supported local MongoDB server through FiftyOne's bundled service or
 `FIFTYONE_DATABASE_URI`. Set `FIFTYONE_DATABASE_DIR` to the local database/lock directory.
 Publishers accessing the same database on this machine must share that lock directory.
 
-Runtime bootstrap reads only project-owned SDK config beneath `CY_HOME/.config`;
-keep `HOME` unchanged. A separate App process should use the same explicit project
-configuration/data selectors; it does not inherit a completed CLI invocation scope.
+FiftyOne and ETA discover normal user settings and supported SDK environment selectors;
+external configuration/data paths are valid and unchanged. A separate App process should
+use the same configuration and database selectors as publication. Earlier project-local
+SDK files remain available through explicit selection, with no migration/deletion; see
+[filesystem ownership](../../docs/filesystem-policy.md#reuse-earlier-project-local-library-paths).
+Project worker protocol files use explicit retained scratch; SDK temporary defaults remain
+unchanged. Arenas are retained after success, errors and cancellation without startup scans
+or recursive cleanup. Remove selected old scratch only during deliberate idle maintenance.
 
 `cy`, `cy-predict`, and `cy-metrics` enable publication by default. Existing required
 command inputs and ClearML configuration still apply. Use `fiftyone.enabled=false`
@@ -24,22 +29,13 @@ Open the dataset manually, replacing the receipt path with your run's path:
 ```python
 import json
 
-from clearml_yolo.adapters.runtime.bootstrap import (
-    project_configuration_imports,
-    runtime_environment,
-)
+import fiftyone as fo
 
-with runtime_environment():
-    from clearml_yolo.adapters.fiftyone.compatibility import isolated_constants
-
-    with isolated_constants(), project_configuration_imports():
-        import fiftyone as fo
-
-    with open("runs/my-run/fiftyone_publication.json", encoding="utf-8") as stream:
-        receipt = json.load(stream)
-    dataset = fo.load_dataset(receipt["dataset_name"])
-    session = fo.launch_app(dataset)
-    session.wait()
+with open("runs/my-run/fiftyone_publication.json", encoding="utf-8") as stream:
+    receipt = json.load(stream)
+dataset = fo.load_dataset(receipt["dataset_name"])
+session = fo.launch_app(dataset)
+session.wait()
 ```
 
 Samples preserve `image_name`, `split`, and referenced image paths. Keep media available
@@ -72,19 +68,10 @@ server. Explicitly install its `@clearml-yolo/evaluation` App extension in that 
 environment and restart App:
 
 ```bash
-uv run python <<'PYTHON'
-from clearml_yolo.adapters.runtime.bootstrap import (
-    project_configuration_imports,
-    runtime_environment,
-)
+uv run --frozen --no-sync python <<'PYTHON'
+from clearml_yolo.adapters.fiftyone.panel import install_evaluation_plugin
 
-with runtime_environment():
-    from clearml_yolo.adapters.fiftyone.compatibility import isolated_constants
-
-    with isolated_constants(), project_configuration_imports():
-        from clearml_yolo.adapters.fiftyone.panel import install_evaluation_plugin
-
-    print(install_evaluation_plugin())
+print(install_evaluation_plugin())
 PYTHON
 ```
 
@@ -109,11 +96,11 @@ for an existing run. There is no automatic historical migration.
 Run the ordinary repository gates:
 
 ```bash
-uv run pytest
-uv run ruff check .
-uv run mypy .
-uv run lint-imports
-uv run pre-commit run --all-files
+uv run --frozen --no-sync pytest
+uv run --frozen --no-sync ruff check .
+uv run --frozen --no-sync mypy .
+uv run --frozen --no-sync lint-imports
+uv run --frozen --no-sync pre-commit run --all-files
 ```
 
 The ordinary suite checks configuration, dependency-free no-op behavior, payload fidelity,
@@ -123,7 +110,7 @@ below at a task-owned database and lock directory before running:
 ```bash
 export FIFTYONE_DATABASE_DIR=/path/to/task-owned/fiftyone
 export FIFTYONE_DATABASE_URI=mongodb://127.0.0.1:27017
-CY_TEST_FIFTYONE=1 uv run pytest tests/test_fiftyone_publisher.py
+CY_TEST_FIFTYONE=1 uv run --frozen --no-sync pytest tests/test_fiftyone_publisher.py
 ```
 
 These tests use unique dataset prefixes and delete only the datasets they create. They

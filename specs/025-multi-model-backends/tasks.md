@@ -179,3 +179,12 @@ and checked release commit `b7cd1f3` are on `master`; annotated Git tag `v0.24.0
 `master` were pushed atomically and verified remotely. No GitHub Release object,
 package publication, release asset upload or deployment was performed. See the
 [release evidence](verification.md#release-closure--2026-10-12) for checks and limitations.
+
+## Torch compatibility amendment — 2026-10-12
+
+- [x] T059 [P] Relax Torch/Torchvision minimums, lock 2.14.1/0.29.1 with only necessary transitive upgrades and preserve local sources.
+- [x] T060 Verify resolution, compiled operators, CPU DDP and applicable native detector/GPU/export execution with the updated pair.
+- [x] T061 Update dependency/verification guidance and dated evidence, validate docs and include this change in feature 024's independent review/release gates.
+
+T059 runs beside feature 024 T023/T024. T060 follows integrated runtime changes;
+T061 and final review depend on measured results, not historical Torch acceptance.

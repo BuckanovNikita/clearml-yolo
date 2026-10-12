@@ -1684,3 +1684,9 @@ partial, contradictory or unrequested implementation work remains. All 58 existi
 tasks are complete; convergence appends nothing and leaves the task ledger unchanged.
 The documentation-only closure check validates three changed Markdown files and
 12 local links; all 14 model selections still compose without SDK imports.
+
+## Torch compatibility amendment — 2026-10-12
+
+The [current ownership/Torch evidence](../024-runtime-isolation/verification-20261012-ownership.md)
+records validation with Torch 2.14.1 and Torchvision 0.29.1. It identifies the rerun
+representative native/export coverage separately from this release's earlier full matrix.

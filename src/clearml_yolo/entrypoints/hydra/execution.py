@@ -441,7 +441,7 @@ class ModelJob:
                     self.previous_position = position
                 return
             devices = selected
-        self.temporary = TemporaryDirectory(prefix="cy-job-", dir=temporary_root())
+        self.temporary = TemporaryDirectory(prefix="cy-job-", dir=temporary_root(), delete=False)
         directory = Path(self.temporary.name)
         document = directory / "job.yaml"
         start_gate = directory / "start.ready"

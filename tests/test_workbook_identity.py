@@ -40,7 +40,10 @@ def _complex_workbook(path: Path) -> None:
     workbook.save(path)
 
 
-def test_banner_all_sheets_preserves_references_and_print_structure(tmp_path: Path) -> None:
+def test_banner_all_sheets_preserves_references_and_print_structure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CY_HOME", str(tmp_path / "workspace"))
     path = tmp_path / "workbook.xlsx"
     _complex_workbook(path)
     original = path.read_bytes()
@@ -77,7 +80,9 @@ def test_banner_all_sheets_preserves_references_and_print_structure(tmp_path: Pa
     assert main.print_title_cols == "$A:$A"
     assert workbook_identities(path) == {"Candidate": identity}
     with deannotated_workbook(path) as restored:
+        assert restored.is_relative_to(tmp_path / "workspace/.tmp")
         assert restored.read_bytes() == original
+    assert not restored.exists()
     assert path.read_bytes() != original
     annotate_workbook(path, {"Candidate": identity})
     assert workbook_identities(path) == {"Candidate": identity}

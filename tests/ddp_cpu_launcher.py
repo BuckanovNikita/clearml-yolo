@@ -125,8 +125,8 @@ def run_scenario(root: Path, ranks: int, scenario: str) -> dict[str, Any]:
     result: dict[str, Any] = json.loads((root / "result.json").read_text())
     result["workers"] = [json.loads(path.read_text()) for path in sorted(root.glob("rank-*.json"))]
     result["remaining_pids"] = remaining_pids
-    result["runtime_directories"] = [
-        str(path) for path in (root / "workspace" / ".tmp").glob("cy-native*")
+    result["retained_runtime_directories"] = [
+        str(path) for path in (root / "workspace" / ".tmp").glob("cy-runtime-*")
     ]
-    # Keep failed scenarios' logs/checkpoints; ephemeral runtime state must disappear.
+    # Process closure is independent of retained invocation scratch on every outcome.
     return result

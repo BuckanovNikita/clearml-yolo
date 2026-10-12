@@ -136,3 +136,10 @@ matrix had already passed in both installation formats before these path guards.
 - Independent closure review validated three Markdown files, five local links,
   two shell examples, balanced fences and whitespace, and cross-checked both JUnit
   reports and the published release refs. No blockers remained.
+
+## File ownership amendment — 2026-10-12
+
+The [ownership and Torch compatibility evidence](verification-20261012-ownership.md)
+records the subsequent removal of SDK redirection and generic arena cleanup. The
+original isolation/recovery acceptance above remains historical and is superseded
+only for those explicitly amended behaviors.

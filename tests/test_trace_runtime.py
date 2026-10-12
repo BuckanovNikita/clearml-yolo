@@ -7,7 +7,6 @@ import subprocess
 import sys
 from collections.abc import Callable, Iterator
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from threading import Event, get_ident
 from types import SimpleNamespace
 from typing import Any, cast, override
@@ -21,7 +20,7 @@ from clearml_yolo.adapters.integrations.training import execute_training
 from clearml_yolo.adapters.observability.tracing import trace_task
 from clearml_yolo.adapters.runtime import gpu_resources, gpu_wait
 from clearml_yolo.adapters.runtime.gpu_resources import GPUDevice, GPUInventory
-from clearml_yolo.adapters.storage.filesystem import initialize_filesystem
+from clearml_yolo.adapters.storage.filesystem import initialize_filesystem, temporary_root
 from clearml_yolo.application.contracts import PreparedDataset
 
 
@@ -63,7 +62,8 @@ def test_gpu_wait_invalid_request_preserves_exception(traces: list[str]) -> None
 
 
 def test_probe_failure_diagnostics_do_not_echo_subprocess_payload(
-    monkeypatch: pytest.MonkeyPatch, traces: list[str],
+    monkeypatch: pytest.MonkeyPatch,
+    traces: list[str],
 ) -> None:
     result = SimpleNamespace(returncode=1, stderr="probe-secret", stdout="")
     monkeypatch.setattr(subprocess, "run", lambda *_args, **_kwargs: result)
@@ -77,7 +77,9 @@ def test_probe_failure_diagnostics_do_not_echo_subprocess_payload(
 
 @pytest.mark.parametrize("initialized", [False, True])
 def test_gpu_memory_release_traces_actual_cleanup(
-    monkeypatch: pytest.MonkeyPatch, traces: list[str], initialized: bool,
+    monkeypatch: pytest.MonkeyPatch,
+    traces: list[str],
+    initialized: bool,
 ) -> None:
     calls: list[str] = []
     cuda = SimpleNamespace(
@@ -106,7 +108,8 @@ class _Model:
 
 
 def test_ddp_relay_lifecycle_is_traced_and_callbacks_are_restored(
-    tmp_path: Path, traces: list[str],
+    tmp_path: Path,
+    traces: list[str],
 ) -> None:
     model = _Model()
     relay = NativeDDPRelay(None, model, str(tmp_path))
@@ -122,7 +125,9 @@ def test_ddp_relay_lifecycle_is_traced_and_callbacks_are_restored(
 
 
 def test_native_runtime_generator_traces_enter_and_restore(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, traces: list[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    traces: list[str],
 ) -> None:
     from ultralytics.utils import SETTINGS
 
@@ -142,7 +147,8 @@ def test_native_runtime_generator_traces_enter_and_restore(
 
 
 def test_gpu_trace_is_silent_without_opt_in(
-    monkeypatch: pytest.MonkeyPatch, traces: list[str],
+    monkeypatch: pytest.MonkeyPatch,
+    traces: list[str],
 ) -> None:
     monkeypatch.setenv("LOGURU_LEVEL", "INFO")
     assert gpu_wait.wait_for_available_gpus(0) == ()
@@ -150,14 +156,17 @@ def test_gpu_trace_is_silent_without_opt_in(
 
 
 def test_training_model_load_failure_preserves_original_exception(
-    monkeypatch: pytest.MonkeyPatch, traces: list[str],
+    monkeypatch: pytest.MonkeyPatch,
+    traces: list[str],
 ) -> None:
+    from ultralytics import models
+
     failure = RuntimeError("native-private-details")
 
     def load(_architecture: object) -> None:
         raise failure
 
-    monkeypatch.setitem(sys.modules, "ultralytics.models", SimpleNamespace(YOLO=load))
+    monkeypatch.setattr(models, "YOLO", load)
     with pytest.raises(RuntimeError) as caught:
         execute_training(None, "yolo.pt", {}, cast(PreparedDataset, object()))
     assert caught.value is failure
@@ -168,7 +177,8 @@ def test_training_model_load_failure_preserves_original_exception(
 
 
 def test_gpu_synchronize_failure_does_not_continue_cleanup(
-    monkeypatch: pytest.MonkeyPatch, traces: list[str],
+    monkeypatch: pytest.MonkeyPatch,
+    traces: list[str],
 ) -> None:
     failure = RuntimeError("cuda-private-details")
     calls: list[str] = []
@@ -194,64 +204,59 @@ def test_gpu_synchronize_failure_does_not_continue_cleanup(
 
 
 @pytest.mark.parametrize("fail_inside", [False, True])
-def test_native_directory_cleanup_span_encloses_actual_cleanup(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, traces: list[str], fail_inside: bool,
+def test_native_restore_is_traced_and_retains_scratch(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    traces: list[str],
+    fail_inside: bool,
 ) -> None:
+    from ultralytics.utils import SETTINGS
+    from ultralytics.utils.callbacks import clearml as integration
+
     monkeypatch.setenv("CY_HOME", str(tmp_path))
     monkeypatch.delenv("LOCAL_RANK", raising=False)
     monkeypatch.delenv(runtime_module.OWNER_PID_ENV, raising=False)
     monkeypatch.delenv(runtime_module.OWNER_TASK_ENV, raising=False)
-    monkeypatch.setattr(runtime_module, "_enable_owner", lambda *_args: None)
-    original_cleanup = TemporaryDirectory.cleanup
-    cleaned: list[str] = []
+    original_setting = SETTINGS["clearml"]
+    original_callbacks = integration.callbacks
+    previous_directory = os.environ.get("YOLO_CONFIG_DIR")
     failure = RuntimeError("caller failed")
+    scratch: list[Path] = []
 
-    def observe_cleanup(directory: TemporaryDirectory[str]) -> None:
-        text = "\n".join(traces)
-        assert "DONE native.runtime.restore" in text
-        assert "START native.runtime.directory.cleanup" in text
-        assert "DONE native.runtime.directory.cleanup" not in text
-        assert Path(directory.name).is_dir()
-        original_cleanup(directory)
-        assert not Path(directory.name).exists()
-        cleaned.append(directory.name)
+    def enable(_integration: object, settings: Any) -> None:
+        dict.__setitem__(settings, "clearml", not original_setting)
+        integration.callbacks = {"test": lambda _trainer: None}
 
-    monkeypatch.setattr(TemporaryDirectory, "cleanup", observe_cleanup)
+    monkeypatch.setattr(runtime_module, "_enable_owner", enable)
+
+    def run_native() -> None:
+        with runtime_module.native_runtime():
+            scratch.append(temporary_root())
+            (scratch[0] / "retained.bin").write_bytes(b"native scratch")
+            assert os.environ.get("YOLO_CONFIG_DIR") == previous_directory
+            assert not any("native.runtime.restore" in message for message in traces)
+            if fail_inside:
+                raise failure
+
     if fail_inside:
-        with (
-            pytest.raises(RuntimeError, match="caller failed") as caught,
-            runtime_module.native_runtime(),
-        ):
-            raise failure
+        with pytest.raises(RuntimeError, match="caller failed") as caught:
+            run_native()
         assert caught.value is failure
     else:
-        with runtime_module.native_runtime():
-            pass
-    assert len(cleaned) == 1
-    assert any("DONE native.runtime.directory.cleanup" in message for message in traces)
-
-
-def test_native_directory_cleanup_failure_preserves_original_exception(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, traces: list[str],
-) -> None:
-    failure = OSError("cleanup failed")
-    original_cleanup = TemporaryDirectory.cleanup
-
-    def fail_cleanup(directory: TemporaryDirectory[str]) -> None:
-        original_cleanup(directory)
-        raise failure
-
-    monkeypatch.setattr(TemporaryDirectory, "cleanup", fail_cleanup)
-    directory = runtime_module._NativeTemporaryDirectory(dir=tmp_path)
-    with pytest.raises(OSError, match="cleanup failed") as caught, directory:
-        pass
-    assert caught.value is failure
-    assert not Path(directory.name).exists()
-    assert any("FAILED native.runtime.directory.cleanup" in message for message in traces)
+        run_native()
+    assert len(scratch) == 1
+    assert (scratch[0] / "retained.bin").read_bytes() == b"native scratch"
+    assert SETTINGS["clearml"] is original_setting
+    assert integration.callbacks is original_callbacks
+    assert os.environ.get("YOLO_CONFIG_DIR") == previous_directory
+    assert any("START native.runtime.restore" in message for message in traces)
+    assert any("DONE native.runtime.restore" in message for message in traces)
 
 
 def test_ddp_consumer_span_parents_callback_and_identifies_training(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, traces: list[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    traces: list[str],
 ) -> None:
     model = _Model()
     model.trainer.ddp = True
@@ -259,9 +264,7 @@ def test_ddp_consumer_span_parents_callback_and_identifies_training(
     waits = iter([False, True])
     monkeypatch.setattr(relay, "_stop", SimpleNamespace(wait=lambda _delay: next(waits)))
     monkeypatch.setattr(relay, "_args", SimpleNamespace())
-    monkeypatch.setattr(
-        relay, "_callbacks", lambda: {"on_train_epoch_end": lambda _trainer: None}
-    )
+    monkeypatch.setattr(relay, "_callbacks", lambda: {"on_train_epoch_end": lambda _trainer: None})
     monkeypatch.setattr(relay, "_consume", lambda: relay._dispatch({"event": "on_train_epoch_end"}))
     relay._consume_live()
     consumer = next(message for message in traces if "START ddp.consumer" in message)
@@ -276,7 +279,9 @@ def test_ddp_consumer_span_parents_callback_and_identifies_training(
 
 
 def test_actual_ddp_consumer_callback_inherits_task_context_at_thread_creation(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, traces: list[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    traces: list[str],
 ) -> None:
     model = _Model()
     model.trainer.ddp = True
@@ -284,9 +289,7 @@ def test_actual_ddp_consumer_callback_inherits_task_context_at_thread_creation(
     release_callback = Event()
     callback_finished = Event()
     monkeypatch.setattr(relay, "_args", SimpleNamespace())
-    monkeypatch.setattr(
-        relay, "_callbacks", lambda: {"on_train_epoch_end": lambda _trainer: None}
-    )
+    monkeypatch.setattr(relay, "_callbacks", lambda: {"on_train_epoch_end": lambda _trainer: None})
 
     def consume() -> None:
         if not release_callback.wait(3):
@@ -321,11 +324,13 @@ def _interrupting_sink(marker: str, failure: BaseException) -> Callable[[object]
     def sink(message: object) -> None:
         if marker in str(message):
             raise failure
+
     return sink
 
 
 def test_ddp_start_terminal_sink_interruption_rolls_back_live_resources(
-    tmp_path: Path, traces: list[str],
+    tmp_path: Path,
+    traces: list[str],
 ) -> None:
     model = _Model()
     relay = NativeDDPRelay(None, model, str(tmp_path))
@@ -348,7 +353,10 @@ def test_ddp_start_terminal_sink_interruption_rolls_back_live_resources(
 @pytest.mark.parametrize("operation", ["ddp.relay.cleanup", "ddp.relay.join"])
 @pytest.mark.parametrize("event", ["START", "DONE"])
 def test_ddp_cleanup_sink_interruption_finishes_join_and_callback_removal(
-    tmp_path: Path, traces: list[str], operation: str, event: str,
+    tmp_path: Path,
+    traces: list[str],
+    operation: str,
+    event: str,
 ) -> None:
     model = _Model()
     relay = NativeDDPRelay(None, model, str(tmp_path))
@@ -368,13 +376,14 @@ def test_ddp_cleanup_sink_interruption_finishes_join_and_callback_removal(
     assert any("DONE ddp.relay.join" in message for message in traces)
 
 
-@pytest.mark.parametrize(
-    "operation", ["native.runtime.restore", "native.runtime.directory.cleanup"]
-)
+@pytest.mark.parametrize("event", ["START", "DONE"])
 @pytest.mark.parametrize("fail_inside", [False, True])
-def test_native_cleanup_sink_interruption_restores_globals_and_removes_directory(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, traces: list[str],
-    operation: str, fail_inside: bool,
+def test_native_restore_sink_interruption_restores_globals_and_retains_scratch(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    traces: list[str],
+    event: str,
+    fail_inside: bool,
 ) -> None:
     from ultralytics import utils
     from ultralytics.utils import SETTINGS
@@ -398,13 +407,17 @@ def test_native_cleanup_sink_interruption_restores_globals_and_removes_directory
     interruption = KeyboardInterrupt("sink interrupted native cleanup")
     failure = ValueError("caller failed before cleanup")
     sink = logger.add(
-        _interrupting_sink(f"START {operation}", interruption), level="TRACE", catch=False
+        _interrupting_sink(f"{event} native.runtime.restore", interruption),
+        level="TRACE",
+        catch=False,
     )
     temporary: list[Path] = []
 
     def run_native() -> None:
         with runtime_module.native_runtime():
-            temporary.append(Path(os.environ["YOLO_CONFIG_DIR"]))
+            temporary.append(temporary_root())
+            (temporary[0] / "retained.bin").write_bytes(b"scratch before interruption")
+            assert os.environ.get("YOLO_CONFIG_DIR") == previous_directory
             if fail_inside:
                 raise failure
 
@@ -420,7 +433,7 @@ def test_native_cleanup_sink_interruption_restores_globals_and_removes_directory
     finally:
         logger.remove(sink)
     assert len(temporary) == 1
-    assert not temporary[0].exists()
+    assert (temporary[0] / "retained.bin").read_bytes() == b"scratch before interruption"
     assert os.environ.get("YOLO_CONFIG_DIR") == previous_directory
     assert SETTINGS["clearml"] is previous_setting
     assert integration.callbacks is previous_callbacks
@@ -428,15 +441,15 @@ def test_native_cleanup_sink_interruption_restores_globals_and_removes_directory
     assert any(
         terminal in message
         for message in traces
-        for terminal in (
-            "DONE native.runtime.directory.cleanup", "INTERRUPTED native.runtime.directory.cleanup"
-        )
+        for terminal in ("DONE native.runtime.restore", "INTERRUPTED native.runtime.restore")
     )
 
 
 @pytest.mark.parametrize("event", ["START", "DONE"])
 def test_gpu_cleanup_sink_interruption_finishes_all_memory_release_phases(
-    monkeypatch: pytest.MonkeyPatch, traces: list[str], event: str,
+    monkeypatch: pytest.MonkeyPatch,
+    traces: list[str],
+    event: str,
 ) -> None:
     calls: list[str] = []
     cuda = SimpleNamespace(
@@ -462,7 +475,9 @@ def test_gpu_cleanup_sink_interruption_finishes_all_memory_release_phases(
 
 @pytest.mark.parametrize("operation", ["ddp.relay.cleanup", "ddp.relay.join"])
 def test_ddp_cleanup_sink_interruption_preserves_pending_caller_exception(
-    tmp_path: Path, traces: list[str], operation: str,
+    tmp_path: Path,
+    traces: list[str],
+    operation: str,
 ) -> None:
     model = _Model()
     relay = NativeDDPRelay(None, model, str(tmp_path))

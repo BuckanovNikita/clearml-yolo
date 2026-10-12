@@ -7,8 +7,14 @@ Paths: data.yaml, cleaned ground_truth.csv, local NDJSON/diagnostics, images and
 Completion: version/identity, split counts, required relative file inventory. Required files
 must exist; every requested split must have at least one image. No image content/mtime checks.
 States: absent -> locked staging -> atomic complete -> locked consumer -> reusable.
-Failed staging is never complete; recover under the same lock. Corrupt complete entries fail
-validation and rebuild safely. Cache root must not be nested in the invocation output.
+Failed staging is never complete. Builders may remove only their own unpublished staging;
+peer or abandoned staging remains untouched. Existing incomplete/corrupt entries fail
+validation and are preserved with an actionable error. Repair or removal requires deliberate
+maintenance while the cache is idle; consumers never rebuild an existing invalid entry.
+Entry locks are native process locks retained through consumption; unsupported native locks
+or acquisition failures fail without a soft-lock fallback. Cache root must not be nested in
+the invocation output. These current rules supersede former automatic recovery/rebuild
+expectations; see [filesystem ownership](../../docs/filesystem-policy.md#dataset-cache-and-temporary-ownership).
 
 ## Invocation publication state
 

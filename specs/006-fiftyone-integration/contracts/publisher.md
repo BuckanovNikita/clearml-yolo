@@ -58,10 +58,15 @@ confidence values, and original CSV indices without filtering or enlarging boxes
 Reversed coordinates, non-finite coordinates, and confidence outside finite `[0, 1]`
 are rejected. Labelled ground-truth boxes must have strictly positive width and height.
 
-Malformed JSON, non-mapping JSON and unreadable optional FiftyOne configuration warn and fall
-back to filesystem defaults during CLI initialization. Explicit directory environment selections
-remain authoritative. Help, config export and computation can proceed; enabled visualization
-still uses the optional warning/no-op publisher boundary if the backend rejects its configuration.
+FiftyOne and ETA use normal SDK configuration discovery, including user settings and
+external selectors. Bootstrap does not read, rewrite, normalize or replace their settings,
+create placeholders or substitute SDK constants. Invalid SDK configuration encountered
+by an enabled visualization operation uses the optional warning/no-op publisher boundary;
+there is no project filesystem-default fallback. Help and config export require no FiftyOne
+import. Existing earlier project-local settings remain available through explicit SDK selection.
+Worker protocol files use explicit project scratch. SDK temporary defaults are unchanged,
+and invocation arenas remain retained after every outcome without startup recovery scans.
+Process cleanup and matching receipts remain required regardless of retained files.
 
 ## Native evaluations and App extension
 
@@ -90,19 +95,10 @@ it in the same server Python environment as the backend and `clearml-yolo`, then
 App:
 
 ```bash
-uv run python <<'PYTHON'
-from clearml_yolo.adapters.runtime.bootstrap import (
-    project_configuration_imports,
-    runtime_environment,
-)
+uv run --frozen --no-sync python <<'PYTHON'
+from clearml_yolo.adapters.fiftyone.panel import install_evaluation_plugin
 
-with runtime_environment():
-    from clearml_yolo.adapters.fiftyone.compatibility import isolated_constants
-
-    with isolated_constants(), project_configuration_imports():
-        from clearml_yolo.adapters.fiftyone.panel import install_evaluation_plugin
-
-    print(install_evaluation_plugin())
+print(install_evaluation_plugin())
 PYTHON
 ```
 

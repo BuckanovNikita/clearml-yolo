@@ -7,12 +7,12 @@
 | `launch_directory` | Working directory observed before application dependencies import |
 | `root` | Absolute `CY_HOME`, defaulting to `launch_directory` |
 | `runs_root` | Automatic application outputs beneath `root/runs` |
-| `cache_root` | Application dataset caches and named dependency data beneath `root/.cache` |
-| `config_root` | Ultralytics settings beneath `root/.config/Ultralytics` |
-| `temporary_root` | Owned invocation temporary storage beneath `root/.tmp` |
+| `cache_root` | Application CSV dataset cache beneath `root/.cache/clearml-yolo/datasets` |
+| `temporary_root` | Explicit `CY_RUNTIME_TEMP_ROOT`, default `root/.tmp`; relative selectors resolve against `root` |
 
-The workspace is captured once. Changing the process working directory does not mutate it.
-General dependency cache/configuration and process temporary defaults are not workspace fields.
+Initialization normalizes `CY_HOME` before working-directory changes. Later cwd changes
+do not mutate it; an explicit new `CY_HOME` selects new project paths without rebinding SDK
+settings. Library configuration/cache and process temporary defaults are not workspace fields.
 
 ## Destination selection
 
@@ -42,21 +42,29 @@ configuration may provide explicit dataset, dataset-zoo and database selections;
 | `lock` | Per-entry ownership held through preparation and training |
 
 Lifecycle: missing entry → private preparation directory → atomic complete entry → locked
-consumer → reusable entry. Failed preparation is never consumed.
+consumer → reusable entry. Failed preparation is never consumed. Existing invalid entries
+are preserved with an error and require deliberate idle maintenance. Peer staging is never
+swept; only the builder's own unpublished staging may be removed after failure. Native lock
+failures have no soft-lock fallback.
 
-## Owned temporary resource
+## Project temporary resource
 
 | Field | Meaning |
 |---|---|
-| `owner` | Invocation or atomic output operation responsible for cleanup |
-| `location` | Workspace `.tmp` by default, or beside an atomic publication destination |
-| `purpose` | Execution configuration, inference manifest, DDP relay/runtime or partial output |
-| `cleanup_boundary` | Context exit or `finally` block covering success, failure and interruption |
+| `owner` | Invocation or atomic output operation creating the file/directory |
+| `location` | Explicit invocation arena, or sibling of an atomic publication destination |
+| `purpose` | Execution config, manifest, DDP relay, queue payload, worker protocol or partial output |
+| `retention` | Invocation arenas survive every exit outcome; a writer cleans only its own atomic temporary sibling |
+
+Arenas are unique per runtime process; nested scopes reuse them. There are no owner/participant
+leases, startup scans or abandoned recovery. Idle maintenance is explicit and requires all
+relevant descendants to be idle, independently of file age/host/PID.
 
 ## Native runtime scope
 
-The scope stores original Ultralytics directory settings, module-level path globals, callback
-objects and `YOLO_CONFIG_DIR`. On entry it applies workspace defaults only to Ultralytics
-downloaded datasets, weights, settings and runs where upstream defaults were active. On exit it
-restores every stored value and deletes its owned temporary directory. Torch and other general
-compute-library caches remain outside this scope.
+The scope stores the in-memory Ultralytics ClearML enable switch, callback objects and
+associated integration attributes. It enables callbacks for the invocation owner, suppresses
+worker ownership and restores every modified value without persisting settings. Fresh DDP
+trainers scope construction and training explicitly. Native directories, SDK configuration,
+user settings, caches, cwd and global temporary defaults retain their normal policy.
+Earlier local library settings/cache files remain on disk and require explicit SDK selection.

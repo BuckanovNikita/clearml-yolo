@@ -29,11 +29,12 @@ this branch.
    pre-commit hooks for release or commit work.
 2. Configure an isolated ClearML project and output directory. Pass project name and
    tags explicitly. Set `CY_HOME` to the task-owned invocation workspace for project data and
-   owned temporary files per the filesystem contract. Bootstrap must install project-owned
-   library configuration/cache selectors before SDK imports and scope interpreter scratch
-   through final uploads/task closure. External runners remain outside that boundary.
-   Keep credentials
-   out of files and logs; native callback image previews are permitted.
+   owned temporary files per the filesystem contract. Bootstrap initializes project paths
+   while preserving ordinary SDK environment, user configuration/cache discovery and global
+   temporary defaults. Project temporary callsites pass their directory explicitly.
+   Invocation arenas remain retained through and after final uploads/task closure.
+   Keep credentials out of published configuration and diagnostic logs; native callback
+   image previews are permitted.
 3. Build ground truth from a small YOLO dataset with disjoint validation/test images,
    including an empty image in each split. Exercise the top-level `ultralytics` and
    `ultralytics_predict` groups through locally editable generated YAML, with explicit
@@ -97,14 +98,19 @@ this branch.
    Repeat CSV training against one dataset cache: filenames and extension casing remain
    intact, image copies and NDJSON conversion do not repeat, source bytes remain unchanged,
    and the returned prepared paths are present. Internal manifests and diagnostic receipts
-   remain local. Inspect the workspace after success and injected failure for owned temporary files.
-   Explicit output/cache paths outside `CY_HOME` must remain selected; a physical-home destination
-   warns without rejection or relocation. Seed conflicting home/system library configs and
-   trace real subprocess config reads; require project-only selectors before SDK imports.
-   Outside-project config overrides must fail. Check leaked library scratch after success,
-   failure and cancellation, including finalization/uploads; preserve live concurrent arenas,
-   partial publication state and durable data. Shared queue locks remain outside the arena.
-   Retained scratch/unsafe worker cleanup is a reported failure or limitation, never a pass.
+   remain local. Inspect the workspace after success, failure and cancellation: invocation
+   arenas must remain present, including overlapping processes and children starting after
+   parent scope exit. Startup must not scan, recover or recursively delete old arenas,
+   even with malformed/duplicate owner records. Explicit output/cache/temp paths and SDK
+   selectors outside `CY_HOME` remain selected; physical-home destinations warn without
+   rejection or relocation. Trace normal SDK configuration reads from selected user/home/
+   external settings; require unchanged selectors, cwd, bytecode and global temp defaults.
+   Verify restored in-memory native ClearML switches, fresh DDP callback scopes and unchanged
+   Ultralytics settings files. Preserve invalid existing dataset entries and peer staging;
+   native lock failures must not use soft-lock fallback. Old project-local SDK settings/caches
+   are reused only by explicit opt-in, with no migration/deletion. Shared queue locks remain
+   outside invocation scratch. Retained files are expected; unsafe descendant cleanup remains
+   a failure or limitation. Deliberate scratch maintenance requires confirmed idle descendants.
    For enabled FiftyOne publication, verify one local owner receipt and canonical run
    link with per-split `evaluation_keys`. Confirm native evaluations register existing
    source matches without rematching, preserve backgrounds/filtered overlays, and survive

@@ -1,11 +1,10 @@
-# Controlled execution and runtime isolation
+# Controlled execution and runtime ownership
 
-The approved [feature 024 specification](../specs/024-runtime-isolation/spec.md)
-amends the former queue-removal and ambient-library-configuration rules. The
-[GPU execution contract](../specs/022-simple-gpu-wait/contracts/execution.md) defines
-all four execution modes; [filesystem ownership](filesystem-policy.md) defines
-configuration, persistent data and temporary ownership. Dated feature evidence
-remains evidence of its original implementation, rather than current acceptance.
+The [feature 024 specification](../specs/024-runtime-isolation/spec.md) and
+[GPU execution contract](../specs/022-simple-gpu-wait/contracts/execution.md) govern
+execution controls and supervised workers. [Filesystem ownership](filesystem-policy.md)
+defines project paths and retained scratch. Dated evidence records its original behavior;
+the current boundary preserves normal library configuration and cache discovery.
 
 ## Selected configuration export
 
@@ -64,42 +63,44 @@ Fault injection verifies bounded failure behavior independently of that incident
 
 ## Runtime boundary
 
-The application execution commands and `cy-init-config` establish project configuration
-through a stdlib-only bootstrap before SDK imports. `cy-dedup` loads no SDKs or
-configuration, creates no application directories and keeps its cleaned atomic
-temporary files beside the selected destination. Package imports remain inert. The command's owned runtime scope includes execution,
-native descendants, optional publication, required uploads, task finalization and
-cleanup. `native_runtime()` scopes environment and scratch for direct programmatic
-use too, restores settings on exit and reuses an outer CLI arena when present.
-`command.return` follows cleanup and is not a success assertion.
+Execution commands and `cy-init-config` initialize project paths through a stdlib-only
+bootstrap. `cy-dedup` initializes no application directories or SDKs and removes its own
+atomic temporary siblings beside the selected destination. Package imports remain inert.
+The runtime scope covers execution, descendants, optional publication, required uploads
+and task finalization. `command.return` follows process/task cleanup and is not a success
+assertion; invocation scratch remains available after that boundary.
 
-New detector selection uses `detector_runtime()` after admission, with the same owned arena
-and ClearML finalization boundaries. RF-DETR and Roboflow configuration roots are set inside
-`CY_HOME` before SDK import. DEIM uses the verified private source loader and restores the
-ambient pycocotools module identities around upstream import/dataset construction. Different
-detector families running concurrently require separate processes; the temporary DEIM module
-alias boundary is sequential. Replay validates the model before device remapping and rejects
-switching between initialized YOLO and new-detector runtime families.
+`CY_HOME` controls project outputs and the CSV dataset cache. `CY_RUNTIME_TEMP_ROOT`
+selects the parent of invocation arenas, defaulting to `CY_HOME/.tmp`. Project temporary
+callsites pass the arena explicitly. `TMPDIR`, `TMP`, `TEMP`, global `tempfile` defaults
+and bytecode settings are unchanged. Unique arenas are retained after success, errors,
+interruption and cancellation. Startup performs no scratch scans or abandoned recovery;
+no scope recursively deletes an arena. Delayed children and overlapping invocations may
+still use retained files. Deliberate maintenance requires confirming that the relevant
+workspace and all descendants are idle.
 
-The boundary preserves `HOME`, package defaults and OS runtime assets. Configuration
-selectors resolve inside the physical `CY_HOME` root; symlinks cannot bypass that
-rule. Optional `AWS_WEB_IDENTITY_TOKEN_FILE` and `AWS_CREDENTIAL_FILE` selectors
-must also remain inside that root; bootstrap validates them without creating credential
-files. Explicit inputs, outputs and persistent data/cache destinations remain valid
-outside that root. Relative SDK data/cache destinations are normalized against the
-launch directory before the temporary SDK import-directory context, so import-time
-cwd changes cannot redirect durable storage.
+Libraries retain normal environment, user settings, cwd configuration discovery, caches
+and credential-provider behavior. Selectors outside `CY_HOME` remain valid and unchanged.
+SDK imports use normal cwd and SDK constants; the project does not create config
+placeholders or bind later workspace selection to an SDK root. SDKs may retain their own
+imported settings, independently of changes to `CY_HOME`. Existing earlier project-local
+settings/caches remain on disk; reuse them through explicit supported SDK selectors as
+shown in [filesystem ownership](filesystem-policy.md#reuse-earlier-project-local-library-paths).
 
-SDK imports bind the process to one project root because SDKs retain configuration
-locations. Leaving a runtime scope restores environment and temporary settings but
-does not undo that binding; selecting another `CY_HOME` requires a fresh process.
-The [ClearML configuration adapter](../src/clearml_yolo/adapters/clearml/configuration.py)
-owns compatibility with SDK constants lacking environment selectors: its session cache
-follows `XDG_CACHE_HOME/clearml/session`, and botocore's customer model directory follows
-`XDG_CONFIG_HOME/aws/models`. Their defaults under `CY_HOME` are
-`.cache/clearml/session` and `.config/aws/models`; custom XDG roots must pass project
-containment validation. Unsupported constant interfaces fail closed before task creation;
-packaged botocore models remain available. These selections persist through SDK shutdown.
-Shared GPU queue coordination is outside invocation scratch and
-is not a library configuration source. External runners such as uv and pytest are
-outside this command boundary.
+`native_runtime()` also supplies retained scratch for programmatic use and reuses an outer
+CLI arena. Its ClearML setting and callback changes are in memory only and restore on
+exit without writing the Ultralytics settings file. The invocation owner remains the only
+tracking owner. Fresh DDP trainers scope callback ownership during construction and
+training, so workers do not require persisted settings or import-time mutations.
+
+New detectors use `detector_runtime()` after admission with the same project scratch and
+ClearML finalization boundaries. RF-DETR and Roboflow retain their own configuration and
+cache defaults. DEIM uses the verified private source loader and restores ambient
+pycocotools module identities around upstream import/dataset construction. Concurrent
+detector families require separate processes because the DEIM module alias boundary is
+sequential. Replay rejects switching between initialized YOLO and new-detector families.
+
+Shared GPU coordination remains user-wide and outside invocation scratch. Compatible
+registry state coordinates projects; incompatible or corrupt state fails closed without
+migration or deletion. Owned process cleanup remains mandatory before releasing GPU
+capacity. Retaining scratch does not establish successful descendant cleanup or publication.

@@ -74,8 +74,11 @@ regenerated YAML checks and installed command helps, including the GPU probe, DD
 callback and FiftyOne extension targets. Check distributions include the supervised queue worker, bounded FiftyOne worker and
 project Hydra launcher plugin. Verify all four execution modes, concurrent queued sweeps,
 sequential queue-disabled BasicLauncher sweeps and mixed-mode rejection before admission.
-Check selected config export for every supported command/model selection, isolated project configuration and
-invocation scratch cleanup, including failure/cancellation. Fault-inject real subprocess
+Check selected config export for every command/model selection, ordinary SDK configuration
+with unchanged external selectors, and retained project scratch after success, failure and
+cancellation. Verify explicit project temp paths without changing global SDK temp defaults.
+Check fresh DDP callback ownership and restored in-memory settings without settings-file writes.
+Invalid dataset entries must be preserved and reported; native locks must not fall back to soft locks. Fault-inject real subprocess
 hangs during import, publication and shutdown; require bounded optional warnings and
 validated receipts, rather than inferred success. See [runtime isolation](runtime-isolation.md).
 Update maintained code links and migration guidance; preserve completed feature history as dated intent.

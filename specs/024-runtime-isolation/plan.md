@@ -1,5 +1,8 @@
 # Controlled execution and library isolation — implementation plan
 
+The [2026-10-12 amendment](spec.md#file-ownership-amendment--2026-10-12) governs current
+file ownership; the original plan below is retained as completed history.
+
 ## Summary
 
 Implement the approved [specification](spec.md) on the existing Python 3.12, uv,
@@ -81,3 +84,24 @@ Typed boundaries/import checks and current toolchain remain. User approval expli
 supersedes former ban on queue bypass and ambient-config permission. No installed
 workflow or constitution file changes. No registered extension hooks. Use explicit
 SPECIFY_FEATURE_DIRECTORY rather than writing protected .specify/feature.json.
+
+## File ownership implementation — 2026-10-12
+
+Reuse the completed feature, append tasks and preserve history. Runtime agent owns
+bootstrap/filesystem and their tests; dataset agent owns dataset_cache and its tests;
+dependency agent owns pyproject/lockfile. Parent owns SDK integration, callbacks,
+operation scratch, docs and combined verification. These workstreams are independent
+until integration. No subagent delegation. Fresh read-only review follows parent checks.
+
+Remove isolation-only SDK constant loaders and import-directory contexts. Keep callbacks
+in process memory, including fresh native DDP workers. Pass project scratch directories
+explicitly to workbook and publication operations. Retain arenas and uncertain-shutdown
+scratch. Maintain native dataset locks without soft fallback; never rebuild an invalid
+existing entry automatically. Dependency work follows feature 025's appended amendment.
+
+Run targeted tests, full pytest (including CPU/Gloo), Ruff, mypy, import-linter and native
+SDK/distribution checks. Exercise detector/GPU/export acceptance on the new Torch pair.
+Record missing NFS/multi-host evidence accurately. Update filesystem/runtime contracts,
+README, migrations, affected current contracts and end-to-end guidance; validate Markdown,
+links and changed examples. After integration, obtain fresh independent review and
+perform the authorized existing release workflow with exact local source restoration.

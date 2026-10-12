@@ -9,8 +9,9 @@ guidance. Use a dedicated ClearML project and explicit tags for every acceptance
 
 ## Prerequisites and local checks
 
-- Install the project with the selected optional backend/export dependencies; preserve the
-  approved `digital-metrics`/`report-generator` copies and local overrides.
+- Install the selected optional backend/export dependencies; detector minimums are
+  Torch >=2.13.0 and Torchvision >=0.28.0, locked at 2.14.1/0.29.1. Preserve the approved
+  `digital-metrics`/`report-generator` copies and local overrides.
 - Verify the approved DEIMv2 checkout and pretrained assets. Use existing permitted weight
   access; missing assets are an unmet gate, not permission to fake pretrained acceptance.
 - Prepare a small labeled CSV with disjoint train/validation/test images, an empty image
@@ -58,7 +59,7 @@ source lineage and one invocation task. Inspect owner-only telemetry and source-
 hashes/cache reuse. Inject callback, upload, flush and interruption failures and require
 failed task completion with retained diagnostics.
 
-## Scheduling, isolation and cross-family comparison
+## Scheduling, runtime ownership and cross-family comparison
 
 For each backend, exercise `(queue.enabled, autogpu.enabled)` values `(true,true)`,
 `(true,false)`, `(false,true)` and `(false,false)`. Check wait-before-task/SDK/CUDA,
@@ -68,8 +69,15 @@ Verify reservation contraction only after owned training descendants exit.
 
 Run mixed-family Hydra sweeps and inspect ordered results, concurrent queued admission,
 sequential queue-off execution, per-run outputs/callbacks and failure propagation. Seed
-outside-project library configuration conflicts and verify invocation isolation through
-uploads/closure. Preserve bounded optional FiftyOne publication and cleanup receipts.
+normal home/user SDK configuration and external selectors; require them to remain
+unchanged and discoverable through uploads/closure. Verify restored in-memory native
+ClearML switches and fresh DDP callback scopes without settings-file writes. Project temp
+callsites must use explicit paths while SDK temp defaults remain unchanged. Require retained
+arenas after success, errors and cancellation, including overlapping and delayed children;
+startup must perform no scan/recovery or recursive deletion. Invalid dataset entries must
+remain preserved and native locks must fail without soft fallback. Preserve bounded optional
+FiftyOne publication and process-cleanup receipts. Old local SDK settings/cache files remain
+available only through explicit supported SDK selection, with no migration/deletion.
 
 Compare each new backend against YOLO and another new backend using explicit source
 checkpoints/thresholds or task IDs. Confirm one shared inference device, identical current

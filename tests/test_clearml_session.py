@@ -151,7 +151,6 @@ def fake_clearml(monkeypatch: pytest.MonkeyPatch) -> tuple[type[Any], FakeTask]:
 
     module.OutputModel = OutputModel  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "clearml", module)
-    monkeypatch.setattr("clearml_yolo.adapters.clearml.session.configure_sdk_state", lambda: None)
     return Task, task
 
 
@@ -1335,8 +1334,8 @@ def test_secondary_failure_diagnostics_preserve_primary_and_redact_credentials(
         logger.remove(sink)
     assert caught.value is original
     output = "".join(messages)
-    assert "PermissionError" in output
-    assert "filesystem denied access" in output
+    assert ("PermissionError" in output) is (failure_stage == "finalization")
+    assert ("filesystem denied access" in output) is (failure_stage == "finalization")
     assert "private-cleanup-token" not in output
 
 
@@ -1432,3 +1431,24 @@ def test_present_empty_remote_run_text_never_uses_defaults(
         replay_configuration(owner, {"model": {"backend": "deimv2"}})
     assert task.failed
     assert task.configurations == []
+
+
+def test_failed_finalization_retains_config_for_pending_consumers(
+    fake_clearml: tuple[type[Any], FakeTask], tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, task = fake_clearml
+    monkeypatch.setenv("CY_HOME", str(tmp_path / "workspace"))
+    source = tmp_path / "configuration.yaml"
+    source.write_text("epochs: 2\n")
+    monkeypatch.setattr(task, "flush", lambda **_kwargs: False)
+    stored: list[Path] = []
+
+    def run() -> None:
+        with invocation(ClearMLConfig(), "train") as owner:
+            connect_config_file(owner, "source", source)
+            stored.append(Path(task.configurations[-1]["configuration"]))
+
+    with pytest.raises(RuntimeError, match="flush"):
+        run()
+    assert stored[0].is_file()
+    assert source.read_text() == "epochs: 2\n"

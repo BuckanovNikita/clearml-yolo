@@ -27,7 +27,8 @@ def _run(tmp_path: Path, ranks: int, scenario: str) -> dict[str, Any]:
 
 def _clean(result: dict[str, Any]) -> None:
     assert result["remaining_pids"] == []
-    assert result["runtime_directories"] == []
+    assert result["retained_runtime_directories"]
+    assert all(Path(path).is_dir() for path in result["retained_runtime_directories"])
     assert result["relay_threads"] == []
     assert result["callbacks_restored"]
     assert result["environment_restored"], result["changed_environment_keys"]

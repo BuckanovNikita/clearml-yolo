@@ -1,25 +1,14 @@
 """Scope Ultralytics' native ClearML callbacks to the invocation owner."""
 
-import json
 import os
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from tempfile import TemporaryDirectory
-from typing import Any, cast, override
+from typing import Any, cast
 
 from clearml_yolo.adapters.observability.tracing import trace_operation
-from clearml_yolo.adapters.runtime.bootstrap import (
-    project_configuration_imports,
-    runtime_environment,
-)
-from clearml_yolo.adapters.storage.filesystem import (
-    cy_home,
-    initialize_filesystem,
-    native_weights_directory,
-    temporary_root,
-    write_path,
-)
+from clearml_yolo.adapters.runtime.bootstrap import runtime_environment
+from clearml_yolo.adapters.storage.filesystem import initialize_filesystem
 
 OWNER_PID_ENV = "CY_CLEARML_OWNER_PID"
 OWNER_TASK_ENV = "CY_CLEARML_OWNER_TASK_ID"
@@ -131,13 +120,6 @@ def _checked_pretrain(integration: Any, callback: Any) -> Any:
     return checked
 
 
-def _write_inherited_settings(settings: Any, get_user_config_dir: Any) -> None:
-    inherited = dict(settings)
-    inherited.update(clearml=False, sync=False, api_key="", openai_api_key="")
-    settings_path = Path(get_user_config_dir()) / "settings.json"
-    settings_path.write_text(json.dumps(inherited), encoding="utf-8")
-
-
 def _without_training_pr(callback: Callable[[Any], None]) -> Callable[[Any], None]:
     def publish(trainer: Any) -> None:
         # Native training PR comes from validation. Test PR is published by the
@@ -185,49 +167,19 @@ def _restore_attribute(target: Any, name: str, existed: bool, value: Any) -> Non
         delattr(target, name)
 
 
-class _NativeTemporaryDirectory(TemporaryDirectory[str]):
-    """Keep tempfile cleanup semantics while exposing its actual exit boundary."""
-
-    @override
-    def cleanup(self) -> None:
-        with trace_operation("native.runtime.directory.cleanup", cleanup=True):
-            super().cleanup()
-
-
-def _configure_native_paths(
-    settings: Any, utils: Any, dataset_paths: Any, ddp_paths: Any, directory: str
-) -> None:
-    # Native path globals are opaque third-party attributes without typed interfaces.
-    for key, folder in (
-        ("datasets_dir", cy_home() / ".cache/ultralytics/datasets"),
-        ("weights_dir", cy_home() / ".cache/ultralytics/weights"),
-        ("runs_dir", cy_home() / "runs"),
-    ):
-        selected = folder if settings[key] == settings.defaults[key] else settings[key]
-        path = write_path(selected).resolve()
-        path.mkdir(parents=True, exist_ok=True)
-        dict.__setitem__(settings, key, str(path))
-    utils.DATASETS_DIR = dataset_paths.DATASETS_DIR = Path(settings["datasets_dir"])
-    utils.WEIGHTS_DIR = Path(settings["weights_dir"])
-    utils.RUNS_DIR = Path(settings["runs_dir"])
-    ddp_paths.USER_CONFIG_DIR = Path(directory) / "Ultralytics"
-    ddp_paths.USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-
-
 @contextmanager
 def detector_runtime() -> Iterator[None]:
-    """Initialize shared Torch paths before owner tracking starts package discovery."""
+    """Initialize Torch before owner tracking starts package discovery."""
     with runtime_environment():
-        with project_configuration_imports():
-            initialize_filesystem()
-            import torch  # noqa: F401 - finish native initialization before ClearML threads
+        initialize_filesystem()
+        import torch  # noqa: F401 - finish native initialization before ClearML threads
 
         yield
 
 
 @contextmanager
 def native_runtime() -> Iterator[None]:
-    """Scope SDK paths and scratch for direct programmatic use as well as the CLI."""
+    """Scope in-memory callbacks without changing native storage or user settings."""
     with runtime_environment(), _configured_native_runtime():
         yield
 
@@ -235,17 +187,10 @@ def native_runtime() -> Iterator[None]:
 @contextmanager
 def _configured_native_runtime() -> Iterator[None]:
     """Enable native callbacks only for the owner and restore every modified global."""
-    with trace_operation("native.runtime.import"), project_configuration_imports():
+    with trace_operation("native.runtime.import"):
         initialize_filesystem()
-        previous = os.environ.get("YOLO_CONFIG_DIR")
-        from ultralytics import utils
-        from ultralytics.data import utils as dataset_utils
-        from ultralytics.utils import SETTINGS, dist, get_user_config_dir
+        from ultralytics.utils import SETTINGS
         from ultralytics.utils.callbacks import clearml as integration
-
-    # These native runtime globals exist upstream but are not exported by its type interface.
-    dataset_paths: Any = dataset_utils
-    ddp_paths: Any = dist
 
     original_setting = SETTINGS["clearml"]
     original_callbacks = integration.callbacks
@@ -253,44 +198,18 @@ def _configured_native_runtime() -> Iterator[None]:
     original_task = getattr(integration, "Task", None)
     had_clearml = hasattr(integration, "clearml")
     original_clearml = getattr(integration, "clearml", None)
-    original_paths = {key: SETTINGS[key] for key in ("datasets_dir", "weights_dir", "runs_dir")}
-    original_globals = (
-        utils.DATASETS_DIR,
-        utils.WEIGHTS_DIR,
-        utils.RUNS_DIR,
-        dataset_paths.DATASETS_DIR,
-        ddp_paths.USER_CONFIG_DIR,
-    )
-    with _NativeTemporaryDirectory(prefix="cy-native-", dir=temporary_root()) as directory:
-        os.environ["YOLO_CONFIG_DIR"] = directory
-        try:
-            with trace_operation("native.runtime.setup"):
-                _configure_native_paths(SETTINGS, utils, dataset_paths, ddp_paths, directory)
-                _write_inherited_settings(SETTINGS, get_user_config_dir)
-                if _is_worker():
-                    dict.__setitem__(SETTINGS, "clearml", False)
-                    integration.callbacks = {}
-                else:
-                    _enable_owner(integration, SETTINGS)
-            with native_weights_directory(Path(SETTINGS["weights_dir"])):
-                yield
-        finally:
-            with trace_operation("native.runtime.restore", cleanup=True):
-                # Bypass SettingsManager persistence: only process memory is restored.
-                dict.__setitem__(SETTINGS, "clearml", original_setting)
-                for key, value in original_paths.items():
-                    dict.__setitem__(SETTINGS, key, value)
-                (
-                    utils.DATASETS_DIR,
-                    utils.WEIGHTS_DIR,
-                    utils.RUNS_DIR,
-                    dataset_paths.DATASETS_DIR,
-                    ddp_paths.USER_CONFIG_DIR,
-                ) = original_globals
-                integration.callbacks = original_callbacks
-                _restore_attribute(integration, "Task", had_task, original_task)
-                _restore_attribute(integration, "clearml", had_clearml, original_clearml)
-                if previous is None:
-                    os.environ.pop("YOLO_CONFIG_DIR", None)
-                else:
-                    os.environ["YOLO_CONFIG_DIR"] = previous
+    try:
+        with trace_operation("native.runtime.setup"):
+            if _is_worker():
+                dict.__setitem__(SETTINGS, "clearml", False)
+                integration.callbacks = {}
+            else:
+                _enable_owner(integration, SETTINGS)
+        yield
+    finally:
+        with trace_operation("native.runtime.restore", cleanup=True):
+            # SettingsManager writes on mutation: bypass persistence for runtime switches.
+            dict.__setitem__(SETTINGS, "clearml", original_setting)
+            integration.callbacks = original_callbacks
+            _restore_attribute(integration, "Task", had_task, original_task)
+            _restore_attribute(integration, "clearml", had_clearml, original_clearml)

@@ -10,24 +10,21 @@ def _run() -> None:  # noqa: PLR0915 - deferred imports precede the worker lifec
     from pathlib import Path
     from typing import cast
 
-    from clearml_yolo.adapters.runtime.bootstrap import project_configuration_imports
+    from hydra._internal.callbacks import Callbacks
+    from hydra._internal.config_loader_impl import ConfigLoaderImpl
+    from hydra._internal.utils import create_config_search_path
+    from hydra.core.hydra_config import HydraConfig
+    from hydra.core.utils import JobRuntime, JobStatus, run_job, setup_globals
+    from hydra.types import HydraContext, TaskFunction
+    from omegaconf import DictConfig, OmegaConf, open_dict
 
-    with project_configuration_imports():
-        from hydra._internal.callbacks import Callbacks
-        from hydra._internal.config_loader_impl import ConfigLoaderImpl
-        from hydra._internal.utils import create_config_search_path
-        from hydra.core.hydra_config import HydraConfig
-        from hydra.core.utils import JobRuntime, JobStatus, run_job, setup_globals
-        from hydra.types import HydraContext, TaskFunction
-        from omegaconf import DictConfig, OmegaConf, open_dict
+    from clearml_yolo.adapters.runtime.gpu_queue import GPUQueue
+    from clearml_yolo.adapters.runtime.gpu_runtime import reservation
+    from clearml_yolo.adapters.runtime.gpu_scheduling import ExactSelection
 
-        from clearml_yolo.adapters.runtime.gpu_queue import GPUQueue
-        from clearml_yolo.adapters.runtime.gpu_runtime import reservation
-        from clearml_yolo.adapters.runtime.gpu_scheduling import ExactSelection
-
-        global execute_owned  # noqa: PLW0603 - private worker injection boundary
-        from clearml_yolo.entrypoints.hydra.common import execute_owned
-        from clearml_yolo.entrypoints.hydra.execution import interruption, restore_hydra_config
+    global execute_owned  # noqa: PLW0603 - private worker injection boundary
+    from clearml_yolo.entrypoints.hydra.common import execute_owned
+    from clearml_yolo.entrypoints.hydra.execution import interruption, restore_hydra_config
 
     payload = OmegaConf.load(sys.argv[1])
     if not isinstance(payload, DictConfig):
@@ -40,10 +37,9 @@ def _run() -> None:  # noqa: PLR0915 - deferred imports precede the worker lifec
                 raise RuntimeError("Supervisor did not establish worker process ownership")
             time.sleep(0.05)
     sys.path[:] = list(payload.sys_path)
-    with project_configuration_imports():
-        function = cast(
-            TaskFunction, getattr(importlib.import_module(payload.module), payload.function)
-        )
+    function = cast(
+        TaskFunction, getattr(importlib.import_module(payload.module), payload.function)
+    )
     # Absolute OmegaConf interpolations must resolve from the job, not its transport envelope.
     configuration = OmegaConf.create(OmegaConf.to_container(payload.config, resolve=False))
     if not isinstance(configuration, DictConfig):
@@ -101,12 +97,10 @@ def _owned_run() -> None:
 def main() -> None:
     from clearml_yolo.adapters.runtime.bootstrap import (
         initialize_runtime_environment,
-        project_configuration_imports,
     )
 
     initialize_runtime_environment()
-    with project_configuration_imports():
-        from clearml_yolo.adapters.observability.tracing import trace_command
+    from clearml_yolo.adapters.observability.tracing import trace_command
 
     trace_command("worker")(_owned_run)()
 

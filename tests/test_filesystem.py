@@ -1,4 +1,4 @@
-"""Default filesystem ownership and explicit destinations."""
+"""Project filesystem paths and preserved external configuration."""
 
 import json
 import os
@@ -10,120 +10,13 @@ import pytest
 from loguru import logger
 
 from clearml_yolo.adapters.storage.dataset_cache import dataset_cache_root
-from clearml_yolo.adapters.storage.filesystem import (
-    model_weights_path,
-    native_weights_directory,
-    write_path,
-)
-
-
-def _environment() -> dict[str, str]:
-    environment = dict(os.environ)
-    for name in tuple(environment):
-        if name.startswith(
-            (
-                "CY_",
-                "XDG_",
-                "YOLO_CONFIG_DIR",
-                "CLEARML_CACHE_DIR",
-                "CLEARML_CONFIG",
-                "TRAINS_CONFIG",
-                "TRAINS_CACHE_DIR",
-                "MPLCONFIGDIR",
-                "TORCH_HOME",
-                "TORCH_EXTENSIONS",
-                "TORCHINDUCTOR_",
-                "TRITON_CACHE",
-                "CUDA_CACHE",
-                "NUMBA_CACHE",
-                "HF_HOME",
-                "FIFTYONE_",
-                "ETA_",
-                "FONTCONFIG",
-            )
-        ) or name in {
-            "TMPDIR",
-            "TMP",
-            "TEMP",
-            "NETRC",
-            "AWS_CONFIG_FILE",
-            "AWS_SHARED_CREDENTIALS_FILE",
-            "BOTO_CONFIG",
-            "MATPLOTLIBRC",
-        }:
-            environment.pop(name)
-    environment.pop("PYTHONDONTWRITEBYTECODE", None)
-    environment.pop("PYTHONPYCACHEPREFIX", None)
-    return environment
+from clearml_yolo.adapters.storage.filesystem import model_weights_path, temporary_root, write_path
 
 
 def test_dataset_default_uses_cy_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("XDG_CACHE_HOME", raising=False)
     monkeypatch.setenv("CY_HOME", str(tmp_path))
     assert dataset_cache_root(None) == tmp_path / ".cache" / "clearml-yolo" / "datasets"
-
-
-@pytest.mark.parametrize("explicit", [False, True])
-def test_startup_installs_local_library_paths_and_preserves_unscoped_temp(
-    tmp_path: Path, explicit: bool
-) -> None:
-    environment = _environment()
-    names = (
-        "XDG_CACHE_HOME",
-        "XDG_CONFIG_HOME",
-        "MPLCONFIGDIR",
-        "TORCH_HOME",
-        "TORCH_EXTENSIONS_DIR",
-        "TORCHINDUCTOR_CACHE_DIR",
-        "TRITON_CACHE_DIR",
-        "CUDA_CACHE_PATH",
-        "NUMBA_CACHE_DIR",
-        "HF_HOME",
-        "PYTHONPYCACHEPREFIX",
-        "FIFTYONE_MODEL_ZOO_DIR",
-        "FIFTYONE_PLUGINS_DIR",
-        "ETA_CONFIG_DIR",
-        "ETA_OUTPUT_DIR",
-        "TMPDIR",
-        "TMP",
-        "TEMP",
-        "FIFTYONE_CONFIG_PATH",
-        "FIFTYONE_APP_CONFIG_PATH",
-        "FIFTYONE_ANNOTATION_CONFIG_PATH",
-        "FIFTYONE_EVALUATION_CONFIG_PATH",
-        "FIFTYONE_BRAIN_CONFIG_PATH",
-    )
-    if explicit:
-        environment.update({name: str(tmp_path / "selected" / name) for name in names})
-    script = """
-import json, os, sys, tempfile
-from pathlib import Path
-names = json.loads(sys.argv[1])
-before = {name: os.environ.get(name) for name in names}
-bytecode_before = sys.pycache_prefix
-temp_before = tempfile.gettempdir()
-from clearml_yolo.adapters.storage.filesystem import initialize_filesystem
-initialize_filesystem()
-after = {name: os.environ.get(name) for name in names}
-assert all(Path(value).is_relative_to(Path.cwd()) for name, value in after.items()
-           if name not in ('TMPDIR', 'TMP', 'TEMP'))
-if before['FIFTYONE_CONFIG_PATH']:
-    assert after == before
-assert sys.pycache_prefix == os.environ['PYTHONPYCACHEPREFIX']
-assert tempfile.gettempdir() == temp_before
-from pathlib import Path
-print('local defaults installed')
-"""
-    result = subprocess.run(  # noqa: S603 - fixed script in a fresh process
-        [sys.executable, "-B", "-c", script, json.dumps(names)],
-        cwd=tmp_path,
-        env=environment,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode == 0, result.stderr
-    assert "local defaults installed" in result.stdout
 
 
 def test_dataset_default_ignores_general_xdg_cache(
@@ -137,28 +30,49 @@ def test_dataset_default_ignores_general_xdg_cache(
 
 
 @pytest.mark.parametrize(
-    "value", ["ul://user/project/model", "http://host/model", "s3://bucket/m.pt"]
+    "value",
+    [
+        "ul://user/project/model",
+        "http://host/model",
+        "s3://bucket/m.pt",
+        "yolo11n.pt",
+        "./explicit-yolo11n.pt",
+        Path("yolo11n.pt"),
+    ],
 )
-def test_remote_model_references_keep_their_scheme(value: str) -> None:
-    assert model_weights_path(value) == value
+def test_model_references_reach_library_without_routing_or_type_changes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, value: str | Path
+) -> None:
+    monkeypatch.setenv("CY_HOME", str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    assert model_weights_path(value) is value
+    assert not (tmp_path / ".cache").exists()
 
 
-def test_explicit_relative_model_destination_stays_relative() -> None:
-    assert model_weights_path("./explicit-yolo11n.pt") == Path("./explicit-yolo11n.pt")
-
-
-def test_bare_models_honor_the_selected_native_weights_directory(tmp_path: Path) -> None:
-    checkpoint = tmp_path / "custom.pt"
-    checkpoint.write_bytes(b"existing checkpoint")
-    with native_weights_directory(tmp_path):
-        assert model_weights_path("custom.pt") == checkpoint
+def test_existing_checkpoint_string_is_a_local_path_without_cache_lookup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("CY_HOME", str(tmp_path))
+    old_download = tmp_path / ".cache/ultralytics/weights/model.pt"
+    old_download.parent.mkdir(parents=True)
+    old_download.write_bytes(b"legacy download")
+    assert model_weights_path("model.pt") == "model.pt"
+    selected = tmp_path / "model.pt"
+    selected.write_bytes(b"native download")
+    assert model_weights_path("model.pt") == Path("model.pt")
+    assert model_weights_path(str(selected)) == selected
+    assert model_weights_path(str(old_download)) == old_download
 
 
 @pytest.mark.parametrize("selection", [None, "workspace", "absolute"])
-def test_config_entrypoint_initializes_paths_before_dependency_imports(
+def test_initialization_freezes_project_root_without_library_configuration(
     tmp_path: Path, selection: str | None
 ) -> None:
-    environment = _environment()
+    environment = dict(os.environ)
+    for name in tuple(environment):
+        if name.startswith("CY_"):
+            environment.pop(name)
     expected = tmp_path
     if selection:
         expected = tmp_path / "workspace"
@@ -167,23 +81,28 @@ def test_config_entrypoint_initializes_paths_before_dependency_imports(
 import json, os
 from pathlib import Path
 from clearml_yolo.adapters.storage.filesystem import initialize_filesystem
+before = dict(os.environ)
 initialize_filesystem()
 os.chdir(Path.cwd().parent)
-print(json.dumps({name: os.environ.get(name) for name in
-    ('CY_HOME', 'YOLO_CONFIG_DIR', 'CLEARML_CACHE_DIR', 'FIFTYONE_DATABASE_DIR',
-     'FIFTYONE_DEFAULT_DATASET_DIR', 'FIFTYONE_DATASET_ZOO_DIR')}))
+from clearml_yolo.adapters.storage.filesystem import cy_home, runs_root, temporary_root
+assert all(os.environ.get(name) == value for name, value in before.items() if name != 'CY_HOME')
+assert all(name in before for name in os.environ if not name.startswith('CY_'))
+print(json.dumps([str(cy_home()), str(runs_root()), str(temporary_root())]))
 """
-    result = subprocess.run(  # noqa: S603 - current interpreter and a fixed test script
-        [sys.executable, "-c", script],
+    result = subprocess.run(  # noqa: S603 - fixed script with task-owned paths
+        [sys.executable, "-B", "-c", script],
         cwd=tmp_path,
         env=environment,
-        check=True,
+        check=False,
         capture_output=True,
         text=True,
     )
-    paths = json.loads(result.stdout)
-    assert paths["CY_HOME"] == str(expected)
-    assert all(value and Path(value).is_relative_to(expected) for value in paths.values())
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == [
+        str(expected),
+        str(expected / "runs"),
+        str(expected / ".tmp"),
+    ]
 
 
 def test_explicit_home_destination_warns_once_without_relocation(
@@ -224,131 +143,51 @@ def test_home_warning_follows_physical_symlink_destination(
     assert bool(messages) == points_into_home
 
 
-def test_explicit_dependency_paths_and_temp_settings_are_preserved(tmp_path: Path) -> None:
-    environment = _environment()
-    workspace = tmp_path / "workspace"
-    selected = tmp_path / "explicit"
-    selected.mkdir()
-    environment.update(
-        CY_HOME=str(workspace),
-        XDG_CACHE_HOME=str(workspace / ".cache"),
-        TMP=str(selected),
-        CLEARML_CACHE_DIR=str(selected / "clearml"),
-    )
-    script = """
-import json, os, tempfile
-from clearml_yolo.adapters.storage.filesystem import initialize_filesystem
-initialize_filesystem()
-from clearml_yolo.adapters.storage.dataset_cache import dataset_cache_root
-print(json.dumps([str(dataset_cache_root(None)), os.environ['CLEARML_CACHE_DIR'],
-                  tempfile.gettempdir()]))
-"""
-    result = subprocess.run(  # noqa: S603 - current interpreter and a fixed test script
-        [sys.executable, "-c", script],
-        cwd=tmp_path,
-        env=environment,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    assert json.loads(result.stdout) == [
-        str(workspace / ".cache" / "clearml-yolo" / "datasets"),
-        str(selected / "clearml"),
-        str(selected),
-    ]
-
-
-def test_native_and_publication_data_storage_stays_in_workspace(tmp_path: Path) -> None:
-    script = """
-from pathlib import Path
-root = Path.cwd().resolve()
-from clearml_yolo.adapters.storage.filesystem import initialize_filesystem
-initialize_filesystem()
-from clearml_yolo.adapters.integrations.native_runtime import native_runtime
-with native_runtime():
-    import matplotlib.pyplot
-    from clearml.config import get_cache_dir
-    assert Path(str(get_cache_dir())).is_relative_to(root)
-    from ultralytics import utils
-    assert utils.USER_CONFIG_DIR == root / '.config' / 'Ultralytics'
-    from ultralytics.data import utils as dataset_utils
-    from ultralytics.utils import dist
-    assert utils.DATASETS_DIR == dataset_utils.DATASETS_DIR
-    assert utils.DATASETS_DIR.is_relative_to(root)
-    assert dist.USER_CONFIG_DIR.is_relative_to(root / '.tmp')
-    import fiftyone as fo
-    assert Path(fo.config.database_dir).is_relative_to(root)
-    assert Path(fo.config.default_dataset_dir).is_relative_to(root)
-    assert Path(fo.config.dataset_zoo_dir).is_relative_to(root)
-print('startup passed')
-"""
-    environment = _environment()
-    environment["HOME"] = str(tmp_path / "home")
-    result = subprocess.run(  # noqa: S603 - fixed script with task-owned home and workspace
-        [sys.executable, "-c", script],
-        cwd=tmp_path,
-        env=environment,
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
-    assert result.returncode == 0, result.stderr
-    assert "startup passed" in result.stdout
-    assert not list((tmp_path / ".tmp").glob("cy-native-*"))
-
-
-@pytest.mark.parametrize("explicit_config", [False, True])
-def test_only_project_fiftyone_configuration_is_a_read_only_input(
-    tmp_path: Path, explicit_config: bool
+def test_project_temp_directory_honors_explicit_external_selection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    fake_home = tmp_path / "home"
-    configs = fake_home / ".fiftyone"
-    configs.mkdir(parents=True)
-    selected = tmp_path / "explicit_database"
-    source = (tmp_path if explicit_config else configs) / "config.json"
-    source.write_text(
-        json.dumps(
-            {
-                "database_dir": str(selected),
-                "database_name": "chosen",
-                "default_dataset_dir": str(tmp_path / "configured_datasets"),
-                "dataset_zoo_dir": str(tmp_path / "configured_zoo"),
-            }
-        )
-    )
-    original = source.read_bytes()
-    environment = _environment()
-    if explicit_config:
-        environment["FIFTYONE_CONFIG_PATH"] = str(source)
-    environment["FIFTYONE_DATASET_ZOO_DIR"] = str(tmp_path / "explicit_zoo")
-    script = """
-import json, os, sys
-from pathlib import Path
-import clearml_yolo.adapters.storage.filesystem as policy
-policy.Path.home = staticmethod(lambda: Path(sys.argv[1]))
-policy.initialize_filesystem()
-print(json.dumps([os.environ.get('FIFTYONE_CONFIG_PATH'), os.environ['FIFTYONE_DATABASE_DIR'],
-                  os.environ['FIFTYONE_DEFAULT_DATASET_DIR'],
-                  os.environ['FIFTYONE_DATASET_ZOO_DIR']]))
-"""
-    result = subprocess.run(  # noqa: S603 - fixed script and task-owned fixture paths
-        [sys.executable, "-c", script, str(fake_home)],
-        cwd=tmp_path,
-        env=environment,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    assert json.loads(result.stdout) == [
-        str(source) if explicit_config else str(tmp_path / ".config/fiftyone/config.json"),
-        str(selected) if explicit_config else str(tmp_path / ".cache/fiftyone/database"),
-        str(tmp_path / "configured_datasets")
-        if explicit_config
-        else str(tmp_path / ".cache/fiftyone/datasets"),
-        str(tmp_path / "explicit_zoo"),
-    ]
-    assert source.read_bytes() == original
+    monkeypatch.setenv("CY_HOME", str(tmp_path / "workspace"))
+    selected = tmp_path / "chosen-temp"
+    monkeypatch.setenv("CY_RUNTIME_TEMP_ROOT", str(selected))
+    assert temporary_root() == selected
+    assert selected.is_dir()
+
+
+def test_project_temp_files_use_invocation_arena_without_changing_global_temp(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import tempfile
+
+    from clearml_yolo.adapters.runtime.bootstrap import runtime_environment
+
+    monkeypatch.setenv("CY_HOME", str(tmp_path))
+    monkeypatch.delenv("CY_RUNTIME_TEMP_ROOT", raising=False)
+    before = tempfile.tempdir
+    with runtime_environment() as arena:
+        assert temporary_root() == arena
+        descriptor, name = tempfile.mkstemp(dir=temporary_root())
+        os.close(descriptor)
+        retained = Path(name)
+        retained.write_text("project temporary file")
+        assert tempfile.tempdir == before
+    assert retained.read_text() == "project temporary file"
+
+
+def test_filesystem_does_not_read_or_rewrite_optional_library_settings(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from clearml_yolo.adapters.storage.filesystem import initialize_filesystem
+
+    selected = tmp_path / "outside" / "private-config.json"
+    selected.parent.mkdir()
+    selected.write_bytes(b"\xff malformed input belongs to the library")
+    original = selected.read_bytes()
+    monkeypatch.setenv("CY_HOME", str(tmp_path / "workspace"))
+    monkeypatch.setenv("FIFTYONE_CONFIG_PATH", str(selected))
+    initialize_filesystem()
+    assert os.environ["FIFTYONE_CONFIG_PATH"] == str(selected)
+    assert selected.read_bytes() == original
+    assert not (tmp_path / "workspace" / ".config").exists()
 
 
 def test_atomic_publication_cleans_partial_output_on_failure(tmp_path: Path) -> None:
@@ -366,47 +205,3 @@ def test_atomic_publication_cleans_partial_output_on_failure(tmp_path: Path) -> 
         fail_serialization()
     assert output.read_text() == "existing result\n"
     assert list(tmp_path.iterdir()) == [output]
-
-
-def test_cache_initialization_uses_only_canonical_setting(tmp_path: Path) -> None:
-    environment = _environment()
-    environment["TRAINS_CACHE_DIR"] = str(tmp_path / "old-cache")
-    script = """
-import os
-from pathlib import Path
-from clearml_yolo.adapters.storage.filesystem import initialize_filesystem
-initialize_filesystem()
-assert Path(os.environ['CLEARML_CACHE_DIR']) == Path.cwd() / '.cache/clearml'
-assert not (Path.cwd() / 'old-cache').exists()
-"""
-    result = subprocess.run(  # noqa: S603 - fixed script and isolated environment
-        [sys.executable, "-B", "-c", script],
-        cwd=tmp_path,
-        env=environment,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode == 0, result.stderr
-
-
-def test_optional_config_read_reports_reason_and_source(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from clearml_yolo.adapters.storage.filesystem import _fiftyone_inputs
-
-    source = tmp_path / "private-config.json"
-    source.write_bytes(b"\xff")
-    monkeypatch.setenv("CY_HOME", str(tmp_path))
-    monkeypatch.setenv("FIFTYONE_CONFIG_PATH", str(source))
-    messages: list[str] = []
-    sink = logger.add(messages.append, level="DEBUG", format="{message}")
-    try:
-        assert _fiftyone_inputs() == {}
-    finally:
-        logger.remove(sink)
-    output = "".join(messages)
-    assert "UnicodeDecodeError" in output
-    assert str(source) in output
-    assert "invalid start byte" in output

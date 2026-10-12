@@ -227,3 +227,13 @@ checkpoint and preprocessing on a fixed labeled corpus with meaningful detection
   by silently accepting random initialization.
 - Preserve approved `digital-metrics` and local dependency overrides. Publication is Git
   version tags only: no GitHub Release objects, release assets or registry uploads.
+
+## Torch compatibility amendment — 2026-10-12
+
+The user approves minimum requirements `torch>=2.13.0` and `torchvision>=0.28.0`,
+with the lockfile updated to Torch 2.14.1 / Torchvision 0.29.1 and only required
+transitive dependency changes. Preserve the approved local dependency revisions and
+source overrides. Upstream [Torchvision 0.29.1 release notes](https://github.com/pytorch/vision/releases/tag/v0.29.1)
+document the compatible pair and relaxed Torch dependency. Native operators, CPU DDP,
+detector execution and applicable GPU/export acceptance must verify the updated pair.
+Runtime storage follows the [file ownership amendment](../024-runtime-isolation/spec.md#file-ownership-amendment--2026-10-12).

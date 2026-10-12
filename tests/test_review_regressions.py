@@ -13,7 +13,7 @@ from PIL import Image
 from clearml_yolo.adapters.clearml.models import _anchored
 from clearml_yolo.adapters.clearml.session import configuration_secrets, sanitize_configuration
 from clearml_yolo.adapters.integrations.native_runtime import _is_worker
-from clearml_yolo.adapters.storage.filesystem import _fiftyone_inputs
+from clearml_yolo.adapters.storage.filesystem import initialize_filesystem
 from clearml_yolo.adapters.yolo.ground_truth import _image_size, _parse_label_file
 from clearml_yolo.core import artifact_names
 from clearml_yolo.core.comparison.assemble import _verdict
@@ -88,14 +88,15 @@ def test_ground_truth_rejects_invalid_coordinates(tmp_path: Path, coordinates: s
 
 
 @pytest.mark.parametrize("content", ["{malformed", "[]"])
-def test_optional_fiftyone_configuration_falls_back(
+def test_initialization_leaves_optional_fiftyone_configuration_to_sdk(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, content: str
 ) -> None:
     monkeypatch.setenv("CY_HOME", str(tmp_path))
     config = tmp_path / "config.json"
     config.write_text(content)
     monkeypatch.setenv("FIFTYONE_CONFIG_PATH", str(config))
-    assert _fiftyone_inputs() == {}
+    initialize_filesystem()
+    assert config.read_text() == content
 
 
 def test_ownerless_rank_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:

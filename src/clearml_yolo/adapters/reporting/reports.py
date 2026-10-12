@@ -8,7 +8,6 @@ from clearml_yolo.adapters.reporting.report_layout import compact_report_counts
 from clearml_yolo.adapters.reporting.workbook_identity import (
     deannotated_workbook,
 )
-from clearml_yolo.adapters.runtime.bootstrap import project_configuration_imports
 
 
 @trace_operation("report.build")
@@ -19,7 +18,7 @@ def build_reports(
     business_path: Path,
     config_path: str | Path | None,
 ) -> None:
-    with trace_operation("report.backend.import"), project_configuration_imports():
+    with trace_operation("report.backend.import"):
         from report_generator.config import Config
         from report_generator.reports.business.builder import BusinessReportBuilder
         from report_generator.reports.dev.builder import DevReportBuilder

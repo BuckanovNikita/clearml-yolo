@@ -332,6 +332,7 @@ def test_ddp_final_replay_cannot_publish_best_twice(
 
 def test_ddp_partial_record_waits_for_newline_and_interruption_stops_consumer(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     import json
     from threading import Event
@@ -340,6 +341,7 @@ def test_ddp_partial_record_waits_for_newline_and_interruption_stops_consumer(
     import clearml
 
     task = _Task()
+    monkeypatch.setenv("CY_HOME", str(tmp_path / "workspace"))
     _Task.current = task
     monkeypatch.setattr(clearml, "Task", _Task)
     monkeypatch.setattr("clearml_yolo.adapters.clearml.session.active_task", lambda: task)
@@ -354,6 +356,7 @@ def test_ddp_partial_record_waits_for_newline_and_interruption_stops_consumer(
 
     monkeypatch.setattr(task.logger, "report_scalar", report)
     model = _Model()
+    original_callbacks = {event: callbacks.copy() for event, callbacks in model.callbacks.items()}
     model.trainer = SimpleNamespace(ddp=True)
     before = set(enumerate_threads())
     with (  # noqa: PT012 - test interruption and context cleanup together
@@ -379,7 +382,9 @@ def test_ddp_partial_record_waits_for_newline_and_interruption_stops_consumer(
         raise KeyboardInterrupt
     assert task.logger.scalars == [("train", "train/box_loss", 0.5, 2)]
     assert task.output_models == []
-    assert not directory.exists()
+    assert directory.is_dir()
+    assert [json.loads(line) for line in journal.read_text().splitlines()] == [pretrain, epoch]
+    assert model.callbacks == original_callbacks
     assert not any(
         thread.name == "cy-native-ddp-relay" for thread in set(enumerate_threads()) - before
     )
@@ -388,12 +393,15 @@ def test_ddp_partial_record_waits_for_newline_and_interruption_stops_consumer(
 def test_ddp_live_callback_failure_reaches_caller_and_stops_publication(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    import json
     from threading import Event
+    from threading import enumerate as enumerate_threads
 
     import clearml
     from ultralytics.utils import torch_utils
 
     task = _Task()
+    monkeypatch.setenv("CY_HOME", str(tmp_path / "workspace"))
     _Task.current = task
     failed = Event()
 
@@ -411,7 +419,9 @@ def test_ddp_live_callback_failure_reaches_caller_and_stops_publication(
     monkeypatch.setenv(OWNER_PID_ENV, str(os.getpid()))
     monkeypatch.setenv(OWNER_TASK_ENV, task.id)
     model = _Model()
+    original_callbacks = {event: callbacks.copy() for event, callbacks in model.callbacks.items()}
     model.trainer = SimpleNamespace(ddp=True, args=SimpleNamespace())
+    before = set(enumerate_threads())
     with (  # noqa: PT012 - expected failure includes relay context cleanup
         pytest.raises(OSError, match="scalar upload failed"),
         native_runtime(),
@@ -421,8 +431,14 @@ def test_ddp_live_callback_failure_reaches_caller_and_stops_publication(
         _capture_events(model, tmp_path / "train")
         assert failed.wait(3)
         relay.replay(model.trainer)
-    assert not directory.exists()
+    assert directory.is_dir()
+    records = [json.loads(line) for line in (directory / "events.jsonl").read_text().splitlines()]
+    assert any(record["event"] == "on_train_epoch_end" for record in records)
+    assert model.callbacks == original_callbacks
     assert task.output_models == []
+    assert not any(
+        thread.name == "cy-native-ddp-relay" for thread in set(enumerate_threads()) - before
+    )
 
 
 @pytest.mark.parametrize("tail", [b'{"event":broken}\n', b'{"event":"on_train_end"}'])

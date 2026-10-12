@@ -17,6 +17,7 @@ from typing import Literal
 from uuid import uuid4
 
 from clearml_yolo.adapters.fiftyone.protocol import WorkerRequest, WorkerResult
+from clearml_yolo.adapters.storage.filesystem import temporary_root
 from clearml_yolo.core.publication import FiftyOneConfig, PublicationReceipt, PublicationRequest
 from clearml_yolo.core.redaction import redact_text
 
@@ -354,9 +355,6 @@ class _OperationScratch:
         try:
             (self.path / ".cy-unsafe-cleanup.json").write_text(json.dumps(marker), encoding="utf-8")
         except OSError as marker_error:
-            from clearml_yolo.adapters.runtime.bootstrap import retain_current_arena
-
-            retain_current_arena("Cannot persist unsafe FiftyOne cleanup ownership")
             sys.stderr.write(
                 "Cannot record unsafe FiftyOne scratch ownership: "
                 f"{redact_text(str(marker_error))[:512]}\n"
@@ -365,7 +363,7 @@ class _OperationScratch:
 
 @contextmanager
 def _operation_scratch() -> Iterator[_OperationScratch]:
-    scratch = _OperationScratch(Path(mkdtemp(prefix="fiftyone-")))
+    scratch = _OperationScratch(Path(mkdtemp(prefix="fiftyone-", dir=temporary_root())))
     try:
         (scratch.path / ".cy-unsafe-cleanup.json").write_text(
             json.dumps(
@@ -476,7 +474,7 @@ class BoundedFiftyOnePublisher:
         message = WorkerRequest(
             operation=operation, operation_id=uuid4().hex, config=self.config, request=request
         )
-        # Bootstrap scopes tempfile to the invocation arena, outside durable outputs.
+        # Request/receipt scratch is explicit; the SDK keeps its native temp selection.
         with _operation_scratch() as scratch:
             arena = scratch.path
             request_path, result_path, phase_path = (
@@ -486,7 +484,6 @@ class BoundedFiftyOnePublisher:
             gate = arena / "start"
             environment = _worker_environment()
             environment["CY_FIFTYONE_START_GATE"] = str(gate)
-            environment.update(dict.fromkeys(("TMPDIR", "TMP", "TEMP"), str(arena)))
             process = subprocess.Popen(  # noqa: S603 - trusted interpreter and module
                 _worker_command(request_path, result_path, phase_path),
                 env=environment,

@@ -106,6 +106,7 @@ def test_training_policy_normalization_and_receipts_stay_out_of_artifacts(
             self.trainer = SimpleNamespace(save_dir=native_output)
 
         def train(self, **settings: Any) -> None:
+            settings.pop("trainer")
             assert not (Path(settings["project"]) / settings["name"]).exists()
             assert settings["fraction"] == 1.0
             assert settings["classes"] is None

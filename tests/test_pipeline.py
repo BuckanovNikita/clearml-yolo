@@ -579,7 +579,7 @@ def test_pipeline_preserves_model_reference_at_prediction_handoff(
     assert received == [reference]
 
 
-def test_pipeline_comparison_reuses_the_workspace_bare_checkpoint(
+def test_pipeline_comparison_reuses_an_existing_local_checkpoint_string(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
     from clearml_yolo.application.use_cases import pipeline
@@ -588,8 +588,7 @@ def test_pipeline_comparison_reuses_the_workspace_bare_checkpoint(
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("CY_HOME", str(tmp_path))
-    checkpoint = tmp_path / ".cache/ultralytics/weights/model.pt"
-    checkpoint.parent.mkdir(parents=True)
+    checkpoint = tmp_path / "model.pt"
     checkpoint.write_bytes(b"downloaded native checkpoint")
     received: list[ModelRef] = []
     patch_workflow(
@@ -608,7 +607,7 @@ def test_pipeline_comparison_reuses_the_workspace_bare_checkpoint(
     )
     pipeline._compare_and_report(
         {},
-        "model.pt",
+        str(checkpoint),
         {"cat": 0.3},
         tmp_path / "truth.csv",
         tmp_path,

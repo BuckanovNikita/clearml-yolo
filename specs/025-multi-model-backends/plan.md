@@ -184,3 +184,13 @@ Machine-specific setup/results belong to global environment evidence, not tracke
 | --- | --- | --- |
 | Native execution extends beyond Ultralytics | Explicit approved DEIMv2/RF-DETR/Faster R-CNN scope | Translating every model into a YOLO runtime would replace native training recipes and fail the requested families. |
 | Separate standalone export runtime | Explicit no-Torch deployment requirement | Reusing native inference as a fallback would not verify standalone TensorRT execution. |
+
+## Torch compatibility implementation — 2026-10-12
+
+Dependency agent exclusively edits pyproject.toml and uv.lock in parallel with feature
+024 runtime/storage implementation. Preserve exact local sources and approved upstream
+revisions. Upgrade only Torch/Torchvision and required transitive dependencies, inspect
+semantic lock changes, then coordinate environment sync before parent verification.
+Parent integrates both workstreams, runs native operators/CPU DDP/detector/GPU/export
+checks and records current evidence. Documentation and fresh independent review precede
+release. Historical acceptance remains dated evidence of the former pair.

@@ -6,34 +6,35 @@
 > [filesystem policy](../../docs/filesystem-policy.md); original feature checks below
 > do not establish current acceptance.
 
-## Isolated workspace
+## Project workspace and ordinary SDK configuration
 
 Choose a task-owned directory. Runner cache settings are optional and remain caller-owned:
 
 ```bash
 export CY_HOME="$PWD/workspace"
-uv run cy-init-config "$CY_HOME/configs"
-uv run cy-train --help
+uv run --frozen --no-sync cy-init-config "$CY_HOME/configs"
+uv run --frozen --no-sync cy-train --help
 ```
 
-Inspect `workspace/`: application runs, Hydra outputs, the prepared CSV dataset cache, named
-Ultralytics/ClearML/FiftyOne stores and owned temporary work must use the locations in
-[the filesystem contract](contracts/filesystem-ownership.md). General XDG, Python, compute-library
-and process temp settings must resolve to project-owned locations during execution.
-`HOME` and external runner settings remain unchanged. A normal exit must not leave invocation-owned
-directories in `.tmp`.
+Inspect `workspace/`: project runs, Hydra outputs, the CSV dataset cache and invocation
+arenas must follow [the filesystem contract](contracts/filesystem-ownership.md). SDK stores
+and settings remain selected by normal environment/user configuration, including paths
+outside `CY_HOME`. XDG, bytecode, cwd configuration discovery and global temp defaults remain
+unchanged. Project temporary callsites pass their directory explicitly.
 
-Set external runner settings such as `UV_CACHE_DIR` explicitly when needed. Library
-configuration/cache selectors must resolve within `CY_HOME`; outside selectors fail.
-Seed conflicting global configs and trace config access; preserve explicit data destinations
-and other invocations while checking leaked-library scratch cleanup on failure/cancellation.
+Trace SDK reads from normal selected user settings. Reuse earlier project-local config/cache
+files only through explicit SDK selectors; verify no migration/deletion or synthesized config.
+Inspect retained arenas after success, failure and cancellation, including overlapping
+invocations and children starting after parent scope exit. Startup must perform no scans,
+recovery or recursive cleanup. Remove selected old scratch only during deliberate maintenance
+with an idle workspace and descendants. Shared GPU coordination remains outside scratch.
 
 ## Explicit destination compatibility
 
 Select an output or cache independently of `CY_HOME` and verify it remains selected:
 
 ```bash
-uv run cy-train dataset_cache_dir=/explicit/shared/cache \
+uv run --frozen --no-sync cy-train dataset_cache_dir=/explicit/shared/cache \
   ultralytics.project=/explicit/run/output --help
 ```
 
@@ -42,7 +43,7 @@ path. Test symlinks in both directions when validating home classification. Do n
 or user-owned destination for destructive fixtures.
 
 Also validate that `dataset_cache_dir=null` selects
-`$CY_HOME/.cache/clearml-yolo/datasets` even with a custom project-local `XDG_CACHE_HOME`, while an explicit
+`$CY_HOME/.cache/clearml-yolo/datasets` regardless of an external `XDG_CACHE_HOME`, while an explicit
 `dataset_cache_dir` remains selected.
 
 ## Training source safety
@@ -53,7 +54,13 @@ then verify:
 1. the complete entry is under `.cache/clearml-yolo/datasets`;
 2. returned cleaned-ground-truth and native-data paths are present;
 3. source CSV and images retain their original bytes;
-4. a second consumer reuses the entry and waits on the same lifetime lock.
+4. a second consumer reuses the entry and waits on the same native lifetime lock;
+5. invalid existing entries and peer staging remain untouched, with invalid entries causing
+   an actionable error requiring idle-cache maintenance;
+6. unsupported native locks and acquisition failures fail without a soft-lock fallback.
+
+Verify native ClearML switches and callbacks restore in memory without settings-file writes,
+including trainer construction and training in fresh DDP interpreters.
 
 ## Repository gates
 
@@ -61,12 +68,12 @@ Run the affected filesystem, dataset/runtime, configuration, model and training 
 the project gates:
 
 ```bash
-uv run pytest
-uv run ruff check .
-uv run mypy .
-uv run lint-imports
+uv run --frozen --no-sync pytest
+uv run --frozen --no-sync ruff check .
+uv run --frozen --no-sync mypy .
+uv run --frozen --no-sync lint-imports
 ```
 
-Validate changed Markdown and local links separately. Mocked tests establish routing and cleanup;
+Validate changed Markdown and local links separately. Mocked tests establish routing and ownership;
 they do not establish native GPU execution or ClearML uploads. Use the project end-to-end skill
 for those claims.

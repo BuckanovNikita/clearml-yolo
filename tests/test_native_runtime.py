@@ -1,6 +1,5 @@
 """Native ClearML callbacks are scoped to the owner process."""
 
-import json
 import os
 from pathlib import Path
 from typing import Any
@@ -13,7 +12,7 @@ from clearml_yolo.adapters.integrations.native_runtime import OWNER_TASK_ENV, na
 def test_owner_enables_every_installed_callback_and_restores_globals(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from ultralytics.utils import SETTINGS, get_user_config_dir
+    from ultralytics.utils import SETTINGS
     from ultralytics.utils.callbacks import clearml as integration
 
     installed = {
@@ -30,14 +29,13 @@ def test_owner_enables_every_installed_callback_and_restores_globals(
         monkeypatch.setattr(integration, name, callback)
     monkeypatch.delenv("LOCAL_RANK", raising=False)
     previous = os.environ.get("YOLO_CONFIG_DIR")
+    settings_bytes = Path(SETTINGS.file).read_bytes()
 
     with native_runtime():
         assert SETTINGS["clearml"] is True
         assert set(integration.callbacks) == set(installed)
-        settings = json.loads(
-            (Path(get_user_config_dir()) / "settings.json").read_text()  # type: ignore[no-untyped-call]
-        )
-        assert settings["clearml"] is False
+        assert os.environ.get("YOLO_CONFIG_DIR") == previous
+        assert Path(SETTINGS.file).read_bytes() == settings_bytes
         assert integration.callbacks["on_train_epoch_end"] is installed["on_train_epoch_end"]
         assert (
             integration.callbacks["on_pretrain_routine_start"]
@@ -47,6 +45,7 @@ def test_owner_enables_every_installed_callback_and_restores_globals(
     assert SETTINGS["clearml"] is original_setting
     assert integration.callbacks is original_callbacks
     assert os.environ.get("YOLO_CONFIG_DIR") == previous
+    assert Path(SETTINGS.file).read_bytes() == settings_bytes
 
 
 def test_pretrain_wrapper_rejects_missing_general_registration(
@@ -175,6 +174,7 @@ def test_owner_restores_globals_when_callback_discovery_fails(
     original_callbacks = integration.callbacks
     original_setting = SETTINGS["clearml"]
     previous = os.environ.get("YOLO_CONFIG_DIR")
+    settings_bytes = Path(SETTINGS.file).read_bytes()
     for name in tuple(vars(integration)):
         if name.startswith("on_"):
             monkeypatch.setattr(integration, name, None)
@@ -186,32 +186,34 @@ def test_owner_restores_globals_when_callback_discovery_fails(
     assert SETTINGS["clearml"] is original_setting
     assert integration.callbacks is original_callbacks
     assert os.environ.get("YOLO_CONFIG_DIR") == previous
+    assert Path(SETTINGS.file).read_bytes() == settings_bytes
 
 
-def test_worker_disables_callbacks_and_writes_only_temporary_settings(
+def test_worker_disables_callbacks_without_persisting_settings(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from ultralytics.utils import SETTINGS, get_user_config_dir
+    from ultralytics.utils import SETTINGS
     from ultralytics.utils.callbacks import clearml as integration
 
     original_callbacks = integration.callbacks
     original_setting = SETTINGS["clearml"]
     previous = os.environ.get("YOLO_CONFIG_DIR")
+    settings_bytes = Path(SETTINGS.file).read_bytes()
     monkeypatch.setenv("LOCAL_RANK", "0")
     monkeypatch.setenv("CY_CLEARML_OWNER_PID", str(os.getpid() + 1))
     monkeypatch.setenv("CY_CLEARML_OWNER_TASK_ID", "parent-task")
 
     with native_runtime():
-        directory = Path(os.environ["YOLO_CONFIG_DIR"])
-        settings = json.loads((Path(get_user_config_dir()) / "settings.json").read_text())  # type: ignore[no-untyped-call]
-        assert settings["clearml"] is False
+        assert os.environ.get("YOLO_CONFIG_DIR") == previous
+        assert Path(SETTINGS.file).read_bytes() == settings_bytes
         assert SETTINGS["clearml"] is False
         assert integration.callbacks == {}
 
     assert SETTINGS["clearml"] is original_setting
     assert integration.callbacks is original_callbacks
     assert os.environ.get("YOLO_CONFIG_DIR") == previous
-    assert not directory.exists()
+    assert Path(SETTINGS.file).read_bytes() == settings_bytes
+    assert Path(SETTINGS.file).read_bytes() == settings_bytes
 
 
 def test_native_general_redacts_credentials_without_changing_training_args(
@@ -257,3 +259,49 @@ def test_native_general_redacts_credentials_without_changing_training_args(
     assert "secret" not in recorded[0]["model"]
     assert trainer.args.model.endswith("token=secret")
     assert owner.connect == original_connect
+
+
+def test_fresh_ddp_trainer_scopes_callbacks_without_changing_sdk_settings(tmp_path: Path) -> None:
+    import subprocess
+    import sys
+
+    script = """
+import os
+from pathlib import Path
+from unittest.mock import patch
+from ultralytics.utils import SETTINGS
+from ultralytics.utils.callbacks import clearml as integration
+from ultralytics.models.yolo.detect import DetectionTrainer
+from clearml_yolo.adapters.integrations.native_trainer import OwnedDetectionTrainer
+# Simulate a user's enabled setting. The native trainer must suppress it in workers.
+dict.__setitem__(SETTINGS, 'clearml', True)
+integration.callbacks = {'sentinel': object()}
+before = Path(SETTINGS.file).read_bytes()
+old_callbacks = integration.callbacks
+calls = []
+def inspect(self, *args, **kwargs):
+    assert SETTINGS['clearml'] is False
+    assert integration.callbacks == {}
+    assert Path(SETTINGS.file).read_bytes() == before
+    calls.append('scoped')
+with (
+    patch.object(DetectionTrainer, '__init__', inspect),
+    patch.object(DetectionTrainer, 'train', inspect),
+):
+    trainer = OwnedDetectionTrainer()
+    assert SETTINGS['clearml'] is True
+    assert integration.callbacks is old_callbacks
+    trainer.train()
+assert calls == ['scoped', 'scoped']
+assert SETTINGS['clearml'] is True
+assert integration.callbacks is old_callbacks
+assert Path(SETTINGS.file).read_bytes() == before
+"""
+    result = subprocess.run(  # noqa: S603 - fresh test-owned DDP worker environment
+        [sys.executable, "-c", script], capture_output=True, text=True,
+        env=dict(os.environ, CY_HOME=str(tmp_path / "project"), LOCAL_RANK="0",
+                 CY_CLEARML_OWNER_PID=str(os.getpid()), CY_CLEARML_OWNER_TASK_ID="owner",
+                 YOLO_CONFIG_DIR=str(tmp_path / "user-settings")),
+        timeout=45, check=False,
+    )
+    assert result.returncode == 0, result.stderr

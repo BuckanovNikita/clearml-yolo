@@ -26,6 +26,9 @@ from workflow_dependencies import (
 def native_publication_boundary(
     monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
+    # Load the real trainer boundary before individual tests substitute YOLO construction.
+    from clearml_yolo.adapters.integrations import native_trainer  # noqa: F401
+
     patch_workflow(
         monkeypatch,
         workflow_dependencies,
@@ -160,6 +163,9 @@ def test_csv_training_uses_prepared_data_and_returns_cleaned_ground_truth(
             )
 
         def train(self, **kwargs: Any) -> None:
+            from clearml_yolo.adapters.integrations.native_trainer import OwnedDetectionTrainer
+
+            assert kwargs.pop("trainer") is OwnedDetectionTrainer
             assert calls["locked"]
             calls["native"] = kwargs
             self.trainer.args = types.SimpleNamespace(**kwargs)
@@ -230,31 +236,6 @@ def test_csv_training_rejects_preparation_directory_outside_project(
             ground_truth="source.csv",
             deps=workflow_dependencies,
         )
-
-
-def test_native_ddp_children_inherit_tracking_isolation() -> None:
-    import os
-    import subprocess
-
-    from clearml_yolo.adapters.integrations.native_runtime import native_runtime
-
-    with native_runtime():
-        result = subprocess.run(
-            [
-                sys.executable,
-                "-c",
-                (
-                    "from ultralytics.utils import SETTINGS; "
-                    "from ultralytics.utils.callbacks import clearml; "
-                    "assert SETTINGS['clearml'] is False; assert not clearml.callbacks"
-                ),
-            ],
-            env=dict(os.environ, LOCAL_RANK="-1"),
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    assert result.returncode == 0, result.stderr
 
 
 def test_training_has_no_implicit_model(
@@ -385,6 +366,7 @@ def test_native_ddp_events_replay_before_model_finalization(
             self.trainer = types.SimpleNamespace(save_dir=directory)
 
         def train(self, **settings: Any) -> None:
+            settings.pop("trainer")
             events.append("train")
             self.trainer.args = types.SimpleNamespace(**settings)
 

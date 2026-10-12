@@ -49,3 +49,19 @@ T004; T008 follows T007; T011 consumes T010; T009 consumes T007/T008. T013 can r
 a slot frees; T014 depends on final schemas. T012/T015 require integrated implementations.
 Documentation runs alongside verification after interfaces settle. T017 follows parent
 verification; T021 requires passing checks, documentation and fresh review.
+
+## File ownership amendment — 2026-10-12
+
+- [x] T022 Re-read current implementation and preserve local overrides; record user-approved ownership amendment and analyze dependencies.
+- [x] T023 [P] Remove SDK redirects, containment, import-directory changes and arena recovery/deletion; verify runtime overlap and environment preservation.
+- [x] T024 [P] Preserve invalid dataset entries and foreign staging; require persistent native locks without soft fallback and verify concurrent preparation.
+- [x] T025 Integrate in-memory owner/DDP callbacks, native library storage defaults and explicit application scratch; preserve uncertain-shutdown files.
+- [x] T026 Run full static/pytest, native SDK/CPU DDP and applicable detector/GPU/export gates after feature 025 dependency integration; record evidence and NFS limitation.
+- [x] T027 Update README, filesystem/runtime/current contracts, migration and end-to-end guidance; validate Markdown, links and changed examples.
+- [x] T028 Obtain fresh independent review after integrated verification and resolve findings.
+- [ ] T029 Complete applicable commit/release gates and authorized Git-only publication, restoring exact local uv sources.
+
+T023/T024 and feature 025 T059 are parallel. Parent T025 consumes T023 interfaces;
+T026 requires their combined implementation. T027 follows final behavior; T028 follows
+T026/T027 and T029 requires passing release gates. Real two-machine NFS is a distinct
+unverified claim if that environment is unavailable, not a simulated acceptance result.

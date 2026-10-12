@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record multi-model release verification
+  ([`9c0c755`](https://github.com/BuckanovNikita/clearml-yolo/commit/9c0c7557a37edc57a4f31a13a94e7df336d45f5a))
+
+
 ## v0.24.0 (2026-10-12)
 
 ### Documentation

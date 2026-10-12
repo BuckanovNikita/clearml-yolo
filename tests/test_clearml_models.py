@@ -245,10 +245,12 @@ def test_local_checkpoints_never_reach_clearml(tmp_path: Path) -> None:
     assert resolve_weights(checkpoint) == checkpoint
 
 
-def test_bare_model_downloads_use_cy_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_bare_model_names_are_left_for_native_library_resolution(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setenv("CY_HOME", str(tmp_path))
     monkeypatch.chdir(tmp_path)
-    assert resolve_weights("yolo11n.pt") == tmp_path / ".cache/ultralytics/weights/yolo11n.pt"
+    assert resolve_weights("yolo11n.pt") == "yolo11n.pt"
 
 
 def test_thresholds_come_from_validation_csv_as_plain_floats(

@@ -1,5 +1,11 @@
 # Feature Specification: Reusable datasets and native ClearML tracking
 
+**Current cache amendment (2026-10-12):** automatic repair/recovery language in
+FR-003 and the corrupt-entry edge case below is historical. The
+[file ownership amendment](../024-runtime-isolation/spec.md#file-ownership-amendment--2026-10-12)
+now requires preserving invalid entries and foreign staging, explicit idle maintenance,
+and persistent native locks without soft fallback. Completed feature history remains.
+
 **Feature Branch**: `008-dataset-clearml-tracking`
 **Created**: 2026-09-29
 **Status**: Implemented, verified, and independently reviewed
