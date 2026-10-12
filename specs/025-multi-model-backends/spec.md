@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-11
 
-**Status**: Implementation, acceptance and independent review verified; release pending
+**Status**: Complete; verified and released as Git tag `v0.24.0`
 
 **Input**: The user requested DEIM, RF-DETR and Faster R-CNN with modern backbones,
 approved the complete multi-model plan revalidated against v0.23.0, and instructed

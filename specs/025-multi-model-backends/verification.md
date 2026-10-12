@@ -1,17 +1,16 @@
 # Implementation evidence — 2026-10-11
 
-Implementation and the native/ClearML/export acceptance matrix pass. Independent final
-review and owned-resource cleanup pass; release remains pending. Earlier results retain
-their original source and policy bindings.
+Completed on 2026-10-12 and released as annotated Git tag **v0.24.0** on `master`.
+All 14 native presets, cross-family workflows, scheduling acceptance and six Faster
+R-CNN FP32/FP16 quality/standalone matrices pass. The current QKV-Float policy uses
+fresh transformer execution and exact transformed-graph byte equivalence for the
+three accepted CNN engines. Parent verification, fresh independent T050 review,
+documentation checks, owned-resource cleanup and required commit/release hooks pass.
 
-Current status on 2026-10-12: all 14 native presets, cross-family workflows and scheduling
-acceptance are recorded below. All six Faster R-CNN FP32 quality and standalone matrices
-passed. The earlier pointwise Float-accumulation policy passes five FP16 presets but
-fails DINOv3's fixed 0.005 quality gate with maximum loss 0.006491526836323883.
-A shared QKV-Float correction passes validation-only numerical criteria, focused checks,
-the full regression suite and all six current FP16 quality/standalone matrices. Fresh
-DINOv2, DINOv3 and Swin execution complements exact transformed-graph byte equivalence
-for the three previously accepted CNN engines. Independent T050 review and owned-resource cleanup pass; release checks remain pending.
+The fixed small corpus establishes relative export quality, not general model accuracy.
+CUDA 11.8 target execution and binary portability remain unverified. Earlier results
+below preserve their original source/policy bindings and failed attempts; current
+completion is recorded in [release closure](#release-closure--2026-10-12).
 
 ## Baseline and workflow
 
@@ -1637,3 +1636,51 @@ verification entry to Unreleased. That generated diff was inspected. The feature
 commit will contain the 125 reviewed task files and that generated changelog; local
 source overrides will be preserved verbatim and restored unstaged after hooks.
 T057/T058 remain open until the actual commit/release checks and branch/tag pushes pass.
+
+
+## Release closure — 2026-10-12
+
+Feature commit `43f9e7dc85672bbb25f29e6abcb27344201ac443` contains the reviewed implementation
+and documentation plus the inspected generated changelog. All applicable hooks pass:
+large-file/conflict/TOML checks, whitespace, changelog, Ruff, strict mypy, import-linter
+and the full pytest suite. YAML checking correctly skips because no YAML files were
+staged. The feature-branch post-commit hook correctly skips automatic versioning.
+The owned runner confirms closure of 862 tracked process identities.
+
+`master` fast-forwards to that feature commit. The established release helper creates
+`b7cd1f33666c4d0cce9b88c026cf9a6eb0ec22d6` with subject `chore(release): 0.24.0` only after
+its required commit hooks, including the full pytest suite, pass. Its exact diff is
+the generated changelog plus the root project version in `pyproject.toml` and `uv.lock`.
+The parent verifies all other project metadata, dependency versions/sources and 278
+source/test files remain unchanged. The owned release runner closes 845 process
+identities. The prepared editable environment reports package version 0.24.0 afterward.
+
+The 245-byte local source-override section is preserved verbatim and restored unstaged
+in both checkouts; SHA-256 is
+`4266f3c5c15df0a64a40ee158615a2f1665565d251b496805929c5b969cc5518`.
+It is absent from both commits. No dependency resolver updates the protected lock.
+No hook is bypassed; the release helper's existing recursion guard suppresses only
+nested changelog/release execution, while quality hooks still run.
+
+The annotated Git tag `v0.24.0` has object
+`8a4f8a53e5d37a17728ee6c57949b2f7ee9be16b` and peels to the checked release commit.
+An atomic push publishes only `master` and that explicit tag. Fresh remote readback
+confirms both commit pointers and the annotated tag object. No GitHub Release object,
+package upload, release asset or deployment is created. This final documentation
+record is a follow-up to the released code; it does not change the version or tag.
+
+The final pre-commit documentation check passes for 28 Markdown files, 264 local links,
+43 fences, 32 CLI examples, all 14 presets and three model-reference forms. The full
+current implementation suite has 2,163 passing and 30 skipped tests; the separate
+206-test independent review also passes. Skips remain distinct from native acceptance.
+The earlier cleanup readback and preserved evidence remain valid; no later check
+creates a live ClearML training/export task or modifies shared services.
+
+
+Final Spec Kit convergence checks 16 functional requirements, seven success criteria,
+16 acceptance scenarios, 12 implementation-plan decisions and five constitution
+principles, including the existing approved native-backend exception. No missing,
+partial, contradictory or unrequested implementation work remains. All 58 existing
+tasks are complete; convergence appends nothing and leaves the task ledger unchanged.
+The documentation-only closure check validates three changed Markdown files and
+12 local links; all 14 model selections still compose without SDK imports.

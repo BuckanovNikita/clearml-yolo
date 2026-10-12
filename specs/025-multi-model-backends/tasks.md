@@ -116,8 +116,8 @@ completion claim or release while required documentation/examples or native gate
 - [x] T054 [P] Write `docs/tensorrt-deployment.md` with exact verified dependency/plugin versions, CUDA 11.8 target rebuilding, dynamic profiles, standalone usage, operator limitations and explicit local-versus-target evidence.
 - [x] T055 Update `.agents/skills/running-end-to-end-tests/SKILL.md` and its project-owned references, regenerate documented selected configuration examples and reconcile `specs/025-multi-model-backends/quickstart.md` with actual command behavior.
 - [x] T056 Validate changed Markdown/local links and all changed command/configuration examples; record documentation scope/outcomes in `specs/025-multi-model-backends/verification.md`.
-- [ ] T057 Run applicable pre-commit/release gates and inspect explicit task-scoped staged paths under `docs/development.md` commit procedure, preserving/restoring the exact local `[tool.uv.sources]` section unstaged; record final verification before commit.
-- [ ] T058 Complete the authorized Conventional Commit/local release workflow using `scripts/local_release.py`, then explicitly push only the required branch and Git version tag after checks; do not create GitHub Release objects or upload assets/packages.
+- [x] T057 Run applicable pre-commit/release gates and inspect explicit task-scoped staged paths under `docs/development.md` commit procedure, preserving/restoring the exact local `[tool.uv.sources]` section unstaged; record final verification before commit.
+- [x] T058 Complete the authorized Conventional Commit/local release workflow using `scripts/local_release.py`, then explicitly push only the required branch and Git version tag after checks; do not create GitHub Release objects or upload assets/packages.
 
 ## Dependencies and execution order
 
@@ -169,3 +169,13 @@ only after checking the clock. Final documentation validation and release remain
 The user subsequently lifted that hold with "can start now". The parent checked
 2026-10-11 20:43:09 UTC and released workload preparation; GPU acceptance remains
 sequential and subject to the existing shared admission contract.
+
+
+## Completion status — 2026-10-12
+
+All T001–T058 are complete. Native/export acceptance, parent verification, fresh T050
+review, documentation checks and owned-resource cleanup pass. Feature commit `43f9e7d`
+and checked release commit `b7cd1f3` are on `master`; annotated Git tag `v0.24.0` and
+`master` were pushed atomically and verified remotely. No GitHub Release object,
+package publication, release asset upload or deployment was performed. See the
+[release evidence](verification.md#release-closure--2026-10-12) for checks and limitations.
