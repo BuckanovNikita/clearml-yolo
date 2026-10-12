@@ -51,6 +51,7 @@ from clearml_yolo.adapters.clearml.session import (
 )
 from clearml_yolo.adapters.clearml.session import task_identity as _tracking_task_identity
 from clearml_yolo.adapters.clearml.session import upload_artifact as _tracking_upload_artifact
+from clearml_yolo.adapters.evaluation.comparison import compare_outcomes as _compare_outcomes
 from clearml_yolo.adapters.evaluation.scoring import (
     calibrate_thresholds as _evaluation_calibrate_thresholds,
 )
@@ -225,6 +226,7 @@ class _ModelRepository:
 
 
 class _EvaluationEngine:
+    compare_outcomes = staticmethod(_compare_outcomes)
     calibrate_thresholds = staticmethod(_evaluation_calibrate_thresholds)
     filter_invalid_prediction_boxes = staticmethod(_evaluation_filter_invalid_prediction_boxes)
     prepare_ground_truth = staticmethod(_evaluation_prepare_ground_truth)

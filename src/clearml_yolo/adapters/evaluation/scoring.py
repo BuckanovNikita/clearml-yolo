@@ -15,14 +15,12 @@ from typing import Protocol, cast
 
 import numpy as np
 import pandas as pd
-from digital_metrics.engines import compute_metrics_from_matches
+from digital_metrics.fixed import evaluate_fixed
 from digital_metrics.matching import compute_iou_matrix, find_duplicates_bboxes, match_boxes
 from digital_metrics.preprocess import PredictionPreprocessor
 from digital_metrics.scoring import (
-    compute_map,
     find_best_confidences,
     find_best_global_confidence,
-    get_confusion_matrix,
     slice_by_conf,
 )
 from digital_metrics.validation import REQUIRED_COLS_GT, validate_dataframes
@@ -30,7 +28,6 @@ from loguru import logger
 from numpy.typing import NDArray
 from pydantic import JsonValue
 
-from clearml_yolo.adapters.evaluation.pr_curves import build_pr_curves
 from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.core.evaluation.models import (
     ClassCounts,
@@ -497,14 +494,20 @@ def compute_evaluation(
         "evaluation.match",
         context={"split": split, "images": len(image_names), "rows": len(predictions)},
     ):
-        matches = match_boxes(
+        fixed = evaluate_fixed(
             gt_df,
             predictions,
-            iou_threshold,
-            strategy=matching_strategy,
+            raw_predictions,
+            classes=classes,
+            thresholds=normalized,
             split_image_names=image_names,
+            iou_threshold=iou_threshold,
+            matching_strategy=matching_strategy,
+            ap_method=ap_method,
+            skip_cohen_kappa=skip_cohen_kappa,
         )
-    sliced = cast(dict[str, list[MatchRecord]], slice_by_conf(matches, classes, normalized))
+    matches = cast(dict[str, list[MatchRecord]], fixed.unfiltered_matches)
+    sliced = cast(dict[str, list[MatchRecord]], fixed.matches)
     payload_methodology: dict[str, JsonValue] = {
         "iou_threshold": iou_threshold,
         "matching_strategy": matching_strategy,
@@ -524,35 +527,23 @@ def compute_evaluation(
         model_identity=model_identity,
     )
     with trace_operation("evaluation.metrics", context={"split": split, "classes": len(classes)}):
-        metrics = cast(
-            dict[str, _BackendMetrics], compute_metrics_from_matches(sliced, classes, normalized)
-        )
-    # Preserve authoritative AP inputs: prepared GT and geometry-valid predictions
-    # before optional confidence filtering/NMS. Raw source rows are export evidence.
-    gt_boxes = gt_df.dropna(subset=BBOX_COLUMNS)
-    with trace_operation(
-        "evaluation.ap",
-        context={"split": split, "images": len(image_names), "classes": len(classes)},
-    ):
-        compute_map(
-            gt_boxes,
-            raw_predictions,
-            metrics,
-            image_names,
-            method=ap_method,
-            strategy=matching_strategy,
-        )
-    cm, class_labels = get_confusion_matrix(sliced, classes)
-    confusion_matrix = ConfusionMatrixPayload(labels=class_labels, counts=cm.tolist())
+        metrics = cast(dict[str, _BackendMetrics], fixed.metrics)
+    confusion_matrix = ConfusionMatrixPayload(labels=fixed.class_labels, counts=fixed.cm.tolist())
     with trace_operation("evaluation.pr", context={"split": split, "classes": len(classes)}):
-        pr_curves = build_pr_curves(
-            gt_boxes,
-            raw_predictions,
-            classes=classes,
-            image_names=image_names,
-            matching_strategy=matching_strategy,
-            ap_method=ap_method,
-        )
+        pr_curves = [
+            PRCurve(
+                class_name=curve.class_name,
+                recall=curve.recall,
+                precision=curve.precision,
+                confidence=curve.confidence,
+                tp=curve.tp,
+                fp=curve.fp,
+                gt_count=curve.gt_count,
+                ap50=curve.ap50,
+                integration_method=curve.integration_method,
+            )
+            for curve in fixed.pr_curves
+        ]
     _verify_pr_ap50(pr_curves, metrics)
     evaluation_payload.report = EvaluationReport(
         classes=list(classes),

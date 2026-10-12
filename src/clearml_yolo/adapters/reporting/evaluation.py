@@ -2,12 +2,11 @@
 
 from collections.abc import Mapping
 from pathlib import Path
-from textwrap import wrap
 
 import numpy as np
 import pandas as pd
 from digital_metrics import summarize_metrics
-from digital_metrics.reporting import get_dashboards, plot_confidence_intervals
+from digital_metrics.reporting import render_evaluation as render_shared_evaluation
 from digital_metrics.types import Metrics
 
 from clearml_yolo.adapters.observability.tracing import trace_operation
@@ -18,7 +17,6 @@ from clearml_yolo.core.evaluation.models import (
     DetectionMetrics,
     EvaluationArtifacts,
 )
-from clearml_yolo.core.identity import ModelIdentity
 
 
 @trace_operation("report.evaluation.render")
@@ -61,6 +59,21 @@ def render_evaluation(
             (output_dir / f"{metric_name}_confidence_intervals{plot_suffix}.png").unlink(
                 missing_ok=True
             )
+    dashboard_path = output_dir / f"full_dashboard_{suffix}.xlsx"
+    dtrk_path = output_dir / f"метрики_дтрк_{suffix}.xlsx"
+    confusion_matrix_path = output_dir / f"matrix_{suffix}.xlsx"
+    plot_paths = {
+        name: output_dir / f"{name}_confidence_intervals_{suffix}.png" for name in PLOT_METRICS
+    }
+    identity = computed.model_identity
+    caption = (
+        None
+        if identity is None
+        else (
+            f"Model: {identity.model_name}\n"
+            f"Training task: {identity.training_task_id or 'unavailable'}"
+        )
+    )
     with trace_operation(
         "report.dashboards.render",
         context={
@@ -69,7 +82,7 @@ def render_evaluation(
             "destination": str(output_dir),
         },
     ):
-        dashboard, dtrk_dashboard = get_dashboards(
+        rendered = render_shared_evaluation(
             visible_metrics,
             computed.ground_truth,
             np.asarray(computed.confusion_matrix.counts),
@@ -77,83 +90,28 @@ def render_evaluation(
             suffix=suffix,
             save_to_excel=True,
             path=str(output_dir),
+            artifact_paths={
+                "dashboard": dashboard_path,
+                "dtrk_dashboard": dtrk_path,
+                "confusion_matrix": confusion_matrix_path,
+                **plot_paths,
+            },
+            caption=caption,
         )
-    dashboard_path = output_dir / f"full_dashboard_{suffix}.xlsx"
-    dtrk_path = output_dir / f"метрики_дтрк_{suffix}.xlsx"
-    plot_paths: dict[str, Path] = {}
-    for metric_name in PLOT_METRICS:
-        generated = output_dir / f"{metric_name}_confidence_intervals.png"
-        preserved = output_dir / f"{metric_name}_confidence_intervals_{suffix}.png"
-        if not preserved.is_file():
-            if not generated.is_file():
-                raise FileNotFoundError(
-                    f"Required confidence interval plot is missing: {preserved}"
-                )
-            generated.replace(preserved)
-        plot_paths[metric_name] = preserved
-    confusion_matrix_path = output_dir / f"matrix_{suffix}.xlsx"
-    _annotate_outputs(
-        visible_metrics,
-        plot_paths,
-        (dashboard_path, dtrk_path, confusion_matrix_path),
-        computed.model_identity,
-    )
+    for path in plot_paths.values():
+        if not path.is_file():
+            raise FileNotFoundError(f"Required confidence interval plot is missing: {path}")
+    if identity is not None:
+        for workbook in (dashboard_path, dtrk_path, confusion_matrix_path):
+            annotate_workbook(workbook, {"model": identity})
     return EvaluationArtifacts(
-        dashboard=dashboard,
-        dtrk_dashboard=dtrk_dashboard,
+        dashboard=rendered.dashboard,
+        dtrk_dashboard=rendered.dtrk_dashboard,
         dashboard_path=dashboard_path,
         dtrk_dashboard_path=dtrk_path,
         plot_paths=plot_paths,
         confusion_matrix_path=confusion_matrix_path,
     )
-
-
-def _annotate_outputs(
-    metrics: dict[str, object],
-    plot_paths: dict[str, Path],
-    workbooks: tuple[Path, ...],
-    identity: ModelIdentity | None,
-) -> None:
-    if identity is None:
-        return
-    for metric_name, path in plot_paths.items():
-        _write_identity_plot(metrics, metric_name, path, identity)
-    for workbook in workbooks:
-        annotate_workbook(workbook, {"model": identity})
-
-
-def _write_identity_plot(
-    metrics: dict[str, object],
-    metric_name: str,
-    path: Path,
-    identity: ModelIdentity,
-) -> None:
-    """Annotate a public producer figure before the final local PNG export.
-
-    The upstream save_path API returns a closed Figure, which remains editable
-    and exportable. Passing save_path avoids its interactive show branch.
-    """
-    with trace_operation(
-        "report.plot.render", context={"artifact": metric_name, "path": str(path)}
-    ):
-        figure, _ = plot_confidence_intervals(
-            metrics=metrics,
-            metric=metric_name,
-            confidence_level=0.95,
-            save_path=str(path),
-            figsize=(12, 8),
-        )
-    if figure is None:
-        raise ValueError(f"No figure was produced for {metric_name!r}")
-    caption = (
-        f"Model: {identity.model_name}\nTraining task: {identity.training_task_id or 'unavailable'}"
-    )
-    wrapped_caption = "\n".join(
-        line for value in caption.splitlines() for line in wrap(value, width=100)
-    )
-    figure.suptitle(wrapped_caption, y=1.03, va="bottom", fontsize=10, parse_math=False)
-    with trace_operation("report.plot.save", context={"path": str(path)}):
-        figure.savefig(path, bbox_inches="tight", dpi=300, metadata={"Model identity": caption})
 
 
 def summarize_evaluation(

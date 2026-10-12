@@ -14,6 +14,7 @@ same data, so folding it in would count the evidence twice.
 import math
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from typing import Protocol
 
 import pandas as pd
 
@@ -47,6 +48,24 @@ class ComparisonTables:
     rows: pd.DataFrame
     excluded: pd.DataFrame
     methodology: dict[str, object]
+
+
+class ComparisonStatistics(Protocol):
+    """Numerical operations supplied by an outer evaluator; policy stays here."""
+
+    def test_pair(
+        self,
+        baseline: SplitOutcome,
+        candidate: SplitOutcome,
+        class_name: str | None,
+        images: Sequence[str],
+        *,
+        iterations: int,
+        seed: int,
+        diagnostic: Callable[[str], None] | None,
+    ) -> tuple[TestResult, TestResult, TestResult]: ...
+
+    def adjust(self, p_values: Sequence[float], q: float) -> list[float]: ...
 
 
 def _rate(numerator: int, denominator: int) -> float:
@@ -250,7 +269,52 @@ def build_comparison_rows(
     ``observe_class`` receives each class before computation and None after the
     class loop; diagnostics are warnings and the final summary is informational.
     """
+    return build_comparison_rows_with_statistics(
+        baseline,
+        candidate,
+        thresholds_baseline=thresholds_baseline,
+        thresholds_candidate=thresholds_candidate,
+        images=images,
+        baseline_classes=baseline_classes,
+        candidate_classes=candidate_classes,
+        q=q,
+        iterations=iterations,
+        seed=seed,
+        observe_class=observe_class,
+        diagnostic=diagnostic,
+        summary=summary,
+        statistics=None,
+    )
+
+
+def build_comparison_rows_with_statistics(
+    baseline: SplitOutcome,
+    candidate: SplitOutcome,
+    *,
+    statistics: ComparisonStatistics | None,
+    thresholds_baseline: dict[str, float],
+    thresholds_candidate: dict[str, float],
+    images: Sequence[str],
+    baseline_classes: set[str] | None = None,
+    candidate_classes: set[str] | None = None,
+    q: float = 0.05,
+    iterations: int = 10_000,
+    seed: int = 0,
+    observe_class: Callable[[str | None], None] | None = None,
+    diagnostic: Callable[[str], None] | None = None,
+    summary: Callable[[str], None] | None = None,
+) -> ComparisonTables:
+    """Compare two scored outcomes of one split, class by class and then pooled.
+
+    ``baseline_classes``/``candidate_classes`` are the checkpoints' own vocabularies. A
+    class one model cannot predict retains the supporting model's metrics and missing
+    values for the other model. Statistical tests and pooled statistics use only shared
+    eligible classes; exclusions explain noncomparability rather than hide metrics.
+    ``observe_class`` receives each class before computation and None after the
+    class loop; diagnostics are warnings and the final summary is informational.
+    """
     validate_q(q)
+    test_pair = _test_pair if statistics is None else statistics.test_pair
     compared: list[str] = []
     excluded_rows: list[dict[str, str]] = []
     known_to_baseline = baseline_classes if baseline_classes is not None else set(baseline.counts)
@@ -281,7 +345,7 @@ def build_comparison_rows(
             observe_class(class_name)
         precision, recall_interval, recall_test = (unavailable_test,) * 3
         if class_name in compared:
-            precision, recall_interval, recall_test = _test_pair(
+            precision, recall_interval, recall_test = test_pair(
                 baseline,
                 candidate,
                 class_name,
@@ -312,12 +376,12 @@ def build_comparison_rows(
         observe_class(None)
 
     frame = pd.DataFrame(rows)
-    family_size = _adjust_family(frame, q) if rows else 0
+    family_size = _adjust_family(frame, q, statistics) if rows else 0
 
     pooled_precision, pooled_recall_interval, pooled_recall = (unavailable_test,) * 3
     if compared:
         # Counts and tests must summarize the same shared eligible class population.
-        pooled_precision, pooled_recall_interval, pooled_recall = _test_pair(
+        pooled_precision, pooled_recall_interval, pooled_recall = test_pair(
             _restricted_outcome(baseline, compared),
             _restricted_outcome(candidate, compared),
             None,
@@ -369,7 +433,9 @@ def build_comparison_rows(
     )
 
 
-def _adjust_family(frame: pd.DataFrame, q: float) -> int:
+def _adjust_family(
+    frame: pd.DataFrame, q: float, statistics: ComparisonStatistics | None = None
+) -> int:
     """Correct every hypothesis of the split at once and write the verdicts back.
 
     Both metrics of every class enter one family: correcting precision and recall
@@ -377,7 +443,11 @@ def _adjust_family(frame: pd.DataFrame, q: float) -> int:
     and let roughly twice as many spurious verdicts through.
     """
     p_values = [*frame["precision_p_value"], *frame["recall_p_value"]]
-    adjusted = adjust_benjamini_hochberg(p_values, q=q).adjusted_p_values
+    adjusted = (
+        adjust_benjamini_hochberg(p_values, q=q).adjusted_p_values
+        if statistics is None
+        else statistics.adjust(p_values, q)
+    )
     half = len(frame)
     frame["precision_p_bh"] = adjusted[:half]
     frame["recall_p_bh"] = adjusted[half:]

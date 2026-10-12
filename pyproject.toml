@@ -288,6 +288,7 @@ source_modules = ["clearml_yolo"]
 forbidden_modules = ["digital_metrics"]
 allow_indirect_imports = true
 ignore_imports = [
+    "clearml_yolo.adapters.evaluation.comparison -> digital_metrics",
     "clearml_yolo.adapters.evaluation.pr_curves -> digital_metrics",
     "clearml_yolo.adapters.evaluation.scoring -> digital_metrics",
     "clearml_yolo.adapters.reporting.evaluation -> digital_metrics",
@@ -300,7 +301,11 @@ source_modules = ["clearml_yolo"]
 forbidden_modules = ["report_generator"]
 allow_indirect_imports = true
 ignore_imports = [
+    "clearml_yolo.adapters.reporting.comparison_workbook -> report_generator",
+    "clearml_yolo.adapters.reporting.metrics_reader -> report_generator",
+    "clearml_yolo.adapters.reporting.report_layout -> report_generator",
     "clearml_yolo.adapters.reporting.reports -> report_generator",
+    "clearml_yolo.adapters.reporting.workbook_identity -> report_generator",
 ]
 
 [[tool.importlinter.contracts]]
@@ -573,9 +578,6 @@ source_modules = ["clearml_yolo"]
 forbidden_modules = ["openpyxl"]
 allow_indirect_imports = true
 ignore_imports = [
-    "clearml_yolo.adapters.reporting.comparison_workbook -> openpyxl",
-    "clearml_yolo.adapters.reporting.report_layout -> openpyxl",
-    "clearml_yolo.adapters.reporting.workbook_identity -> openpyxl",
 ]
 
 [[tool.importlinter.contracts]]

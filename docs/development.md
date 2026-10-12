@@ -89,6 +89,11 @@ environment so a default sync does not remove its installed extras.
 
 ## External dependencies
 
+The [shared evaluation and reporting guide](shared-evaluation-reporting.md) describes
+the additive APIs used by application adapters and the retained compatibility wrappers.
+Dependency source revisions change only through an explicitly authorized update, with
+both legacy and new interface checks and application parity evidence.
+
 `digital-metrics` and `report-generator` live in ignored local directories under
 `external/`. They are ordinary source copies, not parent-repository submodules.
 Copy the approved source trees to `external/digital-metrics` and
@@ -97,8 +102,8 @@ these paths also work; do not add their contents or Git metadata to this reposit
 
 | Dependency | Upstream | Approved source revision |
 | --- | --- | --- |
-| digital-metrics | [repository](https://github.com/Wasilkas/digital-metrics) | `7c6dfa98cc052ce0202f11655839078534182d77` |
-| report-generator | [repository](https://github.com/Wasilkas/report-generator) | `8ddd0f7f11d25367f4e71ace77524ebb72257699` |
+| digital-metrics | [repository](https://github.com/Wasilkas/digital-metrics) | `6e801be1564dce458294eb23592cc1aa0939c4d9` |
+| report-generator | [repository](https://github.com/Wasilkas/report-generator) | `d10aa395d08f738e92e04e076cee93b3a993bf8f` |
 
 The committed lockfile installs both paths editable; it does not store their source
 contents or enforce their Git revisions. Keep the approved copies available for all

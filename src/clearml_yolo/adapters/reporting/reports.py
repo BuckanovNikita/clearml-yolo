@@ -3,8 +3,6 @@
 from pathlib import Path
 
 from clearml_yolo.adapters.observability.tracing import trace_operation
-from clearml_yolo.adapters.reporting.metrics_reader import DashboardReader
-from clearml_yolo.adapters.reporting.report_layout import compact_report_counts
 from clearml_yolo.adapters.reporting.workbook_identity import (
     deannotated_workbook,
 )
@@ -20,8 +18,12 @@ def build_reports(
 ) -> None:
     with trace_operation("report.backend.import"):
         from report_generator.config import Config
-        from report_generator.reports.business.builder import BusinessReportBuilder
-        from report_generator.reports.dev.builder import DevReportBuilder
+        from report_generator.v2 import (
+            BusinessReportBuilder,
+            DevReportBuilder,
+            PresentationOptions,
+            read_metrics_table,
+        )
 
     with trace_operation("report.config.load"):
         config = Config.load(config_path) if config_path else Config.load()
@@ -30,15 +32,19 @@ def build_reports(
         deannotated_workbook(baseline) as baseline_source,
     ):
         with trace_operation("report.workbooks.read"):
-            candidate_reader = DashboardReader(candidate_source)
-            baseline_reader = DashboardReader(baseline_source)
+            candidate_reader = read_metrics_table(candidate_source)
+            baseline_reader = read_metrics_table(baseline_source)
         with trace_operation("report.developer.build", context={"path": str(dev_path)}):
-            DevReportBuilder(candidate_reader, baseline_reader, config).build(dev_path)
+            DevReportBuilder(
+                candidate_reader,
+                baseline_reader,
+                config,
+                presentation=PresentationOptions(counts="below_table"),
+            ).build(dev_path)
         with trace_operation("report.business.build", context={"path": str(business_path)}):
-            BusinessReportBuilder(candidate_reader, baseline_reader, config).build(business_path)
-    sheets = (config.sheet_names.model1, config.sheet_names.model2, config.sheet_names.comparison)
-    with trace_operation("report.class_counts.compact"):
-        compact_report_counts(dev_path, sheets)
-        compact_report_counts(
-            business_path, sheets, translations=config.business.column_translations
-        )
+            BusinessReportBuilder(
+                candidate_reader,
+                baseline_reader,
+                config,
+                presentation=PresentationOptions(counts="below_table"),
+            ).build(business_path)

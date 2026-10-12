@@ -205,10 +205,16 @@ def test_evaluation_fails_when_reconstructed_ap50_disagrees_with_authoritative_m
         ap50=0.25,
         integration_method="interp",
     )
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.evaluation.scoring.build_pr_curves",
-        lambda *args, **kwargs: [mismatched_curve],
-    )
+    from dataclasses import replace
+
+    from digital_metrics.fixed import evaluate_fixed
+    from digital_metrics.scoring.ap import PRObservation
+
+    def inconsistent(*args: object, **kwargs: object) -> object:
+        result = evaluate_fixed(*args, **kwargs)
+        return replace(result, pr_curves=[PRObservation(**mismatched_curve.model_dump())])
+
+    monkeypatch.setattr("clearml_yolo.adapters.evaluation.scoring.evaluate_fixed", inconsistent)
     with pytest.raises(ValueError, match=r"Reconstructed AP50.*42.*authoritative"):
         compute_evaluation(
             gt,

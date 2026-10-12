@@ -5,7 +5,7 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from os import stat_result
 from pathlib import Path
-from typing import Any, Literal, Protocol
+from typing import Any, Literal, Protocol, runtime_checkable
 
 import pandas as pd
 from pydantic import JsonValue
@@ -20,11 +20,13 @@ from clearml_yolo.application.contracts import (
     TrainResult,
     VocabularyReport,
 )
+from clearml_yolo.core.comparison.assemble import ComparisonTables
 from clearml_yolo.core.evaluation.models import (
     ComputedEvaluation,
     DetectionMetrics,
     EvaluatedSplit,
     EvaluationArtifacts,
+    SplitOutcome,
 )
 from clearml_yolo.core.export_requests import ExportRequest, ExportResult
 from clearml_yolo.core.identity import ModelIdentity
@@ -201,6 +203,29 @@ class EvaluationEngine(Protocol):
         source_predictions: pd.DataFrame | None = None,
         model_identity: ModelIdentity | None = None,
     ) -> ComputedEvaluation: ...
+
+
+@runtime_checkable
+class PairedComparisonEngine(Protocol):
+    """Optional evaluation capability; existing dependency bundles remain valid."""
+
+    def compare_outcomes(
+        self,
+        baseline: SplitOutcome,
+        candidate: SplitOutcome,
+        *,
+        thresholds_baseline: dict[str, float],
+        thresholds_candidate: dict[str, float],
+        images: Sequence[str],
+        baseline_classes: set[str] | None = None,
+        candidate_classes: set[str] | None = None,
+        q: float = 0.05,
+        iterations: int = 10_000,
+        seed: int = 0,
+        observe_class: Callable[[str | None], None] | None = None,
+        diagnostic: Callable[[str], None] | None = None,
+        summary: Callable[[str], None] | None = None,
+    ) -> ComparisonTables: ...
 
 
 class EvaluationWriter(Protocol):

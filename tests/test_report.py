@@ -32,7 +32,9 @@ def report_generator(
             return pd.read_excel(self.file_path, index_col=0)
 
     class FakeBuilder:
-        def __init__(self, candidate: FakeReader, baseline: FakeReader, *_: object) -> None:
+        def __init__(
+            self, candidate: FakeReader, baseline: FakeReader, *_: object, **_options: object
+        ) -> None:
             self.candidate = candidate
             self.baseline = baseline
 
@@ -52,8 +54,9 @@ def report_generator(
 
     install("report_generator.config", "Config", FakeConfig)
     install("report_generator.core.reader", "MetricsReader", FakeReader)
-    install("report_generator.reports.dev.builder", "DevReportBuilder", FakeBuilder)
-    install("report_generator.reports.business.builder", "BusinessReportBuilder", FakeBuilder)
+    monkeypatch.setattr("report_generator.v2.DevReportBuilder", FakeBuilder)
+    monkeypatch.setattr("report_generator.v2.BusinessReportBuilder", FakeBuilder)
+    monkeypatch.setattr("report_generator.v2.read_metrics_table", FakeReader)
     patch_workflow(
         monkeypatch,
         workflow_dependencies,

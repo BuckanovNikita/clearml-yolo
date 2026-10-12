@@ -8,6 +8,9 @@
 - Record GPU memory threshold release verification
   ([`90e5a96`](https://github.com/BuckanovNikita/clearml-yolo/commit/90e5a96b6836304997c92ca7406012516e0984d5))
 
+- Require module architecture planning and acceptance
+  ([`4aef37f`](https://github.com/BuckanovNikita/clearml-yolo/commit/4aef37f6adb04e3a2e2540b0cfc1dda12f7bba84))
+
 
 ## v0.25.0 (2026-10-12)
 

@@ -1,0 +1,238 @@
+{
+  "schema_version": 1,
+  "task": "028-shared-extraction",
+  "scope": [
+    "src/clearml_yolo/adapters/evaluation",
+    "src/clearml_yolo/adapters/reporting",
+    "src/clearml_yolo/core/comparison/assemble.py",
+    "src/clearml_yolo/application/ports.py",
+    "src/clearml_yolo/application/use_cases/compare.py",
+    "src/clearml_yolo/entrypoints/composition.py",
+    "tests/test_shared_extraction_compatibility.py",
+    "docs/development.md",
+    "docs/current-contracts.md",
+    "specs/028-shared-extraction",
+    "pyproject.toml",
+    "uv.lock",
+    "tests/test_shared_comparison.py",
+    "tests/test_metrics.py",
+    "tests/test_report.py",
+    "tests/test_scoring_evidence.py",
+    "docs/shared-evaluation-reporting.md"
+  ],
+  "impact": "modules",
+  "rules": "AGENTS.md, docs/agent-workflow.md and existing import-linter/test_architecture SDK ownership and inward dependency contracts remain authoritative.",
+  "modules": [
+    {
+      "id": "evaluation",
+      "path": "src/clearml_yolo/adapters/evaluation",
+      "change": "modify",
+      "responsibility": "Convert authoritative fixed evaluation and paired statistics to neutral application records.",
+      "interface": "Existing scoring/calibration/PR calls remain; new compare adapter uses fixed API without mixing AP and threshold populations.",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "Existing inward application/core interfaces and layer-owned scientific dependencies"
+      ],
+      "forbidden_dependencies": [
+        "SDK imports outside owning adapters",
+        "Core/application storage, network, plotting and process effects"
+      ],
+      "effects": "Reporting adapters own workbook/plot writes; evaluation computation and core policy have no storage/network effects; composition creates dependencies.",
+      "contracts": [
+        "architecture",
+        "import_linter"
+      ]
+    },
+    {
+      "id": "reporting",
+      "path": "src/clearml_yolo/adapters/reporting",
+      "change": "modify",
+      "responsibility": "Render exact artifacts and validate application identity schema through shared mechanics.",
+      "interface": "Existing functions/classes preserve signatures and returns; reporting v2 receives explicit layout/caption options.",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "Existing inward application/core interfaces and layer-owned scientific dependencies"
+      ],
+      "forbidden_dependencies": [
+        "SDK imports outside owning adapters",
+        "Core/application storage, network, plotting and process effects"
+      ],
+      "effects": "Reporting adapters own workbook/plot writes; evaluation computation and core policy have no storage/network effects; composition creates dependencies.",
+      "contracts": [
+        "architecture",
+        "import_linter"
+      ]
+    },
+    {
+      "id": "comparison",
+      "path": "src/clearml_yolo/core/comparison/assemble.py",
+      "change": "modify",
+      "responsibility": "Select eligible classes, hypothesis family and pooled summaries using injectable numerical statistics.",
+      "interface": "Original build_comparison_rows signature preserved; additive statistics entrypoint and protocol.",
+      "layer": "core",
+      "allowed_dependencies": [
+        "Existing inward application/core interfaces and layer-owned scientific dependencies"
+      ],
+      "forbidden_dependencies": [
+        "SDK imports outside owning adapters",
+        "Core/application storage, network, plotting and process effects"
+      ],
+      "effects": "Reporting adapters own workbook/plot writes; evaluation computation and core policy have no storage/network effects; composition creates dependencies.",
+      "contracts": [
+        "architecture",
+        "import_linter"
+      ]
+    },
+    {
+      "id": "ports",
+      "path": "src/clearml_yolo/application/ports.py",
+      "change": "modify",
+      "responsibility": "Declare optional paired comparison capability without modifying dependency bundle constructor.",
+      "interface": "Existing EvaluationEngine and WorkflowDependencies unchanged; new runtime-checkable capability protocol.",
+      "layer": "application",
+      "allowed_dependencies": [
+        "Existing inward application/core interfaces and layer-owned scientific dependencies"
+      ],
+      "forbidden_dependencies": [
+        "SDK imports outside owning adapters",
+        "Core/application storage, network, plotting and process effects"
+      ],
+      "effects": "Reporting adapters own workbook/plot writes; evaluation computation and core policy have no storage/network effects; composition creates dependencies.",
+      "contracts": [
+        "architecture",
+        "import_linter"
+      ]
+    },
+    {
+      "id": "comparison_workflow",
+      "path": "src/clearml_yolo/application/use_cases/compare.py",
+      "change": "modify",
+      "responsibility": "Choose the supplied comparison capability or compatible existing local implementation.",
+      "interface": "Existing compare arguments, progress callbacks and stored report payloads unchanged.",
+      "layer": "application",
+      "allowed_dependencies": [
+        "Existing inward application/core interfaces and layer-owned scientific dependencies"
+      ],
+      "forbidden_dependencies": [
+        "SDK imports outside owning adapters",
+        "Core/application storage, network, plotting and process effects"
+      ],
+      "effects": "Reporting adapters own workbook/plot writes; evaluation computation and core policy have no storage/network effects; composition creates dependencies.",
+      "contracts": [
+        "architecture",
+        "import_linter"
+      ]
+    },
+    {
+      "id": "composition",
+      "path": "src/clearml_yolo/entrypoints/composition.py",
+      "change": "modify",
+      "responsibility": "Wire production optional paired evaluation capability to adapter.",
+      "interface": "Existing build_dependencies signature and WorkflowDependencies construction unchanged.",
+      "layer": "entrypoint",
+      "allowed_dependencies": [
+        "Existing inward application/core interfaces and layer-owned scientific dependencies"
+      ],
+      "forbidden_dependencies": [
+        "SDK imports outside owning adapters",
+        "Core/application storage, network, plotting and process effects"
+      ],
+      "effects": "Reporting adapters own workbook/plot writes; evaluation computation and core policy have no storage/network effects; composition creates dependencies.",
+      "contracts": [
+        "architecture",
+        "import_linter"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "architecture",
+      "path": "tests/test_architecture.py",
+      "status": "existing",
+      "rules": "Exhaustive classification, SDK ownership, effects, dynamic imports and injected negative cases.",
+      "check": "architecture_tests"
+    },
+    {
+      "id": "import_linter",
+      "path": "pyproject.toml",
+      "status": "existing",
+      "rules": "Existing inward layer and sibling adapter dependencies; no weakened contracts.",
+      "check": "imports"
+    }
+  ],
+  "checks": [
+    {
+      "id": "architecture_tests",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync pytest tests/test_architecture.py",
+      "expectation": "All positive contracts and injected negative violations pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/028-shared-extraction/evidence.md"
+      }
+    },
+    {
+      "id": "imports",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync lint-imports",
+      "expectation": "All existing inward dependency contracts kept.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/028-shared-extraction/evidence.md"
+      }
+    },
+    {
+      "id": "suite",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync pytest",
+      "expectation": "Existing and new application tests pass; report skips separately.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/028-shared-extraction/evidence.md"
+      }
+    },
+    {
+      "id": "ruff",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync ruff check .",
+      "expectation": "Exit zero with no lint, type or dead-code errors.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/028-shared-extraction/evidence.md"
+      }
+    },
+    {
+      "id": "mypy",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync mypy .",
+      "expectation": "Exit zero with no lint, type or dead-code errors.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/028-shared-extraction/evidence.md"
+      }
+    },
+    {
+      "id": "docs",
+      "kind": "documentation",
+      "command": "python3 - <<'PY'\nfrom pathlib import Path\nimport re\nfrom urllib.parse import unquote\npaths = [Path(\"docs/development.md\"), Path(\"docs/current-contracts.md\"), Path(\"docs/shared-evaluation-reporting.md\"), *Path(\"specs/028-shared-extraction\").glob(\"*.md\")]\nfor path in paths:\n    content = path.read_text()\n    assert sum(line.startswith(\"```\") for line in content.splitlines()) % 2 == 0, path\n    for target in re.findall(r\"\\[[^\\]]+\\]\\(([^)]+)\\)\", content):\n        if \"://\" in target or target.startswith(\"#\"):\n            continue\n        target = unquote(target.split(\"#\", 1)[0])\n        assert (path.parent / target).exists(), (path, target)\nprint(f\"Validated Markdown fences and local links in {len(paths)} files\")\nPY",
+      "expectation": "Every task-owned Markdown file has balanced code fences and resolvable local link paths.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/028-shared-extraction/evidence.md"
+      }
+    }
+  ],
+  "documentation": "Update dependency revisions and shared capability boundaries in development/current-contract guidance; new feature artifacts and library API guides.",
+  "review": {
+    "status": "accepted",
+    "reviewer": "Fresh native agent integrated_review (read-only; ship verdict)",
+    "evidence": "specs/028-shared-extraction/evidence.md",
+    "reconciliation": "Parent inspected complete task-owned runtime, added tests/fixtures, modified configuration/docs and removed duplicate implementations against Git baselines. Application static-analysis/runtime/test/lockfile pre-existing edits excluded. Exact SDK ownership rules retained; all recorded checks passed; test/documentation scope and executable docs command reconciled."
+  }
+}

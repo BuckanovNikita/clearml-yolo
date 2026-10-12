@@ -762,33 +762,31 @@ def test_arbitrary_logical_split_keeps_outputs_inside_destination(
     assert not (tmp_path / "escape").exists()
 
 
-@pytest.mark.parametrize("already_suffixed", [False, True])
-def test_dashboard_plot_contract_accepts_legacy_and_suffixed_outputs(
+def test_dashboard_plot_contract_uses_explicit_suffixed_paths(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    already_suffixed: bool,
     workflow_dependencies: WorkflowDependencies,
 ) -> None:
-    from digital_metrics.reporting import get_dashboards
+    from digital_metrics.reporting import render_evaluation as shared_render
 
     from clearml_yolo.adapters.reporting import evaluation as scoring
     from clearml_yolo.core.artifact_names import PLOT_METRICS
 
-    original = get_dashboards
+    original = shared_render
 
     def dashboard(*args: Any, **kwargs: Any) -> Any:
         result = original(*args, **kwargs)
-        if already_suffixed:
-            directory = Path(kwargs["path"])
-            suffix = kwargs["suffix"]
-            for metric in PLOT_METRICS:
-                legacy = directory / f"{metric}_confidence_intervals.png"
-                suffixed = directory / f"{metric}_confidence_intervals_{suffix}.png"
-                if legacy.is_file():
-                    legacy.replace(suffixed)
+        directory = Path(kwargs["path"])
+        suffix = kwargs["suffix"]
+        for metric in PLOT_METRICS:
+            assert kwargs["artifact_paths"][metric] == (
+                directory / f"{metric}_confidence_intervals_{suffix}.png"
+            )
         return result
 
-    patch_workflow(monkeypatch, workflow_dependencies, scoring, "get_dashboards", dashboard)
+    patch_workflow(
+        monkeypatch, workflow_dependencies, scoring, "render_shared_evaluation", dashboard
+    )
     patch_workflow(
         monkeypatch,
         workflow_dependencies,
@@ -811,16 +809,14 @@ def test_dashboard_plot_contract_accepts_legacy_and_suffixed_outputs(
     assert (tmp_path / "metrics" / "recall_confidence_intervals_test.png").is_file()
 
 
-@pytest.mark.parametrize("already_suffixed", [False, True])
 @pytest.mark.parametrize("suppress_recall", [False, True])
 def test_reused_destination_requires_fresh_confidence_plots(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    already_suffixed: bool,
     suppress_recall: bool,
     workflow_dependencies: WorkflowDependencies,
 ) -> None:
-    from digital_metrics.reporting import get_dashboards
+    from digital_metrics.reporting import render_evaluation as shared_render
 
     from clearml_yolo.adapters.reporting import evaluation as scoring
     from clearml_yolo.core.artifact_names import PLOT_METRICS
@@ -837,27 +833,14 @@ def test_reused_destination_requires_fresh_confidence_plots(
             (destination / f"{metric}_confidence_intervals{suffix}.png").write_bytes(stale)
 
     def dashboard(*args: Any, **kwargs: Any) -> Any:
-        producer = tmp_path / "producer"
-        producer.mkdir()
-        result = get_dashboards(*args, **kwargs | {"path": str(producer)})
-        directory = Path(kwargs["path"])
-        for path in producer.iterdir():
-            metric = next(
-                (
-                    name
-                    for name in PLOT_METRICS
-                    if path.name.startswith(f"{name}_confidence_intervals")
-                ),
-                None,
-            )
-            if metric is None:
-                path.replace(directory / path.name)
-            elif not (suppress_recall and metric == "recall"):
-                suffix = "_test" if already_suffixed else ""
-                path.replace(directory / f"{metric}_confidence_intervals{suffix}.png")
+        result = shared_render(*args, **kwargs)
+        if suppress_recall:
+            Path(kwargs["artifact_paths"]["recall"]).unlink()
         return result
 
-    patch_workflow(monkeypatch, workflow_dependencies, scoring, "get_dashboards", dashboard)
+    patch_workflow(
+        monkeypatch, workflow_dependencies, scoring, "render_shared_evaluation", dashboard
+    )
     patch_workflow(
         monkeypatch,
         workflow_dependencies,

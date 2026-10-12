@@ -27,7 +27,11 @@ from clearml_yolo.application.contracts import (
     VocabularyReport,
 )
 from clearml_yolo.application.evaluation import evaluate_split
-from clearml_yolo.application.ports import TaskHandle, WorkflowDependencies
+from clearml_yolo.application.ports import (
+    PairedComparisonEngine,
+    TaskHandle,
+    WorkflowDependencies,
+)
 from clearml_yolo.core import artifact_names
 from clearml_yolo.core.comparison.assemble import ComparisonTables, build_comparison_rows
 from clearml_yolo.core.comparison.significance import validate_q
@@ -717,7 +721,12 @@ def compare(
                 unit="class",
             ) as observe_class,
         ):
-            tables = build_comparison_rows(
+            comparison = (
+                deps.evaluation.compare_outcomes
+                if isinstance(deps.evaluation, PairedComparisonEngine)
+                else build_comparison_rows
+            )
+            tables = comparison(
                 baseline_evaluated.outcome,
                 candidate_evaluated.outcome,
                 thresholds_baseline=baseline_evaluated.thresholds,
