@@ -1,7 +1,12 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.24.2 (2026-10-12)
+
+### Bug Fixes
+
+- **config**: Serialize Hydra device lists as plain containers
+  ([`2a6fcdb`](https://github.com/BuckanovNikita/clearml-yolo/commit/2a6fcdbb5c5b5b1f6ff4ad14843c4ff17a6b2ccd))
 
 ### Documentation
 
