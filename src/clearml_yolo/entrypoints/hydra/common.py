@@ -43,7 +43,15 @@ from clearml_yolo.entrypoints.hydra.validation import (
 
 
 def _device_values(config: DictConfig) -> dict[str, Any]:
-    return {phase.settings_path: phase.device for phase in configured_phases(config)}
+    """Detach resolved device requests before passing snapshots to YAML and SDKs."""
+    return {
+        phase.settings_path: (
+            OmegaConf.to_container(phase.device, resolve=True, throw_on_missing=True)
+            if OmegaConf.is_config(phase.device)
+            else phase.device
+        )
+        for phase in configured_phases(config)
+    }
 
 
 @contextmanager

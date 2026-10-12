@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record ownership and Torch compatibility release verification
+  ([`25d709b`](https://github.com/BuckanovNikita/clearml-yolo/commit/25d709bc381b4a31f4b5244612be755c151ef513))
+
+
 ## v0.24.1 (2026-10-12)
 
 ### Bug Fixes

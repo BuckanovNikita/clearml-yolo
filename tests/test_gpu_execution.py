@@ -1,6 +1,7 @@
 """Direct GPU execution preserves native settings and invocation ownership."""
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 from hydra import compose, initialize_config_module
@@ -115,3 +116,94 @@ def test_prediction_retains_requested_device_yaml(
     effective = yaml.safe_load((tmp_path / "ultralytics_predict.yaml").read_text())
     assert requested["device"] == 7
     assert effective["device"] == [0]
+
+
+@pytest.mark.parametrize("devices", [(), (0, 1, 2, 3, 4)])
+def test_hydra_device_lists_write_requested_and_effective_snapshots(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, devices: tuple[int, ...]
+) -> None:
+    import json
+
+    import yaml
+
+    from clearml_yolo.adapters.clearml import session
+    from clearml_yolo.adapters.yolo.config import Stage, requested_settings, write_native_yaml
+    from clearml_yolo.entrypoints.hydra.common import _execute_assigned
+
+    records: list[dict[str, Any]] = []
+    monkeypatch.setattr(
+        session, "record_run_configuration", lambda task, values: records.append(values)
+    )
+
+    def workflow(ultralytics: dict[str, Any], ultralytics_predict: dict[str, Any]) -> None:
+        stages: tuple[Stage, ...] = ("train", "predict")
+        for stage in stages:
+            settings = ultralytics if stage == "train" else ultralytics_predict
+            write_native_yaml(
+                tmp_path / f"{stage}-requested.yaml", requested_settings(settings, stage), stage
+            )
+            write_native_yaml(tmp_path / f"{stage}-effective.yaml", settings, stage)
+
+    config = OmegaConf.create(
+        {
+            "ultralytics": {"device": [-1, -1, -1, -1, -1]},
+            "ultralytics_predict": {"device": "${ultralytics.device}"},
+            "queue": {"enabled": False},
+            "autogpu": {"enabled": bool(devices)},
+        }
+    )
+    _execute_assigned("pipeline", config, workflow, None, devices)
+
+    for stage in ("train", "predict"):
+        requested = yaml.safe_load((tmp_path / f"{stage}-requested.yaml").read_text())
+        assert requested["device"] == [-1, -1, -1, -1, -1]
+    training = yaml.safe_load((tmp_path / "train-effective.yaml").read_text())
+    prediction = yaml.safe_load((tmp_path / "predict-effective.yaml").read_text())
+    assert training["device"] == ([0, 1, 2, 3, 4] if devices else [-1, -1, -1, -1, -1])
+    assert prediction["device"] == ([0] if devices else [-1, -1, -1, -1, -1])
+    assert list(config.ultralytics.device) == [-1, -1, -1, -1, -1]
+    if devices:
+        selection = json.loads(json.dumps(records[-1]))["gpu_selection"]
+        assert selection["requested_devices"] == {
+            "ultralytics": [-1, -1, -1, -1, -1],
+            "ultralytics_predict": [-1, -1, -1, -1, -1],
+        }
+        assert selection["effective_devices"] == {
+            "ultralytics": [0, 1, 2, 3, 4],
+            "ultralytics_predict": [0],
+        }
+
+
+@pytest.mark.parametrize("device", [None, -1, 0, "cpu", "mps", "0,2"])
+def test_hydra_scalar_devices_keep_their_yaml_shape(device: object) -> None:
+    import yaml
+
+    from clearml_yolo.entrypoints.hydra.common import _device_values
+
+    config = OmegaConf.create({"ultralytics": {"device": device}})
+    snapshot = yaml.safe_load(yaml.safe_dump(_device_values(config)))
+    assert snapshot == {"ultralytics": device}
+    assert type(snapshot["ultralytics"]) is type(device)
+
+
+def test_hydra_detector_device_snapshot_resolves_and_detaches_values() -> None:
+    import yaml
+
+    from clearml_yolo.entrypoints.hydra.common import _device_values
+
+    config = OmegaConf.create(
+        {
+            "model": {
+                "backend": "rfdetr",
+                "train": {"device": [-1, "${model.predict.device}"]},
+                "predict": {"device": 0},
+            }
+        }
+    )
+    snapshot = _device_values(config)
+    config.model.train.device[0] = 7
+    config.model.predict.device = 2
+    assert yaml.safe_load(yaml.safe_dump(snapshot)) == {
+        "model.train": [-1, 0],
+        "model.predict": 0,
+    }
