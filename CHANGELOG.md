@@ -1,12 +1,17 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.25.0 (2026-10-12)
 
 ### Documentation
 
 - Record YAML device serialization release verification
   ([`370d321`](https://github.com/BuckanovNikita/clearml-yolo/commit/370d3211d152ca7eb7fedc1c979be2ef6e5538cf))
+
+### Features
+
+- **gpu**: Make used-memory availability threshold configurable
+  ([`1369bf0`](https://github.com/BuckanovNikita/clearml-yolo/commit/1369bf0dbc1f0d6a1b23a517ed1b805d25230683))
 
 
 ## v0.24.2 (2026-10-12)
