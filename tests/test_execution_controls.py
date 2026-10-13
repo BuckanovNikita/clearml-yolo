@@ -21,6 +21,7 @@ def test_model_schemas_enable_independent_execution_controls() -> None:
             config = compose(config_name=name)
             assert config.queue.enabled is True
             assert config.autogpu.enabled is True
+            assert config.autogpu.force is False
             assert config.autogpu.max_used_memory_gib == 2.0
             custom = compose(config_name=name, overrides=["autogpu.max_used_memory_gib=0.5"])
             assert custom.autogpu.max_used_memory_gib == 0.5
@@ -72,7 +73,14 @@ def test_disabled_controls_preserve_native_device_without_probe(
     common.execute_owned("predict", config, workflow)
     assert received == [(os.getpid(), -1)]
     assert policies == [
-        {"execution_policy": {"queue": False, "autogpu": False, "max_used_memory_gib": 2.0}}
+        {
+            "execution_policy": {
+                "queue": False,
+                "autogpu": False,
+                "force": False,
+                "max_used_memory_gib": 2.0,
+            }
+        }
     ]
 
 

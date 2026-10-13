@@ -58,3 +58,37 @@ Parallel work: read-only configuration/queue investigation alongside parent test
 implementation. Review follows integrated verification; release follows review.
 Analysis: FR-007/008 map to T014–015, FR-009/010 to T016–017, documentation to T018–019.
 All four requirements are covered; no unresolved ambiguity or constitution conflict.
+
+## Amendment: force and readable admission (2026-10-12)
+
+- [x] T022 Record FR-011–015, parallel ownership, architecture and acceptance checks.
+- [x] T023 [P] Add failing force/routing/replay tests and implement policy/core/Hydra/launcher changes (FR-011/012; T022).
+- [x] T024 [P] Add failing hidden telemetry/index tests and extend immutable inventory (FR-015; T022).
+- [x] T025 Implement immutable queue diagnostics and direct/queued readable decisions with regression tests (FR-013/014/015; T024).
+- [x] T026 Verify five-of-eight, FIFO/reservation release, combined blockers, throttling, force bypass, generated YAML and sweeps; run GPU/launcher, architecture, Ruff, mypy and full applicable checks (T023–T025).
+- [ ] T027 Run controlled native CPU/GPU acceptance; record physical multi-GPU limitations and clean task-owned resources (T026).
+
+### Documentation update and acceptance
+
+- [x] T028 Update README, current GPU/queue contracts, quickstart and diagnostic guidance; validate Markdown/links/examples (T023–T025).
+- [x] T029 Inspect integrated diff, obtain fresh independent review, record evidence and reconcile/validate architecture acceptance (T026–T028).
+- [ ] T030 Complete applicable commit/release checks, preserving unrelated edits and exact local source overrides (T029).
+
+Follow-ups (not implementation tasks): forced-kill orphan recovery; permission-denied
+process inspection. Both require their own reproduction and lifecycle design.
+
+T027 execution evidence: CPU/single-GPU and forced sequential sweep completed;
+fresh ClearML status/policy/artifact readback is still unverified because of the
+documented SDK naming-query failure after initial harness lookup/cleanup trouble.
+T030 remains gated on that publication acceptance gap; no release can claim it passed.
+See [verification-force.md](verification-force.md).
+
+T029 implementation/architecture acceptance: final fresh review returned `ship`;
+record validation and code/documentation checks passed. This does not close the
+separate T027 publication readback or T030 release gates.
+
+On 2026-10-13, the user separately authorized “commit and push work”. Source
+commit/push proceeds under the normal commit checks, preserving unrelated edits.
+T027 and T030 remain open for the documented live readback and release gates;
+source delivery creates no version tag. See the dated source-delivery amendment
+in [verification-force.md](verification-force.md).

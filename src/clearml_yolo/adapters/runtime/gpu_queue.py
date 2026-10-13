@@ -16,6 +16,7 @@ from typing import Literal, Protocol, Self
 from filelock import BaseFileLock, FileLock, Timeout
 
 from clearml_yolo.adapters.runtime.gpu_resources import GPUDevice, GPUInventory
+from clearml_yolo.core.execution import DEFAULT_MAX_USED_MEMORY_GIB
 
 _SCHEMA_VERSION = 1
 _State = Literal["pending", "active"]
@@ -25,6 +26,66 @@ class SnapshotProvider(Protocol):
     """Provide current devices and availability under the invoking job's policy."""
 
     def snapshot(self) -> tuple[GPUDevice, ...]: ...
+
+
+@dataclass(frozen=True)
+class DeviceAdmission:
+    """One sampled card with exclusions from the same registry transaction."""
+
+    device: GPUDevice
+    logical_index: int | None
+    in_selection: bool
+    reserved_by: str | None = None
+
+    @property
+    def eligible(self) -> bool:
+        return (
+            self.logical_index is not None
+            and self.in_selection
+            and not self.device.busy
+            and self.reserved_by is None
+        )
+
+
+@dataclass(frozen=True)
+class AdmissionDiagnostics:
+    """Detached admission evidence; UUID identities remain internal to scheduling."""
+
+    requested_count: int
+    visible_count: int
+    max_used_memory_gib: float
+    cards: tuple[DeviceAdmission, ...]
+    ticket_id: str | None = None
+    queue_position: int | None = None
+    fifo_blocked_by: str | None = None
+    admitted: tuple[str, ...] = ()
+
+    @property
+    def eligible_count(self) -> int:
+        return sum(card.eligible for card in self.cards)
+
+    @property
+    def insufficient_capacity(self) -> bool:
+        return self.eligible_count < self.requested_count
+
+
+def admission_cards(
+    snapshot: tuple[GPUDevice, ...],
+    visible: tuple[str, ...],
+    selection: tuple[str, ...],
+    reservations: dict[str, str],
+) -> tuple[DeviceAdmission, ...]:
+    """Join sampled physical cards to CUDA order and the caller's exact selection."""
+    ordinals = {uuid: index for index, uuid in enumerate(visible)}
+    return tuple(
+        DeviceAdmission(
+            device,
+            ordinals.get(device.uuid),
+            device.uuid in selection,
+            reservations.get(device.uuid),
+        )
+        for device in snapshot
+    )
 
 
 def queue_root() -> Path:
@@ -160,7 +221,9 @@ class GPUQueue:
         self._registry_path = self.root / "registry.json"
         self._registry_lock = _native_lock(self.root / "registry.lock")
 
-    def register(self, count: int, visible: tuple[str, ...]) -> "Ticket":
+    def register(
+        self, count: int, visible: tuple[str, ...], *, cuda_visible: tuple[str, ...] | None = None
+    ) -> "Ticket":
         """Publish a pending request after acquiring its supervisor liveness lock."""
         if type(count) is not int or count <= 0:
             raise ValueError("GPU count must be a positive integer")
@@ -171,6 +234,9 @@ class GPUQueue:
             raise ValueError("visible GPU UUIDs must be unique")
         if count > len(visible):
             raise ValueError("GPU count exceeds the visible GPU set")
+        inherited = visible if cuda_visible is None else cuda_visible
+        if len(set(inherited)) != len(inherited) or any(uuid not in inherited for uuid in visible):
+            raise ValueError("Selection must be a subset of unique CUDA-visible GPUs")
 
         supervisor_lock: BaseFileLock | None = None
         with self._locked_registry():
@@ -191,7 +257,7 @@ class GPUQueue:
             except BaseException:
                 supervisor_lock.release()
                 raise
-        return Ticket(self, str(ticket_number), supervisor_lock)
+        return Ticket(self, str(ticket_number), supervisor_lock, inherited)
 
     def claim_worker(self, ticket_id: str) -> "WorkerClaim":
         """Return a context manager that validates and owns child liveness."""
@@ -238,41 +304,61 @@ class GPUQueue:
             raise ValueError("GPU queue ticket is closed or missing")
         return registry, request
 
-    def _try_acquire(self, ticket_id: str) -> tuple[str, ...] | None:
+    def _try_acquire(
+        self, ticket_id: str, cuda_visible: tuple[str, ...]
+    ) -> tuple[tuple[str, ...] | None, AdmissionDiagnostics | None]:
         ticket_number = self._ticket_number(ticket_id)
         with self._locked_registry():
             _, request = self._live_request(ticket_number)
             if request.state == "active":
-                return request.devices
+                return request.devices, None
 
         # Driver calls may block. Never hold the shared transaction while probing.
-        known, externally_busy = self._availability(self._inventory.snapshot())
+        snapshot = self._inventory.snapshot()
+        known, externally_busy = self._availability(snapshot)
         with self._locked_registry():
             registry, request = self._live_request(ticket_number)
             if request.state == "active":
-                return request.devices
+                return request.devices, None
             missing = [device for device in request.visible if device not in known]
             if missing:
                 raise RuntimeError(f"GPU visibility was lost for physical GPU UUIDs: {missing}")
             # Each supervisor owns its availability policy. Never admit another
             # project's ticket using this caller's memory threshold.
-            head = next(item for item in registry.requests if item.state == "pending")
-            if head is not request:
-                return None
-            occupied = {
-                device
+            pending = [item for item in registry.requests if item.state == "pending"]
+            head = pending[0]
+            reservations = {
+                device: str(item.ticket)
                 for item in registry.requests
                 if item.state == "active"
                 for device in item.devices
             }
-            occupied.update(externally_busy)
+            occupied = set(reservations) | externally_busy
             available = tuple(device for device in request.visible if device not in occupied)
-            if len(available) < request.count:
-                return None
-            request.devices = available[: request.count]
-            request.state = "active"
-            self._write_registry(registry)
-            return request.devices
+            selected = (
+                available[: request.count]
+                if head is request and len(available) >= request.count
+                else ()
+            )
+            diagnostics = AdmissionDiagnostics(
+                requested_count=request.count,
+                visible_count=len(cuda_visible),
+                max_used_memory_gib=(
+                    self._inventory.max_used_memory_gib
+                    if isinstance(self._inventory, GPUInventory)
+                    else DEFAULT_MAX_USED_MEMORY_GIB
+                ),
+                cards=admission_cards(snapshot, cuda_visible, request.visible, reservations),
+                ticket_id=ticket_id,
+                queue_position=pending.index(request) + 1,
+                fifo_blocked_by=str(head.ticket) if head is not request else None,
+                admitted=selected,
+            )
+            if selected:
+                request.devices = selected
+                request.state = "active"
+                self._write_registry(registry)
+            return selected or None, diagnostics
 
     def _close_ticket(self, ticket_id: str) -> None:
         ticket_number = self._ticket_number(ticket_id)
@@ -317,6 +403,10 @@ class GPUQueue:
             if len(request.devices) <= 1:
                 return request.devices
 
+        if isinstance(self._inventory, GPUInventory):
+            # A fresh worker inherits narrowed CUDA visibility. Only its lease's
+            # telemetry can prevent safe contraction, never an unrelated hidden card.
+            self._inventory.restrict_to(request.devices)
         known, externally_busy = self._availability(self._inventory.snapshot())
         with self._locked_registry():
             registry, request = self._live_request(ticket_number)
@@ -428,11 +518,24 @@ class GPUQueue:
 class Ticket:
     """A supervisor-owned pending or active queue request."""
 
-    def __init__(self, queue: GPUQueue, ticket_id: str, supervisor_lock: BaseFileLock) -> None:
+    def __init__(
+        self,
+        queue: GPUQueue,
+        ticket_id: str,
+        supervisor_lock: BaseFileLock,
+        cuda_visible: tuple[str, ...],
+    ) -> None:
         self.id = ticket_id
         self._queue = queue
         self._supervisor_lock = supervisor_lock
         self._closed = False
+        self._cuda_visible = cuda_visible
+        self._diagnostics: AdmissionDiagnostics | None = None
+
+    @property
+    def diagnostics(self) -> AdmissionDiagnostics | None:
+        """Last acquisition's immutable decision, without a second probe or transaction."""
+        return self._diagnostics
 
     @property
     def devices(self) -> tuple[str, ...]:
@@ -445,7 +548,10 @@ class Ticket:
 
     def try_acquire(self) -> tuple[str, ...] | None:
         self._ensure_open()
-        return self._queue._try_acquire(self.id)
+        selected, diagnostics = self._queue._try_acquire(self.id, self._cuda_visible)
+        if diagnostics is not None:
+            self._diagnostics = diagnostics
+        return selected
 
     def close(self) -> None:
         if self._closed:

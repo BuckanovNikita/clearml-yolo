@@ -1,11 +1,16 @@
 """Execution controls and immutable exact-device mappings for supervised jobs."""
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from clearml_yolo.adapters.runtime.gpu_resources import device_count, execution_phases
-from clearml_yolo.core.execution import AutoGPUControl, ExecutionPhase
+from clearml_yolo.adapters.runtime.gpu_resources import execution_phases
+from clearml_yolo.core.execution import (
+    AutoGPUControl,
+    ExecutionPhase,
+    concrete_device_selector,
+    validate_concrete_phases,
+)
 
 
 def automatic_gpu_control(config: Mapping[str, Any]) -> AutoGPUControl:
@@ -18,7 +23,7 @@ def execution_controls(config: Mapping[str, Any]) -> tuple[bool, bool]:
     values: list[bool] = []
     for name in ("queue", "autogpu"):
         group = config.get(name, {"enabled": True})
-        allowed = {"enabled", "max_used_memory_gib"} if name == "autogpu" else {"enabled"}
+        allowed = {"enabled", "force", "max_used_memory_gib"} if name == "autogpu" else {"enabled"}
         if (
             not isinstance(group, Mapping)
             or set(group) - allowed
@@ -29,7 +34,19 @@ def execution_controls(config: Mapping[str, Any]) -> tuple[bool, bool]:
         if type(enabled) is not bool:
             raise TypeError(f"{name}.enabled must be boolean")
         values.append(enabled)
+    force = config.get("autogpu", {}).get("force", False)
+    if type(force) is not bool:
+        raise TypeError("autogpu.force must be boolean")
+    if force:
+        return False, False
     return values[0], values[1]
+
+
+def forced_device_selection(
+    command: str, config: Mapping[str, Any]
+) -> dict[str, tuple[int, ...] | str]:
+    """Validate forced enabled-phase selectors without CUDA or NVML discovery."""
+    return validate_concrete_phases(execution_phases(command, config))
 
 
 @dataclass(frozen=True)
@@ -41,25 +58,8 @@ class ExactSelection:
 
 
 def _exact_ordinals(value: object) -> tuple[int, ...]:
-    if device_count(value) == 0:
-        return ()
-    values: tuple[int, ...]
-    if type(value) is int:
-        values = (value,)
-    elif isinstance(value, str):
-        text = value.strip()
-        text = text.removeprefix("cuda:")
-        parts = text.split(",")
-        if any(not part.strip().isdigit() for part in parts):
-            raise ValueError("Queued manual selection requires exact nonnegative GPU ordinals")
-        values = tuple(int(part.strip()) for part in parts)
-    elif isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
-        values = tuple(value)
-    else:
-        raise ValueError("Queued manual selection requires exact nonnegative GPU ordinals")
-    if any(type(item) is not int or item < 0 for item in values) or len(set(values)) != len(values):
-        raise ValueError("Queued manual selection requires unique exact nonnegative GPU ordinals")
-    return values
+    selection = concrete_device_selector(value)
+    return selection if isinstance(selection, tuple) else ()
 
 
 def _phase_ids(phase: ExecutionPhase, visible: tuple[str, ...]) -> tuple[str, ...]:

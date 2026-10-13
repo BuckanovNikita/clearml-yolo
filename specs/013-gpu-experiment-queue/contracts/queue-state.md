@@ -36,8 +36,9 @@ NVML must establish the full-GPU inventory and total used memory. An isolated me
 subprocess maps inherited visibility without creating a CUDA context. Admission uses
 the project memory limit defined in the [execution contract](../../022-simple-gpu-wait/contracts/execution.md);
 process presence alone does not make a GPU unavailable. Active queue reservations
-always exclude their devices. Probe failure, incomplete telemetry, unsupported MIG
-visibility or ambiguous mapping prevents admission. Registry v1 is retained; use
+always exclude their devices. Probe failure, incomplete required-device telemetry, unsupported MIG
+visibility or ambiguous mapping prevents admission. Hidden or exact-selection-excluded
+cards do not block admission on healthy required GPUs. Registry v1 is retained; use
 updated supervisors together because older versions can admit other projects' tickets.
 
 Each active request has supervisor and child native liveness locks. A reservation is reclaimed only
@@ -57,3 +58,17 @@ validate current registry state under the lock; a concurrent change cannot be ov
 pre-probe state. A driver stall can delay the probing caller but cannot block unrelated queue
 registration, position, close or cleanup transactions. Active reservations have either their full
 requested cardinality or one retained device after contraction; intermediate sizes are corrupt.
+
+## Decision evidence and force bypass
+
+A ticket exposes immutable diagnostics from its latest admission attempt without
+changing the return contract of `try_acquire()`. One telemetry sample is joined with
+active ticket owners and pending order inside the admission transaction. Format and
+log only after releasing the registry lock; do not re-read queue position or telemetry
+to explain that attempt. CUDA logical/physical indexes are display metadata; registry
+v1 still stores UUIDs and is unchanged.
+
+`autogpu.force=true` bypasses the queue entirely and preserves concrete native device
+choices. It neither reads nor modifies existing tickets and does not reserve capacity.
+Forced-kill orphan recovery and permission-denied process inspection are separate
+follow-ups; this change does not claim to resolve either lifecycle issue.

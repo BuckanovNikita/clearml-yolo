@@ -54,6 +54,11 @@ with automatic selection on preserves direct availability waiting; queue on with
 selection off reserves exact enabled-phase identities; both off preserves native settings
 without project GPU discovery, waits or replacement. CPU/MPS and non-model commands bypass
 GPU telemetry. Controls are execution policy, never workflow arguments. Neither disables tracking.
+`autogpu.force` is strict Boolean, default false: it overrides both switches, bypasses
+project GPU discovery/checks/reservations/waiting, and requires concrete selectors
+for enabled GPU stages. Preserve selector order and inherited visibility; CPU/MPS
+remain supported. ClearML records the effective force policy and rejects replay
+changes to forced choices. Forced sweeps use sequential BasicLauncher.
 `autogpu.max_used_memory_gib` defaults to 2.0 and accepts finite positive numbers.
 Availability means total NVML used memory is strictly below that GiB limit, regardless
 of process presence. Equality is busy; reservations still exclude devices. Each queue
@@ -95,8 +100,9 @@ uses a fixed labeled corpus with source-byte and actual evaluator identity. Loca
 does not establish CUDA 11.8 target compatibility; consult dated acceptance evidence.
 
 NVML and a metadata-only subprocess resolve supported whole-GPU visibility before ClearML
-and native initialization. Unknown telemetry, unsupported MIG, lost visibility and excessive
-demand fail clearly. Shared compatible queue state remains outside project configuration and
+and native initialization. Unknown required-device telemetry, visible MIG, lost visibility and excessive
+demand fail clearly. Hidden cards with unsupported telemetry or MIG cannot block
+healthy visible cards. Exact admission and contraction scope telemetry to required GPUs. Shared compatible queue state remains outside project configuration and
 invocation scratch. Corrupt/incompatible state fails closed without migration or deletion.
 Cancellation reaps owned GPU descendants before releasing capacity. Direct automatic waits
 remain stateless and give no exclusive allocation guarantee. Requested/effective devices and
@@ -105,7 +111,7 @@ policy or exceed admitted identities/capacity.
 
 Queued local multiruns use the project concurrent launcher with BasicSweeper; queue-disabled
 multiruns use sequential BasicLauncher. Preserve callbacks, job environment/output/chdir,
-ordered results and failure outcomes; mixed queue-mode sweeps fail before admission.
+ordered results and failure outcomes; mixed effective queue-mode sweeps fail before admission.
 The [GPU execution contract](../specs/022-simple-gpu-wait/contracts/execution.md), amended by
 [feature 024](../specs/024-runtime-isolation/spec.md), governs all four modes. Historical
 feature 013/022 intent and dated evidence remain preserved. Batch tuning, custom augmentation
@@ -209,3 +215,10 @@ settings are unchanged. Startup performs no scratch recovery or recursive deleti
 ClearML callback switches restore in memory without persisting user settings, including
 fresh DDP trainer scopes. Invalid dataset entries remain available for deliberate idle
 maintenance; unsupported native locks fail without a soft-lock fallback.
+
+GPU admission explanations use CUDA selector indexes and physical cross-references,
+requested/visible/eligible counts, the effective memory limit and queue position.
+Per-card memory/reservation/exclusion reasons are distinct from job-level FIFO and
+capacity blockers. Initial/change/30-second heartbeat messages derive from immutable
+admission evidence and are formatted outside registry locks. See the maintained
+[diagnostic guide](diagnostics.md#gpu-admission-decisions).

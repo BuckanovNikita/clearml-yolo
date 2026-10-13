@@ -261,8 +261,9 @@ def test_sweep_task_can_resolve_its_runtime_output_directory(tmp_path: Path) -> 
     assert _load(tmp_path / "outputs" / "2" / "receipt.json")["value"] == "runtime-path"
 
 
-def test_queue_disabled_launcher_delegates_to_basic_launcher(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize("forced", [False, True])
+def test_unqueued_launcher_delegates_to_basic_launcher(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, forced: bool
 ) -> None:
     loader = _SweepConfigLoader(tmp_path, initial_job_idx=0)
     original = loader.load_sweep_config
@@ -270,7 +271,8 @@ def test_queue_disabled_launcher_delegates_to_basic_launcher(
     def disabled(config: DictConfig, overrides: list[str]) -> DictConfig:
         job = original(config, overrides)
         with open_dict(job):
-            job.queue = {"enabled": False}
+            job.queue = {"enabled": forced}
+            job.autogpu = {"enabled": True, "force": forced}
         return job
 
     monkeypatch.setattr(loader, "load_sweep_config", disabled)
@@ -295,8 +297,9 @@ def test_queue_disabled_launcher_delegates_to_basic_launcher(
     assert calls == ["setup", ([["value=first"]], 0)]
 
 
+@pytest.mark.parametrize("forced", [False, True])
 def test_mixed_queue_batch_fails_before_run_jobs(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, forced: bool
 ) -> None:
     loader = _SweepConfigLoader(tmp_path, initial_job_idx=0)
     original = loader.load_sweep_config
@@ -304,7 +307,8 @@ def test_mixed_queue_batch_fails_before_run_jobs(
     def mixed(config: DictConfig, overrides: list[str]) -> DictConfig:
         job = original(config, overrides)
         with open_dict(job):
-            job.queue = {"enabled": job.value == "first"}
+            job.queue = {"enabled": forced or job.value == "first"}
+            job.autogpu = {"enabled": True, "force": forced and job.value != "first"}
         return job
 
     monkeypatch.setattr(loader, "load_sweep_config", mixed)
@@ -320,12 +324,13 @@ def test_mixed_queue_batch_fails_before_run_jobs(
         launcher.launch([["value=first"], ["value=second"]], 0)
 
 
+@pytest.mark.parametrize("switch", ["queue.enabled", "autogpu.force"])
 def test_mixed_modes_in_later_batch_reject_before_first_admission(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, switch: str
 ) -> None:
     base = _job_config(tmp_path, index=0, value="base")
     with open_dict(base):
-        base.hydra.overrides.task = ["queue.enabled=true,false"]
+        base.hydra.overrides.task = [f"{switch}=true,false"]
         base.hydra.sweeper.max_batch_size = 1
     calls: list[list[str]] = []
 
@@ -335,7 +340,9 @@ def test_mixed_modes_in_later_batch_reject_before_first_admission(
             result = deepcopy(config)
             assert isinstance(result, DictConfig)
             with open_dict(result):
-                result.queue = {"enabled": overrides[0].lower() == "queue.enabled=true"}
+                result.queue = {"enabled": True}
+                result.autogpu = {"enabled": True}
+                OmegaConf.update(result, switch, overrides[0].lower() == f"{switch}=true")
             return result
 
     launcher = QueueLauncher()
@@ -346,10 +353,10 @@ def test_mixed_modes_in_later_batch_reject_before_first_admission(
     )
     monkeypatch.setattr(execution, "run_jobs", lambda jobs: pytest.fail("admission occurred"))
     with pytest.raises(ValueError, match="full sweep"):
-        launcher.launch([["queue.enabled=true"]], 0)
+        launcher.launch([[f"{switch}=true"]], 0)
     assert [[value.lower() for value in call] for call in calls] == [
-        ["queue.enabled=true"],
-        ["queue.enabled=false"],
+        [f"{switch}=true"],
+        [f"{switch}=false"],
     ]
 
 
@@ -434,9 +441,13 @@ def test_exact_union_mapping_survives_fresh_worker_transport(
     class Inventory:
         def __init__(self, *, max_used_memory_gib: float = 2.0) -> None:
             self.max_used_memory_gib = max_used_memory_gib
+            self._visible: tuple[str, ...] = ("GPU-a", "GPU-b", "GPU-c")
 
         def visible(self) -> tuple[str, ...]:
-            return ("GPU-a", "GPU-b", "GPU-c")
+            return self._visible
+
+        def restrict_to(self, visible: tuple[str, ...]) -> None:
+            self._visible = visible
 
         def snapshot(self) -> tuple[GPUDevice, ...]:
             return tuple(GPUDevice(uuid, False) for uuid in self.visible())

@@ -18,6 +18,7 @@ Set a project-wide limit in the exported command YAML:
 ```yaml
 autogpu:
   enabled: true
+  force: false
   max_used_memory_gib: 2.0
 ```
 
@@ -60,3 +61,23 @@ Each job preserves Hydra environment/output/chdir behavior and owns its task. In
 admission creates no task; cancellation of active work waits for owned GPU process cleanup.
 See the [execution contract](contracts/execution.md) for four modes, exact union,
 replay and native owner rules.
+
+## Force explicit devices
+
+To start directly on five explicitly selected GPUs, bypassing project memory and
+queue admission checks even while the enabled switches stay true:
+
+```bash
+cy --config-dir cy-config --config-name cy autogpu.force=true 'ultralytics.device=[0,1,2,3,4]' ultralytics_predict.device=0
+```
+
+Indexes are relative to inherited `CUDA_VISIBLE_DEVICES`; training keeps their order.
+Provide concrete devices for every enabled GPU stage. CPU/MPS also work. Automatic
+selectors (`-1`, null, empty, bare `cuda`) fail. ClearML tracking remains enabled and
+replay cannot change forced devices. Forced sweeps are sequential; mixed effective
+queued/unqueued sweeps fail before any job starts.
+
+Ordinary waits explain each card and show requested/visible/eligible counts, the
+memory threshold and queue position. For five of eight cards below the threshold,
+an empty queue admits immediately; active reservations or FIFO can still delay it.
+See [diagnostics](../../docs/diagnostics.md#gpu-admission-decisions) to interpret logs.

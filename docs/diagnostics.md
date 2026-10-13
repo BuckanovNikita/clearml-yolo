@@ -113,3 +113,32 @@ watchdog and lifecycle mechanics. Application workflows request tracing through 
 [CLI composition](../src/clearml_yolo/entrypoints/composition.py), rather than importing
 adapter logging internals. Evaluation and FiftyOne adapters may depend on observability
 for diagnostics; scientific core records and algorithms remain independent of it.
+
+## GPU admission decisions
+
+INFO messages describe the initial admission decision, changes in categorical reasons
+(throttled to five seconds) and a 30-second waiting heartbeat. Memory fluctuations
+within the same eligible/busy category do not produce new messages. Successful
+admission is reported immediately.
+
+The header shows requested, CUDA-visible and eligible device counts, the effective
+`autogpu.max_used_memory_gib`, and queued ticket/position. `GPU 0` matches the
+configured CUDA selector; `GPU 0 (physical GPU 3)` explains reordered visibility.
+Hidden devices use their physical index. Each card reports eligibility, used memory
+at/above the threshold, the reserving ticket, or exclusion by visibility/exact
+selection. Memory and reservation blockers can occur together. FIFO blocking by an
+earlier pending ticket is a separate line, as is insufficient eligible capacity;
+FIFO does not relabel otherwise eligible cards.
+
+Five requested GPUs with eight eligible cards and an empty queue admit immediately.
+If admission waits, inspect the card reasons and FIFO line. A lower count may reflect
+visibility or exact selection even when the machine has more physical cards.
+Diagnostics use the admission attempt's telemetry sample and locked registry state;
+formatting and logging happen after lock release. This is an observed decision,
+not a guarantee that external workloads will leave capacity free after sampling.
+
+`autogpu.force=true` bypasses these project checks and requires concrete enabled-stage
+selectors. It preserves ClearML tracking and inherited visibility; it does not reserve
+capacity. See the [GPU quickstart](../specs/022-simple-gpu-wait/quickstart.md).
+Forced-kill orphan recovery and permission-denied process inspection are tracked
+separately; the original reported waiting cause remains unconfirmed.

@@ -149,8 +149,12 @@ def test_waiting_logs_are_periodic_without_flooding(clock: list[float]) -> None:
     inventory = _ChangingInventory(
         ("GPU-a",), [(GPUDevice("GPU-a", True),)] * 65 + [(GPUDevice("GPU-a", False),)]
     )
+    from clearml_yolo.entrypoints.hydra.execution import DecisionReporter
+
     try:
-        assert gpu_wait.wait_for_available_gpus(1, inventory=inventory) == (0,)
+        assert gpu_wait.wait_for_available_gpus(
+            1, inventory=inventory, on_decision=DecisionReporter().report
+        ) == (0,)
     finally:
         logger.remove(handler)
     waiting_messages = [message for message in messages if "Waiting" in message]

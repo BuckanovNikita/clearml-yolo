@@ -151,6 +151,7 @@ def test_queue_freezes_policy_from_job_environment_before_admission(
         assert job.ticket.try_acquire() == ("GPU-loaded",)
         assert OmegaConf.to_container(job.config.autogpu, resolve=False) == {
             "enabled": True,
+            "force": False,
             "max_used_memory_gib": 4.0,
         }
         monkeypatch.setenv("CY_TEST_GPU_LIMIT", "0.5")
@@ -232,6 +233,7 @@ def test_queue_routing_does_not_resolve_policy_before_job_environment(
         assert job.ticket.try_acquire() == ("GPU-loaded",)
         assert OmegaConf.to_container(job.config.autogpu, resolve=False) == {
             "enabled": True,
+            "force": False,
             "max_used_memory_gib": 4.0,
         }
     finally:

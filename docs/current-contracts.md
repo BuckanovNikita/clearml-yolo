@@ -242,3 +242,10 @@ Machine-specific setup and evidence stay in the applicable global environment sk
 The repository's [end-to-end skill](../.agents/skills/running-end-to-end-tests/SKILL.md)
 defines portable acceptance. Historical releases and dated evidence describe
 observations then; they are not current execution recipes.
+
+The force/admission amendment adds strict `autogpu.force=false` to the maintained
+[GPU execution contract](../specs/022-simple-gpu-wait/contracts/execution.md). True
+requires concrete enabled-stage selectors and bypasses project GPU discovery,
+memory checks, reservations and waits, with sequential sweeps and protected replay.
+Admission diagnostics use immutable sampled/locked evidence and CUDA selector indexes;
+see [GPU admission decisions](diagnostics.md#gpu-admission-decisions).

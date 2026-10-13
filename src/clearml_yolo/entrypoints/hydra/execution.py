@@ -22,7 +22,12 @@ from loguru import logger
 from omegaconf import DictConfig, OmegaConf, open_dict
 
 from clearml_yolo.adapters.observability.tracing import trace_operation
-from clearml_yolo.adapters.runtime.gpu_queue import GPUQueue, Ticket
+from clearml_yolo.adapters.runtime.gpu_queue import (
+    AdmissionDiagnostics,
+    DeviceAdmission,
+    GPUQueue,
+    Ticket,
+)
 from clearml_yolo.adapters.runtime.gpu_resources import (
     GPUInventory,
     configured_phases,
@@ -35,6 +40,7 @@ from clearml_yolo.adapters.runtime.gpu_scheduling import (
     exact_device_ordinals,
     exact_request,
     execution_controls,
+    forced_device_selection,
 )
 from clearml_yolo.adapters.storage.filesystem import temporary_root
 from clearml_yolo.entrypoints.hydra.validation import materialize_model_config
@@ -43,6 +49,116 @@ POLL_SECONDS = 0.5
 _ENTRYPOINT: tuple[str, Callable[..., Any]] | None = None
 _WINDOWS_JOBS: WeakKeyDictionary[subprocess.Popen[Any], int] = WeakKeyDictionary()
 _POSIX_GROUPS: WeakKeyDictionary[subprocess.Popen[Any], int] = WeakKeyDictionary()
+
+
+_LOG_SECONDS = 30.0
+_CHANGE_LOG_SECONDS = 5.0
+
+
+def device_label(card: DeviceAdmission) -> str:
+    """Name a card in the user's CUDA numbering, retaining a physical cross-reference."""
+    physical = card.device.physical_index
+    if card.logical_index is None:
+        return f"Physical GPU {physical}" if physical is not None else "Hidden GPU"
+    label = f"GPU {card.logical_index}"
+    if physical is not None and physical != card.logical_index:
+        label += f" (physical GPU {physical})"
+    return label
+
+
+def _card_message(card: DeviceAdmission, decision: AdmissionDiagnostics) -> str:
+    reasons: list[str] = []
+    if card.logical_index is None:
+        reasons.append("outside CUDA visibility")
+    elif not card.in_selection:
+        reasons.append("outside the exact selection")
+    else:
+        if card.device.busy:
+            used = card.device.used_memory_bytes
+            measured = f"{used / 1024**3:.3f} GiB " if used is not None else ""
+            reasons.append(
+                f"memory {measured}at/above threshold {decision.max_used_memory_gib:g} GiB"
+            )
+        if card.reserved_by is not None:
+            reasons.append(f"reserved by ticket {card.reserved_by}")
+        if card.eligible:
+            reasons.append("eligible")
+            if card.device.uuid in decision.admitted:
+                reasons.append("selected")
+    return f"{device_label(card)}: {'; '.join(reasons)}"
+
+
+def format_decision(decision: AdmissionDiagnostics) -> str:
+    """Format detached evidence; never sample telemetry or enter registry locks here."""
+    state = "GPU admission ready" if decision.admitted else "Waiting for GPUs"
+    lines = [
+        (
+            f"{state}: requested {decision.requested_count}, visible {decision.visible_count}, "
+            f"eligible {decision.eligible_count}, memory < {decision.max_used_memory_gib:g} GiB"
+        )
+    ]
+    if decision.ticket_id is not None:
+        lines[0] += f"; ticket {decision.ticket_id}, queue position {decision.queue_position}"
+    if decision.fifo_blocked_by is not None:
+        lines.append(f"FIFO blocked by earlier ticket {decision.fifo_blocked_by}")
+    if decision.insufficient_capacity:
+        lines.append(
+            f"Insufficient eligible capacity: need {decision.requested_count}, "
+            f"have {decision.eligible_count}"
+        )
+    # CUDA order is the primary display order; hidden physical cards follow it.
+    cards = sorted(
+        decision.cards,
+        key=lambda card: (card.logical_index is None, card.logical_index or 0),
+    )
+    lines.extend(_card_message(card, decision) for card in cards)
+    return "\n".join(lines)
+
+
+@dataclass
+class DecisionReporter:
+    """Throttle categorical changes and emit a heartbeat despite stable blockers."""
+
+    _last_log: float | None = None
+    _last_signature: tuple[object, ...] | None = None
+
+    def report(self, decision: AdmissionDiagnostics) -> None:
+        message = self.message(decision)
+        if message is not None:
+            logger.info("{}", message)
+
+    def message(self, decision: AdmissionDiagnostics, *, now: float | None = None) -> str | None:
+        current = time.monotonic() if now is None else now
+        signature = (
+            decision.requested_count,
+            decision.visible_count,
+            decision.max_used_memory_gib,
+            decision.queue_position,
+            decision.fifo_blocked_by,
+            decision.admitted,
+            tuple(
+                (
+                    card.device.uuid,
+                    card.logical_index,
+                    card.device.physical_index,
+                    card.device.busy,
+                    card.in_selection,
+                    card.reserved_by,
+                )
+                for card in decision.cards
+            ),
+        )
+        elapsed = current - self._last_log if self._last_log is not None else None
+        changed = signature != self._last_signature
+        if (
+            elapsed is None
+            or elapsed >= _LOG_SECONDS
+            or (changed and (elapsed >= _CHANGE_LOG_SECONDS or bool(decision.admitted)))
+        ):
+            self._last_log = current
+            self._last_signature = signature
+            return format_decision(decision)
+        return None
 
 
 def configure_entrypoint(name: str, function: Callable[..., Any]) -> None:
@@ -90,6 +206,24 @@ def exact_effective_configuration(
             command, effective, selection, admitted
         ).items():
             OmegaConf.update(effective, f"{group}.device", devices)
+    return effective
+
+
+def forced_effective_configuration(command: str, config: DictConfig) -> DictConfig:
+    """Normalize accepted string syntax for native backends, retaining requested identity."""
+    effective = effective_configuration(config, ())
+    with open_dict(effective):
+        for group, selector in forced_device_selection(command, effective).items():
+            path = f"{group}.device"
+            if isinstance(OmegaConf.select(effective, path), str):
+                value = (
+                    selector
+                    if isinstance(selector, str)
+                    else selector[0]
+                    if len(selector) == 1
+                    else list(selector)
+                )
+                OmegaConf.update(effective, path, value)
     return effective
 
 
@@ -387,7 +521,7 @@ class ModelJob:
     process: subprocess.Popen[Any] | None = None
     result: JobReturn | None = None
     temporary: TemporaryDirectory[str] | None = None
-    previous_position: int | None = None
+    decision_reporter: DecisionReporter = field(default_factory=DecisionReporter)
     selection: ExactSelection | None = None
     launch_cwd: str = field(default_factory=os.getcwd)
 
@@ -408,6 +542,8 @@ class ModelJob:
                 if not isinstance(resolved, dict):
                     raise TypeError("Command configuration must be a mapping")
                 inputs = {str(key): value for key, value in resolved.items()}
+                if automatic_gpu_control(inputs).force:
+                    forced_device_selection(self.command, inputs)
                 queued, automatic = execution_controls(inputs)
                 count = job_request(self.command, inputs) if queued else 0
                 if "autogpu" in self.config:
@@ -424,12 +560,14 @@ class ModelJob:
             # The job's environment may further restrict its inherited device visibility.
             with env_override(env):
                 visible = inventory.visible()
+            cuda_visible = visible
             if not automatic:
                 self.selection = exact_request(self.command, inputs, visible)
                 visible = self.selection.devices
                 count = len(visible)
+                inventory.restrict_to(visible)
             self.queue = GPUQueue(inventory=inventory)
-            self.ticket = self.queue.register(count, visible)
+            self.ticket = self.queue.register(count, visible, cuda_visible=cuda_visible)
 
     @trace_operation("queue.start")
     def start(self) -> None:
@@ -438,16 +576,12 @@ class ModelJob:
         devices: tuple[str, ...] = ()
         if self.ticket is not None:
             selected = self.ticket.try_acquire()
+            decision = self.ticket.diagnostics
+            if decision is not None:
+                message = self.decision_reporter.message(decision)
+                if message is not None:
+                    logger.info("{}: {}", self.command, message)
             if selected is None:
-                position = self.ticket.position()
-                if position != self.previous_position:
-                    logger.info(
-                        "{} waiting for GPUs: ticket {} position {}",
-                        self.command,
-                        self.ticket.id,
-                        position,
-                    )
-                    self.previous_position = position
                 return
             devices = selected
         self.temporary = TemporaryDirectory(prefix="cy-job-", dir=temporary_root(), delete=False)
@@ -474,7 +608,15 @@ class ModelJob:
         environment = dict(os.environ)
         if devices:
             environment["CUDA_VISIBLE_DEVICES"] = ",".join(devices)
-        logger.info("Starting {} on GPUs {}", self.command, list(devices))
+        if self.ticket is not None and self.ticket.diagnostics is not None:
+            labels = {
+                card.device.uuid: device_label(card) for card in self.ticket.diagnostics.cards
+            }
+            logger.info(
+                "Starting {} on {}", self.command, ", ".join(labels[uuid] for uuid in devices)
+            )
+        else:
+            logger.info("Starting {}", self.command)
         process = subprocess.Popen(  # noqa: S603 - current interpreter and owned payload
             [sys.executable, "-m", "clearml_yolo.entrypoints.hydra.worker", str(document)],
             cwd=self.launch_cwd,

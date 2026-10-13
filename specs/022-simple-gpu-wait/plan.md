@@ -88,3 +88,35 @@ verification without rewriting completed history. Validate changed Markdown, loc
 links, exported YAML and threshold override examples. Relevant tests cover inventory,
 direct/queued execution, queue sharing, replay, CPU bypass and configuration export;
 run repository lint/type/import and commit gates before the authorized Git-tag release.
+
+## Amendment plan: force and readable admission (2026-10-12)
+
+Implement FR-011–015 in the existing layers, without changing dependencies or registry
+v1. See [architecture.json](architecture.json) for module scope and executable gates.
+Core owns strict force and concrete-selector validation. Runtime scheduling reads
+effective switches; Hydra common owns replay protection and provenance; launcher
+routes effective unqueued jobs through BasicLauncher. Inventory records retain UUID
+and busy compatibility while adding physical/logical indexes and measured bytes.
+Admission diagnostics are immutable snapshots of one telemetry sample and locked
+registry view. Ticket acquisition still returns UUID tuples or None. Presentation
+uses diagnostics after the lock, tracking categorical reasons for throttled refresh.
+
+Parallel ownership: policy delegate owns core/execution.py, gpu_scheduling.py,
+Hydra common.py, launcher.py and dedicated force tests. Inventory delegate owns
+gpu_resources.py and its tests. Parent owns gpu_queue.py, gpu_wait.py, Hydra
+execution.py, diagnostic tests, artifacts and documentation. Agree data interfaces
+before integration. Inventory and policy work are independent after this gate; queue
+integration, parent verification, fresh independent review and acceptance are sequential.
+Preserve pre-existing static-analysis edits (including gpu_queue.py cleanup comment).
+
+Documentation scope: README, maintained execution/queue contracts, GPU quickstart,
+project/current contract summaries and diagnostic guide. Validate Markdown, local
+links and generated configuration examples. Record native checks and hardware limits
+in dated evidence; do not claim the original waiting cause was established.
+
+Integration reconciliation: direct polling publishes immutable decisions through an
+optional callback; formatting/throttling live in the existing Hydra execution
+boundary. The launcher implementation already routes effective controls and needs
+only regression coverage, not a source edit. The explicit force requirement
+supersedes the historical constitution's prohibition on bypass while leaving queued
+admission invariants unchanged. No installed workflow/governance files are modified.

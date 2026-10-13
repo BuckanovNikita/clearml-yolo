@@ -283,10 +283,10 @@ def test_snapshot_uses_total_memory_with_strict_default_boundary(
     )
     _install_nvml(monkeypatch, fake)
     assert GPUInventory().snapshot() == (
-        GPUDevice("GPU-a", False),
-        GPUDevice("GPU-b", False),
-        GPUDevice("GPU-c", True),
-        GPUDevice("GPU-d", True),
+        GPUDevice("GPU-a", False, 0, used_memory_bytes=0),
+        GPUDevice("GPU-b", False, 1, used_memory_bytes=2 * 1024**3 - 1),
+        GPUDevice("GPU-c", True, 2, used_memory_bytes=2 * 1024**3),
+        GPUDevice("GPU-d", True, 3, used_memory_bytes=2 * 1024**3 + 1),
     )
     assert fake.shutdown
 
@@ -300,7 +300,12 @@ def test_snapshot_accepts_reported_eight_card_memory_usage(
         used_memory=tuple(value * 1024**2 for value in (1215, 3, 409, 3, 3, 3, 3, 3)),
     )
     _install_nvml(monkeypatch, fake)
-    assert GPUInventory().snapshot() == tuple(GPUDevice(uuid, False) for uuid in uuids)
+    assert GPUInventory().snapshot() == tuple(
+        GPUDevice(uuid, False, index, used_memory_bytes=value * 1024**2)
+        for index, (uuid, value) in enumerate(
+            zip(uuids, (1215, 3, 409, 3, 3, 3, 3, 3), strict=True)
+        )
+    )
     from clearml_yolo.adapters.runtime import gpu_resources
     from clearml_yolo.adapters.runtime.gpu_wait import wait_for_available_gpus
 
@@ -317,9 +322,9 @@ def test_snapshot_applies_custom_fractional_limit(monkeypatch: pytest.MonkeyPatc
     )
     _install_nvml(monkeypatch, fake)
     assert GPUInventory(max_used_memory_gib=0.5).snapshot() == (
-        GPUDevice("GPU-a", False),
-        GPUDevice("GPU-b", True),
-        GPUDevice("GPU-c", True),
+        GPUDevice("GPU-a", False, 0, used_memory_bytes=512 * 1024**2 - 1),
+        GPUDevice("GPU-b", True, 1, used_memory_bytes=512 * 1024**2),
+        GPUDevice("GPU-c", True, 2, used_memory_bytes=512 * 1024**2 + 1),
     )
 
 
@@ -352,7 +357,9 @@ def test_snapshot_accepts_hardware_without_mig_capability(
     )
     _install_nvml(monkeypatch, fake)
 
-    assert GPUInventory().snapshot() == (GPUDevice(uuid="GPU-a", busy=False),)
+    assert GPUInventory().snapshot() == (
+        GPUDevice(uuid="GPU-a", busy=False, physical_index=0, used_memory_bytes=0),
+    )
 
 
 def test_snapshot_rejects_mig_enabled_hardware_clearly(
@@ -389,6 +396,10 @@ class _FixedInventory(GPUInventory):
     @override
     def snapshot(self) -> tuple[GPUDevice, ...]:
         return self.devices
+
+    @override
+    def _physical_uuids(self) -> tuple[str, ...]:
+        return tuple(device.uuid for device in self.devices)
 
 
 def test_visible_preserves_cuda_logical_order_independently_of_current_occupancy(
@@ -486,3 +497,136 @@ def test_visibility_probe_failure_reports_exit_and_redacts_subprocess_stderr(
     with pytest.raises(RuntimeError, match=r"exit 7.*CUDA unavailable") as caught:
         _probe_visible_uuids()
     assert "private-probe-token" not in str(caught.value)
+
+
+@pytest.mark.parametrize("failure", ["unsupported", "mig", "invalid", "unexpected"])
+def test_hidden_telemetry_failure_does_not_block_visible_device(
+    monkeypatch: pytest.MonkeyPatch, failure: str
+) -> None:
+    from clearml_yolo.adapters.runtime import gpu_resources
+
+    hidden_memory: object = {
+        "unsupported": _NotSupportedError("unsupported"),
+        "mig": 0,
+        "invalid": None,
+        "unexpected": RuntimeError("driver unavailable token=private-token"),
+    }[failure]
+    fake = _FakeNVML(
+        uuids=("GPU-hidden", "GPU-visible"),
+        used_memory=(hidden_memory, 1024),
+        mig_modes=(1 if failure == "mig" else 0, 0),
+    )
+    _install_nvml(monkeypatch, fake)
+    monkeypatch.setattr(gpu_resources, "_probe_visible_uuids", lambda: ("GPU-visible",))
+    inventory = GPUInventory()
+    assert inventory.visible() == ("GPU-visible",)
+    hidden, visible = inventory.snapshot()
+    assert hidden.busy is True
+    assert hidden.used_memory_bytes is None
+    assert hidden.telemetry_error
+    assert "private-token" not in hidden.telemetry_error
+    assert hidden.physical_index == 0
+    assert hidden.logical_index is None
+    assert visible == GPUDevice("GPU-visible", False, 1, 0, 1024)
+
+
+def test_exact_required_subset_tolerates_other_visible_telemetry_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from clearml_yolo.adapters.runtime import gpu_resources
+
+    fake = _FakeNVML(
+        uuids=("GPU-a", "GPU-b"),
+        used_memory=(_NotSupportedError("unsupported"), 123),
+    )
+    _install_nvml(monkeypatch, fake)
+    monkeypatch.setattr(gpu_resources, "_probe_visible_uuids", lambda: ("GPU-b", "GPU-a"))
+    inventory = GPUInventory()
+    assert inventory.visible() == ("GPU-b", "GPU-a")
+    inventory.restrict_to(("GPU-b",))
+    other, required = inventory.snapshot()
+    assert other.logical_index == 1
+    assert other.telemetry_error
+    assert required == GPUDevice("GPU-b", False, 1, 0, 123)
+    inventory.restrict_to(("GPU-a",))
+    with pytest.raises(RuntimeError, match=r"GPU-a.*memory telemetry.*unsupported"):
+        inventory.snapshot()
+
+
+def test_required_visible_unavailable_telemetry_fails_explicitly(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from clearml_yolo.adapters.runtime import gpu_resources
+
+    fake = _FakeNVML(uuids=("GPU-a",), used_memory=(_NotSupportedError("unsupported"),))
+    _install_nvml(monkeypatch, fake)
+    monkeypatch.setattr(gpu_resources, "_probe_visible_uuids", lambda: ("GPU-a",))
+    inventory = GPUInventory()
+    assert inventory.visible() == ("GPU-a",)
+    with pytest.raises(RuntimeError, match=r"GPU-a.*memory telemetry.*unsupported"):
+        inventory.snapshot()
+
+
+def test_visible_rejects_uuid_not_present_in_nvml_inventory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from clearml_yolo.adapters.runtime import gpu_resources
+
+    _install_nvml(monkeypatch, _FakeNVML(uuids=("GPU-a",), used_memory=(0,)))
+    monkeypatch.setattr(gpu_resources, "_probe_visible_uuids", lambda: ("GPU-missing",))
+    with pytest.raises(RuntimeError, match="could not be mapped"):
+        GPUInventory().visible()
+
+
+def test_reserved_scope_can_be_set_without_visibility_probe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = _FakeNVML(
+        uuids=("GPU-hidden", "GPU-reserved"),
+        used_memory=(_NotSupportedError("unsupported"), 1),
+    )
+    _install_nvml(monkeypatch, fake)
+    inventory = GPUInventory()
+    inventory.restrict_to(("GPU-reserved",))
+    hidden, reserved = inventory.snapshot()
+    assert hidden.telemetry_error
+    assert reserved == GPUDevice("GPU-reserved", False, 1, used_memory_bytes=1)
+
+
+def test_required_scope_rejects_duplicate_uuid() -> None:
+    with pytest.raises(ValueError, match="unique"):
+        GPUInventory().restrict_to(("GPU-a", "GPU-a"))
+
+
+def test_required_scope_rejects_uuid_outside_discovered_visibility(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from clearml_yolo.adapters.runtime import gpu_resources
+
+    fake = _FakeNVML(uuids=("GPU-a", "GPU-hidden"), used_memory=(0, 0))
+    _install_nvml(monkeypatch, fake)
+    monkeypatch.setattr(gpu_resources, "_probe_visible_uuids", lambda: ("GPU-a",))
+    inventory = GPUInventory()
+    inventory.visible()
+    with pytest.raises(ValueError, match="outside CUDA visibility"):
+        inventory.restrict_to(("GPU-hidden",))
+
+
+def test_required_gpu_missing_from_inventory_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_nvml(monkeypatch, _FakeNVML(uuids=("GPU-a",), used_memory=(0,)))
+    inventory = GPUInventory()
+    inventory.restrict_to(("GPU-missing",))
+    with pytest.raises(RuntimeError, match="Required GPUs unavailable"):
+        inventory.snapshot()
+
+
+def test_gpu_device_metadata_defaults_preserve_positional_construction() -> None:
+    device = GPUDevice("GPU-a", False)
+    assert device.physical_index is None
+    assert device.logical_index is None
+    assert device.used_memory_bytes is None
+    assert device.telemetry_error is None
+    with pytest.raises(FrozenInstanceError):
+        device.used_memory_bytes = 123  # type: ignore[misc]

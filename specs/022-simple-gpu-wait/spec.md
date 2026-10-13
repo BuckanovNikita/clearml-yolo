@@ -94,3 +94,31 @@ Acceptance: the supplied eight-card snapshot (1215, 3, 409, 3, 3, 3, 3, 3 MiB)
 qualifies all cards before visibility/reservations; three visible cards can be
 selected. Tests cover one byte below/equal/above the limit, custom fractional
 limits, malformed telemetry/configuration and different projects sharing the queue.
+
+## Amendment: forced selection and admission explanations (2026-10-12)
+
+- **FR-011**: Strict Boolean `autogpu.force`, default false, bypasses project discovery,
+  memory waiting and reservations regardless of enabled switches. Enabled GPU stages
+  require concrete unique selectors; reject null, empty, -1 and bare cuda. Preserve
+  configured order, inherited CUDA visibility and CPU/MPS support.
+- **FR-012**: Keep ClearML ownership and effective force provenance; replay cannot
+  change forced devices. Forced multiruns use sequential BasicLauncher. Reject mixed
+  effective queued/unqueued sweeps before admission, including across batches.
+- **FR-013**: Explain admission using CUDA selector indexes, including physical indexes
+  when different. Keep UUIDs internal. Show requested/visible/eligible counts, memory
+  threshold, queue position, memory and reservation blockers per card, visibility and
+  exact-selection exclusions. Distinguish FIFO from capacity; eligible remains eligible.
+- **FR-014**: Report initial decisions, reason changes and 30-second heartbeats with
+  throttling; small memory fluctuations alone must not repeat messages. Use the same
+  sampled telemetry and locked registry state as admission; format/log outside locks.
+- **FR-015**: Hidden cards with unsupported memory or MIG do not block healthy visible
+  cards; required unavailable telemetry fails explicitly. Exact parsing is consistent
+  for case/whitespace. Inventory and admission diagnostics are immutable; retain
+  `Ticket.try_acquire()` return compatibility.
+
+Acceptance covers five of eight eligible cards, reservations/FIFO and release, forced
+bypass with unavailable NVML, replay/order/routing/exported settings, threshold equality,
+hidden cards, reordered indexes, simultaneous blockers and refresh timing. Native CPU
+and available GPU acceptance are required; physical multi-GPU results remain separate.
+Forced-kill orphan recovery and permission-denied process inspection are separate
+follow-ups, outside this amendment. The actual reported waiting cause is unconfirmed.

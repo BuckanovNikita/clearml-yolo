@@ -12,6 +12,17 @@ Completed feature specifications, task ledgers and dated evidence preserve histo
 `queue.enabled` and `autogpu.enabled`, both defaulting to true. They are launch
 controls, not workflow or native model arguments.
 
+`autogpu.force` is a strict Boolean, default false. When true it overrides both
+enabled switches: execute directly with concrete native selectors, without project
+GPU discovery, NVML memory checks, queue tickets, reservations or waiting. Every
+enabled GPU stage requires unique nonnegative ordinals; null, empty, `-1` and bare
+`cuda` fail before native/task initialization. CPU/MPS remain supported. Parsing
+ignores case and surrounding whitespace; training device order and inherited
+CUDA visibility remain intact. Native backend device support still applies.
+ClearML remains required; `execution_policy.force=true`, `queue=false` and
+`autogpu=false` record the effective policy. Replay cannot change forced selections
+(including order) through either canonical run configuration or native General.
+
 `autogpu.max_used_memory_gib` is a finite positive numeric limit, default 2.0
 GiB (2048 MiB), configurable in project YAML or a Hydra override. Existing
 enabled-only configurations use that default. Booleans, strings, null, zero,
@@ -26,7 +37,7 @@ export uses `export.device`. CPU/FP32 ONNX generation has zero GPU demand. Engin
 and verification require one explicit GPU selector and reject CPU. Backend validation
 may reject unsupported multi-device execution without weakening scheduling guarantees.
 The [multi-model contract](../../025-multi-model-backends/contracts/backend.md) preserves
-all four modes below. Replay materializes typed defaults before remapping and may not
+all four modes below and the force override. Replay materializes typed defaults before remapping and may not
 switch between initialized YOLO and new-detector runtime families.
 
 | `queue.enabled` | `autogpu.enabled` | GPU behavior |
@@ -51,8 +62,10 @@ demand. There is no separate count setting or batch tuning.
 
 NVML inventory/memory telemetry and an isolated metadata probe map inherited CUDA
 visibility to whole-GPU UUIDs without initializing CUDA in the invoking process.
-Unknown telemetry fails closed; MIG, lost visibility and requests larger than the
-supported visible set fail clearly. A GPU is free exactly when total NVML used bytes
+Required-device telemetry fails closed; visible MIG, lost visibility and requests
+larger than the supported visible set fail clearly. Hidden cards with unsupported
+memory telemetry or MIG do not block healthy visible cards. Exact mode checks only
+the required selection; worker contraction checks its reserved devices. A GPU is free exactly when total NVML used bytes
 are below `autogpu.max_used_memory_gib * 1024**3`; equality is busy. This includes
 all allocations, including the invoking process and driver/graphics memory. Process
 presence and utilization do not affect eligibility. Selection keeps visibility order
@@ -98,8 +111,9 @@ Queued model multiruns use the distributed `hydra_plugins.cy_queue` launcher wit
 BasicSweeper. Submit in Hydra order; run admitted children concurrently as capacity
 permits. Preserve callbacks, job environment, output directory, configured chdir,
 ordered `JobReturn` results and nonzero failure outcomes. Queue-disabled multiruns
-use standard sequential BasicLauncher. A sweep mixing queue modes is rejected
-before admission. External/remote launchers, cross-host coordination, MIG, persistent
+and forced multiruns use standard sequential BasicLauncher. A sweep mixing effective
+queued and unqueued modes is rejected before admission, including across batches.
+A force sweep can mix raw queue switches when all jobs are effectively unqueued. External/remote launchers, cross-host coordination, MIG, persistent
 daemons and priority scheduling remain unsupported.
 
 Top-level launches with `LOCAL_RANK` other than `-1` require native owner provenance
@@ -109,3 +123,25 @@ A rank variable alone cannot suppress task ownership.
 
 The original remote hang remains unconfirmed. Scheduling restoration and bounded
 optional-publication failures do not establish its root cause.
+
+## Readable admission decisions
+
+Direct and queued waits emit requested, CUDA-visible and eligible counts and the
+effective memory threshold; queued decisions also include ticket and queue position.
+Each physical card is explained as eligible, at/above the memory threshold, reserved
+by another ticket, outside CUDA visibility or outside exact selection. Memory and
+reservation reasons can appear together. FIFO blocking and insufficient eligible
+capacity are separate job-level reasons; FIFO never changes an eligible card's label.
+
+Display CUDA selector indexes (`GPU 0`); when different, include the physical index
+(`GPU 0 (physical GPU 3)`). Hidden cards use physical indexes. UUIDs remain internal
+for reservations and replay, and in persisted provenance rather than normal messages.
+The initial decision and admission are printed, reason changes refresh at most once
+every five seconds, and stable waits emit a 30-second heartbeat. Small memory changes
+that do not change eligibility do not trigger messages.
+
+Immutable admission diagnostics use the same telemetry sample and locked registry
+view as admission. Sampling precedes the transaction; formatting/logging follows
+lock release. `Ticket.try_acquire()` still returns a UUID tuple or None, with its
+latest immutable diagnostics available separately. No second probe or position read
+is needed for presentation.

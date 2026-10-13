@@ -1,0 +1,245 @@
+{
+  "schema_version": 1,
+  "task": "022 force and readable admission amendment",
+  "scope": [
+    "src/clearml_yolo/core/execution.py",
+    "src/clearml_yolo/adapters/runtime/gpu_resources.py",
+    "src/clearml_yolo/adapters/runtime/gpu_scheduling.py",
+    "src/clearml_yolo/adapters/runtime/gpu_queue.py",
+    "src/clearml_yolo/adapters/runtime/gpu_wait.py",
+    "src/clearml_yolo/entrypoints/hydra/common.py",
+    "src/clearml_yolo/entrypoints/hydra/execution.py",
+    "src/hydra_plugins/cy_queue/launcher.py",
+    "tests",
+    "specs/022-simple-gpu-wait",
+    "specs/013-gpu-experiment-queue/contracts/queue-state.md",
+    "README.md",
+    "docs/project-contracts.md",
+    "docs/current-contracts.md",
+    "docs/diagnostics.md"
+  ],
+  "impact": "modules",
+  "rules": "AGENTS.md and docs/agent-workflow.md require inward imports, explicit SDK ownership, no core effects and executable target coverage; retain existing 40 import contracts.",
+  "modules": [
+    {
+      "id": "policy",
+      "path": "src/clearml_yolo/core/execution.py",
+      "change": "modify",
+      "responsibility": "SDK-free strict force and concrete selector validation",
+      "interface": "Preserve existing callers; add force and immutable diagnostics with explicit errors for unsupported required selectors/telemetry.",
+      "layer": "core",
+      "allowed_dependencies": [
+        "Existing inward core/application interfaces and layer-owned dependencies"
+      ],
+      "forbidden_dependencies": [
+        "Core imports of adapters or entrypoints",
+        "Native SDK imports outside owning adapters"
+      ],
+      "effects": "No effects; validate raw configuration and return normalized ordinal identities",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "inventory",
+      "path": "src/clearml_yolo/adapters/runtime/gpu_resources.py",
+      "change": "modify",
+      "responsibility": "Whole-device telemetry with visible scope and immutable metadata",
+      "interface": "Preserve existing callers; add force and immutable diagnostics with explicit errors for unsupported required selectors/telemetry.",
+      "layer": "runtime adapter",
+      "allowed_dependencies": [
+        "Existing inward core/application interfaces and layer-owned dependencies"
+      ],
+      "forbidden_dependencies": [
+        "Core imports of adapters or entrypoints",
+        "Native SDK imports outside owning adapters"
+      ],
+      "effects": "Own NVML and isolated CUDA discovery",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "scheduling",
+      "path": "src/clearml_yolo/adapters/runtime/gpu_scheduling.py",
+      "change": "modify",
+      "responsibility": "Effective switches and exact identities",
+      "interface": "Preserve existing callers; add force and immutable diagnostics with explicit errors for unsupported required selectors/telemetry.",
+      "layer": "runtime adapter",
+      "allowed_dependencies": [
+        "Existing inward core/application interfaces and layer-owned dependencies"
+      ],
+      "forbidden_dependencies": [
+        "Core imports of adapters or entrypoints",
+        "Native SDK imports outside owning adapters"
+      ],
+      "effects": "No new effects; consume core policy",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "queue",
+      "path": "src/clearml_yolo/adapters/runtime/gpu_queue.py",
+      "change": "modify",
+      "responsibility": "Atomic FIFO reservations and immutable decision snapshots",
+      "interface": "Preserve existing callers; add force and immutable diagnostics with explicit errors for unsupported required selectors/telemetry.",
+      "layer": "runtime adapter",
+      "allowed_dependencies": [
+        "Existing inward core/application interfaces and layer-owned dependencies"
+      ],
+      "forbidden_dependencies": [
+        "Core imports of adapters or entrypoints",
+        "Native SDK imports outside owning adapters"
+      ],
+      "effects": "Own locked registry transactions; sample driver outside lock, format/log outside lock",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "wait",
+      "path": "src/clearml_yolo/adapters/runtime/gpu_wait.py",
+      "change": "modify",
+      "responsibility": "Poll direct GPU availability and publish immutable decision data through an optional callback",
+      "interface": "Preserve existing callers; add force and immutable diagnostics with explicit errors for unsupported required selectors/telemetry.",
+      "layer": "runtime adapter",
+      "allowed_dependencies": [
+        "Existing inward core/application interfaces and layer-owned dependencies"
+      ],
+      "forbidden_dependencies": [
+        "Core imports of adapters or entrypoints",
+        "Native SDK imports outside owning adapters"
+      ],
+      "effects": "Own telemetry polling and sleep; presentation is injected by Hydra and never imported from this adapter",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "owner",
+      "path": "src/clearml_yolo/entrypoints/hydra/common.py",
+      "change": "modify",
+      "responsibility": "Forced bypass, provenance and replay protection",
+      "interface": "Preserve existing callers; add force and immutable diagnostics with explicit errors for unsupported required selectors/telemetry.",
+      "layer": "entrypoint",
+      "allowed_dependencies": [
+        "Existing inward core/application interfaces and layer-owned dependencies"
+      ],
+      "forbidden_dependencies": [
+        "Core imports of adapters or entrypoints",
+        "Native SDK imports outside owning adapters"
+      ],
+      "effects": "Own Hydra/ClearML invocation orchestration",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "supervisor",
+      "path": "src/clearml_yolo/entrypoints/hydra/execution.py",
+      "change": "modify",
+      "responsibility": "Compose admission, format readable decisions and throttle direct/queued reports outside locks",
+      "interface": "Preserve existing callers; add force and immutable diagnostics with explicit errors for unsupported required selectors/telemetry.",
+      "layer": "entrypoint",
+      "allowed_dependencies": [
+        "Existing inward core/application interfaces and layer-owned dependencies"
+      ],
+      "forbidden_dependencies": [
+        "Core imports of adapters or entrypoints",
+        "Native SDK imports outside owning adapters"
+      ],
+      "effects": "Own child launch, environment and cleanup; reuse runtime diagnostics",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "imports",
+      "path": "pyproject.toml",
+      "status": "existing",
+      "rules": "Existing layer, core independence, runtime ownership and plugin contracts",
+      "check": "imports"
+    },
+    {
+      "id": "architecture",
+      "path": "tests/test_architecture.py",
+      "status": "existing",
+      "rules": "Exhaustive source classification, effect and SDK ownership, dynamic targets and prohibited-edge negative cases",
+      "check": "architecture"
+    }
+  ],
+  "checks": [
+    {
+      "id": "imports",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync lint-imports",
+      "expectation": "All import contracts pass",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/022-simple-gpu-wait/verification-force.md"
+      }
+    },
+    {
+      "id": "architecture",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync pytest tests/test_architecture.py",
+      "expectation": "Architecture suite and negative dependency cases pass",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/022-simple-gpu-wait/verification-force.md"
+      }
+    },
+    {
+      "id": "behavior",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync pytest tests/test_gpu_resources.py tests/test_gpu_queue.py tests/test_gpu_wait.py tests/test_gpu_scheduling.py tests/test_gpu_execution.py tests/test_gpu_supervision.py tests/test_hydra_queue_launcher.py tests/test_execution_controls.py tests/test_gpu_force.py tests/test_gpu_decisions.py tests/test_gpu_memory_wiring.py tests/test_direct_execution.py tests/test_model_scheduling.py",
+      "expectation": "Force, admission, immutable telemetry and diagnostic/routing regressions pass",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/022-simple-gpu-wait/verification-force.md"
+      }
+    },
+    {
+      "id": "quality",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync ruff check . && uv run --frozen --no-sync mypy .",
+      "expectation": "Ruff and mypy pass",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/022-simple-gpu-wait/verification-force.md"
+      }
+    },
+    {
+      "id": "documentation",
+      "kind": "documentation",
+      "command": "uv run --frozen --no-sync python - (MarkdownIt parse, local link/anchor and whitespace validation; six generated command defaults/force examples)",
+      "expectation": "Changed Markdown links and documented selectors compose successfully",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/022-simple-gpu-wait/verification-force.md"
+      }
+    }
+  ],
+  "documentation": "README Russian force example; execution and queue contracts; project/current summaries; diagnostics and GPU quickstart; dated evidence. Launcher implementation is reused unchanged via effective execution_controls; launcher tests cover routing.",
+  "review": {
+    "status": "accepted",
+    "reviewer": "Fresh independent native subagent final_review (read-only; implementation ship verdict)",
+    "evidence": "specs/022-simple-gpu-wait/verification-force.md",
+    "reconciliation": "Reviewed all seven changed runtime source files, new/changed tests, feature artifacts and maintained documentation. No additions/deletions/renames of production modules or dependency changes. Launcher source is reused unchanged through effective controls. Preserved unrelated static-analysis edits byte-for-byte; excluded original gpu_queue WorkerClaim cleanup and memory-wiring fixture cleanups while reviewing task-owned hunks. Core validation, runtime effects and Hydra presentation match the final diff. This is implementation/architecture acceptance only: fresh ClearML server status/policy/artifact-download readback and release remain open (T027/T030), as explicitly recorded in dated evidence."
+  }
+}
