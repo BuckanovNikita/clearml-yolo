@@ -205,3 +205,43 @@ and single-GPU queued train-to-predict runs repeated successfully; downloaded mo
 and CSV readback checks passed, the GPU registry was empty, and tagged resources were
 removed. Documentation parsing/local links and structural architecture acceptance
 passed. Full commit hooks and 0.26.2 distribution checks remain pending at this point.
+
+## Final 0.26.2 acceptance — 2026-10-13
+
+The cancellation release is based on committed upstream `95f07e1`. Source commit
+`6e7b7a730326f829337e259673cd1d830bdd54c4` and version commit `04fc8e95171fd2b2198430ddcc4b191a371a97b5`
+passed their normal hooks; the annotated tag is `v0.26.2`. This supersedes the
+unpublished local 0.26.1 candidate for publication, without rewriting its evidence.
+
+| Current gate | Result |
+| --- | --- |
+| Source commit full suite | 2296 passed, 30 skipped; normal hooks passed. |
+| Version commit full suite | 2296 passed, 30 skipped; normal hooks passed. |
+| Fresh wheel installation | 790 checks, all 11 CLI help commands and 157 source-file byte comparisons passed; uv pip check passed. |
+| Fresh sdist installation | 790 checks, all 11 CLI help commands and 157 source-file byte comparisons passed; uv pip check passed. |
+| Static and architecture | Ruff, mypy (286 files), Vulture and 40 import contracts passed without weakening the newer policy; architecture checks passed within the full suite. |
+| Native CPU and single-GPU | Queued train-to-predict, downloaded model/artifact checks and empty GPU registry passed; tagged projects/tasks removed. |
+| Independent integration review | Fresh review of the final integrated candidate approved publication subject to completed release gates. |
+
+The source and tests retain the previously reviewed cancellation bytes. The current
+baseline already contains the separate static-analysis release; the task-owned diff
+adds only the seven cancellation paths, six bug records and generated release metadata.
+Parsed project/lock metadata changes only the root version from the new base. Approved
+dependency sources and upstream work are preserved, including the current Vulture gate.
+The local uv overrides remain outside release commits.
+
+The 30 skipped checks are the isolated FiftyOne/database cases and an unsupported
+filesystem reflink operation; they are not counted as passes. Physical multi-GPU
+CUDA/NCCL cancellation on the user's remote host remains unverified. The earlier
+capacity failure and isolated interpreter abort remain historical failed attempts;
+no hook, code path or dependency was altered to hide either failure.
+
+Local distribution SHA-256 values:
+
+- `clearml_yolo-0.26.2-py3-none-any.whl`: `59483d280563d24a4a9da4b1c85c6dfd4f2b36c7d87912dcc0dd81184bf28c03`
+- `clearml_yolo-0.26.2.tar.gz`: `7000c8bb4280ca97f19a6b04be141fede03d349b9321cea93ec95b9449207bf5`
+
+Documentation parsing/local-link checks and architecture acceptance are rerun after
+this evidence update. Explicit branch/tag publication and original-workspace preservation
+are checked by remote readback and byte-level receipts after this acceptance commit.
+No GitHub Release object, registry publication or package upload is performed.

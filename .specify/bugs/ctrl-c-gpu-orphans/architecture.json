@@ -124,8 +124,8 @@
     {
       "id": "static",
       "kind": "behavior",
-      "command": "UV_NO_SYNC=1 uv run ruff check .; UV_NO_SYNC=1 uv run mypy .",
-      "expectation": "Released lint and type checks pass; unrelated static-analysis additions are excluded.",
+      "command": "UV_NO_SYNC=1 uv run ruff check .; UV_NO_SYNC=1 uv run mypy .; UV_NO_SYNC=1 uv run --locked --no-sync vulture",
+      "expectation": "Current baseline lint, typing and dead-code checks pass without relaxing policy.",
       "result": {
         "status": "passed",
         "exit_code": 0,
@@ -147,8 +147,8 @@
   "documentation": "Update runtime-isolation and maintained GPU execution cancellation guidance; retain historical evidence. Record remote reproduction and release limits in bug evidence. Update README cancellation instructions in Russian and adapt the existing supervisor attachment test to the private ownership argument.",
   "review": {
     "status": "accepted",
-    "reviewer": "fresh native read-only subagent /root/review_corrected_release; independent scope/integration review /root/release_scope_check",
+    "reviewer": "fresh native read-only integration reviewer /root/review_v0262_base; prior ownership and scope reviewers retained in review.md",
     "evidence": ".specify/bugs/ctrl-c-gpu-orphans/review.md",
-    "reconciliation": "Inspected all seven owned implementation/test/contract paths, six bug records and release metadata. The final stdlib ownership adapter, Hydra lease ordering, PID/marker discovery, bounded signal handling and regressions match the documented module responsibilities. Existing import contracts and negative-edge checks passed without relaxation. No deleted/renamed modules, new dependencies or dynamic targets. Root project/lock version and generated changelog are metadata-only changes. All source/version/recovery hooks, native CPU and single-GPU checks, and both installed distributions passed. Unrelated work and local dependency overrides are excluded; remote physical multi-GPU cancellation remains unverified. Remote publication is checked separately after this local acceptance record."
+    "reconciliation": "Final integrated diff from 95f07e1 contains exactly the seven cancellation-owned implementation/test/contract paths, six bug records, generated changelog and root-only project/lock version changes. Runtime and test bytes match the previously reviewed candidate; none overlapped the intervening upstream release. Existing dependency and architecture contracts pass unchanged, including the newer Vulture/tooling gates. Source/version hooks, native CPU and single-GPU execution, fresh wheel/sdist installations and documentation checks passed. Dependencies and local source overrides are preserved. Physical remote multi-GPU cancellation remains unverified; remote publication is checked separately."
   }
 }

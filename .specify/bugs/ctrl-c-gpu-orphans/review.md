@@ -55,3 +55,22 @@ Native artifact/checkpoint hashes, 6/108 row counts, ticket release and zero tag
 resources matched the retained readbacks. No release-blocking findings remained.
 The final tag hook and local acceptance are recorded in [release.md](release.md);
 remote publication is checked separately after this record.
+
+## Fresh 0.26.2 integration review — 2026-10-13
+
+`/root/review_v0262_base` returned **SHIP**, conditional on remaining release gates,
+with no blocking code, integration, architecture or scope findings. The read-only
+review independently confirmed the seven owned paths, six bug records and three
+release metadata paths, no upstream overlap, all four source/test hashes, root-only
+metadata version changes and clean approved dependency revisions.
+
+It inspected the 2296-pass/30-skip source suite, including 18 cancellation and 94
+architecture cases. Both packages passed 790 checks; all 157 Python files in each
+archive matched the source. Native artifact/checkpoint bytes matched the readbacks,
+the GPU registry was empty, and tagged-resource cleanup was confirmed. Independent
+whitespace, architecture and Markdown checks passed, including 44 local links/anchors.
+The version hook/tag and final evidence update were still pending at review time;
+[release.md](release.md) records their subsequent acceptance. Remote publication and
+workspace preservation are checked separately. Physical remote multi-GPU cancellation
+and the cause of the historical SIGILL remain unverified. No repository edits or
+additional test-suite/native runs were performed by the reviewer.
