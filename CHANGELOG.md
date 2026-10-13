@@ -1,12 +1,17 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.27.0 (2026-10-13)
 
 ### Documentation
 
 - Record verified cancellation release 0.26.2
   ([`f342471`](https://github.com/BuckanovNikita/clearml-yolo/commit/f342471eba0adf79328e06901527dfbc75f29aa5))
+
+### Features
+
+- Separate direct execution and add shared GPU queue
+  ([`31a5bd5`](https://github.com/BuckanovNikita/clearml-yolo/commit/31a5bd5edc2fe122791005526ae747e7fe5b0401))
 
 
 ## v0.26.2 (2026-10-13)
