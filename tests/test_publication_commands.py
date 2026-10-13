@@ -18,6 +18,17 @@ from workflow_dependencies import (
 )
 
 
+@pytest.fixture(autouse=True)
+def isolate_fake_cli_and_console(monkeypatch: pytest.MonkeyPatch) -> None:
+    """These invocation tests provide their own composed config and fake SDK task."""
+    from clearml_yolo.entrypoints.hydra import common
+
+    monkeypatch.setattr(common, "validate_launch_arguments", lambda name: None)
+    monkeypatch.setattr(
+        "clearml_yolo.adapters.clearml.session._start_console_publisher", lambda *_args: None
+    )
+
+
 def test_worker_publication_is_disabled_without_reading_task_identity(
     tmp_path: Path, workflow_dependencies: WorkflowDependencies
 ) -> None:
@@ -288,7 +299,6 @@ def test_remote_clone_replays_canonical_run_and_general(
         monkeypatch, workflow_dependencies, common, "initialize_naming", lambda _task: None
     )
     patch_workflow(monkeypatch, workflow_dependencies, common, "replay_configuration", replay)
-    config["queue"] = {"enabled": False}
     monkeypatch.setattr(
         "clearml_yolo.adapters.clearml.session.record_run_configuration", lambda *args: None
     )
@@ -410,7 +420,6 @@ def test_remote_clone_does_not_replay_previous_owner_output_route(
     patch_workflow(
         monkeypatch, workflow_dependencies, training, "_execute_training", execute_training
     )
-    config["queue"] = {"enabled": False}
     monkeypatch.setattr(
         "clearml_yolo.adapters.clearml.session.record_run_configuration", lambda *args: None
     )
@@ -446,6 +455,8 @@ def test_current_save_dir_override_reaches_pipeline_conflict_validation(
     from clearml_yolo.entrypoints.hydra import common
     from native_config_helpers import training_settings
 
+    if save_dir is not None:
+        save_dir = str(tmp_path / save_dir)
     config = OmegaConf.create(
         {
             "clearml": {},
@@ -496,7 +507,6 @@ def test_current_save_dir_override_reaches_pipeline_conflict_validation(
         "replay_configuration",
         lambda _task, values: values,
     )
-    config["queue"] = {"enabled": False}
     monkeypatch.setattr(
         "clearml_yolo.adapters.clearml.session.record_run_configuration", lambda *args: None
     )

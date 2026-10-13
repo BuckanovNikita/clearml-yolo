@@ -50,8 +50,10 @@ cy-val = "clearml_yolo.entrypoints.val:main"
 cy-export = "clearml_yolo.entrypoints.export:main"
 cy-init-config = "clearml_yolo.entrypoints.config_tree:main"
 cy-dedup = "clearml_yolo.entrypoints.dedup:main"
+cy-queue = "clearml_yolo.entrypoints.queue:main"
 
 [project.optional-dependencies]
+queue-ui = ["textual>=0.89"]
 detectors = [
     "calflops>=0.3.2",
     "faster-coco-eval==1.8.0",
@@ -73,7 +75,7 @@ requires = ["uv_build>=0.11.32,<0.12.0"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
-module-name = ["clearml_yolo", "hydra_plugins.cy_queue"]
+module-name = ["clearml_yolo"]
 
 [dependency-groups]
 dev = [
@@ -206,7 +208,7 @@ known-first-party = ["clearml_yolo"]
 max-complexity = 10
 
 [tool.importlinter]
-root_packages = ["clearml_yolo", "hydra_plugins.cy_queue"]
+root_packages = ["clearml_yolo"]
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
@@ -243,6 +245,7 @@ modules = [
     "clearml_yolo.entrypoints.metrics",
     "clearml_yolo.entrypoints.pipeline",
     "clearml_yolo.entrypoints.predict",
+    "clearml_yolo.entrypoints.queue",
     "clearml_yolo.entrypoints.report",
     "clearml_yolo.entrypoints.train",
     "clearml_yolo.entrypoints.val",
@@ -293,6 +296,7 @@ forbidden_modules = ["clearml"]
 allow_indirect_imports = true
 ignore_imports = [
     "clearml_yolo.adapters.clearml.detectors -> clearml",
+    "clearml_yolo.adapters.clearml.console_worker -> clearml",
     "clearml_yolo.adapters.clearml.models -> clearml",
     "clearml_yolo.adapters.clearml.naming -> clearml",
     "clearml_yolo.adapters.clearml.native -> clearml",
@@ -363,8 +367,9 @@ ignore_imports = [
     "clearml_yolo.entrypoints.hydra.common -> hydra",
     "clearml_yolo.entrypoints.hydra.config_tree -> hydra",
     "clearml_yolo.entrypoints.hydra.configs -> hydra",
-    "clearml_yolo.entrypoints.hydra.execution -> hydra",
-    "clearml_yolo.entrypoints.hydra.worker -> hydra",
+    "clearml_yolo.entrypoints.hydra.queue_config -> hydra",
+    "clearml_yolo.entrypoints.hydra.sweeps -> hydra",
+    "clearml_yolo.entrypoints.hydra.validation -> hydra",
 ]
 
 [[tool.importlinter.contracts]]
@@ -375,6 +380,7 @@ forbidden_modules = ["hydra_zen"]
 allow_indirect_imports = true
 ignore_imports = [
     "clearml_yolo.entrypoints.hydra.common -> hydra_zen",
+    "clearml_yolo.entrypoints.hydra.queue_config -> hydra_zen",
     "clearml_yolo.entrypoints.hydra.config_tree -> hydra_zen",
     "clearml_yolo.entrypoints.hydra.configs -> hydra_zen",
 ]
@@ -390,9 +396,9 @@ ignore_imports = [
     "clearml_yolo.entrypoints.hydra.config_resolution -> omegaconf",
     "clearml_yolo.entrypoints.hydra.config_tree -> omegaconf",
     "clearml_yolo.entrypoints.hydra.configs -> omegaconf",
-    "clearml_yolo.entrypoints.hydra.execution -> omegaconf",
+    "clearml_yolo.entrypoints.hydra.queue_config -> omegaconf",
+    "clearml_yolo.entrypoints.hydra.sweeps -> omegaconf",
     "clearml_yolo.entrypoints.hydra.validation -> omegaconf",
-    "clearml_yolo.entrypoints.hydra.worker -> omegaconf",
 ]
 
 [[tool.importlinter.contracts]]
@@ -442,6 +448,9 @@ forbidden_modules = [
     "clearml_yolo.adapters.yolo",
 ]
 allow_indirect_imports = true
+ignore_imports = [
+    "clearml_yolo.adapters.observability.capture -> clearml_yolo.adapters.runtime.bootstrap",
+]
 
 [[tool.importlinter.contracts]]
 name = "yolo adapter peer ownership"
@@ -562,8 +571,6 @@ forbidden_modules = [
 ]
 allow_indirect_imports = true
 ignore_imports = [
-    "clearml_yolo.adapters.runtime.gpu_runtime -> clearml_yolo.adapters.clearml.session",
-    "clearml_yolo.adapters.runtime.gpu_runtime -> clearml_yolo.adapters.integrations.native_runtime",
 ]
 
 [[tool.importlinter.contracts]]
@@ -597,6 +604,7 @@ ignore_imports = [
     "clearml_yolo.adapters.integrations.export_operations -> clearml_yolo.adapters.fasterrcnn.configuration",
     "clearml_yolo.adapters.integrations.export_operations -> clearml_yolo.adapters.fasterrcnn.model",
     "clearml_yolo.adapters.integrations.native_ddp -> clearml_yolo.adapters.clearml.session",
+    "clearml_yolo.adapters.integrations.native_ddp -> clearml_yolo.adapters.clearml.deadline",
     "clearml_yolo.adapters.integrations.native_runtime -> clearml_yolo.adapters.clearml.session",
     "clearml_yolo.adapters.integrations.native_runtime -> clearml_yolo.adapters.runtime.bootstrap",
     "clearml_yolo.adapters.integrations.training -> clearml_yolo.adapters.clearml.native",
@@ -632,6 +640,11 @@ forbidden_modules = [
 ]
 allow_indirect_imports = true
 
+# Exact read-only containment helper; other storage effects remain forbidden.
+ignore_imports = [
+    "clearml_yolo.adapters.deim.backend -> clearml_yolo.adapters.storage.filesystem",
+]
+
 [[tool.importlinter.contracts]]
 name = "rfdetr adapter peer ownership"
 type = "forbidden"
@@ -651,6 +664,11 @@ forbidden_modules = [
 ]
 allow_indirect_imports = true
 
+# Exact read-only containment helper; other storage effects remain forbidden.
+ignore_imports = [
+    "clearml_yolo.adapters.rfdetr.backend -> clearml_yolo.adapters.storage.filesystem",
+]
+
 [[tool.importlinter.contracts]]
 name = "fasterrcnn adapter peer ownership"
 type = "forbidden"
@@ -669,6 +687,11 @@ forbidden_modules = [
     "clearml_yolo.adapters.export",
 ]
 allow_indirect_imports = true
+
+# Exact read-only containment helper; other storage effects remain forbidden.
+ignore_imports = [
+    "clearml_yolo.adapters.fasterrcnn.training -> clearml_yolo.adapters.storage.filesystem",
+]
 
 [[tool.importlinter.contracts]]
 name = "export adapter peer ownership"
@@ -691,6 +714,10 @@ allow_indirect_imports = true
 # The ONNX bridge imports its native model lazily; AST graph tests check that edge.
 unmatched_ignore_imports_alerting = "none"
 ignore_imports = [
+    "clearml_yolo.adapters.export.build -> clearml_yolo.adapters.storage.filesystem",
+    "clearml_yolo.adapters.export.metadata -> clearml_yolo.adapters.storage.filesystem",
+    "clearml_yolo.adapters.export.onnx -> clearml_yolo.adapters.storage.filesystem",
+    "clearml_yolo.adapters.export.verification -> clearml_yolo.adapters.storage.filesystem",
     "clearml_yolo.adapters.export.onnx -> clearml_yolo.adapters.fasterrcnn.model",
     "clearml_yolo.adapters.export.verification -> clearml_yolo.adapters.fasterrcnn.model",
     "clearml_yolo.adapters.export.verification -> clearml_yolo.adapters.storage.dataset_records",
@@ -799,14 +826,14 @@ name = "Exhaustive adapter responsibility classification"
 type = "layers"
 containers = ["clearml_yolo.adapters"]
 # Peers share a classification level; the peer contracts enforce their allowed edges.
-layers = ["storage:observability:yolo:evaluation:reporting:clearml:fiftyone:runtime:integrations:deim:rfdetr:fasterrcnn:export"]
+layers = ["storage:observability:yolo:evaluation:reporting:clearml:fiftyone:runtime:integrations:deim:rfdetr:fasterrcnn:export:queue"]
 exhaustive = true
 
 [[tool.importlinter.contracts]]
 name = "Exhaustive application classification"
 type = "layers"
 containers = ["clearml_yolo.application"]
-layers = ["use_cases", "evaluation", "ports", "contracts"]
+layers = ["use_cases", "evaluation", "queue", "ports", "contracts"]
 exhaustive = true
 
 [tool.mypy]
@@ -879,3 +906,23 @@ exclude_commit_patterns = ['^chore\(release\):']
 changelog_file = "CHANGELOG.md"
 output_format = "md"
 mask_initial_release = false
+
+[[tool.importlinter.contracts]]
+name = "Direct execution never imports scheduling or Textual"
+type = "forbidden"
+source_modules = ["clearml_yolo.entrypoints.pipeline", "clearml_yolo.entrypoints.train", "clearml_yolo.entrypoints.predict", "clearml_yolo.entrypoints.val", "clearml_yolo.entrypoints.compare", "clearml_yolo.entrypoints.export", "clearml_yolo.entrypoints.metrics", "clearml_yolo.entrypoints.report", "clearml_yolo.entrypoints.ground_truth", "clearml_yolo.entrypoints.hydra.common", "clearml_yolo.entrypoints.composition"]
+forbidden_modules = ["clearml_yolo.adapters.queue", "clearml_yolo.application.queue", "clearml_yolo.core.queue", "textual"]
+
+[[tool.importlinter.contracts]]
+name = "Scheduling has no model tracking or Hydra SDK dependency"
+type = "forbidden"
+source_modules = ["clearml_yolo.core.queue", "clearml_yolo.application.queue", "clearml_yolo.adapters.queue"]
+forbidden_modules = ["torch", "ultralytics", "clearml", "hydra", "hydra_zen", "omegaconf", "textual"]
+
+[[tool.importlinter.contracts]]
+name = "Textual is owned only by the optional queue UI"
+type = "forbidden"
+source_modules = ["clearml_yolo"]
+forbidden_modules = ["textual"]
+allow_indirect_imports = true
+ignore_imports = ["clearml_yolo.entrypoints.queue_tui -> textual"]

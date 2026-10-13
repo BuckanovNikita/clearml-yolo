@@ -304,6 +304,9 @@ def test_visualization_failure_allows_clearml_task_completion(
     from clearml_yolo.core.publication import FiftyOneConfig
     from test_clearml_session import FakeTask
 
+    monkeypatch.setattr(
+        "clearml_yolo.adapters.clearml.session._start_console_publisher", lambda *_args: None
+    )
     task = FakeTask()
     patch_workflow(monkeypatch, workflow_dependencies, clearml.Task, "init", lambda **_kwargs: task)
     patch_workflow(

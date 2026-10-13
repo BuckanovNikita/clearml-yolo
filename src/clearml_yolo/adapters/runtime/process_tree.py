@@ -1,16 +1,21 @@
 """Linux invocation ownership across native children that start new sessions."""
 
+import ctypes
 import os
 import signal
 import sys
 import threading
-from collections.abc import Iterator
+import time
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
 from types import FrameType
+from typing import override
+from uuid import uuid4
 
 OWNER_ENV = "CY_MODEL_PROCESS_OWNER"
+DIRECT_OWNER_ENV = "CY_DIRECT_MODEL_PROCESS_OWNER"
 
 
 @dataclass(frozen=True)
@@ -20,6 +25,10 @@ class _Process:
     session: int
     born: int
     state: str
+
+
+class UnverifiableProcessTreeError(RuntimeError):
+    """A fresh scan cannot currently rule out owned living processes."""
 
 
 def _read_process(pid: int) -> _Process | None:
@@ -37,15 +46,39 @@ class LinuxProcessTree:
     malicious same-user processes. Environment bytes are never retained or logged.
     """
 
-    def __init__(self, root: int, token: str | None = None) -> None:
+    def __init__(
+        self,
+        root: int,
+        token: str | None = None,
+        *,
+        born: int | None = None,
+        identities: Mapping[int, int] | None = None,
+        owner_env: str = OWNER_ENV,
+        excluded: Mapping[int, int] | None = None,
+    ) -> None:
         self.root = root
-        self._marker = f"{OWNER_ENV}={token}".encode() if token is not None else None
+        self._marker = f"{owner_env}={token}".encode() if token is not None else None
+        self._excluded = dict(excluded or {})
         initial = _read_process(root)
-        self._born = initial.born if initial is not None else None
-        self._identities = {root: initial.born} if initial is not None else {}
+        self._born = born if born is not None else initial.born if initial is not None else None
+        self._identities = dict(identities) if identities is not None else {}
+        if self._born is not None:
+            self._identities[root] = self._born
         self._unreadable: set[int] = set()
         self._scan_changed = False
         self._snapshot: frozenset[tuple[int, int, bool]] = frozenset()
+
+    @property
+    def identities(self) -> tuple[tuple[int, int], ...]:
+        """Persist known births so recovery never adopts replacement processes."""
+        self._owned()
+        return tuple(sorted(self._identities.items()))
+
+    def adopt_children(self, parent: int) -> None:
+        """A subreaper may retain descendants adopted after their parent exits."""
+        for process in self._table().values():
+            if process.parent == parent:
+                self._identities[process.pid] = process.born
 
     def _table(self) -> dict[int, _Process]:
         table: dict[int, _Process] = {}
@@ -73,6 +106,7 @@ class LinuxProcessTree:
         if (
             self._marker is None
             or process.state == "Z"
+            or self._excluded.get(process.pid) == process.born
             or (self._born is not None and process.born < self._born)
         ):
             return False
@@ -83,8 +117,7 @@ class LinuxProcessTree:
             self._scan_changed = True
             return False
         except PermissionError:
-            # Exiting processes can deny environ access after the earlier stat read.
-            # Only confirmed exit clears uncertainty; a live replacement is unknown.
+            # Exit can deny environ after stat. A live replacement is still unknown.
             try:
                 current = _read_process(process.pid)
             except PermissionError:
@@ -100,22 +133,8 @@ class LinuxProcessTree:
             return False
         return self._marker in environment.split(b"\0")
 
-    def _extend_unmarked_owners(self, owners: set[int], table: dict[int, _Process]) -> None:
-        # Compatibility for private callers without launch provenance. Supervised
-        # jobs always use a marker: numeric ancestry alone can race with PID reuse.
-        leader = table.get(self.root)
-        root_matches = self._born is not None and (leader is None or leader.born == self._born)
-        changed = True
-        while changed:
-            changed = False
-            for process in table.values():
-                if process.pid not in owners and (
-                    process.parent in owners or (root_matches and process.session == self.root)
-                ):
-                    owners.add(process.pid)
-                    changed = True
-
-    def _owned(self) -> list[_Process]:
+    def _begin_scan(self) -> dict[int, _Process]:
+        """Share discovery churn and snapshots with native ownership overrides."""
         self._unreadable.clear()
         self._scan_changed = False
         table = self._table()
@@ -124,6 +143,10 @@ class LinuxProcessTree:
             for process in table.values()
             if self._born is None or process.born >= self._born
         )
+        return table
+
+    def _known_owners(self, table: Mapping[int, _Process]) -> set[int]:
+        """Revalidate recorded births before using an earlier discovery snapshot."""
         owners: set[int] = set()
         for pid, born in self._identities.items():
             if pid not in table or table[pid].born != born:
@@ -137,12 +160,38 @@ class LinuxProcessTree:
                     owners.add(pid)
                 elif current != table[pid]:
                     self._scan_changed = True
+        return owners
+
+    def _extend_unmarked_owners(self, owners: set[int], table: Mapping[int, _Process]) -> None:
+        # Only private callers without launch provenance use numeric ancestry.
+        # Marker jobs must not adopt children of a root replaced after discovery.
+        # A session ID remains reserved while its children survive the leader.
+        # Reject a replacement leader instead of adopting a reused root PID.
+        leader = table.get(self.root)
+        root_matches = self._born is not None and (leader is None or leader.born == self._born)
+        changed = True
+        while changed:
+            changed = False
+            for process in table.values():
+                if process.pid not in owners and (
+                    process.parent in owners or (root_matches and process.session == self.root)
+                ):
+                    owners.add(process.pid)
+                    changed = True
+
+    def _owned(self) -> list[_Process]:
+        table = self._begin_scan()
+        owners = self._known_owners(table)
         owners.update(process.pid for process in table.values() if self._marked(process))
         if self._marker is None:
             self._extend_unmarked_owners(owners, table)
         for pid in owners:
             self._identities[pid] = table[pid].born
-        return [table[pid] for pid in owners if table[pid].state != "Z"]
+        return [
+            table[pid]
+            for pid in owners
+            if table[pid].state != "Z" and self._excluded.get(pid) != table[pid].born
+        ]
 
     def signal(self, signum: signal.Signals) -> None:
         """Signal confirmed identities, descendants before their direct worker."""
@@ -160,12 +209,12 @@ class LinuxProcessTree:
                 os.close(descriptor)
 
     def running(self) -> bool:
-        """Require two stable empty scans so late forks cannot disappear between scans."""
+        """Require two stable empty scans so late forks cannot vanish between scans."""
         snapshots: list[frozenset[tuple[int, int, bool]]] = []
         for _ in range(2):
             alive = self._owned()
             if self._unreadable:
-                raise RuntimeError(
+                raise UnverifiableProcessTreeError(
                     "Cannot verify model process cleanup: /proc access denied for PIDs "
                     f"{sorted(self._unreadable)}; GPU lease remains owned"
                 )
@@ -173,6 +222,31 @@ class LinuxProcessTree:
                 return True
             snapshots.append(self._snapshot)
         return snapshots[0] != snapshots[1]
+
+    def terminate(self, *, adopted_parent: int | None = None) -> None:
+        """Allow transient /proc denial within a bounded complete-verification barrier."""
+        with defer_interruptions():
+            if adopted_parent is not None:
+                self.adopt_children(adopted_parent)
+            self.signal(signal.SIGTERM)
+            graceful = time.monotonic() + 2
+            deadline = graceful + 8
+            while True:
+                if adopted_parent is not None:
+                    self.adopt_children(adopted_parent)
+                verification_error: UnverifiableProcessTreeError | None = None
+                try:
+                    if not self.running():
+                        return
+                except UnverifiableProcessTreeError as error:
+                    verification_error = error
+                if time.monotonic() >= deadline:
+                    if verification_error is not None:
+                        raise verification_error
+                    raise RuntimeError("Owned descendants survived bounded cleanup")
+                if time.monotonic() >= graceful:
+                    self.signal(signal.SIGKILL)
+                time.sleep(0.05)
 
 
 @contextmanager
@@ -203,3 +277,262 @@ def defer_interruptions() -> Iterator[None]:
             handler(signum, None)
         elif handler == signal.SIG_DFL:
             raise SystemExit(128 + signum)
+
+
+def process_ticks() -> int:
+    """Earliest possible Linux birth tick for descendants launched after this point."""
+    uptime = float(Path("/proc/uptime").read_text(encoding="ascii").split()[0])
+    return int(uptime * os.sysconf("SC_CLK_TCK"))
+
+
+_fork_writers: list[int] = []
+_fork_callback_registered: list[bool] = []
+
+
+def _record_native_fork() -> None:
+    """Python fork callbacks run before child code, including a second fork."""
+    if not _fork_writers:
+        return
+    process = _read_process(os.getpid())
+    if process is not None:
+        record = f"{process.pid} {process.born}\n".encode("ascii")
+        for descriptor in _fork_writers:
+            # Overflow or a closed parent's pipe leaves ancestry unverified;
+            # cleanup must then use its conservative unknown-child rule.
+            with suppress(OSError):
+                os.write(descriptor, record)
+
+
+def _subreaper(enabled: bool | None = None) -> bool:
+    libc = ctypes.CDLL(None, use_errno=True)
+    libc.prctl.argtypes = [ctypes.c_int, *([ctypes.c_ulong] * 4)]
+    libc.prctl.restype = ctypes.c_int
+    flag = ctypes.c_int()
+    if libc.prctl(37, ctypes.addressof(flag), 0, 0, 0) != 0:
+        raise OSError(ctypes.get_errno(), "Cannot inspect Linux child subreaper")
+    if enabled is not None and libc.prctl(36, int(enabled), 0, 0, 0) != 0:
+        raise OSError(ctypes.get_errno(), "Cannot configure Linux child subreaper")
+    return bool(flag.value)
+
+
+class _NativeProcessTree(LinuxProcessTree):
+    """An unsignallable caller anchor with protected preexisting branches."""
+
+    def __init__(self, current: _Process, token: str, reader: int) -> None:
+        super().__init__(
+            current.pid,
+            token,
+            owner_env=DIRECT_OWNER_ENV,
+            excluded={current.pid: current.born},
+        )
+        self._reader = reader
+        self._records = b""
+        self._ambiguous: set[int] = set()
+        table = self._table()
+        protected = {current.pid}
+        changed = True
+        while changed:
+            changed = False
+            for process in table.values():
+                if process.parent in protected and process.pid not in protected:
+                    protected.add(process.pid)
+                    self._excluded[process.pid] = process.born
+                    changed = True
+        self._has_helpers = len(protected) > 1
+
+    def _fork_identities(self) -> None:
+        while True:
+            try:
+                data = os.read(self._reader, 65536)
+            except BlockingIOError:
+                break
+            if not data:
+                break
+            self._records += data
+        records = self._records.split(b"\n")
+        self._records = records.pop()
+        for record in records:
+            pid, born = map(int, record.split())
+            if self._identities.get(pid) != born:
+                self._scan_changed = True
+            self._identities[pid] = born
+
+    def _protected(self, table: Mapping[int, _Process]) -> set[int]:
+        protected = {
+            pid
+            for pid, born in self._excluded.items()
+            if pid != self.root and pid in table and table[pid].born == born
+        }
+        # Never propagate from the caller: only its preexisting helper branches.
+        changed = True
+        while changed:
+            changed = False
+            for process in table.values():
+                if process.parent in protected and process.pid not in protected:
+                    protected.add(process.pid)
+                    self._excluded[process.pid] = process.born
+                    changed = True
+        return protected
+
+    @override
+    def _owned(self) -> list[_Process]:
+        self._ambiguous.clear()
+        table = self._begin_scan()
+        self._fork_identities()
+        protected = self._protected(table)
+        owners = {
+            pid
+            for pid in self._known_owners(table)
+            if pid != self.root and pid not in protected
+        }
+        owners.update(process.pid for process in table.values() if self._marked(process))
+        changed = True
+        while changed:
+            changed = False
+            for process in table.values():
+                if process.pid in owners or process.pid in protected or process.pid == self.root:
+                    continue
+                if process.parent in owners or (
+                    process.parent == self.root and not self._has_helpers
+                ):
+                    owners.add(process.pid)
+                    changed = True
+        for process in table.values():
+            if (
+                process.parent == self.root
+                and process.pid not in owners | protected
+                and process.state != "Z"
+            ):
+                self._ambiguous.add(process.pid)
+        if self._ambiguous:
+            self._scan_changed = True
+        for pid in owners:
+            self._identities[pid] = table[pid].born
+        self._reap_owned(table, protected)
+        return [table[pid] for pid in owners if table[pid].state != "Z"]
+
+    def _reap_owned(self, table: Mapping[int, _Process], protected: set[int]) -> None:
+        """Keep dead recorded children available for reaping after live revalidation."""
+        for pid, born in self._identities.items():
+            process = table.get(pid)
+            if (
+                process is not None
+                and process.born == born
+                and process.state == "Z"
+                and process.parent == self.root
+                and pid != self.root
+                and pid not in protected
+            ):
+                self._reap(process)
+
+    @staticmethod
+    def _reap(process: _Process) -> None:
+        """Reap only a recorded own child; never consume a publisher's status."""
+        try:
+            descriptor = os.pidfd_open(process.pid)
+        except ProcessLookupError:
+            return
+        try:
+            current = _read_process(process.pid)
+            if current is not None and current.born == process.born:
+                with suppress(ChildProcessError, ProcessLookupError):
+                    os.waitid(os.P_PIDFD, descriptor, os.WEXITED | os.WNOHANG)
+        finally:
+            os.close(descriptor)
+
+    @override
+    def running(self) -> bool:
+        alive = super().running()
+        if self._ambiguous:
+            raise UnverifiableProcessTreeError(
+                "Cannot prove native ownership of adopted children with preexisting "
+                f"helper branches: {sorted(self._ambiguous)}; children remain untouched"
+            )
+        return alive
+
+
+@contextmanager
+def _collect_scope_failure(failures: list[BaseException]) -> Iterator[None]:
+    """At the cleanup boundary, retain failures while attempting every release."""
+    try:
+        yield
+    except BaseException as error:  # noqa: BLE001 - preserve interruptions at cleanup boundary
+        failures.append(error)
+
+
+def _restore_native_scope(
+    reader: int, writer: int, previous: str | None, previous_subreaper: bool | None
+) -> list[BaseException]:
+    failures: list[BaseException] = []
+    with _collect_scope_failure(failures):
+        _fork_writers.remove(writer)
+    for descriptor in (reader, writer):
+        with _collect_scope_failure(failures):
+            os.close(descriptor)
+    if previous_subreaper is not None:
+        with _collect_scope_failure(failures):
+            _subreaper(previous_subreaper)
+    with _collect_scope_failure(failures):
+        if previous is None:
+            os.environ.pop(DIRECT_OWNER_ENV, None)
+        else:
+            os.environ[DIRECT_OWNER_ENV] = previous
+    return failures
+
+
+@contextmanager
+def native_descendant_scope() -> Iterator[None]:
+    """Own new native descendants without signalling the caller or old helpers.
+
+    Ancestry plus subreaper adoption covers fork-only children without relying on
+    runtime environment bytes being visible in /proc. Python fork births provide
+    positive provenance even before the first scan. Unmarked adopted children
+    cannot be attributed safely when preexisting helper branches exist; preserve
+    those children and report unverifiable cleanup. Queue guardian markers remain
+    intact, and only recorded own child statuses are reaped.
+    """
+    if sys.platform != "linux":
+        yield
+        return
+    current = _read_process(os.getpid())
+    if current is None:
+        raise RuntimeError("Native invocation process identity is unavailable")
+    reader, writer = os.pipe2(os.O_CLOEXEC | os.O_NONBLOCK)
+    previous = os.environ.get(DIRECT_OWNER_ENV)
+    token = uuid4().hex
+    try:
+        tree = _NativeProcessTree(current, token, reader)
+        previous_subreaper = _subreaper(True)
+    except BaseException:
+        os.close(reader)
+        os.close(writer)
+        raise
+    if not _fork_callback_registered:
+        os.register_at_fork(after_in_child=_record_native_fork)
+        _fork_callback_registered.append(True)
+    _fork_writers.append(writer)
+    os.environ[DIRECT_OWNER_ENV] = token
+    try:
+        yield
+    finally:
+        primary = sys.exception()
+        failures: list[BaseException] = []
+        with defer_interruptions():
+            # A Python fork may unwind the copied context in its child. Only the
+            # original invocation owns cleanup and restoration of subreaper state.
+            owner = os.getpid() == current.pid
+            if owner:
+                with _collect_scope_failure(failures):
+                    tree.terminate()
+            failures.extend(
+                _restore_native_scope(
+                    reader, writer, previous, previous_subreaper if owner else None
+                )
+            )
+            if failures:
+                errors = [primary, *failures] if primary is not None else failures
+                if len(errors) == 1:
+                    raise errors[0]
+                raise BaseExceptionGroup(
+                    "Native execution, descendant cleanup or restoration failed", errors
+                ) from None

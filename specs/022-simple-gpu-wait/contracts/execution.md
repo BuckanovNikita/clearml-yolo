@@ -160,3 +160,10 @@ view as admission. Sampling precedes the transaction; formatting/logging follows
 lock release. `Ticket.try_acquire()` still returns a UUID tuple or None, with its
 latest immutable diagnostics available separately. No second probe or position read
 is needed for presentation.
+
+## Supersession on 2026-10-13
+
+Feature [029](../../029-shared-cy-queue/spec.md) replaces the four-mode execution and
+Hydra queue launcher described above. This document retains its historical contract.
+The Ctrl+C ownership protections released in v0.26.2 are integrated into generic direct-process
+supervision and the shared queue guardian; physical acceptance remains in the new ledger.

@@ -72,12 +72,14 @@ def test_hydra_pipeline_passes_real_stage_objects(
         workflow_dependencies,
         pipeline,
         "run_prediction",
-        lambda *a, **k: SimpleNamespace(predictions=tmp_path / "predictions.csv"),
+        lambda *a, **k: SimpleNamespace(predictions=tmp_path / "run" / "predictions.csv"),
     )
 
     def evaluate(*args: object, **kwargs: object) -> SimpleNamespace:
         calls.append(kwargs["evaluation"])
-        (tmp_path / "metrics").mkdir()
+        destination = args[2]
+        assert isinstance(destination, Path)
+        destination.mkdir()
         return SimpleNamespace(
             best_confidences={"val": {"cat": 0.5}, "test": {"cat": 0.5}}, evaluations={}
         )
@@ -88,7 +90,7 @@ def test_hydra_pipeline_passes_real_stage_objects(
         config = compose(
             config_name="pipeline",
             overrides=[
-                f"run_dir={tmp_path}",
+                f"run_dir={tmp_path / 'run'}",
                 "ground_truth=explicit.csv",
                 "skip_compare=true",
                 "skip_report=true",
@@ -143,7 +145,7 @@ def test_pipeline_routes_cleaned_truth_and_prediction_policy_after_csv_training(
         # already applied CSV class policy and is the only inference input.
         assert args[4]["classes"] == [1]
         assert kwargs["ultralytics_predict"]["classes"] is None
-        return SimpleNamespace(predictions=tmp_path / "predictions.csv")
+        return SimpleNamespace(predictions=tmp_path / "run" / "predictions.csv")
 
     def metrics(*args: Any, **kwargs: Any) -> SimpleNamespace:
         calls["truth"].append(args[1])
@@ -163,7 +165,7 @@ def test_pipeline_routes_cleaned_truth_and_prediction_policy_after_csv_training(
         clearml=ClearMLConfig(),
         ground_truth="source.csv",
         splits=["test"],
-        run_dir=tmp_path,
+        run_dir=tmp_path / "run",
         dataset_format="flat",
         skip_compare=True,
         skip_report=True,
@@ -188,9 +190,9 @@ def test_pipeline_preflights_once_and_publishes_effective_outputs(
     source = tmp_path / "source.csv"
     source.write_text("image_name,image_path,split\na,a.jpg,val\n", encoding="utf-8")
     cleaned = tmp_path / "cleaned.csv"
-    predictions = tmp_path / "predictions.csv"
-    evaluation_path = tmp_path / "metrics/evaluation_test.json"
-    checkpoint = tmp_path / "detect/train/weights/best.pt"
+    predictions = tmp_path / "run" / "predictions.csv"
+    evaluation_path = tmp_path / "run/metrics/evaluation_test.json"
+    checkpoint = tmp_path / "run/detect/train/weights/best.pt"
     task = SimpleNamespace(id="pipeline-task")
     events: list[str] = []
     requests: list[Any] = []
@@ -280,7 +282,7 @@ def test_pipeline_preflights_once_and_publishes_effective_outputs(
         clearml=ClearMLConfig(),
         ground_truth=str(source),
         splits=["test"],
-        run_dir=tmp_path,
+        run_dir=tmp_path / "run",
         skip_compare=True,
         skip_report=True,
         fiftyone=FiftyOneConfig(),
@@ -300,7 +302,7 @@ def test_pipeline_preflights_once_and_publishes_effective_outputs(
         "model": str(checkpoint),
         "evaluation": evaluation.model_dump(mode="json") | {"calibration_split": "val"},
     }
-    assert (tmp_path / "fiftyone_publication.json").is_file()
+    assert (tmp_path / "run" / "fiftyone_publication.json").is_file()
 
 
 @pytest.mark.parametrize("existing", [False, True])
@@ -315,7 +317,8 @@ def test_pipeline_publishes_only_existing_predictions_when_prediction_is_skipped
     from clearml_yolo.application.use_cases import pipeline
     from clearml_yolo.application.use_cases.metrics import EvaluationConfig
 
-    predictions = tmp_path / "predictions.csv"
+    predictions = tmp_path / "run" / "predictions.csv"
+    predictions.parent.mkdir()
     if existing:
         predictions.write_text("image_name\na\n", encoding="utf-8")
     requests: list[Any] = []
@@ -375,7 +378,7 @@ def test_pipeline_publishes_only_existing_predictions_when_prediction_is_skipped
         clearml=ClearMLConfig(),
         ground_truth=str(tmp_path / "truth.csv"),
         splits=["test"],
-        run_dir=tmp_path,
+        run_dir=tmp_path / "run",
         weights="best.pt",
         skip_train=True,
         skip_predict=True,
@@ -400,7 +403,7 @@ def test_pipeline_publication_failure_warns_and_preserves_predictions(
     from clearml_yolo.application.use_cases import pipeline
     from clearml_yolo.application.use_cases.metrics import EvaluationConfig
 
-    predictions = tmp_path / "predictions.csv"
+    predictions = tmp_path / "run" / "predictions.csv"
 
     class FailingPublisher:
         enabled = True
@@ -444,7 +447,7 @@ def test_pipeline_publication_failure_warns_and_preserves_predictions(
         clearml=ClearMLConfig(),
         ground_truth=str(tmp_path / "truth.csv"),
         splits=["test"],
-        run_dir=tmp_path,
+        run_dir=tmp_path / "run",
         weights="best.pt",
         skip_train=True,
         skip_metrics=True,
@@ -454,7 +457,7 @@ def test_pipeline_publication_failure_warns_and_preserves_predictions(
         deps=workflow_dependencies,
     )
     assert predictions.read_text(encoding="utf-8") == "image_name\na\n"
-    assert not (tmp_path / "fiftyone_publication.json").exists()
+    assert not (tmp_path / "run" / "fiftyone_publication.json").exists()
     assert any("publication failed" in warning for warning in warnings_log)
 
 

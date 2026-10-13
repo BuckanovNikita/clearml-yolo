@@ -402,13 +402,13 @@ def cached_dataset(
     identity = _identity(input_sha256, dataset_format)
     root = dataset_cache_root(cache_dir)
     root.mkdir(parents=True, exist_ok=True)
-    lock_root = root / ".locks"
+    lock_root = write_path(root / ".locks")
     lock_root.mkdir(exist_ok=True)
     entry = root / identity
     if FileLock is SoftFileLock:
         raise RuntimeError("Dataset cache requires native file locks; this platform has none")
     lock = FileLock(
-        lock_root / f"{identity}.lock",
+        write_path(lock_root / f"{identity}.lock"),
         fallback_to_soft=False,
         preserve_lock_file=True,
     )

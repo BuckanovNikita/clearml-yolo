@@ -36,6 +36,9 @@ def _metric_owner(
 
     from clearml_yolo.application.use_cases import metrics as module
 
+    monkeypatch.setattr(
+        "clearml_yolo.adapters.clearml.session._start_console_publisher", lambda *_args: None
+    )
     task = FakeTask()
     patch_workflow(monkeypatch, workflow_dependencies, clearml.Task, "init", lambda **_kwargs: task)
     patch_workflow(

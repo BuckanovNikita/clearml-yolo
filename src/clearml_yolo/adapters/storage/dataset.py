@@ -18,6 +18,7 @@ from clearml_yolo.adapters.storage.dataset_export import (
     exported_image_path,
 )
 from clearml_yolo.adapters.storage.dataset_records import validate_ground_truth
+from clearml_yolo.adapters.storage.filesystem import write_path
 from clearml_yolo.application.contracts import (
     PreparedDataset as PreparedDataset,  # noqa: PLC0414 - typed adapter interface
 )
@@ -37,7 +38,7 @@ _COLUMNS = (
 
 @trace_operation("storage.dataset.truth.write")
 def _write_cleaned_truth(records: ValidatedDataset, path: Path) -> None:
-    with path.open("x", newline="", encoding="utf-8") as stream:
+    with write_path(path).open("x", newline="", encoding="utf-8") as stream:
         writer = csv.writer(stream)
         writer.writerow(_COLUMNS)
         for image in records.images:
@@ -87,7 +88,7 @@ def _validate_source(
     if source_bytes is None:
         return validate_ground_truth(source, required_splits=required_splits)
     snapshot = directory / ".source.csv"
-    snapshot.write_text(_snapshot_csv(source, source_bytes), encoding="utf-8")
+    write_path(snapshot).write_text(_snapshot_csv(source, source_bytes), encoding="utf-8")
     try:
         records = validate_ground_truth(snapshot, required_splits=required_splits)
     finally:
@@ -147,7 +148,7 @@ def prepare_dataset(
     """Reserve fresh output, clean once, and export the requested native representation."""
     if dataset_format not in {"ndjson", "flat", "coco"}:
         raise ValueError("dataset_format must be one of: ndjson, flat, coco")
-    directory = directory.expanduser().absolute()
+    directory = write_path(directory).absolute()
     # Exclusive reservation rejects stale files and symlinks instead of reusing another run.
     directory.mkdir(parents=True, exist_ok=False)
     source_path = Path(source).expanduser().resolve()
@@ -156,7 +157,9 @@ def prepare_dataset(
     _write_cleaned_truth(records, ground_truth)
     manifest = directory / "preparation.json"
     metadata = _preparation_record(records, directory, dataset_format)
-    manifest.write_text(json.dumps(metadata, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    write_path(manifest).write_text(
+        json.dumps(metadata, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
     data = export_dataset(records, directory, dataset_format)
     labels = directory / "labels.zip"
     with (

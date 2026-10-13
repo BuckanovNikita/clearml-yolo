@@ -8,7 +8,8 @@ Infrastructure access and resource capacity come from the environment, not this 
 Set `CY_HOME` to the invocation workspace (default: launch directory) for project datasets,
 outputs and scratch. Bootstrap preserves SDK configuration/cache selectors, cwd discovery,
 credentials, bytecode and global temporary defaults. Project temporary callsites use an
-explicit directory; `CY_RUNTIME_TEMP_ROOT` may select an external parent. Arenas remain
+explicit project-contained directory; `CY_RUNTIME_TEMP_ROOT` must remain under resolved
+`CY_HOME`, including through symlinks. Arenas remain
 retained after every exit outcome, with no startup scans/recovery or recursive deletion.
 Deliberate maintenance requires an idle workspace and descendants. Invalid dataset entries
 are preserved and fail clearly; native lock failures have no soft fallback. See the
@@ -47,32 +48,29 @@ for the native/download/comparison matrices. Use `uv run --frozen --no-sync` aft
 an optional-backend environment so verification does not remove its installed extras.
 
 Select the backend's supported device, batch and precision controls for the environment.
-Model commands and `cy-export` default `queue.enabled=true` and `autogpu.enabled=true`: whole-GPU FIFO
-reservations, fresh supervised children and automatic selection. Queue disabled retains
-direct availability waiting; automatic selection disabled retains exact queued identities
-and training order using the enabled-phase UUID union. Both disabled preserves native
-settings without project GPU discovery/waiting/replacement. CPU/MPS bypass telemetry.
-Automatic mode treats native IDs as demand: one for an integer/null/empty/`cuda`, list
-length for lists, one per `-1`, zero for CPU/MPS; GPU inference requires one. No separate
-GPU-count setting. Exact queued mode requires concrete selectors within inherited CUDA
-visibility and rejects ambiguous automatic values. Neither switch disables tracking.
-GPU availability uses total NVML used memory strictly below
-`autogpu.max_used_memory_gib` (default 2.0 GiB), regardless of process presence.
-Use a finite positive project YAML value or Hydra override. Verify default/custom
-limits in direct waiting, automatic/exact queue admission and worker contraction;
-active reservations remain unavailable. Run updated supervisors together so each
-applies only its own project's policy.
-CPU ONNX export has zero GPU demand; engine build and verification require one GPU.
+Direct commands and `cy-export` run their explicit native devices without queue discovery,
+reservation or waiting. `cy -m` uses ordinary sequential Hydra BasicLauncher. Queue count
+or exact-device selection belongs to `cy-queue submit --gpus N -- ...` or
+`cy-queue submit --devices 0,2 -- ...`; remove native GPU overrides from queued configurations.
+Explicit CPU phases remain CPU. Queued training uses the complete allocation and inference
+its first GPU. Hold all allocated UUIDs through complete pipeline/descendant exit.
 
-Before acceptance, establish sufficient whole-GPU visibility and preserve unrelated compute
-users. Verify no task while waiting, one runner/two waiters on one GPU, interruption with
-owned process cleanup before capacity release, compatible cross-project coordination and
-replay admission limits. Verify multi-GPU cleanup/contraction retains the intended inference
-device; record physical multi-GPU execution unverified when unavailable. Queued sweeps use
-the concurrent project launcher; queue-disabled sweeps use sequential BasicLauncher.
-Mixed queue modes fail before admission. Unknown telemetry, unsupported MIG and excessive
-demand fail clearly in scheduling modes. See the
-[GPU execution contract](../../../../specs/022-simple-gpu-wait/contracts/execution.md).
+A persistent same-user worker executes private immutable snapshots in fresh processes;
+closing a submission terminal or TUI does not stop it. No ClearML task exists while waiting.
+Admission uses total NVML used memory strictly below `worker --max-used-memory-gib`
+(default 2 GiB), independently of model/compiler memory fit. Existing reservations stay
+excluded across queue roots. Unknown telemetry/protocol, unsupported MIG and damaged
+coordination stop admission. Excessive whole-GPU demand remains pending with its reason.
+CPU ONNX export needs no GPU; engine build and verification require one GPU.
+
+Before acceptance preserve unrelated compute and establish available hardware. Verify
+matching direct/queued settings, one/five physical GPUs eager/compiled, independent live
+ClearML console/scalar readback, cancellation and repeated signals. Exercise worker death,
+guardian death, detached native ranks and fail-closed owner recovery. Two real users must
+reorder each other's pending jobs without executing/cancelling the other's work; two hosts
+sharing NFS retain independent order/capacity. Mount aliases and multiple queue roots must
+not duplicate local GPU allocation. Record unavailable hardware/NFS and unresolved native
+errors as acceptance gaps. See the [queue contract](../../../../docs/queue.md).
 
 Optional FiftyOne workers use finite preflight/publication/lock deadlines of 60/900/30
 seconds and no GPU/queue/ClearML ownership. Fault injection must prove bounded import,

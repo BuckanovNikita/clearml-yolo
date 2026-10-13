@@ -4,6 +4,7 @@ import hashlib
 from pathlib import Path
 
 from clearml_yolo.adapters.observability.tracing import trace_operation
+from clearml_yolo.adapters.storage.filesystem import write_path
 from clearml_yolo.core.identity import ModelIdentity
 
 
@@ -23,7 +24,7 @@ def write_checkpoint_identity(path: Path, identity: ModelIdentity) -> Path:
     actual_hash = checkpoint_sha256(path)
     if identity.checkpoint_sha256 != actual_hash:
         raise ValueError("Checkpoint identity does not match local checkpoint bytes")
-    sidecar = path.with_name(path.name + ".identity.json")
+    sidecar = write_path(path.with_name(path.name + ".identity.json"))
     sidecar.write_text(identity.model_dump_json(indent=2) + "\n", encoding="utf-8")
     return sidecar
 

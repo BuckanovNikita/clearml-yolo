@@ -5,9 +5,11 @@ import os
 import signal
 import subprocess
 import sys
+import time
 import types
 from collections import UserDict
 from collections.abc import Callable
+from contextlib import suppress
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -15,6 +17,8 @@ import pandas as pd
 import pytest
 from ruamel.yaml import YAML
 
+from clearml_yolo.adapters.clearml.console import ConsolePublicationError
+from clearml_yolo.adapters.clearml.deadline import TaskFinalizationError
 from clearml_yolo.adapters.clearml.session import (
     DEFAULT_PROJECT_NAME,
     ArtifactUploadError,
@@ -68,6 +72,8 @@ class FakeTask:
         self.closed = False
         self.local = True
         self.reload_count = 0
+        self._dev_worker: Any = None
+        self._logger: Any = None
 
     def upload_artifact(self, **kwargs: Any) -> bool:
         self.uploads.append(kwargs)
@@ -101,9 +107,15 @@ class FakeTask:
     def running_locally(self) -> bool:
         return self.local
 
+    def get_output_log_web_page(self) -> str:
+        return "https://clearml.example/tasks/task-id"
+
     def close(self) -> None:
         self.events.append("close")
         self.closed = True
+
+    def is_main_task(self) -> bool:
+        return not self.closed
 
     def reload(self) -> None:
         self.reload_count += 1
@@ -151,6 +163,9 @@ def fake_clearml(monkeypatch: pytest.MonkeyPatch) -> tuple[type[Any], FakeTask]:
 
     module.OutputModel = OutputModel  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "clearml", module)
+    monkeypatch.setattr(
+        "clearml_yolo.adapters.clearml.session._start_console_publisher", lambda *_args: None
+    )
     return Task, task
 
 
@@ -183,7 +198,7 @@ def test_invocation_owns_one_task_and_nested_stages_reuse_it(
 
     assert len(task_type.init_calls) == 1
     assert task_type.init_calls[0]["reuse_last_task_id"] is False
-    assert task_type.init_calls[0]["auto_connect_streams"] is True
+    assert task_type.init_calls[0]["auto_connect_streams"] is False
     integrations = task_type.init_calls[0]["auto_connect_frameworks"]
     assert integrations["detect_repository"] is False
     assert integrations["pytorch"] is False
@@ -1434,7 +1449,9 @@ def test_present_empty_remote_run_text_never_uses_defaults(
 
 
 def test_failed_finalization_retains_config_for_pending_consumers(
-    fake_clearml: tuple[type[Any], FakeTask], tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    fake_clearml: tuple[type[Any], FakeTask],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _, task = fake_clearml
     monkeypatch.setenv("CY_HOME", str(tmp_path / "workspace"))
@@ -1452,3 +1469,769 @@ def test_failed_finalization_retains_config_for_pending_consumers(
         run()
     assert stored[0].is_file()
     assert source.read_text() == "epochs: 2\n"
+
+
+@pytest.fixture
+def isolated_owner_session(
+    fake_clearml: tuple[type[Any], FakeTask], monkeypatch: pytest.MonkeyPatch
+) -> tuple[type[Any], FakeTask, list[str]]:
+    """Exercise real session boundaries with inert external capture/SDK effects."""
+    task_type, task = fake_clearml
+    effects: list[str] = []
+
+    def captured() -> object:
+        effects.append("capture")
+        return object()
+
+    def unexpected_current_task() -> None:
+        pytest.fail("An inert owner guard must not query SDK current_task")
+
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.session.active_capture", captured)
+    monkeypatch.setattr(task_type, "current_task", unexpected_current_task, raising=False)
+    return task_type, task, effects
+
+
+def _assert_later_owner_is_blocked(
+    isolated_owner_session: tuple[type[Any], FakeTask, list[str]],
+) -> None:
+    task_type, task, effects = isolated_owner_session
+    initial_effects = list(effects)
+    initial_configurations = list(task.configurations)
+    initial_calls = list(task_type.init_calls)
+    with (
+        pytest.raises(RuntimeError, match="fresh process"),
+        invocation(ClearMLConfig(), "predict", {"second": True}),
+    ):
+        effects.append("workflow")
+    assert effects == initial_effects
+    assert task_type.init_calls == initial_calls
+    assert task.configurations == initial_configurations
+
+
+@pytest.mark.parametrize("failure_site", ["workflow", "barrier", "start"])
+def test_owner_isolation_blocks_after_console_publication_failure(
+    isolated_owner_session: tuple[type[Any], FakeTask, list[str]],
+    monkeypatch: pytest.MonkeyPatch,
+    failure_site: str,
+) -> None:
+    _, task, _ = isolated_owner_session
+    original = ConsolePublicationError("first required delivery failed")
+
+    def fail(*_args: Any) -> Any:
+        raise original
+
+    if failure_site == "start":
+        monkeypatch.setattr("clearml_yolo.adapters.clearml.session._start_console_publisher", fail)
+    elif failure_site == "barrier":
+        publisher = types.SimpleNamespace(barrier=fail, finish=lambda: None)
+        monkeypatch.setattr(
+            "clearml_yolo.adapters.clearml.session._start_console_publisher",
+            lambda *_args: publisher,
+        )
+
+    def run() -> None:
+        with invocation(ClearMLConfig(), "train"):
+            if failure_site == "workflow":
+                raise original
+
+    with pytest.raises(ConsolePublicationError) as raised:
+        run()
+    assert raised.value is original
+    assert not task.closed
+    _assert_later_owner_is_blocked(isolated_owner_session)
+
+
+def test_owner_isolation_preserves_workflow_error_when_failure_barrier_fails(
+    isolated_owner_session: tuple[type[Any], FakeTask, list[str]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from clearml_yolo.adapters.clearml import session
+
+    _, task, _ = isolated_owner_session
+    original = ValueError("first computation failed")
+
+    def fail() -> None:
+        raise ConsolePublicationError("delivery failed during failure cleanup")
+
+    publisher = types.SimpleNamespace(barrier=fail, finish=lambda: None)
+    monkeypatch.setattr(session, "_start_console_publisher", lambda *_args: publisher)
+    with (
+        pytest.raises(ValueError, match="first computation failed") as raised,
+        invocation(ClearMLConfig(), "train"),
+    ):
+        raise original
+    assert raised.value is original
+    assert not task.closed
+    assert task.failed
+    _assert_later_owner_is_blocked(isolated_owner_session)
+
+
+@pytest.mark.parametrize(
+    "cleanup_error", [RuntimeError("close failed"), TaskFinalizationError("deadline")]
+)
+@pytest.mark.parametrize("workflow_fails", [False, True])
+def test_owner_isolation_blocks_after_unconfirmed_close(
+    isolated_owner_session: tuple[type[Any], FakeTask, list[str]],
+    monkeypatch: pytest.MonkeyPatch,
+    cleanup_error: Exception,
+    workflow_fails: bool,
+) -> None:
+    _, task, _ = isolated_owner_session
+    original = ValueError("first computation failed") if workflow_fails else cleanup_error
+
+    def fail() -> None:
+        raise cleanup_error
+
+    monkeypatch.setattr(task, "close", fail)
+
+    def run() -> None:
+        with invocation(ClearMLConfig(), "train"):
+            if workflow_fails:
+                raise original
+
+    with pytest.raises(type(original)) as raised:
+        run()
+    assert raised.value is original
+    assert not task.closed
+    _assert_later_owner_is_blocked(isolated_owner_session)
+
+
+def test_owner_isolation_blocks_after_partial_task_initialization(
+    isolated_owner_session: tuple[type[Any], FakeTask, list[str]],
+) -> None:
+    task_type, task, _ = isolated_owner_session
+    original = RuntimeError("SDK retained an owner before init failed")
+
+    def fail() -> None:
+        raise original
+
+    task_type.on_init = fail
+    with pytest.raises(RuntimeError) as raised, invocation(ClearMLConfig(), "train"):
+        pytest.fail("Initialization failure must prevent workflow execution")
+    assert raised.value is original
+    assert not task.closed
+    task_type.on_init = None
+    _assert_later_owner_is_blocked(isolated_owner_session)
+
+
+@pytest.mark.parametrize("workflow_fails", [False, True])
+def test_owner_isolation_allows_sequential_invocations_after_confirmed_close(
+    isolated_owner_session: tuple[type[Any], FakeTask, list[str]], workflow_fails: bool
+) -> None:
+    task_type, task, effects = isolated_owner_session
+    if workflow_fails:
+        with (
+            pytest.raises(ValueError, match="ordinary computation failure"),
+            invocation(ClearMLConfig(), "train"),
+        ):
+            raise ValueError("ordinary computation failure")
+    else:
+        with invocation(ClearMLConfig(), "train"):
+            effects.append("first")
+    assert task.closed
+    with invocation(ClearMLConfig(), "predict", {"second": True}):
+        effects.append("second")
+    assert len(task_type.init_calls) == 2
+    assert effects[-1] == "second"
+    assert task.configurations[-1]["config_dict"] == {"second": True}
+
+
+@pytest.mark.parametrize("failure_site", ["readback", "completed", "failed", "finish"])
+def test_owner_isolation_allows_later_owner_after_post_close_failure(
+    isolated_owner_session: tuple[type[Any], FakeTask, list[str]],
+    monkeypatch: pytest.MonkeyPatch,
+    failure_site: str,
+) -> None:
+    from clearml_yolo.adapters.clearml import session
+
+    task_type, task, effects = isolated_owner_session
+    original = RuntimeError("post-close operation failed")
+
+    def fail(*_args: Any, **_kwargs: Any) -> Any:
+        raise original
+
+    with monkeypatch.context() as patch:
+        if failure_site == "readback":
+            patch.setattr(task_type, "get_task", fail)
+        elif failure_site in {"completed", "failed"}:
+            patch.setattr(task, f"mark_{failure_site}", fail)
+        else:
+            publisher = types.SimpleNamespace(barrier=lambda: None, finish=fail)
+            patch.setattr(session, "_start_console_publisher", lambda *_args: publisher)
+
+        def run() -> None:
+            with invocation(ClearMLConfig(), "train"):
+                if failure_site == "failed":
+                    raise original
+
+        with pytest.raises(RuntimeError) as raised:
+            run()
+        assert raised.value is original
+    assert task.closed
+    with invocation(ClearMLConfig(), "predict"):
+        effects.append("second")
+    assert len(task_type.init_calls) == 2
+    assert effects[-1] == "second"
+
+
+def test_owner_isolation_keeps_nested_stages_and_workers_inert(
+    isolated_owner_session: tuple[type[Any], FakeTask, list[str]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    task_type, task, effects = isolated_owner_session
+    with invocation(ClearMLConfig(), "pipeline") as owner:
+        with invocation(ClearMLConfig(), "train", {"nested": True}) as nested:
+            assert nested is owner
+        assert init_task(ClearMLConfig(), "val") is owner
+        with monkeypatch.context() as patch:
+            patch.setenv("CY_CLEARML_OWNER_PID", str(os.getpid() + 1))
+            with invocation(ClearMLConfig(), "predict") as worker:
+                assert worker is None
+    assert len(task_type.init_calls) == 1
+    assert task.configurations == []
+    assert effects == ["capture"]
+
+
+def test_owner_isolation_blocks_after_real_close_deadline(
+    isolated_owner_session: tuple[type[Any], FakeTask, list[str]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from clearml_yolo.adapters.clearml import session
+
+    _, task, _ = isolated_owner_session
+    monkeypatch.setattr(session, "FINALIZATION_TIMEOUT_SECONDS", 0.02)
+    monkeypatch.setattr(task, "close", lambda: time.sleep(0.2))
+    with (
+        pytest.raises(TaskFinalizationError, match="deadline expired"),
+        invocation(ClearMLConfig(), "train"),
+    ):
+        pass
+    assert not task.closed
+    _assert_later_owner_is_blocked(isolated_owner_session)
+
+
+def test_owner_isolation_retains_inherited_guard_but_allows_worker_bypass(
+    isolated_owner_session: tuple[type[Any], FakeTask, list[str]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    task_type, _, effects = isolated_owner_session
+    owner_pid = os.getpid()
+    with (
+        pytest.raises(ConsolePublicationError, match="required delivery failed"),
+        invocation(ClearMLConfig(), "train"),
+    ):
+        raise ConsolePublicationError("required delivery failed")
+    # A fork inherits SDK state as well as our guard; PID mismatch is not proof of closure.
+    monkeypatch.setattr(os, "getpid", lambda: owner_pid + 1)
+    _assert_later_owner_is_blocked(isolated_owner_session)
+    monkeypatch.setenv("CY_CLEARML_OWNER_PID", str(owner_pid))
+    monkeypatch.setenv("CY_CLEARML_OWNER_TASK_ID", "task-id")
+    with invocation(ClearMLConfig(), "predict", {"worker": True}) as worker:
+        assert worker is None
+    assert len(task_type.init_calls) == 1
+    assert effects == ["capture"]
+
+
+@pytest.mark.parametrize("workflow_fails", [False, True])
+def test_owner_isolation_does_not_retry_interrupted_close_that_returns_noop(
+    isolated_owner_session: tuple[type[Any], FakeTask, list[str]],
+    monkeypatch: pytest.MonkeyPatch,
+    workflow_fails: bool,
+) -> None:
+    _, task, _ = isolated_owner_session
+    close_error = TaskFinalizationError("first close interrupted after shutdown began")
+    original = ValueError("first computation failed") if workflow_fails else close_error
+    close_calls: list[str] = []
+
+    def close() -> None:
+        close_calls.append("close")
+        if len(close_calls) == 1:
+            raise close_error
+        # The SDK records shutdown entry before flushing, so a retry returns immediately.
+
+    monkeypatch.setattr(task, "close", close)
+
+    def run() -> None:
+        with invocation(ClearMLConfig(), "train"):
+            if workflow_fails:
+                raise original
+
+    with pytest.raises(type(original)) as raised:
+        run()
+    assert raised.value is original
+    assert close_calls == ["close"]
+    assert not task.closed
+    _assert_later_owner_is_blocked(isolated_owner_session)
+
+
+@pytest.mark.parametrize("workflow_fails", [False, True])
+def test_owner_isolation_rejects_close_returning_with_sdk_main_still_active(
+    isolated_owner_session: tuple[type[Any], FakeTask, list[str]],
+    monkeypatch: pytest.MonkeyPatch,
+    workflow_fails: bool,
+) -> None:
+    _, task, _ = isolated_owner_session
+    original = ValueError("first computation failed")
+    # ClearML shutdown catches ordinary exceptions before clearing its main task.
+    monkeypatch.setattr(task, "close", lambda: None)
+
+    def run() -> None:
+        with invocation(ClearMLConfig(), "train"):
+            if workflow_fails:
+                raise original
+
+    expected = ValueError if workflow_fails else TaskFinalizationError
+    with pytest.raises(expected, match=r"computation failed|remained active") as raised:
+        run()
+    if workflow_fails:
+        assert raised.value is original
+    assert not task.closed
+    assert not task.completed
+    _assert_later_owner_is_blocked(isolated_owner_session)
+
+
+def test_owner_isolation_detaches_exit_callback_when_failure_close_raises(
+    isolated_owner_session: tuple[type[Any], FakeTask, list[str]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from clearml_yolo.adapters.clearml import session
+
+    _, task, _ = isolated_owner_session
+    original = ValueError("first computation failed")
+    detached: list[FakeTask] = []
+
+    def close() -> None:
+        raise RuntimeError("ordinary close failure")
+
+    monkeypatch.setattr(task, "close", close)
+    monkeypatch.setattr(session, "detach_sdk_exit_callback", detached.append)
+    with (
+        pytest.raises(ValueError, match="first computation failed") as raised,
+        invocation(ClearMLConfig(), "train"),
+    ):
+        raise original
+    assert raised.value is original
+    assert detached
+    assert all(candidate is task for candidate in detached)
+    _assert_later_owner_is_blocked(isolated_owner_session)
+
+
+@pytest.mark.parametrize("publication_fails", [False, True])
+def test_owner_failure_releases_monitor_before_terminal_failure_status(
+    isolated_owner_session: tuple[type[Any], FakeTask, list[str]],
+    monkeypatch: pytest.MonkeyPatch,
+    publication_fails: bool,
+) -> None:
+    _, task, _ = isolated_owner_session
+    original = (
+        ConsolePublicationError("required delivery failed")
+        if publication_fails
+        else ValueError("first computation failed")
+    )
+
+    class Monitor:
+        registered = True
+
+        def unregister(self) -> bool:
+            task.events.append("monitor-unregistered")
+            self.registered = False
+            return True
+
+    monitor = Monitor()
+    task._dev_worker = monitor
+    mark_failed = task.mark_failed
+
+    def terminal_failure(**kwargs: Any) -> object:
+        if monitor.registered:
+            # SDK monitoring interprets the owner's own failed status as external abort.
+            task.events.append("monitor-stopped-owner")
+            return object()
+        return mark_failed(**kwargs)
+
+    monkeypatch.setattr(task, "mark_failed", terminal_failure)
+    with pytest.raises(type(original)) as raised, invocation(ClearMLConfig(), "train"):
+        raise original
+    assert raised.value is original
+    assert task.events[0] == "monitor-unregistered"
+    assert "monitor-stopped-owner" not in task.events
+    assert task.failed
+    assert task.closed is not publication_fails
+    if publication_fails:
+        _assert_later_owner_is_blocked(isolated_owner_session)
+    else:
+        with invocation(ClearMLConfig(), "predict"):
+            pass
+
+
+@pytest.mark.parametrize(
+    "release_failure", ["missing-field", "missing-method", "rejected", "exception", "interrupt"]
+)
+def test_owner_failure_monitor_release_failure_preserves_original_and_skips_status(
+    isolated_owner_session: tuple[type[Any], FakeTask, list[str]],
+    monkeypatch: pytest.MonkeyPatch,
+    release_failure: str,
+) -> None:
+    from clearml_yolo.adapters.clearml import session
+
+    _, task, _ = isolated_owner_session
+    original = ValueError("first computation failed")
+    diagnostics: list[BaseException] = []
+    detached: list[FakeTask] = []
+
+    class Monitor:
+        def unregister(self) -> bool:
+            if release_failure == "exception":
+                raise RuntimeError("monitor release failed")
+            if release_failure == "interrupt":
+                raise KeyboardInterrupt("monitor release interrupted")
+            return False
+
+    if release_failure == "missing-field":
+        monkeypatch.delattr(task, "_dev_worker")
+    elif release_failure == "missing-method":
+        task._dev_worker = object()
+    else:
+        task._dev_worker = Monitor()
+    monkeypatch.setattr(session, "detach_sdk_exit_callback", detached.append)
+    monkeypatch.setattr(
+        "clearml_yolo.adapters.observability.diagnostics.log_exception",
+        lambda _message, error, **_kwargs: diagnostics.append(error),
+    )
+    with (
+        pytest.raises(ValueError, match="first computation failed") as raised,
+        invocation(ClearMLConfig(), "train"),
+    ):
+        raise original
+    assert raised.value is original
+    assert diagnostics
+    assert detached == [task]
+    assert not task.closed
+    assert not task.failed
+    assert not task.completed
+    _assert_later_owner_is_blocked(isolated_owner_session)
+
+
+def test_incomplete_owner_detaches_exact_cached_reporter_without_exit_reentry(
+    tmp_path: Path,
+) -> None:
+    code = """
+import atexit
+import time
+from clearml_yolo.adapters.clearml.deadline import detach_sdk_exit_callback
+
+class Reporter:
+    def __init__(self, name, blocks):
+        self.name = name
+        self.blocks = blocks
+
+    def _handle_program_exit(self):
+        print(self.name, flush=True)
+        if self.blocks:
+            time.sleep(30)
+
+class Owner:
+    def __init__(self, reporter):
+        self._Task__reporter = reporter
+
+    @property
+    def _reporter(self):
+        raise AssertionError('Lazy SDK reporter getter must remain untouched')
+
+    def _at_exit(self):
+        print('unexpected-owner-exit-reentry', flush=True)
+        time.sleep(30)
+
+owner_reporter = Reporter('unexpected-owner-reporter-reentry', True)
+unrelated_reporter = Reporter('unrelated-reporter-exit', False)
+owner = Owner(owner_reporter)
+atexit.register(owner._at_exit)
+atexit.register(owner_reporter._handle_program_exit)
+atexit.register(unrelated_reporter._handle_program_exit)
+atexit.register(lambda: print('unrelated-exit-callback', flush=True))
+detach_sdk_exit_callback(owner)
+print('clean-interpreter-exit', flush=True)
+"""
+    result = subprocess.run(  # noqa: S603 - inert test-owned callbacks, no SDK/service initialization
+        [sys.executable, "-c", code],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=5,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "clean-interpreter-exit" in result.stdout
+    assert "unexpected-owner" not in result.stdout
+    assert "unrelated-reporter-exit" in result.stdout
+    assert "unrelated-exit-callback" in result.stdout
+
+
+def test_owner_failure_diagnostic_precedes_console_barrier_and_finish(
+    isolated_owner_session: tuple[type[Any], FakeTask, list[str]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from clearml_yolo.adapters.clearml import session
+
+    _, task, _ = isolated_owner_session
+    original = ValueError("original optimizer failure")
+    events: list[str] = []
+    logged: list[tuple[str, BaseException, dict[str, Any]]] = []
+
+    def diagnostic(message: str, error: BaseException, **kwargs: Any) -> None:
+        events.append("diagnostic")
+        logged.append((message, error, kwargs))
+
+    publisher = types.SimpleNamespace(
+        barrier=lambda: events.append("barrier"), finish=lambda: events.append("finish")
+    )
+    monkeypatch.setattr("clearml_yolo.adapters.observability.diagnostics.log_exception", diagnostic)
+    monkeypatch.setattr(session, "_start_console_publisher", lambda *_args: publisher)
+    with (
+        pytest.raises(ValueError, match="original optimizer failure") as raised,
+        invocation(ClearMLConfig(), "train"),
+    ):
+        raise original
+    assert raised.value is original
+    assert events == ["diagnostic", "barrier", "finish"]
+    assert logged == [
+        ("Invocation failed", original, {"level": "ERROR", "context": {"task_id": task.id}})
+    ]
+
+
+@pytest.mark.parametrize("diagnostic_error", [RuntimeError("broken sink"), KeyboardInterrupt()])
+def test_owner_failure_diagnostic_error_preserves_original_and_terminal_cleanup(
+    isolated_owner_session: tuple[type[Any], FakeTask, list[str]],
+    monkeypatch: pytest.MonkeyPatch,
+    diagnostic_error: BaseException,
+) -> None:
+    _, task, _ = isolated_owner_session
+    original = ValueError("original optimizer failure")
+
+    def diagnostic(*_args: Any, **_kwargs: Any) -> None:
+        raise diagnostic_error
+
+    monkeypatch.setattr("clearml_yolo.adapters.observability.diagnostics.log_exception", diagnostic)
+    with (
+        pytest.raises(ValueError, match="original optimizer failure") as raised,
+        invocation(ClearMLConfig(), "train"),
+    ):
+        raise original
+    assert raised.value is original
+    assert task.closed
+    assert task.failed
+
+
+@pytest.mark.parametrize("failure_site", ["barrier", "finalization", "finish"])
+def test_secondary_diagnostic_sink_failure_preserves_original_and_cleanup(
+    isolated_owner_session: tuple[type[Any], FakeTask, list[str]],
+    monkeypatch: pytest.MonkeyPatch,
+    failure_site: str,
+) -> None:
+    from loguru import logger
+
+    from clearml_yolo.adapters.clearml import session
+
+    _, task, _ = isolated_owner_session
+    original = ValueError("original computation failure")
+    events: list[str] = []
+    diagnostics: list[str] = []
+    expected_message = {
+        "barrier": "Console publication barrier failed",
+        "finalization": "ClearML failure finalization failed",
+        "finish": "Console publication failed",
+    }[failure_site]
+
+    def barrier() -> None:
+        events.append("barrier")
+        if failure_site == "barrier":
+            raise ConsolePublicationError("secondary barrier failure")
+
+    def finish() -> None:
+        events.append("finish")
+        if failure_site == "finish":
+            raise ConsolePublicationError("secondary finish failure")
+
+    def fail(*_args: Any, **_kwargs: Any) -> None:
+        raise RuntimeError("secondary SDK failure")
+
+    def broken_sink(message: Any) -> None:
+        if expected_message in message.record["message"]:
+            diagnostics.append(message.record["message"])
+            raise RuntimeError("broken diagnostic sink")
+
+    if failure_site == "finalization":
+        monkeypatch.setattr(task, "close", fail)
+    publisher = types.SimpleNamespace(barrier=barrier, finish=finish)
+    monkeypatch.setattr(session, "_start_console_publisher", lambda *_args: publisher)
+    previous_signal = signal.getsignal(signal.SIGTERM)
+    previous_environment = os.environ.get(session.OWNER_PID_ENV)
+    sink = logger.add(broken_sink, catch=False, format="{message}")
+    try:
+        with (
+            pytest.raises(ValueError, match="original computation failure") as raised,
+            invocation(ClearMLConfig(), "train"),
+        ):
+            raise original
+    finally:
+        logger.remove(sink)
+    assert raised.value is original
+    assert diagnostics
+    assert events == ["barrier", "finish"]
+    assert signal.getsignal(signal.SIGTERM) == previous_signal
+    assert os.environ.get(session.OWNER_PID_ENV) == previous_environment
+    assert session._ACTIVE_INVOCATION.get() is None
+    assert bool(task.failed) is (failure_site != "finalization")
+    assert task.closed is (failure_site == "finish")
+
+
+def test_status_diagnostic_sink_failure_preserves_publication_error(
+    isolated_owner_session: tuple[type[Any], FakeTask, list[str]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from loguru import logger
+
+    from clearml_yolo.adapters.clearml import session
+
+    _, task, _ = isolated_owner_session
+    original = ConsolePublicationError("required final delivery failed")
+    diagnostics: list[str] = []
+
+    def finish() -> None:
+        raise original
+
+    def fail(**_kwargs: Any) -> None:
+        raise RuntimeError("secondary SDK status failure")
+
+    def broken_sink(message: Any) -> None:
+        if "ClearML publication failure status update failed" in message.record["message"]:
+            diagnostics.append(message.record["message"])
+            raise RuntimeError("broken diagnostic sink")
+
+    monkeypatch.setattr(task, "mark_failed", fail)
+    publisher = types.SimpleNamespace(barrier=lambda: None, finish=finish)
+    monkeypatch.setattr(session, "_start_console_publisher", lambda *_args: publisher)
+    sink = logger.add(broken_sink, catch=False, format="{message}")
+    try:
+        with pytest.raises(ConsolePublicationError) as raised, invocation(ClearMLConfig(), "train"):
+            pass
+    finally:
+        logger.remove(sink)
+    assert raised.value is original
+    assert diagnostics
+    assert task.closed
+    assert session._ACTIVE_INVOCATION.get() is None
+
+
+@pytest.mark.parametrize("handler_fails", [False, True])
+def test_incomplete_owner_closes_exact_handler_after_status_with_separate_deadline(
+    isolated_owner_session: tuple[type[Any], FakeTask, list[str]],
+    monkeypatch: pytest.MonkeyPatch,
+    handler_fails: bool,
+) -> None:
+    from clearml_yolo.adapters.clearml import session
+
+    _, task, _ = isolated_owner_session
+    events: list[str] = []
+    original = ConsolePublicationError("required delivery failed")
+
+    class Handler:
+        def close(self, *, wait: bool) -> None:
+            assert wait is False
+            assert task.failed
+            events.append("handler")
+            if handler_fails:
+                raise RuntimeError("owner handler cleanup failed")
+            # Installed BackgroundMonitor.stop can swallow the alarm interrupt at join.
+            with suppress(BaseException):
+                time.sleep(0.2)
+
+    def finish() -> None:
+        # Publication receives a new alarm after handler close consumed its own.
+        assert signal.getitimer(signal.ITIMER_REAL)[0] > 0
+        events.append("finish")
+
+    task._logger = types.SimpleNamespace(_task_handler=Handler())
+    publisher = types.SimpleNamespace(barrier=lambda: None, finish=finish)
+    monkeypatch.setattr(session, "_start_console_publisher", lambda *_args: publisher)
+    monkeypatch.setattr(session, "FINALIZATION_TIMEOUT_SECONDS", 0.02)
+    with (
+        pytest.raises(ConsolePublicationError, match="required delivery failed") as raised,
+        invocation(ClearMLConfig(), "train"),
+    ):
+        raise original
+    assert raised.value is original
+    assert events == ["handler", "finish"]
+    _assert_later_owner_is_blocked(isolated_owner_session)
+
+
+def test_incomplete_owner_handler_join_cannot_reenter_during_logging_shutdown(
+    tmp_path: Path,
+) -> None:
+    code = """
+import logging
+import sys
+import threading
+import types
+from clearml_yolo.adapters.clearml import session
+from clearml_yolo.adapters.clearml.console import ConsolePublicationError
+
+class Handler(logging.Handler):
+    def __init__(self):
+        super().__init__()
+        self.background = threading.Thread(target=lambda: threading.Event().wait(30), daemon=True)
+        self.background.start()
+
+    def close(self, wait=False):
+        background = self.background
+        self.background = None
+        if background is not None:
+            try:
+                background.join()
+            except BaseException:
+                pass
+
+handler = Handler()
+class Task:
+    id = 'owned-task'
+    _dev_worker = None
+    _logger = types.SimpleNamespace(_task_handler=handler)
+    failed = False
+
+    @classmethod
+    def init(cls, **kwargs):
+        return task
+
+    def get_output_log_web_page(self):
+        return 'https://example.invalid/task'
+
+    def mark_failed(self, **kwargs):
+        self.failed = True
+
+task = Task()
+sdk = types.ModuleType('clearml')
+sdk.Task = Task
+sys.modules['clearml'] = sdk
+session.active_capture = lambda: object()
+session._start_console_publisher = lambda *args: None
+session.FINALIZATION_TIMEOUT_SECONDS = 0.02
+original = ConsolePublicationError('required delivery failed')
+try:
+    with session.invocation(session.ClearMLConfig(), 'train'):
+        raise original
+except ConsolePublicationError as error:
+    assert error is original
+assert task.failed
+assert handler.background is None
+assert session._INCOMPLETE_OWNER.pid is not None
+print('bounded-owner-exit', flush=True)
+"""
+    result = subprocess.run(  # noqa: S603 - inert fake SDK and test-owned logging thread
+        [sys.executable, "-c", code],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=5,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "bounded-owner-exit" in result.stdout

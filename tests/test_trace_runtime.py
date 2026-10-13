@@ -2,14 +2,13 @@
 
 import gc
 import os
-import re
 import subprocess
 import sys
 from collections.abc import Callable, Iterator
 from pathlib import Path
-from threading import Event, get_ident
+from threading import Event
 from types import SimpleNamespace
-from typing import Any, cast, override
+from typing import Any, cast
 
 import pytest
 from loguru import logger
@@ -18,8 +17,7 @@ from clearml_yolo.adapters.integrations import native_runtime as runtime_module
 from clearml_yolo.adapters.integrations.native_ddp import NativeDDPRelay
 from clearml_yolo.adapters.integrations.training import execute_training
 from clearml_yolo.adapters.observability.tracing import trace_task
-from clearml_yolo.adapters.runtime import gpu_resources, gpu_wait
-from clearml_yolo.adapters.runtime.gpu_resources import GPUDevice, GPUInventory
+from clearml_yolo.adapters.runtime import gpu_resources
 from clearml_yolo.adapters.storage.filesystem import initialize_filesystem, temporary_root
 from clearml_yolo.application.contracts import PreparedDataset
 
@@ -33,32 +31,6 @@ def traces(monkeypatch: pytest.MonkeyPatch) -> Iterator[list[str]]:
         yield messages
     finally:
         logger.remove(sink)
-
-
-class _Inventory(GPUInventory):
-    @override
-    def visible(self) -> tuple[str, ...]:
-        return ("GPU-a", "GPU-b")
-
-    @override
-    def snapshot(self) -> tuple[GPUDevice, ...]:
-        return (GPUDevice("GPU-a", True), GPUDevice("GPU-b", False))
-
-
-def test_gpu_wait_traces_selection_without_exposing_inventory(traces: list[str]) -> None:
-    assert gpu_wait.wait_for_available_gpus(1, inventory=_Inventory()) == (1,)
-    text = "\n".join(traces)
-    assert "START gpu.wait" in text
-    assert "DONE gpu.wait" in text
-    assert "START gpu.selected" in text
-    assert "requested=1 selected=1" in text
-    assert "GPU-a" not in text
-
-
-def test_gpu_wait_invalid_request_preserves_exception(traces: list[str]) -> None:
-    with pytest.raises(ValueError, match="nonnegative"):
-        gpu_wait.wait_for_available_gpus(-1)
-    assert any("FAILED gpu.wait" in message for message in traces)
 
 
 def test_probe_failure_diagnostics_do_not_echo_subprocess_payload(
@@ -144,15 +116,6 @@ def test_native_runtime_generator_traces_enter_and_restore(
         assert not any("native.runtime.restore" in message for message in traces)
     assert SETTINGS["clearml"] is original
     assert any("DONE native.runtime.restore" in message for message in traces)
-
-
-def test_gpu_trace_is_silent_without_opt_in(
-    monkeypatch: pytest.MonkeyPatch,
-    traces: list[str],
-) -> None:
-    monkeypatch.setenv("LOGURU_LEVEL", "INFO")
-    assert gpu_wait.wait_for_available_gpus(0) == ()
-    assert traces == []
 
 
 def test_training_model_load_failure_preserves_original_exception(
@@ -253,7 +216,7 @@ def test_native_restore_is_traced_and_retains_scratch(
     assert any("DONE native.runtime.restore" in message for message in traces)
 
 
-def test_ddp_consumer_span_parents_callback_and_identifies_training(
+def test_ddp_consumer_has_no_sdk_callback_or_terminal_trace_effects(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     traces: list[str],
@@ -263,22 +226,14 @@ def test_ddp_consumer_span_parents_callback_and_identifies_training(
     relay = NativeDDPRelay(None, model, str(tmp_path))
     waits = iter([False, True])
     monkeypatch.setattr(relay, "_stop", SimpleNamespace(wait=lambda _delay: next(waits)))
-    monkeypatch.setattr(relay, "_args", SimpleNamespace())
-    monkeypatch.setattr(relay, "_callbacks", lambda: {"on_train_epoch_end": lambda _trainer: None})
-    monkeypatch.setattr(relay, "_consume", lambda: relay._dispatch({"event": "on_train_epoch_end"}))
+    parsed: list[bool] = []
+    monkeypatch.setattr(relay, "_consume", lambda: parsed.append(True))
     relay._consume_live()
-    consumer = next(message for message in traces if "START ddp.consumer" in message)
-    callback = next(message for message in traces if "START ddp.callback" in message)
-    match = re.search(r"op=([0-9a-f]+)", consumer)
-    assert match is not None
-    assert f"parent={match.group(1)} " in callback
-    assert "stage=train" in consumer
-    assert "stage=train" in callback
-    assert sum("START ddp.consumer" in message for message in traces) == 1
-    assert any("DONE ddp.consumer" in message for message in traces)
+    assert parsed == [True]
+    assert not any("ddp.consumer" in message or "ddp.callback" in message for message in traces)
 
 
-def test_actual_ddp_consumer_callback_inherits_task_context_at_thread_creation(
+def test_actual_ddp_parser_inherits_owner_context_without_async_callback_effects(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     traces: list[str],
@@ -288,13 +243,14 @@ def test_actual_ddp_consumer_callback_inherits_task_context_at_thread_creation(
     relay = NativeDDPRelay(None, model, str(tmp_path))
     release_callback = Event()
     callback_finished = Event()
-    monkeypatch.setattr(relay, "_args", SimpleNamespace())
-    monkeypatch.setattr(relay, "_callbacks", lambda: {"on_train_epoch_end": lambda _trainer: None})
+    contexts: list[str] = []
 
     def consume() -> None:
         if not release_callback.wait(3):
             raise RuntimeError("test did not release consumer callback")
-        relay._dispatch({"event": "on_train_epoch_end"})
+        from clearml_yolo.adapters.observability.tracing import _task_id
+
+        contexts.append(_task_id.get()[1])
         relay._stop.set()
         callback_finished.set()
 
@@ -310,14 +266,8 @@ def test_actual_ddp_consumer_callback_inherits_task_context_at_thread_creation(
         release_callback.set()
         model.trainer.ddp = False
         relay.__exit__(None, None, None)
-    callback = next(message for message in traces if "START ddp.callback" in message)
-    assert "task=owner-task-context " in callback
-    assert "different-caller-context" not in callback
-    assert f"thread={get_ident()} " not in callback
-    assert any(
-        "DONE ddp.consumer" in message and "task=owner-task-context " in message
-        for message in traces
-    )
+    assert contexts == ["owner-task-context"]
+    assert not any("ddp.consumer" in message or "ddp.callback" in message for message in traces)
 
 
 def _interrupting_sink(marker: str, failure: BaseException) -> Callable[[object], None]:

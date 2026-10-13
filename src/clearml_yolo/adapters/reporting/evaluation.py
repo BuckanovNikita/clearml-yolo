@@ -11,6 +11,7 @@ from digital_metrics.types import Metrics
 
 from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.reporting.workbook_identity import annotate_workbook
+from clearml_yolo.adapters.storage.filesystem import write_path
 from clearml_yolo.core.artifact_names import PLOT_METRICS, split_component
 from clearml_yolo.core.evaluation.models import (
     ComputedEvaluation,
@@ -28,6 +29,7 @@ def render_evaluation(
     dashboard_classes: set[str] | None = None,
 ) -> EvaluationArtifacts:
     """Write the original dashboards and plots without repeating matching/scoring."""
+    output_dir = write_path(output_dir)
     metrics = {
         name: Metrics(
             counts_observed=value.counts_observed,
@@ -56,7 +58,7 @@ def render_evaluation(
     # These API-owned outputs must come from this evaluation under either producer convention.
     for metric_name in PLOT_METRICS:
         for plot_suffix in ("", f"_{suffix}"):
-            (output_dir / f"{metric_name}_confidence_intervals{plot_suffix}.png").unlink(
+            write_path(output_dir / f"{metric_name}_confidence_intervals{plot_suffix}.png").unlink(
                 missing_ok=True
             )
     dashboard_path = output_dir / f"full_dashboard_{suffix}.xlsx"
@@ -65,6 +67,8 @@ def render_evaluation(
     plot_paths = {
         name: output_dir / f"{name}_confidence_intervals_{suffix}.png" for name in PLOT_METRICS
     }
+    for artifact in (dashboard_path, dtrk_path, confusion_matrix_path, *plot_paths.values()):
+        write_path(artifact)
     identity = computed.model_identity
     caption = (
         None

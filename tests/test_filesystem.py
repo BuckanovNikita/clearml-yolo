@@ -4,13 +4,78 @@ import json
 import os
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from loguru import logger
 
 from clearml_yolo.adapters.storage.dataset_cache import dataset_cache_root
 from clearml_yolo.adapters.storage.filesystem import model_weights_path, temporary_root, write_path
+
+
+def test_external_application_write_is_rejected_without_creating_destination(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("CY_HOME", str(tmp_path / "workspace"))
+    outside = tmp_path / "outside" / "output.csv"
+    with pytest.raises(ValueError, match="CY_HOME"):
+        write_path(outside)
+    assert not outside.parent.exists()
+
+
+def test_project_write_rejects_symlink_escape(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (root / "link").symlink_to(outside, target_is_directory=True)
+    monkeypatch.setenv("CY_HOME", str(root))
+    with pytest.raises(ValueError, match="CY_HOME"):
+        write_path(root / "link" / "output.csv")
+    assert list(outside.iterdir()) == []
+
+
+def test_external_temp_is_rejected_before_workspace_creation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from clearml_yolo.adapters.runtime.bootstrap import initialize_runtime_environment
+
+    root = tmp_path / "workspace"
+    outside = tmp_path / "outside"
+    monkeypatch.setenv("CY_HOME", str(root))
+    monkeypatch.setenv("CY_RUNTIME_TEMP_ROOT", str(outside))
+    with pytest.raises(ValueError, match="CY_HOME"):
+        initialize_runtime_environment()
+    assert not root.exists()
+    assert not outside.exists()
+
+
+@pytest.mark.parametrize("operation", ["mkdir", "text", "csv", "dataset"])
+def test_storage_operations_validate_destination_before_effects(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, operation: str
+) -> None:
+    import pandas as pd
+
+    from clearml_yolo.adapters.storage import file_io
+    from clearml_yolo.adapters.storage.dataset import prepare_dataset
+
+    monkeypatch.setenv("CY_HOME", str(tmp_path / "workspace"))
+    external = tmp_path / "external"
+    external.mkdir()
+    selected = external / "existing.csv"
+    selected.write_text("unchanged")
+    operations: dict[str, Callable[[], object]] = {
+        "mkdir": lambda: file_io.mkdir(external / "created"),
+        "text": lambda: file_io.write_text(selected, "changed"),
+        "csv": lambda: file_io.write_csv(pd.DataFrame({"value": [1]}), selected),
+        "dataset": lambda: prepare_dataset(tmp_path / "input.csv", external / "dataset"),
+    }
+    with pytest.raises(ValueError, match="CY_HOME"):
+        operations[operation]()
+    assert selected.read_text() == "unchanged"
+    assert list(external.iterdir()) == [selected]
 
 
 def test_dataset_default_uses_cy_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -26,7 +91,8 @@ def test_dataset_default_ignores_general_xdg_cache(
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "home" / ".cache"))
     expected = tmp_path / "workspace" / ".cache" / "clearml-yolo" / "datasets"
     assert dataset_cache_root(None) == expected
-    assert dataset_cache_root(tmp_path / "chosen") == tmp_path / "chosen"
+    with pytest.raises(ValueError, match="CY_HOME"):
+        dataset_cache_root(tmp_path / "chosen")
 
 
 @pytest.mark.parametrize(
@@ -105,52 +171,37 @@ print(json.dumps([str(cy_home()), str(runs_root()), str(temporary_root())]))
     ]
 
 
-def test_explicit_home_destination_warns_once_without_relocation(
+def test_contained_home_destination_is_accepted_without_relocation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     home = tmp_path / "home"
     monkeypatch.setattr(Path, "home", lambda: home)
+    monkeypatch.setenv("CY_HOME", str(home))
     selected = home / "chosen.csv"
-    messages: list[str] = []
-    handle = logger.add(lambda message: messages.append(str(message)), level="WARNING")
-    try:
-        assert write_path(selected) == selected
-        assert write_path(selected) == selected
-    finally:
-        logger.remove(handle)
-    assert len(messages) == 1
-    assert "physically inside user home" in messages[0]
+    assert write_path(selected) == selected
+    assert not selected.exists()
 
 
-@pytest.mark.parametrize("points_into_home", [False, True])
-def test_home_warning_follows_physical_symlink_destination(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, points_into_home: bool
+def test_symlinks_within_workspace_remain_valid_destinations(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    home = tmp_path / "home"
-    outside = tmp_path / "outside"
-    home.mkdir()
-    outside.mkdir()
-    monkeypatch.setattr(Path, "home", lambda: home)
-    link = (outside if points_into_home else home) / "link"
-    destination = home if points_into_home else outside
-    link.symlink_to(destination, target_is_directory=True)
-    messages: list[str] = []
-    handle = logger.add(lambda message: messages.append(str(message)), level="WARNING")
-    try:
-        assert write_path(link / "output.csv") == link / "output.csv"
-    finally:
-        logger.remove(handle)
-    assert bool(messages) == points_into_home
+    target = tmp_path / "real"
+    target.mkdir()
+    link = tmp_path / "alias"
+    link.symlink_to(target, target_is_directory=True)
+    monkeypatch.setenv("CY_HOME", str(tmp_path))
+    assert write_path(link / "output.csv") == link / "output.csv"
 
 
-def test_project_temp_directory_honors_explicit_external_selection(
+def test_project_temp_directory_rejects_explicit_external_selection(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("CY_HOME", str(tmp_path / "workspace"))
     selected = tmp_path / "chosen-temp"
     monkeypatch.setenv("CY_RUNTIME_TEMP_ROOT", str(selected))
-    assert temporary_root() == selected
-    assert selected.is_dir()
+    with pytest.raises(ValueError, match="CY_HOME"):
+        temporary_root()
+    assert not selected.exists()
 
 
 def test_project_temp_files_use_invocation_arena_without_changing_global_temp(

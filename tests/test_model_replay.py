@@ -1,4 +1,4 @@
-"""Replay keeps initialized runtime ownership and admitted device assignment."""
+"""Replay keeps initialized runtime ownership and native device settings."""
 
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -31,7 +31,6 @@ def isolated_owner(monkeypatch: pytest.MonkeyPatch) -> list[str]:
     monkeypatch.setattr(common, "native_runtime", lambda: runtime("ultralytics"))
     monkeypatch.setattr(common, "detector_runtime", lambda: runtime("detector"))
     monkeypatch.setattr(common, "invocation", invocation)
-    monkeypatch.setattr(common, "wait_for_available_gpus", lambda count, **kwargs: (3,))
     monkeypatch.setattr(common, "release_training_memory", lambda: None)
     monkeypatch.setattr(common, "initialize_naming", lambda task: events.append("naming"))
     monkeypatch.setattr(session, "record_run_configuration", lambda task, values: None)
@@ -44,8 +43,6 @@ def _configuration(backend: str, preset: str) -> DictConfig:
             "model": {"backend": backend, "preset": preset},
             "ultralytics_predict": {"device": [-1]},
             "clearml": {},
-            "queue": {"enabled": False},
-            "autogpu": {"enabled": True},
         }
     )
 
@@ -77,7 +74,7 @@ def test_replay_cannot_cross_initialized_runtime_family(
     assert "naming" not in isolated_owner
 
 
-def test_native_replay_materializes_defaults_and_keeps_selected_gpu(
+def test_native_replay_materializes_defaults_and_preserves_replayed_device(
     monkeypatch: pytest.MonkeyPatch, isolated_owner: list[str]
 ) -> None:
     observed: list[dict[str, Any]] = []
@@ -88,14 +85,17 @@ def test_native_replay_materializes_defaults_and_keeps_selected_gpu(
     monkeypatch.setattr(
         common,
         "replay_configuration",
-        lambda task, values: values | {"model": {"backend": "rfdetr", "preset": "small"}},
+        lambda task, values: (
+            values
+            | {"model": {"backend": "rfdetr", "preset": "small", "predict": {"device": "cuda:3"}}}
+        ),
     )
     config = _configuration("deimv2", "s")
     common.execute_owned("predict", config, workflow)
     assert observed[0]["backend"] == "rfdetr"
-    assert observed[0]["predict"]["device"] == [3]
+    assert observed[0]["predict"]["device"] == "cuda:3"
     assert observed[0]["train"]["imgsz"] == 512
-    assert config.model.predict.device is None
+    assert config.model.predict.device == "cuda:3"
     assert isolated_owner == ["detector", "naming"]
 
 
@@ -132,11 +132,12 @@ def test_detector_training_replay_uses_model_group_without_importing_general_int
     monkeypatch.setattr(common, "invocation", invocation)
     monkeypatch.setattr(common, "replay_configuration", lambda task, values: values)
     config = _configuration(backend, preset)
+    config.model["train"] = {"device": "cuda:3"}
     config.ultralytics = stage_settings(native_defaults(), "train")
     common.execute_owned(command, config, workflow)
     assert connected == []
     assert observed[0]["backend"] == backend
-    assert observed[0]["train"]["device"] == [3]
+    assert observed[0]["train"]["device"] == "cuda:3"
     assert observed[0]["train"]["grad_accum_steps"] == 1
 
 
@@ -175,8 +176,6 @@ def test_export_replay_retains_inputs_and_ignores_result_evidence(
             "model": {"backend": "fasterrcnn", "preset": "resnet50_fpn"},
             "export": settings,
             "clearml": {},
-            "queue": {"enabled": False},
-            "autogpu": {"enabled": True},
         }
     )
     common.execute_owned("export", config, workflow)

@@ -1,10 +1,8 @@
 # Controlled execution and runtime ownership
 
-The [feature 024 specification](../specs/024-runtime-isolation/spec.md) and
-[GPU execution contract](../specs/022-simple-gpu-wait/contracts/execution.md) govern
-execution controls and supervised workers. [Filesystem ownership](filesystem-policy.md)
-defines project paths and retained scratch. Dated evidence records its original behavior;
-the current boundary preserves normal library configuration and cache discovery.
+[Direct execution and shared queue](queue.md) governs current execution controls and
+guardians. [Filesystem ownership](filesystem-policy.md) defines project containment and
+retained scratch. Feature 024 and older GPU specifications remain historical records.
 
 ## Selected configuration export
 
@@ -91,42 +89,67 @@ shown in [filesystem ownership](filesystem-policy.md#reuse-earlier-project-local
 CLI arena. Its ClearML setting and callback changes are in memory only and restore on
 exit without writing the Ultralytics settings file. The invocation owner remains the only
 tracking owner. Fresh DDP trainers scope callback ownership during construction and
-training, so workers do not require persisted settings or import-time mutations.
+training, so workers do not require persisted settings or import-time mutations. Rank zero
+appends live scalars to the invocation journal; the relay consumer parses local event
+records without SDK callbacks. Installed callbacks replay synchronously in the owner
+under a deadline, suppressing scalar duplicates already sent through the journal.
 
-New detectors use `detector_runtime()` after admission with the same project scratch and
+New detectors use `detector_runtime()` during direct execution with the same project scratch and
 ClearML finalization boundaries. RF-DETR and Roboflow retain their own configuration and
 cache defaults. DEIM uses the verified private source loader and restores ambient
 pycocotools module identities around upstream import/dataset construction. Concurrent
 detector families require separate processes because the DEIM module alias boundary is
 sequential. Replay rejects switching between initialized YOLO and new-detector families.
 
-Shared GPU coordination remains user-wide and outside invocation scratch. Compatible
-registry state coordinates projects; incompatible or corrupt state fails closed without
-migration or deletion. Owned process cleanup remains mandatory before releasing GPU
-capacity. Retaining scratch does not establish successful descendant cleanup or publication.
+## Cancellation and recovery
 
-During supervised shutdown, additional SIGINT/SIGTERM signals are deferred until
-bounded cleanup finishes; prior handlers are restored and cancellation still reports
-failure. On Linux, a private inherited launch marker and process start identities
-identify native children even when Torch starts ranks in separate sessions or their
-launcher exits first. Cleanup signals confirmed identities through Linux pidfds and
-requires two stable empty descendant scans before releasing capacity. An exit or fork
-that invalidates discovery triggers another bounded cleanup iteration; failure to
-establish stable emptiness remains an error. Linux requires pidfd
-support and readable `/proc` state. Recovering already-orphaned ranks also requires
-environment visibility for same-user processes created since the worker started.
-An unrelated newer non-dumpable process can therefore prevent verified cleanup:
-confirmed job processes are terminated, but unknown ownership remains an error.
-Inaccessible state never proves a process exited. Environment contents are not logged.
-Native children must retain the inherited marker for discovery. Supervised jobs use
-this provenance and retained process identities, never numeric parent/session
-relationships alone. The private compatibility path without a launch marker retains
-its older ancestry/session fallback and cannot provide the same PID-reuse guarantee.
-Windows retains Job Object cleanup; other POSIX systems retain process-group cleanup.
-This does not provide recovery after forcibly killing the supervisor itself.
+Direct commands do not acquire queue resources. A native invocation scope marks and
+cleans newly launched Linux descendants using ancestry, subreaper adoption and Python
+fork birth records while preserving pre-existing helper branches and any inherited
+guardian marker. A newly adopted unmarked child with ambiguous origin is left untouched
+and reported as unverifiable cleanup; missing provenance never authorizes a signal. Queued commands use a separate same-user
+Linux subreaper guardian which owns GPU locks throughout the whole pipeline. Worker exit
+does not release those locks. Repeated SIGINT/SIGTERM defers interruption during bounded
+TERM/KILL descendant cleanup. PID/start-time checks, inherited markers, pidfds and adopted
+children protect against PID reuse and detached ranks. Unknown or inaccessible ownership
+blocks release. Guardian death leaves durable quarantine; only owner `cy-queue recover ID`
+after proven cleanup releases it. No heartbeat expiry, missing parent or low GPU-memory
+observation establishes cleanup. Marked supervised jobs discover new ownership from
+the inherited marker, never a numeric parent/session relationship alone. Retained
+identities are refreshed before use. Empty discovery must remain stable across two
+scans; disappearing entries or changed identities require another bounded attempt.
+Environment-access denial is cleared only after confirming process exit, while
+living or unverifiable candidates continue to block release. Old cancellation work
+is retained in generic process supervision and guardian regression tests; forced
+termination is covered separately.
+Normal queue cancellation gives the verified pipeline owner up to 90 seconds to
+clean native workers and finish publication before the guardian applies its final
+descendant TERM/KILL barrier. New descendant identities remain recorded during
+that grace period, and repeated cancellation does not reset the deadline.
 
-Stop a job with `Ctrl+C` in its original terminal and wait for cleanup to finish.
-For an existing stranded ticket, inspect that ticket's supervisor/worker lock owners
-on the machine running the job and stop the identified invocation. Do not remove
-registry or lock files while their owners are alive: deleting files neither stops
-GPU work nor safely releases its reservation.
+## Console capture and publication
+
+FD-level append-only logs capture Python/native/DDP stdout/stderr beneath the project.
+A network-independent mirror preserves terminal output and saved terminal capability.
+An attach-only publisher batches console/scalar events for the existing task and owns no
+lifecycle transitions. Diagnostics use a separate local file to prevent feedback loops.
+An acknowledged workload checkpoint precedes SDK close/completion. Final offsets include
+SDK shutdown output and a finite deadline governs publisher shutdown; uncertain delivery is not
+automatically replayed. Required publication failure fails the run and retains its logs,
+while cleanup preserves the original computation exception. The owner task finalization
+uses a 60-second Unix main-thread deadline for required uploads, flush, readback and
+close. The budget includes both the explicit flush and the SDK's own close-time
+drain; publisher receipt waits retain their separate shorter bound. Incompatible
+embedding timers fail explicitly.
+If task initialization or owner shutdown cannot complete, later invocations in that
+process fail before creating or reusing a ClearML task. This includes later members
+of a sequential Hydra sweep. Relaunch them in a fresh process after inspecting the
+original failure; the adapter does not reset the SDK singleton or replay uncertain
+deliveries. A normally closed owner permits the next sequential invocation.
+Failure cleanup stops that owner's status monitor before marking failure, so the
+SDK cannot treat the application's own transition as an external abort. Incomplete
+closure detaches only the owner's task/reporter exit callbacks and bounds closure
+of its cached logging handler. Other SDK owners, handlers and configuration remain
+outside that cleanup. The original safe error diagnostic precedes the publication
+barrier; full local logs retain the outer traceback as well.
+See [diagnostics](diagnostics.md) and dated acceptance evidence for actual remote visibility.

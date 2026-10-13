@@ -4,6 +4,7 @@ import hashlib
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from typing import Any
 
 import pandas as pd
@@ -47,7 +48,7 @@ def write_prediction_provenance(
     checkpoint_hash = file_digest(checkpoint) if checkpoint.is_file() else None
     if model_identity is not None and model_identity.checkpoint_sha256 != checkpoint_hash:
         raise ValueError("Model identity does not match prediction checkpoint bytes")
-    _provenance_path(predictions).write_text(
+    write_path(_provenance_path(predictions)).write_text(
         json.dumps(
             {
                 "predictions_sha256": file_digest(predictions),
@@ -118,10 +119,20 @@ def _read_rows(path: Path) -> pd.DataFrame:
 
 @trace_operation("clearml.results.csv.write")
 def _atomic_csv(frame: pd.DataFrame, path: Path) -> None:
+    path = write_path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    pending = path.with_suffix(".pending")
-    frame.to_csv(pending, index=False, float_format="%.17g")
-    pending.replace(path)
+    pending: Path | None = None
+    try:
+        with NamedTemporaryFile(
+            mode="w", encoding="utf-8", newline="", dir=path.parent,
+            prefix=f".{path.name}-", suffix=".pending", delete=False,
+        ) as stream:
+            pending = Path(stream.name)
+            frame.to_csv(stream, index=False, float_format="%.17g")
+        pending.replace(write_path(path))
+    finally:
+        if pending is not None:
+            pending.unlink(missing_ok=True)
 
 
 @dataclass
@@ -192,7 +203,7 @@ class _ResultBundle:
         _atomic_csv(output, path)
         self.contexts[key] = context, path
         # Persist the index too: failures leave both the shards and their identities.
-        manifest = self.directory / "contexts.json"
+        manifest = write_path(self.directory / "contexts.json")
         manifest.write_text(
             json.dumps(
                 [
@@ -221,7 +232,7 @@ class _ResultBundle:
 
 def _bundle(task: Any, output_dir: Path) -> _ResultBundle:
     def create() -> _ResultBundle:
-        bundle = _ResultBundle(task, write_path(output_dir) / "result_publication")
+        bundle = _ResultBundle(task, write_path(output_dir / "result_publication"))
         register_finalizer(task, bundle.finalize)
         return bundle
 

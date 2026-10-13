@@ -43,8 +43,10 @@ def _complex_workbook(path: Path) -> None:
 def test_banner_all_sheets_preserves_references_and_print_structure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("CY_HOME", str(tmp_path / "workspace"))
-    path = tmp_path / "workbook.xlsx"
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    monkeypatch.setenv("CY_HOME", str(workspace))
+    path = workspace / "workbook.xlsx"
     _complex_workbook(path)
     original = path.read_bytes()
     identity = ModelIdentity(

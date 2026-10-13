@@ -20,6 +20,17 @@ from workflow_dependencies import (
 )
 
 
+@pytest.fixture(autouse=True)
+def isolate_fake_cli_and_console(monkeypatch: pytest.MonkeyPatch) -> None:
+    """These invocation tests provide their own composed config and fake SDK task."""
+    from clearml_yolo.entrypoints.hydra import common
+
+    monkeypatch.setattr(common, "validate_launch_arguments", lambda name: None)
+    monkeypatch.setattr(
+        "clearml_yolo.adapters.clearml.session._start_console_publisher", lambda *_args: None
+    )
+
+
 def test_file_resolver_sees_remote_inputs_and_derived_output(
     monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:

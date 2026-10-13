@@ -397,7 +397,9 @@ class RejectRuntime(importlib.abc.MetaPathFinder):
             'clearml', 'torch', 'ultralytics', 'fiftyone',
             'clearml_yolo.entrypoints.composition',
             'clearml_yolo.application.use_cases',
-            'clearml_yolo.adapters.runtime.gpu_runtime',
+            'clearml_yolo.adapters.queue',
+            'clearml_yolo.application.queue',
+            'clearml_yolo.core.queue',
         )
         if any(fullname == name or fullname.startswith(name + '.') for name in forbidden):
             raise AssertionError('Configuration export imported runtime: ' + fullname)

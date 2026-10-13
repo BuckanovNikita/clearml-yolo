@@ -12,7 +12,6 @@ from clearml_yolo.adapters.storage.filesystem import cy_home
 from clearml_yolo.adapters.yolo.config import native_defaults, prediction_defaults, stage_settings
 from clearml_yolo.application.contracts import ClearMLConfig, ModelRef
 from clearml_yolo.core.evaluation.models import EvaluationConfig
-from clearml_yolo.core.execution import AutoGPUControl
 from clearml_yolo.core.export_requests import ExportSettings
 from clearml_yolo.core.models import PRESETS, model_preset
 from clearml_yolo.core.publication import FiftyOneConfig
@@ -31,9 +30,6 @@ def _native() -> dict[str, Any]:
     }
     groups.append({"ultralytics_predict": "_defaults"})
     fields["ultralytics_predict"] = prediction_defaults()
-    fields["queue"] = make_config(enabled=True)
-    fields["autogpu"] = AutoGPUControl().model_dump()
-    groups.append({"override hydra/launcher": "cy_queue"})
     return {"hydra_defaults": groups, **fields}
 
 
@@ -53,11 +49,6 @@ def register_configs() -> None:
                 dir="${cy_home:}/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}-${cy_run_token:}"
             ),
         )
-    )
-    store(
-        {"_target_": "hydra_plugins.cy_queue.launcher.QueueLauncher"},
-        group="hydra/launcher",
-        name="cy_queue",
     )
     tracking = builds(ClearMLConfig, populate_full_signature=True)
     publishing = builds(FiftyOneConfig, populate_full_signature=True)
@@ -80,19 +71,13 @@ def register_configs() -> None:
     store({}, group="ultralytics_predict", name="_defaults")
     store(
         make_config(
-            hydra_defaults=[
-                "_self_",
-                {"model": "fasterrcnn/resnet50_fpn"},
-                {"override hydra/launcher": "cy_queue"},
-            ],
+            hydra_defaults=["_self_", {"model": "fasterrcnn/resnet50_fpn"}],
             model={},
             export=ExportSettings().model_dump(mode="json"),
             weights=None,
             ground_truth=None,
             output_dir=None,
             clearml=tracking,
-            queue=make_config(enabled=True),
-            autogpu=AutoGPUControl().model_dump(),
         ),
         name="export",
     )

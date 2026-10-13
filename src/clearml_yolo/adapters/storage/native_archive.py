@@ -7,6 +7,7 @@ from pathlib import Path
 import yaml
 
 from clearml_yolo.adapters.observability.tracing import trace_operation
+from clearml_yolo.adapters.storage.filesystem import write_path
 from clearml_yolo.core import artifact_names
 from clearml_yolo.core.redaction import sanitize_configuration
 
@@ -14,7 +15,10 @@ from clearml_yolo.core.redaction import sanitize_configuration
 @trace_operation("storage.native.archive")
 def archive_native_outputs(save_dir: Path, destination: Path, *, role: str, split: str) -> Path:
     """Archive native tabular/text outputs without copying source-derived images."""
-    archive = destination / f"native_outputs_{role}_{artifact_names.split_component(split)}.zip"
+    destination = write_path(destination)
+    archive = write_path(
+        destination / f"native_outputs_{role}_{artifact_names.split_component(split)}.zip"
+    )
     allowed = {".csv", ".json", ".txt", ".yaml", ".yml"}
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
         if save_dir.is_dir():

@@ -174,7 +174,7 @@ def test_deim_train_applies_native_recipe_before_solver_construction(
     assert all(loader.collate_fn.scales == [128, 256] for loader in loaders)
 
 
-def test_deim_missing_source_is_actionable() -> None:
+def test_deim_missing_source_is_actionable(tmp_path: Path) -> None:
     from clearml_yolo.adapters.deim.backend import train
 
     prepared = PreparedDataset(
@@ -185,7 +185,9 @@ def test_deim_missing_source_is_actionable() -> None:
         artifacts=[],
     )
     with pytest.raises(ValueError, match="source_dir"):
-        train(ModelConfig(backend="deimv2", preset="s"), prepared, Path("out"), lambda *_: None)
+        train(
+            ModelConfig(backend="deimv2", preset="s"), prepared, tmp_path / "out", lambda *_: None
+        )
 
 
 def test_deim_pretrained_never_silently_falls_back_to_random(tmp_path: Path) -> None:

@@ -107,7 +107,7 @@ os.chdir(root.parent)
 assert initialize_runtime_environment() == root
 assert os.environ['HOME'] == home
 assert not {'clearml', 'fiftyone', 'matplotlib', 'torch', 'loguru', 'pydantic'} & set(sys.modules)
-assert os.environ['CY_GPU_QUEUE_ROOT'] == str(root / 'user-state/clearml-yolo/queue')
+assert 'CY_GPU_QUEUE_ROOT' not in os.environ
 assert os.environ['XDG_STATE_HOME'] == str(root / 'user-state')
 """,
         tmp_path,
@@ -226,9 +226,7 @@ assert (current / 'own.tmp').read_text() == 'keep too'
 
 
 @pytest.mark.parametrize("selected", ["relative-temp", "outside"])
-def test_explicit_project_temp_root_accepts_uncontained_paths(
-    tmp_path: Path, selected: str
-) -> None:
+def test_explicit_project_temp_root_requires_containment(tmp_path: Path, selected: str) -> None:
     expected = (
         tmp_path / selected
         if selected == "relative-temp"
@@ -250,20 +248,27 @@ assert arena.is_dir()
             "EXPECTED_TEMP": str(expected),
         },
     )
-    assert result.returncode == 0, result.stderr
+    if selected == "outside":
+        assert result.returncode != 0
+        assert "CY_HOME" in result.stderr
+        assert not expected.exists()
+    else:
+        assert result.returncode == 0, result.stderr
 
 
-def test_queue_root_is_shared_and_existing_selection_is_unchanged(tmp_path: Path) -> None:
+def test_bootstrap_never_creates_queue_state_and_preserves_ambient_selection(
+    tmp_path: Path,
+) -> None:
     result = _run(
         """
 import os
 from pathlib import Path
 from clearml_yolo.adapters.runtime.bootstrap import initialize_runtime_environment
 first = initialize_runtime_environment()
-queue = os.environ['CY_GPU_QUEUE_ROOT']
+assert 'CY_GPU_QUEUE_ROOT' not in os.environ
 os.environ['CY_HOME'] = str(first / 'other-workspace')
 assert initialize_runtime_environment() != first
-assert os.environ['CY_GPU_QUEUE_ROOT'] == queue
+assert 'CY_GPU_QUEUE_ROOT' not in os.environ
 assert os.environ['XDG_STATE_HOME'] == str(first / 'user-state')
 os.environ['CY_GPU_QUEUE_ROOT'] = 'caller-selected/queue'
 initialize_runtime_environment()

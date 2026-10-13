@@ -306,13 +306,16 @@ def test_snapshot_accepts_reported_eight_card_memory_usage(
             zip(uuids, (1215, 3, 409, 3, 3, 3, 3, 3), strict=True)
         )
     )
+    from clearml_yolo.adapters.queue.inventory import QueueGPUInventory
     from clearml_yolo.adapters.runtime import gpu_resources
-    from clearml_yolo.adapters.runtime.gpu_wait import wait_for_available_gpus
 
     # Reproduce a three-device request even when visibility includes the two
     # cards with retained allocations from the user's report.
     monkeypatch.setattr(gpu_resources, "_probe_visible_uuids", lambda: uuids[:3])
-    assert wait_for_available_gpus(3) == (0, 1, 2)
+    observations = QueueGPUInventory().snapshot()
+    assert [(card.uuid, card.available) for card in observations] == [
+        (uuid, True) for uuid in uuids[:3]
+    ]
 
 
 def test_snapshot_applies_custom_fractional_limit(monkeypatch: pytest.MonkeyPatch) -> None:

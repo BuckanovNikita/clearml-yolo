@@ -17,6 +17,7 @@ from clearml_yolo.adapters.fasterrcnn.evaluation import evaluate_coco
 from clearml_yolo.adapters.fasterrcnn.inference import execution_device
 from clearml_yolo.adapters.fasterrcnn.model import build_model, checkpoint_state
 from clearml_yolo.adapters.fasterrcnn.transform import canvas_size
+from clearml_yolo.adapters.storage.filesystem import validate_output_tree, write_path
 from clearml_yolo.application.contracts import PreparedDataset
 from clearml_yolo.core.models import (
     BackendTrainResult,
@@ -67,6 +68,7 @@ def _training_epoch(
 def _checkpoint(
     model: Any, path: Path, epoch: int, score: float, metadata: CheckpointMetadata
 ) -> None:
+    path = write_path(path)
     torch.save(
         {
             "state_dict": model.state_dict(),
@@ -85,6 +87,7 @@ def train_native(
     output: Path,
     report: Callable[[str, float, int], None],
 ) -> BackendTrainResult:
+    output = validate_output_tree(output)
     settings = config.train
     device = execution_device(settings.device)
     train_data, validation_data, names = prepared_datasets(prepared)
@@ -138,11 +141,11 @@ def train_native(
         },
     )
     output.mkdir(parents=True, exist_ok=True)
-    best_path = output / "best.pth"
-    metrics_path = output / "metrics.csv"
+    best_path = write_path(output / "best.pth")
+    metrics_path = write_path(output / "metrics.csv")
     best_score = -math.inf
     best_metrics: dict[str, float] = {}
-    with metrics_path.open("w", newline="", encoding="utf-8") as stream:
+    with write_path(metrics_path).open("w", newline="", encoding="utf-8") as stream:
         writer = csv.DictWriter(
             stream,
             fieldnames=[

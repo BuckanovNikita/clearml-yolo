@@ -1,32 +1,46 @@
-"""Project workspace paths preserve library defaults and explicit destinations."""
+"""Contained project writes with unchanged external input and library paths."""
 
 import os
 from pathlib import Path
-
-from loguru import logger
 
 from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.runtime.bootstrap import (
     initialize_runtime_environment,
     invocation_temporary_root,
+    project_write_path,
 )
-
-_WARNED_HOME_PATHS: set[Path] = set()
 
 
 def write_path(value: str | Path) -> Path:
-    """Preserve an explicit path, warning once about its physical home destination."""
-    path = Path(value).expanduser()
-    resolved = path.resolve()
-    if resolved.is_relative_to(Path.home().resolve()) and resolved not in _WARNED_HOME_PATHS:
-        logger.warning("Write destination is physically inside user home: {}", resolved)
-        _WARNED_HOME_PATHS.add(resolved)
-    return path
+    """Validate containment before a project-owned write or directory creation."""
+    return project_write_path(value)
+
+
+def validate_output_tree(value: str | Path) -> Path:
+    """Preflight existing native outputs, including contained directory aliases.
+
+    Native trainers choose dynamic checkpoint/plot names. Check their selected
+    output subtree before handing them control without changing SDK cache policy.
+    This is a preflight for cooperating callers, not protection from concurrent
+    replacement of filesystem entries after validation.
+    """
+    root = write_path(value)
+    pending = [root]
+    visited: set[Path] = set()
+    while pending:
+        path = write_path(pending.pop())
+        resolved = path.resolve()
+        if resolved in visited:
+            continue
+        visited.add(resolved)
+        if path.is_dir():
+            pending.extend(path.iterdir())
+    return root
 
 
 def cy_home() -> Path:
     """Resolve the workspace; CLI startup freezes relative values before any chdir."""
-    return write_path(os.environ.get("CY_HOME") or Path.cwd()).resolve()
+    return Path(os.environ.get("CY_HOME") or Path.cwd()).expanduser().resolve()
 
 
 def runs_root() -> Path:

@@ -1,6 +1,7 @@
 """Native ClearML callbacks are scoped to the owner process."""
 
 import os
+from inspect import unwrap
 from pathlib import Path
 from typing import Any
 
@@ -36,7 +37,9 @@ def test_owner_enables_every_installed_callback_and_restores_globals(
         assert set(integration.callbacks) == set(installed)
         assert os.environ.get("YOLO_CONFIG_DIR") == previous
         assert Path(SETTINGS.file).read_bytes() == settings_bytes
-        assert integration.callbacks["on_train_epoch_end"] is installed["on_train_epoch_end"]
+        assert (
+            unwrap(integration.callbacks["on_train_epoch_end"]) is installed["on_train_epoch_end"]
+        )
         assert (
             integration.callbacks["on_pretrain_routine_start"]
             is not installed["on_pretrain_routine_start"]
@@ -250,7 +253,10 @@ def test_native_general_redacts_credentials_without_changing_training_args(
     monkeypatch.setattr(
         integration,
         "on_pretrain_routine_start",
-        lambda trainer: owner.connect(vars(trainer.args), name="General"),
+        # This optional SDK export is populated dynamically by the integration module.
+        lambda trainer: integration.__dict__["Task"].current_task().connect(
+            vars(trainer.args), name="General"
+        ),
     )
     monkeypatch.setenv(OWNER_TASK_ENV, owner.id)
     monkeypatch.delenv("LOCAL_RANK", raising=False)
@@ -267,6 +273,7 @@ def test_fresh_ddp_trainer_scopes_callbacks_without_changing_sdk_settings(tmp_pa
 
     script = """
 import os
+from inspect import unwrap
 from pathlib import Path
 from unittest.mock import patch
 from ultralytics.utils import SETTINGS
@@ -283,6 +290,7 @@ def inspect(self, *args, **kwargs):
     assert SETTINGS['clearml'] is False
     assert integration.callbacks == {}
     assert Path(SETTINGS.file).read_bytes() == before
+    self.save_dir = Path(os.environ['CY_HOME']) / 'native'
     calls.append('scoped')
 with (
     patch.object(DetectionTrainer, '__init__', inspect),
@@ -298,10 +306,18 @@ assert integration.callbacks is old_callbacks
 assert Path(SETTINGS.file).read_bytes() == before
 """
     result = subprocess.run(  # noqa: S603 - fresh test-owned DDP worker environment
-        [sys.executable, "-c", script], capture_output=True, text=True,
-        env=dict(os.environ, CY_HOME=str(tmp_path / "project"), LOCAL_RANK="0",
-                 CY_CLEARML_OWNER_PID=str(os.getpid()), CY_CLEARML_OWNER_TASK_ID="owner",
-                 YOLO_CONFIG_DIR=str(tmp_path / "user-settings")),
-        timeout=45, check=False,
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        env=dict(
+            os.environ,
+            CY_HOME=str(tmp_path / "project"),
+            LOCAL_RANK="0",
+            CY_CLEARML_OWNER_PID=str(os.getpid()),
+            CY_CLEARML_OWNER_TASK_ID="owner",
+            YOLO_CONFIG_DIR=str(tmp_path / "user-settings"),
+        ),
+        timeout=45,
+        check=False,
     )
     assert result.returncode == 0, result.stderr

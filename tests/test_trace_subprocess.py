@@ -72,7 +72,7 @@ def test_real_signal_during_sink_emission_still_interrupts(event: str, signal_na
             raise AssertionError("real signal swallowed by diagnostics")
         finally:
             logger.remove(sink)
-        assert bool(entered) == {event != 'START command.signal'!r}
+        assert bool(entered) == {event != "START command.signal"!r}
         assert signal.getsignal(signal.SIGTERM) is before
         assert tracing._state.active == {{}}
         assert tracing._state.monitor is None
@@ -93,6 +93,7 @@ def test_watchdog_covers_actual_invocation_closure_and_command_return() -> None:
         task = Mock(id="owned-task", name="example", artifacts={})
         task.flush.return_value = True
         task.close.side_effect = lambda: threading.Event().wait(0.14)
+        task.is_main_task.return_value = False
         sdk = types.ModuleType("clearml")
         sdk.Task = Mock()
         sdk.Task.init.return_value = task
@@ -100,6 +101,8 @@ def test_watchdog_covers_actual_invocation_closure_and_command_return() -> None:
         sdk.OutputModel = Mock()
         sys.modules["clearml"] = sdk
         from clearml_yolo.adapters.clearml import session
+        session._start_console_publisher = lambda *_args: None
+        task.get_output_log_web_page.return_value = "https://clearml.example/tasks/owned-task"
         @tracing.trace_command("closure")
         def run():
             with invocation(ClearMLConfig(), "test"):

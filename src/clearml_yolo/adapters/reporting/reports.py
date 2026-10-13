@@ -6,6 +6,7 @@ from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.reporting.workbook_identity import (
     deannotated_workbook,
 )
+from clearml_yolo.adapters.storage.filesystem import write_path
 
 
 @trace_operation("report.build")
@@ -16,6 +17,8 @@ def build_reports(
     business_path: Path,
     config_path: str | Path | None,
 ) -> None:
+    dev_path = write_path(dev_path)
+    business_path = write_path(business_path)
     with trace_operation("report.backend.import"):
         from report_generator.config import Config
         from report_generator.v2 import (

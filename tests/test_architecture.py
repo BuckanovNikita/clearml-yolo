@@ -23,9 +23,7 @@ SRC = ROOT / "src"
 
 @pytest.fixture(scope="module")
 def graph() -> grimp.ImportGraph:
-    imported = grimp.build_graph(
-        "clearml_yolo", "hydra_plugins.cy_queue", include_external_packages=True, cache_dir=None
-    )
+    imported = grimp.build_graph("clearml_yolo", include_external_packages=True, cache_dir=None)
     architecture.add_dynamic_imports(imported, SRC)
     return imported
 
@@ -86,6 +84,37 @@ def test_injected_forbidden_dependencies_are_rejected(
     candidate.add_import(importer=importer, imported=imported)
     findings = architecture.graph_findings(candidate)
     assert any(message in finding for finding in findings), findings
+
+
+@pytest.mark.parametrize(
+    ("importer", "imported"),
+    [
+        ("clearml_yolo.entrypoints.hydra.common", "clearml_yolo.adapters.queue.runtime"),
+        ("clearml_yolo.entrypoints.composition", "clearml_yolo.application.queue"),
+        ("clearml_yolo.entrypoints.pipeline", "textual"),
+        ("clearml_yolo.adapters.queue.guardian", "clearml"),
+        ("clearml_yolo.adapters.queue.storage", "torch"),
+        ("clearml_yolo.application.queue", "hydra"),
+    ],
+)
+def test_direct_queue_and_sdk_boundaries_reject_injected_edges(
+    importer: str,
+    imported: str,
+) -> None:
+    candidate = grimp.ImportGraph()
+    candidate.add_module(importer)
+    candidate.add_module(imported)
+    candidate.add_import(importer=importer, imported=imported)
+    assert architecture.graph_findings(candidate)
+
+
+def test_dynamic_launch_targets_cannot_bypass_direct_queue_boundary() -> None:
+    assert architecture.launch_target_findings(
+        "clearml_yolo.entrypoints.hydra.common", {"clearml_yolo.adapters.queue.guardian"}
+    )
+    assert not architecture.launch_target_findings(
+        "clearml_yolo.adapters.queue.runtime", {"clearml_yolo.adapters.queue.guardian"}
+    )
 
 
 def test_transitive_adapter_escape_cannot_hide_behind_application_helper() -> None:
@@ -211,10 +240,11 @@ def test_runtime_targets_resolve_to_shipped_modules_and_no_legacy_paths(
     graph: grimp.ImportGraph,
 ) -> None:
     targets = architecture.runtime_targets(SRC, ROOT / "pyproject.toml")
-    assert "clearml_yolo.entrypoints.hydra.worker" in targets
+    assert "clearml_yolo.entrypoints.queue_run" in targets
     assert "clearml_yolo.adapters.runtime.gpu_probe" in targets
-    assert "hydra_plugins.cy_queue.launcher.QueueLauncher" in targets
+    assert "clearml_yolo.adapters.queue.guardian" in targets
     assert architecture.target_findings(targets, graph, SRC) == []
+    assert architecture.runtime_boundary_findings(SRC) == []
     migration = json.loads((ROOT / "specs/021-clean-architecture/migration-map.json").read_text())
     assert not set(migration).intersection(graph.modules)
     for legacy in migration:
@@ -399,6 +429,9 @@ def test_actual_application_uses_ports_for_io() -> None:
         ("clearml_yolo.adapters.storage.dataset", "clearml_yolo.adapters.yolo.inference"),
         ("clearml_yolo.adapters.fiftyone.publisher", "clearml_yolo.adapters.clearml.session"),
         ("clearml_yolo.adapters.deim.backend", "clearml_yolo.adapters.rfdetr.backend"),
+        ("clearml_yolo.adapters.deim.backend", "clearml_yolo.adapters.storage.dataset"),
+        ("clearml_yolo.adapters.rfdetr.backend", "clearml_yolo.adapters.storage.dataset"),
+        ("clearml_yolo.adapters.fasterrcnn.training", "clearml_yolo.adapters.storage.dataset"),
         ("clearml_yolo.adapters.fasterrcnn.training", "clearml_yolo.adapters.clearml.detectors"),
         ("clearml_yolo.adapters.storage.checkpoint", "clearml_yolo.adapters.fasterrcnn.model"),
         ("clearml_yolo.adapters.export.metadata", "clearml_yolo.adapters.fasterrcnn.model"),

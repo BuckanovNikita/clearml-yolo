@@ -50,9 +50,12 @@ def test_a_run_dir_is_named_after_the_run_id_beneath_the_root(tmp_path: Path) ->
 
 
 @pytest.mark.parametrize("explicit", [None, Path("runs/handmade")])
-def test_a_resolved_run_dir_is_absolute(explicit: Path | None) -> None:
+def test_a_resolved_run_dir_is_absolute(
+    explicit: Path | None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Hydra runs with chdir=False while ultralytics resolves its project path against the
     working directory, so a relative path would mean two different places."""
+    monkeypatch.chdir(tmp_path)
     assert resolve_run_dir(Path("runs"), "yolo-run-box", explicit).is_absolute()
 
 

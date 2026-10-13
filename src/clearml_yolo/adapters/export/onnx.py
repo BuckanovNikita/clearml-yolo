@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from clearml_yolo.adapters.storage.filesystem import write_path
+
 _MAX_BATCH = 4
 _RGB_CHANNELS = 3
 _STRIDE = 32
@@ -34,6 +36,7 @@ def export_onnx(
     The caller owns preprocessing and inverse coordinate scaling at the boundary.
     The source model, training mode and device remain unchanged.
     """
+    destination = write_path(destination)
     batch, channels, height, width = sample_shape
     if not 1 <= batch <= _MAX_BATCH or channels != _RGB_CHANNELS or min(height, width) < _STRIDE:
         raise ValueError("Export requires batch 1-4, three RGB channels and dimensions >=32")

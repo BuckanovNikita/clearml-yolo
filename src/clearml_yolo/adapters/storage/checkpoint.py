@@ -6,6 +6,7 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from zipfile import BadZipFile, ZipFile, is_zipfile
 
+from clearml_yolo.adapters.storage.filesystem import write_path
 from clearml_yolo.adapters.storage.identity import checkpoint_sha256
 from clearml_yolo.core.models import CheckpointDescriptor, CheckpointMetadata, ModelConfig
 
@@ -45,6 +46,8 @@ def _sidecar(path: Path) -> Path:
 
 
 def _write_descriptor(path: Path, descriptor: CheckpointDescriptor) -> None:
+    write_path(path)
+    write_path(_sidecar(path))
     temporary: Path | None = None
     try:
         with NamedTemporaryFile("w", dir=path.parent, encoding="utf-8", delete=False) as stream:
@@ -84,6 +87,7 @@ def read_checkpoint_descriptor(
 
 def bind_checkpoint(path: Path, metadata: CheckpointMetadata) -> CheckpointDescriptor:
     """Atomically annotate an owned checkpoint; native Torch readers ignore extra records."""
+    write_path(path)
     if path.is_symlink():
         raise ValueError("Refusing to modify a checkpoint symlink")
     existing = read_checkpoint_descriptor(path)

@@ -22,6 +22,7 @@ from report_generator.v2.comparison import (
 )
 
 from clearml_yolo.adapters.observability.tracing import trace_operation
+from clearml_yolo.adapters.storage.filesystem import write_path
 
 __all__ = [
     "COMPARISON_COLUMNS",
@@ -48,6 +49,9 @@ def write_comparison_workbook(
     path: Path,
 ) -> dict[str, Path]:
     """Write unchanged comparison Excel and exclusion/methodology CSV artifacts."""
+    path = write_path(path)
+    for title in ("excluded", "methodology"):
+        write_path(path.with_name(f"{path.stem}_{title}.csv"))
     tables = cast(dict[str, Path], write_shared_workbook(rows, excluded, methodology, path))
     logger.info("Comparison workbook: {} ({} classes, {} excluded)", path, len(rows), len(excluded))
     return tables

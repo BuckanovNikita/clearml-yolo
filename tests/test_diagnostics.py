@@ -171,6 +171,40 @@ def test_debug_level_diagnostic_emits_one_record_with_frames() -> None:
     assert "raised_error" in output[0]
 
 
+@pytest.mark.parametrize("sink_error", [RuntimeError("broken sink"), KeyboardInterrupt()])
+def test_cleanup_diagnostic_and_fallback_failures_preserve_original(
+    monkeypatch: pytest.MonkeyPatch, sink_error: BaseException
+) -> None:
+    from clearml_yolo.adapters.observability import diagnostics
+
+    original = ValueError("original computation failed")
+    writes: list[tuple[int, bytes]] = []
+
+    def sink(_message: object) -> None:
+        raise sink_error
+
+    def write(descriptor: int, data: bytes) -> int:
+        writes.append((descriptor, data))
+        raise OSError("closed diagnostic descriptor")
+
+    def operation() -> None:
+        try:
+            raise original
+        except ValueError:
+            diagnostics.log_exception_safely("Cleanup failed", RuntimeError("secondary failure"))
+            raise
+
+    monkeypatch.setattr("clearml_yolo.adapters.observability.diagnostics.os.write", write)
+    handle = logger.add(sink, catch=False)
+    try:
+        with pytest.raises(ValueError, match="original computation failed") as raised:
+            operation()
+    finally:
+        logger.remove(handle)
+    assert raised.value is original
+    assert writes == [(2, b"Failure diagnostic emission failed; original error retained\n")]
+
+
 def test_credential_uri_with_whitespace_password_is_removed_whole() -> None:
     result = redact_text("connect mongodb://user:two words@host/db failed E111")
     assert "mongodb://" not in result

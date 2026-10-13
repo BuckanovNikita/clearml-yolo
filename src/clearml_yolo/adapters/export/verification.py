@@ -14,6 +14,7 @@ from clearml_yolo.adapters.export.preprocessing import postprocess, preprocess
 from clearml_yolo.adapters.export.quality import evaluate_detections, evaluator_identity
 from clearml_yolo.adapters.export.runtime import TensorRTRunner
 from clearml_yolo.adapters.storage.dataset_records import validate_ground_truth
+from clearml_yolo.adapters.storage.filesystem import write_path
 from clearml_yolo.core.datasets import ImageRecord
 from clearml_yolo.core.export import ExportMetadata
 from clearml_yolo.core.export_quality import match_detections, quality_gate
@@ -38,6 +39,7 @@ def verification_cases() -> tuple[tuple[int, int, int], ...]:
 
 
 def _corpus(request: ExportRequest, destination: Path) -> tuple[list[ImageRecord], Path]:
+    destination = write_path(destination)
     if request.ground_truth is None:
         raise ValueError("Verification requires labeled ground truth")
     records = validate_ground_truth(
@@ -50,7 +52,7 @@ def _corpus(request: ExportRequest, destination: Path) -> tuple[list[ImageRecord
     images = [image for image in records.images if image.split == request.split]
     if not images or not any(image.boxes for image in images):
         raise ValueError("Export quality corpus requires images with labeled foreground objects")
-    manifest = destination / "corpus.json"
+    manifest = write_path(destination / "corpus.json")
     manifest.write_text(
         json.dumps(
             {
@@ -246,6 +248,8 @@ def verify_engine(
     request: ExportRequest, metadata: ExportMetadata, destination: Path
 ) -> ExportResult:
     """Run one serialized engine and its FP32 native reference on identical image bytes."""
+    destination = write_path(destination)
+    destination.mkdir(parents=True, exist_ok=True)
     import torch
 
     from clearml_yolo.adapters.fasterrcnn.model import build_model, checkpoint_state
@@ -270,7 +274,7 @@ def verify_engine(
     detector.load_state_dict(checkpoint_state(request.weights), strict=True)
     detector.to(device).float().eval()
     old_matmul, old_cudnn = torch.backends.cuda.matmul.allow_tf32, torch.backends.cudnn.allow_tf32
-    report_path = destination / "verification.json"
+    report_path = write_path(destination / "verification.json")
     evidence: dict[str, Any] = {
         "operation": "verify",
         "metadata": metadata.model_dump(mode="json"),

@@ -1,5 +1,6 @@
 """Installed native callbacks own epoch telemetry and final model publication."""
 
+from inspect import unwrap
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -110,8 +111,9 @@ def test_installed_callbacks_report_native_epochs_and_one_best_model(
     validator_plots = trainer.validator.plots
 
     with native_runtime():
-        for name in ("on_train_epoch_end", "on_fit_epoch_end", "on_val_end"):
-            assert integration.callbacks[name] is getattr(integration, name)
+        for name in ("on_train_epoch_end", "on_fit_epoch_end"):
+            assert unwrap(integration.callbacks[name]) is unwrap(getattr(integration, name))
+        assert integration.callbacks["on_val_end"] is integration.on_val_end
         for epoch in (1, 2):
             trainer.epoch = epoch
             integration.callbacks["on_train_epoch_end"](trainer)

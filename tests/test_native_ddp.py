@@ -253,12 +253,12 @@ def test_single_process_replay_is_noop_and_does_not_duplicate_native_publication
     assert task.output_models == []
 
 
-def test_ddp_reports_epoch_before_replay_with_invocation_context(
+def test_ddp_journals_epoch_before_replay_with_invocation_context(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Waiting until replay or losing the owner ContextVar hides live epoch progress."""
+    """Rank-zero scalar bytes are available before native work ends or owner replay."""
+    import json
     from contextvars import ContextVar
-    from threading import Event
 
     import clearml
     from ultralytics.utils import torch_utils
@@ -267,15 +267,9 @@ def test_ddp_reports_epoch_before_replay_with_invocation_context(
     _Task.current = task
     owner: ContextVar[Any] = ContextVar("test_ddp_owner", default=None)
     token = owner.set(task)
-    reported = Event()
-    original_report = task.logger.report_scalar
-
-    def report(title: str, series: str, value: float, iteration: int) -> None:
-        assert owner.get() is task
-        original_report(title, series, value, iteration)
-        reported.set()
-
-    monkeypatch.setattr(task.logger, "report_scalar", report)
+    scalars = tmp_path / "scalars.jsonl"
+    scalars.write_text("")
+    monkeypatch.setenv("CY_SCALAR_JOURNAL", str(scalars))
     monkeypatch.setattr(clearml, "Task", _Task)
     monkeypatch.setattr("clearml_yolo.adapters.clearml.session.active_task", owner.get)
     monkeypatch.setattr(
@@ -289,7 +283,14 @@ def test_ddp_reports_epoch_before_replay_with_invocation_context(
     model.trainer = parent
 
     def check_live_progress() -> None:
-        assert reported.wait(3), "Epoch scalars were withheld until training finished"
+        records = [json.loads(line) for line in scalars.read_text().splitlines()]
+        assert {
+            "title": "train",
+            "series": "train/box_loss",
+            "value": 1.25,
+            "iteration": 0,
+        } in records
+        assert task.logger.scalars == [], "The live consumer must not call the SDK"
         assert task.output_models == []
 
     try:
@@ -297,7 +298,9 @@ def test_ddp_reports_epoch_before_replay_with_invocation_context(
             best = _capture_events(model, tmp_path / "train", before_finish=check_live_progress)
             relay.replay(parent)
         assert parent.best == best
-        assert task.logger.scalars.count(("train", "train/box_loss", 1.25, 0)) == 1
+        records = [json.loads(line) for line in scalars.read_text().splitlines()]
+        assert sum(record["series"] == "train/box_loss" for record in records) == 1
+        assert task.logger.scalars == []
         assert len(task.output_models) == 1
     finally:
         owner.reset(token)
@@ -335,8 +338,8 @@ def test_ddp_partial_record_waits_for_newline_and_interruption_stops_consumer(
     tmp_path: Path,
 ) -> None:
     import json
-    from threading import Event
     from threading import enumerate as enumerate_threads
+    from time import monotonic, sleep
 
     import clearml
 
@@ -347,14 +350,6 @@ def test_ddp_partial_record_waits_for_newline_and_interruption_stops_consumer(
     monkeypatch.setattr("clearml_yolo.adapters.clearml.session.active_task", lambda: task)
     monkeypatch.setenv(OWNER_PID_ENV, str(os.getpid()))
     monkeypatch.setenv(OWNER_TASK_ENV, task.id)
-    reported = Event()
-    original_report = task.logger.report_scalar
-
-    def report(title: str, series: str, value: float, iteration: int) -> None:
-        original_report(title, series, value, iteration)
-        reported.set()
-
-    monkeypatch.setattr(task.logger, "report_scalar", report)
     model = _Model()
     original_callbacks = {event: callbacks.copy() for event, callbacks in model.callbacks.items()}
     model.trainer = SimpleNamespace(ddp=True)
@@ -375,12 +370,16 @@ def test_ddp_partial_record_waits_for_newline_and_interruption_stops_consumer(
             "save_dir": str(directory),
         }
         journal.write_bytes((json.dumps(pretrain) + "\n" + json.dumps(epoch)).encode())
-        assert not reported.wait(0.6), "An unterminated record was consumed"
+        sleep(0.6)
+        assert relay._consumed == [pretrain], "An unterminated record was consumed"
         with journal.open("ab") as stream:
             stream.write(b"\n")
-        assert reported.wait(3), "Completed record was not consumed live"
+        deadline = monotonic() + 3
+        while len(relay._consumed) < 2 and monotonic() < deadline:
+            sleep(0.025)
+        assert relay._consumed == [pretrain, epoch], "Completed record was not parsed live"
         raise KeyboardInterrupt
-    assert task.logger.scalars == [("train", "train/box_loss", 0.5, 2)]
+    assert task.logger.scalars == []
     assert task.output_models == []
     assert directory.is_dir()
     assert [json.loads(line) for line in journal.read_text().splitlines()] == [pretrain, epoch]
@@ -390,7 +389,7 @@ def test_ddp_partial_record_waits_for_newline_and_interruption_stops_consumer(
     )
 
 
-def test_ddp_live_callback_failure_reaches_caller_and_stops_publication(
+def test_ddp_owner_callback_failure_reaches_caller_and_stops_publication(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     import json
@@ -429,13 +428,14 @@ def test_ddp_live_callback_failure_reaches_caller_and_stops_publication(
     ):
         directory = relay._directory
         _capture_events(model, tmp_path / "train")
-        assert failed.wait(3)
+        assert not failed.is_set(), "SDK callback must not run in the consumer"
         relay.replay(model.trainer)
     assert directory.is_dir()
     records = [json.loads(line) for line in (directory / "events.jsonl").read_text().splitlines()]
     assert any(record["event"] == "on_train_epoch_end" for record in records)
     assert model.callbacks == original_callbacks
     assert task.output_models == []
+    assert failed.is_set()
     assert not any(
         thread.name == "cy-native-ddp-relay" for thread in set(enumerate_threads()) - before
     )

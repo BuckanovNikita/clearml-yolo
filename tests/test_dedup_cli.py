@@ -53,12 +53,26 @@ def test_dry_run_uses_relative_workspace_without_replacing_files(tmp_path: Path)
     assert sorted(path.name for path in (tmp_path / "workspace").iterdir()) == [".cache"]
 
 
-def test_explicit_directory_overrides_workspace(tmp_path: Path) -> None:
+def test_explicit_directory_selects_cache_within_workspace(tmp_path: Path) -> None:
     cache = tmp_path / "chosen"
     cache.mkdir()
-    result = _run(tmp_path, str(cache), cy_home="nonexistent")
+    result = _run(tmp_path, str(cache), cy_home=str(tmp_path))
     assert result.returncode == 0, result.stderr
     assert "scanned=0" in result.stdout
+    assert sorted(path.name for path in tmp_path.iterdir()) == ["chosen"]
+
+
+def test_explicit_external_directory_is_rejected_without_writes(tmp_path: Path) -> None:
+    cache = tmp_path / "chosen"
+    cache.mkdir()
+    image = cache / "image.jpg"
+    image.write_bytes(b"preserved input")
+    inode = image.stat().st_ino
+    result = _run(tmp_path, str(cache), cy_home="nonexistent")
+    assert result.returncode == 2
+    assert "must be contained beneath CY_HOME" in result.stderr
+    assert image.read_bytes() == b"preserved input"
+    assert image.stat().st_ino == inode
     assert not (tmp_path / "nonexistent").exists()
 
 

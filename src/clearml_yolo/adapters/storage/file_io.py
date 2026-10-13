@@ -6,11 +6,12 @@ from typing import Literal
 import pandas as pd
 
 from clearml_yolo.adapters.observability.tracing import trace_operation
+from clearml_yolo.adapters.storage.filesystem import write_path
 
 
 def mkdir(path: Path, *, parents: bool = False, exist_ok: bool = False) -> None:
     with trace_operation("storage.directory.create", context={"path": str(path)}):
-        path.mkdir(parents=parents, exist_ok=exist_ok)
+        write_path(path).mkdir(parents=parents, exist_ok=exist_ok)
 
 
 def read_text(path: Path, *, encoding: str = "utf-8") -> str:
@@ -20,7 +21,7 @@ def read_text(path: Path, *, encoding: str = "utf-8") -> str:
 
 def write_text(path: Path, content: str, *, encoding: str = "utf-8") -> None:
     with trace_operation("storage.text.write", context={"path": str(path)}):
-        path.write_text(content, encoding=encoding)
+        write_path(path).write_text(content, encoding=encoding)
 
 
 def read_csv(
@@ -40,4 +41,4 @@ def write_csv(
         "storage.csv.write",
         context={"path": str(path), "rows": len(frame), "columns": len(frame.columns)},
     ):
-        frame.to_csv(path, index=index, float_format=float_format)
+        frame.to_csv(write_path(path), index=index, float_format=float_format)

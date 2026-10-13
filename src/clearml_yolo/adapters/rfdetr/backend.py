@@ -14,6 +14,8 @@ from typing import Any
 import pandas as pd
 import yaml
 
+from clearml_yolo.adapters.observability.progress import image_progress
+from clearml_yolo.adapters.storage.filesystem import validate_output_tree, write_path
 from clearml_yolo.application.contracts import PREDICTION_COLUMNS, PreparedDataset
 from clearml_yolo.core.models import (
     BackendTrainResult,
@@ -125,6 +127,7 @@ def train(
     output: Path,
     report: Callable[[str, float, int], None],
 ) -> BackendTrainResult:
+    output = validate_output_tree(output)
     settings = config.train
     if settings.weights is not None and not settings.weights.is_file():
         raise FileNotFoundError(settings.weights)
@@ -141,7 +144,7 @@ def train(
     constructor = getattr(sdk, variant)
     initial = settings.weights
     if initial is None and settings.pretrained:
-        initial = output / "pretrained" / filename
+        initial = write_path(output / "pretrained" / filename)
         initial.parent.mkdir(parents=True, exist_ok=True)
     model = constructor(
         pretrain_weights=str(initial.resolve()) if initial is not None else None,
@@ -184,6 +187,7 @@ def train(
     callback_type = type("OwnerMetrics", (_OwnerMetrics, lightning.Callback), {})
     callback = callback_type(report)
     trainer.callbacks.append(callback)
+    validate_output_tree(output)
     trainer.fit(module, datamodule)
     weights = output / "checkpoint_best_total.pth"
     if not weights.is_file():
@@ -278,12 +282,14 @@ def predict(
         _verify_pretrained(model, weights)
         model.means = list(descriptor.preprocessing.mean)
         model.stds = list(descriptor.preprocessing.std)
-        for offset in range(0, len(image_paths), settings.batch):
-            paths = list(image_paths[offset : offset + settings.batch])
-            outputs = model.predict(
-                paths, threshold=settings.conf, shape=(size, size), include_source_image=False
-            )
-            predictions.extend(zip(paths, outputs, strict=True))
+        with image_progress(len(image_paths)) as advance:
+            for offset in range(0, len(image_paths), settings.batch):
+                paths = list(image_paths[offset : offset + settings.batch])
+                outputs = model.predict(
+                    paths, threshold=settings.conf, shape=(size, size), include_source_image=False
+                )
+                predictions.extend(zip(paths, outputs, strict=True))
+                advance(len(paths))
     frame = _prediction_frame(predictions, descriptor.class_names, settings.max_det)
     frame.attrs.update(
         image_paths=list(image_paths),

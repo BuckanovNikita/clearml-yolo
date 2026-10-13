@@ -195,6 +195,7 @@ def test_forwards_the_inference_settings(ground_truth: pd.DataFrame, tmp_path: P
         "agnostic_nms": True,
         "task": "detect",
         "mode": "predict",
+        "verbose": False,
     }
 
 

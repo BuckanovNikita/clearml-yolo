@@ -28,7 +28,7 @@ The table below also identifies interfaces extracted beyond a mechanical move.
 | `clearml_*` integrations | `clearml_yolo.adapters.clearml` modules named in the migration map |
 | `publishing.models` and FiftyOne integration | `clearml_yolo.core.publication` and `clearml_yolo.adapters.fiftyone` |
 | Filesystem/dataset/cache/run operations | `clearml_yolo.adapters.storage` modules named in the migration map |
-| GPU probe, selection, FIFO reservations and supervised runtime | `clearml_yolo.adapters.runtime.gpu_resources`, `gpu_probe`, `gpu_wait`, `gpu_queue`, `gpu_runtime`, `gpu_scheduling`; `clearml_yolo.entrypoints.hydra.execution` and `worker` |
+| Direct execution and shared queue | `clearml_yolo.entrypoints.hydra.common`; queue policy/application in `core.queue`, `application.queue`, adapters in `adapters.queue`, CLI in `entrypoints.queue` |
 | Project workspace and retained invocation scratch | `clearml_yolo.adapters.runtime.bootstrap` |
 | Native training, DDP and mixed integration lifecycle | `clearml_yolo.adapters.integrations` |
 
@@ -73,13 +73,9 @@ are composed by the invocation entrypoint and are not a user YAML setting.
 Update handwritten dotted targets in notebooks, scripts, custom Hydra groups, callbacks
 and plugin integrations using the migration map. Repository-managed entrypoints,
 GPU probe, DDP callbacks and FiftyOne extension targets follow the new locations.
-Regenerate saved launcher defaults rather than restoring obsolete queue-removal
-assumptions. `hydra_plugins.cy_queue` is distributed again for queued model commands;
-`queue.enabled=false` selects sequential BasicLauncher. Queue and automatic selection
-are independent controls; both false is native pass-through. See the
-[GPU execution contract](../specs/022-simple-gpu-wait/contracts/execution.md).
-Historical ClearML files remain evidence; this release does not rewrite remote artifacts
-or infer old training provenance.
+Direct commands use sequential BasicLauncher without queue controls. Use `cy-queue`
+for immutable batch submissions and GPU allocation; regenerate configurations containing
+removed queue/autogpu settings. See [the queue contract](queue.md).
 
 Comparison caches now identify checkpoints by content and exclude the reuse-policy
 flag from their keys. The first comparison after upgrading regenerates predictions

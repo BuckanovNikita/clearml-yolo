@@ -44,9 +44,31 @@ def _prepare_native_inputs(root: Path) -> None:
         dict.__setitem__(SETTINGS, name, False)
 
 
-def _wait_workers(process: subprocess.Popen[str], root: Path, task: RecordingTask) -> bool:
+def _read_scalars(path: Path, task: RecordingTask, offset: int) -> int:
+    with path.open("rb") as stream:
+        stream.seek(offset)
+        payload = stream.read()
+    complete = payload.rfind(b"\n") + 1
+    for line in payload[:complete].splitlines():
+        task.report_scalar(**json.loads(line))
+    return offset + complete
+
+
+def _wait_workers(
+    process: subprocess.Popen[str],
+    root: Path,
+    task: RecordingTask,
+    scalar_journal: Path,
+) -> tuple[bool, RuntimeError | None]:
     live = False
+    offset = 0
+    failure: RuntimeError | None = None
     while process.poll() is None:
+        if failure is None:
+            try:
+                offset = _read_scalars(scalar_journal, task, offset)
+            except RuntimeError as error:
+                failure = error
         first_epoch = root / "first-epoch-ready"
         release = root / "release-first-epoch"
         observed = any(
@@ -56,7 +78,9 @@ def _wait_workers(process: subprocess.Popen[str], root: Path, task: RecordingTas
             live = observed
             release.write_text("Owner consumed telemetry while workers were still running.\n")
         time.sleep(0.02)
-    return live
+    if failure is None:
+        offset = _read_scalars(scalar_journal, task, offset)
+    return live, failure
 
 
 def _training(root: Path, ranks: int, scenario: str, result: dict[str, Any]) -> None:
@@ -75,8 +99,14 @@ def _training(root: Path, ranks: int, scenario: str, result: dict[str, Any]) -> 
     # Filesystem defaults intentionally persist for descendants; snapshot after initialization.
     initialize_filesystem()
     original_env = os.environ.copy()
+    scalar_journal = Path(os.environ["CY_HOME"]) / "scalars.jsonl"
+    scalar_journal.write_text("")
     try:
-        with native_runtime(), native_ddp_relay(task, model) as relay:
+        with (
+            patch.dict(os.environ, {"CY_SCALAR_JOURNAL": str(scalar_journal)}),
+            native_runtime(),
+            native_ddp_relay(task, model) as relay,
+        ):
             # Workers inherit this temporary native settings directory, including its font.
             import matplotlib as mpl
 
@@ -102,7 +132,8 @@ def _training(root: Path, ranks: int, scenario: str, result: dict[str, Any]) -> 
                 process = subprocess.Popen(  # noqa: S603 - fixed interpreter and local test script
                     command, stdout=output, stderr=subprocess.STDOUT, text=True
                 )
-                result["live_telemetry"] = _wait_workers(process, root, task)
+                live, publication_failure = _wait_workers(process, root, task, scalar_journal)
+                result["live_telemetry"] = live
                 result["launcher_returncode"] = process.returncode
             journal = relay._directory / "events.jsonl"
             if journal.exists():
@@ -110,6 +141,8 @@ def _training(root: Path, ranks: int, scenario: str, result: dict[str, Any]) -> 
                     json.loads(line)["event"] for line in journal.read_text().splitlines()
                 ]
             _check_returncode(process.returncode)
+            if publication_failure is not None:
+                raise publication_failure
             relay.replay(model.trainer)
             result["effective_args"] = vars(model.trainer.args)
             result["best"] = str(model.trainer.best)

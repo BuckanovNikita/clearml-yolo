@@ -10,6 +10,8 @@ from typing import Any, Literal
 
 import yaml
 
+from clearml_yolo.adapters.storage.filesystem import write_path
+
 Stage = Literal["train", "predict"]
 _REQUESTED_DEVICES: ContextVar[dict[str, Any] | None] = ContextVar(
     "requested_devices", default=None
@@ -169,6 +171,169 @@ INACTIVE_KEYS = frozenset(
 KNOWN_KEYS = TRAIN_KEYS | PREDICT_KEYS | INACTIVE_KEYS
 _KEY_LINE = re.compile(r"^([a-zA-Z_][\w]*):")
 
+# Keep validation independent of the model SDK. These are the native parser's
+# typed keys that this adapter forwards; untyped selectors retain native handling.
+_NUMERIC_KEYS = frozenset(
+    ["warmup_epochs", "box", "cls", "dfl", "dis", "degrees", "shear", "time", "batch"]
+)
+_FRACTION_KEYS = frozenset(
+    [
+        "lr0",
+        "lrf",
+        "cls_pw",
+        "momentum",
+        "weight_decay",
+        "warmup_momentum",
+        "warmup_bias_lr",
+        "hsv_h",
+        "hsv_s",
+        "hsv_v",
+        "translate",
+        "perspective",
+        "flipud",
+        "fliplr",
+        "bgr",
+        "mosaic",
+        "mixup",
+        "cutmix",
+        "conf",
+        "iou",
+        "fraction",
+        "multi_scale",
+    ]
+)
+_INTEGER_KEYS = frozenset(
+    [
+        "epochs",
+        "patience",
+        "workers",
+        "seed",
+        "close_mosaic",
+        "max_det",
+        "line_width",
+        "nbs",
+        "save_period",
+    ]
+)
+_INTEGER_MINIMUMS = {"epochs": 1, "patience": 0, "nbs": 1, "max_det": 1, "seed": 0}
+_BOOLEAN_KEYS = frozenset(
+    [
+        "save",
+        "exist_ok",
+        "verbose",
+        "deterministic",
+        "single_cls",
+        "rect",
+        "cos_lr",
+        "val",
+        "save_json",
+        "dnn",
+        "plots",
+        "show",
+        "save_txt",
+        "save_conf",
+        "save_crop",
+        "show_labels",
+        "show_conf",
+        "visualize",
+        "augment",
+        "agnostic_nms",
+        "show_boxes",
+        "nms",
+        "profile",
+        "channels_last",
+        "cls_remap",
+    ]
+)
+_STRING_KEYS = frozenset({"optimizer", "split"})
+_QUANTIZATION_VALUES = frozenset(
+    ["8", "16", "32", "int8", "fp16", "fp32", "w8a8", "w16a16", "w32a32", "w8a16", "w8a32"]
+)
+_TYPE_GROUPS = (
+    (_NUMERIC_KEYS, (int, float), "numeric"),
+    (_INTEGER_KEYS, (int,), "an integer"),
+    (_BOOLEAN_KEYS, (bool,), "a boolean"),
+    (_STRING_KEYS, (str,), "a string"),
+)
+_SCALE_DIMENSIONS = 2
+
+
+def _validate_fraction(key: str, value: Any, qualified: str) -> None:
+    if key == "fraction":
+        if isinstance(value, list):
+            if (
+                len(value) not in (2, 3)
+                or not all(value[:2])
+                or not all(
+                    (type(item) is int and item >= 0) or (type(item) is float and 0 <= item <= 1)
+                    for item in value
+                )
+            ):
+                raise ValueError(f"{qualified} must contain train/val[/test] counts or ratios")
+            return
+        if isinstance(value, bool):
+            raise ValueError(f"{qualified} must be a positive count or a ratio in (0, 1]")
+    if not isinstance(value, (int, float)):
+        raise ValueError(f"{qualified} must be numeric")  # noqa: TRY004 - invalid configuration boundary
+    if key == "fraction":
+        if not (0 < value <= 1 or (isinstance(value, int) and value > 1)):
+            raise ValueError(f"{qualified} must be a positive count or a ratio in (0, 1]")
+    elif not 0 <= value <= 1:
+        raise ValueError(f"{qualified} must be between 0 and 1")
+
+
+def _validate_native_type(key: str, value: Any, qualified: str) -> None:
+    for keys, accepted, description in _TYPE_GROUPS:
+        if key in keys and not isinstance(value, accepted):
+            raise ValueError(f"{qualified} must be {description}")
+    minimum = _INTEGER_MINIMUMS.get(key)
+    if minimum is not None and value < minimum:
+        raise ValueError(f"{qualified} must be at least {minimum}")
+
+
+def _validate_scale(value: Any, qualified: str) -> None:
+    if isinstance(value, (list, tuple)):
+        if len(value) != _SCALE_DIMENSIONS or not all(
+            isinstance(item, (int, float)) for item in value
+        ):
+            raise ValueError(f"{qualified} must contain exactly two numeric values")
+    elif not isinstance(value, (int, float)) or not 0 <= value <= 1:
+        raise ValueError(f"{qualified} must be in [0, 1] or contain two numeric values")
+
+
+def _validate_native_choice(key: str, value: Any, qualified: str) -> None:
+    if key == "compile" and not isinstance(value, (bool, str)):
+        raise ValueError(f"{qualified} must be a boolean or a compiler mode string")
+    if (
+        key == "amp"
+        and not isinstance(value, bool)
+        and str(value).lower() not in {"fp16", "bf16", "fp32"}
+    ):
+        raise ValueError(f"{qualified} must be a boolean or fp16, bf16, fp32")
+    if key == "quantize" and str(value).lower() not in _QUANTIZATION_VALUES:
+        raise ValueError(f"{qualified} must name a supported 8/16/32-bit quantization scheme")
+
+
+def _validate_native_values(values: dict[str, Any], group: str) -> None:
+    """Check native types/ranges without imports, effects or value normalization."""
+    defaults = native_defaults()
+    typed = (_NUMERIC_KEYS | _FRACTION_KEYS | _INTEGER_KEYS | _BOOLEAN_KEYS | _STRING_KEYS) | {
+        "scale",
+        "compile",
+    }
+    for key, value in values.items():
+        qualified = f"{group}.{key}"
+        if value is None:
+            if key == "amp" or (key in typed and defaults.get(key) is not None):
+                raise ValueError(f"{qualified} must not be null")
+            continue
+        _validate_native_type(key, value, qualified)
+        if key in _FRACTION_KEYS:
+            _validate_fraction(key, value, qualified)
+        elif key == "scale":
+            _validate_scale(value, qualified)
+        _validate_native_choice(key, value, qualified)
+
 
 def native_template() -> str:
     """Locate the installed distribution without importing its expensive package."""
@@ -225,6 +390,7 @@ def execution_settings(settings: dict[str, Any], stage: Stage) -> dict[str, Any]
         batch = values["batch"]
         if isinstance(batch, bool) or not isinstance(batch, int) or batch < 1:
             raise ValueError("Prediction requires a positive integer ultralytics_predict.batch")
+    _validate_native_values(values, group)
     return values
 
 
@@ -245,6 +411,7 @@ def prediction_defaults(*, inherit: bool = True) -> dict[str, Any]:
         batch=1,
         rect=True,
         save=False,
+        verbose=False,
         device=[-1],
     )
     return values
@@ -326,6 +493,7 @@ def _example_sections(lines: list[str], stage: Stage) -> str:
 
 def write_native_yaml(path: Path, settings: dict[str, Any], stage: Stage) -> Path:
     """Write a self-contained native configuration beside its stage outputs."""
+    path = write_path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(render_native_yaml(settings, stage), encoding="utf-8")
     return path

@@ -38,14 +38,16 @@ this branch.
 3. Build ground truth from a small YOLO dataset with disjoint validation/test images,
    including an empty image in each split. Exercise the top-level `ultralytics` and
    `ultralytics_predict` groups through locally editable generated YAML, with explicit
-   CPU and available GPU devices. Verify all four queue/autogpu modes: queued automatic
-   admission (one runner/two waiters on one GPU), direct busy-to-free waiting, exact
-   queued identity/order and native pass-through without project GPU telemetry. Require
-   no task while waiting. Test shared cross-project reservations, cancellation without
-   premature release, replay admission limits, and multi-GPU contraction when available.
-   Verify concurrent queued Hydra sweeps, sequential queue-disabled BasicLauncher sweeps
-   and mixed-mode rejection before admission, preserving job/task/failure behavior.
-   Direct availability waiting is not an exclusive reservation.
+   CPU and available GPU devices. Verify direct execution preserves native settings and
+   ordinary Hydra multiruns remain sequential without queue imports/storage/workers.
+   Follow the [shared queue contract](../../../docs/queue.md) for immutable sweep submission,
+   earliest-runnable admission, exact ordered UUID bindings, concurrent disjoint jobs,
+   cross-root GPU exclusion, ownership, stale reorder revisions and guardian recovery.
+   Keep the full allocation through complete pipeline/descendant exit. Verify repeated
+   signals, worker/guardian forced death and uncertain-cleanup quarantine. Real two-user,
+   two-host NFS and physical one/five-GPU eager/compiled acceptance require target evidence;
+   record unavailable targets and unresolved native failures as gaps. Compare matching direct
+   and queued settings without treating scheduling as a compiler fix.
 4. Run a candidate without a baseline; verify evaluation succeeds and comparison is
    skipped. Promote a completed baseline with a `prod` tag, run a candidate and verify
    both checkpoints infer the same current test images under matching settings.
@@ -101,15 +103,16 @@ this branch.
    remain local. Inspect the workspace after success, failure and cancellation: invocation
    arenas must remain present, including overlapping processes and children starting after
    parent scope exit. Startup must not scan, recover or recursively delete old arenas,
-   even with malformed/duplicate owner records. Explicit output/cache/temp paths and SDK
-   selectors outside `CY_HOME` remain selected; physical-home destinations warn without
-   rejection or relocation. Trace normal SDK configuration reads from selected user/home/
-   external settings; require unchanged selectors, cwd, bytecode and global temp defaults.
+   even with malformed/duplicate owner records. Reject application output/cache/temp paths
+   outside resolved `CY_HOME`, including symlink escapes, before creating destination files.
+   Explicit shared queue metadata is the exception; host-local coordination contains only
+   small records/locks. Trace normal SDK configuration reads from selected user/home/external
+   settings; require unchanged SDK selectors, cwd, bytecode and global temp defaults.
    Verify restored in-memory native ClearML switches, fresh DDP callback scopes and unchanged
    Ultralytics settings files. Preserve invalid existing dataset entries and peer staging;
    native lock failures must not use soft-lock fallback. Old project-local SDK settings/caches
    are reused only by explicit opt-in, with no migration/deletion. Shared queue locks remain
-   outside invocation scratch. Retained files are expected; unsafe descendant cleanup remains
+   host-local and outside invocation scratch. Retained files are expected; unsafe descendant cleanup remains
    a failure or limitation. Deliberate scratch maintenance requires confirmed idle descendants.
    For enabled FiftyOne publication, verify one local owner receipt and canonical run
    link with per-split `evaluation_keys`. Confirm native evaluations register existing
@@ -131,7 +134,13 @@ this branch.
    operation timeout plus at most ten seconds cleanup, no GPU/task/queue ownership in
    publication children, and no success without zero exit plus a matching complete receipt.
    Preserve cancellation semantics. Containment does not confirm the original hang cause.
-7. Check artifact/model upload rejection, callback-registration failure, flush failure and
+7. Read console and epoch scalars independently while the task remains active. Under healthy
+   service conditions require visibility within ten seconds; include FD/native child output,
+   partial lines, pre-epoch failures and watchdog diagnostics. Verify quiet prediction image
+   coverage/numerical parity, one operation progress bar and retained warnings/final summary.
+   Force publisher failure and shutdown timeout: retain local append-only logs, preserve the
+   original failure, fail required incomplete publication and never retry uncertain deliveries.
+   Check artifact/model upload rejection, callback-registration failure, flush failure and
    interruption with isolated test invocations. Each must fail
    the command and task while retaining local diagnostics until intentional cleanup.
 8. Record commands, outcomes and limitations. Store machine-specific logs and task records
@@ -161,8 +170,8 @@ behavior. Synthetic random-weight smoke tests establish execution only.
 Run new-family comparisons against YOLO and another native family on identical current
 images with frozen thresholds. Inspect independent backend routing, common device/settings,
 checkpoint-owned vocabulary and recorded effective preprocessing. Verify raw-reference
-assertions, cache separation and checkpoint/source conflicts. Repeat all four execution
-modes, replay guards, mixed-family sweeps, cancellation and owned-process cleanup.
+assertions, cache separation and checkpoint/source conflicts. Repeat both execution
+paths (direct and queued), replay guards, mixed-family sweeps, cancellation and owned-process cleanup.
 
 For every Faster R-CNN preset and FP32/FP16, generate the actual ONNX graph, build the
 engine and execute all required size/batch cases, profile transitions, empty/crowded inputs

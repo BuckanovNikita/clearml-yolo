@@ -19,7 +19,7 @@ from loguru import logger
 
 from clearml_yolo.adapters.observability.diagnostics import log_exception
 from clearml_yolo.adapters.observability.tracing import trace_operation
-from clearml_yolo.adapters.storage.filesystem import model_weights_path
+from clearml_yolo.adapters.storage.filesystem import model_weights_path, write_path
 from clearml_yolo.adapters.yolo.config import write_native_yaml
 from clearml_yolo.adapters.yolo.inference import predict_on_images
 from clearml_yolo.application.contracts import (
@@ -147,6 +147,7 @@ def _evidence(predictions: pd.DataFrame, fallback: dict[str, object]) -> Inferen
 @contextmanager
 def _atomic_text(output: Path) -> Iterator[IO[str]]:
     """Keep rename atomic across filesystems and remove only our own temporary file."""
+    output = write_path(output)
     temporary: Path | None = None
     try:
         with NamedTemporaryFile("w", dir=output.parent, delete=False, encoding="utf-8") as handle:
@@ -166,6 +167,7 @@ def _write_cache(predictions: pd.DataFrame, output: Path, evidence: InferenceEvi
     is satisfied by a file still being appended to, and the short prediction set it gets
     back does not fail — it scores as a recall drop, which reads as a model regression.
     """
+    output = write_path(output)
     output.parent.mkdir(parents=True, exist_ok=True)
     with _atomic_text(output) as handle:
         predictions.to_csv(handle, index=False)
@@ -276,10 +278,11 @@ def reinfer_split(
             "task": "detect",
             "mode": "predict",
             **(native_kwargs or {}),
+            "verbose": False,
         }
-        manifest_dir = output.parent / "prediction_inputs" / native_name / output.stem
+        manifest_dir = write_path(output.parent / "prediction_inputs" / native_name / output.stem)
         manifest_dir.mkdir(parents=True, exist_ok=True)
-        manifest = manifest_dir / "images.txt"
+        manifest = write_path(manifest_dir / "images.txt")
         manifest.write_text(
             "\n".join(str(Path(path).absolute()) for path in image_paths), encoding="utf-8"
         )

@@ -14,17 +14,24 @@ beside the selected destination and are cleaned there.
 | Task-owned runs and latest shortcut | `runs/` |
 | Hydra logs and sweeps | `outputs/`, `multirun/` |
 | Shared CSV datasets | `.cache/clearml-yolo/datasets/` |
-| Invocation scratch | `.tmp/cy-runtime-*` |
+| Invocation scratch and capture logs | `.tmp/cy-runtime-*` |
+| Queue metadata (unless CY_QUEUE_ROOT is explicit) | `.cy-queue/` |
+| Guardian diagnostics and progress | `.cy/queue-logs/`, `.cy/queue-status/` |
 
 `dataset_cache_dir=null` selects `CY_HOME/.cache/clearml-yolo/datasets`, independent of
 XDG. `CY_RUNTIME_TEMP_ROOT` selects the parent of invocation arenas; its default is
-`CY_HOME/.tmp`, and a relative selection resolves against `CY_HOME`. Explicit project
-inputs, outputs, cache and temporary destinations may live outside the workspace,
-including through symlinks. Existing data is neither migrated nor deleted.
+`CY_HOME/.tmp`, and a relative selection resolves against `CY_HOME`. Explicit inputs may live outside the workspace. Application-owned outputs, cache, logs,
+configuration snapshots and temporary destinations must resolve beneath CY_HOME, including
+through symlinks. Invalid destinations fail before creation. Existing data is neither migrated nor deleted.
 
-Write destinations physically beneath the home directory warn once per resolved path
-in a process. The requested path remains accepted. Symlinks determine the physical
-destination: a link beneath home pointing outside it has an external destination.
+Hydra preflight checks generated configuration files and log destinations using each
+run's actual directory, including every sequential sweep member and the sweep manifest.
+It resolves effective mode from both CLI flags and saved Hydra configuration.
+Native trainers validate their selected existing output tree before creating checkpoints,
+plots or logs; project checkpoint and metrics writers also validate their generated leaves.
+Comparison ZIP archives validate both their selected directory and generated archive
+filename before opening, including pre-existing symlinks.
+These checks assume cooperating callers do not replace filesystem entries concurrently.
 
 ## Library configuration and storage
 
@@ -64,11 +71,11 @@ placeholders or fallback configuration. It does not migrate or delete old settin
 or credentials. SDKs may cache their own settings after import; changing `CY_HOME` affects
 project paths without rebinding those library settings.
 
-Shared GPU queue coordination stays outside invocation scratch and remains user-wide:
-`${XDG_STATE_HOME:-~/.local/state}/clearml-yolo/queue` on Unix-like systems or
-`%LOCALAPPDATA%/clearml-yolo/queue` on Windows. An existing `CY_GPU_QUEUE_ROOT` stays selected.
-Compatible registry/locks coordinate projects; corrupt or incompatible state fails closed
-without migration or deletion. Bootstrap does not modify `XDG_STATE_HOME`.
+`cy` does not initialize queue storage. The explicit `CY_QUEUE_ROOT` exception permits
+shared NFS queue metadata outside the project; its default is `$CY_HOME/.cy-queue`.
+Only small host coordination locks/claims live under `/tmp/clearml-yolo-queue`.
+Datasets, checkpoints, logs and payloads never use that coordination directory.
+Old home-based queues are neither migrated nor deleted. See [queue ownership](queue.md).
 
 ## Dataset cache and temporary ownership
 
@@ -94,7 +101,7 @@ workspaces and all descendants are idle; age, host or PID alone does not establi
 Durable outputs, datasets, SDK caches and partial publication state remain persistent.
 
 Atomic comparison publication uses a temporary sibling of its selected output so rename
-is atomic across external output filesystems. The writer removes its own temporary sibling
+is atomic within the selected project filesystem. The writer removes its own temporary sibling
 on success or error. This bounded operation does not authorize sweeping an arena. Native
 process cleanup remains required before releasing GPU capacity, regardless of retained files.
 
@@ -111,11 +118,9 @@ modified value on exit, and leaves the Ultralytics settings file untouched. Fres
 trainers apply the worker callback scope during construction and training. Nested CLI use
 reuses invocation scratch. Detector backends retain their normal configuration and caches.
 
-Default queued execution creates a supervised child with admitted GPU UUID visibility.
-Direct automatic execution waits for availability in the caller; both controls false
-preserves native device selection without project telemetry. Shared coordination locks
-stay outside arenas. See the
-[GPU execution contract](../specs/022-simple-gpu-wait/contracts/execution.md).
+Direct commands preserve native device settings without GPU admission. `cy-queue`
+launches a fresh direct process with explicit UUID visibility and holds all capacity
+until the complete pipeline and its descendants exit. See [queue ownership](queue.md).
 
 ## Explicit image deduplication
 
@@ -126,6 +131,7 @@ The command replaces a destination atomically through a temporary sibling, prese
 mode, ownership, atime/mtime and extended attributes; inode, ctime and birth time can change.
 Reads may update access times. Symlinks are excluded. Unsupported platforms/filesystems and
 cross-device candidates are reported skips; unexpected I/O failures return nonzero.
-Dry-run creates and replaces nothing. See the maintained
+Writable selections must remain beneath resolved `CY_HOME`; external selections are
+permitted only with `--dry-run`, which creates and replaces nothing. See the maintained
 [deduplication contract](../specs/018-cache-image-dedup/contracts/cli.md) for file selection,
 failure behavior and the idle-cache requirement.

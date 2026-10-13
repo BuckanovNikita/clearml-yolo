@@ -18,7 +18,7 @@ from report_generator.v2 import (
 from report_generator.v2 import annotate_workbook as annotate_package
 
 from clearml_yolo.adapters.observability.tracing import trace_operation
-from clearml_yolo.adapters.storage.filesystem import temporary_root
+from clearml_yolo.adapters.storage.filesystem import temporary_root, write_path
 from clearml_yolo.core.identity import ModelIdentity
 
 _META = "customXml/clearml-yolo-identity.xml"
@@ -72,7 +72,7 @@ def deannotated_workbook(path: str | Path) -> Iterator[Path]:
         return
     with TemporaryDirectory(prefix="clearml-yolo-dashboard-", dir=temporary_root()) as directory:
         original = Path(directory) / source.name
-        original.write_bytes(_original(content))
+        write_path(original).write_bytes(_original(content))
         yield original
 
 
@@ -111,6 +111,7 @@ def _banner_lines(identities: Mapping[str, ModelIdentity]) -> list[str]:
 @trace_operation("report.workbook.annotate")
 def annotate_workbook(path: str | Path, identities: Mapping[str, ModelIdentity]) -> None:
     """Prepend literal identities, preserving metadata v1 and byte-exact recovery."""
+    path = write_path(path)
     if not identities:
         raise ValueError("Workbook annotation requires at least one model identity")
     annotate_package(

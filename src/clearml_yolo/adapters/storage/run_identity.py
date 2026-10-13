@@ -85,6 +85,8 @@ def point_latest_at(root: Path, run_dir: Path) -> None:
     taken — each costs a convenience shortcut and nothing else, so it is logged rather than
     raised, and the next run tries again under a different pid.
     """
+    write_path(root)
+    write_path(run_dir)
     latest = root / LATEST_LINK_NAME
     workspace = root.resolve().parent
     target = run_dir.resolve()

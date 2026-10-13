@@ -9,12 +9,18 @@ from contextvars import copy_context
 from functools import partial
 from pathlib import Path
 from tempfile import mkdtemp
-from threading import Event, Thread
+from threading import Event, Thread, get_ident
 from types import SimpleNamespace, TracebackType
 from typing import Any, Self, cast
 from uuid import uuid4
 
-from clearml_yolo.adapters.integrations.native_runtime import OWNER_PID_ENV, OWNER_TASK_ENV
+from clearml_yolo.adapters.clearml.deadline import sdk_deadline
+from clearml_yolo.adapters.integrations.native_runtime import (
+    OWNER_PID_ENV,
+    OWNER_TASK_ENV,
+    replayed_scalars,
+)
+from clearml_yolo.adapters.observability.capture import append_scalar
 from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.storage.filesystem import temporary_root
 
@@ -25,6 +31,7 @@ _EVENTS = (
     "on_val_end",
     "on_train_end",
 )
+_JOIN_SECONDS = 2.0
 
 
 _RECORD_FIELDS: dict[str, dict[str, type[Any] | tuple[type[Any], ...]]] = {
@@ -51,6 +58,27 @@ def _validate_record(record: dict[str, Any]) -> None:
     for name, expected in fields.items():
         if not isinstance(record.get(name), expected):
             raise TypeError(f"Native DDP event output is incomplete: invalid {event} {name}")
+    if "scalar_journaled" in record and not isinstance(record["scalar_journaled"], bool):
+        raise TypeError("Native DDP event output has invalid scalar journal provenance")
+
+
+def _journal_epoch_scalars(record: dict[str, Any]) -> None:
+    """Rank zero produces local scalar bytes; only the owner publisher contacts SDK."""
+    event = record["event"]
+    if event == "on_train_epoch_end":
+        values = [("train", name, value) for name, value in record["losses"].items()]
+        values.extend(("lr", name, value) for name, value in record["lr"].items())
+    elif event == "on_fit_epoch_end":
+        values = [("Epoch Time", "Epoch Time", record["epoch_time"])]
+        values.extend(
+            (name.split("/")[0], name, value) for name, value in record["metrics"].items()
+        )
+    else:
+        return
+    journaled = bool(os.environ.get("CY_SCALAR_JOURNAL"))
+    for title, series, value in values:
+        journaled = append_scalar(title, series, float(value), int(record["epoch"])) and journaled
+    record["scalar_journaled"] = journaled
 
 
 def _plain(value: Any) -> Any:  # noqa: PLR0911 - explicit recursive JSON boundary
@@ -152,6 +180,7 @@ def _capture_event(source: Any, *, event: str, journal: str) -> None:
     root = Path(journal)
     event_directory = root / "files" / uuid4().hex
     record = _event_record(event, source, event_directory)
+    _journal_epoch_scalars(record)
     payload = json.dumps(record, ensure_ascii=False, separators=(",", ":"))
     with (root / "events.jsonl").open("a", encoding="utf-8") as stream:
         stream.write(payload + "\n")
@@ -213,6 +242,8 @@ class NativeDDPRelay:
         self._pending = b""
         self._consumed: list[dict[str, Any]] = []
         self._args: SimpleNamespace | None = None
+        self._owner_thread = get_ident()
+        self._callback_seconds = 15.0
 
     def __enter__(self) -> Self:
         try:
@@ -241,14 +272,13 @@ class NativeDDPRelay:
             return self
 
     def _consume_live(self) -> None:
-        # Callback exceptions belong to the invocation boundary, never to a detached
-        # thread's stderr. Training may finish, but cannot finalize successfully.
+        # A timed-out filesystem reader may remain blocked. It owns no SDK callback,
+        # scalar writes or TRACE terminal emission that could resume after closure.
         try:
-            with trace_operation("ddp.consumer", context={"stage": "train"}):
-                while not self._stop.wait(0.25):
-                    trainer = getattr(self._model, "trainer", None)
-                    if getattr(trainer, "ddp", False):
-                        self._consume()
+            while not self._stop.wait(0.25):
+                trainer = getattr(self._model, "trainer", None)
+                if getattr(trainer, "ddp", False):
+                    self._consume()
         except BaseException as error:  # noqa: BLE001 - relay all failures to the owner boundary
             self._failure = error
 
@@ -256,7 +286,9 @@ class NativeDDPRelay:
     def _stop_consumer(self) -> None:
         self._stop.set()
         if self._thread is not None and self._thread.ident is not None:
-            self._thread.join()
+            self._thread.join(timeout=_JOIN_SECONDS)
+            if self._thread.is_alive():
+                raise RuntimeError("Native DDP callback consumer did not stop within its deadline")
 
     def _callbacks(self) -> dict[str, Any]:
         from ultralytics.utils.callbacks import clearml as integration
@@ -268,7 +300,9 @@ class NativeDDPRelay:
             raise RuntimeError("Installed native ClearML callback set changed before DDP replay")
         return callbacks
 
-    def _consume(self) -> None:
+    def _consume(self, *, final: bool = False) -> None:
+        if self._stop.is_set() and not final:
+            return
         journal = self._directory / "events.jsonl"
         if not journal.is_file():
             return
@@ -276,46 +310,57 @@ class NativeDDPRelay:
         with journal.open("rb") as stream:
             stream.seek(self._offset)
             payload = stream.read()
-            self._offset = stream.tell()
-        lines = (self._pending + payload).split(b"\n")
-        self._pending = lines.pop()
-        for line in lines:
+        if self._stop.is_set() and not final:
+            return
+        self._offset += len(payload)
+        self._pending += payload
+        while b"\n" in self._pending:
+            if self._stop.is_set() and not final:
+                return
+            line, remaining = self._pending.split(b"\n", 1)
             try:
                 record = json.loads(line)
             except (UnicodeDecodeError, json.JSONDecodeError) as error:
                 raise RuntimeError("Native DDP event output is incomplete or corrupt") from error
             if not isinstance(record, dict) or record.get("event") not in _EVENTS:
                 raise RuntimeError("Native DDP event output contains an invalid event")
-            _validate_record(record)
-            if self._consumed and self._consumed[-1]["event"] == "on_train_end":
-                raise RuntimeError("Native DDP event output continues after training ended")
-            if not self._consumed:
-                arguments = record.get("args")
-                if record["event"] != "on_pretrain_routine_start" or not isinstance(
-                    arguments, dict
-                ):
-                    raise RuntimeError(
-                        "Native DDP event output is incomplete: effective arguments are missing"
-                    )
-                self._args = SimpleNamespace(**arguments)
-            elif record["event"] == "on_pretrain_routine_start":
-                raise RuntimeError("Native DDP event output contains duplicate pretrain events")
-            self._consumed.append(record)
-            # Keep native best publication behind full-journal/checkpoint validation.
-            if record["event"] != "on_train_end":
-                self._dispatch(record)
+            if not self._accept_record(record, final=final):
+                return
+            self._pending = remaining
+
+    def _accept_record(self, record: dict[str, Any], *, final: bool) -> bool:
+        _validate_record(record)
+        if self._stop.is_set() and not final:
+            return False
+        if self._consumed and self._consumed[-1]["event"] == "on_train_end":
+            raise RuntimeError("Native DDP event output continues after training ended")
+        if not self._consumed:
+            arguments = record.get("args")
+            if record["event"] != "on_pretrain_routine_start" or not isinstance(arguments, dict):
+                raise RuntimeError(
+                    "Native DDP event output is incomplete: effective arguments are missing"
+                )
+            self._args = SimpleNamespace(**arguments)
+        elif record["event"] == "on_pretrain_routine_start":
+            raise RuntimeError("Native DDP event output contains duplicate pretrain events")
+        self._consumed.append(record)
+        return True
 
     def _dispatch(self, record: dict[str, Any]) -> None:
+        if get_ident() != self._owner_thread:
+            raise RuntimeError("Native DDP SDK callbacks must execute on the owner thread")
         if self._args is None:
             raise RuntimeError(
                 "Native DDP event output is incomplete: effective arguments are missing"
             )
         view = _ReplayTrainer(record, self._args)
         with (
+            sdk_deadline(self._callback_seconds),
             trace_operation(
                 "ddp.callback", context={"event": str(record["event"]), "stage": "train"}
             ),
             _recorded_model_info(record.get("model_info")),
+            replayed_scalars(bool(record.get("scalar_journaled", False))),
         ):
             self._callbacks()[str(record["event"])](view)
 
@@ -333,7 +378,11 @@ class NativeDDPRelay:
         _traceback: TracebackType | None,
     ) -> None:
         try:
-            self._stop_consumer()
+            try:
+                self._stop_consumer()
+            except Exception:
+                if error_type is None:
+                    raise
         finally:
             self._remove_callbacks()
         if error_type is None and self._failure is not None:
@@ -396,7 +445,10 @@ class NativeDDPRelay:
         if self._failure is not None:
             raise self._failure
         self._validate_owner()
-        self._consume()
+        self._consume(final=True)
+        for record in self._consumed:
+            if record["event"] != "on_train_end":
+                self._dispatch(record)
         records = self._records()
         final_args = records[-1].get("args")
         if not isinstance(final_args, dict):

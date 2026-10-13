@@ -25,6 +25,7 @@ from clearml_yolo.adapters.clearml.native import (
     owned_native_model,
 )
 from clearml_yolo.adapters.clearml.session import register_model_barrier
+from clearml_yolo.adapters.observability.capture import append_scalar
 from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.storage.identity import write_checkpoint_identity
 from clearml_yolo.application.ports import TaskHandle
@@ -47,6 +48,8 @@ def record_detector_arguments(task: TaskHandle, values: dict[str, Any]) -> None:
 
 def report_metric(task: TaskHandle, name: str, value: float, step: int) -> None:
     """Forward native scalar callbacks to the single invocation-owned logger."""
+    if append_scalar("Native training", name, value, step):
+        return
     owner: Any = task
     owner.get_logger().report_scalar(
         title="Native training",

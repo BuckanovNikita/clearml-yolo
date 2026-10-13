@@ -9,7 +9,7 @@ and implementation evidence by topic; this summary does not replace those contra
 Faster R-CNN deployment bundles.
 
 Entrypoints: `cy`, `cy-train`, `cy-predict`, `cy-val`, `cy-metrics`,
-`cy-report`, `cy-compare`, `cy-ground-truth`, `cy-export`, `cy-init-config`, and `cy-dedup`.
+`cy-report`, `cy-compare`, `cy-ground-truth`, `cy-export`, `cy-init-config`, `cy-dedup`, and `cy-queue`.
 `cy-init-config DIRECTORY [--command NAME] [--model PRESET] [--force]` writes one selected
 execution wrapper (default `cy`) and its required groups without a ClearML task. Default
 YOLO model commands retain both native groups. New detector selections write one model
@@ -47,30 +47,14 @@ Effective native YAML and retained prediction manifests support replay; YAML is 
 locally with comments preserved; canonical run/dataset/report configurations and native General
 parameters support ClearML replay without artifact copies.
 Pass device, batch, AMP, compilation and native augmentation options through the native groups.
-The model commands and `cy-export` expose `queue.enabled` and `autogpu.enabled`, both default true.
-Queued automatic execution restores FIFO, atomic whole-GPU UUID reservations, supervised
-children, liveness recovery, reservation contraction and concurrent Hydra sweeps. Queue off
-with automatic selection on preserves direct availability waiting; queue on with automatic
-selection off reserves exact enabled-phase identities; both off preserves native settings
-without project GPU discovery, waits or replacement. CPU/MPS and non-model commands bypass
-GPU telemetry. Controls are execution policy, never workflow arguments. Neither disables tracking.
-`autogpu.force` is strict Boolean, default false: it overrides both switches, bypasses
-project GPU discovery/checks/reservations/waiting, and requires concrete selectors
-for enabled GPU stages. Preserve selector order and inherited visibility; CPU/MPS
-remain supported. ClearML records the effective force policy and rejects replay
-changes to forced choices. Forced sweeps use sequential BasicLauncher.
-`autogpu.max_used_memory_gib` defaults to 2.0 and accepts finite positive numbers.
-Availability means total NVML used memory is strictly below that GiB limit, regardless
-of process presence. Equality is busy; reservations still exclude devices. Each queue
-head's own supervisor applies its project limit; direct waits and worker contraction
-use the same setting. Replay cannot change it.
-
-Automatic demand derives from native settings: a training integer is one GPU, a list uses
-its length, every `-1` contributes one, null/empty/`cuda` is one and CPU/MPS is zero.
-Inference needs one device; pipeline demand is the maximum of enabled phases. Exact queued
-mode requires concrete selectors, reserves the training/inference UUID union and preserves
-training order and inference identity through child-local remapping. Native cleanup precedes
-contraction; release training-only capacity while retaining the downstream device.
+Direct `cy` and stage commands execute their configured native devices without project
+GPU discovery, queue storage, reservations, waiting or automatic substitution. `cy -m`
+uses sequential BasicLauncher. `queue.*`, `autogpu.*` and the former queue launcher
+are rejected with migration guidance. The separate [cy-queue contract](queue.md)
+owns count/exact submissions, complete sweep expansion, owner workers, per-host ordering,
+whole-pipeline UUID allocations and guardian recovery. Queue allocation preserves explicit
+CPU phases, compilation, AMP, batch and model settings. Inference uses the first allocated
+device. Memory admission thresholds are not guarantees that compilation/training fits.
 
 New `model=deimv2/<preset>`, `model=rfdetr/<preset>` and `model=fasterrcnn/<preset>` groups
 own typed `model.train` and `model.predict` settings. Unsupported controls fail explicitly.
@@ -99,23 +83,14 @@ defines both dynamic profiles, standalone execution and numerical/quality gates.
 uses a fixed labeled corpus with source-byte and actual evaluator identity. Local execution
 does not establish CUDA 11.8 target compatibility; consult dated acceptance evidence.
 
-NVML and a metadata-only subprocess resolve supported whole-GPU visibility before ClearML
-and native initialization. Unknown required-device telemetry, visible MIG, lost visibility and excessive
-demand fail clearly. Hidden cards with unsupported telemetry or MIG cannot block
-healthy visible cards. Exact admission and contraction scope telemetry to required GPUs. Shared compatible queue state remains outside project configuration and
-invocation scratch. Corrupt/incompatible state fails closed without migration or deletion.
-Cancellation reaps owned GPU descendants before releasing capacity. Direct automatic waits
-remain stateless and give no exclusive allocation guarantee. Requested/effective devices and
-queued reservations are recorded separately under `gpu_selection`; replay cannot change launch
-policy or exceed admitted identities/capacity.
-
-Queued local multiruns use the project concurrent launcher with BasicSweeper; queue-disabled
-multiruns use sequential BasicLauncher. Preserve callbacks, job environment/output/chdir,
-ordered results and failure outcomes; mixed effective queue-mode sweeps fail before admission.
-The [GPU execution contract](../specs/022-simple-gpu-wait/contracts/execution.md), amended by
-[feature 024](../specs/024-runtime-isolation/spec.md), governs all four modes. Historical
-feature 013/022 intent and dated evidence remain preserved. Batch tuning, custom augmentation
-JSON, `--force-gpu`, disabled tracking and MIG are unsupported.
+Queue inventory uses NVML and a metadata-only visibility probe before native launch.
+Unknown required-device telemetry, visible MIG and damaged coordination state fail closed.
+Direct execution has no dependency on this machinery. Queue workers execute only their
+own UID's jobs. Every local participant may reorder pending jobs; only owners cancel/recover.
+Each host partitions durable shared NFS metadata independently; host-global local UUID locks
+prevent participating roots from allocating the same device. Guardian death quarantines
+capacity until owner recovery proves descendant cleanup. No automatic retry is made for
+uncertain outcomes. Historical 013/022/024 specifications remain preserved as prior intent.
 
 `run_dir` owns output routing for `cy`. Pipeline stages cannot use conflicting stage output
 paths or conflicting native training project/name. Standalone output-producing commands use
@@ -172,11 +147,13 @@ readback verifies the metadata. Standalone metrics never creates or modifies mod
 
 ClearML is required for execution commands. One execution invocation owns exactly one task;
 nested stages reuse it and native DDP descendants do not create tasks or upload artifacts.
-The invocation-owned task forwards normal stdout and stderr to its ClearML Console while it
-is active, including native YOLO output. Console streams are raw; credential sanitization
-applies to published configuration. Argument-parser and framework auto-capture remain
-disabled, and forwarding does not cover output after task closure or guarantee capture of
-DDP subprocess streams.
+FD-level project capture retains stdout/stderr from Python, native writes and DDP children.
+A network-independent terminal mirror and attach-only publisher serve the existing task;
+the publisher creates no task and changes no task state. Required console/scalar publication
+uses approximately two-second batches and a bounded final-offset barrier. Local logs survive
+failure; incomplete required publication fails the command without replacing an original
+computation error. No automatic replay of uncertain deliveries occurs. Prediction explicitly
+uses verbose=false and one rate-limited operation progress indicator across supported backends.
 Complete a task only after all required artifacts and the native best Output Model
 are uploaded, verified and flushed. Fail task and command on computation, upload, flush, or interruption
 errors while retaining local output. Keep credentials out of published configuration and
@@ -216,9 +193,6 @@ ClearML callback switches restore in memory without persisting user settings, in
 fresh DDP trainer scopes. Invalid dataset entries remain available for deliberate idle
 maintenance; unsupported native locks fail without a soft-lock fallback.
 
-GPU admission explanations use CUDA selector indexes and physical cross-references,
-requested/visible/eligible counts, the effective memory limit and queue position.
-Per-card memory/reservation/exclusion reasons are distinct from job-level FIFO and
-capacity blockers. Initial/change/30-second heartbeat messages derive from immutable
-admission evidence and are formatted outside registry locks. See the maintained
-[diagnostic guide](diagnostics.md#gpu-admission-decisions).
+Queue public summaries show owner, order, state, requested/allotted devices, wait reason,
+progress and ClearML link without exposing private executable configurations. See
+[queue operations](queue.md) and [diagnostics](diagnostics.md#gpu-admission-decisions).

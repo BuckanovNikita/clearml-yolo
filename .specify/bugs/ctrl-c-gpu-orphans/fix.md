@@ -54,3 +54,14 @@ Full native GPU/ClearML and fresh-distribution release gates are not established
 The user subsequently requested release of this fix. See [release.md](release.md)
 for isolated scope, native verification and final release evidence. Earlier observations
 and deferred-release entries above are retained as historical evidence.
+
+## Feature 029 integration — 2026-10-13
+
+The records above preserve the preceding cleanup implementation and checks. Feature
+[029](../../../specs/029-shared-cy-queue/spec.md) replaces the old Hydra scheduler.
+Its generic process-tree ownership and signal protections are retained in runtime
+`process_tree.py`/`supervision.py` and extended by queue guardians and direct native
+descendant scopes. The new [task ledger](../../../specs/029-shared-cy-queue/tasks.md)
+owns integrated verification, physical GPU cancellation, forced worker/guardian death,
+reservation recovery and release acceptance. Earlier counts are historical evidence,
+not a claim that the refactored execution paths have passed those same checks.

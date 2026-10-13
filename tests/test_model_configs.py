@@ -76,9 +76,9 @@ def test_native_selection_rejects_changed_inactive_yolo_groups(override: str) ->
         validate_wrapper_keys(config, train)
 
 
-@pytest.mark.parametrize("queued", [True, False])
+@pytest.mark.parametrize("device", ["cpu", "cuda:3"])
 def test_initial_mixed_model_multirun_accepts_native_overrides(
-    monkeypatch: pytest.MonkeyPatch, queued: bool
+    monkeypatch: pytest.MonkeyPatch, device: str
 ) -> None:
     selections = ("deimv2/s", "rfdetr/nano", "fasterrcnn/resnet50_fpn")
     resolutions = {"deimv2": 128, "rfdetr": 64, "fasterrcnn": 128}
@@ -87,11 +87,10 @@ def test_initial_mixed_model_multirun_accepts_native_overrides(
     monkeypatch.setenv("CY_TEST_SOURCE_deimv2", "/native/deimv2")
     overrides = [
         "ground_truth=truth.csv",
-        f"queue.enabled={str(queued).lower()}",
         'model.source_dir="${oc.env:CY_TEST_SOURCE_${model.backend},null}"',
         'model.train.imgsz="${oc.decode:${oc.env:CY_TEST_IMGSZ_${model.backend}}}"',
         'model.predict.imgsz="${oc.decode:${oc.env:CY_TEST_IMGSZ_${model.backend}}}"',
-        "model.predict.device=cpu",
+        f"model.predict.device={device}",
         "model.predict.batch=2",
         "model.predict.conf=0.001",
         "model.predict.half=false",
@@ -107,7 +106,7 @@ def test_initial_mixed_model_multirun_accepts_native_overrides(
         # Hydra composes this default-model root before expanding group choices.
         assert initial.model.backend == "ultralytics"
         assert {"source_dir", "train", "predict"} <= set(initial.model)
-        assert initial.model.predict.device == "cpu"
+        assert initial.model.predict.device == device
         for selection in selections:
             expanded = loader.load_sweep_config(initial, [f"model={selection}", *overrides])
             job = OmegaConf.masked_copy(expanded, [str(key) for key in expanded if key != "hydra"])
@@ -117,7 +116,7 @@ def test_initial_mixed_model_multirun_accepts_native_overrides(
             assert job.model.preset == preset
             assert job.model.predict.imgsz == resolutions[backend]
             assert job.model.train.imgsz == resolutions[backend]
-            assert job.model.predict.device == "cpu"
+            assert job.model.predict.device == device
             assert job.model.predict.batch == 2
             assert job.model.source_dir == ("/native/deimv2" if backend == "deimv2" else None)
 

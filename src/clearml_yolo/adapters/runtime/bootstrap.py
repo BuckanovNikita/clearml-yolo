@@ -27,29 +27,33 @@ class _State:
 _STATE = _State()
 
 
-def _capture_queue_root() -> None:
-    """Keep GPU coordination user-wide across project workspace selections."""
-    if os.environ.get("CY_GPU_QUEUE_ROOT"):
-        return
-    if os.name == "nt":
-        state = Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData/Local")
-    else:
-        state = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state")
-    os.environ["CY_GPU_QUEUE_ROOT"] = str((state.expanduser() / "clearml-yolo/queue").resolve())
+def project_write_path(value: str | Path, *, root: Path | None = None) -> Path:
+    """Reject project destinations outside the physically resolved workspace."""
+    workspace = root or Path(os.environ.get("CY_HOME") or Path.cwd()).expanduser().resolve()
+    path = Path(value).expanduser()
+    if not path.resolve().is_relative_to(workspace):
+        raise ValueError(
+            f"Project write destination {path} must be contained beneath CY_HOME={workspace}; "
+            "choose a destination inside CY_HOME or select the intended project workspace. "
+            "External input and library configuration paths remain supported."
+        )
+    return path
 
 
 def _temporary_root(root: Path) -> Path:
     selected = Path(os.environ.get("CY_RUNTIME_TEMP_ROOT") or root / ".tmp").expanduser()
-    return (selected if selected.is_absolute() else root / selected).resolve()
+    return project_write_path(
+        selected if selected.is_absolute() else root / selected, root=root
+    ).resolve()
 
 
 def initialize_runtime_environment() -> Path:
     """Freeze CY_HOME and create project scratch without configuring libraries."""
     with _LOCK:
         root = Path(os.environ.get("CY_HOME") or Path.cwd()).expanduser().resolve()
+        temporary = _temporary_root(root)
         root.mkdir(parents=True, exist_ok=True)
-        _temporary_root(root).mkdir(parents=True, exist_ok=True)
-        _capture_queue_root()
+        temporary.mkdir(parents=True, exist_ok=True)
         os.environ["CY_HOME"] = str(root)
         return root
 
@@ -58,7 +62,7 @@ def invocation_temporary_root() -> Path | None:
     """Return active or inherited scratch, with no ownership or recovery claims."""
     selected = os.environ.get(_ARENA_ENV)
     if selected:
-        arena = Path(selected).expanduser().resolve()
+        arena = project_write_path(selected).resolve()
         if arena.is_dir():
             return arena
     return None
@@ -74,7 +78,7 @@ def runtime_environment() -> Iterator[Path]:
     with _LOCK:
         root = initialize_runtime_environment()
         if _STATE.active is not None and _STATE.active[0] == os.getpid():
-            yield _STATE.active[1]
+            yield project_write_path(_STATE.active[1], root=root)
             return
         arena = Path(tempfile.mkdtemp(prefix="cy-runtime-", dir=_temporary_root(root)))
         previous_active = _STATE.active

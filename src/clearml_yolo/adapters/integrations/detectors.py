@@ -8,6 +8,7 @@ import pandas as pd
 import yaml
 
 from clearml_yolo.adapters.storage.checkpoint import bind_checkpoint, read_checkpoint_descriptor
+from clearml_yolo.adapters.storage.filesystem import write_path
 from clearml_yolo.adapters.storage.identity import checkpoint_sha256
 from clearml_yolo.adapters.yolo.config import (
     native_defaults,
@@ -164,6 +165,8 @@ class DetectorRunner:
     def _native_prediction(values: dict[str, Any]) -> PredictSettings:
         """Translate shared controls; reject changed YOLO-only controls in mixed comparisons."""
         result = {key: value for key, value in values.items() if key not in _PREDICTION_ROUTING}
+        if result.get("verbose") is False:
+            result.pop("verbose")
         if "quantize" in result:
             precision = result.pop("quantize")
             if precision not in {None, 16, 32}:
@@ -238,6 +241,7 @@ class DetectorRunner:
         )
 
     def write_native_yaml(self, path: Path, settings: dict[str, Any], stage: Stage) -> Path:
+        path = write_path(path)
         if self.config.backend == "ultralytics" and "backend" not in settings:
             weights = settings.get("model")
             # Native training recipes may use 'model' for a registry name or a
@@ -307,11 +311,13 @@ class DetectorRunner:
         if image_name not in {"name", "stem", "path"}:
             raise ValueError(f"Unsupported image_name mode: {image_name}")
         settings = self._native_prediction(model_kwargs)
-        output = Path(model_kwargs.get("project", ".")) / str(model_kwargs.get("name", "predict"))
+        output = write_path(
+            Path(model_kwargs.get("project", ".")) / str(model_kwargs.get("name", "predict"))
+        )
         output.mkdir(parents=True, exist_ok=True)
-        directory = manifest_dir or output / "inputs"
+        directory = write_path(manifest_dir or output / "inputs")
         directory.mkdir(parents=True, exist_ok=True)
-        manifest = directory / "images.txt"
+        manifest = write_path(directory / "images.txt")
         paths = list(dict.fromkeys(str(path) for path in image_paths))
         manifest.write_text(
             "\n".join(str(Path(path).absolute()) for path in paths), encoding="utf-8"
@@ -419,7 +425,7 @@ class DetectorRunner:
         config = self.config.model_copy(
             update={"train": TrainSettings.model_validate(native_values)}
         )
-        output = Path(settings["project"]) / str(settings["name"])
+        output = write_path(Path(settings["project"]) / str(settings["name"]))
         output.mkdir(parents=True, exist_ok=True)
         if config.backend == "deimv2":
             from clearml_yolo.adapters.deim.backend import train

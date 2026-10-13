@@ -17,6 +17,8 @@ import yaml
 
 from clearml_yolo.adapters.deim.source import REVISION, load_source, native_coco_modules
 from clearml_yolo.adapters.deim.transforms import bridge_transforms
+from clearml_yolo.adapters.observability.progress import image_progress
+from clearml_yolo.adapters.storage.filesystem import validate_output_tree
 from clearml_yolo.application.contracts import PREDICTION_COLUMNS, PreparedDataset
 from clearml_yolo.core.models import (
     BackendTrainResult,
@@ -158,7 +160,7 @@ def _validate_tuning(model: Any, weights: Path) -> None:
 
 
 def _fit(solver: Any, output: Path) -> None:
-    output = output.resolve()
+    output = validate_output_tree(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
     # Native numerical diagnostics use cwd-relative NaN.pth; keep them in this run.
     with chdir(output):
@@ -171,6 +173,7 @@ def train(
     output: Path,
     report: Callable[[str, float, int], None],
 ) -> BackendTrainResult:
+    output = validate_output_tree(output)
     _validate_training(config)
     output = output.resolve()
     prepared = prepared.model_copy(update={"data": prepared.data.resolve()})
@@ -269,7 +272,7 @@ def _native_predict(
     _load_weights(model, weights)
     postprocessor = cfg.postprocessor.to(device)
     rows: list[dict[str, Any]] = []
-    with torch.inference_mode():
+    with image_progress(len(image_paths)) as advance, torch.inference_mode():
         for offset in range(0, len(image_paths), settings.batch):
             paths = image_paths[offset : offset + settings.batch]
             tensors, originals = [], []
@@ -289,6 +292,7 @@ def _native_predict(
             predictions = postprocessor(outputs, torch.tensor(originals, device=device))
             for path, prediction in zip(paths, predictions, strict=True):
                 rows.extend(_rows(path, prediction, descriptor.class_names, settings))
+            advance(len(paths))
     return rows
 
 

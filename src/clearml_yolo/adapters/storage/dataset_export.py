@@ -12,6 +12,7 @@ from pathlib import Path
 import yaml
 
 from clearml_yolo.adapters.observability.tracing import trace_operation
+from clearml_yolo.adapters.storage.filesystem import write_path
 from clearml_yolo.application.contracts import (
     DatasetFormat as DatasetFormat,  # noqa: PLC0414 - typed adapter interface
 )
@@ -77,14 +78,14 @@ def _export_coco(records: ValidatedDataset, directory: Path) -> Path:
     for split in _SPLITS:
         folder = "valid" if split == "val" else split
         destination = directory / folder
-        destination.mkdir()
+        write_path(destination).mkdir()
         images: list[dict[str, object]] = []
         annotations: list[dict[str, object]] = []
         for index, image in enumerate(records.images, start=1):
             if image.split != split:
                 continue
             filename = exported_image_filename(image, index, "coco")
-            shutil.copyfile(image.path, destination / filename)
+            shutil.copyfile(image.path, write_path(destination / filename))
             images.append(
                 {"id": index, "file_name": filename, "width": image.width, "height": image.height}
             )
@@ -102,13 +103,15 @@ def _export_coco(records: ValidatedDataset, directory: Path) -> Path:
                     }
                 )
         payload = {"images": images, "annotations": annotations, "categories": categories}
-        (destination / "_annotations.coco.json").write_text(
+        write_path(destination / "_annotations.coco.json").write_text(
             json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )
         if images:
             data[split] = folder
     path = directory / "data.yaml"
-    path.write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True), encoding="utf-8")
+    write_path(path).write_text(
+        yaml.safe_dump(data, sort_keys=False, allow_unicode=True), encoding="utf-8"
+    )
     return path
 
 
@@ -197,13 +200,13 @@ def _write_ndjson(path: Path, names: dict[int, str], images: tuple[_ExportImage,
     header = {"type": "dataset", "task": "detect", "path": ".", "class_names": names}
     lines = [json.dumps(header, ensure_ascii=False, separators=(",", ":"))]
     lines.extend(_image_json(image) for image in images)
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    write_path(path).write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def _prepare_directories(directory: Path) -> None:
     for split in _SPLITS:
-        (directory / "images" / split).mkdir(parents=True, exist_ok=True)
-        (directory / "labels" / split).mkdir(parents=True, exist_ok=True)
+        write_path(directory / "images" / split).mkdir(parents=True, exist_ok=True)
+        write_path(directory / "labels" / split).mkdir(parents=True, exist_ok=True)
 
 
 def _destination(directory: Path, image: _ExportImage) -> tuple[Path, Path]:
@@ -214,7 +217,7 @@ def _destination(directory: Path, image: _ExportImage) -> tuple[Path, Path]:
         raise ValueError(f"NDJSON image path does not match split {image.split!r}: {image.file!r}")
     image_path = directory / relative
     label_path = directory / "labels" / image.split / relative.with_suffix(".txt").name
-    return image_path, label_path
+    return write_path(image_path), write_path(label_path)
 
 
 def _label_text(boxes: tuple[_ExportBox, ...]) -> str:
@@ -239,7 +242,7 @@ def _materialize(directory: Path, images: tuple[_ExportImage, ...]) -> None:
     for image in images:
         image_path, label_path = _destination(directory, image)
         shutil.copyfile(image.original_image_path, image_path)
-        label_path.write_text(_label_text(image.boxes), encoding="utf-8")
+        write_path(label_path).write_text(_label_text(image.boxes), encoding="utf-8")
 
 
 @trace_operation("storage.dataset.yaml.write")
@@ -253,7 +256,7 @@ def _write_yaml(directory: Path, names: dict[int, str], images: tuple[_ExportIma
     for split in _SPLITS:
         if split in present_splits:
             data[split] = f"images/{split}"
-    data_path.write_text(
+    write_path(data_path).write_text(
         yaml.safe_dump(data, sort_keys=False, allow_unicode=True), encoding="utf-8"
     )
     return data_path
@@ -264,6 +267,7 @@ def export_dataset(
     records: ValidatedDataset, directory: Path, dataset_format: DatasetFormat
 ) -> Path:
     """Export canonical records and return the native YAML consumed by Ultralytics."""
+    directory = write_path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     if dataset_format == "coco":
         return _export_coco(records, directory)

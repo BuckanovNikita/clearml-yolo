@@ -10,7 +10,7 @@ from pathlib import Path
 
 import grimp
 
-PROJECT_ROOTS = ("clearml_yolo", "hydra_plugins.cy_queue")
+PROJECT_ROOTS = ("clearml_yolo",)
 ADAPTER_RESPONSIBILITIES = {
     "storage",
     "yolo",
@@ -25,6 +25,7 @@ ADAPTER_RESPONSIBILITIES = {
     "rfdetr",
     "fasterrcnn",
     "export",
+    "queue",
 }
 COMMANDS = {
     "pipeline",
@@ -38,6 +39,7 @@ COMMANDS = {
     "config_tree",
     "dedup",
     "export",
+    "queue",
 }
 SCIENTIFIC = {"pydantic", "pandera", "pandas", "numpy", "scipy"}
 APPLICATION_EFFECT_DEPENDENCIES = {
@@ -49,6 +51,7 @@ APPLICATION_EFFECT_DEPENDENCIES = {
     "filelock",
 }
 SDK_OWNERS = {
+    "textual": ("clearml_yolo.entrypoints.queue_tui",),
     "ultralytics": (
         "clearml_yolo.adapters.yolo",
         "clearml_yolo.adapters.integrations.native_runtime",
@@ -104,9 +107,9 @@ SDK_OWNERS = {
     "openpyxl": ("clearml_yolo.adapters.reporting",),
     "fiftyone": ("clearml_yolo.adapters.fiftyone",),
     "eta": (),
-    "hydra": ("clearml_yolo.entrypoints.hydra", "hydra_plugins.cy_queue"),
+    "hydra": ("clearml_yolo.entrypoints.hydra",),
     "hydra_zen": ("clearml_yolo.entrypoints.hydra",),
-    "omegaconf": ("clearml_yolo.entrypoints.hydra", "hydra_plugins.cy_queue"),
+    "omegaconf": ("clearml_yolo.entrypoints.hydra",),
 }
 # The probe reads CUDA visibility in a fresh disposable process before waiting for free GPUs.
 SDK_EXCEPTIONS = {("clearml_yolo.adapters.runtime.gpu_probe", "torch")}
@@ -119,6 +122,7 @@ ADAPTER_PEERS = {
     "clearml": {"storage", "observability"},
     "fiftyone": {"observability"},
     "runtime": {"observability"},
+    "queue": {"runtime"},
     "integrations": {"storage", "observability"},
     "deim": {"observability"},
     "rfdetr": {"observability"},
@@ -127,6 +131,13 @@ ADAPTER_PEERS = {
 }
 # These edges implement explicit cross-adapter coordination or data conversion.
 PEER_EXCEPTIONS = {
+    ("clearml_yolo.adapters.deim.backend", "clearml_yolo.adapters.storage.filesystem"),
+    ("clearml_yolo.adapters.rfdetr.backend", "clearml_yolo.adapters.storage.filesystem"),
+    ("clearml_yolo.adapters.fasterrcnn.training", "clearml_yolo.adapters.storage.filesystem"),
+    ("clearml_yolo.adapters.export.build", "clearml_yolo.adapters.storage.filesystem"),
+    ("clearml_yolo.adapters.export.metadata", "clearml_yolo.adapters.storage.filesystem"),
+    ("clearml_yolo.adapters.export.onnx", "clearml_yolo.adapters.storage.filesystem"),
+    ("clearml_yolo.adapters.export.verification", "clearml_yolo.adapters.storage.filesystem"),
     ("clearml_yolo.adapters.storage.filesystem", "clearml_yolo.adapters.runtime.bootstrap"),
     (
         "clearml_yolo.adapters.integrations.native_runtime",
@@ -134,15 +145,12 @@ PEER_EXCEPTIONS = {
     ),
     ("clearml_yolo.adapters.fiftyone.worker", "clearml_yolo.adapters.runtime.bootstrap"),
     ("clearml_yolo.adapters.fiftyone.bounded", "clearml_yolo.adapters.storage.filesystem"),
-    ("clearml_yolo.adapters.runtime.gpu_runtime", "clearml_yolo.adapters.clearml.session"),
-    (
-        "clearml_yolo.adapters.runtime.gpu_runtime",
-        "clearml_yolo.adapters.integrations.native_runtime",
-    ),
+    ("clearml_yolo.adapters.observability.capture", "clearml_yolo.adapters.runtime.bootstrap"),
     ("clearml_yolo.adapters.clearml.models", "clearml_yolo.adapters.reporting.workbook_identity"),
     ("clearml_yolo.adapters.fiftyone.publisher", "clearml_yolo.adapters.storage.publication_data"),
     ("clearml_yolo.adapters.integrations.native_runtime", "clearml_yolo.adapters.clearml.session"),
     ("clearml_yolo.adapters.integrations.native_ddp", "clearml_yolo.adapters.clearml.session"),
+    ("clearml_yolo.adapters.integrations.native_ddp", "clearml_yolo.adapters.clearml.deadline"),
     ("clearml_yolo.adapters.integrations.training", "clearml_yolo.adapters.clearml.session"),
     ("clearml_yolo.adapters.integrations.training", "clearml_yolo.adapters.clearml.native"),
     ("clearml_yolo.adapters.integrations.training", "clearml_yolo.adapters.yolo.config"),
@@ -223,8 +231,6 @@ def within(module: str, prefix: str) -> bool:
 
 
 def layer(module: str) -> str | None:
-    if within(module, "hydra_plugins.cy_queue"):
-        return "entrypoints"
     pieces = module.split(".")
     if module == "clearml_yolo":
         return "root"
@@ -233,8 +239,8 @@ def layer(module: str) -> str | None:
     responsibilities: dict[str, set[str] | None] = {
         "core": None,
         "adapters": ADAPTER_RESPONSIBILITIES,
-        "application": {"contracts", "ports", "evaluation", "use_cases"},
-        "entrypoints": COMMANDS | {"composition", "hydra"},
+        "application": {"contracts", "ports", "evaluation", "use_cases", "queue"},
+        "entrypoints": COMMANDS | {"composition", "hydra", "queue_tui", "queue_run"},
     }
     selected = pieces[1]
     if selected not in responsibilities:
@@ -245,8 +251,25 @@ def layer(module: str) -> str | None:
     return None
 
 
+def launch_target_findings(importer: str, targets: set[str]) -> list[str]:
+    direct = {f"clearml_yolo.entrypoints.{name}" for name in COMMANDS - {"queue"}}
+    direct.update({"clearml_yolo.entrypoints.hydra.common", "clearml_yolo.entrypoints.composition"})
+    forbidden = (
+        "clearml_yolo.adapters.queue",
+        "clearml_yolo.application.queue",
+        "clearml_yolo.core.queue",
+        "clearml_yolo.entrypoints.queue_run",
+        "textual",
+    )
+    return [
+        f"direct execution imports scheduling: {importer} -> {target}"
+        for target in targets
+        if importer in direct and any(within(target, x) for x in forbidden)
+    ]
+
+
 def _edge_findings(importer: str, imported: str) -> list[str]:
-    findings = []
+    findings = launch_target_findings(importer, {imported})
     source_layer = next(
         (
             name
@@ -279,6 +302,7 @@ def _edge_findings(importer: str, imported: str) -> list[str]:
                     "clearml_yolo.application",
                     "clearml_yolo.application.ports",
                     "clearml_yolo.application.contracts",
+                    "clearml_yolo.application.queue",
                 }
             )
         )
@@ -535,6 +559,20 @@ def runtime_targets(source_root: Path, pyproject: Path) -> set[str]:
     config = tomllib.loads(pyproject.read_text(encoding="utf-8"))
     targets.update(config["project"]["scripts"].values())
     return targets
+
+
+def runtime_boundary_findings(source_root: Path) -> list[str]:
+    """Apply direct/queue boundaries to literal subprocess and dynamic import targets."""
+    findings: list[str] = []
+    for path in source_root.rglob("*.py"):
+        importer = ".".join(path.relative_to(source_root).with_suffix("").parts)
+        targets = {
+            node.value
+            for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
+            if isinstance(node, ast.Constant) and isinstance(node.value, str)
+        }
+        findings.extend(launch_target_findings(importer, targets))
+    return findings
 
 
 def _module_symbols(path: Path) -> set[str]:

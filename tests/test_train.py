@@ -106,7 +106,7 @@ def test_csv_training_uses_prepared_data_and_returns_cleaned_ground_truth(
         required_splits: tuple[str, ...] = ("train", "val"),
     ) -> Iterator[PreparedDataset]:
         assert source == "source.csv"
-        assert cache_dir == tmp_path.parent / (tmp_path.name + "-cache")
+        assert cache_dir == tmp_path / "cache"
         assert dataset_format == expected_format
         assert required_splits == ("train", "val", "test")
         calls["locked"] = True
@@ -151,7 +151,7 @@ def test_csv_training_uses_prepared_data_and_returns_cleaned_ground_truth(
         "clearml_yolo.application.use_cases.train.register_ground_truth",
         lambda _task, truth, **kwargs: calls["uploads"].append((truth, kwargs["output_dir"])),
     )
-    native_dir = tmp_path / "native"
+    native_dir = tmp_path / "training" / "asked"
     (native_dir / "weights").mkdir(parents=True)
     (native_dir / "weights" / "best.pt").write_bytes(b"checkpoint")
 
@@ -182,13 +182,13 @@ def test_csv_training_uses_prepared_data_and_returns_cleaned_ground_truth(
             "batch": -1,
             "amp": False,
             "compile": False,
-            "project": str(tmp_path),
+            "project": str(tmp_path / "training"),
             "name": "asked",
         },
         clearml=ClearMLConfig(),
         ground_truth="source.csv",
         dataset_format=dataset_format,
-        dataset_cache_dir=tmp_path.parent / (tmp_path.name + "-cache"),
+        dataset_cache_dir=tmp_path / "cache",
         required_splits=["train", "val", "test"],
         deps=workflow_dependencies,
     )
@@ -199,7 +199,7 @@ def test_csv_training_uses_prepared_data_and_returns_cleaned_ground_truth(
     assert calls["native"]["compile"] is False
     assert calls["connections"][0][0][1:] == ("dataset", data)
     assert calls["connections"][0][1]["allow_remote_override"] is False
-    assert calls["uploads"] == [(cleaned, tmp_path)]
+    assert calls["uploads"] == [(cleaned, tmp_path / "training")]
     assert calls["locked"] is False
     assert result.weights == native_dir / "weights/best.pt"
     assert result.cleaned_ground_truth == cleaned
@@ -229,7 +229,7 @@ def test_csv_training_rejects_preparation_directory_outside_project(
         lambda *args, **kwargs: pytest.fail("escaped path must not reach dataset preparation"),
         raising=False,
     )
-    with pytest.raises(ValueError, match="training output directory"):
+    with pytest.raises(ValueError, match="CY_HOME"):
         train(
             ultralytics=training_settings() | {"project": str(tmp_path), "name": "../outside"},
             clearml=ClearMLConfig(),

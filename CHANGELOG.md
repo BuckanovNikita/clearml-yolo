@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record verified cancellation release 0.26.2
+  ([`f342471`](https://github.com/BuckanovNikita/clearml-yolo/commit/f342471eba0adf79328e06901527dfbc75f29aa5))
+
+
 ## v0.26.2 (2026-10-13)
 
 ### Bug Fixes

@@ -6,6 +6,7 @@ from pathlib import Path
 from clearml_yolo.adapters.export.metadata import read_metadata, sha256, write_metadata
 from clearml_yolo.adapters.fasterrcnn.configuration import validate_preprocessing
 from clearml_yolo.adapters.storage.checkpoint import read_checkpoint_descriptor
+from clearml_yolo.adapters.storage.filesystem import write_path
 from clearml_yolo.core.export import ExportMetadata, InferencePolicy
 from clearml_yolo.core.export_requests import ExportRequest, ExportResult, gpu_device_index
 from clearml_yolo.core.models import ModelConfig
@@ -18,6 +19,7 @@ class DetectorExporter:
     def execute(self, request: ExportRequest, destination: Path) -> ExportResult:
         if self.model.backend != "fasterrcnn":
             raise ValueError("cy-export supports only Faster R-CNN models")
+        destination = write_path(destination)
         destination.mkdir(parents=True, exist_ok=True)
         if request.operation == "onnx":
             return self._onnx(request, destination)

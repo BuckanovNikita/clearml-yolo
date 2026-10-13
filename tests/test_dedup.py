@@ -58,6 +58,19 @@ def test_dry_run_creates_nothing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     assert source.read_bytes() == destination.read_bytes()
 
 
+def test_external_cache_is_read_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    source, destination = pair(tmp_path)
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    monkeypatch.setenv("CY_HOME", str(workspace))
+    assert dedup.deduplicate(tmp_path, dry_run=True).duplicates == 1
+    before = destination.read_bytes()
+    with pytest.raises(ValueError, match="contained"):
+        dedup.deduplicate(tmp_path)
+    assert source.read_bytes() == destination.read_bytes() == before
+    assert not list(tmp_path.rglob(".cy-dedup-*"))
+
+
 @pytest.mark.usefixtures("simulated_clone")
 def test_replacement_preserves_destination_metadata(tmp_path: Path) -> None:
     source, destination = pair(tmp_path)

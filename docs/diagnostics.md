@@ -54,8 +54,8 @@ GPU discovery/wait/selection, dataset cache locking/conversion/export, native mo
 training/prediction/validation, evaluation/calibration/matching/AP, comparison cache and
 significance, report rendering, ClearML initialization/download/upload/readback/flush,
 optional FiftyOne publication, and cleanup. Native memory collection, CUDA synchronization
-and cache release have separate records. DDP consumer startup/join/replay and meaningful
-callback dispatch are traced without records for every empty consumer poll.
+and cache release have separate records. DDP relay startup/join/replay and owner callback dispatch are traced. The background
+consumer only parses local records and emits no SDK effects or late lifecycle spans.
 
 Every 30 seconds while operations remain active, the watchdog reports the deepest active
 operation in each traced thread. Every 60 seconds it samples Python thread locations,
@@ -116,29 +116,39 @@ for diagnostics; scientific core records and algorithms remain independent of it
 
 ## GPU admission decisions
 
-INFO messages describe the initial admission decision, changes in categorical reasons
-(throttled to five seconds) and a 30-second waiting heartbeat. Memory fluctuations
-within the same eligible/busy category do not produce new messages. Successful
-admission is reported immediately.
+Direct commands do not perform GPU admission. `cy-queue list --json` and the TUI expose
+pending order, owner UID, requested resources, allocation and the current wait reason.
+Admission selects the earliest runnable job using its owner's available worker and full
+GPU set. Worker `--max-used-memory-gib` defaults to 2.0; equality is busy. Existing
+reservations and quarantined guardian claims exclude capacity regardless of low memory.
+A free device does not prove that the selected compiled model/batch fits.
 
-The header shows requested, CUDA-visible and eligible device counts, the effective
-`autogpu.max_used_memory_gib`, and queued ticket/position. `GPU 0` matches the
-configured CUDA selector; `GPU 0 (physical GPU 3)` explains reordered visibility.
-Hidden devices use their physical index. Each card reports eligibility, used memory
-at/above the threshold, the reserving ticket, or exclusion by visibility/exact
-selection. Memory and reservation blockers can occur together. FIFO blocking by an
-earlier pending ticket is a separate line, as is insufficient eligible capacity;
-FIFO does not relabel otherwise eligible cards.
+For a stuck job inspect its owner worker and guardian state. `recovery_required` means
+cleanup or outcome is uncertain; owner `cy-queue recover ID` must prove descendant cleanup.
+Never delete live lock files or use age/PID disappearance alone as proof. Capture native
+compiler errors with command, package versions, physical mapping, first failed rank and
+memory observations. `TORCHINDUCTOR_COMPILE_THREADS=1` is a supported diagnostic comparison,
+not an automatic workaround. See [queue operations](queue.md).
 
-Five requested GPUs with eight eligible cards and an empty queue admit immediately.
-If admission waits, inspect the card reasons and FIFO line. A lower count may reflect
-visibility or exact selection even when the machine has more physical cards.
-Diagnostics use the admission attempt's telemetry sample and locked registry state;
-formatting and logging happen after lock release. This is an observed decision,
-not a guarantee that external workloads will leave capacity free after sampling.
+## Live console and shutdown
 
-`autogpu.force=true` bypasses these project checks and requires concrete enabled-stage
-selectors. It preserves ClearML tracking and inherited visibility; it does not reserve
-capacity. See the [GPU quickstart](../specs/022-simple-gpu-wait/quickstart.md).
-Forced-kill orphan recovery and permission-denied process inspection are tracked
-separately; the original reported waiting cause remains unconfirmed.
+Project FD capture retains stdout.log, stderr.log and scalar records in invocation scratch.
+It includes Python, os.write/native output, DDP children, partial lines and watchdog output.
+Terminal mirroring runs independently of the network; the publisher writes diagnostics to
+its own local stream. Console carriage-return progress is coalesced; prediction normally
+emits one operation progress indicator and summary instead of per-image lines.
+
+The attach-only publisher batches approximately every two seconds. Healthy-service
+acceptance requires console and produced epoch scalars visible remotely within ten seconds
+while training remains active. A mocked/offline run does not prove this latency. Shutdown
+uses final offsets and a deadline, retains local logs, and fails incomplete required
+publication without retrying uncertain deliveries. Original computation errors take
+precedence over cleanup failures, including a configured Loguru sink or stderr failing
+while reporting that cleanup. Memory-cleanup failures and interruptions propagate when
+there is no earlier error. Required owner finalization has a 60-second Unix
+main-thread deadline covering publication and SDK close, which performs its own second
+drain. An existing embedding alarm is rejected without overwriting it.
+An unconfirmed initialization or shutdown also blocks later same-process task
+creation, including remaining sequential sweep members, to prevent reuse of a
+failed SDK owner. Inspect the first error and relaunch remaining work in a fresh
+process; no private SDK state is reset automatically.

@@ -3,7 +3,7 @@
 import sys
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 
 import pytest
 from loguru import logger
@@ -39,9 +39,12 @@ def test_class_observations_preserve_completed_work_progress(
         "Callback progress must preserve the existing tracker"
     )
     monkeypatch.setattr(sys.stderr, "isatty", lambda: False)
+    elapsed = [0.0]
+    monkeypatch.setattr(progress, "monotonic", lambda: elapsed[0])
     with progress.progress_callback("Testing classes", total=2, unit="class") as observe:
         observe("cat")
         assert messages == []
+        elapsed[0] = progress.MINIMUM_LOG_SECONDS + 0.1
         observe("dog")
         assert len(messages) == 1
         assert messages[0][0] == "INFO"
@@ -70,23 +73,29 @@ def test_exception_does_not_report_the_unfinished_class_as_completed(
 def test_exception_closes_terminal_progress(monkeypatch: pytest.MonkeyPatch) -> None:
     closed: list[bool] = []
 
-    def terminal(*args: object, **kwargs: object) -> Iterator[int]:
-        del args, kwargs
-        try:
-            yield 0
-            yield 1
-        finally:
+    class Terminal:
+        def __init__(self, *_args: object, **_kwargs: object) -> None:
+            pass
+
+        def __enter__(self) -> Self:
+            return self
+
+        def __exit__(self, *_args: object) -> None:
             closed.append(True)
 
+        def __iter__(self) -> Iterator[int]:
+            yield 0
+            yield 1
+
     monkeypatch.setattr(sys.stderr, "isatty", lambda: True)
-    monkeypatch.setattr(progress, "tqdm", terminal)
+    monkeypatch.setattr(progress, "tqdm", Terminal)
 
     def fail_during_progress() -> None:
         with progress.progress_callback("Testing classes", total=2, unit="class") as observe:
             observe("cat")
             raise RuntimeError("failed")
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError, match="failed"):
         fail_during_progress()
     assert closed == [True]
 

@@ -193,15 +193,13 @@ New adapters currently support CPU and a single CUDA device. Multi-device reques
 fail explicitly; the existing Ultralytics DDP behavior does not imply native DDP support
 for these adapters. MPS is not an accepted cross-backend execution target in this guide.
 
-The [four queue/autogpu modes](runtime-isolation.md) apply to `model.train.device` and
-`model.predict.device`. With automatic selection enabled, `-1` requests one admitted GPU.
-With queued exact selection (`autogpu.enabled=false`), specify its visible index, such as
-`0`; generic `cuda`, null and `-1` do not identify an exact device. Disabling both controls
-passes native settings through without project admission or remapping; use an explicit
-device supported by the adapter. CPU phases bypass GPU telemetry. Comparison uses one
-shared inference device for both models.
+Direct commands pass `model.train.device` and `model.predict.device` to the native
+backend without admission, waiting or remapping. Use `cy-queue submit --gpus 1 -- ...`
+to schedule a complete pipeline. The [queue](queue.md) supplies the allocated device
+to GPU phases and preserves explicit CPU phases. Comparison uses one shared inference
+device for both models. The former `queue.*` and `autogpu.*` settings are rejected.
 
-Saved configuration replay must retain admission policy and compatible reserved resources.
+Queue snapshots preserve resource requests and validate installation identity before execution.
 A replay that changes between Ultralytics and a new-backend runtime is rejected: relaunch
 with the matching `model=` selection. Changes between new-backend presets retain the
 generic detector runtime but still undergo model and resource validation.

@@ -1,6 +1,5 @@
 """Real process regressions for detached ranks and repeated cancellation signals."""
 
-import json
 import os
 import signal
 import subprocess
@@ -51,7 +50,7 @@ def _kill(pid: int) -> None:
 def test_cancellation_kills_detached_rank_and_preserves_unrelated_process(
     tmp_path: Path, root_exits_first: bool
 ) -> None:
-    from clearml_yolo.entrypoints.hydra import execution
+    from clearml_yolo.adapters.runtime import supervision as execution
 
     child_pid_path = tmp_path / "rank.pid"
     child_ready_path = tmp_path / "rank.ready"
@@ -122,9 +121,6 @@ def test_repeated_ctrl_c_finishes_worker_cleanup(tmp_path: Path) -> None:
     worker_script = dedent("""
         import signal, sys, time
         from pathlib import Path
-        from clearml_yolo.adapters.runtime.gpu_queue import GPUQueue
-        claim = GPUQueue(root=Path(sys.argv[3])).claim_worker(sys.argv[4])
-        claim.__enter__()
         def terminating(signum, frame):
             Path(sys.argv[2]).write_text("received", encoding="utf-8")
         signal.signal(signal.SIGTERM, terminating)
@@ -134,37 +130,20 @@ def test_repeated_ctrl_c_finishes_worker_cleanup(tmp_path: Path) -> None:
     supervisor_script = dedent("""
         import subprocess, sys
         from pathlib import Path
-        from omegaconf import OmegaConf
-        from clearml_yolo.entrypoints.hydra import execution
-        from clearml_yolo.adapters.runtime.gpu_queue import GPUQueue
-        from clearml_yolo.adapters.runtime.gpu_resources import GPUDevice
-
-        class Inventory:
-            def snapshot(self):
-                return (GPUDevice("GPU-test", False),)
-
-        queue = GPUQueue(root=Path(sys.argv[6]), inventory=Inventory())
-        ticket = queue.register(1, ("GPU-test",))
-        assert ticket.try_acquire() == ("GPU-test",)
-
-        class RunningJob(execution.ModelJob):
-            def prepare(self):
-                Path(sys.argv[4]).write_text("ready", encoding="utf-8")
-            def start(self):
-                pass
-            def poll(self):
-                pass
-
+        from clearml_yolo.adapters.runtime import supervision as execution
         worker = subprocess.Popen(
-            [sys.executable, "-c", sys.argv[1], sys.argv[3], sys.argv[5], sys.argv[6], ticket.id],
+            [sys.executable, "-c", sys.argv[1], sys.argv[3], sys.argv[5]],
             start_new_session=True,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
         execution._attach_process_tree(worker)
         Path(sys.argv[2]).write_text(str(worker.pid), encoding="utf-8")
-        job = RunningJob("train", lambda: None, OmegaConf.create({}), process=worker, ticket=ticket)
-        execution.run_jobs([job])
+        Path(sys.argv[4]).write_text("ready", encoding="utf-8")
+        try:
+            worker.wait()
+        finally:
+            execution.cancel_process(worker)
         """)
     supervisor = subprocess.Popen(  # noqa: S603 - signals target this isolated test supervisor
         [
@@ -196,8 +175,6 @@ def test_repeated_ctrl_c_finishes_worker_cleanup(tmp_path: Path) -> None:
 
         assert supervisor.returncode != 0, "Cancellation unexpectedly reported success"
         assert not _running(worker_pid), f"Repeated Ctrl+C abandoned the live worker:\n{errors}"
-        registry = json.loads((queue_root / "registry.json").read_text(encoding="utf-8"))
-        assert registry["requests"] == [], "Cancelled worker still reserves GPU capacity"
     finally:
         _kill(supervisor.pid)
         supervisor.wait(timeout=5)
@@ -281,7 +258,7 @@ def test_inaccessible_owned_process_prevents_verified_release(
 
 
 def test_native_torchrun_ranks_do_not_escape_cancellation(tmp_path: Path) -> None:
-    from clearml_yolo.entrypoints.hydra import execution
+    from clearml_yolo.adapters.runtime import supervision as execution
 
     rank_script = tmp_path / "rank.py"
     rank_script.write_text(
@@ -298,7 +275,7 @@ def test_native_torchrun_ranks_do_not_escape_cancellation(tmp_path: Path) -> Non
     )
     worker_script = dedent("""
         import subprocess, sys
-        from clearml_yolo.entrypoints.hydra.execution import interruption
+        from clearml_yolo.adapters.runtime.supervision import interruption
         with interruption():
             subprocess.run(
                 [sys.executable, "-m", "torch.distributed.run", "--standalone",
@@ -334,7 +311,7 @@ def test_native_torchrun_ranks_do_not_escape_cancellation(tmp_path: Path) -> Non
 
 
 def test_unreadable_new_process_blocks_verification_without_being_killed(tmp_path: Path) -> None:
-    from clearml_yolo.entrypoints.hydra import execution
+    from clearml_yolo.adapters.runtime import supervision as execution
 
     token = uuid4().hex
     worker = subprocess.Popen(
@@ -369,11 +346,64 @@ def test_unreadable_new_process_blocks_verification_without_being_killed(tmp_pat
 
         assert worker.poll() is not None
         assert opaque.poll() is None, "Unknown process must not be treated as job-owned"
+        assert worker in execution._LINUX_TREES, "Unverified ownership must remain registered"
+        assert worker in execution._POSIX_GROUPS
     finally:
         _kill(worker.pid)
         worker.wait(timeout=5)
         _kill(opaque.pid)
         opaque.wait(timeout=5)
+
+
+def test_release_retries_transient_denial_until_fresh_verified_scan(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from clearml_yolo.adapters.runtime import supervision
+
+    token = uuid4().hex
+    worker = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(60)"],
+        start_new_session=True,
+        env={**os.environ, OWNER_ENV: token},
+    )
+    control = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(60)"], start_new_session=True
+    )
+    scans: list[bool] = []
+    try:
+        supervision._attach_process_tree(worker, token)
+        tree = supervision._LINUX_TREES[worker]
+        original_running = tree.running
+        original_read = Path.read_bytes
+
+        def transient_denial(path: Path) -> bytes:
+            if path == Path(f"/proc/{control.pid}/environ"):
+                raise PermissionError("transient process exit visibility")
+            return original_read(path)
+
+        def running() -> bool:
+            assert worker in supervision._LINUX_TREES
+            assert worker in supervision._POSIX_GROUPS
+            scans.append(True)
+            if len(scans) == 1:
+                with monkeypatch.context() as scan:
+                    scan.setattr(Path, "read_bytes", transient_denial)
+                    return original_running()
+            return original_running()
+
+        monkeypatch.setattr(tree, "running", running)
+        supervision._release_process_tree(worker, deadline=time.monotonic() + 2)
+
+        assert len(scans) >= 2
+        assert worker not in supervision._LINUX_TREES
+        assert worker not in supervision._POSIX_GROUPS
+        assert control.poll() is None
+        worker.wait(timeout=5)
+    finally:
+        _kill(worker.pid)
+        worker.wait(timeout=5)
+        _kill(control.pid)
+        control.wait(timeout=5)
 
 
 @pytest.mark.parametrize("after_denial", ["gone", "zombie", "live", "reused", "inaccessible"])

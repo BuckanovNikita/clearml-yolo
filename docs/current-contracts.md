@@ -16,7 +16,7 @@ configuration, output, tracking and evaluation rules formerly listed in `AGENTS.
 | Commands and output routing | [CLI](../specs/001-release-030/contracts/cli.md) | [Entrypoints and checks](../pyproject.toml), [output identity](../src/clearml_yolo/adapters/storage/run_identity.py), [pipeline](../src/clearml_yolo/application/use_cases/pipeline.py) |
 | Filesystem defaults and explicit destinations | [Filesystem ownership](filesystem-policy.md) | [Project bootstrap](../src/clearml_yolo/adapters/runtime/bootstrap.py), [Workspace policy](../src/clearml_yolo/adapters/storage/filesystem.py), [native runtime](../src/clearml_yolo/adapters/integrations/native_runtime.py) |
 | Explicit image cache deduplication | [Deduplication CLI](../specs/018-cache-image-dedup/contracts/cli.md) | [Command](../src/clearml_yolo/entrypoints/dedup.py), [cache implementation](../src/clearml_yolo/adapters/storage/dedup.py) |
-| GPU scheduling, device demand and execution controls | [GPU execution](../specs/022-simple-gpu-wait/contracts/execution.md), [quickstart](../specs/022-simple-gpu-wait/quickstart.md) | [Resource probe](../src/clearml_yolo/adapters/runtime/gpu_resources.py), [GPU wait](../src/clearml_yolo/adapters/runtime/gpu_wait.py), [queue](../src/clearml_yolo/adapters/runtime/gpu_queue.py), [supervision](../src/clearml_yolo/entrypoints/hydra/execution.py), [launcher](../src/hydra_plugins/cy_queue/launcher.py), [configuration translation](../src/clearml_yolo/entrypoints/hydra/execution.py), [invocation](../src/clearml_yolo/entrypoints/hydra/common.py) |
+| GPU scheduling, device demand and execution controls | [Shared cy-queue](queue.md), [current specification](../specs/029-shared-cy-queue/spec.md) | [Queue policy](../src/clearml_yolo/core/queue.py), [application ports](../src/clearml_yolo/application/queue.py), [adapters](../src/clearml_yolo/adapters/queue), [direct invocation](../src/clearml_yolo/entrypoints/hydra/common.py) |
 | Selected export and runtime ownership | [Runtime isolation](runtime-isolation.md), [feature 024](../specs/024-runtime-isolation/spec.md) | [Exporter](../src/clearml_yolo/entrypoints/hydra/config_tree.py), [bootstrap](../src/clearml_yolo/adapters/runtime/bootstrap.py), [bounded publisher](../src/clearml_yolo/adapters/fiftyone/bounded.py) |
 | Native training and prediction groups | [Native configuration](../specs/005-explicit-detection-config/contracts/native-configuration.md), [example layout](../specs/007-detection-config-cleanup/contracts/configuration-and-artifacts.md) | [Native settings](../src/clearml_yolo/adapters/yolo/config.py), [registration](../src/clearml_yolo/entrypoints/hydra/configs.py), [export](../src/clearml_yolo/entrypoints/hydra/config_tree.py) |
 | Detector families and portable checkpoints | [Backend contract](../specs/025-multi-model-backends/contracts/backend.md), [model guide](multi-model-backends.md) | [Typed models](../src/clearml_yolo/core/models.py), [backend routing](../src/clearml_yolo/adapters/integrations/detectors.py), [checkpoint binding](../src/clearml_yolo/adapters/storage/checkpoint.py), [owner publication](../src/clearml_yolo/adapters/clearml/detectors.py) |
@@ -26,16 +26,15 @@ configuration, output, tracking and evaluation rules formerly listed in `AGENTS.
 | Artifacts, native callbacks and task completion | [Publication inventory](../specs/008-dataset-clearml-tracking/contracts/publication.md), [evaluation publication](../specs/014-evaluation-publication/contracts/publication.md), [native tracking](../specs/010-native-clearml-integration/contracts/tracking-publication.md), [model metadata](../specs/008-dataset-clearml-tracking/contracts/model-metadata.md) | [Artifact names](../src/clearml_yolo/core/artifact_names.py), [native runtime](../src/clearml_yolo/adapters/integrations/native_runtime.py), [model verification](../src/clearml_yolo/adapters/clearml/native.py), [display naming](../src/clearml_yolo/adapters/clearml/naming.py), [result bundle](../src/clearml_yolo/adapters/clearml/results.py), [DDP relay](../src/clearml_yolo/adapters/integrations/native_ddp.py), [fresh DDP trainer](../src/clearml_yolo/adapters/integrations/native_trainer.py) |
 | Evaluation, comparison, thresholds and reports | [Task recovery](../specs/012-remove-legacy-compatibility/contracts/task-recovery.md), [evaluation publication](../specs/014-evaluation-publication/contracts/publication.md), [readable plots](../specs/020-readable-evaluation-plots/contracts/plots.md), [Publication inventory](../specs/008-dataset-clearml-tracking/contracts/publication.md), [CLI evaluation contract](../specs/001-release-030/contracts/cli.md) | [Metrics](../src/clearml_yolo/application/use_cases/metrics.py), [comparison](../src/clearml_yolo/application/use_cases/compare.py), [comparison workbook](../src/clearml_yolo/adapters/reporting/comparison_workbook.py), [exact thresholds](../src/clearml_yolo/adapters/clearml/models.py), [source lineage](../src/clearml_yolo/core/evaluation/result_rows.py), [neutral payloads](../src/clearml_yolo/core/evaluation/schema.py), [interactive reporting](../src/clearml_yolo/adapters/clearml/report.py), [paired reports](../src/clearml_yolo/application/use_cases/report.py) |
 | FiftyOne publication | [Publisher](../specs/006-fiftyone-integration/contracts/publisher.md), [native evaluations](../specs/015-fiftyone-native-evaluations/contracts/native-evaluation.md), [current inventory](../specs/008-dataset-clearml-tracking/contracts/publication.md) | [Owner publication](../src/clearml_yolo/application/use_cases/publication.py), [replaceable adapter](../src/clearml_yolo/adapters/fiftyone/publisher.py) |
-| Operation diagnostics and stalled-run capture | [Diagnostics](diagnostics.md) | [Tracing and watchdog](../src/clearml_yolo/adapters/observability/tracing.py), [execution resource port](../src/clearml_yolo/application/ports.py), [composition](../src/clearml_yolo/entrypoints/composition.py), [GPU wait](../src/clearml_yolo/adapters/runtime/gpu_wait.py), [queue](../src/clearml_yolo/adapters/runtime/gpu_queue.py), [supervision](../src/clearml_yolo/entrypoints/hydra/execution.py), [launcher](../src/hydra_plugins/cy_queue/launcher.py), [native cleanup](../src/clearml_yolo/adapters/integrations/native_runtime.py) |
+| Operation diagnostics and stalled-run capture | [Diagnostics](diagnostics.md) | [Tracing](../src/clearml_yolo/adapters/observability/tracing.py), [FD capture](../src/clearml_yolo/adapters/observability/capture.py), [publisher](../src/clearml_yolo/adapters/clearml/console.py), [guardian](../src/clearml_yolo/adapters/queue/guardian.py), [native cleanup](../src/clearml_yolo/adapters/integrations/native_runtime.py) |
 | Local dependency sources | [Development setup](development.md#external-dependencies), [local copies](../specs/017-local-dependency-copies/spec.md) | [Ignore rules](../.gitignore), [package configuration](../pyproject.toml), [editable lock](../uv.lock) |
 | Local versioning, changelog and release hooks | [Local release](../specs/003-semantic-release/contracts/local-release.md) | [Release helper](../scripts/local_release.py), [hook configuration](../.pre-commit-config.yaml), [generated changelog](../CHANGELOG.md) |
 
 ## Changes that must propagate
 
-GPU availability uses the configurable `autogpu.max_used_memory_gib` total-used-memory
-cutoff (default 2.0 GiB, strict less-than). Keep the maintained GPU execution/queue
-contracts, Hydra defaults, supervisor/worker/direct wiring and README consistent.
-Process-based availability in completed feature history is superseded.
+Direct commands never schedule. Queue worker admission uses a strict total-used-memory
+cutoff (default 2.0 GiB), independent of training capacity. Keep [queue](queue.md), direct
+Hydra defaults, private snapshots, owner/guardian adapters, CLI/TUI and README consistent.
 
 Python integrations use the `core`, `application`, `adapters` and `entrypoints`
 packages. Application workflows receive explicit `WorkflowDependencies`; CLI
@@ -75,16 +74,11 @@ independently and preserve current image membership, frozen thresholds and the s
 inference device. Explicit raw references add required vocabulary/preprocessing assertions.
 See the [multi-model contract](../specs/025-multi-model-backends/contracts/backend.md).
 
-The model commands and `cy-export` default `queue.enabled=true` and `autogpu.enabled=true`.
-FIFO reservations, supervised children and concurrent Hydra sweeps are restored; queue-off
-uses sequential BasicLauncher. Automatic direct mode waits without reservations; exact queued
-mode preserves native device identity/order and reserves the enabled-phase UUID union; both
-controls false preserves native settings and bypasses project GPU discovery/waits/replacement.
-Replay preserves admission policy/identities/capacity. CPU/MPS bypass GPU telemetry.
-The [GPU execution contract](../specs/022-simple-gpu-wait/contracts/execution.md), amended
-by [feature 024](../specs/024-runtime-isolation/spec.md), supersedes feature 022's blanket
-queue-removal requirements. Compatible user-wide coordination remains shared across projects;
-corrupt state fails closed and historical evidence is preserved.
+Feature 029 replaces the historical four-mode execution policy with direct commands and
+`cy-queue`. Old switches fail with migration guidance. Whole allocations persist through
+all pipeline phases; guardian death requires proven owner recovery. Ordering selects the
+earliest runnable job on each host. NFS holds durable records, host-local coordination
+holds locks and quarantined claims. Completed historical evidence remains unchanged.
 
 [Runtime isolation](runtime-isolation.md) defines selected export (default only `cy`),
 finite FiftyOne worker deadlines and receipt validation. The stdlib bootstrap runs before
@@ -243,9 +237,6 @@ The repository's [end-to-end skill](../.agents/skills/running-end-to-end-tests/S
 defines portable acceptance. Historical releases and dated evidence describe
 observations then; they are not current execution recipes.
 
-The force/admission amendment adds strict `autogpu.force=false` to the maintained
-[GPU execution contract](../specs/022-simple-gpu-wait/contracts/execution.md). True
-requires concrete enabled-stage selectors and bypasses project GPU discovery,
-memory checks, reservations and waits, with sequential sweeps and protected replay.
-Admission diagnostics use immutable sampled/locked evidence and CUDA selector indexes;
-see [GPU admission decisions](diagnostics.md#gpu-admission-decisions).
+The historical force/admission controls are superseded by direct native execution and
+explicit queue resource requests. Regenerate old configuration examples; do not silently
+translate their controls. See [migration and operations](queue.md).

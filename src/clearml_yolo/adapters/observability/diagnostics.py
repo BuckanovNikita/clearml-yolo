@@ -1,5 +1,6 @@
 """Loguru emission using the core credential-safe diagnostic formatting."""
 
+import os
 from collections.abc import Mapping
 
 from loguru import logger
@@ -38,6 +39,19 @@ def log_exception(
     if level != "DEBUG":
         logger.opt(exception=False).log(level, "{}: {}", operation, details)
     logger.opt(exception=False).debug("{}: {}\n{}", operation, details, _traceback_locations(error))
+
+
+def log_exception_safely(
+    message: str, error: BaseException, *, context: Mapping[str, object] | None = None
+) -> None:
+    """Report a lifecycle failure without interrupting remaining error cleanup."""
+    try:
+        log_exception(message, error, level="ERROR", context=context)
+    except BaseException:  # noqa: BLE001 - diagnostics must preserve the handled failure
+        try:
+            os.write(2, b"Failure diagnostic emission failed; original error retained\n")
+        except BaseException:  # noqa: BLE001 - even a broken fallback cannot replace the error
+            return
 
 
 def log(level: str, message: str, *args: object) -> None:

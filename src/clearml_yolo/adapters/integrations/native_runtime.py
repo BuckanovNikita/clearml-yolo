@@ -3,15 +3,21 @@
 import os
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from contextvars import ContextVar
+from functools import wraps
 from pathlib import Path
 from typing import Any, cast
 
+from clearml_yolo.adapters.observability.capture import append_scalar
 from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.runtime.bootstrap import runtime_environment
 from clearml_yolo.adapters.storage.filesystem import initialize_filesystem
 
 OWNER_PID_ENV = "CY_CLEARML_OWNER_PID"
 OWNER_TASK_ENV = "CY_CLEARML_OWNER_TASK_ID"
+_SCALAR_CALLBACK: ContextVar[bool] = ContextVar("native_scalar_callback", default=False)
+_REPLAYED_SCALARS: ContextVar[bool] = ContextVar("native_replayed_scalars", default=False)
+_SANITIZED_CALLBACK: ContextVar[bool] = ContextVar("native_sanitized_callback", default=False)
 
 
 @trace_operation("gpu.memory.release", cleanup=True)
@@ -80,7 +86,7 @@ class _WarningCapture:
 
 def _checked_pretrain(integration: Any, callback: Any) -> Any:
     def checked(trainer: Any) -> None:
-        from clearml_yolo.adapters.clearml.session import active_task, sanitize_configuration
+        from clearml_yolo.adapters.clearml.session import active_task
 
         task = cast(Any, integration.Task.current_task())
         owner_task_id = os.environ.get(OWNER_TASK_ENV)
@@ -95,20 +101,13 @@ def _checked_pretrain(integration: Any, callback: Any) -> Any:
         # warning. Capture that signal while still executing the installed callback.
         original_logger = integration.LOGGER
         captured = _WarningCapture(original_logger)
-        original_connect = current.connect
         integration.LOGGER = captured
-
-        def connect(values: Any, *args: Any, **kwargs: Any) -> Any:
-            # Native General is provenance only (remote overrides are disabled by
-            # the installed callback); redact storage without altering trainer args.
-            return original_connect(sanitize_configuration(values), *args, **kwargs)
-
-        current.connect = connect
         try:
-            callback(trainer)
+            with _sanitized_callback_scope():
+                callback(trainer)
         finally:
-            current.connect = original_connect
-            integration.LOGGER = original_logger
+            if integration.LOGGER is captured:
+                integration.LOGGER = original_logger
         if captured.messages:
             raise RuntimeError("Native ClearML pretrain callback reported a registration failure")
         parameters = current.get_parameters()
@@ -151,13 +150,110 @@ def _enable_owner(integration: Any, settings: Any) -> None:
 
     dict.__setitem__(settings, "clearml", True)
     integration.clearml = clearml
-    integration.Task = Task
+    integration.Task = _CallbackTasks(Task)
     callbacks = _installed_callbacks(integration)
     callbacks["on_pretrain_routine_start"] = _checked_pretrain(
         integration, callbacks["on_pretrain_routine_start"]
     )
     callbacks["on_train_end"] = _without_training_pr(callbacks["on_train_end"])
+    for event in ("on_train_epoch_end", "on_fit_epoch_end"):
+        callbacks[event] = _journal_scalars(callbacks[event])
     integration.callbacks = callbacks
+
+
+class _ScalarLogger:
+    """Preserve installed callback images/single values; journal only epoch scalars."""
+
+    def __init__(self, original: Any, *, suppress_scalars: bool = False) -> None:
+        self.original = original
+        self.suppress_scalars = suppress_scalars
+
+    def report_scalar(self, title: str, series: str, value: float, iteration: int) -> None:
+        if self.suppress_scalars:
+            return
+        if not append_scalar(title, series, float(value), iteration):
+            self.original.report_scalar(title, series, value, iteration=iteration)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.original, name)
+
+
+class _CallbackTask:
+    """A callback-local SDK view; never replace the real owner's get_logger."""
+
+    def __init__(self, original: Any) -> None:
+        self.original = original
+
+    def get_logger(self) -> Any:
+        original = self.original.get_logger()
+        return (
+            _ScalarLogger(original, suppress_scalars=_REPLAYED_SCALARS.get())
+            if _SCALAR_CALLBACK.get()
+            else original
+        )
+
+    def connect(self, values: Any, *args: Any, **kwargs: Any) -> Any:
+        from clearml_yolo.adapters.clearml.session import sanitize_configuration
+
+        prepared = sanitize_configuration(values) if _SANITIZED_CALLBACK.get() else values
+        return self.original.connect(prepared, *args, **kwargs)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.original, name)
+
+
+class _CallbackTasks:
+    """Keep native Task access scoped by ContextVar without mutating SDK objects."""
+
+    def __init__(self, original: Any) -> None:
+        self.original = original
+
+    def current_task(self) -> Any:
+        task = self.original.current_task()
+        scoped = _SCALAR_CALLBACK.get() or _SANITIZED_CALLBACK.get()
+        return _CallbackTask(task) if task is not None and scoped else task
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.original, name)
+
+
+@contextmanager
+def replayed_scalars(journaled: bool) -> Iterator[None]:
+    """Native replay retains previews/single values without duplicating worker scalars."""
+    token = _REPLAYED_SCALARS.set(journaled)
+    try:
+        yield
+    finally:
+        _REPLAYED_SCALARS.reset(token)
+
+
+@contextmanager
+def _scalar_callback_scope() -> Iterator[None]:
+    token = _SCALAR_CALLBACK.set(True)
+    try:
+        yield
+    finally:
+        _SCALAR_CALLBACK.reset(token)
+
+
+@contextmanager
+def _sanitized_callback_scope() -> Iterator[None]:
+    token = _SANITIZED_CALLBACK.set(True)
+    try:
+        yield
+    finally:
+        _SANITIZED_CALLBACK.reset(token)
+
+
+def _journal_scalars(callback: Callable[[Any], None]) -> Callable[[Any], None]:
+    @wraps(callback)
+    def publish(trainer: Any) -> None:
+        # Refer to an importable helper so native DDP serialization never tries
+        # to pickle a ContextVar from this nested callback's globals.
+        with _scalar_callback_scope():
+            callback(trainer)
+
+    return publish
 
 
 def _restore_attribute(target: Any, name: str, existed: bool, value: Any) -> None:

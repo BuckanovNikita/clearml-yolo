@@ -9,6 +9,7 @@ from typing import Any, Literal
 from clearml_yolo.adapters.export.metadata import sha256
 from clearml_yolo.adapters.export.precision import fp16_weighted_graph
 from clearml_yolo.adapters.export.runtime import cuda_runtime_version, initialize_cuda
+from clearml_yolo.adapters.storage.filesystem import write_path
 from clearml_yolo.core.export import DEFAULT_PROFILES, OptimizationProfile
 
 
@@ -67,6 +68,7 @@ def build_engine(
     workspace_gib: float = 4,
     profiles: tuple[OptimizationProfile, ...] = DEFAULT_PROFILES,
 ) -> EngineBuildResult:
+    engine_path = write_path(engine_path)
     if not math.isfinite(workspace_gib) or workspace_gib <= 0 or not profiles:
         raise ValueError("Build requires positive workspace and at least one profile")
     if precision not in ("fp32", "fp16"):

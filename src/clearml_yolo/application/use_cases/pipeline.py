@@ -62,6 +62,17 @@ def _stage_values(config: Any, allowed: set[str], stage: str) -> dict[str, Any]:
     return values
 
 
+def pipeline_stage_settings(
+    metrics: Any, report: Any, compare: Any
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    """Share effect-free stage-key validation with submission preflight."""
+    return (
+        _stage_values(metrics, {"evaluation", "calibration_split"}, "metrics"),
+        _stage_values(report, {"report_config_path"}, "report"),
+        _stage_values(compare, {"baseline_model", "q", "bootstrap_iterations", "seed"}, "compare"),
+    )
+
+
 def _comparison_settings(settings: dict[str, Any]) -> InferenceConfig:
     fields = {
         key: settings[key] for key in ("conf", "iou", "imgsz", "batch", "device") if key in settings
@@ -263,11 +274,7 @@ def run_pipeline(
             deps.storage.resolve(directory)
         ):
             raise ValueError("dataset_cache_dir must be outside run_dir")
-        metrics_cfg = _stage_values(metrics, {"evaluation", "calibration_split"}, "metrics")
-        report_cfg = _stage_values(report, {"report_config_path"}, "report")
-        compare_cfg = _stage_values(
-            compare, {"baseline_model", "q", "bootstrap_iterations", "seed"}, "compare"
-        )
+        metrics_cfg, report_cfg, compare_cfg = pipeline_stage_settings(metrics, report, compare)
         train_params = routed_native(ultralytics, directory / "detect", "train")
         prediction_overrides = dict(ultralytics_predict)
         prediction_data_overrides: dict[str, dict[str, Any]] = {}

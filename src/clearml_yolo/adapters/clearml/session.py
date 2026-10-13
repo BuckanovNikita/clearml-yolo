@@ -12,6 +12,7 @@ import os
 import re
 import shutil
 import signal
+import sys
 import threading
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import ExitStack, contextmanager
@@ -28,7 +29,23 @@ from ruamel.yaml.comments import CommentedMap, CommentedSeq
 from ruamel.yaml.error import YAMLError
 from ruamel.yaml.tokens import CommentToken
 
-from clearml_yolo.adapters.observability.diagnostics import exception_summary, log_exception
+from clearml_yolo.adapters.clearml.console import ConsolePublicationError, ConsolePublisher
+from clearml_yolo.adapters.clearml.deadline import (
+    TaskFinalizationError,
+    detach_sdk_exit_callback,
+    sdk_deadline,
+)
+from clearml_yolo.adapters.observability.capture import (
+    OutputCapture,
+    active_capture,
+    capture_output,
+    write_progress,
+)
+from clearml_yolo.adapters.observability.diagnostics import (
+    exception_summary,
+    log_exception,
+    log_exception_safely,
+)
 from clearml_yolo.adapters.observability.tracing import trace_operation, trace_task
 from clearml_yolo.adapters.storage.filesystem import temporary_root
 from clearml_yolo.application.contracts import (
@@ -49,6 +66,10 @@ OWNER_TASK_ENV = "CY_CLEARML_OWNER_TASK_ID"
 REDACTED = "<redacted>"
 
 DEFAULT_PROJECT_NAME = "clearml-yolo"
+# Task.close drains the reporter again after our required publication flush. Each
+# drain can wait a reporting interval; budget both, model/readback work and the
+# console barrier without changing SDK timing or allowing unbounded shutdown.
+FINALIZATION_TIMEOUT_SECONDS = 60.0
 
 # Keep the SDK opaque at the adapter boundary so reporting modules need no SDK import.
 Task = Any
@@ -111,6 +132,7 @@ class _InvocationState:
     finalizers: list[Callable[[], None]] = field(default_factory=list)
     resources: dict[str, object] = field(default_factory=dict)
     routing_identity: tuple[str, str, str] | None = None
+    console_publisher: ConsolePublisher | None = None
 
     def enter_stage(self, stage: str) -> None:
         self.current_stage = stage
@@ -141,6 +163,19 @@ class _InvocationState:
 _ACTIVE_INVOCATION: ContextVar[_InvocationState | None] = ContextVar(
     "clearml_yolo_active_invocation", default=None
 )
+
+
+@dataclass
+class _IncompleteOwner:
+    pid: int | None = None
+    task: Any = None
+    close_attempted: bool = False
+
+
+# ClearML retains its SDK main task after incomplete shutdown, even when its exit
+# callback is detached. Keep a separate inert guard, including after partial init.
+# A fork inherits uncertain SDK state; only a fresh interpreter resets this guard.
+_INCOMPLETE_OWNER = _IncompleteOwner()
 
 
 def active_task() -> Any | None:
@@ -235,6 +270,8 @@ def _finalize(state: _InvocationState) -> None:
         for verify in state.model_barriers:
             with trace_operation("clearml.model.verify"):
                 verify()
+    if state.console_publisher is not None:
+        state.console_publisher.barrier()
     # close() waits for repository detection and shuts down the status monitor.
     # Marking completed first makes that monitor interpret our own success as an
     # external abort while background configuration uploads are still running.
@@ -247,7 +284,26 @@ def _finalize(state: _InvocationState) -> None:
 def _close_task(task: Any) -> Any:
     task_id = str(task.id)
     with trace_operation("clearml.task.close", cleanup=True):
-        task.close()
+        owner = _INCOMPLETE_OWNER
+        owns_task = owner.pid == os.getpid() and owner.task is task
+        if owns_task:
+            owner.close_attempted = True
+        try:
+            task.close()
+            # This public SDK getter is inert. close() can suppress a shutdown error
+            # before releasing its main task, or return without work after interruption.
+            main_task_retained = task.is_main_task() is not False
+        except BaseException:
+            detach_sdk_exit_callback(task)
+            raise
+        if main_task_retained:
+            detach_sdk_exit_callback(task)
+            raise TaskFinalizationError("ClearML owner remained active after close")
+        if owns_task:
+            # Remote readback/status failures cannot revive a confirmed closed SDK owner.
+            owner.pid = None
+            owner.task = None
+            owner.close_attempted = False
     from clearml import Task
 
     with trace_operation("clearml.task.readback", cleanup=True):
@@ -269,6 +325,65 @@ def _replay_initial_configuration(task: Any, resolved_config: Any) -> None:
     if not isinstance(resolved_config, Mapping):
         raise TypeError("Resolved run configuration must be a mapping")
     replay_configuration(task, dict(resolved_config))
+
+
+def _start_console_publisher(task: Any, capture: OutputCapture) -> ConsolePublisher:
+    offline = Path(task.get_offline_mode_folder()) if task.is_offline() else None
+    try:
+        publisher = ConsolePublisher(str(task.id), capture, offline_folder=offline)
+        publisher.start()
+    except OSError as error:
+        raise ConsolePublicationError(
+            "Console publisher could not start; local logs retained"
+        ) from error
+    return publisher
+
+
+def _close_for_failure(state: _InvocationState, error: BaseException) -> Any:
+    task = state.task
+    owner = _INCOMPLETE_OWNER
+    if owner.pid == os.getpid() and owner.task is task and owner.close_attempted:
+        # SDK shutdown records entry before draining; a retry can return a no-op
+        # while its main task remains alive. Keep uncertain closure quarantined.
+        detach_sdk_exit_callback(task)
+        return task
+    if isinstance(error, ConsolePublicationError):
+        detach_sdk_exit_callback(task)
+        return task
+    if state.console_publisher is not None:
+        try:
+            state.console_publisher.barrier()
+        except ConsolePublicationError as publication_error:
+            # Task.close and the SDK exit hook can mark completed. Neither may run
+            # while required workload delivery remains unacknowledged.
+            detach_sdk_exit_callback(task)
+            log_exception_safely("Console publication barrier failed", publication_error)
+            return task
+    return _close_task(task)
+
+
+def _release_failure_monitor(state: _InvocationState) -> None:
+    """Stop only this owner's monitor before publishing its own failed status."""
+    _active_state(state.task, "Failure monitor release")
+    with trace_operation("clearml.task.failure_monitor.release", cleanup=True):
+        # ClearML exposes no public monitor release. Its opaque, owner-bound
+        # compatibility field is needed because an active DevWorker interprets
+        # our own mark_failed as external abort and can stop/kill the owner tree.
+        missing = object()
+        monitor = getattr(state.task, "_dev_worker", missing)
+        if monitor is missing:
+            raise TaskFinalizationError(
+                "Installed ClearML SDK cannot release the owner status monitor"
+            )
+        if monitor is None:
+            return
+        unregister = getattr(monitor, "unregister", None)
+        if not callable(unregister):
+            raise TaskFinalizationError(
+                "Installed ClearML SDK cannot release the owner status monitor"
+            )
+        if unregister() is not True:
+            raise TaskFinalizationError("ClearML owner status monitor did not confirm release")
 
 
 @contextmanager
@@ -294,13 +409,26 @@ def invocation(
             active.current_stage = previous_stage
         return
 
+    if _INCOMPLETE_OWNER.pid is not None:
+        raise RuntimeError(
+            "Previous ClearML owner did not confirm closure; "
+            "start a fresh process before another invocation"
+        )
+
     owns_signal = threading.current_thread() is threading.main_thread()
     previous_sigterm: Any = signal.getsignal(signal.SIGTERM) if owns_signal else None
 
     from clearml import Task
 
     with ExitStack() as stack:
+        captured = active_capture()
+        if captured is None:
+            directory = Path(mkdtemp(prefix="cy-console-", dir=temporary_root()))
+            captured = stack.enter_context(capture_output(directory))
         with trace_operation("clearml.task.create", context={"stage": stage}):
+            _INCOMPLETE_OWNER.pid = os.getpid()
+            _INCOMPLETE_OWNER.task = None
+            _INCOMPLETE_OWNER.close_attempted = False
             task: Any = Task.init(
                 project_name=config.project_name,
                 task_name=resolve_task_name(config, stage),
@@ -309,9 +437,8 @@ def invocation(
                 output_uri=config.output_uri,
                 reuse_last_task_id=False,
                 auto_connect_arg_parser=False,
-                # Capture both streams: native output and Loguru's default stderr sink
-                # belong to the same invocation-owned ClearML console.
-                auto_connect_streams=True,
+                # FD capture owns native/child output; SDK stream patching duplicates it.
+                auto_connect_streams=False,
                 # Repository auto-detection uploads arbitrary checkout diffs outside our
                 # sanitized provenance contract. Disable it along with framework captures.
                 auto_connect_frameworks=dict.fromkeys(
@@ -335,13 +462,17 @@ def invocation(
                     False,
                 ),
             )
+            _INCOMPLETE_OWNER.task = task
             state = stack.enter_context(
                 _task_owner(task, config, stage, config_resolver, owns_signal, previous_sigterm)
             )
+            state.console_publisher = _start_console_publisher(task, captured)
+            write_progress(task_url=str(task.get_output_log_web_page()))
         if resolved_config is not None:
             _replay_initial_configuration(task, resolved_config)
         yield task
-        _finalize(state)
+        with sdk_deadline(FINALIZATION_TIMEOUT_SECONDS):
+            _finalize(state)
 
 
 @contextmanager
@@ -354,7 +485,8 @@ def _task_owner(
     previous_sigterm: Any,
 ) -> Iterator[_InvocationState]:
     """Register terminal handling before task creation diagnostics can interrupt."""
-    with trace_task(str(task.id)):
+    task_id = str(task.id)
+    with trace_task(task_id):
         state = _InvocationState(
             task=task, stages=[stage], current_stage=stage, config_resolver=config_resolver
         )
@@ -377,16 +509,24 @@ def _task_owner(
             yield state
         except BaseException as error:
             primary_error = error
+            # Include the original safe diagnostic before the publisher's final barrier.
+            log_exception_safely("Invocation failed", error, context={"task_id": task_id})
+            if isinstance(error, TaskFinalizationError):
+                detach_sdk_exit_callback(task)
             try:
-                with trace_operation("clearml.task.failure_cleanup", cleanup=True):
-                    closed_task = _close_task(task)
+                with (
+                    sdk_deadline(FINALIZATION_TIMEOUT_SECONDS),
+                    trace_operation("clearml.task.failure_cleanup", cleanup=True),
+                ):
+                    _release_failure_monitor(state)
+                    closed_task = _close_for_failure(state, error)
                     _mark_failed(closed_task, error)
-            except Exception as finalization_error:  # noqa: BLE001 - preserve the original failure
-                log_exception(
+            except BaseException as finalization_error:  # noqa: BLE001 - preserve the original failure
+                detach_sdk_exit_callback(task)
+                log_exception_safely(
                     "ClearML failure finalization failed",
                     finalization_error,
-                    level="ERROR",
-                    context={"task_id": str(task.id)},
+                    context={"task_id": task_id},
                 )
             raise
         finally:
@@ -395,7 +535,61 @@ def _task_owner(
             _restore_environment(OWNER_PID_ENV, previous_owner)
             _restore_environment(OWNER_TASK_ENV, previous_task_id)
             _ACTIVE_INVOCATION.reset(token)
-            _cleanup_invocation(state, primary_error)
+            try:
+                _cleanup_invocation(state, primary_error)
+            finally:
+                _finish_incomplete_owner_handler(state)
+                # SDK close/status and cleanup diagnostics belong in the final EOF.
+                _finish_console(state, primary_error or sys.exception())
+
+
+def _finish_incomplete_owner_handler(state: _InvocationState) -> None:
+    """Make only this incomplete owner's cached logging handler inert at exit."""
+    owner = _INCOMPLETE_OWNER
+    if owner.pid != os.getpid() or owner.task is not state.task:
+        return
+    # SDK logging has an independent handler even with stream capture disabled.
+    # Use cached compatibility fields; get_logger() would create new SDK work.
+    sdk_logger = getattr(state.task, "_logger", None)
+    handler = getattr(sdk_logger, "_task_handler", None)
+    if handler is None:
+        return
+    try:
+        # TaskHandler clears its task/service references before joining. Its
+        # monitor can swallow the alarm at join, so use this timer for no later
+        # status/publication operation and never infer daemon completion here.
+        with sdk_deadline(FINALIZATION_TIMEOUT_SECONDS):
+            detach_sdk_exit_callback(state.task)
+            with trace_operation("clearml.task.failure_handler.close", cleanup=True):
+                handler.close(wait=False)
+    except BaseException as error:  # noqa: BLE001 - preserve the original invocation failure
+        log_exception_safely("ClearML failure logging handler cleanup failed", error)
+
+
+def _finish_console(state: _InvocationState, primary_error: BaseException | None) -> None:
+    if state.console_publisher is None:
+        return
+    try:
+        with sdk_deadline(FINALIZATION_TIMEOUT_SECONDS):
+            state.console_publisher.finish()
+    except BaseException as error:
+        if isinstance(error, TaskFinalizationError):
+            detach_sdk_exit_callback(state.task)
+        if primary_error is not None:
+            log_exception_safely("Console publication failed", error)
+            return
+        try:
+            # Only the session owner corrects task state after required final delivery fails.
+            from clearml import Task
+
+            with sdk_deadline(FINALIZATION_TIMEOUT_SECONDS):
+                closed_task: Any = Task.get_task(task_id=str(state.task.id))
+                _mark_failed(closed_task, error)
+        except BaseException as status_error:  # noqa: BLE001 - required delivery error remains primary
+            if isinstance(status_error, TaskFinalizationError):
+                detach_sdk_exit_callback(state.task)
+            log_exception_safely("ClearML publication failure status update failed", status_error)
+        raise
 
 
 def _cleanup_invocation(state: _InvocationState, primary_error: BaseException | None) -> None:

@@ -87,11 +87,11 @@ algorithms in evaluation adapters and copy exact values into core evaluation rec
 Run `lint-imports` and the architecture tests when changing imports, package initializers,
 composition or subprocess/plugin targets. Updating a dependency boundary also requires
 regenerated YAML checks and installed command helps, including the GPU probe, DDP
-callback and FiftyOne extension targets. Check distributions include the supervised queue worker, bounded FiftyOne worker and
-project Hydra launcher plugin. Verify all four execution modes, concurrent queued sweeps,
-sequential queue-disabled BasicLauncher sweeps and mixed-mode rejection before admission.
+callback and FiftyOne extension targets. Check distributions include the queue guardian/snapshot runner, bounded console publisher,
+terminal mirror and FiftyOne worker. Verify direct commands have no queue/Textual imports,
+sequential Hydra sweeps, queue batch validation, optional UI imports and owner-only jobs.
 Check selected config export for every command/model selection, ordinary SDK configuration
-with unchanged external selectors, and retained project scratch after success, failure and
+with unchanged external selectors and project-contained application destinations, and retained project scratch after success, failure and
 cancellation. Verify explicit project temp paths without changing global SDK temp defaults.
 Check fresh DDP callback ownership and restored in-memory settings without settings-file writes.
 Invalid dataset entries must be preserved and reported; native locks must not fall back to soft locks. Fault-inject real subprocess

@@ -14,7 +14,12 @@ from loguru import logger
 
 from clearml_yolo.adapters.observability.progress import track
 from clearml_yolo.adapters.observability.tracing import trace_operation
-from clearml_yolo.adapters.storage.filesystem import model_weights_path, temporary_root
+from clearml_yolo.adapters.storage.filesystem import (
+    model_weights_path,
+    temporary_root,
+    validate_output_tree,
+    write_path,
+)
 from clearml_yolo.adapters.yolo.config import execution_settings, requested_settings
 from clearml_yolo.application.contracts import (
     ImageNameMode as ImageNameMode,  # noqa: PLC0414 - typed adapter interface
@@ -110,7 +115,7 @@ def _write_manifest(paths: list[str], directory: Path) -> tuple[str, dict[str, s
     writes into the join key.
     """
     by_absolute = {str(Path(path).absolute()): path for path in paths}
-    manifest = directory / "images.txt"
+    manifest = write_path(directory / "images.txt")
     manifest.write_text("\n".join(by_absolute.keys()))
     return str(manifest), by_absolute
 
@@ -134,6 +139,28 @@ def _refuse_unscored(by_absolute: dict[str, str], scored: set[str]) -> None:
     )
 
 
+def _validate_saved_prediction(model: Any, settings: dict[str, Any]) -> None:
+    # Native predict selects its final (possibly incremented) output route before
+    # the lazy stream creates directories or saved image/label files. SDK default
+    # paths remain untouched when no native output is requested.
+    if any(settings.get(key) for key in ("save", "save_txt", "save_crop", "visualize")):
+        validate_output_tree(model.predictor.save_dir)
+
+
+def _prediction_configuration(
+    weights: str | Path, model_kwargs: dict[str, Any]
+) -> dict[str, Any]:
+    settings = execution_settings(model_kwargs | {"model": str(weights), "source": None}, "predict")
+    settings.pop("model")
+    settings.pop("source")
+    # Project aggregate progress owns prediction output for every entrypoint.
+    settings["verbose"] = False
+    if settings.get("project") is not None:
+        project = write_path(settings["project"])
+        write_path(project / str(settings.get("name") or "predict"))
+    return settings
+
+
 @trace_operation("yolo.predict")
 def predict_on_images(
     weights: str | Path,
@@ -152,9 +179,9 @@ def predict_on_images(
         raise ValueError(f"Unsupported image_name mode: {image_name!r}")
     if "source" in model_kwargs or "stream" in model_kwargs:
         raise ValueError("source and stream are owned by dataset manifest inference")
-    settings = execution_settings(model_kwargs | {"model": str(weights), "source": None}, "predict")
-    settings.pop("model")
-    settings.pop("source")
+    settings = _prediction_configuration(weights, model_kwargs)
+    if manifest_dir is not None:
+        manifest_dir = write_path(manifest_dir)
 
     paths = [str(path) for path in image_paths]
     if not paths:
@@ -185,6 +212,7 @@ def predict_on_images(
         # `stream`, so the annotation has to be widened rather than narrowed.
         with trace_operation("yolo.inference.stream", context={"images": len(paths)}):
             results: Any = model.predict(source=manifest, stream=True, **settings)
+            _validate_saved_prediction(model, settings)
             for result in track(results, "Inference", total=len(paths), unit="img"):
                 scored.add(result.path)
                 boxes = result.boxes

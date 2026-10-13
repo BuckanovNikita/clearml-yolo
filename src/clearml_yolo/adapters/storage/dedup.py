@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import BinaryIO
 
 from clearml_yolo.adapters.observability.tracing import trace_operation
+from clearml_yolo.adapters.storage.filesystem import write_path
 
 IMAGE_EXTENSIONS = frozenset(
     {".bmp", ".dng", ".jpeg", ".jpg", ".mpo", ".png", ".tif", ".tiff", ".webp", ".pfm", ".heic"}
@@ -220,6 +221,16 @@ def _replace(source: _File, destination: _File) -> None:
             temporary.unlink(missing_ok=True)
 
 
+def _validate_root(directory: Path, *, dry_run: bool) -> None:
+    root_stat = directory.lstat()
+    if stat.S_ISLNK(root_stat.st_mode):
+        raise ValueError(f"Directory must not be a symlink: {directory}")
+    if not stat.S_ISDIR(root_stat.st_mode):
+        raise NotADirectoryError(errno.ENOTDIR, "expected a directory", str(directory))
+    if not dry_run:
+        write_path(directory)
+
+
 @trace_operation("storage.dedup")
 def deduplicate(directory: Path, *, dry_run: bool = False) -> DedupResult:
     """Reflink byte-identical regular images sharing an exact basename.
@@ -228,11 +239,7 @@ def deduplicate(directory: Path, *, dry_run: bool = False) -> DedupResult:
     Failures and unsupported operations retain originals and are reported in the result.
     Symlinks are excluded. Invalid roots raise ValueError or OSError.
     """
-    root_stat = directory.lstat()
-    if stat.S_ISLNK(root_stat.st_mode):
-        raise ValueError(f"Directory must not be a symlink: {directory}")
-    if not stat.S_ISDIR(root_stat.st_mode):
-        raise NotADirectoryError(errno.ENOTDIR, "expected a directory", str(directory))
+    _validate_root(directory, dry_run=dry_run)
     result = DedupResult()
     for source, destination in _candidates(_scan(directory, result), result):
         result.duplicates += 1

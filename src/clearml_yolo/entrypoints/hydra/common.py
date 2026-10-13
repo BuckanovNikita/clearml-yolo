@@ -2,8 +2,9 @@
 
 import inspect
 import sys
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from copy import deepcopy
 from functools import partial
 from typing import Any
 
@@ -24,17 +25,11 @@ from clearml_yolo.adapters.integrations.native_runtime import (
     native_runtime,
     release_training_memory,
 )
-from clearml_yolo.adapters.observability.diagnostics import log_exception
+from clearml_yolo.adapters.observability.capture import capture_output
+from clearml_yolo.adapters.observability.diagnostics import log_exception_safely
 from clearml_yolo.adapters.observability.tracing import trace_command, trace_operation
 from clearml_yolo.adapters.runtime.bootstrap import runtime_environment
-from clearml_yolo.adapters.runtime.gpu_resources import GPUInventory, configured_phases, job_request
-from clearml_yolo.adapters.runtime.gpu_runtime import assigned_devices, exact_selection, scheduled
-from clearml_yolo.adapters.runtime.gpu_scheduling import (
-    automatic_gpu_control,
-    execution_controls,
-    forced_device_selection,
-)
-from clearml_yolo.adapters.runtime.gpu_wait import wait_for_available_gpus
+from clearml_yolo.adapters.runtime.process_tree import native_descendant_scope
 from clearml_yolo.adapters.storage.filesystem import initialize_filesystem, runs_root, write_path
 from clearml_yolo.adapters.storage.run_identity import task_run_dir
 from clearml_yolo.adapters.yolo.config import requested_devices
@@ -42,20 +37,11 @@ from clearml_yolo.core.models import ModelConfig
 from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_file
 from clearml_yolo.entrypoints.hydra.validation import (
     materialize_model_config,
+    reject_legacy_controls,
+    validate_launch_arguments,
+    validate_project_destinations,
     validate_wrapper_keys,
 )
-
-
-def _device_values(config: DictConfig) -> dict[str, Any]:
-    """Detach resolved device requests before passing snapshots to YAML and SDKs."""
-    return {
-        phase.settings_path: (
-            OmegaConf.to_container(phase.device, resolve=True, throw_on_missing=True)
-            if OmegaConf.is_config(phase.device)
-            else phase.device
-        )
-        for phase in configured_phases(config)
-    }
 
 
 @contextmanager
@@ -68,42 +54,10 @@ def _gpu_cleanup(enabled: bool) -> Iterator[None]:
             primary_error = sys.exception()
             try:
                 release_training_memory()
-            except Exception as error:
+            except BaseException as error:
                 if primary_error is None:
                     raise
-                log_exception("Native GPU memory cleanup failed", error, level="ERROR")
-
-
-def _selected_devices(
-    name: str, inputs: dict[str, Any], *, automatic: bool
-) -> tuple[int, ...] | tuple[str, ...]:
-    if scheduled():
-        return assigned_devices()
-    if automatic:
-        count = job_request(name, inputs)
-        if not count:
-            return ()
-        from clearml_yolo.entrypoints.hydra.execution import DecisionReporter
-
-        return wait_for_available_gpus(
-            count,
-            inventory=GPUInventory(
-                max_used_memory_gib=automatic_gpu_control(inputs).max_used_memory_gib
-            ),
-            on_decision=DecisionReporter().report,
-        )
-    return ()
-
-
-def _validate_replay_policy(policy: Mapping[str, Any], replay: dict[str, Any]) -> None:
-    for key, value in policy.items():
-        if key in replay and replay[key] != value:
-            raise ValueError(f"ClearML replay cannot change launch control {key}")
-    recorded = replay.get("execution_policy", {})
-    if isinstance(recorded, Mapping) and "force" in recorded:
-        force = automatic_gpu_control(policy).force
-        if type(recorded["force"]) is not bool or recorded["force"] != force:
-            raise ValueError("ClearML replay cannot change launch control autogpu.force")
+                log_exception_safely("Native GPU memory cleanup failed", error)
 
 
 def _validate_replay_runtime(uses_detector: bool, replay: dict[str, Any]) -> None:
@@ -124,27 +78,9 @@ def _validate_replay_runtime(uses_detector: bool, replay: dict[str, Any]) -> Non
         )
 
 
-def _validate_forced_replay(
-    name: str,
-    config: DictConfig,
-    forced: dict[str, tuple[int, ...] | str] | None,
-    replay: dict[str, Any] | None = None,
-) -> None:
-    if forced is None:
-        return
-    resolved = OmegaConf.to_container(
-        OmegaConf.merge(config, replay or {}), resolve=True, throw_on_missing=True
-    )
-    if not isinstance(resolved, dict):
-        raise TypeError("Command configuration must be a mapping")
-    current = forced_device_selection(name, {str(key): value for key, value in resolved.items()})
-    if any(forced.get(path) != selector for path, selector in current.items()):
-        raise ValueError("ClearML replay cannot change a forced device selection")
-
-
 @trace_operation("invocation.execute")
 def execute_owned(name: str, config: DictConfig, function: Callable[..., Any]) -> None:
-    """Wait for free GPUs, then execute directly under one invocation-owned task."""
+    """Execute native settings unchanged under one invocation-owned task."""
     from hydra.core.hydra_config import HydraConfig
 
     with trace_operation("filesystem.initialize"):
@@ -157,11 +93,7 @@ def execute_owned(name: str, config: DictConfig, function: Callable[..., Any]) -
     if not isinstance(resolved, dict):
         raise TypeError("Resolved command configuration must be a mapping")
     inputs = {str(key): value for key, value in resolved.items()}
-    force = automatic_gpu_control(inputs).force
-    forced = forced_device_selection(name, inputs) if force else None
-    with trace_operation("execution.gpu_wait", context={"stage": name}):
-        _, automatic = execution_controls(inputs)
-        devices = () if force else _selected_devices(name, inputs, automatic=automatic)
+    validate_project_destinations(config)
     # Initialize native imports before ClearML starts background package detection;
     # concurrent torch submodule discovery can observe a partially loaded package.
     model_values = inputs.get("model", {})
@@ -176,21 +108,17 @@ def execute_owned(name: str, config: DictConfig, function: Callable[..., Any]) -
             name,
             config_resolver=lambda document: resolve_config_file(document, config),
         ) as task,
-        _gpu_cleanup(bool(devices) or not automatic),
+        _gpu_cleanup(True),
     ):
-        policy: dict[str, Any] = {
-            key: inputs.pop(key) for key in ("queue", "autogpu") if key in inputs
-        }
         native = dict(inputs.pop("ultralytics", {}))
         replay = replay_configuration(task, inputs)
-        _validate_replay_policy(policy, replay)
+        reject_legacy_controls(replay)
         # Run also contains result provenance; only command inputs are executable.
         accepted = set(inspect.signature(function).parameters) - {"deps"}
         if "model" in config:
             accepted.add("model")
         replay = {key: value for key, value in replay.items() if key in accepted}
         _validate_replay_runtime(uses_detector, replay)
-        _validate_forced_replay(name, config, forced, replay)
         if (
             not uses_detector
             and native
@@ -212,7 +140,7 @@ def execute_owned(name: str, config: DictConfig, function: Callable[..., Any]) -
             if "ultralytics" in config:
                 config.ultralytics = native
         validate_wrapper_keys(config, function)
-        _validate_forced_replay(name, config, forced)
+        validate_project_destinations(config)
         initialize_naming(task)
         # Derive paths only after the owner exists; remote task names may differ.
         with open_dict(config):
@@ -220,71 +148,20 @@ def execute_owned(name: str, config: DictConfig, function: Callable[..., Any]) -
                 config.output_dir = str(task_run_dir(runs_root(), *task_identity(task)) / name)
             if "output" in config and config.output is None:
                 config.output = str(task_run_dir(runs_root(), *task_identity(task)) / f"{name}.csv")
-        _execute_assigned(name, config, function, task, devices)
+        with native_descendant_scope():
+            _execute_direct(name, config, function)
 
 
-def _execute_assigned(
-    name: str,
-    config: DictConfig,
-    function: Callable[..., Any],
-    task: Any,
-    devices: tuple[int, ...] | tuple[str, ...],
-) -> None:
-    from clearml_yolo.adapters.clearml.session import record_run_configuration
-    from clearml_yolo.entrypoints.hydra.execution import effective_configuration
-
+def _execute_direct(name: str, config: DictConfig, function: Callable[..., Any]) -> None:
     materialize_model_config(config)
-    resolved_job = OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
-    if not isinstance(resolved_job, dict):
-        raise TypeError("Command configuration must be a mapping")
-    job_inputs = {str(key): value for key, value in resolved_job.items()}
-    _, automatic = execution_controls(job_inputs)
-    force = automatic_gpu_control(job_inputs).force
-    if (
-        not force
-        and (automatic or scheduled())
-        and job_request(name, {str(k): v for k, v in resolved_job.items()}) > len(devices)
-    ):
-        raise ValueError("ClearML replay requires more GPUs than the available selection")
-    selection = None if force else exact_selection()
-    if force:
-        from clearml_yolo.entrypoints.hydra.execution import forced_effective_configuration
-
-        effective = forced_effective_configuration(name, config)
-    elif selection is not None:
-        from clearml_yolo.entrypoints.hydra.execution import exact_effective_configuration
-
-        effective = exact_effective_configuration(name, config, selection, assigned_devices())
-    else:
-        effective = effective_configuration(config, devices)
-    with open_dict(effective):
-        effective.pop("queue", None)
-        effective.pop("autogpu", None)
-    requests = _device_values(config)
-    if "queue" in config or "autogpu" in config:
-        record_run_configuration(
-            task,
-            {
-                "execution_policy": {
-                    "queue": execution_controls(config)[0],
-                    "autogpu": automatic,
-                    "force": force,
-                    "max_used_memory_gib": automatic_gpu_control(config).max_used_memory_gib,
-                }
-            },
-        )
-    if devices or force:
-        record_run_configuration(
-            task,
-            {
-                "gpu_selection": {
-                    "selected_devices": list(devices),
-                    "reserved_uuids": list(devices) if not force and scheduled() else [],
-                    "requested_devices": requests,
-                    "effective_devices": _device_values(effective),
-                }
-            },
-        )
+    effective = deepcopy(config)
+    requests: dict[str, Any] = {}
+    for group in ("ultralytics", "ultralytics_predict"):
+        if group in config:
+            value = config[group].get("device")
+            requests[group] = (
+                OmegaConf.to_container(value, resolve=True) if OmegaConf.is_config(value) else value
+            )
     with requested_devices(requests):
         if "deps" in inspect.signature(function).parameters:
             with trace_operation("configuration.dependencies"):
@@ -322,28 +199,19 @@ def _execute_assigned(
 
 def launch(name: str, function: Callable[..., Any]) -> None:
     """Compose and execute within one owned runtime lifetime."""
-    trace_command(name)(_launch_owned)(name, function)
-
-
-def _launch_owned(name: str, function: Callable[..., Any]) -> None:
-    with runtime_environment():
-        _launch(name, function)
+    with runtime_environment() as arena, capture_output(arena / "logs"):
+        # Watchdogs inherit the captured descriptors, including native diagnostics.
+        trace_command(name)(_launch)(name, function)
 
 
 def _launch(name: str, function: Callable[..., Any]) -> None:
-    from clearml_yolo.entrypoints.hydra.configs import NATIVE_COMMANDS
-    from clearml_yolo.entrypoints.hydra.execution import configure_entrypoint, schedule_single
-
     with trace_operation("configuration.startup", context={"stage": name}):
         initialize_filesystem()
-        configure_entrypoint(name, function)
         store.add_to_hydra_store(overwrite_ok=True)
+        validate_launch_arguments(name)
 
     @hydra.main(config_name=name, config_path=None, version_base="1.3")
     def execute(config: DictConfig) -> None:
-        if name in NATIVE_COMMANDS and execution_controls(config)[0] and not scheduled():
-            schedule_single(name, function, config)
-        else:
-            execute_owned(name, config, function)
+        execute_owned(name, config, function)
 
     execute()

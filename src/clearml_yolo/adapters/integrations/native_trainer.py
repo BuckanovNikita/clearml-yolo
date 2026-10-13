@@ -2,9 +2,11 @@
 
 from typing import Any, override
 
+from ultralytics.cfg import get_save_dir
 from ultralytics.models.yolo.detect import DetectionTrainer
 
 from clearml_yolo.adapters.integrations.native_runtime import native_runtime
+from clearml_yolo.adapters.storage.filesystem import validate_output_tree
 
 
 class OwnedDetectionTrainer(DetectionTrainer):
@@ -20,6 +22,15 @@ class OwnedDetectionTrainer(DetectionTrainer):
             super().__init__(*args, **kwargs)
 
     @override
+    def check_resume(self, overrides: dict[str, Any]) -> None:
+        # BaseTrainer invokes this after effective configuration is resolved and
+        # before creating weights/ or writing args.yaml. Preserve native routing,
+        # including its directory increment and supported resume normalization.
+        super().check_resume(overrides)  # type: ignore[no-untyped-call]
+        validate_output_tree(get_save_dir(self.args))
+
+    @override
     def train(self) -> None:
         with native_runtime():
+            validate_output_tree(self.save_dir)
             super().train()  # type: ignore[no-untyped-call]  # Native loop has no annotations.

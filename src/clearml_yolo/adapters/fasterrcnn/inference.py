@@ -10,6 +10,7 @@ import torch
 from clearml_yolo.adapters.fasterrcnn.data import image_tensor
 from clearml_yolo.adapters.fasterrcnn.model import build_model, checkpoint_state
 from clearml_yolo.adapters.fasterrcnn.transform import canvas_size
+from clearml_yolo.adapters.observability.progress import image_progress
 from clearml_yolo.application.contracts import PREDICTION_COLUMNS
 from clearml_yolo.core.models import CheckpointMetadata, Device, PredictSettings
 
@@ -48,7 +49,7 @@ def predict_native(
     model.load_state_dict(checkpoint_state(weights), strict=True)
     model.to(device).eval()
     rows: list[dict[str, Any]] = []
-    with torch.inference_mode():
+    with image_progress(len(image_paths)) as advance, torch.inference_mode():
         for offset in range(0, len(image_paths), settings.batch):
             paths = image_paths[offset : offset + settings.batch]
             images = [image_tensor(Path(path)).to(device) for path in paths]
@@ -74,6 +75,7 @@ def predict_native(
                             "bbox_y_br": box[3],
                         }
                     )
+            advance(len(paths))
     frame = pd.DataFrame(rows, columns=PREDICTION_COLUMNS)
     frame.attrs.update(
         image_paths=list(image_paths),
