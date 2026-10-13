@@ -39,7 +39,7 @@ pyproject.toml, so the parent serializes their edits. No delegated agent owns wr
 - [x] T016 Run static checks, negative controls, architecture checks, full tests and hooks.
 - [x] T017 Update policy/report inventory and dated evidence; validate documentation.
 - [x] T018 Obtain fresh independent review, reconcile diff and validate architecture acceptance.
-- [ ] T019 Commit task-owned changes, land on master and finish the established Git-tag-only release.
+- [x] T019 Commit task-owned changes, land on master and finish the established Git-tag-only release.
 
 T013 can run alongside parent T012/T015; T014 depends on installed stubs from T012.
 T016 depends on their integration. T017/T018 follow verification; T019 follows acceptance.

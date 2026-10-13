@@ -136,3 +136,29 @@ or verification task remains; source commit, master integration and release foll
 The one SIGILL is retained as an unresolved, previously documented intermittent
 observation. The original DDP path, real CPU DDP scenarios and the complete normal
 hooks pass on unchanged-source reruns; this is not a claimed root-cause fix.
+
+## Master delivery and release
+
+Source commit `b43edf6` (`fix(quality): tighten lint gates and decode text explicitly`)
+passed every normal commit hook. Its pytest report records **2,278 passed, 30 skipped,
+zero failures/errors in 417.746 seconds**. Master was fast-forwarded to this commit.
+
+The established release helper then completed successfully on master, creating checked
+commit `cec2020` (`chore(release): 0.26.1`) and annotated tag `v0.26.1`. Release-commit
+pytest records **2,278 passed, 30 skipped, zero failures/errors in 430.406 seconds**;
+normal quality hooks were enabled throughout. Release preparation changed only
+the package version, the root lockfile version and the generated changelog. All
+270 original non-root lock nodes remain unchanged; the five planned development
+dependency nodes are the only additions relative to the baseline.
+
+After checking remote refs for concurrent updates, an atomic push advanced remote
+master from `99befea` to `cec2020` and published `v0.26.1`. No GitHub Release,
+package publication or uploaded asset was created. The local dependency source
+overrides were absent during both commits and restored exactly afterward, unstaged.
+
+The main checkout's unrelated cancellation work was preserved separately from the
+task-owned audit changes. Original tracked/index patches and untracked files were
+saved before integration; all unrelated untracked files matched that snapshot and
+12 unrelated file hashes were captured for the final checkout-restoration check.
+The final evidence-only update does not change executable code or dependency policy;
+Markdown, local-link, whitespace and architecture acceptance checks apply to it.

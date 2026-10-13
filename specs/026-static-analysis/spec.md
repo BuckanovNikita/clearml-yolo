@@ -2,7 +2,7 @@
 
 **Feature Branch**: existing checkout; preserve concurrent staged work
 **Created**: 2026-10-12
-**Status**: Specified
+**Status**: Implemented and released as v0.26.1
 **Input**: Revise ignored Ruff and mypy rules, including Ruff rules not selected;
 add Vulture to pre-commit and explain the quality/readability tradeoffs.
 
