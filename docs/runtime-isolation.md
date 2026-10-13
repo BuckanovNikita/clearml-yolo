@@ -104,3 +104,29 @@ Shared GPU coordination remains user-wide and outside invocation scratch. Compat
 registry state coordinates projects; incompatible or corrupt state fails closed without
 migration or deletion. Owned process cleanup remains mandatory before releasing GPU
 capacity. Retaining scratch does not establish successful descendant cleanup or publication.
+
+During supervised shutdown, additional SIGINT/SIGTERM signals are deferred until
+bounded cleanup finishes; prior handlers are restored and cancellation still reports
+failure. On Linux, a private inherited launch marker and process start identities
+identify native children even when Torch starts ranks in separate sessions or their
+launcher exits first. Cleanup signals confirmed identities through Linux pidfds and
+requires two stable empty descendant scans before releasing capacity. An exit or fork
+that invalidates discovery triggers another bounded cleanup iteration; failure to
+establish stable emptiness remains an error. Linux requires pidfd
+support and readable `/proc` state. Recovering already-orphaned ranks also requires
+environment visibility for same-user processes created since the worker started.
+An unrelated newer non-dumpable process can therefore prevent verified cleanup:
+confirmed job processes are terminated, but unknown ownership remains an error.
+Inaccessible state never proves a process exited. Environment contents are not logged.
+Native children must retain the inherited marker for discovery. Supervised jobs use
+this provenance and retained process identities, never numeric parent/session
+relationships alone. The private compatibility path without a launch marker retains
+its older ancestry/session fallback and cannot provide the same PID-reuse guarantee.
+Windows retains Job Object cleanup; other POSIX systems retain process-group cleanup.
+This does not provide recovery after forcibly killing the supervisor itself.
+
+Stop a job with `Ctrl+C` in its original terminal and wait for cleanup to finish.
+For an existing stranded ticket, inspect that ticket's supervisor/worker lock owners
+on the machine running the job and stop the identified invocation. Do not remove
+registry or lock files while their owners are alive: deleting files neither stops
+GPU work nor safely releases its reservation.

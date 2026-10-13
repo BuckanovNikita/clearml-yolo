@@ -88,6 +88,21 @@ migration or deletion. Reserve only supported visible whole GPUs. Cancellation
 terminates and reaps owned native descendants before releasing their capacity;
 never advertise capacity while owned GPU work may remain alive.
 
+Linux supervision follows private inherited job ownership across detached native
+DDP sessions, verifies PID/start-time identity and uses pidfds for signalling.
+Every supervised job supplies a unique launch marker; native children must retain it.
+New descendants are identified by that marker, not numeric parent/session relationships
+that can become stale after PID reuse. Retained identities are refreshed before signalling.
+It requires two stable empty scans before successful release, retrying when discovery
+observes exits or changing process identities. This includes cleanup
+when their launcher exited first. Linux pidfd support and `/proc` visibility for job
+processes and newer same-user candidate processes are required. An unrelated candidate
+whose environment is inaccessible can prevent verified cleanup; silently ignoring it
+could miss an orphaned rank. Unverifiable cleanup fails explicitly. Additional SIGINT/SIGTERM during
+bounded shutdown cannot abandon cleanup; the original cancellation outcome is retained.
+Windows Job Object ownership is unchanged. Forced supervisor death is outside this
+graceful-cancellation guarantee.
+
 With automatic selection disabled, queue mode requires concrete native selectors.
 Resolve them against inherited visibility, reserve the UUID union of enabled
 training/inference phases, and preserve requested training identity and order through

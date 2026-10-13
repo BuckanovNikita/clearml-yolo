@@ -250,7 +250,8 @@ def test_process_tree_is_attached_before_start_gate_opens(
     typed_process = cast(subprocess.Popen[Any], process)
     attached: list[object] = []
 
-    def attach(candidate: object) -> None:
+    def attach(candidate: object, token: str) -> None:
+        assert token
         attached.append(candidate)
 
     def fake_popen(*args: object, **kwargs: object) -> subprocess.Popen[Any]:

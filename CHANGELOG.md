@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record static analysis release 0.26.1
+  ([`95f07e1`](https://github.com/BuckanovNikita/clearml-yolo/commit/95f07e17f413c369dad6af7b801a540ac12fa756))
+
+
 ## v0.26.1 (2026-10-13)
 
 ### Bug Fixes

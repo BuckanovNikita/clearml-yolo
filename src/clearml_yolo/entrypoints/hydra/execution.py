@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
+from uuid import uuid4
 from weakref import WeakKeyDictionary
 
 from hydra.conf import HydraConf
@@ -42,6 +43,11 @@ from clearml_yolo.adapters.runtime.gpu_scheduling import (
     execution_controls,
     forced_device_selection,
 )
+from clearml_yolo.adapters.runtime.process_tree import (
+    OWNER_ENV,
+    LinuxProcessTree,
+    defer_interruptions,
+)
 from clearml_yolo.adapters.storage.filesystem import temporary_root
 from clearml_yolo.entrypoints.hydra.validation import materialize_model_config
 
@@ -49,6 +55,7 @@ POLL_SECONDS = 0.5
 _ENTRYPOINT: tuple[str, Callable[..., Any]] | None = None
 _WINDOWS_JOBS: WeakKeyDictionary[subprocess.Popen[Any], int] = WeakKeyDictionary()
 _POSIX_GROUPS: WeakKeyDictionary[subprocess.Popen[Any], int] = WeakKeyDictionary()
+_LINUX_TREES: WeakKeyDictionary[subprocess.Popen[Any], LinuxProcessTree] = WeakKeyDictionary()
 
 
 _LOG_SECONDS = 30.0
@@ -323,9 +330,11 @@ def _attach_windows_job(process: subprocess.Popen[Any]) -> None:
         _WINDOWS_JOBS[process] = _create_windows_job(process)
 
 
-def _attach_process_tree(process: subprocess.Popen[Any]) -> None:
+def _attach_process_tree(process: subprocess.Popen[Any], token: str | None = None) -> None:
     if os.name == "posix":
         _POSIX_GROUPS[process] = process.pid
+        if sys.platform == "linux":
+            _LINUX_TREES[process] = LinuxProcessTree(process.pid, token)
     else:
         _attach_windows_job(process)
 
@@ -435,49 +444,59 @@ def _posix_group_running(group: int) -> bool:
 def _release_process_tree(process: subprocess.Popen[Any], *, deadline: float | None = None) -> None:
     group = _POSIX_GROUPS.get(process)
     if group is not None:
-        _signal_posix_group(group, signal.SIGKILL)
         deadline = deadline if deadline is not None else time.monotonic() + 5
-        while _posix_group_running(group):
+        tree = _LINUX_TREES.get(process)
+        if tree is not None:
+            tree.signal(signal.SIGKILL)
+        else:
+            _signal_posix_group(group, signal.SIGKILL)
+        while tree.running() if tree is not None else _posix_group_running(group):
             if time.monotonic() >= deadline:
                 raise RuntimeError("Worker descendants survived cleanup; GPU lease remains owned")
+            if tree is not None:
+                tree.signal(signal.SIGKILL)
             time.sleep(0.05)
         _POSIX_GROUPS.pop(process, None)
+        _LINUX_TREES.pop(process, None)
     _release_windows_job(process, deadline=deadline)
 
 
+def _signal_process_tree(process: subprocess.Popen[Any], signum: signal.Signals) -> None:
+    tree = _LINUX_TREES.get(process)
+    group = _POSIX_GROUPS.get(process)
+    if tree is not None:
+        tree.signal(signum)
+    elif group is not None:
+        _signal_posix_group(group, signum)
+    elif os.name == "posix":
+        _signal_posix_process(process, signum)
+    elif os.name == "nt":
+        _terminate_windows_process_tree(process)
+    elif signum == signal.SIGTERM:
+        process.terminate()
+    else:
+        process.kill()
+
+
+@defer_interruptions()
 def cancel_process(process: subprocess.Popen[Any]) -> None:
     """Terminate only this child's process tree, then reap it before releasing capacity."""
     deadline = time.monotonic() + 10
     try:
         if process.poll() is not None:
             return
-        group = _POSIX_GROUPS.get(process)
-        if group is not None:
-            _signal_posix_group(group, signal.SIGTERM)
-        elif os.name == "posix":
-            # Ordinary caller-owned test processes are not assumed to own their group.
-            _signal_posix_process(process, signal.SIGTERM)
-        elif os.name == "nt":
-            _terminate_windows_process_tree(process)
-        else:
-            process.terminate()
+        _signal_process_tree(process, signal.SIGTERM)
         try:
             process.wait(timeout=5)
         except subprocess.TimeoutExpired:
-            if group is not None:
-                _signal_posix_group(group, signal.SIGKILL)
-            elif os.name == "posix":
-                _signal_posix_process(process, signal.SIGKILL)
-            elif os.name == "nt":
-                _terminate_windows_process_tree(process)
-            else:
-                process.kill()
+            _signal_process_tree(process, signal.SIGKILL)
             process.wait(timeout=5)
     finally:
         if process.poll() is not None:
             _release_process_tree(process, deadline=deadline)
 
 
+@defer_interruptions()
 def wait_process(process: subprocess.Popen[Any]) -> int:
     try:
         code = process.wait(timeout=5)
@@ -606,6 +625,8 @@ class ModelJob:
         )
         OmegaConf.save(payload, document)
         environment = dict(os.environ)
+        token = uuid4().hex
+        environment[OWNER_ENV] = token
         if devices:
             environment["CUDA_VISIBLE_DEVICES"] = ",".join(devices)
         if self.ticket is not None and self.ticket.diagnostics is not None:
@@ -625,7 +646,7 @@ class ModelJob:
         )
         self.process = process
         try:
-            _attach_process_tree(process)
+            _attach_process_tree(process, token)
             start_gate.touch()
         except BaseException:
             cancel_process(process)
@@ -692,6 +713,7 @@ class ModelJob:
         return JobStatus[status_name], working_dir
 
     @trace_operation("queue.cleanup", cleanup=True)
+    @defer_interruptions()
     def close(self) -> None:
         if self.process is not None:
             if self.process.poll() is None:
@@ -716,6 +738,7 @@ class ModelJob:
             raise BaseExceptionGroup(f"{self.command} job cleanup failed", errors)
 
 
+@defer_interruptions()
 def _close_jobs(jobs: Sequence[ModelJob]) -> list[BaseException]:
     errors: list[BaseException] = []
     for job in jobs:
