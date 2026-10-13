@@ -574,7 +574,7 @@
       "result": {
         "status": "passed",
         "exit_code": 0,
-        "evidence": "specs/029-shared-cy-queue/verification.md"
+        "evidence": "specs/029-shared-cy-queue/release-2026-10-13.md"
       }
     },
     {
@@ -585,7 +585,7 @@
       "result": {
         "status": "passed",
         "exit_code": 0,
-        "evidence": "specs/029-shared-cy-queue/verification.md"
+        "evidence": "specs/029-shared-cy-queue/release-2026-10-13.md"
       }
     },
     {
@@ -606,15 +606,15 @@
       "result": {
         "status": "passed",
         "exit_code": 0,
-        "evidence": "specs/029-shared-cy-queue/verification.md"
+        "evidence": "specs/029-shared-cy-queue/release-2026-10-13.md"
       }
     }
   ],
   "documentation": "README Russian; docs project/current contracts, filesystem-policy, runtime-isolation, diagnostics, development; new feature artifacts and existing bug reconciliation; generated configs.",
   "review": {
     "status": "accepted",
-    "reviewer": "queue_final_review_5 and execution_final_review_7 (baseline software); release_reconciliation_review (restored process-tree safeguards)",
+    "reviewer": "queue_final_review_5 and execution_final_review_7 (baseline software); release_reconciliation_review (restored process-tree safeguards); final_release_review (versioned release and history/artifact identity)",
     "evidence": "specs/029-shared-cy-queue/independent-review.md",
-    "reconciliation": "Complete tracked/untracked task scope reconciled: direct/queue split, shared cleanup diagnostics, ownership, native adapters, containment, CLI/TUI, packaging, tests and docs; pre-existing Ctrl+C changes integrated and exact local dependency sources preserved. Final 172 source hashes match. Software reviews ship with no remaining finding; full architecture acceptance still blocked by the native check because required five-GPU and actual multi-user NFS targets are unavailable and original native investigations remain unresolved. Subsequent user request make release permits Git-tag-only publication with disclosed native gaps. Remote v0.26.2 review revealed lost process-tree safeguards; runtime reconciliation and fresh review are required before publication, without changing module dependencies or the unavailable native result. T035 restoration now verified by 54 focused, 16 final targeted, 104 architecture and 2375 full-suite passes with 30 skips, real one-GPU repeated direct/queued cancellation, and fresh independent software ship review; release metadata/history integration remains pending. Full native acceptance remains unavailable."
+    "reconciliation": "Complete task scope reconciled: direct/queue split, shared cleanup diagnostics, ownership, native adapters, containment, CLI/TUI, packaging, tests and docs; pre-existing Ctrl+C changes integrated and exact local dependency sources preserved. Remote v0.26.2 audit identified lost process-tree safeguards; T035 restored them without changing module dependencies, with 54 focused, 16 final targeted and 104 architecture passes plus actual one-GPU repeated direct/queued cancellation and fresh independent software review. Final linear source 31a5bd5 and version 6e64236 preserve reviewed runtime/test bytes; both normal full hook suites passed 2375 tests with 30 skips. All 172 source hashes and 177 frozen build inputs match annotated v0.27.0; fresh installed distributions pass and final independent release review is ship. Git branch/tag publication and remote identities verified in specs/029-shared-cy-queue/release-2026-10-13.md. Evidence-only closure adds no module or dependency change. Full architecture acceptance remains blocked by the native check: required five-GPU and actual multi-user NFS targets are unavailable and original native investigations remain unresolved. The subsequent explicit user request make release authorizes Git-tag-only publication with these disclosed gaps; native acceptance remains not-run."
   }
 }

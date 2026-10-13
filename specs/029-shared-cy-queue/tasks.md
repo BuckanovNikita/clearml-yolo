@@ -130,7 +130,7 @@ disclosed limitations; it does not supply missing target evidence or resolve nat
 failures. T011, T015, T028 and the native portion of T019 remain open. The preceding
 release deferral remains historical evidence, superseded by this explicit request.
 
-- [ ] T034 Reconcile published v0.26.2 cancellation history, run normal commit/release
+- [x] T034 Reconcile published v0.26.2 cancellation history, run normal commit/release
   hooks, verify release metadata and installed distributions, obtain independent
   release review, and publish the checked branch and annotated Git tag. Record
   exact refs and limitations in [release evidence](release-2026-10-13.md).
@@ -139,3 +139,10 @@ release deferral remains historical evidence, superseded by this explicit reques
   audit: marker-only supervised ownership, refreshed birth/liveness evidence and
   two stable empty scans. Reproduce with the original upstream tests, preserve the
   refactor's direct/subreaper behavior, renew focused/full checks and fresh review.
+
+T034 published annotated v0.27.0 after normal full hooks (2,375 passed, 30 skipped),
+fresh installed distributions, metadata/history checks and independent release
+acceptance. Remote branch/tag identities were verified. The explicit user-directed
+release supersedes T020's publication deferral; its missing full-matrix prerequisite
+is not marked passed. T011, T015, T028 and the native portion of T019 stay open.
+See [release evidence](release-2026-10-13.md) for exact commits and limitations.

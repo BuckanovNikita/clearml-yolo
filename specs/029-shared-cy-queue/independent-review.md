@@ -225,3 +225,25 @@ changed in dependency metadata. Parent version inspection subsequently found the
 existing generator misgrouped the feature under v0.26.2 on that merge graph. The
 unpublished attempt was stopped; the [release record](release-2026-10-13.md) records
 a linear-history continuation with identical verified software bytes.
+
+## Final versioned release review
+
+After parent verification of the checked source/version commits and installed
+artifacts, fresh read-only `final_release_review` returned **ship** for the
+user-directed v0.27.0 Git-only release, with no blocking finding. It independently
+verified the exact annotated tag and linear ancestry; all 172 production hashes
+and 177 frozen build inputs; wheel/sdist hashes, packaged source and version
+metadata; unchanged dependencies; exact local uv restoration; and byte-identical
+published changelog sections. It confirmed exact/append-only preservation of all
+nine earlier bug/release records and exact critical upstream cancellation regression
+bodies/decorators. The checked merge and final linear source have identical runtime,
+test, README and dependency bytes.
+
+The reviewer inspected normal source/version hooks and both full-suite XML records
+(2,375 passed, 30 skipped each), installed command/configuration/sweep/source checks
+and dependency results. No suites, native probes, writes, commits or further
+delegation were performed. GPT-6.1 Sol/high was requested; runtime settings remain
+unobservable. The verdict explicitly retains unavailable five-GPU and actual
+multi-user/multi-host NFS acceptance and unresolved native causes. Exact release
+refs, artifact identities and parent publication verification are in the
+[release evidence](release-2026-10-13.md).

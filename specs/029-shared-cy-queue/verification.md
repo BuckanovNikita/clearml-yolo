@@ -6,9 +6,11 @@ Implementation, final-source software checks and available native checks are com
 Fresh independent software reviews passed; required five-GPU and actual
 multi-user/multi-host NFS acceptance is unavailable. This is not full native acceptance. The subsequent user-directed release
 continuation and its explicit limitations are recorded in
-[release-2026-10-13.md](release-2026-10-13.md). Sections below retain successive checkpoints;
+[release-2026-10-13.md](release-2026-10-13.md), including published v0.27.0 refs,
+restored v0.26.2 cancellation safeguards and the latest source/distribution checks.
+Sections below retain successive pre-release checkpoints;
 [final software verification](#final-unwind-source-software-verification) records
-the latest source and results.
+the software snapshot before that release reconciliation.
 
 The starting revision is `95f07e17f413c369dad6af7b801a540ac12fa756`. Existing
 Ctrl+C implementation and untracked bug evidence were inspected and integrated,
