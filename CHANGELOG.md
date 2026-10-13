@@ -1,7 +1,12 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.26.2 (2026-10-13)
+
+### Bug Fixes
+
+- Clean up detached model ranks on cancellation
+  ([`6e7b7a7`](https://github.com/BuckanovNikita/clearml-yolo/commit/6e7b7a730326f829337e259673cd1d830bdd54c4))
 
 ### Documentation
 
