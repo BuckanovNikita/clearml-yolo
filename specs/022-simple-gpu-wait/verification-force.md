@@ -245,3 +245,38 @@ installed-distribution reports and fresh quality logs; no fix-first findings rem
 The preferred review model was unavailable due service capacity; a fresh supported
 alternate reviewer completed the review. Changed Markdown/local anchors and the
 architecture acceptance record validate successfully.
+
+### Completed release — 2026-10-13
+
+Acceptance commit `d240417` ran normal documentation hooks and triggered the normal
+master release workflow. Its checked version commit
+`ca5f703bc6ef57334f45b7875fd3783f99fd4772` passed the required Ruff, mypy,
+import-linter and full pytest hooks and received annotated Git tag `v0.26.0`.
+Only `pyproject.toml`, `uv.lock` and generated `CHANGELOG.md` changed in that commit.
+Both version files differ from the delivered source only at the root package
+version; dependency sources, versions and other lock bytes are unchanged.
+The branch and explicit tag were pushed atomically, and remote branch/tag readback
+confirmed the release commit. No GitHub Release, package publication or asset upload
+was performed. T030 is complete.
+
+Both final `0.26.0` archives installed into fresh frozen dependency environments,
+passed dependency compatibility checks and each completed 789 acceptance checks.
+Their 156 application/plugin source modules match the checked release source.
+The added Hydra discovery assertion initially retained a class imported before
+Hydra re-executed its module; the same identity mismatch reproduced in both the
+preliminary and final installations. Initializing discovery before importing the
+class corrects the external harness while preserving the strict registration
+assertion. An independent read-only follow-up confirmed that correction. No project
+or dependency change was needed; both final suites then passed.
+
+| Locally verified distribution | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `clearml_yolo-0.26.0-py3-none-any.whl` | 340199 | `410087b6c447cb066b73254302f3b766e727539d83fd3b9de8289813db63c620` |
+| `clearml_yolo-0.26.0.tar.gz` | 276412 | `a2552e6bd819db2fef3b4731db2734c549b83c44d0123c378d34a8ee57e61dab` |
+
+Release work remained isolated from the 21 snapshotted unrelated files and local
+source overrides. Native task-owned processes exited, both stand tags were cleaned,
+and temporary dependency links in the native worktree were removed without changing
+their targets. Detailed local receipts and downloads were retained outside the
+repository. The physical multi-GPU/DDP/MPS and default SDK-reporting limitations
+above remain explicit; no new runtime behavior was changed during release.

@@ -72,7 +72,7 @@ All four requirements are covered; no unresolved ambiguity or constitution confl
 
 - [x] T028 Update README, current GPU/queue contracts, quickstart and diagnostic guidance; validate Markdown/links/examples (T023–T025).
 - [x] T029 Inspect integrated diff, obtain fresh independent review, record evidence and reconcile/validate architecture acceptance (T026–T028).
-- [ ] T030 Complete applicable commit/release checks, preserving unrelated edits and exact local source overrides (T029).
+- [x] T030 Complete applicable commit/release checks, preserving unrelated edits and exact local source overrides (T029).
 
 Follow-ups (not implementation tasks): forced-kill orphan recovery; permission-denied
 process inspection. Both require their own reproduction and lifecycle design.
@@ -105,3 +105,10 @@ SDK thread-reporting setting enabled startup without application or service chan
 Scoped cleanup returned zero projects/tasks. Historical failed attempts above remain
 recorded; physical multi-GPU/DDP and MPS are unverified. T030 remains open until the
 checked version commit, final installed distributions and explicit Git-tag push.
+
+
+Release completed, 2026-10-13: T030 is complete. Checked release commit `ca5f703`
+and annotated tag `v0.26.0` were pushed atomically after normal full release hooks,
+final wheel/source installs (789 checks each) and independent evidence/harness review.
+Root-version-only changes preserve all dependency lock data. No GitHub Release,
+package or asset publication was created. See [completed-release evidence](verification-force.md#completed-release--2026-10-13).
