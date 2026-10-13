@@ -1,7 +1,12 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.26.1 (2026-10-13)
+
+### Bug Fixes
+
+- **quality**: Tighten lint gates and decode text explicitly
+  ([`b43edf6`](https://github.com/BuckanovNikita/clearml-yolo/commit/b43edf6432921b7d2c0e52d16ef24b9e75e99c04))
 
 ### Documentation
 
