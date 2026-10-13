@@ -2,6 +2,7 @@
 
 import importlib
 import json
+import os
 import subprocess
 import sys
 from collections.abc import Iterator
@@ -94,6 +95,55 @@ assert not {'torch', 'torchvision', 'timm', 'clearml'} & sys.modules.keys()
         text=True,
     )
     assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.skipif(
+    not sys.platform.startswith("linux"),
+    reason="ASCII-locale regression requires Linux C.UTF-8 startup locale",
+)
+def test_coco_unicode_records_load_under_ascii_locale(tmp_path: Path) -> None:
+    folder = tmp_path / "данные"
+    folder.mkdir()
+    image_name = "изображение.png"
+    class_name = "класс-猫"
+    Image.new("RGB", (9, 7)).save(folder / image_name)
+    annotation = folder / "аннотации.json"
+    annotation.write_text(
+        json.dumps(
+            {
+                "images": [{"id": 1, "file_name": image_name, "height": 7, "width": 9}],
+                "categories": [{"id": 0, "name": class_name}],
+                "annotations": [
+                    {"image_id": 1, "category_id": 0, "bbox": [1, 2, 3, 4], "area": 12}
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    # Keep UTF-8 filesystem paths from startup, then exercise ASCII-default text reads.
+    script = (
+        "import codecs\n"
+        "import locale\n"
+        "locale.setlocale(locale.LC_CTYPE, 'C')\n"
+        "from pathlib import Path\n"
+        "from clearml_yolo.adapters.fasterrcnn.data import CocoDataset\n"
+        "assert codecs.lookup(locale.getencoding()).name == 'ascii'\n"
+        f"dataset = CocoDataset(Path({str(annotation)!a}), ({class_name!a},))\n"
+        f"assert dataset.records.images[0].file_name == {image_name!a}\n"
+        f"assert dataset.records.categories[0].name == {class_name!a}\n"
+        "pixels, target = dataset[0]\n"
+        "assert tuple(pixels.shape) == (3, 7, 9)\n"
+        "assert target['labels'].tolist() == [1]\n"
+        "assert target['boxes'].tolist() == [[1, 2, 4, 6]]\n"
+    )
+    result = subprocess.run(  # noqa: S603 - fixed script in the current interpreter
+        [sys.executable, "-B", "-c", script],
+        env={**os.environ, "LC_ALL": "C.UTF-8", "PYTHONUTF8": "0", "PYTHONCOERCECLOCALE": "0"},
+        check=False,
+        capture_output=True,
+    )
+    assert result.returncode == 0, result.stderr.decode("utf-8", errors="replace")
 
 
 @pytest.mark.parametrize("preset", PRESETS)

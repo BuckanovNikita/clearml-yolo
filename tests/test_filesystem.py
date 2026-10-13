@@ -168,9 +168,9 @@ def test_project_temp_files_use_invocation_arena_without_changing_global_temp(
         descriptor, name = tempfile.mkstemp(dir=temporary_root())
         os.close(descriptor)
         retained = Path(name)
-        retained.write_text("project temporary file")
+        retained.write_text("project temporary file", encoding="utf-8")
         assert tempfile.tempdir == before
-    assert retained.read_text() == "project temporary file"
+    assert retained.read_text(encoding="utf-8") == "project temporary file"
 
 
 def test_filesystem_does_not_read_or_rewrite_optional_library_settings(

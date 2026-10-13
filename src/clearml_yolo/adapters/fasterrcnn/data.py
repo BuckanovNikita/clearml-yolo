@@ -54,7 +54,7 @@ def image_tensor(path: Path) -> Tensor:
 class CocoDataset(Dataset[tuple[Tensor, dict[str, Tensor]]]):
     def __init__(self, annotation_file: Path, names: tuple[str, ...]) -> None:
         self.annotation_file = annotation_file
-        self.records = CocoRecords.model_validate_json(annotation_file.read_text())
+        self.records = CocoRecords.model_validate_json(annotation_file.read_text(encoding="utf-8"))
         categories = sorted(self.records.categories, key=lambda item: item.id)
         if [(item.id, item.name) for item in categories] != list(enumerate(names)):
             raise ValueError("COCO category IDs and names must match the checkpoint vocabulary")

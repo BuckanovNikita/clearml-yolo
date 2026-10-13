@@ -1,0 +1,335 @@
+{
+  "schema_version": 1,
+  "task": "026 static analysis approved follow-up",
+  "scope": [
+    "pyproject.toml",
+    "uv.lock",
+    ".pre-commit-config.yaml",
+    "src/clearml_yolo/adapters/clearml/native.py",
+    "src/clearml_yolo/application/use_cases/compare.py",
+    "src/clearml_yolo/core/comparison/significance.py",
+    "src/clearml_yolo/core/export_quality.py",
+    "src/clearml_yolo/adapters/observability/progress.py",
+    "src/clearml_yolo/adapters/fasterrcnn/data.py",
+    "src/clearml_yolo/adapters/fiftyone/bounded.py",
+    "src/clearml_yolo/adapters/runtime/gpu_queue.py",
+    "scripts/local_release.py",
+    "tests",
+    "docs/development.md",
+    "docs/static-analysis.md",
+    "specs/026-static-analysis",
+    "src/clearml_yolo/adapters/clearml/detectors.py",
+    "CHANGELOG.md"
+  ],
+  "impact": "modules",
+  "rules": "AGENTS.md and docs/development.md require inward clean architecture, explicit SDK/effect owners, strict checking and protected external sources.",
+  "modules": [
+    {
+      "id": "clearml",
+      "path": "src/clearml_yolo/adapters/clearml/native.py",
+      "change": "modify",
+      "responsibility": "Verify model metadata with named expectations while preserving task/model identifiers.",
+      "interface": "_verify_model(task, model_id, *, expected_outputs, expected_url, checkpoint_hash, name, design, labels, tags, comment, metadata) returns None or raises NativeModelError on readback mismatch; public finalize API unchanged.",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "Existing inward dependencies and explicitly owned SDK edges in pyproject.toml"
+      ],
+      "forbidden_dependencies": [
+        "Outward layers and unowned SDK/effect edges"
+      ],
+      "effects": "Own SDK reads and downloads; report failures through existing exceptions.",
+      "contracts": [
+        "runtime-contracts",
+        "architecture-tests"
+      ]
+    },
+    {
+      "id": "compare",
+      "path": "src/clearml_yolo/application/use_cases/compare.py",
+      "change": "modify",
+      "responsibility": "Name consumed baseline/candidate evidence explicitly; preserve comparison outputs.",
+      "interface": "compare receives baseline/candidate ModelRef, truth/output paths and settings plus keyword-only WorkflowDependencies; returns CompareResult or None under existing skip policy. Only local evidence names change.",
+      "layer": "application",
+      "allowed_dependencies": [
+        "Existing inward dependencies and explicitly owned SDK edges in pyproject.toml"
+      ],
+      "forbidden_dependencies": [
+        "Outward layers and unowned SDK/effect edges"
+      ],
+      "effects": "Delegate IO through existing ports.",
+      "contracts": [
+        "runtime-contracts",
+        "architecture-tests"
+      ]
+    },
+    {
+      "id": "data",
+      "path": "src/clearml_yolo/adapters/fasterrcnn/data.py",
+      "change": "modify",
+      "responsibility": "Read COCO annotation JSON as UTF-8.",
+      "interface": "CocoDataset(annotation_file: Path, names: tuple[str, ...]) validates COCO records and class vocabulary and yields image/target tensors; decode UTF-8 JSON independently of locale.",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "Existing inward dependencies and explicitly owned SDK edges in pyproject.toml"
+      ],
+      "forbidden_dependencies": [
+        "Outward layers and unowned SDK/effect edges"
+      ],
+      "effects": "Own annotation file reads and image loading.",
+      "contracts": [
+        "runtime-contracts",
+        "architecture-tests"
+      ]
+    },
+    {
+      "id": "bounded",
+      "path": "src/clearml_yolo/adapters/fiftyone/bounded.py",
+      "change": "modify",
+      "responsibility": "Read Linux boot identifier as ASCII.",
+      "interface": "_OperationScratch.retain(owned, error) preserves unsafe-cleanup ownership markers; ASCII boot-ID reads keep existing OSError handling and process identity rules.",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "Existing inward dependencies and explicitly owned SDK edges in pyproject.toml"
+      ],
+      "forbidden_dependencies": [
+        "Outward layers and unowned SDK/effect edges"
+      ],
+      "effects": "Own bounded process/receipt IO at existing interfaces.",
+      "contracts": [
+        "runtime-contracts",
+        "architecture-tests"
+      ]
+    },
+    {
+      "id": "gpu-queue",
+      "path": "src/clearml_yolo/adapters/runtime/gpu_queue.py",
+      "change": "modify",
+      "responsibility": "Make required context-manager arguments intentionally consumed.",
+      "interface": "WorkerClaim.__exit__(exc_type, exc_value, traceback) closes the claim and never suppresses the original exception; required unused protocol arguments are consumed explicitly.",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "Existing inward dependencies and explicitly owned SDK edges in pyproject.toml"
+      ],
+      "forbidden_dependencies": [
+        "Outward layers and unowned SDK/effect edges"
+      ],
+      "effects": "Own queue locks and preserve exception propagation.",
+      "contracts": [
+        "runtime-contracts",
+        "architecture-tests"
+      ]
+    },
+    {
+      "id": "release",
+      "path": "scripts/local_release.py",
+      "change": "modify",
+      "responsibility": "Encode generated hook launcher as UTF-8.",
+      "interface": "install_hooks(root: Path) writes an executable UTF-8 launcher and preserves custom-hook rejection; release version/tag/dirty-tree semantics are unchanged.",
+      "layer": "development tooling",
+      "allowed_dependencies": [
+        "Python standard library",
+        "loguru and pydantic for release helper",
+        "pytest and declared development tools for tests"
+      ],
+      "forbidden_dependencies": [
+        "Application or ML SDK imports in release helper",
+        "Lint/stub packages in runtime dependencies"
+      ],
+      "effects": "Own release filesystem and Git subprocess effects.",
+      "contracts": [
+        "tooling-tests"
+      ]
+    },
+    {
+      "id": "tooling",
+      "path": "pyproject.toml",
+      "change": "modify",
+      "responsibility": "Declare development lint/stub dependencies and scoped static-analysis policy.",
+      "interface": "Existing release and test entrypoints; new tests enforce boundaries without runtime wrappers.",
+      "layer": "development tooling",
+      "allowed_dependencies": [
+        "Python standard library",
+        "loguru and pydantic for release helper",
+        "pytest and declared development tools for tests"
+      ],
+      "forbidden_dependencies": [
+        "Application or ML SDK imports in release helper",
+        "Lint/stub packages in runtime dependencies"
+      ],
+      "effects": "No application runtime effects; uv.lock mirrors exact dev resolution.",
+      "contracts": [
+        "tooling-tests"
+      ]
+    },
+    {
+      "id": "tests",
+      "path": "tests",
+      "change": "modify",
+      "responsibility": "Preserve framework setup effects and verify Unicode, SDK and tooling contracts.",
+      "interface": "Existing release and test entrypoints; new tests enforce boundaries without runtime wrappers.",
+      "layer": "development tooling",
+      "allowed_dependencies": [
+        "Python standard library",
+        "loguru and pydantic for release helper",
+        "pytest and declared development tools for tests"
+      ],
+      "forbidden_dependencies": [
+        "Application or ML SDK imports in release helper",
+        "Lint/stub packages in runtime dependencies"
+      ],
+      "effects": "Test-only temporary files and fake SDK boundaries.",
+      "contracts": [
+        "tooling-tests"
+      ]
+    },
+    {
+      "id": "tooling-contract",
+      "path": "tests/test_tooling_boundaries.py",
+      "change": "add",
+      "responsibility": "Reject prohibited release imports and runtime lint/stub dependencies.",
+      "interface": "Existing release and test entrypoints; new tests enforce boundaries without runtime wrappers.",
+      "layer": "development tooling",
+      "allowed_dependencies": [
+        "Python standard library",
+        "loguru and pydantic for release helper",
+        "pytest and declared development tools for tests"
+      ],
+      "forbidden_dependencies": [
+        "Application or ML SDK imports in release helper",
+        "Lint/stub packages in runtime dependencies"
+      ],
+      "effects": "Read first-party source/metadata; injected source is parsed without execution.",
+      "contracts": [
+        "tooling-tests"
+      ]
+    },
+    {
+      "id": "detector-tracking",
+      "path": "src/clearml_yolo/adapters/clearml/detectors.py",
+      "change": "modify",
+      "responsibility": "Adapt the shared native model verifier call to keyword-only expectations; retain detector tracking metadata.",
+      "interface": "publish_detector_model(task: TaskHandle, weights: Path, descriptor: CheckpointDescriptor, requested_name: str) returns model ID; shared verification failures still propagate.",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "Existing inward dependencies and explicitly owned SDK edges in pyproject.toml"
+      ],
+      "forbidden_dependencies": [
+        "Outward layers and unowned SDK/effect edges"
+      ],
+      "effects": "Own existing non-YOLO detector tracking SDK effects and delegate model verification.",
+      "contracts": [
+        "runtime-contracts",
+        "architecture-tests"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "runtime-contracts",
+      "path": "pyproject.toml",
+      "status": "existing",
+      "rules": "Inward layers and exact SDK owners remain enforced.",
+      "check": "imports"
+    },
+    {
+      "id": "architecture-tests",
+      "path": "tests/test_architecture.py",
+      "status": "existing",
+      "rules": "Dynamic/type-only imports, SDK ownership, pure core and application effect boundaries.",
+      "check": "architecture"
+    },
+    {
+      "id": "tooling-tests",
+      "path": "tests/test_tooling_boundaries.py",
+      "status": "planned",
+      "rules": "Release imports limited to stdlib/loguru/pydantic; lint and stub distributions remain dev-only; negative cases required.",
+      "check": "tooling-boundaries"
+    }
+  ],
+  "checks": [
+    {
+      "id": "imports",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync lint-imports",
+      "expectation": "All configured inward and SDK ownership contracts pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/026-static-analysis/verification-2026-10-13.md"
+      }
+    },
+    {
+      "id": "architecture",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync pytest tests/test_architecture.py",
+      "expectation": "Architecture tests and injected prohibited dependencies pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/026-static-analysis/verification-2026-10-13.md"
+      }
+    },
+    {
+      "id": "tooling-boundaries",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync pytest tests/test_tooling_boundaries.py",
+      "expectation": "Release import and dev-only metadata guards reject injected violations.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/026-static-analysis/verification-2026-10-13.md"
+      }
+    },
+    {
+      "id": "static",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync ruff check . && uv run --frozen --no-sync mypy . && uv run --frozen --no-sync vulture",
+      "expectation": "All static gates pass; separately recorded dead-code and stub misuse controls fail as expected.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/026-static-analysis/verification-2026-10-13.md"
+      }
+    },
+    {
+      "id": "suite",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync pytest",
+      "expectation": "Full regression suite passes, including relevant native CPU distributed tests.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/026-static-analysis/verification-2026-10-13.md"
+      }
+    },
+    {
+      "id": "hooks",
+      "kind": "behavior",
+      "command": "UV_NO_SYNC=1 uv run --frozen --no-sync pre-commit run --all-files",
+      "expectation": "Every applicable configured hook passes.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/026-static-analysis/verification-2026-10-13.md"
+      }
+    },
+    {
+      "id": "docs",
+      "kind": "documentation",
+      "command": "git diff --check; validate changed Markdown and local links with the documented evidence procedure",
+      "expectation": "Changed documentation parses, local links resolve, rule inventory matches installed catalog.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/026-static-analysis/verification-2026-10-13.md"
+      }
+    }
+  ],
+  "documentation": "Update docs/static-analysis.md, docs/development.md and specs/026-static-analysis. Runtime contracts, README and GPU guidance retain behavior and need no edits. SciPy/tqdm consumers were inspected and tested; stubs required no source changes.",
+  "review": {
+    "status": "accepted",
+    "reviewer": "acceptance_review (fresh native read-only agent; requested gpt-6.1-sol/high)",
+    "evidence": "specs/026-static-analysis/verification-2026-10-13.md",
+    "reconciliation": "Reviewed all 41 task-owned paths, including new boundary tests, config/lock, fixtures, encodings, both verifier callers and documentation. Existing inward contracts/effect owners preserved; scoped tooling contracts add negative cases. Unchanged scientific/progress sources are inspected scope only. Main-checkout GPU cancellation edits are excluded. Local uv.sources overrides are environment-only and removed before commits."
+  }
+}

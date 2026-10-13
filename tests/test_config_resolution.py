@@ -113,9 +113,8 @@ def test_scalar_document_preserves_its_resolved_type(document: Any, expected: An
     assert resolve_config_document(document, {"batch": 8}) == expected
 
 
-def test_environment_and_registered_resolvers_resolve_once(
-    monkeypatch: pytest.MonkeyPatch, typed_resolver: None
-) -> None:
+@pytest.mark.usefixtures("typed_resolver")
+def test_environment_and_registered_resolvers_resolve_once(monkeypatch: pytest.MonkeyPatch) -> None:
     from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_document
 
     monkeypatch.setenv("CY_CONFIG_UPLOAD_TEST_VALUE", "private-fixture-value")

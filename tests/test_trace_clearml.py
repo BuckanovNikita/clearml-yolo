@@ -99,7 +99,7 @@ def test_finalizer_failure_traces_failed_terminal_path_without_exception_text(
     )
     assert any(message.startswith("DONE clearml.task.mark_failed ") for message in trace_messages)
     assert owned.read_text() == "name: original\n"
-    assert configuration_source.read_text() == "name: original\n"
+    assert configuration_source.read_text(encoding="utf-8") == "name: original\n"
     assert not any(" clearml.temporary.cleanup " in message for message in trace_messages)
     assert all("private-finalizer-token" not in message for message in trace_messages)
     assert task.events == ["close", "failed"]
@@ -149,7 +149,7 @@ def test_close_failure_preserves_primary_error_and_retains_configuration(
     assert caught.value is original
     assert any(message.startswith("FAILED clearml.task.close ") for message in trace_messages)
     assert owned.read_text() == "name: original\n"
-    assert configuration_source.read_text() == "name: original\n"
+    assert configuration_source.read_text(encoding="utf-8") == "name: original\n"
     assert not any(" clearml.temporary.cleanup " in message for message in trace_messages)
     assert all("private-close-token" not in message for message in trace_messages)
 
@@ -243,7 +243,7 @@ def test_failure_close_sink_exit_preserves_primary_error_and_marks_failed(
     assert caught.value is original
     assert task.events == ["close", "failed"]
     assert owned.read_text() == "name: original\n"
-    assert configuration_source.read_text() == "name: original\n"
+    assert configuration_source.read_text(encoding="utf-8") == "name: original\n"
     assert not any(" clearml.temporary.cleanup " in message for message in trace_messages)
 
 

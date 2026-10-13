@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record verified GPU force release 0.26.0
+  ([`99befea`](https://github.com/BuckanovNikita/clearml-yolo/commit/99befeafb3dbff05e1206a4b008ae48d00269bf8))
+
+
 ## v0.26.0 (2026-10-13)
 
 ### Documentation

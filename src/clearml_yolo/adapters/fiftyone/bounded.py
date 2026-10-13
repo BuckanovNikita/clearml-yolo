@@ -334,7 +334,7 @@ class _OperationScratch:
         owners: list[dict[str, str | int]] = []
         if _platform() == "posix":
             try:
-                boot = Path("/proc/sys/kernel/random/boot_id").read_text().strip()
+                boot = Path("/proc/sys/kernel/random/boot_id").read_text(encoding="ascii").strip()
                 table = _process_table()
                 for pid, start in owned.identities.items():
                     if pid in table and table[pid][2] == start and table[pid][3] != "Z":

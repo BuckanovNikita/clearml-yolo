@@ -588,6 +588,8 @@ class WorkerClaim:
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
+        # Context-manager protocol; close never suppresses errors.
+        del exc_type, exc_value, traceback
         self.close()
 
     @property

@@ -79,11 +79,15 @@ module-name = ["clearml_yolo", "hydra_plugins.cy_queue"]
 dev = [
     "import-linter>=2.13",
     "mypy>=1.11",
+    "packaging>=26",
     "pandas-stubs",
     "types-PyYAML",
     "pre-commit>=4.6.1",
     "pytest>=8.0",
-    "ruff>=0.6",
+    "ruff>=0.16.1,<0.17",
+    "scipy-stubs==1.18.0.1",
+    "types-tqdm==4.70.0.20260906",
+    "vulture>=2.16,<3",
     "python-semantic-release>=10.5,<11",
 ]
 
@@ -94,14 +98,22 @@ src = ["src", "tests"]
 extend-exclude = ["external"]
 
 [tool.ruff.lint]
+# Preview checks are opt-in by exact code; family selectors remain stable-only.
+preview = true
+explicit-preview-rules = true
+# Rationale, omitted families and review boundaries: docs/static-analysis.md.
 select = [
     "A",
+    "ANN",
     "ARG",
     "ASYNC",
     "B",
     "BLE",
     "C4",
     "C90",
+    "COM818",
+    "D418",
+    "D419",
     "DTZ",
     "E",
     "ERA",
@@ -137,29 +149,50 @@ select = [
     "SLOT",
     "T10",
     "T20",
+    "TC004",
+    "TC005",
+    "TC007",
+    "TC010",
     "TID",
     "TRY",
     "UP",
     "W",
     "YTT",
+    # Reviewed preview checks; see docs/static-analysis.md.
+    "ASYNC119",
+    "B901",
+    "B909",
+    "PT029",
+    "PLE1141",
+    "PLE4703",
+    "RUF045",
+    "RUF054",
+    "RUF066",
+    "RUF071",
+    "RUF074",
+    "RUF052",
+    "PLW1514",
 ]
 ignore = [
+    # Opaque SDK interfaces and controlled test doubles require explicit Any boundaries.
+    # Strict mypy checks project-owned contracts; Any is not a default for new interfaces.
+    "ANN401",
     # Torch, ultralytics and the ClearML SDK cost seconds to import, so the modules that
     # need them pull them in at call time and every CLI entrypoint stays responsive.
     "PLC0415",
-    # Every task entrypoint is a hydra-zen config function: one parameter per CLI flag,
-    # so an argument budget would only push the flags into a second indirection.
+    # Public Hydra targets and scientific/SDK contracts expose independent named inputs.
+    # Retain their signatures; internal helpers still merit individual design review.
     "PLR0913",
     "PLR0917",
-    # The message belongs at the raise site here; the exception types are stdlib ones
-    # whose whole payload is that message.
+    # Keep validation context at the raise site for stdlib and domain marker exceptions;
+    # message-specific subclasses would separate the condition from its explanation.
     "TRY003",
 ]
 
 [tool.ruff.lint.per-file-ignores]
 # Tests assert, reach into privates, name literal expectations inline, feed known-value
-# temp paths and unpickle their own fixtures, and pytest collects them without a package.
-"tests/**" = ["ARG", "INP001", "PLR2004", "S101", "S108", "S301", "SLF001"]
+# temp paths, and pytest collects them without a package.
+"tests/**" = ["ARG", "INP001", "PLR2004", "S101", "S108", "SLF001"]
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
 
@@ -801,17 +834,21 @@ enable_error_code = [
 exclude = ["^external/", "^(outputs|runs|multirun|build|dist)/"]
 
 [[tool.mypy.overrides]]
-# The only dependencies that ship neither inline types nor a stub package. Everything
-# else is checked against available signatures, except explicitly opaque adapter boundaries.
+# These dependencies have no installed typing coverage at the imported boundaries.
+# Keep this list narrow; missing project imports must remain errors.
 module = [
     "digital_metrics.*",
     "report_generator.*",
-    "scipy.*",
-    "tqdm.*",
     "fiftyone.*",
-    "eta.*",
 ]
 ignore_missing_imports = true
+
+[tool.vulture]
+# Cross-file uses matter; never reduce this to pre-commit's staged filename list.
+paths = ["src", "scripts", "tests"]
+# Include unused arguments/unreachable code (100%) and imports (90%). Dynamic
+# framework members (60%) remain an advisory audit; see docs/static-analysis.md.
+min_confidence = 80
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

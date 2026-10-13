@@ -100,7 +100,9 @@ def install_hooks(root: Path) -> None:
         f"exec {shlex.quote(sys.executable)} -m pre_commit run "
         "--hook-stage post-commit --all-files\n"
     )
-    with tempfile.NamedTemporaryFile(mode="w", dir=hook.parent, delete=False) as stream:
+    with tempfile.NamedTemporaryFile(
+        encoding="utf-8", mode="w", dir=hook.parent, delete=False
+    ) as stream:
         temporary = Path(stream.name)
         stream.write(launcher)
     try:

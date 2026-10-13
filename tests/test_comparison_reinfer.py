@@ -446,10 +446,10 @@ def test_different_caches_keep_distinct_replay_manifests(
 ) -> None:
     first, _ = _reinfer(ground_truth, tmp_path / "first.csv", RecordingPredictor())
     source = Path(first.attrs["effective_args"]["source"])
-    original = source.read_text()
+    original = source.read_text(encoding="utf-8")
     reduced = ground_truth[ground_truth["image_name"] != "b.jpg"]
     second, _ = _reinfer(reduced, tmp_path / "second.csv", RecordingPredictor())
     assert source != Path(second.attrs["effective_args"]["source"])
-    assert source.read_text() == original
+    assert source.read_text(encoding="utf-8") == original
     cached, _ = _reinfer(ground_truth, tmp_path / "first.csv", _explode)
-    assert Path(cached.attrs["effective_args"]["source"]).read_text() == original
+    assert Path(cached.attrs["effective_args"]["source"]).read_text(encoding="utf-8") == original

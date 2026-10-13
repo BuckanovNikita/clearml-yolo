@@ -51,6 +51,14 @@ repos:
         types_or: [python, toml]
         pass_filenames: false
 
+      - id: vulture
+        name: uv run vulture
+        entry: uv run --locked --no-sync vulture
+        language: system
+        types_or: [python, pyi, toml, yaml]
+        pass_filenames: false
+        require_serial: true
+
       - id: pytest
         name: uv run pytest
         entry: uv run pytest

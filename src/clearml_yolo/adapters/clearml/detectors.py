@@ -165,15 +165,15 @@ def publish_detector_model(
         _verify_model(
             owner,
             model_id,
-            expected_outputs,
-            expected_url,
-            descriptor.checkpoint_sha256,
-            name,
-            design,
-            labels,
-            tags,
-            comment,
-            metadata,
+            expected_outputs=expected_outputs,
+            expected_url=expected_url,
+            checkpoint_hash=descriptor.checkpoint_sha256,
+            name=name,
+            design=design,
+            labels=labels,
+            tags=tags,
+            comment=comment,
+            metadata=metadata,
         )
 
     verify()

@@ -77,7 +77,9 @@ def test_checkpoint_selects_backend_and_restores_image_join_keys(
     assert frame.image_name.tolist() == ["0002"]
     assert frame.instance_label.tolist() == ["0001"]
     assert frame.attrs["checkpoint_design"]["backend"] == "rfdetr"
-    assert Path(frame.attrs["effective_args"]["source"]).read_text().splitlines() == [source]
+    assert Path(frame.attrs["effective_args"]["source"]).read_text(
+        encoding="utf-8"
+    ).splitlines() == [source]
 
 
 def test_raw_reference_requires_checkpoint_owned_labels(tmp_path: Path) -> None:

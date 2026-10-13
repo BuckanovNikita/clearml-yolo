@@ -676,7 +676,7 @@ def test_metric_split_upload_rejection_fails_owner_and_retains_payload(
         monkeypatch,
         workflow_dependencies,
         "clearml_yolo.application.use_cases.metrics.report_table",
-        lambda *a, **kw: None,
+        lambda *a, **_kw: None,
     )
     patch_workflow(
         monkeypatch,

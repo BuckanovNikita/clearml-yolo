@@ -152,7 +152,8 @@ def test_manifest_split_entry_is_supported(dataset_yaml: Path, tmp_path: Path) -
         "./images/val/val_0.jpg\n" + str(root / "images" / "val" / "val_1.jpg") + "\n"
     )
     dataset_yaml.write_text(
-        f"path: {root}\ntrain: images/train\nval: val.txt\nnames:\n  0: cat\n  1: dog\n"
+        f"path: {root}\ntrain: images/train\nval: val.txt\nnames:\n  0: cat\n  1: dog\n",
+        encoding="utf-8",
     )
 
     frame = _build(dataset_yaml, tmp_path)
@@ -166,7 +167,8 @@ def test_manifest_split_entry_is_supported(dataset_yaml: Path, tmp_path: Path) -
 def test_unsupported_split_entry_raises(dataset_yaml: Path, tmp_path: Path) -> None:
     root = dataset_yaml.parent
     dataset_yaml.write_text(
-        f"path: {root}\ntrain: images/train\nval: images/missing\nnames:\n  0: cat\n  1: dog\n"
+        f"path: {root}\ntrain: images/train\nval: images/missing\nnames:\n  0: cat\n  1: dog\n",
+        encoding="utf-8",
     )
 
     with pytest.raises(FileNotFoundError):

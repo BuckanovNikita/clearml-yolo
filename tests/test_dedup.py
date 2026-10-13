@@ -58,7 +58,8 @@ def test_dry_run_creates_nothing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     assert source.read_bytes() == destination.read_bytes()
 
 
-def test_replacement_preserves_destination_metadata(tmp_path: Path, simulated_clone: None) -> None:
+@pytest.mark.usefixtures("simulated_clone")
+def test_replacement_preserves_destination_metadata(tmp_path: Path) -> None:
     source, destination = pair(tmp_path)
     destination.chmod(0o640)
     os.utime(destination, ns=(1_600_000_000_000_000_000, 1_610_000_000_000_000_000))
@@ -129,9 +130,8 @@ def test_permission_failure_keeps_original(tmp_path: Path, monkeypatch: pytest.M
     assert list(destination.parent.iterdir()) == [destination]
 
 
-def test_metadata_failure_keeps_original(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, simulated_clone: None
-) -> None:
+@pytest.mark.usefixtures("simulated_clone")
+def test_metadata_failure_keeps_original(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _, destination = pair(tmp_path)
     before = destination.stat()
 
@@ -202,8 +202,9 @@ def test_hash_collision_never_replaces_different_bytes(
     assert destination.read_bytes() == b"different image bytes"
 
 
+@pytest.mark.usefixtures("simulated_clone")
 def test_cross_device_candidate_does_not_prevent_same_device_dedup(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, simulated_clone: None
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     source, destination = pair(tmp_path)
     third = tmp_path / "c" / "image.jpg"

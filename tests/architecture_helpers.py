@@ -435,7 +435,7 @@ def _eager_targets(path: Path, source_root: Path, modules: set[str]) -> set[str]
     targets: set[str] = set()
     module = _module_name(path, source_root)
     package = module if path.name == "__init__.py" else module.rsplit(".", 1)[0]
-    for node in _eager_import_nodes(ast.parse(path.read_text()).body):
+    for node in _eager_import_nodes(ast.parse(path.read_text(encoding="utf-8")).body):
         if isinstance(node, ast.Import):
             targets.update(alias.name for alias in node.names)
         else:
@@ -532,14 +532,14 @@ def runtime_targets(source_root: Path, pyproject: Path) -> set[str]:
                 and pattern.fullmatch(node.value)
             ):
                 targets.add(node.value)
-    config = tomllib.loads(pyproject.read_text())
+    config = tomllib.loads(pyproject.read_text(encoding="utf-8"))
     targets.update(config["project"]["scripts"].values())
     return targets
 
 
 def _module_symbols(path: Path) -> set[str]:
     symbols: set[str] = set()
-    for node in ast.walk(ast.parse(path.read_text())):
+    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
         if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
             symbols.add(node.name)
         elif isinstance(node, ast.Import | ast.ImportFrom):

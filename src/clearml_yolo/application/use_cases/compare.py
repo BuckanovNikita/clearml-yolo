@@ -672,7 +672,7 @@ def compare(
             backend_assertions=candidate.backend_assertions,
             deps=deps,
         )
-        baseline_evaluated, baseline_vocabulary, _baseline_evidence, _baseline_archive = _scored(
+        baseline_evaluated, baseline_vocabulary, baseline_evidence, _baseline_archive = _scored(
             baseline.weights,
             truth,
             split,
@@ -687,22 +687,20 @@ def compare(
             model_identity=baseline.identity,
             deps=deps,
         )
-        candidate_evaluated, candidate_vocabulary, _candidate_evidence, _candidate_archive = (
-            _scored(
-                candidate.weights,
-                truth,
-                split,
-                candidate_predictions,
-                destination,
-                "candidate",
-                settled,
-                candidate.thresholds,
-                classes,
-                evaluation=evaluation_config,
-                task=task,
-                model_identity=candidate.identity,
-                deps=deps,
-            )
+        candidate_evaluated, candidate_vocabulary, candidate_evidence, _candidate_archive = _scored(
+            candidate.weights,
+            truth,
+            split,
+            candidate_predictions,
+            destination,
+            "candidate",
+            settled,
+            candidate.thresholds,
+            classes,
+            evaluation=evaluation_config,
+            task=task,
+            model_identity=candidate.identity,
+            deps=deps,
         )
         baseline_classes, candidate_classes = (
             set(baseline_vocabulary.model_classes),
@@ -748,8 +746,8 @@ def compare(
                 "split": split,
                 "baseline_source": _source_configuration(baseline),
                 "candidate_source": _source_configuration(candidate),
-                "baseline_architecture": _baseline_evidence.checkpoint_design,
-                "candidate_architecture": _candidate_evidence.checkpoint_design,
+                "baseline_architecture": baseline_evidence.checkpoint_design,
+                "candidate_architecture": candidate_evidence.checkpoint_design,
                 "shared_inference": settled.model_dump(),
                 "image_count": len(baseline_evaluated.image_names),
                 "images": baseline_evaluated.image_names,

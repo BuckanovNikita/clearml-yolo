@@ -210,6 +210,7 @@ def _metadata(
 def _verify_model(
     task: Any,
     model_id: str,
+    *,
     expected_outputs: set[str],
     expected_url: str,
     checkpoint_hash: str,
@@ -354,15 +355,15 @@ def finalize_native_model(task: Any, model: Any, trainer: Any, architecture: Any
         _verify_model(
             task,
             model_id,
-            expected_outputs,
-            expected_url,
-            checkpoint_hash,
-            name,
-            design,
-            labels,
-            tags,
-            comment,
-            metadata,
+            expected_outputs=expected_outputs,
+            expected_url=expected_url,
+            checkpoint_hash=checkpoint_hash,
+            name=name,
+            design=design,
+            labels=labels,
+            tags=tags,
+            comment=comment,
+            metadata=metadata,
         )
 
     verify()

@@ -13,9 +13,16 @@ commit work, select the affected gates from:
 uv run pytest
 uv run ruff check .
 uv run mypy .
+uv run vulture
 uv run lint-imports
 uv run pre-commit run --all-files
 ```
+
+See the [static analysis policy](static-analysis.md) for Ruff selections and exclusions,
+mypy boundary exceptions and Vulture's confidence threshold. The Vulture hook scans
+source, scripts and tests together using the locked development environment. Install
+the updated dev dependencies before running it; for a deliberately prepared optional
+backend environment, use an inexact sync so its installed extras are preserved.
 
 Documentation-only work needs Markdown and local-link validation rather than the
 application suite. Inspect [.pre-commit-config.yaml](../.pre-commit-config.yaml) before
@@ -57,6 +64,15 @@ behavior and model association. Accelerator launch, NCCL, AMP and actual ClearML
 uploads/downloads require separate acceptance. See the
 [CPU validation guide](../specs/010-native-clearml-integration/quickstart.md#cpu-distributed-regression-acceptance--2026-10-10-amendment)
 for scope and evidence requirements; keep observed results in dated evidence.
+
+### Static-analysis boundaries
+
+The release helper imports only the standard library, Loguru and Pydantic. Keep lint
+and stub distributions in the development group, including when adding optional
+runtime extras. `tests/test_tooling_boundaries.py` enforces these constraints with
+injected forbidden imports and dependency declarations. Ruff preview checks require
+explicit code selection; review the [policy report](static-analysis.md) and refresh
+the rule inventory when changing the locked Ruff version.
 
 ## Python integration and architecture
 

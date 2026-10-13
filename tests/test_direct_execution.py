@@ -84,7 +84,7 @@ def test_interruption_while_waiting_does_not_initialize_runtime_or_task(
     monkeypatch.setattr(common, "initialize_filesystem", lambda: None)
     monkeypatch.setattr(common, "wait_for_available_gpus", interrupt)
     monkeypatch.setattr(common, "native_runtime", lambda: pytest.fail("native runtime started"))
-    monkeypatch.setattr(common, "invocation", lambda *a, **kw: pytest.fail("task created"))
+    monkeypatch.setattr(common, "invocation", lambda *a, **_kw: pytest.fail("task created"))
     with pytest.raises(KeyboardInterrupt):
         common.execute_owned(
             "train", OmegaConf.create({"ultralytics": {"device": 0}}), lambda ultralytics: None

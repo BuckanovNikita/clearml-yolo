@@ -31,9 +31,10 @@ def memory_inventory(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(GPUInventory, "snapshot", snapshot)
 
 
+@pytest.mark.usefixtures("memory_inventory")
 @pytest.mark.parametrize(("limit", "selected"), [(None, (1,)), (4.0, (0,))])
 def test_direct_selection_uses_default_or_project_memory_limit(
-    memory_inventory: None, limit: float | None, selected: tuple[int, ...]
+    limit: float | None, selected: tuple[int, ...]
 ) -> None:
     controls: dict[str, Any] = {"enabled": True}
     if limit is not None:
@@ -48,12 +49,12 @@ def test_direct_selection_uses_default_or_project_memory_limit(
     )
 
 
+@pytest.mark.usefixtures("memory_inventory")
 @pytest.mark.parametrize("automatic", [True, False])
 @pytest.mark.parametrize(("limit", "selected"), [(None, "GPU-idle"), (4.0, "GPU-loaded")])
 def test_queued_selection_uses_project_limit_in_automatic_and_exact_modes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    memory_inventory: None,
     automatic: bool,
     limit: float | None,
     selected: str,
@@ -125,8 +126,9 @@ def test_queued_cpu_and_disabled_controls_do_not_construct_inventory(
         job.close()
 
 
+@pytest.mark.usefixtures("memory_inventory")
 def test_queue_freezes_policy_from_job_environment_before_admission(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, memory_inventory: None
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from hydra_queue_fixture import record_exact_job
     from test_hydra_queue_launcher import _job_config
@@ -160,9 +162,10 @@ def test_queue_freezes_policy_from_job_environment_before_admission(
         job.close()
 
 
+@pytest.mark.usefixtures("memory_inventory")
 @pytest.mark.parametrize("route", ["controls", "single", "sweep"])
 def test_queue_routing_does_not_resolve_policy_before_job_environment(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, memory_inventory: None, route: str
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, route: str
 ) -> None:
     from hydra.types import HydraContext, TaskFunction
 
@@ -276,11 +279,11 @@ def test_replay_cannot_change_memory_limit_before_native_execution(
         common.execute_owned("predict", config, workflow)
 
 
+@pytest.mark.usefixtures("memory_inventory")
 @pytest.mark.parametrize("limit", [4.0, "${hydra:job.num}"])
 def test_worker_contraction_preserves_project_memory_limit(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    memory_inventory: None,
     limit: float | str,
 ) -> None:
     from hydra.core.hydra_config import HydraConfig

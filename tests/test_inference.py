@@ -87,7 +87,7 @@ class FakeYolo:
     def predict(self, source: str, **kwargs: Any) -> Iterator[FakeResult]:
         # The manifest lives in a temporary directory that is gone by the time a test
         # looks at the call, so its contents are recorded alongside its path.
-        manifest = Path(source).read_text().splitlines()
+        manifest = Path(source).read_text(encoding="utf-8").splitlines()
         self.calls.append({"source": source, "manifest": manifest, **kwargs})
         listed = sorted(manifest)
         return iter(
@@ -362,7 +362,7 @@ def test_explicit_manifest_persists_for_native_yaml_replay(tmp_path: Path) -> No
     frame = _predict("best.pt", ["a.png"], device="cpu", manifest_dir=tmp_path / "inputs")
     manifest = Path(frame.attrs["effective_args"]["source"])
     assert manifest.is_file()
-    assert manifest.read_text() == str(Path("a.png").absolute())
+    assert manifest.read_text(encoding="utf-8") == str(Path("a.png").absolute())
     assert frame.attrs["effective_args"]["model"] == "best.pt"
     assert frame.attrs["effective_args"]["mode"] == "predict"
 

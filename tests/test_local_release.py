@@ -53,7 +53,7 @@ def release_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     for key in tuple(os.environ):
         if key.startswith("GIT_") or key == "CLEARML_YOLO_RELEASE_ACTIVE":
             monkeypatch.delenv(key)
-    repo = tmp_path / "repository with spaces"
+    repo = tmp_path / "repository with spaces — репозиторий"
     repo.mkdir()
     git(repo, "init", "-b", "master")
     git(repo, "config", "user.name", "Release Test")
