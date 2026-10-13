@@ -152,3 +152,96 @@ it was not waived or fixed by changing the test suite.
 The named feature branch ran normal hooks and created no release tag. No tags
 were pushed. T027 fresh ClearML readback and T030 release acceptance remain open;
 the explicit commit/push request is complete for the implementation source.
+
+## Release acceptance resume — 2026-10-13
+
+The user requested verification and release after source delivery. The release
+checkout is isolated from the unfinished static-analysis work and contains no
+local dependency source overrides. Application source and tests remain identical
+to the delivered implementation; expected release writes are dated evidence,
+architecture reconciliation and generated root-version/changelog metadata.
+
+### Fresh native force and publication checks
+
+The initial fresh CPU attempt reproduced the documented ClearML SDK naming-query
+failure before inference. A separate authenticated task-list control returned a
+proper empty list; it does not establish the cause of the failed invocation.
+The retry uses the supported `sdk.development.report_use_subprocess=false` setting
+through an isolated external SDK configuration, with credentials supplied by the
+environment. See the maintained [reporting transport guidance](../../docs/multi-model-backends.md#clearml-reporting-transport-errors)
+and its earlier controlled investigation. No application, SDK, dependency or
+shared-service patch was made. Default subprocess reporting is not claimed fixed.
+
+The controlled fixture contains six disjoint images across train, validation and
+test, with one background image in each split. The random checkpoint establishes
+execution only. Explicit `autogpu.force=true`, `queue.enabled=true` and
+`autogpu.enabled=true` were supplied for CPU, GPU and two-job GPU multirun commands.
+Fresh processes fetched the exact completed task IDs and canonical configuration,
+then force-downloaded both required artifacts before cleanup.
+
+| Invocation | Completed task ID | Ground-truth rows | Published audit rows |
+| --- | --- | ---: | ---: |
+| CPU prediction | `6b0aeccece1f4731ac77cdfd1db5e6e6` | 6 | 108 |
+| GPU prediction | `88490543975c4f698875c3088f444c69` | 6 | 108 |
+| Forced sweep, first job | `3d207366a9ac4836a3bafdb61adb104f` | 6 | 108 |
+| Forced sweep, second job | `628e161b121e4947839ee38796b9d227` | 6 | 12 |
+
+Every task records effective `force=true`, `queue=false` and `autogpu=false`, with
+identical requested/effective concrete devices. Downloads retain all source rows,
+IDs and image membership, bounded prediction confidences and the standalone
+`not_evaluated`/empty-match semantics. The parent independently verified all eight
+downloaded hashes and sizes. The sweep used one process and BasicLauncher, with
+the first completion preceding the second start. Inherited CUDA visibility remained
+unset throughout, and the dedicated queue directory was never created. Tag-scoped
+cleanup returned zero projects and tasks and removed only owned invocation arenas.
+
+Initial external harness assertions expected raw control sections and empty
+selection fields that canonical serialization intentionally omits. The corrected
+harness follows the actual contract; fresh CPU/GPU/sweep runs independently passed.
+These corrections changed no application behavior.
+
+Two further one-epoch train→predict pipelines passed with `compile=false`, AMP
+disabled, two-image batches and worker count zero. CPU task
+`e218fdf8575c4a9c9975c4af77711ce8` and GPU task
+`13b6ba6cf35a40bf88773a141a4c1f96` each published six ground-truth and 108 audit rows.
+Each published exactly one best Output Model; fresh forced downloads reloaded
+through YOLO with the expected class. The downloaded checkpoint hash, model ID
+and training task ID matched canonical prediction provenance. The parent verified
+all twelve CSV hashes and both checkpoint hashes/sizes across the six accepted
+invocations. The training tag was also cleaned to zero projects/tasks; queue roots
+remained absent and invocation processes exited. These are execution/publication
+checks using synthetic random weights, with product metrics, comparison and business
+reports explicitly skipped; they make no accuracy claim. T027 is now complete.
+
+### Quality and installed distributions
+
+Fresh Ruff and mypy checks pass; mypy checked 283 source files. All 40 import
+contracts pass, and the architecture/force/decision selection passes 150 tests,
+including prohibited-dependency cases. The delivered unchanged source also passed
+the full normal pytest commit hook recorded above. The release commit runs its own
+required full hooks before publication.
+
+Both preliminary distributions were built offline and installed separately
+into fresh Python 3.12 environments from the frozen base/detector/export lock,
+without reusing the prepared environment's site-packages. Only the approved local
+external dependency copies remain editable. Wheel and source-archive installs are
+noneditable; all 156 application/plugin Python modules match the checkout bytes.
+Each installation records 788 passing checks: eleven installed command helps,
+Hydra plugin/worker presence, every selected command/model configuration, default
+and strict forced policy, the ordered five-GPU configuration example, overwrite
+protection and preservation of unrelated files. Configuration checks import no
+ClearML SDK. The external composition harness needed schema registration before
+its first direct composition; installed commands themselves passed unchanged.
+Final versioned distributions receive a fresh build/install check before tag push.
+
+Physical multi-GPU/DDP and MPS remain unverified. The original user's waiting run
+was not inspected, and its cause remains unconfirmed. The separate forced-kill
+orphan-recovery and permission-denied process-inspection follow-ups remain deferred.
+
+Fresh independent read-only release review returned `ship`, conditional on the
+remaining normal version hooks, final distribution checks and explicit Git-tag push.
+The reviewer inspected the five-file documentation/changelog delta, native receipts,
+installed-distribution reports and fresh quality logs; no fix-first findings remain.
+The preferred review model was unavailable due service capacity; a fresh supported
+alternate reviewer completed the review. Changed Markdown/local anchors and the
+architecture acceptance record validate successfully.

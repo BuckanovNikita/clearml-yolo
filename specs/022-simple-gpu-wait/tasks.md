@@ -66,7 +66,7 @@ All four requirements are covered; no unresolved ambiguity or constitution confl
 - [x] T024 [P] Add failing hidden telemetry/index tests and extend immutable inventory (FR-015; T022).
 - [x] T025 Implement immutable queue diagnostics and direct/queued readable decisions with regression tests (FR-013/014/015; T024).
 - [x] T026 Verify five-of-eight, FIFO/reservation release, combined blockers, throttling, force bypass, generated YAML and sweeps; run GPU/launcher, architecture, Ruff, mypy and full applicable checks (T023–T025).
-- [ ] T027 Run controlled native CPU/GPU acceptance; record physical multi-GPU limitations and clean task-owned resources (T026).
+- [x] T027 Run controlled native CPU/GPU acceptance; record physical multi-GPU limitations and clean task-owned resources (T026).
 
 ### Documentation update and acceptance
 
@@ -97,3 +97,11 @@ Source delivery completed: `be587ec` passed all normal commit hooks on an
 unchanged-source retry and was pushed to `origin/master`. Unrelated edits and
 local source overrides were preserved. No release tag was created or pushed;
 T027 and T030 remain open for their stated acceptance gaps.
+
+Release verification resume, 2026-10-13: T027 is complete. Six fresh native
+invocations passed exact-task status, effective-policy and downloaded-artifact
+readback, including CPU/GPU train→predict and checkpoint reload. The maintained
+SDK thread-reporting setting enabled startup without application or service changes.
+Scoped cleanup returned zero projects/tasks. Historical failed attempts above remain
+recorded; physical multi-GPU/DDP and MPS are unverified. T030 remains open until the
+checked version commit, final installed distributions and explicit Git-tag push.

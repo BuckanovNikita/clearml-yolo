@@ -5,6 +5,9 @@
 
 ### Documentation
 
+- Record GPU force source delivery verification
+  ([`8f92a67`](https://github.com/BuckanovNikita/clearml-yolo/commit/8f92a67d3c273b66e0b066839a64cabe1936f55c))
+
 - Record GPU memory threshold release verification
   ([`90e5a96`](https://github.com/BuckanovNikita/clearml-yolo/commit/90e5a96b6836304997c92ca7406012516e0984d5))
 

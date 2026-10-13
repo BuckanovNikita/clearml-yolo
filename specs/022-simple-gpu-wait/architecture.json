@@ -16,7 +16,10 @@
     "README.md",
     "docs/project-contracts.md",
     "docs/current-contracts.md",
-    "docs/diagnostics.md"
+    "docs/diagnostics.md",
+    "pyproject.toml",
+    "uv.lock",
+    "CHANGELOG.md"
   ],
   "impact": "modules",
   "rules": "AGENTS.md and docs/agent-workflow.md require inward imports, explicit SDK ownership, no core effects and executable target coverage; retain existing 40 import contracts.",
@@ -235,11 +238,11 @@
       }
     }
   ],
-  "documentation": "README Russian force example; execution and queue contracts; project/current summaries; diagnostics and GPU quickstart; dated evidence. Launcher implementation is reused unchanged via effective execution_controls; launcher tests cover routing.",
+  "documentation": "README Russian force example; execution and queue contracts; project/current summaries; diagnostics and GPU quickstart; dated evidence. Launcher implementation is reused unchanged via effective execution_controls; launcher tests cover routing. Release resume on 2026-10-13 adds dated verification and root-version/changelog metadata only; no new runtime/dependency/module impact is planned.",
   "review": {
     "status": "accepted",
-    "reviewer": "Fresh independent native subagent final_review (read-only; implementation ship verdict)",
+    "reviewer": "Fresh independent native subagents final_review (implementation ship) and release_review_retry (release evidence ship, pending ordinary release gates)",
     "evidence": "specs/022-simple-gpu-wait/verification-force.md",
-    "reconciliation": "Reviewed all seven changed runtime source files, new/changed tests, feature artifacts and maintained documentation. No additions/deletions/renames of production modules or dependency changes. Launcher source is reused unchanged through effective controls. Preserved unrelated static-analysis edits byte-for-byte; excluded original gpu_queue WorkerClaim cleanup and memory-wiring fixture cleanups while reviewing task-owned hunks. Core validation, runtime effects and Hydra presentation match the final diff. This is implementation/architecture acceptance only: fresh ClearML server status/policy/artifact-download readback and release remain open (T027/T030), as explicitly recorded in dated evidence."
+    "reconciliation": "Reviewed all seven changed runtime source files, new/changed tests, feature artifacts and maintained documentation. No additions/deletions/renames of production modules or dependency changes. Launcher source is reused unchanged through effective controls. Preserved unrelated static-analysis edits byte-for-byte; excluded original gpu_queue WorkerClaim cleanup and memory-wiring fixture cleanups while reviewing task-owned hunks. Core validation, runtime effects and Hydra presentation match the final diff. This is implementation/architecture acceptance only: fresh ClearML server status/policy/artifact-download readback and release remain open (T027/T030), as explicitly recorded in dated evidence. Release resume: source and tests remain identical to delivered 8f92a67; fresh native acceptance closes T027 using the maintained SDK thread-reporting configuration. Fresh Ruff, typing, import contracts, architecture/force/decision tests and preliminary installed distributions pass. Release-only documentation and root-version metadata remain subject to fresh independent review and T030 release checks. Fresh release_review_retry read-only review inspected the five-file evidence/changelog delta and native/package/quality receipts, returned ship with no fix-first findings, and retained normal version hooks, final installed distributions and explicit push as T030 gates. Markdown/local anchors and record acceptance validate."
   }
 }

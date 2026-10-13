@@ -120,3 +120,27 @@ boundary. The launcher implementation already routes effective controls and need
 only regression coverage, not a source edit. The explicit force requirement
 supersedes the historical constitution's prohibition on bypass while leaving queued
 admission invariants unchanged. No installed workflow/governance files are modified.
+
+## Release verification resume — 2026-10-13
+
+The user requested verification and release after source delivery. Resume T027
+and T030 against the committed force implementation; preserve earlier failed and
+successful observations. Expected writes are this plan, tasks and dated evidence,
+architecture acceptance reconciliation, and generated release metadata/changelog.
+Only the root package version may change in `pyproject.toml` and `uv.lock`.
+No runtime interfaces, effects, module placement or dependency references change.
+The existing module/import contracts remain the executable acceptance boundary.
+
+Parallel work: a bounded native-verification delegate owns tagged CPU/GPU execution,
+fresh exact-task status/policy/artifact readback and scoped cleanup; a separate
+packaging delegate owns wheel/source installation, command helps and generated
+configuration checks in external temporary environments. Parent owns isolation,
+quality/architecture checks, documentation, acceptance review and release. Agents
+write only their external evidence. Live verification precedes task closure and
+release; final integrated evidence receives fresh independent read-only review.
+
+Use the documented shared-stand environment without SDK or application patches.
+Synthetic native runs establish execution and publication, not model accuracy.
+Keep physical multi-GPU/DDP/MPS limitations explicit. Reuse the already reviewed
+force/admission implementation and require ordinary commit/release hooks. Publish
+only the checked branch and annotated Git tag after every applicable gate passes.
