@@ -1,7 +1,7 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.26.0 (2026-10-13)
 
 ### Documentation
 
@@ -16,6 +16,9 @@
 
 - Require module architecture planning and acceptance
   ([`4aef37f`](https://github.com/BuckanovNikita/clearml-yolo/commit/4aef37f6adb04e3a2e2540b0cfc1dda12f7bba84))
+
+- Verify forced GPU execution and release readiness
+  ([`d240417`](https://github.com/BuckanovNikita/clearml-yolo/commit/d240417d162600f754c93006762884d6469a0757))
 
 ### Features
 
