@@ -92,3 +92,8 @@ commit/push proceeds under the normal commit checks, preserving unrelated edits.
 T027 and T030 remain open for the documented live readback and release gates;
 source delivery creates no version tag. See the dated source-delivery amendment
 in [verification-force.md](verification-force.md).
+
+Source delivery completed: `be587ec` passed all normal commit hooks on an
+unchanged-source retry and was pushed to `origin/master`. Unrelated edits and
+local source overrides were preserved. No release tag was created or pushed;
+T027 and T030 remain open for their stated acceptance gaps.

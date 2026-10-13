@@ -14,6 +14,11 @@
 - Require module architecture planning and acceptance
   ([`4aef37f`](https://github.com/BuckanovNikita/clearml-yolo/commit/4aef37f6adb04e3a2e2540b0cfc1dda12f7bba84))
 
+### Features
+
+- **gpu**: Force explicit devices and explain admission decisions
+  ([`be587ec`](https://github.com/BuckanovNikita/clearml-yolo/commit/be587ec69e112df25302c03694be8a0ec842a5d1))
+
 ### Refactoring
 
 - Share evaluation statistics and workbook implementation

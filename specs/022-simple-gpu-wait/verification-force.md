@@ -131,3 +131,24 @@ thread and `fsync` in the main thread; it did not establish a cause. An unchange
 focused rerun of `tests/test_native_ddp.py` passed all 22 tests. The source remains
 unchanged; delivery still requires the complete normal commit hooks to pass on
 retry, with no skipped tests or disabled hooks.
+
+### Delivery result
+
+The unchanged-source retry passed every applicable commit hook, including the
+full pytest suite, Ruff, mypy and import contracts. Source commit
+`be587ec69e112df25302c03694be8a0ec842a5d1`
+(`feat(gpu): force explicit devices and explain admission decisions`) was
+fast-forwarded to `master` and pushed to `origin/master`. All unrelated workspace
+files and the exact local source overrides were verified byte-for-byte against
+the pre-delivery snapshot; the index was clean after integration. The committed
+`pyproject.toml` and lockfile are unchanged from the prior source revision.
+
+Markdown validation parsed 11 files and checked 190 local links/anchors after
+the authorization amendment; architecture acceptance validation and whitespace
+checks passed. The final delivery-only additions receive the normal documentation
+commit checks. The first SIGILL remains an unexplained, non-reproduced observation;
+it was not waived or fixed by changing the test suite.
+
+The named feature branch ran normal hooks and created no release tag. No tags
+were pushed. T027 fresh ClearML readback and T030 release acceptance remain open;
+the explicit commit/push request is complete for the implementation source.
