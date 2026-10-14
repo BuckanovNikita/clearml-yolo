@@ -32,9 +32,9 @@ retains the unexecuted physical GPU check required by T016. See
 
 ## Authorized local delivery — 2026-10-15
 
-- [ ] T017 Parent: integrate current upstream documentation, run commit/release hooks, inspect package metadata and distribution, and push the tool branch plus annotated release tag.
-- [ ] T018 Companion/parent: finalize, review, commit and publish the prepared portable usage-skill release after the tool release is verified.
-- [ ] T019 Parent: record release refs and local checks; preserve local overrides and unrelated work; leave physical acceptance open.
+- [x] T017 Parent: integrate current upstream documentation, run commit/release hooks, inspect package metadata and distribution, and push the tool branch plus annotated release tag.
+- [x] T018 Companion/parent: finalize, review, commit and publish the prepared portable usage-skill release after the tool release is verified.
+- [x] T019 Parent: record release refs and local checks; preserve local overrides and unrelated work; leave physical acceptance open.
 
 The user explicitly requested local completion and release before supplying the
 other machine's results. T015's remaining overall acceptance gate and T016 remain
