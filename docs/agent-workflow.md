@@ -4,6 +4,12 @@ Read this policy before Spec Kit workflow stages, including planning, bug-source
 and governance updates. The [agent instructions](../AGENTS.md) route tasks here; this
 project policy supplements the installed skills without changing their files.
 
+Use `python-project-workflow` to supply Python compatibility, architecture, documentation,
+verification and authorized release evidence within these routes. Spec Kit retains its
+stage order, artifacts, execution roles and status ledger. Shared skills do not establish
+a second plan or review process. Inspect current code, configuration, hooks and changes
+before relying on historical task claims; preserve unrelated work and local overrides.
+
 ## Spec Kit integration
 
 Keep installed Spec Kit skills, extension commands, templates and other `.specify/`
@@ -29,6 +35,9 @@ to the request while recording intent, tasks, verification, and documentation ou
 - For documentation-only maintenance without application behavior changes, record
   intent, tasks, no-impact architecture and dated checks in documentation evidence;
   use the documentation stage without creating a new application feature specification.
+- For resumed work, compare the current implementation and task-owned diff with the
+  selected artifacts. Append missing implementation, architecture, verification and
+  documentation work without rewriting completed history or retrofitting inactive plans.
 - For planning-only, read-only, or explicitly limited requests, perform only the
   authorized workflow stages and return the requested result. Follow the active host
   mode and retain applicable review gates; automatic routing does not authorize
@@ -36,7 +45,17 @@ to the request while recording intent, tasks, verification, and documentation ou
 - Do not ask the user to invoke the next skill when the completion request already
   authorizes that stage. Continue through the applicable stages and completion gates;
   ask only for material missing information or a new scope decision. If a required
-  skill is unavailable, report the gap accurately.
+  skill is unavailable, report the gap accurately and continue independent inspection;
+  unavailable required gates do not count as acceptance.
+
+Record the task outcome, compatibility boundaries, affected documentation, concrete
+acceptance checks and authorized stopping point in the native ledger. Reconcile them
+with the final diff and actual check evidence before completion. Existing user or standing
+authorization covers its stated commit/release scope without another stage prompt;
+explicit no-commit/no-release limits and the active host mode take precedence. Evaluate
+the [native release workflow](development.md#local-releases) after acceptance. A docs-only
+change may correctly produce no version tag. Deployment and package publishing remain
+separate actions requiring explicit authorization.
 
 ### Mandatory module architecture planning and acceptance
 
@@ -84,8 +103,9 @@ renames, dependency configuration and composition targets. Reconcile it with mod
 scope, contract coverage and completed tasks, and identify excluded unrelated work.
 Record actual dated check results and negative-case evidence. Review responsibilities,
 interface depth, dependency direction and inversion, effect ownership and justified
-exceptions against project rules; obtain the fresh independent review required by
-[AGENTS.md](../AGENTS.md) after integration and verification. Validate the reconciled
+exceptions against project rules. The final review required by [AGENTS.md](../AGENTS.md)
+covers Python and architecture evidence after integration and verification; reuse that
+review instead of adding a competing review process. Validate the reconciled
 record with `--phase acceptance`; missing, unavailable or failing required checks or
 review block acceptance. No-impact work needs its documentation checks outside the
 minimal record. The validator checks record structure and references; it neither runs

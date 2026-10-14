@@ -3,6 +3,9 @@
 Read the relevant section before environment setup, code verification, dependency work or
 any commit. The [agent instructions](../AGENTS.md) define authorization and task routing.
 Read `pyproject.toml` for entrypoints, dependencies and import contracts.
+The shared `python-project-workflow` skill supplies lifecycle requirements within the
+[native workflow](agent-workflow.md); this document owns the project's commands and
+dependency/commit/release procedures.
 
 ## Verification
 
@@ -146,9 +149,11 @@ issues instead of patching or monkeypatching the dependency.
 
 ## Commit procedure
 
-Commit only when requested. Stage explicit paths or hunks belonging to the task; preserve
-unrelated staged and unstaged changes. Do not stash, reset, revert or bypass hooks to make
-a check pass. Use Conventional Commits when committing.
+Commit when user or standing authorization covers the native completion workflow.
+Explicit no-commit/no-release limits and the active host mode take precedence. Stage
+explicit paths or hunks belonging to the task; preserve unrelated staged and unstaged
+changes. Do not stash, reset, revert or bypass hooks to make a check pass. Use Conventional
+Commits and inspect hook-generated changes before retrying.
 
 Before every commit, temporarily remove the entire `[tool.uv.sources]` section
 from `pyproject.toml`, including its comments and the local editable overrides:
@@ -197,8 +202,10 @@ original commit; inspect its output. To retry or check the release workflow manu
 uv run --locked --no-sync python scripts/local_release.py
 ```
 
-After checking the result, push the branch and any newly created version tag explicitly.
-Publish Git tags only; do not upload package assets. The
+After checking the result, complete authorized delivery by pushing the intended branch
+and any newly created version tag explicitly, then verify the remote refs. A no-release
+evaluation is a valid outcome for documentation-only history; do not force a version bump.
+Publish Git tags only: no GitHub Releases, release assets or registry packages. The
 [release contract](../specs/003-semantic-release/contracts/local-release.md) describes
 version policy, dirty-tree deferral, concurrency and recovery. The
 [validation guide](../specs/003-semantic-release/quickstart.md) covers checks and changelog refresh.

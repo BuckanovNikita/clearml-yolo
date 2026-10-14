@@ -5,6 +5,9 @@
 
 ### Documentation
 
+- Maintain portable usage skill with feature changes
+  ([`665dfd3`](https://github.com/BuckanovNikita/clearml-yolo/commit/665dfd368718a08be91222ef2131250f37927d55))
+
 - Record verified multirun tag release
   ([`cb1eb58`](https://github.com/BuckanovNikita/clearml-yolo/commit/cb1eb5878a8e686d2d1137505ececa4b5bf93558))
 
