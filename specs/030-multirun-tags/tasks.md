@@ -19,7 +19,7 @@
 - [x] T009 Update README.md, docs/queue.md, docs/project-contracts.md and docs/current-contracts.md.
 - [x] T010 Validate changed Markdown/local links and documented validation commands.
 - [x] T011 Obtain fresh independent review and reconcile architecture.json against the final diff.
-- [ ] T012 Complete authorized checked commit and Git-tag-only release workflow.
+- [x] T012 Complete authorized checked commit and Git-tag-only release workflow.
 
 Dependencies: T001–T003 precede T004; T004 precedes T005–T007; T008 follows integration.
 T009–T010 follow the implementation contract; T011 follows verification; T012 follows acceptance.

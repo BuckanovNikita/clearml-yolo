@@ -11,7 +11,9 @@
     "docs/project-contracts.md",
     "docs/current-contracts.md",
     "specs/030-multirun-tags",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "pyproject.toml",
+    "uv.lock"
   ],
   "impact": "modules",
   "rules": "Entrypoints own Hydra configuration and invocation identity; application/core stay inward and SDK calls remain adapter-owned. Existing pyproject import-linter and architecture tests enforce direct/queue isolation, SDK ownership and cycles.",
@@ -164,6 +166,6 @@
     "status": "accepted",
     "reviewer": "review_multirun_tags; parent integration and final diff reconciliation",
     "evidence": "specs/030-multirun-tags/independent-review.md",
-    "reconciliation": "Inspected all task-owned tracked changes and untracked additions: three Hydra modules, behavioral regression file, README, project/current/queue contracts, feature artifacts and generated changelog. No new module, schema, dependency, dynamic target or boundary exception. Existing import contracts and negative cases cover affected modules. Exact local pyproject source overrides and concurrent untracked docs/cls-cls-pw-grid-search.md are excluded. Final focused verification and independent ship review accepted; full checked source/version commits remain a release gate."
+    "reconciliation": "Inspected the complete task diff through v0.28.0: three Hydra modules, behavioral regression file, README, project/current/queue contracts, feature artifacts, generated changelog and root-version-only pyproject/uv.lock updates. No new module, schema, dependency, dynamic target or boundary exception. Existing import contracts and negative cases cover affected modules. Exact local pyproject source overrides and concurrent untracked docs/cls-cls-pw-grid-search.md are excluded. Final focused verification and independent ship review accepted; source and version commits passed all applicable hooks, including full pytest. Tagged runtime/test hashes match the reviewed implementation; the tagged tree matches both verified distributions. Final evidence-only documentation updates have no import or effect impact."
   }
 }

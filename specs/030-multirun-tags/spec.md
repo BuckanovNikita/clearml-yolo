@@ -1,7 +1,7 @@
 # Feature Specification: Automatic multirun tags
 
 **Created**: 2026-10-14
-**Status**: Ready for implementation
+**Status**: Implemented, verified and released in v0.28.0
 **Input**: "Add autotag of tasks that launched from one multirun with random tag"
 
 ## User Scenarios & Testing
