@@ -5,6 +5,9 @@
 
 ### Documentation
 
+- Align agent workflow with shared Python lifecycle
+  ([`38dada3`](https://github.com/BuckanovNikita/clearml-yolo/commit/38dada3fdd730caf38606aa8c1529cf164f34b6b))
+
 - Maintain portable usage skill with feature changes
   ([`665dfd3`](https://github.com/BuckanovNikita/clearml-yolo/commit/665dfd368718a08be91222ef2131250f37927d55))
 

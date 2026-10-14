@@ -48,3 +48,25 @@ Architecture acceptance validation and native delivery follow this state.
 Architecture acceptance validation passed (exit 0) after complete-diff
 reconciliation and review. Markdown and whitespace checks passed on the updated
 evidence. Implementation and acceptance are complete; native delivery is pending.
+
+## Native delivery
+
+Contributor commit `38dada3fdd730caf38606aa8c1529cf164f34b6b`
+(`docs: align agent workflow with shared Python lifecycle`) passed the applicable
+native hooks. The first attempt required the expected generated changelog refresh;
+that diff was inspected and staged before the successful retry. No application
+checks were claimed for the documentation-only change.
+
+The commit was fast-forwarded into an isolated `master` delivery checkout with
+the native hooks installed. `uv run --locked --no-sync python
+scripts/local_release.py` exited 0 with `No unreleased semantic changes.` The
+authorized atomic push of `master` succeeded, and the remote branch was verified
+at the contributor commit. The peeled `v0.28.0` tag remained
+`05aa05ca61d615540a7fb17cbf63abba21c5e8f4`; no version tag was created.
+
+Both task and delivery checkouts contain no local source overrides. The original
+checkout, including its queue/GPU/testing work and dependency overrides, was
+preserved. Its local branch was not advanced through the unrelated dirty work.
+Acceptance, documentation and whitespace checks passed again for this delivery
+record before its native commit and push. The final record commit and pushed refs
+are reported in the completion handoff.

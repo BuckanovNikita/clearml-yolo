@@ -33,7 +33,7 @@ precede fresh independent review, architecture acceptance and native delivery.
 - [x] Align lifecycle discovery, authorization and collaboration guidance.
 - [x] Check changed Markdown, local links/anchors, examples and complete diff.
 - [x] Obtain fresh independent review and validate architecture acceptance.
-- [ ] Commit task-owned changes, evaluate native release and verify pushed refs.
+- [x] Commit task-owned changes, evaluate native release and verify pushed refs.
 
 ## Acceptance
 
