@@ -20,6 +20,7 @@
     "specs/031-test-quality-gpu-controls",
     ".gitignore",
     "README.md",
+    "CHANGELOG.md",
     "src/clearml_yolo/adapters/queue/storage.py"
   ],
   "rules": "Preserve inward layers and SDK ownership in pyproject.toml and tests/test_architecture.py. Process effects remain in runtime/queue adapters; test libraries and harnesses never become production dependencies.",

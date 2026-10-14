@@ -20,7 +20,19 @@ implementation, architecture checks and independent review have passed.
 
 ## Local checks and delivery
 
-Source and generated-release commits must run the installed ordinary hooks.
+Implementation commit `c450411b6ba7dc0cb4fbde2259cd79f43ffdd2d7` passed every
+applicable installed pre-commit hook, including full pytest, Ruff, mypy,
+import-linter and Vulture. The post-commit release check correctly deferred
+version creation on the temporary release branch. The staged package had no
+local source overrides or test-tool runtime dependencies; exact working overrides
+were restored afterward and the index was empty.
+
+Fresh independent release review accepted the local scope and companion guidance,
+subject to actual generated-release, build and remote-ref checks. Its one minor
+record omission was corrected by adding the generated changelog to architecture
+scope. Markdown lint passed 13 files and validation passed 190 local links.
+
+Source and generated-release commits run the installed ordinary hooks.
 `UV_NO_SYNC=1` preserves the prepared optional-backend environment and prevents
 dependency synchronization; it does not disable any check. Temporarily remove
 the exact local `[tool.uv.sources]` section for each commit and restore it

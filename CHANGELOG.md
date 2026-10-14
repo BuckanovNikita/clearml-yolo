@@ -17,6 +17,11 @@
 - Record verified multirun tag release
   ([`cb1eb58`](https://github.com/BuckanovNikita/clearml-yolo/commit/cb1eb5878a8e686d2d1137505ececa4b5bf93558))
 
+### Features
+
+- Add physical GPU controls and DDP regression coverage
+  ([`c450411`](https://github.com/BuckanovNikita/clearml-yolo/commit/c450411b6ba7dc0cb4fbde2259cd79f43ffdd2d7))
+
 
 ## v0.28.0 (2026-10-14)
 
