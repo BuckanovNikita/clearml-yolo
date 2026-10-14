@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record verified shared queue release 0.27.0
+  ([`7ae9153`](https://github.com/BuckanovNikita/clearml-yolo/commit/7ae9153dcd5f812ada18a2b0f2bddbf2bb7e49c8))
+
+
 ## v0.27.0 (2026-10-13)
 
 ### Documentation

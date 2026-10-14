@@ -30,6 +30,13 @@ precedence, and `hydra.mode=MULTIRUN` selects a sweep even without `-m`; `-m` ov
 saved `hydra.mode=RUN`. Direct and queued composition share these rules. BasicSweeper
 and BasicLauncher are the supported Hydra plugins; concurrency belongs to queue workers.
 
+Each effective multirun adds one shared random `multirun-<UUID4 hex>` ClearML tag
+alongside each job's user-supplied `clearml.tags`. This includes one-job sweeps and
+saved MULTIRUN mode. Direct launches generate a fresh group per launch; queued
+submissions freeze it in every snapshot before workers execute. Repeated submissions
+get different tags. Ordinary RUN leaves tags unchanged. See the
+[task-grouping contract](../specs/030-multirun-tags/contracts/tags.md).
+
 Remove native GPU selectors from queued configurations: allocation supplies all training
 devices and the first device for inference/comparison, while explicit CPU phases remain CPU.
 `CUDA_VISIBLE_DEVICES` is set before the fresh pipeline process. Compilation, AMP, batch and

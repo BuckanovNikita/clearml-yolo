@@ -21,7 +21,7 @@ import clearml_yolo.entrypoints.hydra.configs  # noqa: F401 - register shared Co
 from clearml_yolo.adapters.storage.filesystem import write_path
 from clearml_yolo.application.use_cases.pipeline import run_pipeline
 from clearml_yolo.core.queue import JobSnapshot, ResourceRequest
-from clearml_yolo.entrypoints.hydra.sweeps import compose_jobs
+from clearml_yolo.entrypoints.hydra.sweeps import compose_jobs, new_multirun_tag, tag_multirun_job
 from clearml_yolo.entrypoints.hydra.validation import (
     reject_saved_legacy_controls,
     validate_hydra_destinations,
@@ -124,7 +124,8 @@ def _validate_devices(config: DictConfig, overrides: list[str]) -> None:
 
 
 def _resolved(
-    config: DictConfig, index: int, project_root: Path, *, multirun: bool
+    config: DictConfig, index: int, project_root: Path, *, multirun: bool,
+    multirun_tag: str | None,
 ) -> dict[str, Any]:
     previous = HydraConfig.instance().cfg
     try:
@@ -141,6 +142,9 @@ def _resolved(
                 config.hydra.run.dir = str(Path(config.hydra.sweep.dir) / config.hydra.sweep.subdir)
             config.hydra.runtime.output_dir = config.hydra.run.dir
         HydraConfig.instance().set_config(config)
+        if multirun_tag is not None:
+            # Explicit tags may reference hydra:job.num or another job-local value.
+            tag_multirun_job(config, multirun_tag)
         validate_hydra_destinations(config)
         protected = {
             "CUDA_VISIBLE_DEVICES",
@@ -196,9 +200,12 @@ def compose_snapshots(
     snapshots: list[JobSnapshot] = []
     with context:
         multirun, jobs = compose_jobs(options.config_name, overrides, multirun=options.multirun)
+        multirun_tag = new_multirun_tag() if multirun else None
         for index, config in enumerate(jobs):
             _validate_devices(config, list(config.hydra.overrides.task))
-            values = _resolved(config, index, project_root, multirun=multirun)
+            values = _resolved(
+                config, index, project_root, multirun=multirun, multirun_tag=multirun_tag
+            )
             snapshots.append(
                 JobSnapshot(
                     command="pipeline",

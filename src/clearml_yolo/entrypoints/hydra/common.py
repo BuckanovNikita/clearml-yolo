@@ -9,6 +9,8 @@ from functools import partial
 from typing import Any
 
 import hydra
+from hydra.core.hydra_config import HydraConfig
+from hydra.types import RunMode
 from hydra_zen import instantiate, store, zen
 from omegaconf import DictConfig, OmegaConf, open_dict
 
@@ -35,6 +37,7 @@ from clearml_yolo.adapters.storage.run_identity import task_run_dir
 from clearml_yolo.adapters.yolo.config import requested_devices
 from clearml_yolo.core.models import ModelConfig
 from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_file
+from clearml_yolo.entrypoints.hydra.sweeps import new_multirun_tag, tag_multirun_job
 from clearml_yolo.entrypoints.hydra.validation import (
     materialize_model_config,
     reject_legacy_controls,
@@ -81,8 +84,6 @@ def _validate_replay_runtime(uses_detector: bool, replay: dict[str, Any]) -> Non
 @trace_operation("invocation.execute")
 def execute_owned(name: str, config: DictConfig, function: Callable[..., Any]) -> None:
     """Execute native settings unchanged under one invocation-owned task."""
-    from hydra.core.hydra_config import HydraConfig
-
     with trace_operation("filesystem.initialize"):
         initialize_filesystem()
         if HydraConfig.initialized():
@@ -210,8 +211,15 @@ def _launch(name: str, function: Callable[..., Any]) -> None:
         store.add_to_hydra_store(overwrite_ok=True)
         validate_launch_arguments(name)
 
+    multirun_tag: str | None = None
+
     @hydra.main(config_name=name, config_path=None, version_base="1.3")
     def execute(config: DictConfig) -> None:
+        nonlocal multirun_tag
+        if HydraConfig.initialized() and HydraConfig.get().mode == RunMode.MULTIRUN:
+            if multirun_tag is None:
+                multirun_tag = new_multirun_tag()
+            tag_multirun_job(config, multirun_tag)
         execute_owned(name, config, function)
 
     execute()

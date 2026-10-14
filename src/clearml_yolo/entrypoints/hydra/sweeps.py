@@ -1,10 +1,25 @@
 """Resolve native Hydra launch semantics before direct or queued effects."""
 
+from uuid import uuid4
+
 from hydra._internal.core_plugins.basic_sweeper import BasicSweeper
 from hydra.core.global_hydra import GlobalHydra
 from hydra.core.override_parser.overrides_parser import OverridesParser
 from hydra.types import RunMode
-from omegaconf import DictConfig
+from omegaconf import DictConfig, open_dict
+
+
+def new_multirun_tag() -> str:
+    """Create an independent group for one launch or queued submission."""
+    return f"multirun-{uuid4().hex}"
+
+
+def tag_multirun_job(config: DictConfig, tag: str) -> None:
+    """Append the launch-owned group to a job, preserving its explicit tags."""
+    tags = list(config.clearml.tags)
+    if tag not in tags:
+        with open_dict(config.clearml):
+            config.clearml.tags = [*tags, tag]
 
 
 def compose_jobs(

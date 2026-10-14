@@ -56,6 +56,12 @@ whole-pipeline UUID allocations and guardian recovery. Queue allocation preserve
 CPU phases, compilation, AMP, batch and model settings. Inference uses the first allocated
 device. Memory admission thresholds are not guarantees that compilation/training fits.
 
+Each direct or queued multirun adds one shared random `multirun-<UUID4 hex>` ClearML
+tag to all its jobs, preserving explicit tags. The group is fresh per launch/submission
+and persists in queued snapshots. Effective MULTIRUN mode includes one-job sweeps;
+ordinary RUN adds no tag. See the
+[grouping contract](../specs/030-multirun-tags/contracts/tags.md).
+
 New `model=deimv2/<preset>`, `model=rfdetr/<preset>` and `model=fasterrcnn/<preset>` groups
 own typed `model.train` and `model.predict` settings. Unsupported controls fail explicitly.
 Changed controls in inactive groups are rejected in both directions; YOLO settings belong

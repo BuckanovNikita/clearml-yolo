@@ -32,6 +32,11 @@ configuration, output, tracking and evaluation rules formerly listed in `AGENTS.
 
 ## Changes that must propagate
 
+The [multirun grouping contract](../specs/030-multirun-tags/contracts/tags.md) adds a
+shared random ClearML tag per direct launch or queued submission. Keep the shared
+Hydra tag helper, direct callback lifetime and frozen queue tags consistent. Explicit
+user tags survive; ordinary RUN adds no tag.
+
 Direct commands never schedule. Queue worker admission uses a strict total-used-memory
 cutoff (default 2.0 GiB), independent of training capacity. Keep [queue](queue.md), direct
 Hydra defaults, private snapshots, owner/guardian adapters, CLI/TUI and README consistent.

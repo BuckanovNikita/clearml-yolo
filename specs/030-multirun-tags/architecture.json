@@ -1,0 +1,169 @@
+{
+  "schema_version": 1,
+  "task": "030-multirun-tags",
+  "scope": [
+    "src/clearml_yolo/entrypoints/hydra/sweeps.py",
+    "src/clearml_yolo/entrypoints/hydra/common.py",
+    "src/clearml_yolo/entrypoints/hydra/queue_config.py",
+    "tests/test_multirun_tags.py",
+    "README.md",
+    "docs/queue.md",
+    "docs/project-contracts.md",
+    "docs/current-contracts.md",
+    "specs/030-multirun-tags",
+    "CHANGELOG.md"
+  ],
+  "impact": "modules",
+  "rules": "Entrypoints own Hydra configuration and invocation identity; application/core stay inward and SDK calls remain adapter-owned. Existing pyproject import-linter and architecture tests enforce direct/queue isolation, SDK ownership and cycles.",
+  "modules": [
+    {
+      "id": "sweeps",
+      "path": "src/clearml_yolo/entrypoints/hydra/sweeps.py",
+      "change": "modify",
+      "responsibility": "Append one shared tag to a concrete job without losing user tags",
+      "interface": "new_multirun_tag returns a fresh UUID group; tag_multirun_job(config, tag) appends once inside an initialized job context",
+      "layer": "entrypoints.hydra",
+      "allowed_dependencies": [
+        "Hydra/OmegaConf",
+        "standard library",
+        "existing application contracts and permitted outer composition dependencies"
+      ],
+      "forbidden_dependencies": [
+        "Direct launch imports of queue implementation",
+        "ClearML SDK imports outside its adapters",
+        "application/core imports of entrypoints"
+      ],
+      "effects": "Random UUID creation and configuration mutation only; no storage, process or SDK effects",
+      "contracts": [
+        "boundaries",
+        "import-linter"
+      ]
+    },
+    {
+      "id": "common",
+      "path": "src/clearml_yolo/entrypoints/hydra/common.py",
+      "change": "modify",
+      "responsibility": "Own one shared group across callbacks of one effective direct Hydra multirun",
+      "interface": "_launch(name, function) scopes the group to one launch; RUN leaves tags unchanged",
+      "layer": "entrypoints.hydra",
+      "allowed_dependencies": [
+        "Hydra/OmegaConf",
+        "standard library",
+        "existing application contracts and permitted outer composition dependencies"
+      ],
+      "forbidden_dependencies": [
+        "Direct launch imports of queue implementation",
+        "ClearML SDK imports outside its adapters",
+        "application/core imports of entrypoints"
+      ],
+      "effects": "Existing runtime/task composition; tagging happens before execute_owned and never in global state",
+      "contracts": [
+        "boundaries",
+        "import-linter"
+      ]
+    },
+    {
+      "id": "queue_config",
+      "path": "src/clearml_yolo/entrypoints/hydra/queue_config.py",
+      "change": "modify",
+      "responsibility": "Freeze a shared group in the private snapshots of one queued multirun",
+      "interface": "compose_snapshots owns the submission tag; _resolved applies it after setting the job Hydra context, then serializes immutable snapshots",
+      "layer": "entrypoints.hydra",
+      "allowed_dependencies": [
+        "Hydra/OmegaConf",
+        "standard library",
+        "existing application contracts and permitted outer composition dependencies"
+      ],
+      "forbidden_dependencies": [
+        "Direct launch imports of queue implementation",
+        "ClearML SDK imports outside its adapters",
+        "application/core imports of entrypoints"
+      ],
+      "effects": "Existing composition and snapshot serialization; no new worker or storage effect",
+      "contracts": [
+        "boundaries",
+        "import-linter"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "boundaries",
+      "path": "tests/test_architecture.py",
+      "status": "existing",
+      "rules": "Exhaustive direction, SDK ownership, cycles and direct-to-queue boundaries including injected forbidden edges",
+      "check": "architecture"
+    },
+    {
+      "id": "import-linter",
+      "path": "pyproject.toml",
+      "status": "existing",
+      "rules": "Declared inward layers, SDK owners and command independence",
+      "check": "imports"
+    }
+  ],
+  "checks": [
+    {
+      "id": "architecture",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync pytest tests/test_architecture.py",
+      "expectation": "Production graph and injected negative cases pass",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/030-multirun-tags/verification.md"
+      }
+    },
+    {
+      "id": "imports",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync lint-imports",
+      "expectation": "All contracts kept",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/030-multirun-tags/verification.md"
+      }
+    },
+    {
+      "id": "behavior",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync pytest tests/test_multirun_tags.py tests/test_hydra_sweep_configuration.py tests/test_clearml_session.py",
+      "expectation": "Direct and queued tags group correctly; user tags and single runs preserved; session lifecycle unaffected",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/030-multirun-tags/verification.md"
+      }
+    },
+    {
+      "id": "static",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync ruff check . && uv run --frozen --no-sync mypy . && uv run --frozen --no-sync vulture",
+      "expectation": "All static checks pass",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/030-multirun-tags/verification.md"
+      }
+    },
+    {
+      "id": "documentation",
+      "kind": "documentation",
+      "command": "Validate changed Markdown and local links; execute quickstart test commands",
+      "expectation": "No broken local links or invalid changed examples",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/030-multirun-tags/verification.md"
+      }
+    }
+  ],
+  "documentation": "Update Russian README and English queue/project/current contracts with automatic tag semantics; feature artifacts record decisions and dated verification. No configuration schema/generated-default changes.",
+  "review": {
+    "status": "accepted",
+    "reviewer": "review_multirun_tags; parent integration and final diff reconciliation",
+    "evidence": "specs/030-multirun-tags/independent-review.md",
+    "reconciliation": "Inspected all task-owned tracked changes and untracked additions: three Hydra modules, behavioral regression file, README, project/current/queue contracts, feature artifacts and generated changelog. No new module, schema, dependency, dynamic target or boundary exception. Existing import contracts and negative cases cover affected modules. Exact local pyproject source overrides and concurrent untracked docs/cls-cls-pw-grid-search.md are excluded. Final focused verification and independent ship review accepted; full checked source/version commits remain a release gate."
+  }
+}
