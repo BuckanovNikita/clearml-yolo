@@ -26,6 +26,9 @@ to the request while recording intent, tasks, verification, and documentation ou
 - For bugs, use `speckit-bug-assess`, `speckit-bug-fix`, and `speckit-bug-test`,
   including the mandatory documentation stage and verification of the original
   failure path.
+- For documentation-only maintenance without application behavior changes, record
+  intent, tasks, no-impact architecture and dated checks in documentation evidence;
+  use the documentation stage without creating a new application feature specification.
 - For planning-only, read-only, or explicitly limited requests, perform only the
   authorized workflow stages and return the requested result. Follow the active host
   mode and retain applicable review gates; automatic routing does not authorize
@@ -50,7 +53,7 @@ adjacent `architecture.json` using the shared skill's record format; the native 
 remains authoritative for status.
 
 | Workflow | Architecture placement and acceptance |
-|---|---|
+| --- | --- |
 | Feature or refactor | Add an architecture section and linked record to `plan.md`, then dependent implementation, check and documentation tasks to `tasks.md`. Analyze coverage before implementation; reconcile it during verification. |
 | Bug | Add architecture decisions and the adjacent record to `assessment.md` remediation; record actual changes and acceptance in `fix.md` and `test.md`. Keep the bug workflow and verify the original failure path. |
 | Resumed work or converge | Compare current scope and code with existing decisions. Missing records or enforcement become explicit remaining tasks; preserve completed history and respect converge's append-only rules. Do not bulk-retrofit inactive plans. |
@@ -113,6 +116,32 @@ project completion gate, including when an existing task list omits documentatio
 - If the changes have no documentation impact, record the reviewed scope and concrete
   reason in the task ledger or bug verification report. A justified no-change outcome
   satisfies this stage; silently skipping it does not.
+
+### Portable usage skill maintenance
+
+The canonical portable `clearml-yolo` usage skill lives in
+[corp-skills/skills/clearml-yolo](https://github.com/BuckanovNikita/corp-skills/tree/main/skills/clearml-yolo).
+This repository owns application contracts; corp-skills owns the distributable
+usage package. Edit its source, not installed skill copies. Machine-specific stand,
+GPU and credential setup stays in global environment skills.
+
+For changes to CLI/API, Hydra configuration/defaults, model selection, inputs/outputs,
+queue behavior, publication or failure recovery, inspect the skill during planning.
+List affected skill/reference paths and dependent update/validation tasks in the
+native feature or bug ledger. During the documentation stage, reconcile that scope
+with the actual diff, update examples and evaluation cases, or record an inspected
+no-change reason for internal-only work. Preserve completed task history.
+
+Before acceptance, verify examples against current entrypoint schemas and source;
+use isolated output roots for help/config checks and distinguish them from real
+training, GPU or publication evidence. Validate package metadata, local links,
+Markdown and discovery following
+[corp-skills maintenance](https://github.com/BuckanovNikita/corp-skills/blob/main/MAINTENANCE.md).
+Record source version/commit, changed skill paths, actual checks and limitations in
+dated workflow evidence, with a companion corp-skills commit when available.
+Missing access to the source or required validation leaves an open documentation
+task and blocks completion. Follow each repository's authorized release workflow;
+skill installation and unrelated dependency updates are separate actions.
 
 ### Workflow safeguards
 

@@ -10,7 +10,7 @@ The [project contract summary](project-contracts.md) provides the cross-cutting 
 configuration, output, tracking and evaluation rules formerly listed in `AGENTS.md`.
 
 | Topic | Maintained contract | Implementation evidence |
-|---|---|---|
+| --- | --- | --- |
 | Shared scientific and workbook capabilities | [Shared evaluation and reporting](shared-evaluation-reporting.md), [compatibility specification](../specs/028-shared-extraction/spec.md) | [Evaluation adapters](../src/clearml_yolo/adapters/evaluation), [reporting adapters](../src/clearml_yolo/adapters/reporting), [frozen compatibility tests](../tests/test_shared_extraction_compatibility.py) |
 | Python architecture and target migration | [Clean architecture specification](../specs/021-clean-architecture/spec.md), [Python import migration](python-import-migration.md) | [Workflow ports](../src/clearml_yolo/application/ports.py), [composition](../src/clearml_yolo/entrypoints/composition.py), [scientific validation](../src/clearml_yolo/core/validation/schemas.py), [evaluation records](../src/clearml_yolo/core/evaluation/models.py), [computation](../src/clearml_yolo/adapters/evaluation/scoring.py), [report rendering](../src/clearml_yolo/adapters/reporting/evaluation.py) |
 | Commands and output routing | [CLI](../specs/001-release-030/contracts/cli.md) | [Entrypoints and checks](../pyproject.toml), [output identity](../src/clearml_yolo/adapters/storage/run_identity.py), [pipeline](../src/clearml_yolo/application/use_cases/pipeline.py) |
@@ -214,8 +214,11 @@ and reason in the workflow artifacts. Missing required updates or failed validat
 blocks completion.
 
 For a contract change, inspect this index, affected contracts, active specifications,
-quickstarts, README, project-owned integration skills and any applicable
-environment skill.
+quickstarts, README, project-owned integration skills, the portable
+[clearml-yolo usage skill](https://github.com/BuckanovNikita/corp-skills/tree/main/skills/clearml-yolo)
+and any applicable environment skill. The
+[skill maintenance stage](agent-workflow.md#portable-usage-skill-maintenance)
+owns cross-repository updates and acceptance evidence.
 Update current normative text together. Preserve completed task history and dated
 analysis/verification; annotate superseded intent and link to current guidance.
 Do not turn historical observations into a claim about a new implementation.

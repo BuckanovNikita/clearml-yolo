@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record verified multirun tag release
+  ([`cb1eb58`](https://github.com/BuckanovNikita/clearml-yolo/commit/cb1eb5878a8e686d2d1137505ececa4b5bf93558))
+
+
 ## v0.28.0 (2026-10-14)
 
 ### Documentation
