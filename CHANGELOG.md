@@ -1,12 +1,17 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.28.0 (2026-10-14)
 
 ### Documentation
 
 - Record verified shared queue release 0.27.0
   ([`7ae9153`](https://github.com/BuckanovNikita/clearml-yolo/commit/7ae9153dcd5f812ada18a2b0f2bddbf2bb7e49c8))
+
+### Features
+
+- Group multirun tasks with a shared random tag
+  ([`e248cc2`](https://github.com/BuckanovNikita/clearml-yolo/commit/e248cc266f61b0d5898ce5f0a01e09fbe5417f44))
 
 
 ## v0.27.0 (2026-10-13)
