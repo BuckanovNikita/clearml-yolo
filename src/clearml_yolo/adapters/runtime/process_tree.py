@@ -3,6 +3,7 @@
 import ctypes
 import os
 import signal
+import subprocess
 import sys
 import threading
 import time
@@ -16,6 +17,8 @@ from uuid import uuid4
 
 OWNER_ENV = "CY_MODEL_PROCESS_OWNER"
 DIRECT_OWNER_ENV = "CY_DIRECT_MODEL_PROCESS_OWNER"
+_SUPERVISION_PROBE_TIMEOUT_SECONDS = 10.0
+_SUPERVISION_PROBE_SUCCESS = "cy-process-supervision-ok-v1"
 
 
 @dataclass(frozen=True)
@@ -37,6 +40,91 @@ def _read_process(pid: int) -> _Process | None:
     except (FileNotFoundError, ProcessLookupError):
         return None
     return _Process(pid, int(fields[1]), int(fields[3]), int(fields[19]), fields[0])
+
+
+def _probe_pidfd() -> None:
+    """Signal zero checks kernel support without delivering a signal or reaping a child."""
+    operation = "os.pidfd_open"
+    try:
+        descriptor = os.pidfd_open(os.getpid())
+        try:
+            operation = "signal.pidfd_send_signal"
+            signal.pidfd_send_signal(descriptor, 0)
+            operation = "os.waitid(P_PIDFD)"
+            # Our own pidfd is not a child. ECHILD proves this idtype was accepted.
+            with suppress(ChildProcessError):
+                os.waitid(os.P_PIDFD, descriptor, os.WEXITED | os.WNOHANG)
+        finally:
+            os.close(descriptor)
+    except OSError as error:
+        raise RuntimeError(
+            f"Process supervision unavailable in {sys.executable}: {operation} "
+            f"failed ({error}); native work has not started"
+        ) from error
+
+
+def require_process_supervision() -> None:
+    """Reject unsupported Python/kernel capabilities before expensive native execution."""
+    if sys.platform != "linux":
+        raise RuntimeError(f"Process supervision requires Linux: {sys.executable}")
+    # These stdlib APIs are optional build/platform capabilities, not Python-version guarantees.
+    required = {
+        os: ("pidfd_open", "waitid", "P_PIDFD", "pipe2", "register_at_fork"),
+        signal: ("pidfd_send_signal",),
+    }
+    missing = [
+        f"{module.__name__}.{name}"
+        for module, names in required.items()
+        for name in names
+        if not hasattr(module, name)
+    ]
+    if missing:
+        raise RuntimeError(
+            f"Process supervision unavailable in {sys.executable}: missing {', '.join(missing)}. "
+            "Use a Linux Python build exposing pidfd APIs before starting native work"
+        )
+    _probe_pidfd()
+    try:
+        _subreaper()
+        current = _read_process(os.getpid())
+    except OSError as error:
+        raise RuntimeError(
+            f"Process supervision unavailable in {sys.executable}: "
+            f"Linux subreaper/proc capability probe failed ({error})"
+        ) from error
+    if current is None:
+        raise RuntimeError(f"Process supervision cannot read /proc identity in {sys.executable}")
+
+
+def check_interpreter_supervision(interpreter: str) -> None:
+    """Probe the actual snapshot interpreter before mutating admission or GPU claims."""
+    script = (
+        "import sys\n"
+        "from clearml_yolo.adapters.runtime.process_tree import require_process_supervision\n"
+        "try:\n"
+        "    require_process_supervision()\n"
+        "except RuntimeError as error:\n"
+        "    sys.stderr.write(str(error))\n"
+        "    sys.exit(1)\n"
+        f"print({_SUPERVISION_PROBE_SUCCESS!r})\n"
+    )
+    try:
+        result = subprocess.run(  # noqa: S603 - frozen interpreter and fixed capability probe
+            [interpreter, "-c", script],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+            timeout=_SUPERVISION_PROBE_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as error:
+        raise RuntimeError(f"Process supervision probe timed out for {interpreter}") from error
+    except OSError as error:
+        raise RuntimeError(f"Cannot probe process supervision in {interpreter}: {error}") from error
+    if result.returncode or result.stdout.strip() != _SUPERVISION_PROBE_SUCCESS:
+        detail = result.stderr.strip()[-2048:] or "capability acknowledgement missing"
+        raise RuntimeError(f"Process supervision probe failed for {interpreter}: {detail}")
 
 
 class LinuxProcessTree:
@@ -381,9 +469,7 @@ class _NativeProcessTree(LinuxProcessTree):
         self._fork_identities()
         protected = self._protected(table)
         owners = {
-            pid
-            for pid in self._known_owners(table)
-            if pid != self.root and pid not in protected
+            pid for pid in self._known_owners(table) if pid != self.root and pid not in protected
         }
         owners.update(process.pid for process in table.values() if self._marked(process))
         changed = True
@@ -494,6 +580,7 @@ def native_descendant_scope() -> Iterator[None]:
     if sys.platform != "linux":
         yield
         return
+    require_process_supervision()
     current = _read_process(os.getpid())
     if current is None:
         raise RuntimeError("Native invocation process identity is unavailable")

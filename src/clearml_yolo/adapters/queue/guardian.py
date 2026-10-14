@@ -17,6 +17,7 @@ from clearml_yolo.adapters.runtime.process_tree import (
     OWNER_ENV,
     LinuxProcessTree,
     defer_interruptions,
+    require_process_supervision,
 )
 from clearml_yolo.core.queue import GuardianClaim, JobState
 
@@ -88,6 +89,7 @@ class _Guardian:
         self.cancelled = True
 
     def _prepare(self) -> bool:
+        require_process_supervision()
         for signum in (signal.SIGINT, signal.SIGTERM):
             signal.signal(signum, self._cancel)
         deadline = time.monotonic() + 30
@@ -118,6 +120,7 @@ class _Guardian:
             self.payload.identity,
             Path(self.payload.local_root) if self.payload.local_root else None,
         )
+        pool.ensure_control_fence()
         self.lease = pool.acquire(self.claim)
         if self.lease is None:
             state: JobState = (

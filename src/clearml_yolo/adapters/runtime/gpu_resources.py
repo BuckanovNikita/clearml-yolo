@@ -302,6 +302,10 @@ class GPUInventory:
                 )
         self._required_uuids = required
 
+    def physical_uuids(self) -> tuple[str, ...]:
+        """Enumerate physical NVML identities without CUDA or memory telemetry."""
+        return self._physical_uuids()
+
     def _physical_uuids(self) -> tuple[str, ...]:
         """Map physical identities independently of memory and MIG telemetry."""
         nvml = _nvml()
@@ -401,7 +405,7 @@ class GPUInventory:
     def visible(self) -> tuple[str, ...]:
         """Return supported whole-GPU UUIDs in inherited CUDA logical order."""
         visible = _probe_visible_uuids()
-        physical = self._physical_uuids()
+        physical = self.physical_uuids()
         unknown = [uuid for uuid in visible if uuid not in physical]
         if unknown:
             raise RuntimeError(

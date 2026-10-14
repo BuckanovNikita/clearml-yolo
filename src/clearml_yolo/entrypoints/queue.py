@@ -1,6 +1,7 @@
 """Submit and manage durable, per-host, owner-executed pipeline jobs."""
 
 import argparse
+import json
 import os
 import signal
 import sys
@@ -34,6 +35,24 @@ def _parser() -> argparse.ArgumentParser:
         command = commands.add_parser(action, help=f"{action.capitalize()} one owned job")
         command.add_argument("job_id")
     commands.add_parser("tui", help="Open the optional Textual queue interface")
+    gpu = commands.add_parser("gpu", help="Inspect and control physical host GPUs")
+    operations = gpu.add_subparsers(dest="gpu_action", required=True)
+    gpu_list = operations.add_parser(
+        "list", help="List physical identities, holds and claim tokens"
+    )
+    gpu_list.add_argument("--json", action="store_true")
+    disable = operations.add_parser("disable", help="Hold a physical GPU for this Unix owner")
+    disable.add_argument("selector", help="Physical NVML index or full GPU UUID")
+    disable.add_argument("--reason", required=True)
+    enable = operations.add_parser("enable", help="Remove only your hold on a physical GPU")
+    enable.add_argument("selector", help="Physical NVML index or full GPU UUID")
+    release = operations.add_parser("release", help="Release one owned whole-allocation claim")
+    release.add_argument("selector", help="Physical NVML index or full GPU UUID")
+    release.add_argument("--claim-token", required=True)
+    release.add_argument("--reason", required=True)
+    release.add_argument(
+        "--force", action="store_true", help="Audit unverified stale cleanup; never kill"
+    )
     return parser
 
 
@@ -115,6 +134,7 @@ def _tui(service: QueueService) -> None:
 
 
 def _execute(arguments: argparse.Namespace) -> None:
+    from clearml_yolo.adapters.queue.gpu_controls import GPUControls
     from clearml_yolo.adapters.queue.identity import current_identity
     from clearml_yolo.adapters.queue.inventory import QueueGPUInventory
     from clearml_yolo.adapters.queue.runtime import QueueProcesses
@@ -126,12 +146,21 @@ def _execute(arguments: argparse.Namespace) -> None:
     identity = current_identity()
     storage = NFSQueueStore(queue_root, identity)
     threshold = arguments.max_used_memory_gib if arguments.action == "worker" else 2.0
+    processes = QueueProcesses(storage, identity)
     service = QueueService(
         storage,
         QueueGPUInventory(max_used_memory_gib=threshold),
-        QueueProcesses(storage, identity),
+        processes,
         identity,
+        controls=GPUControls(processes.pool),
     )
+    if arguments.action == "gpu":
+        _gpu_operation(service, arguments)
+        return
+    _queue_operation(service, arguments, root)
+
+
+def _queue_operation(service: QueueService, arguments: argparse.Namespace, root: Path) -> None:
     match arguments.action:
         case "submit":
             from clearml_yolo.entrypoints.hydra.queue_config import compose_snapshots
@@ -163,6 +192,41 @@ def _execute(arguments: argparse.Namespace) -> None:
             _tui(service)
         case _:
             raise ValueError("Unknown queue operation")
+
+
+def _gpu_operation(service: QueueService, arguments: argparse.Namespace) -> None:
+    match arguments.gpu_action:
+        case "list":
+            cards = service.gpu_list()
+            if arguments.json:
+                sys.stdout.write(json.dumps([card.model_dump() for card in cards]) + "\n")
+            else:
+                for card in cards:
+                    holds = "; ".join(f"uid={hold.owner_uid}: {hold.reason}" for hold in card.holds)
+                    sys.stdout.write(
+                        f"{card.physical_index if card.physical_index is not None else '-'}\t"
+                        f"{card.uuid}\tholds={holds or '-'}\t"
+                        f"job={card.claim.job_id if card.claim else '-'}\t"
+                        f"claim-token={card.claim_token or '-'}\n"
+                    )
+        case "disable":
+            sys.stdout.write(
+                service.gpu_disable(arguments.selector, reason=arguments.reason).model_dump_json()
+                + "\n"
+            )
+        case "enable":
+            service.gpu_enable(arguments.selector)
+            sys.stdout.write("Own GPU hold removed\n")
+        case "release":
+            audit = service.gpu_release(
+                arguments.selector,
+                token=arguments.claim_token,
+                reason=arguments.reason,
+                force=arguments.force,
+            )
+            sys.stdout.write(audit.model_dump_json() + "\n")
+        case _:
+            raise ValueError("Unknown GPU control operation")
 
 
 if __name__ == "__main__":

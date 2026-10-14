@@ -5,7 +5,10 @@ from contextlib import AbstractContextManager
 from typing import Protocol
 
 from clearml_yolo.core.queue import (
+    GPUControlStatus,
+    GPUHold,
     GPUObservation,
+    GPUReleaseAudit,
     JobSnapshot,
     MoveDirection,
     PublicJob,
@@ -41,12 +44,27 @@ class QueueProcessPort(Protocol):
     def publish_inventory(self, observations: tuple[GPUObservation, ...]) -> None: ...
     def owner_inventory(self) -> dict[int, tuple[GPUObservation, ...]]: ...
     def reserved(self) -> set[str]: ...
+    def held(self) -> set[str]: ...
     def start(
         self, job: PublicJob, devices: tuple[str, ...], *, expected_revision: int | None = None
     ) -> bool: ...
     def recover(self, identifier: str) -> PublicJob: ...
     def worker_registration(self) -> AbstractContextManager[None]: ...
     def pause(self, seconds: float) -> None: ...
+
+
+class QueueGPUControlPort(Protocol):
+    def list(self) -> tuple[GPUControlStatus, ...]: ...
+    def disable(self, selector: str, *, reason: str) -> GPUHold: ...
+    def enable(self, selector: str) -> None: ...
+    def release(
+        self,
+        selector: str,
+        *,
+        token: str,
+        reason: str,
+        force: bool = False,
+    ) -> GPUReleaseAudit: ...
 
 
 class QueueService:
@@ -58,11 +76,38 @@ class QueueService:
         inventory: QueueInventory,
         processes: QueueProcessPort,
         identity: WorkerIdentity,
+        *,
+        controls: QueueGPUControlPort | None = None,
     ) -> None:
         self.storage = storage
         self.inventory = inventory
         self.processes = processes
         self.identity = identity
+        self.controls = controls
+
+    def gpu_list(self) -> tuple[GPUControlStatus, ...]:
+        return self._gpu_controls().list()
+
+    def gpu_disable(self, selector: str, *, reason: str) -> GPUHold:
+        return self._gpu_controls().disable(selector, reason=reason)
+
+    def gpu_enable(self, selector: str) -> None:
+        self._gpu_controls().enable(selector)
+
+    def gpu_release(
+        self,
+        selector: str,
+        *,
+        token: str,
+        reason: str,
+        force: bool = False,
+    ) -> GPUReleaseAudit:
+        return self._gpu_controls().release(selector, token=token, reason=reason, force=force)
+
+    def _gpu_controls(self) -> QueueGPUControlPort:
+        if self.controls is None:
+            raise RuntimeError("GPU controls require an explicitly composed control port")
+        return self.controls
 
     def submit(self, snapshots: Sequence[JobSnapshot]) -> tuple[PublicJob, ...]:
         validated = tuple(
@@ -78,13 +123,16 @@ class QueueService:
         inventories = self.processes.owner_inventory()
         owners = set(inventories)
         reserved = self.processes.reserved()
+        held = self.processes.held()
         selected = earliest_runnable(
             view.jobs, (), owners, reserved=reserved, owner_observations=inventories
         )
         jobs: list[PublicJob] = []
         for job in view.jobs:
             if job.state == "pending":
-                reason = waiting_reason(job, inventories.get(job.owner_uid, ()), owners, reserved)
+                reason = waiting_reason(
+                    job, inventories.get(job.owner_uid, ()), owners, reserved, held
+                )
                 if reason is None:
                     reason = (
                         "Ready for owner worker admission"
@@ -124,9 +172,12 @@ class QueueService:
         inventories = self.processes.owner_inventory()
         owners = set(inventories)
         reserved = self.processes.reserved()
+        held = self.processes.held()
         self.storage.set_waiting(
             {
-                job.id: waiting_reason(job, inventories.get(job.owner_uid, ()), owners, reserved)
+                job.id: waiting_reason(
+                    job, inventories.get(job.owner_uid, ()), owners, reserved, held
+                )
                 for job in view.jobs
                 if job.state == "pending" and job.owner_uid == self.identity.owner_uid
             }

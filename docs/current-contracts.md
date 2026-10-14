@@ -40,6 +40,12 @@ user tags survive; ordinary RUN adds no tag.
 Direct commands never schedule. Queue worker admission uses a strict total-used-memory
 cutoff (default 2.0 GiB), independent of training capacity. Keep [queue](queue.md), direct
 Hydra defaults, private snapshots, owner/guardian adapters, CLI/TUI and README consistent.
+The [operator control contract](queue.md#physical-gpu-operator-controls) uses physical
+`nvidia-smi` indexes independently of CUDA visibility; submission selectors retain
+their logical mapping. Per-owner holds exclude new host allocations across roots.
+Explicit audited release never silently frees a live lock or implies job success.
+Keep capability preflight, hold/claim transactions and remote
+[GPU DDP acceptance](ddp-testing.md) aligned with these rules.
 
 Python integrations use the `core`, `application`, `adapters` and `entrypoints`
 packages. Application workflows receive explicit `WorkflowDependencies`; CLI

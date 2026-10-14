@@ -14,7 +14,8 @@ cy-queue worker
 cy-queue list --json
 ```
 
-Count and exact-device requests are mutually exclusive. Exact selectors resolve to
+Count and exact-device requests are mutually exclusive. Submission integer selectors use
+CUDA-visible logical order, including `CUDA_VISIBLE_DEVICES` remapping, and resolve to
 ordered physical UUIDs at submission. The entire sweep is composed and validated before
 any job is committed. Submission returns stable IDs. Owner-private immutable snapshots
 retain resolved settings, project/cwd, interpreter, installed package/environment identity
@@ -80,6 +81,14 @@ Worker death cannot release active capacity. Cleanup uses inherited ownership ma
 PID/start-time evidence, pidfds and adopted descendants; repeated signals cannot interrupt
 the bounded cleanup sequence. Only verified cleanup releases capacity.
 
+Worker registration, the snapshot's Python interpreter and guardian startup all check
+Linux process supervision before admission or native launch. A Python build missing
+`os.pidfd_open`, `signal.pidfd_send_signal` or other required APIs fails with the
+interpreter path and missing capability. Unsupported kernel pidfd operations also fail.
+Use a compatible Linux Python/kernel environment and resubmit if installation identity
+changed; there is no unsafe cleanup fallback. These checks prevent a long training run
+from discovering an unsupported API only during validation or shutdown.
+
 Normal cancellation first signals the verified pipeline owner and allows up to
 90 seconds for shutdown while retaining the entire allocation. This lets the owner clean native
 workers and publish final diagnostics before the guardian signals remaining
@@ -101,6 +110,50 @@ Supported operation assumes cooperating Linux users, consistent NFS UID mapping 
 shared host PID/local coordination namespaces. Unsupported identity/locking conditions
 fail explicitly. Do not remove live coordination files. The application installs no
 privileged service and changes no mounts or accounts.
+
+## Physical GPU operator controls
+
+These commands use **physical integer indexes in `nvidia-smi`/NVML order**, independent
+of `CUDA_VISIBLE_DEVICES`. Full `GPU-...` UUIDs are also accepted. This differs from
+`submit --devices` integers, which retain CUDA-visible logical order. Resolve indexes
+anew after a reboot or hardware change; UUIDs identify persistent holds and claims.
+Identity resolution does not need healthy memory telemetry. A full UUID can address a
+stale claim even when its device is absent from inventory.
+
+```bash
+cy-queue gpu list
+cy-queue gpu list --json
+cy-queue gpu disable 2 --reason 'Temporarily unavailable for maintenance'
+cy-queue gpu enable 2
+```
+
+`disable` persists a hold for the current Unix UID in host-local coordination. Holds
+apply across queue roots and prevent new allocations; active work retains its allocation.
+Any owner's hold makes a device unavailable. `enable` removes only the caller's hold,
+leaving other holds and quarantine claims intact. Pending jobs report operator holds.
+
+For an owned stale or incorrectly quarantined allocation, read its current `claim-token`
+from `gpu list`. Select any one GPU from that allocation:
+
+```bash
+cy-queue gpu release 2 --claim-token TOKEN_FROM_LIST --reason 'Reviewed stale allocation'
+cy-queue gpu release 2 --claim-token TOKEN_FROM_LIST --reason 'Operator accepts inaccessible stale evidence' --force
+```
+
+Normal release performs verified owned-process cleanup, like recovery. `--force` makes an
+explicit audited override when stale process evidence cannot be verified; it sends no
+signals. Both modes refuse a held OS lock or confirmed live guardian. Force also refuses
+confirmed live owned descendants. Only the claim owner may release it, and a stale token
+fails. Release covers the **whole allocation**, even when one GPU was selected. It marks
+the owning job failed and preserves snapshots, history and the operator audit; it never
+marks successful completion or removes holds. The claim's original queue root must be
+accessible. An interrupted release can be resumed using the same selector and token.
+
+Upgrade all cooperating workers on a host before using GPU controls. Worker startup and control mutations
+install a durable compatibility fence in host coordination: old workers must reject the
+unknown claim protocol instead of ignoring operator holds. Existing active allocations
+remain protected and can finish. Do not delete this fence or downgrade workers while
+controls are in use.
 
 ## Optional terminal UI
 

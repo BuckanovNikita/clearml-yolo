@@ -15,7 +15,12 @@ from clearml_yolo.adapters.queue.identity import process_birth, process_ticks
 from clearml_yolo.adapters.queue.locks import LocalGPULocks
 from clearml_yolo.adapters.queue.records import ChildStatus, GuardianPayload, WorkerRecord
 from clearml_yolo.adapters.queue.storage import NFSQueueStore, _read, atomic_write
-from clearml_yolo.adapters.runtime.process_tree import LinuxProcessTree, defer_interruptions
+from clearml_yolo.adapters.runtime.process_tree import (
+    LinuxProcessTree,
+    check_interpreter_supervision,
+    defer_interruptions,
+    require_process_supervision,
+)
 from clearml_yolo.core.queue import (
     QUEUE_COMPATIBILITY,
     GPUObservation,
@@ -69,6 +74,8 @@ class QueueProcesses:
 
     @contextmanager
     def worker_registration(self) -> Iterator[None]:
+        require_process_supervision()
+        self.pool.ensure_control_fence()
         queue_key = self.store.queue_id
         path = self.pool.root / f"worker-{self.identity.owner_uid}-{queue_key}.lock"
         descriptor = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
@@ -129,6 +136,9 @@ class QueueProcesses:
     def reserved(self) -> set[str]:
         return self.pool.reserved()
 
+    def held(self) -> set[str]:
+        return {hold.uuid for hold in self.pool.holds()}
+
     def refresh(self) -> None:
         self._heartbeat()
         for pid, process in tuple(self._guardians.items()):
@@ -181,6 +191,7 @@ class QueueProcesses:
         self, job: PublicJob, devices: tuple[str, ...], *, expected_revision: int | None = None
     ) -> bool:
         snapshot = self.store.load_snapshot(job.id)
+        check_interpreter_supervision(snapshot.interpreter)
         path = self.store.snapshot_path(job.id)
         directory = path.parent
         argv = (

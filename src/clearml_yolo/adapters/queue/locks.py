@@ -4,6 +4,7 @@ import fcntl
 import hashlib
 import os
 import stat
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -16,9 +17,17 @@ from clearml_yolo.adapters.queue.coordination import (
     shared_descriptor,
 )
 from clearml_yolo.adapters.queue.storage import atomic_write
-from clearml_yolo.core.queue import QUEUE_COMPATIBILITY, GuardianClaim, WorkerIdentity
+from clearml_yolo.core.queue import (
+    QUEUE_COMPATIBILITY,
+    GPUHold,
+    GuardianClaim,
+    WorkerIdentity,
+    claim_token,
+)
 
 _MAX_RECORD_BYTES = 65536
+_CONTROL_COMPATIBILITY = "shared-cy-queue-gpu-controls-v1"
+_CONTROL_FENCE = "gpu-controls.claim.json"
 
 
 def _read_claim(path: Path) -> GuardianClaim | None:
@@ -47,6 +56,14 @@ def _write_claim(path: Path, claim: GuardianClaim | None) -> None:
     atomic_write(path, payload)
 
 
+def _sync_directory(path: Path) -> None:
+    descriptor = os.open(path, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
 class GPULease:
     """Only explicit verified cleanup clears records; close releases OS handles alone."""
 
@@ -73,14 +90,19 @@ class GPULease:
 
     def release_verified(self) -> None:
         with self.pool.transaction():
-            for uuid in self.descriptors:
-                current = _read_claim(self.pool.claim_path(uuid))
-                if current is None and self.recovering:
-                    continue
-                if current is None or current.job_id != self.claim.job_id:
-                    raise RuntimeError("GPU cleanup record changed before verified release")
-            for uuid in self.descriptors:
-                _write_claim(self.pool.claim_path(uuid), None)
+            self.release_in_transaction()
+
+    def release_in_transaction(self) -> None:
+        """Clear pinned metadata after verification/audit in the caller's transaction."""
+        for uuid in self.descriptors:
+            current = _read_claim(self.pool.claim_path(uuid))
+            if current is None and self.recovering:
+                continue
+            if current is None or claim_token(current) != claim_token(self.claim):
+                raise RuntimeError("GPU cleanup record changed before verified release")
+        for uuid in self.descriptors:
+            _write_claim(self.pool.claim_path(uuid), None)
+        _sync_directory(self.pool.root)
 
     def close(self) -> None:
         descriptors, self.descriptors = self.descriptors, {}
@@ -104,6 +126,101 @@ class LocalGPULocks:
         ):
             yield
 
+    def ensure_control_fence(self) -> None:
+        """Fence legacy admission, preserving normal completion of existing leases."""
+        with self.transaction():
+            self._ensure_control_fence()
+
+    def _ensure_control_fence(self) -> None:
+        path = self.root / _CONTROL_FENCE
+        existing = _read_claim(path)
+        if existing is not None:
+            self._validate_fence(existing)
+            return
+        _write_claim(
+            path,
+            GuardianClaim(
+                compatibility=_CONTROL_COMPATIBILITY,
+                job_id="gpu-controls-fence",
+                owner_uid=os.geteuid(),
+                host_id=self.identity.host_id,
+                boot_id="persistent-control",
+                queue_root="",
+                devices=(),
+                marker="gpu-controls-fence",
+                guardian_pid=0,
+                guardian_born=0,
+            ),
+        )
+
+    def _validate_fence(self, claim: GuardianClaim) -> None:
+        expected = GuardianClaim(
+            compatibility=_CONTROL_COMPATIBILITY,
+            job_id="gpu-controls-fence",
+            owner_uid=claim.owner_uid,
+            host_id=self.identity.host_id,
+            boot_id="persistent-control",
+            queue_root="",
+            devices=(),
+            marker="gpu-controls-fence",
+            guardian_pid=0,
+            guardian_born=0,
+        )
+        if claim != expected:
+            raise RuntimeError("GPU control admission fence is corrupt")
+
+    def hold_path(self, uuid: str, uid: int) -> Path:
+        return self.root / f"hold-{hashlib.sha256(uuid.encode()).hexdigest()}-{uid}.json"
+
+    def _holds(self) -> tuple[GPUHold, ...]:
+        holds: list[GPUHold] = []
+        for path in self.root.glob("hold-*.json"):
+            status = path.lstat()
+            if not stat.S_ISREG(status.st_mode) or status.st_size > _MAX_RECORD_BYTES:
+                raise RuntimeError("GPU hold is not a bounded regular record")
+            try:
+                hold = GPUHold.model_validate_json(path.read_bytes())
+            except ValidationError as error:
+                raise RuntimeError("GPU hold protocol is corrupt; admission refused") from error
+            if (
+                status.st_uid != hold.owner_uid
+                or stat.S_IMODE(status.st_mode) & 0o022
+                or hold.host_id != self.identity.host_id
+                or path != self.hold_path(hold.uuid, hold.owner_uid)
+            ):
+                raise PermissionError("GPU hold ownership or identity differs from its record")
+            holds.append(hold)
+        return tuple(holds)
+
+    def holds(self) -> tuple[GPUHold, ...]:
+        with self.transaction():
+            return self._holds()
+
+    def disable(self, uuid: str, reason: str) -> GPUHold:
+        if self.identity.owner_uid != os.geteuid():
+            raise PermissionError("Only the effective owner may disable GPUs")
+        hold = GPUHold(
+            uuid=uuid,
+            owner_uid=os.geteuid(),
+            host_id=self.identity.host_id,
+            reason=reason.strip(),
+            created_at=time.time(),
+        )
+        with self.transaction():
+            self._ensure_control_fence()
+            self._holds()
+            atomic_write(self.hold_path(uuid, hold.owner_uid), hold.model_dump_json())
+        return hold
+
+    def enable(self, uuid: str) -> None:
+        if self.identity.owner_uid != os.geteuid():
+            raise PermissionError("GPU control identity must match the effective owner")
+        with self.transaction():
+            self._ensure_control_fence()
+            self._holds()
+            self.hold_path(uuid, os.geteuid()).unlink(missing_ok=True)
+            _sync_directory(self.root)
+
     def _path(self, uuid: str) -> Path:
         return self.root / f"gpu-{hashlib.sha256(uuid.encode()).hexdigest()}.lock"
 
@@ -121,10 +238,35 @@ class LocalGPULocks:
             raise RuntimeError("GPU guardian still owns its locks; recovery refused")
         return lease
 
+    def transaction_claims(self) -> tuple[GuardianClaim, ...]:
+        """Inspect current claims while the caller holds the host transaction."""
+        return self._claims(check_compatibility=False)
+
+    def transaction_recovery(self, claim: GuardianClaim) -> GPULease:
+        """Pin a complete recovery allocation within an existing transaction."""
+        if claim.owner_uid != os.geteuid():
+            raise PermissionError("Only the effective owner may release GPU capacity")
+        acquired: dict[str, int] = {}
+        try:
+            self._take_recovery_locks(claim, acquired)
+        except BaseException:
+            for descriptor in acquired.values():
+                fcntl.flock(descriptor, fcntl.LOCK_UN)
+                os.close(descriptor)
+            raise
+        return GPULease(self, acquired, claim, recovering=True)
+
+    def _take_recovery_locks(self, claim: GuardianClaim, acquired: dict[str, int]) -> None:
+        for uuid in sorted(claim.devices):
+            if not self._take_lock(uuid, claim, True, acquired):
+                raise RuntimeError("GPU guardian still owns its locks; release refused")
+
     def _acquire(self, claim: GuardianClaim, *, recovery: bool) -> GPULease | None:
         acquired: dict[str, int] = {}
         succeeded = False
         with self.transaction():
+            if not recovery and any(hold.uuid in claim.devices for hold in self._holds()):
+                return None
             if not recovery and any(
                 set(existing.devices).intersection(claim.devices) for existing in self._claims()
             ):
@@ -159,11 +301,7 @@ class LocalGPULocks:
             return True
         if not recovery:
             return False
-        if (current.job_id, current.owner_uid, current.queue_root) != (
-            claim.job_id,
-            claim.owner_uid,
-            claim.queue_root,
-        ):
+        if claim_token(current) != claim_token(claim):
             raise RuntimeError("GPU recovery claim does not own the quarantined device")
         return True
 
@@ -172,6 +310,9 @@ class LocalGPULocks:
         for path in self.root.glob("gpu-*.claim.json"):
             claim = _read_claim(path)
             if claim is not None:
+                if path.name == _CONTROL_FENCE:
+                    self._validate_fence(claim)
+                    continue
                 if claim.host_id != self.identity.host_id:
                     raise RuntimeError("GPU claim belongs to a different host namespace")
                 if check_compatibility and claim.compatibility != QUEUE_COMPATIBILITY:
@@ -182,6 +323,7 @@ class LocalGPULocks:
     def reserved(self) -> set[str]:
         reserved: set[str] = set()
         with self.transaction():
+            reserved.update(hold.uuid for hold in self._holds())
             for claim in self._claims():
                 reserved.update(claim.devices)
         return reserved

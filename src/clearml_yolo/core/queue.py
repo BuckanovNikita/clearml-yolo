@@ -1,5 +1,6 @@
 """Immutable shared-queue records and deterministic whole-device allocation."""
 
+import hashlib
 import json
 from collections.abc import Mapping, Sequence
 from collections.abc import Set as AbstractSet
@@ -160,6 +161,39 @@ class GuardianClaim(QueueRecord):
     identities: tuple[tuple[int, int], ...] = ()
 
 
+def claim_token(claim: GuardianClaim) -> str:
+    """Identify one lease, independently of its evolving descendant evidence."""
+    payload = claim.model_dump(exclude={"child_pid", "child_born", "identities"})
+    return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+
+
+class GPUHold(QueueRecord):
+    uuid: str
+    owner_uid: int = Field(strict=True, ge=0)
+    host_id: str
+    reason: str = Field(min_length=1, max_length=2048)
+    created_at: float
+
+
+class GPUControlStatus(QueueRecord):
+    uuid: str
+    physical_index: int | None = None
+    holds: tuple[GPUHold, ...] = ()
+    claim: GuardianClaim | None = None
+    claim_token: str | None = None
+
+
+class GPUReleaseAudit(QueueRecord):
+    token: str
+    claim: GuardianClaim
+    actor_uid: int = Field(strict=True, ge=0)
+    reason: str = Field(min_length=1, max_length=2048)
+    forced: bool
+    cleanup_verified: bool
+    created_at: float
+    finished: bool = False
+
+
 def earliest_runnable(
     jobs: Sequence[PublicJob],
     observations: Sequence[GPUObservation],
@@ -194,6 +228,7 @@ def waiting_reason(
     observations: Sequence[GPUObservation],
     live_owners: AbstractSet[int],
     reserved: AbstractSet[str],
+    held: AbstractSet[str] = frozenset(),
 ) -> str | None:
     if job.owner_uid not in live_owners:
         return "Owner worker unavailable"
@@ -204,9 +239,18 @@ def waiting_reason(
         if not set(job.request.devices).issubset(card.uuid for card in observations):
             return "Requested GPUs are outside the owner worker CUDA visibility"
         if not set(job.request.devices).issubset(available):
-            return "Waiting for the complete exact GPU allocation"
+            return (
+                "Requested GPU allocation is disabled by an operator hold"
+                if held & set(job.request.devices)
+                else "Waiting for the complete exact GPU allocation"
+            )
     elif len(available) < job.request.count:
         return (
-            f"Waiting for GPU capacity: {job.request.count} requested, {len(available)} available"
+            "Waiting for GPU capacity: operator holds disable visible devices"
+            if held & {card.uuid for card in observations}
+            else (
+                f"Waiting for GPU capacity: {job.request.count} requested, "
+                f"{len(available)} available"
+            )
         )
     return None

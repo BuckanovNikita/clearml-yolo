@@ -38,7 +38,7 @@ warn and preserve otherwise successful computation and the ClearML task.
 retains interruption semantics.
 
 | Setting | Default seconds | Scope |
-|---|---:|---|
+| --- | ---: | --- |
 | `fiftyone.preflight_timeout_seconds` | 60 | Setup operation, including import and worker exit |
 | `fiftyone.publish_timeout_seconds` | 900 | Publication operation, including import and worker exit |
 | `fiftyone.lock_timeout_seconds` | 30 | Database publication lock acquisition |
@@ -103,6 +103,13 @@ sequential. Replay rejects switching between initialized YOLO and new-detector f
 
 ## Cancellation and recovery
 
+On Linux, native execution checks required Python APIs, pidfd kernel operations,
+subreaper access and its `/proc` identity before entering the native scope. A missing
+`os.pidfd_open` is an actionable startup error naming the interpreter. Queue workers
+also probe the frozen job interpreter before changing its pending state, and guardians
+check again before reserving devices. Unsupported environments fail before model work;
+they do not substitute PID-only signalling for identity-safe cleanup.
+
 Direct commands do not acquire queue resources. A native invocation scope marks and
 cleans newly launched Linux descendants using ancestry, subreaper adoption and Python
 fork birth records while preserving pre-existing helper branches and any inherited
@@ -112,8 +119,12 @@ Linux subreaper guardian which owns GPU locks throughout the whole pipeline. Wor
 does not release those locks. Repeated SIGINT/SIGTERM defers interruption during bounded
 TERM/KILL descendant cleanup. PID/start-time checks, inherited markers, pidfds and adopted
 children protect against PID reuse and detached ranks. Unknown or inaccessible ownership
-blocks release. Guardian death leaves durable quarantine; only owner `cy-queue recover ID`
-after proven cleanup releases it. No heartbeat expiry, missing parent or low GPU-memory
+blocks ordinary release. Guardian death leaves durable quarantine; owner `cy-queue recover ID`
+releases it after proven cleanup. The explicit audited
+[GPU operator controls](queue.md#physical-gpu-operator-controls) additionally permit
+owner-only whole-allocation release with a current claim token; force sends no signals
+and refuses live locks or positively identified living owners/descendants.
+No heartbeat expiry, missing parent or low GPU-memory
 observation establishes cleanup. Marked supervised jobs discover new ownership from
 the inherited marker, never a numeric parent/session relationship alone. Retained
 identities are refreshed before use. Empty discovery must remain stable across two

@@ -68,6 +68,28 @@ uploads/downloads require separate acceptance. See the
 [CPU validation guide](../specs/010-native-clearml-integration/quickstart.md#cpu-distributed-regression-acceptance--2026-10-10-amendment)
 for scope and evidence requirements; keep observed results in dated evidence.
 
+### Generated and composed regressions
+
+Hypothesis and pytest-cov are development dependencies. The routine suite stays offline;
+generated cases exercise queue state transitions, lexical CSV identity, prediction-cache
+provenance and frozen validation thresholds. Composed workflow tests join saved Hydra
+configuration, real storage, evaluation and report boundaries. To run these tests with
+branch coverage:
+
+```bash
+uv run --frozen --no-sync pytest tests/test_quality_properties.py tests/test_workflow_quality.py --cov=clearml_yolo --cov-branch --cov-report=term-missing --cov-report=html:.tmp/coverage/html
+uv run --frozen --no-sync pytest -m 'process_capabilities or gpu_controls'
+```
+
+Coverage identifies unexercised paths; it does not establish assertion quality. Preserve
+Hypothesis's reported falsifying example and reproduce a failure before changing its
+seed or adding retries. The local `.hypothesis/` example database is ignored by Git.
+Keep mutation/fault observations and run counts in dated feature evidence.
+
+Physical multi-GPU/NCCL and remote ClearML checks are opt-in under `ddp_gpu`, separate
+from the routine suite and existing `ddp_cpu` tests. Follow the [GPU DDP guide](ddp-testing.md)
+for exact selection, prerequisites, deadlines and the evidence archive to return.
+
 ### Static-analysis boundaries
 
 The release helper imports only the standard library, Loguru and Pydantic. Keep lint

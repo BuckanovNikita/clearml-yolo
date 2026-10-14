@@ -18,8 +18,8 @@ pytestmark = pytest.mark.skipif(sys.platform != "linux", reason="Linux process o
 def _wait(path: Path) -> str:
     deadline = time.monotonic() + 8
     while time.monotonic() < deadline:
-        if path.exists():
-            return path.read_text(encoding="utf-8")
+        if path.exists() and (value := path.read_text(encoding="utf-8")):
+            return value
         time.sleep(0.02)
     raise AssertionError(f"Missing subprocess observation: {path}")
 

@@ -401,23 +401,39 @@ class NFSQueueStore:
         expected_state: JobState | None = None,
     ) -> PublicJob:
         with self.transaction():
-            job = self._find(identifier)
-            self._require_owner(job)
-            if expected_state is not None and job.state != expected_state:
-                raise RuntimeError("Queue job state changed before this operation")
-            values: dict[str, object] = {
-                "state": state,
-                "revision": job.revision + 1,
-                "error": error,
-                "updated_at": time.time(),
-            }
-            if devices is not None:
-                values["devices"] = devices
-            result = PublicJob.model_validate(job.model_dump() | values)
-            atomic_write(
-                self.actor_root / "jobs" / job.id / "public.json", result.model_dump_json()
+            return self.transaction_update(
+                identifier,
+                state,
+                devices=devices,
+                error=error,
+                expected_state=expected_state,
             )
-            return result
+
+    def transaction_update(
+        self,
+        identifier: str,
+        state: JobState,
+        *,
+        devices: tuple[str, ...] | None = None,
+        error: str | None = None,
+        expected_state: JobState | None = None,
+    ) -> PublicJob:
+        """Write within an existing NFS transaction, before taking GPU transactions."""
+        job = self._find(identifier)
+        self._require_owner(job)
+        if expected_state is not None and job.state != expected_state:
+            raise RuntimeError("Queue job state changed before this operation")
+        values: dict[str, object] = {
+            "state": state,
+            "revision": job.revision + 1,
+            "error": error,
+            "updated_at": time.time(),
+        }
+        if devices is not None:
+            values["devices"] = devices
+        result = PublicJob.model_validate(job.model_dump() | values)
+        atomic_write(self.actor_root / "jobs" / job.id / "public.json", result.model_dump_json())
+        return result
 
     def prepare_start(
         self,

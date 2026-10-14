@@ -11,6 +11,9 @@
 - Maintain portable usage skill with feature changes
   ([`665dfd3`](https://github.com/BuckanovNikita/clearml-yolo/commit/665dfd368718a08be91222ef2131250f37927d55))
 
+- Record Python workflow alignment delivery
+  ([`e1b6346`](https://github.com/BuckanovNikita/clearml-yolo/commit/e1b6346d2666f8bc243d4ff0a26f89a0f1cdbc52))
+
 - Record verified multirun tag release
   ([`cb1eb58`](https://github.com/BuckanovNikita/clearml-yolo/commit/cb1eb5878a8e686d2d1137505ececa4b5bf93558))
 

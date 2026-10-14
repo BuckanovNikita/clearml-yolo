@@ -91,6 +91,8 @@ dev = [
     "types-tqdm==4.70.0.20260906",
     "vulture>=2.16,<3",
     "python-semantic-release>=10.5,<11",
+    "hypothesis>=6.169.1",
+    "pytest-cov>=7.1.0",
 ]
 
 [tool.ruff]
@@ -880,7 +882,20 @@ min_confidence = 80
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = ["--strict-markers", "--strict-config"]
-markers = ["ddp_cpu: real multi-rank CPU YOLO training and native relay integration"]
+markers = [
+    "ddp_cpu: real multi-rank CPU YOLO training and native relay integration",
+    "ddp_gpu: opt-in real multi-GPU direct/queued native pipeline acceptance",
+    "process_capabilities: Linux supervision preflight regression tests",
+    "gpu_controls: host-wide GPU holds and manual reservation recovery",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["clearml_yolo"]
+data_file = ".tmp/coverage/.coverage"
+
+[tool.coverage.report]
+show_missing = true
 
 [tool.semantic_release]
 commit_parser = "conventional"
