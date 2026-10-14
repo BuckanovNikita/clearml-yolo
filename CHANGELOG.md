@@ -1,7 +1,7 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.29.0 (2026-10-15)
 
 ### Documentation
 
@@ -10,6 +10,9 @@
 
 - Maintain portable usage skill with feature changes
   ([`665dfd3`](https://github.com/BuckanovNikita/clearml-yolo/commit/665dfd368718a08be91222ef2131250f37927d55))
+
+- Record GPU controls release delivery and remaining remote acceptance
+  ([`a6e431a`](https://github.com/BuckanovNikita/clearml-yolo/commit/a6e431a1395869d39def770d9843e5a556125eb1))
 
 - Record Python workflow alignment delivery
   ([`e1b6346`](https://github.com/BuckanovNikita/clearml-yolo/commit/e1b6346d2666f8bc243d4ff0a26f89a0f1cdbc52))
