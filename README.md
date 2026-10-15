@@ -387,6 +387,13 @@ cy-queue worker
 cy-queue list --json
 ```
 
+По умолчанию `cy-queue worker` пишет в stderr сообщения уровня INFO: запуск,
+изменения состояния заданий, выделенные GPU, причины ожидания и сводку каждые
+60 секунд. `cy-queue worker --log-level DEBUG` добавляет сводку каждого опроса;
+`--log-level WARNING` убирает обычные сообщения. Вывод ID и JSON остаётся в stdout.
+Логи самого pipeline сохраняются в `.cy/queue-logs/JOB_ID.log` внутри проекта,
+из которого отправлено задание. Подробнее: [диагностика worker](docs/queue.md#worker-diagnostics).
+
 `submit` возвращает постоянные ID и проверяет весь sweep до добавления заданий.
 Числа в `submit --devices` означают логические CUDA-индексы с учётом
 `CUDA_VISIBLE_DEVICES`; при отправке они сохраняются как UUID физических устройств.

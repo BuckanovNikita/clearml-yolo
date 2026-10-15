@@ -1,0 +1,131 @@
+{
+  "schema_version": 1,
+  "task": "queue-default-logs",
+  "scope": [
+    "src/clearml_yolo/entrypoints/queue.py",
+    "src/clearml_yolo/application/queue.py",
+    "tests/test_queue_logging.py",
+    "docs/queue.md",
+    "README.md",
+    ".specify/bugs/queue-default-logs"
+  ],
+  "impact": "modules",
+  "rules": "Project clean architecture: entrypoints compose and render; application uses explicit ports and core records, never imports logging or adapters.",
+  "modules": [
+    {
+      "id": "cli",
+      "path": "src/clearml_yolo/entrypoints/queue.py",
+      "change": "modify",
+      "responsibility": "Compose queue operations and render worker diagnostics.",
+      "interface": "Existing CLI stdout contracts retained; worker stderr INFO default with level control.",
+      "layer": "Entrypoint",
+      "allowed_dependencies": [
+        "Python standard library",
+        "core.queue",
+        "application.queue and composed adapters",
+        "Loguru",
+        "core.redaction"
+      ],
+      "forbidden_dependencies": [
+        "direct third-party GPU/ML SDKs"
+      ],
+      "effects": "Own stderr and signal rendering; queue effects remain adapters.",
+      "contracts": [
+        "boundaries",
+        "negative-edges"
+      ]
+    },
+    {
+      "id": "worker",
+      "path": "src/clearml_yolo/application/queue.py",
+      "change": "modify",
+      "responsibility": "Schedule queue work through explicit ports and publish optional observation snapshots.",
+      "interface": "worker(stop, poll_seconds=1, *, observe=None); existing callers remain valid.",
+      "layer": "Application",
+      "allowed_dependencies": [
+        "Python standard library",
+        "core.queue",
+        "explicit ports/callbacks"
+      ],
+      "forbidden_dependencies": [
+        "Loguru",
+        "concrete adapters",
+        "entrypoints"
+      ],
+      "effects": "Effects through injected ports and optional callback only.",
+      "contracts": [
+        "boundaries",
+        "negative-edges"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "boundaries",
+      "path": "pyproject.toml",
+      "status": "existing",
+      "rules": "Application/core exclude logging and effects; entrypoint SDK ownership and layer directions are enforced.",
+      "check": "imports"
+    },
+    {
+      "id": "negative-edges",
+      "path": "tests/test_architecture.py",
+      "status": "existing",
+      "rules": "Injected forbidden logging and adapter edges fail; initializers remain inert and dynamic targets obey boundaries.",
+      "check": "architecture"
+    }
+  ],
+  "checks": [
+    {
+      "id": "imports",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync lint-imports",
+      "expectation": "All configured contracts pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": ".specify/bugs/queue-default-logs/test.md"
+      }
+    },
+    {
+      "id": "architecture",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync pytest tests/test_architecture.py",
+      "expectation": "Actual graph and injected forbidden-edge cases pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": ".specify/bugs/queue-default-logs/test.md"
+      }
+    },
+    {
+      "id": "queue",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync pytest tests/test_queue_logging.py tests/test_queue_commands.py tests/test_shared_queue_service.py",
+      "expectation": "Default real worker emits diagnostics; level filtering, stdout, transitions and observer compatibility pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": ".specify/bugs/queue-default-logs/test.md"
+      }
+    },
+    {
+      "id": "docs",
+      "kind": "documentation",
+      "command": "Markdown lint, local-link checks and cy-queue worker --help",
+      "expectation": "Changed docs and linked references validate; log-level examples match actual parser.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": ".specify/bugs/queue-default-logs/test.md"
+      }
+    }
+  ],
+  "documentation": "Update docs/queue.md and README.md, plus companion corp-skills usage/evaluation references; preserve historical specs.",
+  "review": {
+    "status": "accepted",
+    "reviewer": "Independent /root/final_review; parent resolved record-only redaction dependency detail.",
+    "evidence": ".specify/bugs/queue-default-logs/test.md",
+    "reconciliation": "Compared all task-owned tracked and untracked diff: two source modules, regression tests, README, queue guide, bug artifacts and generated changelog. No other changes in this checkout; original main checkout concurrent compatibility work and local overrides excluded. Companion portable skill changes reviewed separately."
+  }
+}

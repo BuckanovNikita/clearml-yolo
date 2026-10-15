@@ -48,6 +48,29 @@ separate from the capacity needed by the model/compiler.
 
 ## Shared ownership and ordering
 
+### Worker diagnostics
+
+`cy-queue worker` writes INFO diagnostics to stderr by default: startup queue root,
+host, owner UID and memory threshold; changed owner-job states, GPU allocations,
+waiting reasons, progress and errors; and a heartbeat every 60 seconds. An empty
+queue reports `idle` immediately. Unchanged jobs are not repeated on each poll,
+and completed history is counted without replaying old completion messages.
+Failed jobs and jobs requiring recovery are reported at ERROR level.
+
+```bash
+cy-queue worker --log-level DEBUG
+cy-queue worker --log-level WARNING
+```
+
+DEBUG adds a summary for every poll; WARNING or ERROR suppress routine INFO output.
+Job IDs and JSON command results remain on stdout. Worker shutdown is reported
+after orderly exit; active jobs remain supervised by their guardians. Pipeline
+stdout/stderr stays in the submitting project's `.cy/queue-logs/JOB_ID.log`, with
+owner-only permissions. Worker diagnostics summarize queue state rather than
+streaming that file. Use `cy-queue list --json` for the full public queue view.
+
+### Storage and scheduling
+
 `CY_QUEUE_ROOT` selects shared durable metadata, defaulting to `$CY_HOME/.cy-queue`;
 `cy-queue --root PATH` provides an explicit command override. Stable machine identity
 partitions hosts; boot identity is recorded separately. Each host has its own order and

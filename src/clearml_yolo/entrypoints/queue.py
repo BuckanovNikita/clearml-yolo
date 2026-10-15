@@ -5,11 +5,18 @@ import json
 import os
 import signal
 import sys
+import time
+from collections import Counter
 from pathlib import Path
 from types import FrameType
 
+from loguru import logger
+
 from clearml_yolo.application.queue import QueueService
 from clearml_yolo.core.queue import MoveDirection, QueueView, ResourceRequest
+from clearml_yolo.core.redaction import redact_text
+
+_HEARTBEAT_SECONDS = 60
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -23,6 +30,12 @@ def _parser() -> argparse.ArgumentParser:
     submit.add_argument("overrides", nargs=argparse.REMAINDER)
     worker = commands.add_parser("worker", help="Serve this Unix user's jobs until stopped")
     worker.add_argument("--max-used-memory-gib", type=float, default=2.0)
+    worker.add_argument(
+        "--log-level",
+        choices=("DEBUG", "INFO", "WARNING", "ERROR"),
+        default="INFO",
+        help="Worker stderr verbosity (default INFO; DEBUG includes every poll)",
+    )
     listing = commands.add_parser("list", help="Show public job summaries")
     listing.add_argument("--host", help="Read another host partition")
     listing.add_argument("--json", action="store_true")
@@ -102,10 +115,70 @@ def _direction(value: str) -> MoveDirection:
 def main() -> None:
     parser = _parser()
     arguments = parser.parse_args()
+    if arguments.action == "worker":
+        logger.remove()
+        logger.add(
+            sys.stderr,
+            level=arguments.log_level,
+            format="{time:YYYY-MM-DD HH:mm:ss} | {level:<7} | {message}",
+            backtrace=False,
+            diagnose=False,
+        )
     try:
         _execute(arguments)
     except (OSError, ValueError, RuntimeError) as error:
         parser.exit(1, f"cy-queue: {error}\n")
+
+
+class _WorkerLog:
+    """Render public owner observations without logging unchanged poll timestamps."""
+
+    def __init__(self, owner_uid: int) -> None:
+        self.owner_uid = owner_uid
+        self._jobs: dict[str, tuple[object, ...]] = {}
+        self._last_heartbeat: float | None = None
+
+    def __call__(self, view: QueueView) -> None:
+        jobs = tuple(job for job in view.jobs if job.owner_uid == self.owner_uid)
+        initial = self._last_heartbeat is None
+        current: dict[str, tuple[object, ...]] = {}
+        for job in jobs:
+            status = (job.state, job.devices, job.waiting_reason, job.progress, job.error)
+            current[job.id] = status
+            if self._jobs.get(job.id) == status:
+                continue
+            # Existing completed history is counted, without replaying every old job.
+            if initial and job.state in {"completed", "failed", "cancelled"}:
+                continue
+            level = "ERROR" if job.state in {"failed", "recovery_required"} else "INFO"
+            details = (
+                f"Job {job.id} | state={job.state} | "
+                f"request={','.join(job.request.devices or ()) or job.request.count} | "
+                f"allocation={','.join(job.devices) or '-'}"
+            )
+            if job.waiting_reason:
+                details += f" | waiting={job.waiting_reason}"
+            if job.progress is not None:
+                details += f" | progress={job.progress}"
+            if job.error:
+                details += f" | error={job.error}"
+            logger.log(level, "{}", redact_text(details).replace("\n", "\\n").replace("\r", "\\r"))
+        self._jobs = current
+        counts = Counter(job.state for job in jobs)
+        summary = " ".join(f"{state}={count}" for state, count in sorted(counts.items()))
+        active = any(
+            job.state in {"pending", "starting", "running", "cancelling", "recovery_required"}
+            for job in jobs
+        )
+        now = time.monotonic()
+        if self._last_heartbeat is None or now - self._last_heartbeat >= _HEARTBEAT_SECONDS:
+            logger.info(
+                "Worker heartbeat | {} | {}", "active" if active else "idle", summary or "no jobs"
+            )
+            self._last_heartbeat = now
+        logger.debug(
+            "Worker poll | host={} uid={} | {}", view.host_id, self.owner_uid, summary or "no jobs"
+        )
 
 
 def _worker(service: QueueService) -> None:
@@ -117,10 +190,11 @@ def _worker(service: QueueService) -> None:
 
     previous = {sig: signal.signal(sig, stop) for sig in (signal.SIGINT, signal.SIGTERM)}
     try:
-        service.worker(lambda: stopped)
+        service.worker(lambda: stopped, observe=_WorkerLog(service.identity.owner_uid))
     finally:
         for sig, handler in previous.items():
             signal.signal(sig, handler)
+    logger.info("Queue worker stopped; active jobs remain supervised by their guardians")
 
 
 def _tui(service: QueueService) -> None:
@@ -154,6 +228,14 @@ def _execute(arguments: argparse.Namespace) -> None:
         identity,
         controls=GPUControls(processes.pool),
     )
+    if arguments.action == "worker":
+        logger.info(
+            "Starting queue worker | root={} host={} uid={} max_used_memory_gib={}",
+            storage.root,
+            identity.host_id,
+            identity.owner_uid,
+            threshold,
+        )
     if arguments.action == "gpu":
         _gpu_operation(service, arguments)
         return

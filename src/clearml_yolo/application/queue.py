@@ -193,8 +193,18 @@ class QueueService:
             return 0
         return int(self.processes.start(job, allocation.devices, expected_revision=view.revision))
 
-    def worker(self, stop: Callable[[], bool], poll_seconds: float = 1) -> None:
+    def worker(
+        self,
+        stop: Callable[[], bool],
+        poll_seconds: float = 1,
+        *,
+        observe: Callable[[QueueView], None] | None = None,
+    ) -> None:
         with self.processes.worker_registration():
+            if observe is not None:
+                observe(self.storage.view())
             while not stop():
                 self.tick()
+                if observe is not None:
+                    observe(self.storage.view())
                 self.processes.pause(poll_seconds)
