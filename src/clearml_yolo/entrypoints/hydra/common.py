@@ -3,7 +3,7 @@
 import inspect
 import sys
 from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from copy import deepcopy
 from functools import partial
 from typing import Any
@@ -31,6 +31,7 @@ from clearml_yolo.adapters.observability.capture import capture_output
 from clearml_yolo.adapters.observability.diagnostics import log_exception_safely
 from clearml_yolo.adapters.observability.tracing import trace_command, trace_operation
 from clearml_yolo.adapters.runtime.bootstrap import runtime_environment
+from clearml_yolo.adapters.runtime.execution_lifecycle import execution_lifecycle
 from clearml_yolo.adapters.runtime.process_tree import native_descendant_scope
 from clearml_yolo.adapters.storage.filesystem import initialize_filesystem, runs_root, write_path
 from clearml_yolo.adapters.storage.run_identity import task_run_dir
@@ -103,6 +104,7 @@ def execute_owned(name: str, config: DictConfig, function: Callable[..., Any]) -
         and model_values.get("backend", "ultralytics") != "ultralytics"
     )
     with (
+        execution_lifecycle() as supervised,
         detector_runtime() if uses_detector else native_runtime(),
         invocation(
             instantiate(config.clearml),
@@ -149,7 +151,9 @@ def execute_owned(name: str, config: DictConfig, function: Callable[..., Any]) -
                 config.output_dir = str(task_run_dir(runs_root(), *task_identity(task)) / name)
             if "output" in config and config.output is None:
                 config.output = str(task_run_dir(runs_root(), *task_identity(task)) / f"{name}.csv")
-        with native_descendant_scope():
+        # A supervised job reports computation/publication outcomes. Its parent
+        # owns process cleanup and capacity even after this task is finalized.
+        with nullcontext() if supervised else native_descendant_scope():
             _execute_direct(name, config, function)
 
 

@@ -14,6 +14,9 @@
 - Record queue logging release verification
   ([`1ed8182`](https://github.com/BuckanovNikita/clearml-yolo/commit/1ed818284c87d443a6a56dbbd29b49b157f9263d))
 
+- Record training guide master landing
+  ([`932614b`](https://github.com/BuckanovNikita/clearml-yolo/commit/932614ba698dede3ec6405476846ecbbc95f0976))
+
 - Record training guide verification and delivery
   ([`448d25e`](https://github.com/BuckanovNikita/clearml-yolo/commit/448d25ed9b9bb5cac23c11783cef92144af350d8))
 

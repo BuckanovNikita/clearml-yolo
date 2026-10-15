@@ -115,8 +115,15 @@ cleans newly launched Linux descendants using ancestry, subreaper adoption and P
 fork birth records while preserving pre-existing helper branches and any inherited
 guardian marker. A newly adopted unmarked child with ambiguous origin is left untouched
 and reported as unverifiable cleanup; missing provenance never authorizes a signal. Queued commands use a separate same-user
-Linux subreaper guardian which owns GPU locks throughout the whole pipeline. Worker exit
-does not release those locks. Repeated SIGINT/SIGTERM defers interruption during bounded
+Linux subreaper guardian which owns process cleanup outside ClearML task finalization.
+The job only sends an opaque training-finished notification after native training
+returns and unused model memory is released; it imports no queue GPU-management code.
+The guardian durably retains the first GPU, releases extra GPU locks and updates
+queue allocation before acknowledging. The first GPU remains reserved through
+pipeline/descendant exit; absent a training-finished notification, the full allocation
+remains reserved. Failure after durable contraction can leave extras released even
+without acknowledgement; cleanup/recovery uses the remaining durable claim.
+Worker exit does not release active locks. Repeated SIGINT/SIGTERM defers interruption during bounded
 TERM/KILL descendant cleanup. PID/start-time checks, inherited markers, pidfds and adopted
 children protect against PID reuse and detached ranks. Unknown or inaccessible ownership
 blocks ordinary release. Guardian death leaves durable quarantine; owner `cy-queue recover ID`
@@ -124,13 +131,16 @@ releases it after proven cleanup. The explicit audited
 [GPU operator controls](queue.md#physical-gpu-operator-controls) additionally permit
 owner-only whole-allocation release with a current claim token; force sends no signals
 and refuses live locks or positively identified living owners/descendants.
-No heartbeat expiry, missing parent or low GPU-memory
-observation establishes cleanup. Marked supervised jobs discover new ownership from
-the inherited marker, never a numeric parent/session relationship alone. Retained
-identities are refreshed before use. Empty discovery must remain stable across two
-scans; disappearing entries or changed identities require another bounded attempt.
-Environment-access denial is cleared only after confirming process exit, while
-living or unverifiable candidates continue to block release. Old cancellation work
+No heartbeat expiry, missing parent or low GPU-memory observation establishes cleanup.
+Live guardians follow only their own child topology across threads, recorded births
+and subreaper adoption; unrelated same-UID `/proc` access denials cannot poison that
+scoped tree. Recovery retains conservative global marker discovery. There, environment
+access denial is cleared only after confirming process exit, and living or unverifiable
+candidates block release. Retained identities are refreshed before use; empty discovery
+must remain stable across two scans, with churn requiring another bounded attempt.
+A completed successful ClearML task is not retroactively failed by subsequent guardian
+cleanup uncertainty: the queue reports `recovery_required` and quarantines capacity.
+Required computation/upload failures retain their failure semantics. Old cancellation work
 is retained in generic process supervision and guardian regression tests; forced
 termination is covered separately.
 Normal queue cancellation gives the verified pipeline owner up to 90 seconds to

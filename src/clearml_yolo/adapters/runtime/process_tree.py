@@ -337,6 +337,126 @@ class LinuxProcessTree:
                 time.sleep(0.05)
 
 
+class SubreaperProcessTree(LinuxProcessTree):
+    """Own a live supervisor's descendants without global marker discovery.
+
+    The supervisor must be dedicated to this invocation and remain its subreaper.
+    Every child branch is consequently owned, including orphans adopted after a
+    native fork. Historical recovery still uses ``LinuxProcessTree`` and markers.
+    """
+
+    def __init__(
+        self, root: int, token: str, *, subreaper: int, born: int | None = None,
+    ) -> None:
+        super().__init__(root, token, born=born)
+        supervisor = _read_process(subreaper)
+        if supervisor is None:
+            raise RuntimeError("Live supervisor process identity is unavailable")
+        self._supervisor = supervisor
+        self._threaded_zombies: set[int] = set()
+
+    def _identity(self, pid: int) -> _Process | None:
+        try:
+            return _read_process(pid)
+        except PermissionError:
+            self._unreadable.add(pid)
+            return None
+
+    def _children(self, process: _Process) -> set[int]:
+        """Read every thread's children, rejecting a replaced parent snapshot."""
+        children: set[int] = set()
+        try:
+            tasks = tuple(Path(f"/proc/{process.pid}/task").iterdir())
+        except (FileNotFoundError, ProcessLookupError):
+            self._scan_changed = True
+            return children
+        except PermissionError:
+            self._unreadable.add(process.pid)
+            return children
+        if not tasks:
+            self._scan_changed = True
+        if process.state == "Z" and any(task.name != str(process.pid) for task in tasks):
+            # A dead main thread does not imply that its native thread group exited.
+            self._threaded_zombies.add(process.pid)
+        for task in tasks:
+            try:
+                children.update(map(int, (task / "children").read_text(encoding="ascii").split()))
+            except (FileNotFoundError, ProcessLookupError):
+                # An exiting thread can reparent a child after its earlier slot was read.
+                self._scan_changed = True
+            except PermissionError:
+                self._unreadable.add(process.pid)
+        current = self._identity(process.pid)
+        if current is None or current.born != process.born:
+            self._scan_changed = True
+            return set()
+        return children
+
+    def _matches_parent(self, process: _Process, parent: _Process) -> bool:
+        current = self._identity(parent.pid)
+        if (
+            current is None
+            or current.born != parent.born
+            or process.parent != parent.pid
+            or process.born < parent.born
+        ):
+            self._scan_changed = True
+            return False
+        return True
+
+    def _candidate(
+        self, pid: int, born: int | None, parent: _Process | None,
+    ) -> _Process | None:
+        process = self._identity(pid)
+        if process is None or (born is not None and process.born != born):
+            if process is None and parent is not None:
+                self._scan_changed = True
+            if pid == self._supervisor.pid:
+                self._unreadable.add(pid)
+            # A recorded PID may now belong to an entirely unrelated process.
+            return None
+        if parent is not None and not self._matches_parent(process, parent):
+            return None
+        return process
+
+    @override
+    def _table(self) -> dict[int, _Process]:
+        self._threaded_zombies.clear()
+        table: dict[int, _Process] = {}
+        pending: list[tuple[int, int | None, _Process | None]] = [
+            (pid, born, None) for pid, born in self._identities.items()
+        ]
+        pending.append((self._supervisor.pid, self._supervisor.born, None))
+        visited: set[tuple[int, int]] = set()
+        while pending:
+            pid, born, parent = pending.pop()
+            process = self._candidate(pid, born, parent)
+            if process is None:
+                continue
+            identity = (process.pid, process.born)
+            if identity in visited:
+                continue
+            visited.add(identity)
+            if process.pid != self._supervisor.pid:
+                table[pid] = process
+            pending.extend((child, None, process) for child in self._children(process))
+        return table
+
+    @override
+    def _owned(self) -> list[_Process]:
+        table = self._begin_scan()
+        for process in table.values():
+            self._identities[process.pid] = process.born
+        owners = self._known_owners(table)
+        for pid in self._threaded_zombies:
+            current = self._identity(pid)
+            if current is not None and current.born == table[pid].born:
+                owners.add(pid)
+            else:
+                self._scan_changed = True
+        return [table[pid] for pid in owners]
+
+
 @contextmanager
 def defer_interruptions() -> Iterator[None]:
     """Finish bounded cleanup before delivering SIGINT/SIGTERM to prior handlers."""

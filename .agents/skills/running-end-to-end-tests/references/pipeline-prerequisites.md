@@ -53,7 +53,17 @@ reservation or waiting. `cy -m` uses ordinary sequential Hydra BasicLauncher. Qu
 or exact-device selection belongs to `cy-queue submit --gpus N -- ...` or
 `cy-queue submit --devices 0,2 -- ...`; remove native GPU overrides from queued configurations.
 Explicit CPU phases remain CPU. Queued training uses the complete allocation and inference
-its first GPU. Hold all allocated UUIDs through complete pipeline/descendant exit.
+its first GPU. After native training returns and unused model memory is released,
+the external guardian durably shrinks the claim, releases extra GPU locks and updates
+public allocation before acknowledging. Verify another eligible job can use released
+GPUs during inference. Retain the first GPU through pipeline/descendant exit; absent
+a training-finished notification, retain the full allocation. If acknowledgement is
+lost after durable shrink, verify the pipeline stops before inference and cleanup
+follows the remaining durable claim without restoring released extras.
+Verify cleanup uncertainty quarantines queue
+capacity without retroactively failing a completed successful ClearML task, while
+required computation/upload failures still fail. Live guardian discovery is scoped
+to its descendants; recovery keeps conservative global ownership proof.
 
 A persistent same-user worker executes private immutable snapshots in fresh processes;
 closing a submission terminal or TUI does not stop it. No ClearML task exists while waiting.

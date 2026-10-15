@@ -52,7 +52,13 @@ GPU discovery, queue storage, reservations, waiting or automatic substitution. `
 uses sequential BasicLauncher. `queue.*`, `autogpu.*` and the former queue launcher
 are rejected with migration guidance. The separate [cy-queue contract](queue.md)
 owns count/exact submissions, complete sweep expansion, owner workers, per-host ordering,
-whole-pipeline UUID allocations and guardian recovery. Queue allocation preserves explicit
+training allocations with acknowledged contraction to the first inference GPU, and
+guardian recovery. No training-finished notification retains the full allocation;
+failure after durable contraction does not restore released GPUs, and cleanup/recovery
+uses the remaining claim. External guardians own queued descendant cleanup outside ClearML
+finalization; supervisor uncertainty quarantines capacity without retroactively failing
+a completed successful task. Recovery still requires conservative ownership proof.
+Queue allocation preserves explicit
 CPU phases, compilation, AMP, batch and model settings. Inference uses the first allocated
 device. Memory admission thresholds are not guarantees that compilation/training fits.
 
@@ -177,7 +183,6 @@ and flush verification retain their failure behavior.
 Use the shared CSV-addressed dataset cache outside run outputs; source images are immutable.
 Standalone `cy-train` requires `ground_truth`; prepared dataset paths returned by training are
 always present. Direct native-dataset training and native staging are not supported.
-
 
 Opt-in `LOGURU_LEVEL=TRACE` diagnostics identify blocking operations through lifecycle
 records, 30-second deepest-operation heartbeats and 60-second changed grouped Python

@@ -88,6 +88,33 @@ class GPULease:
                 _write_claim(self.pool.claim_path(uuid), claim)
         self.claim = claim
 
+    def retain_first(self) -> GuardianClaim:
+        """Commit training's monotonic transition to its first inference GPU."""
+        if not self.claim.devices or set(self.descriptors) != set(self.claim.devices):
+            raise RuntimeError("GPU handoff requires the complete live allocation")
+        if len(self.claim.devices) == 1:
+            return self.claim
+        retained, *released = self.claim.devices
+        reduced = self.claim.model_copy(update={"devices": (retained,)})
+        with self.pool.transaction():
+            for uuid in self.descriptors:
+                current = _read_claim(self.pool.claim_path(uuid))
+                if current is None or claim_token(current) != claim_token(self.claim):
+                    raise RuntimeError("GPU handoff record changed before partial release")
+            # Keep the full allocation in the retained record until every other
+            # record deletion is durable. An interrupted transition therefore
+            # quarantines the original allocation and recovery accepts missing files.
+            for uuid in released:
+                _write_claim(self.pool.claim_path(uuid), None)
+            _sync_directory(self.pool.root)
+            _write_claim(self.pool.claim_path(retained), reduced)
+            self.claim = reduced
+            for uuid in released:
+                descriptor = self.descriptors.pop(uuid)
+                fcntl.flock(descriptor, fcntl.LOCK_UN)
+                os.close(descriptor)
+        return reduced
+
     def release_verified(self) -> None:
         with self.pool.transaction():
             self.release_in_transaction()

@@ -41,8 +41,19 @@ get different tags. Ordinary RUN leaves tags unchanged. See the
 Remove native GPU selectors from queued configurations: allocation supplies all training
 devices and the first device for inference/comparison, while explicit CPU phases remain CPU.
 `CUDA_VISIBLE_DEVICES` is set before the fresh pipeline process. Compilation, AMP, batch and
-model settings are retained. Hold the full allocation until the pipeline and all owned
-descendants exit; allocation contraction is deferred. Admission defaults to total used
+model settings are retained. Training holds the full allocation. After native training
+returns and releases unused model memory, the job notifies its external guardian and
+waits for a bounded acknowledgement. The guardian first durably shrinks the claim to
+the first allocated GPU, then releases the other GPU locks and updates the public
+allocation before acknowledging. Other jobs may use those released GPUs during
+inference/comparison; normal memory admission still applies. The retained first GPU
+remains reserved until the pipeline and its owned descendants exit. A job that sends no
+training-finished notification retains its full allocation. Once a valid notification
+has durably shrunk the claim, later record-write or acknowledgement failure does not
+restore released GPUs. A failed or unacknowledged handoff stops the pipeline before
+inference; cleanup/recovery follows the remaining durable claim. This is not successful
+pipeline completion.
+Admission defaults to total used
 memory strictly below 2 GiB (`worker --max-used-memory-gib` changes it). This threshold is
 separate from the capacity needed by the model/compiler.
 
@@ -100,9 +111,19 @@ directory, so collaborators never edit another user's private files.
 
 Each execution has a same-user Linux subreaper guardian. It records its identity and claim
 before opening the native launch gate and owns GPU locks independently of the worker.
-Worker death cannot release active capacity. Cleanup uses inherited ownership markers,
-PID/start-time evidence, pidfds and adopted descendants; repeated signals cannot interrupt
-the bounded cleanup sequence. Only verified cleanup releases capacity.
+Worker death cannot release active capacity. The guardian owns descendant cleanup outside
+the job's ClearML finalization. Live discovery follows its own child topology across
+threads, recorded process births and subreaper adoption, with PID/start-time checks
+and pidfds. An unrelated same-UID process whose `/proc` environment is inaccessible
+does not invalidate this scoped supervision. Repeated signals cannot interrupt bounded
+cleanup. The acknowledged training handoff releases only extra GPUs; releasing the
+remaining allocation requires verified cleanup.
+
+A successful computation with required uploads can complete its ClearML task before
+the guardian finishes cleanup. Later supervisor uncertainty quarantines queue capacity
+and reports `recovery_required`; it does not retroactively fail that successful task.
+Computation and mandatory publication failures still fail the task. A completed task
+or local artifacts alone do not prove that queue capacity is safe to reclaim.
 
 Worker registration, the snapshot's Python interpreter and guardian startup all check
 Linux process supervision before admission or native launch. A Python build missing
@@ -125,7 +146,7 @@ Use the same environment for submission and execution. Existing queued snapshots
 retain the previous interpreter and installation identity and may need resubmission.
 
 Normal cancellation first signals the verified pipeline owner and allows up to
-90 seconds for shutdown while retaining the entire allocation. This lets the owner clean native
+90 seconds for shutdown while retaining the current allocation. This lets the owner clean native
 workers and publish final diagnostics before the guardian signals remaining
 descendants. An unresponsive owner reaches the deadline and falls back to verified
 whole-tree TERM/KILL cleanup. Forced termination may leave publication incomplete;
@@ -133,7 +154,9 @@ local logs and uncertain execution evidence are retained.
 
 Guardian death or uncertain cleanup becomes `recovery_required`. The durable local claim
 continues excluding its UUIDs across participating roots after OS locks disappear. Only
-the owner can recover, and inaccessible or ambiguous process evidence remains blocked.
+the owner can recover. Recovery performs conservative global ownership discovery;
+inaccessible or ambiguous process evidence remains blocked, even though unrelated
+processes do not poison the live guardian's scoped tree.
 Never reclaim from a heartbeat timeout, absent parent or low GPU memory. Uncertain jobs
 are never automatically retried. NFS failure stops new admission; active reservations
 remain protected. Unknown protocols and damaged coordination records fail closed. The active guardian

@@ -108,6 +108,7 @@ from clearml_yolo.adapters.reporting.workbook_identity import (
 from clearml_yolo.adapters.reporting.workbook_identity import (
     workbook_identities as _renderer_workbook_identities,
 )
+from clearml_yolo.adapters.runtime.execution_lifecycle import notify_training_finished
 from clearml_yolo.adapters.storage.dataset import (
     apply_dataset_policy as _dataset_apply_dataset_policy,
 )
@@ -276,7 +277,11 @@ class _ExecutionResources:
     progress_callback = staticmethod(_resources_progress_callback)
     log_exception = staticmethod(_resources_log_exception)
     track = staticmethod(_resources_track)
-    training_finished = staticmethod(_resources_training_finished)
+
+    @staticmethod
+    def training_finished() -> None:
+        _resources_training_finished()
+        notify_training_finished()
 
 
 class _TrackingSession:

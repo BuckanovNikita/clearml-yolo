@@ -19,7 +19,9 @@ As a Unix user I submit jobs, close my terminal, and run my own persistent worke
 Other participants may reorder pending jobs, but only I execute/cancel/change/resubmit
 mine. Jobs return stable IDs and expose public summaries without private configurations.
 Each host orders independently and selects the earliest runnable job, skipping absent
-workers and unavailable whole allocations. The complete pipeline holds its allocation.
+workers and unavailable whole allocations. Training holds the full allocation; an
+acknowledged post-training handoff releases all except the first inference GPU. The
+remaining reservation lasts through pipeline/descendant exit.
 Acceptance: concurrent claim/move/cancel, stale-view rejection, user ownership, distinct
 host queues, and host-global UUID exclusion across roots and mount aliases.
 
@@ -53,8 +55,8 @@ metadata alone may escape the project; local coordination holds small records on
 - FR-07: CY_QUEUE_ROOT defaults inside project; durable NFS records partition by stable host with separate boot identity. Foreign hosts are view-only.
 - FR-08: Effective UID and filesystem ownership govern execution/cancellation; each actor owns append-only reorder events. Serialize revisions and reject stale views.
 - FR-09: Earliest runnable scheduling skips unavailable owners/resources; one worker per owner/root supports disjoint concurrent jobs. Atomically reserve all UUIDs globally across queue roots.
-- FR-10: Same-user guardian owns locks and subreaper supervision; persist guardian claim before launch gate. Worker death cannot release allocation.
-- FR-11: Cancellation reaps complete owned descendants, retaining PID/start-time, marker and pidfd protections. Guardian death or uncertain cleanup requires owner recovery and quarantines capacity across roots.
+- FR-10: Same-user guardian owns locks and scoped subreaper supervision outside job ClearML finalization; persist guardian claim before launch gate. Worker death cannot release allocation. After native training returns and unused model memory is released, durably shrink to the first GPU, release extras and update public allocation before bounded acknowledgement. No training-finished notification retains the full allocation. Failure after durable shrink does not restore released extras; cleanup/recovery follows the remaining durable claim.
+- FR-11: Cancellation reaps complete owned descendants, retaining PID/start-time, marker and pidfd protections. Unrelated same-UID process access denials do not poison scoped live guardian discovery. Guardian death or uncertain cleanup requires owner recovery and quarantines capacity across roots; recovery retains conservative global ownership proof. Supervisor cleanup uncertainty does not retroactively fail a successful completed ClearML task; required computation/publication failures still fail.
 - FR-12: Fail closed on unsupported Linux coordination, NFS failure, damaged state, unknown protocols or incompatible active versions. Never infer cleanup from liveness or memory alone.
 - FR-13: Constrain application writes before creation, including Hydra, explicit outputs/cache/scratch and symlinks; preserve SDK policies, outside inputs and old data.
 - FR-14: Capture stdout/stderr at FD boundary into project append-only logs; unbuffered output and terminal mirror remain independent of remote publication.
@@ -84,6 +86,9 @@ installed distributions pass. Missing infrastructure/native failures remain acce
 
 Cooperating Linux users, consistent NFS UID mapping and shared host PID/local-lock namespace;
 no privileged services, account creation, mount changes or deletion of live lock files.
-Admission memory thresholds are not capacity guarantees. Allocation contraction is deferred.
+Admission memory thresholds are not capacity guarantees. The 2026-10-15 user amendment
+requires post-training allocation contraction and external guardian finalization; this
+supersedes the original whole-pipeline reservation assumption without changing archived
+implementation evidence.
 The explicit user plan supersedes historical constitution prohibitions on daemon/count/
 reorder controls; installed workflow files and completed historical evidence remain unchanged.

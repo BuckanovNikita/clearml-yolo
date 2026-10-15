@@ -3,6 +3,7 @@
 import ctypes
 import os
 import signal
+import socket
 import subprocess
 import sys
 import time
@@ -13,9 +14,15 @@ from clearml_yolo.adapters.queue.identity import process_birth
 from clearml_yolo.adapters.queue.locks import GPULease, LocalGPULocks
 from clearml_yolo.adapters.queue.records import GuardianPayload
 from clearml_yolo.adapters.queue.storage import NFSQueueStore, atomic_write
+from clearml_yolo.adapters.runtime.execution_lifecycle import (
+    ACKNOWLEDGED,
+    CHANNEL_FD_ENV,
+    TRAINING_FINISHED,
+)
 from clearml_yolo.adapters.runtime.process_tree import (
     OWNER_ENV,
     LinuxProcessTree,
+    SubreaperProcessTree,
     defer_interruptions,
     require_process_supervision,
 )
@@ -80,6 +87,8 @@ class _Guardian:
         self.child: subprocess.Popen[bytes] | None = None
         self.tree: LinuxProcessTree | None = None
         self.write_gate: int | None = None
+        self.channel: socket.socket | None = None
+        self.handoff_done = False
         self.failure: BaseException | None = None
         self.exit_code = 1
         self.lease: GPULease | None = None
@@ -149,22 +158,26 @@ class _Guardian:
         self._persist()
         self.store.load_snapshot(self.payload.job_id)
         read_gate, self.write_gate = os.pipe()
-        environment = dict(os.environ)
-        environment.update(
-            {
-                OWNER_ENV: self.payload.marker,
-                "CUDA_VISIBLE_DEVICES": ",".join(self.payload.devices),
-                "PYTHONUNBUFFERED": "1",
-                "CY_QUEUE_EXEC_GATE": str(read_gate),
-                "CY_PROGRESS_FILE": str(
-                    Path(self.payload.project_root)
-                    / ".cy"
-                    / "queue-status"
-                    / f"{self.payload.job_id}.json"
-                ),
-            }
-        )
+        child_channel: socket.socket | None = None
         try:
+            self.channel, child_channel = socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET)
+            self.channel.setblocking(False)
+            environment = dict(os.environ)
+            environment.update(
+                {
+                    OWNER_ENV: self.payload.marker,
+                    "CUDA_VISIBLE_DEVICES": ",".join(self.payload.devices),
+                    "PYTHONUNBUFFERED": "1",
+                    "CY_QUEUE_EXEC_GATE": str(read_gate),
+                    CHANNEL_FD_ENV: str(child_channel.fileno()),
+                    "CY_PROGRESS_FILE": str(
+                        Path(self.payload.project_root)
+                        / ".cy"
+                        / "queue-status"
+                        / f"{self.payload.job_id}.json"
+                    ),
+                }
+            )
             descriptor = os.open(
                 self._log_path(), os.O_WRONLY | os.O_CREAT | os.O_APPEND | os.O_NOFOLLOW, 0o600
             )
@@ -178,17 +191,21 @@ class _Guardian:
                     ],
                     cwd=self.payload.cwd,
                     env=environment,
-                    pass_fds=(read_gate,),
+                    pass_fds=(read_gate, child_channel.fileno()),
                     start_new_session=True,
                     stdout=output,
                     stderr=subprocess.STDOUT,
                 )
         finally:
             os.close(read_gate)
+            if child_channel is not None:
+                child_channel.close()
         child_born = process_birth(self.child.pid)
         if child_born is None:
             raise RuntimeError("Gated child identity disappeared before launch")
-        self.tree = LinuxProcessTree(self.child.pid, self.payload.marker, born=child_born)
+        self.tree = SubreaperProcessTree(
+            self.child.pid, self.payload.marker, subreaper=os.getpid(), born=child_born
+        )
         if self.claim is None:
             raise RuntimeError("Guardian launch is missing its lease")
         self.claim = self.claim.model_copy(
@@ -217,8 +234,33 @@ class _Guardian:
                 self.cancelled = True
             if self.cancelled:
                 return
+            self._consume_phase()
             time.sleep(0.1)
         self.exit_code = int(self.child.returncode or 0)
+
+    def _consume_phase(self) -> None:
+        if self.channel is None or self.cancelled:
+            return
+        try:
+            packet = self.channel.recv(64)
+        except BlockingIOError:
+            return
+        if not packet:
+            self.channel.close()
+            self.channel = None
+            return
+        if packet != TRAINING_FINISHED:
+            raise RuntimeError("Unknown execution phase packet")
+        if not self.handoff_done:
+            if self.lease is None or self.claim is None:
+                raise RuntimeError("Guardian phase handoff is missing its capacity claim")
+            # Training returned synchronously, so ranks have joined. Publishers
+            # remain alive while only the unused GPU reservations are released.
+            self.claim = self.lease.retain_first()
+            self._persist()
+            self.store.update(self.payload.job_id, "running", devices=self.claim.devices)
+            self.handoff_done = True
+        self.channel.sendall(ACKNOWLEDGED)
 
     def _record_descendants(self) -> None:
         if self.tree is None or self.claim is None:
@@ -246,6 +288,9 @@ class _Guardian:
             time.sleep(0.1)
 
     def _finish(self) -> None:
+        if self.channel is not None:
+            self.channel.close()
+            self.channel = None
         if self.write_gate is not None:
             os.close(self.write_gate)
             self.write_gate = None
