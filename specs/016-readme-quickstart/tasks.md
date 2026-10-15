@@ -70,7 +70,7 @@ T019 follows T018; T020 follows accepted review and required release checks.
 - [x] T023 Create English TECH_DETAILS.md, reconcile all migrated topics, navigation and incoming anchors, and correct encountered stale direct-GPU guidance.
 - [x] T024 Validate Markdown, links/anchors, shell/YAML/Mermaid, resolved Hydra and temporary generated YAML examples; inspect queue help without workloads.
 - [x] T025 Obtain fresh independent completeness/accuracy/language/separation review after integration and validation; reconcile actual diff and validate architecture acceptance.
-- [ ] T026 Record dated evidence, complete the documentation commit and native release evaluation/delivery without forcing a version bump.
+- [x] T026 Record dated evidence, complete the documentation commit and native release evaluation/delivery without forcing a version bump.
 
 T021 precedes T022/T023. A read-only command audit may accompany parent drafting;
 T024 follows integration, T025 follows checks, T026 follows acceptance. Parent owns

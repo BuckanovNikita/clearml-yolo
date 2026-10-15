@@ -94,4 +94,20 @@ validation passed after reconciliation.
 
 ## Commit and release
 
-Pending documentation commit, native release evaluation and authorized branch delivery.
+Documentation commit `3ae81a57a939a1cc7494e3c74c6930692e15358c`
+(`docs: lead with training workflows and separate technical reference`) passed normal
+pre-commit and post-commit hooks. Markdown-only paths correctly deselected application
+lint/type/import/test gates. No hooks were bypassed. This isolated worktree had no
+local `[tool.uv.sources]` section, so none was removed or restored; pyproject.toml and
+uv.lock remain byte-for-byte unchanged.
+
+The normal release helper was also invoked manually and exited 0 with the explicit
+reason: only master receives automatic release tags. No version/tag, GitHub Release,
+package asset or deployment was created. The task branch
+`docs/training-first-readme` was pushed through the existing SSH remote; remote ref
+readback matched the documentation commit. The primary checkout and its unrelated
+work remain untouched. This final evidence/ledger update follows the same checked
+commit and branch delivery procedure.
+
+Task-owned validation scratch and diagram browser processes are cleaned up after
+verification; no pre-existing services or environments are stopped or changed.

@@ -5,6 +5,9 @@
 
 ### Documentation
 
+- Lead with training workflows and separate technical reference
+  ([`3ae81a5`](https://github.com/BuckanovNikita/clearml-yolo/commit/3ae81a57a939a1cc7494e3c74c6930692e15358c))
+
 - Record verified GPU controls and usage skill releases
   ([`634f3e2`](https://github.com/BuckanovNikita/clearml-yolo/commit/634f3e23165270a285044aba1016883dc34c43bc))
 
