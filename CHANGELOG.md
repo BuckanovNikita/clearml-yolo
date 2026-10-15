@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record Python compatibility release delivery
+  ([`eda01e3`](https://github.com/BuckanovNikita/clearml-yolo/commit/eda01e3bb629e3b610f1a0dcfe4ae74c8c33588b))
+
+
 ## v0.30.1 (2026-10-15)
 
 ### Bug Fixes
