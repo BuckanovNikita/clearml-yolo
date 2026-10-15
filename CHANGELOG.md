@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.30.1 (2026-10-15)
+
+### Bug Fixes
+
+- Show queue worker activity by default
+  ([`d817add`](https://github.com/BuckanovNikita/clearml-yolo/commit/d817adda23cad20a1a62df732042314efeab8dc2))
+
+
 ## v0.30.0 (2026-10-15)
 
 ### Documentation
