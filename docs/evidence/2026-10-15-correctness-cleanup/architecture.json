@@ -460,8 +460,9 @@
     "specs/032-python-compatibility/research.md",
     "specs/032-python-compatibility/spec.md",
     "specs/032-python-compatibility/tasks.md",
-    "specs/032-python-compatibility/verification.md"
+    "specs/032-python-compatibility/verification.md",
+    "docs/evidence/2026-10-15-correctness-cleanup/delivery.md"
   ],
   "impact": "none",
-  "rationale": "Inspected constitution, current-contract index, queue/architecture guides, executable import contracts and runtime ownership. This record covers project prose only: no module, dependency, composition target or executable check changes. Runtime fixes and checker changes have separate module-impact records. Semantic reconciliation is recorded before a separate compression baseline; completed task outcomes and evidence remain intact. Final reconciliation includes new maintained diagrams/status and dated evidence. All modified runtime files, executable architecture helpers, checker script/tests and dependency metadata are covered by the three separate module-impact records. The original local uv source overrides and untracked grid-search draft remain excluded from task ownership."
+  "rationale": "Inspected constitution, current-contract index, queue/architecture guides, executable import contracts and runtime ownership. This record covers project prose only: no module, dependency, composition target or executable check changes. Runtime fixes and checker changes have separate module-impact records. Semantic reconciliation is recorded before a separate compression baseline; completed task outcomes and evidence remain intact. Final reconciliation includes new maintained diagrams/status and dated evidence. All modified runtime files, executable architecture helpers, checker script/tests and dependency metadata are covered by the three separate module-impact records. The original local uv source overrides and untracked grid-search draft remain excluded from task ownership. Closing delivery evidence and status links record verified release identities and retained acceptance limits; the test-only release-hook fixture correction is covered by feature 033 and its scoped review."
 }

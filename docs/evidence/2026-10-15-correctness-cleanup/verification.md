@@ -78,3 +78,10 @@ CPU/single-GPU execution passed. Font and existing Hydra/Pydantic warnings remai
 Installed-package checks cover Python 3.12.13; the supported Python window is unchanged.
 Portable skill evaluation used native Codex, not OpenCode/DeepSeek. No deployment,
 upstream patch, GitHub Release, asset upload or package-registry publication is included.
+
+## Delivery — 2026-10-16
+
+[Delivery evidence](delivery.md) records application v0.32.0, portable guidance
+v0.2.6, final distribution hashes, passing release/recovery hooks and verified
+remote refs. It preserves the later release-hook fixture failure and its reviewed,
+verified test-only correction separately from earlier acceptance results.

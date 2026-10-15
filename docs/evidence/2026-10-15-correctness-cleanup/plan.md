@@ -30,7 +30,7 @@ draft. Delivery includes verified task-scoped commits and Git tags/pushes only.
 - [x] Run targeted and routine suites, Ruff, mypy, Vulture, import contracts, docs, installed distributions/configuration.
 - [x] Run affected native CPU/GPU/ClearML acceptance and download canonical rows.
 - [x] Reconcile final diff, records and actual checks; obtain fresh independent review.
-- [ ] Commit, evaluate native release, push intended branch/tag and verify refs.
+- [x] Commit, evaluate native release, push intended branch/tag and verify refs.
 
 ## Acceptance boundaries
 

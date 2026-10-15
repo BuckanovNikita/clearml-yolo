@@ -1,7 +1,15 @@
 # CHANGELOG
 
 
-## v0.32.0 (2026-10-15)
+## Unreleased
+
+### Testing
+
+- Isolate documentation fixtures from enclosing Git hooks
+  ([`0c2e720`](https://github.com/BuckanovNikita/clearml-yolo/commit/0c2e720c0f04860dd5d9582c7893279a58945b21))
+
+
+## v0.32.0 (2026-10-16)
 
 ### Documentation
 

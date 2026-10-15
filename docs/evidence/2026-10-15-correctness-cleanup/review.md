@@ -77,3 +77,15 @@ local uv source overrides and the untracked grid-search draft outside task owner
 No new runtime import exception, scientific algorithm change or upstream revision was
 introduced. Subsequent edits are acceptance and release evidence only; applicable
 documentation checks and commit/release hooks still apply.
+
+## Release-hook fixture follow-up — 2026-10-16
+
+Fresh read-only reviewer `/root/fixture_isolation_review` returned **ship** for the
+test-only inherited-Git-environment correction. It independently ran 48 checker
+tests, validated the appended plan/tasks and inspected the original failure and
+corrected-run logs. The external-index hash check is parent evidence. Its scope
+was test setup and workflow records; runtime, checker and dependency contracts
+were unchanged. The follow-up commit passed all applicable hooks, then the parent integrated
+it by fast-forward and reran all 48 tests. Feature 033 records the reproduced
+failure, correction and architecture reconciliation; [delivery](delivery.md)
+records release recovery and published identities.
