@@ -96,3 +96,26 @@ and [fresh final review](../../docs/evidence/2026-10-15-correctness-cleanup/revi
 accept the corrected checker and its architecture record. T009 is complete; release
 delivery remains in the parent workflow. The portable application skill changed for
 input fixes, while this development-only checker needs no portable command guidance.
+
+## Release-hook fixture follow-up — 2026-10-16
+
+The automatic version commit's hook suite reported one failure (2812 passed,
+30 skipped, 7 deselected): the temporary Git fixture inherited `GIT_INDEX_FILE`,
+so its `git add` populated the enclosing commit's temporary index and the fixture
+had no `.git/index`. The source commit remained intact; that release attempt did
+not produce a version commit or tag. A scoped probe reproduced the same failure
+using a task-owned external index, without touching the real repository index.
+
+The test module now clears inherited `GIT_*` variables through function-scoped
+`monkeypatch`, following the existing release-test isolation pattern. This also
+protects its in-process checker calls. The checker implementation is unchanged.
+With the external index inherited, all 48 checker tests passed and that index
+retained SHA-256 `17a80b8cee00405a62b210e3549943905d5d67513d73661d5d8fead2a8904b48`.
+Ruff, scoped mypy, changed Markdown and whitespace checks passed. The feature's
+existing module record passed planning validation before the correction.
+
+Independent read-only reviewer `/root/fixture_isolation_review` returned **ship**,
+rerunning all 48 tests, both workflow Markdown files and whitespace validation.
+It inspected the original failure and corrected-run logs; index hash preservation
+is parent evidence. Integration and checked release recovery are recorded in the
+parent delivery evidence, preserving this failed attempt separately.

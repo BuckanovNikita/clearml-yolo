@@ -23,3 +23,7 @@
 
 The checker owner implements T001–T008 without shared-file overlap beyond the
 authorized dependency hunk. Parent owns T009 and release after integrated checks.
+
+## Release-hook fixture follow-up — 2026-10-16
+
+- [x] T010 Isolate temporary Git fixtures from inherited Git environment variables; reproduce the release-hook index failure, verify the parent index stays unchanged, and reconcile acceptance evidence.

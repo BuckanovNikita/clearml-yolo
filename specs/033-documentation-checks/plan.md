@@ -53,3 +53,14 @@ Ruff, strict mypy, Vulture, existing import/architecture tests, explicit feature
 Markdown and `--all`. Existing all-document failures are findings for the parent,
 not reasons to weaken validation. Architecture acceptance remains pending until
 the parent integrates corrections and records fresh independent review.
+
+## Release-hook fixture follow-up — 2026-10-16
+
+The automatic version commit exposed an inherited `GIT_INDEX_FILE` in the temporary
+repository fixture. The parent owns T010 in `tests/test_check_docs.py`: isolate its
+Git environment, following the existing release-test pattern, without changing the
+checker or runtime. The existing module/contract record covers this test file and
+passed its planning validator again. Reproduce with a task-owned external index,
+then verify fixture success and byte-for-byte preservation of that index. Integrate
+after the active release checks finish; obtain scoped read-only review and record
+the failed release attempt separately from successful recovery.

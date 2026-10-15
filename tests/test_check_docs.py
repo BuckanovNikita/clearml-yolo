@@ -1,6 +1,7 @@
 """Exercise document contracts and the maintenance command's dependency boundary."""
 
 import ast
+import os
 import subprocess
 import sys
 import tomllib
@@ -12,6 +13,14 @@ ROOT = Path(__file__).resolve().parents[1]
 with pytest.MonkeyPatch.context() as import_path:
     import_path.syspath_prepend(str(ROOT))
     from scripts.check_docs import check_documents, main, parse_document, tracked_documents
+
+
+@pytest.fixture(autouse=True)
+def isolated_git_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Nested fixture repositories must not use a release hook's temporary index.
+    for key in tuple(os.environ):
+        if key.startswith("GIT_"):
+            monkeypatch.delenv(key)
 
 
 def dependency_findings(source: str) -> set[str]:

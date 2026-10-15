@@ -81,8 +81,8 @@
   "documentation": "Feature spec, plan, research, data model and quickstart document behavior; parent integrates docs/development.md and current contract navigation. Internal maintenance tooling does not change portable application usage.",
   "review": {
     "status": "accepted",
-    "reviewer": "/root/docs_acceptance_review",
+    "reviewer": "/root/docs_acceptance_review; /root/fixture_isolation_review",
     "evidence": "docs/evidence/2026-10-15-correctness-cleanup/review.md",
-    "reconciliation": "Fresh independent read-only review of the integrated task-owned runtime/tooling/tests/docs and architecture scope after parent verification. All initial findings corrected and re-reviewed; actual added/modified paths covered, no moved/deleted runtime modules. Original local uv.sources overrides and untracked grid-search draft excluded. Native/package runtime manifests still match all180files; final review records preserve limits."
+    "reconciliation": "Fresh independent read-only review of the integrated task-owned runtime/tooling/tests/docs and architecture scope after parent verification. All initial findings corrected and re-reviewed; actual added/modified paths covered, no moved/deleted runtime modules. Original local uv.sources overrides and untracked grid-search draft excluded. Native/package runtime manifests still match all180files; final review records preserve limits. The later test-only Git-environment isolation follow-up is covered by the existing contract test path; its original failure was reproduced with an owned external index, all 48 corrected checker cases passed without changing that index, and a bounded independent reviewer returned ship. No module, checker implementation, dependency or effect ownership changed."
   }
 }
