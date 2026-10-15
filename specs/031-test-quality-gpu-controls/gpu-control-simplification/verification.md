@@ -79,7 +79,8 @@ import contracts passed; executable architecture coverage includes both newly
 injected forbidden presentation-module dependencies. Fifteen changed application
 Markdown files passed lint and 252 local file/heading links resolved. Wheel and
 source-distribution builds succeeded as a preliminary packaging check; immutable
-release version/package and remote-ref verification remain delivery work.
+release version/package and remote-ref verification subsequently passed, as recorded
+in [release evidence](release.md).
 
 Independent follow-up review returned ship with no remaining code blockers. The
 architecture record reconciles every task-owned changed/new path, including test
@@ -87,7 +88,7 @@ helpers, import configuration, technical reference and project skill guidance.
 The local source section and unrelated draft are excluded; no removed module or
 untracked implementation file is omitted. Local amendment acceptance is complete;
 this does not close the earlier external physical acceptance gap. Git-tag release
-results will be recorded in release.md after the native workflow finishes.
+results are recorded in [release evidence](release.md).
 
 ## Release test-harness follow-up
 

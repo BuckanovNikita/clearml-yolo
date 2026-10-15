@@ -24,8 +24,9 @@ bypassed, no process was killed to make verification pass, and no unrelated sour
 change was introduced. The manual recovery version commit `bb07786` passed its full commit hooks. Final
 tag revalidation then reported 2575 passed and two test harness failures: a global
 process-table churn assertion and reading an empty, newly created child PID file.
-The candidate remains unpublished and untagged. T028 records the required harness
-corrections and superseding native release attempt; no passing tag check is claimed.
+At that checkpoint the candidate was unpublished and untagged. T028 recorded the
+required harness corrections and superseding native release attempt. The abandoned
+version commit remains in the delivered ancestry; it has no version tag.
 
 ## Abandoned candidate package checks
 
@@ -60,20 +61,58 @@ assertion of ownership, deadline, skip rule or workflow tooling changed.
 
 The parent reran both complete focused suites: 28 tests passed in 18.10 seconds.
 Scoped Ruff, mypy and `git diff --check` passed. Fresh independent review accepted
-the corrections and restart without blockers; full native source/version hooks
-and fresh package/tag checks remain required before delivery.
+the corrections and restart without blockers. The full native source/version hooks
+and fresh package/tag checks subsequently passed as recorded below.
 
 Only the project and root lock-package version tokens were restored to `0.30.2`
 for the new source commit; parsed metadata comparisons confirmed no dependency or
 other configuration drift. The normal semantic version calculation reports
 `0.31.0`. The native changelog generator owns the corresponding history refresh.
-The superseding attempt will name the new checked source commit and create a new
+The superseding attempt named the new checked source commit and created a new
 metadata-only direct-child version commit through unmodified hooks.
+
+## Completed release and package verification
+
+The checked follow-up source commit is
+`c5b19fb9f9e2471d77fce91dfd1724dc83935760`. Its normal commit hooks passed Ruff,
+strict mypy, all import contracts, Vulture and the full pytest suite. The automatic
+release workflow then passed the version commit's required checks and created the
+annotated tag `v0.31.0` at `7a4759876b57a511db071287a7eb708a916f35dc`.
+That version commit is the direct child of the checked source and changes exactly
+pyproject.toml, uv.lock and CHANGELOG.md. No hook or check was bypassed.
+
+The final wheel and source archive were built from immutable candidate tree
+`7c5da6a3b572d3a1284c794f9127ab26a0cae4cb`; the annotated tag resolves to that exact
+tree. All 29 reviewed source/test fingerprints matched. Package inspection confirmed
+the six queue/identity modules, version, queue entrypoint, runtime dependency
+separation and absence of local source overrides. Isolated installed-wheel checks
+confirmed imported-module provenance, version, four minimal control parser forms
+and three actual CLI help commands. No GPU control mutation was performed.
+[Package evidence](package.json) records artifact hashes and the checked references.
+All dependency sources, versions and metadata match the baseline after excluding
+only the root package version. Temporary extracted checkouts, wheel installations,
+index copies and archives were removed; evidence logs and built packages remain.
 
 ## Delivery status
 
-Application tag/remote validation and companion `0.2.5` delivery are pending.
-The final evidence commit will reconcile T027 and the exact delivered references.
-Historical physical multi-GPU/NCCL, real multi-user/NFS and ClearML acceptance remain
-open as recorded in [verification](verification.md). No installed portable skill
-copies are changed by source delivery.
+Application master and annotated `v0.31.0` were pushed atomically. Remote branch,
+annotated-tag object and peeled commit matched the local references. Companion
+collection `v0.2.5` was committed at
+`48675d3473a668650673a8a2808046c217728485`, tagged and pushed atomically with main;
+its remote branch/tag/peeled references also matched. The collection's full Markdown,
+discovery, skill metadata, local link and architecture checks passed; final release
+wording was linted again. This publishes source and Git tags only. No GitHub Release,
+assets, registry packages, deployment or installed skill updates were performed.
+
+T027 and T028 are complete. The exact local source overrides and unrelated draft
+were preserved, and the index was clean after release. Final documentation evidence
+is delivered in a separate task-scoped documentation commit; no new semantic version
+is expected from that record. Historical physical multi-GPU/NCCL, real multi-user/NFS
+and ClearML acceptance remain open as recorded in [verification](verification.md).
+
+The deterministic test-race injections were executed through stdin and retained in
+the agent transcript, not as standalone scripts or log files. They added a vanished
+entry to `/proc` enumeration and returned an empty first child-PID read respectively.
+The same injections passed after the corrections, including fork/orphan/thread
+cleanup modes. The parent focused-suite log and original release failure logs remain
+local evidence; their outcomes are recorded above without implying hardware checks.

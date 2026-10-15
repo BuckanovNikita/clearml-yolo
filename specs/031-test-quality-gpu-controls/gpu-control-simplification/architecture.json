@@ -251,7 +251,7 @@
       "result": {
         "status": "passed",
         "exit_code": 0,
-        "evidence": "specs/031-test-quality-gpu-controls/gpu-control-simplification/verification.md"
+        "evidence": "specs/031-test-quality-gpu-controls/gpu-control-simplification/release.md"
       }
     },
     {
@@ -282,6 +282,6 @@
     "status": "accepted",
     "reviewer": "Fresh native read-only /root/gpu_final_review plus /root/docs_review; parent integration and verification",
     "evidence": "specs/031-test-quality-gpu-controls/gpu-control-simplification/review.md",
-    "reconciliation": "Reviewed the complete diff from 9355693, all new source/test/artifact files, architecture helpers and import contracts, TECH_DETAILS and E2E guidance. Fixed both independent review findings and reverified. Local tool.uv.sources and unrelated docs/cls-cls-pw-grid-search.md are excluded. Native release metadata changes only root version/changelog; historical physical acceptance remains open. Release follow-up changes two existing process-test fixtures only; independent review accepted ownership/deadline preservation and version-only metadata restart. No runtime/import contract drift."
+    "reconciliation": "Reviewed the complete diff from 9355693, all new source/test/artifact files, architecture helpers and import contracts, TECH_DETAILS and E2E guidance. Fixed both independent review findings and reverified. Local tool.uv.sources and unrelated docs/cls-cls-pw-grid-search.md are excluded. Native release metadata changes only root version/changelog; historical physical acceptance remains open. Release follow-up changes two existing process-test fixtures only; independent review accepted ownership/deadline preservation and version-only metadata restart. No runtime/import contract drift. Final source/version hooks and immutable package/tag checks passed; app v0.31.0 and companion v0.2.5 refs verified remotely. Final evidence-only diff stays within the recorded scope."
   }
 }
