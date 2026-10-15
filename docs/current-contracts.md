@@ -1,5 +1,9 @@
 # Current contract index
 
+For practical commands, start with the [usage guide](../README.md). For setup,
+configuration, storage, provenance and operations, use the
+[technical reference](../TECH_DETAILS.md).
+
 Use this index to select the maintained contract for a topic. Feature numbering and
 release dates alone do not establish authority: later features amend specific parts of
 earlier contracts. A contract describes required behavior; inspect implementation and

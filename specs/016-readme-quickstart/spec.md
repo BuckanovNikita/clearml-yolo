@@ -105,3 +105,28 @@ then run `cy --config-dir cy-config --config-name cy`.
 Make that generated-YAML workflow the primary quickstart, replacing the long inline
 argument example. Keep CLI overrides secondary. The user explicitly requests committing
 the documentation and publishing the next minor Git release (0.17.0 from 0.16.0).
+
+## Training-first follow-up — 2026-10-15
+
+The approved follow-up replaces the earlier YAML-first presentation with direct
+one-line `cy-train` examples for YOLO (`yolo11n.pt`), DEIMv2 (`deimv2/s`), RF-DETR
+(`rfdetr/small`) and Faster R-CNN (`fasterrcnn/resnet50_fpn`). Each provides the CSV,
+ClearML project/task/tags; DEIMv2 includes a verified source directory and compatible
+initialization asset. Essential prerequisites link to detailed setup.
+
+README remains Russian and covers training inputs/splits/presets/controls/results,
+complete `cy` experiments and baseline selection, then `cy-predict`, `cy-val`,
+`cy-metrics`, `cy-compare`, `cy-report` with inputs/examples/outputs. Reusable YAML,
+overrides, sweeps and supported DDP follow; queue lifecycle and optional TUI precede
+export, optional conversion, FiftyOne, dedup and concise troubleshooting.
+
+English TECH_DETAILS.md collects detailed setup, configuration/migration, filesystem/
+cache, provenance/publication, process ownership, diagnostics and Python integration,
+linking maintained contracts rather than duplicating them. The plan's migration map
+accounts for every prior topic. Correct stale direct-GPU waiting claims and update
+navigation/incoming anchors; preserve completed history.
+
+This amendment changes documentation only. Acceptance checks Markdown, local links/
+anchors, shell syntax, resolved Hydra examples and temporary generated YAML; queue
+checks use help/source without submissions. Fresh independent review follows parent
+verification. Documentation commit/release evaluation must not force a version bump.

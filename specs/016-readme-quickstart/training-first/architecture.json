@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "task": "Training-first README and separate technical reference",
+  "scope": [
+    "README.md",
+    "CHANGELOG.md",
+    "TECH_DETAILS.md",
+    "docs/current-contracts.md",
+    "docs/development.md",
+    "docs/multi-model-backends.md",
+    "specs/016-readme-quickstart"
+  ],
+  "impact": "none",
+  "rationale": "Inspected pyproject.toml, src/clearml_yolo/entrypoints/hydra/configs.py, src/clearml_yolo/core/models.py, src/clearml_yolo/application/contracts.py, workflow use cases and maintained contracts. Only prose, documented examples, navigation and task evidence change; runtime interfaces, dependency/effect ownership, composition targets and executable import contracts remain unchanged. Documentation and configuration composition checks establish example compatibility without native execution."
+}
