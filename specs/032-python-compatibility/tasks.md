@@ -22,7 +22,7 @@
   validate Markdown/local links and record companion skill impact.
 - [x] T007 Reconcile the full diff and evidence in `architecture.json`; obtain
   fresh independent review and pass architecture acceptance validation.
-- [ ] T008 Follow the commit/release procedure in `docs/development.md`, push
+- [x] T008 Follow the commit/release procedure in `docs/development.md`, push
   authorized refs and preserve unrelated local work on master.
 
 T001 -> T002 -> T003 -> T004/T005 -> T006 -> T007 -> T008. Static checks may run

@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-15
 
-**Status**: Implemented, verified and accepted; delivery pending
+**Status**: Implemented, accepted and released as v0.30.0
 
 **Input**: Allow Python `>=3.12.13,<3.14` for clearml-yolo. Keep the canonical
 checkout on its existing primary branch. Companion projects cveta2 and ed-killer
