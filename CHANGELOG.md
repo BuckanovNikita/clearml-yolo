@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record queue finalization release verification
+  ([`9355693`](https://github.com/BuckanovNikita/clearml-yolo/commit/9355693249ee97fa6e5d51ebfe52ceee6d647293))
+
+
 ## v0.30.2 (2026-10-15)
 
 ### Bug Fixes

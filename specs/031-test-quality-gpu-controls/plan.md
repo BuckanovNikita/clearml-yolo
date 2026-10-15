@@ -82,3 +82,51 @@ verified tool release refs before describing the interface as released. Fresh
 independent review covers the final release diff and evidence. No further module
 or dependency changes are planned; the existing architecture record continues
 to disclose the outstanding physical check.
+
+## GPU control simplification — 2026-10-15
+
+Implement the approved GC-01–05 amendment. The task-owned
+[generation architecture record](gpu-control-simplification/architecture.json)
+extends the original record without rewriting its historical acceptance gaps.
+
+Core retains private UUID records and adds typed operator events/results and lease
+generations. Queue adapters own an append-only per-device generation transition
+under the host transaction, generation-specific lock/claim files, and generation
+fencing on every guardian mutation. Historical process ownership remains available
+for job supervision independently of current capacity. Explicit free is an
+authoritative host-local event, not process cleanup or a job result. It does not
+need the original NFS queue. Automatic reservation queries ignore stale unlocked
+claims; explicit holds and live allocation locks remain exclusions.
+
+Control API: disable(selector) -> GPUHold; enable(selector) -> None;
+release(selector) -> GPUFreeResult; free is the CLI alias. GPUFreeResult contains
+only the selected internal identity, actor, generation and event timestamp.
+GPUControlStatus may retain private identity/claim details; public projections
+must not serialize internal records directly. Full identities remain accepted as
+internal/backward-compatible selectors, but help and public views use indexes or
+short labels. Deprecated token/reason/force CLI arguments are removed.
+
+Startup owns the fresh NVML memory check after reservation acquisition and before
+opening the workload gate. Threshold is fixed at 2 GiB. Unknown/high readings
+release the attempted reservation and return the job to pending. Allocation
+generation must still match before launch. Direct commands remain unscheduled.
+
+Work ownership: reservation agent owns core queue records, locks, operator controls
+and dedicated control tests; presentation agent owns queue CLI/TUI, presentation
+helpers and output tests; parent owns application ports, inventory, guardian/runtime,
+workflow artifacts and integration tests. Documentation may run independently once
+interfaces are stable. All delegates are bounded and do not delegate further.
+Parent integrates, runs checks, and obtains fresh independent review afterward.
+
+Reuse existing layer, SDK-owner and direct-command import contracts and their
+negative tests. Validate the architecture plan before implementation and reconcile
+it against the final diff and executed evidence before acceptance. Update queue,
+current contracts, diagnostics, runtime isolation, Russian README and canonical
+corp-skills usage/evaluation references. Preserve local dependency overrides and
+the unrelated grid-search draft. No dependency revisions change.
+
+Constitution inspection: historical scheduler constraints were already superseded
+by feature 029. This explicit operator override is authorized by the user's plan;
+it changes capacity bookkeeping without performing PID-based automatic cleanup.
+Unknown memory still prevents automatic launch. Installed `.specify` files remain
+unchanged, as required by project policy.

@@ -8,6 +8,7 @@ from textual.widgets import DataTable, Footer, Header, Input, Static
 
 from clearml_yolo.application.queue import QueueService
 from clearml_yolo.core.queue import MoveDirection, PublicJob, QueueView
+from clearml_yolo.entrypoints.queue_presentation import QueuePresentation
 
 
 class QueueApp(App[None]):
@@ -25,9 +26,12 @@ class QueueApp(App[None]):
         Binding("escape", "dismiss_move", "Back", show=False),
     ]
 
-    def __init__(self, service: QueueService) -> None:
+    def __init__(
+        self, service: QueueService, *, presentation: QueuePresentation | None = None
+    ) -> None:
         super().__init__()
         self.service = service
+        self.presentation = presentation or QueuePresentation()
         self.view = QueueView(host_id=service.identity.host_id, revision=0, jobs=())
         self.relative_move: tuple[str, MoveDirection, int] | None = None
 
@@ -67,33 +71,35 @@ class QueueApp(App[None]):
         try:
             view = self.service.list()
         except (OSError, ValueError, RuntimeError) as error:
-            self.query_one("#status", Static).update(f"Queue unavailable: {error}")
+            self.query_one("#status", Static).update(
+                self.presentation.text(f"Queue unavailable: {error}")
+            )
             return
         self.view = view
         table = self.query_one("#jobs", DataTable)
         table.clear()
         for position, job in enumerate(view.jobs, 1):
-            request = ",".join(job.request.devices or ()) or str(job.request.count)
+            request = self.presentation.request(job.request, job.host_id)
             table.add_row(
                 str(position),
-                job.id,
+                self.presentation.text(job.id),
                 str(job.owner_uid),
                 job.state,
                 request,
-                ",".join(job.devices) or "-",
-                job.waiting_reason or "",
+                ",".join(self.presentation.devices(job.devices, job.host_id)) or "-",
+                self.presentation.text(job.waiting_reason or "", job.host_id),
                 (
                     f"{job.progress:.0%}"
                     if isinstance(job.progress, float)
-                    else job.progress or ""
+                    else self.presentation.text(job.progress or "", job.host_id)
                 ),
-                job.clearml_url or "",
+                self.presentation.text(job.clearml_url or "", job.host_id),
                 key=job.id,
             )
             if selected is not None and selected.id == job.id:
                 table.move_cursor(row=position - 1)
         self.query_one("#status", Static).update(
-            f"Host {view.host_id} | revision {view.revision} | "
+            f"Host {self.presentation.text(view.host_id)} | revision {view.revision} | "
             "Closing this view leaves workers running"
         )
 
@@ -110,7 +116,7 @@ class QueueApp(App[None]):
         try:
             self.service.move(job.id, direction, self.view.revision)
         except (OSError, ValueError, RuntimeError) as error:
-            self.notify(str(error), severity="error")
+            self.notify(self.presentation.text(str(error)), severity="error")
         self.refresh_queue()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
@@ -121,7 +127,7 @@ class QueueApp(App[None]):
                     identifier, direction, revision, relative_job_id=event.value.strip()
                 )
             except (OSError, ValueError, RuntimeError) as error:
-                self.notify(str(error), severity="error")
+                self.notify(self.presentation.text(str(error)), severity="error")
         self.relative_move = None
         event.input.value = ""
         event.input.display = False
@@ -169,5 +175,5 @@ class QueueApp(App[None]):
             else:
                 self.service.cancel(job.id)
         except (OSError, ValueError, RuntimeError) as error:
-            self.notify(str(error), severity="error")
+            self.notify(self.presentation.text(str(error)), severity="error")
         self.refresh_queue()

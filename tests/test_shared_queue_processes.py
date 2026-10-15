@@ -11,8 +11,10 @@ from typing import Any
 
 import pytest
 
+pytestmark = pytest.mark.usefixtures("queue_memory")
 
-def test_durable_reservation_blocks_another_root_after_owner_exits(tmp_path: Path) -> None:
+
+def test_stale_reservation_does_not_block_another_root_after_owner_exits(tmp_path: Path) -> None:
     from clearml_yolo.adapters.queue.locks import LocalGPULocks
     from clearml_yolo.core.queue import GuardianClaim, WorkerIdentity
 
@@ -32,17 +34,23 @@ def test_durable_reservation_blocks_another_root_after_owner_exits(tmp_path: Pat
     first = pool.acquire(claim)
     assert first is not None
     first.close()
-    # Closing an OS lock is not evidence of descendant cleanup.
-    assert (
-        LocalGPULocks(identity, tmp_path / "local").acquire(
-            claim.model_copy(update={"job_id": "other", "queue_root": "/queue-two"})
-        )
-        is None
+    # Process evidence survives, but an unlocked historical claim is not capacity.
+    assert pool.reserved() == set()
+    second = LocalGPULocks(identity, tmp_path / "local").acquire(
+        claim.model_copy(update={"job_id": "other", "queue_root": "/queue-two"})
     )
-    assert pool.reserved() == {"GPU-test"}
-    lease = pool.acquire_recovery(claim)
-    lease.release_verified()
-    lease.close()
+    assert second is not None
+    try:
+        recovered = pool.acquire_recovery(claim)
+        try:
+            recovered.release_verified()
+        finally:
+            recovered.close()
+        assert pool.reserved() == {"GPU-test"}
+        assert pool.claim_for("other") == second.claim
+        second.release_verified()
+    finally:
+        second.close()
     assert pool.reserved() == set()
 
 
@@ -114,7 +122,7 @@ def test_failed_atomic_claim_update_preserves_old_recovery_evidence(
         lease.close()
 
 
-def test_interrupted_whole_allocation_quarantines_every_uuid_and_can_recover(
+def test_interrupted_whole_allocation_preserves_evidence_without_blocking_capacity(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -145,8 +153,14 @@ def test_interrupted_whole_allocation_quarantines_every_uuid_and_can_recover(
     with pytest.raises(OSError, match="interruption"):
         pool.acquire(claim)
     monkeypatch.setattr(Path, "replace", original)
-    assert pool.reserved() == {"GPU-a", "GPU-b"}
-    assert pool.acquire(claim.model_copy(update={"job_id": "other", "devices": ("GPU-b",)})) is None
+    assert pool.reserved() == set()
+    other = pool.acquire(claim.model_copy(update={"job_id": "other"}))
+    assert other is not None
+    try:
+        assert pool.reserved() == {"GPU-a", "GPU-b"}
+        other.release_verified()
+    finally:
+        other.close()
     lease = pool.acquire_recovery(claim)
     lease.release_verified()
     lease.close()
@@ -178,7 +192,9 @@ def _wait_for(path: Path, timeout: float = 10) -> str:
     pytest.fail(f"Task-owned subprocess did not become ready: {path}")
 
 
-def test_guardian_death_quarantines_until_owner_reaps_detached_rank(tmp_path: Path) -> None:
+def test_guardian_death_preserves_process_recovery_without_reserving_capacity(
+    tmp_path: Path,
+) -> None:
     from clearml_yolo.adapters.queue.identity import process_birth
     from clearml_yolo.adapters.queue.runtime import QueueProcesses
     from clearml_yolo.adapters.queue.storage import NFSQueueStore
@@ -237,7 +253,7 @@ def test_guardian_death_quarantines_until_owner_reaps_detached_rank(tmp_path: Pa
             time.sleep(0.02)
         processes.refresh()
         assert store.view().jobs[0].state == "recovery_required"
-        assert processes.reserved() == {"GPU-test"}
+        assert processes.reserved() == set()
         assert process_birth(rank_pid) is not None
         result = processes.recover(job.id)
         assert result.state == "cancelled"
@@ -537,9 +553,12 @@ def test_incompatible_active_guardian_stops_admission_but_owner_can_recover(tmp_
     assert lease is not None
     incompatible = claim.model_copy(update={"compatibility": "unknown-guardian-v2"})
     lease.persist(incompatible)
-    lease.close()
-    with pytest.raises(RuntimeError, match="incompatible"):
-        pool.reserved()
+    try:
+        with pytest.raises(RuntimeError, match="incompatible"):
+            pool.reserved()
+    finally:
+        lease.close()
+    assert pool.reserved() == set()
     recovered = pool.acquire_recovery(incompatible)
     recovered.release_verified()
     recovered.close()

@@ -159,6 +159,8 @@ class GuardianClaim(QueueRecord):
     child_pid: int | None = None
     child_born: int | None = None
     identities: tuple[tuple[int, int], ...] = ()
+    # Missing entries represent generation zero for persisted legacy records.
+    generations: tuple[tuple[str, int], ...] = ()
 
 
 def claim_token(claim: GuardianClaim) -> str:
@@ -167,12 +169,20 @@ def claim_token(claim: GuardianClaim) -> str:
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
 
+class GPUFreeResult(QueueRecord):
+    uuid: str
+    actor_uid: int = Field(strict=True, ge=0)
+    generation: int = Field(strict=True, ge=1)
+    created_at: float
+
+
 class GPUHold(QueueRecord):
     uuid: str
     owner_uid: int = Field(strict=True, ge=0)
     host_id: str
-    reason: str = Field(min_length=1, max_length=2048)
+    reason: str = Field(default="Operator disabled GPU", min_length=1, max_length=2048)
     created_at: float
+    generation: int = Field(default=0, strict=True, ge=0)
 
 
 class GPUControlStatus(QueueRecord):
@@ -180,18 +190,6 @@ class GPUControlStatus(QueueRecord):
     physical_index: int | None = None
     holds: tuple[GPUHold, ...] = ()
     claim: GuardianClaim | None = None
-    claim_token: str | None = None
-
-
-class GPUReleaseAudit(QueueRecord):
-    token: str
-    claim: GuardianClaim
-    actor_uid: int = Field(strict=True, ge=0)
-    reason: str = Field(min_length=1, max_length=2048)
-    forced: bool
-    cleanup_verified: bool
-    created_at: float
-    finished: bool = False
 
 
 def earliest_runnable(

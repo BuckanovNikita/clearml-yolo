@@ -9,18 +9,25 @@ import time
 from collections import Counter
 from pathlib import Path
 from types import FrameType
+from typing import Never, override
 
 from loguru import logger
 
-from clearml_yolo.application.queue import QueueService
+from clearml_yolo.application.queue import QueueGPUControlPort, QueueService
 from clearml_yolo.core.queue import MoveDirection, QueueView, ResourceRequest
-from clearml_yolo.core.redaction import redact_text
+from clearml_yolo.entrypoints.queue_presentation import QueuePresentation
 
 _HEARTBEAT_SECONDS = 60
 
 
+class _QueueParser(argparse.ArgumentParser):
+    @override
+    def exit(self, status: int = 0, message: str | None = None) -> Never:
+        super().exit(status, QueuePresentation().text(message) if message else message)
+
+
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="cy-queue", description=__doc__)
+    parser = _QueueParser(prog="cy-queue", description=__doc__)
     parser.add_argument("--root", type=Path, help="Shared metadata root (default CY_QUEUE_ROOT)")
     commands = parser.add_subparsers(dest="action", required=True)
     submit = commands.add_parser("submit", help="Freeze and submit one pipeline or Hydra sweep")
@@ -29,7 +36,6 @@ def _parser() -> argparse.ArgumentParser:
     resources.add_argument("--devices", help="Exact ordered CUDA indexes, e.g. 0,2")
     submit.add_argument("overrides", nargs=argparse.REMAINDER)
     worker = commands.add_parser("worker", help="Serve this Unix user's jobs until stopped")
-    worker.add_argument("--max-used-memory-gib", type=float, default=2.0)
     worker.add_argument(
         "--log-level",
         choices=("DEBUG", "INFO", "WARNING", "ERROR"),
@@ -50,38 +56,51 @@ def _parser() -> argparse.ArgumentParser:
     commands.add_parser("tui", help="Open the optional Textual queue interface")
     gpu = commands.add_parser("gpu", help="Inspect and control physical host GPUs")
     operations = gpu.add_subparsers(dest="gpu_action", required=True)
-    gpu_list = operations.add_parser(
-        "list", help="List physical identities, holds and claim tokens"
-    )
+    gpu_list = operations.add_parser("list", help="List physical GPU numbers, holds and jobs")
     gpu_list.add_argument("--json", action="store_true")
     disable = operations.add_parser("disable", help="Hold a physical GPU for this Unix owner")
-    disable.add_argument("selector", help="Physical NVML index or full GPU UUID")
-    disable.add_argument("--reason", required=True)
+    disable.add_argument("selector", help="Physical GPU number or displayed short GPU label")
     enable = operations.add_parser("enable", help="Remove only your hold on a physical GPU")
-    enable.add_argument("selector", help="Physical NVML index or full GPU UUID")
-    release = operations.add_parser("release", help="Release one owned whole-allocation claim")
-    release.add_argument("selector", help="Physical NVML index or full GPU UUID")
-    release.add_argument("--claim-token", required=True)
-    release.add_argument("--reason", required=True)
-    release.add_argument(
-        "--force", action="store_true", help="Audit unverified stale cleanup; never kill"
-    )
+    enable.add_argument("selector", help="Physical GPU number or displayed short GPU label")
+    for action in ("free", "release"):
+        release = operations.add_parser(action, help="Free one GPU's reservation and holds")
+        release.add_argument("selector", help="Physical GPU number or displayed short GPU label")
     return parser
 
 
-def _show(view: QueueView, *, as_json: bool = False) -> None:
+def _show(
+    view: QueueView,
+    *,
+    as_json: bool = False,
+    presentation: QueuePresentation | None = None,
+) -> None:
+    presentation = presentation or QueuePresentation()
     if as_json:
-        sys.stdout.write(view.model_dump_json() + "\n")
+        sys.stdout.write(json.dumps(presentation.view(view)) + "\n")
         return
-    sys.stdout.write(f"Host {view.host_id} | revision {view.revision}\n")
+    sys.stdout.write(f"Host {presentation.text(view.host_id)} | revision {view.revision}\n")
     for position, job in enumerate(view.jobs, 1):
-        request = ",".join(job.request.devices or ()) or str(job.request.count)
-        allocation = ",".join(job.devices) or "-"
-        reason = job.waiting_reason or ""
+        request = presentation.request(job.request, job.host_id)
+        allocation = ",".join(presentation.devices(job.devices, job.host_id)) or "-"
+        reason = presentation.text(job.waiting_reason or "", job.host_id)
         sys.stdout.write(
-            f"{position}\t{job.id}\tuid={job.owner_uid}\t{job.state}\t"
+            f"{position}\t{presentation.text(job.id)}\tuid={job.owner_uid}\t{job.state}\t"
             f"request={request}\tallocation={allocation}\t{reason}\n"
         )
+
+
+def _presentation(host_id: str) -> QueuePresentation:
+    from clearml_yolo.adapters.runtime.gpu_resources import GPUInventory
+
+    try:
+        physical = GPUInventory().physical_uuids()
+    except Exception as error:  # noqa: BLE001 - optional display metadata from opaque NVML
+        logger.debug(
+            "GPU indexes unavailable; using short labels: {}",
+            QueuePresentation().text(str(error)),
+        )
+        physical = ()
+    return QueuePresentation({uuid: index for index, uuid in enumerate(physical)}, host_id=host_id)
 
 
 def _resource_request(arguments: argparse.Namespace) -> ResourceRequest:
@@ -133,8 +152,9 @@ def main() -> None:
 class _WorkerLog:
     """Render public owner observations without logging unchanged poll timestamps."""
 
-    def __init__(self, owner_uid: int) -> None:
+    def __init__(self, owner_uid: int, presentation: QueuePresentation | None = None) -> None:
         self.owner_uid = owner_uid
+        self.presentation = presentation or QueuePresentation()
         self._jobs: dict[str, tuple[object, ...]] = {}
         self._last_heartbeat: float | None = None
 
@@ -153,8 +173,8 @@ class _WorkerLog:
             level = "ERROR" if job.state in {"failed", "recovery_required"} else "INFO"
             details = (
                 f"Job {job.id} | state={job.state} | "
-                f"request={','.join(job.request.devices or ()) or job.request.count} | "
-                f"allocation={','.join(job.devices) or '-'}"
+                f"request={self.presentation.request(job.request, job.host_id)} | "
+                f"allocation={','.join(self.presentation.devices(job.devices, job.host_id)) or '-'}"
             )
             if job.waiting_reason:
                 details += f" | waiting={job.waiting_reason}"
@@ -162,7 +182,13 @@ class _WorkerLog:
                 details += f" | progress={job.progress}"
             if job.error:
                 details += f" | error={job.error}"
-            logger.log(level, "{}", redact_text(details).replace("\n", "\\n").replace("\r", "\\r"))
+            logger.log(
+                level,
+                "{}",
+                self.presentation.text(details, job.host_id)
+                .replace("\n", "\\n")
+                .replace("\r", "\\r"),
+            )
         self._jobs = current
         counts = Counter(job.state for job in jobs)
         summary = " ".join(f"{state}={count}" for state, count in sorted(counts.items()))
@@ -177,7 +203,10 @@ class _WorkerLog:
             )
             self._last_heartbeat = now
         logger.debug(
-            "Worker poll | host={} uid={} | {}", view.host_id, self.owner_uid, summary or "no jobs"
+            "Worker poll | host={} uid={} | {}",
+            self.presentation.text(view.host_id),
+            self.owner_uid,
+            summary or "no jobs",
         )
 
 
@@ -190,7 +219,10 @@ def _worker(service: QueueService) -> None:
 
     previous = {sig: signal.signal(sig, stop) for sig in (signal.SIGINT, signal.SIGTERM)}
     try:
-        service.worker(lambda: stopped, observe=_WorkerLog(service.identity.owner_uid))
+        service.worker(
+            lambda: stopped,
+            observe=_WorkerLog(service.identity.owner_uid, _presentation(service.identity.host_id)),
+        )
     finally:
         for sig, handler in previous.items():
             signal.signal(sig, handler)
@@ -204,12 +236,19 @@ def _tui(service: QueueService) -> None:
         if error.name and error.name.startswith("textual"):
             raise RuntimeError("Install clearml-yolo[queue-ui] to use cy-queue tui") from error
         raise
-    QueueApp(service).run()
+    QueueApp(service, presentation=_presentation(service.identity.host_id)).run()
 
 
 def _execute(arguments: argparse.Namespace) -> None:
     from clearml_yolo.adapters.queue.gpu_controls import GPUControls
     from clearml_yolo.adapters.queue.identity import current_identity
+    from clearml_yolo.adapters.queue.locks import LocalGPULocks
+
+    identity = current_identity()
+    if arguments.action == "gpu":
+        _gpu_operation(GPUControls(LocalGPULocks(identity)), arguments)
+        return
+
     from clearml_yolo.adapters.queue.inventory import QueueGPUInventory
     from clearml_yolo.adapters.queue.runtime import QueueProcesses
     from clearml_yolo.adapters.queue.storage import NFSQueueStore
@@ -217,28 +256,23 @@ def _execute(arguments: argparse.Namespace) -> None:
 
     root = initialize_runtime_environment()
     queue_root = arguments.root or Path(os.environ.get("CY_QUEUE_ROOT") or root / ".cy-queue")
-    identity = current_identity()
     storage = NFSQueueStore(queue_root, identity)
-    threshold = arguments.max_used_memory_gib if arguments.action == "worker" else 2.0
     processes = QueueProcesses(storage, identity)
     service = QueueService(
         storage,
-        QueueGPUInventory(max_used_memory_gib=threshold),
+        QueueGPUInventory(),
         processes,
         identity,
         controls=GPUControls(processes.pool),
     )
     if arguments.action == "worker":
         logger.info(
-            "Starting queue worker | root={} host={} uid={} max_used_memory_gib={}",
-            storage.root,
-            identity.host_id,
-            identity.owner_uid,
-            threshold,
+            "{}",
+            QueuePresentation().text(
+                f"Starting queue worker | root={storage.root} host={identity.host_id} "
+                f"uid={identity.owner_uid} max_used_memory_gib=2.0"
+            ),
         )
-    if arguments.action == "gpu":
-        _gpu_operation(service, arguments)
-        return
     _queue_operation(service, arguments, root)
 
 
@@ -254,7 +288,11 @@ def _queue_operation(service: QueueService, arguments: argparse.Namespace, root:
             for job in service.submit(snapshots):
                 sys.stdout.write(job.id + "\n")
         case "list":
-            _show(service.list(arguments.host), as_json=arguments.json)
+            _show(
+                service.list(arguments.host),
+                as_json=arguments.json,
+                presentation=_presentation(service.identity.host_id),
+            )
         case "move":
             _show(
                 service.move(
@@ -262,12 +300,15 @@ def _queue_operation(service: QueueService, arguments: argparse.Namespace, root:
                     _direction(arguments.direction),
                     arguments.revision,
                     relative_job_id=arguments.relative_job_id,
-                )
+                ),
+                presentation=_presentation(service.identity.host_id),
             )
         case "cancel":
-            sys.stdout.write(service.cancel(arguments.job_id).model_dump_json() + "\n")
+            job = service.cancel(arguments.job_id)
+            sys.stdout.write(json.dumps(_presentation(service.identity.host_id).job(job)) + "\n")
         case "recover":
-            sys.stdout.write(service.recover(arguments.job_id).model_dump_json() + "\n")
+            job = service.recover(arguments.job_id)
+            sys.stdout.write(json.dumps(_presentation(service.identity.host_id).job(job)) + "\n")
         case "worker":
             _worker(service)
         case "tui":
@@ -276,39 +317,44 @@ def _queue_operation(service: QueueService, arguments: argparse.Namespace, root:
             raise ValueError("Unknown queue operation")
 
 
-def _gpu_operation(service: QueueService, arguments: argparse.Namespace) -> None:
+def _gpu_operation(controls: QueueGPUControlPort, arguments: argparse.Namespace) -> None:
     match arguments.gpu_action:
         case "list":
-            cards = service.gpu_list()
+            cards = controls.list()
+            presentation = QueuePresentation(
+                {
+                    card.uuid: card.physical_index
+                    for card in cards
+                    if card.physical_index is not None
+                }
+            )
             if arguments.json:
-                sys.stdout.write(json.dumps([card.model_dump() for card in cards]) + "\n")
+                sys.stdout.write(json.dumps([presentation.gpu(card) for card in cards]) + "\n")
             else:
                 for card in cards:
-                    holds = "; ".join(f"uid={hold.owner_uid}: {hold.reason}" for hold in card.holds)
+                    holds = "; ".join(f"uid={hold.owner_uid}" for hold in card.holds)
+                    job = presentation.text(card.claim.job_id) if card.claim else "-"
                     sys.stdout.write(
-                        f"{card.physical_index if card.physical_index is not None else '-'}\t"
-                        f"{card.uuid}\tholds={holds or '-'}\t"
-                        f"job={card.claim.job_id if card.claim else '-'}\t"
-                        f"claim-token={card.claim_token or '-'}\n"
+                        f"{presentation.device(card.uuid)}\tholds={holds or '-'}\tjob={job}\n"
                     )
         case "disable":
-            sys.stdout.write(
-                service.gpu_disable(arguments.selector, reason=arguments.reason).model_dump_json()
-                + "\n"
-            )
+            hold = controls.disable(arguments.selector)
+            presentation = _selector_presentation(arguments.selector, hold.uuid)
+            sys.stdout.write(json.dumps(presentation.hold(hold)) + "\n")
         case "enable":
-            service.gpu_enable(arguments.selector)
+            controls.enable(arguments.selector)
             sys.stdout.write("Own GPU hold removed\n")
-        case "release":
-            audit = service.gpu_release(
-                arguments.selector,
-                token=arguments.claim_token,
-                reason=arguments.reason,
-                force=arguments.force,
-            )
-            sys.stdout.write(audit.model_dump_json() + "\n")
+        case "free" | "release":
+            result = controls.release(arguments.selector)
+            presentation = _selector_presentation(arguments.selector, result.uuid)
+            sys.stdout.write(json.dumps(presentation.freed(result)) + "\n")
         case _:
             raise ValueError("Unknown GPU control operation")
+
+
+def _selector_presentation(selector: str, uuid: str) -> QueuePresentation:
+    # The completed control already resolved identity: never add a second lookup.
+    return QueuePresentation({uuid: int(selector)} if selector.isdecimal() else {})
 
 
 if __name__ == "__main__":

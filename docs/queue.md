@@ -47,15 +47,20 @@ waits for a bounded acknowledgement. The guardian first durably shrinks the clai
 the first allocated GPU, then releases the other GPU locks and updates the public
 allocation before acknowledging. Other jobs may use those released GPUs during
 inference/comparison; normal memory admission still applies. The retained first GPU
-remains reserved until the pipeline and its owned descendants exit. A job that sends no
+remains reserved until the pipeline and its owned descendants exit, unless explicitly
+freed. A job that sends no
 training-finished notification retains its full allocation. Once a valid notification
 has durably shrunk the claim, later record-write or acknowledgement failure does not
 restore released GPUs. A failed or unacknowledged handoff stops the pipeline before
 inference; cleanup/recovery follows the remaining durable claim. This is not successful
 pipeline completion.
-Admission defaults to total used
-memory strictly below 2 GiB (`worker --max-used-memory-gib` changes it). This threshold is
-separate from the capacity needed by the model/compiler.
+Automatic GPU availability uses only total used VRAM strictly below 2 GiB (2048 MiB).
+Exactly 2 GiB is busy. This fixed limit is checked again after reserving the complete
+allocation and immediately before workload launch; missing or higher telemetry returns
+the attempted job to pending and releases its reservation. Process lists and utilization
+do not determine availability. Current queue allocations and explicit operator holds
+remain exclusive until released; stale unlocked bookkeeping alone does not exclude a GPU.
+The admission limit is separate from the capacity needed by the model/compiler.
 
 ## Shared ownership and ordering
 
@@ -78,7 +83,9 @@ Job IDs and JSON command results remain on stdout. Worker shutdown is reported
 after orderly exit; active jobs remain supervised by their guardians. Pipeline
 stdout/stderr stays in the submitting project's `.cy/queue-logs/JOB_ID.log`, with
 owner-only permissions. Worker diagnostics summarize queue state rather than
-streaming that file. Use `cy-queue list --json` for the full public queue view.
+streaming that file. Use `cy-queue list --json` for the public queue view. Queue text,
+JSON, TUI, status logs and errors show physical GPU indexes, with short unambiguous
+labels for devices absent from inventory. Full GPU UUIDs and claim tokens remain internal.
 
 ### Storage and scheduling
 
@@ -87,7 +94,7 @@ streaming that file. Use `cy-queue list --json` for the full public queue view.
 partitions hosts; boot identity is recorded separately. Each host has its own order and
 GPU capacity. `list --host HOST_ID` views another host without mutating its partition.
 NFS stores atomic manifests, owner events and history. Small host-local files provide
-transaction locks, worker claims and GPU UUID quarantine across queue roots and mount
+transaction locks, generation events, worker claims and recovery records across queue roots and mount
 aliases. No SQLite WAL database is placed on NFS.
 
 Effective Unix UID and filesystem ownership govern execution. One worker per owner/root
@@ -116,12 +123,14 @@ the job's ClearML finalization. Live discovery follows its own child topology ac
 threads, recorded process births and subreaper adoption, with PID/start-time checks
 and pidfds. An unrelated same-UID process whose `/proc` environment is inaccessible
 does not invalidate this scoped supervision. Repeated signals cannot interrupt bounded
-cleanup. The acknowledged training handoff releases only extra GPUs; releasing the
-remaining allocation requires verified cleanup.
+cleanup. The acknowledged training handoff releases only extra GPUs; ordinary guardian
+release follows verified cleanup. Explicit [manual freeing](#physical-gpu-operator-controls)
+independently clears the selected device's reservation without stopping its workload.
 
 A successful computation with required uploads can complete its ClearML task before
-the guardian finishes cleanup. Later supervisor uncertainty quarantines queue capacity
-and reports `recovery_required`; it does not retroactively fail that successful task.
+the guardian finishes cleanup. Later supervisor uncertainty reports `recovery_required`
+and retains cleanup evidence; current reservations remain exclusive, while stale unlocked
+metadata does not veto automatic admission. It does not retroactively fail that successful task.
 Computation and mandatory publication failures still fail the task. A completed task
 or local artifacts alone do not prove that queue capacity is safe to reclaim.
 
@@ -152,17 +161,20 @@ descendants. An unresponsive owner reaches the deadline and falls back to verifi
 whole-tree TERM/KILL cleanup. Forced termination may leave publication incomplete;
 local logs and uncertain execution evidence are retained.
 
-Guardian death or uncertain cleanup becomes `recovery_required`. The durable local claim
-continues excluding its UUIDs across participating roots after OS locks disappear. Only
-the owner can recover. Recovery performs conservative global ownership discovery;
+Guardian death or uncertain cleanup becomes `recovery_required`. Durable local records
+retain the uncertain outcome. Current reservations exclude their devices across
+participating roots; stale unlocked records alone do not block new admission. Only
+the owner can recover the job. Recovery performs conservative global ownership discovery;
 inaccessible or ambiguous process evidence remains blocked, even though unrelated
 processes do not poison the live guardian's scoped tree.
-Never reclaim from a heartbeat timeout, absent parent or low GPU memory. Uncertain jobs
-are never automatically retried. NFS failure stops new admission; active reservations
+Heartbeat expiry, absent parents and low GPU memory do not prove process cleanup or a
+successful job outcome. Explicit manual freeing requires no cleanup proof. Uncertain jobs
+are never automatically retried. NFS failure stops new job admission; active reservations
 remain protected. Unknown protocols and damaged coordination records fail closed. The active guardian
 compatibility marker identifies the queue supervision protocol; each job separately validates
 its package/version/source identity. A new kernel boot establishes a fresh PID-namespace
-stamp but leaves old reservations quarantined until explicit owner recovery.
+stamp; prior outcome records remain available for owner recovery without making stale,
+unlocked metadata an automatic capacity veto.
 
 Supported operation assumes cooperating Linux users, consistent NFS UID mapping and
 shared host PID/local coordination namespaces. Unsupported identity/locking conditions
@@ -172,46 +184,54 @@ privileged service and changes no mounts or accounts.
 ## Physical GPU operator controls
 
 These commands use **physical integer indexes in `nvidia-smi`/NVML order**, independent
-of `CUDA_VISIBLE_DEVICES`. Full `GPU-...` UUIDs are also accepted. This differs from
-`submit --devices` integers, which retain CUDA-visible logical order. Resolve indexes
-anew after a reboot or hardware change; UUIDs identify persistent holds and claims.
-Identity resolution does not need healthy memory telemetry. A full UUID can address a
-stale claim even when its device is absent from inventory.
+of `CUDA_VISIBLE_DEVICES`. This differs from `submit --devices` integers, which retain
+CUDA-visible logical order. Resolve indexes anew after a reboot or hardware change.
+Identity resolution does not require memory telemetry. Public output uses indexes or
+short unambiguous absent-device labels; displayed short labels are also valid selectors.
+Full UUIDs stay in internal coordination records.
 
 ```bash
 cy-queue gpu list
 cy-queue gpu list --json
-cy-queue gpu disable 2 --reason 'Temporarily unavailable for maintenance'
+cy-queue gpu disable 2
 cy-queue gpu enable 2
+cy-queue gpu free 2
+cy-queue gpu release 2
 ```
+
+GPU JSON rows expose `gpu`, `physical_index`, `holds` and `claim`; an absent device has
+a short `gpu` label and null physical index. Claims expose the job ID, owner UID and
+displayed device labels. Queue-job JSON likewise uses displayed labels for requests
+and allocations. Claim tokens, full UUIDs and private process/snapshot metadata are omitted.
 
 `disable` persists a hold for the current Unix UID in host-local coordination. Holds
 apply across queue roots and prevent new allocations; active work retains its allocation.
-Any owner's hold makes a device unavailable. `enable` removes only the caller's hold,
-leaving other holds and quarantine claims intact. Pending jobs report operator holds.
+Any owner's current hold makes a device unavailable. `enable` removes only the caller's
+hold; `free` clears every existing hold and reservation for the selected GPU across roots.
+Pending jobs report operator holds.
 
-For an owned stale or incorrectly quarantined allocation, read its current `claim-token`
-from `gpu list`. Select any one GPU from that allocation:
+`free` and `release` are equivalent. They accept the user's declaration immediately,
+without tokens, reasons, force flags, confirmation, memory/process checks or signals.
+They clear **only the selected GPU**, including its live reservation and existing holds;
+other GPUs in the same allocation remain reserved. The original queue directory need
+not be accessible. Repeated freeing succeeds. Operator events are recorded automatically
+without deleting another owner's private files.
 
-```bash
-cy-queue gpu release 2 --claim-token TOKEN_FROM_LIST --reason 'Reviewed stale allocation'
-cy-queue gpu release 2 --claim-token TOKEN_FROM_LIST --reason 'Operator accepts inaccessible stale evidence' --force
-```
+Freeing advances that GPU's reservation generation under the host transaction. Older
+locks and claim/hold records no longer block it. Earlier guardians cannot recreate its
+released reservation, overwrite a newer one, or clear a newer allocation during handoff,
+recovery or cleanup. Existing processes continue, and their job outcomes remain independent
+of freeing capacity. `free` does not cancel a job or declare it completed or failed.
 
-Normal release performs verified owned-process cleanup, like recovery. `--force` makes an
-explicit audited override when stale process evidence cannot be verified; it sends no
-signals. Both modes refuse a held OS lock or confirmed live guardian. Force also refuses
-confirmed live owned descendants. Only the claim owner may release it, and a stale token
-fails. Release covers the **whole allocation**, even when one GPU was selected. It marks
-the owning job failed and preserves snapshots, history and the operator audit; it never
-marks successful completion or removes holds. The claim's original queue root must be
-accessible. An interrupted release can be resumed using the same selector and token.
+There is no persistent admission bypass: every new job still checks used VRAM below
+2048 MiB immediately before launch. A later `disable` or a new queue reservation applies
+normally. Use `cancel` or owner `recover` when process cleanup or job recovery is the intent.
 
 Upgrade all cooperating workers on a host before using GPU controls. Worker startup and control mutations
 install a durable compatibility fence in host coordination: old workers must reject the
 unknown claim protocol instead of ignoring operator holds. Existing active allocations
-remain protected and can finish. Do not delete this fence or downgrade workers while
-controls are in use.
+remain protected unless explicitly freed and can finish. Do not delete this fence or
+downgrade workers while controls are in use.
 
 ## Optional terminal UI
 
@@ -227,6 +247,10 @@ Remove `queue.*`, `autogpu.*`, `auto_gpu.*`, `CY_GPU_QUEUE_ROOT` and the old Hyd
 execution recipes. Regenerate saved examples with `cy-init-config`; commands reject the
 old controls rather than interpreting them differently. Old queue directories and data
 are preserved without automatic migration or deletion.
+
+Remove `worker --max-used-memory-gib` from worker commands: admission now uses the fixed
+2 GiB limit. Remove `--reason`, `--claim-token` and `--force` from GPU control commands;
+`gpu release INDEX` now means the same per-device manual action as `gpu free INDEX`.
 
 [Filesystem ownership](filesystem-policy.md) constrains application outputs/cache/logs/scratch
 to the project. Only explicit shared queue metadata and small host-local coordination are

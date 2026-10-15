@@ -1,0 +1,287 @@
+{
+  "schema_version": 1,
+  "task": "031-gpu-control-simplification",
+  "impact": "modules",
+  "scope": [
+    "src/clearml_yolo/core/queue.py",
+    "src/clearml_yolo/application/queue.py",
+    "src/clearml_yolo/adapters/queue",
+    "src/clearml_yolo/adapters/runtime/gpu_resources.py",
+    "src/clearml_yolo/entrypoints/queue.py",
+    "src/clearml_yolo/entrypoints/queue_tui.py",
+    "src/clearml_yolo/entrypoints/queue_presentation.py",
+    "tests",
+    "docs",
+    "README.md",
+    "specs/031-test-quality-gpu-controls",
+    "src/clearml_yolo/core/gpu_identity.py",
+    "pyproject.toml",
+    "TECH_DETAILS.md",
+    ".agents/skills/running-end-to-end-tests",
+    "uv.lock",
+    "CHANGELOG.md"
+  ],
+  "rules": "Existing inward layers, SDK ownership and direct-command isolation in pyproject.toml and tests/test_architecture.py; explicit effects remain in adapters.",
+  "modules": [
+    {
+      "id": "queue-domain",
+      "path": "src/clearml_yolo/core/queue.py",
+      "change": "modify",
+      "responsibility": "Pure policy, private queue records and generation-aware control results.",
+      "interface": "Typed records and deterministic allocation; no SDK or filesystem effects.",
+      "layer": "core",
+      "allowed_dependencies": [
+        "standard library",
+        "Pydantic"
+      ],
+      "forbidden_dependencies": [
+        "adapters",
+        "entrypoints",
+        "runtime SDKs"
+      ],
+      "effects": "None",
+      "contracts": [
+        "architecture"
+      ]
+    },
+    {
+      "id": "queue-application",
+      "path": "src/clearml_yolo/application/queue.py",
+      "change": "modify",
+      "responsibility": "Coordinate queue behavior through explicit ports.",
+      "interface": "Reasonless control operations and memory observations with exclusive live reservations.",
+      "layer": "application",
+      "allowed_dependencies": [
+        "core",
+        "standard library"
+      ],
+      "forbidden_dependencies": [
+        "concrete adapters",
+        "entrypoints",
+        "runtime SDKs"
+      ],
+      "effects": "Effects through injected ports only",
+      "contracts": [
+        "architecture"
+      ]
+    },
+    {
+      "id": "queue-adapters",
+      "path": "src/clearml_yolo/adapters/queue",
+      "change": "modify",
+      "responsibility": "Own generation events, locks, telemetry integration and process supervision.",
+      "interface": "Atomic free and exclusive admission; older generations cannot alter current capacity.",
+      "layer": "adapters",
+      "allowed_dependencies": [
+        "core",
+        "queue adapters",
+        "runtime adapters",
+        "standard library"
+      ],
+      "forbidden_dependencies": [
+        "entrypoints",
+        "model and tracking SDKs"
+      ],
+      "effects": "Host-local coordination, queue storage and owned subprocesses",
+      "contracts": [
+        "architecture"
+      ]
+    },
+    {
+      "id": "gpu-telemetry",
+      "path": "src/clearml_yolo/adapters/runtime/gpu_resources.py",
+      "change": "modify",
+      "responsibility": "Read physical identities and memory without model runtimes.",
+      "interface": "Used bytes; missing readings produce unavailable observations; private UUIDs remain exact.",
+      "layer": "adapters",
+      "allowed_dependencies": [
+        "core",
+        "observability",
+        "standard library",
+        "NVML"
+      ],
+      "forbidden_dependencies": [
+        "queue adapters",
+        "entrypoints",
+        "model SDKs"
+      ],
+      "effects": "NVML and bounded CUDA identity probe",
+      "contracts": [
+        "architecture"
+      ]
+    },
+    {
+      "id": "queue-cli",
+      "path": "src/clearml_yolo/entrypoints/queue.py",
+      "change": "modify",
+      "responsibility": "Compose queue and standalone operator controls.",
+      "interface": "Index-based controls and public projections without tokens or full GPU IDs.",
+      "layer": "entrypoints",
+      "allowed_dependencies": [
+        "core",
+        "application",
+        "adapters"
+      ],
+      "forbidden_dependencies": [
+        "model SDKs"
+      ],
+      "effects": "CLI streams and explicit composition",
+      "contracts": [
+        "architecture"
+      ]
+    },
+    {
+      "id": "queue-tui",
+      "path": "src/clearml_yolo/entrypoints/queue_tui.py",
+      "change": "modify",
+      "responsibility": "Render public queue status and forward actions.",
+      "interface": "Physical GPU labels and sanitized errors.",
+      "layer": "entrypoints",
+      "allowed_dependencies": [
+        "application",
+        "core",
+        "Textual",
+        "presentation helpers"
+      ],
+      "forbidden_dependencies": [
+        "model SDKs"
+      ],
+      "effects": "Terminal UI",
+      "contracts": [
+        "architecture"
+      ]
+    },
+    {
+      "id": "queue-presentation",
+      "path": "src/clearml_yolo/entrypoints/queue_presentation.py",
+      "change": "add",
+      "responsibility": "One public projection for queue records and GPU labels.",
+      "interface": "Sanitized text and JSON without private GPU UUIDs or claim tokens.",
+      "layer": "entrypoints",
+      "allowed_dependencies": [
+        "core",
+        "standard library"
+      ],
+      "forbidden_dependencies": [
+        "runtime SDKs"
+      ],
+      "effects": "None",
+      "contracts": [
+        "architecture",
+        "import-linter"
+      ]
+    },
+    {
+      "id": "gpu-identity",
+      "path": "src/clearml_yolo/core/gpu_identity.py",
+      "change": "add",
+      "responsibility": "Pure shared short GPU identity labels and text sanitization.",
+      "interface": "identity_label and redact_gpu_ids; private UUIDs never rewritten.",
+      "layer": "core",
+      "allowed_dependencies": [
+        "standard library",
+        "Pydantic"
+      ],
+      "forbidden_dependencies": [
+        "adapters",
+        "entrypoints",
+        "runtime SDKs"
+      ],
+      "effects": "None",
+      "contracts": [
+        "architecture"
+      ],
+      "already_applied": true
+    },
+    {
+      "id": "architecture-checks",
+      "path": "tests/architecture_helpers.py",
+      "change": "modify",
+      "already_applied": true,
+      "responsibility": "Classify the public queue presentation boundary and reject direct-command imports.",
+      "interface": "AST and real import contracts, including deliberately injected violations.",
+      "layer": "tests",
+      "allowed_dependencies": [
+        "standard library",
+        "test helpers"
+      ],
+      "forbidden_dependencies": [
+        "runtime model SDK effects"
+      ],
+      "effects": "Read source and import contract configuration for tests only",
+      "contracts": [
+        "architecture",
+        "import-linter"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "architecture",
+      "path": "tests/test_architecture.py",
+      "status": "existing",
+      "rules": "Enforce inward layers, inert imports, queue SDK exclusions and direct-command isolation, including injected forbidden dependencies.",
+      "check": "imports"
+    },
+    {
+      "id": "import-linter",
+      "path": "pyproject.toml",
+      "status": "existing",
+      "rules": "Keep direct-command roots isolated from queue entrypoints, including queue_presentation.",
+      "check": "imports"
+    }
+  ],
+  "checks": [
+    {
+      "id": "imports",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync lint-imports && uv run --frozen --no-sync pytest tests/test_architecture.py",
+      "expectation": "Import contracts and negative dependency cases pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/031-test-quality-gpu-controls/gpu-control-simplification/verification.md"
+      }
+    },
+    {
+      "id": "behavior",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync pytest",
+      "expectation": "Offline regressions pass, including threshold, generation races, old guardians and public output.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/031-test-quality-gpu-controls/gpu-control-simplification/verification.md"
+      }
+    },
+    {
+      "id": "static",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync ruff check . && uv run --frozen --no-sync mypy . && uv run --frozen --no-sync vulture",
+      "expectation": "Lint, strict types and dead-code checks pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/031-test-quality-gpu-controls/gpu-control-simplification/verification.md"
+      }
+    },
+    {
+      "id": "docs",
+      "kind": "documentation",
+      "command": "Validate changed Markdown, local links and command examples using documented tooling",
+      "expectation": "Documentation and portable usage examples agree with implemented controls.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/031-test-quality-gpu-controls/gpu-control-simplification/verification.md"
+      }
+    }
+  ],
+  "documentation": "Queue, diagnostics, current contracts, runtime isolation, Russian README, feature amendments and companion corp-skills source usage/evaluation references.",
+  "review": {
+    "status": "accepted",
+    "reviewer": "Fresh native read-only /root/gpu_final_review plus /root/docs_review; parent integration and verification",
+    "evidence": "specs/031-test-quality-gpu-controls/gpu-control-simplification/review.md",
+    "reconciliation": "Reviewed the complete diff from 9355693, all new source/test/artifact files, architecture helpers and import contracts, TECH_DETAILS and E2E guidance. Fixed both independent review findings and reverified. Local tool.uv.sources and unrelated docs/cls-cls-pw-grid-search.md are excluded. Native release metadata changes only root version/changelog; historical physical acceptance remains open."
+  }
+}

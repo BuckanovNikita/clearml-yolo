@@ -15,6 +15,7 @@ from clearml_yolo.adapters.observability.diagnostics import (
 )
 from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.core.execution import DEFAULT_MAX_USED_MEMORY_GIB, AutoGPUControl, ExecutionPhase
+from clearml_yolo.core.gpu_identity import identity_label, redact_gpu_ids
 
 _CUDA_PROBE_TIMEOUT_SECONDS = 30.0
 
@@ -228,7 +229,7 @@ def job_request(command: str, config: Mapping[str, Any]) -> int:
 def _uuid(value: str | bytes) -> str:
     decoded = value.decode("ascii") if isinstance(value, bytes) else value
     if not decoded.startswith("GPU-"):
-        raise RuntimeError(f"NVML returned unsupported GPU UUID {decoded!r}")
+        raise RuntimeError("NVML returned an unsupported physical GPU identity")
     return decoded
 
 
@@ -249,7 +250,8 @@ def _probe_visible_uuids() -> tuple[str, ...]:
     if result.returncode:
         detail = result.stderr.strip() or f"metadata probe exited {result.returncode}"
         raise RuntimeError(
-            f"CUDA visibility probe failed (exit {result.returncode}): {redact_text(detail)}"
+            f"CUDA visibility probe failed (exit {result.returncode}): "
+            f"{redact_gpu_ids(redact_text(detail))}"
         )
     try:
         loaded = json.loads(result.stdout)
@@ -298,13 +300,18 @@ class GPUInventory:
             unknown = set(required).difference(self._visible_uuids)
             if unknown:
                 raise ValueError(
-                    f"Required GPU UUIDs are outside CUDA visibility: {sorted(unknown)}"
+                    "Required GPUs are outside CUDA visibility: "
+                    + ", ".join(identity_label(uuid) for uuid in sorted(unknown))
                 )
         self._required_uuids = required
 
     def physical_uuids(self) -> tuple[str, ...]:
         """Enumerate physical NVML identities without CUDA or memory telemetry."""
-        return self._physical_uuids()
+        try:
+            return self._physical_uuids()
+        except Exception as error:
+            # Discovery has the same opaque driver exceptions as memory telemetry.
+            raise RuntimeError(redact_gpu_ids(exception_summary(error))) from error
 
     def _physical_uuids(self) -> tuple[str, ...]:
         """Map physical identities independently of memory and MIG telemetry."""
@@ -321,30 +328,43 @@ class GPUInventory:
             if initialized:
                 nvml.nvmlShutdown()
 
-    def _memory_used(self, nvml: _NVML, handle: Any, uuid: str) -> int:
-        try:
-            current_mig_mode, _pending_mig_mode = nvml.nvmlDeviceGetMigMode(handle)
-        except nvml.NVMLError_NotSupported:
-            current_mig_mode = nvml.NVML_DEVICE_MIG_DISABLE
-        if current_mig_mode != nvml.NVML_DEVICE_MIG_DISABLE:
-            raise RuntimeError(f"MIG-enabled GPU {uuid} is unsupported by GPU availability waiting")
+    def _memory_used(self, nvml: _NVML, handle: Any, label: str, *, memory_only: bool) -> int:
+        if not memory_only:
+            try:
+                current_mig_mode, _pending_mig_mode = nvml.nvmlDeviceGetMigMode(handle)
+            except nvml.NVMLError_NotSupported:
+                current_mig_mode = nvml.NVML_DEVICE_MIG_DISABLE
+            if current_mig_mode != nvml.NVML_DEVICE_MIG_DISABLE:
+                raise RuntimeError(
+                    f"MIG-enabled {label} is unsupported by GPU availability waiting"
+                )
         try:
             memory = nvml.nvmlDeviceGetMemoryInfo(handle)
         except nvml.NVMLError_NotSupported as error:
             raise RuntimeError(
-                f"GPU {uuid} memory telemetry is unsupported; cannot determine safe availability"
+                f"{label} memory telemetry is unsupported; cannot determine availability"
             ) from error
         # NVML exposes an opaque binding record, rather than a project-owned type.
         used = getattr(memory, "used", None)
         if isinstance(used, bool) or not isinstance(used, int) or used < 0:
             raise RuntimeError(
-                f"GPU {uuid} memory telemetry returned invalid used bytes; "
-                "cannot determine safe availability"
+                f"{label} memory telemetry returned invalid used bytes; "
+                "cannot determine availability"
             )
         return used
 
     @trace_operation("gpu.inventory")
-    def snapshot(self) -> tuple[GPUDevice, ...]:
+    def snapshot(self, *, memory_only: bool = False) -> tuple[GPUDevice, ...]:
+        """Translate driver errors at the telemetry boundary, without guessing availability."""
+        try:
+            return self._snapshot(memory_only=memory_only)
+        except RuntimeError:
+            raise
+        except Exception as error:
+            # Driver bindings expose opaque exception classes; preserve the cause.
+            raise RuntimeError(redact_gpu_ids(exception_summary(error))) from error
+
+    def _snapshot(self, *, memory_only: bool) -> tuple[GPUDevice, ...]:
         """Fail closed for required GPUs; retain unavailable excluded cards as diagnostics.
 
         With no visibility discovery or explicit scope, all physical GPUs are required.
@@ -363,13 +383,14 @@ class GPUInventory:
                 handle = nvml.nvmlDeviceGetHandleByIndex(index)
                 uuid = _uuid(nvml.nvmlDeviceGetUUID(handle))
                 try:
-                    used = self._memory_used(nvml, handle, uuid)
+                    used = self._memory_used(nvml, handle, f"GPU {index}", memory_only=memory_only)
                 except Exception as error:
                     # This adapter boundary can represent telemetry failures only
                     # when the device cannot participate in this admission decision.
                     if required is None or uuid in required:
                         raise RuntimeError(
-                            f"GPU {uuid} telemetry unavailable: {exception_summary(error)}"
+                            f"GPU {index} telemetry unavailable: "
+                            f"{redact_gpu_ids(exception_summary(error))}"
                         ) from error
                     devices.append(
                         GPUDevice(
@@ -377,7 +398,7 @@ class GPUInventory:
                             busy=True,
                             physical_index=index,
                             logical_index=logical_indexes.get(uuid),
-                            telemetry_error=exception_summary(error),
+                            telemetry_error=redact_gpu_ids(exception_summary(error)),
                         )
                     )
                     continue
@@ -394,7 +415,8 @@ class GPUInventory:
                 missing = set(required).difference(device.uuid for device in devices)
                 if missing:
                     raise RuntimeError(
-                        f"Required GPUs unavailable in NVML inventory: {sorted(missing)}"
+                        "Required GPUs unavailable in NVML inventory: "
+                        + ", ".join(identity_label(uuid) for uuid in sorted(missing))
                     )
             return tuple(devices)
         finally:
@@ -409,7 +431,8 @@ class GPUInventory:
         unknown = [uuid for uuid in visible if uuid not in physical]
         if unknown:
             raise RuntimeError(
-                f"CUDA visibility could not be mapped to physical GPU UUIDs: {unknown}"
+                "CUDA visibility could not be mapped to physical GPUs: "
+                + ", ".join(identity_label(uuid) for uuid in unknown)
             )
         self._visible_uuids = visible
         return visible

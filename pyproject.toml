@@ -926,7 +926,7 @@ mask_initial_release = false
 name = "Direct execution never imports scheduling or Textual"
 type = "forbidden"
 source_modules = ["clearml_yolo.entrypoints.pipeline", "clearml_yolo.entrypoints.train", "clearml_yolo.entrypoints.predict", "clearml_yolo.entrypoints.val", "clearml_yolo.entrypoints.compare", "clearml_yolo.entrypoints.export", "clearml_yolo.entrypoints.metrics", "clearml_yolo.entrypoints.report", "clearml_yolo.entrypoints.ground_truth", "clearml_yolo.entrypoints.hydra.common", "clearml_yolo.entrypoints.composition"]
-forbidden_modules = ["clearml_yolo.adapters.queue", "clearml_yolo.application.queue", "clearml_yolo.core.queue", "textual"]
+forbidden_modules = ["clearml_yolo.adapters.queue", "clearml_yolo.application.queue", "clearml_yolo.core.queue", "clearml_yolo.entrypoints.queue_presentation", "textual"]
 
 [[tool.importlinter.contracts]]
 name = "Scheduling has no model tracking or Hydra SDK dependency"

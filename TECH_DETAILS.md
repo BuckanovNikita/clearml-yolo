@@ -251,27 +251,35 @@ See the [dedup contract](specs/018-cache-image-dedup/contracts/cli.md).
 cancellation, reordering, recovery and operator controls. Queue submission freezes
 and validates the entire sweep before adding jobs; installation changes require
 resubmission. Native GPU selectors must be unset for allocation; explicit CPU phases
-are retained. Compile, AMP and batch settings are not silently modified. An allocation
-is held until the complete pipeline and its owned descendants exit.
+are retained. Compile, AMP and batch settings are not silently modified. Training holds
+the full allocation until acknowledged contraction to the first inference GPU; that
+device stays reserved through pipeline/descendant exit unless explicitly freed.
 
 The earliest runnable job on each host is selected, skipping owners without a worker
-and requests lacking a complete GPU set. Worker admission defaults to strictly less
-than 2 GiB used memory; `--max-used-memory-gib=1.5` changes that ceiling. This is an
+and requests lacking a complete GPU set. Automatic availability uses only used VRAM
+strictly below 2 GiB (2048 MiB), checked again immediately before launch. Equality is
+busy; the limit is fixed. Current queue reservations and explicit holds remain exclusive,
+while stale unlocked records alone do not exclude capacity. This is an
 admission condition, not an out-of-memory guarantee. Durable state lives under
 `CY_QUEUE_ROOT` (default `$CY_HOME/.cy-queue`); host partitions have separate capacity
 and ordering. Shared NFS requires consistent UIDs and supported locking/PID visibility.
 
 Users may reorder others' pending jobs, but only execute, cancel or recover their own.
 `move` requires the current revision from `list --json`. Guardian death marks
-`recovery_required` and quarantines capacity until owner recovery proves cleanup.
-Never delete live lock files or reservation records. Whole allocations remain intact.
+`recovery_required` and retains evidence for owner recovery, which proves cleanup.
+Never delete live lock files or reservation records.
 
 Submission `--devices` indices are CUDA-visible logical indices, frozen to physical
 UUIDs. In contrast, [physical GPU operator controls](docs/queue.md#physical-gpu-operator-controls)
-use physical `nvidia-smi` order or full UUIDs. Holds affect new allocations across
-queue roots while preserving active work. Release requires owner authority, a current
-claim token and a reason; normal release proves cleanup. Forced release is an audited
-manual exception, sends no signals and refuses live locks or confirmed live processes.
+use physical `nvidia-smi` order. Queue text, JSON, TUI, status logs and errors show
+physical indexes or short absent-device labels; full GPU UUIDs and claim tokens remain
+internal. `gpu disable INDEX` adds the caller's hold; `gpu enable INDEX` removes it.
+`gpu free INDEX` and `gpu release INDEX` clear only the selected GPU's existing
+reservations and holds across queue roots. No tokens, reasons, force flags, confirmation,
+memory/process checks, signals or original queue access are needed. Per-device generations
+fence older guardian writes, handoff, recovery and cleanup; sibling allocations and
+existing processes remain intact. Freeing implies neither job failure nor success,
+and each new job still needs fresh memory admission.
 Upgrade all cooperating workers before using these controls. Consult the guide before
 recovery or release rather than deleting coordination files.
 
@@ -298,7 +306,8 @@ normal exit and complete matching receipt; partial data remains for retry.
 
 For direct cancellation, press Ctrl+C and allow owned-process cleanup to finish.
 Repeated signals do not interrupt bounded shutdown. Linux pidfd and `/proc` checks
-establish ownership; uncertain cleanup must not release queue capacity. These policies,
+establish ownership; uncertain cleanup does not prove that descendants exited. Explicit
+manual freeing changes capacity independently of that process-cleanup proof. These policies,
 DDP ownership and publication subprocess boundaries are documented in
 [runtime isolation](docs/runtime-isolation.md). The [DDP guide](docs/ddp-testing.md)
 contains opt-in physical multi-GPU/NCCL tests; CPU/offline checks do not establish

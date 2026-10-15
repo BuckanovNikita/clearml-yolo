@@ -11,6 +11,7 @@ from pathlib import Path
 from types import FrameType
 
 from clearml_yolo.adapters.queue.identity import process_birth
+from clearml_yolo.adapters.queue.inventory import allocation_available
 from clearml_yolo.adapters.queue.locks import GPULease, LocalGPULocks
 from clearml_yolo.adapters.queue.records import GuardianPayload
 from clearml_yolo.adapters.queue.storage import NFSQueueStore, atomic_write
@@ -137,6 +138,7 @@ class _Guardian:
             )
             self.store.update(self.payload.job_id, state, devices=())
             return False
+        self.claim = self.lease.claim
         return True
 
     def _persist(self) -> None:
@@ -154,7 +156,7 @@ class _Guardian:
         log_root.mkdir(mode=0o700, parents=True, exist_ok=True)
         return path
 
-    def _launch(self) -> None:
+    def _launch(self) -> bool:
         self._persist()
         self.store.load_snapshot(self.payload.job_id)
         read_gate, self.write_gate = os.pipe()
@@ -218,12 +220,52 @@ class _Guardian:
         self._persist()
         if self.store.cancelled(self.payload.job_id) or self.cancelled:
             raise InterruptedError("Queue job cancelled before native execution")
-        self.store.update(
-            self.payload.job_id, "running", devices=self.payload.devices, expected_state="starting"
-        )
-        os.write(self.write_gate, b"1")
+        if not allocation_available(self.payload.devices):
+            self._defer_start("GPU memory is unavailable or at least 2 GiB at startup")
+            return False
+        if self.lease is None:
+            raise RuntimeError("Guardian launch is missing its capacity lease")
+        # Match NFS -> host transaction order; free cannot race the final gate.
+        with self.store.transaction(), self.lease.pool.transaction():
+            current = self.lease.is_current_in_transaction()
+            if current:
+                self.store.transaction_update(
+                    self.payload.job_id,
+                    "running",
+                    devices=self.payload.devices,
+                    expected_state="starting",
+                )
+                os.write(self.write_gate, b"1")
+        if not current:
+            self._defer_start("GPU allocation was freed before startup")
+            return False
         os.close(self.write_gate)
         self.write_gate = None
+        return True
+
+    def _defer_start(self, reason: str) -> None:
+        """Close the unopened exec gate; the workload has not acquired a GPU."""
+        if self.write_gate is not None:
+            os.close(self.write_gate)
+            self.write_gate = None
+        if self.channel is not None:
+            self.channel.close()
+            self.channel = None
+        if self.child is not None:
+            self.child.wait(timeout=5)
+        self.tree = None
+        if self.lease is None:
+            raise RuntimeError("Deferred startup is missing its capacity lease")
+        self.lease.release_verified()
+        self.lease.close()
+        state: JobState = (
+            "cancelled"
+            if self.cancelled or self.store.cancelled(self.payload.job_id)
+            else "pending"
+        )
+        self.store.update(self.payload.job_id, state, devices=())
+        if state == "pending":
+            self.store.set_waiting({self.payload.job_id: reason})
 
     def _monitor(self) -> None:
         if self.child is None or self.tree is None or self.claim is None:
@@ -322,22 +364,24 @@ class _Guardian:
         if not self._prepare():
             return
         try:
-            self._launch()
-            self._monitor()
-        except BaseException as error:  # noqa: BLE001 - native cleanup owns all descendants
-            self.failure = error
-        try:
-            self._finish()
-        except BaseException as cleanup_error:
-            self.store.update(
-                self.payload.job_id,
-                "recovery_required",
-                error=(
-                    f"Cleanup verification failed: {type(cleanup_error).__name__}; "
-                    "owner recovery required"
-                ),
-            )
-            raise
+            try:
+                if not self._launch():
+                    return
+                self._monitor()
+            except BaseException as error:  # noqa: BLE001 - native cleanup owns all descendants
+                self.failure = error
+            try:
+                self._finish()
+            except BaseException as cleanup_error:
+                self.store.update(
+                    self.payload.job_id,
+                    "recovery_required",
+                    error=(
+                        f"Cleanup verification failed: {type(cleanup_error).__name__}; "
+                        "owner recovery required"
+                    ),
+                )
+                raise
         finally:
             if self.lease is not None:
                 self.lease.close()

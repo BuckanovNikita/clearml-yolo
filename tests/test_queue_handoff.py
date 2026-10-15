@@ -17,6 +17,8 @@ if TYPE_CHECKING:
     from clearml_yolo.adapters.queue.runtime import QueueProcesses
 
 
+pytestmark = pytest.mark.usefixtures("queue_memory")
+
 def _lease(
     directory: Path,
     devices: tuple[str, ...] = ("GPU-b", "GPU-a", "GPU-c"),
@@ -522,7 +524,7 @@ def test_post_commit_handoff_failure_becomes_recoverable_and_closes_every_lock(
 
     monkeypatch.setattr(locks, "_write_claim", fail_after_commit)
     monkeypatch.setattr(guardian, "_prepare", lambda: True)
-    monkeypatch.setattr(guardian, "_launch", lambda: None)
+    monkeypatch.setattr(guardian, "_launch", lambda: True)
     monkeypatch.setattr(guardian, "_monitor", guardian._consume_phase)
     try:
         child.sendall(b"training-finished-v1")

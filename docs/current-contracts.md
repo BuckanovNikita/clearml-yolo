@@ -21,7 +21,7 @@ configuration, output, tracking and evaluation rules formerly listed in `AGENTS.
 | Commands and output routing | [CLI](../specs/001-release-030/contracts/cli.md) | [Entrypoints and checks](../pyproject.toml), [output identity](../src/clearml_yolo/adapters/storage/run_identity.py), [pipeline](../src/clearml_yolo/application/use_cases/pipeline.py) |
 | Filesystem defaults and explicit destinations | [Filesystem ownership](filesystem-policy.md) | [Project bootstrap](../src/clearml_yolo/adapters/runtime/bootstrap.py), [Workspace policy](../src/clearml_yolo/adapters/storage/filesystem.py), [native runtime](../src/clearml_yolo/adapters/integrations/native_runtime.py) |
 | Explicit image cache deduplication | [Deduplication CLI](../specs/018-cache-image-dedup/contracts/cli.md) | [Command](../src/clearml_yolo/entrypoints/dedup.py), [cache implementation](../src/clearml_yolo/adapters/storage/dedup.py) |
-| GPU scheduling, device demand and execution controls | [Shared cy-queue](queue.md), [current specification](../specs/029-shared-cy-queue/spec.md) | [Queue policy](../src/clearml_yolo/core/queue.py), [application ports](../src/clearml_yolo/application/queue.py), [adapters](../src/clearml_yolo/adapters/queue), [direct invocation](../src/clearml_yolo/entrypoints/hydra/common.py) |
+| GPU scheduling, device demand and execution controls | [Shared cy-queue](queue.md), [queue specification](../specs/029-shared-cy-queue/spec.md), [operator amendments](../specs/031-test-quality-gpu-controls/spec.md) | [Queue policy](../src/clearml_yolo/core/queue.py), [application ports](../src/clearml_yolo/application/queue.py), [adapters](../src/clearml_yolo/adapters/queue), [direct invocation](../src/clearml_yolo/entrypoints/hydra/common.py) |
 | Selected export and runtime ownership | [Runtime isolation](runtime-isolation.md), [feature 024](../specs/024-runtime-isolation/spec.md) | [Exporter](../src/clearml_yolo/entrypoints/hydra/config_tree.py), [bootstrap](../src/clearml_yolo/adapters/runtime/bootstrap.py), [bounded publisher](../src/clearml_yolo/adapters/fiftyone/bounded.py) |
 | Native training and prediction groups | [Native configuration](../specs/005-explicit-detection-config/contracts/native-configuration.md), [example layout](../specs/007-detection-config-cleanup/contracts/configuration-and-artifacts.md) | [Native settings](../src/clearml_yolo/adapters/yolo/config.py), [registration](../src/clearml_yolo/entrypoints/hydra/configs.py), [export](../src/clearml_yolo/entrypoints/hydra/config_tree.py) |
 | Detector families and portable checkpoints | [Backend contract](../specs/025-multi-model-backends/contracts/backend.md), [model guide](multi-model-backends.md) | [Typed models](../src/clearml_yolo/core/models.py), [backend routing](../src/clearml_yolo/adapters/integrations/detectors.py), [checkpoint binding](../src/clearml_yolo/adapters/storage/checkpoint.py), [owner publication](../src/clearml_yolo/adapters/clearml/detectors.py) |
@@ -42,14 +42,23 @@ shared random ClearML tag per direct launch or queued submission. Keep the share
 Hydra tag helper, direct callback lifetime and frozen queue tags consistent. Explicit
 user tags survive; ordinary RUN adds no tag.
 
-Direct commands never schedule. Queue worker admission uses a strict total-used-memory
-cutoff (default 2.0 GiB), independent of training capacity. Keep [queue](queue.md), direct
-Hydra defaults, private snapshots, owner/guardian adapters, CLI/TUI and README consistent.
+Direct commands never schedule. Queue automatic availability uses only used VRAM strictly
+below 2 GiB (2048 MiB), with fresh admission checks immediately before launch and no
+configurable threshold. Current allocations and explicit holds stay exclusive; stale
+unlocked metadata alone does not veto capacity. The cutoff is independent of training
+capacity. Keep [queue](queue.md), direct Hydra defaults, private snapshots, owner/guardian
+adapters, CLI/TUI and README consistent.
 The [operator control contract](queue.md#physical-gpu-operator-controls) uses physical
 `nvidia-smi` indexes independently of CUDA visibility; submission selectors retain
-their logical mapping. Per-owner holds exclude new host allocations across roots.
-Explicit audited release never silently frees a live lock or implies job success.
-Keep capability preflight, hold/claim transactions and remote
+their logical mapping. Queue text, JSON, TUI, status logs and errors expose physical
+indexes or short absent-device labels, with full GPU UUIDs and claim tokens kept internal.
+Per-owner holds exclude new host allocations across roots. `gpu disable INDEX`,
+`enable INDEX`, `free INDEX` and its `release INDEX` alias need no supplementary
+arguments. Manual freeing clears only that GPU's existing reservations and holds without
+memory/process checks, signals, original queue access or changing the job outcome.
+Per-device generations fence earlier guardians and preserve sibling reservations; the
+next job still needs fresh memory admission. Keep capability preflight, hold/claim
+transactions and remote
 [GPU DDP acceptance](ddp-testing.md) aligned with these rules.
 
 Python integrations use the `core`, `application`, `adapters` and `entrypoints`
@@ -91,10 +100,12 @@ inference device. Explicit raw references add required vocabulary/preprocessing 
 See the [multi-model contract](../specs/025-multi-model-backends/contracts/backend.md).
 
 Feature 029 replaces the historical four-mode execution policy with direct commands and
-`cy-queue`. Old switches fail with migration guidance. Whole allocations persist through
-all pipeline phases; guardian death requires proven owner recovery. Ordering selects the
+`cy-queue`. Old switches fail with migration guidance. Training holds the complete
+allocation until acknowledged contraction; the first device remains reserved through
+descendant exit unless explicitly freed. Guardian death retains an uncertain job outcome
+for owner recovery, without letting stale unlocked records block new admission. Ordering selects the
 earliest runnable job on each host. NFS holds durable records, host-local coordination
-holds locks and quarantined claims. Completed historical evidence remains unchanged.
+holds locks, generations and recovery records. Completed historical evidence remains unchanged.
 
 [Runtime isolation](runtime-isolation.md) defines selected export (default only `cy`),
 finite FiftyOne worker deadlines and receipt validation. The stdlib bootstrap runs before

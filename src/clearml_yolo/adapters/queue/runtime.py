@@ -139,6 +139,9 @@ class QueueProcesses:
     def held(self) -> set[str]:
         return {hold.uuid for hold in self.pool.holds()}
 
+    def allocated_devices(self, identifier: str) -> tuple[str, ...]:
+        return self.pool.allocated_devices(identifier)
+
     def refresh(self) -> None:
         self._heartbeat()
         for pid, process in tuple(self._guardians.items()):

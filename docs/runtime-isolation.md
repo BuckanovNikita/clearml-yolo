@@ -119,27 +119,35 @@ Linux subreaper guardian which owns process cleanup outside ClearML task finaliz
 The job only sends an opaque training-finished notification after native training
 returns and unused model memory is released; it imports no queue GPU-management code.
 The guardian durably retains the first GPU, releases extra GPU locks and updates
-queue allocation before acknowledging. The first GPU remains reserved through
-pipeline/descendant exit; absent a training-finished notification, the full allocation
+queue allocation before acknowledging. Unless explicitly freed, the first GPU remains
+reserved through pipeline/descendant exit; absent a training-finished notification, the full allocation
 remains reserved. Failure after durable contraction can leave extras released even
 without acknowledgement; cleanup/recovery uses the remaining durable claim.
 Worker exit does not release active locks. Repeated SIGINT/SIGTERM defers interruption during bounded
 TERM/KILL descendant cleanup. PID/start-time checks, inherited markers, pidfds and adopted
 children protect against PID reuse and detached ranks. Unknown or inaccessible ownership
-blocks ordinary release. Guardian death leaves durable quarantine; owner `cy-queue recover ID`
-releases it after proven cleanup. The explicit audited
+blocks ordinary cleanup. Guardian death leaves durable recovery evidence; owner `cy-queue recover ID`
+settles it after proven cleanup. Stale unlocked records alone do not prevent automatic
+GPU admission. The
 [GPU operator controls](queue.md#physical-gpu-operator-controls) additionally permit
-owner-only whole-allocation release with a current claim token; force sends no signals
-and refuses live locks or positively identified living owners/descendants.
+`gpu free INDEX` or `gpu release INDEX` to clear only the selected physical GPU's
+reservations and existing holds immediately. They require no tokens, reasons, force
+flags, confirmation, memory/process checks or access to the original queue root and
+send no signals. Existing processes, sibling reservations and job outcomes remain
+unchanged. Per-device generations prevent older guardian writes, training handoff,
+recovery and cleanup from restoring a freed reservation or affecting a newer allocation.
+Every new job still needs used VRAM below 2 GiB immediately before launch.
 No heartbeat expiry, missing parent or low GPU-memory observation establishes cleanup.
 Live guardians follow only their own child topology across threads, recorded births
 and subreaper adoption; unrelated same-UID `/proc` access denials cannot poison that
 scoped tree. Recovery retains conservative global marker discovery. There, environment
 access denial is cleared only after confirming process exit, and living or unverifiable
-candidates block release. Retained identities are refreshed before use; empty discovery
+candidates block owner recovery. Retained identities are refreshed before use; empty discovery
 must remain stable across two scans, with churn requiring another bounded attempt.
 A completed successful ClearML task is not retroactively failed by subsequent guardian
-cleanup uncertainty: the queue reports `recovery_required` and quarantines capacity.
+cleanup uncertainty: the queue reports `recovery_required` and retains recovery evidence.
+Current allocations stay exclusive unless explicitly freed; stale unlocked records alone
+do not veto capacity.
 Required computation/upload failures retain their failure semantics. Old cancellation work
 is retained in generic process supervision and guardian regression tests; forced
 termination is covered separately.

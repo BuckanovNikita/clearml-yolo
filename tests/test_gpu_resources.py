@@ -331,10 +331,40 @@ def test_snapshot_applies_custom_fractional_limit(monkeypatch: pytest.MonkeyPatc
     )
 
 
+def test_queue_availability_uses_memory_without_mig_or_process_checks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from clearml_yolo.adapters.queue.inventory import allocation_available
+
+    fake = _FakeNVML(uuids=("GPU-a",), used_memory=(0,))
+
+    def no_extra_check(_handle: int) -> tuple[int, int]:
+        raise AssertionError("Queue availability must use only used memory")
+
+    monkeypatch.setattr(fake, "nvmlDeviceGetMigMode", no_extra_check)
+    _install_nvml(monkeypatch, fake)
+    assert allocation_available(("GPU-a",))
+
+
+def test_queue_keeps_healthy_gpu_available_when_another_memory_read_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from clearml_yolo.adapters.queue.inventory import QueueGPUInventory
+    from clearml_yolo.adapters.runtime import gpu_resources
+
+    fake = _FakeNVML(uuids=("GPU-a", "GPU-b"), used_memory=(_NotSupportedError("unavailable"), 0))
+    _install_nvml(monkeypatch, fake)
+    monkeypatch.setattr(gpu_resources, "_probe_visible_uuids", lambda: ("GPU-a", "GPU-b"))
+    assert [(card.uuid, card.available) for card in QueueGPUInventory().snapshot()] == [
+        ("GPU-a", False),
+        ("GPU-b", True),
+    ]
+
+
 def test_snapshot_reports_unsupported_memory_telemetry(monkeypatch: pytest.MonkeyPatch) -> None:
     fake = _FakeNVML(uuids=("GPU-a",), used_memory=(_NotSupportedError("unsupported"),))
     _install_nvml(monkeypatch, fake)
-    with pytest.raises(RuntimeError, match=r"GPU-a.*memory telemetry.*unsupported"):
+    with pytest.raises(RuntimeError, match=r"GPU 0.*memory telemetry.*unsupported"):
         GPUInventory().snapshot()
     assert fake.shutdown
 
@@ -345,7 +375,7 @@ def test_snapshot_rejects_invalid_memory_telemetry(
 ) -> None:
     fake = _FakeNVML(uuids=("GPU-a",), used_memory=(used,))
     _install_nvml(monkeypatch, fake)
-    with pytest.raises(RuntimeError, match=r"GPU-a.*memory telemetry"):
+    with pytest.raises(RuntimeError, match=r"GPU 0.*memory telemetry"):
         GPUInventory().snapshot()
     assert fake.shutdown
 
@@ -397,7 +427,7 @@ class _FixedInventory(GPUInventory):
         self.devices = devices
 
     @override
-    def snapshot(self) -> tuple[GPUDevice, ...]:
+    def snapshot(self, *, memory_only: bool = False) -> tuple[GPUDevice, ...]:
         return self.devices
 
     @override
@@ -552,7 +582,7 @@ def test_exact_required_subset_tolerates_other_visible_telemetry_failure(
     assert other.telemetry_error
     assert required == GPUDevice("GPU-b", False, 1, 0, 123)
     inventory.restrict_to(("GPU-a",))
-    with pytest.raises(RuntimeError, match=r"GPU-a.*memory telemetry.*unsupported"):
+    with pytest.raises(RuntimeError, match=r"GPU 0.*memory telemetry.*unsupported"):
         inventory.snapshot()
 
 
@@ -566,7 +596,7 @@ def test_required_visible_unavailable_telemetry_fails_explicitly(
     monkeypatch.setattr(gpu_resources, "_probe_visible_uuids", lambda: ("GPU-a",))
     inventory = GPUInventory()
     assert inventory.visible() == ("GPU-a",)
-    with pytest.raises(RuntimeError, match=r"GPU-a.*memory telemetry.*unsupported"):
+    with pytest.raises(RuntimeError, match=r"GPU 0.*memory telemetry.*unsupported"):
         inventory.snapshot()
 
 

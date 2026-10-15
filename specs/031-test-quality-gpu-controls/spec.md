@@ -62,3 +62,31 @@ multi-GPU acceptance awaits user-supplied remote results and is never inferred
 from mocked, CPU or single-GPU checks. ClearML uses normal SDK configuration.
 Runtime fixes are limited to supervision preflight and approved GPU controls.
 The existing CUDA-logical semantics of queue submission are not changed.
+
+## Operator simplification amendment — 2026-10-15
+
+This user-approved amendment supersedes US2/FR-04–06 where they require tokens,
+reasons, ownership verification or live-process refusal for explicit GPU freeing.
+Earlier completed evidence and external acceptance gaps remain historical records.
+
+- GC-01: Public CLI, JSON, TUI, logs and diagnostics use physical GPU indexes or
+  short unambiguous labels, never full GPU identities or claim tokens. Internal
+  identities retain physical UUID precision; submission keeps CUDA logical indexes.
+- GC-02: `gpu disable INDEX`, `gpu enable INDEX`, `gpu free INDEX` and its `release`
+  alias require no token, reason, force flag or confirmation. Free immediately
+  supersedes the selected device's prior holds/reservations across host queue roots,
+  without memory/process checks, signals or original queue access. Other devices
+  remain reserved. Repeated free succeeds.
+- GC-03: Every new job rechecks used VRAM immediately before workload startup.
+  Automatic availability is strictly below 2 GiB (2048 MiB). Active queue leases
+  stay exclusive and explicit disable controls remain effective. Stale bookkeeping
+  alone cannot exclude capacity. Missing memory readings keep admission pending.
+- GC-04: Free creates no lasting memory bypass. Existing processes continue and
+  their job outcomes remain independent. Older guardians cannot recreate freed
+  reservations, alter newer leases, or fail solely because capacity was freed.
+- GC-05: Generation-specific coordination serializes concurrent allocations,
+  operator changes and handoffs, with durable events and backward-worker fencing.
+
+Acceptance covers exact threshold boundaries, startup rechecks, real subprocess
+locks, per-device freeing, cross-root and competing operations, old guardian
+persistence/handoff/cleanup, missing telemetry and absence of public full IDs.

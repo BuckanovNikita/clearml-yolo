@@ -18,6 +18,8 @@ from clearml_yolo.adapters.queue.runtime import QueueProcesses
 from clearml_yolo.adapters.queue.storage import NFSQueueStore
 from clearml_yolo.core.queue import JobSnapshot, PublicJob, WorkerIdentity
 
+pytestmark = pytest.mark.usefixtures("queue_memory")
+
 
 def _wait_for(path: Path, timeout: float = 10) -> str:
     deadline = time.monotonic() + timeout

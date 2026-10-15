@@ -119,13 +119,20 @@ for diagnostics; scientific core records and algorithms remain independent of it
 Direct commands do not perform GPU admission. `cy-queue list --json` and the TUI expose
 pending order, owner UID, requested resources, allocation and the current wait reason.
 Admission selects the earliest runnable job using its owner's available worker and full
-GPU set. Worker `--max-used-memory-gib` defaults to 2.0; equality is busy. Existing
-reservations and quarantined guardian claims exclude capacity regardless of low memory.
+GPU set. Automatic availability uses only used VRAM strictly below 2 GiB (2048 MiB),
+including a fresh check immediately before launch; equality is busy. The limit is fixed.
+Current reservations and explicit holds exclude capacity regardless of low memory;
+stale unlocked records alone do not. Queue text, JSON, TUI, status logs and errors use
+physical GPU indexes or short absent-device labels, never full GPU UUIDs or claim tokens.
 A free device does not prove that the selected compiled model/batch fits.
 
 For a stuck job inspect its owner worker and guardian state. `recovery_required` means
 cleanup or outcome is uncertain; owner `cy-queue recover ID` must prove descendant cleanup.
-Never delete live lock files or use age/PID disappearance alone as proof. Capture native
+To declare physical GPU 2 free, use `cy-queue gpu free 2` (or `gpu release 2`). It clears
+only that device's current reservations and holds, requires no token/reason/force flag,
+and performs no memory/process check or signals. Existing processes and job outcomes
+remain unchanged; the next job still needs fresh memory admission. Never delete live
+lock files or use age/PID disappearance alone as cleanup proof. Capture native
 compiler errors with command, package versions, physical mapping, first failed rank and
 memory observations. `TORCHINDUCTOR_COMPILE_THREADS=1` is a supported diagnostic comparison,
 not an automatic workaround. See [queue operations](queue.md).

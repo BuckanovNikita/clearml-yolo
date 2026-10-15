@@ -40,3 +40,14 @@ The user explicitly requested local completion and release before supplying the
 other machine's results. T015's remaining overall acceptance gate and T016 remain
 external; they do not represent unperformed local implementation or review.
 See [release evidence](release.md).
+
+## GPU control simplification — 2026-10-15
+
+- [x] T020 Parent: capture GC-01–05, interfaces, architecture and dependency-aware ownership; analyze amendment coverage before implementation.
+- [x] T021 [P] Reservation: generation events/locks, per-device unconditional free and reasonless holds; regressions for live/stale/cross-root/interrupted operations (GC-02, GC-04–05).
+- [x] T022 [P] Presentation: minimal CLI and UUID-free public text/JSON/TUI/log/error projections; output regressions (GC-01–02).
+- [x] T023 Parent: application ports, fixed memory-only eligibility, guardian startup recheck and generation-safe supervision integration (GC-03–05; depends on T021 interfaces).
+- [x] T024 Parent: integrate, run focused and full offline/static/import checks, inspect real lock/process evidence and native-check scope (depends on T021–23).
+- [x] T025 Documentation: update affected contracts, README and canonical portable usage skill; validate Markdown, links and commands (depends on T021–23).
+- [x] T026 Fresh independent reviewer/parent: review integrated diff after checks, resolve findings and reconcile architecture acceptance (depends on T024–25).
+- [ ] T027 Parent: task-scoped Conventional Commit and native Git-tag-only release, companion skill delivery and final evidence (depends on T026).

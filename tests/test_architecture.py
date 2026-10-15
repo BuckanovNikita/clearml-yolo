@@ -92,6 +92,8 @@ def test_injected_forbidden_dependencies_are_rejected(
         ("clearml_yolo.entrypoints.hydra.common", "clearml_yolo.adapters.queue.runtime"),
         ("clearml_yolo.entrypoints.composition", "clearml_yolo.application.queue"),
         ("clearml_yolo.entrypoints.pipeline", "textual"),
+        ("clearml_yolo.entrypoints.pipeline", "clearml_yolo.entrypoints.queue_presentation"),
+        ("clearml_yolo.entrypoints.queue_presentation", "torch"),
         ("clearml_yolo.adapters.queue.guardian", "clearml"),
         ("clearml_yolo.adapters.queue.storage", "torch"),
         ("clearml_yolo.application.queue", "hydra"),

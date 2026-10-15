@@ -43,12 +43,19 @@ this branch.
    Follow the [shared queue contract](../../../docs/queue.md) for immutable sweep submission,
    earliest-runnable admission, exact ordered UUID bindings, concurrent disjoint jobs,
    cross-root GPU exclusion, ownership, stale reorder revisions and guardian recovery.
-   Verify acknowledged post-training contraction: the first GPU remains reserved through
+   Verify acknowledged post-training contraction: unless explicitly freed, the first GPU remains reserved through
    pipeline/descendant exit, and released extra GPUs admit other eligible jobs during
    inference. Without a training-finished notification the full allocation stays held.
    Verify lost acknowledgement after durable shrink stops inference and preserves the
    remaining durable claim without restoring released extras. Verify repeated
-   signals, worker/guardian forced death and uncertain-cleanup quarantine. Real two-user,
+   signals, worker/guardian forced death and retained uncertain-cleanup evidence. Verify
+   active allocations stay exclusive, stale unlocked records do not veto capacity, and
+   automatic admission uses only used VRAM strictly below 2 GiB with a fresh launch check.
+   Verify physical-index `gpu free`/`release` clears only the selected device's reservations
+   and holds without tokens, reasons, force flags, confirmation, memory/process checks,
+   signals or original queue access. Existing processes, sibling reservations and job
+   outcomes stay intact; older guardians cannot affect newer allocations. Verify public
+   queue text, JSON, TUI, logs and errors omit full GPU UUIDs and claim tokens. Real two-user,
    two-host NFS and physical one/five-GPU eager/compiled acceptance require target evidence;
    record unavailable targets and unresolved native failures as gaps. Compare matching direct
    and queued settings without treating scheduling as a compiler fix.

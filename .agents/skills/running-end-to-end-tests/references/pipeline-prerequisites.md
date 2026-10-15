@@ -56,22 +56,33 @@ Explicit CPU phases remain CPU. Queued training uses the complete allocation and
 its first GPU. After native training returns and unused model memory is released,
 the external guardian durably shrinks the claim, releases extra GPU locks and updates
 public allocation before acknowledging. Verify another eligible job can use released
-GPUs during inference. Retain the first GPU through pipeline/descendant exit; absent
+GPUs during inference. Unless explicitly freed, retain the first GPU through pipeline/descendant exit; absent
 a training-finished notification, retain the full allocation. If acknowledgement is
 lost after durable shrink, verify the pipeline stops before inference and cleanup
 follows the remaining durable claim without restoring released extras.
-Verify cleanup uncertainty quarantines queue
-capacity without retroactively failing a completed successful ClearML task, while
+Verify cleanup uncertainty retains recovery evidence without retroactively failing a
+completed successful ClearML task, while
 required computation/upload failures still fail. Live guardian discovery is scoped
 to its descendants; recovery keeps conservative global ownership proof.
 
 A persistent same-user worker executes private immutable snapshots in fresh processes;
 closing a submission terminal or TUI does not stop it. No ClearML task exists while waiting.
-Admission uses total NVML used memory strictly below `worker --max-used-memory-gib`
-(default 2 GiB), independently of model/compiler memory fit. Existing reservations stay
-excluded across queue roots. Unknown telemetry/protocol, unsupported MIG and damaged
+Automatic availability uses only NVML used VRAM strictly below 2 GiB (2048 MiB),
+independently of model/compiler memory fit. The limit is fixed and checked again
+immediately before launch; exactly 2 GiB is busy. Current reservations and explicit
+holds stay excluded across queue roots. Stale unlocked records alone do not veto
+admission. Unknown telemetry/protocol, unsupported MIG and damaged
 coordination stop admission. Excessive whole-GPU demand remains pending with its reason.
 CPU ONNX export needs no GPU; engine build and verification require one GPU.
+
+Operator commands use physical `nvidia-smi` indexes independently of CUDA visibility;
+public output uses those indexes or short absent-device labels, with full GPU UUIDs
+and claim tokens kept internal. Verify `gpu disable INDEX`, `enable INDEX`, `free INDEX`
+and `release INDEX` require no supplementary arguments. Free/release clears only the
+selected GPU's existing reservations and holds across roots without memory/process
+checks, signals or original queue access. It preserves sibling reservations, processes
+and job outcomes, and older guardian writes cannot affect newer reservations. The next
+job still needs fresh memory admission; manual freeing grants no persistent bypass.
 
 Before acceptance preserve unrelated compute and establish available hardware. Verify
 matching direct/queued settings, one/five physical GPUs eager/compiled, independent live

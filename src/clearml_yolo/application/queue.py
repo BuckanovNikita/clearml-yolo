@@ -6,9 +6,9 @@ from typing import Protocol
 
 from clearml_yolo.core.queue import (
     GPUControlStatus,
+    GPUFreeResult,
     GPUHold,
     GPUObservation,
-    GPUReleaseAudit,
     JobSnapshot,
     MoveDirection,
     PublicJob,
@@ -45,6 +45,7 @@ class QueueProcessPort(Protocol):
     def owner_inventory(self) -> dict[int, tuple[GPUObservation, ...]]: ...
     def reserved(self) -> set[str]: ...
     def held(self) -> set[str]: ...
+    def allocated_devices(self, identifier: str) -> tuple[str, ...]: ...
     def start(
         self, job: PublicJob, devices: tuple[str, ...], *, expected_revision: int | None = None
     ) -> bool: ...
@@ -55,16 +56,9 @@ class QueueProcessPort(Protocol):
 
 class QueueGPUControlPort(Protocol):
     def list(self) -> tuple[GPUControlStatus, ...]: ...
-    def disable(self, selector: str, *, reason: str) -> GPUHold: ...
+    def disable(self, selector: str) -> GPUHold: ...
     def enable(self, selector: str) -> None: ...
-    def release(
-        self,
-        selector: str,
-        *,
-        token: str,
-        reason: str,
-        force: bool = False,
-    ) -> GPUReleaseAudit: ...
+    def release(self, selector: str) -> GPUFreeResult: ...
 
 
 class QueueService:
@@ -88,21 +82,14 @@ class QueueService:
     def gpu_list(self) -> tuple[GPUControlStatus, ...]:
         return self._gpu_controls().list()
 
-    def gpu_disable(self, selector: str, *, reason: str) -> GPUHold:
-        return self._gpu_controls().disable(selector, reason=reason)
+    def gpu_disable(self, selector: str) -> GPUHold:
+        return self._gpu_controls().disable(selector)
 
     def gpu_enable(self, selector: str) -> None:
         self._gpu_controls().enable(selector)
 
-    def gpu_release(
-        self,
-        selector: str,
-        *,
-        token: str,
-        reason: str,
-        force: bool = False,
-    ) -> GPUReleaseAudit:
-        return self._gpu_controls().release(selector, token=token, reason=reason, force=force)
+    def gpu_release(self, selector: str) -> GPUFreeResult:
+        return self._gpu_controls().release(selector)
 
     def _gpu_controls(self) -> QueueGPUControlPort:
         if self.controls is None:
@@ -141,8 +128,13 @@ class QueueService:
                     )
                 jobs.append(job.model_copy(update={"waiting_reason": reason}))
             else:
-                jobs.append(job)
+                jobs.append(self._allocation(job))
         return view.model_copy(update={"jobs": tuple(jobs)})
+
+    def _allocation(self, job: PublicJob) -> PublicJob:
+        if job.state in {"starting", "running", "cancelling", "recovery_required"}:
+            return job.model_copy(update={"devices": self.processes.allocated_devices(job.id)})
+        return job
 
     def move(
         self,
@@ -157,17 +149,29 @@ class QueueService:
         )
 
     def cancel(self, job_id: str) -> PublicJob:
-        return self.storage.cancel(job_id)
+        return self._allocation(self.storage.cancel(job_id))
 
     def recover(self, job_id: str) -> PublicJob:
-        return self.processes.recover(job_id)
+        return self._allocation(self.processes.recover(job_id))
 
     def tick(self) -> int:
         self.processes.refresh()
         view = self.storage.view()
         if not any(job.state == "pending" for job in view.jobs):
             return 0
-        observations = self.inventory.snapshot()
+        try:
+            observations = self.inventory.snapshot()
+        except (OSError, RuntimeError):
+            # Unknown memory never admits work or leaves a stale free observation.
+            self.processes.publish_inventory(())
+            self.storage.set_waiting(
+                {
+                    job.id: "GPU memory telemetry unavailable"
+                    for job in view.jobs
+                    if job.state == "pending" and job.owner_uid == self.identity.owner_uid
+                }
+            )
+            return 0
         self.processes.publish_inventory(observations)
         inventories = self.processes.owner_inventory()
         owners = set(inventories)
@@ -206,5 +210,5 @@ class QueueService:
             while not stop():
                 self.tick()
                 if observe is not None:
-                    observe(self.storage.view())
+                    observe(self.list())
                 self.processes.pause(poll_seconds)

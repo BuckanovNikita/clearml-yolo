@@ -1,5 +1,6 @@
 """Isolate process-wide runtime configuration between tests."""
 
+import json
 import os
 import sys
 import tempfile
@@ -11,6 +12,18 @@ import pytest
 
 from clearml_yolo.adapters.runtime import bootstrap
 from ddp_gpu_harness import GPUOptions
+
+
+@pytest.fixture
+def queue_memory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Inject only the NVML boundary into real, otherwise unmodified guardians."""
+    memory = tmp_path / "gpu-memory.json"
+    memory.write_text(json.dumps(dict.fromkeys(("GPU-a", "GPU-b", "GPU-c", "GPU-test"), 0)))
+    monkeypatch.setenv("CY_TEST_QUEUE_MEMORY", str(memory))
+    directory = Path(__file__).parent / "queue_nvml"
+    inherited = os.environ.get("PYTHONPATH", "")
+    monkeypatch.setenv("PYTHONPATH", str(directory) + (os.pathsep + inherited if inherited else ""))
+    return memory
 
 
 @pytest.fixture(autouse=True)

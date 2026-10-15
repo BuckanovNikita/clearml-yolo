@@ -240,7 +240,8 @@ def layer(module: str) -> str | None:
         "core": None,
         "adapters": ADAPTER_RESPONSIBILITIES,
         "application": {"contracts", "ports", "evaluation", "use_cases", "queue"},
-        "entrypoints": COMMANDS | {"composition", "hydra", "queue_tui", "queue_run"},
+        "entrypoints": COMMANDS
+        | {"composition", "hydra", "queue_tui", "queue_run", "queue_presentation"},
     }
     selected = pieces[1]
     if selected not in responsibilities:
@@ -259,6 +260,7 @@ def launch_target_findings(importer: str, targets: set[str]) -> list[str]:
         "clearml_yolo.application.queue",
         "clearml_yolo.core.queue",
         "clearml_yolo.entrypoints.queue_run",
+        "clearml_yolo.entrypoints.queue_presentation",
         "textual",
     )
     return [

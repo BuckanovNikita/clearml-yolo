@@ -56,11 +56,15 @@ training allocations with acknowledged contraction to the first inference GPU, a
 guardian recovery. No training-finished notification retains the full allocation;
 failure after durable contraction does not restore released GPUs, and cleanup/recovery
 uses the remaining claim. External guardians own queued descendant cleanup outside ClearML
-finalization; supervisor uncertainty quarantines capacity without retroactively failing
-a completed successful task. Recovery still requires conservative ownership proof.
+finalization; supervisor uncertainty retains recovery evidence without retroactively
+failing a completed successful task. Recovery still requires conservative ownership proof;
+stale unlocked records alone do not veto GPU admission.
 Queue allocation preserves explicit
 CPU phases, compilation, AMP, batch and model settings. Inference uses the first allocated
-device. Memory admission thresholds are not guarantees that compilation/training fits.
+device. Automatic GPU availability uses only used VRAM strictly below 2 GiB (2048 MiB),
+checked again immediately before launch. Exactly 2 GiB is unavailable. Current queue
+allocations and explicit holds remain exclusive unless released. This fixed limit does
+not guarantee that compilation/training fits.
 
 Each direct or queued multirun adds one shared random `multirun-<UUID4 hex>` ClearML
 tag to all its jobs, preserving explicit tags. The group is fresh per launch/submission
@@ -100,9 +104,17 @@ Unknown required-device telemetry, visible MIG and damaged coordination state fa
 Direct execution has no dependency on this machinery. Queue workers execute only their
 own UID's jobs. Every local participant may reorder pending jobs; only owners cancel/recover.
 Each host partitions durable shared NFS metadata independently; host-global local UUID locks
-prevent participating roots from allocating the same device. Guardian death quarantines
-capacity until owner recovery proves descendant cleanup. No automatic retry is made for
-uncertain outcomes. Historical 013/022/024 specifications remain preserved as prior intent.
+prevent participating roots from allocating the same device. Physical-index operator
+controls need no tokens, reasons, force flags or confirmation. `gpu free INDEX` and
+`gpu release INDEX` immediately clear that GPU's reservations and existing holds across
+roots, without memory/process checks, signals or access to the original queue directory.
+Per-device reservation generations preserve sibling allocations and fence older guardian
+writes, handoff, recovery and cleanup. Freeing leaves processes and job outcomes unchanged
+and grants no persistent admission bypass. Public queue output uses physical indexes or
+short absent-device labels; full GPU UUIDs and claim tokens remain internal. Guardian
+death retains recovery records, but stale unlocked records alone do not block capacity.
+No automatic retry is made for uncertain outcomes. Historical 013/022/024 specifications
+remain preserved as prior intent.
 
 `run_dir` owns output routing for `cy`. Pipeline stages cannot use conflicting stage output
 paths or conflicting native training project/name. Standalone output-producing commands use

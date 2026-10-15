@@ -63,13 +63,16 @@ def test_worker_logs_changes_and_heartbeat_without_timestamp_noise(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from clearml_yolo.entrypoints import queue
+    from clearml_yolo.entrypoints.queue_presentation import QueuePresentation
 
     clock = [0.0]
     monkeypatch.setattr(time, "monotonic", lambda: clock[0])
     messages: list[str] = []
     sink = logger.add(messages.append, format="{level}: {message}", level="INFO")
     try:
-        observer = queue._WorkerLog(owner_uid=7)
+        observer = queue._WorkerLog(
+            owner_uid=7, presentation=QueuePresentation({"GPU-one": 2}, host_id="host")
+        )
         pending = PublicJob(
             id="own-job",
             owner_uid=7,
@@ -114,7 +117,8 @@ def test_worker_logs_changes_and_heartbeat_without_timestamp_noise(
         observer(view.model_copy(update={"jobs": (running,)}))
         rendered = "".join(messages)
         assert "running" in rendered
-        assert "GPU-one" in rendered
+        assert "allocation=2" in rendered
+        assert "GPU-one" not in rendered
         assert "Training step 5" in rendered
         messages.clear()
         observer(

@@ -4,6 +4,56 @@ import os
 import sys
 from pathlib import Path
 
+import pytest
+
+pytestmark = pytest.mark.usefixtures("queue_memory")
+
+
+def test_cold_driver_failure_keeps_job_pending(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from types import SimpleNamespace
+
+    from clearml_yolo.adapters.queue.inventory import QueueGPUInventory
+    from clearml_yolo.adapters.queue.runtime import QueueProcesses
+    from clearml_yolo.adapters.queue.storage import NFSQueueStore
+    from clearml_yolo.adapters.runtime import gpu_resources
+    from clearml_yolo.application.queue import QueueService
+    from clearml_yolo.core.queue import JobSnapshot, WorkerIdentity
+
+    class DriverError(Exception):
+        pass
+
+    def unavailable() -> None:
+        raise DriverError("Driver not loaded")
+
+    monkeypatch.setattr(gpu_resources, "_nvml", lambda: SimpleNamespace(nvmlInit=unavailable))
+    monkeypatch.setattr(gpu_resources, "_probe_visible_uuids", lambda: ("GPU-test",))
+    identity = WorkerIdentity(owner_uid=os.geteuid(), host_id="host", boot_id="boot")
+    store = NFSQueueStore(tmp_path / "queue", identity)
+    processes = QueueProcesses(store, identity, local_root=tmp_path / "local")
+    service = QueueService(store, QueueGPUInventory(), processes, identity)
+    service.submit(
+        (
+            JobSnapshot(
+                command="train",
+                config_json="{}",
+                project_root=str(tmp_path),
+                cwd=str(tmp_path),
+                interpreter=sys.executable,
+                package_version="1",
+                package_identity="hash",
+            ),
+        )
+    )
+    with processes.worker_registration():
+        assert service.tick() == 0
+        job = store.view().jobs[0]
+        assert job.state == "pending"
+        assert job.waiting_reason == "GPU memory telemetry unavailable"
+        assert processes.owner_inventory()[identity.owner_uid] == ()
+        assert not processes.reserved()
+
 
 def test_service_submits_schedules_then_cancels_without_retry(tmp_path: Path) -> None:
     from clearml_yolo.adapters.queue.runtime import QueueProcesses
