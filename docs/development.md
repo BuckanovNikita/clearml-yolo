@@ -1,5 +1,8 @@
 # Development and commit procedures
 
+User-facing workflows are in the [README](../README.md); setup and operational
+context are collected in the [technical reference](../TECH_DETAILS.md).
+
 Read the relevant section before environment setup, code verification, dependency work or
 any commit. The [agent instructions](../AGENTS.md) define authorization and task routing.
 Read `pyproject.toml` for entrypoints, dependencies and import contracts.

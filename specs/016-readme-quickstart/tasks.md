@@ -62,3 +62,20 @@ T014 follows T013 and T015. Existing weights and frozen thresholds remain unchan
 - [x] T020 Commit the accepted documentation and publish minor Git release 0.17.0 using repository release gates, without changing dependency revisions or publishing package assets.
 
 T019 follows T018; T020 follows accepted review and required release checks.
+
+## Phase 9 — Training-first README and technical reference (2026-10-15)
+
+- [x] T021 Inspect current README, commands, configuration, model definitions and portable usage skill; establish the content-migration map and no-impact architecture record.
+- [x] T022 Rewrite README.md in Russian with four training one-liners, everyday controls, full experiment and actionable independent workflows.
+- [x] T023 Create English TECH_DETAILS.md, reconcile all migrated topics, navigation and incoming anchors, and correct encountered stale direct-GPU guidance.
+- [x] T024 Validate Markdown, links/anchors, shell/YAML/Mermaid, resolved Hydra and temporary generated YAML examples; inspect queue help without workloads.
+- [x] T025 Obtain fresh independent completeness/accuracy/language/separation review after integration and validation; reconcile actual diff and validate architecture acceptance.
+- [x] T026 Record dated evidence, complete the documentation commit and native release evaluation/delivery without forcing a version bump.
+
+T021 precedes T022/T023. A read-only command audit may accompany parent drafting;
+T024 follows integration, T025 follows checks, T026 follows acceptance. Parent owns
+all writes; bounded reviewers do not delegate. Completed phases above are historical.
+
+## Phase 10 — Requested master landing (2026-10-15)
+
+- [ ] T027 Integrate current master, retain its Python compatibility and queue diagnostics, validate/review the documentation-only result, and land/push master through the native release workflow.

@@ -72,12 +72,12 @@ Without `--model`, configuration export keeps the existing YOLO layout. `cy-expo
 defaults to `fasterrcnn/resnet50_fpn`. Commands that consume only tables, such as
 `cy-metrics` and `cy-report`, do not accept a detector selection in `cy-init-config`.
 
-For a direct RF-DETR pipeline run with automatic GPU admission:
+For a direct RF-DETR pipeline run on GPU 0 (without queue admission or waiting):
 
 ```bash
 cy model=rfdetr/small ground_truth=./ground_truth.csv \
-  model.train.epochs=20 model.train.batch=4 model.train.device=-1 \
-  model.predict.batch=2 model.predict.device=-1 \
+  model.train.epochs=20 model.train.batch=4 model.train.device=0 \
+  model.predict.batch=2 model.predict.device=0 \
   clearml.project_name=detection clearml.task_name=rfdetr-small \
   'clearml.tags=[rfdetr,experiment]'
 ```
@@ -86,7 +86,7 @@ For Faster R-CNN training and separate prediction from its selected checkpoint:
 
 ```bash
 cy-train model=fasterrcnn/convnext_tiny ground_truth=./ground_truth.csv \
-  model.train.epochs=20 model.train.device=-1 \
+  model.train.epochs=20 model.train.device=0 \
   clearml.project_name=detection clearml.task_name=convnext-train \
   'clearml.tags=[fasterrcnn,experiment]'
 
@@ -119,7 +119,7 @@ backbone asset. For example, after obtaining the matching S backbone asset:
 
 ```bash
 cy-train model=deimv2/s model.source_dir=./vendor/DEIMv2 \
-  ground_truth=./ground_truth.csv model.train.device=-1 model.train.epochs=20 \
+  ground_truth=./ground_truth.csv model.train.device=0 model.train.epochs=20 \
   model.train.backbone_weights=./weights/deimv2-s-backbone.pth \
   clearml.project_name=detection clearml.task_name=deimv2-s \
   'clearml.tags=[deimv2,experiment]'
