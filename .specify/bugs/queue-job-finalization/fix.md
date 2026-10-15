@@ -3,7 +3,7 @@
 - **Slug**: queue-job-finalization (reused from assessment context)
 - **Fixed**: 2026-10-15
 - **Assessment**: [assessment.md](assessment.md)
-- **Status**: applied and accepted; release delivery pending
+- **Status**: released as 0.30.2; portable guidance released as 0.2.4
 
 ## Changes
 
@@ -68,4 +68,4 @@ No installed Spec Kit tooling, dependency source or revision changed.
 - [x] Documentation updated; Markdown/link/portable metadata checks pass.
 - [x] Final routine, real CPU/single-GPU, distribution and architecture checks.
 - [x] Fresh independent review and diff reconciliation.
-- [ ] Native Git-tag-only release and verified delivery.
+- [x] Native Git-tag-only release and verified delivery; see [release.md](release.md).

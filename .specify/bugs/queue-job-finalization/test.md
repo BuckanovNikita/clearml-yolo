@@ -2,7 +2,7 @@
 
 Date: 2026-10-15. Baseline: `932614ba698dede3ec6405476846ecbbc95f0976`.
 Scope and implementation: [assessment](assessment.md), [fix](fix.md),
-[architecture record](architecture.json). Independent review passed; release delivery remains pending.
+[architecture record](architecture.json). Independent review passed; [release delivery](release.md) is verified.
 
 ## Failure and correction
 
@@ -105,4 +105,6 @@ checks, not automatic skill routing or OpenCode/DeepSeek runtime evidence.
 
 Fresh [independent review](review.md) returned **ship**, with no blocking findings,
 and independently passed all 35 new tests. Parent reconciled the complete task-owned
-diff and architecture acceptance. Git-tag-only release delivery remains pending.
+diff and architecture acceptance. The accepted source and guidance were published
+with verified annotated tags; see [release.md](release.md) for refs and tagged
+distribution checks. Subsequent evidence-only Markdown/link checks also passed.
