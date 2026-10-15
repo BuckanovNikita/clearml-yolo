@@ -78,7 +78,7 @@
     {
       "id": "imports",
       "kind": "imports",
-      "command": "uv run --frozen --no-sync lint-imports; uv run --frozen --no-sync pytest (full suite includes tests/test_architecture.py and tests/test_tooling_boundaries.py on both minors).",
+      "command": "uv run --frozen --no-sync lint-imports && uv run --frozen --no-sync pytest",
       "expectation": "Existing inward import, SDK ownership and development-only dependency contracts pass, including injected prohibited edges.",
       "result": {
         "status": "passed",

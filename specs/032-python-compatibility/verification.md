@@ -128,5 +128,34 @@ failed mandatory per-interpreter prediction matrix: no such matrix is required b
 the release contract, and native CPU/single-GPU training passes on both minors
 with full standalone prediction on newly admitted 3.13. Evidence wording was
 corrected to distinguish the initial split suite from the final full repeat.
-Normal commit/release hooks, exact local-source restoration and remote ref
-verification follow.
+Architecture acceptance validation passed after this review. Normal delivery
+completed as recorded below.
+
+## Release delivery
+
+- Contributor commit: `68821e90ac85377b68aa4a5ae221b1ca231fe9a5`.
+- Release commit: `2aa54fccbc1580ce92ab995209527d72977c1f91` (v0.30.0).
+- Annotated tag object: `88691164c5a21ea2c5e9399cc4382b6e9bd557e8`.
+- Normal contributor and automatic release hooks passed, including their full
+  pytest runs. The first commit attempt regenerated the changelog for an earlier
+  documentation commit; all code checks passed, and the reviewed generated update
+  was staged before a complete normal retry. No hooks were bypassed.
+- The release diff changed only the changelog and root package version in the
+  manifest/lock. Exact local source overrides were kept absent through both
+  commits, then restored unstaged. Neither commit contains the sources section.
+- Frozen inexact sync updated the canonical environment to 0.30.0 while retaining
+  its prepared extras. Lock consistency and both distribution builds passed.
+  Final release-wheel installations on both minors passed metadata/version,
+  site-packages import-origin and actual pidfd capability checks.
+- Atomic `master`/v0.30.0 push succeeded. Remote branch and peeled annotated tag
+  matched the release commit. The canonical folder remains on `master` and retains
+  the pre-existing local source overrides and untracked grid-search document.
+- The separate cveta2 and ed-killer repositories were released on their existing
+  `main` branches as v0.10.0 and v0.5.0. Companion cveta2 prerequisite guidance was
+  delivered in the skill collection's v0.2.2; no skill installation was performed.
+
+Raw matrix, packaging and hook logs are retained in the machine-environment
+`python-compatibility-20261015-packaging` evidence archive. The disposable test
+environments/builds are cleaned after checks; native evidence and cleanup receipts
+remain in the separate live-run archive. Git refs are the only published outputs;
+no GitHub Release, distribution asset or package-registry publication was created.
