@@ -58,7 +58,7 @@ core imports of infrastructure are added.
 - [x] Repeat real CPU conversion and assert all five saved fields, empty diff and exactly one completed task.
 - [x] Update tracking publication contract; validate Markdown and local links.
 - [x] Obtain fresh independent review after parent verification and reconcile architecture acceptance.
-- [ ] Complete task-only commit and native Git-tag release/delivery within standing authorization.
+- [x] Complete task-only commit and native Git-tag release/delivery within standing authorization (`v0.31.1`; see [test.md](test.md)).
 
 Parent owns implementation/integration; a bounded read-only SDK investigation can run
 in parallel. Fresh review depends on integrated code and executed checks. Isolated

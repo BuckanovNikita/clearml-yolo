@@ -10,7 +10,8 @@
     ".specify/bugs/clearml-script-metadata",
     "pyproject.toml",
     "tests/test_trace_subprocess.py",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "uv.lock"
   ],
   "impact": "modules",
   "rules": "AGENTS.md and docs/development.md: inward core/application dependencies; only outer adapters own SDK, filesystem and process effects. Existing import-linter plus architecture graph/negative tests govern.",
@@ -153,6 +154,6 @@
     "status": "accepted",
     "reviewer": "/root/review_git_isolation (fresh final read-only review; prior full reviews retained)",
     "evidence": ".specify/bugs/clearml-script-metadata/review.md",
-    "reconciliation": "Compared the final 13-path source commit, including Git environment isolation, with the module/effect/import inventory, 261 focused checks, 21-case Git hook canary, successful full source-commit hooks, independent review and live task evidence. Generated changelog follows native tooling; queue implementation is unchanged base history."
+    "reconciliation": "Compared the final 13-path source commit, including Git environment isolation, with the module/effect/import inventory, 261 focused checks, 21-case Git hook canary, successful full source-commit hooks, independent review and live task evidence. Integration preserved the reviewed implementation files; the final master task independently verified all five fields. Native v0.31.1 release hooks passed; its additional uv.lock change updates only the root package version. Generated changelog follows native tooling; queue implementation is unchanged base history. Final delivery evidence is documentation only."
   }
 }

@@ -4,7 +4,7 @@
 - **Tested**: 2026-10-15
 - **Assessment**: [assessment.md](assessment.md)
 - **Fix**: [fix.md](fix.md)
-- **Result**: implementation accepted; final source hooks passed. Native release delivery remains pending.
+- **Result**: accepted and delivered as `v0.31.1`; source and release hooks passed.
 
 ## Checks performed
 
@@ -58,10 +58,29 @@ its isolated project. Independent API readback at 2026-10-15T14:22:52Z confirmed
 | working_dir | `.` |
 | diff | Empty |
 
-[Open the final verification task](http://clearml.k8s.localhost/projects/cab8b5e956054d3fab2c2306d4edd47d/experiments/1a24a8775a6c4c8e80fed631ce2c7b30/execution).
+[Open the post-review verification task](http://clearml.k8s.localhost/projects/cab8b5e956054d3fab2c2306d4edd47d/experiments/1a24a8775a6c4c8e80fed631ce2c7b30/execution).
 
 The isolated task and its synthetic workspace are intentionally retained for user
 inspection. No training, GPU workload or shared-service change was required.
+
+After integration into `master`, a third real CPU conversion completed with exit
+zero and exactly one task in its isolated project. Independent API readback at
+2026-10-15T15:15:26.629811Z confirmed the final implementation, including Git
+environment isolation:
+
+| Field | Recorded value |
+| --- | --- |
+| repository | `git@github.com:BuckanovNikita/clearml-yolo.git` |
+| entry_point | `-m clearml_yolo.entrypoints.ground_truth` |
+| branch | `master` |
+| version_num | `d3538cd075ed6644e3a690f52f2f28c690ab3baa` |
+| working_dir | `.` |
+| diff | Empty |
+
+[Open the final master verification task](http://clearml.k8s.localhost/projects/c13be4a10ed54f6f92a46994977d615a/experiments/388a1b2c3d354c2b80b5ffa6b8d7195c/execution).
+This task and its synthetic workspace are intentionally retained. The original
+task `52567e01e7f84e508ac24c6455eba9e6` was freshly checked in the same readback:
+its five empty or absent fields remain unchanged.
 
 ## Documentation review
 
@@ -93,5 +112,23 @@ Markdown, local links and the reconciled architecture acceptance record are
 validated before the acceptance-documentation commit. No source revisions,
 dependency locks or public CLI/configuration contracts changed.
 
-Native integration and release await the separate queue release work in the
-shared checkout. Existing unrelated changes remain untouched.
+## Native release delivery
+
+The accepted source was integrated after the separate queue release completed.
+Rebased source commit `5d89443` has the same adapter, session, tests and publication
+contract as the reviewed source; the main-checkout verification above used
+acceptance commit `d3538cd075ed6644e3a690f52f2f28c690ab3baa`.
+
+The native release helper exited zero and created annotated tag `v0.31.1` at
+`cb05d073cb076cb26d3db0ba01c7b8f38cb0575e`. Its required commit hooks, including
+the full pytest suite, passed without bypasses. The release changes only the root
+package version in `pyproject.toml` and `uv.lock`, plus the generated changelog;
+no dependency source, version or metadata changed. `uv build` produced the 0.31.1
+wheel and source distribution locally, and wheel inspection confirmed the final
+script adapter and package version. No distributions or release assets were published.
+
+`master` and `v0.31.1` were pushed explicitly, and remote branch/tag readback
+matched the release commit. Final evidence updates are documentation only and do
+not require another version. The exact local uv source overrides were restored
+unstaged; the unrelated draft remained byte-identical. Release lock and recovery
+record were removed by the successful helper.

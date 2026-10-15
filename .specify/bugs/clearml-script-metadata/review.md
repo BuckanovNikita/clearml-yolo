@@ -57,4 +57,6 @@ selectors; fixture Git calls additionally disable user/system configuration.
 Source commit `2170b7912e7835e27dc72e20e14a954c0c3c8a5c` passed all required hooks, including full pytest,
 after the final review and Git isolation correction. The parent reconciled the
 module/effect inventory with the complete source diff; [test.md](test.md) records
-executed evidence. Native release delivery remains a separate pending step.
+executed evidence. After integration, the reviewed implementation files remained
+identical. The final main-checkout task verified all five fields, and the native
+release hooks passed before `v0.31.1` was created and pushed; see [test.md](test.md).
