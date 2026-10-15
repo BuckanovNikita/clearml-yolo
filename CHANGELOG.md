@@ -1,7 +1,12 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.30.2 (2026-10-15)
+
+### Bug Fixes
+
+- **queue**: Separate job completion from GPU supervision
+  ([`427781f`](https://github.com/BuckanovNikita/clearml-yolo/commit/427781f549dd64ec540a48867aa40226fcc9bd5d))
 
 ### Documentation
 
