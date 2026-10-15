@@ -1,12 +1,17 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.32.0 (2026-10-15)
 
 ### Documentation
 
 - Record ClearML metadata release verification
   ([`813ef01`](https://github.com/BuckanovNikita/clearml-yolo/commit/813ef01aa03adc5ec5067baa73131e6ed84718d2))
+
+### Features
+
+- Validate documentation and preserve detection input identity
+  ([`bdf21a6`](https://github.com/BuckanovNikita/clearml-yolo/commit/bdf21a63be95151759c58d2d701735b548c4baaa))
 
 
 ## v0.31.1 (2026-10-15)
