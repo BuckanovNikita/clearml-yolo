@@ -102,6 +102,8 @@ def test_watchdog_covers_actual_invocation_closure_and_command_return() -> None:
         sys.modules["clearml"] = sdk
         from clearml_yolo.adapters.clearml import session
         session._start_console_publisher = lambda *_args: None
+        # This SDK double isolates the watchdog around task closure.
+        session.publish_script = lambda *_args: None
         task.get_output_log_web_page.return_value = "https://clearml.example/tasks/owned-task"
         @tracing.trace_command("closure")
         def run():

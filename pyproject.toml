@@ -302,6 +302,7 @@ ignore_imports = [
     "clearml_yolo.adapters.clearml.models -> clearml",
     "clearml_yolo.adapters.clearml.naming -> clearml",
     "clearml_yolo.adapters.clearml.native -> clearml",
+    "clearml_yolo.adapters.clearml.script -> clearml",
     "clearml_yolo.adapters.clearml.session -> clearml",
     "clearml_yolo.adapters.integrations.native_runtime -> clearml",
 ]

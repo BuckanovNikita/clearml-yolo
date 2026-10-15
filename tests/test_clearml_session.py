@@ -70,10 +70,19 @@ class FakeTask:
         self.run_configuration_text: str | None = None
         self.ignore_remote_run_overrides = False
         self.closed = False
+        self.script_updates: list[dict[str, Any]] = []
+        self.script: dict[str, Any] = {}
+        self.data = types.SimpleNamespace(script=types.SimpleNamespace(to_dict=lambda: self.script))
         self.local = True
         self.reload_count = 0
         self._dev_worker: Any = None
         self._logger: Any = None
+
+    def set_script(self, **kwargs: Any) -> None:
+        self.script_updates.append(kwargs)
+        self.script.update(kwargs)
+        if "commit" in self.script:
+            self.script["version_num"] = self.script.pop("commit")
 
     def upload_artifact(self, **kwargs: Any) -> bool:
         self.uploads.append(kwargs)
@@ -119,6 +128,11 @@ class FakeTask:
 
     def reload(self) -> None:
         self.reload_count += 1
+
+    def _reload_field(self, field: str) -> Any:
+        assert field == "script"
+        self.reload()
+        return self.data.script
 
     def mark_failed(self, **kwargs: Any) -> object:
         self.events.append("failed")
@@ -216,6 +230,57 @@ def test_invocation_owns_one_task_and_nested_stages_reuse_it(
             "config_type": "dictionary",
         }
     ]
+
+
+def test_invocation_publishes_source_identity_before_workflow(
+    fake_clearml: tuple[type[Any], FakeTask],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, task = fake_clearml
+    monkeypatch.setattr(
+        "clearml_yolo.adapters.clearml.script._source_identity",
+        lambda: {
+            "repository": "https://example.test/repo.git",
+            "branch": "main",
+            "commit": "a" * 40,
+        },
+    )
+    with invocation(ClearMLConfig(), "ground_truth"):
+        assert len(task.script_updates) == 1
+        script = task.script_updates[0]
+        assert script["repository"] == "https://example.test/repo.git"
+        assert len(script["commit"]) == 40
+        assert script["branch"]
+        assert script["entry_point"] == "-m clearml_yolo.entrypoints.ground_truth"
+        assert script["working_dir"] == "."
+        assert script["diff"] == ""
+        with invocation(ClearMLConfig(), "train"):
+            assert len(task.script_updates) == 1
+
+
+def test_remote_invocation_preserves_agent_script_metadata(
+    fake_clearml: tuple[type[Any], FakeTask],
+) -> None:
+    _, task = fake_clearml
+    task.local = False
+    with invocation(ClearMLConfig(), "ground_truth"):
+        assert task.script_updates == []
+
+
+def test_rejected_source_metadata_fails_owner_before_workflow(
+    fake_clearml: tuple[type[Any], FakeTask],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, task = fake_clearml
+    monkeypatch.setattr(task, "set_script", lambda **_kwargs: None)
+    with (
+        pytest.raises(RuntimeError, match="did not retain script metadata field"),
+        invocation(ClearMLConfig(), "ground_truth"),
+    ):
+        pytest.fail("Workflow must not start after rejected script metadata")
+    assert task.closed
+    assert task.failed
+    assert not task.completed
 
 
 def test_console_streams_reach_offline_sdk_without_duplicates(tmp_path: Path) -> None:
@@ -866,6 +931,7 @@ def test_model_barrier_waits_flushes_reloads_and_verifies_before_completion(
     monkeypatch.setattr(task, "reload", reload)
 
     with invocation(ClearMLConfig(), "train") as owner:
+        events.clear()  # Observe the model barrier after initial script metadata readback.
         register_model_barrier(owner, lambda: events.append("verify"))
 
     assert output_model.wait_calls == 1
@@ -2213,6 +2279,7 @@ sdk.Task = Task
 sys.modules['clearml'] = sdk
 session.active_capture = lambda: object()
 session._start_console_publisher = lambda *args: None
+session.publish_script = lambda *args: None
 session.FINALIZATION_TIMEOUT_SECONDS = 0.02
 original = ConsolePublicationError('required delivery failed')
 try:

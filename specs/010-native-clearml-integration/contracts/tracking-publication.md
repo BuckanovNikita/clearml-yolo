@@ -11,6 +11,29 @@ filters `*PR_curve` entries from trainer/validator plot mappings only during the
 native figures, image previews, scalars, best-model uploads and callback state; DDP owner
 replay uses the same adapter. Upstream callback functions and local native plot files remain intact.
 
+## Script and Git metadata
+
+New local execution tasks record their canonical Python module as `script.entry_point`
+(`-m clearml_yolo.entrypoints.<stage>`) and repository-root `script.working_dir` (`.`).
+When the imported application comes from a source checkout, its Git `origin` URL,
+current branch and exact HEAD commit populate `repository`, `branch` and `version_num`.
+Discovery uses the imported source location, including linked worktrees, independently
+of the launch directory or virtual-environment console wrapper. Detached checkouts
+record `HEAD` as the branch selector and retain the exact commit.
+
+Publication occurs once inside the owner lifetime before the workflow starts, with
+SDK readback checking the written fields. Rejected metadata fails the task. Nested
+stages reuse these fields; ClearML Agent replay preserves its supplied script metadata.
+The script record excludes raw command arguments and uncommitted code diffs; URL
+credentials are removed/redacted. A recorded commit identifies the checkout's base
+revision, not any uncommitted edits. Configuration publication keeps its existing
+sanitization and replay behavior.
+
+Without a source checkout, Git or an origin remote, unavailable Git fields remain
+unavailable with a warning; module and working-directory publication still works.
+An installed wheel never adopts the identity of an unrelated enclosing checkout.
+Historical tasks are not backfilled.
+
 ## Distributed telemetry
 
 Owner dispatches native completed epoch observations while DDP is running. Events dispatch once in journal order under the owner invocation context. Partial records wait; malformed or incomplete final journals fail. Final on_train_end executes only after full drain and completeness validation. Existing relay context-manager/replay interfaces remain compatible.
@@ -36,6 +59,7 @@ the task closes, or guarantee forwarding from DDP subprocess streams.
 | Output Model | One native best checkpoint, verified before successful completion. |
 | Artifacts | Canonical ground truth, prediction, frozen validation-threshold CSVs; evaluation/comparison workbooks; final performance reports. |
 | Configuration Objects / General | Sanitized execution settings, dataset overrides, source references, normalization and meaningful provenance. |
+| Execution / Script | Source repository, branch, commit, canonical module entrypoint and repository-relative working directory; no raw arguments or code diffs. |
 | Local outputs | Effective YAML with comments, temporary inputs, manifests, journals and diagnostic/publication receipts. |
 
 No numbered YAML, train_data_overrides.json, configuration copies, replay manifests or diagnostic receipts appear as artifacts. No duplicate checkpoint artifact is uploaded. CSV byte deduplication retains logical publication expectations.

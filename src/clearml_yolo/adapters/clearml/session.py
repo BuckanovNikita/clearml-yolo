@@ -35,6 +35,7 @@ from clearml_yolo.adapters.clearml.deadline import (
     detach_sdk_exit_callback,
     sdk_deadline,
 )
+from clearml_yolo.adapters.clearml.script import publish_script
 from clearml_yolo.adapters.observability.capture import (
     OutputCapture,
     active_capture,
@@ -439,8 +440,7 @@ def invocation(
                 auto_connect_arg_parser=False,
                 # FD capture owns native/child output; SDK stream patching duplicates it.
                 auto_connect_streams=False,
-                # Repository auto-detection uploads arbitrary checkout diffs outside our
-                # sanitized provenance contract. Disable it along with framework captures.
+                # Explicit script publication below owns Git identity without raw diffs/argv.
                 auto_connect_frameworks=dict.fromkeys(
                     (
                         "detect_repository",
@@ -467,6 +467,7 @@ def invocation(
                 _task_owner(task, config, stage, config_resolver, owns_signal, previous_sigterm)
             )
             state.console_publisher = _start_console_publisher(task, captured)
+            publish_script(task, stage)
             write_progress(task_url=str(task.get_output_log_web_page()))
         if resolved_config is not None:
             _replay_initial_configuration(task, resolved_config)
