@@ -1,12 +1,21 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.30.0 (2026-10-15)
 
 ### Documentation
 
 - Record verified GPU controls and usage skill releases
   ([`634f3e2`](https://github.com/BuckanovNikita/clearml-yolo/commit/634f3e23165270a285044aba1016883dc34c43bc))
+
+### Features
+
+- Support Python 3.12.13 through 3.13
+  ([`68821e9`](https://github.com/BuckanovNikita/clearml-yolo/commit/68821e90ac85377b68aa4a5ae221b1ca231fe9a5))
+
+### Breaking Changes
+
+- Python 3.12 releases older than 3.12.13 are no longer supported.
 
 
 ## v0.29.0 (2026-10-15)
