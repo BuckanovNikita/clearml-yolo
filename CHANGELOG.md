@@ -1,7 +1,7 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.31.0 (2026-10-15)
 
 ### Documentation
 
@@ -12,6 +12,11 @@
 
 - **queue**: Simplify GPU controls and fence freed reservations
   ([`dcbbc49`](https://github.com/BuckanovNikita/clearml-yolo/commit/dcbbc4903cec07c67ce50cd9b116ea3f6dab8216))
+
+### Testing
+
+- **queue**: Stabilize subprocess readiness checks
+  ([`c5b19fb`](https://github.com/BuckanovNikita/clearml-yolo/commit/c5b19fb9f9e2471d77fce91dfd1724dc83935760))
 
 ### Breaking Changes
 
