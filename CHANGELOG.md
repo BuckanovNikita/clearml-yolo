@@ -1,12 +1,22 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.31.0 (2026-10-15)
 
 ### Documentation
 
 - Record queue finalization release verification
   ([`9355693`](https://github.com/BuckanovNikita/clearml-yolo/commit/9355693249ee97fa6e5d51ebfe52ceee6d647293))
+
+### Features
+
+- **queue**: Simplify GPU controls and fence freed reservations
+  ([`dcbbc49`](https://github.com/BuckanovNikita/clearml-yolo/commit/dcbbc4903cec07c67ce50cd9b116ea3f6dab8216))
+
+### Breaking Changes
+
+- **queue**: Remove reason, token, force and worker threshold options; public GPU fields use
+  physical indexes or short labels instead of full UUIDs.
 
 
 ## v0.30.2 (2026-10-15)
