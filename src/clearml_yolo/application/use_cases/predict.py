@@ -92,9 +92,7 @@ def predict(
         deps.storage.write_path(Path(settings["project"]) / str(settings["name"]))
         settings["mode"] = "predict"
         settings.pop("source", None)
-        truth = deps.storage.read_csv(
-            ground_truth, dtype={"image_name": str, "instance_label": str}
-        )
+        truth = deps.storage.read_ground_truth(ground_truth).execution
         paths = images_to_score(truth, splits)
         groups = (
             [images_to_score(truth, [split]) for split in dict.fromkeys(splits)]
@@ -109,7 +107,7 @@ def predict(
         frame = pd.concat(frames, ignore_index=True).reindex(columns=PREDICTION_COLUMNS)
         deps.storage.write_csv(frame, output_path, index=False)
         recorded_hash = deps.tracking.write_prediction_provenance(
-            output_path, checkpoint_path, identity
+            output_path, checkpoint_path, identity, prediction_image_name=image_name
         )
         if recorded_hash != checkpoint_hash:
             raise ValueError("Checkpoint changed while producing predictions")
@@ -120,6 +118,7 @@ def predict(
             output_dir=output_path.parent,
             model_id=f"checkpoint:{recorded_hash}" if recorded_hash else str(checkpoint),
             splits=splits,
+            prediction_image_name=image_name,
             model_identity=identity,
         )
         if task is not None:

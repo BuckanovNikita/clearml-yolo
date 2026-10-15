@@ -19,6 +19,7 @@ from clearml_yolo.application.contracts import (
     ClearMLConfig,
     CompareResult,
     ComparisonManifest,
+    GroundTruthRead,
     InferenceConfig,
     InferenceEvidence,
     ModelRef,
@@ -36,7 +37,12 @@ from clearml_yolo.core import artifact_names
 from clearml_yolo.core.comparison.assemble import ComparisonTables, build_comparison_rows
 from clearml_yolo.core.comparison.significance import validate_q
 from clearml_yolo.core.evaluation.models import EvaluatedSplit, EvaluationConfig
-from clearml_yolo.core.evaluation.policy import classes_from_ground_truth, validate_split_membership
+from clearml_yolo.core.evaluation.policy import (
+    classes_from_ground_truth,
+    validate_evaluation_image_name,
+    validate_prediction_identity,
+    validate_split_membership,
+)
 from clearml_yolo.core.evaluation.result_rows import assign_source_ids
 from clearml_yolo.core.identity import ModelIdentity, require_model_identity
 from clearml_yolo.core.models import CheckpointMetadata
@@ -242,19 +248,21 @@ def _scored(
     classes: list[str],
     *,
     evaluation: EvaluationConfig,
+    execution_truth: pd.DataFrame | None = None,
     task: TaskHandle | None = None,
     model_identity: ModelIdentity | None = None,
     deps: WorkflowDependencies,
 ) -> tuple[EvaluatedSplit, VocabularyReport, InferenceEvidence, Path]:
     with deps.resources.trace_operation("comparison.score", context={"split": split}):
         del task
+        validate_evaluation_image_name(inference.image_name)
         if inference.reuse_existing and deps.storage.is_file(output):
             _validate_cached_identity(output, weights, model_identity, deps=deps)
         native_project = destination / "native"
         native_name = f"{role}_{artifact_names.split_component(split)}"
         predictions, vocabulary = deps.model.reinfer_split(
             weights,
-            ground_truth,
+            execution_truth if execution_truth is not None else ground_truth,
             split,
             output,
             conf=inference.conf,
@@ -268,7 +276,13 @@ def _scored(
             native_kwargs=inference.ultralytics,
             reuse_existing=inference.reuse_existing,
         )
-        deps.tracking.write_prediction_provenance(output, weights, model_identity)
+        validate_prediction_identity(
+            ground_truth[ground_truth["split"] == split], predictions,
+            image_name=inference.image_name,
+        )
+        deps.tracking.write_prediction_provenance(
+            output, weights, model_identity, prediction_image_name=inference.image_name
+        )
         fallback_args = {
             **inference.model_dump(mode="json", exclude={"reuse_existing", "ultralytics"}),
             **inference.ultralytics,
@@ -349,6 +363,7 @@ def _validate_cached_identity(
     predictions: Path, weights: Path, identity: ModelIdentity | None, *, deps: WorkflowDependencies
 ) -> None:
     """Reject stale source metadata before cached bytes can be reused or rebound."""
+    validate_evaluation_image_name(deps.tracking.prediction_image_name(predictions))
     previous = deps.tracking.prediction_model_identity(predictions)
     checkpoint_hash = deps.tracking.prediction_checkpoint_hash(predictions)
     if checkpoint_hash is not None and checkpoint_hash != deps.tracking.file_digest(weights):
@@ -438,6 +453,7 @@ def _skip_without_baseline(
     reason: str,
     candidate: ResolvedModel,
     truth: pd.DataFrame,
+    execution_truth: pd.DataFrame,
     ground_truth_path: Path,
     destination: Path,
     inference: InferenceConfig,
@@ -448,7 +464,7 @@ def _skip_without_baseline(
 ) -> None:
     with deps.resources.trace_operation("comparison.skip_baseline", context={"split": split}):
         settled = _settled(inference, candidate.weights, None, deps=deps)
-        fingerprint = _split_fingerprint(truth, split, deps=deps)
+        fingerprint = _split_fingerprint(execution_truth, split, deps=deps)
         predictions = _prediction_cache(
             destination,
             "candidate",
@@ -470,6 +486,7 @@ def _skip_without_baseline(
             candidate.thresholds,
             classes,
             evaluation=evaluation,
+            execution_truth=execution_truth,
             task=task,
             model_identity=candidate.identity,
             deps=deps,
@@ -568,6 +585,19 @@ def _evaluation_config(evaluation: EvaluationConfig | dict[str, Any] | None) -> 
     return config
 
 
+def _read_comparison_truth(
+    path: Path, image_name: str, *, deps: WorkflowDependencies
+) -> GroundTruthRead:
+    validate_evaluation_image_name(image_name)
+    loaded = deps.storage.read_ground_truth(path)
+    source = assign_source_ids(loaded.source, row_type="ground_truth")
+    validate_split_membership(source)
+    return GroundTruthRead(
+        source=source,
+        execution=assign_source_ids(loaded.execution, row_type="ground_truth"),
+    )
+
+
 def compare(
     baseline_model: ModelRef,
     candidate_model: ModelRef,
@@ -597,15 +627,8 @@ def compare(
         current_task_id = str(task.id) if task is not None else None
         evaluation_config = _evaluation_config(evaluation)
         ground_truth_path = Path(ground_truth)
-        truth = assign_source_ids(
-            deps.storage.read_csv(
-                ground_truth_path,
-                dtype={"image_name": str, "instance_label": str, "split": str},
-                float_precision="round_trip",
-            ),
-            row_type="ground_truth",
-        )
-        validate_split_membership(truth)
+        loaded_truth = _read_comparison_truth(ground_truth_path, inference.image_name, deps=deps)
+        truth = loaded_truth.source
         try:
             baseline = _resolve_model(
                 baseline_model,
@@ -628,6 +651,7 @@ def compare(
                 reason=str(error),
                 candidate=candidate,
                 truth=truth,
+                execution_truth=loaded_truth.execution,
                 ground_truth_path=ground_truth_path,
                 destination=destination,
                 inference=inference,
@@ -651,7 +675,7 @@ def compare(
             )
         classes = classes_from_ground_truth(truth[truth["split"] == split])
         settled = _settled(inference, candidate.weights, baseline.weights, deps=deps)
-        split_fingerprint = _split_fingerprint(truth, split, deps=deps)
+        split_fingerprint = _split_fingerprint(loaded_truth.execution, split, deps=deps)
         baseline_predictions = _prediction_cache(
             destination,
             "baseline",
@@ -683,6 +707,7 @@ def compare(
             baseline.thresholds,
             classes,
             evaluation=evaluation_config,
+            execution_truth=loaded_truth.execution,
             task=task,
             model_identity=baseline.identity,
             deps=deps,
@@ -698,6 +723,7 @@ def compare(
             candidate.thresholds,
             classes,
             evaluation=evaluation_config,
+            execution_truth=loaded_truth.execution,
             task=task,
             model_identity=candidate.identity,
             deps=deps,

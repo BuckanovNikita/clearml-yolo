@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record ClearML metadata release verification
+  ([`813ef01`](https://github.com/BuckanovNikita/clearml-yolo/commit/813ef01aa03adc5ec5067baa73131e6ed84718d2))
+
+
 ## v0.31.1 (2026-10-15)
 
 ### Bug Fixes

@@ -14,4 +14,19 @@ Queue roots use CY_QUEUE_ROOT or project/.cy-queue. Owner files are private; sum
 and actor reorder events are public. No credentials in summaries. CUDA bindings are
 set before fresh execution; all training devices and first inference device are
 selected, while explicit CPU phases remain CPU. Compile/AMP/batch/model settings stay
-unchanged. Retain allocation until entire pipeline and descendants exit.
+unchanged. Training retains the full allocation until the guardian durably shrinks it
+to the first GPU, releases extras and acknowledges the handoff. No notification keeps
+the full allocation; failed/lost acknowledgement stops inference without restoring
+released extras. Unless explicitly freed, retain the first GPU through pipeline and
+owned descendant exit.
+
+## Current-generation capacity amendment — 2026-10-15
+
+Current reservations and operator holds exclude GPUs across roots. Stale unlocked
+records alone do not veto admission. Explicit per-device free advances its generation,
+fences older guardians and preserves sibling reservations, running processes and job
+outcomes. Every new job still requires fresh used VRAM strictly below 2 GiB (2048 MiB).
+A completed ClearML task, verified process cleanup and available GPU are separate facts;
+uncertain outcomes require owner recovery and are never retried automatically.
+The [queue guide](../../../docs/queue.md) owns operations and the
+[lifecycle diagram](../../../docs/queue-lifecycles.md) separates these state machines.

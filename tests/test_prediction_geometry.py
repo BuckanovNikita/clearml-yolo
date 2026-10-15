@@ -20,9 +20,12 @@ COLUMNS = [
 ]
 
 
-def _truth() -> pd.DataFrame:
+def _truth(*background_images: str) -> pd.DataFrame:
     return pd.DataFrame(
-        [("valid.jpg", "cat", 0, 0, 10, 10, "val")],
+        [
+            ("valid.jpg", "cat", 0, 0, 10, 10, "val"),
+            *((name, None, None, None, None, None, "val") for name in background_images),
+        ],
         columns=[*COLUMNS[:-1], "split"],
     )
 
@@ -51,14 +54,19 @@ def test_geometry_filter_keeps_valid_predictions_and_reports_reasons(
         preprocess_preds_nms_containment_threshold=0.9 if preprocess else None,
         preprocess_preds_nms_iou_threshold=0.9 if preprocess else None,
     )
+    truth = _truth(
+        "zero.jpg", "reverse.jpg", "missing.jpg", "text.jpg", "infinite.jpg", "low.jpg"
+    )
     try:
-        _, raw, prepared, classes = _prepare(
-            predictions, _truth(), config, deps=workflow_dependencies
+        prepared_truth, raw, prepared, classes = _prepare(
+            predictions, truth, config, deps=workflow_dependencies
         )
     finally:
         logger.remove(sink)
 
     pd.testing.assert_frame_equal(predictions, original)
+    assert prepared_truth.image_name.tolist() == truth.image_name.tolist()
+    assert prepared_truth.iloc[1:].instance_label.isna().all()
     assert raw.image_name.tolist() == ["valid.jpg", "low.jpg"]
     assert prepared.image_name.tolist() == (
         ["valid.jpg"] if preprocess else ["valid.jpg", "low.jpg"]
@@ -172,7 +180,7 @@ def test_missing_required_columns_still_fail(
         [("valid.jpg", "cat", 0, 0, 10, 10, 0.8)],
         columns=COLUMNS,
     ).drop(columns=column)
-    with pytest.raises(ValueError, match="missing columns"):
+    with pytest.raises(ValueError, match=rf"missing.*{column}"):
         _prepare(predictions, _truth(), EvaluationConfig(), deps=workflow_dependencies)
 
 
@@ -219,4 +227,16 @@ def test_dropped_geometry_does_not_hide_unrelated_validation_errors(
     )
     predictions[column] = pd.Series([value], dtype=object)
     with pytest.raises(ValueError, match=message):
+        _prepare(predictions, _truth(), EvaluationConfig(), deps=workflow_dependencies)
+
+
+@pytest.mark.parametrize("right_corner", [0, -1, None, "bad", float("inf")])
+def test_invalid_geometry_cannot_hide_unknown_image_membership(
+    right_corner: object, workflow_dependencies: WorkflowDependencies
+) -> None:
+    predictions = pd.DataFrame(
+        [("unknown.jpg", "cat", 0, 0, right_corner, 10, 0.8)],
+        columns=COLUMNS,
+    )
+    with pytest.raises(ValueError, match=r"canonical ground-truth membership.*unknown\.jpg"):
         _prepare(predictions, _truth(), EvaluationConfig(), deps=workflow_dependencies)

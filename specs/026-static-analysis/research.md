@@ -43,5 +43,5 @@ exposed the detector caller and its failure was reproduced before correction.
 
 Compatible SciPy/tqdm stubs required no source casts, ignores or type changes.
 The refreshed [60% Vulture inventory](vulture-advisory-2026-10-13.txt) is advisory: it
-includes framework attributes and callbacks as well as review candidates. No broad
+includes framework attributes and callbacks and review candidates. No broad
 allowlist or automatic dead-symbol deletion was added.

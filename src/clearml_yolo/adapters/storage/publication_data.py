@@ -10,6 +10,7 @@ import pandas as pd
 from pydantic import BaseModel, Field
 
 from clearml_yolo.adapters.observability.tracing import trace_operation
+from clearml_yolo.adapters.storage.file_io import resolved_image_path
 from clearml_yolo.core.validation import ValidationStage, validate_dataframe
 
 BOX_COLUMNS = ("bbox_x_tl", "bbox_y_tl", "bbox_x_br", "bbox_y_br")
@@ -49,7 +50,7 @@ def _read_csv(
     path: Path, required: set[str], *, content: bytes | None = None
 ) -> list[dict[str, str]]:
     with StringIO(
-        (path.read_bytes() if content is None else content).decode("utf-8"), newline=""
+        (path.read_bytes() if content is None else content).decode("utf-8-sig"), newline=""
     ) as stream:
         reader = csv.DictReader(stream)
         names = reader.fieldnames or []
@@ -96,8 +97,7 @@ def read_snapshot(path: Path) -> DatasetSnapshot:
     path_names: dict[Path, str] = {}
     for index, row in enumerate(rows):
         name = row["image_name"]
-        media = Path(row["image_path"]).expanduser()
-        media = (source.parent / media).resolve() if not media.is_absolute() else media.resolve()
+        media = resolved_image_path(row["image_path"], source.parent)
         if not name or not row["image_path"] or not row["split"]:
             raise ValueError("Publication requires nonempty image_name, image_path, and split")
         current = images.setdefault(

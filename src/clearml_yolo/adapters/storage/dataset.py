@@ -18,6 +18,7 @@ from clearml_yolo.adapters.storage.dataset_export import (
     exported_image_path,
 )
 from clearml_yolo.adapters.storage.dataset_records import validate_ground_truth
+from clearml_yolo.adapters.storage.file_io import resolved_image_path
 from clearml_yolo.adapters.storage.filesystem import write_path
 from clearml_yolo.application.contracts import (
     PreparedDataset as PreparedDataset,  # noqa: PLC0414 - typed adapter interface
@@ -62,17 +63,14 @@ def _write_cleaned_truth(records: ValidatedDataset, path: Path) -> None:
 @trace_operation("storage.dataset.source.snapshot")
 def _snapshot_csv(source: Path, source_bytes: bytes) -> str:
     """Resolve relative image paths while preserving the captured CSV rows."""
-    rows = list(csv.reader(io.StringIO(source_bytes.decode("utf-8"), newline="")))
+    rows = list(csv.reader(io.StringIO(source_bytes.decode("utf-8-sig"), newline="")))
     if not rows or rows[0].count("image_path") != 1:
-        return source_bytes.decode("utf-8")
+        return source_bytes.decode("utf-8-sig")
     image_path_index = rows[0].index("image_path")
     for row in rows[1:]:
         if len(row) <= image_path_index or row[image_path_index] == "":
             continue
-        image_path = Path(row[image_path_index]).expanduser()
-        if not image_path.is_absolute():
-            image_path = source.parent / image_path
-        row[image_path_index] = str(image_path.resolve())
+        row[image_path_index] = str(resolved_image_path(row[image_path_index], source.parent))
     snapshot = io.StringIO(newline="")
     csv.writer(snapshot).writerows(rows)
     return snapshot.getvalue()

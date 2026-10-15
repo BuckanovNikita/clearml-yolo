@@ -35,3 +35,16 @@ The [current report layout](../../001-release-030/contracts/cli.md) moves aggreg
 availability out of developer/business metric columns into compact
 `<metric>-valid-class-count` summaries. Apply this layout before identity annotation;
 the annotated and embedded original workbooks both retain those summaries.
+
+## Cross-contract integration
+
+New evaluation/report outputs carry the finalized source model name and full original
+training task ID through checkpoint/prediction hash bindings, contexts and manifests.
+Stored provenance wins over fallback labels; inputs without provenance require explicit
+labels and display unavailable training provenance without registering a model.
+The [identity presentation contract](../../014-evaluation-publication/contracts/publication.md#source-identity-on-new-results)
+defines entrypoint labels, worksheet/local raster captions and repeated printed banners;
+the readable plot amendment governs current ClearML chart captions.
+Workbooks normalize horizontal print width to one page while preserving original body
+styles/formulas and explicit row breaks. Project adapters expose original layouts to
+report/threshold readers; pinned dependencies and historical artifacts are unchanged.

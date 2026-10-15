@@ -105,3 +105,11 @@ immutable source images, pinned dependencies and historical tasks. Do not commit
 ## Phase 12: Convergence
 
 - [x] T034 Preserve a current explicit save_dir key through remote General replay so pipeline routing rejects the conflict exactly as local execution does; retain removal of inherited-only save_dir and add launch regressions per FR-009, FR-013 and Constitution III (partial, MEDIUM; second independent review).
+
+## Resolved-reference correction — 2026-10-15
+
+Original completed tasks above retain their historical outcomes. The byte-only cache
+requirement is superseded by the [input correctness bug](../../.specify/bugs/input-evaluation-correctness/assessment.md),
+whose fix/test records own the remaining implementation and acceptance. The
+[current contract](../../docs/input-provenance.md) defines source-relative media,
+lexical rows, version 2 cache identity and canonical evaluation names.

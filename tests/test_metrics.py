@@ -875,3 +875,32 @@ def test_reused_destination_requires_fresh_confidence_plots(
             assert plot.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
     assert other_split.read_bytes() == stale
     assert unrelated.read_bytes() == stale
+
+
+@pytest.mark.parametrize("mode", ["stem", "path"])
+def test_metrics_rejects_noncanonical_provenance_even_when_names_match(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    workflow_dependencies: WorkflowDependencies, mode: str,
+) -> None:
+    from typing import cast
+
+    from clearml_yolo.adapters.clearml.results import write_prediction_provenance
+    from clearml_yolo.application.contracts import ImageNameMode
+
+    predictions, truth = _write_inputs(tmp_path)
+    checkpoint = tmp_path / "model.pt"
+    checkpoint.write_bytes(b"model")
+    write_prediction_provenance(
+        predictions, checkpoint, prediction_image_name=cast(ImageNameMode, mode)
+    )
+    monkeypatch.setattr(workflow_dependencies.tracking, "init_task", lambda *_a, **_kw: None)
+    monkeypatch.setattr(
+        workflow_dependencies.evaluation, "calibrate_thresholds",
+        lambda *_a, **_kw: pytest.fail("must reject before scoring"),
+    )
+    with pytest.raises(ValueError, match="require image_name='name'"):
+        compute_metrics(
+            predictions, truth, tmp_path / "metrics", ClearMLConfig(), EvaluationConfig(),
+            splits=["test"], fiftyone=FiftyOneConfig(enabled=False), model_label="fixture detector",
+            deps=workflow_dependencies,
+        )

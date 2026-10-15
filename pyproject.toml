@@ -80,6 +80,7 @@ module-name = ["clearml_yolo"]
 [dependency-groups]
 dev = [
     "import-linter>=2.13",
+    "markdown-it-py==4.2.0",
     "mypy>=1.11",
     "packaging>=26",
     "pandas-stubs",

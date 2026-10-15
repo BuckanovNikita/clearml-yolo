@@ -126,6 +126,13 @@ YOLO supports prepared `ndjson` (default) or `flat` data; other detectors derive
 inputs. Direct native-dataset training is not an alternative to the CSV interface.
 Source images remain immutable and are not uploaded as raw dataset artifacts.
 
+The [detection input/provenance contract](docs/input-provenance.md) defines lexical
+identity preservation, CSV-relative execution paths, cache reload precision and
+canonical-only evaluation. `image_name=stem` and `path` remain raw-export modes;
+evaluation rejects them and unknown image identities before scoring. New hash-bound
+prediction provenance records `prediction_image_name`; historical files without it
+must satisfy canonical membership.
+
 Prediction CSV columns are `image_name`, `instance_label`, `confidence`,
 `bbox_x_tl`, `bbox_y_tl`, `bbox_x_br`, `bbox_y_br`. Validation, metrics and comparison
 warn and remove invalid prediction geometry from the evaluation copy, preserving
@@ -208,6 +215,11 @@ Do not supply conflicting stage outputs or native project/name values. Standalon
 output-producing commands should use fresh destinations.
 
 Prepared CSV datasets live under `.cache/clearml-yolo/datasets/`, outside run outputs.
+Version 2 keys include ordered resolved image references alongside CSV digest and format.
+Identical absolute references reuse across CSV directories; relative references that
+resolve differently do not. Hits perform no image-content hashing, mtime checks, copying
+or conversion. Existing entries remain; changing images at unchanged paths still
+requires explicit invalidation while idle.
 Project scratch uses retained `.tmp/cy-runtime-*` arenas; `CY_RUNTIME_TEMP_ROOT` can
 select another parent inside the project. SDK configuration/cache discovery, `HOME`,
 XDG and global `TMPDIR`/`TMP`/`TEMP` are unchanged. No startup recovery scan or recursive

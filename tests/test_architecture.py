@@ -176,7 +176,7 @@ def test_allowed_scientific_dependencies_and_explicit_native_bridge() -> None:
         "open('data.csv')",
         "Path('data.csv').read_text()",
         "pd.read_csv('data.csv')",
-        "subprocess.run(['ls'])",
+        "import subprocess\nsubprocess.run(['ls'])",
         "importlib.import_module('clearml')",
     ],
 )
@@ -495,3 +495,327 @@ def test_dynamic_sdk_import_is_checked_at_its_owner(tmp_path: Path, sdk: str) ->
     candidate.add_module("clearml_yolo.adapters.storage.helper")
     architecture.add_dynamic_imports(candidate, tmp_path)
     assert any("SDK ownership" in finding for finding in architecture.graph_findings(candidate))
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "def deferred(value=initialize()): pass",
+        "async def deferred(*, value=initialize()): pass",
+        "@decorate()\ndef deferred(): pass",
+        "@decorate\ndef deferred(): pass",
+        "def deferred(value: initialize()): pass",
+        "def deferred() -> initialize(): pass",
+        "class Example(load_base()): pass",
+        "class Example(metaclass=load_metaclass()): pass",
+        "@decorate()\nclass Example: pass",
+        "class Example:\n    def deferred(value=initialize()): pass",
+        "callback = lambda value=initialize(): value",
+        "if enabled:\n    def deferred(value=initialize()): pass",
+        "try:\n    from torch import Tensor\nexcept ImportError:\n    pass",
+        "from typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    pass\nelse:\n    initialize()",
+    ],
+)
+def test_initializer_checks_definition_time_operations(source: str) -> None:
+    assert architecture.initializer_findings(ast.parse(source)), source
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "def deferred():\n    initialize()",
+        "async def deferred():\n    initialize()",
+        "class Example:\n    def deferred(self):\n        initialize()",
+        "callback = lambda: initialize()",
+        "if enabled:\n    def deferred():\n        initialize()",
+        "class Example(Base, metaclass=Meta):\n    value: int = 1",
+        "from typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    from torch import Tensor",
+        "from typing import TYPE_CHECKING as checking\nif checking:\n    initialize()",
+        "import typing as types\nif types.TYPE_CHECKING:\n    initialize()",
+    ],
+)
+def test_initializer_keeps_deferred_bodies_and_plain_definitions_inert(source: str) -> None:
+    assert architecture.initializer_findings(ast.parse(source)) == []
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "import requests as network\nnetwork.get('https://example.org')",
+        "from requests import get as fetch\nfetch('https://example.org')",
+        "import httpx\nclient = httpx.Client()\nclient.post('https://example.org')",
+        "from urllib.request import urlopen as fetch\nfetch('https://example.org')",
+        "from shutil import copyfile as copy\ncopy('source', 'target')",
+        "import os as system\nsystem.listdir('.')",
+        "from pathlib import Path as Location\np = Location('data')\np.touch()",
+        "import subprocess as process\nlaunch = process.run\nlaunch(['program'])",
+        "from subprocess import run as launch\ndef deferred():\n    launch(['program'])",
+        "import socket as network\nnetwork.create_connection(('example.org', 80))",
+        "import os as system\nvalue = system.environ['HOME']",
+        "from os import environ as environment\nvalue = environment.get('HOME')",
+        "import os\nenvironment = os.environ\nenvironment['MODE'] = 'changed'",
+        "import os\ndel os.environ['MODE']",
+        "import os\nvalue = dict(os.environ)",
+        "import os\ndef deferred(value=os.getenv('HOME')):\n    os = {}",
+        "def deferred():\n    from requests import get as fetch\n    fetch('https://example.org')",
+        "import os\nclass Example:\n    os = {}\n    def deferred(self):\n        os.listdir('.')",
+        "import os\ncallback = lambda: os.listdir('.')",
+        "import os\nvalues = [os for os in ()]\nos.listdir('.')",
+    ],
+)
+def test_scoped_effect_aliases_are_rejected(source: str) -> None:
+    assert architecture.core_effect_findings(ast.parse(source)), source
+    assert architecture.application_effect_findings(ast.parse(source)), source
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "def get(value): return value\nget('pure')",
+        "mapping = {}\nmapping.get('key')",
+        "import os\ndef pure(os):\n    return os.getenv('key')",
+        "from subprocess import run\ndef pure(run):\n    return run('value')",
+        "import requests\ndef pure(requests):\n    return requests.get('key')",
+        "def first():\n    from requests import get\ndef second():\n    return get('key')",
+        "import requests as network\nnetwork = {}\nnetwork.get('key')",
+        "from os import environ\ndef pure(environ):\n    return environ['key']",
+        "import os\ndef pure():\n    os = {}\n    return os.get('key')",
+        (
+            "class Example:\n    import requests\n"
+            "    def pure(self):\n        return requests.get('key')"
+        ),
+        "import os\ncallback = lambda os: os.getenv('key')",
+        "import os\nvalues = [os.getenv('key') for os in ()]",
+        "import os\nvalues = {os.getenv('key') for os in ()}",
+        "import os\nvalues = {os.getenv('key'): 1 for os in ()}",
+        "import os\nvalues = (os.getenv('key') for os in ())",
+        "import requests\nrequests.utils.quote('value')",
+        "import subprocess\nsubprocess.list2cmdline(['value'])",
+        "import socket\nsocket.inet_aton('127.0.0.1')",
+    ],
+)
+def test_effect_aliases_do_not_escape_scope_or_override_shadowing(source: str) -> None:
+    assert architecture.core_effect_findings(ast.parse(source)) == []
+    assert architecture.application_effect_findings(ast.parse(source)) == []
+
+
+def test_injected_storage_port_exemption_survives_explicit_aliases() -> None:
+    source = "reader = deps.storage.read_text\nreader(path)\ndeps.storage.read_csv(path)"
+    assert architecture.application_effect_findings(ast.parse(source)) == []
+    assert architecture.core_effect_findings(ast.parse(source))
+
+
+@pytest.mark.parametrize(
+    ("attribute", "valid"),
+    [
+        ("local", False),
+        ("nested", False),
+        ("argument", False),
+        ("Worker.local", False),
+        ("Worker.missing", False),
+        ("Worker.run.missing", False),
+        ("Worker.Inner.execute.missing", False),
+        ("Worker", True),
+        ("Worker.run", True),
+        ("Worker.Inner.execute", True),
+        ("alias.run", True),
+        ("renamed.run", True),
+        ("module.Worker.run", True),
+        ("relative.run", True),
+        ("missing_export", False),
+        ("cycle", False),
+        ("annotation_only", False),
+        ("checking_only", False),
+        ("comprehension_local", False),
+    ],
+)
+def test_runtime_target_resolution_respects_scopes_and_reexports(
+    tmp_path: Path, attribute: str, valid: bool
+) -> None:
+    package = tmp_path / "clearml_yolo"
+    package.mkdir()
+    (package / "probe.py").write_text(
+        "def outer(argument):\n"
+        "    local = 1\n"
+        "    def nested(): pass\n"
+        "class Worker:\n"
+        "    def run(self):\n"
+        "        local = 1\n"
+        "    class Inner:\n"
+        "        def execute(self): pass\n"
+        "alias = Worker\n"
+        "from clearml_yolo.other import Exported as renamed\n"
+        "import clearml_yolo.other as module\n"
+        "from .other import Exported as relative\n"
+        "from .other import absent as missing_export\n"
+        "from .other import cycle\n"
+        "annotation_only: str\n"
+        "from typing import TYPE_CHECKING\n"
+        "if TYPE_CHECKING:\n"
+        "    def checking_only(): pass\n"
+        "values = [comprehension_local for comprehension_local in ()]\n"
+    )
+    (package / "other.py").write_text(
+        "from .probe import Worker as Exported\n"
+        "from .probe import Worker\n"
+        "from .probe import cycle\n"
+    )
+    candidate = grimp.ImportGraph()
+    candidate.add_module("clearml_yolo.probe")
+    candidate.add_module("clearml_yolo.other")
+    findings = architecture.target_findings(
+        {f"clearml_yolo.probe:{attribute}"}, candidate, tmp_path
+    )
+    assert bool(findings) is not valid, findings
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ("from importlib import import_module as load\nload('torch')", True),
+        ("import importlib as loader\nloader.import_module('torch')", True),
+        ("import importlib\nload = importlib.import_module\nload('torch')", True),
+        ("__import__('torch')", True),
+        (
+            (
+                "from importlib import import_module\n"
+                "def pure(import_module):\n    import_module('torch')"
+            ),
+            False,
+        ),
+    ],
+)
+def test_dynamic_import_graph_resolves_scoped_import_aliases(
+    tmp_path: Path, source: str, expected: bool
+) -> None:
+    package = tmp_path / "clearml_yolo/adapters/storage"
+    package.mkdir(parents=True)
+    (package / "helper.py").write_text(source)
+    candidate = grimp.ImportGraph()
+    candidate.add_module("clearml_yolo.adapters.storage.helper")
+    architecture.add_dynamic_imports(candidate, tmp_path)
+    assert bool(architecture.graph_findings(candidate)) is expected
+
+
+def test_runtime_target_supports_root_package_reexports(tmp_path: Path) -> None:
+    package = tmp_path / "clearml_yolo"
+    package.mkdir()
+    (package / "__init__.py").write_text("from .worker import Worker\n")
+    (package / "worker.py").write_text("class Worker:\n    def execute(self): pass\n")
+    candidate = grimp.ImportGraph()
+    candidate.add_module("clearml_yolo")
+    candidate.add_module("clearml_yolo.worker")
+    assert architecture.target_findings({"clearml_yolo:Worker.execute"}, candidate, tmp_path) == []
+    assert architecture.target_findings({"clearml_yolo:Worker.missing"}, candidate, tmp_path)
+
+
+def test_runtime_target_inventory_includes_nested_colon_attributes(tmp_path: Path) -> None:
+    package = tmp_path / "clearml_yolo"
+    package.mkdir()
+    (package / "worker.py").write_text("TARGET = 'clearml_yolo.worker:Worker.execute'\n")
+    config = tmp_path / "pyproject.toml"
+    config.write_text("[project.scripts]\nworker='clearml_yolo.worker:Worker.execute'\n")
+    assert architecture.runtime_targets(tmp_path, config) == {"clearml_yolo.worker:Worker.execute"}
+
+
+@pytest.mark.parametrize(
+    ("source", "effect"),
+    [
+        ("import os\nclass C:\n    os = {}\n    class D:\n        os.listdir('.')", True),
+        (
+            (
+                "from os import listdir as scan\nclass C:\n    scan = None\n"
+                "    class D:\n        scan('.')"
+            ),
+            True,
+        ),
+        (
+            (
+                "def enclosing():\n    import os\n    class C:\n        os = {}\n"
+                "        class D:\n            os.listdir('.')"
+            ),
+            True,
+        ),
+        ("class C:\n    import os\n    class D:\n        os.listdir('.')", False),
+        ("import os\nclass C:\n    class D:\n        os = {}\n        os.get('key')", False),
+        (
+            (
+                "import os\ndef enclosing(os):\n    class C:\n        import os\n"
+                "        class D:\n            os.listdir('.')"
+            ),
+            False,
+        ),
+        ("class C:\n    import os\n    class D(os.listdir('.')):\n        pass", True),
+    ],
+)
+def test_nested_class_effect_lookup_skips_outer_class_namespaces(source: str, effect: bool) -> None:
+    assert bool(architecture.core_effect_findings(ast.parse(source))) is effect
+    assert bool(architecture.application_effect_findings(ast.parse(source))) is effect
+
+
+@pytest.mark.parametrize(
+    ("source", "effect"),
+    [
+        ("def f():\n    os.listdir('.')\nimport os", True),
+        ("os = {}\ndef f():\n    os.listdir('.')\nimport os", True),
+        ("import os\ndef f():\n    reader('.')\nreader = os.listdir", True),
+        ("def f():\n    fetch('url')\nfrom requests import get as fetch", True),
+        ("callback = lambda: os.listdir('.')\nimport os", True),
+        ("class C:\n    def method(self):\n        os.listdir('.')\nimport os", True),
+        ("import os\ndef f(os):\n    os.listdir('.')", False),
+        ("def f():\n    os = {}\n    os.get('key')\nimport os", False),
+        ("import os\ndef f():\n    os.listdir('.')\nos = {}", False),
+        ("def f(reader):\n    reader('.')\nimport os\nreader = os.listdir", False),
+        ("import os\ndef f(value=os.listdir('.')): pass\nos = {}", True),
+        ("import os\nclass C:\n    value = os.listdir('.')\nos = {}", True),
+        (
+            (
+                "os = type('Pure', (), {'listdir': staticmethod(lambda _: [])})\n"
+                "def f(value=os.listdir('.')): pass\nimport os"
+            ),
+            False,
+        ),
+        (
+            (
+                "os = type('Pure', (), {'listdir': staticmethod(lambda _: [])})\n"
+                "class C:\n    value = os.listdir('.')\nimport os"
+            ),
+            False,
+        ),
+    ],
+)
+def test_deferred_effects_use_module_bindings_after_module_initialization(
+    source: str, effect: bool
+) -> None:
+    assert bool(architecture.core_effect_findings(ast.parse(source))) is effect
+    assert bool(architecture.application_effect_findings(ast.parse(source))) is effect
+
+
+@pytest.mark.parametrize(
+    ("source", "target", "valid"),
+    [
+        ("def f(): pass\nclass C:\n    run = f", "C.run", True),
+        ("def f(): pass\nclass C:\n    run = f\n    alias = run", "C.alias", True),
+        ("def f(): pass\nclass C:\n    f = f\n    run = f", "C.run", True),
+        ("class C:\n    def f(): pass\n    run = f", "C.run", True),
+        ("class C:\n    run = missing", "C.run", False),
+        ("class C:\n    run = f\n    def f(): pass", "C.run", False),
+        ("class C:\n    def f(): pass\n    class D:\n        run = f", "C.D.run", False),
+        (
+            "def f(): pass\nclass C:\n    f = None\n    class D:\n        run = f",
+            "C.D.run",
+            True,
+        ),
+        ("def f(): pass\nclass C:\n    run = f.missing", "C.run", False),
+    ],
+)
+def test_class_assignment_targets_follow_lexical_simple_alias_lookup(
+    tmp_path: Path, source: str, target: str, valid: bool
+) -> None:
+    package = tmp_path / "clearml_yolo"
+    package.mkdir()
+    (package / "probe.py").write_text(source)
+    candidate = grimp.ImportGraph()
+    candidate.add_module("clearml_yolo.probe")
+    findings = architecture.target_findings({f"clearml_yolo.probe:{target}"}, candidate, tmp_path)
+    assert bool(findings) is not valid, findings

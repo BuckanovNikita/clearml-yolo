@@ -11,36 +11,20 @@ Read the relevant guidance below instead of copying shared skills into the repos
 If a required skill is unavailable, report the missing gate and continue independent
 inspection without claiming acceptance.
 
-## Working agreement
+## Working agreement and collaboration
 
-- Carry authorized work through implementation, appropriate verification and documentation.
-  Inspect relevant code, configuration and existing changes first; preserve unrelated work.
-  Plans describe intent; the repository and dated checks establish implementation evidence.
-- Respect the active host mode and existing authorization. Planning-only work permits
-  inspection, not writes or mutating hooks. Existing user or standing authorization can
-  cover commits and native release delivery; skills and tasks do not create authorization
-  for deployment, dependency updates or unrelated repairs. Explicit stopping points take
-  precedence. Ask only for material missing information or a new scope decision.
-- For bugs, capture and reproduce the failure when feasible, then verify the original
-  failure path. Report checks and limitations accurately.
-- Follow the existing Python toolchain. Prefer strict types, explicit access, Loguru and
-  Pydantic; handle specific exceptions at a boundary that can report or resolve them.
-  Keep code comments and log messages in English.
-- Track and clean up resources created by the task; preserve pre-existing shared services,
-  containers and data. Keep machine-specific knowledge in global environment guidance.
+The [constitution](.specify/memory/constitution.md) defines typed Python, effect
+ownership, verification, preservation and collaboration rules. The
+[workflow policy](docs/agent-workflow.md) owns task routing, authorization boundaries,
+architecture acceptance and documentation stages. Inspect current implementation and
+existing changes; plans are intent, and executed checks are evidence.
 
-## Collaboration
-
-Use `$sol-orchestration` and native subagents when useful independent work or review
-justifies them. Plans identify ownership, dependencies, acceptance evidence and useful
-parallel work within the selected workflow's stage and role rules. Trivial low-risk edits
-may proceed directly with proportionate checks; do not manufacture parallel tasks.
-Bounded subagents must not delegate further. The primary agent inspects the combined
-diff and owns final verification. Substantive changes require fresh independent review
-after integration and checks; use that final review for Python and architecture acceptance
-as well. Smaller changes use review when risk or uncertainty warrants it. Respect live
-tool/model/concurrency limits and planning restrictions. If required delegation or review
-is unavailable, report the acceptance gap and continue independent safe work.
+Use `sol-orchestration` and native subagents when independent work or review is useful.
+Give bounded agents exclusive write ownership and no further delegation. The parent
+integrates and verifies; substantive changes require fresh independent review afterward.
+Trivial low-risk edits need proportionate checks, not manufactured parallel work.
+Report unavailable required review as an acceptance gap. Preserve the selected parent
+model/effort and respect live tool/concurrency limits and planning restrictions.
 
 ## Read when relevant
 

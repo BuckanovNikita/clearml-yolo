@@ -301,3 +301,13 @@ unchanged. Preserve existing API settings and credentials, or supply them throug
 established environment. Changing the reporting worker leaves the
 application's queue, GPU admission and native model workers under their existing contracts.
 Retry into a fresh output directory and require the normal publication checks to pass.
+
+## Cross-contract integration
+
+New detector groups own typed `model.train` and `model.predict` controls. DEIMv2, RF-DETR
+and Faster R-CNN share CSV-derived COCO preparation, canonical prediction records and
+evaluation policy. Embedded checkpoint metadata survives standalone copies/downloads;
+hash/selection conflicts fail before execution. Mixed comparisons resolve each checkpoint
+independently and preserve current image membership, frozen thresholds and the shared
+inference device. Explicit raw references add required vocabulary/preprocessing assertions.
+See the [multi-model contract](../specs/025-multi-model-backends/contracts/backend.md).

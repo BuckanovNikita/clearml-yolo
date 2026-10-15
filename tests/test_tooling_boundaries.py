@@ -84,6 +84,34 @@ def test_release_import_guard_allows_owned_dependencies() -> None:
     )
 
 
+def architecture_import_findings(source: str) -> set[str]:
+    """Static architecture tooling uses only the standard library and its import graph."""
+    allowed = sys.stdlib_module_names | {"grimp"}
+    imported: set[str] = set()
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Import):
+            imported.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            imported.add("relative import" if node.level else node.module or "relative import")
+    return {name for name in imported if name.split(".")[0] not in allowed}
+
+
+def test_architecture_helper_does_not_import_inspected_runtime_or_new_sdks() -> None:
+    assert not architecture_import_findings(
+        (ROOT / "tests/architecture_helpers.py").read_text(encoding="utf-8")
+    )
+
+
+@pytest.mark.parametrize(
+    "source",
+    ["import clearml_yolo", "from torch import Tensor", "from .application import run"],
+)
+def test_architecture_helper_import_guard_rejects_injected_runtime_dependencies(
+    source: str,
+) -> None:
+    assert architecture_import_findings(source)
+
+
 def test_analysis_packages_are_development_only() -> None:
     with (ROOT / "pyproject.toml").open("rb") as stream:
         config = tomllib.load(stream)

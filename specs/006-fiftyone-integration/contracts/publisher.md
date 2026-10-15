@@ -104,3 +104,21 @@ PYTHON
 
 Publication does not globally install the plugin. Existing runs gain native evaluations
 only through new publication/reruns; there is no automatic historical migration.
+
+## Cross-contract integration
+
+FiftyOne visualization is optional. Its setup or publication failures warn and continue
+the owning computation; setup failure disables visualization for that invocation.
+Successful publication retains one local receipt and the canonical run link, including
+`evaluation_keys` for each evaluated split. Native evaluation registration consumes exact
+source matches without rematching and persists original confusion/PR50/AP reports.
+Native predictions use `evaluated_predictions`, excluding filtered boxes; the
+`matched_predictions` audit overlay retains them without native evaluated status.
+The explicit `@clearml-yolo/evaluation` extension supplies `native_evaluation` and
+`evaluation_reports`; install it in the server/backend environment and restart App.
+No global automatic install or historical migration occurs. Restricted subsets expose
+fixed-threshold counts with unavailable AP/PR; mAR is unavailable. Legacy payloads with
+no report remain readable with missing report values unavailable. Raw
+predictions preserve finite, ordered zero-area boxes from native clipping and their
+CSV indices; publication does not filter inference data or change metric inputs.
+See the [publisher contract](publisher.md).

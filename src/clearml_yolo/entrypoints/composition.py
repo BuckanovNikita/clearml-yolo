@@ -28,6 +28,9 @@ from clearml_yolo.adapters.clearml.results import (
     prediction_checkpoint_hash as _tracking_prediction_checkpoint_hash,
 )
 from clearml_yolo.adapters.clearml.results import (
+    prediction_image_name as _tracking_prediction_image_name,
+)
+from clearml_yolo.adapters.clearml.results import (
     prediction_model_identity as _tracking_prediction_model_identity,
 )
 from clearml_yolo.adapters.clearml.results import publish_evaluation as _tracking_publish_evaluation
@@ -118,6 +121,8 @@ from clearml_yolo.adapters.storage.dataset_cache import (
 )
 from clearml_yolo.adapters.storage.file_io import mkdir as _mkdir
 from clearml_yolo.adapters.storage.file_io import read_csv as _read_csv
+from clearml_yolo.adapters.storage.file_io import read_detection_csv as _read_detection_csv
+from clearml_yolo.adapters.storage.file_io import read_ground_truth as _read_ground_truth
 from clearml_yolo.adapters.storage.file_io import read_text as _read_text
 from clearml_yolo.adapters.storage.file_io import write_csv as _write_csv
 from clearml_yolo.adapters.storage.file_io import write_text as _write_text
@@ -268,6 +273,8 @@ class _RunStorage:
     read_text = staticmethod(_read_text)
     write_text = staticmethod(_write_text)
     read_csv = staticmethod(_read_csv)
+    read_detection_csv = staticmethod(_read_detection_csv)
+    read_ground_truth = staticmethod(_read_ground_truth)
     write_csv = staticmethod(_write_csv)
 
 
@@ -291,6 +298,7 @@ class _TrackingSession:
     file_digest = staticmethod(_tracking_file_digest)
     init_task = staticmethod(_tracking_init_task)
     prediction_checkpoint_hash = staticmethod(_tracking_prediction_checkpoint_hash)
+    prediction_image_name = staticmethod(_tracking_prediction_image_name)
     prediction_model_identity = staticmethod(_tracking_prediction_model_identity)
     publish_evaluation = staticmethod(_tracking_publish_evaluation)
     publish_table = staticmethod(_tracking_publish_table)

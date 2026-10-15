@@ -32,6 +32,7 @@ uv run ruff check .
 uv run mypy .
 uv run vulture
 uv run lint-imports
+uv run --frozen --no-sync python scripts/check_docs.py --all
 uv run pre-commit run --all-files
 ```
 
@@ -47,6 +48,13 @@ running hooks: it includes changelog generation and a post-commit release hook.
 The mocked suite cannot prove native training, a GPU or ClearML uploads; those require
 dated real-run evidence and the
 [end-to-end skill](../.agents/skills/running-end-to-end-tests/SKILL.md).
+
+`scripts/check_docs.py --all` reads tracked project Markdown, checking local paths,
+GitHub-style anchors (including duplicate/Unicode headings), reference links and
+fences. Pass new file paths explicitly before staging. It excludes generated changelogs,
+symlinks and installed workflow assets; it never fetches external links, executes
+examples or rewrites files. See the [checker contract](../specs/033-documentation-checks/spec.md)
+for scope and exit codes. Mermaid grammar needs a separate render and visual review.
 
 ### Native CPU distributed regression tests
 

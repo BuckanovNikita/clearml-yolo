@@ -45,3 +45,31 @@ def validate_split_membership(ground_truth: pd.DataFrame) -> None:
             "A logical image cannot belong to both val and test; overlapping image_name(s): "
             f"{overlap}"
         )
+
+
+
+def validate_evaluation_image_name(image_name: str | None) -> None:
+    """Evaluation joins canonical basenames; alternative modes are raw exports only."""
+    if image_name not in (None, "name"):
+        raise ValueError(
+            "Comparison and evaluation require image_name='name'; "
+            f"{image_name!r} is supported only for raw prediction export"
+        )
+
+
+def validate_prediction_identity(
+    ground_truth: pd.DataFrame, predictions: pd.DataFrame, *, image_name: str | None = None
+) -> None:
+    """Reject unmatched identities before filtering can silently discard predictions."""
+    validate_evaluation_image_name(image_name)
+    for label, frame in (("Ground truth", ground_truth), ("Predictions", predictions)):
+        if "image_name" not in frame:
+            raise ValueError(f"{label} is missing the 'image_name' column")
+        if frame["image_name"].isna().any() or frame["image_name"].eq("").any():
+            raise ValueError(f"{label} contains empty canonical image names")
+    unknown = set(predictions["image_name"]) - set(ground_truth["image_name"])
+    if unknown:
+        raise ValueError(
+            "Prediction image_name values are outside canonical ground-truth membership: "
+            f"{sorted(str(value) for value in unknown)}; evaluation requires image_name='name'"
+        )

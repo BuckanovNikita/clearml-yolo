@@ -117,7 +117,7 @@ configuration and verifies every dependency record remains identical.
 
 The first feature-hook attempt stopped with 1,235 passed, 30 skipped and 35 release
 fixture setup errors: the temporary offline-lock adapter intercepted fixture
-repositories as well as the real project. The adapter is now restricted to this
+repositories and the real project. The adapter is now restricted to this
 repository's exact working directory; other commands use the real tool unchanged.
 No feature/release commit was created by that failed attempt, and local overrides
 were restored. The release fixtures and complete hooks passed on the corrected rerun.

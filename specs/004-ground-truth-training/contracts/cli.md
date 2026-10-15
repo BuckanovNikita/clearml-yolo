@@ -11,6 +11,12 @@ Invalid boxes are dropped; the command displays `Invalid bounding boxes dropped:
 before training. Blank background records do not increment N. No valid training boxes
 remaining is fatal after the count is shown. Cleaned ground truth is used downstream.
 
+The [detection input/provenance contract](../../../docs/input-provenance.md) also applies
+to standalone prediction/comparison and `skip_train`. Storage returns aligned lexical
+source rows and resolved execution paths; cwd changes never choose a different media
+file. Detection readers preserve literal identity strings, explicit empty backgrounds,
+row order and round-trip numeric precision across cache reload and publication.
+
 CSV data overrides native data/filter/class-remapping settings with a visible record.
 `resume` is rejected in CSV mode. Unsupported task types are rejected. Dataset configuration
 attached to ClearML cannot override the generated data. Device, epochs, batch, AMP,

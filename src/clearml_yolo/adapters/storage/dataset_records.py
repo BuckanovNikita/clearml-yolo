@@ -14,6 +14,7 @@ from PIL import Image
 
 from clearml_yolo.adapters.observability.diagnostics import log_exception
 from clearml_yolo.adapters.observability.tracing import trace_operation
+from clearml_yolo.adapters.storage.file_io import resolved_image_path
 from clearml_yolo.core.datasets import (
     Box,
     ImageRecord,
@@ -74,13 +75,6 @@ def _cell(row: dict[str | None, str | list[str] | None], column: str) -> str:
     return value if isinstance(value, str) else ""
 
 
-def _resolved_image_path(value: str, csv_parent: Path) -> Path:
-    path = Path(value).expanduser()
-    if not path.is_absolute():
-        path = csv_parent / path
-    return path.resolve()
-
-
 def _validate_header(header: Sequence[str] | None, source: Path) -> None:
     columns = header or []
     duplicate_headers = sorted(column for column, count in Counter(columns).items() if count > 1)
@@ -107,7 +101,7 @@ def _parse_row(signature: tuple[str, ...], number: int, source: Path) -> _CsvRow
         )
 
     split = cast(Split, split_value)
-    image_path = _resolved_image_path(image_path_value, source.parent)
+    image_path = resolved_image_path(image_path_value, source.parent)
     if image_name != image_path.name:
         raise ValueError(
             f"{source}: row {number} image_name {image_name!r} must match "
@@ -169,7 +163,7 @@ def _read_rows(source: Path) -> list[_CsvRow]:
     name_owners: dict[str, tuple[Path, Split]] = {}
     path_owners: dict[Path, tuple[str, Split]] = {}
 
-    with source.open(encoding="utf-8", newline="") as stream:
+    with source.open(encoding="utf-8-sig", newline="") as stream:
         reader = csv.DictReader(stream)
         _validate_header(reader.fieldnames, source)
         for number, raw_row in enumerate(reader, start=2):

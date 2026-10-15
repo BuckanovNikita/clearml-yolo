@@ -356,3 +356,40 @@ def test_unknown_contexts_do_not_overwrite_and_provenance_reuses_slots(
         "Current model · test · Prediction 4",
         "Current model · test · Prediction 4",
     ]
+
+
+@pytest.mark.parametrize("mode", ["name", "stem", "path"])
+def test_raw_publication_preserves_literal_names_and_labels_and_assigns_media_split(
+    owner: tuple[type[Any], FakeTask], tmp_path: Path, mode: str
+) -> None:
+    from typing import cast
+
+    from clearml_yolo.adapters.storage.file_io import read_detection_csv
+    from clearml_yolo.application.contracts import ImageNameMode
+
+    _, task = owner
+    truth, predictions = _inputs(tmp_path)
+    truth_frame = read_detection_csv(truth).assign(
+        image_path=["val.jpg", "test.jpg"], instance_label=["NA", "NULL"]
+    )
+    truth_frame.to_csv(truth, index=False)
+    names = [
+        name if mode == "name" else Path(name).stem if mode == "stem" else str(tmp_path / name)
+        for name in ["val.jpg", "test.jpg"]
+    ]
+    read_detection_csv(predictions).assign(
+        image_name=names, instance_label=["NA", "NULL"]
+    ).to_csv(predictions, index=False)
+    with invocation(ClearMLConfig(), "predict"):
+        results.register_predictions(
+            task, truth, predictions, output_dir=tmp_path,
+            prediction_image_name=cast(ImageNameMode, mode),
+        )
+    frame = read_detection_csv(task.uploads[1]["artifact_object"])
+    predicted = frame[frame.row_type == "predict"].sort_values("source_row_id")
+    assert predicted.image_name.tolist() == names
+    assert predicted.instance_label.tolist() == ["NA", "NULL"]
+    assert predicted.split.tolist() == ["val", "test"]
+    assert predicted.source_row_id.tolist() == ["pred:0", "pred:1"]
+    assert set(predicted.evaluation_status) == {"not_evaluated"}
+    assert predicted.is_below_threshold.isna().all()

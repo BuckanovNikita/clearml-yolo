@@ -1,5 +1,14 @@
 # Implementation Plan: direct execution and shared cy-queue
 
+## Current status amendment — 2026-10-15
+
+The original plan below records implementation intent at its date. Allocation
+contraction is now required after native training and memory release; only acknowledged
+handoff permits inference. Current-generation reservations, explicit holds and fresh
+memory admission govern capacity; stale unlocked records retain recovery evidence
+without automatically blocking admission. See the [current contract](contracts/queue.md)
+and [status map](../../docs/implementation-status.md). Completed tasks remain unchanged.
+
 ## Summary
 
 Implement [spec.md](spec.md) using the existing Python 3.12/uv layered package.

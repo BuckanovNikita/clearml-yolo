@@ -1,5 +1,12 @@
 # Feature Specification: Reusable datasets and native ClearML tracking
 
+**Resolved-reference amendment (2026-10-15):** FR-001 now binds the ordered resolved
+image references as well as CSV bytes, format and preparation version 2. Byte-identical
+relative-path CSVs in different directories can identify different media; the former
+byte-only rule was incorrect. Existing entries remain intact. See the
+[input/provenance contract](../../docs/input-provenance.md) and
+[bug evidence](../../.specify/bugs/input-evaluation-correctness/assessment.md).
+
 **Current cache amendment (2026-10-12):** automatic repair/recovery language in
 FR-003 and the corrupt-entry edge case below is historical. The
 [file ownership amendment](../024-runtime-isolation/spec.md#file-ownership-amendment--2026-10-12)
@@ -36,8 +43,8 @@ and recognizes original image filenames in native previews.
 **Independent Test**: Prepare twice, including two concurrent requests, and observe one dataset.
 **Acceptance Scenarios**:
 
-1. Given identical CSV bytes and format, when another run trains, then it reuses the completed dataset without image-content reads, image copying, or NDJSON conversion.
-2. Given changed CSV bytes or format, when preparing, then a separate dataset is created.
+1. Given identical CSV bytes, resolved image references, format and preparation version, when another run trains, then it reuses the completed dataset without image-content reads, image copying, or NDJSON conversion.
+2. Given changed CSV bytes, resolved image references or format, when preparing, then a separate dataset is created.
 3. Given original filenames including uppercase extensions, when using NDJSON training, then previews retain those filenames.
 4. Given interrupted preparation, when retried, then no partial dataset is consumed and preparation can finish.
 
@@ -98,7 +105,7 @@ to test; pipeline comparison uses test.
 
 ### Functional Requirements
 
-- **FR-001**: Cache identity MUST depend only on CSV bytes, format and preparation version; reuse MUST NOT read image contents or mtimes or repeat copying/conversion.
+- **FR-001**: Cache identity MUST depend on CSV bytes, ordered resolved image references, format and preparation version; reuse MUST NOT read image contents or mtimes or repeat copying/conversion.
 - **FR-002**: NDJSON training MUST preserve original filenames and extension casing; flat naming remains compatible; label-stem collisions MUST fail.
 - **FR-003**: Cache construction MUST serialize per entry, publish atomically, validate completion and required files/splits, recover interrupted builds, and protect concurrent consumers from native repair/cache writes.
 - **FR-004**: Training and pipeline commands MUST expose a shared dataset cache location.
@@ -147,7 +154,7 @@ to test; pipeline comparison uses test.
 
 ## Assumptions
 
-- Images are immutable; identical CSV bytes reference the same images, including when the CSV is moved.
+- Images at unchanged paths are immutable until explicit invalidation. Moving a relative-path CSV may change its resolved references; identical absolute references and CSV bytes may reuse the same entry.
 - CSV identity deliberately excludes image hashing and mtime invalidation. Cache invalidation is explicit deletion while no run uses the entry.
 - Shared cache consumers use a filesystem supporting process locks and atomic directory rename.
 - Automatic cache locations follow the maintained

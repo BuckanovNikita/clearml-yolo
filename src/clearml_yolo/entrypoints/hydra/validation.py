@@ -24,6 +24,7 @@ from clearml_yolo.application.use_cases.pipeline import (
 )
 from clearml_yolo.core.comparison.significance import validate_q
 from clearml_yolo.core.evaluation.models import EvaluationConfig
+from clearml_yolo.core.evaluation.policy import validate_evaluation_image_name
 from clearml_yolo.core.export_requests import ExportSettings
 from clearml_yolo.core.models import ModelConfig
 from clearml_yolo.core.publication import FiftyOneConfig
@@ -105,6 +106,7 @@ def validate_wrapper_keys(config: DictConfig, function: Callable[..., Any]) -> N
         if group in config:
             stage_settings(dict(config[group]), "train" if group == "ultralytics" else "predict")
     if "inference" in config:
+        validate_evaluation_image_name(config.inference.get("image_name", "name"))
         unknown = set(config.inference) - {"reuse_existing", "image_name"}
         if unknown:
             raise ValueError(f"Unsupported inference settings: {sorted(unknown)}")

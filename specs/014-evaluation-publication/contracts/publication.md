@@ -1,5 +1,12 @@
 # Evaluation publication, plots and identities
 
+The [input/provenance diagram and contract](../../../docs/input-provenance.md) governs
+lexical detection reads, source-relative media and canonical evaluation names. Raw
+prediction publication can associate media using its explicit naming mode but keeps
+original names, source-row lineage and `not_evaluated` status. New prediction sidecars
+bind `prediction_image_name` to prediction bytes; publication does not make a raw
+`stem`/`path` export eligible for scoring.
+
 This contract amends the result inventory in
 [feature 008](../../008-dataset-clearml-tracking/contracts/publication.md). It describes
 required publication behavior; [the feature specification](../spec.md), implementation,
@@ -228,3 +235,13 @@ or server readback. Acceptance additionally requires downloaded canonical CSV/da
 content, remote plot inspection, model metadata/checkpoint binding verification, CPU/GPU
 runs, documentation checks and a fresh independent review. Record commands, observations
 and unavailable gates in dated verification evidence.
+
+## Cross-contract integration
+
+The [evaluation publication amendment](publication.md)
+defines invocation-owned `gt_csv`/`predicts_csv`, durable context enrichment, source lineage
+and JSON pre/post-threshold relationships. Canonical CSVs upload once before completion.
+Original full/DTRK dashboards and the three paired comparison/report workbooks remain
+XLSX; exact validation thresholds and comparison exclusions remain CSV. Duplicate evaluation
+summaries and separate match/threshold/methodology sidecars stay local. Missing automatic
+baseline publishes candidate dashboards/plots and records its skip reason.

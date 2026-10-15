@@ -19,6 +19,7 @@ from loguru import logger
 
 from clearml_yolo.adapters.observability.diagnostics import log_exception
 from clearml_yolo.adapters.observability.tracing import trace_operation
+from clearml_yolo.adapters.storage.file_io import read_detection_csv
 from clearml_yolo.adapters.storage.filesystem import model_weights_path, write_path
 from clearml_yolo.adapters.yolo.config import write_native_yaml
 from clearml_yolo.adapters.yolo.inference import predict_on_images
@@ -28,6 +29,7 @@ from clearml_yolo.application.contracts import (
 from clearml_yolo.application.contracts import (
     VocabularyReport as VocabularyReport,  # noqa: PLC0414 - typed adapter interface
 )
+from clearml_yolo.core.evaluation.policy import validate_evaluation_image_name
 from clearml_yolo.core.redaction import sanitize_configuration
 
 Predictor = Callable[..., pd.DataFrame]
@@ -35,9 +37,6 @@ ClassNameLoader = Callable[[str | Path], dict[int, str]]
 
 _REQUIRED_COLUMNS = ("split", "image_path", "instance_label")
 _MAX_REPORTED_PATHS = 5
-# Numeric-looking identifiers (COCO stems, "0001") would come back as int64 and stop
-# joining to the ground truth, so the cached frame must reload as the model produced it.
-_CACHED_TEXT_COLUMNS = {"image_name": str, "instance_label": str}
 COMPARISON_KEYS = frozenset(
     {
         "batch",
@@ -202,7 +201,7 @@ def _read_cache(output: Path, native_project: Path) -> pd.DataFrame | None:
         logger.warning("Ignoring prediction cache without a retained source manifest: {}", output)
         return None
     # Exact float replay preserves detections at the frozen confidence threshold.
-    predictions = pd.read_csv(output, dtype=_CACHED_TEXT_COLUMNS, float_precision="round_trip")
+    predictions = read_detection_csv(output)
     predictions.attrs.update(evidence.model_dump())
     return predictions
 
@@ -245,6 +244,7 @@ def reinfer_split(
         ValueError: If the split is empty, the required columns are absent, or any of
             the split's images is missing on disk.
     """
+    validate_evaluation_image_name(image_name)
     duplicate_native_keys = sorted(COMPARISON_KEYS & set(native_kwargs or {}))
     if duplicate_native_keys:
         raise ValueError(

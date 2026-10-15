@@ -17,6 +17,8 @@ import pytest
 import yaml
 from PIL import Image
 
+from clearml_yolo.adapters.storage.file_io import resolved_image_references
+
 
 def _process_cache_consumer(
     source: str,
@@ -147,10 +149,14 @@ def test_changed_csv_bytes_or_format_create_distinct_entries(tmp_path: Path) -> 
     assert len({ndjson_root, flat_root, changed_root}) == 3
 
 
-def test_identical_csv_bytes_at_another_path_reuse_one_entry(tmp_path: Path) -> None:
+def test_identical_csv_bytes_with_absolute_references_reuse_one_entry(tmp_path: Path) -> None:
     from clearml_yolo.adapters.storage.dataset_cache import cached_dataset
 
     source = _source(tmp_path / "input")
+    for split in ("train", "val"):
+        source.write_text(source.read_text().replace(
+            f",{split}.PNG,", f",{source.parent / f'{split}.PNG'},"
+        ))
     moved = tmp_path / "copy" / "truth.csv"
     moved.parent.mkdir()
     moved.write_bytes(source.read_bytes())
@@ -361,7 +367,10 @@ def test_existing_invalid_entry_is_preserved(tmp_path: Path, kind: str) -> None:
     source = _source(tmp_path / "input")
     cache_dir = tmp_path / "cache"
     cache_dir.mkdir()
-    identity = cache._identity(hashlib.sha256(source.read_bytes()).hexdigest(), "ndjson")
+    identity = cache._identity(
+        hashlib.sha256(source.read_bytes()).hexdigest(), "ndjson",
+        resolved_image_references(source, source.read_bytes()),
+    )
     entry = cache_dir / identity
     target = tmp_path / "target"
     if kind == "directory":
@@ -403,7 +412,10 @@ def test_failed_build_cleans_only_its_staging_directory(
 
     source = _source(tmp_path / "input")
     cache_dir = tmp_path / "cache"
-    identity = cache._identity(hashlib.sha256(source.read_bytes()).hexdigest(), "ndjson")
+    identity = cache._identity(
+        hashlib.sha256(source.read_bytes()).hexdigest(), "ndjson",
+        resolved_image_references(source, source.read_bytes()),
+    )
     foreign_staging = cache_dir / f".{identity}.staging-foreign"
     foreign_staging.mkdir(parents=True)
     (foreign_staging / "foreign.bin").write_bytes(b"preserve me")
@@ -641,7 +653,10 @@ def test_staging_name_collision_preserves_existing_directory(
 
     source = _source(tmp_path / "input")
     cache_dir = tmp_path / "cache"
-    identity = cache._identity(hashlib.sha256(source.read_bytes()).hexdigest(), "ndjson")
+    identity = cache._identity(
+        hashlib.sha256(source.read_bytes()).hexdigest(), "ndjson",
+        resolved_image_references(source, source.read_bytes()),
+    )
     collision = cache_dir / f".{identity}.staging-{UUID(int=0).hex}"
     collision.mkdir(parents=True)
     (collision / "foreign.bin").write_bytes(b"keep collision")

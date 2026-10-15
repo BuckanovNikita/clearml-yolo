@@ -1,5 +1,10 @@
 # Feature Specification: Test quality and GPU controls
 
+**Current operator behavior:** the [2026-10-15 simplification amendment](#operator-simplification-amendment--2026-10-15)
+supersedes the original US2/FR-04–06 token, reason, whole-claim and live-owner release
+rules below. Use [current per-device controls](../../docs/queue.md#physical-gpu-operator-controls).
+The original scenarios and completed outcomes remain historical records.
+
 **Created**: 2026-10-14
 **Status**: Approved for implementation in the user conversation
 **Feature context**: `031-test-quality-gpu-controls`; existing checkout retained.
@@ -90,3 +95,8 @@ Earlier completed evidence and external acceptance gaps remain historical record
 Acceptance covers exact threshold boundaries, startup rechecks, real subprocess
 locks, per-device freeing, cross-root and competing operations, old guardian
 persistence/handoff/cleanup, missing telemetry and absence of public full IDs.
+
+The [maintained lifecycle diagram](../../docs/queue-lifecycles.md) and
+[status map](../../docs/implementation-status.md) separate job completion, cleanup
+evidence and current-generation reservations. Stale unlocked metadata alone cannot
+veto capacity; current reservations and explicit holds still exclude their devices.

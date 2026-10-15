@@ -2,7 +2,9 @@
 
 ## Dataset cache entry
 
-Identity: CSV SHA-256 + format (`ndjson` or `flat`) + preparation version.
+Identity: CSV SHA-256 + ordered resolved image references + format (`ndjson` or `flat`)
++ preparation version 2. Source-directory moves reuse only when the resolved references
+remain identical; old version entries are preserved.
 Paths: data.yaml, cleaned ground_truth.csv, local NDJSON/diagnostics, images and labels.
 Completion: version/identity, split counts, required relative file inventory. Required files
 must exist; every requested split must have at least one image. No image content/mtime checks.

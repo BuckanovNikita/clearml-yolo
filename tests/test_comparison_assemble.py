@@ -527,7 +527,9 @@ def test_comparing_a_model_against_itself_is_refused(
     same = ModelRef(
         source="local", label="fixture detector", weights=checkpoint, thresholds={"car": 0.4}
     )
-    (tmp_path / "gt.csv").write_text("image_name,split\na.png,test\n", encoding="utf-8")
+    (tmp_path / "gt.csv").write_text(
+        "image_name,image_path,split\na.png,a.png,test\n", encoding="utf-8"
+    )
 
     with pytest.raises(ValueError, match="same checkpoint"):
         compare(

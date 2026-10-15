@@ -55,3 +55,10 @@ Generate complete examples with cy-init-config into a new directory, then apply 
 choices. Prediction values come only from the resolved prediction group. Use weights or
 ultralytics_predict.model for standalone inference. Use the installed canonical parameter
 names. No dependency update is required.
+
+## Cross-contract integration
+
+Default YOLO model commands use complete top-level `ultralytics` and `ultralytics_predict`
+groups. Prediction reads its resolved group; visible references provide inheritance.
+Raw wrapper `cfg`, non-null native `cfg`, nested stage-native mappings and duplicate
+native comparison inference fields are unsupported and fail ordinary strict validation.

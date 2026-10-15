@@ -1,5 +1,10 @@
 # Research
 
+The decisions below retain their original research context. The
+[2026-10-15 input amendment](spec.md) supersedes byte-only cache identity with CSV
+digest plus resolved image references, format and preparation version 2; image
+content hashing and mtime checks remain excluded.
+
 ## Dataset lifecycle
 
 Decision: Use cached prepared data.yaml directly, retaining NDJSON locally. Existing export

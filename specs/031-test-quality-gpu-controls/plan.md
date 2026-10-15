@@ -1,5 +1,13 @@
 # Implementation Plan: Test quality and GPU controls
 
+## Current status amendment — 2026-10-15
+
+The original whole-claim/token/reason/live-owner release design below is historical.
+The [operator simplification amendment](spec.md#operator-simplification-amendment--2026-10-15)
+and [queue guide](../../docs/queue.md#physical-gpu-operator-controls) govern current
+per-device generation-fenced free/release behavior. Completed tasks and the external
+multi-GPU acceptance gap remain unchanged; see the [status map](../../docs/implementation-status.md).
+
 Implement the approved [specification](spec.md) with Python 3.12, the existing uv
 toolchain and native Spec Kit ledger. Do not modify installed workflow tooling.
 

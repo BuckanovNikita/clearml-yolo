@@ -121,3 +121,15 @@ backend, preset, foreground labels and preprocessing even without a `.model.json
 When present, that sidecar's hash must match. This descriptor is distinct from training
 provenance in `.identity.json`. Raw comparison checkpoints need explicit backend, preset,
 class strings and preprocessing assertions, plus DEIM source access when applicable.
+
+## Detection identity acceptance
+
+Use the [input/provenance contract](../../../../docs/input-provenance.md) for relative
+media resolution, literal CSV identities and version 2 cache separation. Exercise
+standalone prediction/comparison and `skip_train` from another cwd, including Hydra
+chdir and a conflicting same-named file. Preserve `NA`, `NULL`, `nan`, `None`, numeric
+strings, Unicode and empty backgrounds in source/cache/published rows. Compare unchanged
+cases with identical CSV, checkpoint and settings; test corrected cases separately.
+Require canonical `name` for evaluation; raw `stem`/`path` exports retain their names
+and `not_evaluated` status. Download hash-bound provenance and canonical result rows
+before claiming publication preserves naming mode and source lineage.

@@ -229,3 +229,13 @@ configured profiles and the engine's weight streaming budget. Neither value is t
 peak GPU memory. Native `torch.cuda.max_memory_allocated` measures the Torch allocator
 separately and cannot measure the standalone runner's complete device usage. Record latency
 scope, warmup policy and these memory meanings alongside measurements.
+
+## Cross-contract integration
+
+`cy-export` retains its executable `export` settings and stores generated evidence under
+`export_result`, ignored during replay. It publishes operation-specific ONNX/engine,
+metadata and verification artifacts without registering another trained model. CPU ONNX
+has zero GPU demand; build/verify admit one device. The standalone runner validates hashes,
+runtime/plugins, profiles, tensor semantics and foreground classes. Numerical diagnostics
+and labeled-corpus mAP gates are separate; CUDA 11.8 target execution requires its own
+dated evidence and cannot be inferred from local newer-CUDA success.

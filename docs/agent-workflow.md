@@ -12,6 +12,12 @@ before relying on historical task claims; preserve unrelated work and local over
 
 ## Spec Kit integration
 
+Each normative rule has one authoritative topic location and a linked executable
+check, or an explicit verification limitation. The [contract index](current-contracts.md)
+is navigation, not a duplicate specification. Contract changes reconcile specification,
+implementation, tests, examples and portable usage guidance together. Architecture
+gates include negative tests proving prohibited behavior is rejected.
+
 Keep installed Spec Kit skills, extension commands, templates and other `.specify/`
 files unchanged unless the user explicitly requests a change to those files. Put
 project workflow policy in this file or separate project hooks. Project feature

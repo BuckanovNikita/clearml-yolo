@@ -159,3 +159,15 @@ An unconfirmed initialization or shutdown also blocks later same-process task
 creation, including remaining sequential sweep members, to prevent reuse of a
 failed SDK owner. Inspect the first error and relaunch remaining work in a fresh
 process; no private SDK state is reset automatically.
+
+## Cross-contract integration
+
+`LOGURU_LEVEL=TRACE` enables the maintained [operation diagnostic contract](diagnostics.md):
+lifecycle records preserve caller Loguru sinks; a separate watchdog writes 30-second
+per-thread deepest-operation heartbeats and 60-second changed grouped location-only
+stacks to captured stderr, bounded to eight groups and 12 frames. Scalar context is
+redacted and bounded; full configuration/data/locals/source dumps are excluded.
+Application workflows access tracing through the execution-resource port; evaluation
+and FiftyOne adapters may depend on observability. Keep operation coverage and this
+guide current when blocking boundaries change. Cleanup and `command.return` are
+observable without altering execution, retry, timeout or GPU allocation policy.

@@ -79,3 +79,19 @@ The inventory above governs new publications. Reading existing task models follo
 including ordered historical threshold/dashboard and checkpoint sources. These readers do
 not add legacy artifact uploads or rewrite historical tasks. Artifact-backed provenance records
 source task/artifact identity; it does not invent an Output Model link.
+
+## Cross-contract integration
+
+ClearML publications follow the current inventory, not old artifact counts. Native
+YAML, NDJSON, archives, manifests and diagnostic/publication receipts remain local.
+Consumed dataset and explicit report configurations are Configuration Objects. Canonical
+`run` supports replay through an explicit canonical-object read and a detached, sanitized
+snapshot write; inherited SDK connection flags and proxy containers do not control execution.
+YOLO retains its native `General` replay parameters. New detector
+families replay `run.model` and record sanitized effective native arguments in `General`
+as observed evidence, without applying remote overrides to that evidence. Configuration
+copies are not artifacts.
+Native owner callbacks may publish training/validation previews and non-PR plots; native
+validation PR uploads are filtered with callback state restored on success/failure.
+Native DDP descendants do not publish.
+The native best checkpoint uses one Output Model, verified before completion.

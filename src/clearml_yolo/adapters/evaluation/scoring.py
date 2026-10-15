@@ -46,7 +46,11 @@ from clearml_yolo.core.evaluation.payload import (
     EvaluationPayload,
     EvaluationReport,
 )
-from clearml_yolo.core.evaluation.policy import validate_split_membership, validate_thresholds
+from clearml_yolo.core.evaluation.policy import (
+    validate_prediction_identity,
+    validate_split_membership,
+    validate_thresholds,
+)
 from clearml_yolo.core.evaluation.result_rows import assign_source_ids, build_result_rows
 from clearml_yolo.core.evaluation.schema import ConfusionMatrixPayload, PRCurve
 from clearml_yolo.core.identity import ModelIdentity
@@ -309,6 +313,7 @@ def calibrate_thresholds(
     EvaluationConfig.model_validate(
         {"iou_threshold": iou_threshold, "matching_strategy": matching_strategy}
     )
+    validate_prediction_identity(ground_truth, predictions)
     try:
         calibration_gt = _split_ground_truth(ground_truth, calibration_split)
     except ValueError as error:
@@ -475,6 +480,10 @@ def compute_evaluation(
     )
     if not skip_cohen_kappa:
         raise ValueError("Fixed evaluation currently requires skip_cohen_kappa=True")
+    validate_prediction_identity(ground_truth, raw_predictions)
+    validate_prediction_identity(ground_truth, predictions)
+    if source_predictions is not None:
+        validate_prediction_identity(ground_truth, source_predictions)
     required = classes if required_classes is None else required_classes
     normalized = validate_thresholds(thresholds, required)
     ground_truth, predictions, source_gt, source_preds = _lineage_frames(
@@ -664,6 +673,7 @@ def score_split(
     EvaluationConfig.model_validate(
         {"iou_threshold": iou_threshold, "matching_strategy": matching_strategy}
     )
+    validate_prediction_identity(gt_df, preds_df)
     for frame_name, frame in (("Ground-truth", gt_df), ("Prediction", preds_df)):
         if not frame.index.is_unique:
             raise ValueError(

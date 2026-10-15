@@ -5,7 +5,7 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 
@@ -17,7 +17,9 @@ from clearml_yolo.adapters.clearml.session import (
     upload_artifact,
 )
 from clearml_yolo.adapters.observability.tracing import trace_operation
+from clearml_yolo.adapters.storage.file_io import read_detection_csv, read_ground_truth
 from clearml_yolo.adapters.storage.filesystem import write_path
+from clearml_yolo.application.contracts import ImageNameMode
 from clearml_yolo.core import artifact_names
 from clearml_yolo.core.evaluation.models import EvaluatedSplit
 from clearml_yolo.core.evaluation.result_rows import (
@@ -43,8 +45,12 @@ def write_prediction_provenance(
     predictions: Path,
     checkpoint: Path,
     model_identity: ModelIdentity | None = None,
+    *,
+    prediction_image_name: ImageNameMode = "name",
 ) -> str | None:
     """Bind prediction bytes to a local checkpoint, when one is available."""
+    if prediction_image_name not in {"name", "stem", "path"}:
+        raise ValueError("prediction_image_name must be name, stem, or path")
     checkpoint_hash = file_digest(checkpoint) if checkpoint.is_file() else None
     if model_identity is not None and model_identity.checkpoint_sha256 != checkpoint_hash:
         raise ValueError("Model identity does not match prediction checkpoint bytes")
@@ -52,6 +58,7 @@ def write_prediction_provenance(
         json.dumps(
             {
                 "predictions_sha256": file_digest(predictions),
+                "prediction_image_name": prediction_image_name,
                 "checkpoint_sha256": checkpoint_hash,
                 "model_identity": model_identity.model_dump() if model_identity else None,
             },
@@ -98,23 +105,23 @@ def prediction_model_identity(predictions: Path) -> ModelIdentity | None:
     return identity
 
 
+def prediction_image_name(predictions: Path) -> ImageNameMode | None:
+    """Read naming mode only from provenance bound to these exact CSV bytes."""
+    prediction_checkpoint_hash(predictions)
+    path = _provenance_path(predictions)
+    if not path.is_file():
+        return None
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if "prediction_image_name" not in payload:
+        return None
+    mode = payload["prediction_image_name"]
+    if not isinstance(mode, str) or mode not in {"name", "stem", "path"}:
+        raise ValueError("Prediction provenance contains an invalid prediction_image_name")
+    return cast(ImageNameMode, mode)
+
+
 def _read_rows(path: Path) -> pd.DataFrame:
-    return pd.read_csv(
-        path,
-        dtype={
-            "image_name": str,
-            "instance_label": str,
-            "split": str,
-            "source_row_id": str,
-            "object_id": str,
-            "context_id": str,
-            "model_id": str,
-            "model_name": str,
-            "training_task_id": str,
-            "checkpoint_sha256": str,
-        },
-        float_precision="round_trip",
-    )
+    return read_detection_csv(path)
 
 
 @trace_operation("clearml.results.csv.write")
@@ -284,6 +291,7 @@ def register_predictions(
     model_id: str | None = None,
     role: str = "prediction",
     splits: list[str] | None = None,
+    prediction_image_name: ImageNameMode = "name",
     model_identity: ModelIdentity | None = None,
 ) -> None:
     """Persist not-evaluated rows until a later evaluation enriches the same context."""
@@ -295,6 +303,21 @@ def register_predictions(
     model_identity = model_identity or prediction_model_identity(predictions)
     if model_id is None and (checkpoint_hash := prediction_checkpoint_hash(predictions)):
         model_id = f"checkpoint:{checkpoint_hash}"
+    membership = source["image_name"]
+    if prediction_image_name != "name":
+        execution = read_ground_truth(ground_truth).execution
+        identities: dict[str, str] = {}
+        unique = execution[["image_name", "image_path"]].drop_duplicates()
+        for row in unique.itertuples(index=False):
+            path = Path(str(row.image_path))
+            key = path.stem if prediction_image_name == "stem" else str(path)
+            canonical = str(row.image_name)
+            if key in identities and identities[key] != canonical:
+                raise ValueError(
+                    f"Ambiguous raw prediction {prediction_image_name} identity: {key}"
+                )
+            identities[key] = canonical
+        membership = source["image_name"].map(identities)
     selected = splits if splits is not None else list(truth["split"].dropna().unique())
     for split in selected:
         context = _context(bundle, predictions, role, str(split), model_id, model_identity)
@@ -303,7 +326,7 @@ def register_predictions(
         scoped_truth = truth[truth["split"] == split]
         if scoped_truth.empty:
             raise ValueError(f"No ground-truth rows for split {split!r}")
-        scoped_source = source[source["image_name"].isin(scoped_truth["image_name"])]
+        scoped_source = source[membership.isin(scoped_truth["image_name"])]
         rows = pd.concat(
             [
                 build_ground_truth_rows(scoped_truth),
@@ -313,7 +336,7 @@ def register_predictions(
         )
         bundle.put(context, rows)
     scoped_images = truth.loc[truth["split"].isin(selected), "image_name"]
-    outside = source[~source["image_name"].isin(scoped_images)]
+    outside = source[~membership.isin(scoped_images)]
     if not outside.empty:
         context = _context(
             bundle,

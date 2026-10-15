@@ -167,3 +167,12 @@ by native clipping. Ground-truth background rows retain empty boxes and their im
 membership. Stable source IDs and JSON relationships continue to bind original source
 rows to prepared match indices. Schema failures are fatal at their applicable stage and
 do not silently repair source populations.
+
+## Cross-contract integration
+
+Python integrations use the `core`, `application`, `adapters` and `entrypoints`
+packages. Application workflows receive explicit `WorkflowDependencies`; CLI
+composition supplies them outside Hydra configuration. Old module paths and saved
+Python `_target_` strings must migrate together; no compatibility aliases remain.
+Regenerate editable YAML after backing up custom overrides as described in the
+[import migration](python-import-migration.md).

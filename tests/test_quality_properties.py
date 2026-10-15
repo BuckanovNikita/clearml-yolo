@@ -74,6 +74,8 @@ def test_resolved_yaml_json_snapshot_preserves_lexical_identity_and_types(
 @given(label=_LEXICAL, image=_LEXICAL, confidence=_CONFIDENCE)
 @example(label="0001", image="0010", confidence=0.700000000000003)
 @example(label="e\u0301", image="é", confidence=0.5)
+@example(label="NA", image="NULL", confidence=0.700000000000003)
+@example(label="nan", image="None", confidence=0.5)
 def test_real_prediction_cache_roundtrip_preserves_lexical_and_float_values(
     label: str, image: str, confidence: float
 ) -> None:
@@ -101,7 +103,7 @@ def test_real_prediction_cache_roundtrip_preserves_lexical_and_float_values(
             "imgsz": 64,
             "batch": 1,
             "device": "cpu",
-            "image_name": "stem",
+            "image_name": "name",
             "native_project": root / "native",
             "native_name": "test",
             "predictor": predictor,

@@ -4,6 +4,10 @@
 queue implementation, inspect availability, reserve GPUs, substitute devices or wait.
 `cy -m` uses sequential Hydra execution. Scheduling belongs to `cy-queue`.
 
+The [job/reservation lifecycle diagram](queue-lifecycles.md) separates job outcomes,
+process-cleanup evidence and current-generation GPU availability. The
+[status map](implementation-status.md) links implementation, releases and external gaps.
+
 ## Submit and run
 
 ```bash
@@ -259,3 +263,37 @@ exceptions. SDK configuration, cache/download/temp policies and outside inputs r
 quiet prediction and bounded finalization. The [feature ledger](../specs/029-shared-cy-queue/tasks.md)
 and dated evidence distinguish implemented behavior from physical GPU, live ClearML and
 actual multi-user/multi-host NFS acceptance. CPU/mocked tests cannot substitute for those gates.
+
+## Cross-contract integration
+
+The [multirun grouping contract](../specs/030-multirun-tags/contracts/tags.md) adds a
+shared random ClearML tag per direct launch or queued submission. Keep the shared
+Hydra tag helper, direct callback lifetime and frozen queue tags consistent. Explicit
+user tags survive; ordinary RUN adds no tag.
+
+Direct commands never schedule. Queue automatic availability uses only used VRAM strictly
+below 2 GiB (2048 MiB), with fresh admission checks immediately before launch and no
+configurable threshold. Current allocations and explicit holds stay exclusive; stale
+unlocked metadata alone does not veto capacity. The cutoff is independent of training
+capacity. Keep [queue](queue.md), direct Hydra defaults, private snapshots, owner/guardian
+adapters, CLI/TUI and README consistent.
+The [operator control contract](queue.md#physical-gpu-operator-controls) uses physical
+`nvidia-smi` indexes independently of CUDA visibility; submission selectors retain
+their logical mapping. Queue text, JSON, TUI, status logs and errors expose physical
+indexes or short absent-device labels, with full GPU UUIDs and claim tokens kept internal.
+Per-owner holds exclude new host allocations across roots. `gpu disable INDEX`,
+`enable INDEX`, `free INDEX` and its `release INDEX` alias need no supplementary
+arguments. Manual freeing clears only that GPU's existing reservations and holds without
+memory/process checks, signals, original queue access or changing the job outcome.
+Per-device generations fence earlier guardians and preserve sibling reservations; the
+next job still needs fresh memory admission. Keep capability preflight, hold/claim
+transactions and remote
+[GPU DDP acceptance](ddp-testing.md) aligned with these rules.
+
+Feature 029 replaces the historical four-mode execution policy with direct commands and
+`cy-queue`. Old switches fail with migration guidance. Training holds the complete
+allocation until acknowledged contraction; the first device remains reserved through
+descendant exit unless explicitly freed. Guardian death retains an uncertain job outcome
+for owner recovery, without letting stale unlocked records block new admission. Ordering selects the
+earliest runnable job on each host. NFS holds durable records, host-local coordination
+holds locks, generations and recovery records. Completed historical evidence remains unchanged.

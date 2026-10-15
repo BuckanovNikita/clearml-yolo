@@ -1,5 +1,6 @@
 """Project-owned requests and results shared by workflows and their adapters."""
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, Self
 
@@ -23,6 +24,14 @@ PREDICTION_COLUMNS = [
     "bbox_x_br",
     "bbox_y_br",
 ]
+
+
+@dataclass(frozen=True)
+class GroundTruthRead:
+    """Original source rows and a row-aligned execution view with resolved media paths."""
+
+    source: pd.DataFrame
+    execution: pd.DataFrame
 
 
 class ClearMLConfig(BaseModel):
@@ -207,7 +216,7 @@ class InferenceConfig(BaseModel):
     imgsz: int | list[int]
     batch: int
     device: str | int | list[int] | None
-    image_name: ImageNameMode = "name"
+    image_name: Literal["name"] = "name"
     reuse_existing: bool = True
     ultralytics: dict[str, Any] = Field(default_factory=dict)
 
@@ -243,7 +252,7 @@ class SettledInference(BaseModel):
     imgsz: int | list[int]
     batch: int
     device: str | int | list[int] | None
-    image_name: ImageNameMode
+    image_name: Literal["name"]
     reuse_existing: bool
     ultralytics: dict[str, Any] = Field(default_factory=dict)
 

@@ -1,0 +1,143 @@
+{
+  "schema_version": 1,
+  "task": "architecture-check-blindspots",
+  "scope": [
+    "tests/architecture_helpers.py",
+    "tests/test_architecture.py",
+    "tests/test_tooling_boundaries.py",
+    ".specify/bugs/architecture-check-blindspots"
+  ],
+  "impact": "modules",
+  "rules": "AGENTS.md and docs/agent-workflow.md require executable inward dependency/effect contracts, negative tests and static runtime target validation; existing pyproject import contracts remain authoritative.",
+  "modules": [
+    {
+      "id": "helpers",
+      "path": "tests/architecture_helpers.py",
+      "change": "modify",
+      "responsibility": "Static validation of runtime target paths, initialization effects and inner-layer effect ownership.",
+      "interface": "ASTs and source trees produce findings without executing inspected code; resolve scoped names and supported explicit re-exports conservatively.",
+      "layer": "Test tooling",
+      "allowed_dependencies": [
+        "Python standard library",
+        "existing grimp import graph API"
+      ],
+      "forbidden_dependencies": [
+        "application runtime imports",
+        "new third-party dependencies"
+      ],
+      "effects": "Reads inspected source files only; never executes inspected definitions or effects.",
+      "contracts": [
+        "architecture",
+        "tooling"
+      ]
+    },
+    {
+      "id": "fixtures",
+      "path": "tests/test_architecture.py",
+      "change": "modify",
+      "responsibility": "Prove real architecture passes and prohibited source patterns fail.",
+      "interface": "Temporary source fixtures and existing graph checks establish negative and positive cases.",
+      "layer": "Test tooling",
+      "allowed_dependencies": [
+        "architecture_helpers",
+        "existing pytest/grimp/import-linter test dependencies",
+        "Python standard library"
+      ],
+      "forbidden_dependencies": [
+        "new third-party dependencies"
+      ],
+      "effects": "Owns temporary test fixture files; existing smoke subprocess is retained.",
+      "contracts": [
+        "architecture"
+      ]
+    },
+    {
+      "id": "tooling-contracts",
+      "path": "tests/test_tooling_boundaries.py",
+      "change": "modify",
+      "responsibility": "Keep static architecture tooling independent of inspected application modules and extra SDKs.",
+      "interface": "Source text produces import allowlist findings; actual imports pass and injected runtime imports fail.",
+      "layer": "Test tooling",
+      "allowed_dependencies": [
+        "Python standard library",
+        "existing pytest and packaging test dependencies"
+      ],
+      "forbidden_dependencies": [
+        "new third-party dependencies"
+      ],
+      "effects": "Reads the checker source; does not import or execute inspected application code.",
+      "contracts": [
+        "tooling"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "architecture",
+      "path": "tests/test_architecture.py",
+      "status": "existing",
+      "rules": "Real source and generated targets pass; missing targets and direct inner effects fail; scoped shadowing and lazy definitions remain allowed.",
+      "check": "architecture"
+    },
+    {
+      "id": "tooling",
+      "path": "tests/test_tooling_boundaries.py",
+      "status": "existing",
+      "rules": "Architecture helper imports only Python standard library and grimp; injected runtime/SDK/relative imports fail.",
+      "check": "architecture"
+    }
+  ],
+  "checks": [
+    {
+      "id": "architecture",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync pytest tests/test_architecture.py tests/test_tooling_boundaries.py",
+      "expectation": "Actual architecture and all negative/positive fixtures pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": ".specify/bugs/architecture-check-blindspots/test.md"
+      }
+    },
+    {
+      "id": "imports",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync lint-imports",
+      "expectation": "Existing import contracts remain satisfied.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": ".specify/bugs/architecture-check-blindspots/test.md"
+      }
+    },
+    {
+      "id": "static",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync ruff check tests/architecture_helpers.py tests/test_architecture.py tests/test_tooling_boundaries.py && uv run --frozen --no-sync mypy tests/architecture_helpers.py tests/test_architecture.py tests/test_tooling_boundaries.py && uv run --frozen --no-sync vulture",
+      "expectation": "Changed tooling remains lint-clean and strictly typed.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": ".specify/bugs/architecture-check-blindspots/test.md"
+      }
+    },
+    {
+      "id": "docs",
+      "kind": "documentation",
+      "command": "uv run --frozen --no-sync python scripts/check_docs.py --all",
+      "expectation": "Parent-integrated documentation checker validates records and guide changes.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/evidence/2026-10-15-correctness-cleanup/verification.md"
+      }
+    }
+  ],
+  "documentation": "Parent updates architecture guide with scoped effects, supported explicit re-exports and limitations; bug artifacts preserve dated reproduction and checks.",
+  "review": {
+    "status": "accepted",
+    "reviewer": "/root/runtime_acceptance_review",
+    "evidence": "docs/evidence/2026-10-15-correctness-cleanup/review.md",
+    "reconciliation": "Fresh independent read-only review of the integrated task-owned runtime/tooling/tests/docs and architecture scope after parent verification. All initial findings corrected and re-reviewed; actual added/modified paths covered, no moved/deleted runtime modules. Original local uv.sources overrides and untracked grid-search draft excluded. Native/package runtime manifests still match all180files; final review records preserve limits."
+  }
+}

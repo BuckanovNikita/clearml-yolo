@@ -13,7 +13,11 @@ from clearml_yolo.application.ports import TaskHandle, WorkflowDependencies
 from clearml_yolo.application.use_cases.publication import prepare_publisher, publish_results
 from clearml_yolo.core import artifact_names
 from clearml_yolo.core.evaluation.models import EvaluatedSplit, EvaluationConfig
-from clearml_yolo.core.evaluation.policy import classes_from_ground_truth
+from clearml_yolo.core.evaluation.policy import (
+    classes_from_ground_truth,
+    validate_prediction_identity,
+    validate_split_membership,
+)
 from clearml_yolo.core.evaluation.result_rows import assign_source_ids
 from clearml_yolo.core.identity import require_model_identity
 from clearml_yolo.core.publication import FiftyOneConfig
@@ -81,6 +85,7 @@ def _prepare(
             "Frozen thresholds require the native digital-metrics backend; "
             f"backend={config.backend!r} is unsupported"
         )
+    validate_prediction_identity(ground_truth, predictions)
     prepared_gt = deps.evaluation.prepare_ground_truth(ground_truth, deduplicate=config.preprocess)
     raw_predictions = deps.evaluation.filter_invalid_prediction_boxes(
         predictions.reset_index(drop=True)
@@ -132,24 +137,23 @@ def compute_metrics(
                 "split='all' is unsupported for frozen evaluation; name concrete splits"
             )
         predictions_frame = assign_source_ids(
-            deps.storage.read_csv(
-                predictions,
-                dtype={"image_name": str, "instance_label": str},
-                float_precision="round_trip",
-            ),
+            deps.storage.read_detection_csv(predictions),
             row_type="prediction",
         )
         ground_truth_frame = assign_source_ids(
-            deps.storage.read_csv(
-                ground_truth,
-                dtype={"image_name": str, "instance_label": str, "split": str},
-                float_precision="round_trip",
-            ),
+            deps.storage.read_detection_csv(ground_truth),
             row_type="ground_truth",
         )
         available = set(ground_truth_frame["split"].dropna())
         if missing := (set(requested) - available):
             raise ValueError(f"No ground-truth rows for splits {sorted(missing)}")
+        if calibration_split not in available:
+            raise ValueError(f"No ground-truth rows for calibration split {calibration_split!r}")
+        validate_split_membership(ground_truth_frame)
+        validate_prediction_identity(
+            ground_truth_frame, predictions_frame,
+            image_name=deps.tracking.prediction_image_name(Path(predictions)),
+        )
         destination = deps.storage.write_path(output_dir)
         represented_splits = ground_truth_frame.loc[
             ground_truth_frame["image_name"].isin(predictions_frame["image_name"]), "split"

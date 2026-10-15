@@ -175,7 +175,9 @@ def test_splits_are_inferred_separately_for_reproducible_test_batches(
         model_label="fixture detector",
         deps=workflow_dependencies,
     )
-    assert calls == [["z.png"], ["a.png", "b.png"]]
+    assert calls == [
+        [str(tmp_path / "z.png")], [str(tmp_path / "a.png"), str(tmp_path / "b.png")]
+    ]
 
 
 def test_prediction_preflights_before_compute_and_publishes_exact_outputs(
@@ -293,6 +295,7 @@ def test_prediction_registers_its_context_for_deferred_canonical_publication(
                 "output_dir": tmp_path,
                 "model_id": "best.pt",
                 "splits": None,
+                "prediction_image_name": "name",
                 "model_identity": ModelIdentity(model_name="fixture detector"),
             },
         )
@@ -461,3 +464,52 @@ def test_prediction_run_records_only_meaningful_native_changes(
         assert changes["imgsz"] == {"requested": 64, "effective": [96, 96]}
     else:
         assert changes == {}
+
+
+@pytest.mark.parametrize("pipeline", [False, True])
+def test_prediction_and_skip_train_resolve_csv_paths_from_other_directory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    checkpoint_recording: Any,
+    published: dict[str, pd.DataFrame],
+    workflow_dependencies: WorkflowDependencies,
+    pipeline: bool,
+) -> None:
+    from clearml_yolo.application.use_cases.pipeline import run_pipeline
+
+    checkpoint_recording({"imgsz": 64})
+    source = tmp_path / "dataset"
+    source.mkdir()
+    truth = source / "truth.csv"
+    truth.write_text("image_name,image_path,split\na.png,a.png,val\n")
+    (source / "a.png").write_bytes(b"correct image")
+    working = tmp_path / "hydra-output"
+    working.mkdir()
+    (working / "a.png").write_bytes(b"conflicting image")
+    calls: list[list[str]] = []
+
+    def infer(_weights: object, paths: list[str], **_kwargs: Any) -> pd.DataFrame:
+        calls.append(paths)
+        assert Path(paths[0]).read_bytes() == b"correct image"
+        return pd.DataFrame(columns=PREDICTION_COLUMNS)
+
+    patch_workflow(monkeypatch, workflow_dependencies, predict_module, "predict_on_images", infer)
+    monkeypatch.setattr(workflow_dependencies.storage, "point_latest_at", lambda *_args: None)
+    monkeypatch.chdir(working)
+    if pipeline:
+        run_pipeline(
+            {}, prediction_config(imgsz=64), {}, {}, {}, ClearMLConfig(), str(truth),
+            splits=["val"], run_dir=tmp_path / "run", weights="best.pt",
+            skip_train=True, skip_metrics=True, skip_compare=True, skip_report=True,
+            fiftyone=FiftyOneConfig(enabled=False), model_label="fixture detector",
+            deps=workflow_dependencies,
+        )
+    else:
+        predict(
+            "best.pt", truth, tmp_path / "predictions.csv", ClearMLConfig(), {},
+            ultralytics_predict=prediction_config(imgsz=64),
+            fiftyone=FiftyOneConfig(enabled=False), model_label="fixture detector",
+            deps=workflow_dependencies,
+        )
+    assert calls == [[str(source / "a.png")]]
+    assert "a.png,a.png" in truth.read_text()

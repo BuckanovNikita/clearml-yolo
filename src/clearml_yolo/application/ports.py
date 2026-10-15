@@ -13,6 +13,7 @@ from pydantic import JsonValue
 from clearml_yolo.application.contracts import (
     ClearMLConfig,
     DatasetFormat,
+    GroundTruthRead,
     ImageNameMode,
     ModelRef,
     PreparedDataset,
@@ -307,6 +308,10 @@ class RunStorage(Protocol):
         float_precision: Literal["round_trip"] | None = None,
     ) -> pd.DataFrame: ...
 
+    def read_detection_csv(self, path: str | Path) -> pd.DataFrame: ...
+
+    def read_ground_truth(self, path: str | Path) -> GroundTruthRead: ...
+
     def write_csv(
         self,
         frame: pd.DataFrame,
@@ -377,6 +382,8 @@ class TrackingSession(Protocol):
 
     def prediction_checkpoint_hash(self, predictions: Path) -> str | None: ...
 
+    def prediction_image_name(self, predictions: Path) -> ImageNameMode | None: ...
+
     def prediction_model_identity(self, predictions: Path) -> ModelIdentity | None: ...
 
     def publish_evaluation(
@@ -411,6 +418,7 @@ class TrackingSession(Protocol):
         model_id: str | None = None,
         role: str = "prediction",
         splits: list[str] | None = None,
+        prediction_image_name: ImageNameMode = "name",
         model_identity: ModelIdentity | None = None,
     ) -> None: ...
 
@@ -443,7 +451,8 @@ class TrackingSession(Protocol):
     ) -> None: ...
 
     def write_prediction_provenance(
-        self, predictions: Path, checkpoint: Path, model_identity: ModelIdentity | None = None
+        self, predictions: Path, checkpoint: Path, model_identity: ModelIdentity | None = None,
+        *, prediction_image_name: ImageNameMode = "name",
     ) -> str | None: ...
 
     def has_owned_native_model(self, task: TaskHandle | None) -> bool: ...

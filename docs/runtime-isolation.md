@@ -182,3 +182,15 @@ of its cached logging handler. Other SDK owners, handlers and configuration rema
 outside that cleanup. The original safe error diagnostic precedes the publication
 barrier; full local logs retain the outer traceback as well.
 See [diagnostics](diagnostics.md) and dated acceptance evidence for actual remote visibility.
+
+## Cross-contract integration
+
+[Runtime isolation](runtime-isolation.md) defines selected export (default only `cy`),
+finite FiftyOne worker deadlines and receipt validation. The stdlib bootstrap runs before
+SDK imports to initialize project paths, preserving normal library configuration/cache
+selectors and global temporary defaults. Explicit project temporary callsites use retained
+invocation arenas; startup performs no recovery scan or recursive arena cleanup.
+[Filesystem ownership](filesystem-policy.md) defines outputs, cache locks, idle maintenance
+and explicit opt-in to earlier local SDK paths. Native ClearML callback switches are scoped
+in memory and restored without persisting settings, including fresh DDP trainers.
+The original remote hang is unconfirmed; containment does not establish its cause.

@@ -50,7 +50,8 @@ verification distinguished from mocks. Shared dataset lifecycle is independent o
 1. `cached_dataset(source, cache_dir=None, dataset_format="ndjson", required_splits=...)`
    is a context manager yielding PreparedDataset and guarding the native consumer lifetime.
    Default is `CY_HOME/.cache/clearml-yolo/datasets`, independent of `XDG_CACHE_HOME`.
-   Identity combines SHA-256 CSV bytes, format and preparation version. Staging publication
+   Identity combines SHA-256 CSV bytes, ordered resolved image references, format and
+   preparation version 2 (2026-10-15 amendment; existing entries preserved). Staging publication
    rewrites absolute generated paths to the final entry before atomic rename. Completed
    metadata lists required relative files and split counts; readers reject corrupt entries.
    The conservative first implementation holds the entry lock through training, including

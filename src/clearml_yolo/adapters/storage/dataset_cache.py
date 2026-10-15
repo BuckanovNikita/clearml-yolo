@@ -18,9 +18,10 @@ from clearml_yolo.adapters.observability.diagnostics import log_exception
 from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.storage.dataset import PreparedDataset, prepare_dataset
 from clearml_yolo.adapters.storage.dataset_export import DatasetFormat
+from clearml_yolo.adapters.storage.file_io import resolved_image_references
 from clearml_yolo.adapters.storage.filesystem import cy_home, write_path
 
-PREPARATION_VERSION = 1
+PREPARATION_VERSION = 2
 _COMPLETION_FILE = "completion.json"
 _SUPPORTED_SPLITS = frozenset({"train", "val", "test"})
 
@@ -42,10 +43,13 @@ def dataset_cache_root(cache_dir: str | Path | None) -> Path:
     return write_path(cy_home() / ".cache" / "clearml-yolo" / "datasets").resolve()
 
 
-def _identity(csv_sha256: str, dataset_format: DatasetFormat) -> str:
+def _identity(
+    csv_sha256: str, dataset_format: DatasetFormat, image_references: list[str]
+) -> str:
     payload = json.dumps(
         {
             "csv_sha256": csv_sha256,
+            "resolved_image_references": image_references,
             "dataset_format": dataset_format,
             "preparation_version": PREPARATION_VERSION,
         },
@@ -399,7 +403,9 @@ def cached_dataset(
         source_bytes = source_path.read_bytes()
     with trace_operation("storage.cache.source.hash", context={"bytes": len(source_bytes)}):
         input_sha256 = hashlib.sha256(source_bytes).hexdigest()
-    identity = _identity(input_sha256, dataset_format)
+    identity = _identity(
+        input_sha256, dataset_format, resolved_image_references(source_path, source_bytes)
+    )
     root = dataset_cache_root(cache_dir)
     root.mkdir(parents=True, exist_ok=True)
     lock_root = write_path(root / ".locks")

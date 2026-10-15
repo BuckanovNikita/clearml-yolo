@@ -1,5 +1,11 @@
 # CLI and configuration contract
 
+The [detection input/provenance contract](../../../docs/input-provenance.md) requires
+canonical `image_name=name` for evaluation and comparison. Raw `stem`/`path` exports
+remain available but are rejected before scoring; unknown identifiers cannot silently
+drop out of metrics. New hash-bound sidecars record the naming mode. Historical
+sidecars without it remain usable only when identifiers satisfy canonical membership.
+
 Entrypoints: cy, cy-train, cy-predict, cy-val, cy-metrics, cy-report, cy-compare,
 cy-ground-truth, cy-init-config and cy-dedup.
 
@@ -117,3 +123,36 @@ Evaluation accepts matching strategies `greedy`, `hungarian`, `iou_prior` and AP
 in the inclusive interval `[0, 1]`. Reusable scoring/statistical boundaries apply the same checks.
 Baseline lookup requires every ordinary requested tag using the SDK all-tags operator, excludes
 the current task and matches the entire task name with grouped regex anchoring.
+
+## Cross-contract integration
+
+Validation, metrics and comparison warn and drop invalid prediction geometry before
+preprocessing, calibration and mAP, preserving raw CSVs. All-invalid predictions are
+scored as empty, with unmatched ground truth counted as false negatives. See the
+[evaluation safety contract](cli.md#evaluation-input-and-output-safety).
+
+Pipeline comparison uses the current `test` images. Standalone `cy-compare` defaults to
+`split=test` and accepts another split present in the current ground truth. Both models
+use the selected split under the same inference/evaluation settings; comparison does
+not recalibrate thresholds. Reports consume that pair and its manifest split. Source
+task/model links or task/artifact identities provide provenance from the same checkpoint
+selection used for weights; artifact sources have no invented model link. The
+[recovery amendment](../../012-remove-legacy-compatibility/contracts/task-recovery.md)
+supersedes the 2026-10-02 current-only recovery restriction. Explicit maps take precedence,
+then ordered named threshold payloads and dashboards; dashboard recovery warns about
+rounding and unavailable calibration provenance. Present malformed sources fail strictly.
+Historical predictions and source General/Configuration Objects are not imported over
+current comparison settings. Available threshold precision is preserved; checkpoint
+architecture compatibility with the installed runtime is not guaranteed.
+Developer/business report readers preserve original text class cells exactly, including
+numeric-looking labels such as `0001` and the literal label `NA`. Numeric Excel threshold
+footer cells are excluded by cell type. Class eligibility and excluded-class reporting
+still follow the selected report configuration; source workbooks remain unchanged.
+All report workbooks preserve one-sided class metrics with `NA` for the unavailable
+model/comparison. Model averages and business verdict inputs use each model's own eligible
+classes; statistical comparisons use shared eligible classes. The maintained
+[CLI evaluation contract](cli.md) defines those populations.
+Developer/business reports show aggregate availability below each metric table as
+`<metric>-valid-class-count` (for example `AP50-valid-class-count: 18/20`), preserving
+finite-value counts including zero. Coverage columns and their empty class-row cells
+are removed; missing actual metric values remain `NA`.

@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "task": "033-documentation-checks",
+  "scope": [
+    "scripts/check_docs.py",
+    "tests/test_check_docs.py",
+    "pyproject.toml",
+    "uv.lock",
+    "specs/033-documentation-checks"
+  ],
+  "impact": "modules",
+  "rules": "AGENTS.md and docs/agent-workflow.md require independent maintenance-tool ownership, explicit read-only effects and executable dependency contracts.",
+  "modules": [
+    {
+      "id": "docs-checker",
+      "path": "scripts/check_docs.py",
+      "change": "add",
+      "responsibility": "Select and validate local project Markdown without mutation.",
+      "interface": "Repository root and paths produce deterministic typed diagnostics; CLI returns 0, 1 or 2.",
+      "layer": "Standalone development tooling",
+      "allowed_dependencies": [
+        "Python standard library",
+        "markdown_it",
+        "pydantic"
+      ],
+      "forbidden_dependencies": [
+        "clearml_yolo",
+        "model and tracking SDKs",
+        "dynamic module loaders"
+      ],
+      "effects": "Owns filesystem reads, fixed git ls-files listing and diagnostic output; no writes, network or example execution.",
+      "contracts": [
+        "checker-isolation"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "checker-isolation",
+      "path": "tests/test_check_docs.py",
+      "status": "existing",
+      "rules": "Static allowlist rejects application/SDK imports including deferred/type-only imports and dynamic loaders; positive fixture admits parser and stdlib.",
+      "check": "imports"
+    }
+  ],
+  "checks": [
+    {
+      "id": "imports",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync pytest tests/test_check_docs.py -k dependency",
+      "expectation": "Permitted imports pass; forbidden and dynamic imports fail.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/033-documentation-checks/verification.md"
+      }
+    },
+    {
+      "id": "behavior",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync pytest tests/test_check_docs.py",
+      "expectation": "Fixture documents, read-only CLI and ownership selection pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/033-documentation-checks/verification.md"
+      }
+    },
+    {
+      "id": "docs",
+      "kind": "documentation",
+      "command": "uv run --frozen --no-sync python scripts/check_docs.py specs/033-documentation-checks/*.md specs/033-documentation-checks/checklists/*.md",
+      "expectation": "All new feature documentation has valid local links and structure.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/033-documentation-checks/verification.md"
+      }
+    }
+  ],
+  "documentation": "Feature spec, plan, research, data model and quickstart document behavior; parent integrates docs/development.md and current contract navigation. Internal maintenance tooling does not change portable application usage.",
+  "review": {
+    "status": "accepted",
+    "reviewer": "/root/docs_acceptance_review",
+    "evidence": "docs/evidence/2026-10-15-correctness-cleanup/review.md",
+    "reconciliation": "Fresh independent read-only review of the integrated task-owned runtime/tooling/tests/docs and architecture scope after parent verification. All initial findings corrected and re-reviewed; actual added/modified paths covered, no moved/deleted runtime modules. Original local uv.sources overrides and untracked grid-search draft excluded. Native/package runtime manifests still match all180files; final review records preserve limits."
+  }
+}

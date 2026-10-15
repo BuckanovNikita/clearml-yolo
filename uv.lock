@@ -645,6 +645,7 @@ queue-ui = [
 dev = [
     { name = "hypothesis" },
     { name = "import-linter" },
+    { name = "markdown-it-py" },
     { name = "mypy" },
     { name = "packaging" },
     { name = "pandas-stubs" },
@@ -704,6 +705,7 @@ provides-extras = ["queue-ui", "detectors", "export"]
 dev = [
     { name = "hypothesis", specifier = ">=6.169.1" },
     { name = "import-linter", specifier = ">=2.13" },
+    { name = "markdown-it-py", specifier = "==4.2.0" },
     { name = "mypy", specifier = ">=1.11" },
     { name = "packaging", specifier = ">=26" },
     { name = "pandas-stubs" },

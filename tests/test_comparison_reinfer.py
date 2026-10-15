@@ -454,3 +454,25 @@ def test_different_caches_keep_distinct_replay_manifests(
     assert source.read_text(encoding="utf-8") == original
     cached, _ = _reinfer(ground_truth, tmp_path / "first.csv", _explode)
     assert Path(cached.attrs["effective_args"]["source"]).read_text(encoding="utf-8") == original
+
+
+@pytest.mark.parametrize("label", ["NA", "NULL", "nan", "None", "0001", "树"])
+def test_cache_miss_and_hit_preserve_literal_labels_and_threshold_edges(
+    ground_truth: pd.DataFrame, tmp_path: Path, label: str
+) -> None:
+    import math
+
+    threshold = math.nextafter(0.37, 1.0)
+    predictor = RecordingPredictor()
+
+    def predict_literal(weights: Any, image_paths: list[str], **kwargs: Any) -> pd.DataFrame:
+        return predictor(weights, image_paths, **kwargs).assign(
+            instance_label=label, confidence=threshold
+        )
+
+    output = tmp_path / "preds.csv"
+    first, _ = _reinfer(ground_truth, output, predict_literal)
+    second, _ = _reinfer(ground_truth, output, _explode)
+    pd.testing.assert_frame_equal(first, second, check_exact=True)
+    assert second.instance_label.tolist() == [label, label]
+    assert second.confidence.tolist() == [threshold, threshold]

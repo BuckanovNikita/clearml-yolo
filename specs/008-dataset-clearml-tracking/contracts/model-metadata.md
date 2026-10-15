@@ -101,3 +101,10 @@ model ID/task/project/URL and downloaded SHA-256 plus exact metadata value/type 
 Extend the original completion barrier with threshold expectations; enrichment does not
 create another model or upload weights again. These requirements do not replace the
 canonical `metrics_best_confidences_val` CSV or historical threshold recovery sources.
+
+## Cross-contract integration
+
+Project-local exact display-name collisions include archived tasks/models and exclude
+current IDs; shared readable suffixes are rechecked without changing paths or model IDs.
+Calibration thresholds may enrich only an invocation-owned best model after checkpoint
+hash association and metadata readback. Standalone metrics never mutates models.

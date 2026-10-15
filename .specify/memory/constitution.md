@@ -36,8 +36,9 @@ the pipeline.
 
 ### II. Enforced Module Boundaries
 
-All runtime modules MUST be classified under core, application, adapters or entrypoints;
-`hydra_plugins.cy_queue` remains a separately checked launcher integration. The dependency
+All runtime modules MUST be classified under core, application, adapters or entrypoints.
+Direct commands MUST remain independent of queue and optional UI imports; Hydra multiruns
+use the standard sequential BasicLauncher, without a project launcher plugin. The dependency
 direction is entrypoints -> adapters -> application ports/contracts -> core. Application
 use cases MUST depend on ports/contracts and core rather than concrete adapters. Adapters
 MUST NOT depend on application use cases or entrypoints. Cross-adapter integration bridges
@@ -75,16 +76,31 @@ Runs MUST have isolated identities and output directories. Pipeline output overr
 use run_dir; conflicting native output settings MUST be rejected explicitly. Skipped-stage
 consumers MUST validate required existing inputs. Convenience links MUST preserve user data.
 
-Model execution MUST delegate device, batch, AMP, compilation and distributed training to
-Ultralytics. The project MAY provide one user-wide, same-operating-system FIFO scheduler for
-whole NVIDIA GPUs when all demand is derived from native device settings. That scheduler MUST
-reserve each request atomically, fail closed when device availability is unknown, wait before
-ClearML task creation or native GPU context, use fresh execution children, and preserve requested
-settings separately from concrete child-local effective settings. It MUST NOT add a daemon,
-priority, queue bypass, TTL or PID-only reclaim, separate GPU-count setting, MIG scheduling,
-cross-host coordination, or an upstream monkeypatch. Batch tuning and augmentation-JSON processing
-MUST NOT be provided. `cy-init-config` MUST export current command defaults as editable
-examples with top-level `ultralytics` and `ultralytics_predict` groups and required inputs.
+Model execution MUST delegate native training and inference to the selected backend;
+YOLO device, batch, AMP, compilation and distributed behavior belongs to Ultralytics.
+Approved detector families and export operations follow the
+[backend](../../specs/025-multi-model-backends/contracts/backend.md) and
+[export](../../specs/025-multi-model-backends/contracts/export.md) contracts. Export
+MUST NOT register another trained model; numerical parity and labeled-corpus accuracy
+acceptance remain separate, with target-runtime evidence required for deployment claims.
+
+Direct commands MUST execute configured devices without scheduling. `cy-queue` MAY
+provide explicit whole-GPU count/device requests, persistent same-user workers, durable
+shared records, host-local coordination and reordering of pending jobs. The
+[queue contract](../../docs/queue.md) governs owner execution/cancellation, earliest
+runnable ordering, atomic current-generation reservations and fresh memory admission.
+Training MUST retain the full allocation until acknowledged contraction; absent that
+notification the full reservation remains. The first device stays reserved through
+owned descendant exit unless explicitly freed. Explicit per-device freeing MUST fence
+older guardians without signalling processes or changing job outcomes. Job completion,
+cleanup evidence and GPU availability MUST remain separate. Stale unlocked metadata MUST
+NOT alone veto admission; uncertain outcomes require owner recovery, never automatic retry.
+MIG scheduling, TTL/PID-only cleanup inference, upstream monkeypatches, batch tuning and
+augmentation-JSON processing remain unsupported.
+
+`cy-init-config` MUST export only the selected command (default `cy`) and model's editable
+examples, protecting existing files unless replacement is explicit. Default YOLO model
+commands include top-level `ultralytics` and `ultralytics_predict` groups and required inputs.
 The shared group MUST cover the installed native configuration and preserve its comments;
 the prediction group MUST override applicable shared values. Explicit nulls and explicit
 values equal to defaults MUST retain their precedence. Stage-irrelevant settings MUST be
@@ -175,10 +191,15 @@ files; cleanup MUST affect only resources owned by the task. Select native devic
 explicitly and preserve unrelated workloads. This repository does not deploy or
 tear down shared infrastructure.
 
-Model class names MUST come from the checkpoint rather than ClearML model metadata. Task-based
-weights MUST come from the current best Output Model. Exact per-class confidence values MUST
-come from the source task validation threshold CSV, never rounded dashboard thresholds.
-Historical checkpoint artifacts and threshold payloads MUST NOT provide recovery alternatives.
+Model class names MUST come from the checkpoint rather than ClearML model metadata.
+Task recovery MUST follow the ordered checkpoint and threshold selection in the
+[recovery contract](../../specs/012-remove-legacy-compatibility/contracts/task-recovery.md).
+Current best Output Models and exact validation thresholds remain preferred; approved
+historical checkpoint artifacts, named threshold payloads and dashboard recovery are valid
+fallbacks. Explicit threshold maps take precedence. Dashboard recovery MUST warn about
+rounding and unavailable calibration provenance; malformed present sources MUST fail.
+Recovery MUST preserve available precision and current comparison settings, and MUST NOT
+import historical predictions or silently recalibrate on test data.
 
 ## Development Workflow
 
@@ -194,6 +215,16 @@ Historical checkpoint artifacts and threshold payloads MUST NOT provide recovery
    within existing authorization and after the applicable stage checks pass.
 
 ## Governance
+
+Amendment 9.0.0 (2026-10-15) reconciles Principles II–III and operational constraints
+with approved features 024, 025, 029 and 031 and the task-recovery amendment. It replaces
+the retired launcher/FIFO-only scheduler restrictions with direct execution and explicit
+shared-queue controls; recognizes backend/export ownership, selected configuration export,
+acknowledged allocation contraction and generation-fenced per-device freeing; and restores
+ordered historical checkpoint/threshold recovery with precision warnings. This is a major
+governance correction, not new runtime authorization. Existing dependency, privacy,
+publication and evidence requirements remain. Prior amendments and their dates below are
+preserved; their superseded requirements do not override current topic contracts.
 
 Amendment 8.0.0 implements the user-approved full clean-architecture redesign and Pandera
 validation. Principles I–III replace the historical flat module ordering with exhaustive
@@ -266,4 +297,4 @@ that deliberately alters a governing rule MUST include an explicit amendment rat
 quietly weakening checks. Constitution updates MUST remain confined to this document;
 dependent template or implementation changes require their own authorized work.
 
-**Version**: 8.0.0 | **Ratified**: 2026-09-19 | **Last Amended**: 2026-10-08
+**Version**: 9.0.0 | **Ratified**: 2026-09-19 | **Last Amended**: 2026-10-15
