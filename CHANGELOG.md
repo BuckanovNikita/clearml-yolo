@@ -1,12 +1,23 @@
 # CHANGELOG
 
 
-## v0.31.0 (2026-10-15)
+## v0.31.1 (2026-10-15)
 
 ### Bug Fixes
 
 - **clearml**: Publish and verify task source metadata
-  ([`2170b79`](https://github.com/BuckanovNikita/clearml-yolo/commit/2170b7912e7835e27dc72e20e14a954c0c3c8a5c))
+  ([`5d89443`](https://github.com/BuckanovNikita/clearml-yolo/commit/5d89443b8e1a8e63d21b3c318b2cab0242c4e418))
+
+### Documentation
+
+- Record ClearML metadata acceptance
+  ([`d3538cd`](https://github.com/BuckanovNikita/clearml-yolo/commit/d3538cd075ed6644e3a690f52f2f28c690ab3baa))
+
+- Record GPU control release verification
+  ([`fd87b47`](https://github.com/BuckanovNikita/clearml-yolo/commit/fd87b47f5105ab87be91cf373ae04d53173f94e2))
+
+
+## v0.31.0 (2026-10-15)
 
 ### Documentation
 
