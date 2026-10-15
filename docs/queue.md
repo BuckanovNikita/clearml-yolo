@@ -89,6 +89,18 @@ Use a compatible Linux Python/kernel environment and resubmit if installation id
 changed; there is no unsafe cleanup fallback. These checks prevent a long training run
 from discovering an unsupported API only during validation or shutdown.
 
+The package accepts Python `>=3.12.13,<3.14`; that version range does not guarantee
+the required APIs were compiled into the interpreter. Older standalone Python builds
+can omit them even on a modern kernel. Update the interpreter distribution or choose
+a compatible build, then run its actual capability probe before submitting work:
+
+```bash
+python -c 'from clearml_yolo.adapters.runtime.process_tree import require_process_supervision; require_process_supervision()'
+```
+
+Use the same environment for submission and execution. Existing queued snapshots
+retain the previous interpreter and installation identity and may need resubmission.
+
 Normal cancellation first signals the verified pipeline owner and allows up to
 90 seconds for shutdown while retaining the entire allocation. This lets the owner clean native
 workers and publish final diagnostics before the guardian signals remaining

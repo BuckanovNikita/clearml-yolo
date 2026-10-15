@@ -1,6 +1,6 @@
 # clearml-yolo agent instructions
 
-`clearml-yolo` is a Python 3.12 group of Hydra/hydra-zen applications for native
+`clearml-yolo` supports Python `>=3.12.13,<3.14` and provides Hydra/hydra-zen applications for native
 Ultralytics YOLO training, prediction, validation, metrics, reports and comparison.
 `AGENTS.md` is the shared instruction source; keep `CLAUDE.md` a relative symlink to it.
 

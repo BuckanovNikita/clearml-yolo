@@ -14,7 +14,7 @@ defines the shared behavior.
 
 ## Installation and model selection
 
-Use Python 3.12 and the approved external dependency copies described in
+Use Python `>=3.12.13,<3.14` and the approved external dependency copies described in
 [development setup](development.md#external-dependencies). Keep those revisions and local
 source overrides intact. From the project checkout, install the optional detector stack:
 

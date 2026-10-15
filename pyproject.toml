@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "Buckanov Nikita", email = "buckanov.nikita@yandex.ru" }
 ]
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.12.13,<3.14"
 dependencies = [
     "ultralytics>=8.4.165",
     # Native local NDJSON conversion uses this optional upstream dependency.

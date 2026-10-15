@@ -7,6 +7,17 @@ The shared `python-project-workflow` skill supplies lifecycle requirements withi
 [native workflow](agent-workflow.md); this document owns the project's commands and
 dependency/commit/release procedures.
 
+## Python compatibility
+
+The package supports Python `>=3.12.13,<3.14`. Development, Ruff and mypy retain
+Python 3.12 as the oldest supported minor; `.python-version` selects the development
+default rather than limiting installation to that minor. Verify packaging and the
+routine suite on both Python 3.12 and 3.13 when changing interpreter compatibility.
+
+Linux native execution additionally requires the existing pidfd, subreaper and
+`/proc` capability checks. A Python version constraint cannot guarantee those
+build/kernel capabilities. See [queue supervision](queue.md#guardians-cancellation-and-recovery).
+
 ## Verification
 
 Use the repository's documented tooling and current check configuration. For code or

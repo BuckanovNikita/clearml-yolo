@@ -122,11 +122,14 @@ interpolation is not replaced with a different resize kernel to satisfy TensorRT
 
 ## Standalone environment and library API
 
-The inference library needs Python 3.12, the project wheel installed with `--no-deps`,
+The inference library needs Python `>=3.12.13,<3.14`, the project wheel installed with `--no-deps`,
 NumPy, Pydantic 2, matching TensorRT 10.13.0 bindings/libraries and a compatible CUDA
 runtime library (`libcudart`). CUDA access uses `ctypes`; Torch, Torchvision, timm, ONNX,
 ClearML and cuda-python are not standalone inference dependencies. Image decoding can
 use a separately installed utility such as Pillow, or the caller can supply RGB arrays.
+Select TensorRT bindings that support the chosen Python minor version; the package's
+Python compatibility range does not establish vendor wheel availability or validate
+a particular driver/runtime combination.
 
 For a CUDA 12 deployment, a preparation command shape is shown below. Replace `VERSION`
 with the built wheel version and install the appropriate NVIDIA CUDA runtime library.

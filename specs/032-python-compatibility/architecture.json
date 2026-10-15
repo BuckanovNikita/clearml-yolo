@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "task": "032-python-compatibility",
+  "scope": [
+    "pyproject.toml",
+    "uv.lock",
+    "CHANGELOG.md",
+    "AGENTS.md",
+    "README.md",
+    "docs/development.md",
+    "docs/current-contracts.md",
+    "docs/multi-model-backends.md",
+    "docs/tensorrt-deployment.md",
+    "docs/queue.md",
+    "specs/032-python-compatibility"
+  ],
+  "impact": "modules",
+  "rules": "AGENTS.md and the constitution retain entrypoints -> adapters -> application ports -> core. Packaging selects interpreters/dependencies without moving runtime effects or SDK ownership.",
+  "modules": [
+    {
+      "id": "manifest",
+      "path": "pyproject.toml",
+      "change": "modify",
+      "responsibility": "Declare package interpreter compatibility and dependency categories.",
+      "interface": "Declare >=3.12.13,<3.14; retain existing application and approved dependency source contracts.",
+      "layer": "Packaging and dependency composition",
+      "allowed_dependencies": [
+        "Existing declared application and development dependencies"
+      ],
+      "forbidden_dependencies": [
+        "New undeclared runtime analysis tools",
+        "Unapproved external source revisions"
+      ],
+      "effects": "Only installation/dependency selection; runtime I/O remains owned by existing adapters.",
+      "contracts": [
+        "dependency-ownership",
+        "inward-imports"
+      ]
+    },
+    {
+      "id": "lock",
+      "path": "uv.lock",
+      "change": "modify",
+      "responsibility": "Resolve the supported interpreter range using existing compatible dependency pins.",
+      "interface": "Declare >=3.12.13,<3.14; retain existing application and approved dependency source contracts.",
+      "layer": "Packaging and dependency composition",
+      "allowed_dependencies": [
+        "Existing declared application and development dependencies"
+      ],
+      "forbidden_dependencies": [
+        "New undeclared runtime analysis tools",
+        "Unapproved external source revisions"
+      ],
+      "effects": "Only installation/dependency selection; runtime I/O remains owned by existing adapters.",
+      "contracts": [
+        "dependency-ownership",
+        "inward-imports"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "dependency-ownership",
+      "path": "tests/test_tooling_boundaries.py",
+      "status": "existing",
+      "rules": "Analysis distributions remain development-only; injected runtime declarations fail.",
+      "check": "imports"
+    },
+    {
+      "id": "inward-imports",
+      "path": "tests/test_architecture.py",
+      "status": "existing",
+      "rules": "Existing exhaustive module classification, inward edges, SDK ownership and negative dependency tests remain valid.",
+      "check": "imports"
+    }
+  ],
+  "checks": [
+    {
+      "id": "imports",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync lint-imports; uv run --frozen --no-sync pytest (full suite includes tests/test_architecture.py and tests/test_tooling_boundaries.py on both minors).",
+      "expectation": "Existing inward import, SDK ownership and development-only dependency contracts pass, including injected prohibited edges.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/032-python-compatibility/verification.md"
+      }
+    },
+    {
+      "id": "matrix",
+      "kind": "behavior",
+      "command": "Run the routine pytest suite on isolated Python 3.12 and 3.13 environments and standard Ruff/mypy/Vulture checks.",
+      "expectation": "Existing supported behavior and static gates pass on the declared compatibility matrix.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/032-python-compatibility/verification.md"
+      }
+    },
+    {
+      "id": "packaging",
+      "kind": "behavior",
+      "command": "uv lock --check; uv build; install wheel and source archive in separate 3.12/3.13 environments and verify metadata, all installed command helps/config selections and real pidfd probe.",
+      "expectation": "Lock and built metadata agree; accepted/rejected boundaries, installed entrypoints and actual pidfd preflight pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/032-python-compatibility/verification.md"
+      }
+    },
+    {
+      "id": "docs",
+      "kind": "documentation",
+      "command": "Run Markdown lint, local-link validation and git diff --check for task-owned documentation.",
+      "expectation": "Maintained compatibility guidance and links are valid.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/032-python-compatibility/verification.md"
+      }
+    }
+  ],
+  "documentation": "Update maintained Python prerequisite prose and queue capability guidance; preserve historical evidence. Portable clearml-yolo skill has no conflicting Python version requirement.",
+  "review": {
+    "status": "accepted",
+    "reviewer": "Fresh independent native agent /root/clearml_python_review",
+    "evidence": "specs/032-python-compatibility/verification.md",
+    "reconciliation": "Inspected complete task-owned staged diff and untracked feature artifacts: package/lock compatibility, maintained documentation, generated release metadata scope, no runtime/import-contract/dependency-version changes. Excluded pre-existing local tool.uv.sources overrides and untracked docs/cls-cls-pw-grid-search.md. Both minor suites, negative architecture checks, distributions and scoped native evidence reviewed; 3.12 standalone GPU prediction SDK failure retained as explicit non-blocking limitation for metadata release."
+  }
+}
