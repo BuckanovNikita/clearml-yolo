@@ -11,6 +11,9 @@
 - Record Python compatibility release delivery
   ([`eda01e3`](https://github.com/BuckanovNikita/clearml-yolo/commit/eda01e3bb629e3b610f1a0dcfe4ae74c8c33588b))
 
+- Record queue logging release verification
+  ([`1ed8182`](https://github.com/BuckanovNikita/clearml-yolo/commit/1ed818284c87d443a6a56dbbd29b49b157f9263d))
+
 - Record training guide verification and delivery
   ([`448d25e`](https://github.com/BuckanovNikita/clearml-yolo/commit/448d25ed9b9bb5cac23c11783cef92144af350d8))
 

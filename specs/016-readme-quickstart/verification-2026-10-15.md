@@ -133,3 +133,13 @@ resolution against both branches and current source/contracts, confirmed preserv
 Python/queue guidance and no source/dependency diff against the master target, and
 passed staged/working-tree whitespace checks. Actual runtime model settings were
 not separately observable. Landing and release results follow after delivery.
+
+Master landing completed at merge `c800c99` after incorporating concurrent upstream
+commit `1ed8182` (queue release evidence only). The intermediate merge `9376fd4`
+contains the reviewed README/technical-reference integration. Both merges passed
+normal hooks. Master was fast-forwarded with its exact local source-override section
+restored afterward and its unrelated untracked file verified unchanged. The native
+release helper on master returned `No unreleased semantic changes`; version remains
+0.30.1 and no new tag was made. The ordinary push succeeded and remote master readback
+matched `c800c99`. This closing ledger/evidence commit uses the same normal hooks,
+master fast-forward, release evaluation and verified push procedure.

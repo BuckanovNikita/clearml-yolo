@@ -78,4 +78,4 @@ all writes; bounded reviewers do not delegate. Completed phases above are histor
 
 ## Phase 10 — Requested master landing (2026-10-15)
 
-- [ ] T027 Integrate current master, retain its Python compatibility and queue diagnostics, validate/review the documentation-only result, and land/push master through the native release workflow.
+- [x] T027 Integrate current master, retain its Python compatibility and queue diagnostics, validate/review the documentation-only result, and land/push master through the native release workflow.
