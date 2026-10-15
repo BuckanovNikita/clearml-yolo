@@ -3,6 +3,11 @@
 
 ## v0.31.0 (2026-10-15)
 
+### Bug Fixes
+
+- **clearml**: Publish and verify task source metadata
+  ([`2170b79`](https://github.com/BuckanovNikita/clearml-yolo/commit/2170b7912e7835e27dc72e20e14a954c0c3c8a5c))
+
 ### Documentation
 
 - Record queue finalization release verification

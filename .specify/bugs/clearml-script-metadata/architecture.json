@@ -118,7 +118,12 @@
       "id": "quality",
       "kind": "behavior",
       "command": "Repository pre-commit hooks on the source commit (Ruff, mypy, import-linter, Vulture and full pytest)",
-      "expectation": "Required quality hooks including full pytest pass without bypasses."
+      "expectation": "Required quality hooks including full pytest pass without bypasses.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": ".specify/bugs/clearml-script-metadata/test.md"
+      }
     },
     {
       "id": "live",
@@ -148,6 +153,6 @@
     "status": "accepted",
     "reviewer": "/root/review_git_isolation (fresh final read-only review; prior full reviews retained)",
     "evidence": ".specify/bugs/clearml-script-metadata/review.md",
-    "reconciliation": "Reviewed complete task-owned adapter/session/import edge/test/contract/bug-document diff. Generated changelog follows existing release tooling; queue implementation is unchanged base history. Final full commit hooks and record validation remain required before acceptance."
+    "reconciliation": "Compared the final 13-path source commit, including Git environment isolation, with the module/effect/import inventory, 261 focused checks, 21-case Git hook canary, successful full source-commit hooks, independent review and live task evidence. Generated changelog follows native tooling; queue implementation is unchanged base history."
   }
 }

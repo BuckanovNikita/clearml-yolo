@@ -51,13 +51,13 @@ core imports of infrastructure are added.
 ## Tasks and acceptance
 
 - [x] Capture the live failure and inspect SDK behavior and existing staged work.
-- [ ] Validate architecture plan, add regression and observe failure.
-- [ ] Implement adapter and owner integration; cover real Git, nested stages, remote
+- [x] Validate architecture plan, add regression and observe failure.
+- [x] Implement adapter and owner integration; cover real Git, nested stages, remote
   replay, missing metadata, detached HEAD, credential redaction and publication failure.
-- [ ] Run focused checks, Ruff, mypy, import-linter, architecture negative cases and full pytest/hooks.
-- [ ] Repeat real CPU conversion and assert all five saved fields, empty diff and exactly one completed task.
-- [ ] Update tracking publication contract; validate Markdown and local links.
-- [ ] Obtain fresh independent review after parent verification and reconcile architecture acceptance.
+- [x] Run focused checks, Ruff, mypy, import-linter, architecture negative cases and full pytest/hooks.
+- [x] Repeat real CPU conversion and assert all five saved fields, empty diff and exactly one completed task.
+- [x] Update tracking publication contract; validate Markdown and local links.
+- [x] Obtain fresh independent review after parent verification and reconcile architecture acceptance.
 - [ ] Complete task-only commit and native Git-tag release/delivery within standing authorization.
 
 Parent owns implementation/integration; a bounded read-only SDK investigation can run

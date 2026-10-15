@@ -4,7 +4,7 @@
 - **Tested**: 2026-10-15
 - **Assessment**: [assessment.md](assessment.md)
 - **Fix**: [fix.md](fix.md)
-- **Result**: partial; final full-suite, independent review and release gates are running.
+- **Result**: implementation accepted; final source hooks passed. Native release delivery remains pending.
 
 ## Checks performed
 
@@ -76,3 +76,22 @@ skills. Markdown/link checks and fresh review are recorded before acceptance.
 Source-less wheels cannot invent Git identity. Missing Git or origin is warned;
 detached HEAD records its exact commit and HEAD selector. Git diff and raw argv are
 not uploaded. Existing tasks are unchanged. Remote-agent metadata is preserved.
+
+## Final source acceptance
+
+Source commit `2170b7912e7835e27dc72e20e14a954c0c3c8a5c` completed with exit zero. Its unmodified pre-commit
+hooks passed the changelog check, Ruff, strict mypy, all 43 import contracts,
+Vulture and the complete pytest suite. No hooks were bypassed. The post-commit
+release hook correctly skipped versioning on the isolated feature branch.
+The worktree was clean afterward; Git repository mode, origin and author identity
+remained intact.
+
+The final focused suite passed 261 cases with five existing warnings. The 21-case
+Git-hook canary test left its config, HEAD and index unchanged. Fresh independent
+review found no remaining actionable issue; see [review.md](review.md).
+Markdown, local links and the reconciled architecture acceptance record are
+validated before the acceptance-documentation commit. No source revisions,
+dependency locks or public CLI/configuration contracts changed.
+
+Native integration and release await the separate queue release work in the
+shared checkout. Existing unrelated changes remain untouched.
