@@ -5,8 +5,14 @@
 
 ### Documentation
 
+- Lead with training workflows and separate technical reference
+  ([`3ae81a5`](https://github.com/BuckanovNikita/clearml-yolo/commit/3ae81a57a939a1cc7494e3c74c6930692e15358c))
+
 - Record Python compatibility release delivery
   ([`eda01e3`](https://github.com/BuckanovNikita/clearml-yolo/commit/eda01e3bb629e3b610f1a0dcfe4ae74c8c33588b))
+
+- Record training guide verification and delivery
+  ([`448d25e`](https://github.com/BuckanovNikita/clearml-yolo/commit/448d25ed9b9bb5cac23c11783cef92144af350d8))
 
 
 ## v0.30.1 (2026-10-15)

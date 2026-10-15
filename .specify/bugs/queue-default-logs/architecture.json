@@ -7,7 +7,10 @@
     "tests/test_queue_logging.py",
     "docs/queue.md",
     "README.md",
-    ".specify/bugs/queue-default-logs"
+    ".specify/bugs/queue-default-logs",
+    "pyproject.toml",
+    "uv.lock",
+    "CHANGELOG.md"
   ],
   "impact": "modules",
   "rules": "Project clean architecture: entrypoints compose and render; application uses explicit ports and core records, never imports logging or adapters.",
@@ -126,6 +129,6 @@
     "status": "accepted",
     "reviewer": "Independent /root/final_review; parent resolved record-only redaction dependency detail.",
     "evidence": ".specify/bugs/queue-default-logs/test.md",
-    "reconciliation": "Compared all task-owned tracked and untracked diff: two source modules, regression tests, README, queue guide, bug artifacts and generated changelog. No other changes in this checkout; original main checkout concurrent compatibility work and local overrides excluded. Companion portable skill changes reviewed separately."
+    "reconciliation": "Compared all task-owned tracked and untracked diff: two source modules, regression tests, README, queue guide, bug artifacts and generated changelog. No other changes in this checkout; original main checkout concurrent compatibility work and local overrides excluded. Companion portable skill changes reviewed separately. Final release reconciliation: reviewed queue source/tests remained byte-identical after rebasing onto v0.30.0; native release changes only root version tokens and generated changelog. Concurrent specs/032 delivery documentation was merged intact; its compatibility implementation is baseline, not logging scope."
   }
 }
