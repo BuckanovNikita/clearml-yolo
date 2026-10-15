@@ -1,7 +1,7 @@
 # CHANGELOG
 
 
-## v0.31.0 (2026-10-15)
+## Unreleased
 
 ### Documentation
 

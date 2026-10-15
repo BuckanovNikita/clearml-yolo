@@ -40,3 +40,14 @@ remaining code blockers**. The reviewer reconciled the full affected scope, incl
 architecture helpers, pyproject import contracts, technical reference and end-to-end
 guidance. Final full-suite and architecture-record acceptance remained pending at
 that review checkpoint; physical acceptance remains explicitly open.
+
+## Release follow-up review
+
+After parent verification (28 focused tests, Ruff, mypy and whitespace), the same
+fresh independent reviewer inspected the two test-only race corrections and the
+candidate restart. Verdict: **accepted for normal source/version hook delivery,
+no blockers**. Real birth checks, replacement-PID survival, descendant ownership,
+cleanup assertions and original deadlines remain intact. The reviewer confirmed
+version-only metadata equivalence, archived record/log hash consistency, retained
+ancestry and absent local/remote version tag. Full hooks and fresh package/tag
+checks remain release gates, not implied successes.

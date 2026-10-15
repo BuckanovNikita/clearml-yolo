@@ -226,7 +226,7 @@ while not (directory/'go').exists(): time.sleep(.01)
 def child():
     os.setsid()
     signal.signal(signal.SIGTERM,signal.SIG_IGN)
-    (directory/'child.pid').write_text(str(os.getpid()))
+    (directory/'child.pid').write_text(str(os.getpid())+'\n')
     time.sleep(60)
     os._exit(0)
 if mode=='thread':
@@ -234,7 +234,7 @@ if mode=='thread':
         subprocess.Popen([sys.executable,'-c',
             'import os,signal,sys,time; from pathlib import Path; os.setsid(); '
             'signal.signal(signal.SIGTERM,signal.SIG_IGN); '
-            'Path(sys.argv[1]).write_text(str(os.getpid())); time.sleep(60)',
+            'Path(sys.argv[1]).write_text(str(os.getpid())+"\\n"); time.sleep(60)',
             str(directory/'child.pid')])
         time.sleep(60)
     thread=threading.Thread(target=launch); thread.start()
@@ -253,8 +253,14 @@ worker=subprocess.Popen([sys.executable,'-c',worker_script,str(directory),mode],
 tree=SubreaperProcessTree(worker.pid,'unused-native-token',subreaper=os.getpid())
 (directory/'go').write_text('go')
 deadline=time.monotonic()+8
-while not (directory/'child.pid').exists() and time.monotonic()<deadline: time.sleep(.01)
-child=int((directory/'child.pid').read_text())
+child_text=''
+while time.monotonic()<deadline:
+    if (directory/'child.pid').exists():
+        child_text=(directory/'child.pid').read_text()
+        if child_text.endswith('\n') and child_text[:-1].isdecimal(): break
+    time.sleep(.01)
+assert child_text.endswith('\n') and child_text[:-1].isdecimal(), 'Incomplete descendant PID'
+child=int(child_text)
 if mode=='orphan': worker.wait(timeout=5)
 assert any(pid==child for pid,born in tree.identities), 'Descendant absent from live ownership'
 tree.terminate(adopted_parent=os.getpid())

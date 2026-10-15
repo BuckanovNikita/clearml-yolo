@@ -88,3 +88,10 @@ The local source section and unrelated draft are excluded; no removed module or
 untracked implementation file is omitted. Local amendment acceptance is complete;
 this does not close the earlier external physical acceptance gap. Git-tag release
 results will be recorded in release.md after the native workflow finishes.
+
+## Release test-harness follow-up
+
+Release tag revalidation exposed two existing subprocess-fixture races. See
+[release evidence](release.md) for reproduction, corrections, parent focused checks
+and the unpublished candidate restart. Runtime source and architecture contracts
+remain unchanged. The two test modules were already within this task's test scope.

@@ -6,6 +6,7 @@ import signal
 import subprocess
 import sys
 import time
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -167,16 +168,35 @@ def test_interrupted_whole_allocation_preserves_evidence_without_blocking_capaci
     assert pool.reserved() == set()
 
 
-def test_recovery_reuses_persisted_birth_and_never_signals_replacement_pid() -> None:
-    from clearml_yolo.adapters.runtime.process_tree import LinuxProcessTree
+def test_recovery_reuses_persisted_birth_and_never_signals_replacement_pid(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from clearml_yolo.adapters.runtime.process_tree import LinuxProcessTree, _read_process
 
     child = subprocess.Popen(
         [sys.executable, "-c", "import time; time.sleep(30)"], start_new_session=True
     )
     try:
-        tree = LinuxProcessTree(child.pid, born=1, identities={child.pid: 1})
+        current = _read_process(child.pid)
+        assert current is not None
+        persisted_born = current.born - 1
+        original_iterdir = Path.iterdir
+
+        def owned_processes(path: Path) -> Iterator[Path]:
+            if path == Path("/proc"):
+                return iter((path / str(child.pid),))
+            return original_iterdir(path)
+
+        # The assertion concerns this replacement PID. Unrelated /proc churn can
+        # correctly make recovery report uncertain global discovery as running.
+        # Keep real stat/birth reads and the pidfd signal path for the tested child.
+        monkeypatch.setattr(Path, "iterdir", owned_processes)
+        tree = LinuxProcessTree(
+            child.pid, born=persisted_born, identities={child.pid: persisted_born},
+        )
         tree.signal(signal.SIGKILL)
         assert child.poll() is None
+        assert tree.identities == ((child.pid, persisted_born),)
         assert not tree.running()
     finally:
         child.kill()

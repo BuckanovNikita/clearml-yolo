@@ -51,3 +51,12 @@ See [release evidence](release.md).
 - [x] T025 Documentation: update affected contracts, README and canonical portable usage skill; validate Markdown, links and commands (depends on T021–23).
 - [x] T026 Fresh independent reviewer/parent: review integrated diff after checks, resolve findings and reconcile architecture acceptance (depends on T024–25).
 - [ ] T027 Parent: task-scoped Conventional Commit and native Git-tag-only release, companion skill delivery and final evidence (depends on T026).
+
+## Release verification follow-up — 2026-10-15
+
+- [ ] T028 Parent/reservation reviewer: stabilize affected subprocess-test readiness and PID-replacement assertions after release revalidation exposed host-churn and empty-file races; preserve ownership checks, obtain focused red/green evidence and independent review, then supersede the unpublished version attempt through normal checked release delivery.
+
+This extends verification scope only. Runtime modules and dependency contracts stay
+unchanged. The existing architecture scope already covers both test modules; no
+production behavior, dependency source or installed workflow tooling changes.
+The failed candidate and recovery evidence remain in dated release history.
