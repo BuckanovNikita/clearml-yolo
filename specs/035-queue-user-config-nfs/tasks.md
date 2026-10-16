@@ -21,7 +21,7 @@
 - [x] T008 Update README.md, TECH_DETAILS.md, docs/queue.md, docs/filesystem-policy.md, docs/project-contracts.md and docs/current-contracts.md.
 - [x] T009 [P] Update canonical corp-skills clearml-yolo usage/evaluation package and validate it; link dated evidence in verification.md.
 - [x] T010 Run static/import/architecture/docs/example checks; obtain fresh independent review and validate architecture.json acceptance.
-- [ ] T011 Complete native checked commit/release, isolated installed CLI verification, companion release and preservation checks in release.md.
+- [x] T011 Complete native checked commit/release, isolated installed CLI verification, companion release and preservation checks in release.md.
 
 ## Dependencies and strategy
 

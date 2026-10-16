@@ -148,6 +148,6 @@
     "status": "accepted",
     "reviewer": "Fresh independent application reviewer; separate companion reviewer",
     "evidence": "specs/035-queue-user-config-nfs/review.md",
-    "reconciliation": "Reviewed complete owned runtime/test/documentation/spec diff; no additions, moves or removals of runtime modules. Excluded unrelated local uv sources and user report. Existing import and negative architecture tests enforce both changed modules. Release version/changelog metadata will receive parent reconciliation without dependency changes."
+    "reconciliation": "Reviewed complete owned runtime/test/documentation/spec diff; no additions, moves or removals of runtime modules. Excluded unrelated local uv sources and user report. Existing import and negative architecture tests enforce both changed modules. Release version/changelog metadata received parent reconciliation: exact lockfile comparison confirms only the root version changed, with no dependency changes."
   }
 }

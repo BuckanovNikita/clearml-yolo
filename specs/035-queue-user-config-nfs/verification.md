@@ -55,11 +55,12 @@ selections, alternate model variants, Hydra composition, overwrite preservation 
 read-only required user/shared settings checks passed. This pre-release candidate
 still reports the previous package version; final release metadata is verified later.
 
-## Remaining acceptance
+## Final acceptance
 
 Fresh independent application and companion reviews accepted their scopes; see
-[review](review.md). Reconciled architecture acceptance passed. The full suite passed; native checked release and final installed-package checks
-remain pending in tasks.md.
+[review](review.md). Reconciled architecture acceptance passed. The full suite, native checked release and final installed-package checks passed;
+all task ledger items are complete. See [delivery](release.md) for published versions,
+remote verification, cleanup and preserved user state.
 
 Actual NFS locking, reconnect, server restart, outage and multi-host behavior are
 unverified: no NFS mount exists on this machine and the user explicitly scoped this

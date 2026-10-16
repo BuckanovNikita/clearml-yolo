@@ -2,7 +2,7 @@
 
 **Created**: 2026-10-16
 
-**Status**: Implementation authorized
+**Status**: Delivered in 0.34.0
 
 **Input**: Default queue configuration to the user's config directory and require every
 queue user to fill it; remove the blanket library rejection of NFS coordination.
