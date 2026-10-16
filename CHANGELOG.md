@@ -1,12 +1,17 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.34.0 (2026-10-16)
 
 ### Documentation
 
 - Record readable shared queue delivery
   ([`22c2ec7`](https://github.com/BuckanovNikita/clearml-yolo/commit/22c2ec7511fc9bed17fd91cce2c776153dd4fa63))
+
+### Features
+
+- **queue**: Support user config defaults and NFS coordination
+  ([`f64e973`](https://github.com/BuckanovNikita/clearml-yolo/commit/f64e973aaed25b2467615947387c5d115e39d585))
 
 
 ## v0.33.0 (2026-10-16)
