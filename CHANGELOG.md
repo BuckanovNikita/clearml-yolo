@@ -1,6 +1,20 @@
 # CHANGELOG
 
 
+## v0.33.0 (2026-10-16)
+
+### Features
+
+- **queue**: Add readable shared queues and reversible archives
+  ([`c3e3f15`](https://github.com/BuckanovNikita/clearml-yolo/commit/c3e3f15c7e907ab86d0bf8ccad703654828b0968))
+
+### Breaking Changes
+
+- **queue**: Queue commands require CY_QUEUE_CONFIG. Scripts consuming mutation output must request
+  --json. Configure all users and workers together, retaining existing metadata and coordination
+  locations during migration.
+
+
 ## v0.32.1 (2026-10-16)
 
 ### Bug Fixes
