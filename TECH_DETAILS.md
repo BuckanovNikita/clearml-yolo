@@ -274,11 +274,15 @@ and requests lacking a complete GPU set. Automatic availability uses only used V
 strictly below 2 GiB (2048 MiB), checked again immediately before launch. Equality is
 busy; the limit is fixed. Current queue reservations and explicit holds remain exclusive,
 while stale unlocked records alone do not exclude capacity. This is an
-admission condition, not an out-of-memory guarantee. `CY_QUEUE_CONFIG` must name an
-absolute shared TOML file with `[queue]` name, metadata root and host-local coordination
-root; there is no project-local fallback. `cy-queue config [--json]` validates settings
+admission condition, not an out-of-memory guarantee. Each queue user fills
+`$XDG_CONFIG_HOME/clearml-yolo/queue.toml`, or `~/.config/clearml-yolo/queue.toml`
+when XDG_CONFIG_HOME is unset, empty or relative. Explicit absolute `CY_QUEUE_CONFIG`
+overrides that file. `[queue]` name, metadata root and coordination root are required;
+there is no project-local storage fallback. Coordination supports local Linux filesystems
+or NFS/NFSv4 with effective hard, host-local flock and shared cache; see the
+[NFS requirements and outage limits](docs/queue.md#nfs-coordination). `cy-queue config [--json]` validates settings
 without creating queue state. `--root` overrides metadata only; legacy `CY_QUEUE_ROOT`
-must agree. Set the environment for each user and worker service. Host binding rejects
+must agree. Configure each user and worker service. Host binding rejects
 conflicting coordination locations; relocation requires offline maintenance preserving
 recovery evidence. Host partitions have separate capacity and ordering. Shared NFS
 requires consistent UIDs and supported locking/PID visibility. See

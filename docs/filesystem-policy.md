@@ -70,10 +70,14 @@ placeholders or fallback configuration. It does not migrate or delete old settin
 or credentials. SDKs may cache their own settings after import; changing `CY_HOME` affects
 project paths without rebinding those library settings.
 
-`cy` does not initialize queue storage. Queue commands require an absolute
-`CY_QUEUE_CONFIG` TOML file selecting shared metadata `queue.root` and host-local
-`queue.coordination_root`; neither derives from `CY_HOME`. Metadata may use NFS,
-while coordination requires a supported local Linux filesystem. The fixed bootstrap
+`cy` does not initialize queue storage. Each queue user must fill the TOML file at
+`$XDG_CONFIG_HOME/clearml-yolo/queue.toml` (absolute XDG_CONFIG_HOME), otherwise
+`~/.config/clearml-yolo/queue.toml`; explicit absolute `CY_QUEUE_CONFIG` overrides it.
+The required name, shared metadata `queue.root` and `queue.coordination_root` have no
+implicit defaults and neither storage path derives from `CY_HOME`. Metadata may use
+NFS; coordination accepts local Linux filesystems or NFS/NFSv4 with effective
+`hard,local_lock=flock` (or `all`) and shared cache, subject to the
+[NFS operating requirements](queue.md#nfs-coordination). The fixed bootstrap
 namespace under `/tmp/clearml-yolo-queue` binds each host to its configured location.
 `--root` overrides metadata only; legacy `CY_QUEUE_ROOT` must agree. New shared roots
 have explicit sticky permissions; existing roots and parents retain their modes.

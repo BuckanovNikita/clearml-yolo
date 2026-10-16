@@ -2,6 +2,7 @@
 
 import json
 import os
+import pwd
 import stat
 import subprocess
 import sys
@@ -30,8 +31,114 @@ def test_configuration_is_required_even_with_explicit_metadata_override(tmp_path
     from clearml_yolo.adapters.queue.settings import load_queue_settings
 
     with pytest.raises(ValueError, match="CY_QUEUE_CONFIG"):
-        load_queue_settings(tmp_path / "metadata", environ={})
+        load_queue_settings(tmp_path / "metadata", environ={"HOME": str(tmp_path)})
     assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("xdg", [None, "", "relative", "absolute"])
+def test_default_configuration_uses_the_users_config_directory(
+    tmp_path: Path, xdg: str | None
+) -> None:
+    from clearml_yolo.adapters.queue.settings import load_queue_settings
+
+    environment = {"HOME": str(tmp_path / "home")}
+    config_home = tmp_path / "home" / ".config"
+    if xdg is not None:
+        environment["XDG_CONFIG_HOME"] = str(tmp_path / "custom") if xdg == "absolute" else xdg
+    if xdg == "absolute":
+        config_home = tmp_path / "custom"
+    directory = config_home / "clearml-yolo"
+    directory.mkdir(parents=True)
+    source = _configuration(tmp_path)
+    path = directory / "queue.toml"
+    path.write_bytes(source.read_bytes())
+    settings = load_queue_settings(environ=environment)
+    assert settings.config_path == path
+    assert settings.root == tmp_path / "metadata"
+    assert not settings.root.exists()
+    assert not settings.coordination_root.exists()
+
+
+def test_explicit_configuration_wins_over_default_and_empty_override_uses_default(
+    tmp_path: Path,
+) -> None:
+    from clearml_yolo.adapters.queue.settings import load_queue_settings
+
+    source = _configuration(tmp_path)
+    config_home = tmp_path / "config"
+    default = config_home / "clearml-yolo"
+    default.mkdir(parents=True)
+    path = _configuration(default, name="User queue")
+    environment = {"XDG_CONFIG_HOME": str(config_home), "CY_QUEUE_CONFIG": str(source)}
+    assert load_queue_settings(environ=environment).name == "Shared experiments"
+    environment["CY_QUEUE_CONFIG"] = ""
+    assert load_queue_settings(environ=environment).config_path == path
+
+
+def test_missing_user_configuration_explains_setup_without_creating_files(tmp_path: Path) -> None:
+    from clearml_yolo.adapters.queue.settings import load_queue_settings
+
+    selected = tmp_path / ".config" / "clearml-yolo" / "queue.toml"
+    with pytest.raises(ValueError, match="Queue configuration is missing") as failure:
+        load_queue_settings(environ={"HOME": str(tmp_path)})
+    message = str(failure.value)
+    assert str(selected) in message
+    for field in ("[queue]", "name", "root", "coordination_root", "CY_QUEUE_CONFIG"):
+        assert field in message
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("missing", ["name", "root", "coordination_root"])
+def test_each_user_must_fill_all_required_fields(tmp_path: Path, missing: str) -> None:
+    from clearml_yolo.adapters.queue.settings import load_queue_settings
+
+    config_home = tmp_path / ".config"
+    directory = config_home / "clearml-yolo"
+    directory.mkdir(parents=True)
+    path = _configuration(directory)
+    path.write_text(
+        "\n".join(
+            line for line in path.read_text().splitlines() if not line.startswith(missing + " =")
+        )
+    )
+    with pytest.raises(ValueError, match=r"expected.*name, root and coordination_root"):
+        load_queue_settings(environ={"XDG_CONFIG_HOME": str(config_home)})
+    assert list(directory.iterdir()) == [path]
+
+
+def test_two_users_can_select_the_same_queue_from_their_own_files(tmp_path: Path) -> None:
+    from clearml_yolo.adapters.queue.settings import load_queue_settings
+
+    settings = []
+    for user in ("alice", "bob"):
+        home = tmp_path / user
+        directory = home / ".config" / "clearml-yolo"
+        directory.mkdir(parents=True)
+        _configuration(
+            directory, root=str(tmp_path / "shared"), coordination_root=str(tmp_path / "locks")
+        )
+        settings.append(load_queue_settings(environ={"HOME": str(home)}))
+    assert settings[0].config_path != settings[1].config_path
+    assert settings[0].root == settings[1].root == tmp_path / "shared"
+    assert settings[0].coordination_root == settings[1].coordination_root == tmp_path / "locks"
+    assert not settings[0].root.exists()
+    assert not settings[0].coordination_root.exists()
+
+
+@pytest.mark.parametrize("home", [None, ""])
+def test_missing_home_environment_uses_account_home(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, home: str | None
+) -> None:
+    from clearml_yolo.adapters.queue.settings import load_queue_settings
+
+    account = pwd.struct_passwd(("test-user", "x", os.getuid(), os.getgid(), "", str(tmp_path), ""))
+    monkeypatch.setattr(pwd, "getpwuid", lambda _uid: account)
+    monkeypatch.setenv("HOME", "")
+    directory = tmp_path / ".config" / "clearml-yolo"
+    directory.mkdir(parents=True)
+    path = _configuration(directory)
+    environment = {} if home is None else {"HOME": home}
+    assert load_queue_settings(environ=environment).config_path == path
 
 
 def test_resolving_configuration_never_creates_queue_directories(tmp_path: Path) -> None:
@@ -123,8 +230,136 @@ def test_network_mount_is_allowed_for_metadata_but_refused_for_coordination(
     path = _configuration(tmp_path, root=str(network / "metadata"))
     assert load_queue_settings(environ={"CY_QUEUE_CONFIG": str(path)}).root == network / "metadata"
     _configuration(tmp_path, coordination_root=str(network / "locks"))
-    with pytest.raises(ValueError, match="host-local"):
+    with pytest.raises(ValueError, match=r"host-local|NFS coordination"):
         load_queue_settings(environ={"CY_QUEUE_CONFIG": str(path)})
+
+
+def _mountinfo(monkeypatch: pytest.MonkeyPatch, content: str) -> None:
+    original = Path.read_text
+
+    def read(path: Path, *args: object, **kwargs: object) -> str:
+        if path == Path("/proc/self/mountinfo"):
+            return content
+        return original(path)
+
+    monkeypatch.setattr(Path, "read_text", read)
+
+
+@pytest.mark.parametrize("filesystem", ["nfs", "nfs4"])
+@pytest.mark.parametrize("locking", ["flock", "all"])
+def test_nfs_coordination_accepts_effective_hard_host_local_flock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, filesystem: str, locking: str
+) -> None:
+    from clearml_yolo.adapters.queue.settings import load_queue_settings
+
+    _mountinfo(
+        monkeypatch, f"1 0 0:1 / / rw - {filesystem} server:/queue rw,hard,local_lock={locking}\n"
+    )
+    path = _configuration(tmp_path)
+    settings = load_queue_settings(environ={"CY_QUEUE_CONFIG": str(path)})
+    assert settings.coordination_root == tmp_path / "coordination"
+    assert list(tmp_path.iterdir()) == [path]
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        "rw",
+        "rw,hard",
+        "rw,hard,local_lock=none",
+        "rw,hard,local_lock=posix",
+        "rw,local_lock=flock",
+        "rw,soft,local_lock=all",
+        "rw,softerr,local_lock=flock",
+        "rw,hard,soft,local_lock=all",
+        "rw,hard,softerr,local_lock=all",
+        "rw,hard,nosharecache,local_lock=flock",
+        "rw,hard,local_lock=all,local_lock=none",
+    ],
+)
+def test_nfs_coordination_rejects_unsafe_effective_options(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, options: str
+) -> None:
+    from clearml_yolo.adapters.queue.settings import load_queue_settings
+
+    # Options before the separator cannot override the effective superblock options.
+    _mountinfo(
+        monkeypatch, f"1 0 0:1 / / rw,hard,local_lock=flock - nfs4 server:/queue {options}\n"
+    )
+    path = _configuration(tmp_path)
+    with pytest.raises(ValueError, match=r"NFS coordination.*hard.*local_lock"):
+        load_queue_settings(environ={"CY_QUEUE_CONFIG": str(path)})
+    assert list(tmp_path.iterdir()) == [path]
+
+
+def test_coordination_validation_uses_longest_decoded_mountpoint(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from clearml_yolo.adapters.queue.settings import load_queue_settings
+
+    mount = tmp_path / "shared queue"
+    encoded = str(mount).replace(" ", r"\040")
+    _mountinfo(
+        monkeypatch,
+        "1 0 0:1 / / rw - ext4 /dev/root rw\n"
+        f"2 1 0:2 / {encoded} rw - nfs4 server:/queue rw,hard,local_lock=flock\n"
+        f"3 2 0:3 / {encoded}/unsafe rw - nfs4 server:/unsafe rw,hard,local_lock=none\n",
+    )
+    path = _configuration(tmp_path, coordination_root=str(mount / "safe"))
+    assert (
+        load_queue_settings(environ={"CY_QUEUE_CONFIG": str(path)}).coordination_root
+        == mount / "safe"
+    )
+    _configuration(tmp_path, coordination_root=str(mount / "unsafe" / "locks"))
+    with pytest.raises(ValueError, match="NFS coordination"):
+        load_queue_settings(environ={"CY_QUEUE_CONFIG": str(path)})
+
+
+@pytest.mark.parametrize(
+    "record", ["malformed", "1 0 0:1 / / rw - nfs4", "1 0 0:1 / / rw - nfs4 server:/queue"]
+)
+def test_incomplete_mount_records_fail_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, record: str
+) -> None:
+    from clearml_yolo.adapters.queue.settings import load_queue_settings
+
+    _mountinfo(monkeypatch, record)
+    path = _configuration(tmp_path)
+    with pytest.raises(RuntimeError, match="Cannot determine"):
+        load_queue_settings(environ={"CY_QUEUE_CONFIG": str(path)})
+    assert list(tmp_path.iterdir()) == [path]
+
+
+def test_cli_requires_filled_default_settings_but_help_needs_no_configuration(
+    tmp_path: Path,
+) -> None:
+    environment = dict(os.environ, HOME=str(tmp_path), XDG_CONFIG_HOME="", CY_QUEUE_CONFIG="")
+    environment.pop("CY_QUEUE_ROOT", None)
+    command = [sys.executable, "-c", "from clearml_yolo.entrypoints.queue import main; main()"]
+
+    def run(*arguments: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(  # noqa: S603 - fixed CLI and isolated user configuration
+            [*command, *arguments],
+            env=environment,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=20,
+        )
+
+    assert run("--help").returncode == 0
+    missing = run("list")
+    assert missing.returncode != 0
+    assert "Create and fill [queue]" in missing.stderr
+    assert "coordination_root" in missing.stderr
+    assert list(tmp_path.iterdir()) == []
+    directory = tmp_path / ".config" / "clearml-yolo"
+    directory.mkdir(parents=True)
+    path = _configuration(directory)
+    configured = run("config", "--json")
+    assert configured.returncode == 0, configured.stderr
+    assert json.loads(configured.stdout)["config_path"] == str(path)
+    assert list(directory.iterdir()) == [path]
 
 
 def test_binding_is_shared_readable_and_rejects_conflicting_location(tmp_path: Path) -> None:

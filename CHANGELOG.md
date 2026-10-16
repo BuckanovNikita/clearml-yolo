@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record readable shared queue delivery
+  ([`22c2ec7`](https://github.com/BuckanovNikita/clearml-yolo/commit/22c2ec7511fc9bed17fd91cce2c776153dd4fa63))
+
+
 ## v0.33.0 (2026-10-16)
 
 ### Features

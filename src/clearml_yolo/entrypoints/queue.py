@@ -37,7 +37,9 @@ def _parser() -> argparse.ArgumentParser:
     parser = _QueueParser(prog="cy-queue", description=__doc__)
     parser.add_argument("--root", type=Path, help="Override the configured shared metadata root")
     commands = parser.add_subparsers(dest="action", required=True)
-    config = commands.add_parser("config", help="Inspect CY_QUEUE_CONFIG without starting a queue")
+    config = commands.add_parser(
+        "config", help="Inspect user queue.toml or CY_QUEUE_CONFIG without starting a queue"
+    )
     config.add_argument("--json", action="store_true")
     submit = commands.add_parser("submit", help="Freeze and submit one pipeline or Hydra sweep")
     resources = submit.add_mutually_exclusive_group(required=True)

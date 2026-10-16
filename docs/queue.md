@@ -10,9 +10,12 @@ process-cleanup evidence and current-generation GPU availability. The
 
 ## Shared configuration
 
-Every queue command except help requires `CY_QUEUE_CONFIG`, an absolute path to a
-shared TOML file. Configure this once for participating login shells and worker
-services, using the same file for all users:
+Every queue command except help requires a filled TOML configuration. Each user
+creates `$XDG_CONFIG_HOME/clearml-yolo/queue.toml`, or
+`~/.config/clearml-yolo/queue.toml` when XDG_CONFIG_HOME is unset, empty or relative.
+There is no automatic config creation or implicit system-wide search. Every field
+below is required; all users sharing a queue select the same metadata and coordination
+paths:
 
 ```toml
 [queue]
@@ -22,16 +25,25 @@ coordination_root = "/var/lib/clearml-yolo/coordination"
 ```
 
 ```bash
-export CY_QUEUE_CONFIG=/etc/clearml-yolo/queue.toml
 cy-queue config
 cy-queue config --json
 ```
 
-The file and both directory paths must be absolute. The metadata `root` may use
-NFS with consistent Unix UID mapping; `coordination_root` must use a supported
-host-local Linux filesystem with shared PID and native file-lock namespaces. It
-holds transaction locks, GPU reservations, worker registrations and recovery evidence.
-The implementation retains files; it does not create a SQLite database.
+An explicit absolute `CY_QUEUE_CONFIG` overrides the user file. For example, an
+administrator can provide one shared file, selected in every participating login
+and worker-service environment:
+
+```bash
+export CY_QUEUE_CONFIG=/etc/clearml-yolo/queue.toml
+cy-queue config
+```
+
+The selected file and both directory paths must be absolute. Missing or incomplete
+settings fail before creating queue directories or host bindings, including with
+`--root`. The metadata `root` may use NFS with consistent Unix UID mapping.
+`coordination_root` uses a supported local Linux filesystem or the NFS configuration
+below. It holds transaction locks, GPU reservations, worker registrations and recovery
+evidence. The implementation retains files; it does not create a SQLite database.
 
 An administrator provisions readable configuration and parent directories accessible
 to every participant. For a fresh stand, shared metadata and coordination roots may
@@ -39,16 +51,37 @@ be created with sticky mode `1777`; owner directories and public records remain
 owner-authored, while snapshots remain mode `0600`. Newly created queue roots use
 sticky mode independently of the creator's umask. Existing root and parent modes
 are preserved. Do not broaden permissions on private snapshots or project logs.
-Set the variable in the site's shared login environment and explicitly in each
-worker service environment; exporting it in one user's shell does not configure
-other accounts or already-running processes.
+Exporting an override in one user's shell does not configure other accounts or
+already-running processes. Services must select their user file or explicit override.
 
 `cy-queue config` reads and validates settings without creating directories, acquiring
 GPU locks, binding a host or starting a worker. `--json` also identifies the configuration
 file and root source. `cy-queue --root /absolute/path ...` overrides only the metadata
 root. Legacy `CY_QUEUE_ROOT` is accepted only if it agrees with that selected root;
 otherwise remove the legacy variable or correct the configuration. There is no
-project-local fallback. Direct training commands do not require this configuration.
+project-local storage fallback. Direct training commands do not require this configuration.
+
+### NFS coordination
+
+Linux NFS and NFSv4 coordination mounts require effective `hard` and
+`local_lock=flock` (or `local_lock=all`), with shared cache. `soft`, `softerr`,
+`nosharecache` and remote/indeterminate flock settings are rejected. Inspect the
+actual mount with `findmnt --target /var/lib/clearml-yolo/coordination`; the library
+reads effective superblock options from `/proc/self/mountinfo`. Requested fstab
+options alone may not describe the active mount, especially when multiple mounts
+share an export's cache. Default NFS server-side locking does not preserve the
+existing guardian's process-lifetime lock guarantee after remote lock loss.
+See [Linux NFS mount semantics](https://man7.org/linux/man-pages/man5/nfs.5.html)
+and [lost locks](https://man7.org/linux/man-pages/man2/fcntl_locking.2.html).
+
+All participants on one host must share the same Linux NFS client/inode cache,
+mount namespace, PID namespace and local bootstrap. Each host must have a distinct
+machine identity; host-local flock does not coordinate different machines. Retain
+consistent UID mapping and protected ownership/modes. Do not remount, replace or
+delete the live coordination mount or files. Hard NFS may block filesystem calls
+indefinitely during an outage, including status, recovery and cleanup; the transaction
+contention timeout does not bound those calls. Mount-option validation is an eligibility
+check, not certification of a deployment's locking, restart or outage behavior.
 
 ### Coordination binding and relocation
 
@@ -64,10 +97,10 @@ There is no automatic relocation command. Relocation is an offline administrator
 procedure: stop submission and all workers/guardians across participating roots,
 complete owner recovery for uncertain jobs, and confirm there are no live reservations
 or processes using the namespace. Preserve the complete old host directory and its
-ownership/modes when copying it to the new local root. Only then atomically update
+ownership/modes when copying it to the new supported coordination root. Only then atomically update
 the protected bootstrap binding's canonical absolute root while retaining its protocol,
 host and ownership fields; its filesystem owner must still match the recorded owner.
-Update the shared configuration and restart all participants consistently. Keep the
+Update every participating configuration and restart all participants consistently. Keep the
 old evidence until the move is verified. Never delete live locks or recovery records
 to make a conflicting configuration pass.
 
@@ -163,7 +196,7 @@ The [shared configuration](#shared-configuration) selects durable metadata and l
 coordination explicitly. Stable machine identity
 partitions hosts; boot identity is recorded separately. Each host has its own order and
 GPU capacity. `list --host HOST_ID` views another host without mutating its partition.
-NFS stores atomic manifests, owner events and history. Small host-local files provide
+NFS stores atomic manifests, owner events and history. Small coordination files with host-local locks provide
 transaction locks, generation events, worker claims and recovery records across queue roots and mount
 aliases. No SQLite WAL database is placed on NFS.
 
@@ -282,7 +315,7 @@ stamp; prior outcome records remain available for owner recovery without making 
 unlocked metadata an automatic capacity veto.
 
 Supported operation assumes cooperating Linux users, consistent NFS UID mapping and
-shared host PID/local coordination namespaces. Unsupported identity/locking conditions
+shared host PID and coordination lock namespaces. Unsupported identity/locking conditions
 fail explicitly. Do not remove live coordination files. The application installs no
 privileged service and changes no mounts or accounts.
 
@@ -310,7 +343,7 @@ a word-based `gpu` label and null physical index. Claims expose the job ID, owne
 displayed device labels. Queue-job JSON likewise uses displayed labels for requests
 and allocations. Claim tokens, full UUIDs and private process/snapshot metadata are omitted.
 
-`disable` persists a hold for the current Unix UID in host-local coordination. Holds
+`disable` persists a hold for the current Unix UID in host-partitioned coordination. Holds
 apply across queue roots and prevent new allocations; active work retains its allocation.
 Any owner's current hold makes a device unavailable. `enable` removes only the caller's
 hold; `free` clears every existing hold and reservation for the selected GPU across roots.
@@ -370,7 +403,7 @@ Remove `worker --max-used-memory-gib` from worker commands: admission now uses t
 `gpu release INDEX` now means the same per-device manual action as `gpu free INDEX`.
 
 [Filesystem ownership](filesystem-policy.md) constrains application outputs/cache/logs/scratch
-to the project. Only explicit shared queue metadata and small host-local coordination are
+to the project. Only explicit shared queue metadata and small host-partitioned coordination files are
 exceptions. SDK configuration, cache/download/temp policies and outside inputs remain intact.
 [Diagnostics](diagnostics.md#live-console-and-shutdown) explains FD capture, live publication,
 quiet prediction and bounded finalization. The [feature ledger](../specs/029-shared-cy-queue/tasks.md)
@@ -411,5 +444,6 @@ Feature 029 replaces the historical four-mode execution policy with direct comma
 allocation until acknowledged contraction; the first device remains reserved through
 descendant exit unless explicitly freed. Guardian death retains an uncertain job outcome
 for owner recovery, without letting stale unlocked records block new admission. Ordering selects the
-earliest runnable job on each host. NFS holds durable records, host-local coordination
-holds locks, generations and recovery records. Completed historical evidence remains unchanged.
+earliest runnable job on each host. Shared metadata holds durable job records; coordination
+files hold generations and recovery records, protected by host-local locks. Completed
+historical evidence remains unchanged.

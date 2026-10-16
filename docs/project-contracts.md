@@ -220,8 +220,11 @@ Queue public summaries show owner, order, state, requested/allotted devices, wai
 progress and ClearML link without exposing private executable configurations. See
 [queue operations](queue.md) and [diagnostics](diagnostics.md#gpu-admission-decisions).
 
-Queue configuration is explicit: `CY_QUEUE_CONFIG` names shared TOML settings for the
-metadata and host-local coordination roots. Each host binds one coordination location
+Queue settings remain mandatory: each user fills their XDG config file (normally
+`~/.config/clearml-yolo/queue.toml`); explicit absolute `CY_QUEUE_CONFIG` overrides it.
+Both metadata and coordination roots are explicit. Coordination supports eligible
+NFS mounts with host-local flock as described in the
+[queue contract](queue.md#nfs-coordination). Each host binds one coordination location
 across users and queues. Archive/restore is owner-only, preserves durable history and
 keeps recovery-required jobs visible; stable `job-N` numbers never depend on view position.
 Human-facing output uses readable names and references across CLI, TUI, diagnostics,
