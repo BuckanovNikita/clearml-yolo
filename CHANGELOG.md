@@ -1,7 +1,12 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.32.1 (2026-10-16)
+
+### Bug Fixes
+
+- Extend ClearML finalization deadline to ten minutes
+  ([`d247a2e`](https://github.com/BuckanovNikita/clearml-yolo/commit/d247a2e6f6d179a255ea6caaa5017ac477be8f4c))
 
 ### Documentation
 
