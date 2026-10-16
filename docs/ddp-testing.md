@@ -1,5 +1,10 @@
 # Physical multi-GPU DDP acceptance
 
+The external-result obligation for the delivered implementation is
+[closed by user waiver](evidence/2026-10-16-acceptance-closure/decision.md).
+Physical multi-GPU outcomes remain unverified. This procedure is retained for a
+future explicitly requested target certification; no result bundle is awaited.
+
 These **new** `ddp_gpu` tests run the production direct and queued YOLO pipelines
 with real CUDA/NCCL ranks and ClearML publication. Existing CPU/Gloo DDP tests
 remain part of ordinary pytest. Ordinary pytest deselects the physical suite and

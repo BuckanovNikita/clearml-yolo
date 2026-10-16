@@ -262,7 +262,10 @@ exceptions. SDK configuration, cache/download/temp policies and outside inputs r
 [Diagnostics](diagnostics.md#live-console-and-shutdown) explains FD capture, live publication,
 quiet prediction and bounded finalization. The [feature ledger](../specs/029-shared-cy-queue/tasks.md)
 and dated evidence distinguish implemented behavior from physical GPU, live ClearML and
-actual multi-user/multi-host NFS acceptance. CPU/mocked tests cannot substitute for those gates.
+actual multi-user/multi-host NFS acceptance. CPU/mocked tests do not establish those
+physical outcomes. The listed unavailable external checks are
+[closed by user waiver](evidence/2026-10-16-acceptance-closure/decision.md) as
+completion/release obligations; physical GPU/NFS outcomes remain unverified.
 
 ## Cross-contract integration
 

@@ -1,5 +1,10 @@
 # Feature Specification: Test quality and GPU controls
 
+**Current acceptance disposition (2026-10-16):** the listed external GPU/NFS
+obligations are [closed by user waiver](../../docs/evidence/2026-10-16-acceptance-closure/decision.md).
+Original outcomes and unchecked historical tasks below are preserved; no external
+results are awaited for those obligations. Physical outcomes remain unverified.
+
 **Current operator behavior:** the [2026-10-15 simplification amendment](#operator-simplification-amendment--2026-10-15)
 supersedes the original US2/FR-04–06 token, reason, whole-claim and live-owner release
 rules below. Use [current per-device controls](../../docs/queue.md#physical-gpu-operator-controls).

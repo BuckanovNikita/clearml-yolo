@@ -1,5 +1,10 @@
 # Verification: 2026-10-14
 
+**Current acceptance disposition (2026-10-16):** the listed external GPU/NFS
+obligations are [closed by user waiver](../../docs/evidence/2026-10-16-acceptance-closure/decision.md).
+Original outcomes and unchecked historical tasks below are preserved; no external
+results are awaited for those obligations. Physical outcomes remain unverified.
+
 Implementation is based on `master` commit `665dfd3` (package `0.28.0`).
 The pre-existing local `[tool.uv.sources]` overrides and untracked
 `docs/cls-cls-pw-grid-search.md` are outside this task. Runtime dependency versions
@@ -157,3 +162,11 @@ remains incomplete until the physical result is supplied and reviewed.
 Final planning validation returned exit 0. Final acceptance validation returned
 exit 1 solely for `checks[3].result.status: acceptance requires passed`, the
 explicitly unexecuted physical GPU check.
+
+## External acceptance disposition — 2026-10-16
+
+The [user waiver](../../docs/evidence/2026-10-16-acceptance-closure/decision.md) closes the listed requests for external results.
+No physical run or NFS test was performed for this closure. Earlier failures,
+`not-run` results and architecture-validator outcomes remain unchanged. Current
+documentation checks and scope review are recorded in that decision; they establish
+this disposition change only.

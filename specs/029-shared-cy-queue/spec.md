@@ -1,5 +1,10 @@
 # Feature Specification: Direct execution and shared cy-queue
 
+**Current acceptance disposition (2026-10-16):** the listed external GPU/NFS
+obligations are [closed by user waiver](../../docs/evidence/2026-10-16-acceptance-closure/decision.md).
+Original outcomes and unchecked historical tasks below are preserved; no external
+results are awaited for those obligations. Physical outcomes remain unverified.
+
 Date: 2026-10-13. Status: implementation requested. Source: user-approved refactor plan.
 
 ## User Scenarios & Testing *(mandatory)*

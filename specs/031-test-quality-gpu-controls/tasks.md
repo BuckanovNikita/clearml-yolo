@@ -1,5 +1,10 @@
 # Tasks: Test quality and GPU controls
 
+**Current acceptance disposition (2026-10-16):** the listed external GPU/NFS
+obligations are [closed by user waiver](../../docs/evidence/2026-10-16-acceptance-closure/decision.md).
+Original outcomes and unchecked historical tasks below are preserved; no external
+results are awaited for those obligations. Physical outcomes remain unverified.
+
 ## Definition and architecture
 
 - [x] T001 Capture approved scope, assumptions, interfaces and ownership in spec.md and plan.md (FR-01–10).
@@ -60,3 +65,14 @@ This extends verification scope only. Runtime modules and dependency contracts s
 unchanged. The existing architecture scope already covers both test modules; no
 production behavior, dependency source or installed workflow tooling changes.
 The failed candidate and recovery evidence remain in dated release history.
+
+## External acceptance closure — 2026-10-16
+
+- [x] T029 Record the user's waiver of the unavailable external acceptance
+  obligations, reconcile current status and preserve original outcomes. The
+  [authoritative disposition table](../../docs/evidence/2026-10-16-acceptance-closure/decision.md#decision-and-scope)
+  closes the listed historical tasks without asserting a physical test pass.
+
+This amendment supersedes the earlier requirement to keep those tasks open until
+the user supplies another environment or result bundle. The original checklist
+remains a historical record; the linked decision owns current closure and limits.

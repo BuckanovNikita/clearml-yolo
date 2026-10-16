@@ -1,5 +1,10 @@
 # Integration verification — 2026-10-13
 
+**Current acceptance disposition (2026-10-16):** the listed external GPU/NFS
+obligations are [closed by user waiver](../../docs/evidence/2026-10-16-acceptance-closure/decision.md).
+Original outcomes and unchecked historical tasks below are preserved; no external
+results are awaited for those obligations. Physical outcomes remain unverified.
+
 ## Status and source
 
 Implementation, final-source software checks and available native checks are complete.
@@ -610,3 +615,11 @@ exits **1** solely at `checks[4].result.status: acceptance requires passed`: thi
 is the declared unavailable native matrix, not an import/review failure. The raw
 result is retained in `architecture-acceptance-unwind.log`; it is not reported as
 a passing gate. The ledger keeps T019's full acceptance and T020 release open.
+
+## External acceptance disposition — 2026-10-16
+
+The [user waiver](../../docs/evidence/2026-10-16-acceptance-closure/decision.md) closes the listed requests for external results.
+No physical run or NFS test was performed for this closure. Earlier failures,
+`not-run` results and architecture-validator outcomes remain unchanged. Current
+documentation checks and scope review are recorded in that decision; they establish
+this disposition change only.

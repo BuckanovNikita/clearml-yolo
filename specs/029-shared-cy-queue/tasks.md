@@ -1,5 +1,10 @@
 # Tasks: direct execution and shared cy-queue
 
+**Current acceptance disposition (2026-10-16):** the listed external GPU/NFS
+obligations are [closed by user waiver](../../docs/evidence/2026-10-16-acceptance-closure/decision.md).
+Original outcomes and unchecked historical tasks below are preserved; no external
+results are awaited for those obligations. Physical outcomes remain unverified.
+
 ## Foundation
 
 - [x] T001 Inspect implementation, existing edits, constitution and current contracts; preserve v0.26.1 history in specs/029-shared-cy-queue/plan.md.
@@ -146,3 +151,14 @@ acceptance. Remote branch/tag identities were verified. The explicit user-direct
 release supersedes T020's publication deferral; its missing full-matrix prerequisite
 is not marked passed. T011, T015, T028 and the native portion of T019 stay open.
 See [release evidence](release-2026-10-13.md) for exact commits and limitations.
+
+## External acceptance closure — 2026-10-16
+
+- [x] T036 Record the user's waiver of the unavailable external acceptance
+  obligations, reconcile current status and preserve original outcomes. The
+  [authoritative disposition table](../../docs/evidence/2026-10-16-acceptance-closure/decision.md#decision-and-scope)
+  closes the listed historical tasks without asserting a physical test pass.
+
+This amendment supersedes the earlier requirement to keep those tasks open until
+the user supplies another environment or result bundle. The original checklist
+remains a historical record; the linked decision owns current closure and limits.

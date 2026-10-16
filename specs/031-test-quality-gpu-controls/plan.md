@@ -1,5 +1,10 @@
 # Implementation Plan: Test quality and GPU controls
 
+**Current acceptance disposition (2026-10-16):** the listed external GPU/NFS
+obligations are [closed by user waiver](../../docs/evidence/2026-10-16-acceptance-closure/decision.md).
+Original outcomes and unchecked historical tasks below are preserved; no external
+results are awaited for those obligations. Physical outcomes remain unverified.
+
 ## Current status amendment — 2026-10-15
 
 The original whole-claim/token/reason/live-owner release design below is historical.
@@ -138,3 +143,11 @@ by feature 029. This explicit operator override is authorized by the user's plan
 it changes capacity bookkeeping without performing PID-based automatic cleanup.
 Unknown memory still prevents automatic launch. Installed `.specify` files remain
 unchanged, as required by project policy.
+
+## Acceptance-scope amendment — 2026-10-16
+
+The [user-authorized closure](../../docs/evidence/2026-10-16-acceptance-closure/decision.md) removes the listed unavailable target
+checks from the current completion/release prerequisites. Original implementation
+and verification plans remain unchanged as history. This documentation-only
+amendment uses the decision's no-impact architecture record and documentation
+checks; it creates no new runtime or infrastructure work.

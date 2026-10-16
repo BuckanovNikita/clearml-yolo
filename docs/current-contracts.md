@@ -43,7 +43,7 @@ executable check or an explicit verification limitation. The
 [module](module-architecture.md), [queue](queue-lifecycles.md) and
 [input provenance](input-provenance.md) diagrams explain ownership and invariants.
 The [status map](implementation-status.md) separates implementation, verification,
-release and outstanding external acceptance without rewriting completed task history.
+release, acceptance disposition and unverified limits without rewriting completed task history.
 
 ## Maintaining consistency
 

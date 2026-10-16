@@ -1,5 +1,10 @@
 # Implementation Plan: direct execution and shared cy-queue
 
+**Current acceptance disposition (2026-10-16):** the listed external GPU/NFS
+obligations are [closed by user waiver](../../docs/evidence/2026-10-16-acceptance-closure/decision.md).
+Original outcomes and unchecked historical tasks below are preserved; no external
+results are awaited for those obligations. Physical outcomes remain unverified.
+
 ## Current status amendment — 2026-10-15
 
 The original plan below records implementation intent at its date. Allocation
@@ -83,3 +88,11 @@ single/five-GPU direct/queued eager/compiled parity, actual two-user/two-host NF
 live remote console/scalars, physical cancellation, guardian death and filesystem writes.
 Update README (Russian), project/current contracts, filesystem/runtime/diagnostics/development
 and affected generated examples. Preserve historical evidence; append reconciliation notes.
+
+## Acceptance-scope amendment — 2026-10-16
+
+The [user-authorized closure](../../docs/evidence/2026-10-16-acceptance-closure/decision.md) removes the listed unavailable target
+checks from the current completion/release prerequisites. Original implementation
+and verification plans remain unchanged as history. This documentation-only
+amendment uses the decision's no-impact architecture record and documentation
+checks; it creates no new runtime or infrastructure work.

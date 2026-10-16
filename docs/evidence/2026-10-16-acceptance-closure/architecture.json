@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "task": "Close unavailable physical-GPU and multi-host NFS acceptance by explicit user waiver",
+  "scope": [
+    "docs/evidence/2026-10-16-acceptance-closure",
+    "docs/implementation-status.md",
+    "docs/queue.md",
+    "docs/ddp-testing.md",
+    "docs/current-contracts.md",
+    "CHANGELOG.md",
+    "specs/029-shared-cy-queue/spec.md",
+    "specs/029-shared-cy-queue/plan.md",
+    "specs/029-shared-cy-queue/tasks.md",
+    "specs/029-shared-cy-queue/verification.md",
+    "specs/031-test-quality-gpu-controls/spec.md",
+    "specs/031-test-quality-gpu-controls/plan.md",
+    "specs/031-test-quality-gpu-controls/tasks.md",
+    "specs/031-test-quality-gpu-controls/verification.md"
+  ],
+  "impact": "none",
+  "rationale": "Inspected feature 029/031 specifications, task ledgers, dated checks and original architecture records; current queue coordination and physical GPU test entrypoints retain their existing contracts. This task changes only acceptance disposition and documentation navigation. No runtime module, import contract, dependency, test selection, checker, environment or command changes. Original not-run architecture results and native failure evidence remain unchanged; this no-impact record validates only the documentation closure."
+}
