@@ -5,6 +5,9 @@
 
 ### Documentation
 
+- Close unavailable external acceptance by user waiver
+  ([`c168e62`](https://github.com/BuckanovNikita/clearml-yolo/commit/c168e62e71536246f2ad9a09af307850d8af3708))
+
 - Record v0.32.0 verification and delivery
   ([`6dd22d3`](https://github.com/BuckanovNikita/clearml-yolo/commit/6dd22d33af394da8d83d48b31c635eb712bd2bb1))
 

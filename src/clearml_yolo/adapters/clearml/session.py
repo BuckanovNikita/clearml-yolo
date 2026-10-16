@@ -70,7 +70,7 @@ DEFAULT_PROJECT_NAME = "clearml-yolo"
 # Task.close drains the reporter again after our required publication flush. Each
 # drain can wait a reporting interval; budget both, model/readback work and the
 # console barrier without changing SDK timing or allowing unbounded shutdown.
-FINALIZATION_TIMEOUT_SECONDS = 60.0
+FINALIZATION_TIMEOUT_SECONDS = 600.0
 
 # Keep the SDK opaque at the adapter boundary so reporting modules need no SDK import.
 Task = Any

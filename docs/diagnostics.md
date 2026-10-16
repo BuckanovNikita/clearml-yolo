@@ -152,9 +152,11 @@ uses final offsets and a deadline, retains local logs, and fails incomplete requ
 publication without retrying uncertain deliveries. Original computation errors take
 precedence over cleanup failures, including a configured Loguru sink or stderr failing
 while reporting that cleanup. Memory-cleanup failures and interruptions propagate when
-there is no earlier error. Required owner finalization has a 60-second Unix
-main-thread deadline covering publication and SDK close, which performs its own second
-drain. An existing embedding alarm is rejected without overwriting it.
+there is no earlier error. Required owner finalization has a 10-minute (600-second)
+Unix main-thread deadline covering publication and SDK close, which performs its own
+second drain, in both direct and queued runs. Separate failure cleanup and console/status
+handling use the same owner deadline per scope; publisher receipt waits retain their
+independent shorter timeout. An existing embedding alarm is rejected without overwriting it.
 An unconfirmed initialization or shutdown also blocks later same-process task
 creation, including remaining sequential sweep members, to prevent reuse of a
 failed SDK owner. Inspect the first error and relaunch remaining work in a fresh

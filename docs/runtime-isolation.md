@@ -166,10 +166,12 @@ An acknowledged workload checkpoint precedes SDK close/completion. Final offsets
 SDK shutdown output and a finite deadline governs publisher shutdown; uncertain delivery is not
 automatically replayed. Required publication failure fails the run and retains its logs,
 while cleanup preserves the original computation exception. The owner task finalization
-uses a 60-second Unix main-thread deadline for required uploads, flush, readback and
-close. The budget includes both the explicit flush and the SDK's own close-time
-drain; publisher receipt waits retain their separate shorter bound. Incompatible
-embedding timers fail explicitly.
+uses a 10-minute (600-second) Unix main-thread deadline for required uploads, flush,
+readback and close in both direct and queued runs. The budget includes both the
+explicit flush and the SDK's own close-time drain; publisher receipt waits retain
+their separate shorter bound. Incompatible embedding timers fail explicitly.
+Separate failure cleanup and console/status handling use the same 10-minute owner
+deadline per scope; this is not a total queue-job or total process-exit timeout.
 If task initialization or owner shutdown cannot complete, later invocations in that
 process fail before creating or reusing a ClearML task. This includes later members
 of a sequential Hydra sweep. Relaunch them in a fresh process after inspecting the
