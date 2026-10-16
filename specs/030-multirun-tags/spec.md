@@ -56,3 +56,11 @@ The tag is always automatic for multiruns; no new configuration option is needed
 Existing task creation, remote replay, model-tag inheritance and queue policy remain
 owned by their existing modules. Regression checks use real Hydra composition and
 launching with recording execution boundaries; they do not claim live server publication.
+
+## Presentation amendment — 2026-10-16
+
+The historical display requirements above are superseded by the
+[readable shared queue feature](../034-readable-shared-queue/spec.md) and
+[current readable-output contract](../../docs/readable-output.md).
+Raw identity and grouping semantics are preserved; new human-facing names and tags
+contain no opaque task IDs or hashes. Completed implementation history is unchanged.

@@ -177,10 +177,11 @@ is insufficient.
 
 ## Source identity on new results
 
-Every newly produced evaluation dashboard and report carries the evaluated model's
-finalized display name and full original training task ID. Source identity also travels
-through local prediction provenance, durable result contexts, evaluation payloads and
-paired comparison manifests. The reporting task's ID cannot replace the source training
+Presentation amendment, 2026-10-16: every newly produced evaluation dashboard and
+report displays the evaluated model's readable name. The full original training task
+ID stays in hidden workbook identity and machine provenance: local prediction provenance,
+durable result contexts, evaluation payloads and paired comparison manifests.
+The [readable-output contract](../../../docs/readable-output.md) governs all human text. The reporting task's ID cannot replace the source training
 task ID. Available checkpoint and prediction hashes bind that identity to the actual
 bytes; stale sidecars or inconsistent associations fail explicitly. See the
 [model metadata contract](../../008-dataset-clearml-tracking/contracts/model-metadata.md)
@@ -191,7 +192,7 @@ require a nonempty label: `model_label` for standalone prediction, validation an
 or a pipeline with training disabled; `baseline_model.label` and `candidate_model.label`
 for local comparison references; `baseline_label` and `candidate_label` for reports over
 legacy manifests without identity. Labels do not register a model or invent an identifier;
-unknown training provenance is shown as `Training task: unavailable`.
+workbook provenance status is `Training source: recorded` or `Training source: unavailable`.
 
 Each worksheet in full/DTRK/confusion, evaluation, statistical, developer and business
 workbooks has a literal identity banner. Paired workbooks identify baseline and candidate
@@ -211,9 +212,12 @@ fingerprint validates annotated workbook parts before readers expose that origin
 editing or resaving a decorated XLSX is rejected on ingestion rather than silently using
 stale original metrics. Regenerate the workbook from source inputs to change its contents.
 The adapters do not modify pinned dependencies or source files. Body metrics, eligible
-class populations, output paths and artifact keys remain unchanged.
+class populations, output paths and canonical artifact keys remain unchanged. Distinct
+tables that share a logical name use readable ordinal collision suffixes; exact
+digests remain in internal deduplication maps.
 
-Generated local evaluation raster plots retain model/training-task captions. Current
+Generated local evaluation raster plots show readable model names and source
+recorded/unavailable captions under the [readable-output contract](../../../docs/readable-output.md). Current
 ClearML confusion/PR captions use readable model/split labels under the
 [presentation amendment](../../020-readable-evaluation-plots/contracts/plots.md); they omit
 internal identifiers. Comparison tables remain in downloadable reports, outside Plots.

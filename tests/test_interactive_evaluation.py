@@ -87,6 +87,41 @@ def test_all_zero_matrix_is_finite_and_explicit() -> None:
         json.dumps(plot, allow_nan=False)
 
 
+def test_opaque_class_names_have_distinct_readable_ticks_hover_and_legends() -> None:
+    names = ["0123456789abcdef" * 2, "fedcba9876543210" * 2]
+    matrix = ConfusionMatrixPayload(
+        labels=[*names, "background"],
+        counts=[[1, 2, 0], [3, 4, 0], [0, 0, 0]],
+    )
+    curves = [
+        PRCurve(
+            class_name=name,
+            recall=[0.5],
+            precision=[1],
+            confidence=[0.75],
+            tp=[1],
+            fp=[0],
+            gt_count=2,
+            ap50=0.5,
+            integration_method="continuous",
+        )
+        for name in names
+    ]
+    task = RecordingTask()
+    report_confusion_matrices(task, CONTEXT, matrix)
+    report_pr_curves(task, CONTEXT, curves)
+    encoded = json.dumps(task.plots)
+    assert all(name not in encoded for name in names)
+    ticks = task.plots[0]["figure"]["layout"]["xaxis"]["ticktext"]
+    assert len(set(ticks)) == 3
+    assert task.plots[0]["figure"]["data"][0]["z"] == matrix.counts
+    traces = task.plots[1]["figure"]["data"]
+    assert len({trace["meta"][0] for trace in traces}) == 2
+    assert all(trace["customdata"] == [[0.75, 1, 0]] for trace in traces)
+    assert [curve.class_name for curve in curves] == names
+    assert matrix.labels == [*names, "background"]
+
+
 @pytest.mark.parametrize("method", ["coco", "continuous"])
 def test_pr_points_ties_and_hover_are_preserved(method: str) -> None:
     task = RecordingTask()

@@ -97,3 +97,12 @@ supersedes the original whole-pipeline reservation assumption without changing a
 implementation evidence.
 The explicit user plan supersedes historical constitution prohibitions on daemon/count/
 reorder controls; installed workflow files and completed historical evidence remain unchanged.
+
+## Shared settings and presentation amendment — 2026-10-16
+
+The configuration fallback and human-readable output requirements recorded above
+are superseded by [feature 034](../034-readable-shared-queue/spec.md) and its
+[interfaces](../034-readable-shared-queue/contracts/interfaces.md). `CY_QUEUE_CONFIG`
+is now required, roots are explicit, stable `job-N` references replace opaque display
+IDs, and owner-only archiving changes visibility without scheduling or deletion effects.
+Completed history and previous physical acceptance dispositions remain unchanged.

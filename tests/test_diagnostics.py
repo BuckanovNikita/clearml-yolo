@@ -52,6 +52,37 @@ def test_redaction_preserves_ordinary_locations() -> None:
     )
 
 
+def test_workflow_log_preserves_literal_braces_and_formats_only_supplied_arguments() -> None:
+    from clearml_yolo.adapters.observability.diagnostics import log
+
+    task = "0123456789abcdef" * 2
+    with captured("INFO") as output:
+        log("INFO", '{"status":"ok","count":3}')
+        log("INFO", f'{{"task":"{task}"}}')
+        log("INFO", "{{value}}={}", 0.125)
+    assert output == [
+        '{"status":"ok","count":3}\n',
+        '{"task":"[task]"}\n',
+        "{value}=0.125\n",
+    ]
+
+
+def test_debug_diagnostics_replace_identifiers_in_messages_context_and_causes() -> None:
+    task = "1234567890abcdef" * 2
+    checksum = "abcdef0123456789" * 4
+    with captured("DEBUG") as output:
+        log_exception(
+            f"Task {task} download failed",
+            ValueError(f"checksum {checksum} mismatch"),
+            context={"task_id": task, "path": f"/cache/{checksum}/checkpoint.pt"},
+        )
+    result = "".join(output)
+    assert task not in result
+    assert checksum not in result
+    assert "checkpoint.pt" in result
+    assert "ValueError" in result
+
+
 def test_summary_preserves_messages_causes_empty_types_and_cycles() -> None:
     cause = OSError("checkpoint.pt missing")
     error = RuntimeError("publication failed")

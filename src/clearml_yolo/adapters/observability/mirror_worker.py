@@ -1,15 +1,22 @@
 """Stdlib-only tailer: terminal forwarding never waits for a tracking service."""
 
+import codecs
 import json
 import os
 import sys
 import time
 from pathlib import Path
 
+from clearml_yolo.core.presentation import HumanTextStream
+
 
 def mirror(directory: Path, owner: int, descriptors: tuple[int, int], controls: Path) -> None:
     initial = json.loads((controls / "initial.json").read_text())
     offsets = {name: initial[name] for name in ("stdout", "stderr")}
+    filters = {name: HumanTextStream() for name in offsets}
+    decoders = {
+        name: codecs.getincrementaldecoder("utf-8")(errors="surrogateescape") for name in offsets
+    }
     while True:
         stop = controls / "final.json"
         final = json.loads(stop.read_text()) if stop.is_file() else None
@@ -18,7 +25,10 @@ def mirror(directory: Path, owner: int, descriptors: tuple[int, int], controls: 
                 stream.seek(offsets[name])
                 limit = final[name] - offsets[name] if final is not None else 65536
                 payload = stream.read(min(65536, limit))
-            remaining = memoryview(payload)
+            finished = final is not None and offsets[name] + len(payload) == final[name]
+            text = decoders[name].decode(payload, final=finished)
+            visible = filters[name].feed(text, final=finished)
+            remaining = memoryview(visible.encode("utf-8", errors="surrogateescape"))
             while remaining:
                 written = os.write(descriptor, remaining)
                 remaining = remaining[written:]

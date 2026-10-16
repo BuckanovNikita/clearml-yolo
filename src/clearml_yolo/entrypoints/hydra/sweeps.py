@@ -1,17 +1,61 @@
 """Resolve native Hydra launch semantics before direct or queued effects."""
 
-from uuid import uuid4
+from datetime import UTC, datetime
+from secrets import choice
 
 from hydra._internal.core_plugins.basic_sweeper import BasicSweeper
 from hydra.core.global_hydra import GlobalHydra
 from hydra.core.override_parser.overrides_parser import OverridesParser
 from hydra.types import RunMode
-from omegaconf import DictConfig, open_dict
+from omegaconf import DictConfig, OmegaConf, open_dict
+
+
+def task_overrides(config: DictConfig) -> list[str]:
+    """Keep job-local interpolations unresolved until the job context exists."""
+    values = OmegaConf.to_container(config.hydra.overrides.task, resolve=False)
+    if not isinstance(values, list) or any(not isinstance(value, str) for value in values):
+        raise TypeError("Hydra task overrides must be a list of strings")
+    return [str(value) for value in values]
 
 
 def new_multirun_tag() -> str:
     """Create an independent group for one launch or queued submission."""
-    return f"multirun-{uuid4().hex}"
+    words = (
+        "amber",
+        "birch",
+        "bloom",
+        "brook",
+        "cedar",
+        "cloud",
+        "coral",
+        "dawn",
+        "delta",
+        "dune",
+        "elm",
+        "fern",
+        "field",
+        "flint",
+        "forest",
+        "frost",
+        "grove",
+        "harbor",
+        "hazel",
+        "hill",
+        "iris",
+        "lake",
+        "maple",
+        "meadow",
+        "moon",
+        "oak",
+        "pine",
+        "river",
+        "stone",
+        "sun",
+        "valley",
+        "willow",
+    )
+    phrase = "-".join(choice(words) for _ in range(6))
+    return f"multirun-{datetime.now(UTC):%Y%m%d-%H%M%S}-{phrase}"
 
 
 def tag_multirun_job(config: DictConfig, tag: str) -> None:
@@ -65,7 +109,7 @@ def compose_jobs(
             )
     parameters = configuration.hydra.sweeper.get("params") or {}
     arguments = [f"{key}={value}" for key, value in parameters.items()]
-    arguments.extend(configuration.hydra.overrides.task)
+    arguments.extend(task_overrides(configuration))
     batches = BasicSweeper.split_arguments(parser.parse_overrides(arguments), None)
     jobs = tuple(
         hydra.config_loader.load_sweep_config(configuration, values)

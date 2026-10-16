@@ -13,9 +13,11 @@ For Unicode or punctuation in a CLI label, preserve Hydra's inner quotes, for
 example `cy-metrics 'model_label="experiment-Ω"'` alongside the required inputs.
 
 Train twice with the same requested names. Verify each report uses the finalized
-unique name and full training task ID; recover one model under a new validation task
-and confirm that new task is not shown as the training source. Open every worksheet
-and check print titles; include long Unicode and formula-like custom labels.
+unique readable name and source status; recover one model under a new validation task
+and verify the hidden identity/provenance retains the original training task ID rather
+than the reporting task ID. Open every worksheet and check repeated readable print
+titles without visible IDs or hashes; include long Unicode and formula-like custom
+labels. This recipe follows the 2026-10-16 [presentation amendment](../../docs/readable-output.md).
 
 Generate reports from annotated and historical dashboards and compare metrics,
 class populations, and exact threshold recovery behavior. Verify missing-baseline

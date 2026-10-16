@@ -12,11 +12,13 @@ from contextlib import contextmanager, suppress
 from pathlib import Path
 from uuid import uuid4
 
+_DEFAULT_ROOT = Path("/tmp/clearml-yolo-queue")  # noqa: S108 - explicit host-global namespace
+
 
 def host_directory(host_id: str, root: Path | None = None) -> Path:
     if sys.platform != "linux" or not re.fullmatch(r"[A-Za-z0-9_-]+", host_id):
         raise RuntimeError("Shared queue requires a supported Linux host identity")
-    base = Path("/tmp/clearml-yolo-queue") if root is None else root  # noqa: S108 - explicit host-global namespace
+    base = _DEFAULT_ROOT if root is None else root
     directory = base / host_id
     for path in (base, directory):
         try:
@@ -29,6 +31,93 @@ def host_directory(host_id: str, root: Path | None = None) -> Path:
             raise RuntimeError("Host-local queue namespace is invalid")
     _validate_namespace(directory, host_id)
     return directory
+
+
+def _read_binding(path: Path, host_id: str) -> Path:
+    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    with os.fdopen(descriptor, "r", encoding="utf-8") as source:
+        status = os.fstat(source.fileno())
+        if not stat.S_ISREG(status.st_mode) or stat.S_IMODE(status.st_mode) & 0o022:
+            raise RuntimeError("Queue coordination binding is not a protected regular record")
+        try:
+            record = json.load(source)
+        except (ValueError, UnicodeError) as error:
+            raise RuntimeError("Queue coordination binding is corrupt") from error
+    if (
+        not isinstance(record, dict)
+        or set(record) != {"protocol", "owner_uid", "host_id", "root"}
+        or type(record["protocol"]) is not int
+        or record["protocol"] != 1
+        or type(record["owner_uid"]) is not int
+        or record["owner_uid"] != status.st_uid
+        or record["host_id"] != host_id
+        or not isinstance(record["root"], str)
+        or not Path(record["root"]).is_absolute()
+    ):
+        raise RuntimeError("Queue coordination binding is corrupt")
+    return Path(record["root"])
+
+
+def _publish_binding(path: Path, host_id: str, root: Path) -> None:
+    temporary = path.with_name(f".coordination-{uuid4().hex}.tmp")
+    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as output:
+            os.fchmod(output.fileno(), 0o644)
+            json.dump(
+                {"protocol": 1, "owner_uid": os.geteuid(), "host_id": host_id, "root": str(root)},
+                output,
+            )
+            output.flush()
+            os.fsync(output.fileno())
+        os.link(temporary, path)
+        directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def bind_coordination_root(host_id: str, root: Path, *, bootstrap_root: Path | None = None) -> None:
+    """Prevent cooperating users and queue roots from selecting separate GPU locks.
+
+    The fixed bootstrap namespace remains authoritative even when storage changes.
+    Relocation is an administrator maintenance action, never an implicit migration.
+    """
+    if not root.is_absolute():
+        raise ValueError("Queue coordination root must be an absolute path")
+    selected = root.resolve()
+    bootstrap = (_DEFAULT_ROOT if bootstrap_root is None else bootstrap_root).resolve()
+    with host_transaction(host_id, name="coordination-binding.lock", root=bootstrap):
+        directory = host_directory(host_id, bootstrap)
+        path = directory / "coordination-root.json"
+        if path.exists() or path.is_symlink():
+            if _read_binding(path, host_id) != selected:
+                raise RuntimeError(
+                    "Host coordination is already bound to another location; "
+                    "stop workers and use the documented maintenance procedure"
+                )
+            host_directory(host_id, selected)
+            return
+        # Lock in the same NFS -> GPU order as guardian startup. Preserve every
+        # existing lock/evidence file: even an unlocked file can describe recovery.
+        with (
+            host_transaction(host_id, root=bootstrap),
+            host_transaction(host_id, name="gpu-transaction.lock", root=bootstrap),
+        ):
+            harmless = {"coordination-binding.lock", "nfs-transaction.lock", "gpu-transaction.lock"}
+            if selected != bootstrap and any(
+                item.name not in harmless and not item.name.startswith("namespace-")
+                for item in directory.iterdir()
+            ):
+                raise RuntimeError(
+                    "Existing host coordination evidence requires maintenance before relocation; "
+                    "keep the current coordination root to preserve recovery"
+                )
+            host_directory(host_id, selected)
+            _publish_binding(path, host_id, selected)
 
 
 def _validate_namespace(directory: Path, host_id: str) -> None:

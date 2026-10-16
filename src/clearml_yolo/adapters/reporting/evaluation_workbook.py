@@ -10,6 +10,7 @@ from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.reporting.evaluation import summarize_evaluation as summarize_metrics
 from clearml_yolo.adapters.reporting.workbook_identity import (
     annotate_workbook,
+    humanize_workbook,
     read_dashboard,
 )
 from clearml_yolo.adapters.storage.filesystem import write_path
@@ -25,6 +26,7 @@ def write_candidate_workbook(
     with pd.ExcelWriter(path, engine="openpyxl") as writer:
         per_class.to_excel(writer, sheet_name="Classes")
         pd.DataFrame([summary]).to_excel(writer, sheet_name="Summary", index=False)
+    humanize_workbook(path)
 
 
 @trace_operation("report.evaluation.workbook")
@@ -64,6 +66,8 @@ def write_evaluation_workbook(
         confusion.to_excel(writer, sheet_name="confusion_matrix")
     if evaluated.model_identity is not None:
         annotate_workbook(path, {"model": evaluated.model_identity})
+    else:
+        humanize_workbook(path)
     tables: dict[str, Path] = {}
     for title, frame in {
         "ground_truth_matches": evaluated.gt_matches,

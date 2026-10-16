@@ -772,7 +772,8 @@ def test_checkpoint_download_failure_redacts_sdk_credentials(patch_clearml: Any)
         logger.remove(sink)
     output = str(caught.value) + "".join(messages)
     assert "OSError" in output
-    assert TASK_ID in output
+    assert TASK_ID not in output
+    assert "previous-run" in output
     assert "private-password" not in output
     assert "private-token" not in output
     assert caught.value.__suppress_context__

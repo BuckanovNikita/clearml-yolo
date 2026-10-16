@@ -22,7 +22,9 @@ from report_generator.v2.comparison import (
 )
 
 from clearml_yolo.adapters.observability.tracing import trace_operation
+from clearml_yolo.adapters.reporting.workbook_identity import humanize_workbook
 from clearml_yolo.adapters.storage.filesystem import write_path
+from clearml_yolo.core.presentation import human_text
 
 __all__ = [
     "COMPARISON_COLUMNS",
@@ -53,5 +55,11 @@ def write_comparison_workbook(
     for title in ("excluded", "methodology"):
         write_path(path.with_name(f"{path.stem}_{title}.csv"))
     tables = cast(dict[str, Path], write_shared_workbook(rows, excluded, methodology, path))
-    logger.info("Comparison workbook: {} ({} classes, {} excluded)", path, len(rows), len(excluded))
+    humanize_workbook(path)
+    logger.info(
+        "Comparison workbook: {} ({} classes, {} excluded)",
+        human_text(str(path)),
+        len(rows),
+        len(excluded),
+    )
     return tables

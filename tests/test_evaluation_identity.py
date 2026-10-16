@@ -89,13 +89,13 @@ def test_real_exports_and_payload_retain_identity(
     )
     assert len(captions) == 4
     for caption in captions:
-        assert "Training task: " + (training_id or "unavailable") in caption
+        assert "Training source: " + ("recorded" if training_id else "unavailable") in caption
         assert name.split(maxsplit=1)[0] in caption
     for plot in evaluated.plot_paths.values():
         with Image.open(plot) as image:
             image.verify()
             assert image.info["Model identity"] == (
-                f"Model: {name}\nTraining task: {training_id or 'unavailable'}"
+                identity.caption
             )
     for path in (
         evaluated.dashboard_path,
@@ -106,7 +106,11 @@ def test_real_exports_and_payload_retain_identity(
         values = [cell for sheet in workbook for row in sheet.iter_rows() for cell in row]
         assert name in "".join(str(cell.value) for cell in values if cell.value is not None)
         assert all(cell.data_type != "f" for cell in values)
-        assert any((training_id or "unavailable") in str(cell.value) for cell in values)
+        assert any(
+            ("recorded" if training_id else "unavailable") in str(cell.value) for cell in values
+        )
+        if training_id:
+            assert all(training_id not in str(cell.value) for cell in values)
         workbook.close()
 
 
@@ -148,7 +152,7 @@ def test_display_table_identity_preserves_source_frame() -> None:
     report_table(task, "metrics", "test", frame, identities={"model": identity})
     displayed = task.tables[0]["table_plot"]
     assert displayed["model_model_name"].tolist() == ["local checkpoint"]
-    assert displayed["model_training_task_id"].tolist() == ["unavailable"]
+    assert "model_training_task_id" not in displayed.columns
     assert frame.columns.tolist() == ["precision"]
 
 

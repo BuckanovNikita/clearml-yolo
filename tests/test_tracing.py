@@ -53,6 +53,20 @@ def test_disabled_trace_is_inert(monkeypatch: pytest.MonkeyPatch, events: list[s
     assert events == []
 
 
+def test_opaque_task_and_path_references_are_readable(events: list[str]) -> None:
+    task = "abcdef0123456789" * 2
+    checksum = "abcdef0123456789" * 4
+    with tracing.trace_task(task), tracing.trace_operation(
+        "download", context={"path": f"/cache/{checksum}/checkpoint.pt", "count": 12}
+    ):
+        pass
+    result = "".join(events)
+    assert task not in result
+    assert checksum not in result
+    assert "checkpoint.pt" in result
+    assert "count=12" in result
+
+
 def test_context_does_not_render_opaque_objects(events: list[str]) -> None:
     class Opaque:
         @override

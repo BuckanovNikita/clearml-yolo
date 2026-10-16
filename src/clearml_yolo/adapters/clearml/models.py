@@ -23,6 +23,7 @@ from clearml_yolo.adapters.storage.identity import checkpoint_sha256, read_check
 from clearml_yolo.core.artifact_names import BEST_CONFIDENCES_VAL
 from clearml_yolo.core.identity import ModelIdentity
 from clearml_yolo.core.models import CheckpointMetadata
+from clearml_yolo.core.presentation import human_text
 
 # ClearML ids are 32 lowercase hex characters. Recognising them by shape is what lets
 # `weights=` accept either a checkpoint on disk or a task, without a second config key
@@ -44,7 +45,7 @@ def _task(task_id: str) -> Any:
 
     task: Any = Task.get_task(task_id=task_id)
     if task is None:
-        raise ValueError(f"No ClearML task with id {task_id!r}")
+        raise ValueError("The selected ClearML task does not exist")
     return task
 
 
@@ -87,11 +88,10 @@ def latest_completed_task_id(
     if selected is None:
         return None
     logger.info(
-        "Latest completed task in {!r} tagged {}: {} ({})",
-        project_name,
-        list(tags) if tags else "(any)",
-        selected.id,
-        selected.name,
+        "Latest completed task in {!r} tagged {}: {}",
+        human_text(project_name),
+        human_text(str(list(tags))) if tags else "(any)",
+        human_text(str(selected.name)),
     )
     task_id: str = selected.id
     return task_id
@@ -105,7 +105,7 @@ def best_output_model(task: Any) -> Any | None:
         model for model in outputs if model.get_metadata("clearml_yolo_checkpoint_role") == "best"
     ]
     if len(candidates) > 1:
-        raise ValueError(f"Ambiguous best output models on ClearML task {task.id}")
+        raise ValueError(f"Ambiguous best output models on ClearML task {_task_label(task)}")
     if candidates:
         return candidates[0]
     candidates = [
@@ -115,15 +115,14 @@ def best_output_model(task: Any) -> Any | None:
     ]
     if len(candidates) > 1:
         raise ValueError(
-            f"Ambiguous best checkpoint filename output models on ClearML task {task.id}"
+            f"Ambiguous best checkpoint filename output models on ClearML task {_task_label(task)}"
         )
     if candidates:
         return candidates[0]
     if outputs:
         logger.warning(
-            "Task {} has no best checkpoint marker; using last registered output model {}",
-            task.id,
-            outputs[-1].id,
+            "Task {} has no best checkpoint marker; using its last registered output model",
+            _task_label(task),
         )
         return outputs[-1]
     return None
@@ -180,7 +179,12 @@ def _select_checkpoint(task: Any) -> tuple[Any, dict[str, str]]:
                 links["artifact_url"] = str(artifact_url)
             links.update(model_name=str(task.name), training_task_id=str(task.id))
             return artifact, links
-    raise ValueError(f"ClearML task {task.id} ({task.name}) has no recoverable checkpoint")
+    raise ValueError(f"ClearML task {_task_label(task)} has no recoverable checkpoint")
+
+
+def _task_label(task: Any) -> str:
+    # SDK task proxies do not uniformly expose a name during lookup failures.
+    return human_text(str(getattr(task, "name", None) or "selected task"))
 
 
 def source_model_links(task_id: str) -> dict[str, str]:
@@ -195,7 +199,9 @@ def _validate_downloaded_checkpoint(
     from clearml_yolo.adapters.storage.checkpoint import read_checkpoint_descriptor
 
     if not path.is_file():
-        raise FileNotFoundError(f"Checkpoint {source} returned {path}, but it is not a file")
+        raise FileNotFoundError(
+            human_text(f"Checkpoint {source} returned {path}, but it is not a file")
+        )
     descriptor = read_checkpoint_descriptor(path)
     if raw_metadata is not None:
         if raw_metadata.backend == "ultralytics":
@@ -209,7 +215,9 @@ def _validate_downloaded_checkpoint(
         path.suffix.lower() != ".pt" and descriptor is None and raw_metadata is None
     ):
         raise ValueError(
-            f"Checkpoint {source} must be a .pt file or a described .pth/.ckpt detector: {path}"
+            human_text(
+                f"Checkpoint {source} must be a .pt file or a described .pth/.ckpt detector: {path}"
+            )
         )
 
 
@@ -220,7 +228,9 @@ def resolve_task_model(
     """Download one selected checkpoint and return its matching source provenance."""
     task = _task(task_id)
     selected, links = _select_checkpoint(task)
-    identity = links.get("artifact_name", links.get("model_id", "checkpoint"))
+    checkpoint_name = Path(unquote(urlsplit(links.get("model_url", "")).path)).name
+    identity = human_text(links.get("artifact_name") or checkpoint_name or "checkpoint")
+    task_name = _task_label(task)
     try:
         with trace_operation("clearml.checkpoint.download"):
             checkpoint = selected.get_local_copy()
@@ -229,21 +239,21 @@ def resolve_task_model(
             "Checkpoint download failed",
             error,
             level="DEBUG",
-            context={"task_id": task_id, "checkpoint": identity},
+            context={"task": task_name, "checkpoint": identity},
         )
         raise ValueError(
-            redact_text(f"Cannot download checkpoint {identity!r} on task {task_id}: ")
+            redact_text(f"Cannot download checkpoint {identity!r} on task {task_name}: ")
             + exception_summary(error)
         ) from None
     if not checkpoint:
-        raise ValueError(f"Checkpoint {identity!r} on task {task_id} returned no local file")
+        raise ValueError(f"Checkpoint {identity!r} on task {task_name} returned no local file")
     path = Path(checkpoint)
-    _validate_downloaded_checkpoint(path, f"{identity!r} on task {task_id}", raw_metadata)
+    _validate_downloaded_checkpoint(path, f"{identity!r} on task {task_name}", raw_metadata)
     downloaded_hash = checkpoint_sha256(path)
     if links.get("checkpoint_sha256") not in {None, downloaded_hash}:
-        raise ValueError(f"Checkpoint {identity!r} on task {task_id} failed SHA-256 verification")
+        raise ValueError(f"Checkpoint {identity!r} on task {task_name} failed SHA-256 verification")
     links["checkpoint_sha256"] = downloaded_hash
-    logger.info("Checkpoint of task {} ({}): {}", task_id, task.name, path)
+    logger.info("Checkpoint of task {}: {}", task_name, human_text(str(path)))
     return path, links
 
 
@@ -283,7 +293,7 @@ def resolve_weights_with_identity(
         if not local or not Path(local).is_file():
             raise FileNotFoundError("ClearML model did not return a local checkpoint")
         path = Path(local)
-        _validate_downloaded_checkpoint(path, f"from model {model.id}")
+        _validate_downloaded_checkpoint(path, f"from model {human_text(str(model.name))}")
         actual_hash = checkpoint_sha256(path)
         stored_hash = model.get_metadata("clearml_yolo_checkpoint_sha256")
         if stored_hash and stored_hash != actual_hash:
@@ -442,12 +452,12 @@ def fetch_best_confidences(task_id: str) -> dict[str, float]:
                 "Confidence threshold recovery failed",
                 error,
                 level="DEBUG",
-                context={"task_id": task_id, "artifact": name},
+                context={"task": _task_label(task), "artifact": name},
             )
             raise ValueError(
                 redact_text(
                     f"Cannot recover confidence thresholds from artifact {name!r} "
-                    f"on ClearML task {task_id}: "
+                    f"on ClearML task {_task_label(task)}: "
                 )
                 + exception_summary(error)
             ) from None
@@ -456,12 +466,17 @@ def fetch_best_confidences(task_id: str) -> dict[str, float]:
                 "Recovered thresholds of task {} from legacy dashboard {!r}; "
                 "dashboard precision may be rounded and original calibration provenance "
                 "is unavailable",
-                task_id,
-                name,
+                _task_label(task),
+                human_text(name),
             )
-        logger.info("Thresholds of task {} from {!r}: {} classes", task_id, name, len(thresholds))
+        logger.info(
+            "Thresholds of task {} from {!r}: {} classes",
+            _task_label(task),
+            human_text(name),
+            len(thresholds),
+        )
         return thresholds
     raise ValueError(
-        f"ClearML task {task_id} ({task.name}) has no {BEST_CONFIDENCES_VAL!r} "
+        f"ClearML task {_task_label(task)} has no {BEST_CONFIDENCES_VAL!r} "
         "or supported historical threshold/dashboard artifact. Supply thresholds explicitly."
     )

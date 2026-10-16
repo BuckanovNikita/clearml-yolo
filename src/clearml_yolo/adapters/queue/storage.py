@@ -15,6 +15,8 @@ from pydantic import ValidationError
 
 from clearml_yolo.adapters.queue.coordination import host_transaction
 from clearml_yolo.core.queue import (
+    TERMINAL_JOB_STATES,
+    ArchiveRecord,
     JobSnapshot,
     JobState,
     MoveDirection,
@@ -23,6 +25,7 @@ from clearml_yolo.core.queue import (
     QueueRecord,
     QueueView,
     WorkerIdentity,
+    resolve_job_reference,
 )
 
 
@@ -96,14 +99,24 @@ def _read(path: Path, uid: int, *, private: bool = False) -> str:
 class NFSQueueStore:
     """Effects stay here; public reads never load another owner's configuration."""
 
-    def __init__(self, root: Path, identity: WorkerIdentity) -> None:
+    def __init__(
+        self, root: Path, identity: WorkerIdentity, *, local_root: Path | None = None
+    ) -> None:
         if os.name != "posix" or not hasattr(os, "geteuid"):
             raise RuntimeError("Shared cy-queue requires Linux native file coordination")
         if identity.owner_uid != os.geteuid():
             raise PermissionError("Queue identity must match the effective UID")
         self.root = root.expanduser().resolve()
         self.identity = identity
-        self.root.mkdir(parents=True, exist_ok=True)
+        self.local_root = local_root.expanduser().resolve() if local_root is not None else None
+        try:
+            self.root.mkdir(parents=True)
+        except FileExistsError:
+            if not self.root.is_dir():
+                raise RuntimeError("Shared queue root must be a directory") from None
+        else:
+            # Shared discovery must not inherit the creating user's private umask.
+            self.root.chmod(0o1777)
         _directory(self.root / "hosts", 0o777)
         self.host_root = self.root / "hosts" / _safe_host(identity.host_id)
         _directory(self.host_root, 0o777)
@@ -122,7 +135,7 @@ class NFSQueueStore:
         """Same-host processes share a local lock across every NFS root and alias."""
         if host_id is not None and host_id != self.identity.host_id:
             raise ValueError("Foreign host partitions are view-only")
-        with host_transaction(self.identity.host_id):
+        with host_transaction(self.identity.host_id, root=self.local_root):
             yield
 
     def _root_identity(self) -> str:
@@ -178,6 +191,7 @@ class NFSQueueStore:
     def _view(self, host_id: str) -> QueueView:
         jobs: list[PublicJob] = []
         events: list[OrderingEvent] = []
+        archives: dict[str, ArchiveRecord] = {}
         try:
             for uid, actor in self._actors(host_id):
                 jobs.extend(self._actor_jobs(actor, uid, host_id))
@@ -186,6 +200,11 @@ class NFSQueueStore:
                     if event.owner_uid != uid or event.host_id != host_id:
                         raise RuntimeError("Shared queue ordering event identity mismatch")
                     events.append(event)
+            archives = {
+                job.id: archive
+                for job in jobs
+                if (archive := self._archive_record(job)) is not None
+            }
         except (ValueError, TypeError, ValidationError, UnicodeError) as error:
             raise RuntimeError(
                 f"Shared queue committed record is corrupt: {type(error).__name__}"
@@ -200,8 +219,75 @@ class NFSQueueStore:
             raise RuntimeError("Shared queue ordering contains duplicate revisions")
         for event in events:
             jobs = self._reorder(jobs, event.job_id, event.direction, event.relative_job_id)
-        revision = len(jobs) + len(events) + sum(job.revision for job in jobs)
-        return QueueView(host_id=host_id, revision=revision, jobs=tuple(jobs))
+        revision = (
+            len(jobs)
+            + len(events)
+            + sum(job.revision for job in jobs)
+            + sum(archive.revision for archive in archives.values())
+        )
+        return QueueView(
+            host_id=host_id,
+            revision=revision,
+            jobs=tuple(jobs),
+            archived_job_ids=tuple(
+                job.id for job in jobs if job.id in archives and archives[job.id].archived
+            ),
+        )
+
+    def _archive_path(self, job: PublicJob) -> Path:
+        return (
+            self.root
+            / "hosts"
+            / _safe_host(job.host_id)
+            / "actors"
+            / str(job.owner_uid)
+            / "jobs"
+            / job.id
+            / "archive.json"
+        )
+
+    def _archive_record(self, job: PublicJob) -> ArchiveRecord | None:
+        path = self._archive_path(job)
+        try:
+            path.lstat()
+        except FileNotFoundError:
+            return None
+        archive = ArchiveRecord.model_validate_json(_read(path, job.owner_uid))
+        if (
+            archive.job_id != job.id
+            or archive.owner_uid != job.owner_uid
+            or archive.host_id != job.host_id
+        ):
+            raise RuntimeError("Shared queue archive identity mismatch")
+        return archive
+
+    def set_archived(self, identifiers: Sequence[str], archived: bool) -> QueueView:
+        """Validate the batch first, then atomically publish each owner's sidecar."""
+        with self.transaction():
+            view = self._view(self.identity.host_id)
+            jobs = {
+                job.id: job
+                for identifier in identifiers
+                for job in (resolve_job_reference(view.jobs, identifier),)
+            }
+            for job in jobs.values():
+                self._require_owner(job)
+                if archived and job.state not in TERMINAL_JOB_STATES:
+                    raise ValueError("Only completed, failed or cancelled jobs can be archived")
+            for job in jobs.values():
+                current = self._archive_record(job)
+                if (current.archived if current is not None else False) == archived:
+                    continue
+                record = ArchiveRecord(
+                    job_id=job.id,
+                    owner_uid=job.owner_uid,
+                    host_id=job.host_id,
+                    archived=archived,
+                    revision=current.revision + 1 if current is not None else 1,
+                    updated_at=time.time(),
+                )
+                atomic_write(self._archive_path(job), record.model_dump_json())
+            return self._view(self.identity.host_id)
 
     def view(self, host_id: str | None = None) -> QueueView:
         host = host_id or self.identity.host_id
@@ -279,11 +365,7 @@ class NFSQueueStore:
         return tuple(published)
 
     def _find(self, identifier: str) -> PublicJob:
-        _job_id(identifier)
-        for job in self._view(self.identity.host_id).jobs:
-            if job.id == identifier:
-                return job
-        raise ValueError("Queue job is missing from the local host partition")
+        return resolve_job_reference(self._view(self.identity.host_id).jobs, identifier)
 
     def public_path(self, identifier: str) -> Path:
         with self.transaction():
@@ -361,7 +443,10 @@ class NFSQueueStore:
             view = self._view(self.identity.host_id)
             if expected_revision != view.revision:
                 raise RuntimeError("Stale queue revision; refresh before reordering")
-            job = self._find(identifier)
+            job = resolve_job_reference(view.jobs, identifier)
+            identifier = job.id
+            if relative_job_id is not None:
+                relative_job_id = resolve_job_reference(view.jobs, relative_job_id).id
             if job.state != "pending":
                 raise ValueError("Only pending jobs can be reordered")
             pending = [item for item in view.jobs if item.state == "pending"]

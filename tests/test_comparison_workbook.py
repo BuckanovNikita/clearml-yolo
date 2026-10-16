@@ -149,6 +149,28 @@ def test_class_rows_are_rounded_and_flags_are_readable(
     assert cat["p (P)"] == pytest.approx(0.0312345678)
 
 
+def test_opaque_class_labels_are_readable_but_original_workbook_and_csv_keys_survive(
+    tmp_path: Path,
+    methodology: dict[str, object],
+) -> None:
+    from clearml_yolo.adapters.reporting.workbook_identity import deannotated_workbook
+
+    names = ["0123456789abcdef" * 2, "fedcba9876543210" * 2]
+    rows = pd.DataFrame([_row(name) for name in names])
+    excluded = pd.DataFrame([{"class_name": names[0], "reason": "No examples"}])
+    path = tmp_path / "comparison.xlsx"
+    write_comparison_workbook(rows, excluded, methodology, path)
+    workbook = load_workbook(path)
+    visible = [str(cell.value) for sheet in workbook for row in sheet for cell in row]
+    assert all(name not in " ".join(visible) for name in names)
+    workbook.close()
+    with deannotated_workbook(path) as source:
+        original = pd.read_excel(source)
+    assert original["Класс"].tolist() == names
+    assert rows["class_name"].tolist() == names
+    assert pd.read_csv(path.with_name("comparison_excluded.csv"))["Класс"].tolist() == names[:1]
+
+
 def test_pooled_row_is_last_and_outside_the_bh_family(
     tmp_path: Path, rows: pd.DataFrame, excluded: pd.DataFrame, methodology: dict[str, object]
 ) -> None:

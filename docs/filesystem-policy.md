@@ -15,7 +15,6 @@ beside the selected destination and are cleaned there.
 | Hydra logs and sweeps | `outputs/`, `multirun/` |
 | Shared CSV datasets | `.cache/clearml-yolo/datasets/` |
 | Invocation scratch and capture logs | `.tmp/cy-runtime-*` |
-| Queue metadata (unless CY_QUEUE_ROOT is explicit) | `.cy-queue/` |
 | Guardian diagnostics and progress | `.cy/queue-logs/`, `.cy/queue-status/` |
 
 `dataset_cache_dir=null` selects `CY_HOME/.cache/clearml-yolo/datasets`, independent of
@@ -71,9 +70,16 @@ placeholders or fallback configuration. It does not migrate or delete old settin
 or credentials. SDKs may cache their own settings after import; changing `CY_HOME` affects
 project paths without rebinding those library settings.
 
-`cy` does not initialize queue storage. The explicit `CY_QUEUE_ROOT` exception permits
-shared NFS queue metadata outside the project; its default is `$CY_HOME/.cy-queue`.
-Only small host coordination locks/claims live under `/tmp/clearml-yolo-queue`.
+`cy` does not initialize queue storage. Queue commands require an absolute
+`CY_QUEUE_CONFIG` TOML file selecting shared metadata `queue.root` and host-local
+`queue.coordination_root`; neither derives from `CY_HOME`. Metadata may use NFS,
+while coordination requires a supported local Linux filesystem. The fixed bootstrap
+namespace under `/tmp/clearml-yolo-queue` binds each host to its configured location.
+`--root` overrides metadata only; legacy `CY_QUEUE_ROOT` must agree. New shared roots
+have explicit sticky permissions; existing roots and parents retain their modes.
+Private snapshots remain owner-only in the queue; logs and progress stay in each
+submitting project's directories. Archive sidecars affect visibility without deleting
+any execution evidence. See [configuration and relocation](queue.md#shared-configuration).
 Datasets, checkpoints, logs and payloads never use that coordination directory.
 Old home-based queues are neither migrated nor deleted. See [queue ownership](queue.md).
 

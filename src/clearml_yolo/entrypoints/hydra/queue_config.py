@@ -21,7 +21,12 @@ import clearml_yolo.entrypoints.hydra.configs  # noqa: F401 - register shared Co
 from clearml_yolo.adapters.storage.filesystem import write_path
 from clearml_yolo.application.use_cases.pipeline import run_pipeline
 from clearml_yolo.core.queue import JobSnapshot, ResourceRequest
-from clearml_yolo.entrypoints.hydra.sweeps import compose_jobs, new_multirun_tag, tag_multirun_job
+from clearml_yolo.entrypoints.hydra.sweeps import (
+    compose_jobs,
+    new_multirun_tag,
+    tag_multirun_job,
+    task_overrides,
+)
 from clearml_yolo.entrypoints.hydra.validation import (
     reject_saved_legacy_controls,
     validate_hydra_destinations,
@@ -124,7 +129,11 @@ def _validate_devices(config: DictConfig, overrides: list[str]) -> None:
 
 
 def _resolved(
-    config: DictConfig, index: int, project_root: Path, *, multirun: bool,
+    config: DictConfig,
+    index: int,
+    project_root: Path,
+    *,
+    multirun: bool,
     multirun_tag: str | None,
 ) -> dict[str, Any]:
     previous = HydraConfig.instance().cfg
@@ -202,13 +211,18 @@ def compose_snapshots(
         multirun, jobs = compose_jobs(options.config_name, overrides, multirun=options.multirun)
         multirun_tag = new_multirun_tag() if multirun else None
         for index, config in enumerate(jobs):
-            _validate_devices(config, list(config.hydra.overrides.task))
+            _validate_devices(config, task_overrides(config))
             values = _resolved(
                 config, index, project_root, multirun=multirun, multirun_tag=multirun_tag
+            )
+            clearml_values = values.get("clearml")
+            task_name = (
+                clearml_values.get("task_name") if isinstance(clearml_values, dict) else None
             )
             snapshots.append(
                 JobSnapshot(
                     command="pipeline",
+                    label=task_name if isinstance(task_name, str) and task_name else "Pipeline",
                     config_json=json.dumps(values, allow_nan=False),
                     project_root=str(project_root.resolve()),
                     cwd=str(Path.cwd()),

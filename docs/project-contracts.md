@@ -66,7 +66,7 @@ checked again immediately before launch. Exactly 2 GiB is unavailable. Current q
 allocations and explicit holds remain exclusive unless released. This fixed limit does
 not guarantee that compilation/training fits.
 
-Each direct or queued multirun adds one shared random `multirun-<UUID4 hex>` ClearML
+Each direct or queued multirun adds one shared readable `multirun-<UTC date/time>-<word phrase>` ClearML
 tag to all its jobs, preserving explicit tags. The group is fresh per launch/submission
 and persists in queued snapshots. Effective MULTIRUN mode includes one-job sweeps;
 ordinary RUN adds no tag. See the
@@ -111,7 +111,7 @@ roots, without memory/process checks, signals or access to the original queue di
 Per-device reservation generations preserve sibling allocations and fence older guardian
 writes, handoff, recovery and cleanup. Freeing leaves processes and job outcomes unchanged
 and grants no persistent admission bypass. Public queue output uses physical indexes or
-short absent-device labels; full GPU UUIDs and claim tokens remain internal. Guardian
+word aliases for absent devices; full GPU UUIDs and claim tokens remain internal. Guardian
 death retains recovery records, but stale unlocked records alone do not block capacity.
 No automatic retry is made for uncertain outcomes. Historical 013/022/024 specifications
 remain preserved as prior intent.
@@ -219,3 +219,11 @@ maintenance; unsupported native locks fail without a soft-lock fallback.
 Queue public summaries show owner, order, state, requested/allotted devices, wait reason,
 progress and ClearML link without exposing private executable configurations. See
 [queue operations](queue.md) and [diagnostics](diagnostics.md#gpu-admission-decisions).
+
+Queue configuration is explicit: `CY_QUEUE_CONFIG` names shared TOML settings for the
+metadata and host-local coordination roots. Each host binds one coordination location
+across users and queues. Archive/restore is owner-only, preserves durable history and
+keeps recovery-required jobs visible; stable `job-N` numbers never depend on view position.
+Human-facing output uses readable names and references across CLI, TUI, diagnostics,
+console publication and reports. Exact IDs/hashes remain in machine provenance,
+explicit JSON, raw captures and link targets; see [readable output](readable-output.md).

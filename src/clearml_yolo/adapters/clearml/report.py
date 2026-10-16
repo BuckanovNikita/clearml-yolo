@@ -13,18 +13,19 @@ from typing import Any, NamedTuple
 import pandas as pd
 from loguru import logger
 
-from clearml_yolo.adapters.clearml.session import Task
+from clearml_yolo.adapters.clearml.session import Task, invocation_resource
 from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.core.evaluation.schema import ConfusionMatrixPayload, PRCurve, ResultContext
 from clearml_yolo.core.identity import ModelIdentity
+from clearml_yolo.core.presentation import HumanSeriesRegistry, human_labels, human_text
 
 ITERATION = 0
 
 
 def _display_label(context: ResultContext, display_label: str | None) -> str:
     if display_label is not None:
-        return display_label
-    name = context.model_identity.model_name if context.model_identity else "Current model"
+        return human_text(display_label)
+    name = context.model_identity.label if context.model_identity else "Current model"
     return f"{name} · {context.split}"
 
 
@@ -42,7 +43,11 @@ def _caption_annotation(caption: str) -> dict[str, Any]:
     }
 
 
-def _confusion_trace(matrix: ConfusionMatrixPayload, normalization: str) -> dict[str, Any]:
+def _confusion_trace(
+    matrix: ConfusionMatrixPayload,
+    normalization: str,
+    labels: Mapping[str, str],
+) -> dict[str, Any]:
     counts = matrix.counts
     row_totals = [sum(row) for row in counts]
     column_totals = [sum(row[index] for row in counts) for index in range(len(counts))]
@@ -75,7 +80,7 @@ def _confusion_trace(matrix: ConfusionMatrixPayload, normalization: str) -> dict
         "customdata": hover,
         "text": [
             [
-                f"True: {escape(true)}<br>Predicted: {escape(predicted)}"
+                f"True: {escape(labels[true])}<br>Predicted: {escape(labels[predicted])}"
                 for predicted in matrix.labels
             ]
             for true in matrix.labels
@@ -100,16 +105,17 @@ def report_confusion_matrices(
     """Publish one heatmap with selectable normalizations of the exact same counts."""
     if task is None:
         return
+    labels = human_labels(matrix.labels)
     axis = {
         "tickmode": "array",
         "tickvals": list(range(len(matrix.labels))),
-        "ticktext": [escape(label) for label in matrix.labels],
+        "ticktext": [escape(labels[label]) for label in matrix.labels],
     }
     modes = (("raw", "Counts"), ("row", "Row %"), ("column", "Column %"), ("global", "Overall %"))
     label = _display_label(context, display_label)
     caption = escape(label)
     data = [
-        {**_confusion_trace(matrix, mode), "visible": index == 0, "name": name}
+        {**_confusion_trace(matrix, mode, labels), "visible": index == 0, "name": name}
         for index, (mode, name) in enumerate(modes)
     ]
     figure = {
@@ -146,11 +152,11 @@ def report_confusion_matrices(
     )
 
 
-def _pr_trace(curve: PRCurve) -> dict[str, Any]:
+def _pr_trace(curve: PRCurve, class_name: str) -> dict[str, Any]:
     no_gt = curve.gt_count == 0
     ap50 = None if no_gt else (curve.ap50 if curve.recall else 0.0)
     ap_caption = "unavailable" if ap50 is None else f"{ap50:.6g}"
-    name = f"{escape(curve.class_name)} · AP50={ap_caption} ({escape(curve.integration_method)})"
+    name = f"{escape(class_name)} · AP50={ap_caption} ({escape(curve.integration_method)})"
     if no_gt:
         name += " · No ground truth: recall unavailable"
     elif not curve.recall:
@@ -165,7 +171,7 @@ def _pr_trace(curve: PRCurve) -> dict[str, Any]:
         "customdata": []
         if no_gt
         else [list(point) for point in zip(curve.confidence, curve.tp, curve.fp, strict=True)],
-        "meta": [escape(curve.class_name), ap50, escape(curve.integration_method)],
+        "meta": [escape(class_name), ap50, escape(curve.integration_method)],
         "hovertemplate": "Class: %{meta[0]}<br>AP50: %{meta[1]}<br>Method: %{meta[2]}"
         "<br>Recall: %{x}<br>Precision: %{y}<br>Confidence: %{customdata[0]}"
         "<br>Cumulative TP: %{customdata[1]}<br>Cumulative FP: %{customdata[2]}<extra></extra>",
@@ -197,8 +203,9 @@ def report_pr_curves(
                 "showarrow": False,
             }
         )
+    labels = human_labels(curve.class_name for curve in curves)
     figure = {
-        "data": [_pr_trace(curve) for curve in curves],
+        "data": [_pr_trace(curve, labels[curve.class_name]) for curve in curves],
         "layout": {
             "title": caption,
             "annotations": annotations,
@@ -245,6 +252,35 @@ COMPARED_METRICS = (
 )
 
 
+def _readable_frame(frame: pd.DataFrame) -> pd.DataFrame:
+    strings = [
+        value
+        for row in frame.itertuples(index=False, name=None)
+        for value in row
+        if isinstance(value, str)
+    ]
+    for axis in (frame.index, frame.columns):
+        strings.extend(name for name in axis.names if isinstance(name, str))
+        for level in range(axis.nlevels):
+            strings.extend(
+                value for value in axis.get_level_values(level) if isinstance(value, str)
+            )
+    labels = human_labels(strings)
+
+    def display(value: Any) -> Any:
+        return labels[value] if isinstance(value, str) else value
+
+    result = frame.copy(deep=True)
+    for index in range(len(result.columns)):
+        column = result.iloc[:, index]
+        if any(isinstance(value, str) for value in column):
+            result.isetitem(index, column.map(display, na_action="ignore").array)
+    result = result.rename(columns=display, index=display)
+    result.index = result.index.set_names([display(name) for name in result.index.names])
+    result.columns = result.columns.set_names([display(name) for name in result.columns.names])
+    return result
+
+
 @trace_operation("clearml.report_table")
 def report_table(
     task: Task,
@@ -257,29 +293,30 @@ def report_table(
     """Publish a DataFrame as a ClearML table plot, skipping distributed workers."""
     if task is None:
         return
-    display_frame = frame.copy() if identities else frame
+    display_frame = _readable_frame(frame)
     for role, identity in (identities or {}).items():
-        display_frame[f"{role}_model_name"] = identity.model_name
-        display_frame[f"{role}_training_task_id"] = identity.training_task_id or "unavailable"
+        display_frame[f"{human_text(role)}_model_name"] = identity.label
     options: dict[str, Any] = {}
     if identities:
         caption = "<br>".join(
             escape(line)
             for role, identity in identities.items()
-            for line in wrap(f"{role}: {identity.model_name}", width=100)
+            for line in wrap(f"{human_text(role)}: {identity.label}", width=100)
         )
         options["extra_layout"] = {
             "annotations": [_caption_annotation(caption)],
             "margin": {"t": max(120, 24 * (caption.count("<br>") + 1) + 20)},
         }
     task.get_logger().report_table(
-        title=title,
-        series=series,
+        title=human_text(title),
+        series=human_text(series),
         iteration=ITERATION,
         table_plot=display_frame,
         **options,
     )
-    logger.debug("Reported table {}/{} ({} rows)", title, series, len(frame))
+    logger.debug(
+        "Reported table {}/{} ({} rows)", human_text(title), human_text(series), len(frame)
+    )
 
 
 @trace_operation("clearml.report_scalars")
@@ -287,12 +324,17 @@ def report_scalars(task: Task, title: str, values: Mapping[str, float]) -> None:
     """Publish named values as one ClearML scalar plot, one series per name."""
     if task is None:
         return
+    labels = invocation_resource(task, "clearml.report.scalar_labels", HumanSeriesRegistry)
     task_logger = task.get_logger()
     for series, value in values.items():
+        displayed_title, displayed_series = labels.resolve(title, series)
         task_logger.report_scalar(
-            title=title, series=series, value=float(value), iteration=ITERATION
+            title=displayed_title,
+            series=displayed_series,
+            value=float(value),
+            iteration=ITERATION,
         )
-    logger.debug("Reported {} scalars under {}", len(values), title)
+    logger.debug("Reported {} scalars under {}", len(values), human_text(title))
 
 
 def _tested_hypotheses(per_class: pd.DataFrame) -> pd.DataFrame:

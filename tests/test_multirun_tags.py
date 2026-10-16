@@ -2,10 +2,10 @@
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
-from uuid import UUID
 
 import pytest
 from omegaconf import OmegaConf
@@ -17,10 +17,7 @@ from clearml_yolo.entrypoints.hydra.queue_config import compose_snapshots, write
 def _group(tags: list[str], user_tags: list[str]) -> str:
     assert tags[:-1] == user_tags
     tag = tags[-1]
-    assert tag.startswith("multirun-")
-    token = tag.removeprefix("multirun-")
-    assert UUID(hex=token).version == 4
-    assert len(token) == 32
+    assert re.fullmatch(r"multirun-\d{8}-\d{6}(?:-[a-z]+){6}", tag)
     return tag
 
 
@@ -84,11 +81,13 @@ def test_saved_mode_and_one_job_multiruns_receive_fresh_tags(
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     OmegaConf.save(
-        OmegaConf.create({
-            "defaults": ["pipeline", "_self_"],
-            "ground_truth": "input.csv",
-            "hydra": {"mode": saved_mode},
-        }),
+        OmegaConf.create(
+            {
+                "defaults": ["pipeline", "_self_"],
+                "ground_truth": "input.csv",
+                "hydra": {"mode": saved_mode},
+            }
+        ),
         config_dir / "saved.yaml",
     )
     arguments = ["--config-dir", str(config_dir), "--config-name", "saved"]
@@ -101,9 +100,7 @@ def test_saved_mode_and_one_job_multiruns_receive_fresh_tags(
 
 
 def test_direct_per_job_tags_survive_grouping(tmp_path: Path) -> None:
-    tags = _launches(
-        tmp_path, ["-m", "ground_truth=input.csv", "clearml.tags=[first],[second]"]
-    )
+    tags = _launches(tmp_path, ["-m", "ground_truth=input.csv", "clearml.tags=[first],[second]"])
     assert len(tags) == 5
     assert _group(tags[0], ["first"]) == _group(tags[1], ["second"])
     assert _group(tags[2], ["first"]) == _group(tags[3], ["second"])
@@ -133,12 +130,14 @@ def test_queue_saved_one_job_mode_preserves_user_tags(tmp_path: Path, mode: str)
     config_dir.mkdir()
     user_tags = ["prod", "multirun-user-supplied"]
     OmegaConf.save(
-        OmegaConf.create({
-            "defaults": ["pipeline", "_self_"],
-            "ground_truth": "input.csv",
-            "clearml": {"tags": user_tags},
-            "hydra": {"mode": mode},
-        }),
+        OmegaConf.create(
+            {
+                "defaults": ["pipeline", "_self_"],
+                "ground_truth": "input.csv",
+                "clearml": {"tags": user_tags},
+                "hydra": {"mode": mode},
+            }
+        ),
         config_dir / "saved.yaml",
     )
     snapshots = compose_snapshots(
@@ -158,12 +157,14 @@ def test_queue_preserves_job_dependent_tag_interpolation(tmp_path: Path) -> None
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     OmegaConf.save(
-        OmegaConf.create({
-            "defaults": ["pipeline", "_self_"],
-            "ground_truth": "input.csv",
-            "clearml": {"tags": ["job-${hydra:job.num}"]},
-            "hydra": {"mode": "MULTIRUN", "sweeper": {"params": {"ultralytics.epochs": "1,2"}}},
-        }),
+        OmegaConf.create(
+            {
+                "defaults": ["pipeline", "_self_"],
+                "ground_truth": "input.csv",
+                "clearml": {"tags": ["job-${hydra:job.num}"]},
+                "hydra": {"mode": "MULTIRUN", "sweeper": {"params": {"ultralytics.epochs": "1,2"}}},
+            }
+        ),
         config_dir / "saved.yaml",
     )
     snapshots = compose_snapshots(

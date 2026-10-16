@@ -71,7 +71,7 @@ def test_owner_identity_survives_finalizers_and_cleanup(
         "clearml.temporary.cleanup",
     ]
     assert "task=- " in starts[0]
-    assert all("task=task-id " in message for message in starts[1:])
+    assert all("task=tracked-run " in message for message in starts[1:])
     assert "artifact=final-table" in starts[2]
     assert task.events == ["close", "completed"]
 

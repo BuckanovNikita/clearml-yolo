@@ -41,7 +41,8 @@ def _complex_workbook(path: Path) -> None:
 
 
 def test_banner_all_sheets_preserves_references_and_print_structure(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -61,7 +62,7 @@ def test_banner_all_sheets_preserves_references_and_print_structure(
         banner = "".join(str(sheet.cell(row, 1).value or "") for row in range(1, banner_end + 1))
         assert identity.model_name in banner
         assert identity.training_task_id is not None
-        assert identity.training_task_id in banner
+        assert identity.training_task_id not in banner
         assert all(sheet.cell(row, 1).data_type == "s" for row in range(1, banner_end + 1))
         assert sheet.print_title_rows.startswith("$1:")
         assert sheet.sheet_properties.pageSetUpPr.fitToPage is True
@@ -113,6 +114,68 @@ def test_real_dependency_dashboards_are_readable_annotated_and_historical(tmp_pa
         pd.testing.assert_frame_equal(read_dashboard(path, index_col=0), before)
         with ZipFile(path) as archive:
             assert b"+safe" in archive.read("xl/worksheets/sheet1.xml")
+
+
+@pytest.mark.parametrize("with_identity", [False, True])
+def test_readable_workbook_classes_keep_exact_original_and_distinct_aliases(
+    tmp_path: Path,
+    with_identity: bool,
+) -> None:
+    from clearml_yolo.adapters.reporting.workbook_identity import humanize_workbook
+
+    names = ["0123456789abcdef" * 2, "fedcba9876543210" * 2]
+    path = tmp_path / "classes.xlsx"
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append(["Class", "Value"])
+    sheet.append([names[0], 0.125])
+    sheet.append([names[1], 0.25])
+    sheet.append(["[task]", "=SUM(B2:B3)"])
+    workbook.save(path)
+    original = path.read_bytes()
+    humanize_workbook(path)
+    humanize_workbook(path)
+    if with_identity:
+        identity = ModelIdentity(model_name="Detector", training_task_id=names[0])
+        annotate_workbook(path, {"model": identity})
+        annotate_workbook(path, {"model": identity})
+        assert workbook_identities(path) == {"model": identity}
+    visible = load_workbook(path)
+    labels = [row[0].value for row in visible.active if row[1].value in (0.125, 0.25)]
+    assert len(set(labels)) == 2
+    assert "[task]" not in labels
+    assert all(
+        name not in str(cell.value)
+        for sheet in visible
+        for row in sheet
+        for cell in row
+        for name in names
+    )
+    visible.close()
+    with deannotated_workbook(path) as source:
+        assert source.read_bytes() == original
+    assert read_dashboard(path)["Class"].tolist() == [*names, "[task]"]
+
+
+def test_readable_workbook_rejects_visible_edits_before_recovering_original(tmp_path: Path) -> None:
+    from clearml_yolo.adapters.reporting.workbook_identity import humanize_workbook
+
+    path = tmp_path / "classes.xlsx"
+    workbook = Workbook()
+    workbook.active.append(["0123456789abcdef" * 2, 0.125])
+    workbook.save(path)
+    humanize_workbook(path)
+    with ZipFile(path) as archive:
+        entries = {name: archive.read(name) for name in archive.namelist()}
+    entries["xl/worksheets/sheet1.xml"] = entries["xl/worksheets/sheet1.xml"].replace(
+        b">0.125<",
+        b">10<",
+    )
+    with ZipFile(path, "w") as archive:
+        for name, content in entries.items():
+            archive.writestr(name, content)
+    with pytest.raises(ValueError, match="changed after"), deannotated_workbook(path):
+        pass
 
 
 def test_real_report_workbooks_keep_every_original_sheet_and_cell(tmp_path: Path) -> None:

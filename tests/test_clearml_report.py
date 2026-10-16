@@ -6,6 +6,7 @@ ClearML server or the SDK.
 """
 
 from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any
 
 import pandas as pd
@@ -43,6 +44,17 @@ class _FakeTask:
 
     def get_logger(self) -> _FakeLogger:
         return self._logger
+
+
+@contextmanager
+def _scalar_owner(task: _FakeTask) -> Iterator[None]:
+    from clearml_yolo.adapters.clearml.session import _ACTIVE_INVOCATION, _InvocationState
+
+    token = _ACTIVE_INVOCATION.set(_InvocationState(task, ["report"], "report"))
+    try:
+        yield
+    finally:
+        _ACTIVE_INVOCATION.reset(token)
 
 
 @pytest.fixture
@@ -122,18 +134,75 @@ def test_report_table_keeps_the_requested_title_and_series() -> None:
     (reported,) = task.get_logger().tables
     assert reported["title"] == "comparison"
     assert reported["series"] == "test"
-    assert reported["frame"] is frame
+    pd.testing.assert_frame_equal(reported["frame"], frame)
 
 
 def test_report_scalars_reports_one_series_per_value() -> None:
     task = _FakeTask()
 
-    report_scalars(task, "deltas", {"precision": 0.03, "recall": -0.02})
+    with _scalar_owner(task):
+        report_scalars(task, "deltas", {"precision": 0.03, "recall": -0.02})
 
     assert task.get_logger().scalars == [
         {"title": "deltas", "series": "precision", "value": 0.03},
         {"title": "deltas", "series": "recall", "value": -0.02},
     ]
+
+
+def test_report_table_aliases_are_distinct_and_preserve_numeric_dtypes() -> None:
+    names = ["0123456789abcdef" * 2, "fedcba9876543210" * 2, "[task]", "[task] (2)"]
+    frame = pd.DataFrame(
+        {
+            names[0]: pd.Series([1, 2, 3, 4], dtype="Int64"),
+            names[1]: pd.Series([0.125, 0.25, 0.5, 1.0], dtype="Float64"),
+            names[2]: pd.Series([2, 4, 6, 8], dtype="int16"),
+            names[3]: pd.Series([3, 6, 9, 12], dtype="int32"),
+            "class_name": names,
+        }
+    )
+    frame.index = pd.Index(names, name=names[0])
+    frame.columns.name = names[1]
+    original = frame.copy(deep=True)
+    task = _FakeTask()
+    report_table(task, "metrics", "test", frame)
+    displayed = task.get_logger().tables[0]["frame"]
+    assert displayed.index.is_unique
+    assert displayed.columns.is_unique
+    assert displayed["class_name"].tolist() == displayed.index.tolist()
+    assert displayed.columns[:4].tolist() == displayed.index.tolist()
+    assert list(displayed.dtypes) == list(frame.dtypes)
+    assert displayed.iloc[:, :4].to_numpy().tolist() == frame.iloc[:, :4].to_numpy().tolist()
+    assert displayed.index.name == displayed.index[0]
+    assert displayed.columns.name == displayed.index[1]
+    assert all(name not in displayed.to_string() for name in names[:2])
+    pd.testing.assert_frame_equal(frame, original)
+
+
+def test_scalar_aliases_survive_subsets_reordering_and_later_literal_collisions() -> None:
+    names = ["0123456789abcdef" * 2, "fedcba9876543210" * 2, "[task]", "[task] (2)"]
+    task = _FakeTask()
+    with _scalar_owner(task):
+        report_scalars(task, names[0], {names[0]: 0.125, names[1]: 0.25})
+        report_scalars(task, names[0], {names[1]: 0.5})
+        report_scalars(task, names[0], {names[1]: 0.75, names[0]: 1.0})
+        report_scalars(task, names[0], {names[2]: 1.25, names[3]: 1.5})
+        report_scalars(task, names[1], {names[0]: 2.0})
+        report_scalars(task, names[2], {names[0]: 3.0})
+    records = task.get_logger().scalars
+    assert records[0]["series"] != records[1]["series"]
+    assert records[1]["series"] == records[2]["series"] == records[3]["series"]
+    assert records[0]["series"] == records[4]["series"]
+    assert (
+        len({record["series"] for record in (records[0], records[1], records[5], records[6])}) == 4
+    )
+    assert len({records[index]["title"] for index in (0, 7, 8)}) == 3
+    assert [record["value"] for record in records] == [0.125, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3]
+    assert all(name not in str(records) for name in names[:2])
+
+
+def test_scalar_alias_registry_requires_the_invocation_owner() -> None:
+    with pytest.raises(RuntimeError, match="invocation"):
+        report_scalars(_FakeTask(), "metrics", {"loss": 0.125})
 
 
 def test_report_comparison_keeps_previous_models_out_of_plots() -> None:

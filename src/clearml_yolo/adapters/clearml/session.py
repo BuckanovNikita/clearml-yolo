@@ -52,6 +52,7 @@ from clearml_yolo.adapters.storage.filesystem import temporary_root
 from clearml_yolo.application.contracts import (
     ClearMLConfig as ClearMLConfig,  # noqa: PLC0414 - typed adapter interface
 )
+from clearml_yolo.core.presentation import human_text
 from clearml_yolo.core.redaction import (
     sanitize_configuration as sanitize_configuration,  # noqa: PLC0414 - typed adapter re-export
 )
@@ -388,6 +389,49 @@ def _release_failure_monitor(state: _InvocationState) -> None:
 
 
 @contextmanager
+def _capture_sdk_startup(sdk_logger: Any) -> Iterator[None]:
+    """Route owned SDK announcements through the required captured-byte publisher.
+
+    Task.init reports these strings directly before returning its logger, even
+    with stream integration disabled. The SDK exposes no startup logging hook;
+    temporarily wrap its opaque Logger class and leave every unrelated call intact.
+    """
+    original: Callable[..., None] = sdk_logger.report_text
+    owner = (os.getpid(), threading.get_ident())
+    prefixes = (
+        "ClearML Task: created new task id=",
+        "ClearML results page:",
+        "ClearML running in offline mode, session stored in",
+    )
+
+    def report_text(
+        instance: Any,
+        msg: str,
+        level: int = 20,
+        print_console: bool = True,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        if (
+            owner == (os.getpid(), threading.get_ident())
+            and print_console
+            and not args
+            and not kwargs
+            and msg.startswith(prefixes)
+        ):
+            sys.stdout.write(msg + "\n")
+            sys.stdout.flush()
+            return
+        original(instance, msg, level, print_console, *args, **kwargs)
+
+    sdk_logger.report_text = report_text
+    try:
+        yield
+    finally:
+        sdk_logger.report_text = original
+
+
+@contextmanager
 def invocation(
     config: ClearMLConfig,
     stage: str,
@@ -419,14 +463,17 @@ def invocation(
     owns_signal = threading.current_thread() is threading.main_thread()
     previous_sigterm: Any = signal.getsignal(signal.SIGTERM) if owns_signal else None
 
-    from clearml import Task
+    from clearml import Logger, Task
 
     with ExitStack() as stack:
         captured = active_capture()
         if captured is None:
             directory = Path(mkdtemp(prefix="cy-console-", dir=temporary_root()))
             captured = stack.enter_context(capture_output(directory))
-        with trace_operation("clearml.task.create", context={"stage": stage}):
+        with (
+            trace_operation("clearml.task.create", context={"stage": stage}),
+            _capture_sdk_startup(Logger),
+        ):
             _INCOMPLETE_OWNER.pid = os.getpid()
             _INCOMPLETE_OWNER.task = None
             _INCOMPLETE_OWNER.close_attempted = False
@@ -486,8 +533,9 @@ def _task_owner(
     previous_sigterm: Any,
 ) -> Iterator[_InvocationState]:
     """Register terminal handling before task creation diagnostics can interrupt."""
-    task_id = str(task.id)
-    with trace_task(task_id):
+    # Partially initialized SDK tasks can lack a name during failure cleanup.
+    task_name = human_text(str(getattr(task, "name", None) or resolve_task_name(config, stage)))
+    with trace_task(task_name):
         state = _InvocationState(
             task=task, stages=[stage], current_stage=stage, config_resolver=config_resolver
         )
@@ -502,16 +550,15 @@ def _task_owner(
         primary_error: BaseException | None = None
         try:
             logger.info(
-                "ClearML task {} created: project={!r} name={!r}",
-                task.id,
-                config.project_name,
-                resolve_task_name(config, stage),
+                "ClearML task created: project={!r} name={!r}",
+                human_text(config.project_name),
+                human_text(resolve_task_name(config, stage)),
             )
             yield state
         except BaseException as error:
             primary_error = error
             # Include the original safe diagnostic before the publisher's final barrier.
-            log_exception_safely("Invocation failed", error, context={"task_id": task_id})
+            log_exception_safely("Invocation failed", error, context={"task": task_name})
             if isinstance(error, TaskFinalizationError):
                 detach_sdk_exit_callback(task)
             try:
@@ -527,7 +574,7 @@ def _task_owner(
                 log_exception_safely(
                     "ClearML failure finalization failed",
                     finalization_error,
-                    context={"task_id": task_id},
+                    context={"task": task_name},
                 )
             raise
         finally:
@@ -611,9 +658,8 @@ def init_task(config: ClearMLConfig, stage: str) -> Any:
         raise RuntimeError("ClearML task access requires an invocation() owner")
     active.enter_stage(stage)
     logger.info(
-        "Reusing active ClearML task {} ({}) for stage {}",
-        active.task.id,
-        active.task.name,
+        "Reusing active ClearML task {} for stage {}",
+        human_text(str(active.task.name)),
         stage,
     )
     return active.task
@@ -641,7 +687,7 @@ def upload_artifact(task: Any, name: str, artifact_object: Any) -> None:
         raise FileNotFoundError(f"Required artifact path does not exist: {artifact_object}")
     _sync_upload(task, name, artifact_object)
     record.uploaded = True
-    logger.debug("Uploaded required artifact {}", name)
+    logger.debug("Uploaded required artifact {}", human_text(name))
 
 
 def expect_artifacts(task: Any, names: list[str]) -> None:
@@ -690,16 +736,16 @@ def publish_table(task: Any, name: str, path: Path) -> None:
         active.table_remote_by_key[(name, digest)] = existing_name
         return
     remote_name = name
-    if remote_name in active.table_remote_names:
-        remote_name = f"{name}_{digest[:12]}"
-        if remote_name in active.table_remote_names:
-            remote_name = f"{name}_{digest}"
+    suffix = 2
+    while remote_name in active.table_remote_names:
+        remote_name = f"{name}_{suffix}"
+        suffix += 1
     _sync_upload(task, remote_name, path)
     active.table_by_digest[digest] = remote_name
     active.table_remote_by_key[(name, digest)] = remote_name
     active.table_remote_names.add(remote_name)
     record.uploaded = True
-    logger.debug("Published canonical table {} as {}", name, remote_name)
+    logger.debug("Published canonical table {} as {}", human_text(name), human_text(remote_name))
 
 
 def invocation_resource[T](task: Any, key: str, factory: Callable[[], T]) -> T:
@@ -1117,7 +1163,9 @@ def connect_config_file(
             name=name,
             ignore_remote_overrides=True,
         )
-    logger.info("Connected {} to ClearML as configuration {!r}", path, name)
+    logger.info(
+        "Connected {} to ClearML as configuration {!r}", human_text(str(path)), human_text(name)
+    )
     # Sanitization is for storage, not model execution: preserve local source values
     # (including externally managed credentials) or use the clone's effective source.
     return execution_path

@@ -10,6 +10,7 @@ import pytest
 from loguru import logger
 
 from clearml_yolo.core.queue import PublicJob, QueueView, ResourceRequest
+from queue_cli_helpers import queue_command, queue_environment
 
 
 @pytest.mark.parametrize("level", [None, "DEBUG", "WARNING"])
@@ -17,19 +18,12 @@ def test_real_idle_worker_logs_by_default_and_stops_cleanly(
     tmp_path: Path, level: str | None
 ) -> None:
     queue_root = tmp_path / "queue"
-    command = [
-        sys.executable,
-        "-m",
-        "clearml_yolo.entrypoints.queue",
-        "--root",
-        str(queue_root),
-        "worker",
-    ]
+    command = [*queue_command(tmp_path), "worker"]
     if level:
         command.extend(["--log-level", level])
     with subprocess.Popen(  # noqa: S603 - fixed CLI with an isolated empty queue
         command,
-        env=dict(os.environ, CY_HOME=str(tmp_path)),
+        env=queue_environment(tmp_path),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -75,6 +69,8 @@ def test_worker_logs_changes_and_heartbeat_without_timestamp_noise(
         )
         pending = PublicJob(
             id="own-job",
+            submission_sequence=17,
+            label="Training experiment",
             owner_uid=7,
             host_id="host",
             boot_id="boot",
@@ -86,7 +82,8 @@ def test_worker_logs_changes_and_heartbeat_without_timestamp_noise(
         foreign = pending.model_copy(update={"id": "foreign-job", "owner_uid": 8})
         view = QueueView(host_id="host", revision=1, jobs=(pending, foreign))
         observer(view)
-        assert "own-job" in "".join(messages)
+        assert "Job 17 · Training experiment" in "".join(messages)
+        assert "own-job" not in "".join(messages)
         assert "Waiting for 1 available GPU" in "".join(messages)
         assert "foreign-job" not in "".join(messages)
         messages.clear()

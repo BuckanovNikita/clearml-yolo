@@ -1,6 +1,8 @@
 # Queue job and GPU reservation lifecycles
 
-The [queue contract](queue.md) is authoritative. These are separate state machines:
+The [queue contract](queue.md) is authoritative. Archive/restore is visibility metadata,
+not a job-state transition: it preserves outcomes and reservations, and recovery-required
+jobs remain in the main view. These are separate state machines:
 manual GPU freeing changes capacity bookkeeping without completing or cancelling a job.
 
 ```mermaid

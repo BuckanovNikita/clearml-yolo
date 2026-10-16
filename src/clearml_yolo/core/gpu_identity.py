@@ -5,9 +5,82 @@ import re
 from collections.abc import Mapping
 
 _GPU_ID = re.compile(r"(?:MIG-)?GPU-[A-Za-z0-9-]+(?:/\d+/\d+)?")
+_WORDS = (
+    "amber",
+    "apple",
+    "aspen",
+    "birch",
+    "bloom",
+    "brook",
+    "cedar",
+    "cherry",
+    "cloud",
+    "coral",
+    "crane",
+    "dawn",
+    "delta",
+    "dove",
+    "dune",
+    "elm",
+    "fern",
+    "field",
+    "finch",
+    "flint",
+    "forest",
+    "frost",
+    "garden",
+    "glade",
+    "grove",
+    "harbor",
+    "hazel",
+    "heron",
+    "hill",
+    "iris",
+    "ivy",
+    "jade",
+    "lake",
+    "lark",
+    "laurel",
+    "leaf",
+    "lily",
+    "maple",
+    "meadow",
+    "mint",
+    "moon",
+    "moss",
+    "oak",
+    "ocean",
+    "olive",
+    "orchid",
+    "otter",
+    "pearl",
+    "pine",
+    "plum",
+    "pond",
+    "reed",
+    "ridge",
+    "river",
+    "robin",
+    "rose",
+    "sage",
+    "sand",
+    "shore",
+    "sky",
+    "snow",
+    "star",
+    "stone",
+    "willow",
+)
 
 
 def identity_label(identifier: str) -> str:
+    """Use stable words; selector resolution rejects any alias collision."""
+    digest = hashlib.sha256(identifier.encode()).digest()
+    return "gpu-" + "-".join(_WORDS[value % len(_WORDS)] for value in digest[:4])
+
+
+def legacy_identity_label(identifier: str) -> str:
+    """Retain old short-selector inputs without displaying them."""
     return "gpu-" + hashlib.sha256(identifier.encode()).hexdigest()[:12]
 
 

@@ -26,24 +26,26 @@ Run this as a script: its final `exit` terminates that script. `PIPESTATUS` is c
 immediately in both branches before another command can overwrite it. The same pattern
 works with `cy-train`, `cy-predict`, `cy-val`, `cy-metrics`, `cy-report`, `cy-compare`,
 `cy-ground-truth`, `cy-init-config` and `cy-dedup`, using their own arguments.
-Raw native stdout/stderr retain their existing behavior; the combined log is not a
-redacted export of those streams.
+Terminal output uses [readable names and reference descriptions](readable-output.md).
+The project-local raw stdout/stderr capture retains original bytes; a terminal `tee`
+records the formatted mirror rather than that original stream. Neither route is a
+substitute for reviewing third-party output before sharing diagnostics.
 
 ## Read the records
 
 Illustrative project records, with the caller's Loguru prefix omitted:
 
 ```text
-START training.native.train op=2 parent=1 pid=1234 thread=5678 task=task-id elapsed=0.000s stage=train
-TRACE ACTIVE training.native.train op=2 parent=1 pid=1234 thread=5678 task=task-id elapsed=30.000s parent_stage=workflow.train stage=train
-DONE training.native.train op=2 parent=1 pid=1234 thread=5678 task=task-id elapsed=42.000s stage=train
+START training.native.train op=2 parent=1 pid=1234 thread=5678 task=training-example elapsed=0.000s stage=train
+TRACE ACTIVE training.native.train op=2 parent=1 pid=1234 thread=5678 task=training-example elapsed=30.000s parent_stage=workflow.train stage=train
+DONE training.native.train op=2 parent=1 pid=1234 thread=5678 task=training-example elapsed=42.000s stage=train
 DONE command.return op=- parent=- pid=1234 thread=5678 task=- elapsed=0.000s stage=train
 ```
 
 Operation records contain `START`, then `DONE`, `FAILED` or `INTERRUPTED` as the boundary
 finishes. `op` identifies an operation within the process, `parent` identifies its enclosing
 operation in the same thread, and `pid`/`thread` identify its execution context. `task` is
-the invocation-owned ClearML task when bound, otherwise `-`; `elapsed` is monotonic time
+the invocation-owned ClearML task's readable name when bound, otherwise `-`; `elapsed` is monotonic time
 since that operation began. Selected scalar context may include stage, split, artifact,
 path or destination, row/image/class counts, devices, and cache hit/miss information.
 Context is bounded to 12 permitted scalar fields, with redacted text values capped at
@@ -123,11 +125,13 @@ GPU set. Automatic availability uses only used VRAM strictly below 2 GiB (2048 M
 including a fresh check immediately before launch; equality is busy. The limit is fixed.
 Current reservations and explicit holds exclude capacity regardless of low memory;
 stale unlocked records alone do not. Queue text, JSON, TUI, status logs and errors use
-physical GPU indexes or short absent-device labels, never full GPU UUIDs or claim tokens.
+physical GPU indexes or word aliases for absent devices, never full GPU UUIDs or claim tokens.
 A free device does not prove that the selected compiled model/batch fits.
 
 For a stuck job inspect its owner worker and guardian state. `recovery_required` means
-cleanup or outcome is uncertain; owner `cy-queue recover ID` must prove descendant cleanup.
+cleanup or outcome is uncertain; owner `cy-queue recover job-17` must prove descendant cleanup.
+Archived jobs requiring recovery reappear in the main view; archive is not a cleanup
+operation and does not release resources.
 To declare physical GPU 2 free, use `cy-queue gpu free 2` (or `gpu release 2`). It clears
 only that device's current reservations and holds, requires no token/reason/force flag,
 and performs no memory/process check or signals. Existing processes and job outcomes
@@ -141,6 +145,10 @@ not an automatic workaround. See [queue operations](queue.md).
 
 Project FD capture retains stdout.log, stderr.log and scalar records in invocation scratch.
 It includes Python, os.write/native output, DDP children, partial lines and watchdog output.
+Original capture bytes remain intact. Terminal and ClearML console streams format opaque
+identifiers as readable names or descriptions, including identifiers split across chunks.
+Publication offsets and final acknowledgements still track the original capture stream;
+scalar values and bounded shutdown rules are unchanged.
 Terminal mirroring runs independently of the network; the publisher writes diagnostics to
 its own local stream. Console carriage-return progress is coalesced; prediction normally
 emits one operation progress indicator and summary instead of per-image lines.

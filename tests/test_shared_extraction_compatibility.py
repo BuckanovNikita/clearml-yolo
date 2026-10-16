@@ -388,7 +388,14 @@ def _identity_observation(directory: Path) -> dict[str, Any]:
 
 
 def test_formula_chart_print_and_identity_recovery_equal_frozen_values(tmp_path: Path) -> None:
-    assert _identity_observation(tmp_path) == _expected("identity")
+    expected = _expected("identity")
+    # Feature 034 deliberately changes only visible source banners; retain the
+    # immutable extraction baseline and compare every other cell/identity exactly.
+    cells = expected["annotated"]["sheets"][0]["cells"]
+    assert cells[1] == ["A2", "Training task: candidate-task", "s", 0]
+    assert cells[3] == ["A4", "Training task: baseline-task", "s", 0]
+    cells[1][1] = cells[3][1] = "Training source: recorded"
+    assert _identity_observation(tmp_path) == expected
 
 
 def _public_observation() -> dict[str, Any]:

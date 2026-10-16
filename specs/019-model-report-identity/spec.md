@@ -86,3 +86,11 @@ registration and do not claim uniqueness. Full task IDs disambiguate projects.
 This change affects new outputs only. Existing source provenance takes precedence over
 a custom fallback label. Native Ultralytics training diagnostics retain native formatting;
 the reporting requirement covers this project's evaluation dashboards and reports.
+
+## Presentation amendment — 2026-10-16
+
+The historical display requirements above are superseded by the
+[readable shared queue feature](../034-readable-shared-queue/spec.md) and
+[current readable-output contract](../../docs/readable-output.md).
+Raw identity and grouping semantics are preserved; new human-facing names and tags
+contain no opaque task IDs or hashes. Completed implementation history is unchanged.

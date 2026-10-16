@@ -10,7 +10,11 @@ only the effective Unix user, with disjoint allocations concurrently. `list`, `m
 up/down/top/bottom/before/after and expected revision. Foreign hosts are view-only.
 Only owners cancel/recover; all local participants reorder pending jobs.
 
-Queue roots use CY_QUEUE_ROOT or project/.cy-queue. Owner files are private; summaries
+Configuration amendment, 2026-10-16: queue locations now require an absolute shared
+`CY_QUEUE_CONFIG` TOML path, with explicit metadata and host-local coordination roots.
+There is no project fallback; `--root` overrides metadata and legacy `CY_QUEUE_ROOT`
+must agree. See the [current settings/archive interfaces](../../034-readable-shared-queue/contracts/interfaces.md).
+Owner files are private; summaries
 and actor reorder events are public. No credentials in summaries. CUDA bindings are
 set before fresh execution; all training devices and first inference device are
 selected, while explicit CPU phases remain CPU. Compile/AMP/batch/model settings stay

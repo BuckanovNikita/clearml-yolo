@@ -154,7 +154,7 @@ def test_gpu_list_cli_projects_internal_control_records(
         assert result[0]["gpu"] == "2"
         assert result[0]["claim"]["devices"] == ["2", "0"]
     else:
-        assert "2\tholds=uid=7\tjob=job" in rendered
+        assert "2\tholds=uid=7\tjob=owned by user 7" in rendered
 
 
 @pytest.mark.parametrize("operation", ["free", "release", "disable", "enable"])
@@ -220,8 +220,11 @@ def test_driver_discovery_failure_is_a_sanitized_cli_error(
     def unavailable() -> None:
         raise DriverError(f"Cannot initialize {GPU_A}")
 
+    from queue_cli_helpers import configure_queue
+
+    configure_queue(tmp_path, monkeypatch)
     pool = locks.LocalGPULocks(current_identity(), root=tmp_path / "locks")
-    monkeypatch.setattr(locks, "LocalGPULocks", lambda identity: pool)
+    monkeypatch.setattr(locks, "LocalGPULocks", lambda identity, root=None: pool)
     monkeypatch.setattr(gpu_resources, "_nvml", lambda: SimpleNamespace(nvmlInit=unavailable))
     monkeypatch.setattr("sys.argv", ["cy-queue", *arguments])
     with pytest.raises(SystemExit) as failure:
@@ -234,11 +237,14 @@ def test_driver_discovery_failure_is_a_sanitized_cli_error(
 
 
 @pytest.mark.parametrize("operation", ["free", "release", "disable", "enable"])
+@pytest.mark.parametrize("as_json", [False, True])
 def test_gpu_control_does_not_initialize_runtime_or_queue_storage(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     operation: str,
+    *,
+    as_json: bool,
 ) -> None:
     from clearml_yolo.adapters.queue import locks
     from clearml_yolo.adapters.queue.identity import current_identity
@@ -254,15 +260,23 @@ def test_gpu_control_does_not_initialize_runtime_or_queue_storage(
         inventory_calls.append(True)
         return GPU_A, GPU_B
 
+    from queue_cli_helpers import configure_queue
+
+    configure_queue(tmp_path, monkeypatch)
     pool = locks.LocalGPULocks(current_identity(), root=tmp_path / "locks")
-    monkeypatch.setattr(locks, "LocalGPULocks", lambda identity: pool)
+    monkeypatch.setattr(locks, "LocalGPULocks", lambda identity, root=None: pool)
     monkeypatch.setattr(gpu_resources.GPUInventory, "physical_uuids", physical)
     monkeypatch.setattr(bootstrap, "initialize_runtime_environment", forbidden)
-    arguments = queue._parser().parse_args(["--root", "/proc/denied", "gpu", operation, "1"])
+    arguments = queue._parser().parse_args(
+        ["--root", "/proc/denied", "gpu", operation, "1", *(["--json"] if as_json else [])]
+    )
     queue._execute(arguments)
     rendered = capsys.readouterr().out
     if operation != "enable":
-        assert json.loads(rendered)["gpu"] == "1"
+        if as_json:
+            assert json.loads(rendered)["gpu"] == "1"
+        else:
+            assert "GPU 1:" in rendered
     assert GPU_B not in rendered
     assert len(inventory_calls) == 1
 
@@ -316,6 +330,8 @@ def test_job_mutation_output_never_serializes_gpu_ids(
         queue, "_presentation", lambda host: QueuePresentation({GPU_A: 0, GPU_B: 2})
     )
     arguments = [action, "job"]
+    if action != "move":
+        arguments.append("--json")
     if action == "move":
         arguments.extend(["top", "--revision", "0"])
     queue._queue_operation(
@@ -344,7 +360,7 @@ def test_tui_cells_and_error_notifications_use_safe_gpu_labels(
         identity = WorkerIdentity(owner_uid=7, host_id="local", boot_id="boot")
         failed = False
 
-        def list(self) -> QueueView:
+        def list(self, *, visibility: str = "main") -> QueueView:
             if self.failed:
                 raise RuntimeError(f"GPU unavailable {GPU_A}; claim-token={'c' * 64}")
             return QueueView(host_id="local", revision=1, jobs=(_job(),))

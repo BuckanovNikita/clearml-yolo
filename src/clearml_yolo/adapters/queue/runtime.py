@@ -50,8 +50,11 @@ class QueueProcesses:
     ) -> None:
         self.store = store
         self.identity = identity
-        self.local_root = local_root
-        self.pool = LocalGPULocks(identity, local_root)
+        selected = local_root.resolve() if local_root is not None else store.local_root
+        if store.local_root is not None and selected != store.local_root:
+            raise ValueError("Worker and storage coordination roots must agree")
+        self.local_root = selected
+        self.pool = LocalGPULocks(identity, selected)
         self.child_module = child_module
         self.command_builder = command_builder
         self._guardians: dict[int, subprocess.Popen[bytes]] = {}

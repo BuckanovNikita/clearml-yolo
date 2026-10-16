@@ -126,6 +126,83 @@ def test_source_row_assembly_receives_project_owned_match_values(
     assert observed_modules == ["clearml_yolo.core.evaluation.models"] * 2
 
 
+def test_opaque_evaluation_classes_are_readable_without_changing_machine_values(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from zipfile import ZipFile
+
+    from digital_metrics.reporting import render_evaluation as shared
+    from openpyxl import load_workbook  # type: ignore[import-untyped]
+
+    from clearml_yolo.adapters.reporting import evaluation
+    from clearml_yolo.adapters.reporting.evaluation_workbook import write_candidate_workbook
+    from clearml_yolo.adapters.reporting.workbook_identity import read_dashboard
+
+    names = ["0123456789abcdef" * 2, "fedcba9876543210" * 2]
+    columns = ["image_name", "instance_label", "bbox_x_tl", "bbox_y_tl", "bbox_x_br", "bbox_y_br"]
+    truth = pd.DataFrame(
+        [(name, name, 0, 0, 10, 10) for name in names],
+        columns=columns,
+    ).assign(split="test")
+    predictions = truth.drop(columns="split").assign(confidence=0.75)
+    computed = scoring.compute_evaluation(
+        truth,
+        predictions,
+        predictions,
+        split="test",
+        classes=names,
+        thresholds=dict.fromkeys(names, 0.75),
+        required_classes=names,
+        iou_threshold=0.5,
+        matching_strategy="iou_prior",
+        ap_method="interp",
+        skip_cohen_kappa=True,
+    )
+    original_truth = computed.ground_truth.copy(deep=True)
+    plots: list[Any] = []
+
+    def render(*args: Any, **kwargs: Any) -> Any:
+        result = shared(*args, **kwargs)
+        plots.extend(result.plots.values())
+        return result
+
+    monkeypatch.setattr(evaluation, "render_shared_evaluation", render)
+    artifacts = evaluation.render_evaluation(computed, output_dir=tmp_path, suffix="test")
+    for plot in plots:
+        labels = [label.get_text() for label in plot.axes.get_xticklabels()]
+        assert len(set(labels)) == 2
+        assert all(name not in labels for name in names)
+    for path in (
+        artifacts.dashboard_path,
+        artifacts.dtrk_dashboard_path,
+        artifacts.confusion_matrix_path,
+    ):
+        with ZipFile(path) as archive:
+            assert not any(name.startswith("xl/media/") for name in archive.namelist())
+        workbook = load_workbook(path)
+        visible = " ".join(str(cell.value) for sheet in workbook for row in sheet for cell in row)
+        assert all(name not in visible for name in names)
+        workbook.close()
+        assert set(names) <= set(read_dashboard(path, index_col=0).index)
+    assert list(computed.metrics) == names
+    assert list(artifacts.dashboard.index) == names
+    assert artifacts.dashboard.loc[names[0], "confidence"] == 0.75
+    pd.testing.assert_frame_equal(computed.ground_truth, original_truth)
+    candidate = tmp_path / "candidate.xlsx"
+    write_candidate_workbook(candidate, artifacts.dashboard, {"mean_precision": 1.0})
+    assert read_dashboard(candidate, index_col=0).index.tolist() == names
+    workbook = load_workbook(candidate)
+    assert all(
+        name not in str(cell.value)
+        for sheet in workbook
+        for row in sheet
+        for cell in row
+        for name in names
+    )
+    workbook.close()
+
+
 def test_geometry_filter_validates_raw_evidence_before_dropping_rows(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -139,9 +216,13 @@ def test_geometry_filter_validates_raw_evidence_before_dropping_rows(
 
     monkeypatch.setattr(scoring, "validate_dataframe", validate)
     columns = ["image_name", "instance_label", "bbox_x_tl", "bbox_y_tl", "bbox_x_br", "bbox_y_br"]
-    raw = pd.DataFrame([
-        ("a", "cat", 0, 0, 10, 10), ("a", "cat", 0, 0, 0, 10),
-    ], columns=columns).assign(confidence=0.7)
+    raw = pd.DataFrame(
+        [
+            ("a", "cat", 0, 0, 10, 10),
+            ("a", "cat", 0, 0, 0, 10),
+        ],
+        columns=columns,
+    ).assign(confidence=0.7)
     filtered = scoring.filter_invalid_prediction_boxes(raw)
     assert observed == [("raw_predictions", 2)]
     assert len(raw) == 2

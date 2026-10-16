@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import re
 from collections.abc import Mapping, Sequence
 from collections.abc import Set as AbstractSet
 from typing import Literal, Self
@@ -21,6 +22,8 @@ JobState = Literal[
     "recovery_required",
 ]
 MoveDirection = Literal["up", "down", "top", "bottom", "before", "after"]
+QueueVisibility = Literal["main", "archived", "all"]
+TERMINAL_JOB_STATES: frozenset[JobState] = frozenset({"completed", "failed", "cancelled"})
 
 
 class QueueRecord(BaseModel):
@@ -122,6 +125,33 @@ class QueueView(QueueRecord):
     host_id: str
     revision: int
     jobs: tuple[PublicJob, ...]
+    archived_job_ids: tuple[str, ...] = ()
+
+
+class ArchiveRecord(QueueRecord):
+    """Owner-authored visibility metadata, independent of the executable job record."""
+
+    job_id: str
+    owner_uid: int = Field(strict=True, ge=0)
+    host_id: str
+    archived: bool = Field(strict=True)
+    revision: int = Field(strict=True, ge=1)
+    updated_at: float
+
+
+def resolve_job_reference(jobs: Sequence[PublicJob], reference: str) -> PublicJob:
+    """Resolve immutable submission numbers or compatible exact internal identifiers."""
+    match = re.fullmatch(r"job-([1-9][0-9]*)", reference)
+    matches = (
+        [job for job in jobs if job.submission_sequence == int(match[1])]
+        if match is not None
+        else [job for job in jobs if job.id == reference]
+    )
+    if not matches:
+        raise ValueError("Queue job is missing from the local host partition; use job-N from list")
+    if len(matches) != 1:
+        raise ValueError("Queue job reference is ambiguous; refresh the queue")
+    return matches[0]
 
 
 class GPUObservation(QueueRecord):

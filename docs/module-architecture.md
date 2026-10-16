@@ -33,6 +33,14 @@ every adapter access to every effect or peer. Package initializers remain inert.
 Static AST checks cover supported source syntax, not arbitrary runtime reflection
 or third-party internals; installed and native checks provide separate evidence.
 
+Queue configuration reads and host binding belong to queue adapters; entrypoints inject
+the resolved metadata and coordination locations into storage, workers and guardians.
+Core queue records own stable-reference resolution and archive metadata; application
+ports own archive/restore and view selection. Storage retains complete ordering history
+and atomically writes owner sidecars. Pure presentation helpers format readable references;
+terminal, ClearML and workbook adapters own output effects while preserving exact source
+provenance. Direct commands remain independent of queue and Textual imports.
+
 ## Cross-contract integration
 
 Pandera validates scientific DataFrames by stage without coercing, dropping or

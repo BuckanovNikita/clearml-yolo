@@ -6,7 +6,7 @@ from uuid import UUID
 
 from clearml_yolo.adapters.queue.locks import LocalGPULocks
 from clearml_yolo.adapters.runtime.gpu_resources import GPUInventory
-from clearml_yolo.core.gpu_identity import identity_label
+from clearml_yolo.core.gpu_identity import identity_label, legacy_identity_label
 from clearml_yolo.core.queue import GPUControlStatus, GPUFreeResult, GPUHold
 
 
@@ -40,9 +40,11 @@ class GPUControls:
             return physical[index]
         if _full_uuid(selector):
             return selector
-        if re.fullmatch(r"gpu-[0-9a-f]{12}", selector):
+        if re.fullmatch(r"gpu-(?:[a-z]+-){3}[a-z]+|gpu-[0-9a-f]{12}", selector):
             matches = [
-                uuid for uuid in self.pool.known_devices() if identity_label(uuid) == selector
+                uuid
+                for uuid in self.pool.known_devices()
+                if selector in {identity_label(uuid), legacy_identity_label(uuid)}
             ]
             if len(matches) == 1:
                 return matches[0]

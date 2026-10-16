@@ -2,6 +2,7 @@
 
 from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -10,7 +11,7 @@ from digital_metrics.reporting import render_evaluation as render_shared_evaluat
 from digital_metrics.types import Metrics
 
 from clearml_yolo.adapters.observability.tracing import trace_operation
-from clearml_yolo.adapters.reporting.workbook_identity import annotate_workbook
+from clearml_yolo.adapters.reporting.workbook_identity import annotate_workbook, humanize_workbook
 from clearml_yolo.adapters.storage.filesystem import write_path
 from clearml_yolo.core.artifact_names import PLOT_METRICS, split_component
 from clearml_yolo.core.evaluation.models import (
@@ -18,6 +19,26 @@ from clearml_yolo.core.evaluation.models import (
     DetectionMetrics,
     EvaluationArtifacts,
 )
+from clearml_yolo.core.presentation import human_labels
+
+
+def _humanize_plot_classes(plots: Mapping[str, Any], labels: Mapping[str, str]) -> None:
+    # The reporting dependency is opaque to this project's type checker.
+    if all(name == display for name, display in labels.items()):
+        return
+    for plot in plots.values():
+        plot.axes.set_xticks(
+            plot.axes.get_xticks(),
+            [labels[label.get_text()] for label in plot.axes.get_xticklabels()],
+            rotation=45,
+            ha="right",
+        )
+        plot.figure.savefig(
+            plot.path,
+            bbox_inches="tight",
+            dpi=300,
+            metadata=None if plot.caption is None else {"Model identity": plot.caption},
+        )
 
 
 @trace_operation("report.evaluation.render")
@@ -70,14 +91,7 @@ def render_evaluation(
     for artifact in (dashboard_path, dtrk_path, confusion_matrix_path, *plot_paths.values()):
         write_path(artifact)
     identity = computed.model_identity
-    caption = (
-        None
-        if identity is None
-        else (
-            f"Model: {identity.model_name}\n"
-            f"Training task: {identity.training_task_id or 'unavailable'}"
-        )
-    )
+    caption = identity.caption if identity is not None else None
     with trace_operation(
         "report.dashboards.render",
         context={
@@ -102,12 +116,15 @@ def render_evaluation(
             },
             caption=caption,
         )
+    _humanize_plot_classes(rendered.plots, human_labels(visible_metrics))
     for path in plot_paths.values():
         if not path.is_file():
             raise FileNotFoundError(f"Required confidence interval plot is missing: {path}")
-    if identity is not None:
-        for workbook in (dashboard_path, dtrk_path, confusion_matrix_path):
+    for workbook in (dashboard_path, dtrk_path, confusion_matrix_path):
+        if identity is not None:
             annotate_workbook(workbook, {"model": identity})
+        else:
+            humanize_workbook(workbook)
     return EvaluationArtifacts(
         dashboard=rendered.dashboard,
         dtrk_dashboard=rendered.dtrk_dashboard,

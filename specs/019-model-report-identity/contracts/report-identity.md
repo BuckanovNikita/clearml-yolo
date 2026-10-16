@@ -1,16 +1,18 @@
 # Report identity contract
 
-New evaluation dashboards, local raster plots, and every sheet of evaluation, statistical,
-developer, and business workbooks show the model name and full source training task
-ID. Printed worksheets repeat that identification on every page. Paired reports
-identify baseline and candidate separately. Unknown training provenance is displayed
-as `Training task: unavailable`.
+Presentation amendment, 2026-10-16: new evaluation dashboards, local raster plots,
+and every sheet of evaluation, statistical, developer, and business workbooks show
+readable model names. Printed worksheets repeat that identification on every page.
+Paired reports identify baseline and candidate separately. Workbook source status is
+`Training source: recorded` or `Training source: unavailable`; opaque task identifiers
+and hashes remain in hidden identity metadata and machine provenance. See the
+[current readable-output contract](../../../docs/readable-output.md).
 
 The [readable evaluation plot amendment](../../020-readable-evaluation-plots/contracts/plots.md)
 supersedes this contract's original full-ID requirement for ClearML chart captions.
 Current-model confusion charts use model name/split labels with selectable normalization;
 PR combines class traces on test only. Internal identifiers remain in provenance and
-workbook banners. Baseline charts and comparison tables are excluded from Plots while
+hidden workbook metadata. Baseline charts and comparison tables are excluded from Plots while
 downloadable reports and comparison headline single values remain available. Repeated
 checkpoint/split publication reuses a display slot; unrelated collisions use readable
 stage/ordinal suffixes.

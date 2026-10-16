@@ -95,7 +95,7 @@ def test_recovery_preserves_original_training_task_in_foreign_task(
     assert identity.model_name == "unique-trained-model"
     assert identity.training_task_id == "a" * 32
     assert "b" * 32 not in identity.caption
-    assert "a" * 32 in identity.caption
+    assert "a" * 32 not in identity.caption
     metadata["clearml_yolo_checkpoint_sha256"] = "wrong-hash"
     with pytest.raises(ValueError, match="SHA-256"):
         clearml_models.resolve_weights_with_identity(task.id)

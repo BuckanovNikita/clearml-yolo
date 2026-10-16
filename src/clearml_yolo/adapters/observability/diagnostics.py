@@ -5,18 +5,29 @@ from collections.abc import Mapping
 
 from loguru import logger
 
+from clearml_yolo.core.presentation import human_text
 from clearml_yolo.core.redaction import (
     context_summary as _context_summary,
 )
 from clearml_yolo.core.redaction import (
-    exception_summary as exception_summary,  # noqa: PLC0414 - typed diagnostic interface
+    exception_summary as _exception_summary,
 )
 from clearml_yolo.core.redaction import (
-    redact_text as redact_text,  # noqa: PLC0414 - typed diagnostic interface
+    redact_text as _redact_text,
 )
 from clearml_yolo.core.redaction import (
     traceback_locations as _traceback_locations,
 )
+
+
+def redact_text(text: str) -> str:
+    """Keep credential redaction and readable references at diagnostic boundaries."""
+    return human_text(_redact_text(text))
+
+
+def exception_summary(error: BaseException, *, include_message: bool = True) -> str:
+    """Present an exception chain without credentials or opaque references."""
+    return human_text(_exception_summary(error, include_message=include_message))
 
 
 def log_exception(
@@ -35,10 +46,12 @@ def log_exception(
     details = exception_summary(error, include_message=include_message)
     operation = redact_text(message)
     if context:
-        operation = f"{operation} ({_context_summary(context)})"
+        operation = f"{operation} ({human_text(_context_summary(context))})"
     if level != "DEBUG":
         logger.opt(exception=False).log(level, "{}: {}", operation, details)
-    logger.opt(exception=False).debug("{}: {}\n{}", operation, details, _traceback_locations(error))
+    logger.opt(exception=False).debug(
+        "{}: {}\n{}", operation, details, human_text(_traceback_locations(error))
+    )
 
 
 def log_exception_safely(
@@ -56,4 +69,5 @@ def log_exception_safely(
 
 def log(level: str, message: str, *args: object) -> None:
     """Emit a workflow observation while keeping the logging backend outside it."""
-    logger.opt(depth=1).log(level, message, *args)
+    formatted = message.format(*args) if args else message
+    logger.opt(depth=1).log(level, "{}", human_text(formatted))

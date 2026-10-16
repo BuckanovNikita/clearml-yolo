@@ -45,7 +45,7 @@ def test_custom_label_does_not_invent_training_task() -> None:
     identity = require_model_identity(None, "legacy detector")
     assert identity.model_name == "legacy detector"
     assert identity.training_task_id is None
-    assert identity.caption.endswith("Training task: unavailable")
+    assert identity.caption.endswith("Training source: unavailable")
 
 
 def test_metrics_legacy_csv_requires_label_before_reading(
@@ -139,7 +139,7 @@ def test_report_retains_distinct_source_tasks_and_visible_names(
         for identity in identities.values():
             assert identity.model_name in visible
             assert identity.training_task_id is not None
-            assert identity.training_task_id in visible
+            assert identity.training_task_id not in visible
         workbook.close()
 
 

@@ -30,7 +30,9 @@ retain their original contracts.
 ## Rendering and workbooks
 
 `digital_metrics.render_evaluation` receives explicit artifact paths and a caption.
-Each plot is rendered and saved once with its final model identity caption. The
+Ordinary readable plots are rendered and saved once with their final model identity
+caption. When class labels contain opaque references, the adapter updates their display
+aliases and saves the adjusted figure without repeating scientific computation. The
 application keeps the original dashboard/plot filenames and publication inventory.
 Legacy dependency dashboards still return their original tuple and retain their
 save/show behavior.
@@ -41,11 +43,22 @@ reader keeps its normalization and numeric-looking-label filtering. Statistical
 comparison workbooks use a separate builder over already computed rows; reporting
 does not select a statistical protocol or recalculate results.
 
-Generic OOXML operations live in report-generator. The application owns banner wording,
+Generic OOXML annotation, fingerprint and recovery APIs live in report-generator.
+The application selects visible text replacements and owns banner wording,
 `ModelIdentity` validation and the existing version 1 metadata namespace, element
 names and relationship ID. Original-content recovery remains byte-exact. Fingerprint
 validation rejects edits to annotated workbooks before historical metrics are read.
 Existing readers and annotation methods retain their signatures and failure behavior.
+
+Visible workbook banners and plot captions use model names, comparison roles and
+split context. Banners indicate whether training-source provenance is recorded;
+they do not print task identifiers or checkpoint digests. Exact values remain in
+embedded workbook identity metadata and machine provenance, with the same original
+metric recovery and fingerprint validation. See [readable output](readable-output.md).
+An optional separate presentation envelope retains exact original workbook bytes and
+class-label mappings when visible text needs aliases. Application readers unwrap it
+after model-identity metadata, preserving raw class keys and numeric values. Distinct
+opaque class names remain distinct in displayed tables and plots.
 
 ## Compatibility evidence
 

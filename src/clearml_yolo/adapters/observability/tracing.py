@@ -18,6 +18,7 @@ from types import FrameType
 
 from loguru import logger
 
+from clearml_yolo.core.presentation import human_text
 from clearml_yolo.core.redaction import redact_text, sensitive_key
 
 HEARTBEAT_SECONDS = 30.0
@@ -56,7 +57,7 @@ _CONTEXT_KEYS = frozenset(
 
 
 def _text(value: str) -> str:
-    return re.sub(r"[\x00-\x1f\x7f]", "?", redact_text(value))[:_TEXT_LIMIT]
+    return re.sub(r"[\x00-\x1f\x7f]", "?", human_text(redact_text(value)))[:_TEXT_LIMIT]
 
 
 def _context(context: Mapping[str, object] | None) -> str:

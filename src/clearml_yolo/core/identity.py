@@ -5,6 +5,8 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from clearml_yolo.core.presentation import human_text
+
 
 class ModelIdentity(BaseModel):
     """A display name and known source identifiers, never the reporting task's ID."""
@@ -25,16 +27,14 @@ class ModelIdentity(BaseModel):
 
     @property
     def label(self) -> str:
-        """Use the full source training task ID whenever it is known."""
-        if self.training_task_id:
-            return f"{self.model_name} ({self.training_task_id})"
-        return self.model_name
+        """Display the model name; exact source identifiers remain in provenance."""
+        return human_text(self.model_name)
 
     @property
     def caption(self) -> str:
         return (
-            f"Model: {self.model_name}\n"
-            f"Training task: {self.training_task_id or 'unavailable'}"
+            f"Model: {self.label}\n"
+            f"Training source: {'recorded' if self.training_task_id else 'unavailable'}"
         )
 
     @classmethod

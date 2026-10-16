@@ -10,13 +10,72 @@ import os
 import re
 import sys
 import time
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from clearml_yolo.adapters.observability.capture import write_offsets
+from clearml_yolo.core.presentation import HumanSeriesRegistry, HumanTextStream
 
 _ANSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 _CONTROL_ARGUMENT = 4
+
+
+@dataclass
+class _ConsoleStream:
+    decoder: codecs.IncrementalDecoder = field(
+        default_factory=lambda: codecs.getincrementaldecoder("utf-8")(errors="surrogateescape")
+    )
+    text: HumanTextStream = field(default_factory=HumanTextStream)
+
+    @property
+    def pending_bytes(self) -> int:
+        return len(self.decoder.getstate()[0]) + len(
+            self.text.pending.encode("utf-8", errors="surrogateescape")
+        )
+
+
+@dataclass
+class PublicationState:
+    """Unpublished text tails, kept separate from durable delivery receipts."""
+
+    streams: dict[str, _ConsoleStream] = field(default_factory=dict)
+    scalar_labels: HumanSeriesRegistry = field(default_factory=HumanSeriesRegistry)
+
+
+def _publish_text(
+    stream: _ConsoleStream, payload: bytes, sink: Any, *, final: bool, checkpoint: bool
+) -> None:
+    text = stream.text.feed(stream.decoder.decode(payload, final=final), final=final)
+    if checkpoint and not stream.decoder.getstate()[0]:
+        text += stream.text.checkpoint()
+    # Invalid original UTF-8 remains byte-exact in capture; SDK strings must be valid.
+    text = text.encode("utf-8", errors="surrogateescape").decode("utf-8", errors="replace")
+    for console_line in _ANSI.sub("", text).split("\n"):
+        latest = console_line.split("\r")[-1]
+        if latest:
+            sink.report_text(latest, print_console=False)
+
+
+def _complete_checkpoint_character(
+    console: _ConsoleStream,
+    path: Path,
+    position: int,
+    sink: Any,
+) -> int:
+    """Read at most the remaining bytes of one UTF-8 character past a watermark."""
+    consumed = 0
+    with path.open("rb") as stream:
+        stream.seek(position)
+        for _ in range(3):
+            if not console.decoder.getstate()[0]:
+                break
+            continuation = stream.read(1)
+            if not continuation:
+                break
+            consumed += len(continuation)
+            _publish_text(console, continuation, sink, final=False, checkpoint=True)
+    return consumed
 
 
 def publish_batch(
@@ -26,16 +85,20 @@ def publish_batch(
     *,
     final: bool = False,
     limits: dict[str, int] | None = None,
+    state: PublicationState | None = None,
+    checkpoint: bool = False,
 ) -> dict[str, int]:
+    state = state if state is not None else PublicationState()
     acknowledged = offsets.copy()
     for name, path in paths.items():
+        console = state.streams.setdefault(name, _ConsoleStream()) if name != "scalars" else None
+        read_from = offsets[name] + (console.pending_bytes if console else 0)
         with path.open("rb") as stream:
-            stream.seek(offsets[name])
-            size = min(1024 * 1024, limits[name] - offsets[name]) if limits else 1024 * 1024
+            stream.seek(read_from)
+            size = min(1024 * 1024, max(0, limits[name] - read_from)) if limits else 1024 * 1024
             payload = stream.read(size)
-        reached_final = (
-            final and limits is not None and offsets[name] + len(payload) == limits[name]
-        )
+        reached_limit = limits is not None and read_from + len(payload) >= limits[name]
+        reached_final = final and (limits is None or reached_limit)
         if name == "scalars":
             complete = payload.rfind(b"\n") + 1
             if reached_final and complete != len(payload):
@@ -44,19 +107,33 @@ def publish_batch(
                 record = json.loads(line)
                 if set(record) != {"title", "series", "value", "iteration"}:
                     raise ValueError("Invalid native scalar journal")
+                record["title"], record["series"] = state.scalar_labels.resolve(
+                    record["title"],
+                    record["series"],
+                )
                 sink.report_scalar(**record)
             acknowledged[name] += complete
         else:
-            decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
-            text = decoder.decode(payload, final=final and (limits is None or reached_final))
-            trailing = len(decoder.getstate()[0])
-            # Preserve raw bytes locally; only the latest carriage-return rewrite
-            # belongs in each console batch, rather than every native bar frame.
-            for console_line in _ANSI.sub("", text).split("\n"):
-                latest = console_line.split("\r")[-1]
-                if latest:
-                    sink.report_text(latest, print_console=False)
-            acknowledged[name] += len(payload) - trailing
+            if console is None:
+                raise RuntimeError("Console stream state is unavailable")
+            _publish_text(
+                console,
+                payload,
+                sink,
+                final=reached_final,
+                checkpoint=checkpoint and reached_limit,
+            )
+            consumed = len(payload)
+            if checkpoint and reached_limit and console.decoder.getstate()[0]:
+                # A watermark may bisect one UTF-8 character. Finish only that
+                # character beyond it; never acknowledge undecoded original bytes.
+                consumed += _complete_checkpoint_character(
+                    console,
+                    path,
+                    read_from + consumed,
+                    sink,
+                )
+            acknowledged[name] = read_from + consumed - console.pending_bytes
     if sink.flush(wait=True) is not True:
         raise RuntimeError("ClearML console/scalar flush was not confirmed")
     return acknowledged
@@ -130,14 +207,29 @@ def run(
     controls = control_directory or directory
     initial = controls / "publisher-initial.json"
     offsets = json.loads(initial.read_text()) if initial.is_file() else dict.fromkeys(paths, 0)
+    state = PublicationState()
     while True:
         stop = controls / "publisher-final.json"
-        limits = json.loads(stop.read_text()) if stop.is_file() else None
-        offsets = publish_batch(paths, offsets, sink, final=limits is not None, limits=limits)
+        final = stop.is_file()
+        barrier = controls / "publisher-barrier.json"
+        limits = json.loads(stop.read_text()) if final else None
+        if not final and barrier.is_file():
+            requested = json.loads(barrier.read_text())
+            if any(offsets[name] < value for name, value in requested.items()):
+                limits = requested
+        offsets = publish_batch(
+            paths,
+            offsets,
+            sink,
+            final=final,
+            limits=limits,
+            state=state,
+            checkpoint=limits is not None and not final,
+        )
         write_offsets(controls / "publisher-receipt.json", offsets)
-        if limits is not None and offsets == limits:
+        if final and offsets == limits:
             return
-        if limits is not None:
+        if final:
             continue
         # A short stop poll bounds shutdown without changing the two-second batch.
         until = time.monotonic() + 2

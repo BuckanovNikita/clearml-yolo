@@ -95,6 +95,7 @@ class ConsolePublisher:
     def barrier(self) -> None:
         """Confirm workload bytes before SDK close can mark the task completed."""
         target = self.capture.offsets()
+        write_offsets(self.directory / "publisher-barrier.json", target)
         try:
             self._wait_for_barrier(target)
         except BaseException:

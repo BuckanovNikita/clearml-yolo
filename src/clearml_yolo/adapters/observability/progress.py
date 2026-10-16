@@ -14,6 +14,7 @@ from loguru import logger
 from tqdm import tqdm
 
 from clearml_yolo.adapters.observability.capture import terminal_isatty, write_progress
+from clearml_yolo.core.presentation import human_text
 
 LOG_STEP_FRACTION = 0.1
 # How often to speak when the length is unknown and a percentage cannot be computed.
@@ -26,6 +27,7 @@ def image_progress(
     total: int, description: str = "Inference"
 ) -> Generator[Callable[[int], None], None, None]:
     """Own one image-count operation while native backends process whole batches."""
+    description = human_text(description)
     started = monotonic()
     last_report = started
     done = 0
@@ -71,6 +73,8 @@ def track[Item](
     description. Generators must supply it themselves or the log falls back to a fixed
     interval with no percentage.
     """
+    description = human_text(description)
+    unit = human_text(unit)
     if total is None and isinstance(items, Sized):
         total = len(items)
 

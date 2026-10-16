@@ -1,7 +1,9 @@
 # Automatic task grouping
 
-Each effective Hydra MULTIRUN launch adds one shared `multirun-<UUID4 hex>` ClearML
-tag, including a one-job multirun. Direct stage commands and `cy` share this behavior.
+Presentation amendment, 2026-10-16: each effective Hydra MULTIRUN launch adds one
+shared readable `multirun-YYYYMMDD-HHMMSS-word-word-word-word-word-word` ClearML tag,
+including a one-job multirun. The timestamp is UTC and the six randomly selected words
+distinguish launches within the same second. Direct stage commands and `cy` share this behavior.
 `cy-queue submit -- -m ...` and saved MULTIRUN submissions freeze the group tag in
 every job snapshot; execution retains it. Every new launch/submission gets a new tag.
 User tags, including per-job overrides, are preserved. Ordinary RUN adds no tag.

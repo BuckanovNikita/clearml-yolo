@@ -83,7 +83,11 @@ class _Guardian:
         self.payload = GuardianPayload.model_validate_json(payload_path.read_text(encoding="utf-8"))
         if self.payload.identity.owner_uid != os.geteuid():
             raise PermissionError("Guardian effective UID does not own this snapshot")
-        self.store = NFSQueueStore(Path(self.payload.queue_root), self.payload.identity)
+        self.store = NFSQueueStore(
+            Path(self.payload.queue_root),
+            self.payload.identity,
+            local_root=Path(self.payload.local_root) if self.payload.local_root else None,
+        )
         self.cancelled = False
         self.child: subprocess.Popen[bytes] | None = None
         self.tree: LinuxProcessTree | None = None

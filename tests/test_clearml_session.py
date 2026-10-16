@@ -5,6 +5,7 @@ import os
 import signal
 import subprocess
 import sys
+import threading
 import time
 import types
 from collections import UserDict
@@ -167,6 +168,7 @@ def fake_clearml(monkeypatch: pytest.MonkeyPatch) -> tuple[type[Any], FakeTask]:
 
     module = types.ModuleType("clearml")
     module.Task = Task  # type: ignore[attr-defined]
+    module.Logger = types.SimpleNamespace(report_text=lambda *_args, **_kwargs: None)  # type: ignore[attr-defined]
 
     class OutputModel:
         wait_calls: ClassVar[int] = 0
@@ -189,6 +191,35 @@ def test_tracking_is_required_and_old_task_reuse_controls_are_gone() -> None:
     assert not hasattr(config, "enabled")
     assert not hasattr(config, "continue_task_id")
     assert not hasattr(config, "reuse_last_task_id")
+
+
+@pytest.mark.parametrize("fail", [False, True])
+def test_sdk_startup_capture_is_owner_scoped_and_restores_on_failure(
+    capfd: pytest.CaptureFixture[str], fail: bool,
+) -> None:
+    from clearml_yolo.adapters.clearml.session import _capture_sdk_startup
+
+    sent: list[str] = []
+
+    class Reporter:
+        def report_text(self, message: str, *_args: object, **_kwargs: object) -> None:
+            sent.append(message)
+
+    reporter = Reporter()
+    original = Reporter.report_text
+    startup = "ClearML Task: created new task id=" + "a" * 32
+    with suppress(RuntimeError), _capture_sdk_startup(Reporter):
+        reporter.report_text(startup)
+        reporter.report_text("Ordinary application message")
+        unrelated = threading.Thread(target=reporter.report_text, args=(startup,))
+        unrelated.start()
+        unrelated.join(timeout=1)
+        assert not unrelated.is_alive()
+        if fail:
+            raise RuntimeError("Task initialization failed")
+    assert Reporter.report_text is original
+    assert sent == ["Ordinary application message", startup]
+    assert capfd.readouterr().out == startup + "\n"
 
 
 @pytest.mark.parametrize("output_uri", [None, False])
@@ -290,17 +321,23 @@ import sys
 from pathlib import Path
 
 from loguru import logger
+from clearml import Logger
 from clearml_yolo.adapters.clearml.session import ClearMLConfig, invocation
+from clearml_yolo.adapters.observability.capture import active_capture
 
+original_report_text = Logger.report_text
 try:
     with invocation(ClearMLConfig(project_name='console-regression'), 'predict') as task:
         folder = Path(task.get_offline_mode_folder())
+        capture = active_capture()
+        assert capture is not None
         print('console-stdout-marker')
         print('console-stderr-marker', file=sys.stderr)
         logger.info('console-loguru-marker')
         raise RuntimeError('controlled offline failure')
 except RuntimeError as error:
     assert str(error) == 'controlled offline failure', error
+assert Logger.report_text is original_report_text
 
 events = [
     event
@@ -309,6 +346,9 @@ events = [
 ]
 for marker in ('console-stdout-marker', 'console-stderr-marker', 'console-loguru-marker'):
     assert sum(marker in event['msg'] for event in events) == 1, (marker, events)
+assert sum('created new task' in event['msg'] for event in events) == 1
+assert all(task.id not in event['msg'] for event in events)
+assert task.id in capture.paths['stdout'].read_text()
 """
     environment = dict(os.environ)
     environment.update(
@@ -820,11 +860,30 @@ def test_publish_table_suffixes_different_content_under_the_same_name(
         publish_table(owner, "predictions", third)
         publish_table(owner, "predictions", second)
 
-    assert task.uploads[0]["name"] == "predictions"
-    assert task.uploads[1]["name"].startswith("predictions_")
-    assert len(task.uploads[1]["name"]) == len("predictions_") + 12
-    assert task.uploads[2]["name"].startswith("predictions_")
-    assert len({upload["name"] for upload in task.uploads}) == 3
+    assert [upload["name"] for upload in task.uploads] == [
+        "predictions", "predictions_2", "predictions_3",
+    ]
+
+
+def test_publish_table_numbered_suffix_skips_existing_caller_names(
+    fake_clearml: tuple[type[Any], FakeTask], tmp_path: Path
+) -> None:
+    _, task = fake_clearml
+    paths = [tmp_path / f"table-{number}.csv" for number in range(4)]
+    for number, path in enumerate(paths):
+        path.write_text(f"name,value\ncat,{number}\n")
+
+    with invocation(ClearMLConfig(), "metrics") as owner:
+        publish_table(owner, "predictions_2", paths[0])
+        publish_table(owner, "predictions", paths[1])
+        publish_table(owner, "predictions", paths[2])
+        publish_table(owner, "predictions_3", paths[3])
+        publish_table(owner, "predictions", paths[2])
+        publish_table(owner, "alias", paths[2])
+
+    assert [upload["name"] for upload in task.uploads] == [
+        "predictions_2", "predictions", "predictions_3", "predictions_3_2",
+    ]
 
 
 def test_record_run_configuration_merges_sanitized_meaningful_values(
@@ -2060,7 +2119,7 @@ def test_owner_failure_diagnostic_precedes_console_barrier_and_finish(
     assert raised.value is original
     assert events == ["diagnostic", "barrier", "finish"]
     assert logged == [
-        ("Invocation failed", original, {"level": "ERROR", "context": {"task_id": task.id}})
+        ("Invocation failed", original, {"level": "ERROR", "context": {"task": task.name}})
     ]
 
 
@@ -2276,6 +2335,7 @@ class Task:
 task = Task()
 sdk = types.ModuleType('clearml')
 sdk.Task = Task
+sdk.Logger = types.SimpleNamespace(report_text=lambda *args, **kwargs: None)
 sys.modules['clearml'] = sdk
 session.active_capture = lambda: object()
 session._start_console_publisher = lambda *args: None

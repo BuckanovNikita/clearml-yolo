@@ -29,19 +29,13 @@ class ControlCase:
 
 
 @pytest.fixture
-def control_case(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> ControlCase:
-    from clearml_yolo.adapters.queue import coordination, storage
+def control_case(tmp_path: Path) -> ControlCase:
     from clearml_yolo.adapters.queue.identity import process_ticks
     from clearml_yolo.core.queue import JobSnapshot
 
     identity = WorkerIdentity(owner_uid=os.geteuid(), host_id="control-test", boot_id="boot")
     local_root = tmp_path / "local"
-    monkeypatch.setattr(
-        storage,
-        "host_transaction",
-        lambda host: coordination.host_transaction(host, root=local_root),
-    )
-    store = NFSQueueStore(tmp_path / "queue", identity)
+    store = NFSQueueStore(tmp_path / "queue", identity, local_root=local_root)
     job = store.submit(
         (
             JobSnapshot(

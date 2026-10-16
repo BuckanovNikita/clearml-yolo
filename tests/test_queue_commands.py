@@ -2,13 +2,13 @@
 
 import asyncio
 import json
-import os
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
 from omegaconf import OmegaConf
+
+from queue_cli_helpers import queue_command, queue_environment
 
 
 def test_queue_bindings_preserve_native_settings_and_explicit_cpu() -> None:
@@ -141,14 +141,8 @@ def test_sweep_freezes_hydra_output_and_logging_configuration(tmp_path: Path) ->
 
 
 def test_cli_submits_lists_reorders_and_cancels_without_runtime(tmp_path: Path) -> None:
-    command = [
-        sys.executable,
-        "-m",
-        "clearml_yolo.entrypoints.queue",
-        "--root",
-        str(tmp_path / "queue"),
-    ]
-    environment = dict(os.environ, CY_HOME=str(tmp_path))
+    command = queue_command(tmp_path)
+    environment = queue_environment(tmp_path)
 
     def run(*arguments: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(  # noqa: S603 - fixed package CLI and isolated local records
@@ -161,10 +155,17 @@ def test_cli_submits_lists_reorders_and_cancels_without_runtime(tmp_path: Path) 
         )
 
     submitted = run(
-        "submit", "--gpus", "2", "--", "-m", "ground_truth=input.csv", "ultralytics.epochs=1,2"
+        "submit",
+        "--gpus",
+        "2",
+        "--json",
+        "--",
+        "-m",
+        "ground_truth=input.csv",
+        "ultralytics.epochs=1,2",
     )
     assert submitted.returncode == 0, submitted.stderr
-    ids = submitted.stdout.splitlines()
+    ids = [job["id"] for job in json.loads(submitted.stdout)]
     assert len(ids) == 2
     assert len(set(ids)) == 2
     listed = run("list", "--json")
@@ -177,7 +178,7 @@ def test_cli_submits_lists_reorders_and_cancels_without_runtime(tmp_path: Path) 
     assert moved.returncode == 0, moved.stderr
     stale = run("move", ids[0], "top", "--revision", str(view["revision"]))
     assert stale.returncode != 0
-    cancelled = run("cancel", ids[1])
+    cancelled = run("cancel", "job-2", "--json")
     assert cancelled.returncode == 0, cancelled.stderr
     assert json.loads(cancelled.stdout)["state"] == "cancelled"
     assert run("list", "--json").returncode == 0
@@ -212,11 +213,7 @@ def test_cli_submits_lists_reorders_and_cancels_without_runtime(tmp_path: Path) 
 def test_invalid_sweep_does_not_commit_partial_batch(tmp_path: Path, overrides: list[str]) -> None:
     result = subprocess.run(  # noqa: S603 - fixed CLI with invalid user-input fixture
         [
-            sys.executable,
-            "-m",
-            "clearml_yolo.entrypoints.queue",
-            "--root",
-            str(tmp_path / "queue"),
+            *queue_command(tmp_path),
             "submit",
             "--gpus",
             "1",
@@ -225,13 +222,14 @@ def test_invalid_sweep_does_not_commit_partial_batch(tmp_path: Path, overrides: 
             "ground_truth=input.csv",
             *overrides,
         ],
-        env=dict(os.environ, CY_HOME=str(tmp_path)),
+        env=queue_environment(tmp_path),
         capture_output=True,
         text=True,
         timeout=30,
         check=False,
     )
     assert result.returncode != 0
+    assert "CY_QUEUE_CONFIG" not in result.stderr
     assert not list((tmp_path / "queue").rglob("snapshot.json"))
 
 
@@ -270,6 +268,8 @@ def test_saved_legacy_defaults_report_queue_migration(tmp_path: Path, legacy: st
 
 def test_tui_moves_and_cancels_real_pending_jobs(tmp_path: Path) -> None:
     pytest.importorskip("textual")
+    from textual.widgets import DataTable, Select
+
     from clearml_yolo.adapters.queue.identity import current_identity
     from clearml_yolo.adapters.queue.inventory import QueueGPUInventory
     from clearml_yolo.adapters.queue.runtime import QueueProcesses
@@ -289,7 +289,7 @@ def test_tui_moves_and_cancels_real_pending_jobs(tmp_path: Path) -> None:
     )
     jobs = service.submit(
         compose_snapshots(
-            ["-m", "ground_truth=input.csv", "ultralytics.epochs=1,2"],
+            ["-m", "ground_truth=input.csv", "ultralytics.epochs=1,2,3"],
             ResourceRequest(gpus=1),
             project_root=tmp_path,
         )
@@ -305,6 +305,30 @@ def test_tui_moves_and_cancels_real_pending_jobs(tmp_path: Path) -> None:
                 next(job for job in service.list().jobs if job.id == jobs[0].id).state
                 == "cancelled"
             )
+            await pilot.press("x")
+            assert jobs[0].id not in {job.id for job in service.list().jobs}
+            await pilot.press("v")
+            assert str(application.visibility) == "archived"
+            assert [job.id for job in application.view.jobs] == [jobs[0].id]
+            table = application.query_one("#jobs", DataTable)
+            assert table.get_row_at(0)[3] == "cancelled (archived)"
+            await pilot.press("s")
+            assert application.view.jobs == ()
+            await pilot.press("v", "v")
+            assert str(application.visibility) == "main"
+            table = application.query_one("#jobs", DataTable)
+            table.move_cursor(row=0)
+            selected = application._selected()
+            assert selected is not None
+            assert selected.id == jobs[1].id
+            await pilot.press("a")
+            target = application.query_one("#relative", Select)
+            assert bool(target.display)
+            target.value = jobs[2].id
+            await pilot.pause()
+            assert not bool(target.display)
+            pending = [job.id for job in service.list().jobs if job.state == "pending"]
+            assert pending == [jobs[2].id, jobs[1].id]
             await pilot.press("q")
 
     asyncio.run(exercise())

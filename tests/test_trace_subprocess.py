@@ -91,6 +91,7 @@ def test_watchdog_covers_actual_invocation_closure_and_command_return() -> None:
         tracing.HEARTBEAT_SECONDS = 0.02
         tracing.STACK_SECONDS = 0.04
         task = Mock(id="owned-task", name="example", artifacts={})
+        task.name = "example"
         task.flush.return_value = True
         task.close.side_effect = lambda: threading.Event().wait(0.14)
         task.is_main_task.return_value = False
@@ -99,6 +100,7 @@ def test_watchdog_covers_actual_invocation_closure_and_command_return() -> None:
         sdk.Task.init.return_value = task
         sdk.Task.get_task.return_value = task
         sdk.OutputModel = Mock()
+        sdk.Logger = types.SimpleNamespace(report_text=lambda *_args, **_kwargs: None)
         sys.modules["clearml"] = sdk
         from clearml_yolo.adapters.clearml import session
         session._start_console_publisher = lambda *_args: None
@@ -115,7 +117,7 @@ def test_watchdog_covers_actual_invocation_closure_and_command_return() -> None:
     """)
     assert result.returncode == 0, result.stderr
     assert "ACTIVE clearml.task.close" in result.stderr
-    assert "task=owned-task" in result.stderr
+    assert "task=example" in result.stderr
     assert result.stderr.index("clearml.temporary.cleanup") < result.stderr.index("command.return")
 
 

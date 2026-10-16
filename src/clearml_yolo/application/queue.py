@@ -5,6 +5,7 @@ from contextlib import AbstractContextManager
 from typing import Protocol
 
 from clearml_yolo.core.queue import (
+    TERMINAL_JOB_STATES,
     GPUControlStatus,
     GPUFreeResult,
     GPUHold,
@@ -13,8 +14,10 @@ from clearml_yolo.core.queue import (
     MoveDirection,
     PublicJob,
     QueueView,
+    QueueVisibility,
     WorkerIdentity,
     earliest_runnable,
+    resolve_job_reference,
     waiting_reason,
 )
 
@@ -31,6 +34,7 @@ class QueueStorage(Protocol):
         relative_job_id: str | None = None,
     ) -> QueueView: ...
     def cancel(self, identifier: str) -> PublicJob: ...
+    def set_archived(self, identifiers: Sequence[str], archived: bool) -> QueueView: ...
     def set_waiting(self, reasons: Mapping[str, str | None]) -> None: ...
 
 
@@ -102,9 +106,11 @@ class QueueService:
         )
         return self.storage.submit(validated)
 
-    def list(self, host_id: str | None = None) -> QueueView:
+    def list(
+        self, host_id: str | None = None, *, visibility: QueueVisibility = "main"
+    ) -> QueueView:
         if host_id is not None and host_id != self.identity.host_id:
-            return self.storage.view(host_id)
+            return self._visible(self.storage.view(host_id), visibility)
         self.processes.refresh()
         view = self.storage.view(host_id)
         inventories = self.processes.owner_inventory()
@@ -129,7 +135,28 @@ class QueueService:
                 jobs.append(job.model_copy(update={"waiting_reason": reason}))
             else:
                 jobs.append(self._allocation(job))
-        return view.model_copy(update={"jobs": tuple(jobs)})
+        return self._visible(view.model_copy(update={"jobs": tuple(jobs)}), visibility)
+
+    @staticmethod
+    def _visible(view: QueueView, visibility: QueueVisibility) -> QueueView:
+        if visibility not in {"main", "archived", "all"}:
+            raise ValueError("Queue visibility must be main, archived or all")
+        if visibility == "all":
+            return view
+        archived = set(view.archived_job_ids)
+        jobs = tuple(
+            job
+            for job in view.jobs
+            if (job.id in archived and job.state in TERMINAL_JOB_STATES)
+            == (visibility == "archived")
+        )
+        return view.model_copy(update={"jobs": jobs})
+
+    def archive(self, job_ids: Sequence[str]) -> QueueView:
+        return self._visible(self.storage.set_archived(job_ids, True), "main")
+
+    def restore(self, job_ids: Sequence[str]) -> QueueView:
+        return self._visible(self.storage.set_archived(job_ids, False), "main")
 
     def _allocation(self, job: PublicJob) -> PublicJob:
         if job.state in {"starting", "running", "cancelling", "recovery_required"}:
@@ -144,15 +171,19 @@ class QueueService:
         *,
         relative_job_id: str | None = None,
     ) -> QueueView:
-        return self.storage.move(
-            job_id, direction, expected_revision, relative_job_id=relative_job_id
+        return self._visible(
+            self.storage.move(
+                job_id, direction, expected_revision, relative_job_id=relative_job_id
+            ),
+            "main",
         )
 
     def cancel(self, job_id: str) -> PublicJob:
         return self._allocation(self.storage.cancel(job_id))
 
     def recover(self, job_id: str) -> PublicJob:
-        return self._allocation(self.processes.recover(job_id))
+        job = resolve_job_reference(self.storage.view().jobs, job_id)
+        return self._allocation(self.processes.recover(job.id))
 
     def tick(self) -> int:
         self.processes.refresh()

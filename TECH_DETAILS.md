@@ -106,9 +106,11 @@ Direct commands pass native devices without queue admission, reservation or wait
 Do not interpret `device=-1` as a project scheduler; its handling belongs to the
 selected backend. YOLO native DDP accepts a device list, with a separate inference
 device. Other detector adapters accept CPU or one CUDA device. Direct Hydra sweeps
-are sequential. Every multirun adds one shared `multirun-<UUID>` tag while preserving
+are sequential. Every multirun adds one shared readable tag containing UTC date/time
+and a random word phrase while preserving
 user tags; a single ordinary invocation adds none. See
-[the tag contract](specs/030-multirun-tags/contracts/tags.md).
+[readable output](docs/readable-output.md) and the
+[grouping contract](specs/030-multirun-tags/contracts/tags.md).
 
 `--help` and `--cfg job --resolve` avoid workflow execution and ClearML task creation,
 but startup may create local scratch/logs. Use an existing isolated `CY_HOME` for
@@ -260,7 +262,7 @@ See the [dedup contract](specs/018-cache-image-dedup/contracts/cli.md).
 ## Queue operations
 
 [Queue documentation](docs/queue.md) owns submission, worker startup, status,
-cancellation, reordering, recovery and operator controls. Queue submission freezes
+cancellation, reordering, archive/restore, recovery and operator controls. Queue submission freezes
 and validates the entire sweep before adding jobs; installation changes require
 resubmission. Native GPU selectors must be unset for allocation; explicit CPU phases
 are retained. Compile, AMP and batch settings are not silently modified. Training holds
@@ -272,19 +274,33 @@ and requests lacking a complete GPU set. Automatic availability uses only used V
 strictly below 2 GiB (2048 MiB), checked again immediately before launch. Equality is
 busy; the limit is fixed. Current queue reservations and explicit holds remain exclusive,
 while stale unlocked records alone do not exclude capacity. This is an
-admission condition, not an out-of-memory guarantee. Durable state lives under
-`CY_QUEUE_ROOT` (default `$CY_HOME/.cy-queue`); host partitions have separate capacity
-and ordering. Shared NFS requires consistent UIDs and supported locking/PID visibility.
+admission condition, not an out-of-memory guarantee. `CY_QUEUE_CONFIG` must name an
+absolute shared TOML file with `[queue]` name, metadata root and host-local coordination
+root; there is no project-local fallback. `cy-queue config [--json]` validates settings
+without creating queue state. `--root` overrides metadata only; legacy `CY_QUEUE_ROOT`
+must agree. Set the environment for each user and worker service. Host binding rejects
+conflicting coordination locations; relocation requires offline maintenance preserving
+recovery evidence. Host partitions have separate capacity and ordering. Shared NFS
+requires consistent UIDs and supported locking/PID visibility. See
+[setup and migration](docs/queue.md#shared-configuration).
 
 Users may reorder others' pending jobs, but only execute, cancel or recover their own.
 `move` requires the current revision from `list --json`. Guardian death marks
 `recovery_required` and retains evidence for owner recovery, which proves cleanup.
 Never delete live lock files or reservation records.
 
+Jobs display names and stable `job-N` references derived from submission order, independent
+of queue position. Commands continue accepting raw job identifiers. `submit --label`
+overrides the configured task name. Owners may archive completed, failed or cancelled
+jobs; default lists hide them, `list --archived` selects them and `list --all` includes
+history. Archive/restore changes owner-written sidecars, not execution state or evidence.
+Each sidecar is atomic; a multi-job storage error can be retried after partial progress.
+Recovery-required jobs always remain visible. Use `--json` for machine output.
+
 Submission `--devices` indices are CUDA-visible logical indices, frozen to physical
 UUIDs. In contrast, [physical GPU operator controls](docs/queue.md#physical-gpu-operator-controls)
 use physical `nvidia-smi` order. Queue text, JSON, TUI, status logs and errors show
-physical indexes or short absent-device labels; full GPU UUIDs and claim tokens remain
+physical indexes or word aliases for absent devices; full GPU UUIDs and claim tokens remain
 internal. `gpu disable INDEX` adds the caller's hold; `gpu enable INDEX` removes it.
 `gpu free INDEX` and `gpu release INDEX` clear only the selected GPU's existing
 reservations and holds across queue roots. No tokens, reasons, force flags, confirmation,
@@ -297,11 +313,13 @@ recovery or release rather than deleting coordination files.
 
 Workers log startup, changed job state and a 60-second heartbeat to stderr at INFO
 by default. `--log-level DEBUG` adds each poll summary; WARNING suppresses routine
-messages. IDs/JSON remain on stdout. Pipeline output stays in the submitting
+messages. Readable command results and explicitly selected JSON remain on stdout. Pipeline output stays in the submitting
 project's `.cy/queue-logs/JOB_ID.log`. See [worker diagnostics](docs/queue.md#worker-diagnostics).
 
 With `queue-ui`, TUI arrows select rows; `u`/`d`, `t`/`g` and `b`/`a` reorder,
-`c` cancels, `r` recovers, and `q` exits without stopping the worker.
+with before/after targets selected from pending-job dropdowns. `c` cancels, `r` recovers,
+`x` archives, `s` restores, `v` cycles Main/Archived/All and `o` opens a readable task
+link. `q` exits without stopping the worker.
 
 ## FiftyOne and process ownership
 
@@ -328,7 +346,10 @@ accelerator or remote-publication acceptance.
 ## Diagnostics
 
 Default Loguru level `DEBUG` includes location-only diagnostic stacks; `INFO` gives
-short messages. Errors include operation, type, cause and bounded relevant paths/IDs.
+short messages. Errors include operation, type, cause and bounded relevant paths or
+readable references. Opaque identifiers are omitted from human-facing output;
+exact provenance remains in explicit JSON, retained raw captures and link targets.
+See [readable output](docs/readable-output.md).
 Secrets are redacted; diagnostics omit locals and source excerpts, and configuration
 errors suppress opaque values conservatively. Importing the package preserves caller
 logging configuration.
