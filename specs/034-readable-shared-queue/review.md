@@ -73,6 +73,7 @@ record: pure formatting and stable aliases, queue configuration/archive adapters
 entrypoints, reporting/provenance, regression and multi-user tests, contracts and evidence.
 No initial fix-first finding is waived. Dependency sources, installed workflow tooling,
 local editable overrides and the unrelated grid-search draft remain outside the feature
-diff. The separately delivered ten-minute finalization change will be preserved when
-integrating current master. Full routine and commit gates still run before delivery;
-their outcomes belong in the verification record, not this review verdict.
+diff. Integration preserved the separately delivered ten-minute finalization change;
+the feature source and tests were otherwise identical, and 183 affected tests passed.
+Full routine and commit gates passed before delivery; their outcomes belong in the
+verification and delivery records, not this review verdict.

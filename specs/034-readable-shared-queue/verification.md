@@ -73,7 +73,14 @@ shared service lifecycle, existing users or GPU workloads were changed.
   deselected cases are not counted as physical acceptance. Commit and release hooks
   will execute their required gates separately.
 
-## Limits and pending gates
+## Delivery and limits
+
+Application 0.33.0 and companion guidance 0.2.7 were delivered and their remote
+branches and annotated tags verified. Both application commit gates passed, including
+the full suite. Integration preserved the separately released ten-minute finalization
+setting; 183 affected cases passed. The final 0.33.0 wheel and source distribution
+passed the same complete isolated installation checks recorded above. See
+[delivery evidence](release.md) for preservation, cleanup and release details.
 
 Initial physical GPU inspection found an existing workload, which was left intact.
 A later capacity check allowed a tiny direct single-GPU validation, which passed along
@@ -85,7 +92,6 @@ physical outcome is inferred. Browser interaction was not exercised; Textual pil
 and task-link boundary tests cover this change's UI behavior.
 
 The final full suite, fresh runtime/architecture review and documentation validation
-passed. The architecture acceptance record is reconciled with the complete task diff;
-delivery remains pending. Companion source guidance is
-prepared for 0.2.7 and must follow application delivery. No deployment or package
-publication is authorized by this feature.
+passed. The architecture acceptance record is reconciled with the complete task diff.
+Companion source guidance followed application delivery. No deployment, installed-skill
+replacement or registry package publication was performed.

@@ -35,7 +35,7 @@
 - [x] T016 Update README.md, docs/queue.md, docs/filesystem-policy.md, docs/diagnostics.md, docs/current-contracts.md and affected identity/publication contracts.
 - [x] T017 Update canonical corp-skills/skills/clearml-yolo/SKILL.md and references/usage.md and references/evaluation.md; validate package/docs/examples.
 - [x] T018 Validate Markdown, local links and examples; reconcile architecture/diff/evidence and obtain fresh independent review in specs/034-readable-shared-queue/review.md.
-- [ ] T019 Validate architecture acceptance and deliver task-scoped commits/native Git-tag-only release per docs/development.md, preserving local source overrides and unrelated files.
+- [x] T019 Validate architecture acceptance and deliver task-scoped commits/native Git-tag-only release per docs/development.md, preserving local source overrides and unrelated files.
 
 ## Dependencies and parallel ownership
 
@@ -68,4 +68,6 @@ documentation; T019 follows accepted review and architecture reconciliation.
   Final parent checks passed 439 affected tests, strict typing, lint and import contracts;
   fresh active live readback passed. Final independent rereview accepted the result
   after 117 tests and 24 alias arrival orders. The complete routine suite passed
-  2,927 tests; commit and release hooks execute their required gates separately.
+  2,927 tests; feature and release commit hooks also passed their required gates.
+- Delivered application 0.33.0 and companion guidance 0.2.7; remote branches and
+  annotated tags were verified. See [delivery evidence](release.md).

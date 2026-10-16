@@ -52,4 +52,14 @@ These checks establish documentation syntax, packaged references and observed co
 interfaces. They do not establish training, physical GPU concurrency, ClearML publication,
 multi-user/NFS execution, automatic skill routing or OpenCode/DeepSeek behavior.
 Runtime review remains a separate feature gate. Companion release follows application publication;
-this record does not claim either release has occurred.
+the initial documentation checkpoint did not establish either release.
+
+## Delivery closure
+
+Application 0.33.0 and canonical usage collection 0.2.7 were subsequently published
+and their remote branches and annotated Git tags verified. Final application runtime
+review and architecture acceptance passed. The companion's final validation checked
+38 Markdown files with zero issues, discovered all four collection skills without
+installation, and validated unique frontmatter, four local package links and its
+no-impact architecture record. See the [application delivery record](../../specs/034-readable-shared-queue/release.md)
+for final checks, preservation, cleanup and remaining physical verification limits.
