@@ -1,0 +1,350 @@
+{
+  "schema_version": 1,
+  "task": "Stable ClearML parameter identity",
+  "scope": [
+    "src/clearml_yolo/adapters/clearml/parameters.py",
+    "src/clearml_yolo/adapters/clearml/cache.py",
+    "src/clearml_yolo/adapters/integrations/native_runtime.py",
+    "src/clearml_yolo/adapters/clearml/detectors.py",
+    "src/clearml_yolo/entrypoints/hydra/common.py",
+    "src/clearml_yolo/application/contracts.py",
+    "src/clearml_yolo/adapters/storage/dataset_cache.py",
+    "src/clearml_yolo/application/use_cases/train.py",
+    "tests",
+    "specs/036-stable-clearml-cache",
+    "specs/010-native-clearml-integration/contracts/tracking-publication.md",
+    "docs/current-contracts.md",
+    "README.md",
+    "TECH_DETAILS.md",
+    "pyproject.toml",
+    "uv.lock",
+    "CHANGELOG.md",
+    "src/clearml_yolo/adapters/clearml/session.py",
+    "docs/project-contracts.md",
+    "specs/008-dataset-clearml-tracking/contracts/publication.md",
+    "docs/python-import-migration.md"
+  ],
+  "impact": "modules",
+  "rules": "AGENTS.md and constitution inward layers, adapter effect/SDK ownership, explicit typed interfaces and independent review.",
+  "modules": [
+    {
+      "id": "parameters",
+      "path": "src/clearml_yolo/adapters/clearml/parameters.py",
+      "change": "add",
+      "responsibility": "Detached native General projection",
+      "interface": "Mapping to filtered independent dict; raw inputs preserved",
+      "layer": "adapters",
+      "allowed_dependencies": [
+        "Standard-library Mapping, deepcopy and typing only"
+      ],
+      "forbidden_dependencies": [
+        "ClearML SDK, model/runtime adapters, application use cases, entrypoints and filesystem/network effects"
+      ],
+      "effects": "No effects",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "cache",
+      "path": "src/clearml_yolo/adapters/clearml/cache.py",
+      "change": "add",
+      "responsibility": "Conservative versioned controller hash projection",
+      "interface": "Detached ClearML task representation; unknown content preserved",
+      "layer": "adapters",
+      "allowed_dependencies": [
+        "ClearML parameters policy, PyYAML and standard-library parsing/value helpers"
+      ],
+      "forbidden_dependencies": [
+        "ClearML SDK, model/runtime adapters, application use cases, entrypoints and filesystem/network effects"
+      ],
+      "effects": "No effects; no SDK import",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "native",
+      "path": "src/clearml_yolo/adapters/integrations/native_runtime.py",
+      "change": "modify",
+      "responsibility": "Native owner callback adapter",
+      "interface": "Filter General at callback boundary; preserve execution and DDP owner",
+      "layer": "adapters",
+      "allowed_dependencies": [
+        "Existing session callback bridge, observability, runtime and filesystem adapters; explicit native SDK integration"
+      ],
+      "forbidden_dependencies": [
+        "Entrypoint imports from adapters; concrete adapters or SDKs in application/core"
+      ],
+      "effects": "Existing native SDK callback integration",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "detectors",
+      "path": "src/clearml_yolo/adapters/clearml/detectors.py",
+      "change": "modify",
+      "responsibility": "Native detector argument publication",
+      "interface": "Scientific General projection",
+      "layer": "adapters",
+      "allowed_dependencies": [
+        "Same ClearML adapter helpers, existing storage/observability edges, application ports and core model/identity types"
+      ],
+      "forbidden_dependencies": [
+        "Entrypoint imports from adapters; concrete adapters or SDKs in application/core"
+      ],
+      "effects": "Existing owner ClearML SDK publication",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "replay",
+      "path": "src/clearml_yolo/entrypoints/hydra/common.py",
+      "change": "modify",
+      "responsibility": "Hydra owner replay composition",
+      "interface": "Full native run inputs and scientific General override precedence",
+      "layer": "entrypoints",
+      "allowed_dependencies": [
+        "Hydra/OmegaConf and explicit application/adapter composition targets, including ClearML session and pure parameters policy"
+      ],
+      "forbidden_dependencies": [
+        "Entrypoint imports from adapters; concrete adapters or SDKs in application/core"
+      ],
+      "effects": "Existing invocation/replay effects",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "prepared",
+      "path": "src/clearml_yolo/application/contracts.py",
+      "change": "modify",
+      "responsibility": "Typed prepared dataset record",
+      "interface": "Optional cache_identity without changing existing constructor requirements",
+      "layer": "application",
+      "allowed_dependencies": [
+        "Core policy/identity/model types, Pydantic, Pandas and standard-library value types"
+      ],
+      "forbidden_dependencies": [
+        "Concrete adapters, SDK clients, entrypoints and direct storage/network/process effects"
+      ],
+      "effects": "None",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "dataset-cache",
+      "path": "src/clearml_yolo/adapters/storage/dataset_cache.py",
+      "change": "modify",
+      "responsibility": "Validated dataset cache storage",
+      "interface": "Return existing verified cache identity with PreparedDataset",
+      "layer": "adapters",
+      "allowed_dependencies": [
+        "Storage dataset/file/ownership helpers, observability, FileLock, Pydantic, YAML and standard-library filesystem/hash operations"
+      ],
+      "forbidden_dependencies": [
+        "Entrypoint imports from adapters; concrete adapters or SDKs in application/core"
+      ],
+      "effects": "Existing filesystem reads/writes and locks",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "train",
+      "path": "src/clearml_yolo/application/use_cases/train.py",
+      "change": "modify",
+      "responsibility": "Training workflow",
+      "interface": "Forward dataset identity/root through existing tracking port",
+      "layer": "application",
+      "allowed_dependencies": [
+        "Application contracts/ports and inward core types; effects through injected WorkflowDependencies"
+      ],
+      "forbidden_dependencies": [
+        "Concrete adapters, SDK clients, entrypoints and direct storage/network/process effects"
+      ],
+      "effects": "Only injected ports",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "session",
+      "path": "src/clearml_yolo/adapters/clearml/session.py",
+      "change": "modify",
+      "responsibility": "Canonical JSON run storage/replay and sanitized native parameter publication boundary",
+      "interface": "Publish sanitized JSON accepted by SDK replay; preserve HOCON read compatibility; prepare_native_parameters returns detached sanitized scientific parameters",
+      "layer": "adapters",
+      "allowed_dependencies": [
+        "ClearML SDK and same-adapter helpers, explicit observability/storage edges, application configuration type and core redaction/presentation"
+      ],
+      "forbidden_dependencies": [
+        "Application use cases and entrypoints"
+      ],
+      "effects": "Existing task configuration publication",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "architecture-checker",
+      "path": "tests/architecture_helpers.py",
+      "change": "modify",
+      "responsibility": "Scoped enforcement of pure cache/projection helper boundaries",
+      "interface": "Real and injected graph/effect findings; reject SDK/session/storage dependencies and IO in the two new helper modules",
+      "layer": "tests",
+      "allowed_dependencies": [
+        "Existing AST, grimp and standard-library checker dependencies"
+      ],
+      "forbidden_dependencies": [
+        "Production module imports for execution; any relaxation of existing boundary contracts"
+      ],
+      "effects": "Read-only test/check analysis",
+      "contracts": [
+        "architecture"
+      ]
+    },
+    {
+      "id": "queue-process-regression",
+      "path": "tests/test_shared_queue_processes.py",
+      "change": "modify",
+      "responsibility": "Establish detached-rank readiness before exercising guardian orphan cleanup",
+      "interface": "Bounded fixture handshake; existing cleanup and capacity-release assertions unchanged",
+      "layer": "tests",
+      "allowed_dependencies": [
+        "Existing standard-library process/path primitives, pytest and explicit queue adapter/core imports"
+      ],
+      "forbidden_dependencies": [
+        "New production dependency edges or altered queue lifecycle policy"
+      ],
+      "effects": "Owned synthetic test subprocesses and temporary files only",
+      "contracts": [
+        "architecture"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "imports",
+      "path": "pyproject.toml",
+      "status": "existing",
+      "rules": "Exhaustive layer classification, adapter peer ownership, SDK ownership and inward dependencies",
+      "check": "imports"
+    },
+    {
+      "id": "architecture",
+      "path": "tests/test_architecture.py",
+      "status": "existing",
+      "rules": "Real and injected forbidden imports, inert initialization, effect isolation; pure cache/projection dependency allowlist, scoped effect scans and fresh-process guarded import/call",
+      "check": "architecture"
+    }
+  ],
+  "checks": [
+    {
+      "id": "imports",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync lint-imports",
+      "expectation": "All contracts pass",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/036-stable-clearml-cache/verification.md"
+      }
+    },
+    {
+      "id": "architecture",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync pytest tests/test_architecture.py",
+      "expectation": "Actual graph and injected forbidden edges pass",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/036-stable-clearml-cache/verification.md"
+      }
+    },
+    {
+      "id": "behavior",
+      "kind": "behavior",
+      "command": "UV_NO_SYNC=1 uv run --frozen --no-sync pre-commit run --all-files",
+      "expectation": "Full suite including new cache/publication/replay regressions passes",
+      "result": {
+        "status": "not-run",
+        "reason": "Resumed full hook exposed a test-fixture readiness race; deterministic delayed-start diagnostic passed after synchronization. Complete hook rerun pending."
+      }
+    },
+    {
+      "id": "lint",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync ruff check .",
+      "expectation": "No findings",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/036-stable-clearml-cache/verification.md"
+      }
+    },
+    {
+      "id": "types",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync mypy .",
+      "expectation": "No errors",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/036-stable-clearml-cache/verification.md"
+      }
+    },
+    {
+      "id": "unused",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync vulture",
+      "expectation": "No findings",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/036-stable-clearml-cache/verification.md"
+      }
+    },
+    {
+      "id": "live",
+      "kind": "behavior",
+      "command": "Native CPU and ClearML controller smoke documented in verification.md",
+      "expectation": "Native publication and prelaunch cache miss/hit/miss established",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/036-stable-clearml-cache/verification.md"
+      }
+    },
+    {
+      "id": "docs",
+      "kind": "documentation",
+      "command": "uv run --frozen --no-sync python scripts/check_docs.py --all",
+      "expectation": "Changed Markdown and local links valid; new paths also checked explicitly",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/036-stable-clearml-cache/verification.md"
+      }
+    }
+  ],
+  "documentation": "Tracking contract, current contract index, README/TECH_DETAILS and canonical corp-skills usage/evaluation; dated feature evidence.",
+  "review": {
+    "status": "accepted",
+    "reviewer": "/root/final_acceptance: fresh independent native agent",
+    "evidence": "specs/036-stable-clearml-cache/review.md",
+    "reconciliation": "Inspected all task-owned added/modified runtime modules, tests and architecture checker, untracked cache/projection modules and tests, feature artifacts, maintained documentation and generated changelog. No renames or deletions. Excluded the pre-existing local pyproject.toml uv.sources section and untracked docs/cls-cls-pw-grid-search.md; dependency revisions and release version files remain unchanged. Local source review is accepted; the declared live check remains not-run and blocks final acceptance."
+  }
+}

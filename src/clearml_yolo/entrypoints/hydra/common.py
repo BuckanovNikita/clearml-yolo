@@ -17,6 +17,7 @@ from omegaconf import DictConfig, OmegaConf, open_dict
 # Populate the shared ConfigStore in fresh CLI processes before Hydra composes examples.
 import clearml_yolo.entrypoints.hydra.configs  # noqa: F401
 from clearml_yolo.adapters.clearml.naming import initialize_naming
+from clearml_yolo.adapters.clearml.parameters import project_native_parameters
 from clearml_yolo.adapters.clearml.session import (
     invocation,
     replay_configuration,
@@ -82,6 +83,24 @@ def _validate_replay_runtime(uses_detector: bool, replay: dict[str, Any]) -> Non
         )
 
 
+def _replay_native_parameters(
+    task: Any,
+    native: dict[str, Any],
+    requested: dict[str, Any],
+) -> dict[str, Any]:
+    scientific = task.connect(
+        project_native_parameters(native), name="General", ignore_remote_overrides=False
+    )
+    native.update(project_native_parameters(scientific))
+    # General and canonical run may contain a previous owner's effective output
+    # route. A clone retains only its current explicitly requested route.
+    for key in ("project", "name", "save_dir"):
+        native.pop(key, None)
+        if key in requested:
+            native[key] = requested[key]
+    return native
+
+
 @trace_operation("invocation.execute")
 def execute_owned(name: str, config: DictConfig, function: Callable[..., Any]) -> None:
     """Execute native settings unchanged under one invocation-owned task."""
@@ -113,8 +132,15 @@ def execute_owned(name: str, config: DictConfig, function: Callable[..., Any]) -
         ) as task,
         _gpu_cleanup(True),
     ):
-        native = dict(inputs.pop("ultralytics", {}))
-        replay = replay_configuration(task, inputs)
+        requested_native = dict(inputs.get("ultralytics", {}))
+        remote_native = (
+            name in {"pipeline", "train"} and not uses_detector and not task.running_locally()
+        )
+        replay = (
+            replay_configuration(task, inputs, legacy_native_general=True)
+            if remote_native
+            else replay_configuration(task, inputs)
+        )
         reject_legacy_controls(replay)
         # Run also contains result provenance; only command inputs are executable.
         accepted = set(inspect.signature(function).parameters) - {"deps"}
@@ -122,21 +148,11 @@ def execute_owned(name: str, config: DictConfig, function: Callable[..., Any]) -
             accepted.add("model")
         replay = {key: value for key, value in replay.items() if key in accepted}
         _validate_replay_runtime(uses_detector, replay)
-        if (
-            not uses_detector
-            and native
-            and not task.running_locally()
-            and name in {"pipeline", "train"}
-        ):
-            # General stores the previous trainer's effective output route. A clone
-            # must derive its own route, retaining only current explicit requests.
+        native = deepcopy(replay.get("ultralytics", requested_native))
+        if remote_native and native:
             # Detector General is observed evidence; its executable settings live
             # under run.model and must never overwrite the inactive YOLO group.
-            routing = {key: native[key] for key in ("project", "name", "save_dir") if key in native}
-            native = dict(task.connect(native, name="General", ignore_remote_overrides=False))
-            for key in ("project", "name", "save_dir"):
-                native.pop(key, None)
-            native.update(routing)
+            native = _replay_native_parameters(task, native, requested_native)
         with open_dict(config):
             for key, value in replay.items():
                 config[key] = value

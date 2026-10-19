@@ -298,11 +298,23 @@ def test_guardian_cancellation_reaps_subreaper_children(tmp_path: Path) -> None:
         "signal.signal(signal.SIGTERM,signal.SIG_IGN); "
         "Path(sys.argv[1]).write_text(str(os.getpid())); time.sleep(60)"
     )
-    script = (
-        "import subprocess,sys; "
-        "subprocess.Popen([sys.executable,'-c',sys.argv[1],sys.argv[2]],"
-        "start_new_session=True)"
-    )
+    # Let the rank install its signal handler before owner exit triggers cleanup.
+    script = """
+import subprocess,sys,time
+from pathlib import Path
+
+child = subprocess.Popen(
+    [sys.executable, '-c', sys.argv[1], sys.argv[2]], start_new_session=True
+)
+ready = Path(sys.argv[2])
+deadline = time.monotonic() + 10
+while not ready.is_file() or not ready.read_text():
+    if child.poll() is not None:
+        raise RuntimeError('Detached rank exited before readiness')
+    if time.monotonic() >= deadline:
+        raise TimeoutError('Detached rank did not become ready')
+    time.sleep(0.01)
+"""
     identity = WorkerIdentity(owner_uid=os.geteuid(), host_id="host", boot_id="boot")
     store = NFSQueueStore(tmp_path / "queue", identity)
     job = store.submit(

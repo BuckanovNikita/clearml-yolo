@@ -195,7 +195,8 @@ def test_tracking_is_required_and_old_task_reuse_controls_are_gone() -> None:
 
 @pytest.mark.parametrize("fail", [False, True])
 def test_sdk_startup_capture_is_owner_scoped_and_restores_on_failure(
-    capfd: pytest.CaptureFixture[str], fail: bool,
+    capfd: pytest.CaptureFixture[str],
+    fail: bool,
 ) -> None:
     from clearml_yolo.adapters.clearml.session import _capture_sdk_startup
 
@@ -256,11 +257,37 @@ def test_invocation_owns_one_task_and_nested_stages_reuse_it(
     assert [item["name"] for item in task.uploads] == ["train_best"]
     assert task.configurations == [
         {
-            "config_dict": {"run_dir": "runs/example"},
+            "config_text": json.dumps({"run_dir": "runs/example"}),
             "name": "run",
-            "config_type": "dictionary",
+            "config_type": "json",
         }
     ]
+
+
+@pytest.mark.parametrize("replay", [False, True])
+def test_canonical_run_uses_json_that_round_trips_through_installed_sdk(
+    request: pytest.FixtureRequest,
+    replay: bool,
+) -> None:
+    from clearml.utilities.config import config_dict_to_text, text_to_config_dict
+
+    _, task = request.getfixturevalue("fake_clearml")
+    values = {
+        "ultralytics": {"device": [2, 3], "classes": []},
+        "run_dir": None,
+        "метки": {"0": "коробка", "树": "яблоко"},
+        "ground_truth": "папка/разметка.csv",
+        "literal_path": r"C:\datasets\папка\train",
+        "literal_escape": r"\u043a",
+    }
+    with invocation(ClearMLConfig(), "train", None if replay else values) as owner:
+        if replay:
+            replay_configuration(owner, values)
+    stored = task.configurations[-1]
+    assert stored.get("config_type") == "json"
+    serialized = stored["config_text"]
+    assert json.loads(serialized) == values
+    assert text_to_config_dict(config_dict_to_text(serialized)) == values
 
 
 def test_invocation_publishes_source_identity_before_workflow(
@@ -590,7 +617,7 @@ def test_resolved_configuration_is_sanitized_recursively(
     with invocation(ClearMLConfig(), "train", resolved):
         pass
 
-    stored = task.configurations[-1]["config_dict"]
+    stored = json.loads(task.configurations[-1]["config_text"])
     assert stored == {
         "clearml": {"access_key": "<redacted>", "secret_key": "<redacted>"},
         "endpoint": ("https://<redacted>@example.test/path?token=%3Credacted%3E&safe=yes&empty="),
@@ -861,7 +888,9 @@ def test_publish_table_suffixes_different_content_under_the_same_name(
         publish_table(owner, "predictions", second)
 
     assert [upload["name"] for upload in task.uploads] == [
-        "predictions", "predictions_2", "predictions_3",
+        "predictions",
+        "predictions_2",
+        "predictions_3",
     ]
 
 
@@ -882,7 +911,10 @@ def test_publish_table_numbered_suffix_skips_existing_caller_names(
         publish_table(owner, "alias", paths[2])
 
     assert [upload["name"] for upload in task.uploads] == [
-        "predictions_2", "predictions", "predictions_3", "predictions_3_2",
+        "predictions_2",
+        "predictions",
+        "predictions_3",
+        "predictions_3_2",
     ]
 
 
@@ -910,7 +942,7 @@ def test_record_run_configuration_merges_sanitized_meaningful_values(
         "evaluation": {"iou": 0.0},
     }
     assert all(configuration["name"] == "run" for configuration in task.configurations)
-    assert task.configurations[-1]["config_dict"] == merged
+    assert json.loads(task.configurations[-1]["config_text"]) == merged
     assert task.uploads == []
 
 
@@ -940,7 +972,7 @@ def test_export_result_preserves_empty_evidence_fields(
         stored = record_run_configuration(owner, {"export_result": evidence})
 
     assert stored["export_result"] == evidence
-    assert task.configurations[-1]["config_dict"]["export_result"] == evidence
+    assert json.loads(task.configurations[-1]["config_text"])["export_result"] == evidence
 
 
 def test_replay_configuration_returns_remote_canonical_mapping(
@@ -960,9 +992,9 @@ def test_replay_configuration_returns_remote_canonical_mapping(
     assert task.configuration_reads == ["run"]
     assert task.configurations == [
         {
-            "config_dict": task.run_configuration_result,
+            "config_text": json.dumps(task.run_configuration_result),
             "name": "run",
-            "config_type": "dictionary",
+            "config_type": "json",
         }
     ]
 
@@ -1050,7 +1082,7 @@ def test_run_replay_redacts_storage_without_rewriting_execution_credentials(
     with invocation(ClearMLConfig(), "predict") as owner:
         replayed = replay_configuration(owner, local)
     assert replayed == effective
-    stored = str(task.configurations[-1]["config_dict"])
+    stored = str(json.loads(task.configurations[-1]["config_text"]))
     assert "local-secret" not in stored
     assert "remote-secret" not in stored
 
@@ -1506,7 +1538,7 @@ def test_run_replay_detaches_nested_proxies_before_storage_mutation(
     saved: list[dict[str, Any]] = []
 
     def mutate_snapshot(**kwargs: Any) -> None:
-        snapshot = kwargs["config_dict"]
+        snapshot = json.loads(kwargs["config_text"])
         saved.append(json.loads(json.dumps(snapshot)))
         snapshot["model"]["sizes"][0]["width"] = 999
 
@@ -1538,7 +1570,7 @@ def test_missing_remote_run_falls_back_without_redacting_executable_defaults(
     with invocation(ClearMLConfig(), "predict") as owner:
         assert replay_configuration(owner, local) == local
     assert task.configuration_reads == (["run"] if remote else [])
-    assert task.configurations[-1]["config_dict"]["token"] != local["token"]
+    assert json.loads(task.configurations[-1]["config_text"])["token"] != local["token"]
     assert "local-secret" not in json.dumps(task.configurations)
 
 
@@ -1758,7 +1790,7 @@ def test_owner_isolation_allows_sequential_invocations_after_confirmed_close(
         effects.append("second")
     assert len(task_type.init_calls) == 2
     assert effects[-1] == "second"
-    assert task.configurations[-1]["config_dict"] == {"second": True}
+    assert json.loads(task.configurations[-1]["config_text"]) == {"second": True}
 
 
 @pytest.mark.parametrize("failure_site", ["readback", "completed", "failed", "finish"])

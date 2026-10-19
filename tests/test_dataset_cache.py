@@ -149,6 +149,22 @@ def test_changed_csv_bytes_or_format_create_distinct_entries(tmp_path: Path) -> 
     assert len({ndjson_root, flat_root, changed_root}) == 3
 
 
+def test_exposed_cache_identity_survives_root_relocation_and_tracks_inputs(tmp_path: Path) -> None:
+    from clearml_yolo.adapters.storage.dataset_cache import cached_dataset
+
+    source = _source(tmp_path / "input")
+    identities: list[str] = []
+    for root in (tmp_path / "cache-a", tmp_path / "cache-b"):
+        with cached_dataset(source, root) as prepared:
+            completion = json.loads((prepared.data.parent / "completion.json").read_text())
+            assert prepared.model_dump().get("cache_identity") == completion["identity"]
+            identities.append(completion["identity"])
+    assert identities[0] == identities[1]
+    source.write_bytes(source.read_bytes() + b"\n")
+    with cached_dataset(source, tmp_path / "cache-a") as changed:
+        assert changed.model_dump().get("cache_identity") not in {None, identities[0]}
+
+
 def test_identical_csv_bytes_with_absolute_references_reuse_one_entry(tmp_path: Path) -> None:
     from clearml_yolo.adapters.storage.dataset_cache import cached_dataset
 

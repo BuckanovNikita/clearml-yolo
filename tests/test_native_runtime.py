@@ -245,7 +245,16 @@ def test_native_general_redacts_credentials_without_changing_training_args(
 
     owner = Task()
     trainer = SimpleNamespace(
-        args=SimpleNamespace(model="https://host/m.pt?token=secret", epochs=1)
+        args=SimpleNamespace(
+            model="https://host/m.pt?token=secret",
+            epochs=1,
+            device=[2, 3],
+            project="runs",
+            name="native-run",
+            save_dir="runs/native-run",
+            exist_ok=True,
+            data="cache/generated/data.yaml",
+        )
     )
     original_connect = owner.connect
     monkeypatch.setattr("clearml_yolo.adapters.clearml.session.active_task", lambda: owner)
@@ -254,8 +263,8 @@ def test_native_general_redacts_credentials_without_changing_training_args(
         integration,
         "on_pretrain_routine_start",
         # This optional SDK export is populated dynamically by the integration module.
-        lambda trainer: integration.__dict__["Task"].current_task().connect(
-            vars(trainer.args), name="General"
+        lambda trainer: (
+            integration.__dict__["Task"].current_task().connect(vars(trainer.args), name="General")
         ),
     )
     monkeypatch.setenv(OWNER_TASK_ENV, owner.id)
@@ -263,7 +272,11 @@ def test_native_general_redacts_credentials_without_changing_training_args(
     with native_runtime():
         integration.callbacks["on_pretrain_routine_start"](trainer)
     assert "secret" not in recorded[0]["model"]
+    assert set(recorded[0]) == {"model", "epochs"}
     assert trainer.args.model.endswith("token=secret")
+    assert trainer.args.device == [2, 3]
+    assert trainer.args.name == "native-run"
+    assert trainer.args.data == "cache/generated/data.yaml"
     assert owner.connect == original_connect
 
 

@@ -17,7 +17,7 @@ Historical tasks and dated evidence retain their original names and contents.
 | Interactive evaluation plots | Four post-threshold confusion views and per-class PR curves per model/split context |
 | `compare_workbook_SPLIT` | Paired XLSX artifact containing `Сравнение`; excluded classes in `compare_workbook_SPLIT_excluded` CSV |
 | `report_dev_SPLIT`, `report_business_SPLIT` | Final paired XLSX artifacts |
-| run, consumed dataset, explicit report configuration | Canonical Configuration Objects; native General owns training arguments |
+| run, consumed dataset, explicit report configuration | Canonical Configuration Objects retain full replay settings; native General contains scientific training arguments |
 | Source links and meaningful requested/effective differences | Canonical run configuration, including missing automatic-baseline reason |
 | `export_onnx`, `export_engine` | Produced deployment graph or serialized engine, according to the export operation |
 | `export_metadata` | Checkpoint/graph/engine hashes, classes, preprocessing, inference policy, runtime/plugins and profiles |
@@ -54,7 +54,7 @@ Config-init creates no task/publications.
 
 Result-only sections such as `evaluation_result`, `fiftyone_result` and `export_result`
 stay separate from executable `evaluation`, `fiftyone` and `export` inputs. Remote clones ignore result-only roots and
-reconstruct typed command inputs from canonical run settings plus native General.
+reconstruct typed command inputs from canonical run settings plus scientific native General overrides.
 Prior owner-derived General project/name/save_dir never determine the clone output route;
 current explicit routing requests and the new invocation identity own those paths.
 Current explicit save_dir remains visible to pipeline conflict validation; remote replay
@@ -87,10 +87,12 @@ YAML, NDJSON, archives, manifests and diagnostic/publication receipts remain loc
 Consumed dataset and explicit report configurations are Configuration Objects. Canonical
 `run` supports replay through an explicit canonical-object read and a detached, sanitized
 snapshot write; inherited SDK connection flags and proxy containers do not control execution.
-YOLO retains its native `General` replay parameters. New detector
-families replay `run.model` and record sanitized effective native arguments in `General`
-as observed evidence, without applying remote overrides to that evidence. Configuration
-copies are not artifacts.
+YOLO retains full `run.ultralytics` settings and scientific `General` replay overrides.
+New detector families replay `run.model` and record sanitized scientific native arguments
+in `General` as observed evidence, without applying remote overrides to that evidence.
+The [stable parameter amendment](../../036-stable-clearml-cache/contracts/cache.md)
+defines execution-only exclusions, full replay preservation and opt-in controller cache
+normalization. Configuration copies are not artifacts.
 Native owner callbacks may publish training/validation previews and non-PR plots; native
 validation PR uploads are filtered with callback state restored on success/failure.
 Native DDP descendants do not publish.

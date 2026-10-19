@@ -50,6 +50,33 @@ stdout/stderr is raw and is not passed through that sanitizer, so callers must n
 credentials. This contract does not backfill historical tasks, cover output emitted after
 the task closes, or guarantee forwarding from DDP subprocess streams.
 
+## Stable parameters and full replay
+
+The [stable parameter amendment](../../036-stable-clearml-cache/contracts/cache.md)
+owns the exact publication and cache policy. Native `General` excludes `device`,
+`project`, `name`, `save_dir`, `exist_ok` and CSV-owned generated `data`; remaining
+scientific arguments and nested semantic names/paths remain intact. Native owner
+callbacks, DDP owner replay and other detector publication use the same projection.
+This filters new connection inputs; it does not delete General keys inherited by
+clones of historical templates. Canonical replay and cache normalization still
+handle those keys without cleaning parameter history.
+
+The shared CLI's canonical `run` retains full sanitized native input groups, including
+`ultralytics`; embedding callers own complete input recording within their invocation.
+New snapshots are JSON; historical HOCON remains readable for replay. Remote YOLO training
+restores full native settings and applies scientific `General` overrides while
+retaining current output routing. Omitted devices are restored from `run` with their
+original values. Filtering never changes native arguments or credential redaction.
+
+External controllers opt into `normalize_task_hash` before cached jobs are created;
+publication inside the worker cannot change an earlier cache lookup. The helper
+normalizes only recognized clearml-yolo tasks and known execution-only fields,
+preserving scientific inputs, unknown fields and code/container identity. GPU indices
+are equivalent only at equal CUDA device count. Generated dataset paths require
+recorded cache identity/root; unproven paths and unsupported configuration text remain
+hash-sensitive. See the [controller recipe](../../../TECH_DETAILS.md#clearml-pipeline-cache-identity).
+A cache hit reuses existing remote outputs without writing a new local destination.
+
 ## Publication inventory
 
 | Destination | Permitted contents |
@@ -58,7 +85,8 @@ the task closes, or guarantee forwarding from DDP subprocess streams.
 | Scalars / Plots / Debug Samples | Native non-PR training/validation telemetry; current-model confusion charts and test-only grouped PR; training/validation previews. Comparison headline single values remain outside Plots. |
 | Output Model | One native best checkpoint, verified before successful completion. |
 | Artifacts | Canonical ground truth, prediction, frozen validation-threshold CSVs; evaluation/comparison workbooks; final performance reports. |
-| Configuration Objects / General | Sanitized execution settings, dataset overrides, source references, normalization and meaningful provenance. |
+| Configuration Objects | Full sanitized replay settings, dataset overrides, source references, normalization and meaningful provenance. |
+| General | Sanitized native experiment settings with known execution-only parameters excluded. |
 | Execution / Script | Source repository, branch, commit, canonical module entrypoint and repository-relative working directory; no raw arguments or code diffs. |
 | Local outputs | Effective YAML with comments, temporary inputs, manifests, journals and diagnostic/publication receipts. |
 

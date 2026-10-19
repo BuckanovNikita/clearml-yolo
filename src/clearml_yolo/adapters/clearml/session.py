@@ -35,6 +35,7 @@ from clearml_yolo.adapters.clearml.deadline import (
     detach_sdk_exit_callback,
     sdk_deadline,
 )
+from clearml_yolo.adapters.clearml.parameters import project_native_parameters
 from clearml_yolo.adapters.clearml.script import publish_script
 from clearml_yolo.adapters.observability.capture import (
     OutputCapture,
@@ -75,6 +76,11 @@ FINALIZATION_TIMEOUT_SECONDS = 600.0
 
 # Keep the SDK opaque at the adapter boundary so reporting modules need no SDK import.
 Task = Any
+
+
+def prepare_native_parameters(values: Mapping[str, Any]) -> dict[str, Any]:
+    """Build the sanitized scientific view published by native owner callbacks."""
+    return cast(dict[str, Any], sanitize_configuration(project_native_parameters(values)))
 
 
 def resolve_task_name(config: ClearMLConfig, stage: str) -> str:
@@ -828,14 +834,18 @@ def record_run_configuration(task: Any, values: dict[str, Any]) -> dict[str, Any
     with trace_operation("clearml.configuration.connect"):
         task.set_configuration_object(
             name="run",
-            config_dict=_plain_config_document(active.run_configuration),
-            config_type="dictionary",
+            config_text=json.dumps(
+                _plain_config_document(active.run_configuration), ensure_ascii=False
+            ),
+            config_type="json",
         )
     return dict(active.run_configuration)
 
 
 @trace_operation("clearml.configuration.replay")
-def replay_configuration(task: Any, values: dict[str, Any]) -> dict[str, Any]:
+def replay_configuration(
+    task: Any, values: dict[str, Any], *, legacy_native_general: bool = False
+) -> dict[str, Any]:
     """Resolve a clone's canonical run object and freeze it for this invocation."""
     if _is_worker():
         return values
@@ -858,12 +868,29 @@ def replay_configuration(task: Any, values: dict[str, Any]) -> dict[str, Any]:
     if not effective:
         raise ValueError("Effective ClearML run configuration must not be empty")
     executable = _plain_config_document(effective)
+    if (
+        legacy_native_general
+        and not task.running_locally()
+        and (canonical is None or "ultralytics" not in canonical)
+    ):
+        # Historical tasks stored YOLO settings only in General, including tasks
+        # without a run object. Preserve their actual execution values in the new
+        # full snapshot without reconnecting excluded parameters. A present native
+        # group, even an empty one, always owns its values.
+        native = _plain_config_document(values.get("ultralytics", {}))
+        inherited = task.get_parameters(cast=True) or {}
+        for key in ("device", "data", "exist_ok"):
+            if f"General/{key}" in inherited:
+                native[key] = inherited[f"General/{key}"]
+        executable["ultralytics"] = native
     active.run_configuration = sanitize_configuration(executable)
     with trace_operation("clearml.configuration.connect"):
         task.set_configuration_object(
             name="run",
-            config_dict=_plain_config_document(active.run_configuration),
-            config_type="dictionary",
+            config_text=json.dumps(
+                _plain_config_document(active.run_configuration), ensure_ascii=False
+            ),
+            config_type="json",
         )
     # Redaction is a storage boundary, not a mutation of executable inputs.
     return cast(dict[str, Any], executable)

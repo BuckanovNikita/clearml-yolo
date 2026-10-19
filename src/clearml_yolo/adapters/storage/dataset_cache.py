@@ -287,6 +287,7 @@ def _load_completed(
         manifest=entry / "preparation.json",
         dataset_format=dataset_format,
         artifacts=artifact_paths,
+        cache_identity=completion.identity,
     )
 
 

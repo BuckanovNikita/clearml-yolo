@@ -24,6 +24,9 @@ def test_native_general_redacts_a_copy_and_preserves_nulls_and_defaults(tmp_path
         "workers": 0,
         "classes": [],
         "project": tmp_path,
+        "name": "native-run",
+        "device": "cuda:3",
+        "data": "generated/data.yaml",
         "model": {"num_classes": 1, "api_key": "private-model-key"},
         "source": "https://user:password@example.org/data",
     }
@@ -42,9 +45,11 @@ def test_native_general_redacts_a_copy_and_preserves_nulls_and_defaults(tmp_path
     record_detector_arguments(task, values)
     assert values == original
     assert connected == [
-        values
-        | {
-            "project": str(tmp_path),
+        {
+            "weights": None,
+            "amp": False,
+            "workers": 0,
+            "classes": [],
             "model": {"num_classes": 1, "api_key": "<redacted>"},
             "source": "https://<redacted>@example.org/data",
         }

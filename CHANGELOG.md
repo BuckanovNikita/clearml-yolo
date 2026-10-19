@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- **queue**: Record refresh isolation release verification
+  ([`129b94b`](https://github.com/BuckanovNikita/clearml-yolo/commit/129b94b749d7d4bcaf6e82b9a504a141796c7bdc))
+
+
 ## v0.34.1 (2026-10-19)
 
 ### Bug Fixes

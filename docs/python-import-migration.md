@@ -91,6 +91,14 @@ owns the wider task/publication lifetime. Fresh native DDP trainers scope worker
 during construction and training. `cy-dedup` needs no SDK bootstrap and keeps its atomic
 temporary files beside the selected destination.
 
+The shared CLI records complete sanitized inputs in the canonical `run` Configuration
+Object. Embedded application callers must supply their complete resolved inputs to
+`invocation(..., resolved_config=inputs)` or record them through the tracking interface
+within that invocation. Direct use-case calls do not reconstruct that full snapshot.
+Native `General` excludes execution-only device/routing/generated-data fields, so it
+cannot substitute for full input recording. See the
+[stable parameter contract](../specs/036-stable-clearml-cache/contracts/cache.md).
+
 SDKs use normal imports, environment selectors, user settings, cwd discovery and caches.
 There is no project import-directory context, SDK constant substitution or process binding
 to a library configuration root. `CY_HOME` selects project paths; changing it does not reset

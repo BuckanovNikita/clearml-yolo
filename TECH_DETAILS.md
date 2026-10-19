@@ -175,6 +175,21 @@ local. Consumed dataset and explicit report configurations are Configuration Obj
 not artifact copies. Canonical `run` configuration supports replay; see the
 [configuration publication contract](specs/009-resolved-config-uploads/contracts/configuration-files.md).
 
+Native `General` hyperparameters omit `device`, `project`, `name`, `save_dir`,
+`exist_ok` and CSV-generated `data`. The CLI retains full sanitized native input groups,
+including `ultralytics`, in the canonical `run` Configuration Object. New snapshots use
+JSON; replay also reads historical HOCON. Scientific `General` overrides remain
+authoritative on remote YOLO training replay, while the real device comes from the full
+configuration and current output routing remains protected. Publication never replaces
+executable arguments with cache tokens. See the
+[stable parameter contract](specs/036-stable-clearml-cache/contracts/cache.md).
+Embedded application callers own full input recording through their invocation;
+see [programmatic dependencies](docs/python-import-migration.md#explicit-programmatic-dependencies).
+
+Filtering newly connected values does not delete parameters inherited from historical
+templates. Such clones can retain old General execution keys; canonical replay and
+cache normalization still handle them. No parameter-history cleanup is performed.
+
 Preserve `<checkpoint>.identity.json` and `<predictions.csv>.provenance.json` when
 moving results. Native checkpoint descriptors also record architecture, class order,
 preprocessing and source/dependency identity. Hash and metadata conflicts fail.
@@ -206,6 +221,65 @@ Report summaries show finite-metric class counts, such as `AP50-valid-class-coun
 uses the shared set. `NA` remains an unavailable metric, not a numerical zero.
 The maintained [publication contract](specs/014-evaluation-publication/contracts/publication.md)
 explains these summaries.
+
+### ClearML pipeline cache identity
+
+Filtering displayed hyperparameters alone does not normalize a pipeline cache key:
+ClearML hashes Configuration Objects before a worker starts. In an external
+task-based controller, register the helper after any framework callback registration
+and before creating cached jobs:
+
+```python
+from clearml.automation.job import ClearmlJob
+from clearml_yolo.adapters.clearml.cache import normalize_task_hash
+
+ClearmlJob.register_hashing_callback(normalize_task_hash)
+```
+
+Use the controller's existing `cache_executed_step=True` setting. If it already owns
+a callback, explicitly compose that callback's result with `normalize_task_hash`
+instead of replacing it. Registration affects the controller process's job class;
+registering in a worker is too late for cache lookup. The helper itself registers
+nothing, mutates no supplied configuration and performs no filesystem/network work.
+
+Supply controller `run` overrides as JSON text, for example
+`configuration_overrides={"run": json.dumps(full_run_config, ensure_ascii=False)}`.
+Import `json` in the controller and retain the complete input mapping. The installed
+SDK serializes dictionary overrides with default JSON ASCII escaping; explicit text
+preserves Unicode through its replay parser. Dictionary overrides are otherwise
+supported by the normalizer. This differs from `Task.set_configuration_object`'s
+`config_dict` argument, which serializes as HOCON.
+
+For recognized clearml-yolo execution tasks, normalization ignores known run names,
+output destinations and cache roots. Valid explicit CUDA ordinals normalize by device count:
+`[0,1]` and `[2,3]` match, but one GPU, two GPUs, CPU and MPS remain distinct. Automatic
+selectors remain distinct from explicit allocations. Unsupported selector spellings
+remain distinct according to the consuming backend; YOLO's permissive forms are
+not applied to strict detector or export settings. Scientific inputs remain
+significant, including dataset/model references, class names, seeds, batch, precision,
+optimizer settings, augmentation, thresholds and enabled stages. Code/container
+identity supplied by the SDK and unknown fields are preserved; the helper does not
+restore fields the SDK excludes before calling it.
+
+Names and paths remain significant when they select inputs: the ClearML project
+used by an unresolved comparison model reference, and pipeline run roots used by
+skipped stages to consume existing files. Pin concrete source task IDs before
+caching mutable latest-task/tag lookups; the helper does not resolve them.
+
+Prepared dataset paths normalize only when `run.prepared_dataset` records the existing
+`cache_identity` and generated `root`; their identity and relative paths, class mapping
+and splits still contribute. An arbitrary input path is never normalized by its basename.
+Unrecognized or malformed Configuration Objects, including historical HOCON text,
+remain unchanged and can conservatively prevent a cache hit. Historical tasks are not
+rewritten. The policy includes a version marker to separate future policy changes.
+JSON with active escapes whose meaning differs in the SDK replay parser also remains
+unnormalized; literal Unicode and escaped backslashes are supported.
+
+A hit reuses the previous task's remote outputs. It creates no files at a newly
+requested local destination. Existing input immutability requirements still apply;
+this helper neither inspects input contents nor supplies a new pipeline runner.
+The [cache contract](specs/036-stable-clearml-cache/contracts/cache.md) defines the
+projection and replay boundaries.
 
 ## Filesystem and cache
 

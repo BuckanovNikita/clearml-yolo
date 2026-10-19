@@ -44,8 +44,12 @@ Stage-irrelevant settings are commented in exported native YAML and excluded fro
 Raw `cfg` loading, non-null native `cfg`, nested stage-native mappings and duplicate native
 comparison inference settings are unsupported and fail ordinary strict validation.
 Effective native YAML and retained prediction manifests support replay; YAML is retained
-locally with comments preserved; canonical run/dataset/report configurations and native General
-parameters support ClearML replay without artifact copies.
+locally with comments preserved; CLI canonical run/dataset/report configurations retain full
+replay settings without artifact copies, while native General contains scientific experiment
+parameters. YOLO replay applies scientific General overrides over full `run.ultralytics`
+settings; devices and other known execution-only values remain in the full configuration.
+External controllers can explicitly normalize cache identity before job creation through
+the [stable parameter contract](../specs/036-stable-clearml-cache/contracts/cache.md).
 Pass device, batch, AMP, compilation and native augmentation options through the native groups.
 Direct `cy` and stage commands execute their configured native devices without project
 GPU discovery, queue storage, reservations, waiting or automatic substitution. `cy -m`

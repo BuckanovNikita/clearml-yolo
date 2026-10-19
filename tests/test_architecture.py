@@ -65,6 +65,18 @@ def test_actual_graph_obeys_classification_direction_sdk_ownership_and_cycles(
         ("clearml_yolo.adapters.clearml.models", "report_generator", "SDK ownership"),
         ("clearml_yolo.adapters.yolo.inference", "fiftyone", "SDK ownership"),
         ("clearml_yolo.adapters.storage.dataset", "hydra", "SDK ownership"),
+        ("clearml_yolo.adapters.clearml.cache", "clearml", "pure adapter dependency"),
+        (
+            "clearml_yolo.adapters.clearml.cache",
+            "clearml_yolo.adapters.clearml.session",
+            "pure adapter dependency",
+        ),
+        (
+            "clearml_yolo.adapters.clearml.cache",
+            "clearml_yolo.adapters.storage.filesystem",
+            "pure adapter dependency",
+        ),
+        ("clearml_yolo.adapters.clearml.parameters", "clearml", "pure adapter dependency"),
         ("clearml_yolo.entrypoints.composition", "torch", "SDK ownership"),
         ("clearml_yolo.adapters.export.metadata", "torch", "SDK ownership"),
         ("clearml_yolo.adapters.export.metadata", "timm", "SDK ownership"),
@@ -197,6 +209,82 @@ def test_actual_core_contains_no_io_network_process_or_dynamic_import_calls() ->
     assert findings == []
 
 
+@pytest.mark.parametrize("module", architecture.PURE_ADAPTERS)
+def test_pure_cache_projection_adapters_have_no_effects(module: str) -> None:
+    path = SRC.joinpath(*module.split(".")).with_suffix(".py")
+    assert architecture.pure_adapter_effect_findings(module, ast.parse(path.read_text())) == []
+
+
+@pytest.mark.parametrize("module", architecture.PURE_ADAPTERS)
+@pytest.mark.parametrize(
+    "source",
+    [
+        "def project(value):\n    return open('input').read()",
+        "import socket\ndef project(value):\n    return socket.create_connection(('host', 80))",
+        "import subprocess\ndef project(value):\n    return subprocess.run(['worker'])",
+    ],
+)
+def test_pure_adapter_effect_contract_rejects_injected_io(module: str, source: str) -> None:
+    tree = ast.parse(source)
+    assert architecture.pure_adapter_effect_findings(module, tree)
+    assert (
+        architecture.pure_adapter_effect_findings("clearml_yolo.adapters.clearml.session", tree)
+        == []
+    )
+
+
+def test_cache_projection_import_and_call_are_inert_in_fresh_process() -> None:
+    source = """
+import json
+import os
+import sys
+
+class DenySdk:
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname == "clearml" or fullname.startswith("clearml."):
+            raise AssertionError("Projection imported the ClearML SDK")
+
+sys.meta_path.insert(0, DenySdk())
+calling = False
+def audit(event, args):
+    if event.startswith(("socket.", "subprocess.")) or event in {
+        "os.system", "os.mkdir", "os.remove", "os.rename", "os.rmdir"
+    }:
+        raise AssertionError(event)
+    if event == "open":
+        mode, flags = args[1:3]
+        if calling or (mode and any(char in mode for char in "wax+")) or (
+            flags & (os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_TRUNC)
+        ):
+            raise AssertionError("Projection performed file IO")
+
+sys.addaudithook(audit)
+from clearml_yolo.adapters.clearml.cache import normalize_task_hash
+from clearml_yolo.adapters.clearml.parameters import project_native_parameters
+calling = True
+run = {"ultralytics": {"device": [0, 1]}, "prepared_dataset": {
+    "root": "/generated", "cache_identity": "a" * 64
+}}
+value = {"script": {"entry_point": "-m clearml_yolo.entrypoints.train"},
+    "configs": {"run": json.dumps(run), "dataset": "path: /generated\\nnames: {0: cat}"}}
+projected = normalize_task_hash(value)
+assert json.loads(projected["configs"]["run"])["ultralytics"]["device"] == {
+    "type": "cuda", "count": 2
+}
+assert project_native_parameters({"device": [0, 1], "epochs": 2}) == {"epochs": 2}
+assert "clearml" not in sys.modules
+"""
+    completed = subprocess.run(  # noqa: S603 - fixed interpreter and literal probe source
+        [sys.executable, "-B", "-c", source],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        timeout=20,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+
+
 def test_package_initializers_do_not_execute_operations_or_eagerly_load_sdks() -> None:
     findings: list[str] = []
     for path in SRC.rglob("__init__.py"):
@@ -291,6 +379,16 @@ def test_all_console_commands_are_independent_entrypoints(graph: grimp.ImportGra
             "clearml_yolo.adapters.yolo.inference",
         ),
         ("clearml SDK has explicit owners", "clearml_yolo.application.contracts", "clearml"),
+        (
+            "clearml adapter peer ownership",
+            "clearml_yolo.adapters.clearml.cache",
+            "clearml_yolo.adapters.yolo.config",
+        ),
+        (
+            "Clean architecture inward layers",
+            "clearml_yolo.application.use_cases.train",
+            "clearml_yolo.adapters.clearml.parameters",
+        ),
         (
             "torchvision SDK has explicit owners",
             "clearml_yolo.application.contracts",
