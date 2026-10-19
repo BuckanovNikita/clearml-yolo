@@ -43,5 +43,10 @@ coordination. Deliver the full requested change; no partial MVP release.
 
 - [x] R001 Recover the feature after prerequisite 036 in isolation and verify clean application against concurrent changes.
 - [x] R002 Re-run real CPU controller cache and paired pipeline publication/download checks; preserve scheduler coverage as an explicit gap.
-- [ ] R003 Complete integrated hooks, separate architecture checks and fresh independent review.
+- [x] R003 Complete integrated hooks, separate architecture checks and fresh independent review.
 - [ ] R004 Release the application through the native Git-tag workflow, then release the portable skill sequentially.
+
+Fresh integrated source review and reconciliation passed. T016 remains open only
+for the architecture acceptance failure caused by the declared scheduler gap;
+T013 remains incomplete for that execution coverage. The user renewed Git-only
+release authorization with the limitation disclosed.

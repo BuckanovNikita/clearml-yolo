@@ -42,3 +42,29 @@ and cleanup are recorded in verification.md. Required gaps are not waived by rev
 Final integrated acceptance review is deferred until the prerequisite changes are
 released and the remaining native gate is resolved. The source-review approval above
 does not waive those dependencies.
+
+## Fresh integrated release review — 2026-10-19
+
+A new independent read-only native agent, `/root/release_final_review`, reviewed
+application `129b94b..fd395d3` and all nine companion paths after parent integration
+and verification. Verdict: source accepted, no blocking correctness, regression,
+architecture or scope findings. All 87 application paths are accounted for by the
+architecture records. Typed ports retain effect ownership; pure cache helpers have
+positive and negative enforcement. Dependency and hook configuration is unchanged.
+The test-only readiness handshake fixes the reproduced fixture race without
+changing production queue behavior, deadlines or cleanup assertions.
+
+The reviewer independently verified all 21 task-owned runtime hashes and 324 archived
+native evidence hashes, active-task observations, early/final artifact equality,
+72/96 result rows, strict threshold flags, checkpoint hashes and 6/11 readable
+workbooks. It inspected passing normal hook and separate architecture logs and
+reran documentation checks: 531 application files and six changed companion Markdown
+files, zero issues. Companion guidance matches configuration, replay, cache, result
+completion and export failure behavior. No source or service changes were made.
+
+Architecture acceptance passes for 036 and both companion records. Feature 037
+remains unaccepted solely because its declared native scheduled-execution check is
+not-run. The renewed user release instruction authorizes Git-only delivery with
+that gap recorded; source-review approval does not imply full acceptance. Historical
+GPU/DDP observations were not treated as fresh evidence. Packaging and final remote
+ref verification follow this review.

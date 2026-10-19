@@ -151,3 +151,12 @@ bypass was attempted. Physical multi-GPU and real export-runtime coverage remain
 limited as described above. Portable skill recovery and fresh behavioral evaluation
 passed; its release follows application delivery. Integrated checks and final review
 are recorded below when complete.
+
+Final integrated source checks passed through the normal contributor commit hooks:
+full pytest, Ruff, mypy, Vulture and import-linter, followed by the normal post-commit
+helper. Feature commit `fd395d3` follows prerequisite `2e4b5f2`. Separate architecture
+tests passed 246; Markdown/local-link validation checked 531 files with zero issues.
+Fresh independent integrated review accepted the source without blockers; see
+[review.md](review.md). All 87 changed paths reconcile with the architecture records.
+The original 56 dirty application files and index remain unchanged. The release
+clone has no local uv source section; original source overrides remain untouched.

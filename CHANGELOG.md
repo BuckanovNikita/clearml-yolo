@@ -10,6 +10,9 @@
 
 ### Features
 
+- **clearml**: Publish accurate configuration and complete artifacts earlier
+  ([`fd395d3`](https://github.com/BuckanovNikita/clearml-yolo/commit/fd395d34bff7f3128047e5d0c302f2c3f0720b78))
+
 - **clearml**: Stabilize experiment parameters and controller cache identity
   ([`2e4b5f2`](https://github.com/BuckanovNikita/clearml-yolo/commit/2e4b5f2fa3c3e9dc90920af75fe3edb8e346bcd0))
 

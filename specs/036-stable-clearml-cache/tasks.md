@@ -23,7 +23,7 @@
 - [x] T009 Update tracking contract, index, README/technical guidance and corp-skills
   usage/evaluation; validate docs, links and examples.
 - [x] T010 Obtain fresh independent review after integration/checks; resolve findings.
-- [ ] T011 Reconcile actual scope/evidence and validate architecture acceptance.
+- [x] T011 Reconcile actual scope/evidence and validate architecture acceptance.
 - [ ] T012 Follow commit procedure, native Git-only release, pushes and ref verification.
 
 ## Independent review follow-up
@@ -55,3 +55,7 @@ required live publication/cache evidence.
 - [x] T021 Reproduce and synchronize the detached-rank readiness fixture in
   tests/test_shared_queue_processes.py; retain cleanup assertions and run the
   delayed-start diagnostic, complete process suite and normal commit hooks.
+
+The resumed native cache check, full hooks, integrated review and architecture
+acceptance now pass. The historical capacity block above is superseded by the
+2026-10-19 verification. Git-only delivery remains the final open step.
