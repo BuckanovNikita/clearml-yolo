@@ -4,7 +4,7 @@
 - **Tested**: 2026-10-19
 - **Assessment**: [assessment.md](assessment.md)
 - **Fix**: [fix.md](fix.md)
-- **Result**: verified (release workflow in progress)
+- **Result**: verified
 
 ## Checks performed
 
@@ -101,3 +101,22 @@ only and with the reviewed files frozen throughout execution; no checks are bypa
 Recommendation: close the reproduced monitoring bug. Native commit/release hooks and
 remote ref verification are the remaining delivery steps, recorded separately after
 completion. No application code changed after the accepted independent review.
+
+## Delivered releases — 2026-10-19
+
+Contributor commit `ac65f80` passed every applicable commit hook. The native post-commit
+workflow passed and created version commit `c0b77e58339c72f4078fec24fea403ee6a798e93`
+and annotated Git tag **v0.34.1**. The release commit changes only generated CHANGELOG.md
+and the root version tokens in pyproject.toml/uv.lock; dependencies are unchanged.
+The branch and exact tag were pushed atomically; remote master and the peeled tag both
+resolved to that version commit at publication. No GitHub Release, assets or packages
+were published, and the installed environment was not upgraded.
+
+Companion portable guidance commit `7409062` and annotated **v0.2.9** were also pushed
+atomically; remote main and the peeled tag resolve to that commit. The server reports
+the collection's renamed location as custom-opencode-skills; the maintained corp-skills
+remote alias remains functional and was not changed by this task.
+
+This documentation follow-up records delivery only. Inspected implementation/test files
+remain identical to the reviewed and tested release; module architecture is unchanged.
+Original unrelated ClearML/cache work and local dependency overrides are preserved.
