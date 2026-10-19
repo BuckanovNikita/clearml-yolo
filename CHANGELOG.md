@@ -1,7 +1,12 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.34.1 (2026-10-19)
+
+### Bug Fixes
+
+- **queue**: Isolate private task refresh failures from monitoring
+  ([`ac65f80`](https://github.com/BuckanovNikita/clearml-yolo/commit/ac65f80ec74926edca3a1409d3847dec9902124d))
 
 ### Documentation
 
