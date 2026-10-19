@@ -1,9 +1,12 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.35.0 (2026-10-19)
 
 ### Documentation
+
+- **clearml**: Record integrated release review and native evidence
+  ([`b4a8164`](https://github.com/BuckanovNikita/clearml-yolo/commit/b4a8164feb486a3864af2e2cfec96501963c2df0))
 
 - **queue**: Record refresh isolation release verification
   ([`129b94b`](https://github.com/BuckanovNikita/clearml-yolo/commit/129b94b749d7d4bcaf6e82b9a504a141796c7bdc))
