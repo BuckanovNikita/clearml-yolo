@@ -43,6 +43,8 @@ def published(
 ) -> dict[str, pd.DataFrame]:
     """Everything the stage would have published to ClearML, keyed by section/series."""
     tables: dict[str, pd.DataFrame] = {}
+    for method in ("declare_result_producers", "complete_result_producer", "register_ground_truth"):
+        monkeypatch.setattr(workflow_dependencies.tracking, method, lambda *_a, **_k: None)
 
     def report_table(
         _: object, title: str, series: str, frame: pd.DataFrame, **_kwargs: Any
@@ -323,7 +325,7 @@ def test_empty_prediction_output_has_canonical_header_and_is_published(
     assert list(pd.read_csv(result.predictions)) == PREDICTION_COLUMNS
 
 
-def test_invocation_uploads_canonical_prediction_and_gt_csvs_once_at_completion(
+def test_invocation_uploads_canonical_prediction_and_gt_csvs_before_completion(
     tmp_path: Path,
     checkpoint_recording: Any,
     published: dict[str, pd.DataFrame],
@@ -331,7 +333,7 @@ def test_invocation_uploads_canonical_prediction_and_gt_csvs_once_at_completion(
     fake_clearml: tuple[type[Any], Any],
     workflow_dependencies: WorkflowDependencies,
 ) -> None:
-    from clearml_yolo.adapters.clearml.results import register_predictions
+    from clearml_yolo.adapters.clearml import results
     from clearml_yolo.adapters.clearml.session import invocation
 
     checkpoint_recording({"imgsz": 64})
@@ -339,16 +341,15 @@ def test_invocation_uploads_canonical_prediction_and_gt_csvs_once_at_completion(
     patch_workflow(
         monkeypatch, workflow_dependencies, predict_module, "init_task", lambda *_a, **_k: task
     )
-    patch_workflow(
-        monkeypatch,
-        workflow_dependencies,
-        predict_module,
-        "register_predictions",
-        register_predictions,
-    )
+    for method in (
+        "register_predictions", "register_ground_truth",
+        "declare_result_producers", "complete_result_producer",
+    ):
+        monkeypatch.setattr(workflow_dependencies.tracking, method, getattr(results, method))
     with invocation(ClearMLConfig(), "predict"):
         result = _predict(tmp_path, 64, workflow_dependencies=workflow_dependencies)
-        assert task.uploads == []
+        assert [item["name"] for item in task.uploads] == ["gt_csv", "predicts_csv"]
+        assert not task.completed
     assert [item["name"] for item in task.uploads] == [
         artifact_names.GROUND_TRUTH,
         artifact_names.PREDICTIONS,

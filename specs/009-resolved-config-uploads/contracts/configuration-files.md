@@ -30,3 +30,11 @@ The shared CLI uses `resolve_config_file` with a closure over current composed c
   completion guarantees. Do not publish configuration files as artifacts.
 
 Editable local exports and historical task files are outside this attachment contract.
+
+## Startup run views
+
+Resolved file behavior above also supplies inputs to the CLI's active `run` snapshot.
+The [startup configuration contract](../../010-native-clearml-integration/contracts/tracking-publication.md#accurate-startup-configuration)
+defines selected-backend publication, informational `run_overrides` against built-in
+selected-preset defaults, and early General. These JSON views are Configuration Objects,
+not duplicate artifacts; execution and cloning use `run`.

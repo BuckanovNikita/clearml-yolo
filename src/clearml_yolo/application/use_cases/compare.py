@@ -491,6 +491,11 @@ def _skip_without_baseline(
             model_identity=candidate.identity,
             deps=deps,
         )
+        _publish_comparison_tables(
+            task, ground_truth_path,
+            {"candidate": (predictions, evaluated, candidate)}, deps=deps,
+        )
+        deps.tracking.complete_result_producer(task, "compare")
         workbook = (
             destination
             / f"compare_evaluation_candidate_{artifact_names.split_component(split)}.xlsx"
@@ -522,12 +527,6 @@ def _skip_without_baseline(
                         "evaluation": evaluation.model_dump(),
                     },
                 },
-            )
-            _publish_comparison_tables(
-                task,
-                ground_truth_path,
-                {"candidate": (predictions, evaluated, candidate)},
-                deps=deps,
             )
 
 
@@ -585,6 +584,32 @@ def _evaluation_config(evaluation: EvaluationConfig | dict[str, Any] | None) -> 
     return config
 
 
+def _publish_comparison_workbook(
+    task: TaskHandle | None,
+    tables: ComparisonTables,
+    workbook: Path,
+    split: str,
+    baseline: ResolvedModel,
+    candidate: ResolvedModel,
+    *,
+    deps: WorkflowDependencies,
+) -> dict[str, Path]:
+    csv_tables = deps.renderer.write_comparison_workbook(
+        tables.rows, tables.excluded, tables.methodology, workbook
+    )
+    identities = {
+        role: model.identity
+        for role, model in (("baseline", baseline), ("candidate", candidate))
+        if model.identity is not None
+    }
+    deps.renderer.annotate_workbook(workbook, identities)
+    if task is not None:
+        name = artifact_names.per_split(artifact_names.COMPARISON_WORKBOOK_PREFIX, split)
+        deps.tracking.expect_artifacts(task, [name])
+        deps.tracking.upload_artifact(task, name, workbook)
+    return csv_tables
+
+
 def _read_comparison_truth(
     path: Path, image_name: str, *, deps: WorkflowDependencies
 ) -> GroundTruthRead:
@@ -629,6 +654,8 @@ def compare(
         ground_truth_path = Path(ground_truth)
         loaded_truth = _read_comparison_truth(ground_truth_path, inference.image_name, deps=deps)
         truth = loaded_truth.source
+        deps.tracking.declare_result_producers(task, ["compare"], output_dir=destination)
+        deps.tracking.register_ground_truth(task, ground_truth_path, output_dir=destination)
         try:
             baseline = _resolve_model(
                 baseline_model,
@@ -712,6 +739,10 @@ def compare(
             model_identity=baseline.identity,
             deps=deps,
         )
+        _publish_comparison_tables(
+            task, ground_truth_path,
+            {"baseline": (baseline_predictions, baseline_evaluated, baseline)}, deps=deps,
+        )
         candidate_evaluated, candidate_vocabulary, candidate_evidence, _candidate_archive = _scored(
             candidate.weights,
             truth,
@@ -728,6 +759,11 @@ def compare(
             model_identity=candidate.identity,
             deps=deps,
         )
+        _publish_comparison_tables(
+            task, ground_truth_path,
+            {"candidate": (candidate_predictions, candidate_evaluated, candidate)}, deps=deps,
+        )
+        deps.tracking.complete_result_producer(task, "compare")
         baseline_classes, candidate_classes = (
             set(baseline_vocabulary.model_classes),
             set(candidate_vocabulary.model_classes),
@@ -783,15 +819,9 @@ def compare(
         workbook = destination / (
             artifact_names.per_split(artifact_names.COMPARISON_WORKBOOK_PREFIX, split) + ".xlsx"
         )
-        csv_tables = deps.renderer.write_comparison_workbook(
-            tables.rows, tables.excluded, tables.methodology, workbook
+        csv_tables = _publish_comparison_workbook(
+            task, tables, workbook, split, baseline, candidate, deps=deps
         )
-        identities = {
-            role: model.identity
-            for role, model in (("baseline", baseline), ("candidate", candidate))
-            if model.identity is not None
-        }
-        deps.renderer.annotate_workbook(workbook, identities)
         deps.tracking.report_comparison(task, split, tables.rows, tables.methodology)
         manifest = _write_manifest(
             destination,
@@ -815,18 +845,6 @@ def compare(
                     }
                 },
             )
-            _publish_comparison_tables(
-                task,
-                ground_truth_path,
-                {
-                    "baseline": (baseline_predictions, baseline_evaluated, baseline),
-                    "candidate": (candidate_predictions, candidate_evaluated, candidate),
-                },
-                deps=deps,
-            )
-            name = artifact_names.per_split(artifact_names.COMPARISON_WORKBOOK_PREFIX, split)
-            deps.tracking.expect_artifacts(task, [name])
-            deps.tracking.upload_artifact(task, name, workbook)
             for name, table_path in csv_tables.items():
                 if name.endswith("_excluded"):
                     deps.tracking.publish_table(task, name, table_path)

@@ -91,3 +91,8 @@ observations then; they are not current execution recipes.
 The historical force/admission controls are superseded by direct native execution and
 explicit queue resource requests. Regenerate old configuration examples; do not silently
 translate their controls. See [migration and operations](queue.md).
+
+Feature [037](../specs/037-early-accurate-publication/spec.md) extends active configuration,
+early General and complete-only artifact timing; its
+[architecture and verification plan](../specs/037-early-accurate-publication/plan.md) links the
+current publication/replay contracts and the continuing stable-cache work.

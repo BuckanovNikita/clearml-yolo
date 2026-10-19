@@ -8,6 +8,11 @@
 - **queue**: Record refresh isolation release verification
   ([`129b94b`](https://github.com/BuckanovNikita/clearml-yolo/commit/129b94b749d7d4bcaf6e82b9a504a141796c7bdc))
 
+### Features
+
+- **clearml**: Stabilize experiment parameters and controller cache identity
+  ([`2e4b5f2`](https://github.com/BuckanovNikita/clearml-yolo/commit/2e4b5f2fa3c3e9dc90920af75fe3edb8e346bcd0))
+
 
 ## v0.34.1 (2026-10-19)
 

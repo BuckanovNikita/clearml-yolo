@@ -277,11 +277,12 @@
     {
       "id": "behavior",
       "kind": "behavior",
-      "command": "UV_NO_SYNC=1 uv run --frozen --no-sync pre-commit run --all-files",
+      "command": "UV_NO_SYNC=1 git commit (normal pre-commit hooks)",
       "expectation": "Full suite including new cache/publication/replay regressions passes",
       "result": {
-        "status": "not-run",
-        "reason": "Resumed full hook exposed a test-fixture readiness race; deterministic delayed-start diagnostic passed after synchronization. Complete hook rerun pending."
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/036-stable-clearml-cache/verification.md"
       }
     },
     {
@@ -345,6 +346,6 @@
     "status": "accepted",
     "reviewer": "/root/final_acceptance: fresh independent native agent",
     "evidence": "specs/036-stable-clearml-cache/review.md",
-    "reconciliation": "Inspected all task-owned added/modified runtime modules, tests and architecture checker, untracked cache/projection modules and tests, feature artifacts, maintained documentation and generated changelog. No renames or deletions. Excluded the pre-existing local pyproject.toml uv.sources section and untracked docs/cls-cls-pw-grid-search.md; dependency revisions and release version files remain unchanged. Local source review is accepted; the declared live check remains not-run and blocks final acceptance."
+    "reconciliation": "Inspected all task-owned added/modified runtime modules, tests and architecture checker, untracked cache/projection modules and tests, feature artifacts, maintained documentation and generated changelog. No renames or deletions. Excluded the pre-existing local pyproject.toml uv.sources section and untracked docs/cls-cls-pw-grid-search.md; dependency revisions and release version files remain unchanged. Local source review is accepted; the declared live check remains not-run and blocks final acceptance. Resumed release: the declared live cache check now passes; the fixture readiness amendment and recovered combined source await fresh integrated review."
   }
 }

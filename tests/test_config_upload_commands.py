@@ -58,7 +58,8 @@ def test_file_resolver_sees_remote_inputs_and_derived_output(
         resolver = kwargs.get("config_resolver")
         yield RemoteTask()
 
-    def replay(_task: Any, values: dict[str, Any]) -> dict[str, Any]:
+    def replay(_task: Any, values: dict[str, Any], *, publish: bool) -> dict[str, Any]:
+        assert publish is False
         return values | {"weights": "remote.pt", "clearml": {"task_name": "remote"}}
 
     def command(clearml: Any, weights: str, output_dir: str | None) -> None:
@@ -88,6 +89,7 @@ def test_file_resolver_sees_remote_inputs_and_derived_output(
         monkeypatch, workflow_dependencies, common, "initialize_naming", lambda _task: None
     )
     patch_workflow(monkeypatch, workflow_dependencies, common, "replay_configuration", replay)
+    monkeypatch.setattr(common, "publish_run_configuration", lambda *_args: None)
     common.launch("report", command)
     assert attached == [
         {

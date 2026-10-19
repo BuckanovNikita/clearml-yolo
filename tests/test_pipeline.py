@@ -20,6 +20,15 @@ from workflow_dependencies import (
 )
 
 
+@pytest.fixture(autouse=True)
+def fake_result_producers(
+    monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
+) -> None:
+    """These routing tests stub nested stages; adapter lifecycle has separate coverage."""
+    for method in ("declare_result_producers", "complete_result_producer"):
+        monkeypatch.setattr(workflow_dependencies.tracking, method, lambda *_a, **_k: None)
+
+
 def test_routing_fills_only_output_ownership(tmp_path: Path) -> None:
     result = routed_native({"device": [0, 1], "batch": -1}, tmp_path, "train")
     assert result == {"device": [0, 1], "batch": -1, "project": str(tmp_path), "name": "train"}

@@ -872,3 +872,35 @@ def test_unparsed_run_keeps_general_selectors_conservative(
         representation["hyper_params"]["General/device"] = device
         values.append(representation)
     assert sdk_hash(values[0]) != sdk_hash(values[1])
+
+
+def test_derived_overrides_do_not_affect_recognized_task_hash(sdk_hash: Callable[..., str]) -> None:
+    first = _representation()
+    second = deepcopy(first)
+    second["configs"]["run_overrides"] = json.dumps({"ultralytics": {"weight_decay": 0.02}})
+    assert sdk_hash(first) == sdk_hash(second)
+    assert "run_overrides" in second["configs"]
+    for value in ("malformed", "{}", None):
+        second["configs"]["run_overrides"] = value
+        assert normalize_task_hash(first) == normalize_task_hash(second)
+    second["script"]["entry_point"] = "unrelated.py"
+    assert normalize_task_hash(second) == second
+
+
+@pytest.mark.parametrize("ambiguous", [True, False])
+def test_derived_overrides_stay_informational_when_recognized_projection_is_unsafe(
+    ambiguous: bool,
+) -> None:
+    first = _representation()
+    if ambiguous:
+        # Installed SDK's HOCON parser and JSON disagree on unicode escapes.
+        first["configs"]["run"] = '{"model": "\\u0041"}'
+    else:
+        run = json.loads(first["configs"]["run"])
+        run["ultralytics"]["device"] = {"invalid": "selector"}
+        first["configs"]["run"] = json.dumps(run)
+    second = deepcopy(first)
+    second["configs"]["run_overrides"] = "private derived metadata"
+    assert normalize_task_hash(first) == normalize_task_hash(second)
+    assert normalize_task_hash(first) == first
+    assert "run_overrides" in second["configs"]

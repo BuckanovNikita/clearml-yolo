@@ -52,6 +52,6 @@ required live publication/cache evidence.
 
 ## Resumed release verification
 
-- [ ] T021 Reproduce and synchronize the detached-rank readiness fixture in
+- [x] T021 Reproduce and synchronize the detached-rank readiness fixture in
   tests/test_shared_queue_processes.py; retain cleanup assertions and run the
   delayed-start diagnostic, complete process suite and normal commit hooks.

@@ -1,6 +1,8 @@
 """Command publication lifecycle and nested-owner suppression."""
 
 import json
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -94,6 +96,9 @@ def test_training_policy_normalization_and_receipts_stay_out_of_artifacts(
     from test_clearml_session import FakeTask
 
     task = FakeTask()
+    monkeypatch.setattr(
+        workflow_dependencies.tracking, "publish_training_parameters", lambda *args: None
+    )
     patch_workflow(monkeypatch, workflow_dependencies, clearml.Task, "init", lambda **_kwargs: task)
     patch_workflow(
         monkeypatch, workflow_dependencies, clearml.Task, "get_task", lambda **_kwargs: task
@@ -179,7 +184,7 @@ def test_training_policy_normalization_and_receipts_stay_out_of_artifacts(
             deps=workflow_dependencies,
         )
         register_ground_truth(task, truth, output_dir=tmp_path / "publication")
-        assert task.uploads == []
+        assert [item["name"] for item in task.uploads] == [artifact_names.GROUND_TRUTH]
         assert (
             publish_results(
                 Publisher(),
@@ -213,6 +218,12 @@ def test_validation_disables_nested_prediction_and_metrics_publication(
     from clearml_yolo.application.use_cases import val
 
     nested: list[FiftyOneConfig] = []
+    declarations: list[object] = []
+    monkeypatch.setattr(
+        workflow_dependencies.tracking,
+        "declare_result_producers",
+        lambda _task, producers, **_kwargs: declarations.append(producers),
+    )
     predictions = tmp_path / "predictions.csv"
     expected = MetricsResult(output_dir=tmp_path / "metrics")
     patch_workflow(
@@ -245,8 +256,21 @@ def test_validation_disables_nested_prediction_and_metrics_publication(
         deps=workflow_dependencies,
     )
     assert result is expected
+    assert declarations == [["predict", "metrics"]]
     assert len(nested) == 2
     assert all(not config.enabled for config in nested)
+
+
+@contextmanager
+def _replay_owner(task: Any) -> Iterator[Any]:
+    from clearml_yolo.adapters.clearml import session
+
+    state = session._InvocationState(task=task, stages=["train"], current_stage="train")
+    token = session._ACTIVE_INVOCATION.set(state)
+    try:
+        yield task
+    finally:
+        session._ACTIVE_INVOCATION.reset(token)
 
 
 def test_remote_clone_replays_canonical_run_and_general(
@@ -272,9 +296,9 @@ def test_remote_clone_replays_canonical_run_and_general(
             return False
 
         @staticmethod
-        def connect(values: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
-            assert kwargs == {"name": "General", "ignore_remote_overrides": False}
-            return values | {"epochs": 17}
+        def get_parameters(**kwargs: Any) -> dict[str, Any]:
+            assert kwargs == {"cast": True}
+            return {"General/epochs": 17}
 
     def replay(_task: Any, values: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
         inputs.append(values)
@@ -296,12 +320,16 @@ def test_remote_clone_replays_canonical_run_and_general(
         workflow_dependencies,
         common,
         "invocation",
-        lambda *_args, **_kwargs: nullcontext(RemoteTask()),
+        lambda *_args, **_kwargs: _replay_owner(RemoteTask()),
     )
     patch_workflow(
         monkeypatch, workflow_dependencies, common, "initialize_naming", lambda _task: None
     )
     patch_workflow(monkeypatch, workflow_dependencies, common, "replay_configuration", replay)
+    monkeypatch.setattr(common, "publish_run_configuration", lambda *args: None)
+    monkeypatch.setattr(
+        workflow_dependencies.tracking, "publish_training_parameters", lambda *args: None
+    )
     monkeypatch.setattr(
         "clearml_yolo.adapters.clearml.session.record_run_configuration", lambda *args: None
     )
@@ -358,14 +386,13 @@ def test_remote_clone_does_not_replay_previous_owner_output_route(
             return False
 
         @staticmethod
-        def connect(values: dict[str, Any], **_kwargs: Any) -> dict[str, Any]:
-            values.update(
-                epochs=17,
-                project="/previous/run/detect",
-                name="previous-task",
-                save_dir="/previous/run/detect/previous-task",
-            )
-            return values
+        def get_parameters(**_kwargs: Any) -> dict[str, Any]:
+            return {
+                "General/epochs": 17,
+                "General/project": "/previous/run/detect",
+                "General/name": "previous-task",
+                "General/save_dir": "/previous/run/detect/previous-task",
+            }
 
     task = RemoteTask()
 
@@ -403,7 +430,7 @@ def test_remote_clone_does_not_replay_previous_owner_output_route(
         workflow_dependencies,
         common,
         "invocation",
-        lambda *_args, **_kwargs: nullcontext(task),
+        lambda *_args, **_kwargs: _replay_owner(task),
     )
     patch_workflow(
         monkeypatch, workflow_dependencies, common, "initialize_naming", lambda _task: None
@@ -428,6 +455,10 @@ def test_remote_clone_does_not_replay_previous_owner_output_route(
     )
     patch_workflow(
         monkeypatch, workflow_dependencies, training, "_execute_training", execute_training
+    )
+    monkeypatch.setattr(common, "publish_run_configuration", lambda *args: None)
+    monkeypatch.setattr(
+        workflow_dependencies.tracking, "publish_training_parameters", lambda *args: None
     )
     monkeypatch.setattr(
         "clearml_yolo.adapters.clearml.session.record_run_configuration", lambda *args: None
@@ -480,9 +511,12 @@ def test_current_save_dir_override_reaches_pipeline_conflict_validation(
             return not remote
 
         @staticmethod
-        def connect(values: dict[str, Any], **_kwargs: Any) -> dict[str, Any]:
-            values.update(project="/old/detect", name="old", save_dir="/old/detect/old")
-            return values
+        def get_parameters(**_kwargs: Any) -> dict[str, Any]:
+            return {
+                "General/project": "/old/detect",
+                "General/name": "old",
+                "General/save_dir": "/old/detect/old",
+            }
 
     def command(
         clearml: Any, ultralytics: dict[str, Any], ultralytics_predict: dict[str, Any]
@@ -504,7 +538,7 @@ def test_current_save_dir_override_reaches_pipeline_conflict_validation(
         workflow_dependencies,
         common,
         "invocation",
-        lambda *_args, **_kwargs: nullcontext(Task()),
+        lambda *_args, **_kwargs: _replay_owner(Task()),
     )
     patch_workflow(
         monkeypatch, workflow_dependencies, common, "initialize_naming", lambda _task: None
@@ -515,6 +549,10 @@ def test_current_save_dir_override_reaches_pipeline_conflict_validation(
         common,
         "replay_configuration",
         lambda _task, values, **kwargs: values,
+    )
+    monkeypatch.setattr(common, "publish_run_configuration", lambda *args: None)
+    monkeypatch.setattr(
+        workflow_dependencies.tracking, "publish_training_parameters", lambda *args: None
     )
     monkeypatch.setattr(
         "clearml_yolo.adapters.clearml.session.record_run_configuration", lambda *args: None

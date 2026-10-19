@@ -77,6 +77,34 @@ recorded cache identity/root; unproven paths and unsupported configuration text 
 hash-sensitive. See the [controller recipe](../../../TECH_DETAILS.md#clearml-pipeline-cache-identity).
 A cache hit reuses existing remote outputs without writing a new local destination.
 
+## Accurate startup configuration
+
+The CLI publishes `run` as detached, resolved JSON after YAML/CLI composition, queue device
+binding and supported remote overrides. It contains selected executable inputs: YOLO retains
+its active native groups with only model backend/preset selectors; alternative detectors
+retain `model` settings and omit inactive YOLO groups. Later result provenance cannot replace
+these configured roots. Native normalization is recorded separately under its existing
+normalization/evidence fields. Historical replay remains supported and old tasks are untouched.
+
+A second JSON Configuration Object, `run_overrides`, contains only recursive differences
+from built-in project defaults for the same command and selected model preset. It includes
+YAML and CLI changes, preserves meaningful false/zero/null/empty values and list order,
+and prunes unchanged values and empty parents produced by pruning. Generated routing,
+tracking destinations/tags, result provenance and inactive groups are excluded. Both objects
+are sanitized; `run_overrides` is deterministic and informational. Cloning and execution
+continue to use `run`, and the recognized-task cache projection ignores `run_overrides`.
+
+Training publishes sanitized, validated `General` parameters before dataset preparation,
+after remote overrides have been applied. Native callbacks refresh observed normalization
+through their existing owner-only lifecycle, including DDP and alternative detectors.
+The existing parameter exclusions remain. Commands that skip training do not create training
+parameters. Embedded workflows use the tracking port for early General and must still supply
+their own complete executable run mapping.
+
+Complete artifacts follow the [publication timing contract](../../014-evaluation-publication/contracts/publication.md#invocation-csv-bundle).
+Finalization remains a verification barrier: an earlier complete upload survives later failure,
+but upload rejection or a failed final flush fails the task.
+
 ## Publication inventory
 
 | Destination | Permitted contents |
@@ -85,7 +113,7 @@ A cache hit reuses existing remote outputs without writing a new local destinati
 | Scalars / Plots / Debug Samples | Native non-PR training/validation telemetry; current-model confusion charts and test-only grouped PR; training/validation previews. Comparison headline single values remain outside Plots. |
 | Output Model | One native best checkpoint, verified before successful completion. |
 | Artifacts | Canonical ground truth, prediction, frozen validation-threshold CSVs; evaluation/comparison workbooks; final performance reports. |
-| Configuration Objects | Full sanitized replay settings, dataset overrides, source references, normalization and meaningful provenance. |
+| Configuration Objects | Full sanitized `run`, informational `run_overrides`, consumed configuration, source references, normalization and meaningful provenance. |
 | General | Sanitized native experiment settings with known execution-only parameters excluded. |
 | Execution / Script | Source repository, branch, commit, canonical module entrypoint and repository-relative working directory; no raw arguments or code diffs. |
 | Local outputs | Effective YAML with comments, temporary inputs, manifests, journals and diagnostic/publication receipts. |

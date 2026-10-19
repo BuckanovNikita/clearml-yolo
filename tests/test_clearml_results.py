@@ -1,4 +1,4 @@
-"""Canonical CSVs preserve contexts and upload once at owner completion."""
+"""Canonical CSVs preserve contexts and upload once all declared producers complete."""
 
 from dataclasses import replace
 from pathlib import Path
@@ -115,12 +115,14 @@ def test_prediction_bundle_is_deferred_and_contexts_are_distinct(
     _, task = owner
     truth, predictions = _inputs(tmp_path)
     with invocation(ClearMLConfig(), "pipeline"):
+        results.declare_result_producers(task, ["predict"], output_dir=tmp_path)
         results.register_predictions(task, truth, predictions, output_dir=tmp_path, model_id="m1")
         results.register_predictions(task, truth, predictions, output_dir=tmp_path, model_id="m1")
         results.register_predictions(
             task, truth, predictions, output_dir=tmp_path, model_id="m2", role="comparison_baseline"
         )
-        assert task.uploads == []
+        assert [item["name"] for item in task.uploads] == ["gt_csv"]
+        results.complete_result_producer(task, "predict")
     assert [item["name"] for item in task.uploads] == ["gt_csv", "predicts_csv"]
     frame = pd.read_csv(task.uploads[1]["artifact_object"], dtype={"instance_label": str})
     assert set(frame["model_id"]) == {"m1", "m2"}
@@ -170,7 +172,9 @@ def test_raw_predictions_outside_split_population_remain_exported(
     extra = source.iloc[[0]].assign(image_name="outside.jpg")
     pd.concat([source, extra], ignore_index=True).to_csv(predictions, index=False)
     with invocation(ClearMLConfig(), "predict"):
+        results.declare_result_producers(task, ["predict"], output_dir=tmp_path)
         results.register_predictions(task, truth, predictions, output_dir=tmp_path)
+        results.complete_result_producer(task, "predict")
     frame = pd.read_csv(task.uploads[1]["artifact_object"])
     predicted = frame[frame["row_type"] == "predict"]
     assert set(predicted["image_name"]) == {"val.jpg", "test.jpg", "outside.jpg"}
@@ -195,7 +199,9 @@ def test_source_identity_survives_context_csv_and_manifest(
     results.write_prediction_provenance(predictions, checkpoint, identity)
     assert results.prediction_model_identity(predictions) == identity
     with invocation(ClearMLConfig(), "metrics"):
+        results.declare_result_producers(task, ["predict"], output_dir=tmp_path)
         results.register_predictions(task, truth, predictions, output_dir=tmp_path)
+        results.complete_result_producer(task, "predict")
     frame = pd.read_csv(
         task.uploads[1]["artifact_object"],
         dtype={"training_task_id": str, "model_name": str},
@@ -245,14 +251,16 @@ def test_baseline_keeps_artifacts_and_provenance_without_plots(
         model_identity=identity,
     )
     with invocation(ClearMLConfig(), "compare"):
+        results.declare_result_producers(task, ["predict"], output_dir=tmp_path)
         results.publish_evaluation(
             task, evaluated, truth, predictions, output_dir=tmp_path, role="comparison_baseline"
         )
+        results.complete_result_producer(task, "predict")
     assert plot_calls == []
     assert [upload["name"] for upload in task.uploads] == [
+        "gt_csv",
         "comparison_baseline_dashboard_full_test",
         "comparison_baseline_dashboard_dtrk_test",
-        "gt_csv",
         "predicts_csv",
     ]
     frame = pd.read_csv(task.uploads[-1]["artifact_object"])
@@ -289,12 +297,14 @@ def test_checkpoint_slots_repeat_and_collisions_have_readable_suffixes(
         ("a", "prediction", "val"),
     ]
     with invocation(ClearMLConfig(), "pipeline"):
+        results.declare_result_producers(task, ["predict"], output_dir=tmp_path)
         for index, (checkpoint, role, split) in enumerate(cases):
             source = tmp_path / f"predictions-{index}.csv"
             source.write_bytes(predictions.read_bytes())
             identity = ModelIdentity(model_name="猫 01", checkpoint_sha256=checkpoint * 64)
             value = replace(evaluated, split=split, model_identity=identity)
             results.publish_evaluation(task, value, truth, source, output_dir=tmp_path, role=role)
+        results.complete_result_producer(task, "predict")
     assert [label for kind, _, label in plot_calls if kind == "confusion"] == [
         "猫 01 · test",
         "猫 01 · test",
@@ -326,6 +336,7 @@ def test_unknown_contexts_do_not_overwrite_and_provenance_reuses_slots(
     checkpoint = tmp_path / "best.pt"
     checkpoint.write_bytes(b"same checkpoint")
     with invocation(ClearMLConfig(), "pipeline"):
+        results.declare_result_producers(task, ["predict"], output_dir=tmp_path)
         for index in range(8):
             source = tmp_path / f"unknown-{index}.csv"
             source.write_bytes(predictions.read_bytes())
@@ -346,6 +357,7 @@ def test_unknown_contexts_do_not_overwrite_and_provenance_reuses_slots(
             results.publish_evaluation(
                 task, value, truth, source, output_dir=tmp_path, model_id=model_id
             )
+        results.complete_result_producer(task, "predict")
     assert [label for kind, _, label in plot_calls if kind == "confusion"] == [
         "Current model · test",
         "Current model · test · Prediction",
@@ -381,10 +393,12 @@ def test_raw_publication_preserves_literal_names_and_labels_and_assigns_media_sp
         image_name=names, instance_label=["NA", "NULL"]
     ).to_csv(predictions, index=False)
     with invocation(ClearMLConfig(), "predict"):
+        results.declare_result_producers(task, ["predict"], output_dir=tmp_path)
         results.register_predictions(
             task, truth, predictions, output_dir=tmp_path,
             prediction_image_name=cast(ImageNameMode, mode),
         )
+        results.complete_result_producer(task, "predict")
     frame = read_detection_csv(task.uploads[1]["artifact_object"])
     predicted = frame[frame.row_type == "predict"].sort_values("source_row_id")
     assert predicted.image_name.tolist() == names

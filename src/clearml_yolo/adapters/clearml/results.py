@@ -1,7 +1,8 @@
-"""Collect durable result contexts and publish canonical CSVs at owner completion."""
+"""Publish immutable truth and results as their declared producers finish."""
 
 import hashlib
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -20,6 +21,7 @@ from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.storage.file_io import read_detection_csv, read_ground_truth
 from clearml_yolo.adapters.storage.filesystem import write_path
 from clearml_yolo.application.contracts import ImageNameMode
+from clearml_yolo.application.ports import ResultProducer
 from clearml_yolo.core import artifact_names
 from clearml_yolo.core.evaluation.models import EvaluatedSplit
 from clearml_yolo.core.evaluation.result_rows import (
@@ -149,6 +151,9 @@ class _ResultBundle:
     truth: Path | None = None
     contexts: dict[tuple[str, str], tuple[ResultContext, Path]] = field(default_factory=dict)
     prediction_expected: bool = False
+    producers: frozenset[ResultProducer] | None = None
+    completed_producers: set[ResultProducer] = field(default_factory=set)
+    predictions_uploaded: bool = False
     plot_slots: dict[tuple[str, str, str], str] = field(default_factory=dict)
 
     def display_label(self, context: ResultContext, predictions: Path, role: str) -> str:
@@ -181,18 +186,55 @@ class _ResultBundle:
         self.plot_slots[source] = label
         return label
 
+    def declare(self, producers: Sequence[ResultProducer]) -> None:
+        declared = frozenset(producers)
+        if not declared <= {"predict", "metrics", "compare"}:
+            raise ValueError("Unknown result producer")
+        if len(declared) != len(producers):
+            raise ValueError("Result producers must be declared without duplicates")
+        if self.producers is None:
+            self.producers = declared
+        elif not declared <= self.producers:
+            raise ValueError("Result producers must be declared before any contribution")
+        elif declared & self.completed_producers:
+            raise ValueError("Result producers are already complete")
+
+    def require_writable(self) -> None:
+        if self.producers is None:
+            raise RuntimeError("Declare result producers before registering result rows")
+        if self.completed_producers == self.producers:
+            raise RuntimeError("Result producers are complete; result rows are immutable")
+
+    def complete(self, producer: ResultProducer) -> None:
+        if self.producers is None or producer not in self.producers:
+            raise ValueError(f"Result producer {producer!r} was not declared")
+        if producer in self.completed_producers:
+            raise ValueError(f"Result producer {producer!r} is already complete")
+        self.completed_producers.add(producer)
+        if self.completed_producers == self.producers and self.prediction_expected:
+            with trace_operation("clearml.results.csv.assemble"):
+                frames = [_read_rows(path) for _, (_, path) in sorted(self.contexts.items())]
+                combined = pd.concat(frames, ignore_index=True)
+                destination = self.directory / "predicts_csv.csv"
+                _atomic_csv(combined, destination)
+            upload_artifact(self.task, artifact_names.PREDICTIONS, destination)
+            self.predictions_uploaded = True
+
     def set_truth(self, path: Path) -> pd.DataFrame:
         frame = assign_source_ids(_read_rows(path), row_type="ground_truth")
         destination = self.directory / "gt_csv.csv"
-        if self.truth is None:
-            expect_artifacts(self.task, [artifact_names.GROUND_TRUTH])
-        elif not frame.equals(_read_rows(self.truth)):
-            raise ValueError("One invocation cannot publish conflicting effective ground truth")
+        if self.truth is not None:
+            if not frame.equals(_read_rows(self.truth)):
+                raise ValueError("One invocation cannot publish conflicting effective ground truth")
+            return frame
+        expect_artifacts(self.task, [artifact_names.GROUND_TRUTH])
         _atomic_csv(frame, destination)
         self.truth = destination
+        upload_artifact(self.task, artifact_names.GROUND_TRUTH, destination)
         return frame
 
     def put(self, context: ResultContext, rows: pd.DataFrame) -> None:
+        self.require_writable()
         if not self.prediction_expected:
             expect_artifacts(self.task, [artifact_names.PREDICTIONS])
             self.prediction_expected = True
@@ -226,24 +268,35 @@ class _ResultBundle:
 
     @trace_operation("clearml.results.finalize")
     def finalize(self) -> None:
-        if self.truth is not None:
-            upload_artifact(self.task, artifact_names.GROUND_TRUTH, self.truth)
-        if self.prediction_expected:
-            with trace_operation("clearml.results.csv.assemble"):
-                frames = [_read_rows(path) for _, (_, path) in sorted(self.contexts.items())]
-                combined = pd.concat(frames, ignore_index=True)
-                destination = self.directory / "predicts_csv.csv"
-                _atomic_csv(combined, destination)
-            upload_artifact(self.task, artifact_names.PREDICTIONS, destination)
+        if self.producers is not None and (pending := self.producers - self.completed_producers):
+            raise RuntimeError(f"Incomplete result producers: {', '.join(sorted(pending))}")
+        if self.prediction_expected and not self.predictions_uploaded:
+            raise RuntimeError("Completed prediction results were not uploaded")
 
 
-def _bundle(task: Any, output_dir: Path) -> _ResultBundle:
+def _bundle(task: Any, output_dir: Path | None = None) -> _ResultBundle:
     def create() -> _ResultBundle:
+        if output_dir is None:
+            raise RuntimeError("Declare result producers before completing them")
         bundle = _ResultBundle(task, write_path(output_dir / "result_publication"))
         register_finalizer(task, bundle.finalize)
         return bundle
 
     return invocation_resource(task, "clearml_results", create)
+
+
+def declare_result_producers(
+    task: Any, producers: Sequence[ResultProducer], *, output_dir: Path
+) -> None:
+    """Freeze the complete contributor set; nested stages may declare active subsets."""
+    if task is not None:
+        _bundle(task, output_dir).declare(producers)
+
+
+def complete_result_producer(task: Any, producer: ResultProducer) -> None:
+    """Publish the aggregate exactly when its last enabled contributor finishes."""
+    if task is not None:
+        _bundle(task).complete(producer)
 
 
 def register_ground_truth(task: Any, ground_truth: Path, *, output_dir: Path) -> None:
@@ -298,6 +351,7 @@ def register_predictions(
     if task is None:
         return
     bundle = _bundle(task, output_dir)
+    bundle.require_writable()
     truth = bundle.set_truth(ground_truth)
     source = assign_source_ids(_read_rows(predictions), row_type="prediction")
     model_identity = model_identity or prediction_model_identity(predictions)
@@ -365,6 +419,7 @@ def publish_evaluation(
     if task is None:
         return
     bundle = _bundle(task, output_dir)
+    bundle.require_writable()
     bundle.set_truth(ground_truth)
     context = _context(
         bundle,

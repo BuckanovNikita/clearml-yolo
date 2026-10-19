@@ -7,6 +7,7 @@ from clearml_yolo.adapters.export.metadata import read_metadata, sha256, write_m
 from clearml_yolo.adapters.fasterrcnn.configuration import validate_preprocessing
 from clearml_yolo.adapters.storage.checkpoint import read_checkpoint_descriptor
 from clearml_yolo.adapters.storage.filesystem import write_path
+from clearml_yolo.application.ports import ArtifactReady
 from clearml_yolo.core.export import ExportMetadata, InferencePolicy
 from clearml_yolo.core.export_requests import ExportRequest, ExportResult, gpu_device_index
 from clearml_yolo.core.models import ModelConfig
@@ -16,13 +17,19 @@ class DetectorExporter:
     def __init__(self, model: ModelConfig) -> None:
         self.model = model
 
-    def execute(self, request: ExportRequest, destination: Path) -> ExportResult:
+    def execute(
+        self,
+        request: ExportRequest,
+        destination: Path,
+        *,
+        artifact_ready: ArtifactReady | None = None,
+    ) -> ExportResult:
         if self.model.backend != "fasterrcnn":
             raise ValueError("cy-export supports only Faster R-CNN models")
         destination = write_path(destination)
         destination.mkdir(parents=True, exist_ok=True)
         if request.operation == "onnx":
-            return self._onnx(request, destination)
+            return self._onnx(request, destination, artifact_ready=artifact_ready)
         source = request.onnx if request.operation == "build" else request.engine
         if source is None:
             raise ValueError("Export operation requires its source artifact")
@@ -32,7 +39,7 @@ class DetectorExporter:
             raise ValueError("Selected preset disagrees with export metadata")
         validate_preprocessing(metadata.descriptor.preprocessing)
         if request.operation == "build":
-            return self._build(request, destination, metadata)
+            return self._build(request, destination, metadata, artifact_ready=artifact_ready)
         if request.precision != metadata.precision:
             raise ValueError("Requested verification precision disagrees with engine metadata")
         if request.weights is None:
@@ -42,9 +49,15 @@ class DetectorExporter:
             raise ValueError("Verification checkpoint disagrees with export source descriptor")
         from clearml_yolo.adapters.export.verification import verify_engine
 
-        return verify_engine(request, metadata, destination)
+        return verify_engine(request, metadata, destination, artifact_ready=artifact_ready)
 
-    def _onnx(self, request: ExportRequest, destination: Path) -> ExportResult:
+    def _onnx(
+        self,
+        request: ExportRequest,
+        destination: Path,
+        *,
+        artifact_ready: ArtifactReady | None = None,
+    ) -> ExportResult:
         if request.weights is None:
             raise ValueError("ONNX export requires weights")
         descriptor = read_checkpoint_descriptor(request.weights, expected=self.model)
@@ -70,6 +83,8 @@ class DetectorExporter:
         )
         detector.load_state_dict(checkpoint_state(request.weights), strict=True)
         graph = export_onnx(detector, destination / "model.onnx")
+        if artifact_ready is not None:
+            artifact_ready("export_onnx", graph.path)
         metadata = ExportMetadata(
             descriptor=descriptor,
             graph_sha256=sha256(graph.path),
@@ -80,13 +95,21 @@ class DetectorExporter:
         )
         metadata_path = destination / "model.onnx.json"
         write_metadata(metadata, metadata_path)
+        if artifact_ready is not None:
+            artifact_ready("export_metadata", metadata_path)
         return ExportResult(
             artifacts={"export_onnx": graph.path, "export_metadata": metadata_path},
             evidence=metadata.model_dump(mode="json") | {"operation": "onnx"},
         )
 
     @staticmethod
-    def _build(request: ExportRequest, destination: Path, metadata: ExportMetadata) -> ExportResult:
+    def _build(
+        request: ExportRequest,
+        destination: Path,
+        metadata: ExportMetadata,
+        *,
+        artifact_ready: ArtifactReady | None = None,
+    ) -> ExportResult:
         if request.onnx is None or sha256(request.onnx) != metadata.graph_sha256:
             raise ValueError("ONNX graph hash disagrees with export metadata")
         from clearml_yolo.adapters.export.build import build_engine
@@ -99,6 +122,8 @@ class DetectorExporter:
             profiles=metadata.profiles,
             device=gpu_device_index(request.device),
         )
+        if artifact_ready is not None:
+            artifact_ready("export_engine", built.path)
         bound = metadata.model_copy(
             update={
                 "engine_sha256": built.sha256,
@@ -109,6 +134,8 @@ class DetectorExporter:
         )
         metadata_path = destination / "model.engine.json"
         write_metadata(bound, metadata_path)
+        if artifact_ready is not None:
+            artifact_ready("export_metadata", metadata_path)
         return ExportResult(
             artifacts={"export_engine": built.path, "export_metadata": metadata_path},
             evidence=bound.model_dump(mode="json") | {"operation": "build"},

@@ -92,6 +92,7 @@ def predict(
         deps.storage.write_path(Path(settings["project"]) / str(settings["name"]))
         settings["mode"] = "predict"
         settings.pop("source", None)
+        deps.tracking.declare_result_producers(task, ["predict"], output_dir=output_path.parent)
         truth = deps.storage.read_ground_truth(ground_truth).execution
         paths = images_to_score(truth, splits)
         groups = (
@@ -99,6 +100,7 @@ def predict(
             if splits
             else [paths]
         )
+        deps.tracking.register_ground_truth(task, Path(ground_truth), output_dir=output_path.parent)
         frames = [
             _predict_group(checkpoint, group, image_name, settings, output_path, index, deps=deps)
             for index, group in enumerate(groups)
@@ -121,6 +123,7 @@ def predict(
             prediction_image_name=image_name,
             model_identity=identity,
         )
+        deps.tracking.complete_result_producer(task, "predict")
         if task is not None:
             deps.tracking.record_run_configuration(
                 task,

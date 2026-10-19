@@ -23,6 +23,12 @@ from clearml_yolo.adapters.clearml.native import owned_native_model
 from clearml_yolo.adapters.clearml.report import report_comparison as _tracking_report_comparison
 from clearml_yolo.adapters.clearml.report import report_scalars as _tracking_report_scalars
 from clearml_yolo.adapters.clearml.report import report_table as _tracking_report_table
+from clearml_yolo.adapters.clearml.results import (
+    complete_result_producer as _tracking_complete_result_producer,
+)
+from clearml_yolo.adapters.clearml.results import (
+    declare_result_producers as _tracking_declare_result_producers,
+)
 from clearml_yolo.adapters.clearml.results import file_digest as _tracking_file_digest
 from clearml_yolo.adapters.clearml.results import (
     prediction_checkpoint_hash as _tracking_prediction_checkpoint_hash,
@@ -49,6 +55,9 @@ from clearml_yolo.adapters.clearml.session import (
 from clearml_yolo.adapters.clearml.session import expect_artifacts as _tracking_expect_artifacts
 from clearml_yolo.adapters.clearml.session import init_task as _tracking_init_task
 from clearml_yolo.adapters.clearml.session import publish_table as _tracking_publish_table
+from clearml_yolo.adapters.clearml.session import (
+    publish_training_parameters as _tracking_publish_training_parameters,
+)
 from clearml_yolo.adapters.clearml.session import (
     record_run_configuration as _tracking_record_run_configuration,
 )
@@ -292,6 +301,9 @@ class _ExecutionResources:
 
 
 class _TrackingSession:
+    publish_training_parameters = staticmethod(_tracking_publish_training_parameters)
+    declare_result_producers = staticmethod(_tracking_declare_result_producers)
+    complete_result_producer = staticmethod(_tracking_complete_result_producer)
     associate_calibration_thresholds = staticmethod(_tracking_associate_calibration_thresholds)
     connect_config_file = staticmethod(_tracking_connect_config_file)
     expect_artifacts = staticmethod(_tracking_expect_artifacts)

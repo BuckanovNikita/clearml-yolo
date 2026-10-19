@@ -222,6 +222,27 @@ uses the shared set. `NA` remains an unavailable metric, not a numerical zero.
 The maintained [publication contract](specs/014-evaluation-publication/contracts/publication.md)
 explains these summaries.
 
+### Startup configuration and complete artifact timing
+
+`run` records resolved executable inputs for the selected backend after supported overrides;
+inactive backend defaults are omitted. `run_overrides` is a sanitized JSON differences view
+against built-in defaults for the same command and selected preset, including YAML/CLI changes.
+Recursive pruning preserves meaningful false, zero, null, empty collections and list order;
+routing and result provenance are excluded. It is informational, does not drive replay,
+and is excluded from the recognized-task cache projection. Training `General` is available
+before dataset preparation; native owner callbacks later refresh observed normalization.
+Skipped training creates no General parameters. See the
+[startup contract](specs/010-native-clearml-integration/contracts/tracking-publication.md#accurate-startup-configuration).
+
+`gt_csv` uploads after its validated effective file is written. Exact thresholds and annotated
+model/split dashboards upload when complete, before subsequent evaluation/statistics.
+Workflows declare every enabled result contributor and complete it after its final row update;
+the last completion uploads one combined `predicts_csv` before later reports/optional work.
+Each final annotated report/workbook and finalized export file uploads as soon as ready.
+Incomplete aggregates remain local on failure, complete uploads remain available, and final
+upload/model/flush barriers still determine success. See the
+[result contract](specs/014-evaluation-publication/contracts/publication.md#invocation-csv-bundle).
+
 ### ClearML pipeline cache identity
 
 Filtering displayed hyperparameters alone does not normalize a pipeline cache key:

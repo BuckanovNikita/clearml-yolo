@@ -26,6 +26,9 @@ from workflow_dependencies import (
 def native_publication_boundary(
     monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
+    monkeypatch.setattr(
+        workflow_dependencies.tracking, "publish_training_parameters", lambda *a: None
+    )
     # Load the real trainer boundary before individual tests substitute YOLO construction.
     from clearml_yolo.adapters.integrations import native_trainer  # noqa: F401
 
@@ -426,3 +429,47 @@ def test_native_ddp_events_replay_before_model_finalization(
         deps=workflow_dependencies,
     )
     assert events == ["train", "replay", "finalize", "relay_closed"]
+
+
+@pytest.mark.parametrize(
+    "selection", ["ultralytics", "rfdetr/small", "deimv2/s", "fasterrcnn/resnet50_fpn"]
+)
+def test_validated_general_is_published_before_any_dataset_preparation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, selection: str
+) -> None:
+    from clearml_yolo.application.use_cases import train as module
+    from clearml_yolo.core.models import model_preset
+    from clearml_yolo.entrypoints.composition import build_dependencies
+
+    model = model_preset(selection)
+    deps = build_dependencies(model)
+    task = object()
+    events: list[str] = []
+    observed: list[dict[str, Any]] = []
+    monkeypatch.setattr(deps.tracking, "init_task", lambda *a, **k: task)
+
+    def publish(owner: object, values: dict[str, Any]) -> None:
+        assert owner is task
+        observed.append(values)
+        events.append("General")
+
+    def prepare(*args: Any, **kwargs: Any) -> Any:
+        assert events == ["General"]
+        raise RuntimeError("dataset reached after General")
+
+    monkeypatch.setattr(deps.tracking, "publish_training_parameters", publish)
+    monkeypatch.setattr(module, "_prepare_csv_dataset", prepare)
+    settings = (
+        training_settings()
+        if selection == "ultralytics"
+        else model.train.model_dump(mode="json") | {"model": model.preset}
+    )
+    settings.update(project=str(tmp_path), name="train", epochs=2, weight_decay=0.02)
+    with pytest.raises(RuntimeError, match="dataset reached after General"):
+        train(settings, ClearMLConfig(), "truth.csv", deps=deps)
+    assert observed[0]["weight_decay"] == 0.02
+    assert observed[0]["epochs"] == 2
+    events.clear()
+    with pytest.raises(ValueError, match="epochs"):
+        train(settings | {"epochs": 0}, ClearMLConfig(), "truth.csv", deps=deps)
+    assert events == []

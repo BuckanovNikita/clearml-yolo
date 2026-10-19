@@ -112,6 +112,7 @@ def train(
             deps.tracking.task_identity(task)[1]
         )
         deps.storage.write_path(Path(settings["project"]) / str(settings["name"]))
+        deps.tracking.publish_training_parameters(task, settings | {"model": str(architecture)})
         with _prepare_csv_dataset(
             task,
             settings,

@@ -78,6 +78,9 @@ _CAPABILITIES = {
     },
     "resources": {"training_finished", "log_exception", "track"},
     "tracking": {
+        "publish_training_parameters",
+        "declare_result_producers",
+        "complete_result_producer",
         "init_task",
         "record_run_configuration",
         "register_ground_truth",

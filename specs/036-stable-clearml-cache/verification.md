@@ -210,3 +210,10 @@ before readiness. The isolated test passed, and delaying rank initialization by
 handshake before owner exit passed that delayed diagnostic. The diagnostic delay
 was then removed. Production queue code, cleanup deadlines and test assertions
 remain unchanged. The full process suite and final commit hook results follow.
+
+The full queue-process suite passed 15 tests after the readiness correction. The
+normal contributor commit hooks then passed Ruff, mypy, Vulture, import-linter and
+the complete pytest suite, producing prerequisite commit `2e4b5f2`. The post-commit
+launcher initially failed to query an expired temporary interpreter path. Retrying
+the documented helper with the prepared interpreter succeeded and correctly
+skipped tagging on the integration branch. No checks or hooks were bypassed.

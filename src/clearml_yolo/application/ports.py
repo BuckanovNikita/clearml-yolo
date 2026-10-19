@@ -35,6 +35,8 @@ from clearml_yolo.core.models import CheckpointMetadata
 from clearml_yolo.core.publication import FiftyOneConfig, PublicationReceipt, PublicationRequest
 
 Stage = Literal["train", "predict"]
+ResultProducer = Literal["predict", "metrics", "compare"]
+ArtifactReady = Callable[[str, Path], None]
 
 
 class TaskHandle(Protocol):
@@ -361,6 +363,18 @@ class ExecutionResources(Protocol):
 
 
 class TrackingSession(Protocol):
+    def publish_training_parameters(
+        self, task: TaskHandle | None, values: Mapping[str, Any]
+    ) -> None: ...
+
+    def declare_result_producers(
+        self, task: TaskHandle | None, producers: Sequence[ResultProducer], *, output_dir: Path
+    ) -> None: ...
+
+    def complete_result_producer(
+        self, task: TaskHandle | None, producer: ResultProducer
+    ) -> None: ...
+
     def associate_calibration_thresholds(
         self,
         task: TaskHandle | None,
@@ -459,7 +473,13 @@ class TrackingSession(Protocol):
 
 
 class DetectorExporter(Protocol):
-    def execute(self, request: ExportRequest, destination: Path) -> ExportResult: ...
+    def execute(
+        self,
+        request: ExportRequest,
+        destination: Path,
+        *,
+        artifact_ready: ArtifactReady | None = None,
+    ) -> ExportResult: ...
 
 
 @dataclass(frozen=True)

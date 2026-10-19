@@ -17,10 +17,11 @@ from omegaconf import DictConfig, OmegaConf, open_dict
 # Populate the shared ConfigStore in fresh CLI processes before Hydra composes examples.
 import clearml_yolo.entrypoints.hydra.configs  # noqa: F401
 from clearml_yolo.adapters.clearml.naming import initialize_naming
-from clearml_yolo.adapters.clearml.parameters import project_native_parameters
 from clearml_yolo.adapters.clearml.session import (
     invocation,
+    publish_run_configuration,
     replay_configuration,
+    replay_training_parameters,
     task_identity,
 )
 from clearml_yolo.adapters.integrations.native_runtime import (
@@ -37,7 +38,7 @@ from clearml_yolo.adapters.runtime.process_tree import native_descendant_scope
 from clearml_yolo.adapters.storage.filesystem import initialize_filesystem, runs_root, write_path
 from clearml_yolo.adapters.storage.run_identity import task_run_dir
 from clearml_yolo.adapters.yolo.config import requested_devices
-from clearml_yolo.core.models import ModelConfig
+from clearml_yolo.core.models import ModelConfig, model_preset
 from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_file
 from clearml_yolo.entrypoints.hydra.sweeps import new_multirun_tag, tag_multirun_job
 from clearml_yolo.entrypoints.hydra.validation import (
@@ -88,10 +89,7 @@ def _replay_native_parameters(
     native: dict[str, Any],
     requested: dict[str, Any],
 ) -> dict[str, Any]:
-    scientific = task.connect(
-        project_native_parameters(native), name="General", ignore_remote_overrides=False
-    )
-    native.update(project_native_parameters(scientific))
+    native = replay_training_parameters(task, native)
     # General and canonical run may contain a previous owner's effective output
     # route. A clone retains only its current explicitly requested route.
     for key in ("project", "name", "save_dir"):
@@ -99,6 +97,42 @@ def _replay_native_parameters(
         if key in requested:
             native[key] = requested[key]
     return native
+
+
+def _publication_inputs(config: DictConfig) -> dict[str, Any]:
+    """Detach executable inputs, omitting the selected backend's inactive groups."""
+    resolved = OmegaConf.to_container(config, resolve=True)
+    if not isinstance(resolved, dict):
+        raise TypeError("Resolved command configuration must be a mapping")
+    values = {str(key): value for key, value in resolved.items()}
+    values.pop("defaults", None)
+    model = values.get("model")
+    if isinstance(model, dict):
+        if model.get("backend", "ultralytics") == "ultralytics":
+            values["model"] = {key: model[key] for key in ("backend", "preset") if key in model}
+        else:
+            values.pop("ultralytics", None)
+            values.pop("ultralytics_predict", None)
+            if "dataset_format" in values:
+                values["dataset_format"] = "coco"
+    return values
+
+
+def _builtin_defaults(name: str, config: DictConfig) -> dict[str, Any]:
+    """Compose the registered project root and selected preset without user overrides."""
+    # The local Zen store retains built-in roots even when a YAML search path
+    # shadows their names. Re-entering Hydra would inherit that user's search path.
+    defaults = OmegaConf.structured(store[None, name])
+    if not isinstance(defaults, DictConfig):
+        raise TypeError("Built-in command defaults must be a mapping")
+    with open_dict(defaults):
+        defaults.pop("defaults", None)
+        if "model" in defaults:
+            backend = OmegaConf.select(config, "model.backend", default="ultralytics")
+            preset = OmegaConf.select(config, "model.preset", default="default")
+            selection = "ultralytics" if backend == "ultralytics" else f"{backend}/{preset}"
+            defaults.model = model_preset(selection).model_dump(mode="json")
+    return _publication_inputs(defaults)
 
 
 @trace_operation("invocation.execute")
@@ -137,9 +171,9 @@ def execute_owned(name: str, config: DictConfig, function: Callable[..., Any]) -
             name in {"pipeline", "train"} and not uses_detector and not task.running_locally()
         )
         replay = (
-            replay_configuration(task, inputs, legacy_native_general=True)
+            replay_configuration(task, inputs, legacy_native_general=True, publish=False)
             if remote_native
-            else replay_configuration(task, inputs)
+            else replay_configuration(task, inputs, publish=False)
         )
         reject_legacy_controls(replay)
         # Run also contains result provenance; only command inputs are executable.
@@ -149,7 +183,10 @@ def execute_owned(name: str, config: DictConfig, function: Callable[..., Any]) -
         replay = {key: value for key, value in replay.items() if key in accepted}
         _validate_replay_runtime(uses_detector, replay)
         native = deepcopy(replay.get("ultralytics", requested_native))
-        if remote_native and native:
+        training = name == "train" or (
+            name == "pipeline" and not replay.get("skip_train", inputs.get("skip_train", False))
+        )
+        if remote_native and native and training:
             # Detector General is observed evidence; its executable settings live
             # under run.model and must never overwrite the inactive YOLO group.
             native = _replay_native_parameters(task, native, requested_native)
@@ -160,6 +197,9 @@ def execute_owned(name: str, config: DictConfig, function: Callable[..., Any]) -
                 config.ultralytics = native
         validate_wrapper_keys(config, function)
         validate_project_destinations(config)
+        publish_run_configuration(
+            task, _publication_inputs(config), _builtin_defaults(name, config)
+        )
         initialize_naming(task)
         # Derive paths only after the owner exists; remote task names may differ.
         with open_dict(config):
@@ -212,6 +252,18 @@ def _execute_direct(name: str, config: DictConfig, function: Callable[..., Any])
                         effective.dataset_format = "coco"
 
             # Supply concrete capabilities outside the public Hydra configuration.
+            if name == "train" or (name == "pipeline" and not effective.skip_train):
+                parameters = dependencies.model.execution_settings(
+                    dict(effective.ultralytics), "train"
+                )
+                if not parameters.get("model"):
+                    raise ValueError(
+                        "Set ultralytics.model explicitly; no training model fallback is provided"
+                    )
+                dependencies.tracking.publish_training_parameters(
+                    dependencies.tracking.init_task(instantiate(effective.clearml), stage=name),
+                    parameters | {"mode": "train"},
+                )
             bound = partial(function, deps=dependencies)
             zen(bound, exclude="deps")(effective)
         else:

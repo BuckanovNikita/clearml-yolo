@@ -377,6 +377,8 @@ def test_metrics_preflights_before_scoring_and_publishes_evaluation_payloads(
 
     predictions, ground_truth = _write_inputs(tmp_path)
     task = SimpleNamespace(id="metrics-task")
+    for method in ("declare_result_producers", "complete_result_producer"):
+        monkeypatch.setattr(workflow_dependencies.tracking, method, lambda *_args, **_kwargs: None)
     events: list[str] = []
     requests: list[PublicationRequest] = []
     original_prepare = metrics_module._prepare
