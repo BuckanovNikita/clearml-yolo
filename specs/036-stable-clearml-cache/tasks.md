@@ -24,7 +24,7 @@
   usage/evaluation; validate docs, links and examples.
 - [x] T010 Obtain fresh independent review after integration/checks; resolve findings.
 - [x] T011 Reconcile actual scope/evidence and validate architecture acceptance.
-- [ ] T012 Follow commit procedure, native Git-only release, pushes and ref verification.
+- [x] T012 Follow commit procedure, native Git-only release, pushes and ref verification.
 
 ## Independent review follow-up
 
@@ -59,3 +59,6 @@ required live publication/cache evidence.
 The resumed native cache check, full hooks, integrated review and architecture
 acceptance now pass. The historical capacity block above is superseded by the
 2026-10-19 verification. Git-only delivery remains the final open step.
+
+Git-only delivery is complete: application v0.35.0, then portable guidance v0.2.10;
+remote refs and original-workspace preservation were verified.

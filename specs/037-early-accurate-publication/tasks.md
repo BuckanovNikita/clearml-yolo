@@ -28,9 +28,9 @@
 ## Documentation and release
 
 - [x] T014 Update affected publication/replay/export contracts, README.md, TECH_DETAILS.md and docs/current-contracts.md; validate Markdown/links/examples.
-- [ ] T015 Update canonical corp-skills clearml-yolo usage/evaluation references and validate its package; record companion commit/evidence.
+- [x] T015 Update canonical corp-skills clearml-yolo usage/evaluation references and validate its package; record companion commit/evidence.
 - [ ] T016 Obtain fresh independent integrated review, reconcile task delta against other agents' finished changes and validate architecture acceptance.
-- [ ] T017 Follow docs/development.md commit procedure and complete sequential Git-only release after other agents finish; verify pushed refs.
+- [x] T017 Follow docs/development.md commit procedure and complete sequential Git-only release after other agents finish; verify pushed refs.
 
 ## Dependencies and execution
 
@@ -44,9 +44,14 @@ coordination. Deliver the full requested change; no partial MVP release.
 - [x] R001 Recover the feature after prerequisite 036 in isolation and verify clean application against concurrent changes.
 - [x] R002 Re-run real CPU controller cache and paired pipeline publication/download checks; preserve scheduler coverage as an explicit gap.
 - [x] R003 Complete integrated hooks, separate architecture checks and fresh independent review.
-- [ ] R004 Release the application through the native Git-tag workflow, then release the portable skill sequentially.
+- [x] R004 Release the application through the native Git-tag workflow, then release the portable skill sequentially.
 
 Fresh integrated source review and reconciliation passed. T016 remains open only
 for the architecture acceptance failure caused by the declared scheduler gap;
 T013 remains incomplete for that execution coverage. The user renewed Git-only
 release authorization with the limitation disclosed.
+
+Application v0.35.0 and companion v0.2.10 were released sequentially and remote
+refs verified. T013 and the acceptance portion of T016 remain open solely for
+actual scheduler execution; all other listed implementation/review/delivery work
+is complete. See the final dated verification for evidence and limitations.

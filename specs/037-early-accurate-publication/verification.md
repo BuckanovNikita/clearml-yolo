@@ -160,3 +160,42 @@ Fresh independent integrated review accepted the source without blockers; see
 [review.md](review.md). All 87 changed paths reconcile with the architecture records.
 The original 56 dirty application files and index remain unchanged. The release
 clone has no local uv source section; original source overrides remain untouched.
+
+## Git-only delivery completed — 2026-10-19
+
+The native release helper created annotated application tag
+[`v0.35.0`](https://github.com/BuckanovNikita/clearml-yolo/tree/v0.35.0)
+at `accdfb664b2c9f605b026b26d713cae4213e05e2`, after normal version-commit hooks passed.
+The source history orders stable-cache commit `2e4b5f2` before publication commit
+`fd395d3`. The release changes only generated changelog and root package versions;
+all dependency bytes and sources are unchanged. Master and the exact tag were
+pushed atomically and remote branch/tag/peeled refs matched local values.
+
+Both exact-tag distributions built offline and installed in separate fresh Python
+3.12.13 environments using unchanged prepared dependencies. Each passed all 184
+shipped-file comparisons, dependency compatibility checks, 12 command helps, nine
+generated command selections/compositions, six explicit Faster R-CNN selections,
+omitted default, overwrite refusal/force and unrelated-file preservation. Ten
+runtime targets resolved and application imports came from the installed artifact.
+The parent independently checked archive hashes, content and all 46 command outcomes
+per installation. This is not a fresh dependency resolution or a Python 3.13 check.
+The first harness attempt used symlinked dependency metadata that uv did not detect;
+its evidence is retained. Copying unchanged metadata into the isolated environments
+resolved the harness issue, and both fresh runs passed. All three task-owned install
+environments were removed. Build artifacts remain private and were not uploaded.
+
+The portable guidance followed as
+[`v0.2.10`](https://github.com/BuckanovNikita/custom-opencode-skills/tree/v0.2.10),
+commit `351fde30139095668d40c7ee917b6276704bdc5e`. Its main branch and annotated tag
+were pushed atomically after application delivery; remote refs were verified. The
+server redirected the former corp-skills repository name to custom-opencode-skills,
+and the destination refs were independently checked. The collection's 44-file
+Markdown/local-link checks, package metadata/containment, controller example and
+both architecture records passed. No installed skills changed.
+
+Final application documentation validation checked 531 Markdown files with zero
+issues. All 89 release paths reconcile with the architecture scopes. Original
+application dirty files and index, and original companion dirty files, remain
+unchanged. Feature 036 acceptance passes. Feature 037 acceptance still fails only
+its declared native scheduler check; delivery does not erase that limitation.
+Git-only publication created no GitHub Release objects, assets or registry packages.
