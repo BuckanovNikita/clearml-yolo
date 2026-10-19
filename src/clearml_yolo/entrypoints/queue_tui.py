@@ -62,6 +62,7 @@ class QueueApp(App[None]):
             "Waiting reason",
             "Progress",
             "ClearML",
+            "Status diagnostic",
         )
         self.query_one("#relative", Select).display = False
         self.refresh_queue()
@@ -81,6 +82,7 @@ class QueueApp(App[None]):
             )
             return
         self.view = view
+        messages = self.presentation.refresh_messages(view)
         table = self.query_one("#jobs", DataTable)
         table.clear()
         for position, job in enumerate(view.jobs, 1):
@@ -99,6 +101,7 @@ class QueueApp(App[None]):
                     else self.presentation.text(job.progress or "", job.host_id)
                 ),
                 "Open task (o)" if job.clearml_url else "",
+                messages.get(job.id, ""),
                 key=job.id,
             )
             if selected is not None and selected.id == job.id:
@@ -106,6 +109,7 @@ class QueueApp(App[None]):
         self.query_one("#status", Static).update(
             f"{self.presentation.queue_name} | {self.presentation.host(view.host_id)} | "
             f"{self.visibility.title()} | archived {len(view.archived_job_ids)} | "
+            f"warnings {len(messages)} | "
             f"revision {view.revision} | "
             "Closing this view leaves workers running"
         )

@@ -104,18 +104,21 @@ def _show(
     if as_json:
         sys.stdout.write(json.dumps(presentation.view(view)) + "\n")
         return
+    messages = presentation.refresh_messages(view)
     sys.stdout.write(
         f"{presentation.queue_name} | {presentation.host(view.host_id)} | "
-        f"revision {view.revision} | archived {len(view.archived_job_ids)}\n"
+        f"revision {view.revision} | archived {len(view.archived_job_ids)} | "
+        f"warnings {len(messages)}\n"
     )
     for position, job in enumerate(view.jobs, 1):
         request = presentation.request(job.request, job.host_id)
         allocation = ",".join(presentation.devices(job.devices, job.host_id)) or "-"
         reason = presentation.text(job.waiting_reason or "", job.host_id)
         state = job.state + (" (archived)" if job.id in view.archived_job_ids else "")
+        diagnostic = f"\t{messages[job.id]}" if job.id in messages else ""
         sys.stdout.write(
             f"{position}\t{presentation.job_title(job)}\tuid={job.owner_uid}\t{state}\t"
-            f"request={request}\tallocation={allocation}\t{reason}\n"
+            f"request={request}\tallocation={allocation}\t{reason}{diagnostic}\n"
         )
 
 

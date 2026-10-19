@@ -225,6 +225,30 @@ the display name. Duplicate names remain distinguishable by job number. Submissi
 mutation and GPU-control commands print human-readable text by default; use `--json`
 for scripts. Listing JSON retains machine job identifiers and adds readable references.
 
+### Unavailable task status
+
+`cy-queue list` and the TUI refresh each owned job independently. If a private snapshot
+or status cannot be read or validated, its readable public summary remains visible
+with `Status unavailable; showing last recorded state`. Missing, malformed and
+hash-mismatched snapshots do not hide healthy jobs or prevent their status updates.
+Pending, finished and archived jobs follow the same rule; existing queue order and
+archive visibility are preserved.
+
+Text and TUI output show a warning count and identify the affected rows. Listing
+JSON adds `warning_count` and `refresh_issues`, whose entries contain `job_id`,
+`reference` and `message`. Both count and entries include only the selected view's
+visible jobs. Messages contain no private configuration or raw validation details.
+Warnings are transient: they disappear after a successful refresh and do not become
+durable job errors.
+
+Monitoring does not recover jobs, change execution outcomes or release reservations.
+Viewing historical package identities and legacy configuration fields does not import
+Hydra or evaluate saved pipeline overrides. Worker admission, execution and recovery
+retain strict validation; being visible does not make an old snapshot executable or
+migrate it. Invalid shared manifests, queue configuration and coordination failures
+remain queue-wide errors. If a later TUI refresh fails this way, previously displayed
+rows remain available with the error reported.
+
 ## Archive completed jobs
 
 ```bash

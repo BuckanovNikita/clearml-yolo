@@ -1,0 +1,263 @@
+{
+  "schema_version": 1,
+  "task": "queue-view-refresh-isolation",
+  "scope": [
+    "src/clearml_yolo/core/queue.py",
+    "src/clearml_yolo/application/queue.py",
+    "src/clearml_yolo/adapters/queue/storage.py",
+    "src/clearml_yolo/adapters/queue/runtime.py",
+    "src/clearml_yolo/entrypoints/queue_presentation.py",
+    "src/clearml_yolo/entrypoints/queue.py",
+    "src/clearml_yolo/entrypoints/queue_tui.py",
+    "tests",
+    "docs/queue.md",
+    "specs/029-shared-cy-queue/contracts/queue.md",
+    ".specify/bugs/queue-view-refresh-isolation",
+    "pyproject.toml",
+    "uv.lock",
+    "CHANGELOG.md"
+  ],
+  "impact": "modules",
+  "rules": "Project AGENTS.md, constitution and agent-workflow.md require inward dependencies, explicit effect ownership, SDK isolation and negative import coverage.",
+  "modules": [
+    {
+      "id": "core",
+      "path": "src/clearml_yolo/core/queue.py",
+      "change": "modify",
+      "responsibility": "Immutable diagnostics and queue view data",
+      "interface": "QueueRefreshIssue(job_id,message); default empty QueueView.refresh_issues",
+      "layer": "core",
+      "effects": "No effects",
+      "allowed_dependencies": [
+        "stdlib",
+        "pydantic"
+      ],
+      "forbidden_dependencies": [
+        "adapters",
+        "entrypoints",
+        "Hydra",
+        "filesystem effects"
+      ],
+      "contracts": [
+        "layers",
+        "negative"
+      ]
+    },
+    {
+      "id": "application",
+      "path": "src/clearml_yolo/application/queue.py",
+      "change": "modify",
+      "responsibility": "Monitoring policy and archive visibility",
+      "interface": "QueueProcessPort.refresh_monitoring returns typed issues; list preserves affected summaries; tick remains strict",
+      "layer": "application",
+      "effects": "Effects only through injected ports",
+      "allowed_dependencies": [
+        "core",
+        "stdlib"
+      ],
+      "forbidden_dependencies": [
+        "adapters",
+        "Hydra",
+        "rendering"
+      ],
+      "contracts": [
+        "layers",
+        "negative"
+      ]
+    },
+    {
+      "id": "storage",
+      "path": "src/clearml_yolo/adapters/queue/storage.py",
+      "change": "modify",
+      "responsibility": "Private snapshot read failure classification",
+      "interface": "Typed private snapshot failure; authorization and transaction errors remain global",
+      "layer": "adapter",
+      "effects": "Own filesystem reads and validation",
+      "allowed_dependencies": [
+        "core",
+        "queue coordination",
+        "pydantic",
+        "stdlib"
+      ],
+      "forbidden_dependencies": [
+        "entrypoints",
+        "Hydra",
+        "model SDKs"
+      ],
+      "contracts": [
+        "layers",
+        "negative"
+      ]
+    },
+    {
+      "id": "runtime",
+      "path": "src/clearml_yolo/adapters/queue/runtime.py",
+      "change": "modify",
+      "responsibility": "Refresh each owned private status independently",
+      "interface": "refresh_monitoring reads status and publishes healthy progress; strict refresh unchanged",
+      "layer": "adapter",
+      "effects": "Own filesystem/process boundaries; monitoring never releases reservations or changes outcomes",
+      "allowed_dependencies": [
+        "core",
+        "queue adapters",
+        "process runtime"
+      ],
+      "forbidden_dependencies": [
+        "entrypoints imports",
+        "Hydra",
+        "model SDKs"
+      ],
+      "contracts": [
+        "layers",
+        "negative"
+      ]
+    },
+    {
+      "id": "presentation",
+      "path": "src/clearml_yolo/entrypoints/queue_presentation.py",
+      "change": "modify",
+      "responsibility": "Safe public diagnostic rendering",
+      "interface": "JSON issues and warning count plus shared row diagnostic formatting",
+      "layer": "entrypoint",
+      "effects": "Pure rendering",
+      "allowed_dependencies": [
+        "core",
+        "pydantic",
+        "stdlib"
+      ],
+      "forbidden_dependencies": [
+        "queue storage reads",
+        "GPU discovery"
+      ],
+      "contracts": [
+        "layers",
+        "negative"
+      ]
+    },
+    {
+      "id": "cli",
+      "path": "src/clearml_yolo/entrypoints/queue.py",
+      "change": "modify",
+      "responsibility": "CLI composition and rendering",
+      "interface": "Text listing row diagnostics and warning count",
+      "layer": "entrypoint",
+      "effects": "Own CLI output; services own policy",
+      "allowed_dependencies": [
+        "core",
+        "application",
+        "adapters",
+        "presentation"
+      ],
+      "forbidden_dependencies": [
+        "direct model SDK imports"
+      ],
+      "contracts": [
+        "layers",
+        "negative"
+      ]
+    },
+    {
+      "id": "tui",
+      "path": "src/clearml_yolo/entrypoints/queue_tui.py",
+      "change": "modify",
+      "responsibility": "TUI rendering and selection retention",
+      "interface": "Row diagnostics and warning count; later global failure retains rows",
+      "layer": "entrypoint",
+      "effects": "Own Textual interaction",
+      "allowed_dependencies": [
+        "core",
+        "application",
+        "presentation",
+        "textual"
+      ],
+      "forbidden_dependencies": [
+        "queue filesystem effects",
+        "Hydra"
+      ],
+      "contracts": [
+        "layers",
+        "negative"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "layers",
+      "path": "pyproject.toml",
+      "status": "existing",
+      "rules": "Inward layers; scheduling excludes Hydra/ML/Textual; Textual owned by TUI.",
+      "check": "imports"
+    },
+    {
+      "id": "negative",
+      "path": "tests/test_architecture.py",
+      "status": "existing",
+      "rules": "Injected queue SDK/layer edges and core/application effects are rejected.",
+      "check": "architecture"
+    }
+  ],
+  "checks": [
+    {
+      "id": "imports",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync lint-imports",
+      "expectation": "All inward-layer and SDK ownership contracts pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": ".specify/bugs/queue-view-refresh-isolation/test.md"
+      }
+    },
+    {
+      "id": "architecture",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync pytest tests/test_architecture.py",
+      "expectation": "Real graph and injected prohibited dependencies/effects pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": ".specify/bugs/queue-view-refresh-isolation/test.md"
+      }
+    },
+    {
+      "id": "queue",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync pytest tests/test_queue*.py tests/test_shared_queue*.py",
+      "expectation": "Mixed snapshots, strict execution, archives, CLI and headless TUI pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": ".specify/bugs/queue-view-refresh-isolation/test.md"
+      }
+    },
+    {
+      "id": "quality",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync ruff check .; uv run --frozen --no-sync mypy .; uv run --frozen --no-sync vulture",
+      "expectation": "Static checks pass separately.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": ".specify/bugs/queue-view-refresh-isolation/test.md"
+      }
+    },
+    {
+      "id": "docs",
+      "kind": "documentation",
+      "command": "uv run --frozen --no-sync python scripts/check_docs.py --all; markdownlint-cli2 changed Markdown",
+      "expectation": "Links, Markdown and changed command examples pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": ".specify/bugs/queue-view-refresh-isolation/test.md"
+      }
+    }
+  ],
+  "documentation": "Update docs/queue.md and shared queue contract; companion corp-skills usage/evaluation references. Inspect README/current index for no-change reasons.",
+  "review": {
+    "status": "accepted",
+    "reviewer": "Fresh independent /root/final_review; ship after documentation wording correction",
+    "evidence": ".specify/bugs/queue-view-refresh-isolation/test.md",
+    "reconciliation": "Inspected all task-owned diff: seven production modules, two new regression modules, queue guide/contract, four bug artifacts and native release metadata. No module additions/deletions/renames or dependency/configuration contracts changed. Unrelated ClearML/cache code/docs/tests and local uv source overrides are excluded; isolated checkout verifies committed baseline plus only this task. Review accepted corrected recovery documentation and companion portable references."
+  }
+}

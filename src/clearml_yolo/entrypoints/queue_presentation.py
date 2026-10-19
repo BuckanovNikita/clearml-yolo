@@ -114,6 +114,7 @@ class QueuePresentation:
         }
 
     def view(self, view: QueueView) -> dict[str, JsonValue]:
+        messages = self.refresh_messages(view)
         return {
             "protocol": view.protocol,
             "host_id": view.host_id,
@@ -122,6 +123,23 @@ class QueuePresentation:
                 self.job(job) | {"archived": job.id in view.archived_job_ids} for job in view.jobs
             ],
             "archived_count": len(view.archived_job_ids),
+            "warning_count": len(messages),
+            "refresh_issues": [
+                {
+                    "job_id": job.id,
+                    "reference": self.reference(job),
+                    "message": messages[job.id],
+                }
+                for job in view.jobs
+                if job.id in messages
+            ],
+        }
+
+    def refresh_messages(self, view: QueueView) -> dict[str, str]:
+        """Attach safe transient diagnostics only to jobs in the displayed view."""
+        issues = {issue.job_id: issue.message for issue in view.refresh_issues}
+        return {
+            job.id: self.text(issues[job.id], job.host_id) for job in view.jobs if job.id in issues
         }
 
     def hold(self, hold: GPUHold) -> dict[str, JsonValue]:

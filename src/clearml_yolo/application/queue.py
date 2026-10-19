@@ -13,6 +13,7 @@ from clearml_yolo.core.queue import (
     JobSnapshot,
     MoveDirection,
     PublicJob,
+    QueueRefreshIssue,
     QueueView,
     QueueVisibility,
     WorkerIdentity,
@@ -44,6 +45,7 @@ class QueueInventory(Protocol):
 
 class QueueProcessPort(Protocol):
     def refresh(self) -> None: ...
+    def refresh_monitoring(self) -> tuple[QueueRefreshIssue, ...]: ...
     def live_owners(self) -> set[int]: ...
     def publish_inventory(self, observations: tuple[GPUObservation, ...]) -> None: ...
     def owner_inventory(self) -> dict[int, tuple[GPUObservation, ...]]: ...
@@ -111,7 +113,8 @@ class QueueService:
     ) -> QueueView:
         if host_id is not None and host_id != self.identity.host_id:
             return self._visible(self.storage.view(host_id), visibility)
-        self.processes.refresh()
+        issues = self.processes.refresh_monitoring()
+        unavailable = {issue.job_id for issue in issues}
         view = self.storage.view(host_id)
         inventories = self.processes.owner_inventory()
         owners = set(inventories)
@@ -122,7 +125,9 @@ class QueueService:
         )
         jobs: list[PublicJob] = []
         for job in view.jobs:
-            if job.state == "pending":
+            if job.id in unavailable:
+                jobs.append(job)
+            elif job.state == "pending":
                 reason = waiting_reason(
                     job, inventories.get(job.owner_uid, ()), owners, reserved, held
                 )
@@ -135,7 +140,9 @@ class QueueService:
                 jobs.append(job.model_copy(update={"waiting_reason": reason}))
             else:
                 jobs.append(self._allocation(job))
-        return self._visible(view.model_copy(update={"jobs": tuple(jobs)}), visibility)
+        return self._visible(
+            view.model_copy(update={"jobs": tuple(jobs), "refresh_issues": issues}), visibility
+        )
 
     @staticmethod
     def _visible(view: QueueView, visibility: QueueVisibility) -> QueueView:
@@ -150,7 +157,15 @@ class QueueService:
             if (job.id in archived and job.state in TERMINAL_JOB_STATES)
             == (visibility == "archived")
         )
-        return view.model_copy(update={"jobs": jobs})
+        visible_ids = {job.id for job in jobs}
+        return view.model_copy(
+            update={
+                "jobs": jobs,
+                "refresh_issues": tuple(
+                    issue for issue in view.refresh_issues if issue.job_id in visible_ids
+                ),
+            }
+        )
 
     def archive(self, job_ids: Sequence[str]) -> QueueView:
         return self._visible(self.storage.set_archived(job_ids, True), "main")

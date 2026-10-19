@@ -121,11 +121,19 @@ class PublicJob(QueueRecord):
     clearml_url: str | None = None
 
 
+class QueueRefreshIssue(QueueRecord):
+    """Transient monitoring failure, never a durable execution outcome."""
+
+    job_id: str
+    message: str = "Status unavailable; showing last recorded state"
+
+
 class QueueView(QueueRecord):
     host_id: str
     revision: int
     jobs: tuple[PublicJob, ...]
     archived_job_ids: tuple[str, ...] = ()
+    refresh_issues: tuple[QueueRefreshIssue, ...] = ()
 
 
 class ArchiveRecord(QueueRecord):

@@ -14,7 +14,12 @@ from clearml_yolo.adapters.queue.guardian import cleanup_tree
 from clearml_yolo.adapters.queue.identity import process_birth, process_ticks
 from clearml_yolo.adapters.queue.locks import LocalGPULocks
 from clearml_yolo.adapters.queue.records import ChildStatus, GuardianPayload, WorkerRecord
-from clearml_yolo.adapters.queue.storage import NFSQueueStore, _read, atomic_write
+from clearml_yolo.adapters.queue.storage import (
+    NFSQueueStore,
+    PrivateSnapshotError,
+    _read,
+    atomic_write,
+)
 from clearml_yolo.adapters.runtime.process_tree import (
     LinuxProcessTree,
     check_interpreter_supervision,
@@ -27,6 +32,7 @@ from clearml_yolo.core.queue import (
     GuardianClaim,
     JobSnapshot,
     PublicJob,
+    QueueRefreshIssue,
     WorkerIdentity,
 )
 
@@ -155,6 +161,30 @@ class QueueProcesses:
             if job.owner_uid == self.identity.owner_uid:
                 self._refresh_job(job)
                 self._refresh_status(job)
+
+    def refresh_monitoring(self) -> tuple[QueueRefreshIssue, ...]:
+        """Refresh private telemetry without changing outcomes or process ownership."""
+        issues: list[QueueRefreshIssue] = []
+        for job in self.store.view().jobs:
+            if job.owner_uid != self.identity.owner_uid:
+                continue
+            try:
+                snapshot = self.store.load_snapshot(job.id)
+            except PrivateSnapshotError:
+                issues.append(QueueRefreshIssue(job_id=job.id))
+                continue
+            try:
+                status = self._read_status(job, snapshot)
+            except (OSError, ValueError, RuntimeError):
+                # Private payloads and validation errors can contain configuration secrets.
+                issues.append(QueueRefreshIssue(job_id=job.id))
+                continue
+            if status is not None:
+                # Shared publication/coordination failures must remain queue-wide errors.
+                self.store.publish_status(
+                    job.id, progress=status.progress, clearml_url=status.task_url
+                )
+        return tuple(issues)
 
     def _refresh_job(self, job: PublicJob) -> None:
         claim = self.pool.claim_for(job.id)
@@ -333,11 +363,16 @@ class QueueProcesses:
 
     def _refresh_status(self, job: PublicJob) -> None:
         snapshot = self.store.load_snapshot(job.id)
+        status = self._read_status(job, snapshot)
+        if status is not None:
+            self.store.publish_status(job.id, progress=status.progress, clearml_url=status.task_url)
+
+    @staticmethod
+    def _read_status(job: PublicJob, snapshot: JobSnapshot) -> ChildStatus | None:
         project = Path(snapshot.project_root).resolve()
         path = project / ".cy" / "queue-status" / f"{job.id}.json"
         if not path.exists():
-            return
+            return None
         if not path.resolve().is_relative_to(project) or path.stat().st_size > _MAX_STATUS_BYTES:
             raise RuntimeError("Child queue status is outside its project or exceeds its bound")
-        status = ChildStatus.model_validate_json(_read(path, job.owner_uid, private=True))
-        self.store.publish_status(job.id, progress=status.progress, clearml_url=status.task_url)
+        return ChildStatus.model_validate_json(_read(path, job.owner_uid, private=True))

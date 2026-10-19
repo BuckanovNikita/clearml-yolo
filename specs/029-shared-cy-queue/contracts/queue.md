@@ -34,3 +34,23 @@ A completed ClearML task, verified process cleanup and available GPU are separat
 uncertain outcomes require owner recovery and are never retried automatically.
 The [queue guide](../../../docs/queue.md) owns operations and the
 [lifecycle diagram](../../../docs/queue-lifecycles.md) separates these state machines.
+
+## Monitoring isolation amendment — 2026-10-19
+
+`list` and `tui` refresh private telemetry independently for each owned job. Expected
+snapshot/status read or validation failures retain that job's last public summary
+and allow healthy jobs to refresh. `QueueView.refresh_issues` defaults to empty and
+carries transient job identifiers and safe messages, separate from durable outcomes.
+Text and TUI rows show `Status unavailable; showing last recorded state` and a warning
+count. JSON exposes `warning_count` and `refresh_issues` entries with `job_id`,
+`reference` and `message`; counts and entries follow current archive visibility.
+Successful refresh clears the warning. Private configuration and raw validation
+errors are excluded from these diagnostics.
+
+Monitoring preserves records, ordering, ownership checks and reservations; it performs
+no recovery or outcome transition. Historical package identities and legacy pipeline
+settings remain viewable without Hydra imports or override evaluation. Worker
+admission and execution still validate snapshots strictly; recovery retains its strict
+ownership and cleanup checks. Viewing authorizes no automatic migration or old-task execution. Invalid shared metadata,
+queue settings and coordination errors remain queue-wide failures, and a later TUI
+failure retains the previously displayed rows and selection.

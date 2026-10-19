@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- **queue**: Record user config and NFS release verification
+  ([`7dfa425`](https://github.com/BuckanovNikita/clearml-yolo/commit/7dfa425b204f0687311b707e15293d3361e0f177))
+
+
 ## v0.34.0 (2026-10-16)
 
 ### Documentation

@@ -33,6 +33,10 @@ class _SubmissionBatch(QueueRecord):
     jobs: tuple[str, ...]
 
 
+class PrivateSnapshotError(RuntimeError):
+    """An owned private snapshot cannot be read or validated for this job."""
+
+
 def _safe_host(host: str) -> str:
     if not re.fullmatch(r"[A-Za-z0-9_-]+", host):
         raise ValueError("Host identity is not a safe queue partition")
@@ -383,19 +387,24 @@ class NFSQueueStore:
             job = self._find(identifier)
             self._require_owner(job)
             path = self.actor_root / "jobs" / job.id / "snapshot.json"
-            payload = _read(path, job.owner_uid, private=True)
+            try:
+                payload = _read(path, job.owner_uid, private=True)
+            except (OSError, ValueError) as error:
+                raise PrivateSnapshotError("Private queue snapshot is unreadable") from error
             if hashlib.sha256(payload.encode()).hexdigest() != job.snapshot_hash:
-                raise RuntimeError("Private queue snapshot hash mismatch; execution refused")
+                raise PrivateSnapshotError(
+                    "Private queue snapshot hash mismatch; execution refused"
+                )
             try:
                 snapshot = JobSnapshot.model_validate_json(payload)
             except ValidationError as error:
-                raise RuntimeError("Private queue snapshot is corrupt") from error
+                raise PrivateSnapshotError("Private queue snapshot is corrupt") from error
             if (
                 snapshot.id != job.id
                 or snapshot.owner_uid != job.owner_uid
                 or snapshot.host_id != job.host_id
             ):
-                raise RuntimeError("Private queue snapshot identity mismatch")
+                raise PrivateSnapshotError("Private queue snapshot identity mismatch")
             return snapshot
 
     def _require_owner(self, job: PublicJob) -> None:
