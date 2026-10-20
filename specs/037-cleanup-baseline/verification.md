@@ -140,3 +140,45 @@ class-specific, documented `noqa: PLR0904` preserves the published cohesive
 invocation lifecycle without changing interfaces or a runtime statement. Ruff
 then passed. Import/effect rules and the method-count rule elsewhere remain active.
 The retry runs normal hooks without bypass.
+
+## Post-merge parent verification
+
+Normal merge commit `9fc0b50db12437ec669daa4ae543c3e7ca1c761f` has parents
+`a7d681503381d70eed645efa267726cc9e2ae21b` and
+`41a4036666b2225a4e3029e1695499cf914a5f59`. Its normal commit hook passed Ruff,
+mypy, all import contracts, Vulture and the full pytest suite. The successful
+hook does not print pytest counts; no count is inferred. The separate integrated
+architecture suite passed 246 tests (five warnings) in 3.49 seconds.
+
+Both rebuilt wheel and sdist passed installed checks against the final integrated
+source: 184 package-file hashes, 12 console help probes, nine default and 81 selected
+configurations, nine shipped callables, overwrite/mode checks and two queue snapshots
+per distribution. The source-manifest SHA-256 is
+`b26afdab1d9620f627d583be6af7980ea3df9158f815689a919838da616d831f`; structured
+results supplement the earlier snapshot in [packaging.json](packaging.json).
+Python is 3.12.13, dependencies were reused, and only the sdist environment includes
+the queue UI extra. These are installed-source checks, not new target certification.
+
+All 43 extracted import contracts are semantically identical to the published
+configuration. Package/dependency/other-tool metadata and the entire lockfile equal
+the published version. The lint annotation preserves TrackingSession's complete AST.
+The runtime delta otherwise remains the five evidenced orphan-removal files; no
+new executed behavior or native boundary was introduced by conflict resolution.
+Native evidence remains the two dated chains; no new scheduler, physical multi-GPU,
+NFS, export-runtime or unexplained-enrichment-failure resolution is claimed.
+
+Fresh read-only `merged_baseline_review` returned ship for the documentation delta:
+new contracts match source; all twelve early-publication artifacts and new map
+fingerprints match the published commit; prior exact metadata, visualization and
+FiftyOne instructions remain intact; both evidence chains and the missing scheduler
+acceptance stay distinct. Final integrated source review and archival cutover follow.
+
+Final independent integrated review returned ship after the duplicate-link helper
+correction; see [review](review.md#final-merged-source-review-2026-10-20).
+Private native proof is retained at agent-skills commit
+`1ab7da0b6448971a0abb44b5ec8380304714cfbc`, tag `v0.7.1`, under
+`skills/clearml-yolo-environment/references/cache-cleanup-2026-10-20/`.
+The 40-entry checksum manifest hashes to
+`31cfb3b908497acd566e4815fa9dba900297b282a56cf0ecfb763989e0aa370c`.
+This ordinary private Git archive preserves raw observations independently of
+temporary workspaces; no environment skill installation was performed.

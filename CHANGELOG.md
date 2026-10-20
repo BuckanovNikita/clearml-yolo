@@ -5,8 +5,27 @@
 
 ### Documentation
 
+- **clearml**: Record sequential release verification
+  ([`41a4036`](https://github.com/BuckanovNikita/clearml-yolo/commit/41a4036666b2225a4e3029e1695499cf914a5f59))
+
+
+## v0.35.0 (2026-10-19)
+
+### Documentation
+
+- **clearml**: Record integrated release review and native evidence
+  ([`b4a8164`](https://github.com/BuckanovNikita/clearml-yolo/commit/b4a8164feb486a3864af2e2cfec96501963c2df0))
+
 - **queue**: Record refresh isolation release verification
   ([`129b94b`](https://github.com/BuckanovNikita/clearml-yolo/commit/129b94b749d7d4bcaf6e82b9a504a141796c7bdc))
+
+### Features
+
+- **clearml**: Publish accurate configuration and complete artifacts earlier
+  ([`fd395d3`](https://github.com/BuckanovNikita/clearml-yolo/commit/fd395d34bff7f3128047e5d0c302f2c3f0720b78))
+
+- **clearml**: Stabilize experiment parameters and controller cache identity
+  ([`2e4b5f2`](https://github.com/BuckanovNikita/clearml-yolo/commit/2e4b5f2fa3c3e9dc90920af75fe3edb8e346bcd0))
 
 ### Refactoring
 

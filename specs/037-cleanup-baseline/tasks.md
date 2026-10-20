@@ -33,6 +33,6 @@ Baseline author owns the new baseline and migration map until integration. No bo
 
 ## Published-work reconciliation added at delivery preflight
 
-- [ ] T016 Preserve reviewed local work, merge published origin/master and reconcile all conflicts without losing either scope.
-- [ ] T017 Include released early-publication contracts/evidence in baseline and final archival inventory.
-- [ ] T018 Reverify integrated source, refresh package/live impact evidence and obtain fresh delta review before final H.
+- [x] T016 Preserve reviewed local work, merge published origin/master and reconcile all conflicts without losing either scope.
+- [x] T017 Include released early-publication contracts/evidence in baseline and final archival inventory.
+- [x] T018 Reverify integrated source, refresh package/live impact evidence and obtain fresh delta review before final H.

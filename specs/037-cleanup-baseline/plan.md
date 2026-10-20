@@ -55,3 +55,30 @@ isolated branch with ordinary checks, merge the published ancestry, reconcile
 conflicts and the baseline against that implementation, then run affected/full
 checks and fresh review before final H and cutover. Do not overwrite published
 work or reuse its version tag. The interrupted initial commit created no commit.
+
+## Final documentation cutover architecture
+
+The following scoped record passed planning validation before history removal.
+It applies after the separately checked source/fixture integration and will be
+validated again against the cutover diff. Final acceptance is retained in the baseline.
+
+```json
+{
+  "schema_version": 1,
+  "task": "Verified history cutover to stage-zero baseline",
+  "scope": [
+    "specs",
+    ".specify/bugs",
+    ".specify/assessments",
+    ".specify/feature.json",
+    "docs",
+    ".agents/skills/running-end-to-end-tests",
+    "AGENTS.md",
+    "README.md",
+    "TECH_DETAILS.md",
+    ".specify/memory/constitution.md"
+  ],
+  "impact": "none",
+  "rationale": "After the separately verified source/fixture integration checkpoint, cutover removes only byte-preserved historical records, redirects documentation links, records the single baseline and clears the ignored active-feature pointer. Runtime modules, supported interfaces, dependencies, executable architecture checks and installed workflow tooling are unchanged. Both live test fixtures were already relocated and verified before this boundary; removing their unused historical copies adds no runtime or import effect."
+}
+```

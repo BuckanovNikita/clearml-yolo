@@ -5242,8 +5242,8 @@
       "kind": "historical-evidence",
       "topic": "Cleanup and archival cutover evidence; no active old ledger",
       "reason": "Current requirement or navigation is consolidated; original source and dated claims remain recoverable at checkpoint H.",
-      "sha256": "6ce4e7e87e350ae9d888a06c0d84497535b8bd2a2ca75011a962b4a34699474d",
-      "bytes": 11276,
+      "sha256": "52a58e594632a02276a64736c46bc8b0ec0a71793ef63b00fc0eaaf3a52f193b",
+      "bytes": 12299,
       "archive_command": "git show H:specs/037-cleanup-baseline/architecture.json"
     },
     "specs/037-cleanup-baseline/checklists/requirements.md": {
@@ -5273,8 +5273,8 @@
       "topic": "Final cleanup integration and acceptance evidence",
       "reason": "Preserve dated source verification in checkpoint H; baseline records cutover outcome.",
       "archive_command": "git show H:specs/037-cleanup-baseline/packaging.json",
-      "sha256": "4de3e25a3641a3601fc2966f1477e34fc28bfa64618f76151333d866dd0bcbbc",
-      "bytes": 988
+      "sha256": "00ad7232f1868b66be6afe536a94169a8f07b23742703692e5b6f0365916f6fb",
+      "bytes": 2059
     },
     "specs/037-cleanup-baseline/plan.md": {
       "source_path": "specs/037-cleanup-baseline/plan.md",
@@ -5282,8 +5282,8 @@
       "kind": "historical-evidence",
       "topic": "Cleanup and archival cutover evidence; no active old ledger",
       "reason": "Current requirement or navigation is consolidated; original source and dated claims remain recoverable at checkpoint H.",
-      "sha256": "1d63349656bfae3048a1023cb84f5f494078a6181d0a7091a93200b10aacc761",
-      "bytes": 3609,
+      "sha256": "c4e6587df1227b402b05e29b88e6bd6001de312b0e77e03c2d0a4d264ebe6563",
+      "bytes": 4819,
       "archive_command": "git show H:specs/037-cleanup-baseline/plan.md"
     },
     "specs/037-cleanup-baseline/quickstart.md": {
@@ -5313,8 +5313,8 @@
       "topic": "Final cleanup integration and acceptance evidence",
       "reason": "Preserve dated source verification in checkpoint H; baseline records cutover outcome.",
       "archive_command": "git show H:specs/037-cleanup-baseline/review.md",
-      "sha256": "af3146d6fea791d07450f099d9c61dfeac324247c68ab2517a8ae69163c7dc91",
-      "bytes": 1742
+      "sha256": "01b55254e2d501b2c4c9ecffe5b97460e9db92fa4a921d9961d9df18086b41d9",
+      "bytes": 3107
     },
     "specs/037-cleanup-baseline/spec.md": {
       "source_path": "specs/037-cleanup-baseline/spec.md",
@@ -5332,7 +5332,7 @@
       "kind": "historical-evidence",
       "topic": "Cleanup and archival cutover evidence; no active old ledger",
       "reason": "Current requirement or navigation is consolidated; original source and dated claims remain recoverable at checkpoint H.",
-      "sha256": "91042236e912421d9dba723024956d8d6333de5e393a35ae7855d74c3610e26b",
+      "sha256": "68dfe18d031b5fd9006b0eb7729d3ebbe683c4d040c6ad6e2be3620f5c49f824",
       "bytes": 2246,
       "archive_command": "git show H:specs/037-cleanup-baseline/tasks.md"
     },
@@ -5353,107 +5353,118 @@
       "topic": "Final cleanup integration and acceptance evidence",
       "reason": "Preserve dated source verification in checkpoint H; baseline records cutover outcome.",
       "archive_command": "git show H:specs/037-cleanup-baseline/verification.md",
-      "sha256": "f51c0aad28e3f1719664c6d38e1da2aa04b15ed2e80d99bb671a4d79ec12d47f",
-      "bytes": 7086
+      "sha256": "5a2da6b0aad6784eb7dc938e34bd4f2284e8707f01fdfb7cd935f0feb861871a",
+      "bytes": 12074
     },
     "specs/037-early-accurate-publication/spec.md": {
       "destination": "specs/000-baseline/spec.md#required-publication-and-task-lifecycle",
-      "kind": "current-contract",
+      "kind": "specification-or-usage",
       "topic": "Accurate startup configuration and early complete publication",
       "reason": "Current obligations consolidated; exact source and disclosed scheduler acceptance gap retained in checkpoint.",
       "sha256": "12db599ff280fc2bb9b2e978f046dfc09f532ec28e9b908bdc7ba246461cb7a6",
       "bytes": 4495,
-      "archive_command": "git show H:specs/037-early-accurate-publication/spec.md"
+      "archive_command": "git show H:specs/037-early-accurate-publication/spec.md",
+      "source_path": "specs/037-early-accurate-publication/spec.md"
     },
     "specs/037-early-accurate-publication/data-model.md": {
-      "destination": "git:H:specs/037-early-accurate-publication/data-model.md",
-      "kind": "task-history",
+      "destination": "specs/000-baseline/spec.md#historical-evidence-and-limits",
+      "kind": "historical-evidence",
       "topic": "Accurate startup configuration and early complete publication",
       "reason": "Current obligations consolidated; exact source and disclosed scheduler acceptance gap retained in checkpoint.",
       "sha256": "596e246c5b20939abe99b7871854029cdc23027569baa66e5e0aae11be626e34",
       "bytes": 568,
-      "archive_command": "git show H:specs/037-early-accurate-publication/data-model.md"
+      "archive_command": "git show H:specs/037-early-accurate-publication/data-model.md",
+      "source_path": "specs/037-early-accurate-publication/data-model.md"
     },
     "specs/037-early-accurate-publication/plan.md": {
-      "destination": "git:H:specs/037-early-accurate-publication/plan.md",
-      "kind": "task-history",
+      "destination": "specs/000-baseline/spec.md#historical-evidence-and-limits",
+      "kind": "historical-evidence",
       "topic": "Accurate startup configuration and early complete publication",
       "reason": "Current obligations consolidated; exact source and disclosed scheduler acceptance gap retained in checkpoint.",
       "sha256": "650157ee43496894aea9da27d22e2ea1c20b03a7c87dffeae297d7789fc210ea",
       "bytes": 3377,
-      "archive_command": "git show H:specs/037-early-accurate-publication/plan.md"
+      "archive_command": "git show H:specs/037-early-accurate-publication/plan.md",
+      "source_path": "specs/037-early-accurate-publication/plan.md"
     },
     "specs/037-early-accurate-publication/research.md": {
-      "destination": "git:H:specs/037-early-accurate-publication/research.md",
-      "kind": "task-history",
+      "destination": "specs/000-baseline/spec.md#historical-evidence-and-limits",
+      "kind": "historical-evidence",
       "topic": "Accurate startup configuration and early complete publication",
       "reason": "Current obligations consolidated; exact source and disclosed scheduler acceptance gap retained in checkpoint.",
       "sha256": "783eb0661e1248cdf72045a9ace1939d4ce7a45022a00627d73ec2319a518f78",
       "bytes": 1015,
-      "archive_command": "git show H:specs/037-early-accurate-publication/research.md"
+      "archive_command": "git show H:specs/037-early-accurate-publication/research.md",
+      "source_path": "specs/037-early-accurate-publication/research.md"
     },
     "specs/037-early-accurate-publication/review.md": {
-      "destination": "git:H:specs/037-early-accurate-publication/review.md",
-      "kind": "task-history",
+      "destination": "specs/000-baseline/spec.md#historical-evidence-and-limits",
+      "kind": "historical-evidence",
       "topic": "Accurate startup configuration and early complete publication",
       "reason": "Current obligations consolidated; exact source and disclosed scheduler acceptance gap retained in checkpoint.",
       "sha256": "44f658c654916ca8fb3cb525f005ef80f94f9ee799c9406bc22317df692f05d7",
       "bytes": 4142,
-      "archive_command": "git show H:specs/037-early-accurate-publication/review.md"
+      "archive_command": "git show H:specs/037-early-accurate-publication/review.md",
+      "source_path": "specs/037-early-accurate-publication/review.md"
     },
     "specs/037-early-accurate-publication/analysis.md": {
-      "destination": "git:H:specs/037-early-accurate-publication/analysis.md",
-      "kind": "task-history",
+      "destination": "specs/000-baseline/spec.md#historical-evidence-and-limits",
+      "kind": "historical-evidence",
       "topic": "Accurate startup configuration and early complete publication",
       "reason": "Current obligations consolidated; exact source and disclosed scheduler acceptance gap retained in checkpoint.",
       "sha256": "b0a721c9591e4c7f6bc6719dc88301a0017f02b67afa5edd0902387b1f843b67",
       "bytes": 2705,
-      "archive_command": "git show H:specs/037-early-accurate-publication/analysis.md"
+      "archive_command": "git show H:specs/037-early-accurate-publication/analysis.md",
+      "source_path": "specs/037-early-accurate-publication/analysis.md"
     },
     "specs/037-early-accurate-publication/tasks.md": {
-      "destination": "git:H:specs/037-early-accurate-publication/tasks.md",
-      "kind": "task-history",
+      "destination": "specs/000-baseline/spec.md#historical-evidence-and-limits",
+      "kind": "historical-evidence",
       "topic": "Accurate startup configuration and early complete publication",
       "reason": "Current obligations consolidated; exact source and disclosed scheduler acceptance gap retained in checkpoint.",
       "sha256": "65cde8c21bb260705a81cac26394dd199127ce39cbebd5fe69e7d422d3d2e706",
       "bytes": 4404,
-      "archive_command": "git show H:specs/037-early-accurate-publication/tasks.md"
+      "archive_command": "git show H:specs/037-early-accurate-publication/tasks.md",
+      "source_path": "specs/037-early-accurate-publication/tasks.md"
     },
     "specs/037-early-accurate-publication/verification.md": {
-      "destination": "git:H:specs/037-early-accurate-publication/verification.md",
-      "kind": "task-history",
+      "destination": "specs/000-baseline/spec.md#historical-evidence-and-limits",
+      "kind": "historical-evidence",
       "topic": "Accurate startup configuration and early complete publication",
       "reason": "Current obligations consolidated; exact source and disclosed scheduler acceptance gap retained in checkpoint.",
       "sha256": "55820033983b14a1dd4fa9556c3b9311469b4c6a75c06be828b4b09da350578a",
       "bytes": 13573,
-      "archive_command": "git show H:specs/037-early-accurate-publication/verification.md"
+      "archive_command": "git show H:specs/037-early-accurate-publication/verification.md",
+      "source_path": "specs/037-early-accurate-publication/verification.md"
     },
     "specs/037-early-accurate-publication/architecture.json": {
-      "destination": "git:H:specs/037-early-accurate-publication/architecture.json",
-      "kind": "task-history",
+      "destination": "specs/000-baseline/spec.md#historical-evidence-and-limits",
+      "kind": "historical-evidence",
       "topic": "Accurate startup configuration and early complete publication",
       "reason": "Current obligations consolidated; exact source and disclosed scheduler acceptance gap retained in checkpoint.",
       "sha256": "04c36c4e540f36f350c661c2e7c0f2fc491b6811c50583db7706c02a5ecf05e9",
       "bytes": 12689,
-      "archive_command": "git show H:specs/037-early-accurate-publication/architecture.json"
+      "archive_command": "git show H:specs/037-early-accurate-publication/architecture.json",
+      "source_path": "specs/037-early-accurate-publication/architecture.json"
     },
     "specs/037-early-accurate-publication/quickstart.md": {
-      "destination": "git:H:specs/037-early-accurate-publication/quickstart.md",
-      "kind": "task-history",
+      "destination": "specs/000-baseline/spec.md#historical-evidence-and-limits",
+      "kind": "historical-evidence",
       "topic": "Accurate startup configuration and early complete publication",
       "reason": "Current obligations consolidated; exact source and disclosed scheduler acceptance gap retained in checkpoint.",
       "sha256": "d1e25a0e27567189d0e0122dcaf70a36476421e668ca1d61bab42056ebd147b0",
       "bytes": 605,
-      "archive_command": "git show H:specs/037-early-accurate-publication/quickstart.md"
+      "archive_command": "git show H:specs/037-early-accurate-publication/quickstart.md",
+      "source_path": "specs/037-early-accurate-publication/quickstart.md"
     },
     "specs/037-early-accurate-publication/checklists/requirements.md": {
-      "destination": "git:H:specs/037-early-accurate-publication/checklists/requirements.md",
-      "kind": "task-history",
+      "destination": "specs/000-baseline/spec.md#historical-evidence-and-limits",
+      "kind": "historical-evidence",
       "topic": "Accurate startup configuration and early complete publication",
       "reason": "Current obligations consolidated; exact source and disclosed scheduler acceptance gap retained in checkpoint.",
       "sha256": "75b5a14faf7a39bb93433bd6e5196278d89fa121ac7b4e982b481fad3e8e2585",
       "bytes": 339,
-      "archive_command": "git show H:specs/037-early-accurate-publication/checklists/requirements.md"
+      "archive_command": "git show H:specs/037-early-accurate-publication/checklists/requirements.md",
+      "source_path": "specs/037-early-accurate-publication/checklists/requirements.md"
     },
     "specs/037-early-accurate-publication/contracts/publication.md": {
       "destination": "specs/000-baseline/spec.md#required-publication-and-task-lifecycle",
@@ -5462,7 +5473,8 @@
       "reason": "Current obligations consolidated; exact source and disclosed scheduler acceptance gap retained in checkpoint.",
       "sha256": "015b788cbe3281db4d926303f8d896d523cdf366463e308c4f1900a0f05eec8b",
       "bytes": 2070,
-      "archive_command": "git show H:specs/037-early-accurate-publication/contracts/publication.md"
+      "archive_command": "git show H:specs/037-early-accurate-publication/contracts/publication.md",
+      "source_path": "specs/037-early-accurate-publication/contracts/publication.md"
     }
   },
   "fragment_policy": "Replace the whole historical target including its old fragment with destination; do not append the historical fragment. For evidence links, use the immutable H archive URL plus archive_fragment instead.",

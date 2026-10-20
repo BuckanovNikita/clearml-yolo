@@ -295,8 +295,8 @@
   "documentation": "Update maintained links/contracts and new baseline; preserve retired evidence in checkpoint. New personal skill and portable usage source have their own verification.",
   "review": {
     "status": "accepted",
-    "reviewer": "integrated_review; fresh native read-only review after parent checks",
+    "reviewer": "final_merge_review; fresh independent native read-only final merged review",
     "evidence": "specs/037-cleanup-baseline/review.md",
-    "reconciliation": "Reviewed the complete integrated tracked/untracked source, tests, configuration split, immutable fixture additions and maintained documentation against records 026 configuration-split, 036 cache/replay and 037 cleanup. Existing user-authorized dirty changes are included; the local uv.sources section is excluded from commits and restored exactly afterward. Import/effect checks remain intact; 036 live acceptance passed with its preserved unexplained transient failure. History removal and final docs cutover remain subsequent explicit checks."
+    "reconciliation": "Complete delta from published41a4036 reconciled with approved initial configuration split, five orphan-removal modules, TrackingSession comment-only lint integration, test reader/fixture consumers and maintained documentation. All43 import contracts and package/dependency metadata/lock remain equal; full normal hooks,246 architecture checks and final wheel/sdist source hashes passed. Native historical evidence and missing early037 scheduler acceptance remain distinct. Final archive cutover is documentation-only and separately validated."
   }
 }
