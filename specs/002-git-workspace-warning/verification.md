@@ -162,3 +162,20 @@ this checkout; the explicit `--locked --no-sync` invocations also work. Setting
 `UV_FROZEN` alongside explicit `--locked` was rejected by argument validation,
 so that redundant setting is not used. This follows the existing prepared-backend
 verification policy without altering hooks or resolving dependencies.
+
+## Delivery verification
+
+The feature commit retry passed every applicable hook, including the complete
+pytest hook. Master integration and the native checked release helper then
+succeeded, creating v0.37.0. The parent verified the release-only file set, direct
+commit parent, annotated tag, unchanged dependency lock apart from the root
+version, exact local override restoration and matching remote branch/tag refs
+after the atomic push. See [release.md](release.md) for immutable identities
+and companion delivery.
+
+Companion collection v0.4.1 was then published with matching remote main and
+annotated/peeled tag refs independently checked by the parent. Final delivery
+documentation and architecture reconciliation passed the 60-file documentation
+check, shared acceptance validator and whitespace check. All task ledger items
+are complete; neither repository's installed skills or unrelated working changes
+were replaced.

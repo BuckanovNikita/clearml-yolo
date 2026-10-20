@@ -25,8 +25,8 @@ and stay quiet within a working tree; inert multirun continues through both jobs
 
 - [x] T010 Run full routine pytest, Ruff, mypy, Vulture and import contracts; record results in verification.md.
 - [x] T011 Obtain fresh independent review of final application/companion diffs and checks; reconcile architecture.json and validate acceptance.
-- [ ] T012 Commit verified changes, land on master and complete native Git-only release with exact local uv override preservation; record delivery in release.md.
-- [ ] T013 Publish the validated companion documentation patch release and verify application/companion remote refs in release.md.
+- [x] T012 Commit verified changes, land on master and complete native Git-only release with exact local uv override preservation; record delivery in release.md.
+- [x] T013 Publish the validated companion documentation patch release and verify application/companion remote refs in release.md.
 
 ## Dependencies and ownership
 
