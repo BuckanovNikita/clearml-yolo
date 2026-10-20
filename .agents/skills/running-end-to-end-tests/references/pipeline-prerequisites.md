@@ -1,7 +1,8 @@
 # Pipeline prerequisites
 
-Use Python and dependencies from `pyproject.toml` and `uv.lock`. Detector extras require
-Torch >=2.13.0 and Torchvision >=0.28.0, locked at 2.14.1/0.29.1. Configure ClearML
+Use Python and dependency bounds from `pyproject.toml` and selected versions from
+`uv.lock`. Detector, ONNX export and queue TUI dependencies install by default;
+project extras are removed. Keep development tools in the separate `dev` group. Configure ClearML
 through normal SDK environment/user configuration; external selectors are valid.
 Infrastructure access and resource capacity come from the environment, not this repository.
 
@@ -16,7 +17,26 @@ are preserved and fail clearly; native lock failures have no soft fallback. See 
 [filesystem contract](../../../../docs/filesystem-policy.md). Preserve source images,
 existing user settings and old local SDK caches; reuse old local selectors explicitly.
 
-Build the ground-truth CSV before stages that consume it:
+Supply a local ground-truth CSV or a finalized ClearML dataset containing only root
+`dataset.csv`; additional files or linked entries must fail before download.
+Select the dataset with `ground_truth={dataset_id:DATASET_ID}` or
+`ground_truth={project_name:annotations,name:ground-truth,version:"1.2.0"}`;
+quote the whole mapping override in a shell. Version is optional only for the
+project/name pair. The materialized CSV is unchanged and image references are not
+remapped. Absolute references remain absolute, and relative references resolve
+beside the downloaded CSV. Preserve accessible media at those references. Use a fresh
+CSV-only dataset lineage when testing transport exclusion of historical media,
+because the SDK can fetch whole archive chunks into its cache.
+
+Local CSV execution warns once; nested stages reuse the resolved source. Verify
+help/configuration inspection and queue submission do not download datasets, while
+execution and replay resolve once and preserve the requested selector alongside
+actual dataset identity, version and CSV digest. Compare a task-owned CSV-only
+dataset's downloaded bytes and downstream results with its local source before
+claiming retrieval or parity. See the
+[source contract](../../../../docs/input-provenance.md#ground-truth-sources).
+
+For existing YOLO annotations, build the CSV before consuming it:
 
 ```bash
 uv run --frozen --no-sync cy-ground-truth data_yaml=data.yaml output=ground_truth.csv
@@ -39,13 +59,13 @@ include both native groups for default YOLO; new detector selections write only 
 accepts only Faster R-CNN presets; `cy-metrics`, `cy-report` and `cy-ground-truth` use no model group.
 Only selected files/parents participate in overwrite checks.
 
-New detectors use typed `model.train` and `model.predict` settings, derive COCO working
-data from the same CSV and require the optional detector dependencies. DEIMv2 also requires
+New detectors use typed `model.train` and `model.predict` settings and derive COCO working
+data from the same CSV using the default runtime dependencies. DEIMv2 also requires
 its verified source checkout and compatible explicit pretrained assets. Follow the
 [model guide](../../../../docs/multi-model-backends.md) for presets and restrictions and
 the [multi-model acceptance guide](../../../../specs/025-multi-model-backends/quickstart.md)
 for the native/download/comparison matrices. Use `uv run --frozen --no-sync` after preparing
-an optional-backend environment so verification does not remove its installed extras.
+a backend environment so verification does not remove additional external runtime packages.
 
 Select the backend's supported device, batch and precision controls for the environment.
 Direct commands and `cy-export` run their explicit native devices without queue discovery,

@@ -7,8 +7,9 @@ from typing import Any
 
 import pandas as pd
 
-from clearml_yolo.application.contracts import ClearMLConfig, MetricsResult
+from clearml_yolo.application.contracts import ClearMLConfig, GroundTruthInput, MetricsResult
 from clearml_yolo.application.evaluation import evaluate_split
+from clearml_yolo.application.ground_truth import resolve_ground_truth
 from clearml_yolo.application.ports import TaskHandle, WorkflowDependencies
 from clearml_yolo.application.use_cases.publication import prepare_publisher, publish_results
 from clearml_yolo.core import artifact_names
@@ -107,7 +108,7 @@ def _prepare(
 
 def compute_metrics(
     predictions: str | Path,
-    ground_truth: str | Path,
+    ground_truth: GroundTruthInput,
     output_dir: str | Path,
     clearml: ClearMLConfig,
     evaluation: EvaluationConfig,
@@ -121,6 +122,7 @@ def compute_metrics(
     """Calibrate once on validation and score requested splits at that exact mapping."""
     with deps.resources.trace_operation("workflow.metrics"):
         task = deps.tracking.init_task(clearml, stage="metrics")
+        ground_truth = resolve_ground_truth(ground_truth, task=task, deps=deps).path
         publisher = prepare_publisher(task, fiftyone, factory=deps.publisher_factory, deps=deps)
         identity = require_model_identity(
             deps.tracking.prediction_model_identity(Path(predictions)),

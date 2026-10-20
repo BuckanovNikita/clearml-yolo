@@ -9,9 +9,11 @@ from typing import Any
 from clearml_yolo.application.contracts import (
     ClearMLConfig,
     DatasetFormat,
+    GroundTruthInput,
     PreparedDataset,
     TrainResult,
 )
+from clearml_yolo.application.ground_truth import resolve_ground_truth
 from clearml_yolo.application.ports import TaskHandle, WorkflowDependencies
 
 TRAIN_DIR = "detect"
@@ -88,7 +90,7 @@ def _execute_training(
 def train(
     ultralytics: dict[str, Any],
     clearml: ClearMLConfig,
-    ground_truth: str | Path,
+    ground_truth: GroundTruthInput,
     ultralytics_predict: dict[str, Any] | None = None,
     dataset_format: DatasetFormat = "ndjson",
     required_splits: list[str] | None = None,
@@ -99,6 +101,7 @@ def train(
     """Train from CSV ground truth; native callbacks own training publications."""
     with deps.resources.trace_operation("workflow.train"):
         task = deps.tracking.init_task(clearml, stage="train")
+        ground_truth = resolve_ground_truth(ground_truth, task=task, deps=deps).path
         deps.model.stage_settings(ultralytics_predict or {}, "predict")
         settings = deps.model.execution_settings(ultralytics, "train")
         architecture = settings.pop("model")

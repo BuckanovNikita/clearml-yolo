@@ -9,9 +9,11 @@ import pandas as pd
 from clearml_yolo.application.contracts import (
     PREDICTION_COLUMNS,
     ClearMLConfig,
+    GroundTruthInput,
     ImageNameMode,
     PredictResult,
 )
+from clearml_yolo.application.ground_truth import resolve_ground_truth
 from clearml_yolo.application.ports import WorkflowDependencies
 from clearml_yolo.application.use_cases.publication import prepare_publisher, publish_results
 from clearml_yolo.core import artifact_names
@@ -37,7 +39,7 @@ def images_to_score(ground_truth: pd.DataFrame, splits: list[str] | None) -> lis
 
 def predict(
     weights: str | Path | None,
-    ground_truth: str | Path,
+    ground_truth: GroundTruthInput,
     output: str | Path | None,
     clearml: ClearMLConfig,
     ultralytics: dict[str, Any],
@@ -51,6 +53,7 @@ def predict(
 ) -> PredictResult:
     with deps.resources.trace_operation("workflow.predict"):
         task = deps.tracking.init_task(clearml, stage="predict")
+        ground_truth = resolve_ground_truth(ground_truth, task=task, deps=deps).path
         publisher = prepare_publisher(task, fiftyone, factory=deps.publisher_factory, deps=deps)
         deps.model.stage_settings(ultralytics, "train")
         settings = deps.model.prediction_settings(ultralytics_predict or {}, weights)

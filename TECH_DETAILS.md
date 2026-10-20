@@ -23,18 +23,13 @@ checkout does not download those source trees or enforce their Git revisions.
 Do not change approved upstream revisions as part of setup. Development dependencies
 and local source overrides are documented in the development guide.
 
-Install the extras needed for the intended operation:
-
-| Capability | Installation from the project checkout |
-| --- | --- |
-| DEIMv2, RF-DETR, Faster R-CNN | `uv sync --frozen --extra detectors` |
-| Faster R-CNN ONNX export | `uv sync --frozen --extra detectors --extra export` |
-| Queue terminal interface | `uv sync --frozen --extra queue-ui` |
-
-Combine extras when needed; for an already prepared optional environment, use the
-[development environment preservation guidance](docs/development.md#python-integration-and-architecture).
-The detector stack requires Torch >=2.13.0 and Torchvision >=0.28.0; consult `uv.lock`
-for the selected versions. DEIMv2 also requires the exact source revision and compatible
+The default installation includes the detector stack, ONNX/ONNX Runtime and the
+Textual queue interface. Project extras `detectors`, `export` and `queue-ui` have
+been removed; remove `--extra` selections and package extras from installation recipes.
+Development tools remain in the separate `dev` group. Read
+[package metadata](pyproject.toml) for dependency lower bounds, exact pins and upper
+bounds, and `uv.lock` for the selected versions; a resolver result alone does not
+establish runtime compatibility. DEIMv2 still requires the exact source revision and compatible
 assets in the [model guide](docs/multi-model-backends.md#deimv2-source-and-initialization).
 TensorRT and its matching CUDA runtime are separate requirements in the
 [deployment guide](docs/tensorrt-deployment.md).
@@ -84,7 +79,7 @@ for inheritance and precedence.
 
 | Existing manual step or parameter | Corresponding interface |
 | --- | --- |
-| Prepare native training data | Supply CSV through `ground_truth`; preparation owns native data and class selection |
+| Prepare native training data | Supply a local CSV or a ClearML dataset containing only root `dataset.csv` through `ground_truth`; preparation owns native data and class selection |
 | Ultralytics `model`, `epochs`, `batch`, `imgsz`, `amp`, `mosaic` | Corresponding `ultralytics.*` keys |
 | Ultralytics prediction `batch`, `conf`, `iou` | Independent `ultralytics_predict.*` keys |
 | Native `project` and `name` | Pipeline `run_dir` and explicit ClearML project/task identity |

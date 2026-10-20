@@ -68,6 +68,7 @@ def test_actual_graph_obeys_classification_direction_sdk_ownership_and_cycles(
             "clearml_yolo.entrypoints.composition",
             "direction",
         ),
+        ("clearml_yolo.application.ground_truth", "clearml", "SDK ownership"),
         ("clearml_yolo.application.contracts", "openpyxl", "SDK ownership"),
         ("clearml_yolo.adapters.storage.dataset", "ultralytics", "SDK ownership"),
         ("clearml_yolo.adapters.clearml.models", "report_generator", "SDK ownership"),
@@ -515,6 +516,9 @@ def test_actual_exhaustive_contract_rejects_new_unclassified_module(
         ("deps.storage.read_text(path)", False),
         ("deps.storage.stat(path)", False),
         ("deps.storage.read_csv(path)", False),
+        ("deps.ground_truth_repository.resolve(reference)", False),
+        ("deps.ground_truth_repository.read_bytes(path)", True),
+        ("repository.resolve(reference)", True),
         ("pd.ExcelWriter('x.xlsx')", True),
     ],
 )

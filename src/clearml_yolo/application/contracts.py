@@ -1,11 +1,12 @@
 """Project-owned requests and results shared by workflows and their adapters."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, Self
 
 import pandas as pd
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from clearml_yolo.core.evaluation.policy import validate_thresholds
 from clearml_yolo.core.identity import ModelIdentity
@@ -32,6 +33,49 @@ class GroundTruthRead:
 
     source: pd.DataFrame
     execution: pd.DataFrame
+
+
+class ClearMLDatasetRef(BaseModel):
+    """One immutable dataset ID or a named dataset with an optional version."""
+
+    model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
+    dataset_id: str | None = None
+    project_name: str | None = None
+    name: str | None = None
+    version: str | None = None
+
+    @field_validator("dataset_id", "project_name", "name", "version")
+    @classmethod
+    def _nonempty(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("Dataset selector values must not be empty")
+        return value
+
+    @model_validator(mode="after")
+    def _one_selector(self) -> Self:
+        if self.dataset_id is not None:
+            if any(value is not None for value in (self.project_name, self.name, self.version)):
+                raise ValueError("dataset_id cannot be combined with project_name, name or version")
+        elif self.project_name is None or self.name is None:
+            raise ValueError("Ground truth requires dataset_id or both project_name and name")
+        return self
+
+
+@dataclass(frozen=True)
+class ResolvedGroundTruth:
+    """CSV path and original dataset identity, retained through derived stage inputs."""
+
+    path: Path
+    dataset_id: str | None = None
+    project_name: str | None = None
+    name: str | None = None
+    version: str | None = None
+    csv_sha256: str | None = None
+
+
+type GroundTruthInput = (
+    str | Path | ClearMLDatasetRef | Mapping[str, object] | ResolvedGroundTruth
+)
 
 
 class ClearMLConfig(BaseModel):

@@ -111,15 +111,28 @@ def test_hydra_pipeline_passes_real_stage_objects(
     assert calls[0].iou_threshold == 0.5
 
 
+@pytest.mark.parametrize("remote", [False, True])
 def test_pipeline_routes_cleaned_truth_and_prediction_policy_after_csv_training(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies,
+    remote: bool,
 ) -> None:
     from types import SimpleNamespace
 
+    from clearml_yolo.application.contracts import ResolvedGroundTruth
     from clearml_yolo.application.use_cases import pipeline
 
     cleaned = tmp_path / "cleaned.csv"
-    calls: dict[str, Any] = {"truth": [], "uploads": []}
+    calls: dict[str, Any] = {"truth": [], "uploads": [], "resolve": [], "warnings": []}
+    source = Path("source.csv")
+    resolved = ResolvedGroundTruth(path=source, dataset_id="dataset-id" if remote else None)
+    monkeypatch.setattr(
+        workflow_dependencies.ground_truth_repository, "resolve",
+        lambda ref: calls["resolve"].append(ref) or resolved,
+    )
+    monkeypatch.setattr(
+        workflow_dependencies.resources, "log",
+        lambda level, *args: calls["warnings"].append(args) if level == "WARNING" else None,
+    )
     patch_workflow(
         monkeypatch, workflow_dependencies, pipeline, "init_task", lambda *args, **kwargs: object()
     )
@@ -139,7 +152,7 @@ def test_pipeline_routes_cleaned_truth_and_prediction_policy_after_csv_training(
     )
 
     def training(*args: Any, **kwargs: Any) -> SimpleNamespace:
-        assert kwargs["ground_truth"] == "source.csv"
+        assert kwargs["ground_truth"] == resolved
         assert kwargs["dataset_format"] == "flat"
         assert kwargs["required_splits"] == ["train", "val", "test"]
         return SimpleNamespace(
@@ -149,7 +162,8 @@ def test_pipeline_routes_cleaned_truth_and_prediction_policy_after_csv_training(
         )
 
     def prediction(*args: Any, **kwargs: Any) -> SimpleNamespace:
-        calls["truth"].append(args[1])
+        calls["truth"].append(args[1].path)
+        assert args[1].dataset_id == resolved.dataset_id
         # The training group remains independent; prediction's owned group has
         # already applied CSV class policy and is the only inference input.
         assert args[4]["classes"] == [1]
@@ -157,7 +171,8 @@ def test_pipeline_routes_cleaned_truth_and_prediction_policy_after_csv_training(
         return SimpleNamespace(predictions=tmp_path / "run" / "predictions.csv")
 
     def metrics(*args: Any, **kwargs: Any) -> SimpleNamespace:
-        calls["truth"].append(args[1])
+        calls["truth"].append(args[1].path)
+        assert args[1].dataset_id == resolved.dataset_id
         Path(args[2]).mkdir(parents=True)
         return SimpleNamespace(best_confidences={"val": {"cat": 0.5}}, evaluations={})
 
@@ -172,7 +187,7 @@ def test_pipeline_routes_cleaned_truth_and_prediction_policy_after_csv_training(
         report={"report_config_path": None},
         compare={"baseline_model": object(), "q": 0.05, "bootstrap_iterations": 1, "seed": 0},
         clearml=ClearMLConfig(),
-        ground_truth="source.csv",
+        ground_truth={"dataset_id": "dataset-id"} if remote else "source.csv",
         splits=["test"],
         run_dir=tmp_path / "run",
         dataset_format="flat",
@@ -182,6 +197,8 @@ def test_pipeline_routes_cleaned_truth_and_prediction_policy_after_csv_training(
         deps=workflow_dependencies,
     )
     assert calls["truth"] == [cleaned, cleaned]
+    assert len(calls["resolve"]) == int(remote)
+    assert len(calls["warnings"]) == int(not remote)
     assert (
         "prediction_data_overrides",
         {"ultralytics_predict": {"classes": {"requested": [0], "effective": None}}},

@@ -21,6 +21,23 @@ Linux native execution additionally requires the existing pidfd, subreaper and
 `/proc` capability checks. A Python version constraint cannot guarantee those
 build/kernel capabilities. See [queue supervision](queue.md#guardians-cancellation-and-recovery).
 
+## Runtime dependency compatibility
+
+All supported runtime capabilities install by default, including the detector
+stack, ONNX export and the queue TUI. There are no project extras; remove
+`--extra detectors`, `--extra export`, `--extra queue-ui` and corresponding package
+extras from recipes. Keep development tools in `dependency-groups.dev`; required
+upstream extras such as `rfdetr[train]` and `pandera[pandas]` remain runtime inputs.
+
+[`pyproject.toml`](../pyproject.toml) owns direct lower bounds, exact pins and upper
+bounds. The normal lockfile records the selected environment. When changing floors,
+test an isolated `lowest-direct` resolution on Python 3.12.13 and 3.13, record the
+resolved versions and executed checks in dated evidence, and raise a floor only
+when compatibility evidence requires it. Resolution alone is not a runtime check.
+Keep minimum-version resolutions separate from the normal lockfile, retain approved
+external source revisions and avoid unrelated upgrades. TensorRT system requirements
+and the DEIMv2 checkout remain external prerequisites.
+
 ## Verification
 
 Use the repository's documented tooling and current check configuration. For code or
@@ -39,8 +56,8 @@ uv run pre-commit run --all-files
 See the [static analysis policy](static-analysis.md) for Ruff selections and exclusions,
 mypy boundary exceptions and Vulture's confidence threshold. The Vulture hook scans
 source, scripts and tests together using the locked development environment. Install
-the updated dev dependencies before running it; for a deliberately prepared optional
-backend environment, use an inexact sync so its installed extras are preserved.
+the updated dev dependencies before running it; for a deliberately prepared environment
+with additional external runtime packages, use an inexact sync to preserve them.
 
 Documentation-only work needs Markdown and local-link validation rather than the
 application suite. Inspect [.pre-commit-config.yaml](../.pre-commit-config.yaml) before
@@ -115,8 +132,8 @@ for exact selection, prerequisites, deadlines and the evidence archive to return
 ### Static-analysis boundaries
 
 The release helper imports only the standard library, Loguru and Pydantic. Keep lint
-and stub distributions in the development group, including when adding optional
-runtime extras. `tests/test_tooling_boundaries.py` enforces these constraints with
+and stub distributions in the development group when adding runtime dependencies.
+`tests/test_tooling_boundaries.py` enforces these constraints with
 injected forbidden imports and dependency declarations. Ruff preview checks require
 explicit code selection; review the [policy report](static-analysis.md) and refresh
 the rule inventory when changing the locked Ruff version.
@@ -145,10 +162,10 @@ Invalid dataset entries must be preserved and reported; native locks must not fa
 hangs during import, publication and shutdown; require bounded optional warnings and
 validated receipts, rather than inferred success. See [runtime isolation](runtime-isolation.md).
 Update maintained code links and migration guidance; preserve completed feature history as dated intent.
-For detector/export changes, include the optional dependencies and acceptance matrices in
+For detector/export changes, include the runtime prerequisites and acceptance matrices in
 the [model guide](multi-model-backends.md) and [deployment guide](tensorrt-deployment.md).
-Use `uv run --frozen --no-sync` for verification in a deliberately prepared optional-backend
-environment so a default sync does not remove its installed extras.
+Use `uv run --frozen --no-sync` for verification in a deliberately prepared backend
+environment so a default sync does not remove additional external runtime packages.
 
 ## External dependencies
 

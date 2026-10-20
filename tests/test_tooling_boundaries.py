@@ -117,7 +117,7 @@ def test_analysis_packages_are_development_only() -> None:
         config = tomllib.load(stream)
     project = config["project"]
     requirements = list(project["dependencies"])
-    for extra in project["optional-dependencies"].values():
+    for extra in project.get("optional-dependencies", {}).values():
         requirements.extend(extra)
     assert not runtime_analysis_dependencies(requirements)
     dev = {canonicalize_name(Requirement(item).name) for item in config["dependency-groups"]["dev"]}

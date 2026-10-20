@@ -346,7 +346,7 @@ def layer(module: str) -> str | None:
     responsibilities: dict[str, set[str] | None] = {
         "core": None,
         "adapters": ADAPTER_RESPONSIBILITIES,
-        "application": {"contracts", "ports", "evaluation", "use_cases", "queue"},
+        "application": {"contracts", "ports", "evaluation", "ground_truth", "use_cases", "queue"},
         "entrypoints": COMMANDS
         | {"composition", "hydra", "queue_tui", "queue_run", "queue_presentation"},
     }
@@ -639,7 +639,11 @@ class _EffectVisitor(ast.NodeVisitor):
             or name.startswith(("urllib.request.", "http.client.", "multiprocessing."))
             or method in EFFECTFUL_CALLS - ambiguous
         )
-        if explicit and not (self.application and name.startswith("deps.storage.")):
+        port_effect = self.application and (
+            name.startswith("deps.storage.")
+            or name == "deps.ground_truth_repository.resolve"
+        )
+        if explicit and not port_effect:
             self.report(node, name)
         self.generic_visit(node)
 

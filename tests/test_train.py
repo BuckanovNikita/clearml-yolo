@@ -110,7 +110,7 @@ def test_csv_training_uses_prepared_data_and_returns_cleaned_ground_truth(
         dataset_format: str = "ndjson",
         required_splits: tuple[str, ...] = ("train", "val"),
     ) -> Iterator[PreparedDataset]:
-        assert source == "source.csv"
+        assert Path(source) == Path("source.csv")
         assert cache_dir == tmp_path / "cache"
         assert dataset_format == expected_format
         assert required_splits == ("train", "val", "test")

@@ -2,16 +2,19 @@
 
 import json
 from collections.abc import Mapping
-from dataclasses import fields, is_dataclass
+from dataclasses import fields, is_dataclass, replace
 from pathlib import Path
 from typing import Any
 
 from clearml_yolo.application.contracts import (
     ClearMLConfig,
     DatasetFormat,
+    GroundTruthInput,
     InferenceConfig,
     ModelRef,
+    ResolvedGroundTruth,
 )
+from clearml_yolo.application.ground_truth import resolve_ground_truth
 from clearml_yolo.application.ports import (
     Publisher,
     ResultProducer,
@@ -114,7 +117,7 @@ def _compare_and_report(
     config: dict[str, Any],
     checkpoint: str | Path,
     thresholds: dict[str, float],
-    ground_truth: str | Path,
+    ground_truth: GroundTruthInput,
     directory: Path,
     clearml: ClearMLConfig,
     inference: InferenceConfig,
@@ -174,7 +177,7 @@ def _compare_and_report(
 def _train_from_ground_truth(
     train_params: dict[str, Any],
     clearml: ClearMLConfig,
-    ground_truth: str,
+    ground_truth: ResolvedGroundTruth,
     dataset_format: DatasetFormat,
     dataset_cache_dir: str | Path | None,
     required_splits: list[str],
@@ -182,7 +185,7 @@ def _train_from_ground_truth(
     task: TaskHandle | None,
     *,
     deps: WorkflowDependencies,
-) -> tuple[Path, Path]:
+) -> tuple[Path, ResolvedGroundTruth]:
     trained = run_training(
         train_params,
         clearml,
@@ -196,7 +199,7 @@ def _train_from_ground_truth(
         task, {"prediction_data_overrides": prediction_data_overrides}
     )
     deps.resources.training_finished()
-    return (trained.weights, trained.cleaned_ground_truth)
+    return trained.weights, replace(ground_truth, path=trained.cleaned_ground_truth)
 
 
 def _publish_pipeline(
@@ -250,7 +253,7 @@ def run_pipeline(
     report: Any,
     compare: Any,
     clearml: ClearMLConfig,
-    ground_truth: str,
+    ground_truth: GroundTruthInput,
     splits: list[str] | None = None,
     dataset_format: DatasetFormat = "ndjson",
     dataset_cache_dir: str | Path | None = None,
@@ -270,6 +273,7 @@ def run_pipeline(
     """Pass real producer outputs to consumers and preserve files on any failure."""
     with deps.resources.trace_operation("workflow.pipeline"):
         task = deps.tracking.init_task(clearml, stage="pipeline")
+        resolved_truth = resolve_ground_truth(ground_truth, task=task, deps=deps)
         publisher = prepare_publisher(task, fiftyone, factory=deps.publisher_factory, deps=deps)
         if weights is not None and (not skip_train):
             raise ValueError(
@@ -308,12 +312,12 @@ def run_pipeline(
         )
         results: dict[str, Any] = {"run_dir": directory}
         checkpoint = weights if weights is not None else directory / "detect/train/weights/best.pt"
-        effective_ground_truth: str | Path = ground_truth
+        effective_ground_truth = resolved_truth
         if not skip_train:
             checkpoint, effective_ground_truth = _train_from_ground_truth(
                 train_params,
                 clearml,
-                ground_truth,
+                resolved_truth,
                 dataset_format,
                 dataset_cache_dir,
                 _required_training_splits(
@@ -398,8 +402,8 @@ def run_pipeline(
             publisher,
             task,
             directory,
-            effective_ground_truth,
-            ground_truth,
+            effective_ground_truth.path,
+            resolved_truth.path,
             predictions,
             prediction_splits,
             evaluations,

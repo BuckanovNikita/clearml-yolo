@@ -4,6 +4,7 @@ from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import Any, override
 
+from clearml_yolo.adapters.clearml.datasets import ClearMLGroundTruthRepository
 from clearml_yolo.adapters.clearml.models import (
     fetch_best_confidences as _repository_fetch_best_confidences,
 )
@@ -334,6 +335,7 @@ def build_dependencies(model: ModelConfig | dict[str, Any] | None = None) -> Wor
     selected = model if isinstance(model, ModelConfig) else ModelConfig.model_validate(model or {})
     return WorkflowDependencies(
         dataset=_DatasetStore() if selected.backend == "ultralytics" else _DetectorDatasetStore(),
+        ground_truth_repository=ClearMLGroundTruthRepository(),
         model=DetectorRunner(selected, _ModelRunner()),
         repository=_ModelRepository(),
         evaluation=_EvaluationEngine(),

@@ -123,6 +123,15 @@ and resources. Workers revalidate identity before execution; changed installatio
 resubmission. Credentials come from the owning user's environment. Public summaries never
 contain executable configurations.
 
+Ground-truth [dataset selectors](input-provenance.md#ground-truth-sources) are
+validated and preserved in the private snapshot without downloading a dataset.
+The worker resolves the selector once at execution. An omitted dataset version
+uses the SDK's current selection at that time, so submission does not freeze it;
+use a dataset ID or explicit project/name/version when the source must be fixed.
+Resolved dataset identity, version and CSV digest are recorded separately from
+the executable selector. A local CSV remains supported and warns once during
+execution, not submission.
+
 Preflight validates project request types and cross-field rules, including the supported
 native parameter types and ranges, without importing model SDKs. Dataset availability,
 model loading and whether the workload fits GPU memory remain execution-time checks.
@@ -396,10 +405,10 @@ unknown claim protocol instead of ignoring operator holds. Existing active alloc
 remain protected unless explicitly freed and can finish. Do not delete this fence or
 downgrade workers while controls are in use.
 
-## Optional terminal UI
+## Terminal UI
 
-Install `clearml-yolo[queue-ui]` or use `uv sync --dev --extra queue-ui --inexact`, then
-run `cy-queue tui`. Textual loads only for this interface. The table shows owner, position,
+The default installation includes Textual; run `cy-queue tui` without installing
+a project extra. Textual loads only for this interface. The table shows owner, position,
 state, request/allocation, waiting reason, progress and a readable ClearML task link.
 Arrow keys select; `u`/`d` move, `t`/`g` send to top/bottom, and `b`/`a` select another
 pending job from a dropdown for before/after ordering. `c` cancels, `r` recovers,

@@ -50,6 +50,42 @@ def _configuration(backend: str, preset: str) -> DictConfig:
     )
 
 
+@pytest.mark.parametrize(
+    "selector",
+    [
+        {"dataset_id": "fixed-id"},
+        {"project_name": "annotations", "name": "truth"},
+        {"project_name": "annotations", "name": "truth", "version": "1.0.0"},
+    ],
+)
+def test_remote_replay_preserves_dataset_selector_and_separates_provenance(
+    monkeypatch: pytest.MonkeyPatch, isolated_owner: list[str], selector: dict[str, str]
+) -> None:
+    observed: list[Any] = []
+    published: list[dict[str, Any]] = []
+    provenance = {"dataset_id": "resolved-id", "csv_sha256": "digest"}
+
+    def workflow(ground_truth: Any, clearml: Any) -> None:
+        observed.append(ground_truth)
+
+    monkeypatch.setattr(
+        common, "replay_configuration",
+        lambda task, values, **kwargs: values | {
+            "ground_truth": selector, "ground_truth_source": provenance
+        },
+    )
+    monkeypatch.setattr(
+        common, "publish_run_configuration",
+        lambda task, values, defaults: published.append(values),
+    )
+    common.execute_owned(
+        "train", OmegaConf.create({"clearml": {}, "ground_truth": "old-local.csv"}), workflow
+    )
+    assert observed == [selector]
+    assert published[0]["ground_truth"] == selector
+    assert "ground_truth_source" not in published[0]
+
+
 @pytest.mark.parametrize("command", ["train", "pipeline"])
 def test_training_replay_keeps_full_native_values_and_only_general_scientific_overrides(
     monkeypatch: pytest.MonkeyPatch,

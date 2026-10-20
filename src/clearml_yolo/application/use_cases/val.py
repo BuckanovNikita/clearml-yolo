@@ -3,7 +3,8 @@
 from pathlib import Path
 from typing import Any
 
-from clearml_yolo.application.contracts import ClearMLConfig, MetricsResult
+from clearml_yolo.application.contracts import ClearMLConfig, GroundTruthInput, MetricsResult
+from clearml_yolo.application.ground_truth import resolve_ground_truth
 from clearml_yolo.application.ports import WorkflowDependencies
 from clearml_yolo.application.use_cases.metrics import compute_metrics
 from clearml_yolo.application.use_cases.predict import predict
@@ -13,7 +14,7 @@ from clearml_yolo.core.publication import FiftyOneConfig
 
 def validate(
     weights: str | Path | None,
-    ground_truth: str | Path,
+    ground_truth: GroundTruthInput,
     output_dir: str | Path,
     clearml: ClearMLConfig,
     ultralytics: dict[str, Any],
@@ -26,6 +27,7 @@ def validate(
 ) -> MetricsResult:
     with deps.resources.trace_operation("workflow.val"):
         task = deps.tracking.init_task(clearml, stage="val")
+        ground_truth = resolve_ground_truth(ground_truth, task=task, deps=deps)
         selected = list(dict.fromkeys(splits or ["train", "val", "test"]))
         destination = deps.storage.write_path(output_dir)
         deps.tracking.declare_result_producers(

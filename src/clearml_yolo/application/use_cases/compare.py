@@ -19,6 +19,7 @@ from clearml_yolo.application.contracts import (
     ClearMLConfig,
     CompareResult,
     ComparisonManifest,
+    GroundTruthInput,
     GroundTruthRead,
     InferenceConfig,
     InferenceEvidence,
@@ -28,6 +29,7 @@ from clearml_yolo.application.contracts import (
     VocabularyReport,
 )
 from clearml_yolo.application.evaluation import evaluate_split
+from clearml_yolo.application.ground_truth import resolve_ground_truth
 from clearml_yolo.application.ports import (
     PairedComparisonEngine,
     TaskHandle,
@@ -626,7 +628,7 @@ def _read_comparison_truth(
 def compare(
     baseline_model: ModelRef,
     candidate_model: ModelRef,
-    ground_truth: str | Path,
+    ground_truth: GroundTruthInput,
     output_dir: str | Path,
     clearml: ClearMLConfig,
     inference: InferenceConfig | dict[str, Any],
@@ -651,7 +653,7 @@ def compare(
         deps.storage.mkdir(destination, parents=True, exist_ok=True)
         current_task_id = str(task.id) if task is not None else None
         evaluation_config = _evaluation_config(evaluation)
-        ground_truth_path = Path(ground_truth)
+        ground_truth_path = resolve_ground_truth(ground_truth, task=task, deps=deps).path
         loaded_truth = _read_comparison_truth(ground_truth_path, inference.image_name, deps=deps)
         truth = loaded_truth.source
         deps.tracking.declare_result_producers(task, ["compare"], output_dir=destination)

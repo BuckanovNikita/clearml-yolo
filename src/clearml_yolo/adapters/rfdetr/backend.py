@@ -42,7 +42,7 @@ def _sdk() -> Any:
         actual = importlib.metadata.version("rfdetr")
     except importlib.metadata.PackageNotFoundError as exc:
         raise ImportError(
-            'RF-DETR requires the optional "rfdetr[train]==1.11.2" dependency'
+            'RF-DETR requires the default "rfdetr[train]==1.11.2" dependency'
         ) from exc
     if actual != VERSION:
         raise RuntimeError(f"RF-DETR requires version {VERSION}; installed version is {actual}")

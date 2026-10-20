@@ -134,10 +134,11 @@ def test_composition_exposes_optional_statistics_without_changing_dependency_con
         "publisher_factory",
         "disabled_publisher",
         "exporter",
+        "ground_truth_repository",
     ]
     for name, parameter in signature.parameters.items():
         assert parameter.kind is inspect.Parameter.POSITIONAL_OR_KEYWORD
-        if name == "exporter":
+        if name in {"exporter", "ground_truth_repository"}:
             assert parameter.default is None
         else:
             assert parameter.default is inspect.Parameter.empty

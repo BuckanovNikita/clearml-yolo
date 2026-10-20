@@ -275,7 +275,10 @@ def _tui(service: QueueService, presentation: QueuePresentation | None = None) -
         from clearml_yolo.entrypoints.queue_tui import QueueApp
     except ModuleNotFoundError as error:
         if error.name and error.name.startswith("textual"):
-            raise RuntimeError("Install clearml-yolo[queue-ui] to use cy-queue tui") from error
+            raise RuntimeError(
+                "The clearml-yolo installation is missing textual; "
+                "reinstall its default dependencies"
+            ) from error
         raise
     QueueApp(service, presentation=presentation or _presentation(service.identity.host_id)).run()
 

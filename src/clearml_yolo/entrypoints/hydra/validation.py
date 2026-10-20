@@ -17,6 +17,7 @@ from clearml_yolo.adapters.yolo.config import (
     stage_settings,
 )
 from clearml_yolo.application.contracts import ClearMLConfig, ModelRef
+from clearml_yolo.application.ground_truth import normalize_ground_truth
 from clearml_yolo.application.use_cases.pipeline import (
     pipeline_stage_settings,
     routed_native,
@@ -99,6 +100,12 @@ def validate_wrapper_keys(config: DictConfig, function: Callable[..., Any]) -> N
     unknown = set(config) - accepted
     if unknown:
         raise ValueError(f"Unsupported wrapper settings: {sorted(unknown)}")
+    if (
+        "ground_truth" in config
+        and not OmegaConf.is_missing(config, "ground_truth")
+        and config.ground_truth is not None
+    ):
+        normalize_ground_truth(config.ground_truth)
     model = materialize_model_config(config)
     _validate_export(config, model)
     _validate_inactive_groups(config, model)
@@ -188,6 +195,7 @@ def validate_pipeline_configuration(config: DictConfig) -> None:
     if not isinstance(resolved, dict):
         raise TypeError("Pipeline settings must be a mapping")
     values = {str(key): value for key, value in resolved.items()}
+    normalize_ground_truth(values["ground_truth"])
     _validate_pipeline_types(values)
     metrics, report, compare = pipeline_stage_settings(
         values["metrics"], values["report"], values["compare"]

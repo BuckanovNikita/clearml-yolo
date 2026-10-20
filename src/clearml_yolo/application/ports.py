@@ -12,11 +12,13 @@ from pydantic import JsonValue
 
 from clearml_yolo.application.contracts import (
     ClearMLConfig,
+    ClearMLDatasetRef,
     DatasetFormat,
     GroundTruthRead,
     ImageNameMode,
     ModelRef,
     PreparedDataset,
+    ResolvedGroundTruth,
     ScoredResolution,
     TrainResult,
     VocabularyReport,
@@ -76,6 +78,10 @@ class DatasetStore(Protocol):
     ) -> AbstractContextManager[PreparedDataset]: ...
 
     def dataset_cache_root(self, cache_dir: str | Path | None) -> Path: ...
+
+
+class GroundTruthRepository(Protocol):
+    def resolve(self, reference: ClearMLDatasetRef) -> ResolvedGroundTruth: ...
 
 
 class ModelRunner(Protocol):
@@ -496,3 +502,4 @@ class WorkflowDependencies:
     publisher_factory: Callable[[FiftyOneConfig | None], Publisher]
     disabled_publisher: Publisher
     exporter: DetectorExporter | None = None
+    ground_truth_repository: GroundTruthRepository | None = None

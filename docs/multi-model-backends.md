@@ -16,22 +16,19 @@ defines the shared behavior.
 
 Use Python `>=3.12.13,<3.14` and the approved external dependency copies described in
 [development setup](development.md#external-dependencies). Keep those revisions and local
-source overrides intact. From the project checkout, install the optional detector stack:
+source overrides intact. From the project checkout, install the complete runtime:
 
 ```bash
-uv sync --frozen --extra detectors
+uv sync --frozen
 ```
 
-The `detectors` extra requires Torch >=2.13.0 and Torchvision >=0.28.0; the committed
-lock selects Torch 2.14.1 and Torchvision 0.29.1. It also supplies RF-DETR training,
-timm and COCO evaluation dependencies declared in `pyproject.toml`. DEIMv2 additionally
-needs its verified source checkout below. For ONNX export and its checks, add `--extra export`:
-
-```bash
-uv sync --frozen --extra detectors --extra export
-```
-
-The export extra supplies ONNX and ONNX Runtime. TensorRT and its matching CUDA runtime
+Torch, Torchvision, RF-DETR training, timm, COCO evaluation, ONNX, ONNX Runtime and
+the queue TUI are default runtime dependencies. Project extras are removed;
+dependency lower bounds and compatibility constraints live in
+[`pyproject.toml`](../pyproject.toml), and `uv.lock` records selected versions.
+Upstream extras such as `rfdetr[train]` remain part of those runtime declarations.
+DEIMv2 additionally needs its verified source checkout below.
+TensorRT and its matching CUDA runtime
 are separate deployment prerequisites; see the [TensorRT deployment guide](tensorrt-deployment.md).
 No model SDK or ClearML task is initialized by configuration export or composition.
 

@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- **clearml**: Record sequential release verification
+  ([`41a4036`](https://github.com/BuckanovNikita/clearml-yolo/commit/41a4036666b2225a4e3029e1695499cf914a5f59))
+
+
 ## v0.35.0 (2026-10-19)
 
 ### Documentation

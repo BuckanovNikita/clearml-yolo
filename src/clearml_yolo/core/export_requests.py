@@ -50,6 +50,17 @@ class ExportSettings(BaseModel):
         gpu_device_index(device)
         return self
 
+    def validate_input_presence(self, *, has_weights: bool, has_ground_truth: bool) -> None:
+        """Reject incomplete operations before task creation or remote resolution."""
+        if self.operation == "onnx" and not has_weights:
+            raise ValueError("ONNX export requires weights")
+        if self.operation == "build" and self.onnx is None:
+            raise ValueError("Engine build requires an ONNX graph and its metadata")
+        if self.operation == "verify" and (
+            self.engine is None or not has_weights or not has_ground_truth
+        ):
+            raise ValueError("Verification requires engine, weights and labeled ground_truth")
+
 
 class ExportRequest(ExportSettings):
     weights: Path | None = None
@@ -57,14 +68,9 @@ class ExportRequest(ExportSettings):
 
     @model_validator(mode="after")
     def operation_inputs(self) -> Self:
-        if self.operation == "onnx" and self.weights is None:
-            raise ValueError("ONNX export requires weights")
-        if self.operation == "build" and self.onnx is None:
-            raise ValueError("Engine build requires an ONNX graph and its metadata")
-        if self.operation == "verify" and any(
-            value is None for value in (self.engine, self.weights, self.ground_truth)
-        ):
-            raise ValueError("Verification requires engine, weights and labeled ground_truth")
+        self.validate_input_presence(
+            has_weights=self.weights is not None, has_ground_truth=self.ground_truth is not None
+        )
         return self
 
 

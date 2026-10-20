@@ -9,9 +9,10 @@
 Нужны установленный пакет для Python `>=3.12.13,<3.14` (Python 3.12 начиная с 3.12.13
 или Python 3.13), настроенный доступ к ClearML с хранилищем артефактов, изображения
 и CSV с выборками `train` и `val`. Для нативных запусков сборка Python и ядро Linux
-должны поддерживать pidfd; одного номера версии недостаточно. Для DEIMv2, RF-DETR и
-Faster R-CNN нужны зависимости `detectors`; [установка и настройка](TECH_DETAILS.md#setup)
-описаны отдельно. Ниже выбран GPU `0`; для CPU замените соответствующий `device=0`
+должны поддерживать pidfd; одного номера версии недостаточно. Зависимости всех
+поддерживаемых моделей, ONNX-экспорта и TUI входят в обычную установку без extras;
+[установка и внешние требования](TECH_DETAILS.md#setup) описаны отдельно.
+Ниже выбран GPU `0`; для CPU замените соответствующий `device=0`
 на `device=cpu`. Прямые команды начинают работу сразу и не ждут свободного GPU.
 
 Замените пути на свои, а проект, имя задачи и теги — на обозначения эксперимента.
@@ -51,9 +52,41 @@ cy-train model=fasterrcnn/resnet50_fpn ground_truth=./ground_truth.csv model.tra
 
 ## Повседневное обучение
 
+### Источник разметки
+
+`ground_truth` принимает локальный CSV или ссылку на финализированный ClearML Dataset.
+Для набора по ID либо проекту и имени используйте:
+
+```bash
+cy-train 'ground_truth={dataset_id:DATASET_ID}' ultralytics.model=yolo11n.pt ultralytics.device=0 clearml.project_name=detection clearml.task_name=dataset-train 'clearml.tags=[training]'
+cy-train 'ground_truth={project_name:annotations,name:ground-truth,version:"1.2.0"}' ultralytics.model=yolo11n.pt ultralytics.device=0 clearml.project_name=detection clearml.task_name=versioned-train 'clearml.tags=[training]'
+```
+
+Замените `DATASET_ID`, проект, имя и версию набора своими значениями.
+В паре `project_name`/`name` можно опустить `version`: версию выберет ClearML SDK.
+Указанный здесь проект относится к набору данных; `clearml.project_name` по-прежнему
+задаёт проект эксперимента. ID нельзя совмещать с проектом, именем или версией.
+Пустые, неизвестные и неполные поля вызывают ошибку.
+
+Набор должен содержать только корневой `dataset.csv`: дополнительные файлы и ссылки
+вызывают ошибку до загрузки. Входной CSV сохраняется без изменения байтов, изображения
+остаются внешними, пути не переписываются. Абсолютные пути остаются абсолютными,
+относительные считаются от каталога загруженного CSV. Используйте ссылки на изображения,
+доступные выполняющему процессу. Особенности передачи архивов и кэша SDK описаны
+в [контракте источников](docs/input-provenance.md#ground-truth-sources).
+
+Этот ввод поддерживают `cy`, `cy-train`, `cy-predict`, `cy-val`, `cy-metrics`,
+`cy-compare` и необязательный `ground_truth` в `cy-export`.
+Локальный `ground_truth=./ground_truth.csv` продолжает работать: при выполнении
+один раз выводится рекомендация использовать ClearML Dataset. Вложенные этапы
+не повторяют предупреждение или загрузку. Справка, просмотр конфигурации и постановка
+в очередь не скачивают набор; он разрешается при выполнении. Конфигурация для
+повторного запуска сохраняет исходную ссылку, а фактические ID, версия и хеш CSV
+записываются отдельно. Без явной версии новый запуск может выбрать другую версию.
+
 ### CSV и выборки
 
-Вход `ground_truth` — CSV с абсолютными координатами углов рамки в пикселях:
+Локальный или загруженный CSV содержит абсолютные координаты углов рамки в пикселях:
 
 ```csv
 image_name,image_path,instance_label,bbox_x_tl,bbox_y_tl,bbox_x_br,bbox_y_br,split
@@ -513,7 +546,7 @@ cy-queue restore job-17
 cy-queue submit --gpus 1 -- -m --config-dir cy-config --config-name cy ultralytics.epochs=10,20
 ```
 
-После установки необязательного `queue-ui` доступен интерфейс:
+Терминальный интерфейс входит в обычную установку:
 
 ```bash
 cy-queue tui
@@ -561,7 +594,7 @@ cy-queue gpu free 2
 
 ### Экспорт Faster R-CNN — `cy-export`
 
-Для CPU/FP32 ONNX нужны Faster R-CNN-чекпойнт и зависимости `detectors` / `export`:
+Для CPU/FP32 ONNX нужен Faster R-CNN-чекпойнт; зависимости входят в обычную установку:
 
 ```bash
 cy-export model=fasterrcnn/resnet50_fpn weights=./best.pth \
