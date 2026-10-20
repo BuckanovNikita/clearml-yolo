@@ -1,7 +1,7 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.37.0 (2026-10-20)
 
 ### Documentation
 
@@ -10,6 +10,11 @@
 
 - Restrict distribution builds to debugging
   ([`3b3bd8f`](https://github.com/BuckanovNikita/clearml-yolo/commit/3b3bd8fa5b727e7387a0604b94b1f755e18ae5b8))
+
+### Features
+
+- **cli**: Warn when experiment launches lack a Git working tree
+  ([`a609fd7`](https://github.com/BuckanovNikita/clearml-yolo/commit/a609fd7e8ac5d781b8f418e7dad2986dc80dc225))
 
 
 ## v0.36.0 (2026-10-20)
