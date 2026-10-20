@@ -37,7 +37,7 @@
 ## Acceptance and release
 
 - [x] T017 Obtain fresh independent review after parent integration/checks and reconcile architecture.json with actual diff and evidence.
-- [ ] T018 Complete task-owned conventional commits and native Git-tag-only release/delivery after acceptance.
+- [x] T018 Complete task-owned conventional commits and native Git-tag-only release/delivery after acceptance.
 
 ## Dependencies and parallel ownership
 
@@ -66,9 +66,16 @@ The ledger now belongs to the new `001` epoch. T018 stays pending.
 - [x] T020 Reconcile current guides, the contract index and relocated feature records; validate Markdown, links and unchanged public examples on the merged tree.
 - [x] T021 Rerun affected/static/import checks and both minimum-version affected groups after T019; record results without replacing earlier evidence.
 - [x] T022 Reconcile architecture and obtain fresh independent review of the merged source/docs after T020–T021.
-- [ ] T023 Rebuild the release from current master, pass required full commit/release hooks and final-source wheel probes, then complete T018 with verified branch/tag delivery.
-- [ ] T024 Reconcile companion skill source links/evidence with this new feature path and the final published application commit before the companion collection release.
+- [x] T023 Rebuild the release from current master, pass required full commit/release hooks and final-source wheel probes, then complete T018 with verified branch/tag delivery.
+- [x] T024 Reconcile companion skill source links/evidence with this new feature path and the final published application commit before the companion collection release.
 
 Parent owns T019/T021–T024 and the architecture record; the documentation agent
 owns T020. These gates are sequential after their declared dependencies; existing
 runtime contracts, approved dependency revisions and historical checks are preserved.
+
+## Final closure
+
+All task and integration gates are complete. [Delivery](release.md) records the
+verified application `v0.36.0`, final build artifacts, companion `v0.2.12`, executed
+checks and remaining out-of-scope verification limits. Earlier pending statements
+retain their chronological context and are superseded by this closure.

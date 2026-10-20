@@ -370,12 +370,12 @@
     {
       "id": "packaging",
       "kind": "behavior",
-      "command": "uv build --out-dir .tmp/cy036/integration-build; inspect wheel metadata and compare every packaged source file with src; uv run --frozen --no-sync pytest tests/test_default_dependencies.py",
+      "command": "uv build; reinstall final wheel without dependency resolution in four existing default/minimum Python 3.12/3.13 environments; compare installed files, archive payloads and tagged source; uv pip check",
       "expectation": "Wheel default runtime metadata passes; isolated installation and minima recorded separately",
       "result": {
         "status": "passed",
         "exit_code": 0,
-        "evidence": "specs/001-clearml-ground-truth/verification.md"
+        "evidence": "specs/001-clearml-ground-truth/release.md"
       }
     },
     {
@@ -395,6 +395,6 @@
     "status": "accepted",
     "reviewer": "Fresh native reviewer /root/baseline_review; parent integration reconciliation",
     "evidence": "specs/001-clearml-ground-truth/review.md",
-    "reconciliation": "Compared complete task-owned diff against upstream0340e9c and original acceptedde726d9, including new adapter/application policy, contracts/ports/composition/consumers, export validation, metadata, tests, documentation and001feature renames. Dedicated .importlinter retains all upstream rules plus only exact dataset SDK edge and policy classification. Upstream cleanup, Ruff, fixtures, stage-zero baseline and retired-history deletion are preserved as inherited changes, not reimplemented. No external source changes or unrelated worktree changes included. Parent scoped/static/import/build checks and fresh review passed; required full hooks and final versioned artifact/delivery gates remain explicitly pending in ledger."
+    "reconciliation": "Compared complete task-owned diff against upstream0340e9c and original acceptedde726d9, including new adapter/application policy, contracts/ports/composition/consumers, export validation, metadata, tests, documentation and001feature renames. Dedicated .importlinter retains all upstream rules plus only exact dataset SDK edge and policy classification. Upstream cleanup, Ruff, fixtures, stage-zero baseline and retired-history deletion are preserved as inherited changes, not reimplemented. No external source changes or unrelated worktree changes included. Parent scoped/static/import/build checks and fresh review passed; required full hooks and final versioned artifact/delivery gates remain explicitly pending in ledger. Final contributor/release full hooks, versioned artifact probes and tagged-source comparison passed; remote application and companion refs verified. Documentation-only closure records results without further executable changes."
   }
 }

@@ -1,0 +1,166 @@
+{
+  "artifacts": {
+    "clearml_yolo-0.36.0-py3-none-any.whl": {
+      "bytes": 427239,
+      "sha256": "bbb01a17287de46ed12aac04e83367ab8f82d4400a82bc36b00d8004a06a0dd9"
+    },
+    "clearml_yolo-0.36.0.tar.gz": {
+      "bytes": 343811,
+      "sha256": "b137815b4d1a656144e53d784535b9f669f390331437476133d8eb9e0db4464d"
+    }
+  },
+  "dependency_preservation": {
+    "accepted_dependency_commit": "de726d94df49155ec381591fe84b77728b55987a",
+    "checks": {
+      "dependencies": true,
+      "development_dependencies": true,
+      "nonroot_lock_records": true,
+      "optional-dependencies": true,
+      "requires-python": true
+    },
+    "prepared_version": "0.36.0"
+  },
+  "earlier_candidate_evidence_preserved": true,
+  "installation_contract": {
+    "installation": "application wheel only, reinstall with --no-deps",
+    "project_extras": [],
+    "unconditional_runtime_requirements": 36
+  },
+  "installed_artifact_probes": {
+    "default-312": {
+      "adapter_imported_from_environment": true,
+      "adapter_sha256": "dee9a1a3cdc7384339557a6c963f2cb345ae0776d2eb22bf67fa0f35ab712a86",
+      "all_distribution_versions_unchanged": true,
+      "all_runtime_requirements_unconditional": true,
+      "application_version": "0.36.0",
+      "clearml_version": "2.1.10",
+      "extra_external_file_rejected_before_download": true,
+      "installed_file_bytes_match_wheel": true,
+      "installed_files_checked": 186,
+      "installed_metadata_bytes_match_wheel": true,
+      "pip_check": "passed",
+      "project_extras": [],
+      "python": "3.12.13",
+      "runtime_requirements": 36,
+      "valid_csv_path_bytes_hash_and_provenance": true
+    },
+    "default-313": {
+      "adapter_imported_from_environment": true,
+      "adapter_sha256": "dee9a1a3cdc7384339557a6c963f2cb345ae0776d2eb22bf67fa0f35ab712a86",
+      "all_distribution_versions_unchanged": true,
+      "all_runtime_requirements_unconditional": true,
+      "application_version": "0.36.0",
+      "clearml_version": "2.1.10",
+      "extra_external_file_rejected_before_download": true,
+      "installed_file_bytes_match_wheel": true,
+      "installed_files_checked": 186,
+      "installed_metadata_bytes_match_wheel": true,
+      "pip_check": "passed",
+      "project_extras": [],
+      "python": "3.13.14",
+      "runtime_requirements": 36,
+      "valid_csv_path_bytes_hash_and_provenance": true
+    },
+    "venv-312": {
+      "adapter_imported_from_environment": true,
+      "adapter_sha256": "dee9a1a3cdc7384339557a6c963f2cb345ae0776d2eb22bf67fa0f35ab712a86",
+      "all_distribution_versions_unchanged": true,
+      "all_runtime_requirements_unconditional": true,
+      "application_version": "0.36.0",
+      "clearml_version": "2.1.6",
+      "extra_external_file_rejected_before_download": true,
+      "installed_file_bytes_match_wheel": true,
+      "installed_files_checked": 186,
+      "installed_metadata_bytes_match_wheel": true,
+      "pip_check": "passed",
+      "project_extras": [],
+      "python": "3.12.13",
+      "runtime_requirements": 36,
+      "valid_csv_path_bytes_hash_and_provenance": true
+    },
+    "venv-313": {
+      "adapter_imported_from_environment": true,
+      "adapter_sha256": "dee9a1a3cdc7384339557a6c963f2cb345ae0776d2eb22bf67fa0f35ab712a86",
+      "all_distribution_versions_unchanged": true,
+      "all_runtime_requirements_unconditional": true,
+      "application_version": "0.36.0",
+      "clearml_version": "2.1.6",
+      "extra_external_file_rejected_before_download": true,
+      "installed_file_bytes_match_wheel": true,
+      "installed_files_checked": 186,
+      "installed_metadata_bytes_match_wheel": true,
+      "pip_check": "passed",
+      "project_extras": [],
+      "python": "3.13.14",
+      "runtime_requirements": 36,
+      "valid_csv_path_bytes_hash_and_provenance": true
+    }
+  },
+  "prepared_from_source_commit": "dfb3a1606f045deb5326a46da94ef18a8618a00f",
+  "source_validation": {
+    "packaged_path_set_matches_tracked_source": true,
+    "python_source_files": 184,
+    "regular_packaged_files": 186,
+    "sdist_payload_matches_wheel_and_prepared_source": true,
+    "sdist_pyproject_matches_prepared_source": true,
+    "wheel_metadata_matches_prepared_project": true,
+    "wheel_payload_matches_prepared_source": true
+  },
+  "verification_scope": {
+    "all_cli_help_pages_repeated": false,
+    "execution": "Each probe ran outside the source checkout, with PYTHONPATH removed and Python isolated mode.",
+    "focused_upstream_integration": {
+      "performed_in_this_artifact_check": false,
+      "prior_result_per_python": {
+        "passed": 535
+      },
+      "python_versions": [
+        "3.12.13",
+        "3.13.14"
+      ]
+    },
+    "full_minimum_suites": {
+      "performed_in_this_artifact_check": false,
+      "prior_result_per_python": {
+        "deselected": 7,
+        "passed": 3370,
+        "skipped": 30
+      },
+      "python_versions": [
+        "3.12.13",
+        "3.13.14"
+      ]
+    },
+    "live_clearml_or_gpu": {
+      "note": "Live ClearML and GPU execution are separate parent-run evidence; the installed adapter probes use a fake SDK dataset.",
+      "performed_in_this_artifact_check": false
+    },
+    "this_check": [
+      "Version 0.36.0 and wheel metadata",
+      "Every regular installed package file against the built wheel",
+      "No dependency-version changes",
+      "No project extras and all 36 runtime requirements unconditional",
+      "Fake-SDK adapter rejects extra external file before download",
+      "Fake-SDK CSV-only resolution preserves path, bytes, hash and provenance",
+      "uv pip check"
+    ]
+  },
+  "version": "0.36.0",
+  "release_identity_confirmation": {
+    "tag": "v0.36.0",
+    "commit": "42ce196bb4b91d8d4e80fa59397b730bb0d10cd2",
+    "annotated_tag": true,
+    "all_package_files_match_tag": true,
+    "sdist_pyproject_matches_tag": true,
+    "local_dist_hashes_match": true
+  },
+  "publication": {
+    "date": "2026-10-20",
+    "branch": "master",
+    "commit": "42ce196bb4b91d8d4e80fa59397b730bb0d10cd2",
+    "annotated_tag": "v0.36.0",
+    "tag_object": "745ea0e856698a3b089b0189874939f00b411315",
+    "remote_refs_verified": true,
+    "registry_or_release_assets_published": false
+  }
+}

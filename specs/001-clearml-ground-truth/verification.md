@@ -193,3 +193,11 @@ Logs: `.tmp/cy036/baseline-tests.log`, `baseline-static.log`, `baseline-build.lo
 `baseline-build-evidence.json` and
 `.tmp/dependencies-036/upstream-integration-evidence.json`. Fresh integration
 review, full commit/release hooks and final versioned probes remain pending.
+
+## Final delivery closure
+
+The integrated contributor and release full hooks passed. Final versioned artifact
+probes and tagged-source comparison passed, then application `v0.36.0` and companion
+`v0.2.12` were pushed with verified remote refs. [Delivery](release.md) and
+[artifact evidence](release-artifacts.json) record exact source identities, results
+and scope. T018/T023/T024 are complete; earlier pending notes are historical.

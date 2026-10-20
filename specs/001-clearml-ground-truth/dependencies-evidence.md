@@ -136,3 +136,7 @@ T021 passed 535 affected tests on each minimum interpreter with unchanged
 requirements and installed distributions. The final versioned wheel rebuild/probe
 remains pending under T023; the old wheel is not the merged release artifact. See the
 [integration status](verification.md#concurrent-baseline-integration--2026-10-20).
+
+Final `v0.36.0` artifacts and all four installed-artifact checks are complete;
+[release evidence](release-artifacts.json) supersedes the earlier wheel inventory
+for delivery while preserving the original full minimum-version results.
