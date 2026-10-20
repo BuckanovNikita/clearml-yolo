@@ -1,12 +1,21 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.36.0 (2026-10-20)
 
 ### Documentation
 
+- Consolidate historical specifications into stage-zero baseline
+  ([`228be7f`](https://github.com/BuckanovNikita/clearml-yolo/commit/228be7f4e8184667f39cb1ad797c4b00e6958022))
+
+- Preserve reviewed history before stage-zero cutover
+  ([`d74945c`](https://github.com/BuckanovNikita/clearml-yolo/commit/d74945c83dc24094c599388bbcfd5e987daeb9bf))
+
 - Record ground truth and dependency acceptance
   ([`de726d9`](https://github.com/BuckanovNikita/clearml-yolo/commit/de726d94df49155ec381591fe84b77728b55987a))
+
+- Record verified cleanup and baseline delivery
+  ([`0340e9c`](https://github.com/BuckanovNikita/clearml-yolo/commit/0340e9c503f495b6515592d1aa1452d4978e21ef))
 
 - **clearml**: Record sequential release verification
   ([`41a4036`](https://github.com/BuckanovNikita/clearml-yolo/commit/41a4036666b2225a4e3029e1695499cf914a5f59))
@@ -15,6 +24,11 @@
 
 - Support ClearML ground truth and complete default dependencies
   ([`a3f4c5a`](https://github.com/BuckanovNikita/clearml-yolo/commit/a3f4c5ac248f03ffe5f58c2d3821a0d16babb29f))
+
+### Refactoring
+
+- Remove orphaned helpers and prepare history baseline
+  ([`a7d6815`](https://github.com/BuckanovNikita/clearml-yolo/commit/a7d681503381d70eed645efa267726cc9e2ae21b))
 
 
 ## v0.35.0 (2026-10-19)
