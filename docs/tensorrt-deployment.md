@@ -7,7 +7,7 @@ The [export contract](tensorrt-deployment.md) and
 define acceptance for all six Faster R-CNN presets and both precisions.
 
 Local results and any outstanding preset/precision gates are recorded in the
-[dated verification ledger](../specs/025-multi-model-backends/verification.md).
+[dated verification ledger](https://github.com/BuckanovNikita/clearml-yolo/blob/d74945c83dc24094c599388bbcfd5e987daeb9bf/specs/025-multi-model-backends/verification.md).
 CUDA 11.8 deployment has **not** been validated; local execution does not establish
 compatibility with that target.
 
@@ -204,7 +204,7 @@ Rebuild engines for the deployment GPU and runtime. A successful build on one GP
 combination establishes no binary portability to another. TensorRT deserialization can
 reject incompatible plans even when metadata is valid. Preserve the original graph,
 checkpoint descriptor and hash identities; do not rewrite sidecars to bypass a mismatch.
-See the [research](../specs/025-multi-model-backends/research.md#tensorrt-compatibility-and-parity)
+See the [research](https://github.com/BuckanovNikita/clearml-yolo/blob/d74945c83dc24094c599388bbcfd5e987daeb9bf/specs/025-multi-model-backends/research.md#tensorrt-compatibility-and-parity)
 for the official NVIDIA release-notes source and the distinction between the CUDA 11.8
 target and newer-CUDA local execution.
 

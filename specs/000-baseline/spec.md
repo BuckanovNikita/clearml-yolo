@@ -642,7 +642,7 @@ Git tags only; GitHub Release objects, assets, registries and deployment require
 ## Historical evidence and limits
 
 The pre-reset release at integration start is v0.34.1. During cleanup integration, origin advanced to
-v0.35.0; its source/evidence commits are preserved below for normal Git reconciliation before archival
+v0.35.0; its source/evidence commits were merged normally and preserved below before archival
 cutover. Upstream delivery does not certify the cleanup's newly merged source or erase task-specific
 verification gaps. New cutover delivery is recorded below only after actual checks. Older status text such
 as “approved” or unchecked tasks may predate later review/release evidence; use the complete dated chain at
@@ -680,13 +680,17 @@ request is silently reopened.
 
 ## Historical provenance
 
-**Archival checkpoint H: pending the parent’s verified preservation commit.** Replace this sentence with H's
-full immutable SHA and repository link after all retired files, including formerly uncommitted records,
-exist in that reachable commit. Until then, history removal and final baseline acceptance are not
-established. The archival snapshot preserves documents; it is distinct from commits that originally
-implemented behavior. The checkpoint's `specs/037-cleanup-baseline/history-map.json` inventories exact
-retired paths, destinations, topics and dispositions. It covers old feature directories, `.specify/bugs`,
-`.specify/assessments`, `docs/evidence` and selected standalone dated reports.
+**Archival checkpoint H:**
+[`d74945c83dc24094c599388bbcfd5e987daeb9bf`](https://github.com/BuckanovNikita/clearml-yolo/commit/d74945c83dc24094c599388bbcfd5e987daeb9bf).
+All 548 retired files, including formerly uncommitted records, exist byte-for-byte in this ordinary reachable
+commit. Their combined size is 3,563,396 bytes. The snapshot preserves documents and is distinct from commits
+that originally implemented behavior. Its
+[history map](https://github.com/BuckanovNikita/clearml-yolo/blob/d74945c83dc24094c599388bbcfd5e987daeb9bf/specs/037-cleanup-baseline/history-map.json)
+inventories exact paths, SHA-256 values, sizes, destinations, topics and dispositions; the map excludes its
+own recursive fingerprint. The map's SHA-256 is
+`9568e0755bee0b056657e86f66bf1dee645aced6b86f7ada39c411a3add8b4d6`.
+Coverage includes old feature directories, `.specify/bugs`, `.specify/assessments`, `docs/evidence` and the
+three selected standalone dated reports. Existing commits, branches and tags were not rewritten or deleted.
 
 Retrieve any original document with `git show H:path/to/document`, list it with `git ls-tree -r --name-only
 H -- specs .specify/bugs .specify/assessments docs/evidence`, and inspect historical changes with `git log
@@ -738,10 +742,54 @@ release authorization.
 
 ### Cutover acceptance
 
-Pending parent integration: normal reconciliation of upstream v0.35.0 and cleanup source, post-merge
-source/native checks and independent review, preservation of both feature 036 live evidence chains and
-early-publication 037's pending scheduler acceptance, static configuration delivery, verified archival H,
-complete retired-file coverage, unchanged fixture hashes, migrated live references,
-documentation/architecture acceptance, unchanged workflow tooling, cleared local active-feature state,
-dry-run next feature `001`, and exact Git-only delivery refs. Record actual final outcomes here without
-turning earlier results into new evidence or closing the inherited early-publication scheduler gap.
+On 2026-10-20, ordinary merge `9fc0b50db12437ec669daa4ae543c3e7ca1c761f` reconciled the local cleanup
+checkpoint and published v0.35.0 history. Its normal hooks passed Ruff, mypy, all 43 import contracts,
+Vulture and the full pytest suite. A separate integrated architecture run passed 246 tests. Both final
+wheel and sdist passed installed checks against all 184 package-file hashes, 12 console commands, nine
+default/81 selected configurations, nine shipped callables, overwrite/mode checks and two queue snapshots.
+Source-manifest SHA-256 is `b26afdab1d9620f627d583be6af7980ea3df9158f815689a919838da616d831f`.
+These Python 3.12.13 checks reused dependencies; they add no Python 3.13 or hardware certification.
+The [dated verification](https://github.com/BuckanovNikita/clearml-yolo/blob/d74945c83dc24094c599388bbcfd5e987daeb9bf/specs/037-cleanup-baseline/verification.md)
+and [fresh independent review](https://github.com/BuckanovNikita/clearml-yolo/blob/d74945c83dc24094c599388bbcfd5e987daeb9bf/specs/037-cleanup-baseline/review.md)
+retain initial, interrupted and successful outcomes separately. Final review returned ship after correcting
+a duplicate-link replacement bug in the cutover helper.
+
+The real dry-run and applied cutover both verified all 548 archived files before removal. Post-cutover
+checks confirmed one file under `specs/`, both fixture hashes unchanged, all 52 snapshotted workflow-tool
+paths unchanged, 20 historical commit/source references resolvable, and all 38 retained historical links
+redirected to H. Source, tests, dependency configuration and executable contracts are unchanged since H.
+The ignored active-feature pointer is absent. The installed creation script's read-only dry-run selected
+`001-next-work` without creating a feature or pointer. Current documentation validation follows the cutover
+commit procedure; final Git delivery is recorded separately below.
+
+The final documentation-only architecture record passed planning before removal and acceptance afterward:
+
+```json
+{
+  "schema_version": 1,
+  "task": "Verified history cutover to stage-zero baseline",
+  "scope": [
+    "specs",
+    ".specify/bugs",
+    ".specify/assessments",
+    ".specify/feature.json",
+    "docs",
+    ".agents/skills/running-end-to-end-tests",
+    "AGENTS.md",
+    "README.md",
+    "TECH_DETAILS.md",
+    ".specify/memory/constitution.md"
+  ],
+  "impact": "none",
+  "rationale": "After the separately verified source/fixture integration checkpoint, cutover removes only byte-preserved historical records, redirects documentation links, records the single baseline and clears the ignored active-feature pointer. Runtime modules, supported interfaces, dependencies, executable architecture checks and installed workflow tooling are unchanged. Both live test fixtures were already relocated and verified before this boundary; removing their unused historical copies adds no runtime or import effect."
+}
+```
+
+The `cleanup-code` personal skill was released and installed from private `agent-skills` commit
+`7f635ce123332d5444f294909c6a753dea7d268e`, annotated tag `v0.7.2`. All six installed files match the
+released source; fresh independent review and 102 offline checks passed. Only this skill was installed;
+shared agent links and unrelated lock metadata were preserved. Automatic host loading was not tested.
+Actual native CPU/single-GPU/cache observations remain in the private
+[dated evidence archive](https://github.com/BuckanovNikita/agent-skills/blob/1ab7da0b6448971a0abb44b5ec8380304714cfbc/skills/clearml-yolo-environment/references/cache-cleanup-2026-10-20/acceptance.md).
+Neither this cutover nor successful repeats resolve the unexplained enrichment failure or complete the
+inherited early-publication scheduler gate.

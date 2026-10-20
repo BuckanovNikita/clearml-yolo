@@ -11,10 +11,10 @@ New stable and preview rules become active on upgrades unless explicitly exclude
 Review changed diagnostics and exclusion reasons with each upgrade. Removed rules
 cannot be selected. There is no family whitelist or preview opt-in list.
 
-The [2026-10-19 evidence](../specs/026-static-analysis/config-split/verification.md)
+The [2026-10-19 evidence](https://github.com/BuckanovNikita/clearml-yolo/blob/d74945c83dc24094c599388bbcfd5e987daeb9bf/specs/026-static-analysis/config-split/verification.md)
 records configuration equivalence and effective rule changes. The
-[earlier audit](../specs/026-static-analysis/verification-2026-10-13.md) and
-[earlier inventory](../specs/026-static-analysis/ruff-rule-inventory.csv) remain historical.
+[earlier audit](https://github.com/BuckanovNikita/clearml-yolo/blob/d74945c83dc24094c599388bbcfd5e987daeb9bf/specs/026-static-analysis/verification-2026-10-13.md) and
+[earlier inventory](https://github.com/BuckanovNikita/clearml-yolo/blob/d74945c83dc24094c599388bbcfd5e987daeb9bf/specs/026-static-analysis/ruff-rule-inventory.csv) remain historical.
 An exclusion records a tradeoff, not proof that a rule is harmful. Violation count alone
 is insufficient justification; existing architecture and complexity checks still apply.
 

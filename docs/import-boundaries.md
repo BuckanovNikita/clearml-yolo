@@ -159,4 +159,4 @@ These checks do not execute inspected modules or provide complete control-flow,
 interprocedural or reflective analysis. Computed imports/attributes, generated or
 inherited attributes, branch-dependent rebinding and unknown wrappers remain review
 obligations. Generic filesystem method-name checks are conservative. See the
-[negative-fixture evidence](../.specify/bugs/architecture-check-blindspots/test.md).
+[negative-fixture evidence](https://github.com/BuckanovNikita/clearml-yolo/blob/d74945c83dc24094c599388bbcfd5e987daeb9bf/.specify/bugs/architecture-check-blindspots/test.md).

@@ -5,6 +5,9 @@
 
 ### Documentation
 
+- Preserve reviewed history before stage-zero cutover
+  ([`d74945c`](https://github.com/BuckanovNikita/clearml-yolo/commit/d74945c83dc24094c599388bbcfd5e987daeb9bf))
+
 - **clearml**: Record sequential release verification
   ([`41a4036`](https://github.com/BuckanovNikita/clearml-yolo/commit/41a4036666b2225a4e3029e1695499cf914a5f59))
 

@@ -7,7 +7,7 @@ The default remains `model=ultralytics`, with its existing `ultralytics` and
 `ultralytics_predict` groups.
 
 This guide documents the implemented interfaces. Configuration examples are not execution evidence.
-Use the [verification ledger](../specs/025-multi-model-backends/verification.md) for
+Use the [verification ledger](https://github.com/BuckanovNikita/clearml-yolo/blob/d74945c83dc24094c599388bbcfd5e987daeb9bf/specs/025-multi-model-backends/verification.md) for
 observed results and the [acceptance guide](../specs/000-baseline/spec.md#detector-backends-and-deployment-export)
 for the required checks. The [backend contract](../specs/000-baseline/spec.md#detector-backends-and-deployment-export)
 defines the shared behavior.
@@ -285,7 +285,7 @@ alone does not establish native parity, labeled-corpus accuracy or deployment po
 If Linux startup fails inside `Task.query_tasks` because `tasks` is `None`, preserve the
 failed invocation and its logs. A response for another API endpoint requires transport
 diagnosis; an empty task list alone does not establish this problem. The
-[dated investigation](../specs/025-multi-model-backends/verification.md#clearml-reporting-transport-investigation--2026-10-12)
+[dated investigation](https://github.com/BuckanovNikita/clearml-yolo/blob/d74945c83dc24094c599388bbcfd5e987daeb9bf/specs/025-multi-model-backends/verification.md#clearml-reporting-transport-investigation--2026-10-12)
 records a reproduced inherited-connection failure and its limits.
 
 The ClearML SDK supports thread-based reporting through this setting in its HOCON
