@@ -5,6 +5,9 @@
 
 ### Documentation
 
+- Consolidate historical specifications into stage-zero baseline
+  ([`228be7f`](https://github.com/BuckanovNikita/clearml-yolo/commit/228be7f4e8184667f39cb1ad797c4b00e6958022))
+
 - Preserve reviewed history before stage-zero cutover
   ([`d74945c`](https://github.com/BuckanovNikita/clearml-yolo/commit/d74945c83dc24094c599388bbcfd5e987daeb9bf))
 

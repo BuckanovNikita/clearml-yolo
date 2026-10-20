@@ -759,8 +759,8 @@ checks confirmed one file under `specs/`, both fixture hashes unchanged, all 52 
 paths unchanged, 20 historical commit/source references resolvable, and all 38 retained historical links
 redirected to H. Source, tests, dependency configuration and executable contracts are unchanged since H.
 The ignored active-feature pointer is absent. The installed creation script's read-only dry-run selected
-`001-next-work` without creating a feature or pointer. Current documentation validation follows the cutover
-commit procedure; final Git delivery is recorded separately below.
+`001-next-work` without creating a feature or pointer. All 34 retained Markdown files passed structure and local-link validation through the cutover
+commit procedure; final Git delivery is recorded below.
 
 The final documentation-only architecture record passed planning before removal and acceptance afterward:
 
@@ -793,3 +793,26 @@ Actual native CPU/single-GPU/cache observations remain in the private
 [dated evidence archive](https://github.com/BuckanovNikita/agent-skills/blob/1ab7da0b6448971a0abb44b5ec8380304714cfbc/skills/clearml-yolo-environment/references/cache-cleanup-2026-10-20/acceptance.md).
 Neither this cutover nor successful repeats resolve the unexplained enrichment failure or complete the
 inherited early-publication scheduler gate.
+
+### Delivery record (2026-10-20)
+
+The cutover is published on application `master` at
+[`228be7f4e8184667f39cb1ad797c4b00e6958022`](https://github.com/BuckanovNikita/clearml-yolo/commit/228be7f4e8184667f39cb1ad797c4b00e6958022).
+The remote branch was verified against that commit. The native release helper reported no unreleased
+semantic changes; version v0.35.0 and its existing tag at
+`accdfb664b2c9f605b026b26d713cae4213e05e2` remain unchanged. This dated evidence update follows the
+cutover and does not change runtime behavior. The exact local dependency-source section was preserved,
+excluded from commits and restored unstaged after every attempt.
+
+Portable usage links were published in `custom-opencode-skills` v0.2.11 at
+[`e0ff164696d86eaca42e218623f6c9f03798f0ad`](https://github.com/BuckanovNikita/custom-opencode-skills/commit/e0ff164696d86eaca42e218623f6c9f03798f0ad),
+with remote branch and annotated-tag targets verified. Package validation, four explicit Markdown checks,
+45-file Markdown lint, discovery of all four skills, architecture validation and fresh link review passed.
+Only three contract links and release evidence changed; examples and installed usage copies were preserved.
+The original checkout's concurrent unrelated edits were untouched. Personal `cleanup-code` v0.7.2 source,
+annotated tag and six installed files were also independently reverified against Git objects.
+
+Task-owned native runs and remote data were cleaned as recorded in their private evidence. Both disposable
+package environments and all six generated probe workspaces were removed after acceptance; verification
+manifests and logs remain available. The current work starts from this specification and feature `001`;
+retired pending checkboxes remain historical records, and the explicit limitations above remain in force.
