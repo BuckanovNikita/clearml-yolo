@@ -1,0 +1,157 @@
+{
+  "schema_version": 1,
+  "task": "002-git-workspace-warning",
+  "scope": [
+    "src/clearml_yolo/adapters/runtime/git_workspace.py",
+    "src/clearml_yolo/entrypoints/hydra/common.py",
+    "tests/test_git_workspace.py",
+    "tests/test_architecture.py",
+    "README.md",
+    "specs/000-baseline/spec.md",
+    "docs/runtime-isolation.md",
+    "docs/current-contracts.md",
+    "specs/002-git-workspace-warning",
+    "CHANGELOG.md",
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "impact": "modules",
+  "rules": "Constitution principles I-II and docs/agent-workflow.md: inward typed boundaries, runtime effect ownership, existing imports and negative architecture coverage",
+  "modules": [
+    {
+      "id": "git-workspace",
+      "path": "src/clearml_yolo/adapters/runtime/git_workspace.py",
+      "change": "add",
+      "responsibility": "Inspect launch directory Git membership and emit advisory diagnostics",
+      "interface": "warn_if_unversioned_launch(directory: Path) -> None; failures are advisory, one probe and at most one warning",
+      "layer": "adapters",
+      "allowed_dependencies": [
+        "Standard library",
+        "Existing inward dependencies and runtime-to-observability boundary"
+      ],
+      "forbidden_dependencies": [
+        "Runtime-to-ClearML or other prohibited adapter peers",
+        "Core/application effects",
+        "Direct-command queue/Textual imports"
+      ],
+      "effects": "Read-only Git subprocess with sanitized environment and five-second timeout; diagnostics via observability",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "launch",
+      "path": "src/clearml_yolo/entrypoints/hydra/common.py",
+      "change": "modify",
+      "responsibility": "Own experiment invocation startup and orchestration",
+      "interface": "Preserve launch(name, function) signature; check original cwd once within capture before Hydra",
+      "layer": "entrypoints",
+      "allowed_dependencies": [
+        "Standard library",
+        "Existing inward application, core, adapter, configuration and composition dependencies; the new runtime Git adapter"
+      ],
+      "forbidden_dependencies": [
+        "Reverse dependencies from core/application into entrypoints",
+        "Direct-command queue/Textual imports",
+        "Git subprocess effects implemented in the launch boundary instead of the runtime adapter"
+      ],
+      "effects": "Capture cwd and compose existing runtime adapter; existing invocation effects remain",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "imports",
+      "path": ".importlinter",
+      "status": "existing",
+      "rules": "Runtime peer ownership, layers, SDK ownership and command independence",
+      "check": "imports"
+    },
+    {
+      "id": "architecture",
+      "path": "tests/test_architecture.py",
+      "status": "existing",
+      "rules": "Classification, actual graph and injected forbidden dependencies; add runtime-to-ClearML negative case",
+      "check": "architecture"
+    }
+  ],
+  "checks": [
+    {
+      "id": "imports",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync lint-imports",
+      "expectation": "All configured import contracts pass",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/002-git-workspace-warning/verification.md"
+      }
+    },
+    {
+      "id": "architecture",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync pytest tests/test_architecture.py",
+      "expectation": "Actual graph passes; injected runtime-to-ClearML dependency is rejected",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/002-git-workspace-warning/verification.md"
+      }
+    },
+    {
+      "id": "workspace",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync pytest tests/test_git_workspace.py tests/test_runtime_bootstrap.py tests/test_hydra_sweep_configuration.py",
+      "expectation": "Git detection, all nine CLI commands, streams, CY_HOME independence, multirun and bootstrap tests pass",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/002-git-workspace-warning/verification.md"
+      }
+    },
+    {
+      "id": "regression",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync pytest",
+      "expectation": "Routine suite passes; opt-in physical GPU selection remains separate",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/002-git-workspace-warning/verification.md"
+      }
+    },
+    {
+      "id": "quality",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync ruff check . && uv run --frozen --no-sync mypy . && uv run --frozen --no-sync vulture",
+      "expectation": "All configured quality checks pass",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/002-git-workspace-warning/verification.md"
+      }
+    },
+    {
+      "id": "docs",
+      "kind": "documentation",
+      "command": "uv run --frozen --no-sync python scripts/check_docs.py --all",
+      "expectation": "Tracked Markdown, local links and anchors pass; new files explicitly checked before staging",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/002-git-workspace-warning/verification.md"
+      }
+    }
+  ],
+  "documentation": "README, baseline commands, runtime-isolation and contract index; companion corp-skills usage/evaluation and dated evidence. Existing local dependency overrides excluded; root metadata/lock changes only by release helper.",
+  "review": {
+    "status": "accepted",
+    "reviewer": "Fresh native agent /root/final_review; parent reconciled integrated evidence",
+    "evidence": "specs/002-git-workspace-warning/review.md",
+    "reconciliation": "Reviewed complete task-owned tracked and new-file diff against 3b3bd8f: runtime Git adapter, shared launch, behavior tests and runtime peer negative contract, project and feature documentation, and generated changelog. Existing local uv source overrides excluded. No dependencies or public configuration changed; planned root version/lock updates are owned only by the native release helper. Companion eight-path documentation diff against 5bfa94e reviewed separately. All required behavior, import, architecture, quality and documentation checks passed; no blocking review findings."
+  }
+}

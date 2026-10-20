@@ -6,6 +6,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager, nullcontext
 from copy import deepcopy
 from functools import partial
+from pathlib import Path
 from typing import Any
 
 import hydra
@@ -34,6 +35,7 @@ from clearml_yolo.adapters.observability.diagnostics import log_exception_safely
 from clearml_yolo.adapters.observability.tracing import trace_command, trace_operation
 from clearml_yolo.adapters.runtime.bootstrap import runtime_environment
 from clearml_yolo.adapters.runtime.execution_lifecycle import execution_lifecycle
+from clearml_yolo.adapters.runtime.git_workspace import warn_if_unversioned_launch
 from clearml_yolo.adapters.runtime.process_tree import native_descendant_scope
 from clearml_yolo.adapters.storage.filesystem import initialize_filesystem, runs_root, write_path
 from clearml_yolo.adapters.storage.run_identity import task_run_dir
@@ -272,7 +274,9 @@ def _execute_direct(name: str, config: DictConfig, function: Callable[..., Any])
 
 def launch(name: str, function: Callable[..., Any]) -> None:
     """Compose and execute within one owned runtime lifetime."""
+    launch_directory = Path.cwd()
     with runtime_environment() as arena, capture_output(arena / "logs"):
+        warn_if_unversioned_launch(launch_directory)
         # Watchdogs inherit the captured descriptors, including native diagnostics.
         trace_command(name)(_launch)(name, function)
 

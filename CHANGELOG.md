@@ -8,6 +8,9 @@
 - Record verified ground truth release delivery
   ([`38659b5`](https://github.com/BuckanovNikita/clearml-yolo/commit/38659b5ac60b2665f1315938c752aebb018f59b9))
 
+- Restrict distribution builds to debugging
+  ([`3b3bd8f`](https://github.com/BuckanovNikita/clearml-yolo/commit/3b3bd8fa5b727e7387a0604b94b1f755e18ae5b8))
+
 
 ## v0.36.0 (2026-10-20)
 

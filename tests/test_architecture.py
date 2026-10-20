@@ -441,6 +441,11 @@ def test_all_console_commands_are_independent_entrypoints(graph: grimp.ImportGra
             "clearml_yolo.adapters.fasterrcnn.inference",
         ),
         (
+            "runtime adapter peer ownership",
+            "clearml_yolo.adapters.runtime.git_workspace",
+            "clearml_yolo.adapters.clearml.script",
+        ),
+        (
             "Every command entrypoint stands alone",
             "clearml_yolo.entrypoints.export",
             "clearml_yolo.entrypoints.train",

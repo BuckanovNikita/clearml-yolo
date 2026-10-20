@@ -92,6 +92,15 @@ commands. Export defaults to Faster R-CNN ResNet-50-FPN. Missing inputs remain `
 and parents are preflighted. Force replaces regular selected files, never symlink/directory destinations or
 unrelated files. Export/help loads no model SDK.
 
+Experiment commands (`cy`, `cy-train`, `cy-predict`, `cy-val`, `cy-metrics`,
+`cy-report`, `cy-compare`, `cy-export`, `cy-ground-truth`) check their launch cwd
+for Git working-tree membership once before Hydra composition, including help
+and configuration inspection. Unverified membership emits an advisory stderr
+warning with configuration-versioning guidance and does not change execution or
+stdout. CY_HOME and installed source identity are independent. See the
+[startup contract](../../docs/runtime-isolation.md#git-workspace-warning) and
+[executable checks](../../tests/test_git_workspace.py).
+
 ### Native configuration
 
 Default `model=ultralytics` exposes complete top-level `ultralytics` training and `ultralytics_predict`

@@ -101,6 +101,27 @@ pycocotools module identities around upstream import/dataset construction. Concu
 detector families require separate processes because the DEIM module alias boundary is
 sequential. Replay rejects switching between initialized YOLO and new-detector families.
 
+### Git workspace warning
+
+The nine experiment commands listed in the [command contract](../specs/000-baseline/spec.md#commands-and-configuration)
+inspect the original launch cwd once inside console capture and before Hydra can
+change directories. This includes help/config inspection and emits at most one
+workspace warning per invocation, including multiruns. The warning uses stderr
+and existing captured logs; stdout and workload exit semantics are preserved.
+It recommends a Git checkout or deliberate `git init` for versioning experiment
+configuration, without initializing or modifying a repository.
+
+The read-only Git probe has a five-second timeout and ignores inherited `GIT_*`
+overrides. Repository roots, subdirectories, unborn repositories, linked worktrees
+and submodules are accepted. Bare repositories, missing Git, unsuccessful or
+unrecognized responses and OS/timeout failures produce an advisory warning that
+membership could not be verified. A verification failure does not prove absence.
+The check is independent of CY_HOME, tracked files, cleanliness, remotes and
+ClearML's package-source identity. Config export, deduplication, queue administration
+and direct programmatic workflow calls do not perform this check. A queued
+pipeline process checks its recorded launch cwd through the ordinary entrypoint.
+See [regression coverage](../tests/test_git_workspace.py).
+
 ## Cancellation and recovery
 
 On Linux, native execution checks required Python APIs, pidfd kernel operations,
