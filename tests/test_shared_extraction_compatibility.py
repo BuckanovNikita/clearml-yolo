@@ -50,7 +50,7 @@ from clearml_yolo.core.comparison.significance import (
 from clearml_yolo.core.evaluation.models import ClassCounts, SplitOutcome
 from clearml_yolo.core.identity import ModelIdentity
 
-BASELINE = Path(__file__).resolve().parents[1] / "specs/028-shared-extraction/baseline.json"
+BASELINE = Path(__file__).resolve().parent / "fixtures/shared-extraction-baseline.json"
 COLUMNS = ["image_name", "instance_label", "bbox_x_tl", "bbox_y_tl", "bbox_x_br", "bbox_y_br"]
 
 

@@ -13,7 +13,7 @@ their permitted edges. The graph tests supplement these contracts with complete
 helper-cycle detection, core allowlists, explicit-effect and runtime-target checks.
 
 `uv run lint-imports --no-cache` enforces the configured contracts in
-[pyproject.toml](../pyproject.toml). `uv run pytest tests/test_architecture.py` checks
+[.importlinter](../.importlinter). `uv run pytest tests/test_architecture.py` checks
 the complete module graph, responsibility classification, cycles, core dependency
 allowlist, explicit effects, initializers and runtime targets. Negative tests mutate
 graphs and run both project checks and actual configured import-linter contracts.
@@ -109,7 +109,7 @@ of SDK ownership:
   reads storage dataset records. `native_ddp` also uses the ClearML deadline adapter.
 
 The authoritative exact-edge lists are `ignore_imports` in
-[pyproject.toml](../pyproject.toml) and `PEER_EXCEPTIONS` in
+[.importlinter](../.importlinter) and `PEER_EXCEPTIONS` in
 [architecture helpers](../tests/architecture_helpers.py); this table summarizes
 responsibilities rather than granting additional edges.
 
@@ -159,4 +159,4 @@ These checks do not execute inspected modules or provide complete control-flow,
 interprocedural or reflective analysis. Computed imports/attributes, generated or
 inherited attributes, branch-dependent rebinding and unknown wrappers remain review
 obligations. Generic filesystem method-name checks are conservative. See the
-[negative-fixture evidence](../.specify/bugs/architecture-check-blindspots/test.md).
+[negative-fixture evidence](https://github.com/BuckanovNikita/clearml-yolo/blob/d74945c83dc24094c599388bbcfd5e987daeb9bf/.specify/bugs/architecture-check-blindspots/test.md).

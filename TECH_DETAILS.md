@@ -1,18 +1,13 @@
 # Technical reference
 
-Start with the [Russian usage guide](README.md) for training and complete experiments.
-This reference covers setup and operational details. The
-[current contract index](docs/current-contracts.md) identifies authoritative contracts
-and implementation evidence; historical feature evidence records what was checked at
-that time, not necessarily the current interface.
+Start with the [usage guide](README.md) for commands and the
+[current contract index](docs/current-contracts.md) for authoritative behavior.
 
 ## Setup
 
-Use Python `>=3.12.13,<3.14` (Python 3.12.13 or newer in the 3.12 series, or
-Python 3.13) and an available project checkout. See [package metadata](pyproject.toml)
-and the [compatibility policy](docs/development.md#python-compatibility). Populate the approved `digital-metrics` and `report-generator`
-source copies using [external dependency setup](docs/development.md#external-dependencies),
-then install from the committed lockfile:
+Use Python `>=3.12.13,<3.14`. Populate the approved dependency source copies using
+[development setup](docs/development.md#external-dependencies), then install the
+committed environment:
 
 ```bash
 uv sync --frozen
@@ -74,7 +69,7 @@ Other detectors use `model.train.*` and `model.predict.*`. In each exported grou
 file, use bare keys rather than another wrapper. Unknown settings and changed inactive
 backend controls fail validation. Raw `cfg`, nested stage-native mappings and duplicate
 comparison inference fields are unsupported. Use the
-[native configuration contract](specs/005-explicit-detection-config/contracts/native-configuration.md)
+[native configuration contract](specs/000-baseline/spec.md#native-configuration)
 for inheritance and precedence.
 
 | Existing manual step or parameter | Corresponding interface |
@@ -105,7 +100,7 @@ are sequential. Every multirun adds one shared readable tag containing UTC date/
 and a random word phrase while preserving
 user tags; a single ordinary invocation adds none. See
 [readable output](docs/readable-output.md) and the
-[grouping contract](specs/030-multirun-tags/contracts/tags.md).
+[grouping contract](specs/000-baseline/spec.md#direct-execution-shared-queue-and-diagnostics).
 
 `--help` and `--cfg job --resolve` avoid workflow execution and ClearML task creation,
 but startup may create local scratch/logs. Use an existing isolated `CY_HOME` for
@@ -118,7 +113,7 @@ Training requires `ground_truth` and nonempty `train`/`val`; the default pipelin
 also consumes `test`. CSV image paths resolve relative to the CSV directory, while
 CLI input paths resolve from the launch directory. Image identities, background rows,
 invalid boxes and split ownership follow the
-[CSV training contract](specs/004-ground-truth-training/contracts/cli.md).
+[CSV training contract](specs/000-baseline/spec.md#detection-inputs-dataset-cache-and-output-routing).
 YOLO supports prepared `ndjson` (default) or `flat` data; other detectors derive COCO
 inputs. Direct native-dataset training is not an alternative to the CSV interface.
 Source images remain immutable and are not uploaded as raw dataset artifacts.
@@ -134,7 +129,7 @@ Prediction CSV columns are `image_name`, `instance_label`, `confidence`,
 `bbox_x_tl`, `bbox_y_tl`, `bbox_x_br`, `bbox_y_br`. Validation, metrics and comparison
 warn and remove invalid prediction geometry from the evaluation copy, preserving
 raw CSV evidence. All-invalid predictions are scored as empty, with unmatched truth
-counted as false negatives. See [evaluation safety](specs/001-release-030/contracts/cli.md#evaluation-input-and-output-safety).
+counted as false negatives. See [evaluation safety](specs/000-baseline/spec.md#commands-and-configuration).
 
 `cy-val` and `cy-metrics` calibrate on `val`; thresholds are frozen for evaluation.
 Standalone comparison defaults to `test` and can select another present split.
@@ -150,7 +145,7 @@ cannot override conflicting metadata. See
 [checkpoint metadata and comparison](docs/multi-model-backends.md#data-checkpoints-and-comparison).
 ClearML recovery selects weights and threshold sources in a defined order;
 historical dashboards supply stored thresholds, never historical predictions or
-metrics for current comparison. See the [task recovery contract](specs/012-remove-legacy-compatibility/contracts/task-recovery.md).
+metrics for current comparison. See the [task recovery contract](specs/000-baseline/spec.md#evaluation-comparison-and-historical-model-recovery).
 
 ## Provenance and publication
 
@@ -160,7 +155,7 @@ artifacts, the native best Output Model where applicable, and publication flush.
 Computation, upload, flush or interruption failures fail the command/task while
 retaining local output. Optional FiftyOne failure has different semantics below.
 
-The [publication contract](specs/014-evaluation-publication/contracts/publication.md)
+The [publication contract](specs/000-baseline/spec.md#required-publication-and-task-lifecycle)
 is the maintained inventory. It covers canonical invocation-owned `gt_csv` and
 `predicts_csv`, original source-row lineage, exclusions, thresholds and JSON evaluation
 relationships. Full/DTRK metric workbooks, exact validation thresholds and paired
@@ -168,7 +163,7 @@ comparison/report workbooks are published as specified there. Native YAML, NDJSO
 archives, manifests, diagnostic receipts and duplicate evaluation sidecars remain
 local. Consumed dataset and explicit report configurations are Configuration Objects,
 not artifact copies. Canonical `run` configuration supports replay; see the
-[configuration publication contract](specs/009-resolved-config-uploads/contracts/configuration-files.md).
+[configuration publication contract](specs/000-baseline/spec.md#configuration-resolution-and-replay).
 
 Native `General` hyperparameters omit `device`, `project`, `name`, `save_dir`,
 `exist_ok` and CSV-generated `data`. The CLI retains full sanitized native input groups,
@@ -177,7 +172,7 @@ JSON; replay also reads historical HOCON. Scientific `General` overrides remain
 authoritative on remote YOLO training replay, while the real device comes from the full
 configuration and current output routing remains protected. Publication never replaces
 executable arguments with cache tokens. See the
-[stable parameter contract](specs/036-stable-clearml-cache/contracts/cache.md).
+[stable parameter contract](specs/000-baseline/spec.md#stable-experiment-parameters-and-controller-caching).
 Embedded application callers own full input recording through their invocation;
 see [programmatic dependencies](docs/python-import-migration.md#explicit-programmatic-dependencies).
 
@@ -198,8 +193,8 @@ labels when printing; width fits one page while row page breaks remain. Compatib
 adapters preserve original metric layouts for report generation and threshold recovery.
 Workbook checksums detect edits or resaves; regenerate books rather than modifying
 signed inputs. Existing remote artifacts are not rewritten. See
-[source identity on new results](specs/014-evaluation-publication/contracts/publication.md#source-identity-on-new-results)
-and [report identity](specs/019-model-report-identity/contracts/report-identity.md).
+[source identity on new results](specs/000-baseline/spec.md#required-publication-and-task-lifecycle)
+and [report identity](specs/000-baseline/spec.md#reports-and-readable-visualization).
 
 ClearML interactive plot labels use readable model names and splits, without internal
 IDs or hashes. Current-model `Confusion matrix` offers Counts, Row %, Column % and
@@ -209,12 +204,12 @@ checkpoint/split slots retain labels; collisions gain readable suffixes. Baselin
 plots and comparison tables are excluded from Plots, while baseline books, paired
 reports and headline comparison values remain available. Native validation PR images
 are filtered; other native plots, previews and scalars remain. See the
-[plot contract](specs/020-readable-evaluation-plots/contracts/plots.md).
+[plot contract](specs/000-baseline/spec.md#reports-and-readable-visualization).
 
 Report summaries show finite-metric class counts, such as `AP50-valid-class-count:
 18/20`; finite zero values count. Each model uses its eligible classes and comparison
 uses the shared set. `NA` remains an unavailable metric, not a numerical zero.
-The maintained [publication contract](specs/014-evaluation-publication/contracts/publication.md)
+The maintained [publication contract](specs/000-baseline/spec.md#required-publication-and-task-lifecycle)
 explains these summaries.
 
 ### Startup configuration and complete artifact timing
@@ -227,7 +222,7 @@ routing and result provenance are excluded. It is informational, does not drive 
 and is excluded from the recognized-task cache projection. Training `General` is available
 before dataset preparation; native owner callbacks later refresh observed normalization.
 Skipped training creates no General parameters. See the
-[startup contract](specs/010-native-clearml-integration/contracts/tracking-publication.md#accurate-startup-configuration).
+[startup contract](specs/000-baseline/spec.md#configuration-resolution-and-replay).
 
 `gt_csv` uploads after its validated effective file is written. Exact thresholds and annotated
 model/split dashboards upload when complete, before subsequent evaluation/statistics.
@@ -236,7 +231,7 @@ the last completion uploads one combined `predicts_csv` before later reports/opt
 Each final annotated report/workbook and finalized export file uploads as soon as ready.
 Incomplete aggregates remain local on failure, complete uploads remain available, and final
 upload/model/flush barriers still determine success. See the
-[result contract](specs/014-evaluation-publication/contracts/publication.md#invocation-csv-bundle).
+[result contract](specs/000-baseline/spec.md#required-publication-and-task-lifecycle).
 
 ### ClearML pipeline cache identity
 
@@ -294,7 +289,7 @@ unnormalized; literal Unicode and escaped backslashes are supported.
 A hit reuses the previous task's remote outputs. It creates no files at a newly
 requested local destination. Existing input immutability requirements still apply;
 this helper neither inspects input contents nor supplies a new pipeline runner.
-The [cache contract](specs/036-stable-clearml-cache/contracts/cache.md) defines the
+The [cache contract](specs/000-baseline/spec.md#stable-experiment-parameters-and-controller-caching) defines the
 projection and replay boundaries.
 
 ## Filesystem and cache
@@ -347,7 +342,7 @@ cross-filesystem pairs are skipped; unexpected I/O errors produce nonzero exit.
 are permitted only with `--dry-run`; mutations stay inside `CY_HOME`. Reported file/
 duplicate/reflink counts do not measure freed space. Temporary replacement files sit
 beside their image and are removed after the operation. SDKs and GPU are not required.
-See the [dedup contract](specs/018-cache-image-dedup/contracts/cli.md).
+See the [dedup contract](specs/000-baseline/spec.md#explicit-cache-deduplication).
 
 ## Queue operations
 
@@ -417,8 +412,9 @@ link. `q` exits without stopping the worker.
 
 ## FiftyOne and process ownership
 
-FiftyOne is optional visualization. Use the [viewing guide](specs/006-fiftyone-integration/quickstart.md)
-to open the application and inspect detections and full-split digital-metrics panels.
+FiftyOne is optional visualization; its
+[publication contract](specs/000-baseline/spec.md#optional-fiftyone-publication)
+defines dataset and evaluation behavior.
 Its isolated worker owns no GPU or ClearML task. Setup/publication errors warn and do
 not fail otherwise successful computation. Available controls are
 `fiftyone.enabled=false`, `fiftyone.preflight_timeout_seconds=60`,
@@ -427,6 +423,48 @@ Timeout overrides must be finite positive values. Preflight/publication deadline
 include import and exit, followed by separately bounded cleanup. Success requires a
 normal exit and complete matching receipt; partial data remains for retry.
 `cy-val` does not expose this configuration group.
+
+### Open a published FiftyOne dataset
+
+The App process must use the same database and SDK configuration as publication.
+Provide MongoDB through FiftyOne's bundled service or `FIFTYONE_DATABASE_URI`;
+publishers sharing that database on one machine also share `FIFTYONE_DATABASE_DIR`
+for the local database/lock directory. Keep the referenced media paths accessible.
+Read the successful run's local receipt, replacing the example path:
+
+```python
+import json
+
+import fiftyone as fo
+
+with open("runs/my-run/fiftyone_publication.json", encoding="utf-8") as stream:
+    receipt = json.load(stream)
+dataset = fo.load_dataset(receipt["dataset_name"])
+session = fo.launch_app(dataset)
+session.wait()
+```
+
+The receipt contains task-specific field names and the split-to-evaluation
+`evaluation_keys` mapping; prediction-only publication has no evaluation keys.
+For native digital-metrics panels, install the project package in the Python
+environment running the FiftyOne server, explicitly install its App extension,
+and restart the App:
+
+```bash
+uv run --frozen --no-sync python <<'PYTHON'
+from clearml_yolo.adapters.fiftyone.panel import install_evaluation_plugin
+
+print(install_evaluation_plugin())
+PYTHON
+```
+
+Publication never installs the extension automatically. Use `native_evaluation`
+for exact TP/FP/FN, wrong-class cells and labels, and `evaluation_reports` for
+full-split PR/AP reports. Restricted subsets retain fixed-threshold counts without
+AP/PR; leaving the subset restores the full report. Historical payloads lacking
+report data remain readable; republish explicitly to add native results.
+
+### Cancellation
 
 For direct cancellation, press Ctrl+C and allow owned-process cleanup to finish.
 Repeated signals do not interrupt bounded shutdown. Linux pidfd and `/proc` checks

@@ -25,6 +25,12 @@ specifications under `specs/` remain project documentation.
 
 ### Automatic workflow routing
 
+The [stage-zero specification](../specs/000-baseline/spec.md) starts the current
+numbering epoch. New feature artifacts begin at `001` and reference that baseline.
+Retrieve retired evidence by its full checkpoint SHA and path; old feature numbers
+can recur in the new epoch. Preserve the baseline as a specification, not an active
+feature ledger, and retain the installed Spec Kit workflow.
+
 Automatically follow the applicable Spec Kit workflow for every user request to
 complete work; explicit skill invocation is unnecessary. Reuse the relevant existing
 feature or bug artifacts and preserve completed history. Keep the workflow proportionate
@@ -86,7 +92,7 @@ remains authoritative for status.
 | Planning-only or read-only | Return decisions, proposed record content and checks without artifact writes or mutating hooks. Optional stdin record validation is read-only; it does not establish implementation acceptance. |
 
 For this Python project, inspect the actual contracts in
-[pyproject.toml](../pyproject.toml) and [architecture tests](../tests/test_architecture.py),
+[.importlinter](../.importlinter) and [architecture tests](../tests/test_architecture.py),
 with the maintained [architecture guidance](development.md#python-integration-and-architecture).
 Reuse their relevant coverage for inward dependencies, exhaustive classification, SDK
 ownership, cycles, application/core effects, inert initializers and dynamic Hydra/plugin/

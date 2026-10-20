@@ -1,7 +1,7 @@
 # Physical multi-GPU DDP acceptance
 
 The external-result obligation for the delivered implementation is
-[closed by user waiver](evidence/2026-10-16-acceptance-closure/decision.md).
+[closed by user waiver](https://github.com/BuckanovNikita/clearml-yolo/blob/d74945c83dc24094c599388bbcfd5e987daeb9bf/docs/evidence/2026-10-16-acceptance-closure/decision.md).
 Physical multi-GPU outcomes remain unverified. This procedure is retained for a
 future explicitly requested target certification; no result bundle is awaited.
 
@@ -110,5 +110,5 @@ uv run --frozen --no-sync pytest tests/test_ddp_gpu_harness.py -q
 ```
 
 The maintained [queue contract](queue.md) and
-[publication inventory](../specs/014-evaluation-publication/contracts/publication.md)
+[publication inventory](../specs/000-baseline/spec.md#required-publication-and-task-lifecycle)
 define the production behavior checked here.

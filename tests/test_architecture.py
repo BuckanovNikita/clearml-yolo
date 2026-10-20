@@ -10,6 +10,8 @@ from pathlib import Path
 
 import grimp
 import pytest
+from importlinter.adapters.user_options import IniFileUserOptionReader
+from importlinter.application.user_options import UserOptions
 from importlinter.configuration import configure
 from importlinter.contracts.forbidden import ForbiddenContract
 from importlinter.contracts.independence import IndependenceContract
@@ -19,6 +21,16 @@ import architecture_helpers as architecture
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
+
+
+@pytest.fixture(scope="module")
+def import_options() -> UserOptions:
+    # Use the same reader as lint-imports, including native INI list/boolean handling.
+    configure()  # type: ignore[no-untyped-call]
+    options = IniFileUserOptionReader().read_options(str(ROOT / ".importlinter"))
+    assert options is not None
+    assert options.contracts_options
+    return options
 
 
 @pytest.fixture(scope="module")
@@ -347,7 +359,7 @@ def test_runtime_targets_resolve_to_shipped_modules_and_no_legacy_paths(
     assert "clearml_yolo.adapters.queue.guardian" in targets
     assert architecture.target_findings(targets, graph, SRC) == []
     assert architecture.runtime_boundary_findings(SRC) == []
-    migration = json.loads((ROOT / "specs/021-clean-architecture/migration-map.json").read_text())
+    migration = json.loads((ROOT / "tests/fixtures/legacy-module-map.json").read_text())
     assert not set(migration).intersection(graph.modules)
     for legacy in migration:
         path = SRC.joinpath(*legacy.split("."))
@@ -445,22 +457,18 @@ def test_actual_configured_import_linter_contract_rejects_mutated_graph(
     importer: str,
     imported: str,
     graph: grimp.ImportGraph,
+    import_options: UserOptions,
 ) -> None:
-    # import-linter's public bootstrap is untyped; contract/check APIs are typed.
-    configure()  # type: ignore[no-untyped-call]
-    session = tomllib.loads((ROOT / "pyproject.toml").read_text())["tool"]["importlinter"]
-    options = next(contract for contract in session["contracts"] if contract["name"] == name)
-    parsed_options = {
-        key: str(value).lower() if isinstance(value, bool) else value
-        for key, value in options.items()
-    }
+    options = next(c for c in import_options.contracts_options if c["name"] == name)
     contract_classes: dict[str, type[LayersContract | ForbiddenContract | IndependenceContract]] = {
         "layers": LayersContract,
         "forbidden": ForbiddenContract,
         "independence": IndependenceContract,
     }
     contract_class = contract_classes[options["type"]]
-    contract = contract_class(name=name, session_options=session, contract_options=parsed_options)
+    contract = contract_class(
+        name=name, session_options=import_options.session_options, contract_options=options
+    )
     actual = contract.check(deepcopy(graph), verbose=False)
     assert actual.kept
     mutated = deepcopy(graph)
@@ -468,9 +476,10 @@ def test_actual_configured_import_linter_contract_rejects_mutated_graph(
     assert not contract.check(mutated, verbose=False).kept
 
 
-def test_lazy_import_allowances_match_real_dynamic_edges(graph: grimp.ImportGraph) -> None:
-    config = tomllib.loads((ROOT / "pyproject.toml").read_text())
-    for contract in config["tool"]["importlinter"]["contracts"]:
+def test_lazy_import_allowances_match_real_dynamic_edges(
+    graph: grimp.ImportGraph, import_options: UserOptions
+) -> None:
+    for contract in import_options.contracts_options:
         if contract.get("unmatched_ignore_imports_alerting") != "none":
             continue
         # import-linter omits import_module calls. Its exact optional allowances
@@ -492,15 +501,12 @@ def test_actual_exhaustive_contract_rejects_new_unclassified_module(
     name: str,
     module: str,
     graph: grimp.ImportGraph,
+    import_options: UserOptions,
 ) -> None:
-    configure()  # type: ignore[no-untyped-call]
-    session = tomllib.loads((ROOT / "pyproject.toml").read_text())["tool"]["importlinter"]
-    options = next(contract for contract in session["contracts"] if contract["name"] == name)
-    parsed_options = {
-        key: str(value).lower() if isinstance(value, bool) else value
-        for key, value in options.items()
-    }
-    contract = LayersContract(name=name, session_options=session, contract_options=parsed_options)
+    options = next(c for c in import_options.contracts_options if c["name"] == name)
+    contract = LayersContract(
+        name=name, session_options=import_options.session_options, contract_options=options
+    )
     assert contract.check(deepcopy(graph), verbose=False).kept
     mutated = deepcopy(graph)
     mutated.add_module(module)

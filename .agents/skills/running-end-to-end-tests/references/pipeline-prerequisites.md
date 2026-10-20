@@ -63,7 +63,7 @@ New detectors use typed `model.train` and `model.predict` settings and derive CO
 data from the same CSV using the default runtime dependencies. DEIMv2 also requires
 its verified source checkout and compatible explicit pretrained assets. Follow the
 [model guide](../../../../docs/multi-model-backends.md) for presets and restrictions and
-the [multi-model acceptance guide](../../../../specs/025-multi-model-backends/quickstart.md)
+the [multi-model acceptance guide](../../../../specs/000-baseline/spec.md#detector-backends-and-deployment-export)
 for the native/download/comparison matrices. Use `uv run --frozen --no-sync` after preparing
 a backend environment so verification does not remove additional external runtime packages.
 
@@ -134,7 +134,7 @@ use `baseline_model.label`/`candidate_model.label` for local comparison referenc
 `Training task: unavailable` and do not register models. Include source-identity readback,
 real workbook banners/print titles and plot captions in acceptance; use project workbook
 adapters when checking metric values beneath banners. See the
-[identity contract](../../../../specs/014-evaluation-publication/contracts/publication.md#source-identity-on-new-results).
+[identity contract](../../../../specs/000-baseline/spec.md#required-publication-and-task-lifecycle).
 
 Native detector metadata is embedded in the checkpoint archive, so standalone copies retain
 backend, preset, foreground labels and preprocessing even without a `.model.json` sidecar.

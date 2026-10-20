@@ -54,20 +54,6 @@ def _settled(**overrides: Any) -> Any:
     ).model_copy(update=overrides)
 
 
-def _assert_native_audit_artifacts(uploads: dict[str, object]) -> None:
-    effective = uploads["compare_effective_inference"]
-    assert isinstance(effective, dict)
-    assert effective["baseline"]["device"] == "normalized-baseline"
-    assert effective["candidate"]["device"] == "normalized-candidate"
-    locations = uploads["compare_native_output_locations"]
-    assert isinstance(locations, dict)
-    assert locations["baseline"]["native_save_dir"].endswith("native/baseline_test")
-    candidate_archive = uploads["compare_native_outputs_candidate_test"]
-    assert isinstance(candidate_archive, Path)
-    with zipfile.ZipFile(candidate_archive) as bundle:
-        assert bundle.namelist() == ["labels/image.txt"]
-
-
 CLASSES = ["car", "van"]
 IMAGES = [f"img{index}.png" for index in range(40)]
 

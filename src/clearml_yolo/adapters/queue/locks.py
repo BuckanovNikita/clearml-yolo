@@ -354,25 +354,6 @@ class LocalGPULocks:
                     result.append(projected)
         return tuple(result)
 
-    def transaction_recovery(self, claim: GuardianClaim) -> GPULease:
-        """Pin old process ownership without claiming a newer capacity generation."""
-        if claim.owner_uid != os.geteuid():
-            raise PermissionError("Only the effective owner may recover GPU capacity")
-        acquired: dict[str, int] = {}
-        try:
-            self._take_recovery_locks(claim, acquired)
-        except BaseException:
-            self._close_descriptors(acquired)
-            raise
-        return GPULease(self, acquired, claim, recovering=True)
-
-    def _take_recovery_locks(self, claim: GuardianClaim, acquired: dict[str, int]) -> None:
-        for uuid in sorted(claim.devices):
-            generation = dict(claim.generations).get(uuid, 0)
-            if not self._take_lock(uuid, generation, acquired):
-                raise RuntimeError("GPU guardian still owns its locks; recovery refused")
-            self._validate_recovery(uuid, generation, claim)
-
     def _prepare_claim(self, claim: GuardianClaim) -> GuardianClaim | None:
         if any(hold.uuid in claim.devices for hold in self._holds()):
             return None

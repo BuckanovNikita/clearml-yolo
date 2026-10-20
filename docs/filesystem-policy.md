@@ -143,5 +143,5 @@ Reads may update access times. Symlinks are excluded. Unsupported platforms/file
 cross-device candidates are reported skips; unexpected I/O failures return nonzero.
 Writable selections must remain beneath resolved `CY_HOME`; external selections are
 permitted only with `--dry-run`, which creates and replaces nothing. See the maintained
-[deduplication contract](../specs/018-cache-image-dedup/contracts/cli.md) for file selection,
+[deduplication contract](../specs/000-baseline/spec.md#explicit-cache-deduplication) for file selection,
 failure behavior and the idle-cache requirement.

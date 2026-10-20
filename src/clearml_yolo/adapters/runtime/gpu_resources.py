@@ -175,19 +175,6 @@ def _export_phase(config: Mapping[str, Any]) -> ExecutionPhase:
     return ExecutionPhase(kind="export", settings_path="export", device=device)
 
 
-def configured_phases(config: Mapping[str, Any]) -> tuple[ExecutionPhase, ...]:
-    """Describe present native setting groups for provenance and automatic remapping."""
-    training, prediction = _model_paths(config)
-    phases: list[ExecutionPhase] = []
-    if _settings(config, training) is not None:
-        phases.append(_model_phase(config, "train", training))
-    if _settings(config, prediction) is not None:
-        phases.append(_model_phase(config, "predict", prediction))
-    if "export" in config:
-        phases.append(_export_phase(config))
-    return tuple(phases)
-
-
 def _skip(config: Mapping[str, Any], key: str) -> bool:
     value = config.get(key, False)
     if not isinstance(value, bool):

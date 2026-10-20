@@ -48,7 +48,8 @@ repos:
         name: uv run lint-imports
         entry: uv run lint-imports
         language: system
-        types_or: [python, toml]
+        # .importlinter has no extension; include it alongside source and TOML.
+        files: '(\.py$|\.toml$|^\.importlinter$)'
         pass_filenames: false
 
       - id: vulture
@@ -63,7 +64,7 @@ repos:
         name: uv run pytest
         entry: uv run pytest
         language: system
-        types_or: [python, toml]
+        files: '(\.py$|\.toml$|^\.importlinter$)'
         pass_filenames: false
 
       - id: local-release

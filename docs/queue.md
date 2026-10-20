@@ -145,7 +145,7 @@ alongside each job's user-supplied `clearml.tags`. This includes one-job sweeps 
 saved MULTIRUN mode. Direct launches generate a fresh group per launch; queued
 submissions freeze it in every snapshot before workers execute. Repeated submissions
 get different tags. Ordinary RUN leaves tags unchanged. See the
-[task-grouping contract](../specs/030-multirun-tags/contracts/tags.md).
+[task-grouping contract](../specs/000-baseline/spec.md#direct-execution-shared-queue-and-diagnostics).
 
 Remove native GPU selectors from queued configurations: allocation supplies all training
 devices and the first device for inference/comparison, while explicit CPU phases remain CPU.
@@ -439,16 +439,16 @@ Remove `worker --max-used-memory-gib` from worker commands: admission now uses t
 to the project. Only explicit shared queue metadata and small host-partitioned coordination files are
 exceptions. SDK configuration, cache/download/temp policies and outside inputs remain intact.
 [Diagnostics](diagnostics.md#live-console-and-shutdown) explains FD capture, live publication,
-quiet prediction and bounded finalization. The [feature ledger](../specs/029-shared-cy-queue/tasks.md)
+quiet prediction and bounded finalization. The [feature ledger](https://github.com/BuckanovNikita/clearml-yolo/blob/d74945c83dc24094c599388bbcfd5e987daeb9bf/specs/029-shared-cy-queue/tasks.md)
 and dated evidence distinguish implemented behavior from physical GPU, live ClearML and
 actual multi-user/multi-host NFS acceptance. CPU/mocked tests do not establish those
 physical outcomes. The listed unavailable external checks are
-[closed by user waiver](evidence/2026-10-16-acceptance-closure/decision.md) as
+[closed by user waiver](https://github.com/BuckanovNikita/clearml-yolo/blob/d74945c83dc24094c599388bbcfd5e987daeb9bf/docs/evidence/2026-10-16-acceptance-closure/decision.md) as
 completion/release obligations; physical GPU/NFS outcomes remain unverified.
 
 ## Cross-contract integration
 
-The [multirun grouping contract](../specs/030-multirun-tags/contracts/tags.md) adds a
+The [multirun grouping contract](../specs/000-baseline/spec.md#direct-execution-shared-queue-and-diagnostics) adds a
 shared random ClearML tag per direct launch or queued submission. Keep the shared
 Hydra tag helper, direct callback lifetime and frozen queue tags consistent. Explicit
 user tags survive; ordinary RUN adds no tag.

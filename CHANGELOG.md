@@ -5,6 +5,9 @@
 
 ### Documentation
 
+- Record ground truth and dependency acceptance
+  ([`de726d9`](https://github.com/BuckanovNikita/clearml-yolo/commit/de726d94df49155ec381591fe84b77728b55987a))
+
 - **clearml**: Record sequential release verification
   ([`41a4036`](https://github.com/BuckanovNikita/clearml-yolo/commit/41a4036666b2225a4e3029e1695499cf914a5f59))
 

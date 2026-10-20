@@ -66,7 +66,7 @@ this branch.
    unchanged. Compare metrics, statistical results and report counts. Exercise `cy-val`,
    `cy-compare` and `cy-report` independently, including nondefault evaluation options.
 6. Force-download every required artifact and verify the explicit publication inventory.
-   Use the [evaluation publication contract](../../../specs/014-evaluation-publication/contracts/publication.md)
+   Use the [evaluation publication contract](../../../specs/000-baseline/spec.md#required-publication-and-task-lifecycle)
    for canonical names. Download `gt_csv` and `predicts_csv`; confirm one upload per
    invocation, every original source row/ID, exclusions, strict threshold flags and JSON
    pre/post-threshold relationships. Check standalone prediction is not evaluated and
@@ -95,7 +95,7 @@ this branch.
    events, zero comparison/degraded-class/methodology table events and zero non-test PR
    events, while baseline CSV contexts, dashboards, paired reports and headline single
    values remain available. Use the
-   [readable plot contract](../../../specs/020-readable-evaluation-plots/contracts/plots.md).
+   [readable plot contract](../../../specs/000-baseline/spec.md#reports-and-readable-visualization).
    Verify unused names remain intact and active/archived project-local collisions receive
    shared task/model suffixes without changing IDs/paths. Check owned best-model threshold
    metadata against exact val thresholds and actual prediction checkpoint SHA-256 with
@@ -132,7 +132,7 @@ this branch.
    `evaluated_predictions` excludes them, and native patches do not count them as FP. Check exact wrong-class/duplicate counts and confusion cells,
    persisted label click-through, native rename/delete, interrupted same-task retry and
    concurrent-task isolation against the
-   [native evaluation contract](../../../specs/015-fiftyone-native-evaluations/contracts/native-evaluation.md).
+   [native evaluation contract](../../../specs/000-baseline/spec.md#optional-fiftyone-publication).
    Explicitly install `@clearml-yolo/evaluation` in the server/backend Python environment
    using `install_evaluation_plugin()` and restart App; publication must not install it.
    Inspect `native_evaluation` and `evaluation_reports` for original PR50 and
@@ -170,7 +170,7 @@ an unverified gate. Describe physical multi-GPU execution as unverified unless e
 ## Multi-model and deployment acceptance
 
 When detector integration changes, follow the
-[multi-model acceptance guide](../../../specs/025-multi-model-backends/quickstart.md)
+[multi-model acceptance guide](../../../specs/000-baseline/spec.md#detector-backends-and-deployment-export)
 and its backend/export contracts in addition to the shared workflow checks above.
 Exercise every advertised preset with real short training, pretrained initialization,
 best selection, standalone copied/downloaded checkpoint reload, prediction and validation.

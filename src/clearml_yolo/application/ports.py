@@ -368,7 +368,8 @@ class ExecutionResources(Protocol):
     def training_finished(self) -> None: ...
 
 
-class TrackingSession(Protocol):
+# One invocation owns this tracking lifecycle; preserve the published port as a whole.
+class TrackingSession(Protocol):  # noqa: PLR0904
     def publish_training_parameters(
         self, task: TaskHandle | None, values: Mapping[str, Any]
     ) -> None: ...
