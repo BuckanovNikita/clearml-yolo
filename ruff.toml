@@ -1,0 +1,93 @@
+# Native Ruff configuration; detailed tradeoffs live in docs/static-analysis.md.
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+extend-exclude = ["external"]
+
+[lint]
+select = ["ALL"]
+# Include preview rules by default too; formatter preview remains off.
+preview = true
+ignore = [
+    # Opaque SDK calls and test doubles need Any; strict mypy checks owned interfaces.
+    "ANN401",
+    # Lazy imports keep CLI help fast and optional/platform SDKs behind guards.
+    "PLC0415",
+    # Hydra, public ports and SDK overrides expose independent named/positional inputs.
+    "PLR0913", "PLR0917", "FBT",
+    # Keep short guard diagnostics at the raise site; no single-use msg/class indirection.
+    "EM", "TRY003",
+    # No mandatory per-file copyright header or issue/author syntax for debt notes.
+    "CPY001", "FIX", "TD",
+    # Document contracts and constraints, without mandatory prose on every helper.
+    # Existing concise docstrings need no uniform section/summary layout.
+    "D1", "D205", "D209", "D401", "D413", "DOC",
+    # Choose no blank line before class docstrings and first-line multiline summaries.
+    # These alternatives conflict with enabled D211 and D212 respectively.
+    "D203", "D213",
+    # Comma layout and preview blank-line layout belong to formatting, not lint policy.
+    "COM812", "COM819", "E302", "E303", "E306",
+    # Pydantic/Hydra inspect runtime types; keep available cast types unquoted.
+    "TC001", "TC002", "TC003", "TC006", "TC008",
+    # Process supervision needs subprocess imports; call-site security rules stay on.
+    "S404",
+    # Explicit empty-string checks distinguish lexical values from other falsey inputs.
+    "PLC1901",
+    # Native adapters/workflows have structured state and protocol methods. Review cohesion
+    # individually; extra count thresholds would force unrelated signature/control-flow churn.
+    # Existing C901, PLR0911/0912/0915 and effect-boundary checks remain enabled.
+    "PLR0914", "PLR0916", "PLR1702", "PLR6301", "PLW0717",
+    # In-place operators can alter aliasing/array semantics; explicit reassignment is allowed.
+    "PLR6104",
+    # Small ordered membership literals also accept unhashable inputs; don't require sets.
+    "PLR6201",
+    # Preserve readable sequential assembly and generators over bulk extension/starmap.
+    "FURB113", "FURB140",
+    # Parentheses can clarify tuple-valued keys in scientific indexing.
+    "RUF031",
+    # An explicit False fallback documents boolean protocol defaults even in conditions.
+    "RUF056",
+    # Successful task finalization and failure cleanup have different lifecycle owners.
+    "RUF075",
+    # Allow justified code-specific noqa; RUF100 still rejects unused suppressions.
+    "RUF105",
+    # Rule codes are the project's searchable suppression/review vocabulary.
+    "RUF201",
+]
+
+[lint.per-file-ignores]
+# Pytest fixtures/mocks accept unused inputs, assert literal expectations, and probe
+# private state. Known fake temp paths are not writable outputs; real IO uses fixtures.
+# Small test doubles need not acquire dataclass equality/repr/constructor semantics.
+# SDK fakes mirror large interfaces, local lambdas state expectations, float fixtures
+# use exact values, and workbook fixtures parse XML produced by the test itself.
+# Literal templates/Git revisions are not f-strings. Direct dunder calls exercise
+# context-manager entry/failure paths and bypass persistent SDK setters in test doubles.
+"tests/**" = [
+    "ARG", "B903", "FURB118", "INP001", "PLC2701", "PLC2801", "PLR0904", "PLR2004",
+    "RUF027", "RUF069", "S101", "S108", "S405", "SLF001",
+]
+# Native dict mutation bypasses persistent SDK setters; frozen ResourceRequest validation
+# normalizes its default with object.__setattr__.
+"src/clearml_yolo/adapters/integrations/native_runtime.py" = ["PLC2801"]
+"src/clearml_yolo/core/queue.py" = ["PLC2801"]
+# Hydra exposes sweep/parser functionality through private modules, with regression tests.
+"src/clearml_yolo/entrypoints/hydra/{sweeps,validation}.py" = ["PLC2701"]
+# FiftyOne discovers register() in this initializer; it is a required plugin entrypoint.
+"src/clearml_yolo/adapters/fiftyone/plugin/__init__.py" = ["RUF067"]
+# This check verifies an exact integral family size, not approximate scientific equality.
+"src/clearml_yolo/adapters/clearml/report.py" = ["RUF069"]
+# Reads XML members of locally produced XLSX workbooks; parsing behavior is unchanged.
+"src/clearml_yolo/adapters/reporting/workbook_identity.py" = ["S405"]
+
+[lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[lint.flake8-tidy-imports.banned-api]
+"logging".msg = "Use loguru's logger, which is what every module and the ClearML handler expect."
+
+[lint.isort]
+known-first-party = ["clearml_yolo"]
+
+[lint.mccabe]
+max-complexity = 10

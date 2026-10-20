@@ -62,3 +62,17 @@ sample; the sample must fail while intended dynamic callbacks remain usable.
 - This is tooling maintenance; public CLI, model behavior and dependency revisions are unchanged.
 - Generated files and external dependencies are outside first-party dead-code scope.
 - A confidence threshold may exclude uncertain dynamic-use findings if its limitation is explicit.
+
+## Configuration simplification amendment — 2026-10-19
+
+The contributor wants a shorter package manifest and an exclusion-based Ruff policy.
+
+- **FR-006**: Move large tool policies to automatically discovered dedicated files;
+  preserve package metadata, dependency sources, release settings and import contracts.
+- **FR-007**: Select all Ruff rules by default, including preview rules, and document
+  each excluded rule or family with a project-specific reason. Retain existing checks.
+- **FR-008**: Normal commands, hooks and architecture negative tests must consume the
+  extracted configuration. Preserve unrelated working changes.
+
+Acceptance: the manifest is substantially shorter, Ruff passes with explained exclusions,
+and import contracts and their injected-violation tests retain their enforcement.

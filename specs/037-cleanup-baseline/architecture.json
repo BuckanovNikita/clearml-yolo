@@ -1,0 +1,283 @@
+{
+  "schema_version": 1,
+  "task": "037 cleanup and baseline",
+  "scope": [
+    "src/clearml_yolo/core/execution.py",
+    "src/clearml_yolo/core/artifact_names.py",
+    "src/clearml_yolo/adapters/runtime/gpu_resources.py",
+    "src/clearml_yolo/adapters/runtime/supervision.py",
+    "src/clearml_yolo/adapters/queue/locks.py",
+    "tests/test_comparison_assemble.py",
+    "tests/test_architecture.py",
+    "tests/test_shared_extraction_compatibility.py",
+    "tests/fixtures/shared-extraction-baseline.json",
+    "tests/fixtures/legacy-module-map.json",
+    "specs/028-shared-extraction/baseline.json",
+    "specs/021-clean-architecture/migration-map.json",
+    "specs/037-cleanup-baseline",
+    "specs/000-baseline",
+    "docs",
+    "AGENTS.md",
+    ".specify/memory/constitution.md",
+    ".agents/skills/running-end-to-end-tests",
+    "README.md",
+    "TECH_DETAILS.md"
+  ],
+  "impact": "modules",
+  "rules": "Preserve supported behavior and current inward import/effect ownership; explicit user-authorized history reset preserves originals in Git.",
+  "modules": [
+    {
+      "id": "execution",
+      "path": "src/clearml_yolo/core/execution.py",
+      "change": "modify",
+      "responsibility": "Pure execution records and active policy",
+      "interface": "Preserve supported behavior; remove only proven orphaned helpers or relocate immutable test data.",
+      "layer": "core",
+      "allowed_dependencies": [
+        "Existing inward imports and declared test dependencies"
+      ],
+      "forbidden_dependencies": [
+        "New outward dependencies, hidden effects or SDK imports in core/application"
+      ],
+      "effects": "No effects",
+      "contracts": [
+        "architecture"
+      ]
+    },
+    {
+      "id": "artifact-names",
+      "path": "src/clearml_yolo/core/artifact_names.py",
+      "change": "modify",
+      "responsibility": "Stable publication naming",
+      "interface": "Preserve supported behavior; remove only proven orphaned helpers or relocate immutable test data.",
+      "layer": "core",
+      "allowed_dependencies": [
+        "Existing inward imports and declared test dependencies"
+      ],
+      "forbidden_dependencies": [
+        "New outward dependencies, hidden effects or SDK imports in core/application"
+      ],
+      "effects": "No effects",
+      "contracts": [
+        "architecture"
+      ]
+    },
+    {
+      "id": "gpu-resources",
+      "path": "src/clearml_yolo/adapters/runtime/gpu_resources.py",
+      "change": "modify",
+      "responsibility": "Native GPU demand/inventory",
+      "interface": "Preserve supported behavior; remove only proven orphaned helpers or relocate immutable test data.",
+      "layer": "runtime adapter",
+      "allowed_dependencies": [
+        "Existing inward imports and declared test dependencies"
+      ],
+      "forbidden_dependencies": [
+        "New outward dependencies, hidden effects or SDK imports in core/application"
+      ],
+      "effects": "Existing NVML/probe effects remain adapter-owned",
+      "contracts": [
+        "architecture"
+      ]
+    },
+    {
+      "id": "supervision",
+      "path": "src/clearml_yolo/adapters/runtime/supervision.py",
+      "change": "modify",
+      "responsibility": "Owned process cancellation and supervision",
+      "interface": "Preserve supported behavior; remove only proven orphaned helpers or relocate immutable test data.",
+      "layer": "runtime adapter",
+      "allowed_dependencies": [
+        "Existing inward imports and declared test dependencies"
+      ],
+      "forbidden_dependencies": [
+        "New outward dependencies, hidden effects or SDK imports in core/application"
+      ],
+      "effects": "Existing process effects remain adapter-owned",
+      "contracts": [
+        "architecture"
+      ]
+    },
+    {
+      "id": "locks",
+      "path": "src/clearml_yolo/adapters/queue/locks.py",
+      "change": "modify",
+      "responsibility": "Generation-aware GPU lease ownership",
+      "interface": "Preserve supported behavior; remove only proven orphaned helpers or relocate immutable test data.",
+      "layer": "queue adapter",
+      "allowed_dependencies": [
+        "Existing inward imports and declared test dependencies"
+      ],
+      "forbidden_dependencies": [
+        "New outward dependencies, hidden effects or SDK imports in core/application"
+      ],
+      "effects": "Filesystem/flock effects remain queue-owned",
+      "contracts": [
+        "architecture"
+      ]
+    },
+    {
+      "id": "comparison-tests",
+      "path": "tests/test_comparison_assemble.py",
+      "change": "modify",
+      "responsibility": "Observable comparison/publication regression coverage",
+      "interface": "Preserve supported behavior; remove only proven orphaned helpers or relocate immutable test data.",
+      "layer": "tests",
+      "allowed_dependencies": [
+        "Existing inward imports and declared test dependencies"
+      ],
+      "forbidden_dependencies": [
+        "New outward dependencies, hidden effects or SDK imports in core/application"
+      ],
+      "effects": "Isolated test fixtures only",
+      "contracts": [
+        "architecture"
+      ]
+    },
+    {
+      "id": "architecture-tests",
+      "path": "tests/test_architecture.py",
+      "change": "modify",
+      "responsibility": "Executable module and historical import boundary checks",
+      "interface": "Preserve supported behavior; remove only proven orphaned helpers or relocate immutable test data.",
+      "layer": "tests",
+      "allowed_dependencies": [
+        "Existing inward imports and declared test dependencies"
+      ],
+      "forbidden_dependencies": [
+        "New outward dependencies, hidden effects or SDK imports in core/application"
+      ],
+      "effects": "Read immutable fixture at maintained location",
+      "contracts": [
+        "architecture"
+      ]
+    },
+    {
+      "id": "compatibility-tests",
+      "path": "tests/test_shared_extraction_compatibility.py",
+      "change": "modify",
+      "responsibility": "Frozen scientific/report compatibility observations",
+      "interface": "Preserve supported behavior; remove only proven orphaned helpers or relocate immutable test data.",
+      "layer": "tests",
+      "allowed_dependencies": [
+        "Existing inward imports and declared test dependencies"
+      ],
+      "forbidden_dependencies": [
+        "New outward dependencies, hidden effects or SDK imports in core/application"
+      ],
+      "effects": "Read immutable fixture at maintained location",
+      "contracts": [
+        "architecture"
+      ]
+    },
+    {
+      "id": "scientific-fixture",
+      "path": "tests/fixtures/shared-extraction-baseline.json",
+      "change": "add",
+      "responsibility": "Frozen scientific/report expectations",
+      "interface": "Preserve supported behavior; remove only proven orphaned helpers or relocate immutable test data. Copy bytes from specs/028-shared-extraction/baseline.json; retain historical original until checkpoint and final documentation cutover.",
+      "layer": "test data",
+      "allowed_dependencies": [
+        "Existing inward imports and declared test dependencies"
+      ],
+      "forbidden_dependencies": [
+        "New outward dependencies, hidden effects or SDK imports in core/application"
+      ],
+      "effects": "No effects",
+      "contracts": [
+        "architecture"
+      ]
+    },
+    {
+      "id": "migration-fixture",
+      "path": "tests/fixtures/legacy-module-map.json",
+      "change": "add",
+      "responsibility": "Historical module migration expectations",
+      "interface": "Preserve supported behavior; remove only proven orphaned helpers or relocate immutable test data. Copy bytes from specs/021-clean-architecture/migration-map.json; retain historical original until checkpoint and final documentation cutover.",
+      "layer": "test data",
+      "allowed_dependencies": [
+        "Existing inward imports and declared test dependencies"
+      ],
+      "forbidden_dependencies": [
+        "New outward dependencies, hidden effects or SDK imports in core/application"
+      ],
+      "effects": "No effects",
+      "contracts": [
+        "architecture"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "architecture",
+      "path": "tests/test_architecture.py",
+      "status": "existing",
+      "rules": "Positive/negative layer, SDK ownership, dynamic target, initializer and migration-map checks; immutable fixture moves add no runtime edges.",
+      "check": "architecture"
+    }
+  ],
+  "checks": [
+    {
+      "id": "architecture",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync pytest tests/test_architecture.py",
+      "expectation": "Current positive/negative architecture checks pass after fixture relocation.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/037-cleanup-baseline/verification.md"
+      }
+    },
+    {
+      "id": "imports",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync lint-imports",
+      "expectation": "Every existing import contract remains satisfied.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/037-cleanup-baseline/verification.md"
+      }
+    },
+    {
+      "id": "behavior",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync pytest",
+      "expectation": "Full offline behavior suite including CPU DDP passes.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/037-cleanup-baseline/verification.md"
+      }
+    },
+    {
+      "id": "static",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync ruff check . && uv run --frozen --no-sync mypy . && uv run --frozen --no-sync vulture",
+      "expectation": "Existing static gates pass without policy weakening.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/037-cleanup-baseline/verification.md"
+      }
+    },
+    {
+      "id": "docs",
+      "kind": "documentation",
+      "command": "uv run --frozen --no-sync python scripts/check_docs.py --all",
+      "expectation": "Current documents and all new task documents resolve.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/037-cleanup-baseline/verification.md"
+      }
+    }
+  ],
+  "documentation": "Update maintained links/contracts and new baseline; preserve retired evidence in checkpoint. New personal skill and portable usage source have their own verification.",
+  "review": {
+    "status": "accepted",
+    "reviewer": "integrated_review; fresh native read-only review after parent checks",
+    "evidence": "specs/037-cleanup-baseline/review.md",
+    "reconciliation": "Reviewed the complete integrated tracked/untracked source, tests, configuration split, immutable fixture additions and maintained documentation against records 026 configuration-split, 036 cache/replay and 037 cleanup. Existing user-authorized dirty changes are included; the local uv.sources section is excluded from commits and restored exactly afterward. Import/effect checks remain intact; 036 live acceptance passed with its preserved unexplained transient failure. History removal and final docs cutover remain subsequent explicit checks."
+  }
+}

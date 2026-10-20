@@ -110,5 +110,5 @@ uv run --frozen --no-sync pytest tests/test_ddp_gpu_harness.py -q
 ```
 
 The maintained [queue contract](queue.md) and
-[publication inventory](../specs/014-evaluation-publication/contracts/publication.md)
+[publication inventory](../specs/000-baseline/spec.md#required-publication-and-task-lifecycle)
 define the production behavior checked here.

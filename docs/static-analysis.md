@@ -1,125 +1,79 @@
 # Static analysis policy and exclusion report
 
-[pyproject.toml](../pyproject.toml) defines the policy; the
-[pre-commit configuration](../.pre-commit-config.yaml) runs it. This report covers
-explicit ignores, unselected rule families, preview rules, test exceptions and mypy
-suppressions. The [dated audit](../specs/026-static-analysis/verification-2026-10-13.md)
-and [complete rule inventory](../specs/026-static-analysis/ruff-rule-inventory.csv)
-record the installed catalog and effective selection at review time.
+[Ruff configuration](../ruff.toml) selects `ALL`, including lint preview rules, and
+opts out only through commented `ignore` and path-scoped exceptions. Formatter preview
+remains disabled. [Import contracts](../.importlinter) use native import-linter discovery;
+[pyproject.toml](../pyproject.toml) retains mypy, Vulture, pytest, coverage and package/
+release settings. The [hooks](../.pre-commit-config.yaml) use the same commands as the CLI.
 
-An exclusion is not proof that a rule damages code quality. Some preserve runtime
-contracts or avoid repetitive syntax; others reflect missing typing coverage,
-inapplicable frameworks, unstable checks, or unresolved design debt. High violation
-counts alone are not a reason to disable a useful check.
+Ruff is constrained to `>=0.16.1,<0.17`; the lock selects the installed version.
+New stable and preview rules become active on upgrades unless explicitly excluded.
+Review changed diagnostics and exclusion reasons with each upgrade. Removed rules
+cannot be selected. There is no family whitelist or preview opt-in list.
 
-## Rules enabled by this review
+The [2026-10-19 evidence](../specs/026-static-analysis/config-split/verification.md)
+records configuration equivalence and effective rule changes. The
+[earlier audit](../specs/026-static-analysis/verification-2026-10-13.md) and
+[earlier inventory](../specs/026-static-analysis/ruff-rule-inventory.csv) remain historical.
+An exclusion records a tradeoff, not proof that a rule is harmful. Violation count alone
+is insufficient justification; existing architecture and complexity checks still apply.
 
-- `ANN001/002/003/201/202/204/205/206`: require annotations on parameters and returns.
-  These complement strict mypy and expose missing annotations earlier in linting.
-- `COM818`: catches accidental singleton tuples created by a trailing comma.
-- `D418/D419`: reject docstrings on overload declarations and empty docstrings without
-  requiring prose on every function.
-- `TC004/005/007/010`: catch runtime use of imports hidden behind `TYPE_CHECKING`, empty
-  checking blocks, aliases using unavailable runtime types and string operands in unions.
-- Explicit preview checks: `ASYNC119`, `B901`, `B909`, `PT029`, `PLE1141`, `PLE4703`,
-  `RUF045`, `RUF054`, `RUF066`, `RUF071`, `RUF074`, `RUF052` and `PLW1514`.
-  These add correctness checks, reject misleading dummy names, and require explicit
-  text encodings. Comparison evidence uses ordinary names; text/JSON uses UTF-8 and
-  Linux boot IDs use ASCII.
+## Ruff exclusions
 
-The obsolete `eta.*` mypy exception and unused test-wide Ruff `S301` exception were
-removed. `S301` does not detect the existing `cloudpickle` fixture loader; removing
-the exception does not establish that arbitrary fixture deserialization is safe.
+The comments beside every selector in `ruff.toml` are the executable policy's rationale.
+Exceptions are global unless a narrower file scope is stated below.
+This table adds the relevant contracts and examples.
 
-## Project-wide Ruff ignores
+| Rules | Reason and boundary |
+| --- | --- |
+| `ANN401` | Opaque ClearML/detector SDK APIs and variable-shape test doubles need explicit `Any`. Strict mypy still checks owned interfaces; prefer concrete models and protocols where known. |
+| `PLC0415` | Heavy SDKs, optional backends and platform-specific imports load behind startup/platform guards. Hoisting them changes CLI startup and failure timing. |
+| `PLR0913`, `PLR0917`, `FBT` | Hydra derives configuration from workflow signatures; public ports and SDK overrides have existing positional callers. Avoid blanket argument bundling or keyword-only conversion. Prefer named arguments in new internal APIs. |
+| `EM`, `TRY003` | Short validation guards keep their diagnostic at the raise site. Single-use message variables or message-specific exception subclasses add indirection without different recovery behavior. Use structured exceptions when recovery needs them. |
+| `CPY001`, `FIX`, `TD` | No per-file copyright or mandatory issue/author syntax policy. Keep actionable debt notes instead of deleting them to pass marker checks. |
+| `D1`, `D205`, `D209`, `D401`, `D413`, `DOC` | Require useful contract documentation, not prose on every named test/helper or a uniform summary/section layout. Remaining docstring checks, including empty/overload docstrings, stay enabled. |
+| `D203`, `D213` | Choose the mutually exclusive alternatives `D211` (no blank line before class docstring) and `D212` (summary on the first line). |
+| `COM812`, `COM819`, `E302`, `E303`, `E306` | Comma and preview blank-line layout are formatting choices. The accidental tuple check `COM818` and existing whitespace checks remain enabled. |
+| `TC001`, `TC002`, `TC003`, `TC006`, `TC008` | Pydantic/Hydra inspect annotations at runtime. Do not relocate types into checking-only blocks or quote already available cast/alias types merely for linting. Future-annotations imports remain forbidden. |
+| `S404` | Process supervision requires subprocess imports. Call-site security checks remain enabled; an import alone does not establish unsafe execution. |
+| `S405` (workbook identity adapter and tests only) | Read XML members of locally generated XLSX workbooks and test fixtures. Parsing behavior remains unchanged. |
+| `PLC2701` (Hydra sweeps/validation and tests only) | Hydra sweep/parser functionality uses private upstream modules. Regression tests and import architecture contracts govern these boundaries. |
+| `PLC1901` | CSV/config parsing distinguishes an empty string from other falsey values; explicit lexical comparisons preserve intent. |
+| `PLC2801` (native runtime adapter, core ResourceRequest and tests only) | Native settings bypass persistent SDK setters using `dict.__setitem__`; frozen ResourceRequest validation normalizes its default with `object.__setattr__`. Tests call context-manager dunders to exercise entry/failure paths. Ordinary assignment or a whole `with` block is not equivalent. |
+| `PLR0914`, `PLR0916`, `PLR1702`, `PLR6301`, `PLW0717` | Native adapters/workflows have protocol methods and structured state/error handling. These extra heuristic thresholds need individual design review, not unrelated extraction to satisfy counts. Existing `C901`, `PLR0911/0912/0915` and effect boundaries remain active; this is not blanket approval of complex helpers. |
+| `PLR6104` | Augmented assignment can change aliasing or array semantics. Explicit reassignment is permitted. |
+| `PLR6201` | Small ordered membership literals support unhashable inputs; a set is not universally interchangeable. |
+| `FURB113`, `FURB140` | Sequential list assembly and readable generators need not become bulk extension or `starmap`. The ONNX attribute generator in export/build.py illustrates the tradeoff. |
+| `RUF027` (tests only) | Literal Hydra interpolation, generated-code templates and Git revision braces are not missing f-strings. |
+| `RUF031` | Parentheses can clarify tuple-valued keys in scientific indexing. |
+| `RUF056` | An explicit `False` fallback communicates a boolean protocol default even in a condition, as in native distributed rank parsing. |
+| `RUF067` (FiftyOne plugin initializer only) | FiftyOne discovers `register()` in the plugin initializer; that executable entrypoint is required. Other initializer effects remain constrained by architecture tests. |
+| `RUF069` (ClearML report adapter and tests only) | Exact integral/fixture float comparisons must not become approximate assertions. Numerical tolerance decisions belong to individual scientific contracts. |
+| `RUF075` | Successful task finalization and failure cleanup have distinct owners. Context-manager exception behavior needs lifecycle review. |
+| `RUF105` | Rule-specific `noqa` is allowed for documented boundaries; `RUF100` rejects unused suppressions. |
+| `RUF201` | Codes remain the searchable vocabulary used in suppression comments, tooling and reviews. |
 
-| Rule | What enabling it enforces | Project evidence and tradeoff | Decision |
-| --- | --- | --- | --- |
-| `ANN401` | No explicit `Any` in function annotations | [Detector tracking adapters](../src/clearml_yolo/adapters/clearml/detectors.py) receive opaque SDK objects, and test doubles deliberately accept variable call shapes. Replacing these with `object` plus repeated casts or invented incomplete interfaces can conceal the actual dynamic boundary. Concrete project-owned models and protocols remain preferable where known. | Retain; not permission to spread `Any` through new core interfaces. |
-| `PLC0415` | Imports at module scope | [Train startup](../src/clearml_yolo/entrypoints/train.py) initializes the environment before importing the workflow; [deduplication](../src/clearml_yolo/adapters/storage/dedup.py) imports Unix-only `fcntl` after the platform guard. Hoisting imports can load heavy/optional SDKs during help or fail on unsupported platforms before the guard. | Retain across entrypoints, adapters and tests. It protects import timing and portability, not merely formatting. |
-| `PLR0913` | A maximum total parameter count | [compute_evaluation](../src/clearml_yolo/adapters/evaluation/scoring.py) names independent scientific settings and makes most keyword-only. [Hydra registration](../src/clearml_yolo/entrypoints/hydra/configs.py) derives configuration from workflow signatures. Arbitrary bundling can obscure units/meaning and change generated configuration. Some internal helpers still have too many responsibilities. | Retain compatibility; review helpers individually. Not all current violations are justified. |
-| `PLR0917` | A maximum positional parameter count | Existing workflow and port signatures have positional callers. Blanket conversion to keyword-only breaks callers; SDK overrides may have fixed signatures. The private [_verify_model](../src/clearml_yolo/adapters/clearml/native.py) now keeps only task/model ID positional and names every expected field. | Retain for public/SDK compatibility; improve internal signatures individually. It would be false to claim keyword-only arguments inherently reduce readability. |
-| `TRY003` | Exception messages defined in exception classes rather than raise sites | Validation in [config resolution](../src/clearml_yolo/entrypoints/hydra/config_resolution.py) places a specific diagnostic next to the failing condition. Stdlib exceptions and marker exceptions such as `NativeModelError` and `ReleaseError` intentionally share types across messages. Message-specific subclasses add definitions and navigation without new recovery behavior. | Retain; use dedicated exception classes when callers need distinct recovery or structured data. |
-
-For example, keeping `raise ValueError("Expected a mapping")` beside the guard makes
-the condition and explanation visible together. Moving it to a new exception class
-solely for lint compliance adds indirection. By contrast, changing a long private call
-to named arguments can improve readability: the argument-budget exceptions are a
-compatibility compromise, not a claim that every large signature is good design.
-
-## Unselected stable Ruff rules
-
-The inventory lists every code and rule name. This table explains all wholly or
-partially omitted families; selected families otherwise include their stable rules,
-apart from the explicit ignores above. Family names are distinct selectors: `A` does
-not imply `ANN`, and `F` does not imply `FBT`.
-
-| Family or codes | What the rules ask for | Why excluded, and what remains useful |
-| --- | --- | --- |
-| `AIR`, `FAST`, `DJ` | Airflow, FastAPI and Django conventions/API migrations | No corresponding application interfaces. No negative readability claim: these checks become useful if those frameworks are introduced. |
-| `FBT001/002/003` | Avoid positional Boolean parameters/defaults and literal Boolean call arguments | Blanket keyword-only conversion affects existing Hydra/port contracts. `FBT003` also flags legitimate external calls such as `pd.Series(False, ...)`. Prefer named Boolean arguments in new internal APIs; the rule's intent is useful. |
-| `COM812`, `COM819` | Require or prohibit trailing commas | These encode opposing styles and overlap with the Ruff formatter. Enforcing comma layout independently can create formatting churn. `COM818`, which catches an accidental tuple, is enabled. |
-| `CPY001` | A copyright notice in every file | The repository has no per-file header requirement. This is an ownership policy decision, not a correctness rule; repetitive headers add reading overhead. |
-| `EM101/102/103` | Assign literal, f-string and formatted exception messages to variables before raising | Adding a single-use `msg` separates a short guard from its diagnostic. This differs from TRY003's exception-class rule. The benefit is less duplicated message text in tracebacks; use a variable when a message is complex or reused. |
-| `FIX001–004` | Ban FIXME, TODO, XXX and HACK markers | Removing honest debt notes to satisfy a marker ban can hide known limitations. Resolve the issue or keep actionable context; marker presence alone is not a defect. |
-| `TD001–007` | TODO tag, author, issue link, colon, description and punctuation conventions | No mandatory issue-linked TODO policy. Mechanical attribution/punctuation can add clutter or encourage deleting useful notes. Descriptive, actionable comments remain expected. |
-| `TC001/002/003` | Move annotation-only imports under `TYPE_CHECKING` | Runtime annotation consumers include Pydantic and Hydra. Blind relocation can break schema/configuration introspection or require quoted types and extra checking blocks. Runtime annotations are a project contract; evaluate import savings at specific boundaries. |
-| `TC006` | Quote the type argument to `typing.cast` | A resolved expression such as `cast(list[dict[str, str]], value)` remains readable and navigable. Quoting already available types adds no typing guarantee. Quote when a type is unavailable at runtime; no future-annotations import is permitted. |
-| `D100–107` | Require docstrings on public modules, classes, methods/functions and magic methods | Tests already name their scenario; requiring a second sentence on every obvious helper encourages paraphrases that drift. Document contracts, constraints and surprising behavior. |
-| Remaining stable `D2xx`, `D3xx`, `D4xx` except enabled `D418/419` | Docstring whitespace, quoting, summary grammar and section layout | There is no single structured docstring style across these concise modules. Blanket adoption mixes useful consistency checks with forced rewrites; `D203/D211` and `D212/D213` are mutually incompatible alternatives. Formatting checks could be selected later without making all docstrings mandatory. |
-
-## Preview and removed rules
-
-Lint preview is enabled with `explicit-preview-rules = true`; only the exact preview
-codes listed above are selected. Formatter preview remains disabled. Ruff is constrained
-to `>=0.16.1,<0.17` and the lock determines the reviewed version. Preview also affects
-existing rule behavior, so explicit selection is not a promise of stable diagnostics.
-Review rule promotions, changed diagnostics and this inventory on upgrades.
-
-Excluding other previews is a stability/scope decision, not evidence that they are bad.
-Promotion to stable brings rules from selected families into scope on a tool upgrade.
-The inventory includes every preview code even in otherwise selected families.
-
-The remaining previews fall into these reviewed categories:
-
-- **Formatting and documentation:** E/W spacing overlaps with formatting. `DOC` and
-  `D420/421` demand structured documentation or additional consistency; concise helper
-  summaries need not restate every return and exception. They become more useful for
-  a documented external API with an adopted section style.
-- **Import bans:** preview `S4xx` rules reject imports such as `subprocess` or XML
-  libraries regardless of their safe use. This project owns process supervision;
-  existing call-site security checks provide more specific signals.
-- **Framework/API migrations:** preview `AIR` is inapplicable; `TC008`, `TID254/255`
-  and `UP051` require a separate compatibility review before import/annotation changes.
-- **Heuristic refactoring:** preview `B`, `PL`, `FURB` and `RUF` rules mix useful
-  suggestions with subjective transformations. For example `FURB140` suggests replacing
-  the clear ONNX attribute generator in [build.py](../src/clearml_yolo/adapters/export/build.py)
-  with `starmap`. A shorter expression is not necessarily easier to understand.
-- **Concrete semantic conflicts:** `PLC2801` flags explicit `dict.__setitem__` calls in
-  [native runtime settings](../src/clearml_yolo/adapters/integrations/native_runtime.py)
-  that intentionally bypass persistent SDK setters. `RUF027` mistakes literal Hydra
-  interpolation and Git revision braces for missing f-strings. `RUF069` would replace
-  exact integral/fixture float assertions with approximate comparisons. `RUF075` needs
-  lifecycle review where successful finalization and failure cleanup have different owners.
-- **Policy preferences:** `RUF031` removes optional tuple-key parentheses;
-  `RUF067/105/106/201` concern export/suppression policy. They require an intentional
-  policy change, not mass edits solely to make a preview scan green.
-
-Removed catalog entries cannot be enabled and are not policy gaps.
+Framework checks such as Airflow, FastAPI and Django remain enabled even though this
+application currently has no such interfaces. Unexcluded previews run by default.
 
 ## Test-only Ruff exceptions
 
 | Exception | Reason and boundary |
 | --- | --- |
-| `ARG` | Pytest fixture injection and mocks intentionally accept unused parameters. Prefer `pytest.mark.usefixtures` for setup-only fixtures and underscore-prefixed callback parameters where practical. |
-| `INP001` | Pytest discovers this test directory without making it an installed package. |
-| `PLR2004` | Literal expected values keep small test scenarios self-contained; naming every expected count adds navigation. |
-| `S101` | Assertions are pytest's assertion/reporting interface. This does not allow production assertions for input validation. |
-| `S108` | Tests use known fake temporary path strings. Real writable test outputs still use isolated fixtures. |
-| `SLF001` | Focused tests exercise internal failure paths and state without adding public test-only APIs. |
-
-Inline `noqa` remains rule-specific and subject to `RUF100` unused-suppression checks.
-Per-file exceptions apply only to tests; they do not disable production checks.
+| `ARG` | Pytest fixture injection and mocks accept unused parameters. Prefer setup-only `usefixtures` and underscore callback parameters where practical. |
+| `B903` | Simple test doubles need not acquire dataclass-generated equality, representation or constructor semantics. |
+| `FURB118` | Local lambdas keep callback expectations readable without importing operator helpers. |
+| `PLC2701` | Focused tests import private helpers without exposing a public test API. |
+| `PLC2801` | Direct context-manager entry/failure probes and SDK setter bypasses need explicit dunder calls. |
+| `RUF027` | Literal templates and Git revisions must not interpolate in the test process. |
+| `PLR0904` | SDK test doubles mirror interfaces with many methods. |
+| `RUF069` | Integral and exact float fixture comparisons do not need tolerances. |
+| `S405` | Workbook fixtures parse XML generated by the test. |
+| `INP001` | Pytest discovers tests without an installed test package. |
+| `PLR2004` | Literal expectations keep small scenarios self-contained. |
+| `S101` | Assertions are pytest's reporting interface; production input validation still uses exceptions. |
+| `S108` | Known fake temp path strings are fixtures; actual writable outputs use isolated temporary directories. |
+| `SLF001` | Tests probe internal failure paths without adding public test-only APIs. |
 
 ## Mypy review
 

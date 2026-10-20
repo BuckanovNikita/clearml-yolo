@@ -86,3 +86,31 @@ full pytest and all pre-commit hooks. Exercise Unicode file handling, SDK verifi
 and comparison/significance/progress paths. Verify negative controls for Vulture,
 stub API misuse and prohibited tooling dependencies. Validate Markdown, local links,
 rule inventory and architecture acceptance; record actual results and exclusions.
+
+## Configuration simplification — 2026-10-19
+
+Reuse this feature's Spec Kit stages and completed history. Move Ruff to `ruff.toml`
+and import contracts to native `.importlinter` INI, keeping small mypy/pytest/coverage/
+Vulture settings with package and release metadata in `pyproject.toml`. Keep Python
+>=3.12.13,<3.14, uv_build, the lock and protected dependency sources unchanged.
+Use `ALL` with lint preview and explicit exclusions; preserve all previously enabled
+rules and test exceptions. Prefer precise selectors over disabling whole useful families.
+
+### Architecture
+
+[The scoped record](config-split/architecture.json) covers development configuration,
+hook discovery and architecture test readers. No runtime modules or effect owners change.
+Use import-linter's native INI reader in existing negative tests, preserving every
+contract and comment during extraction. Ensure a change to `.importlinter` triggers
+the architecture hook and pytest despite having no Python/TOML extension.
+
+Parent owns these sequential edits and verifies normalized old/new contract equivalence,
+Ruff selection/discovery, mypy, Vulture, import contracts, architecture/tooling tests,
+documentation and applicable hooks. A fresh bounded read-only reviewer follows integration
+and checks. Existing unrelated changes stay intact; commit only task-owned hunks and
+evaluate the existing release workflow within its dirty-tree rules.
+
+Documentation: update static-analysis policy, development/workflow references and the
+live architecture import-contract pointers. README and portable usage skill need no changes because
+application commands, Hydra schemas and user behavior are untouched. Preserve earlier
+rule inventory as dated history; record new evidence separately.

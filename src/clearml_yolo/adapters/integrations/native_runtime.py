@@ -1,7 +1,7 @@
 """Scope Ultralytics' native ClearML callbacks to the invocation owner."""
 
 import os
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from functools import wraps
@@ -193,9 +193,18 @@ class _CallbackTask:
         )
 
     def connect(self, values: Any, *args: Any, **kwargs: Any) -> Any:
-        from clearml_yolo.adapters.clearml.session import sanitize_configuration
+        from clearml_yolo.adapters.clearml.session import (
+            prepare_native_parameters,
+            sanitize_configuration,
+        )
 
-        prepared = sanitize_configuration(values) if _SANITIZED_CALLBACK.get() else values
+        prepared = values
+        if _SANITIZED_CALLBACK.get():
+            name = kwargs.get("name", args[0] if args else "General")
+            if name == "General" and isinstance(values, Mapping):
+                prepared = prepare_native_parameters(values)
+            else:
+                prepared = sanitize_configuration(values)
         return self.original.connect(prepared, *args, **kwargs)
 
     def __getattr__(self, name: str) -> Any:

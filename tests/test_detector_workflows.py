@@ -279,7 +279,13 @@ def test_pipeline_uses_selected_best_and_backend_owned_settings(
     assert requested["device"] == [-1]
     assert effective["device"] == "cpu"
     recipe = yaml.safe_load((best.parent / "native_train.yaml").read_text())
-    assert harness.native_arguments == [recipe]
+    published = harness.native_arguments[0]
+    assert not {"device", "project", "name", "save_dir", "exist_ok", "data"} & published.keys()
+    assert published == {
+        key: value
+        for key, value in recipe.items()
+        if key not in {"device", "project", "name", "save_dir", "exist_ok", "data"}
+    }
     assert recipe["device"] == "cpu"
     assert recipe["use_ema"] == harness.config.train.use_ema
     if selection == "rfdetr/small":

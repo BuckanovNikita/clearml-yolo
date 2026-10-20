@@ -1,5 +1,6 @@
 """Command publication lifecycle and nested-owner suppression."""
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -192,7 +193,9 @@ def test_training_policy_normalization_and_receipts_stay_out_of_artifacts(
     assert result.weights == best
     assert [item["name"] for item in task.uploads] == [artifact_names.GROUND_TRUTH]
     run = next(
-        item["config_dict"] for item in reversed(task.configurations) if item["name"] == "run"
+        json.loads(item["config_text"])
+        for item in reversed(task.configurations)
+        if item["name"] == "run"
     )
     assert run["training_data_overrides"]["fraction"] == {"requested": 0.5, "effective": 1.0}
     assert run["training_data_overrides"]["classes"] == {"requested": [0], "effective": None}
@@ -273,7 +276,7 @@ def test_remote_clone_replays_canonical_run_and_general(
             assert kwargs == {"name": "General", "ignore_remote_overrides": False}
             return values | {"epochs": 17}
 
-    def replay(_task: Any, values: dict[str, Any]) -> dict[str, Any]:
+    def replay(_task: Any, values: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
         inputs.append(values)
         return values | {"ground_truth": "remote.csv", "comparison_status": "previous result"}
 
@@ -304,7 +307,13 @@ def test_remote_clone_replays_canonical_run_and_general(
     )
     common.launch("train", command)
     assert executed == [("remote.csv", 17)]
-    assert inputs == [{"clearml": {}, "ground_truth": "local.csv"}]
+    assert inputs == [
+        {
+            "clearml": {},
+            "ground_truth": "local.csv",
+            "ultralytics": training_settings(device="cpu"),
+        }
+    ]
 
 
 @pytest.mark.parametrize("stage", ["train", "pipeline"])
@@ -404,7 +413,7 @@ def test_remote_clone_does_not_replay_previous_owner_output_route(
         workflow_dependencies,
         common,
         "replay_configuration",
-        lambda _task, values: values,
+        lambda _task, values, **kwargs: values,
     )
     patch_workflow(
         monkeypatch, workflow_dependencies, training, "init_task", lambda *_args, **_kwargs: task
@@ -505,7 +514,7 @@ def test_current_save_dir_override_reaches_pipeline_conflict_validation(
         workflow_dependencies,
         common,
         "replay_configuration",
-        lambda _task, values: values,
+        lambda _task, values, **kwargs: values,
     )
     monkeypatch.setattr(
         "clearml_yolo.adapters.clearml.session.record_run_configuration", lambda *args: None
@@ -571,7 +580,9 @@ def test_real_invocation_freezes_routing_before_collision_display_rename(
     expected = task_run_dir(tmp_path / "runs", "project", "requested/report", task.id) / "report"
     assert outputs == [str(expected)]
     run = next(
-        item["config_dict"] for item in reversed(task.configurations) if item["name"] == "run"
+        json.loads(item["config_text"])
+        for item in reversed(task.configurations)
+        if item["name"] == "run"
     )
     assert run["display_names"]["requested_task_name"] == "requested/report"
     assert run["display_names"]["effective_task_name"] == task.name

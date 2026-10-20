@@ -59,6 +59,10 @@ for every task.
 
 ## Workflow and completion
 
+Start new work from the [stage-zero specification](specs/000-baseline/spec.md).
+It identifies the current contracts and immutable pre-reset history. New features
+use the new numbering epoch beginning at `001`; do not reactivate retired task ledgers.
+
 Automatically route completion requests through the applicable Spec Kit workflow in
 [agent-workflow.md](docs/agent-workflow.md#automatic-workflow-routing), reusing existing
 artifacts and preserving completed history. Keep the process proportionate and honor

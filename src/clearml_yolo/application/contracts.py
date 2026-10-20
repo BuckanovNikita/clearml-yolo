@@ -60,6 +60,7 @@ class PreparedDataset(BaseModel):
     manifest: Path
     dataset_format: DatasetFormat
     artifacts: list[Path]
+    cache_identity: str | None = None
 
 
 class ScoredResolution(BaseModel):

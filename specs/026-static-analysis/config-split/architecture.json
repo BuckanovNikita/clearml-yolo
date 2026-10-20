@@ -1,0 +1,186 @@
+{
+  "schema_version": 1,
+  "task": "026 configuration simplification 2026-10-19",
+  "scope": [
+    "pyproject.toml",
+    "ruff.toml",
+    ".importlinter",
+    ".pre-commit-config.yaml",
+    "tests/test_architecture.py",
+    "docs/static-analysis.md",
+    "docs/development.md",
+    "docs/agent-workflow.md",
+    "specs/026-static-analysis",
+    "docs/current-contracts.md",
+    "docs/import-boundaries.md",
+    "docs/module-architecture.md"
+  ],
+  "impact": "modules",
+  "rules": "AGENTS.md and docs/agent-workflow.md require explicit dependency/effect ownership and executable negative checks; preserve runtime contracts and protected dependency revisions.",
+  "modules": [
+    {
+      "id": "pyproject-toml",
+      "path": "pyproject.toml",
+      "change": "modify",
+      "responsibility": "Package metadata and small tool settings",
+      "interface": "Existing CLI commands and contract semantics remain; configuration discovery uses native tool readers.",
+      "layer": "development tooling",
+      "allowed_dependencies": [
+        "Standard library and existing development dependencies"
+      ],
+      "forbidden_dependencies": [
+        "New runtime dependencies or application behavior changes"
+      ],
+      "effects": "Read repository configuration and source; run offline development checks only.",
+      "contracts": [
+        "architecture",
+        "tooling"
+      ]
+    },
+    {
+      "id": "ruff-toml",
+      "path": "ruff.toml",
+      "change": "add",
+      "responsibility": "Default-all lint policy and explicit exclusions",
+      "interface": "Existing CLI commands and contract semantics remain; configuration discovery uses native tool readers.",
+      "layer": "development tooling",
+      "allowed_dependencies": [
+        "Standard library and existing development dependencies"
+      ],
+      "forbidden_dependencies": [
+        "New runtime dependencies or application behavior changes"
+      ],
+      "effects": "Read repository configuration and source; run offline development checks only.",
+      "contracts": [
+        "architecture",
+        "tooling"
+      ]
+    },
+    {
+      "id": "-importlinter",
+      "path": ".importlinter",
+      "change": "add",
+      "responsibility": "Existing inward import and SDK ownership contracts",
+      "interface": "Existing CLI commands and contract semantics remain; configuration discovery uses native tool readers.",
+      "layer": "development tooling",
+      "allowed_dependencies": [
+        "Standard library and existing development dependencies"
+      ],
+      "forbidden_dependencies": [
+        "New runtime dependencies or application behavior changes"
+      ],
+      "effects": "Read repository configuration and source; run offline development checks only.",
+      "contracts": [
+        "architecture",
+        "tooling"
+      ]
+    },
+    {
+      "id": "-pre-commit-config-yaml",
+      "path": ".pre-commit-config.yaml",
+      "change": "modify",
+      "responsibility": "Dispatch checks for native configuration changes",
+      "interface": "Existing CLI commands and contract semantics remain; configuration discovery uses native tool readers.",
+      "layer": "development tooling",
+      "allowed_dependencies": [
+        "Standard library and existing development dependencies"
+      ],
+      "forbidden_dependencies": [
+        "New runtime dependencies or application behavior changes"
+      ],
+      "effects": "Read repository configuration and source; run offline development checks only.",
+      "contracts": [
+        "architecture",
+        "tooling"
+      ]
+    },
+    {
+      "id": "tests-test_architecture-py",
+      "path": "tests/test_architecture.py",
+      "change": "modify",
+      "responsibility": "Read native import contracts and reject injected forbidden dependencies",
+      "interface": "Existing CLI commands and contract semantics remain; configuration discovery uses native tool readers.",
+      "layer": "development tooling",
+      "allowed_dependencies": [
+        "Standard library and existing development dependencies"
+      ],
+      "forbidden_dependencies": [
+        "New runtime dependencies or application behavior changes"
+      ],
+      "effects": "Read repository configuration and source; run offline development checks only.",
+      "contracts": [
+        "architecture",
+        "tooling"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "architecture",
+      "path": "tests/test_architecture.py",
+      "status": "existing",
+      "rules": "Reject prohibited layer/SDK imports and unclassified modules using actual extracted configuration.",
+      "check": "architecture"
+    },
+    {
+      "id": "tooling",
+      "path": "tests/test_tooling_boundaries.py",
+      "status": "existing",
+      "rules": "Development lint dependencies cannot enter runtime metadata; release helper imports remain bounded.",
+      "check": "architecture"
+    }
+  ],
+  "checks": [
+    {
+      "id": "architecture",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync pytest tests/test_architecture.py tests/test_tooling_boundaries.py",
+      "expectation": "Existing graph and tooling boundary checks pass, including injected forbidden edges.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/026-static-analysis/config-split/verification.md"
+      }
+    },
+    {
+      "id": "imports",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync lint-imports",
+      "expectation": "Every unchanged import contract passes under native discovery.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/026-static-analysis/config-split/verification.md"
+      }
+    },
+    {
+      "id": "static",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync ruff check . && uv run --frozen --no-sync mypy . && uv run --frozen --no-sync vulture",
+      "expectation": "Static checks pass; prior Ruff rules remain enabled and normalized import contracts are unchanged.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/026-static-analysis/config-split/verification.md"
+      }
+    },
+    {
+      "id": "docs",
+      "kind": "documentation",
+      "command": "uv run --frozen --no-sync python scripts/check_docs.py --all",
+      "expectation": "Changed Markdown and links resolve; newly added evidence checked explicitly.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/026-static-analysis/config-split/verification.md"
+      }
+    }
+  ],
+  "documentation": "Update policy and live import-contract pointers; no application/portable usage changes. Preserve historical evidence.",
+  "review": {
+    "status": "accepted",
+    "reviewer": "integrated_review; fresh native read-only review after parent checks",
+    "evidence": "specs/037-cleanup-baseline/review.md",
+    "reconciliation": "Reviewed the complete integrated tracked/untracked source, tests, configuration split, immutable fixture additions and maintained documentation against records 026 configuration-split, 036 cache/replay and 037 cleanup. Existing user-authorized dirty changes are included; the local uv.sources section is excluded from commits and restored exactly afterward. Import/effect checks remain intact; 036 live acceptance passed with its preserved unexplained transient failure. History removal and final docs cutover remain subsequent explicit checks."
+  }
+}

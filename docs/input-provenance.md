@@ -34,6 +34,6 @@ flowchart TD
 | Publication | Raw/evaluated rows plus contexts → canonical artifacts | Raw media association uses explicit naming mode and never claims evaluation; evaluated rows preserve source IDs | Required uploads/flush fail the invocation; download/readback proves lexical identity and lineage |
 
 Validation calibrates candidate thresholds; test and comparison consume frozen thresholds.
-Historical source recovery follows the [ordered recovery contract](../specs/012-remove-legacy-compatibility/contracts/task-recovery.md),
-and artifact/context ownership follows the [publication contract](../specs/014-evaluation-publication/contracts/publication.md).
+Historical source recovery follows the [ordered recovery contract](../specs/000-baseline/spec.md#evaluation-comparison-and-historical-model-recovery),
+and artifact/context ownership follows the [publication contract](../specs/000-baseline/spec.md#required-publication-and-task-lifecycle).
 Scientific algorithms and approved dependency revisions remain unchanged.

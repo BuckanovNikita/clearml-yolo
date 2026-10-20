@@ -43,6 +43,10 @@ COMMANDS = {
     "queue",
 }
 SCIENTIFIC = {"pydantic", "pandera", "pandas", "numpy", "scipy"}
+PURE_ADAPTERS = {
+    "clearml_yolo.adapters.clearml.parameters": set(),
+    "clearml_yolo.adapters.clearml.cache": {"yaml", "clearml_yolo.adapters.clearml.parameters"},
+}
 APPLICATION_EFFECT_DEPENDENCIES = {
     "loguru",
     "matplotlib",
@@ -414,6 +418,12 @@ def _edge_findings(importer: str, imported: str) -> list[str]:
         if forbidden:
             findings.append(f"dependency direction: {importer} -> {imported}")
     external_root = imported.split(".", maxsplit=1)[0]
+    if (
+        importer in PURE_ADAPTERS
+        and external_root not in sys.stdlib_module_names
+        and not any(within(imported, allowed) for allowed in PURE_ADAPTERS[importer])
+    ):
+        findings.append(f"pure adapter dependency: {importer} -> {imported}")
     if source_layer == "application" and external_root in APPLICATION_EFFECT_DEPENDENCIES:
         findings.append(f"application effects require ports: {importer} -> {imported}")
     if external_root in SDK_OWNERS and (
@@ -741,6 +751,11 @@ def application_effect_findings(tree: ast.Module) -> list[str]:
     visitor = _EffectVisitor(application=True)
     visitor.visit(tree)
     return visitor.findings
+
+
+def pure_adapter_effect_findings(module: str, tree: ast.Module) -> list[str]:
+    """Apply the established no-effects scanner only to declared pure adapters."""
+    return core_effect_findings(tree) if module in PURE_ADAPTERS else []
 
 
 def _module_name(path: Path, source_root: Path) -> str:

@@ -24,14 +24,13 @@ from clearml_yolo.adapters.clearml.native import (
     _verify_model,
     owned_native_model,
 )
-from clearml_yolo.adapters.clearml.session import register_model_barrier
+from clearml_yolo.adapters.clearml.session import prepare_native_parameters, register_model_barrier
 from clearml_yolo.adapters.observability.capture import append_scalar
 from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.storage.identity import write_checkpoint_identity
 from clearml_yolo.application.ports import TaskHandle
 from clearml_yolo.core.identity import ModelIdentity
 from clearml_yolo.core.models import CheckpointDescriptor
-from clearml_yolo.core.redaction import sanitize_configuration
 
 
 @trace_operation("clearml.detector.arguments")
@@ -40,7 +39,7 @@ def record_detector_arguments(task: TaskHandle, values: dict[str, Any]) -> None:
     # The SDK may mutate its connected dictionary; sanitize into a separate tree.
     owner: Any = task
     owner.connect(
-        sanitize_configuration(values),
+        prepare_native_parameters(values),
         name="General",
         ignore_remote_overrides=True,
     )

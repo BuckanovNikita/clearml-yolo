@@ -297,17 +297,6 @@ def cancel_process(process: subprocess.Popen[Any]) -> None:
             _release_process_tree(process, deadline=deadline)
 
 
-@defer_interruptions()
-def wait_process(process: subprocess.Popen[Any]) -> int:
-    try:
-        code = process.wait(timeout=5)
-    except BaseException:
-        cancel_process(process)
-        raise
-    _release_process_tree(process)
-    return code
-
-
 def _interrupt(signum: int, _frame: Any) -> None:
     raise SystemExit(128 + signum)
 

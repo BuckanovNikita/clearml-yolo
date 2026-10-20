@@ -2,8 +2,8 @@
 
 This guide describes the implemented interfaces and required deployment checks;
 commands below are not execution evidence.
-The [export contract](../specs/025-multi-model-backends/contracts/export.md) and
-[validation guide](../specs/025-multi-model-backends/quickstart.md#faster-r-cnn-export-acceptance)
+The [export contract](tensorrt-deployment.md) and
+[validation guide](../specs/000-baseline/spec.md#detector-backends-and-deployment-export)
 define acceptance for all six Faster R-CNN presets and both precisions.
 
 Local results and any outstanding preset/precision gates are recorded in the
@@ -23,7 +23,7 @@ the source model before adapting inference and does not alter that model. Engine
 and verification are separate GPU operations with their normal application admission.
 The standalone library caller supplies scheduling and device selection itself.
 
-These command forms match the [feature quickstart](../specs/025-multi-model-backends/quickstart.md):
+These command forms match the [feature quickstart](../specs/000-baseline/spec.md#detector-backends-and-deployment-export):
 
 ```bash
 uv run --frozen --no-sync cy-export model=fasterrcnn/resnet50_fpn weights=./acceptance/best.pt \

@@ -43,3 +43,20 @@ pyproject.toml, so the parent serializes their edits. No delegated agent owns wr
 
 T013 can run alongside parent T012/T015; T014 depends on installed stubs from T012.
 T016 depends on their integration. T017/T018 follow verification; T019 follows acceptance.
+
+## Phase 6 — Configuration simplification (2026-10-19)
+
+- [x] T020 Append FR-006–008, plan and config-split/architecture.json; validate planning and artifact consistency.
+- [x] T021 [US1] Extract Ruff and import-linter configuration from pyproject.toml; preserve normalized contracts and use ALL with explained exclusions.
+- [x] T022 [US1] Adapt tests/test_architecture.py and .pre-commit-config.yaml to native configuration discovery, including negative controls.
+- [x] T023 Verify static gates, architecture/tooling tests, configuration equivalence and applicable hooks.
+- [x] T024 Update docs/static-analysis.md, docs/development.md, docs/agent-workflow.md and current architecture pointers; validate Markdown and links.
+- [x] T025 Record dated results, fresh independent review and diff reconciliation; validate architecture acceptance.
+- [ ] T026 Commit task-owned changes and evaluate native release within existing dirty-tree safeguards.
+
+T020 precedes edits; T021 precedes T022/T023; T024 follows the final configuration.
+T025 follows verification and documentation; T026 follows acceptance. Shared configuration
+edits stay with the parent; the independent reviewer has no write ownership.
+
+T026 is deferred by the native dirty-tree safeguard; see [dated evidence](config-split/verification.md).
+Implementation acceptance passed; no commit, version tag or push is claimed.

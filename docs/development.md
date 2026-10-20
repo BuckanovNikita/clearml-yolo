@@ -5,7 +5,9 @@ context are collected in the [technical reference](../TECH_DETAILS.md).
 
 Read the relevant section before environment setup, code verification, dependency work or
 any commit. The [agent instructions](../AGENTS.md) define authorization and task routing.
-Read `pyproject.toml` for entrypoints, dependencies and import contracts.
+Read [pyproject.toml](../pyproject.toml) for package/dependency/release settings,
+[ruff.toml](../ruff.toml) for lint policy and [.importlinter](../.importlinter) for import
+contracts. Ruff and import-linter discover their dedicated files automatically.
 The shared `python-project-workflow` skill supplies lifecycle requirements within the
 [native workflow](agent-workflow.md); this document owns the project's commands and
 dependency/commit/release procedures.
@@ -53,7 +55,7 @@ dated real-run evidence and the
 GitHub-style anchors (including duplicate/Unicode headings), reference links and
 fences. Pass new file paths explicitly before staging. It excludes generated changelogs,
 symlinks and installed workflow assets; it never fetches external links, executes
-examples or rewrites files. See the [checker contract](../specs/033-documentation-checks/spec.md)
+examples or rewrites files. See the [checker contract](../specs/000-baseline/spec.md#verification-and-delivery-requirements)
 for scope and exit codes. Mermaid grammar needs a separate render and visual review.
 
 ### Native CPU distributed regression tests
@@ -87,7 +89,7 @@ Test-only trainer adaptations retain installed native loops and do not add a
 production CPU distributed launcher. Local task recordings establish callback
 behavior and model association. Accelerator launch, NCCL, AMP and actual ClearML
 uploads/downloads require separate acceptance. See the
-[CPU validation guide](../specs/010-native-clearml-integration/quickstart.md#cpu-distributed-regression-acceptance--2026-10-10-amendment)
+[CPU validation guide](../specs/000-baseline/spec.md#required-publication-and-task-lifecycle)
 for scope and evidence requirements; keep observed results in dated evidence.
 
 ### Generated and composed regressions
@@ -250,6 +252,6 @@ After checking the result, complete authorized delivery by pushing the intended 
 and any newly created version tag explicitly, then verify the remote refs. A no-release
 evaluation is a valid outcome for documentation-only history; do not force a version bump.
 Publish Git tags only: no GitHub Releases, release assets or registry packages. The
-[release contract](../specs/003-semantic-release/contracts/local-release.md) describes
+[release contract](../specs/000-baseline/spec.md#local-release-interface) describes
 version policy, dirty-tree deferral, concurrency and recovery. The
-[validation guide](../specs/003-semantic-release/quickstart.md) covers checks and changelog refresh.
+[validation guide](../specs/000-baseline/spec.md#local-release-interface) covers checks and changelog refresh.

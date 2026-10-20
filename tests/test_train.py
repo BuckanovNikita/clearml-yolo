@@ -77,11 +77,13 @@ def test_train_result_requires_prepared_dataset_paths(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("dataset_format", ["ndjson", "flat"])
 @pytest.mark.parametrize("device", ["cpu", [0, 1]])
+@pytest.mark.parametrize("cache_identity", [None, "a" * 64])
 def test_csv_training_uses_prepared_data_and_returns_cleaned_ground_truth(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     dataset_format: DatasetFormat,
     device: Any,
+    cache_identity: str | None,
     workflow_dependencies: WorkflowDependencies,
 ) -> None:
     expected_format = dataset_format
@@ -96,7 +98,7 @@ def test_csv_training_uses_prepared_data_and_returns_cleaned_ground_truth(
         path.write_text("prepared\n", encoding="utf-8")
     alternate = tmp_path / "remote-data.yaml"
     alternate.write_text("remote\n", encoding="utf-8")
-    calls: dict[str, Any] = {"uploads": [], "connections": []}
+    calls: dict[str, Any] = {"uploads": [], "connections": [], "configurations": []}
 
     @contextmanager
     def cached_dataset(
@@ -116,6 +118,7 @@ def test_csv_training_uses_prepared_data_and_returns_cleaned_ground_truth(
             manifest=manifest,
             dataset_format=expected_format,
             artifacts=[ndjson, labels],
+            cache_identity=cache_identity,
         )
         calls["locked"] = False
 
@@ -125,6 +128,12 @@ def test_csv_training_uses_prepared_data_and_returns_cleaned_ground_truth(
         "clearml_yolo.application.use_cases.train.cached_dataset",
         cached_dataset,
         raising=False,
+    )
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.train.record_run_configuration",
+        lambda _task, values: calls["configurations"].append(values),
     )
     patch_workflow(
         monkeypatch,
@@ -201,6 +210,16 @@ def test_csv_training_uses_prepared_data_and_returns_cleaned_ground_truth(
     assert calls["connections"][0][1]["allow_remote_override"] is False
     assert calls["uploads"] == [(cleaned, tmp_path / "training")]
     assert calls["locked"] is False
+    prepared_records = [
+        values["prepared_dataset"]
+        for values in calls["configurations"]
+        if "prepared_dataset" in values
+    ]
+    assert prepared_records == (
+        [{"cache_identity": cache_identity, "root": str(prepared_dir)}]
+        if cache_identity is not None
+        else []
+    )
     assert result.weights == native_dir / "weights/best.pt"
     assert result.cleaned_ground_truth == cleaned
     assert result.dataset_reference == data

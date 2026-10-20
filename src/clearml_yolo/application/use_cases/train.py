@@ -58,6 +58,16 @@ def _prepare_csv_dataset(
         deps.tracking.register_ground_truth(task, prepared.ground_truth, output_dir=project)
         effective, overrides = deps.dataset.apply_dataset_policy(settings, prepared.data)
         deps.tracking.record_run_configuration(task, {"training_data_overrides": overrides})
+        if prepared.cache_identity is not None:
+            deps.tracking.record_run_configuration(
+                task,
+                {
+                    "prepared_dataset": {
+                        "cache_identity": prepared.cache_identity,
+                        "root": str(prepared.data.parent),
+                    }
+                },
+            )
         deps.tracking.connect_config_file(
             task, "dataset", prepared.data, allow_remote_override=False
         )

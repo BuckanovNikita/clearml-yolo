@@ -1,0 +1,34 @@
+{
+  "wheel": {
+    "distribution": "wheel",
+    "version": "0.34.1",
+    "root_import_inert": true,
+    "source_hashes_checked": 184,
+    "ui_extra": false,
+    "console_help": 12,
+    "default_configurations": 9,
+    "selected_configurations": 81,
+    "shipped_targets": 9,
+    "rejected_evaluation_modes": 2,
+    "raw_prediction_modes": 3,
+    "queue_snapshots": 2,
+    "python": "3.12.13",
+    "source_manifest_sha256": "8d9208dd09e505d37025d4035f02a4a01e139e0c15df058f4e494b05cea21a94"
+  },
+  "sdist": {
+    "distribution": "sdist",
+    "version": "0.34.1",
+    "root_import_inert": true,
+    "source_hashes_checked": 184,
+    "ui_extra": true,
+    "console_help": 12,
+    "default_configurations": 9,
+    "selected_configurations": 81,
+    "shipped_targets": 9,
+    "rejected_evaluation_modes": 2,
+    "raw_prediction_modes": 3,
+    "queue_snapshots": 2,
+    "python": "3.12.13",
+    "source_manifest_sha256": "8d9208dd09e505d37025d4035f02a4a01e139e0c15df058f4e494b05cea21a94"
+  }
+}

@@ -38,7 +38,6 @@ COMPARISON_WORKBOOK_PREFIX = "compare_workbook"
 # Titles of the collapsible sections in the plots and scalars tabs. The comparison stage
 # owns three more of its own, declared next to the report that writes them.
 METRICS_SECTION = "metrics"
-REPORT_SECTION = "report"
 PREDICT_SECTION = "predict"
 
 # The one series under PREDICT_SECTION. A stage that scores every split writes its section

@@ -1,7 +1,7 @@
 # Module dependencies and effect ownership
 
 The [import contracts](import-boundaries.md) and executable rules in
-[pyproject.toml](../pyproject.toml) govern the arrows below. A runtime dependency
+[.importlinter](../.importlinter) govern the arrows below. A runtime dependency
 points inward; composition supplies the concrete implementations of typed ports.
 
 ```mermaid

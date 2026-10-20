@@ -181,7 +181,8 @@ def test_ddp_rank_zero_events_replay_installed_callbacks_in_owner(
         model.trainer = parent
         relay.replay(parent)
 
-    assert task.parameters["General/name"] == "ddp-run"
+    assert "General/name" not in task.parameters
+    assert "General/project" not in task.parameters
     assert task.parameters["General/secret"] == "<redacted>"
     assert parent.args.imgsz == 128
     assert ("train", "train/box_loss", 1.25, 0) in task.logger.scalars
@@ -216,7 +217,7 @@ def test_ddp_replay_refuses_incomplete_events_before_best_publication(
     with native_runtime(), native_ddp_relay(task, model) as relay:
         monkeypatch.setenv(OWNER_PID_ENV, "worker-owner-pid")
         monkeypatch.setattr("ultralytics.utils.RANK", 0)
-        trainer = SimpleNamespace(args=SimpleNamespace(project="runs", name="ddp-run"))
+        trainer = SimpleNamespace(args=SimpleNamespace(project="runs", name="ddp-run", epochs=1))
         _invoke(model, "on_pretrain_routine_start", trainer)
         monkeypatch.setenv(OWNER_PID_ENV, str(os.getpid()))
         parent = SimpleNamespace(ddp=True, args=SimpleNamespace())
@@ -224,7 +225,7 @@ def test_ddp_replay_refuses_incomplete_events_before_best_publication(
         with pytest.raises(RuntimeError, match="incomplete"):
             relay.replay(parent)
 
-    assert task.parameters["General/name"] == "ddp-run"
+    assert task.parameters == {"General/epochs": 1}
     assert task.logger.scalars == []
     assert task.output_models == []
 
@@ -461,7 +462,9 @@ def test_ddp_corrupt_or_unterminated_journal_never_publishes_best(
         native_ddp_relay(task, model) as relay,
     ):
         journal = relay._directory / "events.jsonl"
-        journal.write_bytes(b'{"event":"on_pretrain_routine_start","args":{"name":"bad"}}\n' + tail)
+        journal.write_bytes(
+            b'{"event":"on_pretrain_routine_start","args":{"name":"bad","epochs":1}}\n' + tail
+        )
         relay.replay(model.trainer)
     assert task.output_models == []
 
