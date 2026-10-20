@@ -24,7 +24,7 @@
   usage/evaluation; validate docs, links and examples.
 - [x] T010 Obtain fresh independent review after integration/checks; resolve findings.
 - [x] T011 Reconcile actual scope/evidence and validate architecture acceptance.
-- [ ] T012 Follow commit procedure, native Git-only release, pushes and ref verification.
+- [x] T012 Follow commit procedure, native Git-only release, pushes and ref verification.
 
 ## Independent review follow-up
 
@@ -42,13 +42,26 @@
 - [x] T020 Restrict device normalization to selectors accepted by the relevant
   native/detector/export consumer; preserve unsupported aliases and invalid forms.
 
-## Remaining gate recorded on 2026-10-16
+## Remaining gate
 
 T008 remains blocked by the shared environment's capacity WAIT. No live resources
 were created. T011 reconciliation is recorded, but its acceptance validator fails
 solely on the unexecuted live check. T012 release remains unstarted. Local checks,
 documentation and independent source review are complete; they do not replace the
 required live publication/cache evidence.
+
+## Resumed release verification
+
+- [x] T021 Reproduce and synchronize the detached-rank readiness fixture in
+  tests/test_shared_queue_processes.py; retain cleanup assertions and run the
+  delayed-start diagnostic, complete process suite and normal commit hooks.
+
+The resumed native cache check, full hooks, integrated review and architecture
+acceptance now pass. The historical capacity block above is superseded by the
+2026-10-19 verification. Git-only delivery remains the final open step.
+
+Git-only delivery is complete: application v0.35.0, then portable guidance v0.2.10;
+remote refs and original-workspace preservation were verified.
 
 ## Live acceptance resumed on 2026-10-20
 
@@ -66,3 +79,7 @@ T012 delivery remain parent-owned.
 Task 037 completed the combined source/configuration/documentation checks and fresh
 independent review. T011 is accepted against that integrated delta; T012 Git delivery
 is recorded in the stage-zero cutover after the preservation commit.
+
+These independent cleanup observations supplement the upstream v0.35.0 delivery recorded above.
+The earlier parent-owned delivery wording predates discovery of that published ancestry;
+cleanup integration and history cutover are tracked separately in `037-cleanup-baseline`.

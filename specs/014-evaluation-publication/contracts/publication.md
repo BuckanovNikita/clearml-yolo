@@ -17,10 +17,27 @@ artifacts and verification records are not rewritten.
 
 An invocation publishes effective ground truth as `gt_csv` and, when it has prediction
 contexts, one combined result table as `predicts_csv`. The owner registers durable local
-shards while stages run, enriches already registered contexts when evaluation becomes
-available, and assembles/uploads each canonical CSV once before artifact/model barriers
-and final flush. A pipeline reuses its invocation bundle rather than publishing the same
-CSV at each nested stage. Workers never publish; a worker-side reporting call is a no-op.
+shards while stages run and enriches already registered contexts when evaluation becomes
+available. Effective validated `gt_csv` uploads immediately after its canonical file is
+written; an identical repeat is a no-op and conflicting ground truth fails. The workflow
+declares all enabled result contributors (`predict`, `metrics`, `compare`) before any rows
+are registered. Each explicitly completes after its last row mutation. The final contributor
+assembles and uploads `predicts_csv` once, before later statistics, reports or optional
+publication. Nested stages share the declaration; standalone validation declares both
+prediction and metrics. Skipped comparison explicitly completes without fabricated rows.
+Workers never publish; a worker-side reporting call is a no-op.
+
+Completed results are immutable: late writes, undeclared or duplicate completion and new
+contributors after declaration fail. Finalization verifies every declared contributor and
+required upload plus the existing model/flush barriers. It does not upload incomplete
+aggregates. A later failure preserves earlier complete uploads and local incomplete shards.
+
+Exact validation thresholds upload after calibration and the complete CSV write. Each
+model/split dashboard uploads after its final workbook annotation, before another evaluation
+or comparison statistics. Comparison and report workbooks upload immediately after their
+final annotations. Canonical names remain unchanged; no intermediate replacement uploads
+are made. Best Output Model publication follows finalized checkpoint selection and retains
+its existing upload verification.
 
 Ground-truth and train commands register effective ground truth only. Predict registers
 ground truth and a not-evaluated prediction context. Metrics/validation enrich evaluated
@@ -229,8 +246,10 @@ not rewritten.
 
 ## Failure and verification boundaries
 
-Register expected publications before finalization. Owner callbacks assemble canonical
-CSVs before artifact/model barriers and flush. Required assembly, upload, model metadata,
+Register expected publications before finalization. The owner publishes effective truth
+when validated and assembles combined predictions when the last declared producer
+completes. Finalization verifies completion before artifact/model barriers and flush.
+Required assembly, upload, model metadata,
 flush or interruption errors fail the command/task and retain local diagnostic evidence.
 FiftyOne stays optional under its maintained publisher contract.
 

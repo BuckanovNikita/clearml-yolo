@@ -15,6 +15,7 @@ import yaml
 from PIL import Image
 
 from clearml_yolo.adapters.clearml import detectors as publication
+from clearml_yolo.adapters.clearml.session import prepare_native_parameters
 from clearml_yolo.adapters.integrations.detectors import DetectorRunner
 from clearml_yolo.adapters.storage.checkpoint import bind_checkpoint
 from clearml_yolo.adapters.storage.identity import (
@@ -204,6 +205,13 @@ def detector_harness(
         monkeypatch.setattr(publication, "report_metric", lambda *args: None)
         monkeypatch.setattr(deps.tracking, "init_task", lambda *args, **kwargs: task)
         monkeypatch.setattr(
+            deps.tracking,
+            "publish_training_parameters",
+            lambda owner, values: connect(
+                prepare_native_parameters(values), name="General", ignore_remote_overrides=True
+            ),
+        )
+        monkeypatch.setattr(
             deps.tracking, "task_identity", lambda owner: ("project", "native", "native-owner")
         )
         monkeypatch.setattr(
@@ -212,10 +220,13 @@ def detector_harness(
             lambda owner, data: harness.settings.append(data),
         )
         for name in (
+            "declare_result_producers",
+            "complete_result_producer",
             "register_ground_truth",
             "connect_config_file",
             "report_table",
             "register_predictions",
+            "publish_evaluation",
             "upload_artifact",
         ):
             monkeypatch.setattr(deps.tracking, name, lambda *args, **kwargs: None)
@@ -279,7 +290,8 @@ def test_pipeline_uses_selected_best_and_backend_owned_settings(
     assert requested["device"] == [-1]
     assert effective["device"] == "cpu"
     recipe = yaml.safe_load((best.parent / "native_train.yaml").read_text())
-    published = harness.native_arguments[0]
+    assert harness.native_arguments[0]["weight_decay"] == harness.config.train.weight_decay
+    published = harness.native_arguments[-1]
     assert not {"device", "project", "name", "save_dir", "exist_ok", "data"} & published.keys()
     assert published == {
         key: value
@@ -305,7 +317,7 @@ def test_native_general_connection_failure_prevents_publication(
     harness.connection_failure = True
     with pytest.raises(RuntimeError, match="General connection failed"):
         _pipeline(harness)
-    assert len(harness.training) == 1
+    assert harness.training == []
     assert harness.published == []
 
 

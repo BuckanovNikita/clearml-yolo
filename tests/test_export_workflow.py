@@ -13,6 +13,7 @@ from clearml_yolo.adapters.export.metadata import sha256, write_metadata
 from clearml_yolo.adapters.export.verification import _corpus, _verify_corpus, verification_cases
 from clearml_yolo.adapters.integrations.export_operations import DetectorExporter
 from clearml_yolo.application.contracts import ClearMLConfig
+from clearml_yolo.application.ports import ArtifactReady
 from clearml_yolo.application.use_cases.export import export_model
 from clearml_yolo.core.export import ExportMetadata
 from clearml_yolo.core.export_requests import ExportRequest, ExportResult
@@ -47,10 +48,18 @@ def test_verification_evidence_uploads_before_failed_completion(
         calls.append(("upload", name))
 
     class Exporter:
-        def execute(self, request: ExportRequest, destination: Path) -> ExportResult:
+        def execute(
+            self,
+            request: ExportRequest,
+            destination: Path,
+            *,
+            artifact_ready: ArtifactReady | None = None,
+        ) -> ExportResult:
             assert destination == tmp_path / "output"
             assert destination.is_dir()
             assert request.weights == checkpoint
+            assert artifact_ready is not None
+            artifact_ready("export_verification", report)
             return ExportResult(
                 artifacts={"export_verification": report},
                 evidence={"operation": "verify", "passed": passed},

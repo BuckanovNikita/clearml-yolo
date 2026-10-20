@@ -21,7 +21,7 @@ from clearml_yolo.adapters.reporting.comparison_workbook import (
     write_comparison_workbook,
 )
 from clearml_yolo.adapters.reporting.workbook_identity import read_dashboard
-from clearml_yolo.application.ports import WorkflowDependencies
+from clearml_yolo.application.ports import PairedComparisonEngine, WorkflowDependencies
 from clearml_yolo.core.comparison.assemble import (
     DEGRADED,
     IMPROVED,
@@ -730,6 +730,8 @@ def _stub_comparison_publication(
 ) -> tuple[dict[str, object], dict[str, Any], list[str], list[dict[str, Any]]]:
     uploads: dict[str, object] = {}
     configurations: dict[str, Any] = {}
+    for method in ("declare_result_producers", "complete_result_producer", "register_ground_truth"):
+        monkeypatch.setattr(workflow_dependencies.tracking, method, lambda *_args, **_kwargs: None)
     patch_workflow(
         monkeypatch,
         workflow_dependencies,
@@ -886,6 +888,49 @@ def _assert_evaluation_handoffs(
         assert call["model_id"]
 
 
+def _assert_comparison_counts(result: Any) -> tuple[pd.DataFrame, pd.DataFrame]:
+    baseline = read_dashboard(result.baseline_dashboard, index_col=0)
+    candidate = read_dashboard(result.candidate_dashboard, index_col=0)
+    statistics = read_dashboard(result.workbook, sheet_name="Сравнение")
+    row = statistics[statistics["Класс"] == "cat"].iloc[0]
+    assert (baseline.loc["cat", "tp"], baseline.loc["cat", "fp"], baseline.loc["cat", "fn"]) == (
+        row["TP прод"],
+        row["FP прод"],
+        row["FN прод"],
+    )
+    assert (
+        candidate.loc["cat", "tp"],
+        candidate.loc["cat", "fp"],
+        candidate.loc["cat", "fn"],
+    ) == (row["TP новая"], row["FP новая"], row["FN новая"])
+    assert candidate.loc["cat", "fp"] == 1
+    return baseline, candidate
+
+
+def _assert_dashboards_before_statistics(
+    monkeypatch: pytest.MonkeyPatch,
+    workflow_dependencies: WorkflowDependencies,
+    evaluations: list[dict[str, Any]],
+) -> None:
+    assert isinstance(workflow_dependencies.evaluation, PairedComparisonEngine)
+    comparison = workflow_dependencies.evaluation.compare_outcomes
+    completed: list[str] = []
+    monkeypatch.setattr(
+        workflow_dependencies.tracking, "complete_result_producer",
+        lambda _task, producer: completed.append(producer),
+    )
+
+    def compare_after_dashboards(*args: Any, **kwargs: Any) -> Any:
+        assert [call["role"] for call in evaluations] == [
+            "comparison_baseline", "comparison_candidate"
+        ]
+        assert completed == ["compare"]
+        return comparison(*args, **kwargs)
+
+    monkeypatch.setattr(
+        workflow_dependencies.evaluation, "compare_outcomes", compare_after_dashboards
+    )
+
 @pytest.mark.parametrize("legacy_role", [None, "baseline", "candidate", "both"])
 @pytest.mark.parametrize("split", ["test", "val"])
 @pytest.mark.parametrize("override", [False, True])
@@ -946,6 +991,7 @@ def test_compare_dashboards_and_statistics_share_the_same_test_counts(
         )
         rows = []
         if Path(weights).name == "candidate.pt":
+            assert [call["role"] for call in evaluations] == ["comparison_baseline"]
             rows = [
                 ("image.jpg", "cat", 0.0, 0.0, 10.0, 10.0, 0.9),
                 ("empty.jpg", "cat", 20.0, 20.0, 30.0, 30.0, 0.8),
@@ -984,6 +1030,8 @@ def test_compare_dashboards_and_statistics_share_the_same_test_counts(
         lambda *_args: 640,
     )
 
+    _assert_dashboards_before_statistics(monkeypatch, workflow_dependencies, evaluations)
+
     models = _recovered_comparison_models(
         tmp_path,
         monkeypatch,
@@ -1007,21 +1055,7 @@ def test_compare_dashboards_and_statistics_share_the_same_test_counts(
     )
 
     assert result is not None
-    baseline = read_dashboard(result.baseline_dashboard, index_col=0)
-    candidate = read_dashboard(result.candidate_dashboard, index_col=0)
-    statistics = read_dashboard(result.workbook, sheet_name="Сравнение")
-    row = statistics[statistics["Класс"] == "cat"].iloc[0]
-    assert (baseline.loc["cat", "tp"], baseline.loc["cat", "fp"], baseline.loc["cat", "fn"]) == (
-        row["TP прод"],
-        row["FP прод"],
-        row["FN прод"],
-    )
-    assert (
-        candidate.loc["cat", "tp"],
-        candidate.loc["cat", "fp"],
-        candidate.loc["cat", "fn"],
-    ) == (row["TP новая"], row["FP новая"], row["FN новая"])
-    assert candidate.loc["cat", "fp"] == 1
+    baseline, candidate = _assert_comparison_counts(result)
     assert membership == [(split, ["image.jpg", "empty.jpg"])] * 2
     threshold = 0.7 if override and legacy_role is not None else 0.5
     assert baseline.loc["cat", "confidence"] == threshold

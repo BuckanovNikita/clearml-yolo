@@ -402,13 +402,18 @@ def normalize_task_hash(representation: dict[str, Any]) -> dict[str, Any]:
         f"-m clearml_yolo.entrypoints.{command}" for command in _COMMANDS
     }:
         return result
+    configs = result.get("configs")
+    if isinstance(configs, dict):
+        # This view never controls execution, even when opaque/unsafe executable
+        # inputs require the conservative projection fallback below.
+        configs.pop("run_overrides", None)
     # Projected identities are terminal values. Never reinterpret their markers
     # as executable selectors, and preserve any caller-owned version-key collision.
     if _POLICY_KEY in result:
         return result
+    unprojected = deepcopy(result)
     try:
         command = entrypoint.rpartition(".")[2]
-        configs = result.get("configs")
         run = _document(configs.get("run")) if isinstance(configs, dict) else None
         binding = _dataset_binding(run)
         consumer = _run_consumer(run, command)
@@ -425,6 +430,6 @@ def normalize_task_hash(representation: dict[str, Any]) -> dict[str, Any]:
     except _UnsafeProjectionError:
         # Reject the entire projection: partial edits could conflate executable
         # inputs whose raw markers or SDK parsing differ from normalized values.
-        return deepcopy(representation)
+        return unprojected
     result[_POLICY_KEY] = _POLICY_VERSION
     return result

@@ -4,7 +4,7 @@ __all__ = ["ReportResult"]
 from pathlib import Path
 
 from clearml_yolo.application.contracts import ClearMLConfig, ComparisonManifest, ReportResult
-from clearml_yolo.application.ports import TaskHandle, WorkflowDependencies
+from clearml_yolo.application.ports import WorkflowDependencies
 from clearml_yolo.application.use_cases.compare import MANIFEST_NAME
 from clearml_yolo.core import artifact_names
 from clearml_yolo.core.identity import ModelIdentity, require_model_identity
@@ -133,16 +133,16 @@ def build_reports(
         deps.renderer.build_reports(
             candidate_path, baseline_path, dev_path, business_path, effective_config_path
         )
-        deps.renderer.annotate_workbook(dev_path, identities)
-        deps.renderer.annotate_workbook(business_path, identities)
+        for name, path in zip(expected, (dev_path, business_path), strict=True):
+            deps.renderer.annotate_workbook(path, identities)
+            if task is not None:
+                deps.tracking.upload_artifact(task, name, path)
         result = ReportResult(
             dev_reports={split: dev_path}, business_reports={split: business_path}
         )
         deps.resources.log(
             "INFO", "Split {!r}: {} and {}", split, dev_path.name, business_path.name
         )
-        if task is not None:
-            _upload_reports(task, split, dev_path, business_path, deps=deps)
         return result
 
 
@@ -159,19 +159,3 @@ def _report_identity(
     if identity is not None and supplied is not None and (identity != supplied):
         raise ValueError(f"{role} dashboard identity does not match comparison manifest")
     return require_model_identity(identity or supplied, label)
-
-
-def _upload_reports(
-    task: TaskHandle | None,
-    split: str,
-    dev_path: Path,
-    business_path: Path,
-    *,
-    deps: WorkflowDependencies,
-) -> None:
-    deps.tracking.upload_artifact(
-        task, artifact_names.per_split(artifact_names.REPORT_DEV_PREFIX, split), dev_path
-    )
-    deps.tracking.upload_artifact(
-        task, artifact_names.per_split(artifact_names.REPORT_BUSINESS_PREFIX, split), business_path
-    )

@@ -8,6 +8,11 @@
 - **queue**: Record refresh isolation release verification
   ([`129b94b`](https://github.com/BuckanovNikita/clearml-yolo/commit/129b94b749d7d4bcaf6e82b9a504a141796c7bdc))
 
+### Refactoring
+
+- Remove orphaned helpers and prepare history baseline
+  ([`a7d6815`](https://github.com/BuckanovNikita/clearml-yolo/commit/a7d681503381d70eed645efa267726cc9e2ae21b))
+
 
 ## v0.34.1 (2026-10-19)
 

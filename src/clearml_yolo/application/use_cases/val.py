@@ -25,9 +25,12 @@ def validate(
     deps: WorkflowDependencies,
 ) -> MetricsResult:
     with deps.resources.trace_operation("workflow.val"):
-        deps.tracking.init_task(clearml, stage="val")
+        task = deps.tracking.init_task(clearml, stage="val")
         selected = list(dict.fromkeys(splits or ["train", "val", "test"]))
         destination = deps.storage.write_path(output_dir)
+        deps.tracking.declare_result_producers(
+            task, ["predict", "metrics"], output_dir=destination
+        )
         predicted = predict(
             weights,
             ground_truth,

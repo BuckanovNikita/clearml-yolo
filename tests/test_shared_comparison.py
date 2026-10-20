@@ -177,6 +177,8 @@ def test_workflow_uses_optional_capability_and_keeps_legacy_injection_fallback(
             "split": ["test"],
         }
     ).to_csv(truth, index=False)
+    (tmp_path / "baseline.pt").write_bytes(b"resolved baseline fixture")
+    (tmp_path / "candidate.pt").write_bytes(b"resolved candidate fixture")
     models = iter(
         [
             ResolvedModel(

@@ -34,6 +34,14 @@ including the ONNX plugin inventory, so it agrees with the published metadata/re
 | `build` | `export_engine`: `model.engine`; `export_metadata`: `model.engine.json` | `export_result` binds source/graph/engine hashes, precision, profiles, runtime versions and plugins |
 | `verify` | `export_verification`: `verification.json`; `export_corpus`: `corpus.json` | `export_result` records verification outcomes and corpus identity |
 
+Each finalized graph, engine, metadata document and corpus manifest uploads as soon as it
+is complete. The final verification report uploads only after all cases and corpus checks
+finish; intermediate report writes remain local. A completed report whose quality gate fails
+still uploads before the task fails. No intermediate artifact replacement occurs. Earlier
+complete files remain available if a later producer fails, and upload rejection stops work.
+The optional typed artifact-ready callback carries names and paths through the export port;
+export adapters do not acquire ClearML SDK dependencies. Finalization still verifies uploads.
+
 The build report consists of structured `export_result` and the engine metadata sidecar;
 there is no separate build-report file or artifact. Verification accepts a corpus containing
 only the selected split; ordinary training retains its required training/validation populations.

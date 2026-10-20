@@ -21,10 +21,11 @@
     ".specify/memory/constitution.md",
     ".agents/skills/running-end-to-end-tests",
     "README.md",
-    "TECH_DETAILS.md"
+    "TECH_DETAILS.md",
+    "src/clearml_yolo/application/ports.py"
   ],
   "impact": "modules",
-  "rules": "Preserve supported behavior and current inward import/effect ownership; explicit user-authorized history reset preserves originals in Git.",
+  "rules": "Preserve supported behavior and current inward import/effect ownership; explicit user-authorized history reset preserves originals in Git. Published v0.35.0 ancestry is incorporated normally; its runtime interfaces remain byte-identical apart from the five listed orphan removals. Historical feature037 scheduler acceptance remains not-run, independently of this cleanup architecture acceptance.",
   "modules": [
     {
       "id": "execution",
@@ -202,6 +203,24 @@
         "New outward dependencies, hidden effects or SDK imports in core/application"
       ],
       "effects": "No effects",
+      "contracts": [
+        "architecture"
+      ]
+    },
+    {
+      "id": "tracking-port-lint",
+      "path": "src/clearml_yolo/application/ports.py",
+      "change": "modify",
+      "responsibility": "Published invocation tracking port",
+      "interface": "Existing TrackingSession signatures and runtime AST unchanged; only a documented class-specific method-count suppression integrates the stronger preview lint policy.",
+      "layer": "application port",
+      "allowed_dependencies": [
+        "Existing core records and typed interface inputs"
+      ],
+      "forbidden_dependencies": [
+        "Concrete adapters and SDK effects"
+      ],
+      "effects": "None; Protocol remains the injected boundary",
       "contracts": [
         "architecture"
       ]

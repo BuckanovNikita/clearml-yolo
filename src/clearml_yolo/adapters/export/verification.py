@@ -15,6 +15,7 @@ from clearml_yolo.adapters.export.quality import evaluate_detections, evaluator_
 from clearml_yolo.adapters.export.runtime import TensorRTRunner
 from clearml_yolo.adapters.storage.dataset_records import validate_ground_truth
 from clearml_yolo.adapters.storage.filesystem import write_path
+from clearml_yolo.application.ports import ArtifactReady
 from clearml_yolo.core.datasets import ImageRecord
 from clearml_yolo.core.export import ExportMetadata
 from clearml_yolo.core.export_quality import match_detections, quality_gate
@@ -245,7 +246,11 @@ def _rejections(runner: TensorRTRunner) -> dict[str, bool]:
 
 
 def verify_engine(
-    request: ExportRequest, metadata: ExportMetadata, destination: Path
+    request: ExportRequest,
+    metadata: ExportMetadata,
+    destination: Path,
+    *,
+    artifact_ready: ArtifactReady | None = None,
 ) -> ExportResult:
     """Run one serialized engine and its FP32 native reference on identical image bytes."""
     destination = write_path(destination)
@@ -257,6 +262,8 @@ def verify_engine(
     if request.engine is None or request.weights is None:
         raise ValueError("Verification requires an engine and native checkpoint")
     images, manifest = _corpus(request, destination)
+    if artifact_ready is not None:
+        artifact_ready("export_corpus", manifest)
     evaluator = evaluator_identity()
     index = gpu_device_index(request.device)
     device = torch.device(f"cuda:{index}")
@@ -325,6 +332,8 @@ def verify_engine(
         torch.backends.cuda.matmul.allow_tf32 = old_matmul
         torch.backends.cudnn.allow_tf32 = old_cudnn
         report_path.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
+    if artifact_ready is not None:
+        artifact_ready("export_verification", report_path)
     return ExportResult(
         artifacts={"export_verification": report_path, "export_corpus": manifest},
         evidence=evidence,

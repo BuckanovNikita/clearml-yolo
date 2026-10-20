@@ -215,12 +215,30 @@
       "contracts": [
         "architecture"
       ]
+    },
+    {
+      "id": "queue-process-regression",
+      "path": "tests/test_shared_queue_processes.py",
+      "change": "modify",
+      "responsibility": "Establish detached-rank readiness before exercising guardian orphan cleanup",
+      "interface": "Bounded fixture handshake; existing cleanup and capacity-release assertions unchanged",
+      "layer": "tests",
+      "allowed_dependencies": [
+        "Existing standard-library process/path primitives, pytest and explicit queue adapter/core imports"
+      ],
+      "forbidden_dependencies": [
+        "New production dependency edges or altered queue lifecycle policy"
+      ],
+      "effects": "Owned synthetic test subprocesses and temporary files only",
+      "contracts": [
+        "architecture"
+      ]
     }
   ],
   "contracts": [
     {
       "id": "imports",
-      "path": ".importlinter",
+      "path": "pyproject.toml",
       "status": "existing",
       "rules": "Exhaustive layer classification, adapter peer ownership, SDK ownership and inward dependencies",
       "check": "imports"
@@ -259,7 +277,7 @@
     {
       "id": "behavior",
       "kind": "behavior",
-      "command": "UV_NO_SYNC=1 uv run --frozen --no-sync pre-commit run --all-files",
+      "command": "UV_NO_SYNC=1 git commit (normal pre-commit hooks)",
       "expectation": "Full suite including new cache/publication/replay regressions passes",
       "result": {
         "status": "passed",
@@ -326,8 +344,8 @@
   "documentation": "Tracking contract, current contract index, README/TECH_DETAILS and canonical corp-skills usage/evaluation; dated feature evidence.",
   "review": {
     "status": "accepted",
-    "reviewer": "integrated_review; fresh native read-only review after parent checks",
-    "evidence": "specs/037-cleanup-baseline/review.md",
-    "reconciliation": "Reviewed the complete integrated tracked/untracked source, tests, configuration split, immutable fixture additions and maintained documentation against records 026 configuration-split, 036 cache/replay and 037 cleanup. Existing user-authorized dirty changes are included; the local uv.sources section is excluded from commits and restored exactly afterward. Import/effect checks remain intact; 036 live acceptance passed with its preserved unexplained transient failure. History removal and final docs cutover remain subsequent explicit checks."
+    "reviewer": "/root/release_final_review: fresh independent read-only native agent",
+    "evidence": "specs/036-stable-clearml-cache/review.md",
+    "reconciliation": "Fresh independent review covered all 87 combined application source/test/documentation paths from 129b94b to fd395d3 and all nine companion paths after parent integration and full hooks. All 21 task-owned runtime hashes and 324 native archive hashes were independently verified. The final 89-path release delta additionally contains only generated root package version changes in pyproject.toml and uv.lock; all paths are covered by the existing architecture scopes. Final wheel/source-archive contents and installed commands passed. Dependency versions, sources and hooks are unchanged. The unrelated lint split, local uv overrides and draft remain excluded; original dirty files/index are preserved. Source review is accepted. Feature 037 native scheduler coverage remains missing and prevents full 037 acceptance despite authorized delivery."
   }
 }

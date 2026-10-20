@@ -91,3 +91,8 @@ observations then; they are not current execution recipes.
 The historical force/admission controls are superseded by direct native execution and
 explicit queue resource requests. Regenerate old configuration examples; do not silently
 translate their controls. See [migration and operations](queue.md).
+
+Active executable configuration, informational differences and early validated General
+follow the [startup contract](../specs/000-baseline/spec.md#configuration-resolution-and-replay).
+Contributor completion controls [artifact timing](../specs/000-baseline/spec.md#required-publication-and-task-lifecycle);
+source review and [dated acceptance limits](../specs/000-baseline/spec.md#historical-evidence-and-limits) remain distinct.

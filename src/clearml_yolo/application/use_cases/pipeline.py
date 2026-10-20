@@ -12,7 +12,12 @@ from clearml_yolo.application.contracts import (
     InferenceConfig,
     ModelRef,
 )
-from clearml_yolo.application.ports import Publisher, TaskHandle, WorkflowDependencies
+from clearml_yolo.application.ports import (
+    Publisher,
+    ResultProducer,
+    TaskHandle,
+    WorkflowDependencies,
+)
 from clearml_yolo.application.use_cases.compare import NoBaselineModelError
 from clearml_yolo.application.use_cases.compare import compare as run_comparison
 from clearml_yolo.application.use_cases.metrics import compute_metrics
@@ -150,6 +155,7 @@ def _compare_and_report(
         deps.tracking.record_run_configuration(
             task, {"comparison_status": {"status": "skipped", "reason": str(error)}}
         )
+        deps.tracking.complete_result_producer(task, "compare")
         return {"comparison_status": "skipped"}
     if result is None:
         return {"comparison_status": "skipped"}
@@ -228,6 +234,15 @@ def _publish_pipeline(
     )
 
 
+def _result_producers(
+    skip_predict: bool, skip_metrics: bool, skip_compare: bool
+) -> list[ResultProducer]:
+    stages: tuple[tuple[ResultProducer, bool], ...] = (
+        ("predict", skip_predict), ("metrics", skip_metrics), ("compare", skip_compare)
+    )
+    return [producer for producer, skipped in stages if not skipped]
+
+
 def run_pipeline(
     ultralytics: dict[str, Any],
     ultralytics_predict: dict[str, Any],
@@ -288,6 +303,9 @@ def run_pipeline(
         )
         deps.storage.mkdir(directory, parents=True, exist_ok=True)
         deps.storage.point_latest_at(deps.storage.runs_root(), directory)
+        deps.tracking.declare_result_producers(
+            task, _result_producers(skip_predict, skip_metrics, skip_compare), output_dir=directory
+        )
         results: dict[str, Any] = {"run_dir": directory}
         checkpoint = weights if weights is not None else directory / "detect/train/weights/best.pt"
         effective_ground_truth: str | Path = ground_truth

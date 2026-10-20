@@ -43,11 +43,23 @@ def export_model(
                 },
             },
         )
-    result = deps.exporter.execute(request, destination)
+    published: dict[str, Path] = {}
+
+    def artifact_ready(name: str, path: Path) -> None:
+        if name in published:
+            raise ValueError(f"Export artifact {name!r} was already published")
+        deps.tracking.expect_artifacts(task, [name])
+        deps.tracking.upload_artifact(task, name, path)
+        published[name] = path
+
+    result = deps.exporter.execute(request, destination, artifact_ready=artifact_ready)
+    for name, path in published.items():
+        if result.artifacts.get(name) != path:
+            raise ValueError(f"Export result disagrees with published artifact {name!r}")
+    for name, path in result.artifacts.items():
+        if name not in published:
+            artifact_ready(name, path)
     deps.tracking.record_run_configuration(task, {"export_result": result.evidence})
-    deps.tracking.expect_artifacts(task, list(result.artifacts))
-    for name, artifact in result.artifacts.items():
-        deps.tracking.upload_artifact(task, name, artifact)
     if not result.passed:
         raise ValueError("Export verification failed; inspect the retained verification report")
     return result

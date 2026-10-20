@@ -22,8 +22,10 @@ establish a physical outcome. An unexplained requirement/code mismatch must be i
 New Spec Kit work starts at **001** in this new epoch, references this specification, and creates its own
 specification, plan, architecture record and task ledger. `000-baseline` must not become the active feature
 or inherit old unfinished checkboxes. Identify a retired feature using its full historical path and
-checkpoint, not its number alone: the old epoch includes two different `003-*` features. Existing Git
-commits, branches and tags retain their meaning. No history is rewritten.
+checkpoint, not its number alone: the old epoch includes two different `003-*` features and both
+`037-early-accurate-publication` and `037-cleanup-baseline`. Their artifacts retain separate identities and
+are preserved together at H. Existing Git commits, branches and tags retain their meaning. No history is
+rewritten.
 
 The [constitution](../../.specify/memory/constitution.md), [agent workflow](../../docs/agent-workflow.md),
 installed Spec Kit tooling and current topic guides remain in place. Future tasks follow the native
@@ -133,11 +135,21 @@ URL signatures are redacted. Noninterpolated inputs retain their original execut
 copies use explicit invocation scratch, under the current retained-arena filesystem policy. Embedding
 callers without an injected resolver must supply concrete documents.
 
-The shared CLI records full sanitized inputs in canonical `run`, including native groups. Consumed `dataset`
-and explicit `report` remain separate Configuration Objects; configuration copies are not artifacts.
-Embedding callers own complete input recording through the invocation/tracking interface. Result-only
-sections, including `evaluation_result`, `fiftyone_result` and `export_result`, never replace executable
-inputs. SDK proxy containers are detached; inherited SDK connection flags do not own execution.
+The shared CLI publishes detached resolved JSON `run` after YAML/CLI composition, queue device binding and
+supported remote overrides. It contains only selected executable inputs: YOLO retains its native groups and
+model backend/preset selectors; other detectors retain `model` settings and omit inactive YOLO groups.
+Native-detector dataset format is the effective COCO format. Later result provenance cannot replace frozen
+executable roots; native normalization remains separate. Consumed `dataset` and explicit `report` remain
+separate Configuration Objects; configuration copies are not artifacts. Embedding callers still own complete
+executable input recording through the invocation/tracking interface. Result-only sections, including
+`evaluation_result`, `fiftyone_result` and `export_result`, never replace executable inputs. SDK proxy
+containers are detached; inherited SDK connection flags do not own execution.
+
+Sanitized deterministic JSON `run_overrides` contains recursive differences from built-in project defaults
+for the same command and selected preset, independently of user YAML/search-path shadowing. Preserve
+meaningful false, zero, null, explicit empty collections, value types and list order; prune unchanged values
+and empty parents created by pruning. Exclude output routing, tracking destinations/tags, result provenance
+and inactive groups. The view is informational: execution and cloning use `run`, never `run_overrides`.
 
 ### Stable experiment parameters and controller caching
 
@@ -146,6 +158,13 @@ Native `General` excludes `device`, `project`, `name`, `save_dir`, `exist_ok` an
 `clearml_yolo.adapters.clearml.parameters.project_native_parameters` returns a detached projection; the
 session boundary adds sanitization. Owner callbacks, DDP replay and native-detector publication share this
 policy. Filtering new connection inputs does not delete parameters inherited from historical templates.
+
+Training publishes sanitized validated General before dataset preparation, after supported remote overrides.
+Native owner callbacks may subsequently refresh observed normalization, including DDP and alternative
+detectors. Existing execution-only exclusions remain. Commands that skip training do not create training
+parameters. Remote scientific override reads do not publish unvalidated input or treat a redacted
+observation as executable credential material. Embedded workflows use the typed tracking port for early
+General and retain responsibility for recording their complete executable run.
 
 New canonical run snapshots are JSON with literal Unicode (`ensure_ascii=False`); historical HOCON remains
 replayable. YOLO remote training restores full native settings from `run.ultralytics` and applies scientific
@@ -165,8 +184,11 @@ normalization-policy version.
 Normalize accepted explicit CUDA ordinals to device type/count only in known native, General and inference
 contexts. CPU/MPS, unresolved/invalid selections and different device counts stay distinct. Selector grammar
 follows each consumer; typed detectors and export cannot inherit YOLO's permissive forms. Unsupported
-document syntax, malformed markers and ambiguous SDK/JSON escape semantics preserve the original
-representation instead of creating collisions. Historical HOCON is not reinterpreted.
+document syntax, malformed markers and ambiguous SDK/JSON escape semantics preserve executable identity
+instead of creating collisions. For a recognized clearml-yolo execution script, the derived `run_overrides`
+object is always excluded from cache identity, including conservative fallback and an already-versioned
+representation. Unknown scripts remain untouched. No other unsupported content is normalized by this
+exception. Historical HOCON is not reinterpreted.
 
 `PreparedDataset.cache_identity` carries the existing preparation key. When present, training records
 `run.prepared_dataset={cache_identity, root}`. Only proven generated paths under that root normalize to
@@ -260,6 +282,14 @@ profiles. Build consumes the ONNX sidecar; verify binds engine, native checkpoin
 Settings remain under `export`, results under `export_result`. Default workspace is 4 GiB; it is not an
 inference-memory promise.
 
+`DetectorExporter.execute(request, destination, *, artifact_ready=None)` accepts an optional typed
+`Callable[[str, Path], None]`. Export producers announce finalized immutable graph, engine, metadata and
+corpus files immediately; the application uploads them and verifies the returned inventory without duplicate
+upload. The final verification report publishes only after all cases/corpus checks finish; intermediate
+reports remain local. A complete report that fails its quality gate uploads before the task fails.
+Callback/upload errors propagate, earlier complete artifacts survive later producer failure, and export
+adapters acquire no ClearML dependency. Final upload verification remains mandatory.
+
 Dynamic NCHW profiles have batches min/opt/max 1/2/4: full-frame width×height 960×608 / 960×608 / 960×736;
 strips 1536×128 / 1920×256 / 1920×256. Batches 1–4 and interior shapes must fit one whole profile with valid
 canvas/image sizes. Reject cross-profile/out-of-profile requests. Proposal processing, ROI and NMS remain
@@ -334,11 +364,16 @@ Model and one exact validation threshold CSV; recovery never rewrites source tas
 ## Required publication and task lifecycle
 
 One invocation owns exactly one ClearML task; nested stages reuse it. Native/DDP workers neither create
-tasks nor upload. Register expected publications before finalization; owner callbacks assemble canonical
-CSVs before model/artifact barriers and flush. Missing output,
-callback/journal/computation/upload/readback/flush failure or interruption fails both task and command while
-retaining local output. Required owner finalization has the current ten-minute main-thread Unix deadline. Do
-not replace an original computation exception with cleanup/finalization errors.
+tasks nor upload. Register expected publications before finalization. Publish validated effective ground
+truth immediately after its canonical file is complete. Workflows declare all enabled prediction-result
+contributors before registering rows and explicitly complete each after its final mutation. The last
+completion assembles/uploads one complete `predicts_csv` before later comparison statistics, reports or
+optional publication. Finalization verifies contributor completion and all required upload/model/flush
+barriers; it never publishes an incomplete aggregate. A later failure preserves earlier complete uploads and
+local incomplete shards. Missing output, callback, journal, computation, upload, readback, flush or
+interruption errors fail task and command while retaining local output. Required owner finalization has the
+current ten-minute main-thread Unix deadline. Do not replace an original computation exception with
+cleanup/finalization errors.
 
 New local tasks publish canonical module entrypoint and repository-relative working directory.
 Source-checkout discovery uses imported code, including worktrees, to record sanitized origin, branch and
@@ -362,7 +397,7 @@ enclosing checkout. Historical tasks are not backfilled.
 | `report_dev_SPLIT`, `report_business_SPLIT` | Final paired developer/business XLSX |
 | `export_onnx`, `export_engine`, `export_metadata` | Operation-produced deployment artifact and metadata |
 | `export_verification`, `export_corpus` | Verification report and fixed-corpus manifest |
-| Configuration Objects | Canonical run, consumed dataset, explicit report and meaningful provenance |
+| Configuration Objects | Active executable `run`, informational `run_overrides`, consumed dataset, explicit report and meaningful provenance |
 | General | Sanitized scientific native arguments |
 
 Ground-truth/train register GT; train also owns model/telemetry. Predict adds not-evaluated rows.
@@ -377,7 +412,23 @@ manifests, input workbooks and publication receipts remain local. Do not add con
 artifacts. Content deduplication still satisfies each logical expectation. Confidence plots must be freshly
 generated; clear only recognized current/legacy names, preserving unrelated/sibling outputs.
 
+Exact validation thresholds upload after calibration and final CSV writing. Each model/split dashboard
+uploads after final identity annotation, before the next evaluation or comparison statistics. Comparison and
+report workbooks upload after their final annotations. Ground-truth repeat registration is a no-op only for
+identical effective truth; conflicting truth fails. Existing canonical artifact names remain unchanged and
+no intermediate replacement uploads are introduced. Best Output Model publication still follows finalized
+checkpoint selection and retains its native ownership and download/metadata verification.
+
 ### Canonical result rows
+
+`TrackingSession` provides `publish_training_parameters(task, values)`, `declare_result_producers(task,
+producers, *, output_dir)` and `complete_result_producer(task, producer)`, where `ResultProducer` is
+`Literal["predict", "metrics", "compare"]`. Pipeline declares the full enabled set; standalone stages
+declare their own producer, and standalone validation declares prediction plus metrics. Identical or
+active-subset declarations are allowed; duplicate/unknown producer declarations, undeclared/duplicate
+completion, expansion of the declared set and row mutation after all producers complete fail. A skipped
+comparison completes explicitly without fabricated rows; an empty producer set requires no predictions
+artifact. Alternative injected tracking implementations must provide these typed operations.
 
 Durable invocation shards retain original fields and source identities assigned before preprocessing.
 `row_type` is `gt` or `predict`; `source_row_id`/`object_id` distinguish identical boxes and repeated
@@ -590,9 +641,12 @@ Git tags only; GitHub Release objects, assets, registries and deployment require
 
 ## Historical evidence and limits
 
-The pre-reset release at integration start is v0.34.1. New cutover delivery is recorded below only after
-actual checks. Older status text such as “approved” or unchecked tasks may predate later review/release
-evidence; use the complete dated chain at checkpoint H.
+The pre-reset release at integration start is v0.34.1. During cleanup integration, origin advanced to
+v0.35.0; its source/evidence commits are preserved below for normal Git reconciliation before archival
+cutover. Upstream delivery does not certify the cleanup's newly merged source or erase task-specific
+verification gaps. New cutover delivery is recorded below only after actual checks. Older status text such
+as “approved” or unchecked tasks may predate later review/release evidence; use the complete dated chain at
+checkpoint H.
 
 | Historical area | Preserved outcome and limit |
 | --- | --- |
@@ -604,11 +658,25 @@ evidence; use the complete dated chain at checkpoint H.
 | User configuration/NFS eligibility 035 | v0.34.0 verifies discovery, mountinfo validation, software and isolated package behavior. Actual NFS locking, reconnect, server restart/outage and multi-host execution were not run. |
 | Queue refresh isolation | v0.34.1 verifies reproduced missing/malformed snapshot isolation and headless rendering. Exact original historical ValueError, physical GPU, NFS outage and live ClearML behavior are not established by those checks. |
 | Static configuration split 026 amendment | Local checks, semantic import-contract equivalence and fresh review passed before reset; delivery had been deferred by existing mixed working changes. Final integration/delivery must be recorded below. |
-| Stable parameter/cache 036 | Local checks, installed-package probes and CPU/Gloo recording-boundary tests passed. On 2026-10-20 real CPU and single-GPU publication/download/reload passed; server-backed controller lookup established miss, routing-only hit and scientific-change miss in diagnostic and plain repeats. One earlier remote model-enrichment failure remains unexplained; no source fix or reliability guarantee follows. Final integrated review/delivery is recorded below. |
+| Stable parameter/cache 036 | Upstream v0.35.0 records accepted source, hooks, review, architecture and real CPU PipelineController/ClearmlJob miss/routing-only hit/weight-decay miss, with active-task reads and downloaded GT/best-checkpoint hashes. Its workload ran locally under SDK simulated-remote settings; this proves server-backed lookup, not ClearML-agent scheduling. Separately, local checks, installed-package probes and CPU/Gloo recording-boundary tests passed; on 2026-10-20 real CPU/single-GPU publication/download/reload and diagnostic/plain controller miss-hit-miss repeats passed. One earlier local remote model-enrichment failure remains unexplained; neither upstream acceptance nor later local success establishes its cause, a source fix or a reliability guarantee. Final cleanup integration/delivery is recorded below. |
+| Accurate startup/early publication 037 | Implemented, source-reviewed and delivered in v0.35.0. Persistent resumed CPU cache and paired pipelines verified active run/General/run_overrides, early GT/calibration/dashboards, aggregate timing, once-only uploads, exact downloads/checkpoints and readable reports. Actual scheduled execution remains not-run: T013 and the acceptance portion of T016 remain open, and its architecture acceptance fails only that native gate. Renewed explicit user authorization permitted Git-only delivery with the disclosed gap; delivery is not full acceptance. Physical multi-GPU, other native presets and real ONNX/TensorRT execution were not established by these scoped runs. |
 
-The waiver is an acceptance disposition, not a passing test or a runtime relaxation. It does not cover CUDA
-11.8 or future target certification. The feature 036 live gate was checked independently on 2026-10-20. A future request to certify a waived
-target starts new scoped acceptance and review; no old external-input request is silently reopened.
+Upstream early-publication 037's earlier direct single-GPU, CPU/Gloo DDP and queue snapshot/worker-loader
+observations remain dated historical evidence; their earlier temporary raw archives were unavailable during
+resumed release. Fresh persistent resumed evidence covers CPU controller lookup and paired pipelines. Actual
+queue submission/loader testing did not establish scheduler admission; normal attempts stayed pending under
+memory policy without bypass. Synthetic data does not establish model accuracy. Exact-tag wheel/source
+installs reused prepared dependencies on Python 3.12.13 and do not prove fresh dependency resolution or
+Python 3.13 execution. Corresponding portable guidance was delivered separately as v0.2.10 at
+`351fde30139095668d40c7ee917b6276704bdc5e` in custom-opencode-skills; the former corp-skills alias
+redirects, and that delivery did not replace installed skill copies.
+
+The historical 029/031 waiver is an acceptance disposition, not a passing test or runtime relaxation. It
+does not cover CUDA 11.8, future target certification or early-publication 037's pending scheduler gate.
+Feature 036's live gate passed upstream and was independently checked locally on 2026-10-20. New 037's
+successful source review and explicitly authorized delivery do not complete its missing native acceptance. A
+future request to certify a waived target starts new scoped acceptance and review; no old external-input
+request is silently reopened.
 
 ## Historical provenance
 
@@ -642,6 +710,11 @@ Original source commits below are immutable anchors, not blanket current accepta
 | Readable shared queue/archive | `c3e3f15c7e907ab86d0bf8ccad703654828b0968` | `specs/034-readable-shared-queue/` |
 | User config and NFS eligibility | `f64e973aaed25b2467615947387c5d115e39d585` | `specs/035-queue-user-config-nfs/` |
 | Private refresh failure isolation | `ac65f80ec74926edca3a1409d3847dec9902124d` | `.specify/bugs/queue-view-refresh-isolation/` |
+| Stable parameters/controller cache | `2e4b5f2fa3c3e9dc90920af75fe3edb8e346bcd0` | `specs/036-stable-clearml-cache/` |
+| Accurate startup and early complete publication | `fd395d34bff7f3128047e5d0c302f2c3f0720b78` | `specs/037-early-accurate-publication/` |
+| Integrated publication review/native evidence | `b4a8164feb486a3864af2e2cfec96501963c2df0` | `specs/037-early-accurate-publication/review.md` |
+| Application v0.35.0 | `accdfb664b2c9f605b026b26d713cae4213e05e2` | `specs/037-early-accurate-publication/verification.md` |
+| Sequential release verification and retained acceptance limit | `41a4036666b2225a4e3029e1695499cf914a5f59` | `specs/037-early-accurate-publication/verification.md` |
 
 ### Preserved executable fixtures
 
@@ -665,8 +738,10 @@ release authorization.
 
 ### Cutover acceptance
 
-Pending parent integration: final source/native checks and independent review, feature 036 live disposition,
-static configuration delivery, verified archival H, complete retired-file coverage, unchanged fixture
-hashes, migrated live references, documentation/architecture acceptance, unchanged workflow tooling, cleared
-local active-feature state, dry-run next feature `001`, and exact Git-only delivery refs. Record actual
-final outcomes here without turning earlier results into new evidence.
+Pending parent integration: normal reconciliation of upstream v0.35.0 and cleanup source, post-merge
+source/native checks and independent review, preservation of both feature 036 live evidence chains and
+early-publication 037's pending scheduler acceptance, static configuration delivery, verified archival H,
+complete retired-file coverage, unchanged fixture hashes, migrated live references,
+documentation/architecture acceptance, unchanged workflow tooling, cleared local active-feature state,
+dry-run next feature `001`, and exact Git-only delivery refs. Record actual final outcomes here without
+turning earlier results into new evidence or closing the inherited early-publication scheduler gap.

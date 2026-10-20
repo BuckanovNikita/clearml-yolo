@@ -175,6 +175,97 @@ Final ownership checks found no running task-owned test or live-harness processe
 Disposable build/install workspaces were removed after verification; the prepared
 live harness and local check logs remain available for the pending acceptance run.
 
+## Resumed release verification — 2026-10-19
+
+The user renewed the release request after the previously reported acceptance and
+coordination limitations. Delivery is prepared in an isolated clone of the released
+queue-fix baseline. The canonical working tree and index remain untouched; the
+concurrent lint-configuration split and unrelated grid-search draft are excluded.
+The prerequisite is committed before feature 037 and the combined Git-only release.
+The earlier temporary raw logs are no longer available; their dated observations
+above remain historical. New release evidence is retained in a persistent private
+archive, and normal hooks are rerun on the recovered source.
+
+Actual native CPU execution and server cache lookup now pass against the integrated
+036/037 source. The real PipelineController/ClearmlJob path produced an initial
+miss, reused that exact completed task after output-routing changes, and missed
+after changing weight decay. Draft controller nodes exercised SDK construction and
+server lookup; the first job executed locally with the SDK's simulated-remote
+environment. This establishes controller caching, not ClearML-agent scheduling.
+
+Independent reads observed validated General, full run and run_overrides while the
+task was in progress before preparation, and downloaded ground truth before
+training. The final eight-image CSV included two empty images and matched its early
+copy. The single downloaded best checkpoint matched the native file hash and
+stored weight decay 0.0234. All 23 archived evidence files were rehashed by the
+parent. Cleanup proved zero owned processes, tagged tasks or projects. Synthetic
+random-weight CPU data establishes execution/publication, not model accuracy.
+
+The first resumed full hook passed static checks and 3262 tests, with 30 skipped
+and 7 deselected, but failed one queue-process fixture readiness assertion. Its
+persisted job was already completed: the synthetic owner exited immediately after
+spawning its detached rank, letting correct guardian cleanup terminate the rank
+before readiness. The isolated test passed, and delaying rank initialization by
+0.3 seconds reproduced the same failure deterministically. A bounded readiness
+handshake before owner exit passed that delayed diagnostic. The diagnostic delay
+was then removed. Production queue code, cleanup deadlines and test assertions
+remain unchanged. The full process suite and final commit hook results follow.
+
+The full queue-process suite passed 15 tests after the readiness correction. The
+normal contributor commit hooks then passed Ruff, mypy, Vulture, import-linter and
+the complete pytest suite, producing prerequisite commit `2e4b5f2`. The post-commit
+launcher initially failed to query an expired temporary interpreter path. Retrying
+the documented helper with the prepared interpreter succeeded and correctly
+skipped tagging on the integration branch. No checks or hooks were bypassed.
+
+Final integrated source checks passed through the normal contributor commit hooks:
+full pytest, Ruff, mypy, Vulture and import-linter, followed by the normal post-commit
+helper. Feature commit `fd395d3` follows prerequisite `2e4b5f2`. Separate architecture
+tests passed 246; Markdown/local-link validation checked 531 files with zero issues.
+Fresh independent integrated review accepted the source without blockers; see
+[review.md](review.md). All 87 changed paths reconcile with the architecture records.
+The original 56 dirty application files and index remain unchanged. The release
+clone has no local uv source section; original source overrides remain untouched.
+
+## Git-only delivery completed — 2026-10-19
+
+The native release helper created annotated application tag
+[`v0.35.0`](https://github.com/BuckanovNikita/clearml-yolo/tree/v0.35.0)
+at `accdfb664b2c9f605b026b26d713cae4213e05e2`, after normal version-commit hooks passed.
+The source history orders stable-cache commit `2e4b5f2` before publication commit
+`fd395d3`. The release changes only generated changelog and root package versions;
+all dependency bytes and sources are unchanged. Master and the exact tag were
+pushed atomically and remote branch/tag/peeled refs matched local values.
+
+Both exact-tag distributions built offline and installed in separate fresh Python
+3.12.13 environments using unchanged prepared dependencies. Each passed all 184
+shipped-file comparisons, dependency compatibility checks, 12 command helps, nine
+generated command selections/compositions, six explicit Faster R-CNN selections,
+omitted default, overwrite refusal/force and unrelated-file preservation. Ten
+runtime targets resolved and application imports came from the installed artifact.
+The parent independently checked archive hashes, content and all 46 command outcomes
+per installation. This is not a fresh dependency resolution or a Python 3.13 check.
+The first harness attempt used symlinked dependency metadata that uv did not detect;
+its evidence is retained. Copying unchanged metadata into the isolated environments
+resolved the harness issue, and both fresh runs passed. All three task-owned install
+environments were removed. Build artifacts remain private and were not uploaded.
+
+The portable guidance followed as
+[`v0.2.10`](https://github.com/BuckanovNikita/custom-opencode-skills/tree/v0.2.10),
+commit `351fde30139095668d40c7ee917b6276704bdc5e`. Its main branch and annotated tag
+were pushed atomically after application delivery; remote refs were verified. The
+server redirected the former corp-skills repository name to custom-opencode-skills,
+and the destination refs were independently checked. The collection's 44-file
+Markdown/local-link checks, package metadata/containment, controller example and
+both architecture records passed. No installed skills changed.
+
+Final application documentation validation checked 531 Markdown files with zero
+issues. All 89 release paths reconcile with the architecture scopes. Original
+application dirty files and index, and original companion dirty files, remain
+unchanged. Feature 036 acceptance passes. Feature 037 acceptance still fails only
+its declared native scheduler check; delivery does not erase that limitation.
+Git-only publication created no GitHub Release objects, assets or registry packages.
+
 ## Live acceptance resumed: 2026-10-20
 
 Current shared-environment capacity permitted the previously blocked live gate.

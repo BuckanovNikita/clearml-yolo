@@ -17,7 +17,7 @@ Historical tasks and dated evidence retain their original names and contents.
 | Interactive evaluation plots | Four post-threshold confusion views and per-class PR curves per model/split context |
 | `compare_workbook_SPLIT` | Paired XLSX artifact containing `Сравнение`; excluded classes in `compare_workbook_SPLIT_excluded` CSV |
 | `report_dev_SPLIT`, `report_business_SPLIT` | Final paired XLSX artifacts |
-| run, consumed dataset, explicit report configuration | Canonical Configuration Objects retain full replay settings; native General contains scientific training arguments |
+| run, run_overrides, consumed dataset, explicit report configuration | `run` retains full active replay settings; `run_overrides` shows selected-preset differences; General contains scientific training arguments |
 | Source links and meaningful requested/effective differences | Canonical run configuration, including missing automatic-baseline reason |
 | `export_onnx`, `export_engine` | Produced deployment graph or serialized engine, according to the export operation |
 | `export_metadata` | Checkpoint/graph/engine hashes, classes, preprocessing, inference policy, runtime/plugins and profiles |
@@ -26,11 +26,12 @@ Historical tasks and dated evidence retain their original names and contents.
 
 `expect_artifacts(task, names)` and `upload_artifact(task, name, path)` remain strict.
 `publish_table(task, name, path)` retains content deduplication and satisfies aliases.
-The invocation bundle registers/enriches durable local context shards and assembles
-`gt_csv`/`predicts_csv` exactly once in owner-only pre-finalization callbacks. Empty
-prediction CSVs are valid. Required files must exist; callbacks precede model/artifact
-barriers and flush. Registered expectations cannot be silently skipped.
-`record_run_configuration(task, values)` merges sanitized nonempty sections into canonical run.
+The invocation bundle publishes validated effective ground truth immediately and registers
+local prediction/evaluation shards until every declared contributor completes. It then
+uploads one complete combined CSV before later reports or optional work. The
+[evaluation contract](../../014-evaluation-publication/contracts/publication.md#invocation-csv-bundle)
+defines sequencing and strict completion. Finalization verifies required uploads and flushes.
+`record_run_configuration(task, values)` merges sanitized nonempty provenance into canonical run without overwriting frozen executable roots.
 
 New uploads do not include `metrics_evaluation_*` summary workbooks, separate match,
 threshold or methodology sidecars, raw prediction artifacts or a skipped-baseline
@@ -89,7 +90,7 @@ Consumed dataset and explicit report configurations are Configuration Objects. C
 snapshot write; inherited SDK connection flags and proxy containers do not control execution.
 YOLO retains full `run.ultralytics` settings and scientific `General` replay overrides.
 New detector families replay `run.model` and record sanitized scientific native arguments
-in `General` as observed evidence, without applying remote overrides to that evidence.
+in `General` before preparation and refresh observed evidence, without applying remote overrides to that evidence.
 The [stable parameter amendment](../../036-stable-clearml-cache/contracts/cache.md)
 defines execution-only exclusions, full replay preservation and opt-in controller cache
 normalization. Configuration copies are not artifacts.

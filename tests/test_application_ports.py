@@ -66,6 +66,8 @@ def test_nested_validation_forwards_the_same_dependencies(
 ) -> None:
     task = SimpleNamespace(id="validation-owner")
     monkeypatch.setattr(workflow_dependencies.tracking, "init_task", lambda *a, **k: task)
+    declaration = Mock()
+    monkeypatch.setattr(workflow_dependencies.tracking, "declare_result_producers", declaration)
     predicted = Mock(spec=PredictResult)
     predicted.predictions = tmp_path / "actual.csv"
     metrics = MetricsResult(output_dir=tmp_path / "metrics")
@@ -86,6 +88,7 @@ def test_nested_validation_forwards_the_same_dependencies(
     )
 
     assert result is metrics
+    declaration.assert_called_once_with(task, ["predict", "metrics"], output_dir=tmp_path)
     assert prediction.call_args.kwargs["deps"] is workflow_dependencies
     assert evaluation.call_args.kwargs["deps"] is workflow_dependencies
     assert prediction.call_args.kwargs["splits"] == ["val", "test"]

@@ -83,6 +83,36 @@ def prepare_native_parameters(values: Mapping[str, Any]) -> dict[str, Any]:
     return cast(dict[str, Any], sanitize_configuration(project_native_parameters(values)))
 
 
+def publish_training_parameters(task: Any, values: Mapping[str, Any]) -> None:
+    """Publish already validated inputs before preparation; callbacks refresh observations."""
+    if _is_worker():
+        return
+    active = _active_state(task, "Training parameter publication")
+    prepared = prepare_native_parameters(values)
+    if active.training_parameters == prepared:
+        return
+    task.connect(prepared, name="General", ignore_remote_overrides=True)
+    active.training_parameters = copy.deepcopy(prepared)
+
+
+def replay_training_parameters(task: Any, values: Mapping[str, Any]) -> dict[str, Any]:
+    """Read remote scientific overrides without publishing unvalidated or private values."""
+    if _is_worker():
+        return dict(values)
+    _active_state(task, "Training parameter replay")
+    inherited = task.get_parameters(cast=True) or {}
+    scientific = project_native_parameters(values)
+    sanitized = prepare_native_parameters(values)
+    overrides = {
+        key: inherited[f"General/{key}"]
+        for key in scientific
+        if f"General/{key}" in inherited
+        # A redacted observation is never executable credential material.
+        and inherited[f"General/{key}"] != sanitized[key]
+    }
+    return copy.deepcopy(dict(values) | overrides)
+
+
 def resolve_task_name(config: ClearMLConfig, stage: str) -> str:
     """Name a stage-specific task, used only when a stage runs standalone."""
     return config.task_name if stage == "pipeline" else f"{config.task_name}/{stage}"
@@ -133,6 +163,8 @@ class _InvocationState:
     table_remote_names: set[str] = field(default_factory=set)
     model_barriers: list[Callable[[], None]] = field(default_factory=list)
     run_configuration: dict[str, Any] = field(default_factory=dict)
+    executable_keys: frozenset[str] = frozenset()
+    training_parameters: dict[str, Any] | None = None
     config_directory: Path | None = None
     config_resolver: Callable[[Any], Any] | None = None
     config_file_count: int = 0
@@ -809,6 +841,97 @@ def _merge_configuration(target: dict[str, Any], update: Mapping[str, Any]) -> N
 
 _EMPTY = object()
 
+_OVERRIDE_ROUTING = frozenset(
+    {"run_id", "run_dir", "output", "output_dir", "dataset_cache_dir", "display_names"}
+)
+_OVERRIDE_PROVENANCE = frozenset(
+    {
+        "training_data_overrides",
+        "prediction_data_overrides",
+        "prepared_dataset",
+        "training_normalization",
+        "prediction_result",
+        "evaluation_result",
+        "comparison",
+        "comparison_status",
+        "export_result",
+        "fiftyone_result",
+        "source_model",
+    }
+)
+
+
+def _override_inputs(values: Mapping[str, Any]) -> dict[str, Any]:
+    result = copy.deepcopy(dict(values))
+    for key in _OVERRIDE_ROUTING | _OVERRIDE_PROVENANCE:
+        result.pop(key, None)
+    tracking = result.get("clearml")
+    if isinstance(tracking, dict):
+        for key in ("project_name", "task_name", "tags", "output_uri"):
+            tracking.pop(key, None)
+        if not tracking:
+            result.pop("clearml")
+    for group in ("ultralytics", "ultralytics_predict"):
+        native = result.get(group)
+        if isinstance(native, dict):
+            for key in ("project", "name", "save_dir"):
+                native.pop(key, None)
+    return result
+
+
+def _configuration_difference(
+    values: Mapping[str, Any], defaults: Mapping[str, Any]
+) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in values.items():
+        default = defaults.get(key, _EMPTY)
+        if isinstance(value, Mapping) and isinstance(default, Mapping) and value:
+            nested = _configuration_difference(value, default)
+            if nested:
+                result[key] = nested
+        elif not _same_configuration_value(value, default):
+            # An explicit empty map replaces a nonempty default; it is not an
+            # empty parent produced by recursively removing unchanged children.
+            result[key] = copy.deepcopy(value)
+    return result
+
+
+def _same_configuration_value(value: Any, default: Any) -> bool:
+    if type(value) is not type(default):
+        return False
+    if isinstance(value, list):
+        return len(value) == len(default) and all(
+            _same_configuration_value(item, other)
+            for item, other in zip(value, default, strict=True)
+        )
+    if isinstance(value, dict):
+        return value.keys() == default.keys() and all(
+            _same_configuration_value(item, default[key]) for key, item in value.items()
+        )
+    return bool(value == default)
+
+
+def _publish_json(task: Any, name: str, values: Mapping[str, Any]) -> None:
+    task.set_configuration_object(
+        name=name,
+        config_text=json.dumps(_plain_config_document(values), ensure_ascii=False, sort_keys=True),
+        config_type="json",
+    )
+
+
+def publish_run_configuration(
+    task: Any, values: Mapping[str, Any], defaults: Mapping[str, Any]
+) -> None:
+    """Freeze resolved executable inputs and publish their informational differences."""
+    if _is_worker():
+        return
+    active = _active_state(task, "Executable configuration publication")
+    active.run_configuration = sanitize_configuration(_plain_config_document(values))
+    active.executable_keys = frozenset(values)
+    differences = _configuration_difference(_override_inputs(values), _override_inputs(defaults))
+    _publish_json(task, "run", active.run_configuration)
+    _publish_json(task, "run_overrides", sanitize_configuration(differences))
+
 
 @trace_operation("clearml.configuration.record")
 def record_run_configuration(task: Any, values: dict[str, Any]) -> dict[str, Any]:
@@ -816,7 +939,9 @@ def record_run_configuration(task: Any, values: dict[str, Any]) -> dict[str, Any
     if _is_worker():
         return values
     active = _active_state(task, "Run configuration recording")
-    sanitized = sanitize_configuration(values)
+    sanitized = sanitize_configuration(
+        {key: value for key, value in values.items() if key not in active.executable_keys}
+    )
     cleaned = _meaningful(sanitized)
     # Export evidence mirrors its published sidecar: an empty plugin inventory or
     # detection list is meaningful and must survive configuration recording.
@@ -842,9 +967,21 @@ def record_run_configuration(task: Any, values: dict[str, Any]) -> dict[str, Any
     return dict(active.run_configuration)
 
 
+def _remote_run_configuration(task: Any) -> Any:
+    canonical = None
+    if not task.running_locally():
+        with trace_operation("clearml.configuration.read"):
+            canonical = task.get_configuration_object_as_dict("run")
+            # The SDK also returns None for a present empty text blob. Only an
+            # absent canonical object may fall back to executable CLI defaults.
+            if canonical is None and task.get_configuration_object("run") is not None:
+                raise ValueError("Effective ClearML run configuration must not be empty")
+    return canonical
+
+
 @trace_operation("clearml.configuration.replay")
 def replay_configuration(
-    task: Any, values: dict[str, Any], *, legacy_native_general: bool = False
+    task: Any, values: dict[str, Any], *, legacy_native_general: bool = False, publish: bool = True
 ) -> dict[str, Any]:
     """Resolve a clone's canonical run object and freeze it for this invocation."""
     if _is_worker():
@@ -854,14 +991,7 @@ def replay_configuration(
         raise ValueError("Canonical run configuration must not be empty")
     # Canonical replay must not inherit the SDK's ignore-override parameter or
     # expose connected proxy containers to Hydra/application configuration.
-    canonical = None
-    if not task.running_locally():
-        with trace_operation("clearml.configuration.read"):
-            canonical = task.get_configuration_object_as_dict("run")
-            # The SDK also returns None for a present empty text blob. Only an
-            # absent canonical object may fall back to executable CLI defaults.
-            if canonical is None and task.get_configuration_object("run") is not None:
-                raise ValueError("Effective ClearML run configuration must not be empty")
+    canonical = _remote_run_configuration(task)
     effective = values if canonical is None else canonical
     if not isinstance(effective, Mapping):
         raise TypeError("ClearML run configuration override must be a mapping")
@@ -884,14 +1014,15 @@ def replay_configuration(
                 native[key] = inherited[f"General/{key}"]
         executable["ultralytics"] = native
     active.run_configuration = sanitize_configuration(executable)
-    with trace_operation("clearml.configuration.connect"):
-        task.set_configuration_object(
-            name="run",
-            config_text=json.dumps(
-                _plain_config_document(active.run_configuration), ensure_ascii=False
-            ),
-            config_type="json",
-        )
+    if publish:
+        with trace_operation("clearml.configuration.connect"):
+            task.set_configuration_object(
+                name="run",
+                config_text=json.dumps(
+                    _plain_config_document(active.run_configuration), ensure_ascii=False
+                ),
+                config_type="json",
+            )
     # Redaction is a storage boundary, not a mutation of executable inputs.
     return cast(dict[str, Any], executable)
 

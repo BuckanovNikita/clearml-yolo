@@ -104,3 +104,39 @@ hooks passed; its interrupted pytest hook is not a passing check. The exact loca
 uv.sources section was restored. The prior completed 3263-test suite still describes
 the pre-merge source only. Reconciliation and new acceptance are explicit remaining
 tasks; no remote changes or tags will be overwritten.
+
+## Normal published-history integration
+
+The local preservation checkpoint `a7d681503381d70eed645efa267726cc9e2ae21b`
+passed every normal pre-commit gate, including the full pytest hook. Published
+`41a4036666b2225a4e3029e1695499cf914a5f59` is merged normally without rewriting
+commits or tags. Twenty conflicts were resolved against inspected source: each
+conflicting runtime/test file's local version equalled feature036 at `2e4b5f2`,
+so the newer published version preserves both scientific/cache and publication
+work. The resulting runtime delta from the published tip is exactly the five
+previously reviewed orphan-removal files. The test delta retains fixture moves,
+the equivalent import-contract reader and removed unused assertion helper.
+
+Published early-publication contracts and all twelve feature037 artifacts are
+included. Both feature036 native evidence chains remain in the combined record;
+early-publication's actual scheduler gate remains not-run and is not covered by
+the historical waiver. Post-merge checks and independent review follow below.
+
+The personal skill refinement is released at
+`7f635ce123332d5444f294909c6a753dea7d268e`, tag `v0.7.2`. It adds observed lessons
+on available upstream reconciliation and exact contract/procedure retention.
+Fresh independent review returned ship; 102 offline tests and package checks
+passed. All six installed files match released source (aggregate SHA-256
+`b29f125071b8969ad646d61751f21dbf949d186cbc2999a2c24a6bf54763fb4e`). Only
+cleanup-code was updated; previous bytes and lock metadata were backed up, and
+unrelated lock entries and shared Claude link were unchanged. Host activation
+and empirical behavior improvement remain untested.
+
+The first merged hook exposed `PLR0904` on the published `TrackingSession` port
+(23 methods versus the preview threshold of 20). Upstream did not enable that
+preview rule; the local configuration split does. The attempt was interrupted
+during pytest, before commit creation; its partial test run is not a pass. A
+class-specific, documented `noqa: PLR0904` preserves the published cohesive
+invocation lifecycle without changing interfaces or a runtime statement. Ruff
+then passed. Import/effect rules and the method-count rule elsewhere remain active.
+The retry runs normal hooks without bypass.

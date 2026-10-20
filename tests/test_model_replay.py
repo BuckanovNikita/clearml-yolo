@@ -36,6 +36,7 @@ def isolated_owner(monkeypatch: pytest.MonkeyPatch) -> list[str]:
     monkeypatch.setattr(common, "release_training_memory", lambda: None)
     monkeypatch.setattr(common, "initialize_naming", lambda task: events.append("naming"))
     monkeypatch.setattr(session, "record_run_configuration", lambda task, values: None)
+    monkeypatch.setattr(common, "publish_run_configuration", lambda task, values, defaults: None)
     return events
 
 
@@ -74,17 +75,25 @@ def test_training_replay_keeps_full_native_values_and_only_general_scientific_ov
         replay_inputs.append(deepcopy(values))
         return values | {"ultralytics": deepcopy(canonical)}
 
-    def connect(values: dict[str, Any], *, name: str, **kwargs: Any) -> dict[str, Any]:
-        assert name == "General"
-        assert kwargs == {"ignore_remote_overrides": False}
-        connected.append(deepcopy(values))
-        # Stale inherited routing or an SDK proxy must not regain ownership of
-        # execution-only values when the scientific result is merged back.
-        return values | {"epochs": 17, "device": [8, 9], "name": "inherited", "data": "old.yaml"}
+    def get_parameters(*, cast: bool) -> dict[str, Any]:
+        assert cast is True
+        connected.append({"read": True})
+        return {
+            "General/epochs": 17,
+            "General/device": [8, 9],
+            "General/name": "inherited",
+            "General/data": "old.yaml",
+        }
 
     @contextmanager
     def invocation(*args: Any, **kwargs: Any) -> Iterator[Any]:
-        yield SimpleNamespace(running_locally=lambda: False, connect=connect)
+        task = SimpleNamespace(running_locally=lambda: False, get_parameters=get_parameters)
+        state = session._InvocationState(task=task, stages=[command], current_stage=command)
+        token = session._ACTIVE_INVOCATION.set(state)
+        try:
+            yield task
+        finally:
+            session._ACTIVE_INVOCATION.reset(token)
 
     def workflow(ultralytics: dict[str, Any], clearml: Any) -> None:
         observed.append(ultralytics)
@@ -95,7 +104,7 @@ def test_training_replay_keeps_full_native_values_and_only_general_scientific_ov
     common.execute_owned(command, config, workflow)
 
     assert replay_inputs == [{"clearml": {}, "ultralytics": current}]
-    assert connected == [{"epochs": 3, "classes": []}]
+    assert connected == [{"read": True}]
     assert observed == [
         {
             "device": [2, 3],
@@ -120,7 +129,7 @@ def test_local_replay_records_complete_native_group_without_mutating_it(
     def invocation(*args: Any, **kwargs: Any) -> Iterator[Any]:
         yield SimpleNamespace(running_locally=lambda: True)
 
-    def replay(task: Any, values: dict[str, Any]) -> dict[str, Any]:
+    def replay(task: Any, values: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
         captured.append(deepcopy(values))
         return values
 
@@ -194,6 +203,7 @@ def test_legacy_training_replay_restores_general_execution_fields_without_old_ro
         observed.append(ultralytics)
 
     monkeypatch.setattr(common, "invocation", invocation)
+    monkeypatch.setattr(common, "publish_run_configuration", session.publish_run_configuration)
     # Exercise the real session boundary: legacy tasks either omitted the native
     # group from run or had no run Configuration Object at all.
     native = {"device": [0, 1], "epochs": 1, "name": "current", "data": None, "exist_ok": False}
@@ -210,12 +220,13 @@ def test_legacy_training_replay_restores_general_execution_fields_without_old_ro
             "exist_ok": True,
         }
     ]
-    assert connected == [{"epochs": 1}]
+    assert connected == []
     assert inherited["General/name"] == "previous"
     assert recorded[0]["ultralytics"] == native | {
         "device": stored_device,
         "data": "cache/legacy/data.yaml",
         "exist_ok": True,
+        "epochs": 17,
     }
 
 
@@ -238,6 +249,11 @@ def test_explicit_canonical_native_values_never_fall_back_to_legacy_general(
         task = SimpleNamespace(
             running_locally=lambda: False,
             connect=connect,
+            get_parameters=lambda **kwargs: {
+                "General/device": [8, 9],
+                "General/data": "old.yaml",
+                "General/exist_ok": True,
+            },
             get_configuration_object_as_dict=lambda name: {
                 "clearml": {},
                 "ultralytics": deepcopy(canonical),
@@ -282,7 +298,9 @@ def test_replay_cannot_cross_initialized_runtime_family(
     monkeypatch.setattr(
         common,
         "replay_configuration",
-        lambda task, values: values | {"model": {"backend": replayed[0], "preset": replayed[1]}},
+        lambda task, values, **kwargs: (
+            values | {"model": {"backend": replayed[0], "preset": replayed[1]}}
+        ),
     )
     with pytest.raises(ValueError, match=r"runtime.*[Rr]elaunch.*model="):
         common.execute_owned("predict", _configuration(*initial), workflow)
@@ -301,7 +319,7 @@ def test_native_replay_materializes_defaults_and_preserves_replayed_device(
     monkeypatch.setattr(
         common,
         "replay_configuration",
-        lambda task, values: (
+        lambda task, values, **kwargs: (
             values
             | {"model": {"backend": "rfdetr", "preset": "small", "predict": {"device": "cuda:3"}}}
         ),
@@ -346,7 +364,7 @@ def test_detector_training_replay_uses_model_group_without_importing_general_int
         observed.append(model)
 
     monkeypatch.setattr(common, "invocation", invocation)
-    monkeypatch.setattr(common, "replay_configuration", lambda task, values: values)
+    monkeypatch.setattr(common, "replay_configuration", lambda task, values, **kwargs: values)
     config = _configuration(backend, preset)
     config.model["train"] = {"device": "cuda:3"}
     config.ultralytics = stage_settings(native_defaults(), "train")
@@ -383,7 +401,7 @@ def test_export_replay_retains_inputs_and_ignores_result_evidence(
     monkeypatch.setattr(
         common,
         "replay_configuration",
-        lambda task, values: (
+        lambda task, values, **kwargs: (
             values | {"export_result": {"operation": "onnx", "graph_sha256": "a" * 64}}
         ),
     )

@@ -155,6 +155,7 @@ def compute_metrics(
             image_name=deps.tracking.prediction_image_name(Path(predictions)),
         )
         destination = deps.storage.write_path(output_dir)
+        deps.tracking.declare_result_producers(task, ["metrics"], output_dir=destination)
         represented_splits = ground_truth_frame.loc[
             ground_truth_frame["image_name"].isin(predictions_frame["image_name"]), "split"
         ].dropna()
@@ -275,6 +276,7 @@ def compute_metrics(
                 summary.get("mean_f1_score", float("nan")),
                 evaluated.dashboard_path,
             )
+        deps.tracking.complete_result_producer(task, "metrics")
         publish_results(
             publisher,
             task,

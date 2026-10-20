@@ -56,6 +56,11 @@ This table adds the relevant contracts and examples.
 Framework checks such as Airflow, FastAPI and Django remain enabled even though this
 application currently has no such interfaces. Unexcluded previews run by default.
 
+`TrackingSession` has a class-specific `PLR0904` exception: its published methods
+describe one invocation's tracking lifecycle, including contributor completion.
+Keep that cohesive port and its consumer contracts intact; the method-count rule
+remains enabled for other production classes.
+
 ## Test-only Ruff exceptions
 
 | Exception | Reason and boundary |

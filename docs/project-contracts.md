@@ -146,7 +146,8 @@ Evaluation publication follows the
 [current result contract](../specs/000-baseline/spec.md#required-publication-and-task-lifecycle):
 one invocation-owned `gt_csv` and combined `predicts_csv` retain original source rows,
 stable IDs, exclusions, thresholds and JSON pre/post-threshold relationships. Canonical
-CSVs assemble once before completion; prediction-only rows stay not evaluated.
+Ground truth uploads when validated and written; the combined prediction CSV assembles
+once when all enabled contributors finish, before later reports. Prediction-only rows stay not evaluated.
 Publish original full/DTRK dashboards, exact validation thresholds and paired comparison/
 report workbooks with comparison exclusions. Duplicate evaluation summaries and separate
 match/threshold/methodology sidecars remain local. Missing automatic baseline retains
@@ -234,3 +235,7 @@ keeps recovery-required jobs visible; stable `job-N` numbers never depend on vie
 Human-facing output uses readable names and references across CLI, TUI, diagnostics,
 console publication and reports. Exact IDs/hashes remain in machine provenance,
 explicit JSON, raw captures and link targets; see [readable output](readable-output.md).
+
+Startup `run`/`run_overrides` views and early training General follow the
+[configuration contract](../specs/000-baseline/spec.md#configuration-resolution-and-replay).
+Selected executable inputs remain distinct from observed normalization and result provenance.

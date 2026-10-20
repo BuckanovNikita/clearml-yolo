@@ -49,3 +49,15 @@ canonical corp-skills usage/evaluation references. Validate Markdown/local links
 examples. Run focused and full pytest, Ruff, mypy, Vulture, lint-imports, architecture
 checks, live ClearML CPU cache/publication smoke and required hooks. Track real results
 in verification.md; unavailable requirements are gaps, not passes.
+
+## Release verification amendment — 2026-10-19
+
+The resumed full hook exposed a queue-process test setup race: the synthetic owner
+exits immediately after spawning its detached rank, allowing correct guardian cleanup
+to terminate that rank before it installs its signal handler and writes readiness.
+The persisted job is completed, while the test times out waiting for readiness.
+Synchronize this existing fixture on the rank readiness file before owner exit,
+with a bounded condition wait and early child-failure detection. Production queue
+code, cleanup deadlines, assertions and import contracts remain unchanged. The
+existing real-process regression and a delayed-start diagnostic cover the boundary.
+This verification-only correction is included in the final independent review.
