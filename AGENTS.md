@@ -42,6 +42,10 @@ for every task.
 
 ## Dependencies and Git
 
+- Releases consist only of Git commits and annotated version tags. Build project
+  `.whl` wheels and `.tar.gz` source archives only for a concrete debugging task;
+  never build or present them as release deliverables or routine release checks.
+  This project rule overrides generic distribution-build guidance in shared skills.
 - Keep `digital-metrics` pinned to the approved upstream revision. Do not change its
   source, checkout, dependency reference or locked revision without explicit user intent.
   General cleanup or dependency maintenance does not authorize this. Adapt this project's

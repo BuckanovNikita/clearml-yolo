@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record verified ground truth release delivery
+  ([`38659b5`](https://github.com/BuckanovNikita/clearml-yolo/commit/38659b5ac60b2665f1315938c752aebb018f59b9))
+
+
 ## v0.36.0 (2026-10-20)
 
 ### Documentation

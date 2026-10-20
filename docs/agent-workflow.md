@@ -69,6 +69,12 @@ the [native release workflow](development.md#local-releases) after acceptance. A
 change may correctly produce no version tag. Deployment and package publishing remain
 separate actions requiring explicit authorization.
 
+Project wheels (`.whl`) and source archives (`.tar.gz`) are debugging tools only.
+Do not add their construction, installation or delivery to routine release gates.
+Use source-checkout verification for releases; a concrete packaging/install
+debugging task may build local diagnostic distributions. This project-specific
+rule takes precedence over shared skills' generic packaging checklists.
+
 ### Mandatory module architecture planning and acceptance
 
 Use the shared `module-architecture-planning` skill for repository change planning,

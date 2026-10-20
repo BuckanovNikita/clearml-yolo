@@ -122,7 +122,7 @@ interpolation is not replaced with a different resize kernel to satisfy TensorRT
 
 ## Standalone environment and library API
 
-The inference library needs Python `>=3.12.13,<3.14`, the project wheel installed with `--no-deps`,
+The inference library needs Python `>=3.12.13,<3.14`, the selected project source checkout installed with `--no-deps`,
 NumPy, Pydantic 2, matching TensorRT 10.13.0 bindings/libraries and a compatible CUDA
 runtime library (`libcudart`). CUDA access uses `ctypes`; Torch, Torchvision, timm, ONNX,
 ClearML and cuda-python are not standalone inference dependencies. Image decoding can
@@ -131,15 +131,18 @@ Select TensorRT bindings that support the chosen Python minor version; the packa
 Python compatibility range does not establish vendor wheel availability or validate
 a particular driver/runtime combination.
 
-For a CUDA 12 deployment, a preparation command shape is shown below. Replace `VERSION`
-with the built wheel version and install the appropriate NVIDIA CUDA runtime library.
+For a CUDA 12 deployment, run the preparation commands below from the selected
+project source checkout and install the appropriate NVIDIA CUDA runtime library.
 Use the vendor distribution matching the CUDA 11.8 target when preparing that target;
 this CUDA 12 package example does not validate CUDA 11.8 deployment.
 
 ```bash
-python -m pip install --no-deps ./dist/clearml_yolo-VERSION-py3-none-any.whl
+python -m pip install --no-deps .
 python -m pip install numpy 'pydantic>=2,<3' 'tensorrt-cu12==10.13.0.35'
 ```
+
+Project distribution files are created only for debugging under the
+[release policy](development.md#local-releases).
 
 Importing the following library modules does not import Torch, TensorRT or ClearML and
 does not create a CUDA context. Constructing `TensorRTRunner` initializes TensorRT/CUDA;

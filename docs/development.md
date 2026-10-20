@@ -242,6 +242,13 @@ commit contains no `[tool.uv.sources]` section.
 
 ## Local releases
 
+Releases contain Git commits and annotated version tags only. Do not build,
+upload or offer project `.whl` wheels or `.tar.gz` source archives as release
+deliverables. Distribution builds and isolated archive installs are allowed only
+for a concrete debugging purpose; they are not routine release acceptance gates.
+Run release verification from the source checkout. Generic packaging guidance in
+shared skills does not override this project rule.
+
 After installing dependencies, install both repository hooks:
 
 ```bash

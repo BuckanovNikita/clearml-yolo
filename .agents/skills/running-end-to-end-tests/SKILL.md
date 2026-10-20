@@ -158,8 +158,11 @@ this branch.
    with the environment skill; keep a portable verification summary in the repository.
    Clean up only owned resources per that environment's instructions.
 
-Build and install both distributions in fresh environments for release acceptance.
-Verify every installed command help and documented configuration example.
+Verify command help and documented configuration examples from the source checkout.
+Project wheels (`.whl`) and source archives (`.tar.gz`) may be built and installed
+only to investigate a concrete packaging/install problem; they are not release
+deliverables or routine acceptance gates. Follow the
+[project release policy](../../../docs/development.md#local-releases).
 Check every `cy-init-config --command` selection and omitted selection (only `cy`),
 both YOLO groups on existing model commands, selected new-model group inventory,
 Faster R-CNN-only `cy-export`, non-model wrapper-only inventory,

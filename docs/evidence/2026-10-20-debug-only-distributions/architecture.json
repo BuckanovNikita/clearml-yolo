@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "task": "Restrict project distributions to debugging",
+  "scope": [
+    "AGENTS.md",
+    "docs/agent-workflow.md",
+    "docs/development.md",
+    "docs/tensorrt-deployment.md",
+    "specs/000-baseline/spec.md",
+    ".agents/skills/running-end-to-end-tests/SKILL.md",
+    "docs/evidence/2026-10-20-debug-only-distributions",
+    "CHANGELOG.md"
+  ],
+  "impact": "none",
+  "rationale": "Inspected release helper, hooks, build configuration and current guidance. The helper already uses --skip-build and hooks do not build distributions. This change updates prose and installation examples to make wheels/source archives debugging-only; it changes no runtime module, dependency configuration, import contract or executable tooling."
+}

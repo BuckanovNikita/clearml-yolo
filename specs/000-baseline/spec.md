@@ -615,8 +615,9 @@ Frozen tests protect scientific values, signatures/defaults, configuration/CLI, 
 byte-exact original-content recovery. Mocked payloads prove adapter behavior, not native/GPU/server results.
 Native acceptance follows the [end-to-end skill](../../.agents/skills/running-end-to-end-tests/SKILL.md):
 actual execution, required readback/download, checkpoint/provenance validation, paired current-image
-comparison and owned-resource cleanup. Packaging claims require appropriate fresh distribution installs;
-reuse of prepared dependencies is stated.
+comparison and owned-resource cleanup. Releases verify the source checkout. Project `.whl` and `.tar.gz`
+distributions are built only for concrete debugging work; any diagnostic packaging claims require
+appropriate isolated installs, with reused dependencies stated.
 
 ### Local release interface
 
@@ -637,7 +638,9 @@ post-commit failure does not undo the contributor commit. Recovery validates rec
 never rewrites existing refs. Legacy recovery records without a changelog checksum cannot tag automatically.
 Exit 0 means release complete or an explained skip; exit 1 means a reported failure/defer, with the original
 contributor commit retained. Authorized delivery explicitly pushes and verifies branch/tag refs. Publish
-Git tags only; GitHub Release objects, assets, registries and deployment require separate scope.
+Git commits and annotated tags only. Project `.whl` wheels and `.tar.gz` source archives are debugging
+tools, never release deliverables or routine release checks. GitHub Release objects, assets, registries
+and deployment require separate scope.
 
 ## Historical evidence and limits
 
