@@ -80,3 +80,14 @@ architecture planning checks passed. It inspected the 134-test focused and
 nine original failures. It performed no edits, further delegation or shared-service
 calls. Minimum-matrix completion, final wheel and architecture acceptance remain
 separate evidence gates.
+
+## Final dependency and verification reconciliation
+
+After the scoped review, exact report failures established pandas 3.0.0 and
+openpyxl 3.1.5 as the final common floors. This changed only root dependency
+requirements/lock metadata. The parent independently compared every non-root lock
+record against the integrated baseline; all are unchanged. Final report checks
+(46 per interpreter), full minima (3,370 passed per interpreter), all four
+installed-wheel probes and normal full commit hooks passed. The packaged Python
+sources match the reviewed final source. No new runtime implementation, architectural
+exception or weakened test fixture was introduced by this floor adjustment.

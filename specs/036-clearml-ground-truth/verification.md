@@ -98,6 +98,34 @@ Portable skill source validation is recorded in its companion collection report.
 
 ## Acceptance and delivery
 
-Acceptance remains pending until the complete checks, independent review and
-architecture reconciliation below pass. Releases use Git commits and annotated
+The final complete normal-environment suite passed through the required contributor
+commit hook, together with Ruff, mypy, Vulture, import contracts, whitespace and
+changelog checks. Contributor commit: `a3f4c5a`. The final complete minimum suites
+both exited 0: **3,370 passed, 30 skipped, seven deselected** on Python 3.12.13
+and 3.13.14. Skips/deselections are not native/GPU acceptance claims.
+
+The final minimum matrix uses pandas 3.0.0 and openpyxl 3.1.5. Pandas 2.2.3
+added Excel header styling that violated the frozen workbook contract; 3.0.0
+passed that original failure. Its `read_excel` path rejected openpyxl 3.1.0;
+3.1.5 passed. Each interpreter passed 46 focused report/workbook checks before
+the final complete run. No application or frozen-report fixture was changed to
+accommodate these versions. The dependency report records the final wheel,
+installed-version matrix and unchanged protected/third-party lock records.
+
+Three independent reviews covered the integrated implementation, the CSV-only
+inventory correction and constructor compatibility. All actionable findings are
+resolved. The final pandas/openpyxl metadata adjustment was reconciled by the
+parent against exact failure reproductions, passing focused/full suites and the
+complete lock diff. Module responsibility, effects and import rules are unchanged.
+
+The complete task-owned diff against `41a4036` (including all new files, dependency
+metadata, tests and docs) matches the architecture scope. No unrelated source or
+workflow tooling is included. Final documentation and architecture acceptance
+checks are recorded with delivery below. Releases use Git commits and annotated
 tags only; package-registry publication and deployment are outside this task.
+
+Final pre-release documentation validation checked 544 Markdown files with no
+issues. Architecture acceptance validation exited 0 after complete diff/check/review
+reconciliation. The companion collection passed discovery (all four skills),
+strict frontmatter checks, Markdown lint (46 files), repository links (46 files),
+package-root links (three files) and its no-impact architecture acceptance.

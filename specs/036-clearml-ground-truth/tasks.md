@@ -25,8 +25,8 @@
 
 ## Integration and verification
 
-- [ ] T012 Verify positive/negative architecture and all affected behavior; record results in verification.md.
-- [ ] T013 Run real ClearML CSV-only retrieval and wheel/default/minimum-environment checks; record native and dependency evidence.
+- [x] T012 Verify positive/negative architecture and all affected behavior; record results in verification.md.
+- [x] T013 Run real ClearML CSV-only retrieval and wheel/default/minimum-environment checks; record native and dependency evidence.
 
 ## Documentation update
 
@@ -36,7 +36,7 @@
 
 ## Acceptance and release
 
-- [ ] T017 Obtain fresh independent review after parent integration/checks and reconcile architecture.json with actual diff and evidence.
+- [x] T017 Obtain fresh independent review after parent integration/checks and reconcile architecture.json with actual diff and evidence.
 - [ ] T018 Complete task-owned conventional commits and native Git-tag-only release/delivery after acceptance.
 
 ## Dependencies and parallel ownership

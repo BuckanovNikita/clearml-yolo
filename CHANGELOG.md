@@ -8,6 +8,11 @@
 - **clearml**: Record sequential release verification
   ([`41a4036`](https://github.com/BuckanovNikita/clearml-yolo/commit/41a4036666b2225a4e3029e1695499cf914a5f59))
 
+### Features
+
+- Support ClearML ground truth and complete default dependencies
+  ([`a3f4c5a`](https://github.com/BuckanovNikita/clearml-yolo/commit/a3f4c5ac248f03ffe5f58c2d3821a0d16babb29f))
+
 
 ## v0.35.0 (2026-10-19)
 

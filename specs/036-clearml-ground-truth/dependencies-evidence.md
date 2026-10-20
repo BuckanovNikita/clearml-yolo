@@ -23,15 +23,17 @@ without supplemental constraints. All direct versions remain at those resolution
 testing; the release-tooling transitive adjustment is recorded below.
 See [uv resolution strategy](https://docs.astral.sh/uv/concepts/resolution/#resolution-strategy).
 
-The common wheel-backed floors are aiohttp 3.10.5, NumPy 2.1.0, pandas 2.2.3,
-SciPy 1.14.1 and PyYAML 6.0.2. This evidence establishes the tested common Linux matrix,
-not every possible source build or platform. Initial PyYAML 6.0 installation failed on
+Wheel availability establishes aiohttp 3.10.5, NumPy 2.1.0, SciPy 1.14.1 and
+PyYAML 6.0.2 as the common tested floors. It initially permits pandas 2.2.3; the
+preserved workbook contract requires pandas 3.0.0 as explained below. This evidence
+establishes the tested common Linux matrix, not every possible source build or platform.
+Initial PyYAML 6.0 installation failed on
 both interpreters with the upstream `build_ext.cython_sources` build error. Pillow 12.2.0
 and Pydantic 2.9.2 were initially imposed by the dependency graph; Pydantic needed the
 additional application-specific correction below. Other retained or normalized floors
 are listed in the companion JSON alongside installed versions.
 
-Two functional probes determine the important SDK/schema floors:
+Functional probes determine the SDK, schema and workbook floors:
 
 - Published ClearML wheel source from 2.1.0 through 2.1.5 lacks the `files` parameter on
   `Dataset.get_local_copy`; 2.1.6 introduces it. The installed 2.1.6 SDK also exposes
@@ -41,6 +43,13 @@ Two functional probes determine the important SDK/schema floors:
   reproducer `type Example = str | Path; TypeAdapter(Example)` fails too. Pydantic 2.10.0
   passes the reproducer and original failing test on both supported interpreters;
   the declared floor is `pydantic>=2.10.0`.
+- pandas 2.2.3 fails the frozen comparison-workbook contract because its default Excel
+  headers add borders and alignment. With only pandas changed to 3.0.0, that exact test
+  passes. The upstream [pandas 3.0 release notes](https://pandas.pydata.org/docs/whatsnew/v3.0.0.html)
+  document removal of default `to_excel` styling. The declared floor is `pandas>=3.0.0`.
+  That release requires openpyxl 3.1.5 for `read_excel`; the existing dashboard-read test
+  reproduces its `ImportError` with openpyxl 3.1.0. pandas 3.0.0/openpyxl 3.1.5 pass the
+  report and workbook suite on both Python versions, establishing `openpyxl>=3.1.5`.
 
 The protected `digital-metrics>=0.6.1` reference remains unchanged. Verification uses the
 approved source revision, whose package metadata identifies version 0.7.0. This is not
@@ -60,10 +69,12 @@ so only that transitive runtime selection changes from 3.0.0 to the normal lock'
 in the minimum test environments. All direct minima and every other resolved runtime
 version remain unchanged. Test tools are not introduced into application runtime
 requirements or the separate default-install environments. The complete matrix invokes
-`python -m pytest -x -q --basetemp <owned-directory-outside-the-repository>` with absolute
+`python -m pytest -q --basetemp <owned-directory-outside-the-repository>` with absolute
 `PYTHONPATH` entries for the current checkout's `src` and `tests` and
-`NO_ALBUMENTATIONS_UPDATE=1` and `UV_FROZEN=1`. The outside-repository base directory preserves the docs
-checker's non-repository fixtures and avoids concurrent pytest retention races.
+`NO_ALBUMENTATIONS_UPDATE=1` and `UV_NO_SYNC=1`, with `UV_FROZEN` removed to allow
+real hook commands that specify `--locked`. The outside-repository base directory
+preserves the docs checker's non-repository fixtures and avoids concurrent pytest
+retention races.
 
 Independent empty environments install the application wheel without extras together
 with the two approved external wheels, constrained by
@@ -82,28 +93,37 @@ FiftyOne publication or ClearML server retrieval.
 
 ## Results
 
-- Built-wheel installation without project extras: passed on Python 3.12.13 and 3.13.14.
-- `uv pip check`: passed in all four isolated environments.
-- Outside-checkout default-wheel imports, 12 command help pages and configuration export:
-  passed on both interpreters.
+- Final minimum dependency suite: 3,370 passed, 30 skipped and seven
+  deselected on each interpreter (Python 3.12: 686.28 seconds; Python 3.13: 675.73 seconds).
+- Final report/workbook floor checks: 46 passed on each interpreter.
+- Standalone ground-truth module after explicit Hydra configuration registration:
+  33 passed on each interpreter before the final pandas adjustment; the final complete
+  suites also cover those cases at the final floors.
+- Built-wheel installation without project extras and `uv pip check`: passed in all
+  four isolated environments. Final wheel metadata declares the 36 unconditional
+  requirements and no extras, including the final pandas/openpyxl floors.
+- Outside-checkout capability imports, all 12 command help pages and configuration
+  export passed on both default environments using the integrated wheel. The final
+  rebuilt wheel additionally passed installed-adapter probes in all four environments:
+  an extra external-file entry is rejected before materialization; a CSV-only dataset
+  preserves bytes, path, hash and provenance. Each probe imports from the environment's
+  installed package with `PYTHONPATH` removed. These are fake-SDK boundary probes.
+- All 184 packaged Python source files in the final wheel match the checked-out source.
+  The companion JSON records their digests and the final wheel digest.
 - Packaging and development-dependency boundary tests: 35 passed; focused Ruff and mypy
   checks passed.
-- The initial focused minimum runtime matrix passed 311 tests per interpreter; one
-  subprocess fixture failed because its initial relative `PYTHONPATH` could not locate
-  the application after changing directories. Installing the wheel and using absolute
-  source paths corrected that setup issue.
-- The full minimum matrix with Pydantic 2.10.0 reached 1,547 passing tests, one skip and
-  seven deselected physical GPU cases on each interpreter before stopping at
-  `test_export_workflow.py::test_missing_inputs_fail_before_task_creation`. This matches
-  the normal-environment application regression, subsequently fixed by validating
-  export inputs before task creation. No dependency-floor workaround was applied.
-- After the export fix and upstream integration, each complete minimum-suite invocation
-  reached 3,129 passing tests, 30 skips and seven deselections before stopping at the
-  old exact `WorkflowDependencies` constructor expectation in
-  `test_shared_comparison.py`. The feature adds a repository port; correction of that
-  compatibility contract and its regression expectations is tracked by the parent.
-  These stopped runs alone do not establish complete acceptance.
 
-The companion JSON preserves exact installed distributions, the wheel digest, published
-ClearML wheel probe URLs, direct requirements and check results. Task-owned environments
+Earlier runs are retained as diagnosis history, not final acceptance: the first full
+minimum runs exposed the Pydantic alias limitation; subsequent runs stopped at the
+export validation-order regression (1,547 passing tests each), then at an obsolete
+constructor-signature expectation after upstream integration (3,129 passing tests each,
+30 skips, seven deselections). The corrected continuation passed 352 tests and exposed
+the pandas 2.2.3 workbook-style mismatch on each interpreter. The final complete matrix
+runs again with pandas 3.0.0 and openpyxl 3.1.5, covering all earlier sections at the
+final supported floors. The standalone Hydra registration issue was corrected in its
+test setup. The frozen workbook fixtures remain unchanged.
+
+The [companion JSON](dependencies-evidence.json) preserves exact installed distributions,
+the wheel digest, published ClearML wheel probe URLs, direct requirements and check results.
+Task-owned environments
 and logs are retained under the ignored `.tmp/dependencies-036` directory for review.
