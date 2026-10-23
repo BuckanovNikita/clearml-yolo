@@ -1,12 +1,17 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.38.0 (2026-10-23)
 
 ### Documentation
 
 - Record Git workspace warning release delivery
   ([`b3bef79`](https://github.com/BuckanovNikita/clearml-yolo/commit/b3bef797c732da74ce1734392d914f89417a59e4))
+
+### Features
+
+- Extract queue and support portable training
+  ([`ad6a8ec`](https://github.com/BuckanovNikita/clearml-yolo/commit/ad6a8ec81901801c7bb434beed67405da81551ab))
 
 
 ## v0.37.0 (2026-10-20)
