@@ -1,7 +1,8 @@
 # Portable training integration, 2026-10-23
 
 This is executed evidence for feature 003. Implementation is present in CY and the
-sibling cy-queue checkout. The resumed acceptance checks below passed; Git delivery is recorded separately.
+sibling cy-queue checkout. The resumed acceptance checks below passed; Git delivery and the refreshed installed versions are recorded in
+[the delivery evidence](2026-10-23-delivery.md).
 Source inspection, fixture tests and live execution are distinguished.
 
 ## Checks
@@ -88,7 +89,7 @@ cleaned. This single-GPU evidence does not establish idle admission under the de
 limit or release/reassignment of additional physical GPUs.
 
 Source installation and command ownership were checked in isolated offline
-environments. CY source currently declares 0.37.0; the extracted queue requires
+environments. At that candidate checkpoint, CY source declared 0.37.0; the extracted queue requires
 the intended compatible CY release `>=0.38,<0.39`. For the compatibility test only,
 copies of the current source used intended CY 0.38.0 metadata and queue 0.1.0.
 Externally prepared dependencies were reused through isolated links and copied

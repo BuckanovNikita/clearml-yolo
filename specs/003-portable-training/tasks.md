@@ -31,7 +31,7 @@
 - [x] T042 Update Russian READMEs and queue migration/backend/assets/filesystem/Agent/architecture/baseline contracts; validate Markdown, links and examples.
 - [x] T043 Update portable corp-skills usage/evaluation guidance and validate source package; commit companion changes after checks.
 - [x] T044 Obtain fresh independent review after parent integration/verification; resolve findings, reconcile diff and validate architecture acceptance.
-- [ ] T045 Complete CY Git-only release and verify refs; commit new cy-queue repository without remote creation/publication/deployment; preserve local overrides and clean task-owned resources.
+- [x] T045 Complete CY Git-only release and verify refs; commit new cy-queue repository without remote creation/publication/deployment; preserve local overrides and clean task-owned resources.
 
 ## Dependencies
 
@@ -71,3 +71,17 @@ checks, then received local companion commit `05b5156`. Its Git-tag delivery fol
 CY publication. Both repositories' architecture acceptance validators passed after
 reconciliation with the final code review and live evidence, completing T044.
 T045 now owns release, compatible active-environment refresh and final delivery receipts.
+
+## Delivery closure, 2026-10-23
+
+T045 completed: CY feature `ad6a8ec` and automatic release `8caafcd` passed hooks;
+annotated `v0.38.0` and master were pushed and remote refs verified. The new queue
+ends at verified Conventional Commit `1be96a6` without a remote or tag. The active
+environment was refreshed source-first to CY 0.38.0 and queue 0.1.0; dependency,
+entrypoint and resource checks pass. Exact local overrides and unrelated work were
+preserved. [Delivery evidence](evidence/2026-10-23-delivery.md) records the outcome
+and retains all scoped verification limitations.
+
+The portable usage collection was then published as annotated `v0.4.3`, with final
+evidence commit `593f4e9` and verified remote refs. Its original dirty checkout was
+preserved; no installed-skill export was requested or performed.
