@@ -7,6 +7,8 @@ from typing import Any, TypedDict
 import pandas as pd
 import yaml
 
+from clearml_yolo.adapters.assets.execution import prepare_model_assets
+from clearml_yolo.adapters.clearml.session import active_task, publish_model_assets
 from clearml_yolo.adapters.storage.checkpoint import bind_checkpoint, read_checkpoint_descriptor
 from clearml_yolo.adapters.storage.filesystem import write_path
 from clearml_yolo.adapters.storage.identity import checkpoint_sha256
@@ -280,6 +282,8 @@ class DetectorRunner:
                 "source_dir": source if descriptor.backend == "deimv2" else None,
             }
         )
+        config, assets = prepare_model_assets(config, training=False)
+        publish_model_assets(active_task(), assets)
         if descriptor.backend == "deimv2":
             from clearml_yolo.adapters.deim.backend import predict
         elif descriptor.backend == "rfdetr":

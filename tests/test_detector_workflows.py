@@ -35,6 +35,7 @@ from clearml_yolo.application.use_cases.compare import compare
 from clearml_yolo.application.use_cases.metrics import compute_metrics
 from clearml_yolo.application.use_cases.pipeline import run_pipeline
 from clearml_yolo.application.use_cases.train import train
+from clearml_yolo.core.assets import ResolvedAsset
 from clearml_yolo.core.evaluation.models import (
     ComputedEvaluation,
     EvaluationArtifacts,
@@ -158,6 +159,11 @@ def detector_harness(
     monkeypatch: pytest.MonkeyPatch,
 ) -> Iterator[Callable[[str], _Harness]]:
     loaded = set(sys.modules)
+    # Native SDK execution is replaced below; keep asset IO at the same explicit boundary.
+    monkeypatch.setattr(
+        "clearml_yolo.adapters.integrations.detectors.prepare_model_assets",
+        lambda config, *, training: (config.model_copy(deep=True), ()),
+    )
 
     def create(selection: str = "rfdetr/small") -> _Harness:
         config = model_preset(selection).model_copy(
@@ -239,6 +245,63 @@ def detector_harness(
     assert not {"torch", "torchvision", "ultralytics", "timm", "rfdetr"} & (
         set(sys.modules) - loaded
     )
+
+
+def test_recovered_deim_prepares_source_with_another_selected_family(
+    detector_harness: Callable[[str], _Harness], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    harness = detector_harness("rfdetr/small")
+    weights = _archive(harness.root / "baseline.pth", _metadata(model_preset("deimv2/s")))
+    source = harness.root / "managed-source"
+    record = ResolvedAsset(
+        canonical_url="https://github.com/Intellindust-AI-Lab/DEIMv2/archive/pinned.tar.gz",
+        path=source,
+        sha256="a" * 64,
+        override="model.source_dir",
+        content_kind="source-tree",
+    )
+    published: list[tuple[ResolvedAsset, ...]] = []
+    prepared: list[ModelConfig] = []
+
+    def prepare(
+        config: ModelConfig, *, training: bool
+    ) -> tuple[ModelConfig, tuple[ResolvedAsset, ...]]:
+        assert not training
+        assert (config.backend, config.preset, config.source_dir) == ("deimv2", "s", None)
+        resolved = config.model_copy(update={"source_dir": source}, deep=True)
+        prepared.append(resolved)
+        return resolved, (record,)
+
+    def predict(
+        config: ModelConfig,
+        descriptor: CheckpointMetadata,
+        weights: Path,
+        paths: Sequence[str],
+        settings: PredictSettings,
+    ) -> pd.DataFrame:
+        assert config is prepared[0]
+        assert config.source_dir == source
+        return harness.native_predict(config, descriptor, weights, paths, settings)
+
+    monkeypatch.setattr(
+        "clearml_yolo.adapters.integrations.detectors.prepare_model_assets", prepare
+    )
+    monkeypatch.setattr(
+        "clearml_yolo.adapters.integrations.detectors.publish_model_assets",
+        lambda task, assets: published.append(assets),
+    )
+    monkeypatch.setattr("clearml_yolo.adapters.deim.backend.predict", predict)
+    assert isinstance(harness.deps.model, DetectorRunner)
+    harness.deps.model.bind_reference(
+        weights, ModelRef(source="local", weights=weights, thresholds={"thing": 0.5})
+    )
+    result = harness.deps.model.predict_on_images(
+        weights, [str(harness.root / "test.png")], project=str(harness.root), name="recovered"
+    )
+    assert len(result) == 1
+    assert published == [(record,)]
+    assert harness.config.source_dir is None
+    assert harness.config.backend == "rfdetr"
 
 
 def _pipeline(harness: _Harness) -> dict[str, Any]:

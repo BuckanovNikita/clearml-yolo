@@ -13,15 +13,10 @@ import torch
 from torch import Tensor, nn
 from torch.nn import functional
 
+from clearml_yolo.adapters.fasterrcnn.assets import TIMM_MODELS
 from clearml_yolo.adapters.fasterrcnn.transform import LetterboxTransform
 from clearml_yolo.core.models import ImageSize
 
-_TIMM_MODELS = {
-    "convnext_tiny": "convnext_tiny.fb_in22k_ft_in1k",
-    "swin_tiny": "swin_tiny_patch4_window7_224.ms_in1k",
-    "dinov2_small": "vit_small_patch14_dinov2.lvd142m",
-    "dinov3_small": "vit_small_patch16_dinov3.lvd1689m",
-}
 _STRIDES = (4, 8, 16, 32)
 
 
@@ -56,11 +51,15 @@ class FeaturePyramid(nn.Module):
             options.update(features_only=True, out_indices=(0, 1, 2, 3))
             if preset == "swin_tiny":
                 options["strict_img_size"] = False
-        self.body = timm.create_model(
-            _TIMM_MODELS[preset], pretrained=pretrained and weights is None, **options
-        )
+        if pretrained and weights is None:
+            raise ValueError("Prepare the pretrained backbone asset before native construction")
         if weights is not None:
-            self.body.load_state_dict(checkpoint_state(weights), strict=True)
+            options["pretrained_cfg_overlay"] = {"file": str(weights.absolute())}
+        # A native file override retains checkpoint filtering, key remapping and
+        # positional interpolation before timm wraps the feature extractor.
+        self.body = timm.create_model(
+            TIMM_MODELS[preset], pretrained=weights is not None, **options
+        )
         channels = (
             [int(self.body.num_features)] * 4
             if self.patch_features
@@ -99,15 +98,13 @@ class FeaturePyramid(nn.Module):
 
 
 def _resnet_backbone(preset: str, *, pretrained: bool, weights: Path | None) -> Any:
-    models = importlib.import_module("torchvision.models")
     utilities = importlib.import_module("torchvision.models.detection.backbone_utils")
     name = preset.removesuffix("_fpn")
-    native_weights = (
-        models.ResNet50_Weights.DEFAULT if name == "resnet50" else models.ResNet101_Weights.DEFAULT
-    )
+    if pretrained and weights is None:
+        raise ValueError("Prepare the pretrained backbone asset before native construction")
     backbone = utilities.resnet_fpn_backbone(
         backbone_name=name,
-        weights=native_weights if pretrained and weights is None else None,
+        weights=None,
         trainable_layers=5,
     )
     if weights is not None:
@@ -138,7 +135,7 @@ def build_model(
         raise FileNotFoundError(backbone_weights)
     if preset in {"resnet50_fpn", "resnet101_fpn"}:
         backbone = _resnet_backbone(preset, pretrained=pretrained, weights=backbone_weights)
-    elif preset in _TIMM_MODELS:
+    elif preset in TIMM_MODELS:
         backbone = FeaturePyramid(preset, pretrained=pretrained, weights=backbone_weights)
     else:
         raise ValueError(f"Unsupported Faster R-CNN preset: {preset}")

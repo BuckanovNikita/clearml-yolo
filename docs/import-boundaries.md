@@ -58,7 +58,8 @@ dependencies are forbidden in both application and core.
 | OpenPyXL | Reporting adapters |
 | FiftyOne | FiftyOne adapters |
 | Hydra, hydra-zen and OmegaConf | Hydra entrypoint helpers |
-| Textual | Optional queue TUI entrypoint |
+| HTTP requests for model assets | CY assets adapter |
+| Textual / NVML | Separate `cy_queue` package only |
 
 The exact imports listed in `ignore_imports` are the permitted ownership edges,
 including imports used only for type checking. New SDK imports require a matching
@@ -67,10 +68,10 @@ backend/export contracts explicitly permit absent imports and the AST ownership
 checks cover those edges. Indirect SDK use through an approved adapter is normal;
 the layer rules still prevent a core or application module from reaching that adapter.
 
-`adapters.runtime.gpu_probe -> torch` is the one metadata-probe exception: the
-queue submission launches this disposable process to map inherited GPU visibility.
-It performs no model inference or training. Direct commands do not discover or wait
-for queue capacity.
+GPU inventory and the disposable visibility probe moved to `cy_queue`; its
+architecture contracts own their SDK edges. CY cannot import `cy_queue`, Textual
+or NVML. Direct commands and ClearML Agents do not discover or wait for queue
+capacity. The permitted dependency direction is queue → CY shared interfaces.
 
 ## Adapter peers
 
@@ -84,7 +85,7 @@ for queue capacity.
 | ClearML | Storage, observability |
 | FiftyOne | Observability |
 | Runtime | Observability |
-| Queue | Runtime |
+| Assets | Storage, observability |
 | Integrations | Storage, observability |
 | DEIMv2, RF-DETR, Faster R-CNN, export | Observability |
 
@@ -107,6 +108,10 @@ of SDK ownership:
   `integrations.export_operations` composes export operations and native model loading.
   Export ONNX/verification bridges use the Faster R-CNN model, and verification
   reads storage dataset records. `native_ddp` also uses the ClearML deadline adapter.
+- `assets.execution` composes asset descriptions supplied by DEIM, RF-DETR and
+  Faster R-CNN adapters. DEIM source loading uses manifest verification from
+  `assets.archive`. Model asset selection/loading uses immutable core descriptions. HTTP, cache writes, locks and extraction stay outside core and
+  application workflows; native detector adapters retain checkpoint transformations.
 
 The authoritative exact-edge lists are `ignore_imports` in
 [.importlinter](../.importlinter) and `PEER_EXCEPTIONS` in
@@ -128,8 +133,9 @@ functions or re-export pure records. They cannot eagerly load protected SDKs or
 execute startup operations. The public root is also imported in a fresh interpreter
 to verify that no scientific library, framework or SDK is pulled in by that import.
 
-Architecture checks inventory console scripts and literal worker, guardian, console,
-FiftyOne and CUDA metadata-probe targets; the retired project Hydra launcher must not remain.
+CY architecture checks inventory its console scripts and literal console, native
+worker and FiftyOne targets. The separate queue checks its guardian, snapshot runner
+and CUDA metadata-probe targets; the retired project Hydra launcher must not remain.
 They also export and compose the generated Hydra examples to inspect targets created by `hydra_zen.builds`. Target modules and named
 attributes must exist in the shipped source tree; legacy aliases and missing targets
 fail. These static checks complement command-help and installed-package verification

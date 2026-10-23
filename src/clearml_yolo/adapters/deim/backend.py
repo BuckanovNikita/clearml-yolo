@@ -85,10 +85,13 @@ def _native_writer(report: Callable[[str, float, int], None]) -> _OwnerWriter:
 
 
 def _config(config: ModelConfig, names: tuple[str, ...], size: tuple[int, int]) -> Any:
-    core, _ = load_source(config.source_dir)
-    if config.source_dir is None:
-        raise ValueError("DEIMv2 requires source_dir")
-    path = config.source_dir / "configs" / "deimv2" / f"deimv2_dinov3_{config.preset}_coco.yml"
+    source = config.source_dir
+    if source is None:
+        from clearml_yolo.adapters.assets.sources import prepare_deim_source
+
+        source, _ = prepare_deim_source()
+    core, _ = load_source(source)
+    path = source / "configs" / "deimv2" / f"deimv2_dinov3_{config.preset}_coco.yml"
     cfg = core.YAMLConfig(
         str(path.resolve()),
         num_classes=len(names),

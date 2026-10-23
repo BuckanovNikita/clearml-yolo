@@ -4,7 +4,6 @@ import json
 import os
 import subprocess
 import sys
-import time
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -198,61 +197,6 @@ def test_malformed_endpoint_log_preserves_original_failure_and_receipts(tmp_path
     assert "credential-fixture" not in (evidence.root / "owner.log").read_text()
 
 
-@pytest.mark.parametrize("owner_stop_failure", [False, True])
-def test_exhausted_queue_cleanup_still_kills_owned_term_ignoring_child(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, owner_stop_failure: bool
-) -> None:
-    import ddp_gpu_harness as harness
-
-    evidence = Evidence(GPUOptions("0,1", "owned-tests", tmp_path, cleanup_timeout=0.01), "stuck")
-    (evidence.root / "request.json").write_text("{}")
-    ready = evidence.root / "ready"
-    child = subprocess.Popen(  # noqa: S603 - exact owned cleanup regression
-        [
-            sys.executable,
-            "-c",
-            (
-                "import signal,sys,time; from pathlib import Path; "
-                "signal.signal(signal.SIGTERM, signal.SIG_IGN); "
-                "Path(sys.argv[1]).touch(); time.sleep(30)"
-            ),
-            str(ready),
-        ],
-        env=dict(os.environ, CY_DDP_TRACE=str(evidence.root)),
-    )
-
-    def stuck_queue(*_args: object) -> None:
-        time.sleep(0.02)
-        raise TimeoutError("injected stuck production cleanup")
-
-    def failed_owner_stop(*_args: object) -> None:
-        raise subprocess.TimeoutExpired("owned-test-process", 0.01)
-
-    monkeypatch.setattr(harness, "_cleanup_queue", stuck_queue)
-    if owner_stop_failure:
-        monkeypatch.setattr(harness, "_stop_owned", failed_owner_stop)
-    try:
-        deadline = time.monotonic() + 5
-        while not ready.exists() and time.monotonic() < deadline:
-            time.sleep(0.01)
-        assert ready.exists()
-        with pytest.raises(AssertionError, match="Physical DDP cleanup failed"):
-            harness._cleanup_scenario(
-                evidence,
-                harness.environment_for(evidence),
-                child if owner_stop_failure else None,
-                "owned-job",
-            )
-        assert child.poll() is not None
-        receipt = json.loads((evidence.root / "cleanup.json").read_text())
-        assert receipt["initial_survivors"][0][0] == child.pid
-        assert receipt["remaining"] == []
-    finally:
-        if child.poll() is None:
-            child.kill()
-        child.wait(timeout=5)
-
-
 def test_timeout_preserves_partial_output_and_failure_receipt(tmp_path: Path) -> None:
     evidence = Evidence(GPUOptions("0,1", "owned-tests", tmp_path), "timeout")
 
@@ -326,12 +270,14 @@ def test_generated_inputs_and_native_config_compose_offline(tmp_path: Path) -> N
     source = Path(__file__).resolve().parents[1] / "src"
     code = (
         "import os; from pathlib import Path; "
-        "from clearml_yolo.core.queue import ResourceRequest; "
-        "from clearml_yolo.entrypoints.hydra.queue_config import compose_snapshots; "
+        "from hydra import compose, initialize_config_dir; "
+        "import clearml_yolo.entrypoints.hydra.configs; "
+        "from hydra_zen import store; "
         "root=Path(os.environ['CY_HOME']); "
-        "jobs=compose_snapshots(['--config-dir',str(root/'config'),'--config-name','ddp'],"
-        "ResourceRequest(devices=('GPU-a','GPU-b')),project_root=root); "
-        "assert len(jobs)==1; assert 'pretrained' in jobs[0].config_json"
+        "store.add_to_hydra_store(overwrite_ok=True); "
+        "context=initialize_config_dir(config_dir=str(root/'config'),version_base='1.3'); "
+        "context.__enter__(); config=compose(config_name='ddp'); "
+        "assert 'pretrained' in config.ultralytics; context.__exit__(None,None,None)"
     )
     evidence.command(
         [sys.executable, "-c", code], dict(base, PYTHONPATH=f"{source}:{base['PYTHONPATH']}")
@@ -389,7 +335,7 @@ def test_explicit_gpu_file_selection_requires_authorization() -> None:
 def test_inaccessible_known_owned_process_blocks_cleanup(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    from clearml_yolo.adapters.queue.identity import process_birth
+    from ddp_gpu_instrumentation import process_birth
     from ddp_gpu_worker import _owned_processes
 
     pid = os.getpid()

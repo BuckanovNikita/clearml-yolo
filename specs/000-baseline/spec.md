@@ -38,7 +38,12 @@ Python support is `>=3.12.13,<3.14`; the development interpreter remains Python 
 lockfile and setup guidance must agree. Optional native packages, drivers and runtimes have additional
 platform requirements. On Linux, direct and queued native work requires the actual pidfd/subreaper/`/proc`
 capability preflight; an accepted interpreter version alone is insufficient. Changing a queued interpreter
-or installation identity requires resubmission.
+or installation identity requires resubmission. The separate `cy-queue` distribution
+uses the `cy_queue` namespace and depends on a compatible CY version. Queue-only
+Textual/NVML dependencies and queue tests belong there. Shared process supervision
+and lifecycle communication remain in CY, which must not import the queue package.
+Install CY from source before the queue in the same environment; neither package
+is assumed published on PyPI. See the [extraction feature](../003-portable-training/spec.md).
 
 The package uses `core`, `application`, named `adapters` and `entrypoints`. Core contains pure
 project/scientific records and policy. Application workflows use explicit typed `WorkflowDependencies`
@@ -126,10 +131,20 @@ directory.
 
 New detector families use typed `model.train`/`model.predict` settings. Changed controls in inactive YOLO or
 native groups fail in both directions; unchanged composed defaults permit mixed-family sweep composition.
-Unsupported controls are never silently ignored. Replay cannot switch between initialized YOLO and
-new-detector runtime families.
+Unsupported controls are never silently ignored. ClearML Agent replay restores the selected
+backend before runtime initialization; it does not switch an already initialized runtime.
 
 ### Configuration resolution and replay
+
+An externally managed ClearML Agent may launch the recorded module entrypoint without
+original CLI arguments. Fetch one detached replay snapshot through the ClearML adapter
+before mandatory-input validation and backend selection, initialize that backend, then
+join the same task through the existing invocation lifecycle. Preserve parameter precedence,
+remote script metadata, ownership, required publication, failure reporting and cleanup.
+An absent canonical configuration permits complete explicit inputs; malformed or empty
+canonical configuration fails. Agent CUDA visibility and native logical devices remain
+authoritative. This path requires no queue package, configuration or GPU reservation.
+
 
 Attached YAML/JSON is resolved against detached command context before sanitization. File roots override
 corresponding command roots as whole values; only original file fields are published. Preserve
@@ -147,9 +162,14 @@ callers without an injected resolver must supply concrete documents.
 The shared CLI publishes detached resolved JSON `run` after YAML/CLI composition, queue device binding and
 supported remote overrides. It contains only selected executable inputs: YOLO retains its native groups and
 model backend/preset selectors; other detectors retain `model` settings and omit inactive YOLO groups.
-Native-detector dataset format is the effective COCO format. Later result provenance cannot replace frozen
+Native-detector dataset format is the effective COCO format. Asset resolution uses an
+execution-only copy: canonical selectors, including null defaults, remain intact, while
+resolved paths, original URLs and hashes are recorded in a separate `model_assets`
+Configuration Object, outside canonical replay/cache inputs. Later result provenance cannot replace frozen
 executable roots; native normalization remains separate. Consumed `dataset` and explicit `report` remain
-separate Configuration Objects; configuration copies are not artifacts. Embedding callers still own complete
+separate Configuration Objects; `model_assets` stores resolved non-YOLO asset provenance
+as an `assets` list of original URLs, paths, hashes, overrides and revisions.
+Configuration copies are not artifacts. Embedding callers still own complete
 executable input recording through the invocation/tracking interface. Result-only sections, including
 `evaluation_result`, `fiftyone_result` and `export_result`, never replace executable inputs. SDK proxy
 containers are detached; inherited SDK connection flags do not own execution.
@@ -274,6 +294,30 @@ ResNet50-FPN, ResNet101-FPN, ConvNeXt-Tiny, Swin-Tiny, DINOv2-Small and DINOv3-S
 supported. Lazy composition reports the selected missing prerequisite without initializing another backend.
 Typed controls, exact foreground strings, empty images and coordinate/membership semantics survive native
 dataset conversion. Background detector slots are not public labels.
+
+The [asset contract](../../docs/model-assets.md) covers DEIMv2, RF-DETR and every
+Faster R-CNN preset. Explicit local paths remain authoritative and missing explicit
+inputs fail. Training resolves matching pretrained assets only when requested and
+not superseded by explicit full detector weights. Backend adapters preserve native
+loading transformations; no full-detector or random-weight substitution for a
+requested backbone. Ultralytics defaults, downloads and dependencies are unchanged.
+
+Resolution occurs only during execution: valid local/cache content, configured proxy,
+then upstream. Empty/unset proxy variables select upstream; non-GitHub hosts retain
+their original endpoints. GHR preserves the complete GitHub release path beneath its
+repository root. GH derives the Artifactory downloadCommit request for the approved
+DEIM revision. Managed source extraction checks safe archive entries and a packaged
+approved-revision code/configuration manifest; explicit checkouts retain validation.
+
+Managed weights use `CY_HOME/.cache/clearml-yolo/models/<backend>/<preset>/<asset-id>/<filename>`,
+with identity derived from canonical source, revision and available checksum. DEIM
+uses `CY_HOME/.cache/clearml-yolo/sources/DEIMv2/<revision>.tar.gz` and adjacent
+`<revision>/`. Reuse valid library caches without global SDK changes. Outer adapters
+own bounded HTTP/retries, per-asset locking, temporary downloads, atomic publication
+and integrity validation with standard authentication/TLS. Errors list every known
+missing asset's original full URL, exact absolute destination, override and access
+requirements; attempted proxy credentials are redacted. Manual placement works
+without a receipt from an earlier online download. Dependencies remain externally managed.
 
 Owned checkpoints embed backend, preset, foreground vocabulary, preprocessing and source/dependency
 identity; external descriptors add the checkpoint SHA-256. Validate descriptors, sidecars and available
@@ -406,7 +450,7 @@ enclosing checkout. Historical tasks are not backfilled.
 | `report_dev_SPLIT`, `report_business_SPLIT` | Final paired developer/business XLSX |
 | `export_onnx`, `export_engine`, `export_metadata` | Operation-produced deployment artifact and metadata |
 | `export_verification`, `export_corpus` | Verification report and fixed-corpus manifest |
-| Configuration Objects | Active executable `run`, informational `run_overrides`, consumed dataset, explicit report and meaningful provenance |
+| Configuration Objects | Active executable `run`, informational `run_overrides`, resolved asset provenance `model_assets`, consumed dataset, explicit report and meaningful provenance |
 | General | Sanitized scientific native arguments |
 
 Ground-truth/train register GT; train also owns model/telemetry. Predict adds not-evaluated rows.
@@ -561,8 +605,13 @@ current execution authority. Direct commands pass configured native devices with
 discovery/waiting/reservations; direct multirun is sequential BasicLauncher. Old `queue.*`, `autogpu.*`,
 `auto_gpu.*`, queue roots/launcher and force controls fail with migration guidance, not silent translation.
 
-Queue submissions freeze complete sweeps, input settings, package/interpreter identity, owner and resource
-requests. Owner workers execute only their UID's jobs; collaborators may reorder pending jobs through
+The separate queue accepts `submit --command {pipeline,train}`, defaulting to pipeline,
+and launches the corresponding existing CY entrypoint. Queue submissions freeze complete
+sweeps, input settings, both packages' installation identities, interpreter, owner and resource
+requests. Configuration locations, coordination namespaces, lock identities, durable
+records/history, ownership, cancellation/recovery and acknowledged handoff remain
+compatible. Upgrades stop all participants together, preserve records and resubmit
+pending work after environment changes; see the [offline upgrade](../../docs/queue.md#coordinated-package-upgrade). Owner workers execute only their UID's jobs; collaborators may reorder pending jobs through
 revision-checked public operations. Per-host earliest runnable ordering and whole-allocation claims apply
 across roots. CPU phases remain CPU; inference retains the first allocated device. Used VRAM must be
 strictly below 2048 MiB immediately before launch; unknown required telemetry, visible MIG or damaged

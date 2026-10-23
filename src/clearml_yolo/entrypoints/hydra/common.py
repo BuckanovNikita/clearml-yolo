@@ -17,9 +17,14 @@ from omegaconf import DictConfig, OmegaConf, open_dict
 
 # Populate the shared ConfigStore in fresh CLI processes before Hydra composes examples.
 import clearml_yolo.entrypoints.hydra.configs  # noqa: F401
+from clearml_yolo.adapters.assets.execution import prepare_model_assets
 from clearml_yolo.adapters.clearml.naming import initialize_naming
 from clearml_yolo.adapters.clearml.session import (
+    RemoteReplay,
+    active_task,
+    fetch_remote_replay,
     invocation,
+    publish_model_assets,
     publish_run_configuration,
     replay_configuration,
     replay_training_parameters,
@@ -137,6 +142,36 @@ def _builtin_defaults(name: str, config: DictConfig) -> dict[str, Any]:
     return _publication_inputs(defaults)
 
 
+def _executable_replay(
+    config: DictConfig, function: Callable[..., Any], replay: dict[str, Any]
+) -> dict[str, Any]:
+    reject_legacy_controls(replay)
+    # Run also contains result provenance; only command inputs are executable.
+    accepted = set(inspect.signature(function).parameters) - {"deps"}
+    if "model" in config:
+        accepted.add("model")
+    return {key: value for key, value in replay.items() if key in accepted}
+
+
+def _restore_agent_inputs(
+    config: DictConfig, function: Callable[..., Any]
+) -> tuple[RemoteReplay | None, dict[str, Any]]:
+    # Agent scripts record a bare entrypoint. Restore inputs before validating
+    # required fields or selecting the native runtime; no task is initialized yet.
+    snapshot = fetch_remote_replay()
+    native = (
+        OmegaConf.to_container(config.ultralytics, resolve=False) if "ultralytics" in config else {}
+    )
+    if not isinstance(native, dict):
+        raise TypeError("Native command configuration must be a mapping")
+    requested = {str(key): value for key, value in native.items()}
+    if snapshot is not None and snapshot.canonical is not None:
+        with open_dict(config):
+            for key, value in _executable_replay(config, function, snapshot.canonical).items():
+                config[key] = deepcopy(value)
+    return snapshot, requested
+
+
 @trace_operation("invocation.execute")
 def execute_owned(name: str, config: DictConfig, function: Callable[..., Any]) -> None:
     """Execute native settings unchanged under one invocation-owned task."""
@@ -144,6 +179,7 @@ def execute_owned(name: str, config: DictConfig, function: Callable[..., Any]) -
         initialize_filesystem()
         if HydraConfig.initialized():
             write_path(HydraConfig.get().runtime.output_dir)
+    remote_replay, requested_native = _restore_agent_inputs(config, function)
     with trace_operation("configuration.resolve", context={"stage": name}):
         validate_wrapper_keys(config, function)
         resolved = OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
@@ -165,10 +201,10 @@ def execute_owned(name: str, config: DictConfig, function: Callable[..., Any]) -
             instantiate(config.clearml),
             name,
             config_resolver=lambda document: resolve_config_file(document, config),
+            remote_replay=remote_replay,
         ) as task,
         _gpu_cleanup(True),
     ):
-        requested_native = dict(inputs.get("ultralytics", {}))
         remote_native = (
             name in {"pipeline", "train"} and not uses_detector and not task.running_locally()
         )
@@ -177,12 +213,7 @@ def execute_owned(name: str, config: DictConfig, function: Callable[..., Any]) -
             if remote_native
             else replay_configuration(task, inputs, publish=False)
         )
-        reject_legacy_controls(replay)
-        # Run also contains result provenance; only command inputs are executable.
-        accepted = set(inspect.signature(function).parameters) - {"deps"}
-        if "model" in config:
-            accepted.add("model")
-        replay = {key: value for key, value in replay.items() if key in accepted}
+        replay = _executable_replay(config, function, replay)
         _validate_replay_runtime(uses_detector, replay)
         native = deepcopy(replay.get("ultralytics", requested_native))
         training = name == "train" or (
@@ -215,6 +246,18 @@ def execute_owned(name: str, config: DictConfig, function: Callable[..., Any]) -
             _execute_direct(name, config, function)
 
 
+def _execution_model(name: str, config: DictConfig) -> ModelConfig:
+    selected = (
+        ModelConfig.model_validate(OmegaConf.to_container(config.model, resolve=True))
+        if "model" in config
+        else ModelConfig()
+    )
+    training = name == "train" or (name == "pipeline" and not config.skip_train)
+    prepared, assets = prepare_model_assets(selected, training=training)
+    publish_model_assets(active_task(), assets)
+    return prepared
+
+
 def _execute_direct(name: str, config: DictConfig, function: Callable[..., Any]) -> None:
     materialize_model_config(config)
     effective = deepcopy(config)
@@ -230,13 +273,7 @@ def _execute_direct(name: str, config: DictConfig, function: Callable[..., Any])
             with trace_operation("configuration.dependencies"):
                 from clearml_yolo.entrypoints.composition import build_dependencies
 
-                selected = (
-                    ModelConfig.model_validate(
-                        OmegaConf.to_container(effective.model, resolve=True)
-                    )
-                    if "model" in effective
-                    else ModelConfig()
-                )
+                selected = _execution_model(name, effective)
                 dependencies = (
                     build_dependencies()
                     if selected.backend == "ultralytics"

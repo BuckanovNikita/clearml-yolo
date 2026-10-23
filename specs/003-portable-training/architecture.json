@@ -1,0 +1,445 @@
+{
+  "schema_version": 1,
+  "task": "003 portable training and queue extraction",
+  "scope": [
+    "src/clearml_yolo",
+    "tests",
+    "scripts",
+    "pyproject.toml",
+    "uv.lock",
+    ".importlinter",
+    "docs",
+    "README.md",
+    "TECH_DETAILS.md",
+    "specs/003-portable-training",
+    "specs/000-baseline/spec.md",
+    ".agents/skills/running-end-to-end-tests/references/pipeline-prerequisites.md",
+    "CHANGELOG.md"
+  ],
+  "impact": "modules",
+  "rules": "Constitution inward layers; queue depends on CY only; outer adapters own effects; no runtime SDK imports in inert initializers.",
+  "modules": [
+    {
+      "id": "startup",
+      "path": "src/clearml_yolo/entrypoints/hydra/common.py",
+      "change": "modify",
+      "responsibility": "Compose restored launch settings before runtime choice",
+      "interface": "Detached replay then one owned task; preserve canonical selectors",
+      "layer": "entrypoint",
+      "allowed_dependencies": [
+        "CY adapters",
+        "application contracts"
+      ],
+      "forbidden_dependencies": [
+        "cy_queue"
+      ],
+      "effects": "Composition owns invocation order and effect injection",
+      "contracts": [
+        "cy-imports"
+      ]
+    },
+    {
+      "id": "clearml",
+      "path": "src/clearml_yolo/adapters/clearml/session.py",
+      "change": "modify",
+      "responsibility": "Fetch detached remote inputs and own task lifecycle",
+      "interface": "Replay snapshot then same-task invocation, metadata preserved",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "core",
+        "application contracts",
+        "ClearML SDK"
+      ],
+      "forbidden_dependencies": [
+        "cy_queue",
+        "entrypoints"
+      ],
+      "effects": "ClearML reads and task lifecycle",
+      "contracts": [
+        "cy-imports"
+      ]
+    },
+    {
+      "id": "asset-records",
+      "path": "src/clearml_yolo/core/assets.py",
+      "change": "add",
+      "responsibility": "Describe immutable assets and provenance",
+      "interface": "Typed sources, identity and content evidence",
+      "layer": "core",
+      "allowed_dependencies": [
+        "stdlib",
+        "pydantic"
+      ],
+      "forbidden_dependencies": [
+        "adapters",
+        "HTTP libraries"
+      ],
+      "effects": "No effects",
+      "contracts": [
+        "cy-imports"
+      ]
+    },
+    {
+      "id": "asset-resolver",
+      "path": "src/clearml_yolo/adapters/assets",
+      "change": "add",
+      "responsibility": "Resolve assets and verified source archives",
+      "interface": "Execution-only resolver with atomic cache and actionable offline errors",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "core",
+        "storage",
+        "HTTP libraries",
+        "deim.assets/source",
+        "rfdetr.assets",
+        "fasterrcnn.assets"
+      ],
+      "forbidden_dependencies": [
+        "entrypoints",
+        "cy_queue"
+      ],
+      "effects": "Network, cache files, locks and extraction owned here",
+      "contracts": [
+        "cy-imports"
+      ]
+    },
+    {
+      "id": "deim",
+      "path": "src/clearml_yolo/adapters/deim",
+      "change": "modify",
+      "responsibility": "Select and load native model assets",
+      "interface": "Supported local native loading; preserve initialization transforms",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "core",
+        "assets",
+        "native SDK"
+      ],
+      "forbidden_dependencies": [
+        "entrypoints",
+        "cy_queue"
+      ],
+      "effects": "Native model construction/training",
+      "contracts": [
+        "cy-imports"
+      ]
+    },
+    {
+      "id": "rfdetr",
+      "path": "src/clearml_yolo/adapters/rfdetr",
+      "change": "modify",
+      "responsibility": "Select and load native model assets",
+      "interface": "Supported local native loading; preserve initialization transforms",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "core",
+        "assets",
+        "native SDK"
+      ],
+      "forbidden_dependencies": [
+        "entrypoints",
+        "cy_queue"
+      ],
+      "effects": "Native model construction/training",
+      "contracts": [
+        "cy-imports"
+      ]
+    },
+    {
+      "id": "fasterrcnn",
+      "path": "src/clearml_yolo/adapters/fasterrcnn",
+      "change": "modify",
+      "responsibility": "Select and load native model assets",
+      "interface": "Supported local native loading; preserve initialization transforms",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "core",
+        "assets",
+        "native SDK"
+      ],
+      "forbidden_dependencies": [
+        "entrypoints",
+        "cy_queue"
+      ],
+      "effects": "Native model construction/training",
+      "contracts": [
+        "cy-imports"
+      ]
+    },
+    {
+      "id": "queue-core",
+      "path": "src/clearml_yolo/core/queue.py",
+      "change": "remove",
+      "responsibility": "Move queue-only responsibility to cy_queue",
+      "interface": "Wire/coordination compatibility retained in sibling",
+      "layer": "extracted",
+      "allowed_dependencies": [
+        "CY documented shared interfaces"
+      ],
+      "forbidden_dependencies": [
+        "CY reverse import"
+      ],
+      "effects": "Transferred to queue outer adapters",
+      "contracts": [
+        "cy-imports"
+      ]
+    },
+    {
+      "id": "queue-app",
+      "path": "src/clearml_yolo/application/queue.py",
+      "change": "remove",
+      "responsibility": "Move queue-only responsibility to cy_queue",
+      "interface": "Wire/coordination compatibility retained in sibling",
+      "layer": "extracted",
+      "allowed_dependencies": [
+        "CY documented shared interfaces"
+      ],
+      "forbidden_dependencies": [
+        "CY reverse import"
+      ],
+      "effects": "Transferred to queue outer adapters",
+      "contracts": [
+        "cy-imports"
+      ]
+    },
+    {
+      "id": "queue-adapters",
+      "path": "src/clearml_yolo/adapters/queue",
+      "change": "remove",
+      "responsibility": "Move queue-only responsibility to cy_queue",
+      "interface": "Wire/coordination compatibility retained in sibling",
+      "layer": "extracted",
+      "allowed_dependencies": [
+        "CY documented shared interfaces"
+      ],
+      "forbidden_dependencies": [
+        "CY reverse import"
+      ],
+      "effects": "Transferred to queue outer adapters",
+      "contracts": [
+        "cy-imports"
+      ]
+    },
+    {
+      "id": "queue-compose",
+      "path": "src/clearml_yolo/entrypoints/hydra/queue_config.py",
+      "change": "remove",
+      "responsibility": "Move queue-only responsibility to cy_queue",
+      "interface": "Wire/coordination compatibility retained in sibling",
+      "layer": "extracted",
+      "allowed_dependencies": [
+        "CY documented shared interfaces"
+      ],
+      "forbidden_dependencies": [
+        "CY reverse import"
+      ],
+      "effects": "Transferred to queue outer adapters",
+      "contracts": [
+        "cy-imports"
+      ]
+    },
+    {
+      "id": "gpu",
+      "path": "src/clearml_yolo/adapters/runtime/gpu_resources.py",
+      "change": "remove",
+      "responsibility": "Move queue-only responsibility to cy_queue",
+      "interface": "Wire/coordination compatibility retained in sibling",
+      "layer": "extracted",
+      "allowed_dependencies": [
+        "CY documented shared interfaces"
+      ],
+      "forbidden_dependencies": [
+        "CY reverse import"
+      ],
+      "effects": "Transferred to queue outer adapters",
+      "contracts": [
+        "cy-imports"
+      ]
+    },
+    {
+      "id": "probe",
+      "path": "src/clearml_yolo/adapters/runtime/gpu_probe.py",
+      "change": "remove",
+      "responsibility": "Move queue-only responsibility to cy_queue",
+      "interface": "Wire/coordination compatibility retained in sibling",
+      "layer": "extracted",
+      "allowed_dependencies": [
+        "CY documented shared interfaces"
+      ],
+      "forbidden_dependencies": [
+        "CY reverse import"
+      ],
+      "effects": "Transferred to queue outer adapters",
+      "contracts": [
+        "cy-imports"
+      ]
+    },
+    {
+      "id": "execution",
+      "path": "src/clearml_yolo/core/execution.py",
+      "change": "remove",
+      "responsibility": "Move queue-only responsibility to cy_queue",
+      "interface": "Wire/coordination compatibility retained in sibling",
+      "layer": "extracted",
+      "allowed_dependencies": [
+        "CY documented shared interfaces"
+      ],
+      "forbidden_dependencies": [
+        "CY reverse import"
+      ],
+      "effects": "Transferred to queue outer adapters",
+      "contracts": [
+        "cy-imports"
+      ],
+      "already_applied": true
+    },
+    {
+      "id": "gpu_identity",
+      "path": "src/clearml_yolo/core/gpu_identity.py",
+      "change": "remove",
+      "responsibility": "Move queue-only responsibility to cy_queue",
+      "interface": "Wire/coordination compatibility retained in sibling",
+      "layer": "extracted",
+      "allowed_dependencies": [
+        "CY documented shared interfaces"
+      ],
+      "forbidden_dependencies": [
+        "CY reverse import"
+      ],
+      "effects": "Transferred to queue outer adapters",
+      "contracts": [
+        "cy-imports"
+      ],
+      "already_applied": true
+    },
+    {
+      "id": "detector-integration",
+      "path": "src/clearml_yolo/adapters/integrations/detectors.py",
+      "change": "modify",
+      "responsibility": "Prepare source for recovered detector references independently of selected family",
+      "interface": "Prediction resolves only descriptor-required native source and accumulates separate asset provenance",
+      "layer": "adapter integration",
+      "allowed_dependencies": [
+        "core",
+        "application ports/contracts",
+        "assets.execution",
+        "clearml.session",
+        "native backend adapters"
+      ],
+      "forbidden_dependencies": [
+        "cy_queue",
+        "entrypoints"
+      ],
+      "effects": "Coordinates outer asset preparation and native loading; backend preserves checkpoint transformations",
+      "contracts": [
+        "cy-imports"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "cy-imports",
+      "path": "tests/test_architecture.py",
+      "status": "existing",
+      "rules": "Exhaustive inward dependencies, SDK ownership, no reverse queue imports including injected forbidden edges",
+      "check": "architecture"
+    }
+  ],
+  "checks": [
+    {
+      "id": "architecture",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync lint-imports && uv run --frozen --no-sync pytest tests/test_architecture.py",
+      "expectation": "Production graph passes and injected forbidden edges fail",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/003-portable-training/evidence/2026-10-23-integration.md"
+      }
+    },
+    {
+      "id": "tests",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync pytest",
+      "expectation": "Routine suite passes including replay and assets regressions",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/003-portable-training/evidence/2026-10-23-integration.md"
+      }
+    },
+    {
+      "id": "static",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync ruff check . && uv run --frozen --no-sync mypy .",
+      "expectation": "Ruff and strict typing pass",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/003-portable-training/evidence/2026-10-23-integration.md"
+      }
+    },
+    {
+      "id": "docs",
+      "kind": "documentation",
+      "command": "uv run --frozen --no-sync python scripts/check_docs.py --all",
+      "expectation": "Markdown and local links pass; new files checked explicitly before staging",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/003-portable-training/evidence/2026-10-23-integration.md"
+      }
+    },
+    {
+      "id": "native-agent",
+      "kind": "behavior",
+      "command": "Externally prepared clearml-agent execute --standalone-mode --cpu-only for recorded bare train and pipeline tasks; force-download task/model publication",
+      "expectation": "Same-task native execution, backend restoration, script metadata preservation, canonical selectors and publication verified",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/003-portable-training/evidence/2026-10-23-integration.md"
+      }
+    },
+    {
+      "id": "native-family",
+      "kind": "behavior",
+      "command": "Existing cy-train one-epoch DEIMv2/s, RF-DETR/nano and Faster R-CNN/resnet50_fpn with automatic pretrained resolution; force-download and reload outputs",
+      "expectation": "Native training and publication verified for each affected family",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/003-portable-training/evidence/2026-10-23-native-families.md"
+      }
+    },
+    {
+      "id": "physical-queue",
+      "kind": "behavior",
+      "command": "Observe default 2 GiB rejection; real cy-queue train and pipeline under documented isolated real-inventory test ceiling, retaining shared locks/guardians; verify GPU execution and downloaded task/model publication",
+      "expectation": "Real queue GPU execution, lifecycle and publication pass with explicit test-profile limitation; production 2 GiB policy unchanged and separately verified",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/003-portable-training/evidence/2026-10-23-live-queue.md"
+      }
+    },
+    {
+      "id": "compatible-installation",
+      "kind": "behavior",
+      "command": "Offline source-first installation of copied current CY source with intended 0.38.0 metadata, then queue0.1.0, using isolated reused prepared dependencies; uv pip check and installed CLI/resource checks",
+      "expectation": "Candidate compatible versions satisfy declared dependency range; CY and queue own respective entrypoints; DEIM manifest included; help/config inspection resolve no assets",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/003-portable-training/evidence/2026-10-23-integration.md"
+      }
+    }
+  ],
+  "documentation": "README, queue migration, backend/assets, filesystem, Agent startup, import/module contracts, baseline and portable corp-skills usage/evaluation.",
+  "review": {
+    "status": "accepted",
+    "reviewer": "Fresh native independent code/architecture review and bounded fix re-review",
+    "evidence": "specs/003-portable-training/evidence/2026-10-23-review.md",
+    "reconciliation": "Compared current task-owned additions/removals and cross-package extraction, source/native bridges, startup lifecycle, dependencies and all contract tests/documentation. Local tool.uv.sources and pre-existing corp-skills cache edits remain excluded. Fresh independent live-evidence review verified single-GPU execution, publication and cleanup under the documented test ceiling; release remains separately tracked."
+  }
+}

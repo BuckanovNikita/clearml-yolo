@@ -53,6 +53,7 @@ from clearml_yolo.adapters.storage.filesystem import temporary_root
 from clearml_yolo.application.contracts import (
     ClearMLConfig as ClearMLConfig,  # noqa: PLC0414 - typed adapter interface
 )
+from clearml_yolo.core.assets import ResolvedAsset
 from clearml_yolo.core.presentation import human_text
 from clearml_yolo.core.redaction import (
     sanitize_configuration as sanitize_configuration,  # noqa: PLC0414 - typed adapter re-export
@@ -78,6 +79,40 @@ FINALIZATION_TIMEOUT_SECONDS = 600.0
 Task = Any
 
 
+@dataclass(frozen=True)
+class RemoteReplay:
+    """Detached Agent inputs read before native runtime initialization."""
+
+    task_id: str
+    canonical: dict[str, Any] | None
+    parameters: dict[str, Any]
+
+
+def fetch_remote_replay() -> RemoteReplay | None:
+    """Read one Agent snapshot without starting a task or native package discovery."""
+    if _is_worker():
+        return None
+    from clearml import Task
+    from clearml.config import get_remote_task_id, running_remotely
+
+    if not running_remotely():
+        return None
+    task_id = get_remote_task_id()
+    if not task_id:
+        raise RuntimeError("ClearML Agent execution has no remote task identifier")
+    with sdk_deadline(FINALIZATION_TIMEOUT_SECONDS):
+        task: Any = Task.get_task(task_id=task_id)
+        canonical = _remote_run_configuration(task)
+        if canonical is not None:
+            if not isinstance(canonical, Mapping):
+                raise TypeError("ClearML run configuration override must be a mapping")
+            if not canonical:
+                raise ValueError("Effective ClearML run configuration must not be empty")
+            canonical = _plain_config_document(canonical)
+        parameters = _plain_config_document(task.get_parameters(cast=True) or {})
+    return RemoteReplay(str(task_id), canonical, parameters)
+
+
 def prepare_native_parameters(values: Mapping[str, Any]) -> dict[str, Any]:
     """Build the sanitized scientific view published by native owner callbacks."""
     return cast(dict[str, Any], sanitize_configuration(project_native_parameters(values)))
@@ -99,8 +134,12 @@ def replay_training_parameters(task: Any, values: Mapping[str, Any]) -> dict[str
     """Read remote scientific overrides without publishing unvalidated or private values."""
     if _is_worker():
         return dict(values)
-    _active_state(task, "Training parameter replay")
-    inherited = task.get_parameters(cast=True) or {}
+    active = _active_state(task, "Training parameter replay")
+    inherited = (
+        active.remote_replay.parameters
+        if active.remote_replay is not None
+        else task.get_parameters(cast=True) or {}
+    )
     scientific = project_native_parameters(values)
     sanitized = prepare_native_parameters(values)
     overrides = {
@@ -157,6 +196,8 @@ class _InvocationState:
     task: Any
     stages: list[str]
     current_stage: str
+    remote_replay: RemoteReplay | None = None
+    model_assets: dict[tuple[str, str], ResolvedAsset] = field(default_factory=dict)
     artifacts: list[_ArtifactRecord] = field(default_factory=list)
     table_by_digest: dict[str, str] = field(default_factory=dict)
     table_remote_by_key: dict[tuple[str, str], str] = field(default_factory=dict)
@@ -476,6 +517,7 @@ def invocation(
     resolved_config: Any | None = None,
     *,
     config_resolver: Callable[[Any], Any] | None = None,
+    remote_replay: RemoteReplay | None = None,
 ) -> Iterator[Any]:
     """Own the sole ClearML task and its terminal status for one CLI invocation."""
     if _is_worker():
@@ -551,6 +593,9 @@ def invocation(
             state = stack.enter_context(
                 _task_owner(task, config, stage, config_resolver, owns_signal, previous_sigterm)
             )
+            state.remote_replay = remote_replay
+            if remote_replay is not None and str(task.id) != remote_replay.task_id:
+                raise RuntimeError("ClearML invocation joined a different task than Agent replay")
             state.console_publisher = _start_console_publisher(task, captured)
             publish_script(task, stage)
             write_progress(task_url=str(task.get_output_log_web_page()))
@@ -933,6 +978,20 @@ def publish_run_configuration(
     _publish_json(task, "run_overrides", sanitize_configuration(differences))
 
 
+def publish_model_assets(task: Any, assets: tuple[ResolvedAsset, ...]) -> None:
+    """Keep resolved local paths outside canonical executable replay inputs."""
+    if _is_worker() or not assets:
+        return
+    state = _active_state(task, "Model asset provenance publication")
+    for asset in assets:
+        state.model_assets[(asset.canonical_url, str(asset.path))] = asset
+    _publish_json(
+        task,
+        "model_assets",
+        {"assets": [asset.model_dump(mode="json") for asset in state.model_assets.values()]},
+    )
+
+
 @trace_operation("clearml.configuration.record")
 def record_run_configuration(task: Any, values: dict[str, Any]) -> dict[str, Any]:
     """Merge result provenance while preserving explicit native replay settings."""
@@ -991,7 +1050,11 @@ def replay_configuration(
         raise ValueError("Canonical run configuration must not be empty")
     # Canonical replay must not inherit the SDK's ignore-override parameter or
     # expose connected proxy containers to Hydra/application configuration.
-    canonical = _remote_run_configuration(task)
+    canonical = (
+        active.remote_replay.canonical
+        if active.remote_replay is not None
+        else _remote_run_configuration(task)
+    )
     effective = values if canonical is None else canonical
     if not isinstance(effective, Mapping):
         raise TypeError("ClearML run configuration override must be a mapping")
@@ -1008,7 +1071,11 @@ def replay_configuration(
         # full snapshot without reconnecting excluded parameters. A present native
         # group, even an empty one, always owns its values.
         native = _plain_config_document(values.get("ultralytics", {}))
-        inherited = task.get_parameters(cast=True) or {}
+        inherited = (
+            active.remote_replay.parameters
+            if active.remote_replay is not None
+            else task.get_parameters(cast=True) or {}
+        )
         for key in ("device", "data", "exist_ok"):
             if f"General/{key}" in inherited:
                 native[key] = inherited[f"General/{key}"]

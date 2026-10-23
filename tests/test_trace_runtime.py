@@ -2,7 +2,6 @@
 
 import gc
 import os
-import subprocess
 import sys
 from collections.abc import Callable, Iterator
 from pathlib import Path
@@ -17,7 +16,6 @@ from clearml_yolo.adapters.integrations import native_runtime as runtime_module
 from clearml_yolo.adapters.integrations.native_ddp import NativeDDPRelay
 from clearml_yolo.adapters.integrations.training import execute_training
 from clearml_yolo.adapters.observability.tracing import trace_task
-from clearml_yolo.adapters.runtime import gpu_resources
 from clearml_yolo.adapters.storage.filesystem import initialize_filesystem, temporary_root
 from clearml_yolo.application.contracts import PreparedDataset
 
@@ -31,20 +29,6 @@ def traces(monkeypatch: pytest.MonkeyPatch) -> Iterator[list[str]]:
         yield messages
     finally:
         logger.remove(sink)
-
-
-def test_probe_failure_diagnostics_do_not_echo_subprocess_payload(
-    monkeypatch: pytest.MonkeyPatch,
-    traces: list[str],
-) -> None:
-    result = SimpleNamespace(returncode=1, stderr="probe-secret", stdout="")
-    monkeypatch.setattr(subprocess, "run", lambda *_args, **_kwargs: result)
-    with pytest.raises(RuntimeError, match="failed"):
-        gpu_resources.GPUInventory().visible()
-    text = "\n".join(traces)
-    assert "FAILED gpu.visibility_probe" in text
-    assert "FAILED gpu.visibility" in text
-    assert "probe-secret" not in text
 
 
 @pytest.mark.parametrize("initialized", [False, True])

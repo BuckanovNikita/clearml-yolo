@@ -14,7 +14,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from uuid import uuid4
 from xml.etree.ElementTree import Element, SubElement, tostring
@@ -247,17 +247,6 @@ def environment_for(evidence: Evidence, *, instrument: bool = False) -> dict[str
     return environment
 
 
-def _queue_command(root: Path, *arguments: str) -> list[str]:
-    return [
-        sys.executable,
-        "-m",
-        "clearml_yolo.entrypoints.queue",
-        "--root",
-        str(root / "queue"),
-        *arguments,
-    ]
-
-
 def _wait(check: Callable[[], Any], deadline: float, description: str) -> Any:
     while time.monotonic() < deadline:
         value = check()
@@ -275,37 +264,6 @@ def _stop_owned(process: subprocess.Popen[Any], deadline: float) -> None:
         except subprocess.TimeoutExpired:
             process.kill()
             process.wait(timeout=10)
-
-
-def _job(evidence: Evidence, environment: dict[str, str], identifier: str) -> dict[str, Any]:
-    result = evidence.command(
-        _queue_command(evidence.root, "list", "--json"), environment, timeout=30
-    )
-    view = json.loads(result.stdout)
-    job = next(job for job in view["jobs"] if job["id"] == identifier)
-    transitions = evidence.data.setdefault("queue_transitions", [])
-    if not transitions or transitions[-1]["state"] != job["state"]:
-        transitions.append({"observed_at": time.time(), **job})
-    return cast(dict[str, Any], job)
-
-
-def _claim(
-    evidence: Evidence, environment: dict[str, str], identifier: str
-) -> dict[str, Any] | None:
-    (evidence.root / "job-id").write_text(identifier, encoding="utf-8")
-    evidence.helper("claim", environment)
-    return cast(
-        dict[str, Any] | None, json.loads((evidence.root / "claim-readback.json").read_text())
-    )
-
-
-def _assert_allocation(evidence: Evidence, environment: dict[str, str], identifier: str) -> None:
-    claim = _claim(evidence, environment, identifier)
-    if claim is None or tuple(claim["devices"]) != tuple(evidence.data["uuids"]):
-        raise AssertionError(
-            "Whole physical allocation was not retained through the pipeline stage"
-        )
-    evidence.data.setdefault("allocation_readbacks", []).append(claim)
 
 
 def _prepare_scenario(evidence: Evidence, *, compiled: bool) -> dict[str, str]:
@@ -355,38 +313,7 @@ def _launch_arguments(
     if not queued:
         overrides += [f"ultralytics.device=[{devices}]", "ultralytics_predict.device=0"]
         return [sys.executable, "-m", "clearml_yolo.entrypoints.pipeline", *overrides], None
-    submitted = evidence.command(
-        _queue_command(evidence.root, "submit", "--devices", devices, "--", *overrides), base
-    )
-    identifiers = submitted.stdout.strip().splitlines()
-    if len(identifiers) != 1:
-        raise AssertionError(f"Expected one queued job, received {identifiers}")
-    identifier = identifiers[0]
-    evidence.data["job_id"] = identifier
-    if _job(evidence, base, identifier)["state"] != "pending":
-        raise AssertionError("Submission did not create a pending immutable job")
-    return _queue_command(evidence.root, "worker"), identifier
-
-
-def _cleanup_queue(
-    evidence: Evidence, base: dict[str, str], identifier: str, deadline: float
-) -> None:
-    state = _job(evidence, base, identifier)["state"]
-    if state not in _TERMINAL:
-        evidence.command(_queue_command(evidence.root, "cancel", identifier), base)
-        _wait(
-            lambda: _job(evidence, base, identifier)["state"] in _TERMINAL,
-            deadline,
-            "queue cancellation cleanup",
-        )
-    if _job(evidence, base, identifier)["state"] == "recovery_required":
-        evidence.command(
-            _queue_command(evidence.root, "recover", identifier),
-            base,
-            timeout=max(1, deadline - time.monotonic()),
-        )
-    if _claim(evidence, base, identifier) is not None:
-        raise AssertionError("Owned allocation remains claimed after cleanup")
+    raise ValueError("Queued physical acceptance belongs to the cy-queue test suite")
 
 
 def _cleanup_scenario(
@@ -397,12 +324,6 @@ def _cleanup_scenario(
 ) -> None:
     deadline = time.monotonic() + evidence.options.cleanup_timeout
     errors: list[str] = []
-    if identifier:
-        try:
-            _cleanup_queue(evidence, base, identifier, deadline)
-        except Exception as error:  # noqa: BLE001 - retain diagnostics and always attempt cleanup
-            # Report every queue failure while still running owned-process cleanup.
-            errors.append(str(error))
     if owner is not None:
         try:
             _stop_owned(owner, deadline)
@@ -448,14 +369,11 @@ def run_scenario(options: GPUOptions, scenario: str, *, queued: bool, compiled: 
                     stdout=log,
                     stderr=subprocess.STDOUT,
                 )
-                if queued and identifier:
-                    _run_queued(evidence, base, identifier, scenario, deadline)
-                else:
-                    owner.wait(timeout=max(0.1, deadline - time.monotonic()))
-                    if owner.returncode != 0:
-                        raise AssertionError(
-                            f"Direct native pipeline exited {owner.returncode}; see owner.log"
-                        )
+                owner.wait(timeout=max(0.1, deadline - time.monotonic()))
+                if owner.returncode != 0:
+                    raise AssertionError(
+                        f"Direct native pipeline exited {owner.returncode}; see owner.log"
+                    )
             evidence.helper("verify", base, timeout=max(0.1, min(180, deadline - time.monotonic())))
             evidence.data["verification"] = json.loads(
                 (evidence.root / "verification.json").read_text()
@@ -463,64 +381,6 @@ def run_scenario(options: GPUOptions, scenario: str, *, queued: bool, compiled: 
         finally:
             _cleanup_scenario(evidence, base, owner, identifier)
     return evidence.root
-
-
-def _run_queued(
-    evidence: Evidence, environment: dict[str, str], identifier: str, scenario: str, deadline: float
-) -> None:
-    fault = scenario in {"queued-rank-exit", "queued-cancel", "queued-guardian-death"}
-    _wait(
-        lambda: _job(evidence, environment, identifier)["state"] == "running",
-        deadline,
-        "queue launch",
-    )
-    _assert_allocation(evidence, environment, identifier)
-    _wait(
-        lambda: len(list(evidence.root.glob("rank-*-started.json"))) == len(evidence.data["uuids"]),
-        deadline,
-        "all physical CUDA ranks",
-    )
-    if fault:
-        _assert_allocation(evidence, environment, identifier)
-        if scenario == "queued-cancel":
-            evidence.command(_queue_command(evidence.root, "cancel", identifier), environment)
-            evidence.command(_queue_command(evidence.root, "cancel", identifier), environment)
-        elif scenario == "queued-guardian-death":
-            evidence.helper("kill-guardian", environment)
-            _wait(
-                lambda: _job(evidence, environment, identifier)["state"] == "recovery_required",
-                deadline,
-                "guardian death quarantine",
-            )
-            _assert_allocation(evidence, environment, identifier)
-            evidence.command(
-                _queue_command(evidence.root, "recover", identifier), environment, timeout=120
-            )
-        else:
-            (evidence.root / "release-training").touch()
-    else:
-        (evidence.root / "release-training").touch()
-        prediction_started = evidence.root / "pipeline-predict-started.json"
-        _wait(prediction_started.exists, deadline, "post-training prediction/validation")
-        _assert_allocation(evidence, environment, identifier)
-        (evidence.root / "release-predict").touch()
-
-    def terminal_job() -> dict[str, Any] | None:
-        job = _job(evidence, environment, identifier)
-        return job if job["state"] in _TERMINAL else None
-
-    final = _wait(
-        terminal_job,
-        deadline,
-        "queue finalization",
-    )
-    expected = "failed" if scenario == "queued-rank-exit" else "cancelled" if fault else "completed"
-    if final["state"] != expected:
-        raise AssertionError(
-            f"Expected {expected}, observed {final['state']}: {final.get('error')}"
-        )
-    if _claim(evidence, environment, identifier) is not None:
-        raise AssertionError("Terminal queue job retained an owned whole-GPU claim")
 
 
 def checkpoint_sha256(path: Path) -> str:

@@ -15,7 +15,7 @@ import pandas as pd
 import yaml
 
 from clearml_yolo.adapters.observability.progress import image_progress
-from clearml_yolo.adapters.storage.filesystem import validate_output_tree, write_path
+from clearml_yolo.adapters.storage.filesystem import validate_output_tree
 from clearml_yolo.application.contracts import PREDICTION_COLUMNS, PreparedDataset
 from clearml_yolo.core.models import (
     BackendTrainResult,
@@ -140,12 +140,11 @@ def train(
     training = importlib.import_module("rfdetr.training")
     lightning = importlib.import_module("pytorch_lightning")
     lightning.seed_everything(settings.seed, workers=True)
-    variant, filename = _VARIANTS[config.preset]
+    variant, _ = _VARIANTS[config.preset]
     constructor = getattr(sdk, variant)
     initial = settings.weights
     if initial is None and settings.pretrained:
-        initial = write_path(output / "pretrained" / filename)
-        initial.parent.mkdir(parents=True, exist_ok=True)
+        raise ValueError("Prepare the RF-DETR pretrained asset before native construction")
     model = constructor(
         pretrain_weights=str(initial.resolve()) if initial is not None else None,
         device=device,

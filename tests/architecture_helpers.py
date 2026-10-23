@@ -26,7 +26,7 @@ ADAPTER_RESPONSIBILITIES = {
     "rfdetr",
     "fasterrcnn",
     "export",
-    "queue",
+    "assets",
 }
 COMMANDS = {
     "pipeline",
@@ -40,7 +40,6 @@ COMMANDS = {
     "config_tree",
     "dedup",
     "export",
-    "queue",
 }
 SCIENTIFIC = {"pydantic", "pandera", "pandas", "numpy", "scipy"}
 PURE_ADAPTERS = {
@@ -56,7 +55,9 @@ APPLICATION_EFFECT_DEPENDENCIES = {
     "filelock",
 }
 SDK_OWNERS = {
-    "textual": ("clearml_yolo.entrypoints.queue_tui",),
+    "textual": (),
+    "pynvml": (),
+    "cy_queue": (),
     "ultralytics": (
         "clearml_yolo.adapters.yolo",
         "clearml_yolo.adapters.integrations.native_runtime",
@@ -75,6 +76,7 @@ SDK_OWNERS = {
         "clearml_yolo.adapters.fasterrcnn.evaluation",
         "clearml_yolo.adapters.fasterrcnn.inference",
         "clearml_yolo.adapters.fasterrcnn.model",
+        "clearml_yolo.adapters.fasterrcnn.assets",
         "clearml_yolo.adapters.fasterrcnn.training",
         "clearml_yolo.adapters.fasterrcnn.transform",
         "clearml_yolo.adapters.export.onnx",
@@ -86,14 +88,16 @@ SDK_OWNERS = {
     "torchvision": (
         "clearml_yolo.adapters.deim.backend",
         "clearml_yolo.adapters.fasterrcnn.model",
+        "clearml_yolo.adapters.fasterrcnn.assets",
         "clearml_yolo.adapters.fasterrcnn.transform",
         "clearml_yolo.adapters.export.tensors",
     ),
     "timm": (
         "clearml_yolo.adapters.export.swin",
         "clearml_yolo.adapters.fasterrcnn.model",
+        "clearml_yolo.adapters.fasterrcnn.assets",
     ),
-    "rfdetr": ("clearml_yolo.adapters.rfdetr.backend",),
+    "rfdetr": ("clearml_yolo.adapters.rfdetr.backend", "clearml_yolo.adapters.rfdetr.assets"),
     "pytorch_lightning": ("clearml_yolo.adapters.rfdetr.backend",),
     "pycocotools": (
         "clearml_yolo.adapters.fasterrcnn.evaluation",
@@ -116,8 +120,7 @@ SDK_OWNERS = {
     "hydra_zen": ("clearml_yolo.entrypoints.hydra",),
     "omegaconf": ("clearml_yolo.entrypoints.hydra",),
 }
-# Queue submission probes CUDA visibility in a disposable process; direct commands do not wait.
-SDK_EXCEPTIONS = {("clearml_yolo.adapters.runtime.gpu_probe", "torch")}
+SDK_EXCEPTIONS: set[tuple[str, str]] = set()
 ADAPTER_PEERS = {
     "storage": {"observability"},
     "observability": set(),
@@ -127,7 +130,7 @@ ADAPTER_PEERS = {
     "clearml": {"storage", "observability"},
     "fiftyone": {"observability"},
     "runtime": {"observability"},
-    "queue": {"runtime"},
+    "assets": {"storage", "observability"},
     "integrations": {"storage", "observability"},
     "deim": {"observability"},
     "rfdetr": {"observability"},
@@ -136,6 +139,17 @@ ADAPTER_PEERS = {
 }
 # These edges implement explicit cross-adapter coordination or data conversion.
 PEER_EXCEPTIONS = {
+    ("clearml_yolo.adapters.integrations.detectors", "clearml_yolo.adapters.assets.execution"),
+    ("clearml_yolo.adapters.integrations.detectors", "clearml_yolo.adapters.clearml.session"),
+    ("clearml_yolo.adapters.assets.execution", "clearml_yolo.adapters.deim.assets"),
+    ("clearml_yolo.adapters.assets.execution", "clearml_yolo.adapters.deim.source"),
+    ("clearml_yolo.adapters.assets.execution", "clearml_yolo.adapters.fasterrcnn.assets"),
+    ("clearml_yolo.adapters.assets.execution", "clearml_yolo.adapters.rfdetr.assets"),
+    ("clearml_yolo.adapters.assets.sources", "clearml_yolo.adapters.deim.assets"),
+    ("clearml_yolo.adapters.deim.backend", "clearml_yolo.adapters.assets.sources"),
+    ("clearml_yolo.adapters.deim.source", "clearml_yolo.adapters.assets.sources"),
+    ("clearml_yolo.adapters.deim.source", "clearml_yolo.adapters.assets.archive"),
+    ("clearml_yolo.adapters.deim.source", "clearml_yolo.adapters.storage.filesystem"),
     ("clearml_yolo.adapters.deim.backend", "clearml_yolo.adapters.storage.filesystem"),
     ("clearml_yolo.adapters.rfdetr.backend", "clearml_yolo.adapters.storage.filesystem"),
     ("clearml_yolo.adapters.fasterrcnn.training", "clearml_yolo.adapters.storage.filesystem"),
@@ -346,9 +360,8 @@ def layer(module: str) -> str | None:
     responsibilities: dict[str, set[str] | None] = {
         "core": None,
         "adapters": ADAPTER_RESPONSIBILITIES,
-        "application": {"contracts", "ports", "evaluation", "ground_truth", "use_cases", "queue"},
-        "entrypoints": COMMANDS
-        | {"composition", "hydra", "queue_tui", "queue_run", "queue_presentation"},
+        "application": {"contracts", "ports", "evaluation", "ground_truth", "use_cases"},
+        "entrypoints": COMMANDS | {"composition", "hydra"},
     }
     selected = pieces[1]
     if selected not in responsibilities:
@@ -360,20 +373,11 @@ def layer(module: str) -> str | None:
 
 
 def launch_target_findings(importer: str, targets: set[str]) -> list[str]:
-    direct = {f"clearml_yolo.entrypoints.{name}" for name in COMMANDS - {"queue"}}
-    direct.update({"clearml_yolo.entrypoints.hydra.common", "clearml_yolo.entrypoints.composition"})
-    forbidden = (
-        "clearml_yolo.adapters.queue",
-        "clearml_yolo.application.queue",
-        "clearml_yolo.core.queue",
-        "clearml_yolo.entrypoints.queue_run",
-        "clearml_yolo.entrypoints.queue_presentation",
-        "textual",
-    )
+    forbidden = ("cy_queue", "textual", "pynvml")
     return [
-        f"direct execution imports scheduling: {importer} -> {target}"
+        f"CY imports extracted scheduling: {importer} -> {target}"
         for target in targets
-        if importer in direct and any(within(target, x) for x in forbidden)
+        if within(importer, "clearml_yolo") and any(within(target, x) for x in forbidden)
     ]
 
 
@@ -411,7 +415,6 @@ def _edge_findings(importer: str, imported: str) -> list[str]:
                     "clearml_yolo.application",
                     "clearml_yolo.application.ports",
                     "clearml_yolo.application.contracts",
-                    "clearml_yolo.application.queue",
                 }
             )
         )
@@ -926,10 +929,22 @@ def runtime_boundary_findings(source_root: Path) -> list[str]:
     findings: list[str] = []
     for path in source_root.rglob("*.py"):
         importer = ".".join(path.relative_to(source_root).with_suffix("").parts)
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        # A literal used solely as a comparison value is a selector, not a
+        # launch target (for example rejection of the retired cy_queue launcher).
+        selectors = {
+            id(value)
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Compare)
+            for value in (node.left, *node.comparators)
+            if isinstance(value, ast.Constant)
+        }
         targets = {
             node.value
-            for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
-            if isinstance(node, ast.Constant) and isinstance(node.value, str)
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and id(node) not in selectors
         }
         findings.extend(launch_target_findings(importer, targets))
     return findings

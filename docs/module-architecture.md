@@ -14,8 +14,9 @@ flowchart TD
     Adapter --> Core
     Ports --> Core
     Adapter --> Effects[Filesystem, SDKs, network, processes and rendering]
-    Queue[Queue adapters] --> Runtime[Runtime process supervision]
-    Entry -. queued commands only .-> Queue
+    Queue[cy_queue adapters] --> Runtime[CY runtime process supervision]
+    QueueEntry[cy_queue entrypoints and CY integration] --> Queue
+    QueueEntry --> Entry
 ```
 
 | Boundary | Input → output | Invariant and owner | Failure behavior / check |
@@ -25,7 +26,8 @@ flowchart TD
 | Application | Records and ports → workflow results | Effects cross explicit ports; no concrete adapters or SDK construction | Propagate required computation/publication failure; workflow tests |
 | Core | Values → policy, validation and evaluation records | No filesystem, environment, process, network or SDK effects | Explicit validation errors; architecture negative fixtures |
 | Evaluation / reporting | Scientific inputs → values / rendered reports | Evaluation owns pinned metric integration; reporting owns workbook/plot writes | Geometry policy and metric parity tests; no hidden rendering during computation |
-| Queue / runtime | Requests and process identities → claims and cleanup evidence | Queue owns admission; runtime owns scoped process supervision | Unknown coordination fails closed; real subprocess and generation tests |
+| Assets | Typed source request → verified local path and provenance | CY outer resolver owns HTTP/cache/locks/extraction; backend owns native loading | Explicit missing inputs fail; proxy/offline/integrity and native-loader tests |
+| cy_queue / CY runtime | Requests and process identities → claims and cleanup evidence | Separate queue owns admission; CY runtime owns scoped process supervision and lifecycle messages | Unknown coordination fails closed; queue subprocess/generation tests and CY lifecycle tests |
 
 Adapter peer permissions and exact bridges are enumerated in the
 [boundary guide](import-boundaries.md#adapter-peers). The drawing does not grant
@@ -33,13 +35,23 @@ every adapter access to every effect or peer. Package initializers remain inert.
 Static AST checks cover supported source syntax, not arbitrary runtime reflection
 or third-party internals; installed and native checks provide separate evidence.
 
-Queue configuration reads and host binding belong to queue adapters; entrypoints inject
+Queue configuration reads and host binding belong to the separate `cy_queue` adapters;
+its entrypoints inject
 the resolved metadata and coordination locations into storage, workers and guardians.
 Core queue records own stable-reference resolution and archive metadata; application
 ports own archive/restore and view selection. Storage retains complete ordering history
 and atomically writes owner sidecars. Pure presentation helpers format readable references;
 terminal, ClearML and workbook adapters own output effects while preserving exact source
-provenance. Direct commands remain independent of queue and Textual imports.
+provenance. CY has no reverse imports of `cy_queue`, Textual or NVML; the queue
+consumes documented CY process, lifecycle and configuration interfaces. Direct
+commands and ClearML Agent execution remain independent of queue installation.
+See the [cross-package contract](queue.md#cy-integration-interfaces).
+
+The ClearML adapter returns a detached remote replay snapshot before runtime
+selection. Entrypoint composition validates restored inputs, selects the runtime
+and joins the same task through the invocation lifecycle. Asset resolution occurs
+after canonical publication and updates only execution copies; the separate ClearML
+`model_assets` Configuration Object records paths, original source URLs and content hashes.
 
 ## Cross-contract integration
 

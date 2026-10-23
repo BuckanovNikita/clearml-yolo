@@ -22,12 +22,14 @@ source overrides intact. From the project checkout, install the complete runtime
 uv sync --frozen
 ```
 
-Torch, Torchvision, RF-DETR training, timm, COCO evaluation, ONNX, ONNX Runtime and
-the queue TUI are default runtime dependencies. Project extras are removed;
+Torch, Torchvision, RF-DETR training, timm, COCO evaluation, ONNX and ONNX Runtime
+are CY runtime dependencies. The queue TUI and NVML belong to the separate
+[cy-queue source installation](queue.md#installation). Project extras are removed;
 dependency lower bounds and compatibility constraints live in
 [`pyproject.toml`](../pyproject.toml), and `uv.lock` records selected versions.
 Upstream extras such as `rfdetr[train]` remain part of those runtime declarations.
-DEIMv2 additionally needs its verified source checkout below.
+DEIMv2 uses its approved source revision, resolved automatically or supplied as
+the verified checkout described below.
 TensorRT and its matching CUDA runtime
 are separate deployment prerequisites; see the [TensorRT deployment guide](tensorrt-deployment.md).
 No model SDK or ClearML task is initialized by configuration export or composition.
@@ -100,32 +102,43 @@ sidecar described below. Inputs without training provenance require an explicit
 
 ### DEIMv2 source and initialization
 
-DEIMv2 loads its source privately from `model.source_dir`. Prepare a separate checkout:
+With `model.source_dir=null`, execution prepares the archive of approved revision
+`1d2ca42171570c713e78fc6a766ec5104b7f4724`, verifies its code/configuration against
+the packaged manifest and extracts it beneath `CY_HOME`. Help, configuration
+inspection and queue submission do not download or extract source. An explicit
+checkout remains authoritative and must have the approved revision with unchanged
+tracked code/configuration and no unexpected code/configuration files.
+
+For an explicit checkout, prepare it separately:
 
 ```bash
 git clone https://github.com/Intellindust-AI-Lab/DEIMv2.git ./vendor/DEIMv2
 git -C ./vendor/DEIMv2 checkout 1d2ca42171570c713e78fc6a766ec5104b7f4724
 ```
 
-The loader checks this exact revision and rejects changed or untracked files under
-`engine/` or `configs/`. Git must be available. Keep pretrained assets outside those
-source directories. A current branch checkout is not interchangeable with the pinned recipe.
+Keep assets outside `engine/` and `configs/`. A branch head is not interchangeable
+with the pinned source. Git validates explicitly supplied checkouts; managed source
+archives use the packaged content manifest and need no synthetic Git repository.
 
-Pretrained DEIMv2 training requires an explicit compatible full detector checkpoint or
-backbone asset. For example, after obtaining the matching S backbone asset:
+Training with `pretrained=true` and no explicit weights resolves the matching
+DEIM backbone. An explicit `model.train.backbone_weights` file selects a compatible
+backbone; `model.train.weights` instead uses native detector tuning and class-head
+adjustment. Missing explicit files fail rather than falling back to a download.
+DEIM prediction still needs source, but never requests pretrained initialization.
 
 ```bash
-cy-train model=deimv2/s model.source_dir=./vendor/DEIMv2 \
-  ground_truth=./ground_truth.csv model.train.device=0 model.train.epochs=20 \
-  model.train.backbone_weights=./weights/deimv2-s-backbone.pth \
+cy-train model=deimv2/s ground_truth=./ground_truth.csv \
+  model.train.device=0 model.train.epochs=20 \
   clearml.project_name=detection clearml.task_name=deimv2-s \
   'clearml.tags=[deimv2,experiment]'
 ```
 
-The asset name above is a local example, not a downloadable model identifier.
-`model.train.weights=./weights/deimv2-s-detector.pth` instead uses native detector tuning
-with a compatible backbone and native class-head adjustment. DEIM prediction also needs
-the verified `source_dir`; it loads the selected checkpoint without pretrained initialization.
+The [asset guide](model-assets.md) defines source/cache paths, GitHub proxy semantics,
+access-gated assets and offline recovery. It also covers RF-DETR and every Faster
+R-CNN preset. Canonical replay retains original selectors including nulls; resolved
+paths, original URLs and hashes are recorded in the separate `model_assets`
+ClearML Configuration Object. Dependencies remain
+externally installed, and Ultralytics downloads and defaults remain unchanged.
 
 ## Training and prediction controls
 
@@ -151,8 +164,9 @@ YOLO-only population controls, such as class filters, that a native backend cann
 | `amp`, `use_ema` | `true`, `true` | Native mixed precision and exponential moving average |
 | `grad_accum_steps` | 1 | Gradient accumulation; DEIMv2 currently requires 1 |
 
-RF-DETR supports full native `weights`, or downloads its preset pretrained detector into
-the run when `pretrained=true` and no weights are supplied. It rejects `backbone_weights`.
+RF-DETR supports full native `weights`, or resolves its preset pretrained detector
+from the existing asset registry when `pretrained=true` and no weights are supplied.
+Managed assets use the [model cache](model-assets.md#cache-locations), not a per-run download. It rejects `backbone_weights`.
 Faster R-CNN uses Torchvision/timm pretrained backbones with task-specific detection heads;
 `backbone_weights` selects a compatible local backbone state, and `weights` loads a full
 detector state strictly. Full detector weights must match the architecture and class-head
@@ -191,15 +205,18 @@ fail explicitly; the existing Ultralytics DDP behavior does not imply native DDP
 for these adapters. MPS is not an accepted cross-backend execution target in this guide.
 
 Direct commands pass `model.train.device` and `model.predict.device` to the native
-backend without admission, waiting or remapping. Use `cy-queue submit --gpus 1 -- ...`
-to schedule a complete pipeline. The [queue](queue.md) supplies the allocated device
+backend without admission, waiting or remapping. Install the separate queue and use
+`cy-queue submit --gpus 1 -- ...` for a complete pipeline, or
+`cy-queue submit --command train --gpus 1 -- ...` for standalone training. The [queue](queue.md) supplies the allocated device
 to GPU phases and preserves explicit CPU phases. Comparison uses one shared inference
 device for both models. The former `queue.*` and `autogpu.*` settings are rejected.
 
-Queue snapshots preserve resource requests and validate installation identity before execution.
-A replay that changes between Ultralytics and a new-backend runtime is rejected: relaunch
-with the matching `model=` selection. Changes between new-backend presets retain the
-generic detector runtime but still undergo model and resource validation.
+Queue snapshots preserve resource requests and validate both package identities before
+execution. ClearML Agent execution restores one detached canonical configuration before
+required-input validation and runtime selection, including a backend different from the
+local default. It joins the same task and preserves Agent-provided CUDA visibility and
+native logical devices without queue configuration or reservations. See
+[Agent execution](runtime-isolation.md#clearml-agent-execution).
 
 ## Data, checkpoints and comparison
 
@@ -253,8 +270,9 @@ Replace the vocabulary, thresholds and preprocessing with the checkpoint's actua
 The example requires a compatible full Faster R-CNN state; metadata does not convert an
 arbitrary external architecture. Use `candidate_model` for the other side, and
 `compare.baseline_model`/`compare.candidate_model` inside `cy` configuration. Explicit
-metadata is asserted against an embedded descriptor when one exists. For a raw DEIMv2
-reference, also supply its verified `source_dir` (or select it in the DEIM model group).
+metadata is asserted against an embedded descriptor when one exists. DEIMv2 references
+prepare verified source during execution even when another detector family is selected.
+An explicit `source_dir` assertion remains authoritative and must pass checkout validation.
 If both sides reference the same checkpoint, its resolved model metadata must agree.
 Different display labels and class thresholds remain valid.
 

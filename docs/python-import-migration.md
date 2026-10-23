@@ -28,7 +28,9 @@ The table below also identifies interfaces extracted beyond a mechanical move.
 | `clearml_*` integrations | `clearml_yolo.adapters.clearml` modules named in the migration map |
 | `publishing.models` and FiftyOne integration | `clearml_yolo.core.publication` and `clearml_yolo.adapters.fiftyone` |
 | Filesystem/dataset/cache/run operations | `clearml_yolo.adapters.storage` modules named in the migration map |
-| Direct execution and shared queue | `clearml_yolo.entrypoints.hydra.common`; queue policy/application in `core.queue`, `application.queue`, adapters in `adapters.queue`, CLI in `entrypoints.queue` |
+| Direct execution | `clearml_yolo.entrypoints.hydra.common` |
+| Queue policy, storage, GPU inventory, guardians and CLI/TUI | Separate `cy-queue` distribution: `cy_queue.core`, `cy_queue.application`, `cy_queue.adapters`, `cy_queue.entrypoints` |
+| Shared process supervision and lifecycle communication | `clearml_yolo.adapters.runtime.process_tree`, `supervision`, `execution_lifecycle` |
 | Project workspace and retained invocation scratch | `clearml_yolo.adapters.runtime.bootstrap` |
 | Native training, DDP and mixed integration lifecycle | `clearml_yolo.adapters.integrations` |
 
@@ -71,11 +73,15 @@ Do not copy obsolete `_target_` strings back into the new tree. Workflow depende
 are composed by the invocation entrypoint and are not a user YAML setting.
 
 Update handwritten dotted targets in notebooks, scripts, custom Hydra groups, callbacks
-and plugin integrations using the migration map. Repository-managed entrypoints,
-GPU probe, DDP callbacks and FiftyOne extension targets follow the new locations.
+and plugin integrations using the migration map. CY-managed entrypoints, DDP
+callbacks and FiftyOne extension targets follow the current locations. The queue
+GPU probe and guardian targets now belong to `cy_queue`; there are no reverse
+imports or compatibility aliases in CY.
 Direct commands use sequential BasicLauncher without queue controls. Use `cy-queue`
-for immutable batch submissions and GPU allocation; regenerate configurations containing
-removed queue/autogpu settings. See [the queue contract](queue.md).
+from its separately installed source package for immutable pipeline or standalone
+training submissions and GPU allocation; regenerate configurations containing
+removed queue/autogpu settings. Preserve old records and follow the coordinated
+[offline upgrade](queue.md#coordinated-package-upgrade). See [the queue contract](queue.md).
 
 Comparison caches now identify checkpoints by content and exclude the reuse-policy
 flag from their keys. The first comparison after upgrading regenerates predictions

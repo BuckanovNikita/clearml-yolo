@@ -14,6 +14,8 @@ beside the selected destination and are cleaned there.
 | Task-owned runs and latest shortcut | `runs/` |
 | Hydra logs and sweeps | `outputs/`, `multirun/` |
 | Shared CSV datasets | `.cache/clearml-yolo/datasets/` |
+| Managed non-YOLO weights | `.cache/clearml-yolo/models/<backend>/<preset>/<asset-id>/<filename>` |
+| Managed DEIM source archive and tree | `.cache/clearml-yolo/sources/DEIMv2/<revision>.tar.gz` and adjacent `<revision>/` |
 | Invocation scratch and capture logs | `.tmp/cy-runtime-*` |
 | Guardian diagnostics and progress | `.cy/queue-logs/`, `.cy/queue-status/` |
 
@@ -43,11 +45,25 @@ AWS credential-provider discovery remains the SDK's responsibility. SDK selector
 files, substitutes private SDK constants, or changes cwd for imports. Relative selectors
 therefore follow the selected library's own semantics.
 
-Unresolved native checkpoint names and remote URIs pass through unchanged; libraries
-determine download/cache locations. Existing local checkpoint strings are recognized as
+Ultralytics checkpoint names and remote URIs pass through unchanged; its library
+determines download/cache locations. Non-YOLO pretrained assets use the explicit
+[asset resolver](model-assets.md), which may reuse verified native library caches
+without changing global SDK settings. Explicit local inputs remain authoritative. Existing local checkpoint strings are recognized as
 `Path` inputs at their original locations, allowing local comparison without cache lookup.
 The application does not redirect native dataset, weight or run defaults through global
 Ultralytics settings. Its explicit training outputs and CSV-prepared data remain project-owned.
+
+### Managed model assets
+
+Asset identities incorporate canonical source, revision and available checksum.
+The resolver checks valid local/cache files before proxy and upstream requests.
+Per-asset locks, temporary sibling downloads and atomic publication keep concurrent
+consumers from observing incomplete files. DEIM extraction rejects unsafe archive
+entries and verifies code/configuration against the packaged approved manifest.
+Manually placing the exact files or source archive at the paths in an error message
+is sufficient for offline reuse; an earlier online receipt is not required.
+Canonical replay retains input selectors. The separate `model_assets` ClearML
+Configuration Object records resolved paths, original URLs and content hashes. See [offline recovery](model-assets.md#offline-placement-and-access).
 
 ### Reuse earlier project-local library paths
 
@@ -70,7 +86,9 @@ placeholders or fallback configuration. It does not migrate or delete old settin
 or credentials. SDKs may cache their own settings after import; changing `CY_HOME` affects
 project paths without rebinding those library settings.
 
-`cy` does not initialize queue storage. Each queue user must fill the TOML file at
+CY execution, including ClearML Agent replay, does not initialize queue storage.
+The separate `cy-queue` package retains the existing locations and namespaces;
+its extraction does not relocate files. Each queue user must fill the TOML file at
 `$XDG_CONFIG_HOME/clearml-yolo/queue.toml` (absolute XDG_CONFIG_HOME), otherwise
 `~/.config/clearml-yolo/queue.toml`; explicit absolute `CY_QUEUE_CONFIG` overrides it.
 The required name, shared metadata `queue.root` and `queue.coordination_root` have no
@@ -126,11 +144,14 @@ see [Python import migration](python-import-migration.md#explicit-programmatic-d
 `native_runtime()` scopes the ClearML enable switch and callbacks in memory, restores each
 modified value on exit, and leaves the Ultralytics settings file untouched. Fresh DDP
 trainers apply the worker callback scope during construction and training. Nested CLI use
-reuses invocation scratch. Detector backends retain their normal configuration and caches.
+reuses invocation scratch. Detector backends retain their normal SDK configuration;
+managed asset paths are supplied through execution-only model copies, not global
+cache changes.
 
 Direct commands preserve native device settings without GPU admission. `cy-queue`
-launches a fresh direct process with explicit UUID visibility and holds all capacity
-until the complete pipeline and its descendants exit. See [queue ownership](queue.md).
+launches a fresh direct process with explicit UUID visibility. It retains the full
+training allocation until acknowledged contraction; the first GPU remains reserved
+through command/descendant exit unless explicitly freed. See [queue ownership](queue.md).
 
 ## Explicit image deduplication
 

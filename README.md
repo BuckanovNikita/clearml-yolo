@@ -10,8 +10,9 @@
 или Python 3.13), настроенный доступ к ClearML с хранилищем артефактов, изображения
 и CSV с выборками `train` и `val`. Для нативных запусков сборка Python и ядро Linux
 должны поддерживать pidfd; одного номера версии недостаточно. Зависимости всех
-поддерживаемых моделей, ONNX-экспорта и TUI входят в обычную установку без extras;
-[установка и внешние требования](TECH_DETAILS.md#setup) описаны отдельно.
+поддерживаемых моделей и ONNX-экспорта входят в обычную установку без extras;
+очередь и её TUI устанавливаются отдельным пакетом `cy-queue`.
+[Установка и внешние требования](TECH_DETAILS.md#setup) описаны отдельно.
 Ниже выбран GPU `0`; для CPU замените соответствующий `device=0`
 на `device=cpu`. Прямые команды начинают работу сразу и не ждут свободного GPU.
 
@@ -24,12 +25,12 @@
 cy-train ground_truth=./ground_truth.csv ultralytics.model=yolo11n.pt ultralytics.device=0 clearml.project_name=detection clearml.task_name=yolo11n-train 'clearml.tags=[yolo,training]'
 ```
 
-**DEIMv2:** подготовьте [исходники утверждённой ревизии и совместимые веса](docs/multi-model-backends.md#deimv2-source-and-initialization).
-`deimv2-s-backbone.pth` здесь — путь к уже полученным весам backbone для пресета S,
-а не имя для автоматического скачивания.
+**DEIMv2:** при выполнении автоматически подготавливаются исходники утверждённой
+ревизии и соответствующие веса backbone. Для закрытой сети доступны
+[прокси и ручное размещение файлов](docs/model-assets.md).
 
 ```bash
-cy-train model=deimv2/s ground_truth=./ground_truth.csv model.source_dir=./vendor/DEIMv2 model.train.backbone_weights=./weights/deimv2-s-backbone.pth model.train.device=0 clearml.project_name=detection clearml.task_name=deimv2-s-train 'clearml.tags=[deimv2,training]'
+cy-train model=deimv2/s ground_truth=./ground_truth.csv model.train.device=0 clearml.project_name=detection clearml.task_name=deimv2-s-train 'clearml.tags=[deimv2,training]'
 ```
 
 **RF-DETR:**
@@ -259,7 +260,8 @@ cy-predict weights=./best.pt ground_truth=./ground_truth.csv 'splits=[val,test]'
 
 Результат — указанный CSV, файл происхождения рядом с ним и артефакт `predicts_csv`.
 Для нового семейства укажите его `model=...` и `model.predict.device=0` вместо
-`ultralytics_predict.device=0`; DEIMv2 также требует `model.source_dir`.
+`ultralytics_predict.device=0`. DEIMv2 использует явно заданный `model.source_dir`
+или подготавливает исходники утверждённой ревизии автоматически.
 
 ### Проверка модели — `cy-val`
 
@@ -443,11 +445,51 @@ DEIMv2, RF-DETR и Faster R-CNN поддерживают CPU или один CUD
 адаптеров не реализован. Проверки реального multi-GPU запуска описаны в
 [руководстве DDP](docs/ddp-testing.md).
 
+## Выполнение через ClearML Agent
+
+Внешний ClearML Agent запускает сохранённую точку входа без повторения исходных
+аргументов CLI. CY читает конфигурацию `run` до проверки обязательных входов
+и выбора backend, затем присоединяется к той же задаче ClearML. Отсутствующий
+`run` допускает полный явный набор аргументов; пустой или некорректный `run`
+вызывает ошибку. Устройства выбираются в логическом пространстве, заданном
+Agent через `CUDA_VISIBLE_DEVICES`; очередь CY в этом запуске не участвует.
+
+Зависимости устанавливает ваше окружение Agent. Для DEIMv2, RF-DETR и Faster R-CNN
+CY разрешает модельные файлы только при выполнении: сначала проверяет локальные
+файлы и кэш, затем настроенный прокси и исходный URL. `GHR` задаёт корень прокси
+GitHub Releases, `GH` — корень VCS-репозитория Artifactory для архива DEIMv2.
+При ошибке скачивания разместите перечисленные файлы по точным путям из сообщения
+и повторите запуск; предыдущая онлайн-загрузка не нужна. Явно заданные пути
+не заменяются автоматическими. Исходные значения, включая `null`, сохраняются
+для replay, а разрешённые пути, URL и хеши записываются в отдельный Configuration Object
+`model_assets`. Подробности —
+[запуск Agent](docs/runtime-isolation.md#clearml-agent-execution)
+и [модельные файлы](docs/model-assets.md).
+
 ## Выполнение через очередь
 
 Прямые `cy` и `cy-train` используют нативные устройства без ожидания и резервирования.
-`cy-queue` отдельно сохраняет задания, ждёт доступный полный набор GPU и запускает
-работу через worker владельца. Старые `queue.*`, `autogpu.*` и Hydra launcher удалены.
+`cy-queue` — отдельный пакет с пространством имён `cy_queue`, который зависит от
+совместимой версии CY. Он сохраняет задания, ждёт доступный полный набор GPU
+и запускает работу через worker владельца. Прямые команды и ClearML Agent
+не требуют этого пакета или настроек очереди. Старые `queue.*`, `autogpu.*`
+и Hydra launcher удалены.
+
+Сначала установите CY из исходников по [инструкции](docs/development.md#external-dependencies),
+затем очередь из соседнего checkout в то же окружение. Публикация пакетов в PyPI
+не предполагается. Из каталога `clearml-yolo`:
+
+```bash
+uv sync --frozen
+uv pip install --python .venv/bin/python -e ../cy-queue
+uv run --frozen --no-sync cy-queue --help
+```
+
+Перед синхронным обновлением всех участников остановите отправку и workers,
+дождитесь завершения активных заданий и выполните необходимое восстановление.
+Сохраните старые записи, настройки и каталоги координации. После изменения
+окружения ожидающие задания нужно отправить заново; подробнее —
+[порядок обновления](docs/queue.md#coordinated-package-upgrade).
 
 Каждый пользователь должен создать и заполнить
 `~/.config/clearml-yolo/queue.toml`. Если задан абсолютный `XDG_CONFIG_HOME`, файл
@@ -509,8 +551,15 @@ ClearML: очередь показывает `recovery_required` и сохран
 
 ```bash
 cy-queue submit --gpus 1 -- --config-dir cy-config --config-name cy
+cy-queue submit --command train --gpus 1 -- --config-dir train-config --config-name cy-train
 cy-queue worker
 ```
+
+`submit` по умолчанию запускает pipeline (`cy`); `--command train` запускает
+`cy-train`. Для второго примера сначала подготовьте конфигурацию
+`cy-init-config train-config --command cy-train` и заполните её входы.
+Явные CPU-этапы сохраняются, но каждое задание очереди требует хотя бы одну GPU;
+`--gpus 0` не поддерживается.
 
 По умолчанию worker пишет в stderr сообщения INFO о запуске, изменениях заданий,
 выделенных GPU и причинах ожидания, а также сводку каждые 60 секунд.
@@ -662,7 +711,7 @@ cy-dedup
 | --- | --- |
 | Нет изображений или выборки | Пути относительно CSV; `train`/`val` для обучения и `test` для полного процесса |
 | Неизвестный параметр | Правильную группу; создайте свежий YAML через `cy-init-config` в новом каталоге |
-| Не загружается модель | Семейство, пресет, совместимость весов, зависимости; для DEIMv2 ещё исходники и backbone |
+| Не загружается модель | Семейство, пресет, совместимость весов и зависимости; [сообщение о недостающих файлах](docs/model-assets.md#offline-placement-and-access) содержит исходный URL, абсолютный путь и параметр для ручного размещения |
 | Требуется подпись модели | Передайте `model_label` или подписи ModelRef; сохраните файлы происхождения |
 | Очередь ждёт GPU | Наличие worker владельца, полного набора устройств, резервы и порог памяти; прямой запуск не ждёт |
 | Нет парных отчётов | Наличие завершённой базовой задачи с тегом `prod` или корректной явной ссылки |

@@ -10,6 +10,8 @@ Faster R-CNN deployment bundles.
 
 Entrypoints: `cy`, `cy-train`, `cy-predict`, `cy-val`, `cy-metrics`,
 `cy-report`, `cy-compare`, `cy-ground-truth`, `cy-export`, `cy-init-config`, `cy-dedup`, and `cy-queue`.
+The `cy-queue` command belongs to the separately installed compatible queue source
+package; CY's own entrypoints do not require that package or its configuration.
 `cy-init-config DIRECTORY [--command NAME] [--model PRESET] [--force]` writes one selected
 execution wrapper (default `cy`) and its required groups without a ClearML task. Default
 YOLO model commands retain both native groups. New detector selections write one model

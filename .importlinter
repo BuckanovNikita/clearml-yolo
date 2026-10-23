@@ -48,7 +48,6 @@ modules =
     clearml_yolo.entrypoints.metrics
     clearml_yolo.entrypoints.pipeline
     clearml_yolo.entrypoints.predict
-    clearml_yolo.entrypoints.queue
     clearml_yolo.entrypoints.report
     clearml_yolo.entrypoints.train
     clearml_yolo.entrypoints.val
@@ -78,19 +77,21 @@ source_modules =
 forbidden_modules =
     torch
 allow_indirect_imports = true
+# Asset cache introspection loads torch.hub lazily; AST tests verify this owner.
+unmatched_ignore_imports_alerting = none
 ignore_imports =
     clearml_yolo.adapters.export.positions -> torch
     clearml_yolo.adapters.export.swin -> torch
     clearml_yolo.adapters.export.tensors -> torch
     clearml_yolo.adapters.export.verification -> torch
     clearml_yolo.adapters.fasterrcnn.data -> torch
+    clearml_yolo.adapters.fasterrcnn.assets -> torch
     clearml_yolo.adapters.fasterrcnn.evaluation -> torch
     clearml_yolo.adapters.fasterrcnn.inference -> torch
     clearml_yolo.adapters.fasterrcnn.model -> torch
     clearml_yolo.adapters.fasterrcnn.training -> torch
     clearml_yolo.adapters.fasterrcnn.transform -> torch
     clearml_yolo.adapters.integrations.native_runtime -> torch
-    clearml_yolo.adapters.runtime.gpu_probe -> torch
 
 [importlinter:contract:clearml-sdk-has-explicit-owners]
 name = clearml SDK has explicit owners
@@ -183,7 +184,6 @@ ignore_imports =
     clearml_yolo.entrypoints.hydra.common -> hydra
     clearml_yolo.entrypoints.hydra.config_tree -> hydra
     clearml_yolo.entrypoints.hydra.configs -> hydra
-    clearml_yolo.entrypoints.hydra.queue_config -> hydra
     clearml_yolo.entrypoints.hydra.sweeps -> hydra
     clearml_yolo.entrypoints.hydra.validation -> hydra
 
@@ -197,7 +197,6 @@ forbidden_modules =
 allow_indirect_imports = true
 ignore_imports =
     clearml_yolo.entrypoints.hydra.common -> hydra_zen
-    clearml_yolo.entrypoints.hydra.queue_config -> hydra_zen
     clearml_yolo.entrypoints.hydra.config_tree -> hydra_zen
     clearml_yolo.entrypoints.hydra.configs -> hydra_zen
 
@@ -214,7 +213,6 @@ ignore_imports =
     clearml_yolo.entrypoints.hydra.config_resolution -> omegaconf
     clearml_yolo.entrypoints.hydra.config_tree -> omegaconf
     clearml_yolo.entrypoints.hydra.configs -> omegaconf
-    clearml_yolo.entrypoints.hydra.queue_config -> omegaconf
     clearml_yolo.entrypoints.hydra.sweeps -> omegaconf
     clearml_yolo.entrypoints.hydra.validation -> omegaconf
 
@@ -412,6 +410,7 @@ forbidden_modules =
 allow_indirect_imports = true
 ignore_imports =
     clearml_yolo.adapters.integrations.detectors -> clearml_yolo.adapters.clearml.detectors
+    clearml_yolo.adapters.integrations.detectors -> clearml_yolo.adapters.clearml.session
     clearml_yolo.adapters.integrations.detectors -> clearml_yolo.adapters.deim.backend
     clearml_yolo.adapters.integrations.detectors -> clearml_yolo.adapters.rfdetr.backend
     clearml_yolo.adapters.integrations.detectors -> clearml_yolo.adapters.fasterrcnn.backend
@@ -462,6 +461,7 @@ allow_indirect_imports = true
 # Exact read-only containment helper; other storage effects remain forbidden.
 ignore_imports =
     clearml_yolo.adapters.deim.backend -> clearml_yolo.adapters.storage.filesystem
+    clearml_yolo.adapters.deim.source -> clearml_yolo.adapters.storage.filesystem
 
 [importlinter:contract:rfdetr-adapter-peer-ownership]
 name = rfdetr adapter peer ownership
@@ -548,6 +548,7 @@ allow_indirect_imports = true
 unmatched_ignore_imports_alerting = none
 ignore_imports =
     clearml_yolo.adapters.deim.backend -> torchvision
+    clearml_yolo.adapters.fasterrcnn.assets -> torchvision
     clearml_yolo.adapters.fasterrcnn.model -> torchvision
     clearml_yolo.adapters.fasterrcnn.transform -> torchvision
     clearml_yolo.adapters.export.tensors -> torchvision
@@ -564,6 +565,7 @@ allow_indirect_imports = true
 unmatched_ignore_imports_alerting = none
 ignore_imports =
     clearml_yolo.adapters.export.swin -> timm
+    clearml_yolo.adapters.fasterrcnn.assets -> timm
     clearml_yolo.adapters.fasterrcnn.model -> timm
 
 [importlinter:contract:rfdetr-sdk-has-explicit-owners]
@@ -578,6 +580,7 @@ allow_indirect_imports = true
 unmatched_ignore_imports_alerting = none
 ignore_imports =
     clearml_yolo.adapters.rfdetr.backend -> rfdetr
+    clearml_yolo.adapters.rfdetr.assets -> rfdetr
 
 [importlinter:contract:pytorch-lightning-sdk-has-explicit-owners]
 name = pytorch_lightning SDK has explicit owners
@@ -653,7 +656,7 @@ containers =
     clearml_yolo.adapters
 # Peers share a classification level; the peer contracts enforce their allowed edges.
 layers =
-    storage:observability:yolo:evaluation:reporting:clearml:fiftyone:runtime:integrations:deim:rfdetr:fasterrcnn:export:queue
+    storage:observability:yolo:evaluation:reporting:clearml:fiftyone:runtime:integrations:deim:rfdetr:fasterrcnn:export:assets
 exhaustive = true
 
 [importlinter:contract:exhaustive-application-classification]
@@ -664,56 +667,17 @@ containers =
 layers =
     use_cases
     evaluation | ground_truth
-    queue
     ports
     contracts
 exhaustive = true
 
-[importlinter:contract:direct-execution-never-imports-scheduling-or-textual]
-name = Direct execution never imports scheduling or Textual
-type = forbidden
-source_modules =
-    clearml_yolo.entrypoints.pipeline
-    clearml_yolo.entrypoints.train
-    clearml_yolo.entrypoints.predict
-    clearml_yolo.entrypoints.val
-    clearml_yolo.entrypoints.compare
-    clearml_yolo.entrypoints.export
-    clearml_yolo.entrypoints.metrics
-    clearml_yolo.entrypoints.report
-    clearml_yolo.entrypoints.ground_truth
-    clearml_yolo.entrypoints.hydra.common
-    clearml_yolo.entrypoints.composition
-forbidden_modules =
-    clearml_yolo.adapters.queue
-    clearml_yolo.application.queue
-    clearml_yolo.core.queue
-    clearml_yolo.entrypoints.queue_presentation
-    textual
-
-[importlinter:contract:scheduling-has-no-model-tracking-or-hydra-sdk-dependency]
-name = Scheduling has no model tracking or Hydra SDK dependency
-type = forbidden
-source_modules =
-    clearml_yolo.core.queue
-    clearml_yolo.application.queue
-    clearml_yolo.adapters.queue
-forbidden_modules =
-    torch
-    ultralytics
-    clearml
-    hydra
-    hydra_zen
-    omegaconf
-    textual
-
-[importlinter:contract:textual-is-owned-only-by-the-optional-queue-ui]
-name = Textual is owned only by the optional queue UI
+[importlinter:contract:cy-never-imports-extracted-queue]
+name = CY never imports extracted queue or its private dependencies
 type = forbidden
 source_modules =
     clearml_yolo
 forbidden_modules =
+    cy_queue
     textual
+    pynvml
 allow_indirect_imports = true
-ignore_imports =
-    clearml_yolo.entrypoints.queue_tui -> textual

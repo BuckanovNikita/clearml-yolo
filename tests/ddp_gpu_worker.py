@@ -417,34 +417,8 @@ def _verify_checkpoint(root: Path, task: Any, downloads: Path, result: dict[str,
     )
 
 
-def _owned_claim(root: Path) -> Any:
-    from clearml_yolo.adapters.queue.identity import current_identity
-    from clearml_yolo.adapters.queue.locks import LocalGPULocks
-
-    claim = LocalGPULocks(current_identity()).claim_for((root / "job-id").read_text())
-    if claim is not None:
-        assert claim.queue_root == str(root / "queue")
-        assert claim.owner_uid == os.geteuid()
-    return claim
-
-
-def _kill_guardian(root: Path) -> None:
-    from clearml_yolo.adapters.queue.identity import process_birth
-
-    claim = _owned_claim(root)
-    assert claim is not None, "No owned guardian claim available for fault injection"
-    assert process_birth(claim.guardian_pid) == claim.guardian_born
-    descriptor = os.pidfd_open(claim.guardian_pid)
-    try:
-        assert process_birth(claim.guardian_pid) == claim.guardian_born
-        signal.pidfd_send_signal(descriptor, signal.SIGKILL)
-    finally:
-        os.close(descriptor)
-    write(root, "guardian-killed.json", claim.model_dump())
-
-
 def _owned_processes(root: Path) -> list[tuple[int, int]]:
-    from clearml_yolo.adapters.queue.identity import process_birth
+    from ddp_gpu_instrumentation import process_birth
 
     known = {
         int(record["pid"]): record["born"]
@@ -478,7 +452,7 @@ def _owned_processes(root: Path) -> list[tuple[int, int]]:
 
 
 def _cleanup(root: Path) -> None:
-    from clearml_yolo.adapters.queue.identity import process_birth
+    from ddp_gpu_instrumentation import process_birth
 
     initial = _owned_processes(root)
     for signum, seconds in ((signal.SIGTERM, 5), (signal.SIGKILL, 5)):
@@ -509,12 +483,7 @@ def _cleanup(root: Path) -> None:
 def main() -> None:
     operation, root = sys.argv[1], Path(sys.argv[2])
     request = json.loads((root / "request.json").read_text())
-    if operation == "claim":
-        claim = _owned_claim(root)
-        write(root, "claim-readback.json", claim.model_dump() if claim else None)
-    elif operation == "kill-guardian":
-        _kill_guardian(root)
-    elif operation == "cleanup":
+    if operation == "cleanup":
         _cleanup(root)
     else:
         {"preflight": _preflight, "cuda": _cuda, "prepare": _prepare, "verify": _verify}[operation](

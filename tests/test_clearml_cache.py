@@ -179,7 +179,7 @@ def test_projection_is_detached_deterministic_and_idempotent() -> None:
     "entry_point",
     [
         "train.py",
-        "-m clearml_yolo.entrypoints.queue",
+        "-m cy_queue.entrypoints.queue",
         "-m other.train",
         "-m clearml_yolo.entrypoints.train --unknown",
         None,

@@ -9,7 +9,6 @@ from packaging.utils import canonicalize_name
 
 ROOT = Path(__file__).resolve().parents[1]
 CAPABILITY_PACKAGES = {
-    "textual",
     "calflops",
     "faster-coco-eval",
     "pycocotools",
@@ -57,3 +56,10 @@ def test_minimum_version_guard_rejects_missing_inclusive_floor(requirement: str)
 @pytest.mark.parametrize("requirement", ["numpy>=2", "numpy==2.0", "numpy~=2.0"])
 def test_minimum_version_guard_accepts_inclusive_floor(requirement: str) -> None:
     assert not _unbounded_dependencies([requirement])
+
+
+def test_queue_distribution_is_not_a_cy_runtime_dependency() -> None:
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
+    names = {canonicalize_name(Requirement(text).name) for text in project["dependencies"]}
+    assert not names.intersection({"cy-queue", "textual", "nvidia-ml-py"})
+    assert "cy-queue" not in project["scripts"]

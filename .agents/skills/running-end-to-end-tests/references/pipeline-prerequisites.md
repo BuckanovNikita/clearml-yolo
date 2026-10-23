@@ -1,8 +1,10 @@
 # Pipeline prerequisites
 
 Use Python and dependency bounds from `pyproject.toml` and selected versions from
-`uv.lock`. Detector, ONNX export and queue TUI dependencies install by default;
-project extras are removed. Keep development tools in the separate `dev` group. Configure ClearML
+`uv.lock`. Detector and ONNX export dependencies install with CY; the queue TUI
+and NVML belong to the separate `cy-queue` source package. Install CY first, then
+a compatible queue version into the same environment when queue testing is required.
+Neither package is assumed available on PyPI; project extras are removed. Keep development tools in the separate `dev` group. Configure ClearML
 through normal SDK environment/user configuration; external selectors are valid.
 Infrastructure access and resource capacity come from the environment, not this repository.
 
@@ -60,8 +62,11 @@ accepts only Faster R-CNN presets; `cy-metrics`, `cy-report` and `cy-ground-trut
 Only selected files/parents participate in overwrite checks.
 
 New detectors use typed `model.train` and `model.predict` settings and derive COCO working
-data from the same CSV using the default runtime dependencies. DEIMv2 also requires
-its verified source checkout and compatible explicit pretrained assets. Follow the
+data from the same CSV using the default runtime dependencies. DEIMv2 uses its
+verified source checkout when explicit, otherwise an approved manifest-verified
+archive. Non-YOLO pretrained assets resolve only at execution; explicit local
+weights remain authoritative. Follow [asset recovery](../../../../docs/model-assets.md)
+for cache, proxies and offline placement. Follow the
 [model guide](../../../../docs/multi-model-backends.md) for presets and restrictions and
 the [multi-model acceptance guide](../../../../specs/000-baseline/spec.md#detector-backends-and-deployment-export)
 for the native/download/comparison matrices. Use `uv run --frozen --no-sync` after preparing
@@ -71,8 +76,12 @@ Select the backend's supported device, batch and precision controls for the envi
 Direct commands and `cy-export` run their explicit native devices without queue discovery,
 reservation or waiting. `cy -m` uses ordinary sequential Hydra BasicLauncher. Queue count
 or exact-device selection belongs to `cy-queue submit --gpus N -- ...` or
-`cy-queue submit --devices 0,2 -- ...`; remove native GPU overrides from queued configurations.
-Explicit CPU phases remain CPU. Queued training uses the complete allocation and inference
+`cy-queue submit --devices 0,2 -- ...`; add `--command train` for standalone
+training (pipeline is the default). Remove native GPU overrides from queued
+configurations. Queue tests must preserve old records and include both packages in
+installation identity checks; changed environments require pending resubmission.
+Explicit CPU phases remain CPU, but the queue still requires a positive GPU
+allocation and does not accept `--gpus 0`. Queued training uses the complete allocation and inference
 its first GPU. After native training returns and unused model memory is released,
 the external guardian durably shrinks the claim, releases extra GPU locks and updates
 public allocation before acknowledging. Verify another eligible job can use released

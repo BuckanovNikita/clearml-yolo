@@ -1,7 +1,6 @@
 """Dataset references preserve CSV provenance without changing local input semantics."""
 
 import hashlib
-import json
 import sys
 from dataclasses import replace
 from pathlib import Path
@@ -24,7 +23,10 @@ from workflow_dependencies import (
 @pytest.mark.parametrize(
     "value",
     [
-        {}, {"dataset_id": ""}, {"project_name": "p"}, {"name": "n"},
+        {},
+        {"dataset_id": ""},
+        {"project_name": "p"},
+        {"name": "n"},
         {"dataset_id": "id", "name": "n"},
         {"dataset_id": "id", "version": "1.0"},
         {"project_name": "p", "name": " "},
@@ -50,7 +52,8 @@ def test_local_warning_only_at_original_boundary(
     warnings: list[tuple[Any, ...]] = []
     monkeypatch.setattr(workflow_dependencies.resources, "log", lambda *args: warnings.append(args))
     monkeypatch.setattr(
-        workflow_dependencies.ground_truth_repository, "resolve",
+        workflow_dependencies.ground_truth_repository,
+        "resolve",
         lambda _: pytest.fail("local path triggered dataset lookup"),
     )
     source = tmp_path / "original.csv"
@@ -67,8 +70,18 @@ def test_legacy_dependency_constructor_keeps_local_input_support(
     workflow_dependencies: WorkflowDependencies,
 ) -> None:
     existing_fields = (
-        "dataset", "model", "repository", "evaluation", "evaluation_writer", "renderer",
-        "storage", "resources", "tracking", "publisher_factory", "disabled_publisher", "exporter",
+        "dataset",
+        "model",
+        "repository",
+        "evaluation",
+        "evaluation_writer",
+        "renderer",
+        "storage",
+        "resources",
+        "tracking",
+        "publisher_factory",
+        "disabled_publisher",
+        "exporter",
     )
     legacy = WorkflowDependencies(
         *(getattr(workflow_dependencies, name) for name in existing_fields)
@@ -83,8 +96,12 @@ def test_remote_source_records_identity_and_preserves_request(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
     resolved = ResolvedGroundTruth(
-        path=tmp_path / "dataset.csv", dataset_id="exact-id", project_name="p",
-        name="n", version="1.0.0", csv_sha256="digest",
+        path=tmp_path / "dataset.csv",
+        dataset_id="exact-id",
+        project_name="p",
+        name="n",
+        version="1.0.0",
+        csv_sha256="digest",
     )
     calls: list[ClearMLDatasetRef] = []
     records: list[dict[str, Any]] = []
@@ -95,7 +112,8 @@ def test_remote_source_records_identity_and_preserves_request(
 
     monkeypatch.setattr(workflow_dependencies.ground_truth_repository, "resolve", fetch)
     monkeypatch.setattr(
-        workflow_dependencies.tracking, "record_run_configuration",
+        workflow_dependencies.tracking,
+        "record_run_configuration",
         lambda task, values: records.append(values),
     )
     monkeypatch.setattr(
@@ -129,7 +147,9 @@ def test_remote_source_records_identity_and_preserves_request(
     ],
 )
 def test_adapter_downloads_root_csv_unchanged(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, reference: ClearMLDatasetRef,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    reference: ClearMLDatasetRef,
     selector: dict[str, str],
 ) -> None:
     from clearml_yolo.adapters.clearml.datasets import ClearMLGroundTruthRepository
@@ -145,8 +165,12 @@ def test_adapter_downloads_root_csv_unchanged(
         return str(tmp_path)
 
     dataset = SimpleNamespace(
-        id="id", project="p", name="n", version="1.0.0",
-        is_final=lambda: True, list_files=lambda: ["dataset.csv"],
+        id="id",
+        project="p",
+        name="n",
+        version="1.0.0",
+        is_final=lambda: True,
+        list_files=lambda: ["dataset.csv"],
         get_local_copy=local_copy,
     )
 
@@ -155,7 +179,8 @@ def test_adapter_downloads_root_csv_unchanged(
         return dataset
 
     monkeypatch.setitem(
-        sys.modules, "clearml",
+        sys.modules,
+        "clearml",
         SimpleNamespace(Dataset=SimpleNamespace(get=get_dataset)),
     )
     result = ClearMLGroundTruthRepository().resolve(reference)
@@ -178,12 +203,15 @@ def test_adapter_downloads_root_csv_unchanged(
     ],
 )
 def test_invalid_dataset_inventory_or_state_fails_before_download(
-    monkeypatch: pytest.MonkeyPatch, final: bool, files: list[str],
+    monkeypatch: pytest.MonkeyPatch,
+    final: bool,
+    files: list[str],
 ) -> None:
     from clearml_yolo.adapters.clearml.datasets import ClearMLGroundTruthRepository
 
     dataset = SimpleNamespace(
-        is_final=lambda: final, list_files=lambda: files,
+        is_final=lambda: final,
+        list_files=lambda: files,
         get_local_copy=lambda **_: pytest.fail("invalid dataset downloaded"),
     )
     monkeypatch.setitem(
@@ -206,33 +234,6 @@ def test_hydra_accepts_reference_without_sdk_resolution(command: str) -> None:
     assert normalize_ground_truth(config.ground_truth) == ClearMLDatasetRef(dataset_id="id")
 
 
-@pytest.mark.parametrize(
-    "override",
-    [
-        "ground_truth={dataset_id:id}",
-        'ground_truth={project_name:p,name:n,version:"1.0.0"}',
-    ],
-)
-def test_queue_preserves_selector_without_fetching(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, override: str,
-) -> None:
-    from clearml_yolo.adapters.clearml.datasets import ClearMLGroundTruthRepository
-    from clearml_yolo.core.queue import ResourceRequest
-    from clearml_yolo.entrypoints.hydra.queue_config import compose_snapshots
-
-    monkeypatch.setattr(
-        ClearMLGroundTruthRepository, "resolve",
-        lambda *args: pytest.fail("queue submission downloaded dataset"),
-    )
-    snapshot, = compose_snapshots([override], ResourceRequest(gpus=1), project_root=tmp_path)
-    selected = json.loads(snapshot.config_json)["ground_truth"]
-    assert normalize_ground_truth(selected) == (
-        ClearMLDatasetRef(dataset_id="id")
-        if "dataset_id" in override
-        else ClearMLDatasetRef(project_name="p", name="n", version="1.0.0")
-    )
-
-
 def test_download_failure_preserves_cause(monkeypatch: pytest.MonkeyPatch) -> None:
     from clearml_yolo.adapters.clearml.datasets import ClearMLGroundTruthRepository
 
@@ -240,7 +241,8 @@ def test_download_failure_preserves_cause(monkeypatch: pytest.MonkeyPatch) -> No
         raise OSError("fixture download failed")
 
     dataset = SimpleNamespace(
-        is_final=lambda: True, list_files=lambda: ["dataset.csv"],
+        is_final=lambda: True,
+        list_files=lambda: ["dataset.csv"],
         get_local_copy=failed_download,
     )
     monkeypatch.setitem(
@@ -252,18 +254,22 @@ def test_download_failure_preserves_cause(monkeypatch: pytest.MonkeyPatch) -> No
 
 @pytest.mark.parametrize("ground_truth", [None, {"dataset_id": "id"}])
 def test_export_missing_weights_precedes_task_and_dataset_effects(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, ground_truth: dict[str, str] | None,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    ground_truth: dict[str, str] | None,
     workflow_dependencies: WorkflowDependencies,
 ) -> None:
     from clearml_yolo.application.contracts import ClearMLConfig
     from clearml_yolo.application.use_cases.export import export_model
 
     monkeypatch.setattr(
-        workflow_dependencies.tracking, "init_task",
+        workflow_dependencies.tracking,
+        "init_task",
         lambda *args, **kwargs: pytest.fail("Invalid export created a task"),
     )
     monkeypatch.setattr(
-        workflow_dependencies.ground_truth_repository, "resolve",
+        workflow_dependencies.ground_truth_repository,
+        "resolve",
         lambda *args: pytest.fail("Invalid export fetched a dataset"),
     )
     with pytest.raises(ValueError, match="requires weights"):

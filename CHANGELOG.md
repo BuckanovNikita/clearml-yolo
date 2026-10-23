@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record Git workspace warning release delivery
+  ([`b3bef79`](https://github.com/BuckanovNikita/clearml-yolo/commit/b3bef797c732da74ce1734392d914f89417a59e4))
+
+
 ## v0.37.0 (2026-10-20)
 
 ### Documentation

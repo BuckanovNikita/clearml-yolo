@@ -99,7 +99,33 @@ ClearML finalization boundaries. RF-DETR and Roboflow retain their own configura
 cache defaults. DEIM uses the verified private source loader and restores ambient
 pycocotools module identities around upstream import/dataset construction. Concurrent
 detector families require separate processes because the DEIM module alias boundary is
-sequential. Replay rejects switching between initialized YOLO and new-detector families.
+sequential. Agent replay restores its backend before either runtime is initialized.
+
+## ClearML Agent execution
+
+CY supports its existing recorded `pipeline` and `train` module entrypoints under
+an externally managed ClearML Agent. The ClearML adapter reads one detached replay
+snapshot before mandatory-input validation and backend selection. The selected
+runtime initializes, then the existing invocation lifecycle joins the same task.
+Remote script metadata, task ownership, required publication, failure reporting and
+cleanup remain owned by that lifecycle.
+
+A missing canonical `run` object may use complete explicit launch arguments. A
+present empty or malformed canonical object fails instead of silently selecting
+local defaults. Canonical settings and supported scientific General overrides keep
+the existing precedence; observed General values do not override native detector
+`model` settings. Original output ownership and task identity are preserved.
+
+Agent-provided `CUDA_VISIBLE_DEVICES` and configured native logical device settings
+remain unchanged. No queue package, configuration, GPU inventory or reservation is
+required. Dependencies are installed by the Agent's environment; CY does not install
+them at execution time and introduces no separate task-submission interface.
+
+Non-YOLO assets resolve only after canonical inputs are recorded and only in an
+execution copy. `run` retains explicit selectors and null defaults; resolved paths,
+source URLs and hashes are recorded in a separate `model_assets` Configuration
+Object and do not replace canonical replay inputs. Help, configuration inspection and
+queue submission perform no asset resolution. See [model assets](model-assets.md).
 
 ### Git workspace warning
 

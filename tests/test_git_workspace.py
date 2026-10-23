@@ -242,7 +242,7 @@ common.launch('pipeline', lambda: None)
     assert _WARNING not in result.stdout
 
 
-@pytest.mark.parametrize("command", ["cy-init-config", "cy-dedup", "cy-queue"])
+@pytest.mark.parametrize("command", ["cy-init-config", "cy-dedup"])
 def test_administration_help_does_not_warn(tmp_path: Path, command: str) -> None:
     result = _run([str(Path(sys.executable).with_name(command)), "--help"], tmp_path)
     assert result.returncode == 0, result.stderr

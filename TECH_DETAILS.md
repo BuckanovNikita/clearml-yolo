@@ -18,14 +18,18 @@ checkout does not download those source trees or enforce their Git revisions.
 Do not change approved upstream revisions as part of setup. Development dependencies
 and local source overrides are documented in the development guide.
 
-The default installation includes the detector stack, ONNX/ONNX Runtime and the
-Textual queue interface. Project extras `detectors`, `export` and `queue-ui` have
+The CY installation includes the detector stack and ONNX/ONNX Runtime. The separate
+`cy-queue` distribution owns the Textual interface and NVML dependency; install it
+from its source checkout after CY in the same environment, following
+[queue installation](docs/queue.md#installation). Project extras `detectors`, `export` and `queue-ui` have
 been removed; remove `--extra` selections and package extras from installation recipes.
 Development tools remain in the separate `dev` group. Read
 [package metadata](pyproject.toml) for dependency lower bounds, exact pins and upper
 bounds, and `uv.lock` for the selected versions; a resolver result alone does not
-establish runtime compatibility. DEIMv2 still requires the exact source revision and compatible
-assets in the [model guide](docs/multi-model-backends.md#deimv2-source-and-initialization).
+establish runtime compatibility. DEIMv2 uses its approved source revision and matching
+assets, resolving omitted local inputs at execution time. See the
+[model guide](docs/multi-model-backends.md#deimv2-source-and-initialization) and
+[asset/cache/offline contract](docs/model-assets.md).
 TensorRT and its matching CUDA runtime are separate requirements in the
 [deployment guide](docs/tensorrt-deployment.md).
 
@@ -175,6 +179,15 @@ executable arguments with cache tokens. See the
 [stable parameter contract](specs/000-baseline/spec.md#stable-experiment-parameters-and-controller-caching).
 Embedded application callers own full input recording through their invocation;
 see [programmatic dependencies](docs/python-import-migration.md#explicit-programmatic-dependencies).
+
+An externally managed ClearML Agent restores one detached replay snapshot before
+required-input validation and runtime selection, then joins the same task. Bare recorded
+entrypoints therefore use the recorded backend and inputs. Agent CUDA visibility and
+native logical devices remain unchanged; no queue package/configuration is required.
+Missing canonical settings allow complete explicit launch inputs, while empty or malformed
+settings fail. Canonical selectors retain null defaults; asset resolution changes an
+execution copy and records provenance in the separate `model_assets` Configuration
+Object. See [Agent ownership](docs/runtime-isolation.md#clearml-agent-execution).
 
 Filtering newly connected values does not delete parameters inherited from historical
 templates. Such clones can retain old General execution keys; canonical replay and
@@ -347,8 +360,10 @@ See the [dedup contract](specs/000-baseline/spec.md#explicit-cache-deduplication
 ## Queue operations
 
 [Queue documentation](docs/queue.md) owns submission, worker startup, status,
-cancellation, reordering, archive/restore, recovery and operator controls. Queue submission freezes
-and validates the entire sweep before adding jobs; installation changes require
+cancellation, reordering, archive/restore, recovery and operator controls in the separate
+`cy-queue` package. Submission defaults to `--command pipeline`; `--command train`
+uses the existing standalone training entrypoint. Queue submission freezes
+and validates the entire sweep before adding jobs; changes to either package or the environment require
 resubmission. Native GPU selectors must be unset for allocation; explicit CPU phases
 are retained. Compile, AMP and batch settings are not silently modified. Training holds
 the full allocation until acknowledged contraction to the first inference GPU; that
@@ -405,7 +420,7 @@ by default. `--log-level DEBUG` adds each poll summary; WARNING suppresses routi
 messages. Readable command results and explicitly selected JSON remain on stdout. Pipeline output stays in the submitting
 project's `.cy/queue-logs/JOB_ID.log`. See [worker diagnostics](docs/queue.md#worker-diagnostics).
 
-With `queue-ui`, TUI arrows select rows; `u`/`d`, `t`/`g` and `b`/`a` reorder,
+With `cy-queue tui`, TUI arrows select rows; `u`/`d`, `t`/`g` and `b`/`a` reorder,
 with before/after targets selected from pending-job dropdowns. `c` cancels, `r` recovers,
 `x` archives, `s` restores, `v` cycles Main/Archived/All and `o` opens a readable task
 link. `q` exits without stopping the worker.

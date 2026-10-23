@@ -2,11 +2,78 @@
 
 `cy` and stage commands run directly with native device settings. They do not import
 queue implementation, inspect availability, reserve GPUs, substitute devices or wait.
-`cy -m` uses sequential Hydra execution. Scheduling belongs to `cy-queue`.
+`cy -m` uses sequential Hydra execution. Scheduling belongs to the separate
+`cy-queue` distribution and `cy_queue` Python namespace. Dependency direction is
+`cy-queue` → `clearml-yolo`; CY never imports the queue package.
 
 The [job/reservation lifecycle diagram](queue-lifecycles.md) separates job outcomes,
 process-cleanup evidence and current-generation GPU availability. The
 [status map](implementation-status.md) links implementation, releases and external gaps.
+
+## Installation
+
+Install `clearml-yolo` from source first, including the approved external dependency
+copies in [development setup](development.md#external-dependencies). Then install
+`cy-queue` from its separate checkout into that same Python environment. Neither
+distribution is assumed to be published on PyPI. From a CY checkout with a sibling
+`cy-queue` checkout:
+
+```bash
+uv sync --frozen
+uv pip install --python .venv/bin/python -e ../cy-queue
+uv run --frozen --no-sync cy-queue --help
+```
+
+The queue's package metadata declares its compatible CY range. Do not bypass that
+constraint. Subsequent CY verification commands use `uv run --frozen --no-sync` in
+this combined environment so synchronization does not remove the separately installed
+queue. Queue-only Textual and NVML dependencies belong to `cy-queue`; shared process
+supervision and lifecycle communication remain in CY. Direct commands and externally
+managed ClearML Agents require neither queue installation nor queue configuration.
+
+### Coordinated package upgrade
+
+This is an offline upgrade of all cooperating queue participants:
+
+1. Stop new submissions and all workers. Let active jobs and guardians finish, or
+   perform owner cancellation/recovery and confirm no task-owned descendants or
+   reservations remain. Do not remove live locks or recovery records.
+2. Preserve the complete metadata and coordination trees, ownership/modes, history,
+   configuration files and host bootstrap binding. Keep the existing locations and
+   namespaces; extraction does not migrate or delete records.
+3. Install compatible CY and cy-queue source versions in each participant's existing
+   environment. Update worker service commands to use that environment consistently.
+4. Read history with the new installation. Pending snapshots retain the old package
+   identity and must be cancelled and resubmitted when the environment has changed.
+   Preserve old records for audit; do not rewrite an identity to force execution.
+5. Restart workers together after configuration and identity checks. Verify a new
+   submission, ownership, cancellation and recovery using the existing coordination
+   root before resuming normal work.
+
+Do not overlap old bundled-queue workers with extracted-queue workers during the
+upgrade. Configuration paths, `/tmp/clearml-yolo-queue`, lock identities and durable
+record formats remain compatible; the source package move is not a coordination
+relocation. Use the separate [relocation procedure](#coordination-binding-and-relocation)
+only when changing a storage location deliberately.
+
+## CY integration interfaces
+
+The queue owns scheduling policy, durable records/storage, GPU inventory and
+probing, guardians, CLI/TUI and Hydra submission composition in `cy_queue`. CY owns
+shared process supervision and invocation lifecycle communication in
+`clearml_yolo.adapters.runtime.process_tree`, `supervision` and
+`execution_lifecycle`. Queue integration also consumes CY's bootstrap/filesystem,
+diagnostics, pure presentation/model records and Hydra configuration, validation
+and sweep helpers. The [import contract](import-boundaries.md) forbids reverse
+imports; both repositories test their boundary and runtime targets.
+
+The queue composes pipeline or train, freezes the configuration, and launches the
+corresponding existing CY module entrypoint. CY sends computation/publication
+outcomes and training-finished messages; the queue owns durable reservations,
+acknowledgement and descendant cleanup. Extraction preserves this wire protocol,
+including full reservation retention when no training-finished notification arrives.
+If acknowledgement is lost after durable contraction, execution stops before inference
+and recovery retains the reduced claim without restoring released extra GPUs.
 
 ## Shared configuration
 
@@ -106,8 +173,17 @@ to make a conflicting configuration pass.
 
 ## Submit and run
 
+`submit --command pipeline` is the default and launches the existing `cy` entrypoint.
+`submit --command train` launches `cy-train`; compose its own command configuration
+with `cy-init-config train-config --command cy-train` and fill its required inputs.
+Submission validates and freezes settings without downloading model assets. Each
+job requests at least one whole GPU. Explicit CPU phases remain CPU, but they do
+not create a zero-GPU queue mode; `--gpus 0` is invalid.
+
+
 ```bash
 cy-queue submit --gpus 2 -- --config-dir cy-config --config-name cy
+cy-queue submit --command train --gpus 1 -- --config-dir train-config --config-name cy-train
 cy-queue submit --devices 0,2 -- --config-dir cy-config --config-name cy
 cy-queue submit --gpus 1 -- -m --config-dir cy-config --config-name cy ultralytics.epochs=10,20
 cy-queue worker
@@ -322,8 +398,10 @@ a compatible build, then run its actual capability probe before submitting work:
 python -c 'from clearml_yolo.adapters.runtime.process_tree import require_process_supervision; require_process_supervision()'
 ```
 
-Use the same environment for submission and execution. Existing queued snapshots
-retain the previous interpreter and installation identity and may need resubmission.
+Use the same environment for submission and execution. Installation identity includes
+both CY and cy-queue versions and source content, the interpreter and installed
+distributions. Existing queued snapshots retain the previous identity; after an
+environment change, resubmit pending jobs rather than modifying their snapshots.
 
 Normal cancellation first signals the verified pipeline owner and allows up to
 90 seconds for shutdown while retaining the current allocation. This lets the owner clean native
@@ -407,8 +485,8 @@ downgrade workers while controls are in use.
 
 ## Terminal UI
 
-The default installation includes Textual; run `cy-queue tui` without installing
-a project extra. Textual loads only for this interface. The table shows owner, position,
+The `cy-queue` installation includes Textual; run `cy-queue tui` without installing
+a project extra. CY alone does not install the queue UI. Textual loads only for this interface. The table shows owner, position,
 state, request/allocation, waiting reason, progress and a readable ClearML task link.
 Arrow keys select; `u`/`d` move, `t`/`g` send to top/bottom, and `b`/`a` select another
 pending job from a dropdown for before/after ordering. `c` cancels, `r` recovers,
@@ -423,7 +501,8 @@ execution recipes. Regenerate saved examples with `cy-init-config`; commands rej
 old controls rather than interpreting them differently. Old queue directories and data
 are preserved without automatic migration or deletion.
 
-Before upgrading, record the current metadata and coordination locations and prepare
+Follow the [coordinated package upgrade](#coordinated-package-upgrade) before replacing
+the bundled queue. Record the current metadata and coordination locations and prepare
 the shared TOML configuration for every user and service. Point `queue.root` at the
 existing metadata to retain history. Keep its current coordination location until
 the [offline relocation procedure](#coordination-binding-and-relocation) is applicable.

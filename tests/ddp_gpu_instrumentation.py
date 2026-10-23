@@ -46,12 +46,20 @@ def _parameters(model: Any) -> str:
     return digest.hexdigest()
 
 
+def process_birth(pid: int) -> int | None:
+    """Read a process birth token for the independent physical test harness."""
+    try:
+        parts = Path(f"/proc/{pid}/stat").read_text(encoding="ascii").rsplit(")", 1)[1].split()
+    except (FileNotFoundError, ProcessLookupError):
+        return None
+    return None if parts[0] == "Z" else int(parts[19])
+
+
 def install() -> None:
     """Observe real native/SDK boundaries; do not replace trainers, transports or queue effects."""
     root = Path(os.environ["CY_DDP_TRACE"])
     request = json.loads((root / "request.json").read_text())
     scenario = request["scenario"]
-    from clearml_yolo.adapters.queue.identity import process_birth
 
     write(
         root,

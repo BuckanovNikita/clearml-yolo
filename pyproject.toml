@@ -21,7 +21,7 @@ dependencies = [
     # FiftyOne's Strawberry integration still imports graphql.execution.ExecutionContext.
     "graphql-core>=3.2.0,<3.3",
     "filelock>=3.32.0",
-    "nvidia-ml-py>=12.535.77",
+    "requests>=2.32.0",
     "pydantic>=2.10.0",
     "pyyaml>=6.0.2",
     "loguru>=0.7.0",
@@ -37,7 +37,6 @@ dependencies = [
     "report-generator>=0.1.2",
     "ruamel-yaml>=0.18.0,<0.19",
     # Every supported runtime capability is part of the standard installation.
-    "textual>=0.89.0",
     "calflops>=0.3.2",
     "faster-coco-eval==1.8.0",
     "pycocotools==2.0.11",
@@ -63,7 +62,6 @@ cy-val = "clearml_yolo.entrypoints.val:main"
 cy-export = "clearml_yolo.entrypoints.export:main"
 cy-init-config = "clearml_yolo.entrypoints.config_tree:main"
 cy-dedup = "clearml_yolo.entrypoints.dedup:main"
-cy-queue = "clearml_yolo.entrypoints.queue:main"
 
 [build-system]
 requires = ["uv_build>=0.11.32,<0.12.0"]
@@ -80,6 +78,7 @@ dev = [
     "packaging>=26",
     "pandas-stubs",
     "types-PyYAML",
+    "types-requests>=2.32.0",
     "pre-commit>=4.6.1",
     "pytest>=8.0",
     "ruff>=0.16.1,<0.17",

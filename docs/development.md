@@ -25,8 +25,11 @@ build/kernel capabilities. See [queue supervision](queue.md#guardians-cancellati
 
 ## Runtime dependency compatibility
 
-All supported runtime capabilities install by default, including the detector
-stack, ONNX export and the queue TUI. There are no project extras; remove
+All CY runtime capabilities install by default, including the detector stack and
+ONNX export. The separate `cy-queue` source package owns scheduling, the Textual TUI
+and NVML; install it after CY into the same environment using
+[queue installation](queue.md#installation). Neither distribution is assumed to be
+available on PyPI. There are no project extras; remove
 `--extra detectors`, `--extra export`, `--extra queue-ui` and corresponding package
 extras from recipes. Keep development tools in `dependency-groups.dev`; required
 upstream extras such as `rfdetr[train]` and `pandera[pandas]` remain runtime inputs.
@@ -38,7 +41,9 @@ resolved versions and executed checks in dated evidence, and raise a floor only
 when compatibility evidence requires it. Resolution alone is not a runtime check.
 Keep minimum-version resolutions separate from the normal lockfile, retain approved
 external source revisions and avoid unrelated upgrades. TensorRT system requirements
-and the DEIMv2 checkout remain external prerequisites.
+remain external prerequisites. DEIMv2 source and non-YOLO pretrained assets can
+resolve at execution through the [asset adapter](model-assets.md); explicit local
+checkouts and files remain authoritative. Dependency installation is always external.
 
 ## Verification
 
@@ -112,14 +117,14 @@ for scope and evidence requirements; keep observed results in dated evidence.
 ### Generated and composed regressions
 
 Hypothesis and pytest-cov are development dependencies. The routine suite stays offline;
-generated cases exercise queue state transitions, lexical CSV identity, prediction-cache
-provenance and frozen validation thresholds. Composed workflow tests join saved Hydra
+generated CY cases exercise lexical CSV identity, prediction-cache provenance and
+frozen validation thresholds. Queue state-transition cases live in cy-queue. Composed workflow tests join saved Hydra
 configuration, real storage, evaluation and report boundaries. To run these tests with
 branch coverage:
 
 ```bash
 uv run --frozen --no-sync pytest tests/test_quality_properties.py tests/test_workflow_quality.py --cov=clearml_yolo --cov-branch --cov-report=term-missing --cov-report=html:.tmp/coverage/html
-uv run --frozen --no-sync pytest -m 'process_capabilities or gpu_controls'
+uv run --frozen --no-sync pytest -m process_capabilities
 ```
 
 Coverage identifies unexercised paths; it does not establish assertion quality. Preserve
@@ -152,10 +157,14 @@ algorithms in evaluation adapters and copy exact values into core evaluation rec
 
 Run `lint-imports` and the architecture tests when changing imports, package initializers,
 composition or subprocess/plugin targets. Updating a dependency boundary also requires
-regenerated YAML checks and installed command helps, including the GPU probe, DDP
-callback and FiftyOne extension targets. Check distributions include the queue guardian/snapshot runner, bounded console publisher,
-terminal mirror and FiftyOne worker. Verify direct commands have no queue/Textual imports,
-sequential Hydra sweeps, queue batch validation, optional UI imports and owner-only jobs.
+regenerated YAML checks and installed command helps, including DDP callback and
+FiftyOne extension targets. Check CY source installs include its bounded console
+publisher, terminal mirror and FiftyOne worker; the queue source install must include
+its guardian, snapshot runner and GPU probe. Verify CY has no cy_queue/Textual/NVML
+imports, direct Hydra sweeps stay sequential, and queue tests preserve atomic batch
+validation, deferred UI imports and owner-only jobs. Run the queue repository tests,
+Ruff, strict mypy and import contracts in the combined environment when changing
+the shared interfaces. Include negative import cases and both-package identity checks.
 Check selected config export for every command/model selection, ordinary SDK configuration
 with unchanged external selectors and project-contained application destinations, and retained project scratch after success, failure and
 cancellation. Verify explicit project temp paths without changing global SDK temp defaults.

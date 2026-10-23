@@ -67,7 +67,7 @@ def test_actual_graph_obeys_classification_direction_sdk_ownership_and_cycles(
             "direction",
         ),
         ("clearml_yolo.core.identity", "loguru", "core dependency"),
-        ("clearml_yolo.core.presentation", "clearml_yolo.adapters.queue.settings", "direction"),
+        ("clearml_yolo.core.presentation", "clearml_yolo.adapters.runtime.bootstrap", "direction"),
         ("clearml_yolo.core.presentation", "loguru", "core dependency"),
         ("clearml_yolo.application.use_cases.metrics", "loguru", "application effects"),
         ("clearml_yolo.core.identity", "digital_metrics", "SDK ownership"),
@@ -124,15 +124,12 @@ def test_injected_forbidden_dependencies_are_rejected(
 @pytest.mark.parametrize(
     ("importer", "imported"),
     [
-        ("clearml_yolo.entrypoints.hydra.common", "clearml_yolo.adapters.queue.runtime"),
-        ("clearml_yolo.entrypoints.composition", "clearml_yolo.application.queue"),
+        ("clearml_yolo.entrypoints.hydra.common", "cy_queue.adapters.runtime"),
+        ("clearml_yolo.entrypoints.composition", "cy_queue.application.queue"),
         ("clearml_yolo.entrypoints.pipeline", "textual"),
-        ("clearml_yolo.entrypoints.pipeline", "clearml_yolo.adapters.queue.settings"),
-        ("clearml_yolo.entrypoints.pipeline", "clearml_yolo.entrypoints.queue_presentation"),
-        ("clearml_yolo.entrypoints.queue_presentation", "torch"),
-        ("clearml_yolo.adapters.queue.guardian", "clearml"),
-        ("clearml_yolo.adapters.queue.storage", "torch"),
-        ("clearml_yolo.application.queue", "hydra"),
+        ("clearml_yolo.adapters.runtime.supervision", "cy_queue.adapters.guardian"),
+        ("clearml_yolo.adapters.runtime.bootstrap", "pynvml"),
+        ("clearml_yolo.core.models", "cy_queue.core.queue"),
     ],
 )
 def test_direct_queue_and_sdk_boundaries_reject_injected_edges(
@@ -148,10 +145,10 @@ def test_direct_queue_and_sdk_boundaries_reject_injected_edges(
 
 def test_dynamic_launch_targets_cannot_bypass_direct_queue_boundary() -> None:
     assert architecture.launch_target_findings(
-        "clearml_yolo.entrypoints.hydra.common", {"clearml_yolo.adapters.queue.guardian"}
+        "clearml_yolo.entrypoints.hydra.common", {"cy_queue.adapters.queue.guardian"}
     )
     assert not architecture.launch_target_findings(
-        "clearml_yolo.adapters.queue.runtime", {"clearml_yolo.adapters.queue.guardian"}
+        "cy_queue.adapters.queue.runtime", {"clearml_yolo.adapters.runtime.supervision"}
     )
 
 
@@ -200,9 +197,11 @@ def test_allowed_scientific_dependencies_and_explicit_native_bridge() -> None:
         candidate.add_module(imported)
         candidate.add_module("clearml_yolo.core.identity")
         candidate.add_import(importer="clearml_yolo.core.identity", imported=imported)
-    candidate.add_module("clearml_yolo.adapters.runtime.gpu_probe")
+    candidate.add_module("clearml_yolo.adapters.integrations.native_runtime")
     candidate.add_module("torch")
-    candidate.add_import(importer="clearml_yolo.adapters.runtime.gpu_probe", imported="torch")
+    candidate.add_import(
+        importer="clearml_yolo.adapters.integrations.native_runtime", imported="torch"
+    )
     assert architecture.graph_findings(candidate) == []
 
 
@@ -354,9 +353,7 @@ def test_runtime_targets_resolve_to_shipped_modules_and_no_legacy_paths(
     graph: grimp.ImportGraph,
 ) -> None:
     targets = architecture.runtime_targets(SRC, ROOT / "pyproject.toml")
-    assert "clearml_yolo.entrypoints.queue_run" in targets
-    assert "clearml_yolo.adapters.runtime.gpu_probe" in targets
-    assert "clearml_yolo.adapters.queue.guardian" in targets
+    assert not any(target.startswith("cy_queue") for target in targets)
     assert architecture.target_findings(targets, graph, SRC) == []
     assert architecture.runtime_boundary_findings(SRC) == []
     migration = json.loads((ROOT / "tests/fixtures/legacy-module-map.json").read_text())
@@ -943,3 +940,21 @@ def test_class_assignment_targets_follow_lexical_simple_alias_lookup(
     candidate.add_module("clearml_yolo.probe")
     findings = architecture.target_findings({f"clearml_yolo.probe:{target}"}, candidate, tmp_path)
     assert bool(findings) is not valid, findings
+
+
+@pytest.mark.parametrize(
+    ("source", "forbidden"),
+    [
+        ('if selection == "cy_queue": raise ValueError("retired")', False),
+        ('importlib.import_module("cy_queue")', True),
+        ('if importlib.import_module("cy_queue") == other: pass', True),
+        ('subprocess.run(["python", "-m", "cy_queue.entrypoints.queue"])', True),
+    ],
+)
+def test_dynamic_queue_imports_are_distinct_from_rejected_selector_values(
+    tmp_path: Path, source: str, forbidden: bool
+) -> None:
+    module = tmp_path / "clearml_yolo" / "entrypoints" / "train.py"
+    module.parent.mkdir(parents=True)
+    module.write_text(source)
+    assert bool(architecture.runtime_boundary_findings(tmp_path)) is forbidden

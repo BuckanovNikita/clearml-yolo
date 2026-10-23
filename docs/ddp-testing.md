@@ -5,8 +5,9 @@ The external-result obligation for the delivered implementation is
 Physical multi-GPU outcomes remain unverified. This procedure is retained for a
 future explicitly requested target certification; no result bundle is awaited.
 
-These **new** `ddp_gpu` tests run the production direct and queued YOLO pipelines
-with real CUDA/NCCL ranks and ClearML publication. Existing CPU/Gloo DDP tests
+CY's `ddp_gpu` tests run the production direct YOLO pipeline. The separate cy-queue
+repository owns the full direct/queued comparison and queue failure matrix. Both use
+real CUDA/NCCL ranks and ClearML publication. Existing CPU/Gloo DDP tests
 remain part of ordinary pytest. Ordinary pytest deselects the physical suite and
 does not probe GPUs or contact ClearML through this harness.
 
@@ -24,7 +25,7 @@ indexes. The harness resolves indexes through NVML identity enumeration, then se
 Queued submission uses logical indexes within that new UUID visibility, preserving
 the production queue's selector semantics. MIG selections are unsupported.
 
-Run exactly the new physical tests:
+Run the direct physical tests from the CY checkout:
 
 ```bash
 uv run --frozen --no-sync pytest -m ddp_gpu \
@@ -35,13 +36,29 @@ uv run --frozen --no-sync pytest -m ddp_gpu \
   -ra -vv
 ```
 
+Run the complete comparison and queue-failure matrix from the sibling cy-queue
+checkout, using the same prepared environment:
+
+```bash
+uv run --frozen --no-sync --project ../clearml-yolo pytest -m ddp_gpu \
+  --run-ddp-gpu \
+  --ddp-devices=0,1 \
+  --ddp-clearml-project=clearml-yolo-ddp-tests \
+  --ddp-artifacts=.tmp/ddp-results \
+  -ra -vv
+```
+
+Queued scenarios require the existing filled `queue.toml` or `CY_QUEUE_CONFIG`.
+The harness retains its host coordination root and overrides only scenario-owned
+durable metadata. Installing CY alone provides the direct cases without queue imports.
+
 Missing opt-in, required options, devices, capabilities, credentials or services
 fail an explicitly selected test; they never become a skip or successful result.
 A missing artifacts option retains selection-failure evidence in
 `.tmp/ddp-results`. Each scenario otherwise creates a unique directory beneath the
 requested artifacts directory before parsing selection or running preflight.
 
-The serial matrix comprises direct eager, direct compiled, queued eager, queued
+The queue repository's serial matrix comprises direct eager, direct compiled, queued eager, queued
 compiled, queued rank exit, repeated queued cancellation, and guardian death with
 owner recovery. Every training configuration uses a local YOLOv8n architecture YAML,
 random initialization, two epochs, disjoint generated train/validation/test images
@@ -103,11 +120,14 @@ records. A passing offline harness test, CPU DDP run or single-GPU run does not
 establish this physical multi-GPU acceptance. Until a target executes this command
 and the results are reviewed, physical acceptance remains unverified.
 
-The offline harness checks can be run separately:
+The offline direct harness checks can be run separately from CY:
 
 ```bash
 uv run --frozen --no-sync pytest tests/test_ddp_gpu_harness.py -q
 ```
+
+The queue repository has its own same-named harness tests covering the full matrix;
+run those from that checkout with the shared prepared environment.
 
 The maintained [queue contract](queue.md) and
 [publication inventory](../specs/000-baseline/spec.md#required-publication-and-task-lifecycle)
