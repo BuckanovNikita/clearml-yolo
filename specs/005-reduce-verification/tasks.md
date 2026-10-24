@@ -43,6 +43,9 @@ Independent checks: selected offline baseline plus explicit result inspection.
 - [x] T016 Obtain fresh independent review after verification, resolve findings, reconcile `architecture.json` with actual diff and validate acceptance; record `evidence/review.md`.
 - [ ] T017 Complete task-scoped Conventional Commit and automatic Git-tag-only release/push, restore local overrides exactly and record `evidence/release.md`.
 
+T017 delivery status: local contributor/version commits and annotated tag are complete;
+GitHub connectivity blocks push and remote verification. See [delivery evidence](evidence/release.md).
+
 ## Dependencies and parallel execution
 
 Review follow-up (required before T016/T017 acceptance):
