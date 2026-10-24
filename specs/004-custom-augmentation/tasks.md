@@ -92,6 +92,14 @@ authorization and the remaining verification limits. Native/architecture results
 are not relabeled as passing. The delivery portion of T020 proceeds under this
 exception; its complete-acceptance portion remains pending.
 
-- [ ] T022 Deliver the application and usage companion through checked Git-only
+- [x] T022 Deliver the application and usage companion through checked Git-only
   release under the user's explicit exception; verify remote refs and preserve
   the incomplete native acceptance evidence.
+
+Application v0.39.0 and usage collection v0.4.4 were atomically pushed with
+annotated tags and verified remote refs. Normal application hooks passed for
+both the contributor and version commits; companion documentation checks passed.
+The [delivery receipt](evidence/release.md) records identities, the investigated
+interpreter crash, preserved local overrides and the remaining native gap.
+T020's delivery portion is complete under the explicit exception; its full
+acceptance portion and T014/T015 remain open.

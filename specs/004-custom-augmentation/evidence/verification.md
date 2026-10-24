@@ -5,6 +5,10 @@ This record covers feature `004-custom-augmentation` against base commit
 review are complete. Native acceptance remains incomplete; this document does not
 claim release completion.
 
+Subsequent Git delivery under the user's explicit release instruction is recorded
+in [release.md](release.md). That delivery does not change the incomplete native
+acceptance results preserved below.
+
 ## Local integration
 
 The complete ordinary suite, including real two/four-rank CPU DDP, finished with

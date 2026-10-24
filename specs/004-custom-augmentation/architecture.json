@@ -345,6 +345,6 @@
     "status": "accepted",
     "reviewer": "fresh native subagent /root/final_integration_review (read-only source review)",
     "evidence": "specs/004-custom-augmentation/evidence/review.md",
-    "reconciliation": "Inspected complete tracked and untracked task-owned diff against d8a3695, including dependencies, test tooling, examples and docs. All changed paths match declared scope. The pre-existing local tool.uv.sources section is excluded and preserved exactly. Review accepts code and architecture; pending native checks still block acceptance/release."
+    "reconciliation": "Inspected complete tracked and untracked task-owned diff against d8a3695, including dependencies, test tooling, examples and docs. All changed paths match declared scope. The pre-existing local tool.uv.sources section is excluded and preserved exactly. Review accepts code and architecture; pending native checks still block complete acceptance. The user separately authorized Git-only delivery with that disclosed gap; see specs/004-custom-augmentation/evidence/release.md. Final release audit reconciled all 69 committed paths, including the generated changelog."
   }
 }
