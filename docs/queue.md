@@ -61,8 +61,7 @@ only when changing a storage location deliberately.
 The queue owns scheduling policy, durable records/storage, GPU inventory and
 probing, guardians, CLI/TUI and Hydra submission composition in `cy_queue`. CY owns
 shared process supervision and invocation lifecycle communication in
-`clearml_yolo.adapters.runtime.process_tree`, `supervision` and
-`execution_lifecycle`. Queue integration also consumes CY's bootstrap/filesystem,
+`clearml_yolo.adapters.runtime.process_tree` and `execution_lifecycle`. Queue integration also consumes CY's bootstrap/filesystem,
 diagnostics, pure presentation/model records and Hydra configuration, validation
 and sweep helpers. The [import contract](import-boundaries.md) forbids reverse
 imports; both repositories test their boundary and runtime targets.

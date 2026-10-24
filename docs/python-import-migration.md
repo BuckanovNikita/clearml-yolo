@@ -30,7 +30,7 @@ The table below also identifies interfaces extracted beyond a mechanical move.
 | Filesystem/dataset/cache/run operations | `clearml_yolo.adapters.storage` modules named in the migration map |
 | Direct execution | `clearml_yolo.entrypoints.hydra.common` |
 | Queue policy, storage, GPU inventory, guardians and CLI/TUI | Separate `cy-queue` distribution: `cy_queue.core`, `cy_queue.application`, `cy_queue.adapters`, `cy_queue.entrypoints` |
-| Shared process supervision and lifecycle communication | `clearml_yolo.adapters.runtime.process_tree`, `supervision`, `execution_lifecycle` |
+| Shared process supervision and lifecycle communication | `clearml_yolo.adapters.runtime.process_tree`, `execution_lifecycle` |
 | Project workspace and retained invocation scratch | `clearml_yolo.adapters.runtime.bootstrap` |
 | Native training, DDP and mixed integration lifecycle | `clearml_yolo.adapters.integrations` |
 
@@ -190,3 +190,11 @@ composition supplies them outside Hydra configuration. Old module paths and save
 Python `_target_` strings must migrate together; no compatibility aliases remain.
 Regenerate editable YAML after backing up custom overrides as described in the
 [import migration](python-import-migration.md).
+
+## Removed unused supervision API
+
+`clearml_yolo.adapters.runtime.supervision` is removed. It had no production callers.
+Use the existing `process_tree.LinuxProcessTree` ownership/termination interface and
+`process_tree.defer_interruptions` for explicit cleanup; callers still own waiting for
+their `Popen` children. Queue guardians already use these active interfaces. The
+removal adds no compatibility facade and changes no queue wire protocol.

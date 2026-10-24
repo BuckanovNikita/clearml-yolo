@@ -2,7 +2,7 @@
 line-length = 100
 target-version = "py312"
 src = ["src", "tests"]
-extend-exclude = ["external"]
+extend-exclude = ["external", "mutants"]
 
 [lint]
 select = ["ALL"]

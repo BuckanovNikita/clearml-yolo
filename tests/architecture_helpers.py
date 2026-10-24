@@ -1,10 +1,12 @@
 """Static architecture checks shared by positive and injected negative tests."""
 
 import ast
+import configparser
 import re
 import sys
 import tomllib
 from collections.abc import Iterator, Mapping
+from graphlib import CycleError, TopologicalSorter
 from importlib.util import resolve_name
 from pathlib import Path
 from typing import override
@@ -12,211 +14,27 @@ from typing import override
 import grimp
 
 PROJECT_ROOTS = ("clearml_yolo",)
-ADAPTER_RESPONSIBILITIES = {
-    "augmentation",
-    "storage",
-    "yolo",
-    "clearml",
-    "evaluation",
-    "reporting",
-    "fiftyone",
-    "runtime",
-    "integrations",
-    "observability",
-    "deim",
-    "rfdetr",
-    "fasterrcnn",
-    "export",
-    "assets",
-}
-COMMANDS = {
-    "pipeline",
-    "train",
-    "predict",
-    "val",
-    "metrics",
-    "report",
-    "compare",
-    "ground_truth",
-    "config_tree",
-    "dedup",
-    "export",
-}
 SCIENTIFIC = {"pydantic", "pandera", "pandas", "numpy", "scipy"}
 PURE_ADAPTERS = {
     "clearml_yolo.adapters.clearml.parameters": set(),
     "clearml_yolo.adapters.clearml.cache": {"yaml", "clearml_yolo.adapters.clearml.parameters"},
 }
-APPLICATION_EFFECT_DEPENDENCIES = {
-    "loguru",
-    "matplotlib",
-    "PIL",
-    "openpyxl",
-    "requests",
-    "filelock",
+# Ownership lives in import-linter; initializers and literal launch targets need
+# only its external roots, not a second table of permitted owners or peer edges.
+IMPORT_CONTRACTS = configparser.ConfigParser()
+IMPORT_CONTRACTS.read(Path(__file__).resolve().parents[1] / ".importlinter")
+SDK_ROOTS = {
+    root
+    for section in IMPORT_CONTRACTS.sections()
+    if section.endswith("-sdk-has-explicit-owners")
+    for root in IMPORT_CONTRACTS[section]["forbidden_modules"].split()
 }
-SDK_OWNERS = {
-    "albumentations": ("clearml_yolo.adapters.augmentation.serialization",),
-    "textual": (),
-    "pynvml": (),
-    "cy_queue": (),
-    "ultralytics": (
-        "clearml_yolo.adapters.yolo",
-        "clearml_yolo.adapters.integrations.native_runtime",
-        "clearml_yolo.adapters.integrations.native_ddp",
-        "clearml_yolo.adapters.integrations.native_trainer",
-        "clearml_yolo.adapters.integrations.training",
-    ),
-    "torch": (
-        "clearml_yolo.adapters.augmentation.torch_data",
-        "clearml_yolo.adapters.yolo",
-        "clearml_yolo.adapters.integrations.native_runtime",
-        "clearml_yolo.adapters.integrations.native_ddp",
-        "clearml_yolo.adapters.integrations.training",
-        "clearml_yolo.adapters.deim.backend",
-        "clearml_yolo.adapters.rfdetr.backend",
-        "clearml_yolo.adapters.fasterrcnn.data",
-        "clearml_yolo.adapters.fasterrcnn.evaluation",
-        "clearml_yolo.adapters.fasterrcnn.inference",
-        "clearml_yolo.adapters.fasterrcnn.model",
-        "clearml_yolo.adapters.fasterrcnn.assets",
-        "clearml_yolo.adapters.fasterrcnn.training",
-        "clearml_yolo.adapters.fasterrcnn.transform",
-        "clearml_yolo.adapters.export.onnx",
-        "clearml_yolo.adapters.export.positions",
-        "clearml_yolo.adapters.export.swin",
-        "clearml_yolo.adapters.export.tensors",
-        "clearml_yolo.adapters.export.verification",
-    ),
-    "torchvision": (
-        "clearml_yolo.adapters.augmentation.torch_data",
-        "clearml_yolo.adapters.deim.backend",
-        "clearml_yolo.adapters.fasterrcnn.model",
-        "clearml_yolo.adapters.fasterrcnn.assets",
-        "clearml_yolo.adapters.fasterrcnn.transform",
-        "clearml_yolo.adapters.export.tensors",
-    ),
-    "timm": (
-        "clearml_yolo.adapters.export.swin",
-        "clearml_yolo.adapters.fasterrcnn.model",
-        "clearml_yolo.adapters.fasterrcnn.assets",
-    ),
-    "rfdetr": ("clearml_yolo.adapters.rfdetr.backend", "clearml_yolo.adapters.rfdetr.assets"),
-    "pytorch_lightning": ("clearml_yolo.adapters.rfdetr.backend",),
-    "pycocotools": (
-        "clearml_yolo.adapters.fasterrcnn.evaluation",
-        "clearml_yolo.adapters.export.quality",
-    ),
-    "onnx": ("clearml_yolo.adapters.export.onnx", "clearml_yolo.adapters.export.build"),
-    "tensorrt": ("clearml_yolo.adapters.export.build", "clearml_yolo.adapters.export.runtime"),
-    "clearml": (
-        "clearml_yolo.adapters.clearml",
-        "clearml_yolo.adapters.integrations.native_runtime",
-        "clearml_yolo.adapters.integrations.training",
-    ),
-    "botocore": (),
-    "digital_metrics": ("clearml_yolo.adapters.evaluation", "clearml_yolo.adapters.reporting"),
-    "report_generator": ("clearml_yolo.adapters.reporting",),
-    "openpyxl": ("clearml_yolo.adapters.reporting",),
-    "fiftyone": ("clearml_yolo.adapters.fiftyone",),
-    "eta": (),
-    "hydra": ("clearml_yolo.entrypoints.hydra",),
-    "hydra_zen": ("clearml_yolo.entrypoints.hydra",),
-    "omegaconf": ("clearml_yolo.entrypoints.hydra",),
-}
-SDK_EXCEPTIONS: set[tuple[str, str]] = set()
-ADAPTER_PEERS = {
-    "augmentation": set(),
-    "storage": {"observability"},
-    "observability": set(),
-    "yolo": {"storage", "observability"},
-    "evaluation": {"observability"},
-    "reporting": {"storage", "observability"},
-    "clearml": {"storage", "observability"},
-    "fiftyone": {"observability"},
-    "runtime": {"observability"},
-    "assets": {"storage", "observability"},
-    "integrations": {"storage", "observability"},
-    "deim": {"observability"},
-    "rfdetr": {"observability"},
-    "fasterrcnn": {"observability"},
-    "export": {"observability"},
-}
-# These edges implement explicit cross-adapter coordination or data conversion.
-PEER_EXCEPTIONS = {
-    ("clearml_yolo.adapters.fasterrcnn.data", "clearml_yolo.adapters.augmentation.pipeline"),
-    ("clearml_yolo.adapters.yolo.augmentation", "clearml_yolo.adapters.augmentation.pipeline"),
-    ("clearml_yolo.adapters.deim.transforms", "clearml_yolo.adapters.augmentation.pipeline"),
-    ("clearml_yolo.adapters.deim.transforms", "clearml_yolo.adapters.augmentation.torch_data"),
-    ("clearml_yolo.adapters.rfdetr.transforms", "clearml_yolo.adapters.augmentation.pipeline"),
-    ("clearml_yolo.adapters.rfdetr.transforms", "clearml_yolo.adapters.augmentation.torch_data"),
-    ("clearml_yolo.adapters.fasterrcnn.data", "clearml_yolo.adapters.augmentation.torch_data"),
-    (
-        "clearml_yolo.adapters.integrations.native_trainer",
-        "clearml_yolo.adapters.yolo.augmentation",
-    ),
-    ("clearml_yolo.adapters.integrations.detectors", "clearml_yolo.adapters.assets.execution"),
-    ("clearml_yolo.adapters.integrations.detectors", "clearml_yolo.adapters.clearml.session"),
-    ("clearml_yolo.adapters.assets.execution", "clearml_yolo.adapters.deim.assets"),
-    ("clearml_yolo.adapters.assets.execution", "clearml_yolo.adapters.deim.source"),
-    ("clearml_yolo.adapters.assets.execution", "clearml_yolo.adapters.fasterrcnn.assets"),
-    ("clearml_yolo.adapters.assets.execution", "clearml_yolo.adapters.rfdetr.assets"),
-    ("clearml_yolo.adapters.assets.sources", "clearml_yolo.adapters.deim.assets"),
-    ("clearml_yolo.adapters.deim.backend", "clearml_yolo.adapters.assets.sources"),
-    ("clearml_yolo.adapters.deim.source", "clearml_yolo.adapters.assets.sources"),
-    ("clearml_yolo.adapters.deim.source", "clearml_yolo.adapters.assets.archive"),
-    ("clearml_yolo.adapters.deim.source", "clearml_yolo.adapters.storage.filesystem"),
-    ("clearml_yolo.adapters.deim.backend", "clearml_yolo.adapters.storage.filesystem"),
-    ("clearml_yolo.adapters.rfdetr.backend", "clearml_yolo.adapters.storage.filesystem"),
-    ("clearml_yolo.adapters.fasterrcnn.training", "clearml_yolo.adapters.storage.filesystem"),
-    ("clearml_yolo.adapters.export.build", "clearml_yolo.adapters.storage.filesystem"),
-    ("clearml_yolo.adapters.export.metadata", "clearml_yolo.adapters.storage.filesystem"),
-    ("clearml_yolo.adapters.export.onnx", "clearml_yolo.adapters.storage.filesystem"),
-    ("clearml_yolo.adapters.export.verification", "clearml_yolo.adapters.storage.filesystem"),
-    ("clearml_yolo.adapters.storage.filesystem", "clearml_yolo.adapters.runtime.bootstrap"),
-    (
-        "clearml_yolo.adapters.integrations.native_runtime",
-        "clearml_yolo.adapters.runtime.bootstrap",
-    ),
-    ("clearml_yolo.adapters.fiftyone.worker", "clearml_yolo.adapters.runtime.bootstrap"),
-    ("clearml_yolo.adapters.fiftyone.bounded", "clearml_yolo.adapters.storage.filesystem"),
-    ("clearml_yolo.adapters.observability.capture", "clearml_yolo.adapters.runtime.bootstrap"),
-    ("clearml_yolo.adapters.clearml.models", "clearml_yolo.adapters.reporting.workbook_identity"),
-    ("clearml_yolo.adapters.fiftyone.publisher", "clearml_yolo.adapters.storage.publication_data"),
-    ("clearml_yolo.adapters.integrations.native_runtime", "clearml_yolo.adapters.clearml.session"),
-    ("clearml_yolo.adapters.integrations.native_ddp", "clearml_yolo.adapters.clearml.session"),
-    ("clearml_yolo.adapters.integrations.native_ddp", "clearml_yolo.adapters.clearml.deadline"),
-    ("clearml_yolo.adapters.integrations.training", "clearml_yolo.adapters.clearml.session"),
-    ("clearml_yolo.adapters.integrations.training", "clearml_yolo.adapters.clearml.native"),
-    ("clearml_yolo.adapters.integrations.training", "clearml_yolo.adapters.yolo.config"),
-    ("clearml_yolo.adapters.integrations.detectors", "clearml_yolo.adapters.yolo.config"),
-    ("clearml_yolo.adapters.integrations.detectors", "clearml_yolo.adapters.yolo.reinfer"),
-    ("clearml_yolo.adapters.integrations.detectors", "clearml_yolo.adapters.clearml.detectors"),
-    ("clearml_yolo.adapters.integrations.detectors", "clearml_yolo.adapters.deim.backend"),
-    ("clearml_yolo.adapters.integrations.detectors", "clearml_yolo.adapters.rfdetr.backend"),
-    ("clearml_yolo.adapters.integrations.detectors", "clearml_yolo.adapters.fasterrcnn.backend"),
-    ("clearml_yolo.adapters.export.onnx", "clearml_yolo.adapters.fasterrcnn.model"),
-    (
-        "clearml_yolo.adapters.integrations.export_operations",
-        "clearml_yolo.adapters.export.metadata",
-    ),
-    ("clearml_yolo.adapters.integrations.export_operations", "clearml_yolo.adapters.export.build"),
-    ("clearml_yolo.adapters.integrations.export_operations", "clearml_yolo.adapters.export.onnx"),
-    (
-        "clearml_yolo.adapters.integrations.export_operations",
-        "clearml_yolo.adapters.export.verification",
-    ),
-    ("clearml_yolo.adapters.export.verification", "clearml_yolo.adapters.fasterrcnn.model"),
-    ("clearml_yolo.adapters.export.verification", "clearml_yolo.adapters.storage.dataset_records"),
-    (
-        "clearml_yolo.adapters.integrations.export_operations",
-        "clearml_yolo.adapters.fasterrcnn.configuration",
-    ),
-    (
-        "clearml_yolo.adapters.integrations.export_operations",
-        "clearml_yolo.adapters.fasterrcnn.model",
-    ),
-}
+QUEUE_ROOTS = set(
+    IMPORT_CONTRACTS["importlinter:contract:cy-never-imports-extracted-queue"][
+        "forbidden_modules"
+    ].split()
+)
+SDK_ROOTS |= QUEUE_ROOTS
 EFFECTFUL_CALLS = {
     "open",
     "read_text",
@@ -367,133 +185,39 @@ def within(module: str, prefix: str) -> bool:
     return module == prefix or module.startswith(prefix + ".")
 
 
-def layer(module: str) -> str | None:
-    pieces = module.split(".")
-    if module == "clearml_yolo":
-        return "root"
-    if len(pieces) < 2 or pieces[0] != "clearml_yolo":
-        return None
-    responsibilities: dict[str, set[str] | None] = {
-        "core": None,
-        "adapters": ADAPTER_RESPONSIBILITIES,
-        "application": {"contracts", "ports", "evaluation", "ground_truth", "use_cases"},
-        "entrypoints": COMMANDS | {"composition", "hydra"},
-    }
-    selected = pieces[1]
-    if selected not in responsibilities:
-        return None
-    permitted = responsibilities[selected]
-    if len(pieces) == 2 or permitted is None or pieces[2] in permitted:
-        return selected
-    return None
-
-
 def launch_target_findings(importer: str, targets: set[str]) -> list[str]:
-    forbidden = ("cy_queue", "textual", "pynvml")
     return [
         f"CY imports extracted scheduling: {importer} -> {target}"
         for target in targets
-        if within(importer, "clearml_yolo") and any(within(target, x) for x in forbidden)
+        if within(importer, "clearml_yolo") and any(within(target, root) for root in QUEUE_ROOTS)
     ]
 
 
-def _edge_findings(importer: str, imported: str) -> list[str]:
-    findings = launch_target_findings(importer, {imported})
-    source_layer = next(
-        (
-            name
-            for name in ("core", "application", "adapters", "entrypoints")
-            if within(importer, f"clearml_yolo.{name}")
-        ),
-        layer(importer),
-    )
-    target_layer = layer(imported)
-    if source_layer == target_layer == "adapters":
-        source_parts, target_parts = importer.split("."), imported.split(".")
-        if len(source_parts) > 2 and len(target_parts) > 2:
-            source_peer, target_peer = source_parts[2], target_parts[2]
-            if (
-                source_peer != target_peer
-                and target_peer not in ADAPTER_PEERS.get(source_peer, set())
-                and (importer, imported) not in PEER_EXCEPTIONS
-            ):
-                findings.append(f"adapter peer ownership: {importer} -> {imported}")
-    if target_layer is not None:
-        forbidden = (
-            (source_layer == "core" and target_layer not in {"core", "root"})
-            or (source_layer == "application" and target_layer in {"adapters", "entrypoints"})
-            or (source_layer == "adapters" and target_layer == "entrypoints")
-            or (
-                source_layer == "adapters"
-                and target_layer == "application"
-                and imported
-                not in {
-                    "clearml_yolo.application",
-                    "clearml_yolo.application.ports",
-                    "clearml_yolo.application.contracts",
-                }
-            )
-        )
-        if forbidden:
-            findings.append(f"dependency direction: {importer} -> {imported}")
-    external_root = imported.split(".", maxsplit=1)[0]
-    if (
-        importer in PURE_ADAPTERS
-        and external_root not in sys.stdlib_module_names
-        and not any(within(imported, allowed) for allowed in PURE_ADAPTERS[importer])
-    ):
-        findings.append(f"pure adapter dependency: {importer} -> {imported}")
-    if source_layer == "application" and external_root in APPLICATION_EFFECT_DEPENDENCIES:
-        findings.append(f"application effects require ports: {importer} -> {imported}")
-    if external_root in SDK_OWNERS and (
-        not any(within(importer, owner) for owner in SDK_OWNERS[external_root])
-        and (importer, external_root) not in SDK_EXCEPTIONS
-    ):
-        findings.append(f"SDK ownership: {importer} -> {imported}")
-    if (
-        source_layer == "core"
-        and target_layer is None
-        and (external_root not in sys.stdlib_module_names | SCIENTIFIC)
-    ):
-        findings.append(f"core dependency allowlist: {importer} -> {imported}")
-    return findings
-
-
-def _cycle_findings(graph: grimp.ImportGraph, modules: set[str]) -> list[str]:
-    visited: set[str] = set()
-    active: list[str] = []
-    findings: list[str] = []
-
-    def visit(module: str) -> None:
-        if module in active:
-            cycle = [*active[active.index(module) :], module]
-            findings.append("dependency cycle: " + " -> ".join(cycle))
-            return
-        if module in visited:
-            return
-        active.append(module)
-        for imported in sorted(graph.find_modules_directly_imported_by(module) & modules):
-            visit(imported)
-        active.pop()
-        visited.add(module)
-
-    for module in sorted(modules):
-        visit(module)
-    return findings
-
-
 def graph_findings(graph: grimp.ImportGraph) -> list[str]:
-    """Inspect every project module and edge, including transitive escape causes."""
-    modules = {
-        module for module in graph.modules if any(within(module, root) for root in PROJECT_ROOTS)
-    }
+    """Check allowlists and whole-graph cycles not expressed by import-linter."""
+    modules = {module for module in graph.modules if within(module, "clearml_yolo")}
     findings = []
+    dependencies = {}
     for module in sorted(modules):
-        if layer(module) is None:
-            findings.append(f"unclassified module: {module}")
-        for imported in sorted(graph.find_modules_directly_imported_by(module)):
-            findings.extend(_edge_findings(module, imported))
-    findings.extend(_cycle_findings(graph, modules))
+        imports = graph.find_modules_directly_imported_by(module)
+        dependencies[module] = imports & modules
+        for imported in sorted(imports):
+            external_root = imported.split(".", maxsplit=1)[0]
+            if (
+                module in PURE_ADAPTERS
+                and external_root not in sys.stdlib_module_names
+                and not any(within(imported, allowed) for allowed in PURE_ADAPTERS[module])
+            ):
+                findings.append(f"pure adapter dependency: {module} -> {imported}")
+            if (
+                within(module, "clearml_yolo.core")
+                and external_root not in sys.stdlib_module_names | SCIENTIFIC | {"clearml_yolo"}
+            ):
+                findings.append(f"core dependency allowlist: {module} -> {imported}")
+    try:
+        tuple(TopologicalSorter(dependencies).static_order())
+    except CycleError as error:
+        findings.append("dependency cycle: " + " -> ".join(error.args[1]))
     return findings
 
 
@@ -872,7 +596,7 @@ def initializer_dependency_findings(source_root: Path) -> list[str]:
         if module in chain:
             return
         next_chain = (*chain, module)
-        if module.split(".", maxsplit=1)[0] in SDK_OWNERS:
+        if module.split(".", maxsplit=1)[0] in SDK_ROOTS:
             findings.append("eager SDK import chain: " + " -> ".join(next_chain))
         for imported in edges.get(module, set()):
             visit(imported, next_chain)
@@ -908,7 +632,7 @@ def initializer_findings(tree: ast.Module) -> list[str]:
                 if isinstance(node, ast.Import)
                 else [node.module or ""]
             )
-            if any(name.split(".")[0] in SDK_OWNERS for name in names):
+            if any(name.split(".")[0] in SDK_ROOTS for name in names):
                 findings.append(f"eager SDK import at line {node.lineno}")
         elif isinstance(node, ast.Call):
             findings.append(f"initializer operation at line {node.lineno}")

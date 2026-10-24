@@ -697,8 +697,11 @@ work requires fresh independent review. Documentation and portable usage guidanc
 Missing/failing required checks remain gaps. Historical waivers apply only to their specified targets.
 
 Use [development checks](../../docs/development.md#verification) and [static-analysis
-policy](../../docs/static-analysis.md): affected/full pytest as appropriate, Ruff, strict mypy, Vulture,
-separate import contracts and architecture tests, Markdown/link checking and required hooks. Ruff rules live
+policy](../../docs/static-analysis.md): the canonical `scripts/verify.py` runs Ruff, strict mypy,
+Vulture, import-linter and one complete ordinary pytest suite, including architecture and CPU-DDP.
+Documentation uses separate `--docs` evidence; scoped mutation acceptance remains outside hooks.
+Matching private receipts permit reuse across contributor and strictly validated version commits;
+`--force` requires fresh checks. Required hooks invoke the same canonical entrypoint. Ruff rules live
 in `ruff.toml`, import contracts in `.importlinter`; `pyproject.toml` keeps package/small tool settings.
 Advisory unused-code findings need callsite/dynamic-consumer/contract evidence before deletion.
 Documentation checker tests include negative cases; its parser does not validate external links, command

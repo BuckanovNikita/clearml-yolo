@@ -1,7 +1,6 @@
 """Resolve native assets with proxy fallback, atomic publication and offline recovery."""
 
 import hashlib
-import json
 import os
 import tarfile
 import tempfile
@@ -11,6 +10,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 import requests
 from filelock import FileLock, Timeout
+from safetensors import SafetensorError, safe_open
 
 from clearml_yolo.adapters.assets.archive import validate_archive
 from clearml_yolo.adapters.assets.http import download as _download
@@ -20,8 +20,6 @@ from clearml_yolo.core.assets import AssetSpec, ResolvedAsset
 
 _ATTEMPTS = 2
 _LOCK_TIMEOUT = 1260
-_MIN_JSON_BYTES = 2
-_OFFSET_PAIR_SIZE = 2
 
 
 class AssetResolutionError(RuntimeError):
@@ -75,28 +73,12 @@ def source_urls(spec: AssetSpec) -> tuple[str, ...]:
 
 
 def _safetensors(path: Path) -> None:
-    size = path.stat().st_size
-    with path.open("rb") as stream:
-        length = int.from_bytes(stream.read(8), "little")
-        if length < _MIN_JSON_BYTES or length > min(size - 8, 100_000_000):
-            raise ValueError("Invalid safetensors header length")
-        header = json.loads(stream.read(length))
-    if not isinstance(header, dict) or not header:
-        raise ValueError("Invalid safetensors header")
-    ends = []
-    for key, value in header.items():
-        if key == "__metadata__":
-            continue
-        if not isinstance(value, dict) or not isinstance(value.get("data_offsets"), list):
-            raise TypeError("Invalid safetensors tensor offsets")
-        offsets = value["data_offsets"]
-        if len(offsets) != _OFFSET_PAIR_SIZE or not all(isinstance(item, int) for item in offsets):
-            raise TypeError("Invalid safetensors tensor offsets")
-        if not 0 <= offsets[0] <= offsets[1] <= size - 8 - length:
-            raise ValueError("Truncated safetensors data")
-        ends.append(offsets[1])
-    if not ends or max(ends) != size - 8 - length:
-        raise ValueError("Incomplete safetensors payload")
+    try:
+        with safe_open(path, framework="numpy") as tensors:
+            if not tensors.keys():
+                raise ValueError("Safetensors asset contains no tensors")
+    except SafetensorError as error:
+        raise ValueError("Invalid safetensors asset") from error
 
 
 def validate_asset(path: Path, spec: AssetSpec) -> str:

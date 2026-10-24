@@ -23,6 +23,7 @@ source_modules =
 forbidden_modules =
     clearml_yolo.application.use_cases
     clearml_yolo.application.evaluation
+    clearml_yolo.application.ground_truth
 
 [importlinter:contract:application-command-composition-is-inward-and-acyclic]
 name = Application command composition is inward and acyclic
@@ -95,6 +96,9 @@ ignore_imports =
     clearml_yolo.adapters.fasterrcnn.training -> torch
     clearml_yolo.adapters.fasterrcnn.transform -> torch
     clearml_yolo.adapters.integrations.native_runtime -> torch
+    clearml_yolo.adapters.deim.backend -> torch
+    clearml_yolo.adapters.rfdetr.backend -> torch
+    clearml_yolo.adapters.export.onnx -> torch
 
 [importlinter:contract:clearml-sdk-has-explicit-owners]
 name = clearml SDK has explicit owners
@@ -252,6 +256,7 @@ forbidden_modules =
     clearml_yolo.adapters.reporting
     clearml_yolo.adapters.runtime
     clearml_yolo.adapters.yolo
+    clearml_yolo.adapters.assets
 allow_indirect_imports = true
 ignore_imports =
     clearml_yolo.adapters.storage.filesystem -> clearml_yolo.adapters.runtime.bootstrap
@@ -275,6 +280,7 @@ forbidden_modules =
     clearml_yolo.adapters.runtime
     clearml_yolo.adapters.storage
     clearml_yolo.adapters.yolo
+    clearml_yolo.adapters.assets
 allow_indirect_imports = true
 ignore_imports =
     clearml_yolo.adapters.observability.capture -> clearml_yolo.adapters.runtime.bootstrap
@@ -296,6 +302,7 @@ forbidden_modules =
     clearml_yolo.adapters.integrations
     clearml_yolo.adapters.reporting
     clearml_yolo.adapters.runtime
+    clearml_yolo.adapters.assets
 allow_indirect_imports = true
 ignore_imports =
     clearml_yolo.adapters.yolo.augmentation -> clearml_yolo.adapters.augmentation.pipeline
@@ -318,6 +325,7 @@ forbidden_modules =
     clearml_yolo.adapters.runtime
     clearml_yolo.adapters.storage
     clearml_yolo.adapters.yolo
+    clearml_yolo.adapters.assets
 allow_indirect_imports = true
 
 [importlinter:contract:reporting-adapter-peer-ownership]
@@ -337,6 +345,7 @@ forbidden_modules =
     clearml_yolo.adapters.integrations
     clearml_yolo.adapters.runtime
     clearml_yolo.adapters.yolo
+    clearml_yolo.adapters.assets
 allow_indirect_imports = true
 
 [importlinter:contract:clearml-adapter-peer-ownership]
@@ -356,6 +365,7 @@ forbidden_modules =
     clearml_yolo.adapters.reporting
     clearml_yolo.adapters.runtime
     clearml_yolo.adapters.yolo
+    clearml_yolo.adapters.assets
 allow_indirect_imports = true
 ignore_imports =
     clearml_yolo.adapters.clearml.models -> clearml_yolo.adapters.reporting.workbook_identity
@@ -378,6 +388,7 @@ forbidden_modules =
     clearml_yolo.adapters.runtime
     clearml_yolo.adapters.storage
     clearml_yolo.adapters.yolo
+    clearml_yolo.adapters.assets
 allow_indirect_imports = true
 ignore_imports =
     clearml_yolo.adapters.fiftyone.worker -> clearml_yolo.adapters.runtime.bootstrap
@@ -402,6 +413,7 @@ forbidden_modules =
     clearml_yolo.adapters.reporting
     clearml_yolo.adapters.storage
     clearml_yolo.adapters.yolo
+    clearml_yolo.adapters.assets
 allow_indirect_imports = true
 ignore_imports =
 
@@ -422,6 +434,7 @@ forbidden_modules =
     clearml_yolo.adapters.reporting
     clearml_yolo.adapters.runtime
     clearml_yolo.adapters.yolo
+    clearml_yolo.adapters.assets
 allow_indirect_imports = true
 ignore_imports =
     clearml_yolo.adapters.integrations.native_trainer -> clearml_yolo.adapters.yolo.augmentation
@@ -445,6 +458,7 @@ ignore_imports =
     clearml_yolo.adapters.integrations.training -> clearml_yolo.adapters.clearml.native
     clearml_yolo.adapters.integrations.training -> clearml_yolo.adapters.clearml.session
     clearml_yolo.adapters.integrations.training -> clearml_yolo.adapters.yolo.config
+    clearml_yolo.adapters.integrations.detectors -> clearml_yolo.adapters.assets.execution
 
 [importlinter:contract:openpyxl-sdk-has-explicit-owners]
 name = openpyxl SDK has explicit owners
@@ -474,6 +488,7 @@ forbidden_modules =
     clearml_yolo.adapters.rfdetr
     clearml_yolo.adapters.fasterrcnn
     clearml_yolo.adapters.export
+    clearml_yolo.adapters.assets
 allow_indirect_imports = true
 # Exact read-only containment helper; other storage effects remain forbidden.
 ignore_imports =
@@ -481,6 +496,9 @@ ignore_imports =
     clearml_yolo.adapters.deim.transforms -> clearml_yolo.adapters.augmentation.torch_data
     clearml_yolo.adapters.deim.backend -> clearml_yolo.adapters.storage.filesystem
     clearml_yolo.adapters.deim.source -> clearml_yolo.adapters.storage.filesystem
+    clearml_yolo.adapters.deim.backend -> clearml_yolo.adapters.assets.sources
+    clearml_yolo.adapters.deim.source -> clearml_yolo.adapters.assets.archive
+    clearml_yolo.adapters.deim.source -> clearml_yolo.adapters.assets.sources
 
 [importlinter:contract:rfdetr-adapter-peer-ownership]
 name = rfdetr adapter peer ownership
@@ -500,6 +518,7 @@ forbidden_modules =
     clearml_yolo.adapters.deim
     clearml_yolo.adapters.fasterrcnn
     clearml_yolo.adapters.export
+    clearml_yolo.adapters.assets
 allow_indirect_imports = true
 # Exact read-only containment helper; other storage effects remain forbidden.
 ignore_imports =
@@ -525,6 +544,7 @@ forbidden_modules =
     clearml_yolo.adapters.deim
     clearml_yolo.adapters.rfdetr
     clearml_yolo.adapters.export
+    clearml_yolo.adapters.assets
 allow_indirect_imports = true
 # Exact read-only containment helper; other storage effects remain forbidden.
 ignore_imports =
@@ -550,6 +570,7 @@ forbidden_modules =
     clearml_yolo.adapters.deim
     clearml_yolo.adapters.rfdetr
     clearml_yolo.adapters.fasterrcnn
+    clearml_yolo.adapters.assets
 allow_indirect_imports = true
 # The ONNX bridge imports its native model lazily; AST graph tests check that edge.
 unmatched_ignore_imports_alerting = none
@@ -743,3 +764,49 @@ forbidden_modules =
     clearml_yolo.adapters.export
     clearml_yolo.adapters.assets
 allow_indirect_imports = true
+
+[importlinter:contract:assets-adapter-peer-ownership]
+name = assets adapter peer ownership
+type = forbidden
+source_modules =
+    clearml_yolo.adapters.assets
+forbidden_modules =
+    clearml_yolo.adapters.augmentation
+    clearml_yolo.adapters.clearml
+    clearml_yolo.adapters.deim
+    clearml_yolo.adapters.evaluation
+    clearml_yolo.adapters.export
+    clearml_yolo.adapters.fasterrcnn
+    clearml_yolo.adapters.fiftyone
+    clearml_yolo.adapters.integrations
+    clearml_yolo.adapters.reporting
+    clearml_yolo.adapters.rfdetr
+    clearml_yolo.adapters.runtime
+    clearml_yolo.adapters.yolo
+allow_indirect_imports = true
+ignore_imports =
+    clearml_yolo.adapters.assets.execution -> clearml_yolo.adapters.deim.assets
+    clearml_yolo.adapters.assets.execution -> clearml_yolo.adapters.deim.source
+    clearml_yolo.adapters.assets.execution -> clearml_yolo.adapters.fasterrcnn.assets
+    clearml_yolo.adapters.assets.execution -> clearml_yolo.adapters.rfdetr.assets
+    clearml_yolo.adapters.assets.sources -> clearml_yolo.adapters.deim.assets
+
+[importlinter:contract:exhaustive-entrypoint-classification]
+name = Exhaustive entrypoint classification
+type = layers
+containers =
+    clearml_yolo.entrypoints
+layers =
+    compare:composition:config_tree:dedup:export:ground_truth:hydra:metrics:pipeline:predict:report:train:val
+exhaustive = true
+
+[importlinter:contract:safetensors-sdk-has-explicit-owners]
+name = safetensors SDK has explicit owners
+type = forbidden
+source_modules =
+    clearml_yolo
+forbidden_modules =
+    safetensors
+allow_indirect_imports = true
+ignore_imports =
+    clearml_yolo.adapters.assets.resolver -> safetensors

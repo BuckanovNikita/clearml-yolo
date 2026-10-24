@@ -1,0 +1,406 @@
+{
+  "schema_version": 1,
+  "task": "005 reduce code and verify each release once",
+  "scope": [
+    "src/clearml_yolo/adapters/runtime/supervision.py",
+    "src/clearml_yolo/entrypoints/composition.py",
+    "src/clearml_yolo/adapters/assets",
+    "src/clearml_yolo/adapters/storage/identity.py",
+    "src/clearml_yolo/adapters/storage/dedup.py",
+    "src/clearml_yolo/adapters/clearml/native.py",
+    "src/clearml_yolo/adapters/export/metadata.py",
+    "tests/architecture_helpers.py",
+    "tests/test_architecture.py",
+    "scripts/verify.py",
+    "scripts/local_release.py",
+    "pyproject.toml",
+    "tests",
+    ".importlinter",
+    ".pre-commit-config.yaml",
+    "ruff.toml",
+    ".gitignore",
+    "uv.lock",
+    "docs",
+    "specs/005-reduce-verification",
+    "specs/000-baseline/spec.md",
+    "AGENTS.md",
+    "CHANGELOG.md"
+  ],
+  "impact": "modules",
+  "rules": "Project constitution and docs/import-boundaries.md: typed inward dependencies, adapter-owned effects, inert initializers and explicit runtime targets; standalone verification tooling must not import application runtime.",
+  "modules": [
+    {
+      "id": "obsolete-supervision",
+      "path": "src/clearml_yolo/adapters/runtime/supervision.py",
+      "change": "remove",
+      "responsibility": "Remove unused public API; active process_tree remains owner of cancellation",
+      "interface": "Removed import documented as the sole approved breaking change",
+      "layer": "Runtime adapter",
+      "allowed_dependencies": [
+        "Python stdlib",
+        "application ports",
+        "core"
+      ],
+      "forbidden_dependencies": [
+        "entrypoints",
+        "cy_queue"
+      ],
+      "effects": "No replacement effect owner; process_tree retains signals and ownership.",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "composition",
+      "path": "src/clearml_yolo/entrypoints/composition.py",
+      "change": "modify",
+      "responsibility": "Construct typed workflow dependencies using adapter module imports",
+      "interface": "Preserve factory signatures and binding timing",
+      "layer": "Entrypoint",
+      "allowed_dependencies": [
+        "adapters",
+        "application ports",
+        "core"
+      ],
+      "forbidden_dependencies": [],
+      "effects": "Composition creates dependencies; adapters retain runtime effects.",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "assets",
+      "path": "src/clearml_yolo/adapters/assets",
+      "change": "modify",
+      "responsibility": "Validate cached assets with library format parser",
+      "interface": "Existing ValueError/fallback and nonempty tensor-key boundary",
+      "layer": "Adapter",
+      "allowed_dependencies": [
+        "safetensors",
+        "stdlib",
+        "core",
+        "allowed adapter peers"
+      ],
+      "forbidden_dependencies": [
+        "application use cases",
+        "entrypoints"
+      ],
+      "effects": "Own file reads and downloads, unchanged cache/tracing behavior.",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "identity",
+      "path": "src/clearml_yolo/adapters/storage/identity.py",
+      "change": "modify",
+      "responsibility": "Consolidate file hashing with hashlib.file_digest",
+      "interface": "Preserve digest/signature, tracing and identity checks",
+      "layer": "Adapter",
+      "allowed_dependencies": [
+        "stdlib",
+        "existing permitted peers",
+        "core"
+      ],
+      "forbidden_dependencies": [
+        "entrypoints",
+        "application use cases"
+      ],
+      "effects": "Own local file reads; no new effects.",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "dedup",
+      "path": "src/clearml_yolo/adapters/storage/dedup.py",
+      "change": "modify",
+      "responsibility": "Consolidate file hashing with hashlib.file_digest",
+      "interface": "Preserve digest/signature, tracing and identity checks",
+      "layer": "Adapter",
+      "allowed_dependencies": [
+        "stdlib",
+        "existing permitted peers",
+        "core"
+      ],
+      "forbidden_dependencies": [
+        "entrypoints",
+        "application use cases"
+      ],
+      "effects": "Own local file reads; no new effects.",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "native-hash",
+      "path": "src/clearml_yolo/adapters/clearml/native.py",
+      "change": "modify",
+      "responsibility": "Consolidate file hashing with hashlib.file_digest",
+      "interface": "Preserve digest/signature, tracing and identity checks",
+      "layer": "Adapter",
+      "allowed_dependencies": [
+        "stdlib",
+        "existing permitted peers",
+        "core"
+      ],
+      "forbidden_dependencies": [
+        "entrypoints",
+        "application use cases"
+      ],
+      "effects": "Own local file reads; no new effects.",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "export-hash",
+      "path": "src/clearml_yolo/adapters/export/metadata.py",
+      "change": "modify",
+      "responsibility": "Consolidate file hashing with hashlib.file_digest",
+      "interface": "Preserve digest/signature, tracing and identity checks",
+      "layer": "Adapter",
+      "allowed_dependencies": [
+        "stdlib",
+        "existing permitted peers",
+        "core"
+      ],
+      "forbidden_dependencies": [
+        "entrypoints",
+        "application use cases"
+      ],
+      "effects": "Own local file reads; no new effects.",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "architecture-tools",
+      "path": "tests/architecture_helpers.py",
+      "change": "modify",
+      "responsibility": "Retain unique AST checks and evaluate configured graph rules",
+      "interface": "Forbidden ordinary/dynamic edges, effects, cycles, targets and inits reject",
+      "layer": "Development tooling",
+      "allowed_dependencies": [
+        "stdlib",
+        "import-linter",
+        "grimp"
+      ],
+      "forbidden_dependencies": [
+        "application runtime imports"
+      ],
+      "effects": "Read source/configuration only.",
+      "contracts": [
+        "architecture"
+      ]
+    },
+    {
+      "id": "architecture-tests",
+      "path": "tests/test_architecture.py",
+      "change": "modify",
+      "responsibility": "Prove configured contracts with representative negative cases",
+      "interface": "Same rejected boundaries with duplicate assertions removed",
+      "layer": "Development tooling",
+      "allowed_dependencies": [
+        "pytest",
+        "stdlib",
+        "import-linter",
+        "architecture_helpers"
+      ],
+      "forbidden_dependencies": [
+        "application runtime effects"
+      ],
+      "effects": "Own temporary injected graph fixtures.",
+      "contracts": [
+        "architecture"
+      ]
+    },
+    {
+      "id": "verify",
+      "path": "scripts/verify.py",
+      "change": "add",
+      "responsibility": "Canonical checks, exact receipts and source/dependency fingerprints",
+      "interface": "Default, --force and --docs; fail-closed reuse",
+      "layer": "Development tooling",
+      "allowed_dependencies": [
+        "Python standard library"
+      ],
+      "forbidden_dependencies": [
+        "clearml_yolo runtime",
+        "SDKs"
+      ],
+      "effects": "Own subprocesses/logs/atomic private receipts.",
+      "contracts": [
+        "tooling"
+      ]
+    },
+    {
+      "id": "release",
+      "path": "scripts/local_release.py",
+      "change": "modify",
+      "responsibility": "Validate automatic release and map source verification",
+      "interface": "Preserve public CLI, ownership/locks/parent/metadata/tag recovery",
+      "layer": "Development tooling",
+      "allowed_dependencies": [
+        "stdlib",
+        "Loguru",
+        "Pydantic",
+        "verify tooling"
+      ],
+      "forbidden_dependencies": [
+        "clearml_yolo runtime",
+        "SDKs"
+      ],
+      "effects": "Own git/PSR subprocesses and private release state.",
+      "contracts": [
+        "tooling"
+      ]
+    },
+    {
+      "id": "mutation-config",
+      "path": "pyproject.toml",
+      "change": "modify",
+      "responsibility": "Declare locked parser and bounded mutation tooling",
+      "interface": "Preserve Python/external revision and local override contract",
+      "layer": "Development configuration",
+      "allowed_dependencies": [
+        "safetensors",
+        "mutmut",
+        "existing deps"
+      ],
+      "forbidden_dependencies": [
+        "unapproved external revisions"
+      ],
+      "effects": "No application effects; development selection only.",
+      "contracts": [
+        "tooling"
+      ]
+    },
+    {
+      "id": "mutation-tests",
+      "path": "tests/test_policy_mutation.py",
+      "change": "add",
+      "responsibility": "Exercise pure policy boundary cases and diagnostic contracts for selected offline mutants",
+      "interface": "Parameterized behavior assertions; no native/GPU/network/publication effects",
+      "layer": "Test tooling",
+      "allowed_dependencies": [
+        "pytest",
+        "pandas",
+        "clearml_yolo pure core"
+      ],
+      "forbidden_dependencies": [
+        "native training",
+        "network publication",
+        "release execution"
+      ],
+      "effects": "Test-local data only; inherited conftest isolates runtime environment.",
+      "contracts": [
+        "tooling"
+      ]
+    },
+    {
+      "id": "verification-tests",
+      "path": "tests/test_verify.py",
+      "change": "add",
+      "responsibility": "Prove receipt invalidation, exact index views and independent documentation evidence",
+      "interface": "Temporary repositories and deterministic fixture commands; failures and interrupted checks cannot produce success",
+      "layer": "Test tooling",
+      "allowed_dependencies": [
+        "pytest",
+        "stdlib",
+        "verification tooling"
+      ],
+      "forbidden_dependencies": [
+        "live services",
+        "application runtime effects"
+      ],
+      "effects": "Own temporary Git repositories and fixture subprocesses; inspect private receipts and logs.",
+      "contracts": [
+        "tooling"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "imports",
+      "path": ".importlinter",
+      "status": "existing",
+      "rules": "Configured inward layers, adapter peers and SDK ownership remain authoritative including augmented dynamic edges.",
+      "check": "canonical"
+    },
+    {
+      "id": "architecture",
+      "path": "tests/test_architecture.py",
+      "status": "existing",
+      "rules": "Unique effects/dynamic imports/allowlists/inert initializers/runtime targets and graphlib cycles with configured negative graph cases.",
+      "check": "canonical"
+    },
+    {
+      "id": "tooling",
+      "path": "tests/test_tooling_boundaries.py",
+      "status": "existing",
+      "rules": "Tooling cannot import application runtime; dependencies remain separated.",
+      "check": "canonical"
+    }
+  ],
+  "checks": [
+    {
+      "id": "canonical",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync python scripts/verify.py --force",
+      "expectation": "Ruff/mypy/Vulture/import-linter and full pytest pass, including architecture negatives, CPU-DDP, assets, cancellation and receipt/release failure/invalidation paths.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/005-reduce-verification/evidence/verification.md"
+      }
+    },
+    {
+      "id": "mutation",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync mutmut run --max-children 4 'clearml_yolo.core.*'; uv run --frozen --no-sync mutmut results",
+      "expectation": "Selected baseline executed; every mutant killed or reviewed equivalent, no untested/timeouts/errors.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/005-reduce-verification/evidence/mutation.md"
+      }
+    },
+    {
+      "id": "docs",
+      "kind": "documentation",
+      "command": "uv run --frozen --no-sync python scripts/verify.py --docs",
+      "expectation": "Tracked and new governed Markdown/link/example validation passes.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/005-reduce-verification/evidence/verification.md"
+      }
+    },
+    {
+      "id": "queue-callers",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync --project ../clearml-yolo pytest -q tests/test_shared_queue_processes.py (from compatible cy-queue checkout)",
+      "expectation": "Real active queue caller cancellation/recovery tests pass without modifying queue sources.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/005-reduce-verification/evidence/cancellation-coverage.md"
+      }
+    }
+  ],
+  "documentation": "Update development/workflow/import boundaries/API migration/model asset guidance, index and baseline; inspect portable usage skill and record no-change reason for internal changes.",
+  "review": {
+    "status": "accepted",
+    "reviewer": "Fresh native /root/final_acceptance, supported by unchanged runtime/mutation review and parent integration",
+    "evidence": "specs/005-reduce-verification/evidence/review.md",
+    "reconciliation": "Compared every tracked and untracked task-owned path against scope: removed supervision module/exclusive tests; modified composition, parser/hashes, import contracts, tooling and tests; added verifier, mutation/receipt tests and feature artifacts; updated configuration, workflow/API guidance and generated changelog. All executable checks passed on v9, current mutation input hashes match reviewed results, and independent review returned ship. Only the original private local uv source override is excluded and restored unstaged after hooks; no unrelated changes are staged."
+  }
+}

@@ -29,6 +29,7 @@ dependencies = [
     "loguru>=0.7.0",
     "pandas>=3.0.0",
     "numpy>=2.1.0",
+    "safetensors>=0.8.0,<0.9",
     "pandera[pandas]>=0.34.1,<0.35",
     "pillow>=12.2.0",
     "scipy>=1.14.1",
@@ -90,6 +91,7 @@ dev = [
     "python-semantic-release>=10.5,<11",
     "hypothesis>=6.169.1",
     "pytest-cov>=7.1.0",
+    "mutmut>=3.8,<3.9",
 ]
 
 [tool.mypy]
@@ -114,7 +116,7 @@ enable_error_code = [
     "unused-awaitable",
 ]
 # Local copies are external dependencies, so they are not ours to type-check.
-exclude = ["^external/", "^(outputs|runs|multirun|build|dist)/"]
+exclude = ["^external/", "^(outputs|runs|multirun|build|dist|mutants)/"]
 
 [[tool.mypy.overrides]]
 # These dependencies have no installed typing coverage at the imported boundaries.
@@ -152,6 +154,25 @@ data_file = ".tmp/coverage/.coverage"
 
 [tool.coverage.report]
 show_missing = true
+
+[tool.mutmut]
+source_paths = ["src/"]
+only_mutate = [
+    "src/clearml_yolo/core/datasets.py",
+    "src/clearml_yolo/core/evaluation/policy.py",
+    "src/clearml_yolo/core/export_quality.py",
+]
+# The source tree supplies imports; only the three pure-policy files above mutate.
+# tests/ includes the conftest helpers and fixtures used by these offline selections.
+also_copy = ["tests/", "pyproject.toml"]
+pytest_add_cli_args = ["-q"]
+pytest_add_cli_args_test_selection = [
+    "tests/test_dataset_records.py",
+    "tests/test_input_correctness.py",
+    "tests/test_comparison_scoring.py",
+    "tests/test_export_quality.py",
+    "tests/test_policy_mutation.py",
+]
 
 [tool.semantic_release]
 commit_parser = "conventional"

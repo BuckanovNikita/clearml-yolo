@@ -4,167 +4,36 @@ from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import Any, override
 
-from clearml_yolo.adapters.clearml.datasets import ClearMLGroundTruthRepository
-from clearml_yolo.adapters.clearml.models import (
-    fetch_best_confidences as _repository_fetch_best_confidences,
+from clearml_yolo.adapters.clearml import datasets as clearml_datasets
+from clearml_yolo.adapters.clearml import models as clearml_models
+from clearml_yolo.adapters.clearml import native as clearml_native
+from clearml_yolo.adapters.clearml import report as clearml_report
+from clearml_yolo.adapters.clearml import results as clearml_results
+from clearml_yolo.adapters.clearml import session as clearml_session
+from clearml_yolo.adapters.evaluation import comparison, scoring
+from clearml_yolo.adapters.fiftyone import noop
+from clearml_yolo.adapters.integrations import native_runtime, training
+from clearml_yolo.adapters.observability import diagnostics, progress, tracing
+from clearml_yolo.adapters.reporting import (
+    comparison_workbook,
+    evaluation_workbook,
+    reports,
+    workbook_identity,
 )
-from clearml_yolo.adapters.clearml.models import (
-    latest_completed_task_id as _repository_latest_completed_task_id,
+from clearml_yolo.adapters.reporting import evaluation as reporting_evaluation
+from clearml_yolo.adapters.runtime import execution_lifecycle
+from clearml_yolo.adapters.storage import (
+    dataset,
+    dataset_cache,
+    file_io,
+    filesystem,
+    identity,
+    native_archive,
+    run_identity,
 )
-from clearml_yolo.adapters.clearml.models import (
-    resolve_task_model as _repository_resolve_task_model,
-)
-from clearml_yolo.adapters.clearml.models import (
-    resolve_weights_with_identity as _repository_resolve_weights_with_identity,
-)
-from clearml_yolo.adapters.clearml.native import (
-    associate_calibration_thresholds as _tracking_associate_calibration_thresholds,
-)
-from clearml_yolo.adapters.clearml.native import owned_native_model
-from clearml_yolo.adapters.clearml.report import report_comparison as _tracking_report_comparison
-from clearml_yolo.adapters.clearml.report import report_scalars as _tracking_report_scalars
-from clearml_yolo.adapters.clearml.report import report_table as _tracking_report_table
-from clearml_yolo.adapters.clearml.results import (
-    complete_result_producer as _tracking_complete_result_producer,
-)
-from clearml_yolo.adapters.clearml.results import (
-    declare_result_producers as _tracking_declare_result_producers,
-)
-from clearml_yolo.adapters.clearml.results import file_digest as _tracking_file_digest
-from clearml_yolo.adapters.clearml.results import (
-    prediction_checkpoint_hash as _tracking_prediction_checkpoint_hash,
-)
-from clearml_yolo.adapters.clearml.results import (
-    prediction_image_name as _tracking_prediction_image_name,
-)
-from clearml_yolo.adapters.clearml.results import (
-    prediction_model_identity as _tracking_prediction_model_identity,
-)
-from clearml_yolo.adapters.clearml.results import publish_evaluation as _tracking_publish_evaluation
-from clearml_yolo.adapters.clearml.results import (
-    register_ground_truth as _tracking_register_ground_truth,
-)
-from clearml_yolo.adapters.clearml.results import (
-    register_predictions as _tracking_register_predictions,
-)
-from clearml_yolo.adapters.clearml.results import (
-    write_prediction_provenance as _tracking_write_prediction_provenance,
-)
-from clearml_yolo.adapters.clearml.session import (
-    connect_config_file as _tracking_connect_config_file,
-)
-from clearml_yolo.adapters.clearml.session import expect_artifacts as _tracking_expect_artifacts
-from clearml_yolo.adapters.clearml.session import init_task as _tracking_init_task
-from clearml_yolo.adapters.clearml.session import publish_table as _tracking_publish_table
-from clearml_yolo.adapters.clearml.session import (
-    publish_training_parameters as _tracking_publish_training_parameters,
-)
-from clearml_yolo.adapters.clearml.session import (
-    record_run_configuration as _tracking_record_run_configuration,
-)
-from clearml_yolo.adapters.clearml.session import task_identity as _tracking_task_identity
-from clearml_yolo.adapters.clearml.session import upload_artifact as _tracking_upload_artifact
-from clearml_yolo.adapters.evaluation.comparison import compare_outcomes as _compare_outcomes
-from clearml_yolo.adapters.evaluation.scoring import (
-    calibrate_thresholds as _evaluation_calibrate_thresholds,
-)
-from clearml_yolo.adapters.evaluation.scoring import (
-    compute_evaluation as _evaluation_compute_evaluation,
-)
-from clearml_yolo.adapters.evaluation.scoring import (
-    filter_invalid_prediction_boxes as _evaluation_filter_invalid_prediction_boxes,
-)
-from clearml_yolo.adapters.evaluation.scoring import (
-    prepare_ground_truth as _evaluation_prepare_ground_truth,
-)
-from clearml_yolo.adapters.evaluation.scoring import (
-    prepare_predictions as _evaluation_prepare_predictions,
-)
-from clearml_yolo.adapters.fiftyone.noop import NoOpPublisher
-from clearml_yolo.adapters.integrations.native_runtime import (
-    release_training_memory as _resources_training_finished,
-)
-from clearml_yolo.adapters.integrations.training import execute_training as _execute_training
-from clearml_yolo.adapters.observability.diagnostics import (
-    log as _resources_log,
-)
-from clearml_yolo.adapters.observability.diagnostics import (
-    log_exception as _resources_log_exception,
-)
-from clearml_yolo.adapters.observability.progress import (
-    progress_callback as _resources_progress_callback,
-)
-from clearml_yolo.adapters.observability.progress import track as _resources_track
-from clearml_yolo.adapters.observability.tracing import (
-    trace_operation as _resources_trace_operation,
-)
-from clearml_yolo.adapters.reporting.comparison_workbook import (
-    write_comparison_workbook as _renderer_write_comparison_workbook,
-)
-from clearml_yolo.adapters.reporting.evaluation import (
-    render_evaluation as _evaluation_writer_render_evaluation,
-)
-from clearml_yolo.adapters.reporting.evaluation import summarize_evaluation as summarize_metrics
-from clearml_yolo.adapters.reporting.evaluation_workbook import (
-    write_candidate_workbook,
-)
-from clearml_yolo.adapters.reporting.evaluation_workbook import (
-    write_evaluation_workbook as _write_evaluation_workbook,
-)
-from clearml_yolo.adapters.reporting.reports import build_reports as _build_reports
-from clearml_yolo.adapters.reporting.workbook_identity import (
-    annotate_workbook as _renderer_annotate_workbook,
-)
-from clearml_yolo.adapters.reporting.workbook_identity import (
-    read_dashboard as _renderer_read_dashboard,
-)
-from clearml_yolo.adapters.reporting.workbook_identity import (
-    workbook_identities as _renderer_workbook_identities,
-)
-from clearml_yolo.adapters.runtime.execution_lifecycle import notify_training_finished
-from clearml_yolo.adapters.storage.dataset import (
-    apply_dataset_policy as _dataset_apply_dataset_policy,
-)
-from clearml_yolo.adapters.storage.dataset_cache import cached_dataset as _dataset_cached_dataset
-from clearml_yolo.adapters.storage.dataset_cache import (
-    dataset_cache_root as _dataset_dataset_cache_root,
-)
-from clearml_yolo.adapters.storage.file_io import mkdir as _mkdir
-from clearml_yolo.adapters.storage.file_io import read_csv as _read_csv
-from clearml_yolo.adapters.storage.file_io import read_detection_csv as _read_detection_csv
-from clearml_yolo.adapters.storage.file_io import read_ground_truth as _read_ground_truth
-from clearml_yolo.adapters.storage.file_io import read_text as _read_text
-from clearml_yolo.adapters.storage.file_io import write_csv as _write_csv
-from clearml_yolo.adapters.storage.file_io import write_text as _write_text
-from clearml_yolo.adapters.storage.filesystem import (
-    model_weights_path as _storage_model_weights_path,
-)
-from clearml_yolo.adapters.storage.filesystem import runs_root as _storage_runs_root
-from clearml_yolo.adapters.storage.filesystem import write_path as _storage_write_path
-from clearml_yolo.adapters.storage.identity import (
-    read_checkpoint_identity as _repository_read_checkpoint_identity,
-)
-from clearml_yolo.adapters.storage.native_archive import (
-    archive_native_outputs as _archive_native_outputs,
-)
-from clearml_yolo.adapters.storage.run_identity import point_latest_at as _storage_point_latest_at
-from clearml_yolo.adapters.storage.run_identity import resolve_run_dir as _storage_resolve_run_dir
-from clearml_yolo.adapters.storage.run_identity import (
-    safe_path_component as _storage_safe_path_component,
-)
-from clearml_yolo.adapters.storage.run_identity import task_run_dir as _storage_task_run_dir
-from clearml_yolo.adapters.yolo.config import execution_settings as _model_execution_settings
-from clearml_yolo.adapters.yolo.config import prediction_settings as _model_prediction_settings
-from clearml_yolo.adapters.yolo.config import requested_settings as _model_requested_settings
-from clearml_yolo.adapters.yolo.config import stage_settings as _model_stage_settings
-from clearml_yolo.adapters.yolo.config import write_native_yaml as _model_write_native_yaml
-from clearml_yolo.adapters.yolo.ground_truth import (
-    build_ground_truth as _dataset_build_ground_truth,
-)
-from clearml_yolo.adapters.yolo.inference import predict_on_images as _model_predict_on_images
-from clearml_yolo.adapters.yolo.inference import resolution_of as _model_resolution_of
-from clearml_yolo.adapters.yolo.inference import trained_imgsz as _model_trained_imgsz
-from clearml_yolo.adapters.yolo.reinfer import reinfer_split as _model_reinfer_split
+from clearml_yolo.adapters.yolo import config as yolo_config
+from clearml_yolo.adapters.yolo import ground_truth as yolo_ground_truth
+from clearml_yolo.adapters.yolo import inference, reinfer
 from clearml_yolo.application.contracts import DatasetFormat, ModelRef, PreparedDataset, TrainResult
 from clearml_yolo.application.ports import (
     Publisher,
@@ -176,13 +45,13 @@ from clearml_yolo.core.transforms import TransformConfig
 
 
 def _has_owned_native_model(task: object) -> bool:
-    return owned_native_model(task) is not None
+    return clearml_native.owned_native_model(task) is not None
 
 
 class _DatasetStore:
-    apply_dataset_policy = staticmethod(_dataset_apply_dataset_policy)
-    build_ground_truth = staticmethod(_dataset_build_ground_truth)
-    dataset_cache_root = staticmethod(_dataset_dataset_cache_root)
+    apply_dataset_policy = staticmethod(dataset.apply_dataset_policy)
+    build_ground_truth = staticmethod(yolo_ground_truth.build_ground_truth)
+    dataset_cache_root = staticmethod(dataset_cache.dataset_cache_root)
 
     @staticmethod
     def cached_dataset(
@@ -193,7 +62,7 @@ class _DatasetStore:
     ) -> AbstractContextManager[PreparedDataset]:
         if dataset_format == "coco":
             raise ValueError("Ultralytics training requires ndjson or flat dataset_format")
-        return _dataset_cached_dataset(
+        return dataset_cache.cached_dataset(
             ground_truth, cache_dir, dataset_format, required_splits=required_splits
         )
 
@@ -210,7 +79,7 @@ class _DetectorDatasetStore(_DatasetStore):
         # Native adapters own their COCO representation, including callers that
         # use the shared programmatic train API's legacy default argument.
         del dataset_format
-        return _dataset_cached_dataset(
+        return dataset_cache.cached_dataset(
             ground_truth, cache_dir, "coco", required_splits=required_splits
         )
 
@@ -225,15 +94,15 @@ class _ModelRunner:
         if reference.backend not in {None, "ultralytics"}:
             raise ValueError("A native detector reference requires the detector dispatcher")
 
-    execution_settings = staticmethod(_model_execution_settings)
-    predict_on_images = staticmethod(_model_predict_on_images)
-    prediction_settings = staticmethod(_model_prediction_settings)
-    reinfer_split = staticmethod(_model_reinfer_split)
-    requested_settings = staticmethod(_model_requested_settings)
-    resolution_of = staticmethod(_model_resolution_of)
-    stage_settings = staticmethod(_model_stage_settings)
-    trained_imgsz = staticmethod(_model_trained_imgsz)
-    write_native_yaml = staticmethod(_model_write_native_yaml)
+    execution_settings = staticmethod(yolo_config.execution_settings)
+    predict_on_images = staticmethod(inference.predict_on_images)
+    prediction_settings = staticmethod(yolo_config.prediction_settings)
+    reinfer_split = staticmethod(reinfer.reinfer_split)
+    requested_settings = staticmethod(yolo_config.requested_settings)
+    resolution_of = staticmethod(inference.resolution_of)
+    stage_settings = staticmethod(yolo_config.stage_settings)
+    trained_imgsz = staticmethod(inference.trained_imgsz)
+    write_native_yaml = staticmethod(yolo_config.write_native_yaml)
 
     def train(
         self,
@@ -242,100 +111,102 @@ class _ModelRunner:
         settings: dict[str, Any],
         prepared: PreparedDataset,
     ) -> TrainResult:
-        return _execute_training(task, architecture, settings, prepared, transforms=self.transforms)
+        return training.execute_training(
+            task, architecture, settings, prepared, transforms=self.transforms
+        )
 
 
 class _ModelRepository:
-    fetch_best_confidences = staticmethod(_repository_fetch_best_confidences)
-    latest_completed_task_id = staticmethod(_repository_latest_completed_task_id)
-    read_checkpoint_identity = staticmethod(_repository_read_checkpoint_identity)
-    resolve_task_model = staticmethod(_repository_resolve_task_model)
-    resolve_weights_with_identity = staticmethod(_repository_resolve_weights_with_identity)
+    fetch_best_confidences = staticmethod(clearml_models.fetch_best_confidences)
+    latest_completed_task_id = staticmethod(clearml_models.latest_completed_task_id)
+    read_checkpoint_identity = staticmethod(identity.read_checkpoint_identity)
+    resolve_task_model = staticmethod(clearml_models.resolve_task_model)
+    resolve_weights_with_identity = staticmethod(clearml_models.resolve_weights_with_identity)
 
 
 class _EvaluationEngine:
-    compare_outcomes = staticmethod(_compare_outcomes)
-    calibrate_thresholds = staticmethod(_evaluation_calibrate_thresholds)
-    filter_invalid_prediction_boxes = staticmethod(_evaluation_filter_invalid_prediction_boxes)
-    prepare_ground_truth = staticmethod(_evaluation_prepare_ground_truth)
-    prepare_predictions = staticmethod(_evaluation_prepare_predictions)
-    compute_evaluation = staticmethod(_evaluation_compute_evaluation)
+    compare_outcomes = staticmethod(comparison.compare_outcomes)
+    calibrate_thresholds = staticmethod(scoring.calibrate_thresholds)
+    filter_invalid_prediction_boxes = staticmethod(scoring.filter_invalid_prediction_boxes)
+    prepare_ground_truth = staticmethod(scoring.prepare_ground_truth)
+    prepare_predictions = staticmethod(scoring.prepare_predictions)
+    compute_evaluation = staticmethod(scoring.compute_evaluation)
 
 
 class _EvaluationWriter:
-    render_evaluation = staticmethod(_evaluation_writer_render_evaluation)
-    summarize_metrics = staticmethod(summarize_metrics)
+    render_evaluation = staticmethod(reporting_evaluation.render_evaluation)
+    summarize_metrics = staticmethod(reporting_evaluation.summarize_evaluation)
 
 
 class _ReportRenderer:
-    write_candidate_workbook = staticmethod(write_candidate_workbook)
-    annotate_workbook = staticmethod(_renderer_annotate_workbook)
-    read_dashboard = staticmethod(_renderer_read_dashboard)
-    workbook_identities = staticmethod(_renderer_workbook_identities)
-    write_comparison_workbook = staticmethod(_renderer_write_comparison_workbook)
-    build_reports = staticmethod(_build_reports)
-    write_evaluation_workbook = staticmethod(_write_evaluation_workbook)
+    write_candidate_workbook = staticmethod(evaluation_workbook.write_candidate_workbook)
+    annotate_workbook = staticmethod(workbook_identity.annotate_workbook)
+    read_dashboard = staticmethod(workbook_identity.read_dashboard)
+    workbook_identities = staticmethod(workbook_identity.workbook_identities)
+    write_comparison_workbook = staticmethod(comparison_workbook.write_comparison_workbook)
+    build_reports = staticmethod(reports.build_reports)
+    write_evaluation_workbook = staticmethod(evaluation_workbook.write_evaluation_workbook)
 
 
 class _RunStorage:
-    model_weights_path = staticmethod(_storage_model_weights_path)
-    point_latest_at = staticmethod(_storage_point_latest_at)
-    resolve_run_dir = staticmethod(_storage_resolve_run_dir)
-    runs_root = staticmethod(_storage_runs_root)
-    safe_path_component = staticmethod(_storage_safe_path_component)
-    task_run_dir = staticmethod(_storage_task_run_dir)
-    write_path = staticmethod(_storage_write_path)
-    archive_native_outputs = staticmethod(_archive_native_outputs)
-    mkdir = staticmethod(_mkdir)
+    model_weights_path = staticmethod(filesystem.model_weights_path)
+    point_latest_at = staticmethod(run_identity.point_latest_at)
+    resolve_run_dir = staticmethod(run_identity.resolve_run_dir)
+    runs_root = staticmethod(filesystem.runs_root)
+    safe_path_component = staticmethod(run_identity.safe_path_component)
+    task_run_dir = staticmethod(run_identity.task_run_dir)
+    write_path = staticmethod(filesystem.write_path)
+    archive_native_outputs = staticmethod(native_archive.archive_native_outputs)
+    mkdir = staticmethod(file_io.mkdir)
     is_file = staticmethod(Path.is_file)
     is_dir = staticmethod(Path.is_dir)
     stat = staticmethod(Path.stat)
     resolve = staticmethod(Path.resolve)
     absolute = staticmethod(Path.absolute)
-    read_text = staticmethod(_read_text)
-    write_text = staticmethod(_write_text)
-    read_csv = staticmethod(_read_csv)
-    read_detection_csv = staticmethod(_read_detection_csv)
-    read_ground_truth = staticmethod(_read_ground_truth)
-    write_csv = staticmethod(_write_csv)
+    read_text = staticmethod(file_io.read_text)
+    write_text = staticmethod(file_io.write_text)
+    read_csv = staticmethod(file_io.read_csv)
+    read_detection_csv = staticmethod(file_io.read_detection_csv)
+    read_ground_truth = staticmethod(file_io.read_ground_truth)
+    write_csv = staticmethod(file_io.write_csv)
 
 
 class _ExecutionResources:
-    trace_operation = staticmethod(_resources_trace_operation)
-    log = staticmethod(_resources_log)
-    progress_callback = staticmethod(_resources_progress_callback)
-    log_exception = staticmethod(_resources_log_exception)
-    track = staticmethod(_resources_track)
+    trace_operation = staticmethod(tracing.trace_operation)
+    log = staticmethod(diagnostics.log)
+    progress_callback = staticmethod(progress.progress_callback)
+    log_exception = staticmethod(diagnostics.log_exception)
+    track = staticmethod(progress.track)
 
     @staticmethod
     def training_finished() -> None:
-        _resources_training_finished()
-        notify_training_finished()
+        native_runtime.release_training_memory()
+        execution_lifecycle.notify_training_finished()
 
 
 class _TrackingSession:
-    publish_training_parameters = staticmethod(_tracking_publish_training_parameters)
-    declare_result_producers = staticmethod(_tracking_declare_result_producers)
-    complete_result_producer = staticmethod(_tracking_complete_result_producer)
-    associate_calibration_thresholds = staticmethod(_tracking_associate_calibration_thresholds)
-    connect_config_file = staticmethod(_tracking_connect_config_file)
-    expect_artifacts = staticmethod(_tracking_expect_artifacts)
-    file_digest = staticmethod(_tracking_file_digest)
-    init_task = staticmethod(_tracking_init_task)
-    prediction_checkpoint_hash = staticmethod(_tracking_prediction_checkpoint_hash)
-    prediction_image_name = staticmethod(_tracking_prediction_image_name)
-    prediction_model_identity = staticmethod(_tracking_prediction_model_identity)
-    publish_evaluation = staticmethod(_tracking_publish_evaluation)
-    publish_table = staticmethod(_tracking_publish_table)
-    record_run_configuration = staticmethod(_tracking_record_run_configuration)
-    register_ground_truth = staticmethod(_tracking_register_ground_truth)
-    register_predictions = staticmethod(_tracking_register_predictions)
-    report_comparison = staticmethod(_tracking_report_comparison)
-    report_scalars = staticmethod(_tracking_report_scalars)
-    report_table = staticmethod(_tracking_report_table)
-    task_identity = staticmethod(_tracking_task_identity)
-    upload_artifact = staticmethod(_tracking_upload_artifact)
-    write_prediction_provenance = staticmethod(_tracking_write_prediction_provenance)
+    publish_training_parameters = staticmethod(clearml_session.publish_training_parameters)
+    declare_result_producers = staticmethod(clearml_results.declare_result_producers)
+    complete_result_producer = staticmethod(clearml_results.complete_result_producer)
+    associate_calibration_thresholds = staticmethod(clearml_native.associate_calibration_thresholds)
+    connect_config_file = staticmethod(clearml_session.connect_config_file)
+    expect_artifacts = staticmethod(clearml_session.expect_artifacts)
+    file_digest = staticmethod(clearml_results.file_digest)
+    init_task = staticmethod(clearml_session.init_task)
+    prediction_checkpoint_hash = staticmethod(clearml_results.prediction_checkpoint_hash)
+    prediction_image_name = staticmethod(clearml_results.prediction_image_name)
+    prediction_model_identity = staticmethod(clearml_results.prediction_model_identity)
+    publish_evaluation = staticmethod(clearml_results.publish_evaluation)
+    publish_table = staticmethod(clearml_session.publish_table)
+    record_run_configuration = staticmethod(clearml_session.record_run_configuration)
+    register_ground_truth = staticmethod(clearml_results.register_ground_truth)
+    register_predictions = staticmethod(clearml_results.register_predictions)
+    report_comparison = staticmethod(clearml_report.report_comparison)
+    report_scalars = staticmethod(clearml_report.report_scalars)
+    report_table = staticmethod(clearml_report.report_table)
+    task_identity = staticmethod(clearml_session.task_identity)
+    upload_artifact = staticmethod(clearml_session.upload_artifact)
+    write_prediction_provenance = staticmethod(clearml_results.write_prediction_provenance)
     has_owned_native_model = staticmethod(_has_owned_native_model)
 
 
@@ -351,7 +222,7 @@ def build_dependencies(
     selected = model if isinstance(model, ModelConfig) else ModelConfig.model_validate(model or {})
     return WorkflowDependencies(
         dataset=_DatasetStore() if selected.backend == "ultralytics" else _DetectorDatasetStore(),
-        ground_truth_repository=ClearMLGroundTruthRepository(),
+        ground_truth_repository=clearml_datasets.ClearMLGroundTruthRepository(),
         model=DetectorRunner(selected, _ModelRunner(transforms), transforms=transforms),
         repository=_ModelRepository(),
         evaluation=_EvaluationEngine(),
@@ -361,7 +232,7 @@ def build_dependencies(
         resources=_ExecutionResources(),
         tracking=_TrackingSession(),
         publisher_factory=create_publisher,
-        disabled_publisher=NoOpPublisher(),
+        disabled_publisher=noop.NoOpPublisher(),
         exporter=DetectorExporter(selected),
     )
 
@@ -370,7 +241,7 @@ def create_publisher(config: FiftyOneConfig | None = None) -> Publisher:
     """Select visual publication once at the composition boundary."""
     selected = config if config is not None else FiftyOneConfig()
     if not selected.enabled:
-        return NoOpPublisher()
+        return noop.NoOpPublisher()
     from clearml_yolo.adapters.fiftyone.bounded import BoundedFiftyOnePublisher
 
     return BoundedFiftyOnePublisher(selected)

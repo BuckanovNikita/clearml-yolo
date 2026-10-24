@@ -14,8 +14,8 @@ from collections import defaultdict
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from io import BufferedReader
 from pathlib import Path
-from typing import BinaryIO
 
 from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.storage.filesystem import write_path
@@ -71,7 +71,7 @@ def _check(file: _File, snapshot: os.stat_result) -> None:
 
 
 @contextmanager
-def _open(file: _File) -> Iterator[BinaryIO]:
+def _open(file: _File) -> Iterator[BufferedReader]:
     descriptor = os.open(file.path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
     with os.fdopen(descriptor, "rb") as stream:
         _check(file, os.fstat(stream.fileno()))
@@ -111,10 +111,8 @@ def _failure(result: DedupResult, path: Path, error: OSError) -> None:
 
 
 def _digest(file: _File) -> bytes:
-    digest = hashlib.sha256()
     with _open(file) as stream:
-        while chunk := stream.read(_CHUNK_SIZE):
-            digest.update(chunk)
+        digest = hashlib.file_digest(stream, "sha256")
         _check(file, os.fstat(stream.fileno()))
     return digest.digest()
 

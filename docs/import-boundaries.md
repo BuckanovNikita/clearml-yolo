@@ -9,14 +9,15 @@ Import-linter's exhaustive container contracts classify every root child, adapte
 responsibility and application component. A new unclassified child such as
 `clearml_yolo.misc` fails `lint-imports` even when it has no imports. Adapter
 responsibilities share one classification level; the peer contracts below govern
-their permitted edges. The graph tests supplement these contracts with complete
-helper-cycle detection, core allowlists, explicit-effect and runtime-target checks.
+their permitted edges. The graph tests supplement these contracts with `graphlib` whole-graph cycle detection,
+core/adapter dependency allowlists, explicit-effect and runtime-target checks.
 
 `uv run lint-imports --no-cache` enforces the configured contracts in
 [.importlinter](../.importlinter). `uv run pytest tests/test_architecture.py` checks
 the complete module graph, responsibility classification, cycles, core dependency
 allowlist, explicit effects, initializers and runtime targets. Negative tests mutate
-graphs and run both project checks and actual configured import-linter contracts.
+graphs and run unique AST checks and actual configured import-linter contracts. The
+canonical verifier includes both commands without a separate architecture pytest run.
 
 ## Layers and effects
 
@@ -58,14 +59,14 @@ dependencies are forbidden in both application and core.
 | OpenPyXL | Reporting adapters |
 | FiftyOne | FiftyOne adapters |
 | Hydra, hydra-zen and OmegaConf | Hydra entrypoint helpers |
-| HTTP requests for model assets | CY assets adapter |
+| HTTP requests and safetensors format validation | CY assets adapter |
 | Textual / NVML | Separate `cy_queue` package only |
 
 The exact imports listed in `ignore_imports` are the permitted ownership edges,
 including imports used only for type checking. New SDK imports require a matching
 owner and an explicit contract entry. Ordinary unmatched exceptions fail; optional
-backend/export contracts explicitly permit absent imports and the AST ownership
-checks cover those edges. Indirect SDK use through an approved adapter is normal;
+backend/export contracts explicitly permit absent imports and the same configured
+contracts evaluate the AST-enriched graph containing literal dynamic edges. Indirect SDK use through an approved adapter is normal;
 the layer rules still prevent a core or application module from reaching that adapter.
 
 GPU inventory and the disposable visibility probe moved to `cy_queue`; its
@@ -114,8 +115,8 @@ of SDK ownership:
   application workflows; native detector adapters retain checkpoint transformations.
 
 The authoritative exact-edge lists are `ignore_imports` in
-[.importlinter](../.importlinter) and `PEER_EXCEPTIONS` in
-[architecture helpers](../tests/architecture_helpers.py); this table summarizes
+[.importlinter](../.importlinter); there is no second Python ownership table.
+This table summarizes
 responsibilities rather than granting additional edges.
 
 The composition root binds `integrations.native_runtime` training-memory release

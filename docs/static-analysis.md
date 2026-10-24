@@ -101,8 +101,8 @@ are maintained in `pyproject.toml` and should be reviewed with their runtime ver
 `eta.*` was removed because the project does not import it. Package-scoped import
 exceptions still mask missing submodules within those packages; they are a real typing
 coverage limit. Local external copies and generated output/build directories are excluded
-from recursive discovery because they are not first-party source, not because their
-errors are harmless.
+from recursive discovery because they are not first-party source. Generated `mutants/`
+is also excluded; [mutation acceptance](development.md#scoped-mutation-acceptance) runs separately.
 
 The inline suppression audit found these categories, kept at their call sites:
 
@@ -127,10 +127,10 @@ interfaces incrementally instead of replacing suppression comments with equally 
 
 ```bash
 uv run --frozen --no-sync vulture
-uv run --frozen --no-sync pre-commit run vulture --all-files
+uv run --frozen --no-sync python scripts/verify.py
 ```
 
-The hook uses the locked development environment and scans `src`, `scripts` and
+The canonical verification hook uses the locked development environment and scans `src`, `scripts` and
 `tests` together through `[tool.vulture]`; staged filenames are not passed to it.
 Its 80% threshold includes unused arguments/unreachable code (100%) and imports (90%).
 It deliberately does not gate most attributes, functions and variables (60%).

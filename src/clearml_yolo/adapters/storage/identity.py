@@ -11,11 +11,8 @@ from clearml_yolo.core.identity import ModelIdentity
 @trace_operation("storage.checkpoint.hash")
 def checkpoint_sha256(path: Path) -> str:
     """Hash actual checkpoint bytes with bounded memory."""
-    digest = hashlib.sha256()
     with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+        return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
 @trace_operation("storage.checkpoint.identity.write")

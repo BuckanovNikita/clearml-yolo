@@ -8,11 +8,8 @@ from clearml_yolo.core.export import ExportMetadata
 
 
 def sha256(path: Path) -> str:
-    digest = hashlib.sha256()
     with path.open("rb") as stream:
-        for block in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
+        return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
 def write_metadata(metadata: ExportMetadata, destination: Path) -> None:

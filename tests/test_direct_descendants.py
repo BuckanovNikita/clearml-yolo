@@ -15,8 +15,8 @@ from clearml_yolo.adapters.runtime.process_tree import _read_process
 pytestmark = pytest.mark.skipif(sys.platform != "linux", reason="Linux process ownership")
 
 
-def _wait(path: Path) -> str:
-    deadline = time.monotonic() + 8
+def _wait(path: Path, *, timeout: float = 8) -> str:
+    deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if path.exists() and (value := path.read_text(encoding="utf-8")):
             return value
@@ -25,8 +25,11 @@ def _wait(path: Path) -> str:
 
 
 def _alive(pid: int) -> bool:
-    process = _read_process(pid)
-    return process is not None and process.state != "Z"
+    try:
+        fields = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8").rsplit(")", 1)[1].split()
+    except (FileNotFoundError, ProcessLookupError):
+        return False
+    return fields[0] != "Z"
 
 
 @pytest.mark.parametrize("orphan", [False, True])

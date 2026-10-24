@@ -623,3 +623,49 @@ def test_recovery_rejects_changed_changelog(release_repo: Path) -> None:
     assert result.returncode == 1
     assert "changelog" in result.stderr.lower()
     assert git(repo, "tag", "--list") == "v0.3.0"
+
+
+def test_one_suite_across_verification_commit_version_and_tag_recovery(release_repo: Path) -> None:
+    """Real pre-commit/PSR/Git lifecycle reuses an ordinary pytest fixture suite."""
+    repo = release_repo
+    # Only tool selection/dependency inventory are replaced. Receipt bytes, effective
+    # index, release normalization and all Git/PSR operations are production code.
+    (repo / "verify_fixture.py").write_text(
+        "import sys\nfrom pathlib import Path\n"
+        f"sys.path.insert(0, {str(ROOT)!r})\n"
+        "from scripts import verify\n"
+        "verify.dependency_files = lambda root: iter(())\n"
+        "verify.check_commands = lambda *a, **k: [[sys.executable, '-m', 'pytest', '-q']]\n"
+        "raise SystemExit(verify.main())\n"
+    )
+    (repo / "test_suite.py").write_text(
+        "from pathlib import Path\n"
+        "def test_checked_source():\n"
+        "    with Path('.git/suites').open('a') as stream: stream.write('suite\\n')\n"
+        "    assert Path('change.txt').read_text() == 'checked contributor\\n'\n"
+    )
+    config_path = repo / ".pre-commit-config.yaml"
+    config = yaml.safe_load(config_path.read_text())
+    check_hook = config["repos"][0]["hooks"][0]
+    launcher = ["uv", "run", "--frozen", "--no-sync", "python"]
+    check_hook["entry"] = " ".join([*launcher, "verify_fixture.py", "--hook"])
+    config["repos"][0]["hooks"][1]["entry"] = " ".join([*launcher, f'"{HELPER}"'])
+    config_path.write_text(yaml.safe_dump(config))
+    (repo / "change.txt").write_text("checked contributor\n")
+    git(repo, "add", ".")
+    manual = command(repo, *launcher, "verify_fixture.py")
+    assert "Successful application checks" in manual.stdout
+    tag_hook = refuse_tag(repo)
+    git(repo, "commit", "-m", "fix: reuse checked contributor")
+    assert git(repo, "log", "-1", "--format=%s") == "chore(release): 0.3.1"
+    assert (repo / ".git/suites").read_text().splitlines() == ["suite"]
+    tag_hook.unlink()
+    result = retry(repo)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert git(repo, "rev-parse", "v0.3.1^{commit}") == git(repo, "rev-parse", "HEAD")
+    assert (repo / ".git/suites").read_text().splitlines() == ["suite"]
+    assert git(repo, "rev-list", "--count", "HEAD") == "3"
+
+    after_release = command(repo, *launcher, "verify_fixture.py")
+    assert "Reused successful" in after_release.stdout
+    assert (repo / ".git/suites").read_text().splitlines() == ["suite"]

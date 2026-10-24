@@ -47,24 +47,41 @@ checkouts and files remain authoritative. Dependency installation is always exte
 
 ## Verification
 
-Use the repository's documented tooling and current check configuration. For code or
-commit work, select the affected gates from:
+Use one canonical entrypoint for ordinary verification and hooks:
 
 ```bash
-uv run pytest
-uv run ruff check .
-uv run mypy .
-uv run vulture
-uv run lint-imports
-uv run --frozen --no-sync python scripts/check_docs.py --all
-uv run pre-commit run --all-files
+uv run --frozen --no-sync python scripts/verify.py
+uv run --frozen --no-sync python scripts/verify.py --force
+uv run --frozen --no-sync python scripts/verify.py --docs
+uv run --frozen --no-sync pre-commit run --all-files
 ```
 
+The default runs Ruff, strict mypy, Vulture, import-linter and one complete ordinary
+pytest suite. That pytest run includes architecture negative cases and native CPU-DDP;
+no additional architecture or full-suite invocation is needed to satisfy those gates.
+Focused commands remain useful while developing. `--force` requires fresh ordinary
+checks. `--docs` validates documentation separately, including new governed Markdown.
+Documentation validation runs fresh because link-target existence can change independently.
+
+Successful application checks record commands, results and log references in Git-private
+storage. Reuse requires matching governed source, tests, fixtures, package data, check
+configuration, lockfile, interpreter, installed dependency file identities, editable
+contents and test-affecting environment, including new/untracked inputs. Environment
+values are digested rather than logged. Git hook invocation noise is normalized in
+the actual check environment; nonempty `PYTEST_ADDOPTS` is rejected so selection flags
+cannot turn ordinary acceptance into a partial or collection-only run. Success is written atomically only after all
+checks pass and a second input snapshot is unchanged. Missing, malformed, stale,
+failed or interrupted evidence runs fresh checks. Hook checks reject an index/worktree
+view mismatch; partial staging or path-limited commits cannot borrow success for a
+different file view. Ignored root files and nested fixtures are also fingerprinted.
+Ignored local fixture data is treated as an external input; code and checking
+configuration must match the staged view. Documentation-only evidence updates do not invalidate application
+checks. Keep local receipts/logs private; dated feature evidence records outcomes.
+
 See the [static analysis policy](static-analysis.md) for Ruff selections and exclusions,
-mypy boundary exceptions and Vulture's confidence threshold. The Vulture hook scans
-source, scripts and tests together using the locked development environment. Install
-the updated dev dependencies before running it; for a deliberately prepared environment
-with additional external runtime packages, use an inexact sync to preserve them.
+mypy boundary exceptions and Vulture's confidence threshold. Install the locked dev
+dependencies before verification; in a deliberately prepared environment, an inexact
+sync preserves additional external runtime packages.
 
 Documentation-only work needs Markdown and local-link validation rather than the
 application suite. Inspect [.pre-commit-config.yaml](../.pre-commit-config.yaml) before
@@ -84,7 +101,7 @@ for scope and exit codes. Mermaid grammar needs a separate render and visual rev
 
 The `ddp_cpu` suite runs real native YOLO training, validation and checkpoint creation
 in two-rank and four-rank CPU/Gloo process groups. It is included in `uv run pytest`
-and the existing pytest commit hook. To select it directly:
+and the canonical verification commit hook. To select it directly:
 
 ```bash
 uv run pytest -m ddp_cpu
@@ -136,9 +153,36 @@ Physical multi-GPU/NCCL and remote ClearML checks are opt-in under `ddp_gpu`, se
 from the routine suite and existing `ddp_cpu` tests. Follow the [GPU DDP guide](ddp-testing.md)
 for exact selection, prerequisites, deadlines and the evidence archive to return.
 
+### Scoped mutation acceptance
+
+The locked mutmut 3.8.x development dependency assesses training-box validation,
+evaluation policy and core export quality. `[tool.mutmut]` defines the exact source,
+offline test selection and copied fixtures. Native training, GPU, remote publication
+and release machinery are excluded. Generated `mutants/` content is ignored by Git,
+Ruff and mypy and is outside Vulture's maintained paths.
+
+```bash
+uv run --frozen --no-sync mutmut run 'clearml_yolo.core.*'
+uv run --frozen --no-sync mutmut results
+uv run --frozen --no-sync mutmut run 'clearml_yolo.core.evaluation.policy*'
+uv run --frozen --no-sync mutmut show MUTANT_NAME
+```
+
+At acceptance, rerun affected selected modules when their code, selected tests, fixtures
+or dependencies change. Use explicit module/function selection for incremental work;
+an explicit selection reruns cached verdicts, while bare `mutmut run` may reuse them.
+Clear only task-owned stale mutant output when source/test/dependency changes require
+fresh execution. Broader audits are explicit. Mutation never runs inside contributor
+or version-commit hooks. Report its outcomes separately from ordinary pytest success.
+Every survivor needs stronger assertions or a reviewed equivalence explanation bound
+to the tested inputs. Untested mutants, timeouts and runner errors remain acceptance
+gaps regardless of command exit status. Keep the baseline and individual dispositions
+in dated feature evidence, not this evergreen guide.
+
 ### Static-analysis boundaries
 
-The release helper imports only the standard library, Loguru and Pydantic. Keep lint
+The release helper imports the standard library, Loguru, Pydantic and the verifier's
+shared byte-exact version validation. The verification entrypoint uses only the standard library and never imports application runtime modules. Keep lint
 and stub distributions in the development group when adding runtime dependencies.
 `tests/test_tooling_boundaries.py` enforces these constraints with
 injected forbidden imports and dependency declarations. Ruff preview checks require
@@ -155,8 +199,8 @@ code may use NumPy, pandas, SciPy, Pydantic and Pandera, but owns no SDK calls, 
 configuration, rendering or filesystem effects. Keep the pinned `digital-metrics`
 algorithms in evaluation adapters and copy exact values into core evaluation records.
 
-Run `lint-imports` and the architecture tests when changing imports, package initializers,
-composition or subprocess/plugin targets. Updating a dependency boundary also requires
+The canonical verification runs `lint-imports` and the architecture tests within its
+ordinary suite when changing imports, package initializers, composition or subprocess/plugin targets. Updating a dependency boundary also requires
 regenerated YAML checks and installed command helps, including DDP callback and
 FiftyOne extension targets. Check CY source installs include its bounded console
 publisher, terminal mirror and FiftyOne worker; the queue source install must include
@@ -237,7 +281,9 @@ digital-metrics = { path = "external/digital-metrics", editable = true }
 report-generator = { path = "external/report-generator", editable = true }
 ```
 
-Preserve the exact local section before removing it. Stage only the section removal
+Preserve the exact local section before removing it. Perform final canonical verification
+after removal and keep the section absent through independent review and automatic
+release. This permits the same success receipt to cover those unchanged inputs. Stage only the section removal
 and other authorized changes; verify that the staged `pyproject.toml` has no
 `[tool.uv.sources]` section. Preserve unrelated staged and unstaged edits. Run the
 applicable commit checks without bypassing hooks. This temporary removal does not
@@ -274,6 +320,10 @@ changes produce a checked version commit and an annotated version tag. Documenta
 commits alone do not bump the version. Release preparation updates only the root
 package version in `uv.lock`; it does not resolve dependencies. The committed dependency
 sources, versions and metadata remain unchanged while local source overrides are absent.
+Generated version commits may reuse source verification only after validating the exact
+expected source parent, the three release paths, root-version-only metadata changes and
+the prepared changelog hash. Tag recovery retains metadata, ownership, concurrency and
+conflicting-tag checks; a commit message alone never authorizes reuse.
 A failed post-commit hook does not undo the
 original commit; inspect its output. To retry or check the release workflow manually:
 

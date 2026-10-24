@@ -29,43 +29,13 @@ repos:
         pass_filenames: false
         require_serial: true
 
-      - id: ruff
-        name: uv run ruff check .
-        entry: uv run ruff check .
+      - id: verify
+        name: Verify the exact source and dependency view
+        entry: uv run --frozen --no-sync python scripts/verify.py --hook
         language: system
-        types_or: [python, pyi, toml]
-        pass_filenames: false
-
-      - id: mypy
-        name: uv run mypy .
-        entry: uv run mypy .
-        language: system
-        types_or: [python, pyi, toml]
+        always_run: true
         pass_filenames: false
         require_serial: true
-
-      - id: lint-imports
-        name: uv run lint-imports
-        entry: uv run lint-imports
-        language: system
-        # .importlinter has no extension; include it alongside source and TOML.
-        files: '(\.py$|\.toml$|^\.importlinter$)'
-        pass_filenames: false
-
-      - id: vulture
-        name: uv run vulture
-        entry: uv run --locked --no-sync vulture
-        language: system
-        types_or: [python, pyi, toml, yaml]
-        pass_filenames: false
-        require_serial: true
-
-      - id: pytest
-        name: uv run pytest
-        entry: uv run pytest
-        language: system
-        files: '(\.py$|\.toml$|^\.importlinter$)'
-        pass_filenames: false
 
       - id: local-release
         name: Create local semantic version commit and tag

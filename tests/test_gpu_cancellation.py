@@ -13,189 +13,30 @@ from uuid import uuid4
 
 import pytest
 
-from clearml_yolo.adapters.runtime.process_tree import OWNER_ENV
+from clearml_yolo.adapters.runtime import process_tree
+from clearml_yolo.adapters.runtime.process_tree import OWNER_ENV, LinuxProcessTree
+from test_direct_descendants import _alive, _wait
 
 pytestmark = pytest.mark.skipif(sys.platform != "linux", reason="requires Linux /proc")
-
-
-def _ready(path: Path) -> str:
-    deadline = time.monotonic() + 10
-    while time.monotonic() < deadline:
-        if path.is_file():
-            value = path.read_text(encoding="utf-8")
-            if value:
-                return value
-        time.sleep(0.02)
-    pytest.fail(f"Process did not publish readiness: {path.name}")
-
-
-def _running(pid: int) -> bool:
-    try:
-        fields = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8").rsplit(")", 1)[1].split()
-    except (FileNotFoundError, ProcessLookupError):
-        return False
-    return fields[0] != "Z"
 
 
 def _kill(pid: int) -> None:
     with suppress(ProcessLookupError):
         os.kill(pid, signal.SIGKILL)
     deadline = time.monotonic() + 5
-    while _running(pid) and time.monotonic() < deadline:
+    while _alive(pid) and time.monotonic() < deadline:
         time.sleep(0.02)
-    assert not _running(pid), f"Task-owned process {pid} survived test teardown"
-
-
-@pytest.mark.parametrize("root_exits_first", [False, True])
-def test_cancellation_kills_detached_rank_and_preserves_unrelated_process(
-    tmp_path: Path, root_exits_first: bool
-) -> None:
-    from clearml_yolo.adapters.runtime import supervision as execution
-
-    child_pid_path = tmp_path / "rank.pid"
-    child_ready_path = tmp_path / "rank.ready"
-    child_script = dedent("""
-        import signal, sys, time
-        from pathlib import Path
-        signal.signal(signal.SIGTERM, signal.SIG_IGN)
-        Path(sys.argv[1]).write_text("ready", encoding="utf-8")
-        time.sleep(60)
-        """)
-    token = uuid4().hex
-    worker_script = dedent("""
-        import subprocess, sys, time
-        from pathlib import Path
-        child = subprocess.Popen(
-            [sys.executable, "-c", sys.argv[1], sys.argv[3]], start_new_session=True,
-        )
-        Path(sys.argv[2]).write_text(str(child.pid), encoding="utf-8")
-        """) + ("raise SystemExit(0)" if root_exits_first else "time.sleep(60)")
-    unrelated = subprocess.Popen(
-        [sys.executable, "-c", "import time; time.sleep(60)"], start_new_session=True
-    )
-    worker = subprocess.Popen(  # noqa: S603 - fixed task-owned process tree
-        [
-            sys.executable,
-            "-c",
-            worker_script,
-            child_script,
-            str(child_pid_path),
-            str(child_ready_path),
-        ],
-        start_new_session=True,
-        env={**os.environ, OWNER_ENV: token},
-    )
-    child_pid: int | None = None
-    try:
-        execution._attach_process_tree(worker, token)
-        child_pid = int(_ready(child_pid_path))
-        _ready(child_ready_path)
-        assert os.getpgid(child_pid) != worker.pid
-        if root_exits_first:
-            worker.wait(timeout=5)
-        else:
-            assert worker.poll() is None
-
-        execution.cancel_process(worker)
-
-        assert worker.poll() is not None
-        assert not _running(child_pid), "Detached DDP-style rank survived successful cancellation"
-        assert unrelated.poll() is None, "Cancellation killed an unrelated process"
-    finally:
-        _kill(worker.pid)
-        worker.wait(timeout=5)
-        if child_pid is None and child_pid_path.is_file():
-            child_pid = int(child_pid_path.read_text(encoding="utf-8"))
-        if child_pid is not None:
-            _kill(child_pid)
-        _kill(unrelated.pid)
-        unrelated.wait(timeout=5)
-
-
-def test_repeated_ctrl_c_finishes_worker_cleanup(tmp_path: Path) -> None:
-    worker_pid_path = tmp_path / "worker.pid"
-    worker_ready_path = tmp_path / "worker.ready"
-    supervisor_ready_path = tmp_path / "supervisor.ready"
-    termination_path = tmp_path / "termination.ready"
-    queue_root = tmp_path / "queue"
-    worker_script = dedent("""
-        import signal, sys, time
-        from pathlib import Path
-        def terminating(signum, frame):
-            Path(sys.argv[2]).write_text("received", encoding="utf-8")
-        signal.signal(signal.SIGTERM, terminating)
-        Path(sys.argv[1]).write_text("ready", encoding="utf-8")
-        time.sleep(60)
-        """)
-    supervisor_script = dedent("""
-        import subprocess, sys
-        from pathlib import Path
-        from clearml_yolo.adapters.runtime import supervision as execution
-        worker = subprocess.Popen(
-            [sys.executable, "-c", sys.argv[1], sys.argv[3], sys.argv[5]],
-            start_new_session=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        execution._attach_process_tree(worker)
-        Path(sys.argv[2]).write_text(str(worker.pid), encoding="utf-8")
-        Path(sys.argv[4]).write_text("ready", encoding="utf-8")
-        try:
-            worker.wait()
-        finally:
-            execution.cancel_process(worker)
-        """)
-    supervisor = subprocess.Popen(  # noqa: S603 - signals target this isolated test supervisor
-        [
-            sys.executable,
-            "-c",
-            supervisor_script,
-            worker_script,
-            str(worker_pid_path),
-            str(worker_ready_path),
-            str(supervisor_ready_path),
-            str(termination_path),
-            str(queue_root),
-        ],
-        start_new_session=True,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
-    worker_pid: int | None = None
-    try:
-        worker_pid = int(_ready(worker_pid_path))
-        _ready(worker_ready_path)
-        _ready(supervisor_ready_path)
-        os.kill(supervisor.pid, signal.SIGINT)
-        _ready(termination_path)
-
-        os.kill(supervisor.pid, signal.SIGINT)
-        _, errors = supervisor.communicate(timeout=15)
-
-        assert supervisor.returncode != 0, "Cancellation unexpectedly reported success"
-        assert not _running(worker_pid), f"Repeated Ctrl+C abandoned the live worker:\n{errors}"
-    finally:
-        _kill(supervisor.pid)
-        supervisor.wait(timeout=5)
-        if supervisor.stderr is not None:
-            supervisor.stderr.close()
-        if worker_pid is None and worker_pid_path.is_file():
-            worker_pid = int(worker_pid_path.read_text(encoding="utf-8"))
-        if worker_pid is not None:
-            _kill(worker_pid)
+    assert not _alive(pid), f"Task-owned process {pid} survived test teardown"
 
 
 def test_cleanup_defers_first_interrupt_and_restores_handlers() -> None:
-    from clearml_yolo.adapters.runtime.process_tree import defer_interruptions
-
     previous = {signum: signal.getsignal(signum) for signum in (signal.SIGINT, signal.SIGTERM)}
     events: list[str] = []
 
     def cleanup() -> None:
-        with defer_interruptions():
+        with process_tree.defer_interruptions():
             signal.raise_signal(signal.SIGINT)
-            with defer_interruptions():
+            with process_tree.defer_interruptions():
                 signal.raise_signal(signal.SIGTERM)
                 events.append("inner cleanup finished")
             events.append("outer cleanup finished")
@@ -206,37 +47,9 @@ def test_cleanup_defers_first_interrupt_and_restores_handlers() -> None:
     assert {signum: signal.getsignal(signum) for signum in previous} == previous
 
 
-def test_reused_pid_is_not_signalled(monkeypatch: pytest.MonkeyPatch) -> None:
-    from dataclasses import replace
-
-    from clearml_yolo.adapters.runtime import process_tree
-
-    process = subprocess.Popen(
-        [sys.executable, "-c", "import time; time.sleep(60)"], start_new_session=True
-    )
-    try:
-        tree = process_tree.LinuxProcessTree(process.pid)
-        original = process_tree._read_process
-
-        def replaced_identity(pid: int) -> process_tree._Process | None:
-            status = original(pid)
-            if pid == process.pid and status is not None:
-                return replace(status, born=status.born + 1)
-            return status
-
-        monkeypatch.setattr(process_tree, "_read_process", replaced_identity)
-        tree.signal(signal.SIGKILL)
-        assert process.poll() is None, "A reused PID was treated as an owned process"
-    finally:
-        _kill(process.pid)
-        process.wait(timeout=5)
-
-
 def test_inaccessible_owned_process_prevents_verified_release(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from clearml_yolo.adapters.runtime import process_tree
-
     process = subprocess.Popen(
         [sys.executable, "-c", "import time; time.sleep(60)"], start_new_session=True
     )
@@ -258,8 +71,6 @@ def test_inaccessible_owned_process_prevents_verified_release(
 
 
 def test_native_torchrun_ranks_do_not_escape_cancellation(tmp_path: Path) -> None:
-    from clearml_yolo.adapters.runtime import supervision as execution
-
     rank_script = tmp_path / "rank.py"
     rank_script.write_text(
         dedent("""
@@ -275,12 +86,10 @@ def test_native_torchrun_ranks_do_not_escape_cancellation(tmp_path: Path) -> Non
     )
     worker_script = dedent("""
         import subprocess, sys
-        from clearml_yolo.adapters.runtime.supervision import interruption
-        with interruption():
-            subprocess.run(
-                [sys.executable, "-m", "torch.distributed.run", "--standalone",
-                 "--nproc-per-node=2", sys.argv[1], sys.argv[2]], check=True,
-            )
+        subprocess.run(
+            [sys.executable, "-m", "torch.distributed.run", "--standalone",
+             "--nproc-per-node=2", sys.argv[1], sys.argv[2]], check=True,
+        )
         """)
     token = uuid4().hex
     with (tmp_path / "torchrun.log").open("w", encoding="utf-8") as output:
@@ -293,14 +102,17 @@ def test_native_torchrun_ranks_do_not_escape_cancellation(tmp_path: Path) -> Non
         )
         rank_pids: list[int] = []
         try:
-            execution._attach_process_tree(worker, token)
-            rank_pids.extend(int(_ready(tmp_path / f"rank-{rank}.pid")) for rank in range(2))
+            tree = LinuxProcessTree(worker.pid, token)
+            rank_pids.extend(
+                int(_wait(tmp_path / f"rank-{rank}.pid", timeout=10)) for rank in range(2)
+            )
             assert all(os.getpgid(pid) != worker.pid for pid in rank_pids)
 
-            execution.cancel_process(worker)
+            tree.terminate()
+            worker.wait(timeout=5)
 
             assert worker.poll() is not None
-            assert all(not _running(pid) for pid in rank_pids)
+            assert all(not _alive(pid) for pid in rank_pids)
         finally:
             with suppress(ProcessLookupError):
                 os.killpg(worker.pid, signal.SIGKILL)
@@ -311,8 +123,6 @@ def test_native_torchrun_ranks_do_not_escape_cancellation(tmp_path: Path) -> Non
 
 
 def test_unreadable_new_process_blocks_verification_without_being_killed(tmp_path: Path) -> None:
-    from clearml_yolo.adapters.runtime import supervision as execution
-
     token = uuid4().hex
     worker = subprocess.Popen(
         [sys.executable, "-c", "import time; time.sleep(60)"],
@@ -332,8 +142,8 @@ def test_unreadable_new_process_blocks_verification_without_being_killed(tmp_pat
         start_new_session=True,
     )
     try:
-        execution._attach_process_tree(worker, token)
-        _ready(tmp_path / "opaque.ready")
+        tree = LinuxProcessTree(worker.pid, token)
+        _wait(tmp_path / "opaque.ready", timeout=10)
         try:
             Path(f"/proc/{opaque.pid}/environ").read_bytes()
         except PermissionError:
@@ -342,12 +152,12 @@ def test_unreadable_new_process_blocks_verification_without_being_killed(tmp_pat
             pytest.skip("Runner can inspect non-dumpable process environments")
 
         with pytest.raises(RuntimeError, match="Cannot verify model process cleanup"):
-            execution.cancel_process(worker)
+            tree.terminate()
+        worker.wait(timeout=5)
 
         assert worker.poll() is not None
         assert opaque.poll() is None, "Unknown process must not be treated as job-owned"
-        assert worker in execution._LINUX_TREES, "Unverified ownership must remain registered"
-        assert worker in execution._POSIX_GROUPS
+        assert worker.pid in dict(tree.identities), "Unverified cleanup retains recovery identity"
     finally:
         _kill(worker.pid)
         worker.wait(timeout=5)
@@ -355,63 +165,10 @@ def test_unreadable_new_process_blocks_verification_without_being_killed(tmp_pat
         opaque.wait(timeout=5)
 
 
-def test_release_retries_transient_denial_until_fresh_verified_scan(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from clearml_yolo.adapters.runtime import supervision
-
-    token = uuid4().hex
-    worker = subprocess.Popen(
-        [sys.executable, "-c", "import time; time.sleep(60)"],
-        start_new_session=True,
-        env={**os.environ, OWNER_ENV: token},
-    )
-    control = subprocess.Popen(
-        [sys.executable, "-c", "import time; time.sleep(60)"], start_new_session=True
-    )
-    scans: list[bool] = []
-    try:
-        supervision._attach_process_tree(worker, token)
-        tree = supervision._LINUX_TREES[worker]
-        original_running = tree.running
-        original_read = Path.read_bytes
-
-        def transient_denial(path: Path) -> bytes:
-            if path == Path(f"/proc/{control.pid}/environ"):
-                raise PermissionError("transient process exit visibility")
-            return original_read(path)
-
-        def running() -> bool:
-            assert worker in supervision._LINUX_TREES
-            assert worker in supervision._POSIX_GROUPS
-            scans.append(True)
-            if len(scans) == 1:
-                with monkeypatch.context() as scan:
-                    scan.setattr(Path, "read_bytes", transient_denial)
-                    return original_running()
-            return original_running()
-
-        monkeypatch.setattr(tree, "running", running)
-        supervision._release_process_tree(worker, deadline=time.monotonic() + 2)
-
-        assert len(scans) >= 2
-        assert worker not in supervision._LINUX_TREES
-        assert worker not in supervision._POSIX_GROUPS
-        assert control.poll() is None
-        worker.wait(timeout=5)
-    finally:
-        _kill(worker.pid)
-        worker.wait(timeout=5)
-        _kill(control.pid)
-        control.wait(timeout=5)
-
-
 @pytest.mark.parametrize("after_denial", ["gone", "zombie", "live", "reused", "inaccessible"])
 def test_environment_denial_rechecks_process_liveness(
     monkeypatch: pytest.MonkeyPatch, after_denial: str
 ) -> None:
-    from clearml_yolo.adapters.runtime import process_tree
-
     # A process can exit after the table snapshot but before its environment is read.
     candidate = process_tree._Process(4242, 1, 4242, 123, "S")
     tree = process_tree.LinuxProcessTree(2**31 - 1, uuid4().hex)
@@ -451,8 +208,6 @@ def test_environment_denial_rechecks_process_liveness(
 def test_pid_reuse_after_snapshot_does_not_adopt_unmarked_processes(
     monkeypatch: pytest.MonkeyPatch, association: str
 ) -> None:
-    from clearml_yolo.adapters.runtime import process_tree
-
     root = process_tree._Process(101, 1, 101, 10, "S")
     replacement = process_tree._Process(root.pid, 1, root.session, 20, "S")
     child = process_tree._Process(
@@ -484,8 +239,6 @@ def test_pid_reuse_after_snapshot_does_not_adopt_unmarked_processes(
 def test_empty_scan_does_not_release_a_late_forked_child(
     monkeypatch: pytest.MonkeyPatch, child_exits_during_next_scan: bool
 ) -> None:
-    from clearml_yolo.adapters.runtime import process_tree
-
     root = process_tree._Process(101, 1, 101, 10, "S")
     parent = process_tree._Process(202, 1, 202, 11, "S")
     child = process_tree._Process(303, 1, 303, 12, "S")
@@ -512,8 +265,6 @@ def test_empty_scan_does_not_release_a_late_forked_child(
 def test_disappearing_enumerated_child_prevents_false_quiescence(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from clearml_yolo.adapters.runtime import process_tree
-
     root = process_tree._Process(101, 1, 101, 10, "S")
     parent = process_tree._Process(202, 1, 202, 11, "Z")
     parent_path, child_path = Path("/proc/202"), Path("/proc/303")

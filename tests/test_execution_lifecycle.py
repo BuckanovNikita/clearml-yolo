@@ -76,6 +76,7 @@ def test_supervised_success_does_not_enter_native_cleanup(
 
 
 def test_training_cleanup_precedes_acknowledged_handoff(monkeypatch: pytest.MonkeyPatch) -> None:
+    from clearml_yolo.adapters.integrations import native_runtime
     from clearml_yolo.adapters.runtime import execution_lifecycle as lifecycle
     from clearml_yolo.entrypoints import composition
 
@@ -84,7 +85,9 @@ def test_training_cleanup_precedes_acknowledged_handoff(monkeypatch: pytest.Monk
     monkeypatch.setenv(lifecycle.CHANNEL_FD_ENV, str(child.detach()))
     monkeypatch.setenv(lifecycle.OWNER_PID_ENV, str(os.getpid()))
     monkeypatch.setattr(
-        composition, "_resources_training_finished", lambda: observations.append("memory-free")
+        native_runtime,
+        "release_training_memory",
+        lambda: observations.append("memory-free"),
     )
 
     def guardian() -> None:

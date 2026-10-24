@@ -40,108 +40,53 @@ def graph() -> grimp.ImportGraph:
     return imported
 
 
-def test_actual_graph_obeys_classification_direction_sdk_ownership_and_cycles(
-    graph: grimp.ImportGraph,
+def _contract(
+    options: UserOptions, name: str
+) -> LayersContract | ForbiddenContract | IndependenceContract:
+    selected = next(contract for contract in options.contracts_options if contract["name"] == name)
+    classes: dict[str, type[LayersContract | ForbiddenContract | IndependenceContract]] = {
+        "layers": LayersContract,
+        "forbidden": ForbiddenContract,
+        "independence": IndependenceContract,
+    }
+    return classes[selected["type"]](
+        name=name, session_options=options.session_options, contract_options=selected
+    )
+
+
+def test_actual_graph_obeys_every_configured_contract_including_dynamic_imports(
+    graph: grimp.ImportGraph, import_options: UserOptions
 ) -> None:
+    for options in import_options.contracts_options:
+        contract = _contract(import_options, options["name"])
+        # Contracts remove ignored edges, so each gets its own graph.
+        result = contract.check(deepcopy(graph), verbose=False)
+        assert result.kept, (contract.name, result.metadata)
     assert architecture.graph_findings(graph) == []
 
 
 @pytest.mark.parametrize(
-    ("importer", "imported", "message"),
+    ("importer", "imported", "rejected"),
     [
-        ("clearml_yolo.core.identity", "clearml_yolo.adapters.storage.identity", "direction"),
-        ("clearml_yolo.application.ports", "clearml_yolo.entrypoints.composition", "direction"),
-        (
-            "clearml_yolo.application.use_cases.train",
-            "clearml_yolo.adapters.yolo.inference",
-            "direction",
-        ),
-        (
-            "clearml_yolo.adapters.storage.dataset",
-            "clearml_yolo.application.use_cases.train",
-            "direction",
-        ),
-        (
-            "clearml_yolo.adapters.yolo.inference",
-            "clearml_yolo.entrypoints.composition",
-            "direction",
-        ),
-        ("clearml_yolo.core.identity", "loguru", "core dependency"),
-        ("clearml_yolo.core.presentation", "clearml_yolo.adapters.runtime.bootstrap", "direction"),
-        ("clearml_yolo.core.presentation", "loguru", "core dependency"),
-        ("clearml_yolo.application.use_cases.metrics", "loguru", "application effects"),
-        ("clearml_yolo.core.identity", "digital_metrics", "SDK ownership"),
-        ("clearml_yolo.core.transforms", "albumentations", "SDK ownership"),
-        ("clearml_yolo.application.contracts", "clearml", "SDK ownership"),
-        ("clearml_yolo.application.use_cases.export", "clearml", "SDK ownership"),
-        ("clearml_yolo.application.use_cases.pipeline", "clearml", "SDK ownership"),
-        ("clearml_yolo.adapters.export.verification", "clearml", "SDK ownership"),
-        (
-            "clearml_yolo.adapters.clearml.results",
-            "clearml_yolo.entrypoints.composition",
-            "direction",
-        ),
-        ("clearml_yolo.application.ground_truth", "clearml", "SDK ownership"),
-        ("clearml_yolo.application.contracts", "openpyxl", "SDK ownership"),
-        ("clearml_yolo.adapters.storage.dataset", "ultralytics", "SDK ownership"),
-        ("clearml_yolo.adapters.clearml.models", "report_generator", "SDK ownership"),
-        ("clearml_yolo.adapters.yolo.inference", "fiftyone", "SDK ownership"),
-        ("clearml_yolo.adapters.storage.dataset", "hydra", "SDK ownership"),
-        ("clearml_yolo.adapters.clearml.cache", "clearml", "pure adapter dependency"),
-        (
-            "clearml_yolo.adapters.clearml.cache",
-            "clearml_yolo.adapters.clearml.session",
-            "pure adapter dependency",
-        ),
-        (
-            "clearml_yolo.adapters.clearml.cache",
-            "clearml_yolo.adapters.storage.filesystem",
-            "pure adapter dependency",
-        ),
-        ("clearml_yolo.adapters.clearml.parameters", "clearml", "pure adapter dependency"),
-        ("clearml_yolo.entrypoints.composition", "torch", "SDK ownership"),
-        ("clearml_yolo.adapters.export.metadata", "torch", "SDK ownership"),
-        ("clearml_yolo.adapters.export.metadata", "timm", "SDK ownership"),
-        ("clearml_yolo.adapters.storage.checkpoint", "torchvision", "SDK ownership"),
-        ("clearml_yolo.adapters.deim.backend", "rfdetr", "SDK ownership"),
-        ("clearml_yolo.adapters.rfdetr.backend", "timm", "SDK ownership"),
-        ("clearml_yolo.adapters.fasterrcnn.backend", "pytorch_lightning", "SDK ownership"),
-        ("clearml_yolo.application.contracts", "pycocotools", "SDK ownership"),
-        ("clearml_yolo.adapters.clearml.detectors", "onnx", "SDK ownership"),
-        ("clearml_yolo.entrypoints.composition", "tensorrt", "SDK ownership"),
+        ("clearml_yolo.core.identity", "loguru", True),
+        ("clearml_yolo.core.identity", "unapproved_scientific_package", True),
+        ("clearml_yolo.adapters.clearml.cache", "clearml", True),
+        ("clearml_yolo.adapters.clearml.cache", "clearml_yolo.adapters.clearml.session", True),
+        ("clearml_yolo.adapters.clearml.cache", "clearml_yolo.adapters.storage.filesystem", True),
+        ("clearml_yolo.adapters.clearml.parameters", "yaml", True),
+    ] + [
+        ("clearml_yolo.core.identity", dependency, False)
+        for dependency in ("pydantic", "pandera", "pandas", "numpy", "scipy", "math")
     ],
 )
-def test_injected_forbidden_dependencies_are_rejected(
-    importer: str, imported: str, message: str
+def test_unique_dependency_allowlists(
+    importer: str, imported: str, rejected: bool
 ) -> None:
     candidate = grimp.ImportGraph()
     candidate.add_module(importer)
     candidate.add_module(imported)
     candidate.add_import(importer=importer, imported=imported)
-    findings = architecture.graph_findings(candidate)
-    assert any(message in finding for finding in findings), findings
-
-
-@pytest.mark.parametrize(
-    ("importer", "imported"),
-    [
-        ("clearml_yolo.entrypoints.hydra.common", "cy_queue.adapters.runtime"),
-        ("clearml_yolo.entrypoints.composition", "cy_queue.application.queue"),
-        ("clearml_yolo.entrypoints.pipeline", "textual"),
-        ("clearml_yolo.adapters.runtime.supervision", "cy_queue.adapters.guardian"),
-        ("clearml_yolo.adapters.runtime.bootstrap", "pynvml"),
-        ("clearml_yolo.core.models", "cy_queue.core.queue"),
-    ],
-)
-def test_direct_queue_and_sdk_boundaries_reject_injected_edges(
-    importer: str,
-    imported: str,
-) -> None:
-    candidate = grimp.ImportGraph()
-    candidate.add_module(importer)
-    candidate.add_module(imported)
-    candidate.add_import(importer=importer, imported=imported)
-    assert architecture.graph_findings(candidate)
+    assert bool(architecture.graph_findings(candidate)) == rejected
 
 
 def test_dynamic_launch_targets_cannot_bypass_direct_queue_boundary() -> None:
@@ -149,36 +94,8 @@ def test_dynamic_launch_targets_cannot_bypass_direct_queue_boundary() -> None:
         "clearml_yolo.entrypoints.hydra.common", {"cy_queue.adapters.queue.guardian"}
     )
     assert not architecture.launch_target_findings(
-        "cy_queue.adapters.queue.runtime", {"clearml_yolo.adapters.runtime.supervision"}
+        "cy_queue.adapters.queue.runtime", {"clearml_yolo.adapters.runtime.process_tree"}
     )
-
-
-def test_transitive_adapter_escape_cannot_hide_behind_application_helper() -> None:
-    candidate = grimp.ImportGraph()
-    for module in (
-        "clearml_yolo.application.use_cases.train",
-        "clearml_yolo.application.helper",
-        "clearml_yolo.adapters.yolo.inference",
-    ):
-        candidate.add_module(module)
-    candidate.add_import(
-        importer="clearml_yolo.application.use_cases.train",
-        imported="clearml_yolo.application.helper",
-    )
-    candidate.add_import(
-        importer="clearml_yolo.application.helper", imported="clearml_yolo.adapters.yolo.inference"
-    )
-    assert any("direction" in finding for finding in architecture.graph_findings(candidate))
-
-
-@pytest.mark.parametrize(
-    "module",
-    ["clearml_yolo.misc", "clearml_yolo.adapters.misc.helper", "clearml_yolo.application.misc"],
-)
-def test_unclassified_module_is_rejected(module: str) -> None:
-    candidate = grimp.ImportGraph()
-    candidate.add_module(module)
-    assert any("unclassified" in finding for finding in architecture.graph_findings(candidate))
 
 
 @pytest.mark.parametrize("prefix", ["core", "adapters.storage", "entrypoints.hydra"])
@@ -192,42 +109,17 @@ def test_injected_helper_cycle_is_rejected(prefix: str) -> None:
     assert any("cycle" in finding for finding in architecture.graph_findings(candidate))
 
 
-def test_allowed_scientific_dependencies_and_explicit_native_bridge() -> None:
-    candidate = grimp.ImportGraph()
-    for imported in ("pydantic", "pandera", "pandas", "numpy", "scipy", "math"):
-        candidate.add_module(imported)
-        candidate.add_module("clearml_yolo.core.identity")
-        candidate.add_import(importer="clearml_yolo.core.identity", imported=imported)
-    candidate.add_module("clearml_yolo.adapters.integrations.native_runtime")
-    candidate.add_module("torch")
-    candidate.add_import(
-        importer="clearml_yolo.adapters.integrations.native_runtime", imported="torch"
-    )
-    assert architecture.graph_findings(candidate) == []
-
-
-@pytest.mark.parametrize(
-    "source",
-    [
-        "open('data.csv')",
-        "Path('data.csv').read_text()",
-        "pd.read_csv('data.csv')",
-        "import subprocess\nsubprocess.run(['ls'])",
-        "importlib.import_module('clearml')",
-    ],
-)
-def test_core_effectful_calls_are_rejected(source: str) -> None:
-    assert architecture.core_effect_findings(ast.parse(source)), source
-
-
-def test_actual_core_contains_no_io_network_process_or_dynamic_import_calls() -> None:
-    findings: list[str] = []
-    for path in (SRC / "clearml_yolo/core").rglob("*.py"):
-        findings.extend(
-            f"{path.relative_to(ROOT)}: {finding}"
-            for finding in architecture.core_effect_findings(ast.parse(path.read_text()))
-        )
-    assert findings == []
+@pytest.mark.parametrize("layer", ["core", "application"])
+def test_actual_inner_layers_have_no_direct_effects(layer: str) -> None:
+    check = {
+        "core": architecture.core_effect_findings,
+        "application": architecture.application_effect_findings,
+    }[layer]
+    assert [
+        f"{path.relative_to(ROOT)}: {finding}"
+        for path in (SRC / "clearml_yolo" / layer).rglob("*.py")
+        for finding in check(ast.parse(path.read_text()))
+    ] == []
 
 
 @pytest.mark.parametrize("module", architecture.PURE_ADAPTERS)
@@ -307,27 +199,12 @@ assert "clearml" not in sys.modules
 
 
 def test_package_initializers_do_not_execute_operations_or_eagerly_load_sdks() -> None:
-    findings: list[str] = []
-    for path in SRC.rglob("__init__.py"):
-        findings.extend(
-            f"{path.relative_to(ROOT)}: {finding}"
-            for finding in architecture.initializer_findings(ast.parse(path.read_text()))
-        )
-    assert findings == []
+    assert [
+        f"{path.relative_to(ROOT)}: {finding}"
+        for path in SRC.rglob("__init__.py")
+        for finding in architecture.initializer_findings(ast.parse(path.read_text()))
+    ] == []
     assert architecture.initializer_dependency_findings(SRC) == []
-
-
-@pytest.mark.parametrize(
-    "source",
-    [
-        "client = create_client()",
-        "initialize()",
-        "from ultralytics import YOLO",
-        "from clearml import Task",
-    ],
-)
-def test_effectful_initializers_are_rejected(source: str) -> None:
-    assert architecture.initializer_findings(ast.parse(source)), source
 
 
 def test_public_root_import_is_inert_in_fresh_interpreter() -> None:
@@ -380,24 +257,69 @@ def test_legacy_missing_module_and_missing_attribute_targets_are_rejected(
     assert architecture.target_findings({target}, graph, SRC)
 
 
-def test_all_console_commands_are_independent_entrypoints(graph: grimp.ImportGraph) -> None:
+def test_console_command_inventory_matches_configured_independence(
+    import_options: UserOptions,
+) -> None:
     config = tomllib.loads((ROOT / "pyproject.toml").read_text())
     commands = {target.split(":")[0] for target in config["project"]["scripts"].values()}
-    assert commands == {f"clearml_yolo.entrypoints.{name}" for name in architecture.COMMANDS}
-    for importer in commands:
-        for imported in commands - {importer}:
-            assert graph.find_shortest_chain(importer, imported) is None, (importer, imported)
+    options = _contract(import_options, "Every command entrypoint stands alone").contract_options
+    assert commands == set(options["modules"])
 
 
 @pytest.mark.parametrize(
     ("name", "importer", "imported"),
     [
         (
+            "Adapters depend only on application ports and contracts",
+            "clearml_yolo.adapters.storage.dataset",
+            "clearml_yolo.application.ground_truth",
+        ),
+        (
+            "Application command composition is inward and acyclic",
+            "clearml_yolo.application.use_cases.train",
+            "clearml_yolo.application.use_cases.pipeline",
+        ),
+        (
+            "CY never imports extracted queue or its private dependencies",
+            "clearml_yolo.adapters.runtime.process_tree",
+            "cy_queue",
+        ),
+        (
+            "CY never imports extracted queue or its private dependencies",
+            "clearml_yolo.entrypoints.pipeline",
+            "textual",
+        ),
+        (
+            "CY never imports extracted queue or its private dependencies",
+            "clearml_yolo.adapters.runtime.bootstrap",
+            "pynvml",
+        ),
+        (
+            "assets adapter peer ownership",
+            "clearml_yolo.adapters.assets.sources",
+            "clearml_yolo.adapters.clearml.session",
+        ),
+        (
+            "storage adapter peer ownership",
+            "clearml_yolo.adapters.storage.dataset",
+            "clearml_yolo.adapters.assets.sources",
+        ),
+        (
+            "evaluation adapter peer ownership",
+            "clearml_yolo.adapters.evaluation.scoring",
+            "clearml_yolo.adapters.reporting.evaluation",
+        ),
+        (
             "Clean architecture inward layers",
             "clearml_yolo.application.use_cases.train",
             "clearml_yolo.adapters.yolo.inference",
         ),
         ("clearml SDK has explicit owners", "clearml_yolo.application.contracts", "clearml"),
+        ("safetensors SDK has explicit owners", "clearml_yolo.application.ports", "safetensors"),
+        ("Exhaustive root layer classification", "clearml_yolo.misc", None),
+        ("Exhaustive adapter responsibility classification", "clearml_yolo.adapters.misc", None),
+        ("Exhaustive application classification", "clearml_yolo.application.misc", None),
+        ("Exhaustive entrypoint classification", "clearml_yolo.entrypoints.misc", None),
         (
             "albumentations SDK has explicit owners",
             "clearml_yolo.core.transforms",
@@ -463,25 +385,49 @@ def test_all_console_commands_are_independent_entrypoints(graph: grimp.ImportGra
 def test_actual_configured_import_linter_contract_rejects_mutated_graph(
     name: str,
     importer: str,
-    imported: str,
+    imported: str | None,
     graph: grimp.ImportGraph,
     import_options: UserOptions,
 ) -> None:
-    options = next(c for c in import_options.contracts_options if c["name"] == name)
-    contract_classes: dict[str, type[LayersContract | ForbiddenContract | IndependenceContract]] = {
-        "layers": LayersContract,
-        "forbidden": ForbiddenContract,
-        "independence": IndependenceContract,
-    }
-    contract_class = contract_classes[options["type"]]
-    contract = contract_class(
-        name=name, session_options=import_options.session_options, contract_options=options
-    )
+    contract = _contract(import_options, name)
     actual = contract.check(deepcopy(graph), verbose=False)
     assert actual.kept
     mutated = deepcopy(graph)
-    mutated.add_import(importer=importer, imported=imported)
+    if imported is None:
+        mutated.add_module(importer)
+    else:
+        if imported not in mutated.modules:
+            mutated.add_module(imported)
+        mutated.add_import(importer=importer, imported=imported)
     assert not contract.check(mutated, verbose=False).kept
+
+
+def test_transitive_adapter_escape_is_rejected_by_configured_layers(
+    graph: grimp.ImportGraph, import_options: UserOptions
+) -> None:
+    candidate = deepcopy(graph)
+    candidate.add_module("clearml_yolo.application.helper")
+    candidate.add_import(
+        importer="clearml_yolo.application.use_cases.train",
+        imported="clearml_yolo.application.helper",
+    )
+    candidate.add_import(
+        importer="clearml_yolo.application.helper",
+        imported="clearml_yolo.adapters.yolo.inference",
+    )
+    assert not _contract(import_options, "Clean architecture inward layers").check(
+        candidate, verbose=False
+    ).kept
+
+
+def test_type_only_imports_remain_in_the_configured_graph(
+    graph: grimp.ImportGraph, import_options: UserOptions
+) -> None:
+    exclusion = import_options.session_options.get("exclude_type_checking_imports")
+    assert str(exclusion).lower() != "true"
+    assert "clearml_yolo.adapters.augmentation.pipeline" in graph.find_modules_directly_imported_by(
+        "clearml_yolo.adapters.deim.transforms"
+    )
 
 
 def test_lazy_import_allowances_match_real_dynamic_edges(
@@ -498,30 +444,6 @@ def test_lazy_import_allowances_match_real_dynamic_edges(
 
 
 @pytest.mark.parametrize(
-    ("name", "module"),
-    [
-        ("Exhaustive root layer classification", "clearml_yolo.misc"),
-        ("Exhaustive adapter responsibility classification", "clearml_yolo.adapters.misc"),
-        ("Exhaustive application classification", "clearml_yolo.application.misc"),
-    ],
-)
-def test_actual_exhaustive_contract_rejects_new_unclassified_module(
-    name: str,
-    module: str,
-    graph: grimp.ImportGraph,
-    import_options: UserOptions,
-) -> None:
-    options = next(c for c in import_options.contracts_options if c["name"] == name)
-    contract = LayersContract(
-        name=name, session_options=import_options.session_options, contract_options=options
-    )
-    assert contract.check(deepcopy(graph), verbose=False).kept
-    mutated = deepcopy(graph)
-    mutated.add_module(module)
-    assert not contract.check(mutated, verbose=False).kept
-
-
-@pytest.mark.parametrize(
     ("source", "expected"),
     [
         ("Path('x').stat()", True),
@@ -534,45 +456,15 @@ def test_actual_exhaustive_contract_rejects_new_unclassified_module(
         ("deps.ground_truth_repository.read_bytes(path)", True),
         ("repository.resolve(reference)", True),
         ("pd.ExcelWriter('x.xlsx')", True),
+        (
+            "reader = deps.storage.read_text\nreader(path)\ndeps.storage.read_csv(path)",
+            False,
+        ),
     ],
 )
 def test_application_io_requires_explicit_storage_port(source: str, expected: bool) -> None:
     assert bool(architecture.application_effect_findings(ast.parse(source))) == expected
-
-
-def test_actual_application_uses_ports_for_io() -> None:
-    findings: list[str] = []
-    for path in (SRC / "clearml_yolo/application").rglob("*.py"):
-        findings.extend(
-            f"{path.relative_to(ROOT)}: {finding}"
-            for finding in architecture.application_effect_findings(ast.parse(path.read_text()))
-        )
-    assert findings == []
-
-
-@pytest.mark.parametrize(
-    ("importer", "imported"),
-    [
-        ("clearml_yolo.adapters.evaluation.scoring", "clearml_yolo.adapters.reporting.evaluation"),
-        ("clearml_yolo.adapters.evaluation.scoring", "clearml_yolo.adapters.clearml.session"),
-        ("clearml_yolo.adapters.storage.dataset", "clearml_yolo.adapters.yolo.inference"),
-        ("clearml_yolo.adapters.fiftyone.publisher", "clearml_yolo.adapters.clearml.session"),
-        ("clearml_yolo.adapters.deim.backend", "clearml_yolo.adapters.rfdetr.backend"),
-        ("clearml_yolo.adapters.deim.backend", "clearml_yolo.adapters.storage.dataset"),
-        ("clearml_yolo.adapters.rfdetr.backend", "clearml_yolo.adapters.storage.dataset"),
-        ("clearml_yolo.adapters.fasterrcnn.training", "clearml_yolo.adapters.storage.dataset"),
-        ("clearml_yolo.adapters.fasterrcnn.training", "clearml_yolo.adapters.clearml.detectors"),
-        ("clearml_yolo.adapters.storage.checkpoint", "clearml_yolo.adapters.fasterrcnn.model"),
-        ("clearml_yolo.adapters.export.metadata", "clearml_yolo.adapters.fasterrcnn.model"),
-        ("clearml_yolo.adapters.yolo.inference", "clearml_yolo.adapters.export.onnx"),
-    ],
-)
-def test_adapter_peer_escapes_are_rejected(importer: str, imported: str) -> None:
-    candidate = grimp.ImportGraph()
-    candidate.add_module(importer)
-    candidate.add_module(imported)
-    candidate.add_import(importer=importer, imported=imported)
-    assert any("adapter peer" in finding for finding in architecture.graph_findings(candidate))
+    assert architecture.core_effect_findings(ast.parse(source))
 
 
 def test_generated_hydra_targets_resolve_after_export_and_composition(
@@ -610,23 +502,12 @@ def test_initializer_cannot_eagerly_load_sdk_through_internal_reexport(tmp_path:
 
 
 @pytest.mark.parametrize(
-    "sdk", ["clearml", "torchvision", "timm", "rfdetr", "pytorch_lightning", "onnx", "tensorrt"]
-)
-def test_dynamic_sdk_import_is_checked_at_its_owner(tmp_path: Path, sdk: str) -> None:
-    package = tmp_path / "clearml_yolo/adapters/storage"
-    package.mkdir(parents=True)
-    (package / "helper.py").write_text(
-        f"from importlib import import_module\nclient = import_module({sdk!r})\n"
-    )
-    candidate = grimp.ImportGraph()
-    candidate.add_module("clearml_yolo.adapters.storage.helper")
-    architecture.add_dynamic_imports(candidate, tmp_path)
-    assert any("SDK ownership" in finding for finding in architecture.graph_findings(candidate))
-
-
-@pytest.mark.parametrize(
     "source",
     [
+        "client = create_client()",
+        "initialize()",
+        "from ultralytics import YOLO",
+        "from clearml import Task",
         "def deferred(value=initialize()): pass",
         "async def deferred(*, value=initialize()): pass",
         "@decorate()\ndef deferred(): pass",
@@ -668,6 +549,11 @@ def test_initializer_keeps_deferred_bodies_and_plain_definitions_inert(source: s
 @pytest.mark.parametrize(
     "source",
     [
+        "open('data.csv')",
+        "Path('data.csv').read_text()",
+        "pd.read_csv('data.csv')",
+        "import subprocess\nsubprocess.run(['ls'])",
+        "importlib.import_module('clearml')",
         "import requests as network\nnetwork.get('https://example.org')",
         "from requests import get as fetch\nfetch('https://example.org')",
         "import httpx\nclient = httpx.Client()\nclient.post('https://example.org')",
@@ -688,6 +574,26 @@ def test_initializer_keeps_deferred_bodies_and_plain_definitions_inert(source: s
         "import os\nclass Example:\n    os = {}\n    def deferred(self):\n        os.listdir('.')",
         "import os\ncallback = lambda: os.listdir('.')",
         "import os\nvalues = [os for os in ()]\nos.listdir('.')",
+        # Nested class lookup skips enclosing class namespaces.
+        "import os\nclass C:\n    os = {}\n    class D:\n        os.listdir('.')",
+        (
+            "from os import listdir as scan\nclass C:\n    scan = None\n"
+            "    class D:\n        scan('.')"
+        ),
+        (
+            "def enclosing():\n    import os\n    class C:\n        os = {}\n"
+            "        class D:\n            os.listdir('.')"
+        ),
+        "class C:\n    import os\n    class D(os.listdir('.')):\n        pass",
+        # Deferred callables see final module bindings; defaults execute eagerly.
+        "def f():\n    os.listdir('.')\nimport os",
+        "os = {}\ndef f():\n    os.listdir('.')\nimport os",
+        "import os\ndef f():\n    reader('.')\nreader = os.listdir",
+        "def f():\n    fetch('url')\nfrom requests import get as fetch",
+        "callback = lambda: os.listdir('.')\nimport os",
+        "class C:\n    def method(self):\n        os.listdir('.')\nimport os",
+        "import os\ndef f(value=os.listdir('.')): pass\nos = {}",
+        "import os\nclass C:\n    value = os.listdir('.')\nos = {}",
     ],
 )
 def test_scoped_effect_aliases_are_rejected(source: str) -> None:
@@ -719,6 +625,26 @@ def test_scoped_effect_aliases_are_rejected(source: str) -> None:
         "import requests\nrequests.utils.quote('value')",
         "import subprocess\nsubprocess.list2cmdline(['value'])",
         "import socket\nsocket.inet_aton('127.0.0.1')",
+        # Nested class lookup skips enclosing class namespaces.
+        "class C:\n    import os\n    class D:\n        os.listdir('.')",
+        "import os\nclass C:\n    class D:\n        os = {}\n        os.get('key')",
+        (
+            "import os\ndef enclosing(os):\n    class C:\n        import os\n"
+            "        class D:\n            os.listdir('.')"
+        ),
+        # Deferred callables see final module bindings; defaults execute eagerly.
+        "import os\ndef f(os):\n    os.listdir('.')",
+        "def f():\n    os = {}\n    os.get('key')\nimport os",
+        "import os\ndef f():\n    os.listdir('.')\nos = {}",
+        "def f(reader):\n    reader('.')\nimport os\nreader = os.listdir",
+        (
+            "os = type('Pure', (), {'listdir': staticmethod(lambda _: [])})\n"
+            "def f(value=os.listdir('.')): pass\nimport os"
+        ),
+        (
+            "os = type('Pure', (), {'listdir': staticmethod(lambda _: [])})\n"
+            "class C:\n    value = os.listdir('.')\nimport os"
+        ),
     ],
 )
 def test_effect_aliases_do_not_escape_scope_or_override_shadowing(source: str) -> None:
@@ -726,46 +652,44 @@ def test_effect_aliases_do_not_escape_scope_or_override_shadowing(source: str) -
     assert architecture.application_effect_findings(ast.parse(source)) == []
 
 
-def test_injected_storage_port_exemption_survives_explicit_aliases() -> None:
-    source = "reader = deps.storage.read_text\nreader(path)\ndeps.storage.read_csv(path)"
-    assert architecture.application_effect_findings(ast.parse(source)) == []
-    assert architecture.core_effect_findings(ast.parse(source))
-
-
 @pytest.mark.parametrize(
-    ("attribute", "valid"),
+    ("target", "valid"),
     [
-        ("local", False),
-        ("nested", False),
-        ("argument", False),
-        ("Worker.local", False),
-        ("Worker.missing", False),
-        ("Worker.run.missing", False),
-        ("Worker.Inner.execute.missing", False),
-        ("Worker", True),
-        ("Worker.run", True),
-        ("Worker.Inner.execute", True),
-        ("alias.run", True),
-        ("renamed.run", True),
-        ("module.Worker.run", True),
-        ("relative.run", True),
-        ("missing_export", False),
-        ("cycle", False),
-        ("annotation_only", False),
-        ("checking_only", False),
-        ("comprehension_local", False),
+        (".probe:local", False),
+        (".probe:nested", False),
+        (".probe:argument", False),
+        (".probe:Worker.local", False),
+        (".probe:Worker.missing", False),
+        (".probe:Worker.run.missing", False),
+        (".probe:Worker.Inner.execute.missing", False),
+        (".probe:Worker", True),
+        (".probe:Worker.run", True),
+        (".probe:Worker.Inner.execute", True),
+        (".probe:alias.run", True),
+        (".probe:renamed.run", True),
+        (".probe:module.Worker.run", True),
+        (".probe:relative.run", True),
+        (".probe:missing_export", False),
+        (".probe:cycle", False),
+        (".probe:annotation_only", False),
+        (".probe:checking_only", False),
+        (".probe:comprehension_local", False),
+        (":Worker.execute", True),
+        (":Worker.missing", False),
     ],
 )
 def test_runtime_target_resolution_respects_scopes_and_reexports(
-    tmp_path: Path, attribute: str, valid: bool
+    tmp_path: Path, target: str, valid: bool
 ) -> None:
     package = tmp_path / "clearml_yolo"
     package.mkdir()
+    (package / "__init__.py").write_text("from .probe import Worker\n")
     (package / "probe.py").write_text(
         "def outer(argument):\n"
         "    local = 1\n"
         "    def nested(): pass\n"
         "class Worker:\n"
+        "    def execute(self): pass\n"
         "    def run(self):\n"
         "        local = 1\n"
         "    class Inner:\n"
@@ -788,11 +712,10 @@ def test_runtime_target_resolution_respects_scopes_and_reexports(
         "from .probe import cycle\n"
     )
     candidate = grimp.ImportGraph()
+    candidate.add_module("clearml_yolo")
     candidate.add_module("clearml_yolo.probe")
     candidate.add_module("clearml_yolo.other")
-    findings = architecture.target_findings(
-        {f"clearml_yolo.probe:{attribute}"}, candidate, tmp_path
-    )
+    findings = architecture.target_findings({f"clearml_yolo{target}"}, candidate, tmp_path)
     assert bool(findings) is not valid, findings
 
 
@@ -805,6 +728,13 @@ def test_runtime_target_resolution_respects_scopes_and_reexports(
         ("__import__('torch')", True),
         (
             (
+                "from typing import TYPE_CHECKING\nfrom importlib import import_module\n"
+                "if TYPE_CHECKING:\n    import_module('torch')"
+            ),
+            True,
+        ),
+        (
+            (
                 "from importlib import import_module\n"
                 "def pure(import_module):\n    import_module('torch')"
             ),
@@ -812,28 +742,27 @@ def test_runtime_target_resolution_respects_scopes_and_reexports(
         ),
     ],
 )
+@pytest.mark.parametrize(
+    "sdk",
+    ["clearml", "torch", "torchvision", "timm", "rfdetr", "pytorch_lightning",
+     "onnx", "tensorrt", "safetensors"],
+)
 def test_dynamic_import_graph_resolves_scoped_import_aliases(
-    tmp_path: Path, source: str, expected: bool
+    tmp_path: Path,
+    sdk: str,
+    source: str,
+    expected: bool,
+    graph: grimp.ImportGraph,
+    import_options: UserOptions,
 ) -> None:
     package = tmp_path / "clearml_yolo/adapters/storage"
     package.mkdir(parents=True)
-    (package / "helper.py").write_text(source)
-    candidate = grimp.ImportGraph()
+    (package / "helper.py").write_text(source.replace("torch", sdk))
+    candidate = deepcopy(graph)
     candidate.add_module("clearml_yolo.adapters.storage.helper")
     architecture.add_dynamic_imports(candidate, tmp_path)
-    assert bool(architecture.graph_findings(candidate)) is expected
-
-
-def test_runtime_target_supports_root_package_reexports(tmp_path: Path) -> None:
-    package = tmp_path / "clearml_yolo"
-    package.mkdir()
-    (package / "__init__.py").write_text("from .worker import Worker\n")
-    (package / "worker.py").write_text("class Worker:\n    def execute(self): pass\n")
-    candidate = grimp.ImportGraph()
-    candidate.add_module("clearml_yolo")
-    candidate.add_module("clearml_yolo.worker")
-    assert architecture.target_findings({"clearml_yolo:Worker.execute"}, candidate, tmp_path) == []
-    assert architecture.target_findings({"clearml_yolo:Worker.missing"}, candidate, tmp_path)
+    contract = _contract(import_options, f"{sdk} SDK has explicit owners")
+    assert contract.check(candidate, verbose=False).kept is not expected
 
 
 def test_runtime_target_inventory_includes_nested_colon_attributes(tmp_path: Path) -> None:
@@ -843,79 +772,6 @@ def test_runtime_target_inventory_includes_nested_colon_attributes(tmp_path: Pat
     config = tmp_path / "pyproject.toml"
     config.write_text("[project.scripts]\nworker='clearml_yolo.worker:Worker.execute'\n")
     assert architecture.runtime_targets(tmp_path, config) == {"clearml_yolo.worker:Worker.execute"}
-
-
-@pytest.mark.parametrize(
-    ("source", "effect"),
-    [
-        ("import os\nclass C:\n    os = {}\n    class D:\n        os.listdir('.')", True),
-        (
-            (
-                "from os import listdir as scan\nclass C:\n    scan = None\n"
-                "    class D:\n        scan('.')"
-            ),
-            True,
-        ),
-        (
-            (
-                "def enclosing():\n    import os\n    class C:\n        os = {}\n"
-                "        class D:\n            os.listdir('.')"
-            ),
-            True,
-        ),
-        ("class C:\n    import os\n    class D:\n        os.listdir('.')", False),
-        ("import os\nclass C:\n    class D:\n        os = {}\n        os.get('key')", False),
-        (
-            (
-                "import os\ndef enclosing(os):\n    class C:\n        import os\n"
-                "        class D:\n            os.listdir('.')"
-            ),
-            False,
-        ),
-        ("class C:\n    import os\n    class D(os.listdir('.')):\n        pass", True),
-    ],
-)
-def test_nested_class_effect_lookup_skips_outer_class_namespaces(source: str, effect: bool) -> None:
-    assert bool(architecture.core_effect_findings(ast.parse(source))) is effect
-    assert bool(architecture.application_effect_findings(ast.parse(source))) is effect
-
-
-@pytest.mark.parametrize(
-    ("source", "effect"),
-    [
-        ("def f():\n    os.listdir('.')\nimport os", True),
-        ("os = {}\ndef f():\n    os.listdir('.')\nimport os", True),
-        ("import os\ndef f():\n    reader('.')\nreader = os.listdir", True),
-        ("def f():\n    fetch('url')\nfrom requests import get as fetch", True),
-        ("callback = lambda: os.listdir('.')\nimport os", True),
-        ("class C:\n    def method(self):\n        os.listdir('.')\nimport os", True),
-        ("import os\ndef f(os):\n    os.listdir('.')", False),
-        ("def f():\n    os = {}\n    os.get('key')\nimport os", False),
-        ("import os\ndef f():\n    os.listdir('.')\nos = {}", False),
-        ("def f(reader):\n    reader('.')\nimport os\nreader = os.listdir", False),
-        ("import os\ndef f(value=os.listdir('.')): pass\nos = {}", True),
-        ("import os\nclass C:\n    value = os.listdir('.')\nos = {}", True),
-        (
-            (
-                "os = type('Pure', (), {'listdir': staticmethod(lambda _: [])})\n"
-                "def f(value=os.listdir('.')): pass\nimport os"
-            ),
-            False,
-        ),
-        (
-            (
-                "os = type('Pure', (), {'listdir': staticmethod(lambda _: [])})\n"
-                "class C:\n    value = os.listdir('.')\nimport os"
-            ),
-            False,
-        ),
-    ],
-)
-def test_deferred_effects_use_module_bindings_after_module_initialization(
-    source: str, effect: bool
-) -> None:
-    assert bool(architecture.core_effect_findings(ast.parse(source))) is effect
-    assert bool(architecture.application_effect_findings(ast.parse(source))) is effect
 
 
 @pytest.mark.parametrize(

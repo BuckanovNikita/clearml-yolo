@@ -80,3 +80,13 @@ upstream access grant rather than substituting an incompatible checkpoint.
 
 See [backend selection](multi-model-backends.md) for the supported presets and
 [Agent execution](runtime-isolation.md) for remote replay ownership.
+
+## Safetensors validation
+
+The asset adapter uses `safetensors.safe_open(framework="numpy")` to validate the
+header, dtype, shapes and non-overlapping payload offsets. At least one named tensor
+is required; legal zero-element tensors retain their existing support. Empty tensor
+maps, truncated payloads and malformed descriptors are invalid. Library format errors
+are translated to the existing `ValueError` boundary so invalid native-cache entries
+still fall through to normal resolution. Hashing uses `hashlib.file_digest` while
+retaining traced reads and caller identity checks.

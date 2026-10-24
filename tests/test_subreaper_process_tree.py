@@ -4,7 +4,6 @@ import os
 import signal
 import subprocess
 import sys
-import time
 from collections.abc import Iterator
 from contextlib import suppress
 from pathlib import Path
@@ -12,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from clearml_yolo.adapters.runtime import process_tree
+from test_direct_descendants import _wait
 
 pytestmark = pytest.mark.skipif(sys.platform != "linux", reason="Linux subreaper ownership")
 
@@ -197,15 +197,6 @@ def test_live_scope_second_scan_finds_late_adoption(monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr(Path, "read_text", late_child)
 
     assert tree.running(), "One empty scan cannot establish cleanup before adoption settles"
-
-
-def _wait(path: Path) -> str:
-    deadline = time.monotonic() + 8
-    while time.monotonic() < deadline:
-        if path.exists() and (value := path.read_text(encoding="utf-8")):
-            return value
-        time.sleep(0.02)
-    raise AssertionError(f"Missing process fixture observation: {path}")
 
 
 @pytest.mark.parametrize("launch", ["fork", "orphan", "thread"])

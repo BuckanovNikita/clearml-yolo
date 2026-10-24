@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record custom augmentation release delivery
+  ([`9c3f296`](https://github.com/BuckanovNikita/clearml-yolo/commit/9c3f296f370971436afd8cc300c31034d52dd4dc))
+
+
 ## v0.39.0 (2026-10-24)
 
 ### Documentation

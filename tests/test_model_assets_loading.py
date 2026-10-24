@@ -1,6 +1,7 @@
 """Asset selection uses native registries and local files retain native transformations."""
 
 import importlib
+import json
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -12,6 +13,74 @@ from clearml_yolo.adapters.fasterrcnn import assets as fasterrcnn_assets
 from clearml_yolo.adapters.rfdetr import assets as rfdetr_assets
 from clearml_yolo.core.assets import AssetCache
 from clearml_yolo.core.models import PRESETS, model_preset
+
+
+def _safetensors_payload(header: dict[str, object], data: bytes = b"\x00" * 4) -> bytes:
+    encoded = json.dumps(header).encode()
+    return len(encoded).to_bytes(8, "little") + encoded + data
+
+
+@pytest.mark.parametrize(
+    ("header", "data"),
+    [
+        ({}, b""),
+        ({"__metadata__": {"description": "no tensors"}}, b""),
+        ({"x": {"dtype": "F32", "shape": [1], "data_offsets": [0, 4]}}, b"\x00" * 3),
+        ({"x": {"dtype": "invalid", "shape": [1], "data_offsets": [0, 4]}}, b"\x00" * 4),
+        ({"x": {"dtype": "F32", "shape": [2], "data_offsets": [0, 4]}}, b"\x00" * 4),
+        ({"x": {"dtype": "F32", "shape": [-1], "data_offsets": [0, 4]}}, b"\x00" * 4),
+        (
+            {
+                "x": {"dtype": "F32", "shape": [1], "data_offsets": [0, 4]},
+                "y": {"dtype": "F32", "shape": [1], "data_offsets": [0, 4]},
+            },
+            b"\x00" * 4,
+        ),
+    ],
+    ids=["empty-map", "metadata-only", "truncated", "dtype", "shape", "negative", "overlap"],
+)
+def test_malformed_safetensors_use_asset_value_error_boundary(
+    tmp_path: Path, header: dict[str, object], data: bytes
+) -> None:
+    path = tmp_path / "model.safetensors"
+    path.write_bytes(_safetensors_payload(header, data))
+    spec = fasterrcnn_assets.pretrained_asset("resnet50_fpn").model_copy(
+        update={"filename": path.name, "checksum": None}
+    )
+    with pytest.raises(ValueError, match=r"[Ss]afetensors"):
+        resolver.validate_asset(path, spec)
+
+
+def test_valid_zero_element_tensor_is_distinct_from_no_tensors(tmp_path: Path) -> None:
+    path = tmp_path / "model.safetensors"
+    path.write_bytes(
+        _safetensors_payload({"x": {"dtype": "F32", "shape": [0], "data_offsets": [0, 0]}}, b"")
+    )
+    resolver._safetensors(path)
+
+
+def test_malformed_safetensors_cache_falls_through_to_valid_candidate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("CY_HOME", str(tmp_path / "project"))
+    cache = tmp_path / "model.safetensors"
+    cache.write_bytes(
+        _safetensors_payload({"x": {"dtype": "F32", "shape": [1], "data_offsets": [0, 4]}})
+    )
+    spec = fasterrcnn_assets.pretrained_asset("resnet50_fpn").model_copy(
+        update={"filename": cache.name, "checksum": None, "cache_candidates": (cache,)}
+    )
+    destination = resolver.asset_destination(spec)
+    destination.parent.mkdir(parents=True)
+    destination.write_bytes(
+        _safetensors_payload({"x": {"dtype": "invalid", "shape": [1], "data_offsets": [0, 4]}})
+    )
+    monkeypatch.setattr(resolver, "_download", lambda *args: pytest.fail("valid offline cache"))
+
+    record = resolver.resolve_asset(spec)
+
+    assert record.path == cache
+    assert destination.read_bytes() != cache.read_bytes(), "Invalid user cache remains untouched"
 
 
 @pytest.fixture
@@ -131,11 +200,9 @@ def test_hf_safetensors_cache_keeps_the_loading_suffix(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     import hashlib
-    import json
 
     monkeypatch.setenv("CY_HOME", str(tmp_path / "project"))
-    header = json.dumps({"x": {"dtype": "F32", "shape": [1], "data_offsets": [0, 4]}}).encode()
-    payload = len(header).to_bytes(8, "little") + header + b"\x00" * 4
+    payload = _safetensors_payload({"x": {"dtype": "F32", "shape": [1], "data_offsets": [0, 4]}})
     digest = hashlib.sha256(payload).hexdigest()
     blob = tmp_path / digest
     blob.write_bytes(payload)

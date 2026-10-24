@@ -112,9 +112,11 @@ Resolve `scripts/validate_architecture.py` from the shared skill directory, supp
 repository root explicitly and validate the record with `--phase plan` before
 implementation. The skill documents its command and record schema. Include concrete
 acceptance commands and expectations in the record and ledger. For runtime module work,
-run `uv run lint-imports` and `uv run pytest tests/test_architecture.py` separately,
-together with affected behavior and documentation checks and any scoped enforcement
-added by the task. These commands complement record validation.
+run `uv run --frozen --no-sync python scripts/verify.py`: its import-linter check and
+complete pytest suite include architecture negative cases and CPU-DDP. That canonical
+run satisfies these gates without repeating architecture tests or the full suite.
+Run `--docs` separately and include scoped mutation acceptance when selected logic,
+tests or dependencies change. These executed checks complement record validation.
 
 Before acceptance, inspect the complete task-owned diff, including additions, removals,
 renames, dependency configuration and composition targets. Reconcile it with module

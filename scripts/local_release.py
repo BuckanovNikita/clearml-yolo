@@ -13,9 +13,17 @@ import tomllib
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
+
+if TYPE_CHECKING or __package__:
+    from scripts.verify import VerificationError, version_bytes
+    from scripts.verify import git as verification_git
+else:
+    from verify import VerificationError, version_bytes
+    from verify import git as verification_git
 
 RELEASE_VERSION = re.compile(r"(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)")
 RELEASE_FILES = ("pyproject.toml", "uv.lock", "CHANGELOG.md")
@@ -143,27 +151,6 @@ def require_clean(root: Path) -> None:
         )
 
 
-def versioned_lock_bytes(content: bytes, package_index: int, old: str, new: str) -> bytes:
-    """Edit one canonical uv package table without reserializing unrelated TOML."""
-    sections = re.split(rb"(?m)(?=^\[\[package\]\][ \t]*(?:#[^\r\n]*)?\r?$)", content)
-    if package_index + 1 >= len(sections):
-        raise ReleaseError("Lockfile root package table cannot be located unambiguously.")
-    section = sections[package_index + 1]
-    end = section.find(b"\n[", len(b"[[package]]"))
-    header = section if end == -1 else section[:end]
-    pattern = (
-        rb"(?m)^[ \t]*version[ \t]*=[ \t]*([\"'])(?P<value>"
-        + re.escape(old.encode())
-        + rb")\1(?=[ \t]*(?:#[^\r\n]*)?\r?$)"
-    )
-    matches = list(re.finditer(pattern, header))
-    if len(matches) != 1:
-        raise ReleaseError("Lockfile root version token cannot be located unambiguously.")
-    start, end = matches[0].span("value")
-    sections[package_index + 1] = section[:start] + new.encode() + section[end:]
-    return b"".join(sections)
-
-
 def refresh_lock_version(root: Path, attempt: Attempt) -> None:
     """Update only the checked source commit's root version, without resolving dependencies."""
     project = tomllib.loads(git(root, "show", f"{attempt.source}:pyproject.toml"))["project"]
@@ -177,13 +164,11 @@ def refresh_lock_version(root: Path, attempt: Attempt) -> None:
         )
     before = tomllib.loads(content.decode())
     matches = [
-        (index, package)
-        for index, package in enumerate(before.get("package", []))
-        if package.get("name") == project["name"]
+        package for package in before.get("package", []) if package.get("name") == project["name"]
     ]
     if len(matches) != 1:
         raise ReleaseError("Lockfile must contain exactly one root project package.")
-    index, package = matches[0]
+    package = matches[0]
     # uv uses virtual roots for projects without a build system, including release fixtures.
     if package.get("source") not in ({"editable": "."}, {"virtual": "."}):
         raise ReleaseError("Lockfile root package must refer to the current project directory.")
@@ -192,37 +177,24 @@ def refresh_lock_version(root: Path, attempt: Attempt) -> None:
         raise ReleaseError(
             "Lockfile root version differs from the recorded source project version."
         )
-    updated = versioned_lock_bytes(content, index, old, attempt.version)
-    after = tomllib.loads(updated.decode())
-    after["package"][index]["version"] = old
-    if after != before:
-        raise ReleaseError(
-            "Lockfile update changed dependencies or metadata beyond the root version."
-        )
+    updated = version_bytes(content, attempt.version, lock=True, name=project["name"])
     if path.read_bytes() != content or git(root, "rev-parse", "HEAD") != attempt.source:
         raise ReleaseError("Lockfile or source commit changed during version preparation.")
     path.write_bytes(updated)
 
 
 def validate_metadata(root: Path, attempt: Attempt) -> None:
-    """Allow only the root project version to change in either parsed TOML document."""
-    project_before = tomllib.loads(git(root, "show", f"{attempt.source}:pyproject.toml"))
-    project_after = tomllib.loads((root / "pyproject.toml").read_text())
-    if project_after["project"]["version"] != attempt.version:
-        raise ReleaseError("Package version does not match the release attempt.")
-    project_after["project"]["version"] = project_before["project"]["version"]
-    if project_after != project_before:
-        raise ReleaseError("Release changed project metadata beyond the version.")
-
-    lock_before = tomllib.loads(git(root, "show", f"{attempt.source}:uv.lock"))
-    lock_after = tomllib.loads((root / "uv.lock").read_text())
-    name = project_before["project"]["name"]
-    packages = [entry for entry in lock_after["package"] if entry["name"] == name]
-    if len(packages) != 1 or packages[0]["version"] != attempt.version:
-        raise ReleaseError("Lockfile root package version does not match the release attempt.")
-    packages[0]["version"] = project_before["project"]["version"]
-    if lock_after != lock_before:
-        raise ReleaseError("Lock refresh changed dependencies or sources; inspect retained files.")
+    """Require byte-exact root-version edits, preserving every dependency and comment."""
+    project = tomllib.loads(git(root, "show", f"{attempt.source}:pyproject.toml"))["project"]
+    for path in ("pyproject.toml", "uv.lock"):
+        before = verification_git(root, "show", f"{attempt.source}:{path}")
+        expected = version_bytes(
+            before, attempt.version, lock=path == "uv.lock", name=project["name"]
+        )
+        if (root / path).read_bytes() != expected:
+            raise ReleaseError(
+                "Release changed dependencies, sources or metadata beyond the root version."
+            )
 
 
 def validate_release_commit(root: Path, attempt: Attempt) -> None:
@@ -422,7 +394,7 @@ def main() -> int:
                 logger.info("Release skipped: {}.", reason)
             else:
                 release(root)
-    except (ReleaseError, OSError, ValueError, KeyError, ValidationError) as exc:
+    except (ReleaseError, VerificationError, OSError, ValueError, KeyError, ValidationError) as exc:
         logger.error(
             "{}. The original commit is retained. Retry after resolving this: {}", exc, RETRY
         )
