@@ -1,12 +1,22 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.40.0 (2026-10-24)
 
 ### Documentation
 
 - Record custom augmentation release delivery
   ([`9c3f296`](https://github.com/BuckanovNikita/clearml-yolo/commit/9c3f296f370971436afd8cc300c31034d52dd4dc))
+
+### Refactoring
+
+- Reduce runtime code and reuse release verification
+  ([`35dd11c`](https://github.com/BuckanovNikita/clearml-yolo/commit/35dd11c8105b8b3ba97d51a6bb2edabeb8e5996b))
+
+### Breaking Changes
+
+- Remove clearml_yolo.adapters.runtime.supervision; use the active process_tree ownership and
+  cancellation APIs.
 
 
 ## v0.39.0 (2026-10-24)
