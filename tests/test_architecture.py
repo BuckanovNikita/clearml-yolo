@@ -71,6 +71,7 @@ def test_actual_graph_obeys_classification_direction_sdk_ownership_and_cycles(
         ("clearml_yolo.core.presentation", "loguru", "core dependency"),
         ("clearml_yolo.application.use_cases.metrics", "loguru", "application effects"),
         ("clearml_yolo.core.identity", "digital_metrics", "SDK ownership"),
+        ("clearml_yolo.core.transforms", "albumentations", "SDK ownership"),
         ("clearml_yolo.application.contracts", "clearml", "SDK ownership"),
         ("clearml_yolo.application.use_cases.export", "clearml", "SDK ownership"),
         ("clearml_yolo.application.use_cases.pipeline", "clearml", "SDK ownership"),
@@ -397,6 +398,11 @@ def test_all_console_commands_are_independent_entrypoints(graph: grimp.ImportGra
             "clearml_yolo.adapters.yolo.inference",
         ),
         ("clearml SDK has explicit owners", "clearml_yolo.application.contracts", "clearml"),
+        (
+            "albumentations SDK has explicit owners",
+            "clearml_yolo.core.transforms",
+            "albumentations",
+        ),
         (
             "clearml adapter peer ownership",
             "clearml_yolo.adapters.clearml.cache",

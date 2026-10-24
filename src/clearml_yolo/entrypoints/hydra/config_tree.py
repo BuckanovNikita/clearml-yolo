@@ -16,6 +16,11 @@ from clearml_yolo.adapters.yolo.config import (
 )
 from clearml_yolo.core.models import model_preset
 from clearml_yolo.entrypoints.hydra.configs import NATIVE_COMMANDS, PREDICTION_COMMANDS
+from clearml_yolo.entrypoints.hydra.transforms import (
+    TRAINING_COMMANDS,
+    native_overlay,
+    profile_values,
+)
 
 COMMAND_OF_CONFIG = {
     "pipeline": "cy",
@@ -128,6 +133,15 @@ def _selection(command: str, model: str | None) -> tuple[str, str]:
 def _groups(config_name: str, model: str) -> dict[Path, str]:
     selected = model_preset(model)
     groups: dict[Path, str] = {}
+    if config_name in TRAINING_COMMANDS:
+        for profile in ("default", "albumentations"):
+            groups[Path("transforms") / f"{profile}.yaml"] = OmegaConf.to_yaml(
+                OmegaConf.create(profile_values(profile))
+            )
+            groups[Path("transform_overrides") / f"{model}_{profile}.yaml"] = (
+                "# @package _global_\n"
+                + OmegaConf.to_yaml(OmegaConf.create(native_overlay(model, profile)))
+            )
     if config_name in NATIVE_COMMANDS and model != "ultralytics":
         groups[Path("model") / f"{model}.yaml"] = OmegaConf.to_yaml(
             OmegaConf.create(selected.model_dump(mode="json"))
@@ -157,6 +171,7 @@ def _command_yaml(config_name: str, model: str) -> str:
         values.pop("ultralytics", None)
         values.pop("ultralytics_predict", None)
         values.pop("model", None)
+        values.pop("transforms", None)
         defaults: list[object] = [config_name]
         if config_name in NATIVE_COMMANDS and model != "ultralytics":
             defaults.append({"override /model": model})

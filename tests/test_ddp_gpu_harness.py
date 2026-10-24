@@ -109,7 +109,7 @@ def test_evidence_command_failure_is_not_an_implicit_retry(tmp_path: Path) -> No
 def test_ordinary_collection_deselects_gpu_without_environment_effects() -> None:
     from conftest import pytest_collection_modifyitems
 
-    gpu = SimpleNamespace(get_closest_marker=lambda name: object())
+    gpu = SimpleNamespace(get_closest_marker=lambda name: object() if name == "ddp_gpu" else None)
     ordinary = SimpleNamespace(get_closest_marker=lambda name: None)
     removed = []
     config = SimpleNamespace(
@@ -130,7 +130,7 @@ def test_explicit_mark_selection_retains_gpu_missing_authorization() -> None:
     config = SimpleNamespace(
         args=[], getoption=lambda name: False, option=SimpleNamespace(markexpr="ddp_gpu")
     )
-    gpu = SimpleNamespace(get_closest_marker=lambda name: object())
+    gpu = SimpleNamespace(get_closest_marker=lambda name: object() if name == "ddp_gpu" else None)
     items = [gpu]
     pytest_collection_modifyitems(config, items)  # type: ignore[arg-type]
     assert items == [gpu]
@@ -326,7 +326,7 @@ def test_explicit_gpu_file_selection_requires_authorization() -> None:
         getoption=lambda name: False,
         option=SimpleNamespace(markexpr=""),
     )
-    gpu = SimpleNamespace(get_closest_marker=lambda name: object())
+    gpu = SimpleNamespace(get_closest_marker=lambda name: object() if name == "ddp_gpu" else None)
     items = [gpu]
     pytest_collection_modifyitems(config, items)  # type: ignore[arg-type]
     assert items == [gpu]

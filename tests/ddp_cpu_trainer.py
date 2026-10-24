@@ -105,7 +105,7 @@ class CpuDetectionTrainer(DetectionTrainer):
             "close_mosaic": 0,
             "save": True,
             "val": True,
-            "project": str(self.root / "train"),
+            "project": str(self.root / "workspace" / "train"),
             "name": "run",
             "exist_ok": True,
             "hsv_h": 0.0,
@@ -154,7 +154,26 @@ class CpuDetectionTrainer(DetectionTrainer):
     @override
     def preprocess_batch(self, batch: Any) -> Any:
         self.epoch_samples.extend(Path(path).name for path in batch["im_file"])
-        return super().preprocess_batch(batch)
+        if self.scenario != "custom_mosaic":
+            return super().preprocess_batch(batch)
+        input_dtype = str(batch["img"].dtype)
+        expected_pixels = batch["img"].float() / 255.0
+        result = super().preprocess_batch(batch)
+        boxes = result["bboxes"]
+        self.evidence["batches"].append(
+            {
+                "input_dtype": input_dtype,
+                "shape": list(result["img"].shape),
+                "output_dtype": str(result["img"].dtype),
+                "scaled_once": torch.equal(result["img"], expected_pixels),
+                "box_counts": torch.bincount(
+                    result["batch_idx"].to(torch.int64), minlength=len(result["img"])
+                ).tolist(),
+                "boxes_finite": bool(torch.isfinite(boxes).all()),
+                "boxes_normalized": bool(((boxes >= 0) & (boxes <= 1)).all()),
+            }
+        )
+        return result
 
     @override
     def optimizer_step(self) -> None:
@@ -175,6 +194,16 @@ class CpuDetectionTrainer(DetectionTrainer):
     def run_callbacks(self, event: str) -> None:
         super().run_callbacks(event)
         if event == "on_train_start":
+            if self.scenario == "custom_mosaic":
+                self.evidence.update(
+                    train_dataset=type(self.train_loader.dataset).__name__,
+                    validation_dataset=type(self.test_loader.dataset).__name__,
+                    train_final_transforms=[
+                        type(transform).__name__
+                        for transform in self.train_loader.dataset.transforms.transforms
+                    ],
+                    batches=[],
+                )
             self.evidence["ddp"] = isinstance(self.model, DistributedDataParallel)
             self.evidence["distributed_sampler"] = isinstance(
                 self.train_loader.sampler, DistributedSampler

@@ -6,11 +6,15 @@ import tempfile
 from collections.abc import Iterator
 from copy import deepcopy
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from clearml_yolo.adapters.runtime import bootstrap
 from ddp_gpu_harness import GPUOptions
+
+if TYPE_CHECKING:
+    from severstal_harness import SeverstalOptions
 
 
 @pytest.fixture(autouse=True)
@@ -62,18 +66,36 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default=150,
         help="Production cleanup deadline; minimum 120 seconds, plus 15-second fallback",
     )
+    severstal = parser.getgroup("native Severstal acceptance")
+    severstal.addoption("--run-severstal-gpu", action="store_true")
+    severstal.addoption("--severstal-dataset", default="")
+    severstal.addoption("--severstal-artifacts", default="")
+    severstal.addoption("--severstal-clearml-project", default="")
+    severstal.addoption("--severstal-tags", default="", help="Comma-separated ownership tags")
+    severstal.addoption("--severstal-device", default="0")
+    severstal.addoption("--severstal-timeout", type=float, default=1800)
+    severstal.addoption(
+        "--severstal-backbone",
+        action="append",
+        default=[],
+        metavar="MODEL=PATH",
+        help="Local pretrained backbone for a DEIMv2/Faster R-CNN selection; repeat for each model",
+    )
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     """Keep ordinary pytest offline, while an explicit GPU selection fails missing opt-in."""
-    explicit_file = any("test_native_ddp_gpu.py" in value for value in config.args)
-    if config.getoption("--run-ddp-gpu") or "ddp_gpu" in config.option.markexpr or explicit_file:
-        return
-    selected = [item for item in items if item.get_closest_marker("ddp_gpu") is None]
-    removed = [item for item in items if item.get_closest_marker("ddp_gpu") is not None]
-    items[:] = selected
-    if removed:
-        config.hook.pytest_deselected(items=removed)
+    for marker, flag, filename in (
+        ("ddp_gpu", "--run-ddp-gpu", "test_native_ddp_gpu.py"),
+        ("severstal_gpu", "--run-severstal-gpu", "test_severstal_gpu.py"),
+    ):
+        explicit_file = any(filename in value for value in config.args)
+        if config.getoption(flag) or marker in config.option.markexpr or explicit_file:
+            continue
+        removed = [item for item in items if item.get_closest_marker(marker) is not None]
+        items[:] = [item for item in items if item.get_closest_marker(marker) is None]
+        if removed:
+            config.hook.pytest_deselected(items=removed)
 
 
 @pytest.fixture
@@ -103,3 +125,30 @@ def ddp_gpu_options(request: pytest.FixtureRequest) -> GPUOptions:
                 f"Physical DDP selection requires {' '.join(missing)}; evidence: {evidence.root}"
             )
     return options
+
+
+@pytest.fixture
+def severstal_options(request: pytest.FixtureRequest) -> "SeverstalOptions":
+    """Require explicit data, evidence and stand ownership before any native run."""
+    from severstal_harness import SeverstalOptions, parse_backbone_options
+
+    config = request.config
+    required = (
+        "--run-severstal-gpu",
+        "--severstal-dataset",
+        "--severstal-artifacts",
+        "--severstal-clearml-project",
+        "--severstal-tags",
+    )
+    missing = [name for name in required if not config.getoption(name)]
+    if missing:
+        raise ValueError(f"Native Severstal selection requires {' '.join(missing)}")
+    return SeverstalOptions(
+        dataset=Path(config.getoption("--severstal-dataset")),
+        artifacts=Path(config.getoption("--severstal-artifacts")),
+        project=config.getoption("--severstal-clearml-project"),
+        tags=tuple(value.strip() for value in config.getoption("--severstal-tags").split(",")),
+        device=config.getoption("--severstal-device"),
+        timeout=config.getoption("--severstal-timeout"),
+        backbone_weights=parse_backbone_options(config.getoption("--severstal-backbone")),
+    )

@@ -1,0 +1,350 @@
+{
+  "schema_version": 1,
+  "task": "004-custom-augmentation",
+  "scope": [
+    "src/clearml_yolo/core/transforms.py",
+    "src/clearml_yolo/core/models.py",
+    "src/clearml_yolo/adapters/augmentation",
+    "src/clearml_yolo/adapters/integrations",
+    "src/clearml_yolo/adapters/deim",
+    "src/clearml_yolo/adapters/rfdetr",
+    "src/clearml_yolo/adapters/fasterrcnn",
+    "src/clearml_yolo/entrypoints",
+    "scripts/severstal.py",
+    "tests/architecture_helpers.py",
+    "pyproject.toml",
+    "uv.lock",
+    ".importlinter",
+    "tests",
+    "docs",
+    "README.md",
+    "specs/004-custom-augmentation",
+    "src/clearml_yolo/adapters/yolo/augmentation.py",
+    "examples/augmentation",
+    "specs/000-baseline/spec.md",
+    "CHANGELOG.md"
+  ],
+  "impact": "modules",
+  "rules": "AGENTS.md and docs/agent-workflow.md: inward layers, explicit SDK/effect ownership, inert imports, no upstream mutations. Test tooling has task-owned filesystem effects.",
+  "modules": [
+    {
+      "id": "policy",
+      "path": "src/clearml_yolo/core/transforms.py",
+      "change": "add",
+      "responsibility": "Validate portable augmentation selector and immutable pipeline identity.",
+      "interface": "TransformConfig and TransformSnapshot; reject incompatible mode/selector/hash.",
+      "layer": "core",
+      "allowed_dependencies": [
+        "Python standard library without effects",
+        "Pydantic",
+        "NumPy"
+      ],
+      "forbidden_dependencies": [
+        "Outward layer imports",
+        "Unowned SDK imports",
+        "Process-global upstream monkeypatches"
+      ],
+      "effects": "None; no filesystem or SDK imports.",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "model",
+      "path": "src/clearml_yolo/core/models.py",
+      "change": "modify",
+      "responsibility": "Validate selected backend native augmentation override fields.",
+      "interface": "TrainSettings.augmentation and backend-specific validation.",
+      "layer": "core",
+      "allowed_dependencies": [
+        "Python standard library without effects",
+        "Pydantic",
+        "NumPy"
+      ],
+      "forbidden_dependencies": [
+        "Outward layer imports",
+        "Unowned SDK imports",
+        "Process-global upstream monkeypatches"
+      ],
+      "effects": "None.",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "augmentation",
+      "path": "src/clearml_yolo/adapters/augmentation",
+      "change": "add",
+      "responsibility": "Load validated JSON and execute aligned RGB geometry and training-only mosaic.",
+      "interface": "DetectionSample and TrainingPipeline; empty target outcomes are valid.",
+      "layer": "adapters",
+      "allowed_dependencies": [
+        "Project inward dependency contracts; native SDKs only at explicit adapter owners"
+      ],
+      "forbidden_dependencies": [
+        "Outward layer imports",
+        "Unowned SDK imports",
+        "Process-global upstream monkeypatches"
+      ],
+      "effects": "File reads and Albumentations execution; donor reads use supplied callable.",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "yolo",
+      "path": "src/clearml_yolo/adapters/integrations",
+      "change": "modify",
+      "responsibility": "Own native training integration, raw YOLO dataset and spawned worker configuration.",
+      "interface": "Explicit frozen transform configuration passed through native adapters.",
+      "layer": "adapters",
+      "allowed_dependencies": [
+        "Project inward dependency contracts; native SDKs only at explicit adapter owners"
+      ],
+      "forbidden_dependencies": [
+        "Outward layer imports",
+        "Unowned SDK imports",
+        "Process-global upstream monkeypatches"
+      ],
+      "effects": "Native SDK, worker lifecycle and owner publication remain at existing boundaries.",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "yolo_dataset",
+      "path": "src/clearml_yolo/adapters/yolo/augmentation.py",
+      "change": "add",
+      "already_applied": true,
+      "responsibility": "Read original YOLO RGB training samples, call shared augmentation, and apply native final LetterBox/Format. Refines the originally planned raw-reader responsibility under integrations into the existing YOLO adapter.",
+      "interface": "AugmentedYOLODataset preserves native dataset/collate protocols; custom source geometry precedes final sizing.",
+      "layer": "adapters",
+      "allowed_dependencies": [
+        "Core transform contract",
+        "Shared augmentation.pipeline",
+        "Ultralytics data SDK",
+        "Torch worker seed",
+        "PIL and NumPy"
+      ],
+      "forbidden_dependencies": [
+        "Entrypoints/application use cases",
+        "Native optional augmentation",
+        "Validation/test donor data"
+      ],
+      "effects": "Image reads and dataset-local SDK execution; no global mutation.",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "deim",
+      "path": "src/clearml_yolo/adapters/deim",
+      "change": "modify",
+      "responsibility": "Bridge raw DEIM samples and deterministic finalization.",
+      "interface": "Optional typed TransformConfig to train, native loader protocol retained.",
+      "layer": "adapters",
+      "allowed_dependencies": [
+        "Project inward dependency contracts; native SDKs only at explicit adapter owners"
+      ],
+      "forbidden_dependencies": [
+        "Outward layer imports",
+        "Unowned SDK imports",
+        "Process-global upstream monkeypatches"
+      ],
+      "effects": "DEIM SDK and image reads.",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "rfdetr",
+      "path": "src/clearml_yolo/adapters/rfdetr",
+      "change": "modify",
+      "responsibility": "Bridge raw RF-DETR samples and deterministic finalization.",
+      "interface": "Optional typed TransformConfig to train, native datamodule lifecycle retained.",
+      "layer": "adapters",
+      "allowed_dependencies": [
+        "Project inward dependency contracts; native SDKs only at explicit adapter owners"
+      ],
+      "forbidden_dependencies": [
+        "Outward layer imports",
+        "Unowned SDK imports",
+        "Process-global upstream monkeypatches"
+      ],
+      "effects": "RF-DETR SDK and image reads.",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "fasterrcnn",
+      "path": "src/clearml_yolo/adapters/fasterrcnn",
+      "change": "modify",
+      "responsibility": "Bridge raw Faster R-CNN samples before native normalization.",
+      "interface": "Optional typed TransformConfig to train_native and CocoDataset transforms.",
+      "layer": "adapters",
+      "allowed_dependencies": [
+        "Project inward dependency contracts; native SDKs only at explicit adapter owners"
+      ],
+      "forbidden_dependencies": [
+        "Outward layer imports",
+        "Unowned SDK imports",
+        "Process-global upstream monkeypatches"
+      ],
+      "effects": "Torch/Torchvision SDK and image reads.",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "entrypoints",
+      "path": "src/clearml_yolo/entrypoints",
+      "change": "modify",
+      "responsibility": "Compose/export visible profiles and freeze/restore snapshots before execution.",
+      "interface": "transforms=default/albumentations and one pipeline_file selector; build_dependencies optional transforms.",
+      "layer": "entrypoints",
+      "allowed_dependencies": [
+        "Project inward dependency contracts; native SDKs only at explicit adapter owners"
+      ],
+      "forbidden_dependencies": [
+        "Outward layer imports",
+        "Unowned SDK imports",
+        "Process-global upstream monkeypatches"
+      ],
+      "effects": "Hydra composition and injected outer resolution; no direct model SDK imports.",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "severstal",
+      "path": "scripts/severstal.py",
+      "change": "add",
+      "responsibility": "Convert official masks, group identities and freeze reproducible test splits.",
+      "interface": "Explicit source/output paths; preserve source bytes and reject malformed RLE.",
+      "layer": "outer test tooling",
+      "allowed_dependencies": [
+        "Project inward dependency contracts; native SDKs only at explicit adapter owners"
+      ],
+      "forbidden_dependencies": [
+        "Outward layer imports",
+        "Unowned SDK imports",
+        "Process-global upstream monkeypatches"
+      ],
+      "effects": "Read source files and write only task-owned prepared fixtures.",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    },
+    {
+      "id": "dependency_contracts",
+      "path": "tests/architecture_helpers.py",
+      "change": "modify",
+      "responsibility": "Enforce exhaustive SDK owners and pure inner boundaries.",
+      "interface": "Actual import graph plus injected forbidden edges.",
+      "layer": "verification",
+      "allowed_dependencies": [
+        "Project inward dependency contracts; native SDKs only at explicit adapter owners"
+      ],
+      "forbidden_dependencies": [
+        "Outward layer imports",
+        "Unowned SDK imports",
+        "Process-global upstream monkeypatches"
+      ],
+      "effects": "Read-only source/import graph analysis.",
+      "contracts": [
+        "imports",
+        "architecture"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "imports",
+      "path": ".importlinter",
+      "status": "existing",
+      "rules": "Inward dependencies and explicit SDK owners; add exact Albumentations owners.",
+      "check": "lint-imports"
+    },
+    {
+      "id": "architecture",
+      "path": "tests/test_architecture.py",
+      "status": "existing",
+      "rules": "Exhaustive classifications, pure inner layers and negative SDK/direction edges.",
+      "check": "architecture-tests"
+    }
+  ],
+  "checks": [
+    {
+      "id": "lint-imports",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync lint-imports",
+      "expectation": "All import contracts pass including exact augmentation SDK ownership.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/004-custom-augmentation/evidence/verification.md"
+      }
+    },
+    {
+      "id": "architecture-tests",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync pytest tests/test_architecture.py",
+      "expectation": "Actual graph passes; injected forbidden augmentation/core SDK edges fail.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/004-custom-augmentation/evidence/verification.md"
+      }
+    },
+    {
+      "id": "behavior",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync pytest",
+      "expectation": "All ordinary behavioral regression checks pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/004-custom-augmentation/evidence/verification.md"
+      }
+    },
+    {
+      "id": "native",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync pytest -m severstal_gpu --run-severstal-gpu",
+      "expectation": "All 45 official Severstal optimizer, checkpoint, replay and publication scenarios pass.",
+      "result": {
+        "status": "not-run",
+        "reason": "Complete 45-case acceptance is not yet available: 39 pretrained scenarios passed; six DEIMv2-L/X scenarios require authorized DINOv3 Small/Small+ weights. See evidence/verification.md and evidence/native-smoke.json. Supplemental random-initialization failures do not satisfy the pretrained gate."
+      }
+    },
+    {
+      "id": "docs",
+      "kind": "documentation",
+      "command": "uv run --frozen --no-sync python scripts/check_docs.py --all",
+      "expectation": "Changed documentation/local links/examples validate; portable skill checks recorded separately.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/004-custom-augmentation/evidence/verification.md"
+      }
+    }
+  ],
+  "documentation": "README, backend/augmentation/current contracts, native feature spec/quickstart, and corp-skills usage/evaluation source.",
+  "review": {
+    "status": "accepted",
+    "reviewer": "fresh native subagent /root/final_integration_review (read-only source review)",
+    "evidence": "specs/004-custom-augmentation/evidence/review.md",
+    "reconciliation": "Inspected complete tracked and untracked task-owned diff against d8a3695, including dependencies, test tooling, examples and docs. All changed paths match declared scope. The pre-existing local tool.uv.sources section is excluded and preserved exactly. Review accepts code and architecture; pending native checks still block acceptance/release."
+  }
+}

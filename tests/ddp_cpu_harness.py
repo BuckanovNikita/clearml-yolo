@@ -83,8 +83,48 @@ def _wait_workers(
     return live, failure
 
 
-def _training(root: Path, ranks: int, scenario: str, result: dict[str, Any]) -> None:
+def _serialize_custom_trainer(root: Path, result: dict[str, Any]) -> dict[str, str]:
+    import albumentations as augmentation
     import cloudpickle  # type: ignore[import-untyped]
+
+    from clearml_yolo.adapters.augmentation.configuration import resolve_transform_config
+    from clearml_yolo.adapters.integrations.native_trainer import trainer_with_transforms
+    from clearml_yolo.core.transforms import TransformConfig
+
+    pipeline_file = root / "augmentation.json"
+    augmentation.save(
+        augmentation.Compose(
+            [
+                augmentation.Mosaic(
+                    grid_yx=(2, 2),
+                    target_size=(64, 64),
+                    cell_shape=(32, 32),
+                    center_range=(0.5, 0.5),
+                    fit_mode="contain",
+                    p=1,
+                ),
+                # Deliberately differ from imgsz: native final geometry must still run.
+                augmentation.Resize(height=48, width=80, p=1),
+            ],
+            bbox_params=augmentation.BboxParams(format="pascal_voc", label_fields=["labels"]),
+        ),
+        pipeline_file,
+    )
+    config = resolve_transform_config(
+        TransformConfig(mode="albumentations", pipeline_file=pipeline_file)
+    )
+    assert config.snapshot is not None
+    trainer_file = root / "trainer.pkl"
+    # Use the production factory, serialized by value as in Ultralytics' DDP launch.
+    trainer_file.write_bytes(cloudpickle.dumps(trainer_with_transforms(config)))
+    pipeline_file.unlink()
+    result["pipeline_source_removed"] = not pipeline_file.exists()
+    result["pipeline_sha256"] = config.snapshot.sha256
+    return {"trainer": str(trainer_file), "pipeline_source": str(pipeline_file)}
+
+
+def _training(root: Path, ranks: int, scenario: str, result: dict[str, Any]) -> None:
+    import cloudpickle
     from ultralytics.utils import get_user_config_dir
 
     from clearml_yolo.adapters.integrations.native_ddp import native_ddp_relay
@@ -117,6 +157,8 @@ def _training(root: Path, ranks: int, scenario: str, result: dict[str, Any]) -> 
             callbacks_file = root / "callbacks.pkl"
             callbacks_file.write_bytes(cloudpickle.dumps(model.callbacks))
             job = {"root": str(root), "callbacks": str(callbacks_file), "scenario": scenario}
+            if scenario == "custom_mosaic":
+                job.update(_serialize_custom_trainer(root, result))
             (root / "job.json").write_text(json.dumps(job))
             command = [
                 sys.executable,

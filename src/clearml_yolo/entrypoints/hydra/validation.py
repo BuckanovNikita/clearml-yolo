@@ -30,6 +30,7 @@ from clearml_yolo.core.export_requests import ExportSettings
 from clearml_yolo.core.models import ModelConfig
 from clearml_yolo.core.publication import FiftyOneConfig
 from clearml_yolo.entrypoints.hydra.sweeps import compose_jobs
+from clearml_yolo.entrypoints.hydra.transforms import prepare_transforms
 
 
 def materialize_model_config(config: DictConfig) -> ModelConfig | None:
@@ -97,6 +98,8 @@ def validate_wrapper_keys(config: DictConfig, function: Callable[..., Any]) -> N
     accepted = set(inspect.signature(function).parameters) - {"deps"}
     if "ultralytics" in config or "ultralytics_predict" in config or "export" in config:
         accepted.add("model")
+    if function.__name__ in {"train", "run_pipeline"}:
+        accepted.add("transforms")
     unknown = set(config) - accepted
     if unknown:
         raise ValueError(f"Unsupported wrapper settings: {sorted(unknown)}")
@@ -106,6 +109,7 @@ def validate_wrapper_keys(config: DictConfig, function: Callable[..., Any]) -> N
         and config.ground_truth is not None
     ):
         normalize_ground_truth(config.ground_truth)
+    prepare_transforms(config)
     model = materialize_model_config(config)
     _validate_export(config, model)
     _validate_inactive_groups(config, model)

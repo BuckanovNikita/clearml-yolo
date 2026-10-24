@@ -1,0 +1,781 @@
+{
+  "recorded_utc": "2026-10-23T21:55:42.632777+00:00",
+  "recipe": {
+    "train": 160,
+    "val": 40,
+    "test": 40,
+    "epochs": 1,
+    "batch": 1,
+    "seed": 0,
+    "amp": false
+  },
+  "passed_scenarios": 39,
+  "required_scenarios": 45,
+  "scenarios": [
+    {
+      "selection": "ultralytics",
+      "variant": "default",
+      "status": "passed",
+      "optimizer": {
+        "steps": 2,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "fb23f16473f699e6f8ad26eb35e2cfa098d5d2c698244b390c317cbaa7e42b4d"
+      },
+      "checkpoint_sha256": "50c23ecfc2a911c2c8682fe5b1da5c87041124e83f933d93ce70963a7ab86881",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 0
+    },
+    {
+      "selection": "ultralytics",
+      "variant": "json",
+      "status": "passed",
+      "optimizer": {
+        "steps": 2,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "fb23f16473f699e6f8ad26eb35e2cfa098d5d2c698244b390c317cbaa7e42b4d"
+      },
+      "checkpoint_sha256": "1b38846a749d7e00c9d535e28da716cec560af22d283e61ea29a084df46393f7",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 1
+    },
+    {
+      "selection": "ultralytics",
+      "variant": "json_mosaic",
+      "status": "passed",
+      "optimizer": {
+        "steps": 2,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "fb23f16473f699e6f8ad26eb35e2cfa098d5d2c698244b390c317cbaa7e42b4d"
+      },
+      "checkpoint_sha256": "2d2c72c65cea1f7668e5fba4ef0c9f64299c79421ad08e775a7d9b7a3abe38ab",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 2
+    },
+    {
+      "selection": "deimv2/s",
+      "variant": "default",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "22b5675e7e1ffcbf93c63e2d21d99873b20c1851c9140126f01ae88a357b049d"
+      },
+      "checkpoint_sha256": "4249a7df745d48bf6fa8b77d781cca4532940a5376f0db90ecbb719382b9f5be",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 0
+    },
+    {
+      "selection": "deimv2/s",
+      "variant": "json",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "22b5675e7e1ffcbf93c63e2d21d99873b20c1851c9140126f01ae88a357b049d"
+      },
+      "checkpoint_sha256": "43c07ac2a0dcacca6800296481c17dbe801594b0cc791b9012280704b8c18737",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 1
+    },
+    {
+      "selection": "deimv2/s",
+      "variant": "json_mosaic",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "22b5675e7e1ffcbf93c63e2d21d99873b20c1851c9140126f01ae88a357b049d"
+      },
+      "checkpoint_sha256": "8a4026ae5df16da7b1b2d8e4cf20b88b72708a4aeefcf70e253e931e73654348",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 2
+    },
+    {
+      "selection": "deimv2/m",
+      "variant": "default",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "35ceec789217dba1fecbe4aae9b97331128e73a542fa7cfd5540b6157f24774b"
+      },
+      "checkpoint_sha256": "c5a35b8d80e6ec9f15eba3b3b1006d6b5e0ad4ff2995870b3b3ed3b07f08aae6",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 0
+    },
+    {
+      "selection": "deimv2/m",
+      "variant": "json",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "35ceec789217dba1fecbe4aae9b97331128e73a542fa7cfd5540b6157f24774b"
+      },
+      "checkpoint_sha256": "cb9d49850a769ff29ce32ad1fa7339c369e75e7272a5b5e19668b6c06a9485ba",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 1
+    },
+    {
+      "selection": "deimv2/m",
+      "variant": "json_mosaic",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "35ceec789217dba1fecbe4aae9b97331128e73a542fa7cfd5540b6157f24774b"
+      },
+      "checkpoint_sha256": "74bbbd7f93b684989b38573c7c174a52d39e8cc7f1fec2247c3fb2c07c7faac5",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 2
+    },
+    {
+      "selection": "deimv2/l",
+      "variant": "default",
+      "status": "awaiting-authorized-backbone"
+    },
+    {
+      "selection": "deimv2/l",
+      "variant": "json",
+      "status": "awaiting-authorized-backbone"
+    },
+    {
+      "selection": "deimv2/l",
+      "variant": "json_mosaic",
+      "status": "awaiting-authorized-backbone"
+    },
+    {
+      "selection": "deimv2/x",
+      "variant": "default",
+      "status": "awaiting-authorized-backbone"
+    },
+    {
+      "selection": "deimv2/x",
+      "variant": "json",
+      "status": "awaiting-authorized-backbone"
+    },
+    {
+      "selection": "deimv2/x",
+      "variant": "json_mosaic",
+      "status": "awaiting-authorized-backbone"
+    },
+    {
+      "selection": "rfdetr/nano",
+      "variant": "default",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "a45679bd5c1cc935475000d0a3524115b2ad22229d86e7a80ca1cbc31b8b8d6e"
+      },
+      "checkpoint_sha256": "46323e279676d112e7f81d38829f6c02c964e9f5792179104cc9b72d3ac21484",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 0
+    },
+    {
+      "selection": "rfdetr/nano",
+      "variant": "json",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "a45679bd5c1cc935475000d0a3524115b2ad22229d86e7a80ca1cbc31b8b8d6e"
+      },
+      "checkpoint_sha256": "53a7ca75ab59cba547838e5c908cafb8ab3c6d8245e7bb7cbb81e3baed5bbe7f",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 1
+    },
+    {
+      "selection": "rfdetr/nano",
+      "variant": "json_mosaic",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "a45679bd5c1cc935475000d0a3524115b2ad22229d86e7a80ca1cbc31b8b8d6e"
+      },
+      "checkpoint_sha256": "bc94187d4619de8a45c3d6364789554ce5020b8cc7ac9f308cba23981752cb2c",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 2
+    },
+    {
+      "selection": "rfdetr/small",
+      "variant": "default",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "e03485114a0694793e49ad549ddbd29c653e8965ae7dba4cb930057b520f5481"
+      },
+      "checkpoint_sha256": "dd2e6e577af26f8333114f91093a4c2f46983f2e0f8231a8fc2d78e00ff6a68f",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 0
+    },
+    {
+      "selection": "rfdetr/small",
+      "variant": "json",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "e03485114a0694793e49ad549ddbd29c653e8965ae7dba4cb930057b520f5481"
+      },
+      "checkpoint_sha256": "15bba5b1b225faa16dd5316d61ce8fc3ca416d57a3196238d05d1aa0d1793bf5",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 1
+    },
+    {
+      "selection": "rfdetr/small",
+      "variant": "json_mosaic",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "e03485114a0694793e49ad549ddbd29c653e8965ae7dba4cb930057b520f5481"
+      },
+      "checkpoint_sha256": "176849a9fd18b1a0a2b3fc660892d09fd51c7cf644df791953747e8915b869e8",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 2
+    },
+    {
+      "selection": "rfdetr/medium",
+      "variant": "default",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "e282f644c541e9ebb098790eac437d2a50de446590250afb7434efd01a801544"
+      },
+      "checkpoint_sha256": "acf6f92638b6dca4b57a43f07efebd34dc04b907d22283c794354d8b85373e5c",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 0
+    },
+    {
+      "selection": "rfdetr/medium",
+      "variant": "json",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "e282f644c541e9ebb098790eac437d2a50de446590250afb7434efd01a801544"
+      },
+      "checkpoint_sha256": "4e4b4261a5be66e9e5f4e9d3af6a9db7bce8c7630474d7aecdad23a1b8a0cb44",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 1
+    },
+    {
+      "selection": "rfdetr/medium",
+      "variant": "json_mosaic",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "e282f644c541e9ebb098790eac437d2a50de446590250afb7434efd01a801544"
+      },
+      "checkpoint_sha256": "c861dda2818274017df2356299bcef55bbe5f80b34c5b65a532c20d8806ff4e2",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 2
+    },
+    {
+      "selection": "rfdetr/large",
+      "variant": "default",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "8eacdaa2ce5ea20ee108d227865c3e21857872047a22631ba5db999885113420"
+      },
+      "checkpoint_sha256": "664401b6ca68ec25497bfad4941747a26d4cd51e01550ffd74c57d85d57899ff",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 0
+    },
+    {
+      "selection": "rfdetr/large",
+      "variant": "json",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "8eacdaa2ce5ea20ee108d227865c3e21857872047a22631ba5db999885113420"
+      },
+      "checkpoint_sha256": "094dbf9d22bd929ead22456a4bdeb85a97b03841a5dc92537295d42a4a8aa79e",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 1
+    },
+    {
+      "selection": "rfdetr/large",
+      "variant": "json_mosaic",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "8eacdaa2ce5ea20ee108d227865c3e21857872047a22631ba5db999885113420"
+      },
+      "checkpoint_sha256": "0ca47f05857e9f3a9814d7dfe4b0ccab73323cfecc01e4da0a441dcd66d6aad3",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 2
+    },
+    {
+      "selection": "fasterrcnn/resnet50_fpn",
+      "variant": "default",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "a7ad54793ad97ae85238079a7113f2f4a9210379c36a037fbc30f5a811c96530"
+      },
+      "checkpoint_sha256": "87da3a74825481d279fa15c2f360a193cbb79aab2fe8663e37289d4591e7fdaa",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 0
+    },
+    {
+      "selection": "fasterrcnn/resnet50_fpn",
+      "variant": "json",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "a7ad54793ad97ae85238079a7113f2f4a9210379c36a037fbc30f5a811c96530"
+      },
+      "checkpoint_sha256": "36756241254f86161707cfd27f40cad5c0266680f3a613002daf138f13b41ee0",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 1
+    },
+    {
+      "selection": "fasterrcnn/resnet50_fpn",
+      "variant": "json_mosaic",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "a7ad54793ad97ae85238079a7113f2f4a9210379c36a037fbc30f5a811c96530"
+      },
+      "checkpoint_sha256": "bc17f41b8d8d19581bb1337c5dee8b86c07f0791076e3dcc18e740c3ee15089c",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 2
+    },
+    {
+      "selection": "fasterrcnn/resnet101_fpn",
+      "variant": "default",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "180dcf220993fccb02340d867be3dfdca5d79c1e4e329d45b096713a2cc87422"
+      },
+      "checkpoint_sha256": "863bcf827b411548d4f9033397bbda3145774615c80ddb437c45ba2600dfc089",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 0
+    },
+    {
+      "selection": "fasterrcnn/resnet101_fpn",
+      "variant": "json",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "180dcf220993fccb02340d867be3dfdca5d79c1e4e329d45b096713a2cc87422"
+      },
+      "checkpoint_sha256": "53855c655a1f1d178e2cc9c441a1bc4fb491abdeadc1b31227026e15100aa562",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 1
+    },
+    {
+      "selection": "fasterrcnn/resnet101_fpn",
+      "variant": "json_mosaic",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "180dcf220993fccb02340d867be3dfdca5d79c1e4e329d45b096713a2cc87422"
+      },
+      "checkpoint_sha256": "de18179e840fd9f326d3f9881fd2874b875ceed6e84c382e9cd99844e46cc5e4",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 2
+    },
+    {
+      "selection": "fasterrcnn/convnext_tiny",
+      "variant": "default",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "b4d95d95ea65ea5da5a8ff57f988e419d85f8dfabe0969d182f6cfd39970ecb7"
+      },
+      "checkpoint_sha256": "c384b389cfa8d3720ec53f90415c9cad04f5e3cb580be46ec137c1da6e8a5399",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 0
+    },
+    {
+      "selection": "fasterrcnn/convnext_tiny",
+      "variant": "json",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "b4d95d95ea65ea5da5a8ff57f988e419d85f8dfabe0969d182f6cfd39970ecb7"
+      },
+      "checkpoint_sha256": "a9a9184344849e37dbf2757730cbfe5c0847cd7b80e0ab5ab5fc61fd0af0d1f8",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 1
+    },
+    {
+      "selection": "fasterrcnn/convnext_tiny",
+      "variant": "json_mosaic",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "b4d95d95ea65ea5da5a8ff57f988e419d85f8dfabe0969d182f6cfd39970ecb7"
+      },
+      "checkpoint_sha256": "534e5fec484a1a01df45273fb5d08c9a581d188227fa4b5ed5de81ec46cb3dda",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 2
+    },
+    {
+      "selection": "fasterrcnn/swin_tiny",
+      "variant": "default",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "1cee099ec365f8f1d210df89066bf47f1963a74bf2eb2f9f53ed58d1e8e4e825"
+      },
+      "checkpoint_sha256": "ea7c29463c54c4588bf2c6ba1ad01b1fc2d9e51919e8e6fdc706989cf3e8e69d",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 0
+    },
+    {
+      "selection": "fasterrcnn/swin_tiny",
+      "variant": "json",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "1cee099ec365f8f1d210df89066bf47f1963a74bf2eb2f9f53ed58d1e8e4e825"
+      },
+      "checkpoint_sha256": "7740397d6ca5035cde405a4f3a917753696060886014c4542280d814f9eaad55",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 1
+    },
+    {
+      "selection": "fasterrcnn/swin_tiny",
+      "variant": "json_mosaic",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "1cee099ec365f8f1d210df89066bf47f1963a74bf2eb2f9f53ed58d1e8e4e825"
+      },
+      "checkpoint_sha256": "8f263a25cb0ba965493b24e7da47daf62e31a09116bdf74aa447034232f58d6d",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 2
+    },
+    {
+      "selection": "fasterrcnn/dinov2_small",
+      "variant": "default",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "6a910ffec8f78eaaf61b196dcbde3a3981f67d7d5c8730b038b1af09e9eca890"
+      },
+      "checkpoint_sha256": "a436b04110f6cdd3a94ce5000af04cfbd9251bd5ece524df918890c0d866eb32",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 0
+    },
+    {
+      "selection": "fasterrcnn/dinov2_small",
+      "variant": "json",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "6a910ffec8f78eaaf61b196dcbde3a3981f67d7d5c8730b038b1af09e9eca890"
+      },
+      "checkpoint_sha256": "218776ef6deef82b54049c5c2e6ff1e0e1c3b623f79281d2c789b95f29e60a06",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 1
+    },
+    {
+      "selection": "fasterrcnn/dinov2_small",
+      "variant": "json_mosaic",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "6a910ffec8f78eaaf61b196dcbde3a3981f67d7d5c8730b038b1af09e9eca890"
+      },
+      "checkpoint_sha256": "340b8fd303965d83aa405c5997ae24cf307cd07e6b012600f11a37c8e8d8b5da",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 2
+    },
+    {
+      "selection": "fasterrcnn/dinov3_small",
+      "variant": "default",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "93b0f4f58dcefb8ee6388003a0379f103857f34b189d414613bde0bf6a7cf15b"
+      },
+      "checkpoint_sha256": "7af1c0a8c341f33280e37c1b1289f16f27efa2054e76a906df8dd9bc796a5f9c",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 0
+    },
+    {
+      "selection": "fasterrcnn/dinov3_small",
+      "variant": "json",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "93b0f4f58dcefb8ee6388003a0379f103857f34b189d414613bde0bf6a7cf15b"
+      },
+      "checkpoint_sha256": "13162ae217ca6168bdd1fbb532f35eb47eb0cc3c4ff53814dca18d37f7f70d93",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 1
+    },
+    {
+      "selection": "fasterrcnn/dinov3_small",
+      "variant": "json_mosaic",
+      "status": "passed",
+      "optimizer": {
+        "steps": 160,
+        "skipped_steps": 0,
+        "parameter_changed": true,
+        "initial_optimizer_parameters_sha256": "93b0f4f58dcefb8ee6388003a0379f103857f34b189d414613bde0bf6a7cf15b"
+      },
+      "checkpoint_sha256": "574dec75a10bf6c03723ddc157a0c7fda5fe4ee2e46fa821805d99812b23ff46",
+      "checkpoint_reloaded": true,
+      "evaluated_images": 80,
+      "manifest_sha256": "1d0f169f2202684f8d6bbee543a149330645dc9c28c026fdb3e1dfa51c2379f9",
+      "initialization_comparisons": 2
+    }
+  ],
+  "earlier_failed_attempts": [
+    {
+      "selection": "fasterrcnn/dinov2_small",
+      "variant": "json_mosaic",
+      "status": "failed"
+    },
+    {
+      "selection": "deimv2/l",
+      "variant": "default",
+      "status": "failed"
+    },
+    {
+      "selection": "ultralytics",
+      "variant": "default",
+      "status": "failed"
+    },
+    {
+      "selection": "ultralytics",
+      "variant": "default",
+      "status": "failed"
+    },
+    {
+      "selection": "ultralytics",
+      "variant": "default",
+      "status": "failed"
+    },
+    {
+      "selection": "rfdetr/nano",
+      "variant": "json",
+      "status": "failed"
+    }
+  ],
+  "supplemental_random_initialization": {
+    "scope": "Execution exploration only; never replaces required pretrained acceptance.",
+    "passed_scenarios": 0,
+    "attempted_scenarios": 6,
+    "scenarios": [
+      {
+        "selection": "deimv2/l",
+        "variant": "default",
+        "status": "failed",
+        "optimizer": {
+          "steps": 0,
+          "skipped_steps": 0,
+          "parameter_changed": false,
+          "initial_optimizer_parameters_sha256": null
+        },
+        "failure": "Upstream generalized_box_iou prediction-box assertion before first optimizer update."
+      },
+      {
+        "selection": "deimv2/l",
+        "variant": "json",
+        "status": "failed",
+        "optimizer": {
+          "steps": 0,
+          "skipped_steps": 0,
+          "parameter_changed": false,
+          "initial_optimizer_parameters_sha256": null
+        },
+        "failure": "Upstream generalized_box_iou prediction-box assertion before first optimizer update."
+      },
+      {
+        "selection": "deimv2/l",
+        "variant": "json_mosaic",
+        "status": "failed",
+        "optimizer": {
+          "steps": 0,
+          "skipped_steps": 0,
+          "parameter_changed": false,
+          "initial_optimizer_parameters_sha256": null
+        },
+        "failure": "Upstream generalized_box_iou prediction-box assertion before first optimizer update."
+      },
+      {
+        "selection": "deimv2/x",
+        "variant": "default",
+        "status": "failed",
+        "optimizer": {
+          "steps": 0,
+          "skipped_steps": 0,
+          "parameter_changed": false,
+          "initial_optimizer_parameters_sha256": null
+        },
+        "failure": "Upstream generalized_box_iou prediction-box assertion before first optimizer update."
+      },
+      {
+        "selection": "deimv2/x",
+        "variant": "json",
+        "status": "failed",
+        "optimizer": {
+          "steps": 0,
+          "skipped_steps": 0,
+          "parameter_changed": false,
+          "initial_optimizer_parameters_sha256": null
+        },
+        "failure": "Upstream generalized_box_iou prediction-box assertion before first optimizer update."
+      },
+      {
+        "selection": "deimv2/x",
+        "variant": "json_mosaic",
+        "status": "failed",
+        "optimizer": {
+          "steps": 0,
+          "skipped_steps": 0,
+          "parameter_changed": false,
+          "initial_optimizer_parameters_sha256": null
+        },
+        "failure": "Upstream generalized_box_iou prediction-box assertion before first optimizer update."
+      }
+    ]
+  }
+}

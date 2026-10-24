@@ -8,11 +8,13 @@ authors = [
 ]
 requires-python = ">=3.12.13,<3.14"
 dependencies = [
-    "ultralytics>=8.4.165",
+    "ultralytics>=8.4.184",
+    # Native distributed workers must not install their serializer at execution time.
+    "cloudpickle>=3.1.1",
     # Native local NDJSON conversion uses this optional upstream dependency.
     "aiohttp>=3.10.5",
     # Native training uses this optional upstream augmentation block.
-    "albumentations>=2.0.0,<3",
+    "albumentations>=2.0.8,<3",
     "hydra-core>=1.3.0",
     "hydra-zen>=0.16.0",
     "omegaconf>=2.3.0,<2.4",
@@ -118,6 +120,7 @@ exclude = ["^external/", "^(outputs|runs|multirun|build|dist)/"]
 # These dependencies have no installed typing coverage at the imported boundaries.
 # Keep this list narrow; missing project imports must remain errors.
 module = [
+    "albumentations.*",
     "digital_metrics.*",
     "report_generator.*",
     "fiftyone.*",
@@ -135,6 +138,7 @@ min_confidence = 80
 testpaths = ["tests"]
 addopts = ["--strict-markers", "--strict-config"]
 markers = [
+    "severstal_gpu: opt-in native all-model Severstal training and ClearML acceptance",
     "ddp_cpu: real multi-rank CPU YOLO training and native relay integration",
     "ddp_gpu: opt-in real multi-GPU direct/queued native pipeline acceptance",
     "process_capabilities: Linux supervision preflight regression tests",

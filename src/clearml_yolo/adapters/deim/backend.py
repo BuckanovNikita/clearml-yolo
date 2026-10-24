@@ -16,7 +16,11 @@ import pandas as pd
 import yaml
 
 from clearml_yolo.adapters.deim.source import REVISION, load_source, native_coco_modules
-from clearml_yolo.adapters.deim.transforms import bridge_transforms
+from clearml_yolo.adapters.deim.transforms import (
+    TrainingTransform,
+    bridge_transforms,
+    custom_training_recipe,
+)
 from clearml_yolo.adapters.observability.progress import image_progress
 from clearml_yolo.adapters.storage.filesystem import validate_output_tree
 from clearml_yolo.application.contracts import PREDICTION_COLUMNS, PreparedDataset
@@ -29,6 +33,7 @@ from clearml_yolo.core.models import (
     PredictSettings,
     Preprocessing,
 )
+from clearml_yolo.core.transforms import TransformConfig
 
 _DEFAULT_IOU = 0.7
 _MINIMUM_SIZE = 128
@@ -103,7 +108,12 @@ def _config(config: ModelConfig, names: tuple[str, ...], size: tuple[int, int]) 
     return cfg
 
 
-def _prepare_loaders(cfg: Any, prepared: PreparedDataset, config: ModelConfig) -> None:
+def _prepare_loaders(
+    cfg: Any,
+    prepared: PreparedDataset,
+    config: ModelConfig,
+    transforms: TransformConfig | None = None,
+) -> None:
     height, width = _size(config.train.imgsz)
     if height != width:
         raise ValueError("DEIMv2 native multiscale training requires a square imgsz")
@@ -115,6 +125,8 @@ def _prepare_loaders(cfg: Any, prepared: PreparedDataset, config: ModelConfig) -
         )
         loader.update(total_batch_size=config.train.batch, num_workers=config.train.workers)
         loader["drop_last"] = False
+        if split == "train" and transforms is not None and transforms.mode == "albumentations":
+            custom_training_recipe(loader["dataset"]["transforms"], loader["collate_fn"])
         for operation in loader["dataset"]["transforms"]["ops"]:
             if operation["type"] == "Resize":
                 operation["size"] = [height, width]
@@ -129,6 +141,15 @@ def _prepare_loaders(cfg: Any, prepared: PreparedDataset, config: ModelConfig) -
             loader.collate_fn.scales = [
                 scale for scale in loader.collate_fn.scales if scale >= _MINIMUM_SIZE
             ]
+    if transforms is not None and transforms.mode == "albumentations":
+        dataset = cfg.train_dataloader.dataset
+        # Replace only this training dataset instance, never the upstream registry.
+        dataset._transforms = TrainingTransform(  # noqa: SLF001
+            dataset,
+            dataset._transforms,  # noqa: SLF001
+            transforms,
+            config.train.seed,
+        )
 
 
 def _validate_training(config: ModelConfig) -> None:
@@ -175,6 +196,8 @@ def train(
     prepared: PreparedDataset,
     output: Path,
     report: Callable[[str, float, int], None],
+    *,
+    transforms: TransformConfig | None = None,
 ) -> BackendTrainResult:
     output = validate_output_tree(output)
     _validate_training(config)
@@ -218,7 +241,7 @@ def train(
     writer = _native_writer(report)
     cfg.writer = writer
     with native_coco_modules():
-        _prepare_loaders(cfg, prepared, config)
+        _prepare_loaders(cfg, prepared, config, transforms)
     if config.train.weights is not None:
         cfg.tuning = str(config.train.weights.resolve())
         cfg.yaml_cfg["tuning"] = cfg.tuning

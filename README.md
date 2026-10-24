@@ -156,6 +156,46 @@ cy-train ground_truth=./ground_truth.csv ultralytics.model=yolo11n.pt \
 Если переносите параметры из Ultralytics, используйте префикс `ultralytics.`;
 [различия настроек и миграция](TECH_DETAILS.md#configuration-and-migration) описаны отдельно.
 
+### Свои аугментации и Mosaic
+
+Для всех моделей `cy-train` и `cy` принимают JSON, сохранённый через
+`albumentations.save`. Например:
+
+```python
+from pathlib import Path
+
+import albumentations as A
+
+pipeline = A.Compose(
+    [A.HorizontalFlip(p=0.5), A.RandomBrightnessContrast(p=0.2)],
+    bbox_params=A.BboxParams(format="pascal_voc", label_fields=["class_labels"]),
+)
+A.save(pipeline, Path("augmentation.json"))
+```
+
+```bash
+cy-train model=rfdetr/nano ground_truth=./ground_truth.csv \
+  transforms=albumentations transforms.pipeline_file=./augmentation.json \
+  model.train.device=0 model.train.epochs=20 \
+  clearml.project_name=detection clearml.task_name=rfdetr-custom \
+  'clearml.tags=[rfdetr,custom-augmentation]'
+```
+
+`transforms=default` сохраняет нативный рецепт. В режиме `albumentations` отключаются
+встроенные случайные аугментации выбранной модели, включая нативный Mosaic;
+конфликтующие параметры заменяются с сообщением в журнале. Обязательные resize,
+подготовка тензоров и нормализация остаются у backend. Поэтому не добавляйте
+`Normalize`, `ToFloat` или `ToTensorV2` в JSON. Свой `Resize` допустим, но окончательный
+размер модели по-прежнему задаётся через `ultralytics.imgsz` или `model.train.imgsz`.
+
+Для Mosaic поставьте один `A.Mosaic(...)` первым в корневом `A.Compose`.
+Дополнительные изображения из обучающей выборки подбираются автоматически для всех
+семейств. Готовые примеры — [flip.json](examples/augmentation/flip.json) и
+[mosaic.json](examples/augmentation/mosaic.json). JSON проверяется до обучения;
+его содержимое и хеш сохраняются для повторного запуска без исходного файла.
+Порядок операций, ограничения, экспорт конфигурации и правила конфликтов описаны
+в [руководстве по аугментациям](docs/augmentation.md).
+
 ## Полный эксперимент
 
 `cy` связывает обучение с предсказаниями, калибровкой порогов на `val` и оценкой

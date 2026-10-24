@@ -165,13 +165,14 @@ from clearml_yolo.adapters.yolo.inference import predict_on_images as _model_pre
 from clearml_yolo.adapters.yolo.inference import resolution_of as _model_resolution_of
 from clearml_yolo.adapters.yolo.inference import trained_imgsz as _model_trained_imgsz
 from clearml_yolo.adapters.yolo.reinfer import reinfer_split as _model_reinfer_split
-from clearml_yolo.application.contracts import DatasetFormat, ModelRef, PreparedDataset
+from clearml_yolo.application.contracts import DatasetFormat, ModelRef, PreparedDataset, TrainResult
 from clearml_yolo.application.ports import (
     Publisher,
     WorkflowDependencies,
 )
 from clearml_yolo.core.models import ModelConfig
 from clearml_yolo.core.publication import FiftyOneConfig
+from clearml_yolo.core.transforms import TransformConfig
 
 
 def _has_owned_native_model(task: object) -> bool:
@@ -215,6 +216,9 @@ class _DetectorDatasetStore(_DatasetStore):
 
 
 class _ModelRunner:
+    def __init__(self, transforms: TransformConfig | None = None) -> None:
+        self.transforms = transforms
+
     @staticmethod
     def bind_reference(weights: Path, reference: ModelRef) -> None:
         del weights
@@ -230,7 +234,15 @@ class _ModelRunner:
     stage_settings = staticmethod(_model_stage_settings)
     trained_imgsz = staticmethod(_model_trained_imgsz)
     write_native_yaml = staticmethod(_model_write_native_yaml)
-    train = staticmethod(_execute_training)
+
+    def train(
+        self,
+        task: object,
+        architecture: str | Path,
+        settings: dict[str, Any],
+        prepared: PreparedDataset,
+    ) -> TrainResult:
+        return _execute_training(task, architecture, settings, prepared, transforms=self.transforms)
 
 
 class _ModelRepository:
@@ -327,7 +339,11 @@ class _TrackingSession:
     has_owned_native_model = staticmethod(_has_owned_native_model)
 
 
-def build_dependencies(model: ModelConfig | dict[str, Any] | None = None) -> WorkflowDependencies:
+def build_dependencies(
+    model: ModelConfig | dict[str, Any] | None = None,
+    *,
+    transforms: TransformConfig | None = None,
+) -> WorkflowDependencies:
     """Construct an independent dependency bundle for one command invocation."""
     from clearml_yolo.adapters.integrations.detectors import DetectorRunner
     from clearml_yolo.adapters.integrations.export_operations import DetectorExporter
@@ -336,7 +352,7 @@ def build_dependencies(model: ModelConfig | dict[str, Any] | None = None) -> Wor
     return WorkflowDependencies(
         dataset=_DatasetStore() if selected.backend == "ultralytics" else _DetectorDatasetStore(),
         ground_truth_repository=ClearMLGroundTruthRepository(),
-        model=DetectorRunner(selected, _ModelRunner()),
+        model=DetectorRunner(selected, _ModelRunner(transforms), transforms=transforms),
         repository=_ModelRepository(),
         evaluation=_EvaluationEngine(),
         evaluation_writer=_EvaluationWriter(),

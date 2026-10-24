@@ -33,6 +33,7 @@ from clearml_yolo.core.models import (
     TrainSettings,
 )
 from clearml_yolo.core.redaction import sanitize_configuration
+from clearml_yolo.core.transforms import TransformConfig
 
 _ROUTING = frozenset(
     {
@@ -74,9 +75,12 @@ class _ReinferArguments(TypedDict):
 class DetectorRunner:
     """Keep legacy YOLO behavior while resolving described checkpoints independently."""
 
-    def __init__(self, config: ModelConfig, legacy: ModelRunner) -> None:
+    def __init__(
+        self, config: ModelConfig, legacy: ModelRunner, *, transforms: TransformConfig | None = None
+    ) -> None:
         self.config = config
         self.legacy = legacy
+        self.transforms = transforms
         self._references: dict[Path, ModelRef] = {}
 
     def bind_reference(self, weights: Path, reference: ModelRef) -> None:
@@ -438,11 +442,13 @@ class DetectorRunner:
         else:
             from clearml_yolo.adapters.fasterrcnn.backend import train
 
+        arguments = {"transforms": self.transforms} if self.transforms is not None else {}
         result = train(
             config,
             prepared,
             output,
             lambda name, value, step: report_metric(task, name, value, step),
+            **arguments,
         )
         effective = settings | result.effective_args
         self.write_native_yaml(output / "native_train.yaml", effective, "train")

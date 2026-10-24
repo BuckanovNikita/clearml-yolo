@@ -8,6 +8,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    JsonValue,
     StrictBool,
     StrictInt,
     field_validator,
@@ -36,6 +37,33 @@ PRESETS: dict[str, dict[str, int]] = {
 }
 
 
+class DeimAugmentationOverrides(BaseModel):
+    """Visible native controls replaced by the shared training pipeline."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mosaic_prob: Annotated[float, Field(ge=0, le=1)]
+    mixup_prob: Annotated[float, Field(ge=0, le=1)]
+    copyblend_prob: Annotated[float, Field(ge=0, le=1)]
+    base_size_repeat: StrictInt | None
+    ops: list[dict[str, JsonValue]]
+
+
+class RFDETRAugmentationOverrides(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    aug_config: dict[str, JsonValue]
+    augmentation_backend: str
+    scale_jitter: StrictBool
+    multi_scale: str
+
+
+class EmptyAugmentationOverrides(BaseModel):
+    """Faster R-CNN has no optional native dataset augmentation to disable."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class TrainSettings(BaseModel):
     """Common controls translated explicitly by each native training adapter."""
 
@@ -55,6 +83,9 @@ class TrainSettings(BaseModel):
     amp: StrictBool = True
     grad_accum_steps: Annotated[int, Field(strict=True, gt=0)] = 1
     use_ema: StrictBool = True
+    augmentation: (
+        DeimAugmentationOverrides | RFDETRAugmentationOverrides | EmptyAugmentationOverrides | None
+    ) = None
 
 
 class PredictSettings(BaseModel):
@@ -94,6 +125,16 @@ class ModelConfig(BaseModel):
 
     @model_validator(mode="after")
     def compatible_recipe(self) -> Self:
+        augmentation = self.train.augmentation
+        expected = {
+            "deimv2": DeimAugmentationOverrides,
+            "rfdetr": RFDETRAugmentationOverrides,
+            "fasterrcnn": EmptyAugmentationOverrides,
+        }
+        if augmentation is not None and (
+            self.backend not in expected or not isinstance(augmentation, expected[self.backend])
+        ):
+            raise ValueError("model.train.augmentation does not match the selected backend")
         if self.backend == "rfdetr":
             for size in (self.train.imgsz, self.predict.imgsz):
                 if size is not None and (not isinstance(size, int) or size % 32):

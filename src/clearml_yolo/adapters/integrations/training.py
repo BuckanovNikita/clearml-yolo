@@ -12,12 +12,18 @@ from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.storage.filesystem import model_weights_path
 from clearml_yolo.adapters.yolo.config import requested_settings, write_native_yaml
 from clearml_yolo.application.contracts import PreparedDataset, TrainResult
+from clearml_yolo.core.transforms import TransformConfig
 
 
 def execute_training(
-    task: object, architecture: str | Path, settings: dict[str, Any], prepared: PreparedDataset
+    task: object,
+    architecture: str | Path,
+    settings: dict[str, Any],
+    prepared: PreparedDataset,
+    *,
+    transforms: TransformConfig | None = None,
 ) -> TrainResult:
-    from clearml_yolo.adapters.integrations.native_trainer import OwnedDetectionTrainer
+    from clearml_yolo.adapters.integrations.native_trainer import trainer_with_transforms
 
     with trace_operation("native.import.yolo"):
         from ultralytics.models import YOLO
@@ -34,7 +40,7 @@ def execute_training(
     )
     with native_ddp_relay(task, model) as relay:
         with trace_operation("training.native.train", context={"stage": "train"}):
-            model.train(trainer=OwnedDetectionTrainer, **settings)
+            model.train(trainer=trainer_with_transforms(transforms), **settings)
         trainer: Any = model.trainer
         relay.replay(trainer)
         directory = Path(trainer.save_dir)

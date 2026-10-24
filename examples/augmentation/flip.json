@@ -1,0 +1,43 @@
+{
+  "__version__": "2.0.8",
+  "transform": {
+    "__class_fullname__": "Compose",
+    "p": 1.0,
+    "transforms": [
+      {
+        "__class_fullname__": "HorizontalFlip",
+        "p": 0.5
+      },
+      {
+        "__class_fullname__": "RandomBrightnessContrast",
+        "p": 0.2,
+        "brightness_by_max": true,
+        "brightness_limit": [
+          -0.2,
+          0.2
+        ],
+        "contrast_limit": [
+          -0.2,
+          0.2
+        ],
+        "ensure_safe_range": false
+      }
+    ],
+    "bbox_params": {
+      "format": "pascal_voc",
+      "label_fields": [
+        "class_labels"
+      ],
+      "min_area": 0.0,
+      "min_visibility": 0.0,
+      "min_width": 0.0,
+      "min_height": 0.0,
+      "check_each_transform": true,
+      "clip": true,
+      "max_accept_ratio": null
+    },
+    "keypoint_params": null,
+    "additional_targets": {},
+    "is_check_shapes": true
+  }
+}

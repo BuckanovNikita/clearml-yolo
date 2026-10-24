@@ -61,9 +61,10 @@ cy-init-config detector-config --command cy-train --model rfdetr/small
 cy-train --config-dir detector-config --config-name cy-train --cfg job
 ```
 
-This writes `detector-config/cy-train.yaml` and
-`detector-config/model/rfdetr/small.yaml`. Edit the latter's `train` and `predict`
-sections, retaining `backend` and `preset`. Set the CSV and ClearML project, task name
+This writes `detector-config/cy-train.yaml`, the selected
+`detector-config/model/rfdetr/small.yaml`, both `transforms` profiles, and the
+selected model's `transform_overrides` specializations. Edit the model's `train`
+and `predict` sections, retaining `backend` and `preset`. Set the CSV and ClearML project, task name
 and tags in the wrapper. `--cfg job` composes configuration without executing a model.
 Existing selected files require `--force`; unrelated command files are preserved.
 
@@ -197,6 +198,22 @@ foreground class strings. Faster R-CNN's internal background offset is never a p
 The pipeline and paired comparison resolve shared requested inference settings before
 scoring; recorded effective sizes can differ across backends. Predictions' `conf` is a
 raw filtering threshold, separate from validation-calibrated class thresholds.
+
+### Custom augmentation and Mosaic
+
+Training uses `transforms=default` unless you select
+`transforms=albumentations transforms.pipeline_file=./augmentation.json`.
+The latter accepts a standard `A.save` JSON Compose for every model in the preset
+table, with one optional first top-level Mosaic. CY reads raw training images and
+supplies Mosaic donors automatically; validation and inference keep their usual
+preprocessing.
+
+Custom mode disables the selected backend's optional native augmentation and reports
+conflicting overrides. Required final resizing, tensor conversion and normalization
+remain active. Do not include normalization or tensor conversion in the JSON, and
+continue to set the final model size through `ultralytics.imgsz` or `model.train.imgsz`.
+The [augmentation guide](augmentation.md) lists exact conflict rules, native overrides,
+JSON examples, generated configuration files and frozen snapshot replay behavior.
 
 ### Devices, scheduling and replay
 

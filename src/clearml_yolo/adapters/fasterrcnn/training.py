@@ -26,6 +26,7 @@ from clearml_yolo.core.models import (
     Preprocessing,
     TrainSettings,
 )
+from clearml_yolo.core.transforms import TransformConfig
 
 
 def _training_epoch(
@@ -86,11 +87,15 @@ def train_native(
     prepared: PreparedDataset,
     output: Path,
     report: Callable[[str, float, int], None],
+    *,
+    transforms: TransformConfig | None = None,
 ) -> BackendTrainResult:
     output = validate_output_tree(output)
     settings = config.train
     device = execution_device(settings.device)
-    train_data, validation_data, names = prepared_datasets(prepared)
+    train_data, validation_data, names = prepared_datasets(
+        prepared, transforms=transforms, seed=settings.seed
+    )
     torch.manual_seed(settings.seed)
     model = build_model(
         config.preset,

@@ -25,6 +25,7 @@ from clearml_yolo.core.models import (
     PredictSettings,
     Preprocessing,
 )
+from clearml_yolo.core.transforms import TransformConfig
 
 VERSION = "1.11.2"
 _DEFAULT_IOU = 0.7
@@ -126,6 +127,8 @@ def train(
     prepared: PreparedDataset,
     output: Path,
     report: Callable[[str, float, int], None],
+    *,
+    transforms: TransformConfig | None = None,
 ) -> BackendTrainResult:
     output = validate_output_tree(output)
     settings = config.train
@@ -178,9 +181,22 @@ def train(
         "compute_val_loss": True,
         "accelerator": "cpu" if device == "cpu" else "gpu",
     }
+    custom = transforms is not None and transforms.mode == "albumentations"
+    if custom:
+        arguments.update(
+            aug_config={},
+            augmentation_backend="torchvision",
+            scale_jitter=False,
+            multi_scale="off",
+        )
     native_config = model.get_train_config(**arguments)
     module = training.RFDETRModelModule(model.model_config, native_config)
     datamodule = training.RFDETRDataModule(model.model_config, native_config)
+    if transforms is not None and custom:
+        from clearml_yolo.adapters.rfdetr.transforms import install_training_transforms
+
+        datamodule.setup("fit")
+        install_training_transforms(datamodule, transforms, seed=settings.seed)
     devices: int | list[int] = [int(device.split(":")[1])] if ":" in device else 1
     trainer = training.build_trainer(native_config, model.model_config, devices=devices)
     callback_type = type("OwnerMetrics", (_OwnerMetrics, lightning.Callback), {})

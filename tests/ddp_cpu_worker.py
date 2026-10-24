@@ -7,7 +7,7 @@ import sys
 import traceback
 from contextlib import ExitStack, redirect_stderr, redirect_stdout
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from unittest.mock import patch
 
 
@@ -37,7 +37,19 @@ def _train(job: dict[str, Any], evidence: dict[str, Any]) -> None:
         assert evidence["active_task_none"]
         with Path(job["callbacks"]).open("rb") as stream:
             callbacks = cloudpickle.load(stream)
-        trainer = CpuDetectionTrainer(
+        trainer_type = CpuDetectionTrainer
+        if job["scenario"] == "custom_mosaic":
+            with Path(job["trainer"]).open("rb") as stream:
+                native_trainer = cloudpickle.load(stream)
+            evidence["pipeline_source_missing"] = not Path(job["pipeline_source"]).exists()
+            evidence["pipeline_sha256"] = native_trainer.transform_config.snapshot.sha256
+            # Retain the captured production dataset builder and runtime ownership;
+            # the test subclass adapts only accelerator boundaries and records evidence.
+            trainer_type = cast(
+                type[CpuDetectionTrainer],
+                type("CustomCpuDetectionTrainer", (CpuDetectionTrainer, native_trainer), {}),
+            )
+        trainer = trainer_type(
             root=Path(job["root"]),
             scenario=job["scenario"],
             evidence=evidence,

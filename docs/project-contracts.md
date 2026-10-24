@@ -52,7 +52,16 @@ parameters. YOLO replay applies scientific General overrides over full `run.ultr
 settings; devices and other known execution-only values remain in the full configuration.
 External controllers can explicitly normalize cache identity before job creation through
 the [stable parameter contract](../specs/000-baseline/spec.md#stable-experiment-parameters-and-controller-caching).
-Pass device, batch, AMP, compilation and native augmentation options through the native groups.
+Pass device, batch, AMP and compilation through the native groups. Native augmentation
+options retain their behavior with `transforms=default`. For `cy` and `cy-train`,
+`transforms=albumentations transforms.pipeline_file=FILE` selects standard `A.save`
+JSON for any registered backend. The custom profile visibly disables optional native
+augmentation, reports conflicting overrides and retains required final preprocessing.
+One first top-level JSON Mosaic receives raw training donors on every backend.
+Validation rejects unsupported transforms, targets and preprocessing conflicts; a
+canonical content snapshot and SHA-256 digest make replay independent of the source
+file. Generated training configurations include both profiles and the selected
+model/profile specialization. See the [augmentation contract](augmentation.md).
 Direct `cy` and stage commands execute their configured native devices without project
 GPU discovery, queue storage, reservations, waiting or automatic substitution. `cy -m`
 uses sequential BasicLauncher. `queue.*`, `autogpu.*` and the former queue launcher

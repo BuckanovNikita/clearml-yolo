@@ -13,6 +13,7 @@ import grimp
 
 PROJECT_ROOTS = ("clearml_yolo",)
 ADAPTER_RESPONSIBILITIES = {
+    "augmentation",
     "storage",
     "yolo",
     "clearml",
@@ -55,6 +56,7 @@ APPLICATION_EFFECT_DEPENDENCIES = {
     "filelock",
 }
 SDK_OWNERS = {
+    "albumentations": ("clearml_yolo.adapters.augmentation.serialization",),
     "textual": (),
     "pynvml": (),
     "cy_queue": (),
@@ -66,6 +68,7 @@ SDK_OWNERS = {
         "clearml_yolo.adapters.integrations.training",
     ),
     "torch": (
+        "clearml_yolo.adapters.augmentation.torch_data",
         "clearml_yolo.adapters.yolo",
         "clearml_yolo.adapters.integrations.native_runtime",
         "clearml_yolo.adapters.integrations.native_ddp",
@@ -86,6 +89,7 @@ SDK_OWNERS = {
         "clearml_yolo.adapters.export.verification",
     ),
     "torchvision": (
+        "clearml_yolo.adapters.augmentation.torch_data",
         "clearml_yolo.adapters.deim.backend",
         "clearml_yolo.adapters.fasterrcnn.model",
         "clearml_yolo.adapters.fasterrcnn.assets",
@@ -122,6 +126,7 @@ SDK_OWNERS = {
 }
 SDK_EXCEPTIONS: set[tuple[str, str]] = set()
 ADAPTER_PEERS = {
+    "augmentation": set(),
     "storage": {"observability"},
     "observability": set(),
     "yolo": {"storage", "observability"},
@@ -139,6 +144,17 @@ ADAPTER_PEERS = {
 }
 # These edges implement explicit cross-adapter coordination or data conversion.
 PEER_EXCEPTIONS = {
+    ("clearml_yolo.adapters.fasterrcnn.data", "clearml_yolo.adapters.augmentation.pipeline"),
+    ("clearml_yolo.adapters.yolo.augmentation", "clearml_yolo.adapters.augmentation.pipeline"),
+    ("clearml_yolo.adapters.deim.transforms", "clearml_yolo.adapters.augmentation.pipeline"),
+    ("clearml_yolo.adapters.deim.transforms", "clearml_yolo.adapters.augmentation.torch_data"),
+    ("clearml_yolo.adapters.rfdetr.transforms", "clearml_yolo.adapters.augmentation.pipeline"),
+    ("clearml_yolo.adapters.rfdetr.transforms", "clearml_yolo.adapters.augmentation.torch_data"),
+    ("clearml_yolo.adapters.fasterrcnn.data", "clearml_yolo.adapters.augmentation.torch_data"),
+    (
+        "clearml_yolo.adapters.integrations.native_trainer",
+        "clearml_yolo.adapters.yolo.augmentation",
+    ),
     ("clearml_yolo.adapters.integrations.detectors", "clearml_yolo.adapters.assets.execution"),
     ("clearml_yolo.adapters.integrations.detectors", "clearml_yolo.adapters.clearml.session"),
     ("clearml_yolo.adapters.assets.execution", "clearml_yolo.adapters.deim.assets"),
@@ -643,8 +659,7 @@ class _EffectVisitor(ast.NodeVisitor):
             or method in EFFECTFUL_CALLS - ambiguous
         )
         port_effect = self.application and (
-            name.startswith("deps.storage.")
-            or name == "deps.ground_truth_repository.resolve"
+            name.startswith("deps.storage.") or name == "deps.ground_truth_repository.resolve"
         )
         if explicit and not port_effect:
             self.report(node, name)

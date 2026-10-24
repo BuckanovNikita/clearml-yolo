@@ -124,8 +124,9 @@ Native normalization is recorded separately from requested settings rather than 
 Known stage-irrelevant keys are excluded from execution and commented in effective YAML. Unknown keys,
 non-detection tasks, wrong modes, non-null `embed`, invalid image sizes, raw wrapper `cfg`, non-null native
 `cfg`, nested stage-native mappings and duplicate comparison inference-native settings fail validation.
-Explicit custom `augmentations` remain supported. Sparse programmatic native mappings must be composed
-before use. A produced checkpoint owns pipeline inference; conflicting explicit prediction model selections
+Existing native `augmentations` remain supported with `transforms=default`; the portable JSON
+profile below replaces optional native augmentation when selected. Sparse programmatic native mappings
+must be composed before use. A produced checkpoint owns pipeline inference; conflicting explicit prediction model selections
 fail. Comparison rejects prediction model/project/name overrides in favor of model references and its output
 directory.
 
@@ -133,6 +134,40 @@ New detector families use typed `model.train`/`model.predict` settings. Changed 
 native groups fail in both directions; unchanged composed defaults permit mixed-family sweep composition.
 Unsupported controls are never silently ignored. ClearML Agent replay restores the selected
 backend before runtime initialization; it does not switch an already initialized runtime.
+
+### Custom training augmentation
+
+`cy-train` and the training stage of `cy` expose `transforms=default|albumentations`.
+Default mode preserves native recipes and prohibits a JSON selector or custom snapshot.
+Custom mode requires `transforms.pipeline_file` containing standard Albumentations `A.save`
+JSON, or an already frozen replay snapshot. It supports every registered YOLO, DEIMv2,
+RF-DETR and Faster R-CNN selection. Generated training wrappers include both profiles
+and a root model/profile specialization with visible native disable values.
+
+Custom mode replaces optional native data augmentation, including native Mosaic and
+multi-scale recipes; explicit conflicting values are overridden with a diagnostic.
+Mandatory final geometry, tensor conversion and normalization remain backend-owned.
+User geometry does not replace the configured final model size. The JSON root is Compose;
+supported nested compositions preserve ordering/probabilities and bbox filtering. Validate
+classes, constructor parameters, detection targets and preprocessing conflicts before
+training. Reject external executable classes, Lambda, normalization/tensor/float conversion,
+unsupported targets and invalid RGB output contracts.
+
+Support one first top-level Mosaic with any valid grid and nonconflicting metadata key.
+Select raw donors only from training data, distinctly excluding the primary when possible;
+use replacement for small populations, and the primary only for a one-image population.
+Never recursively augment donors. Keep boxes, classes, instance identities and crowd flags
+aligned through clipping/filtering, including empty images and crops removing all boxes.
+Worker-seeded random streams advance between samples. Validation/inference keep their
+normal deterministic preprocessing.
+
+Freeze validated content, SHA-256 digest and original file selector into the canonical
+configuration before queue serialization or execution. DDP and remote replay use that
+snapshot without reading the original file; mismatched content/digest fails. Explicitly
+selecting a different file replaces the snapshot. The
+[augmentation guide](../../docs/augmentation.md) owns usage and backend-specific details;
+[feature 004](../004-custom-augmentation/spec.md) defines the separate Severstal smoke
+acceptance matrix and deferred full-training scope.
 
 ### Configuration resolution and replay
 

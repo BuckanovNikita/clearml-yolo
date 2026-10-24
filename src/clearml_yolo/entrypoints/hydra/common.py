@@ -48,6 +48,7 @@ from clearml_yolo.adapters.yolo.config import requested_devices
 from clearml_yolo.core.models import ModelConfig, model_preset
 from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_file
 from clearml_yolo.entrypoints.hydra.sweeps import new_multirun_tag, tag_multirun_job
+from clearml_yolo.entrypoints.hydra.transforms import prepare_transforms, profile_values
 from clearml_yolo.entrypoints.hydra.validation import (
     materialize_model_config,
     reject_legacy_controls,
@@ -134,6 +135,8 @@ def _builtin_defaults(name: str, config: DictConfig) -> dict[str, Any]:
         raise TypeError("Built-in command defaults must be a mapping")
     with open_dict(defaults):
         defaults.pop("defaults", None)
+        if name in {"train", "pipeline"}:
+            defaults.transforms = profile_values("default")
         if "model" in defaults:
             backend = OmegaConf.select(config, "model.backend", default="ultralytics")
             preset = OmegaConf.select(config, "model.preset", default="default")
@@ -150,6 +153,8 @@ def _executable_replay(
     accepted = set(inspect.signature(function).parameters) - {"deps"}
     if "model" in config:
         accepted.add("model")
+    if function.__name__ in {"train", "run_pipeline"}:
+        accepted.add("transforms")
     return {key: value for key, value in replay.items() if key in accepted}
 
 
@@ -274,14 +279,19 @@ def _execute_direct(name: str, config: DictConfig, function: Callable[..., Any])
                 from clearml_yolo.entrypoints.composition import build_dependencies
 
                 selected = _execution_model(name, effective)
-                dependencies = (
-                    build_dependencies()
-                    if selected.backend == "ultralytics"
-                    else build_dependencies(selected)
-                )
+                transforms = prepare_transforms(effective)
+                if transforms.mode == "native":
+                    dependencies = (
+                        build_dependencies()
+                        if selected.backend == "ultralytics"
+                        else build_dependencies(selected)
+                    )
+                else:
+                    dependencies = build_dependencies(selected, transforms=transforms)
 
             with open_dict(effective):
                 effective.pop("model", None)
+                effective.pop("transforms", None)
                 if selected.backend != "ultralytics" and name != "export":
                     effective.ultralytics = selected.train.model_dump(mode="json") | {
                         "model": selected.preset,

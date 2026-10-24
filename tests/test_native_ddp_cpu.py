@@ -34,9 +34,36 @@ def _clean(result: dict[str, Any]) -> None:
     assert result["environment_restored"], result["changed_environment_keys"]
 
 
-@pytest.mark.parametrize("ranks", [2, 4], ids=["two-ranks", "four-ranks"])
-def test_cpu_ddp_trains_yolo_and_replays_only_rank_zero(tmp_path: Path, ranks: int) -> None:
-    result = _run(tmp_path, ranks, "success")
+def _custom_pipeline(result: dict[str, Any]) -> None:
+    assert result["pipeline_source_removed"]
+    for worker in result["workers"]:
+        assert worker["pipeline_source_missing"]
+        assert worker["pipeline_sha256"] == result["pipeline_sha256"]
+        assert worker["train_dataset"] == "AugmentedYOLODataset"
+        assert worker["validation_dataset"] == "YOLODataset"
+        assert worker["train_final_transforms"] == ["LetterBox", "Format"]
+        assert len(worker["batches"]) == 2
+        for batch in worker["batches"]:
+            assert batch["input_dtype"] == "torch.uint8"
+            assert batch["shape"] == [4, 3, 64, 64]
+            assert batch["output_dtype"] == "torch.float32"
+            assert batch["scaled_once"]
+            assert batch["box_counts"] == [4, 4, 4, 4]
+            assert batch["boxes_finite"]
+            assert batch["boxes_normalized"]
+    assert result["effective_args"]["mosaic"] == 0.0
+    assert result["effective_args"]["close_mosaic"] == 0
+
+
+@pytest.mark.parametrize(
+    ("ranks", "scenario"),
+    [(2, "success"), (4, "success"), (2, "custom_mosaic")],
+    ids=["two-ranks", "four-ranks", "custom-mosaic-two-ranks"],
+)
+def test_cpu_ddp_trains_yolo_and_replays_only_rank_zero(
+    tmp_path: Path, ranks: int, scenario: str
+) -> None:
+    result = _run(tmp_path, ranks, scenario)
     assert result["error"] is None, result
     assert result["launcher_returncode"] == 0
     workers = result["workers"]
@@ -98,6 +125,8 @@ def test_cpu_ddp_trains_yolo_and_replays_only_rank_zero(tmp_path: Path, ranks: i
                 and scalar["value"] == pytest.approx(value)
                 for scalar in scalars
             )
+    if scenario == "custom_mosaic":
+        _custom_pipeline(result)
     _clean(result)
 
 

@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record portable training release delivery
+  ([`d8a3695`](https://github.com/BuckanovNikita/clearml-yolo/commit/d8a3695eb481cdcf9fd523a17fee53a411bcf514))
+
+
 ## v0.38.0 (2026-10-23)
 
 ### Documentation

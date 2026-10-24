@@ -36,6 +36,8 @@ def test_installed_command_creates_examples(
         "cy.yaml",
         "ultralytics",
         "ultralytics_predict",
+        "transforms",
+        "transform_overrides",
     }
 
 
@@ -320,6 +322,13 @@ def test_selection_writes_only_required_outputs(tmp_path: Path, command: str) ->
 
     written = dump_config_tree(tmp_path, command=command)
     expected = {f"{command}.yaml"}
+    if command in {"cy", "cy-train"}:
+        expected |= {
+            "transforms/default.yaml",
+            "transforms/albumentations.yaml",
+            "transform_overrides/ultralytics_default.yaml",
+            "transform_overrides/ultralytics_albumentations.yaml",
+        }
     if command in {"cy", "cy-train", "cy-predict", "cy-val", "cy-compare"}:
         expected |= {"ultralytics/default.yaml", "ultralytics_predict/default.yaml"}
     assert {str(path.relative_to(tmp_path)) for path in written} == expected

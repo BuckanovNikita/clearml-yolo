@@ -15,6 +15,11 @@ from clearml_yolo.core.evaluation.models import EvaluationConfig
 from clearml_yolo.core.export_requests import ExportSettings
 from clearml_yolo.core.models import PRESETS, model_preset
 from clearml_yolo.core.publication import FiftyOneConfig
+from clearml_yolo.entrypoints.hydra.transforms import (
+    model_selections,
+    native_overlay,
+    profile_values,
+)
 
 RUN_STAMP_RESOLVER = "cy_run_token"
 HYDRA_RUN_DIR = "${cy_home:}/outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}-${cy_run_token:}"
@@ -22,7 +27,7 @@ PREDICTION_COMMANDS = frozenset({"train", "predict", "val", "pipeline", "compare
 NATIVE_COMMANDS = PREDICTION_COMMANDS | {"export"}
 
 
-def _native() -> dict[str, Any]:
+def _native(*, training: bool = False) -> dict[str, Any]:
     groups: list[Any] = ["_self_", {"model": "ultralytics"}, {"ultralytics": "_defaults"}]
     fields: dict[str, Any] = {
         "model": {},
@@ -30,6 +35,14 @@ def _native() -> dict[str, Any]:
     }
     groups.append({"ultralytics_predict": "_defaults"})
     fields["ultralytics_predict"] = prediction_defaults()
+    if training:
+        fields["transforms"] = profile_values("default")
+        groups.extend(
+            [
+                {"transforms": "default"},
+                {"transform_overrides": "${model}_${transforms}"},
+            ]
+        )
     return {"hydra_defaults": groups, **fields}
 
 
@@ -69,6 +82,11 @@ def register_configs() -> None:
                 )
     store({}, group="ultralytics", name="_defaults")
     store({}, group="ultralytics_predict", name="_defaults")
+    for profile in ("default", "albumentations"):
+        store(profile_values(profile), group="transforms", name=profile)
+        for selection in model_selections():
+            group, name = f"transform_overrides/{selection}_{profile}".rsplit("/", maxsplit=1)
+            store(native_overlay(selection, profile), group=group, name=name, package="_global_")
     store(
         make_config(
             hydra_defaults=["_self_", {"model": "fasterrcnn/resnet50_fpn"}],
@@ -83,7 +101,7 @@ def register_configs() -> None:
     )
     store(
         make_config(
-            **_native(),
+            **_native(training=True),
             clearml=tracking,
             ground_truth=MISSING,
             dataset_format="ndjson",
@@ -173,7 +191,7 @@ def register_configs() -> None:
     )
     store(
         make_config(
-            **_native(),
+            **_native(training=True),
             metrics=make_config(evaluation=evaluation, calibration_split="val"),
             compare=make_config(baseline_model=model, q=0.05, bootstrap_iterations=10000, seed=0),
             report=make_config(report_config_path=None),

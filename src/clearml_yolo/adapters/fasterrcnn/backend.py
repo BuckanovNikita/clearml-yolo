@@ -14,6 +14,7 @@ from clearml_yolo.core.models import (
     ModelConfig,
     PredictSettings,
 )
+from clearml_yolo.core.transforms import TransformConfig
 
 
 def validate_device(value: Device) -> None:
@@ -26,13 +27,15 @@ def train(
     prepared: PreparedDataset,
     output: Path,
     report: Callable[[str, float, int], None],
+    *,
+    transforms: TransformConfig | None = None,
 ) -> BackendTrainResult:
     if config.backend != "fasterrcnn":
         raise ValueError("Faster R-CNN training requires its own model configuration")
     validate_device(config.train.device)
     from clearml_yolo.adapters.fasterrcnn.training import train_native
 
-    return train_native(config, prepared, output, report)
+    return train_native(config, prepared, output, report, transforms=transforms)
 
 
 def predict(

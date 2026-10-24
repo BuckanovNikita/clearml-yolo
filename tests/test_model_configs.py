@@ -42,6 +42,10 @@ def test_selected_model_export_contains_only_required_groups(tmp_path: Path) -> 
     assert {path.relative_to(tmp_path).as_posix() for path in paths} == {
         "cy-train.yaml",
         "model/rfdetr/small.yaml",
+        "transforms/default.yaml",
+        "transforms/albumentations.yaml",
+        "transform_overrides/rfdetr/small_default.yaml",
+        "transform_overrides/rfdetr/small_albumentations.yaml",
     }
     with initialize_config_dir(config_dir=str(tmp_path), version_base="1.3"):
         config = compose(config_name="cy-train", overrides=["model.train.epochs=2"])
