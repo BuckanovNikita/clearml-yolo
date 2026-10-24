@@ -1,12 +1,17 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.39.0 (2026-10-24)
 
 ### Documentation
 
 - Record portable training release delivery
   ([`d8a3695`](https://github.com/BuckanovNikita/clearml-yolo/commit/d8a3695eb481cdcf9fd523a17fee53a411bcf514))
+
+### Features
+
+- Support custom Albumentations and mosaic across detector models
+  ([`3b95fba`](https://github.com/BuckanovNikita/clearml-yolo/commit/3b95fbaae4bc2440e239e7b01a3c47755475ac8f))
 
 
 ## v0.38.0 (2026-10-23)
