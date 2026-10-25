@@ -31,7 +31,7 @@ saved private section and confirmed to be the only working-tree change. It was t
 temporarily removed again for the documentation evidence commit; the same restoration
 procedure applies after that command and its hooks.
 
-## Remote delivery pending
+## Remote delivery deferred on 2026-10-24
 
 The authorized atomic push of `master` and `v0.40.0` failed because GitHub was unreachable.
 SSH port 22 and SSH port 443 timed out. Authenticated HTTPS push and ref inspection
@@ -41,11 +41,26 @@ were changed, and no unrelated services were restarted. All stalled attempts exi
 The earlier preflight observed remote `master` at the original baseline, but current
 remote refs could not be reverified. Local tag creation is not evidence of remote delivery.
 
-T017 remains pending until the intended branch and tag can be pushed and remote refs
-verified. The final bounded delivery attempt is reported separately; this record does
-not claim a successful push.
+T017 remained pending after those attempts; they did not establish remote delivery.
 
 This documentation-only follow-up records executed evidence and delivery status. It
 changes no runtime module, interface, import contract or effect owner. The accepted
 [architecture record](../architecture.json) covers these paths; Markdown/local links
 and architecture structure are revalidated before its commit.
+
+## Remote delivery completed — 2026-10-25
+
+The authorized retry atomically pushed `master` and `v0.40.0` through the existing
+SSH remote. A separate remote-ref query confirmed:
+
+| Remote ref | Verified object |
+| --- | --- |
+| `refs/heads/master` | `d0a47a657e71ea8d818403c8a1b63909455c1c73` |
+| `refs/tags/v0.40.0` | `c69f04a5757f46a472de3f0998b92e528599282d` |
+| `refs/tags/v0.40.0^{}` | `4edd0cb1366c1b5817cbe8050076f608a7f03700` |
+
+T017 is complete. The following documentation-only commit records this verified
+delivery and ledger closure; it changes no application or checking behavior. The
+original local dependency overrides remain excluded from commits and are restored
+exactly after hooks. The existing accepted architecture record covers the evidence,
+ledger and generated changelog paths; no interface, dependency or effect owner changes.

@@ -41,10 +41,10 @@ Independent checks: selected offline baseline plus explicit result inspection.
 - [x] T014 Update `docs/development.md`, `docs/agent-workflow.md`, architecture/import/migration/assets/queue/static-analysis guidance, contract index and baseline; record portable usage review.
 - [x] T015 Integrate all changes; remove/preserve local overrides and run canonical verification plus docs; record timings/check invocations and before/after line totals in `evidence/verification.md`.
 - [x] T016 Obtain fresh independent review after verification, resolve findings, reconcile `architecture.json` with actual diff and validate acceptance; record `evidence/review.md`.
-- [ ] T017 Complete task-scoped Conventional Commit and automatic Git-tag-only release/push, restore local overrides exactly and record `evidence/release.md`.
+- [x] T017 Complete task-scoped Conventional Commit and automatic Git-tag-only release/push, restore local overrides exactly and record `evidence/release.md`.
 
-T017 delivery status: local contributor/version commits and annotated tag are complete;
-GitHub connectivity blocks push and remote verification. See [delivery evidence](evidence/release.md).
+T017 delivery status: branch and annotated tag pushed on 2026-10-25; remote refs verified.
+See [delivery evidence](evidence/release.md).
 
 ## Dependencies and parallel execution
 
