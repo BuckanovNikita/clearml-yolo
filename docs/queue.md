@@ -14,13 +14,17 @@ process-cleanup evidence and current-generation GPU availability. The
 
 Install `clearml-yolo` from source first, including the approved external dependency
 copies in [development setup](development.md#external-dependencies). Then install
-`cy-queue` from its separate checkout into that same Python environment. Neither
+`cy-queue` from its [separate public repository](https://github.com/BuckanovNikita/cy-queue)
+into that same Python environment. Neither
 distribution is assumed to be published on PyPI. From a CY checkout with a sibling
 `cy-queue` checkout:
 
 ```bash
-uv sync --frozen
-uv pip install --python .venv/bin/python -e ../cy-queue
+# Obtain the sibling checkout once if it is not already present:
+git clone https://github.com/BuckanovNikita/cy-queue.git ../cy-queue
+uv sync --frozen --inexact
+uv pip install --python .venv/bin/python -e . -e ../cy-queue
+uv pip check --python .venv/bin/python
 uv run --frozen --no-sync cy-queue --help
 ```
 
@@ -30,6 +34,11 @@ this combined environment so synchronization does not remove the separately inst
 queue. Queue-only Textual and NVML dependencies belong to `cy-queue`; shared process
 supervision and lifecycle communication remain in CY. Direct commands and externally
 managed ClearML Agents require neither queue installation nor queue configuration.
+
+Installing both sources in one command refreshes editable version metadata and checks
+the pair without resolving CY from an index. Before upgrading an existing shared queue,
+follow the coordinated procedure below. Every release of either package requires the
+[latest-pair release check](development.md#paired-cy-and-queue-release-check).
 
 ### Coordinated package upgrade
 

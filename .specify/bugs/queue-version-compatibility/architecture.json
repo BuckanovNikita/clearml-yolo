@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "task": "queue-version-compatibility: CY documentation",
+  "scope": [
+    "AGENTS.md",
+    "README.md",
+    "docs/queue.md",
+    "docs/development.md",
+    ".specify/bugs/queue-version-compatibility",
+    "CHANGELOG.md"
+  ],
+  "impact": "none",
+  "rationale": "Inspected CY source metadata, queue integration interfaces, release procedure and local source overrides. CY edits document installation and paired release acceptance only; its runtime, dependency metadata and executable checkers remain unchanged. The queue packaging and regression changes have their own module-impact record in that repository. Preserve the pre-existing local pyproject overrides. The normal commit hook also refreshed generated changelog documentation for a previously committed docs change; the three added lines were inspected."
+}

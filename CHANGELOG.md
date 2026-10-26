@@ -5,6 +5,9 @@
 
 ### Documentation
 
+- Confirm verification reuse release delivery
+  ([`885b85e`](https://github.com/BuckanovNikita/clearml-yolo/commit/885b85ecfadbdf5c4f53795149e605b842b1d1f9))
+
 - Record verification reuse release evidence
   ([`d0a47a6`](https://github.com/BuckanovNikita/clearml-yolo/commit/d0a47a657e71ea8d818403c8a1b63909455c1c73))
 

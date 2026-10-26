@@ -295,6 +295,36 @@ Restore it on failed or interrupted commit attempts as well; remove it again bef
 retrying. Verify that the working copy has the local overrides and that a successful
 commit contains no `[tool.uv.sources]` section.
 
+## Paired CY and queue release check
+
+Before every release or delivery of either repository, verify the latest CY and
+[cy-queue](https://github.com/BuckanovNikita/cy-queue) together. Fetch both remotes
+and inspect their latest default branches/tags, preserving unrelated local changes.
+Use the intended release versions, including any version the local release hook will
+produce. A stale sibling checkout or editable installation is not current evidence.
+
+With approved external dependencies prepared and active workers drained according to
+[queue upgrade](queue.md#coordinated-package-upgrade), or in an isolated environment:
+
+```bash
+uv pip install --python .venv/bin/python -e . -e ../cy-queue
+uv pip check --python .venv/bin/python
+# Run from the queue repository so its own configuration is selected:
+cd ../cy-queue
+uv run --frozen --no-sync --project ../clearml-yolo pytest -q
+uv run --frozen --no-sync --project ../clearml-yolo cy-queue --help
+```
+
+Run the queue's configured static/import checks and CY's applicable verification too.
+Queue installation tests verify source/installed versions and dependency constraints;
+normal resolution must succeed without `--no-deps`. Record both source SHAs, versions
+and actual integration results in dated task evidence. If hooks change a version,
+refresh the installation and recheck the final pair before pushing. Incompatibility,
+stale metadata, missing current sources or unavailable/failed checks block delivery.
+Update the queue's bounded requirement only after verifying the new CY interfaces;
+do not assume an untested future minor is compatible. CY remains independent of the
+queue at runtime. This is a mandatory release acceptance step alongside the hooks.
+
 ## Local releases
 
 Releases contain Git commits and annotated version tags only. Do not build,

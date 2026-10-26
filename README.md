@@ -516,14 +516,21 @@ GitHub Releases, `GH` — корень VCS-репозитория Artifactory д
 и Hydra launcher удалены.
 
 Сначала установите CY из исходников по [инструкции](docs/development.md#external-dependencies),
-затем очередь из соседнего checkout в то же окружение. Публикация пакетов в PyPI
+затем очередь из отдельного [публичного репозитория](https://github.com/BuckanovNikita/cy-queue)
+в то же окружение. Публикация пакетов в PyPI
 не предполагается. Из каталога `clearml-yolo`:
 
 ```bash
-uv sync --frozen
-uv pip install --python .venv/bin/python -e ../cy-queue
+# Клонирование требуется только при отсутствии соседнего checkout:
+git clone https://github.com/BuckanovNikita/cy-queue.git ../cy-queue
+uv sync --frozen --inexact
+uv pip install --python .venv/bin/python -e . -e ../cy-queue
+uv pip check --python .venv/bin/python
 uv run --frozen --no-sync cy-queue --help
 ```
+
+Установка обоих исходников одной командой проверяет совместимость версий и обновляет
+метаданные editable-установок. Диапазон поддерживаемых версий CY задаёт пакет очереди.
 
 Перед синхронным обновлением всех участников остановите отправку и workers,
 дождитесь завершения активных заданий и выполните необходимое восстановление.

@@ -50,6 +50,11 @@ for every task.
   source, checkout, dependency reference or locked revision without explicit user intent.
   General cleanup or dependency maintenance does not authorize this. Adapt this project's
   integration; report upstream issues rather than patching or monkeypatching the dependency.
+- Before releasing or delivering either CY or cy-queue, verify the latest source
+  versions of both together, including the proposed release versions. Follow the
+  [paired release check](docs/development.md#paired-cy-and-queue-release-check): normal
+  dependency resolution, matching source/installed metadata and the queue integration
+  suite are mandatory. Incompatible or unavailable evidence blocks delivery.
 - Use Conventional Commits and complete the native release workflow when user or standing
   authorization covers delivery. Explicit no-commit/no-release limits and the active host
   mode take precedence. Stage only task-owned paths or hunks; preserve unrelated staged
