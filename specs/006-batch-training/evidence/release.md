@@ -86,3 +86,54 @@ Read-only diff whitespace and architecture planning checks passed. Architecture
 acceptance exited 1 for the failed native and unexecuted physical-DDP entries;
 those statuses remain unchanged. The review accepts publication under the recorded
 release exception and does not establish full feature or architecture acceptance.
+
+## Local version creation
+
+The first normal commit attempt stopped because the changelog hook added the
+previously committed paired-release policy entry. The parent inspected that exact
+three-line generated change and staged it, then retried without bypassing hooks.
+All contributor and automatic release hooks passed. Feature commit
+`6ff30fe` contains the 208 reviewed paths plus generated CHANGELOG.md. The hook
+created version commit `e12114535caf399b9e8db9d3dc9693eb64581587` and annotated tag
+`v0.41.0`, both resolving to that version commit. Its metadata diff changes only
+the root project version from 0.40.0 to 0.41.0 in pyproject.toml and uv.lock, plus
+the generated changelog. No dependency resolution or dependency revision changed.
+The exact saved local uv source section was restored unstaged after both attempts;
+it is absent from committed metadata. The index was empty after successful hooks.
+Final paired verification uses the actual committed metadata in isolation.
+
+## Actual release pair
+
+The parent inspected final [paired evidence](release-queue.md), raw command statuses,
+exact committed metadata identities, source/installed versions and post-check drift
+results. Actual CY 0.41.0 / queue 0.1.2 passed normal joint resolution, dependency
+consistency, all static/import checks, all 512 queue tests (7 physical cases
+deselected) and installed CLI help. This satisfies both reviewers' remaining
+pre-push condition. Queue source and approved external copies remained unchanged
+through canonical verification, hooks and the final pair. T034 is complete.
+
+## Verified publication
+
+Queue commit `ae252ed8e633e7548180577739673ff0506e1c0c` published the five reviewed
+compatibility paths on main; the remote branch matched and its working tree/index
+were clean. No queue tag was invented. CY's master and specific annotated v0.41.0
+tag were pushed atomically. Remote master and the peeled tag both matched
+`e12114535caf399b9e8db9d3dc9693eb64581587`; the tag object was
+`179eee28ad9e758e48651ca7acdf4b31e24fef08`.
+
+After CY publication, portable guidance collection v0.5.0 was published atomically
+from an isolated clean main checkout. Commit
+`a9dea49470344d6fbfbc3a9e0381d169b1ac1a81` contains exactly the eight reviewed
+paths, with only factual review/publication evidence appended after review.
+Annotated tag object `19a6612a8da2ddfaa84bc092e3a04032a186444f` and the remote
+branch resolve to that commit. Final Markdown, links, architecture and scoped diff
+checks passed. The original dirty usage-source checkout was preserved. GitHub
+redirected its existing remote to the renamed `custom-opencode-skills` repository;
+no remote configuration was changed.
+
+T033–T035 are complete. T022/T031 and full architecture acceptance remain open for
+the disclosed native gaps. The release uses Git commits/tags only: no GitHub Release,
+assets, registry publication, deployment or operational installation. Final evidence
+is committed separately as documentation after the version tag; it changes no runtime
+inputs or release metadata. Task-owned verification logs and manifests remain private;
+disposable environments and isolated source checkouts can be removed after inspection.

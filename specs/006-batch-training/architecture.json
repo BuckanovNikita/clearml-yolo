@@ -233,7 +233,7 @@
       "result": {
         "status": "passed",
         "exit_code": 0,
-        "evidence": "specs/006-batch-training/evidence/single-gpu-queue.md"
+        "evidence": "specs/006-batch-training/evidence/release-queue.md"
       }
     },
     {
@@ -263,6 +263,6 @@
     "status": "accepted",
     "reviewer": "Fresh independent native agent release_final_review; prior implementation reviews retained in evidence/review.md and evidence/single-gpu.md",
     "evidence": "specs/006-batch-training/evidence/release.md",
-    "reconciliation": "All 208 changed/added CY paths match the release ownership manifest. Prior broad and single-GPU amendment reviews are corroborated; final runtime inputs passed canonical checks with uv sources absent, documentation checks passed, proposed paired versions passed and fresh release review found no code blockers. No release-preparation runtime changes, dependency updates or import exceptions were introduced. Full architecture acceptance remains open for failed native confirmation and unexecuted physical DDP, including the broader backend matrix. The later explicit release request permits publication with those disclosed exceptions; actual-version paired refresh is required before pushing. Local uv sources remain excluded from commits and will be restored exactly."
+    "reconciliation": "All 208 changed/added CY paths match the release ownership manifest. Prior broad and single-GPU amendment reviews are corroborated; final runtime inputs passed canonical checks with uv sources absent, documentation checks passed, proposed paired versions passed and fresh release review found no code blockers. No release-preparation runtime changes, dependency updates or import exceptions were introduced. Full architecture acceptance remains open for failed native confirmation and unexecuted physical DDP, including the broader backend matrix. The later explicit release request permits publication with those disclosed exceptions; actual-version paired refresh passed normal resolution, exact source/installed metadata, all 512 queue tests and static/import checks before delivery. The native hooks created and published annotated CY v0.41.0; compatible queue and portable usage refs were verified. Local uv sources are excluded from commits and restored exactly. Dated release evidence records the explicit exception; failed/unrun check statuses remain unchanged."
   }
 }

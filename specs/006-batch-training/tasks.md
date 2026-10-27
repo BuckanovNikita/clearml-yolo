@@ -134,8 +134,8 @@ recorded, superseding the previous release stopping point for this delivery.
 T022/T031 and full architecture acceptance remain open; missing checks are not passes.
 
 - [x] T033 Reconcile release scope and documentation, preserve local uv sources, and prepare the compatible queue/usage companions.
-- [ ] T034 Run final canonical/docs checks with uv sources absent, verify final paired versions, and obtain fresh release review.
-- [ ] T035 Commit the feature through normal hooks, create the native semantic version/tag, publish verified companion and CY refs, and restore local uv sources.
+- [x] T034 Run final canonical/docs checks with uv sources absent, verify final paired versions, and obtain fresh release review.
+- [x] T035 Commit the feature through normal hooks, create the native semantic version/tag, publish verified companion and CY refs, and restore local uv sources.
 
 T033 precedes T034. T035 requires successful ordinary checks and review; only the
 disclosed native YOLO confirmation, broader FCOS/backend matrix and physical DDP

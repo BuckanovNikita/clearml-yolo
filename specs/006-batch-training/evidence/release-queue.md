@@ -80,16 +80,44 @@ review remains parent-owned.
 
 ## Final actual-version refresh
 
-Pending the parent's CY release hook. The isolated environment and snapshots remain
-available for normal joint reinstallation using actual release metadata, exact
-source/installed parity, dependency consistency and repeated full queue/static/import
-checks before delivery. No final actual-version success is asserted yet.
+The normal CY hooks produced feature commit
+`6ff30fe` and version commit `e12114535caf399b9e8db9d3dc9693eb64581587`; annotated
+`v0.41.0` points to that version commit. The final refresh read actual committed
+`HEAD:pyproject.toml` and `HEAD:uv.lock` with `git show`, then copied those exact
+bytes into the existing isolated snapshot. Their SHA-256 identities are recorded
+in private `actual-committed-metadata.json`. The committed metadata has no local
+uv source overrides; the working checkout's restored overrides were preserved.
+
+Normal joint resolution and reinstall again passed for 282 packages with
+`UV_LINK_MODE=copy`, using the existing frozen requirement list and approved copied
+external sources. No dependency entry or approved source revision changed. Exact
+source/installed CY 0.41.0 and queue 0.1.2 and isolated import origins passed again;
+`uv pip check` found all 282 packages compatible. Final checks all exited 0:
+
+| Actual-version check | Result |
+| --- | --- |
+| `ruff check .` | Passed |
+| `ruff format --check .` | 82 files already formatted |
+| `mypy .` | No issues in 68 source files |
+| `lint-imports` | 2 contracts kept, 0 broken |
+| `python -m pytest -q` | 512 passed, 7 physical GPU tests deselected, 4 warnings in 115.85 s |
+| `cy-queue --help` outside both checkouts | Passed |
+
+Before and after the refresh, source audits confirmed zero queue or external-source
+drift. CY differences from the original capture were confined to release metadata,
+Markdown and feature records; runtime source, packaged configuration, tests and
+verification configuration remained identical. Thus final runtime inputs match the
+released source with the exact committed release metadata. Test processes completed
+and installed metadata remained 0.41.0/0.1.2; no operational install occurred.
+Fresh parent-owned independent reviewers accepted the integrated CY and companion
+change conditional on this final pair check; that condition now passes. The parent
+still owns final evidence inspection, acceptance and authorized delivery.
 
 ## Evidence and delivery boundary
 
 Raw logs, commands/exit codes, manifests, metadata and source-drift reports are in
 ignored `.tmp/queue-release-vduuee6i/`. All proposed-check test processes completed;
 only retained task-owned files remain. Queue files stay frozen while the parent
-canonical verifier runs. Parent review, final metadata refresh, commits and remote
-ref verification remain separate release gates. No queue tag, GitHub Release,
+canonical verifier runs. Parent evidence inspection, commits and remote ref verification remain separate
+delivery steps. Final actual metadata refresh and full paired checks passed above. No queue tag, GitHub Release,
 asset/package publication, deployment or operational installation is included.
