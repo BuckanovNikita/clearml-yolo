@@ -1,7 +1,7 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.41.0 (2026-10-27)
 
 ### Documentation
 
@@ -13,6 +13,11 @@
 
 - Require compatible CY and queue releases
   ([`9fd2294`](https://github.com/BuckanovNikita/clearml-yolo/commit/9fd2294ab219c534fcce87b59eea7b56e9d01173))
+
+### Features
+
+- Add batch estimation and native detector workflows
+  ([`6ff30fe`](https://github.com/BuckanovNikita/clearml-yolo/commit/6ff30fefd2b5018bbd0c64165841d57d51d567f0))
 
 
 ## v0.40.0 (2026-10-24)
