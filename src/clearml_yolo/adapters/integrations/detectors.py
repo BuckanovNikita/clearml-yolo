@@ -294,6 +294,8 @@ class DetectorRunner:
             from clearml_yolo.adapters.rfdetr.backend import predict
         elif descriptor.backend == "fasterrcnn":
             from clearml_yolo.adapters.fasterrcnn.backend import predict
+        elif descriptor.backend == "fcos":
+            from clearml_yolo.adapters.fcos.backend import predict
         else:
             raise ValueError(f"Unsupported described detector: {descriptor.backend}")
         return predict(config, descriptor, weights, image_paths, settings)
@@ -435,21 +437,47 @@ class DetectorRunner:
         )
         output = write_path(Path(settings["project"]) / str(settings["name"]))
         output.mkdir(parents=True, exist_ok=True)
+        from clearml_yolo.adapters.clearml.session import record_run_configuration
+        from clearml_yolo.adapters.integrations.batch_resolution import resolve_native_batch
+        from clearml_yolo.adapters.runtime.distributed import (
+            global_batch_per_rank,
+            selected_gpu_indices,
+        )
+
+        config, batch_estimate = resolve_native_batch(config, prepared, self.transforms)
+        if batch_estimate is not None:
+            record_run_configuration(task, {"training_batch_estimate": batch_estimate})
+        devices = selected_gpu_indices(config.train.device)
+        global_batch_per_rank(config.train.batch, max(len(devices), 1))
         if config.backend == "deimv2":
             from clearml_yolo.adapters.deim.backend import train
         elif config.backend == "rfdetr":
             from clearml_yolo.adapters.rfdetr.backend import train
+        elif config.backend == "fcos":
+            from clearml_yolo.adapters.fcos.backend import train
         else:
             from clearml_yolo.adapters.fasterrcnn.backend import train
 
         arguments = {"transforms": self.transforms} if self.transforms is not None else {}
-        result = train(
-            config,
-            prepared,
-            output,
-            lambda name, value, step: report_metric(task, name, value, step),
-            **arguments,
-        )
+        if len(devices) > 1:
+            from clearml_yolo.adapters.integrations.distributed_training import train_distributed
+
+            result = train_distributed(
+                config,
+                prepared,
+                output,
+                lambda name, value, step: report_metric(task, name, value, step),
+                devices=devices,
+                transforms=self.transforms,
+            )
+        else:
+            result = train(
+                config,
+                prepared,
+                output,
+                lambda name, value, step: report_metric(task, name, value, step),
+                **arguments,
+            )
         effective = settings | result.effective_args
         self.write_native_yaml(output / "native_train.yaml", effective, "train")
         record_detector_arguments(task, effective)

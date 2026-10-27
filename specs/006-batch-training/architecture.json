@@ -1,0 +1,268 @@
+{
+  "schema_version": 1,
+  "task": "006-batch-training",
+  "scope": [
+    "src/clearml_yolo",
+    "tests",
+    ".importlinter",
+    "pyproject.toml",
+    "README.md",
+    "docs",
+    "specs/000-baseline/spec.md",
+    "specs/006-batch-training"
+  ],
+  "impact": "modules",
+  "rules": "AGENTS.md and constitution inward layers; core/application have no SDK or IO effects. Adapters use ports/contracts only; explicit bridge edges and SDK owners.",
+  "modules": [
+    {
+      "id": "batch-policy",
+      "path": "src/clearml_yolo/core/batch_estimation.py",
+      "change": "add",
+      "responsibility": "Catalogue, search and strict compatibility records",
+      "interface": "Pure search transitions and typed measured/extrapolated recommendations; exact compatible allocation preferred, otherwise N times minimum compatible single-GPU capacity with source keys/status and no invented trials",
+      "layer": "core",
+      "allowed_dependencies": [
+        "Project inward contracts and explicitly owned libraries"
+      ],
+      "forbidden_dependencies": [
+        "Outer layers and undeclared peer SDK ownership"
+      ],
+      "effects": "None; data only",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "model-contracts",
+      "path": "src/clearml_yolo/core/models.py",
+      "change": "modify",
+      "responsibility": "Native model and global microbatch contracts",
+      "interface": "FCOS registry and nullable training batch",
+      "layer": "core",
+      "allowed_dependencies": [
+        "Project inward contracts and explicitly owned libraries"
+      ],
+      "forbidden_dependencies": [
+        "Outer layers and undeclared peer SDK ownership"
+      ],
+      "effects": "None; validation only",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "batch-use-case",
+      "path": "src/clearml_yolo/application/use_cases/batch_estimate.py",
+      "change": "add",
+      "responsibility": "Coordinate probe and cache ports",
+      "interface": "Injected probe/store orchestration deduplicates single-GPU profiles; multi-GPU search inputs are rejected; cache and refresh preserve actual trial records",
+      "layer": "application",
+      "allowed_dependencies": [
+        "Project inward contracts and explicitly owned libraries"
+      ],
+      "forbidden_dependencies": [
+        "Outer layers and undeclared peer SDK ownership"
+      ],
+      "effects": "Effects delegated through ports",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "ports",
+      "path": "src/clearml_yolo/application/batch_ports.py",
+      "change": "add",
+      "responsibility": "Explicit application effect interfaces",
+      "interface": "BatchProbe.profile/run and BatchEstimateStore.read/save protocols; no concrete SDK types",
+      "layer": "application",
+      "allowed_dependencies": [
+        "core.batch_estimation and standard typing only"
+      ],
+      "forbidden_dependencies": [
+        "Adapters, filesystem/environment/process access and SDK imports"
+      ],
+      "effects": "No concrete SDK construction",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "workers",
+      "path": "src/clearml_yolo/adapters/runtime",
+      "change": "modify",
+      "responsibility": "Bounded owned worker lifetime",
+      "interface": "Rank request/result and bounded cleanup; monitors receive a callable for a fresh birth-validated ownership scan after collecting telemetry, never a historical PID union",
+      "layer": "adapters",
+      "allowed_dependencies": [
+        "Project inward contracts and explicitly owned libraries"
+      ],
+      "forbidden_dependencies": [
+        "Outer layers and undeclared peer SDK ownership"
+      ],
+      "effects": "Own subprocess and distributed worker setup",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "native",
+      "path": "src/clearml_yolo/adapters",
+      "change": "modify",
+      "responsibility": "Native model/probe execution and atomic storage",
+      "interface": "Distinct FCOS and shared Torchvision execution; local estimate storage; estimator adapter rejects multi-GPU trials, lookup resolves typed measured/extrapolated targets with source keys/statuses and preserved requested null",
+      "layer": "adapters",
+      "allowed_dependencies": [
+        "Project inward contracts and explicitly owned libraries"
+      ],
+      "forbidden_dependencies": [
+        "Outer layers and undeclared peer SDK ownership"
+      ],
+      "effects": "Own SDK, filesystem and GPU telemetry effects",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "composition",
+      "path": "src/clearml_yolo/entrypoints",
+      "change": "modify",
+      "responsibility": "Compose CLI and explicit schemas",
+      "interface": "Estimator devices select hardware; counts filter derived first-N allocations; first idle selected representative per hardware group; per-GPU ceiling defaults to 1024",
+      "layer": "entrypoints",
+      "allowed_dependencies": [
+        "Project inward contracts and explicitly owned libraries"
+      ],
+      "forbidden_dependencies": [
+        "Outer layers and undeclared peer SDK ownership"
+      ],
+      "effects": "Construct adapters and parse configuration",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "worker-records",
+      "path": "src/clearml_yolo/application/training_workers.py",
+      "change": "add",
+      "responsibility": "Validated owner-to-rank requests and typed scalar/result receipts",
+      "interface": "TrainingWorkerRequest/Result, BatchProbeRequest/ProbeRankResult and WorkerScalar; token/rank identity, explicit failure classification",
+      "layer": "application",
+      "allowed_dependencies": [
+        "application.contracts, core model/profile/transform records and Pydantic"
+      ],
+      "forbidden_dependencies": [
+        "Adapters, filesystem/environment/process access and SDK imports"
+      ],
+      "effects": "No concrete SDK construction",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "gpu-memory",
+      "path": "src/clearml_yolo/adapters/runtime/gpu_memory.py",
+      "change": "add",
+      "responsibility": "Measure allocator and non-allocator GPU memory envelopes at native lifecycle boundaries",
+      "interface": "Synchronized driver usage minus contemporaneous allocator reservation; typed worker receipts retain the observed non-allocator maximum separately",
+      "layer": "adapters",
+      "allowed_dependencies": [
+        "torch CUDA APIs and inward worker records only"
+      ],
+      "forbidden_dependencies": [
+        "Application entrypoints, model SDK construction and external service publication"
+      ],
+      "effects": "Own CUDA memory telemetry; native probe owners call it before native teardown. The invocation owner combines the allocator peak, measured non-allocator envelope and fresh pre-worker baseline without double counting.",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "imports",
+      "path": ".importlinter",
+      "status": "existing",
+      "rules": "Inward layers, exhaustive classifications, SDK owners and explicit peer bridges",
+      "check": "canonical"
+    },
+    {
+      "id": "negative",
+      "path": "tests/test_architecture.py",
+      "status": "existing",
+      "rules": "Reject forbidden effects, imports, dynamic targets and initializer side effects",
+      "check": "canonical"
+    }
+  ],
+  "checks": [
+    {
+      "id": "canonical",
+      "kind": "imports",
+      "command": "CUDA_VISIBLE_DEVICES='' uv run --frozen --no-sync python scripts/verify.py",
+      "expectation": "Ruff, strict typing, Vulture, import contracts and ordinary suite including negative architecture and CPU-DDP pass",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/006-batch-training/evidence/release.md"
+      }
+    },
+    {
+      "id": "native",
+      "kind": "behavior",
+      "command": "Real single-GPU cy-batch-estimate searches, cache reuse and fresh confirmation per evidence/single-gpu.md",
+      "expectation": "Real single-GPU optimizer/validation searches; automated identical/mixed allocation extrapolation, source compatibility and provenance checks; no distributed estimator launches",
+      "result": {
+        "status": "failed",
+        "exit_code": 1,
+        "evidence": "specs/006-batch-training/evidence/single-gpu.md"
+      }
+    },
+    {
+      "id": "paired",
+      "kind": "behavior",
+      "command": "Current CY/queue source installation and queue checks per docs/development.md",
+      "expectation": "Normal resolution, matching source/installed metadata and complete queue integration checks pass for current sources and proposed release versions",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/006-batch-training/evidence/single-gpu-queue.md"
+      }
+    },
+    {
+      "id": "docs",
+      "kind": "documentation",
+      "command": "uv run --frozen --no-sync python scripts/verify.py --docs",
+      "expectation": "Markdown, local links and changed examples validate; portable usage package reconciled",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/006-batch-training/evidence/release.md"
+      }
+    },
+    {
+      "id": "ddp-native",
+      "kind": "behavior",
+      "command": "Physical multi-GPU training acceptance from specs/006-batch-training/quickstart.md",
+      "expectation": "Real supported-backend DDP correctness, failure recovery, sharding, checkpoint and owner publication evidence",
+      "result": {
+        "status": "not-run",
+        "reason": "The current machine exposes one GPU; physical multi-GPU training requires at least two. Full architecture acceptance remains open. The later explicit release request is recorded in evidence/release.md; it does not make this unexecuted gate pass."
+      }
+    }
+  ],
+  "documentation": "README.md, docs maintained model/config/queue/filesystem/augmentation contracts, feature evidence and canonical corp-skills usage package; docs/import-boundaries.md, module-architecture.md, model-assets.md and baseline navigation reconciled. Sibling queue changes widen its bounded CY requirement and add null-batch integration tests plus task documentation; runtime architecture is unchanged and paired evidence records existing import checks. T026 extends only explicitly opted-in physical acceptance helpers and offline evidence-contract tests; no new application import or effect ownership. Its fresh independent review accepted the final fixture correction after parent focused verification; physical execution remains a separate gate. The 2026-10-27 release preparation changes availability labels and dated evidence only; existing module/import ownership is unchanged. Release metadata excludes local uv sources and preserves approved dependency revisions.",
+  "review": {
+    "status": "accepted",
+    "reviewer": "Fresh independent native agent release_final_review; prior implementation reviews retained in evidence/review.md and evidence/single-gpu.md",
+    "evidence": "specs/006-batch-training/evidence/release.md",
+    "reconciliation": "All 208 changed/added CY paths match the release ownership manifest. Prior broad and single-GPU amendment reviews are corroborated; final runtime inputs passed canonical checks with uv sources absent, documentation checks passed, proposed paired versions passed and fresh release review found no code blockers. No release-preparation runtime changes, dependency updates or import exceptions were introduced. Full architecture acceptance remains open for failed native confirmation and unexecuted physical DDP, including the broader backend matrix. The later explicit release request permits publication with those disclosed exceptions; actual-version paired refresh is required before pushing. Local uv sources remain excluded from commits and will be restored exactly."
+  }
+}

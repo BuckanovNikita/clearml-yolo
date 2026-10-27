@@ -19,6 +19,7 @@ def test_detector_output_tree_rejected_before_native_work(
     from clearml_yolo.adapters.deim import backend as deim
     from clearml_yolo.adapters.fasterrcnn import training as fasterrcnn
     from clearml_yolo.adapters.rfdetr import backend as rfdetr
+    from clearml_yolo.adapters.torchvision import training as shared_training
 
     monkeypatch.setenv("CY_HOME", str(tmp_path / "workspace"))
     output = tmp_path / "workspace" / "native"
@@ -31,7 +32,7 @@ def test_detector_output_tree_rejected_before_native_work(
     def native_effect(*_args: Any, **_kwargs: Any) -> None:
         raise AssertionError("Native setup ran before output validation")
 
-    monkeypatch.setattr(fasterrcnn, "execution_device", native_effect)
+    monkeypatch.setattr(shared_training, "training_context", native_effect)
     monkeypatch.setattr(rfdetr, "_names", native_effect)
     monkeypatch.setattr(deim, "_validate_training", native_effect)
     functions = {
@@ -49,7 +50,7 @@ def test_detector_output_tree_rejected_before_native_work(
 def test_checkpoint_leaf_revalidated_before_torch_save(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from clearml_yolo.adapters.fasterrcnn import training
+    from clearml_yolo.adapters.torchvision import training
 
     monkeypatch.setenv("CY_HOME", str(tmp_path))
     output = tmp_path / "best.pth"

@@ -1,7 +1,9 @@
 # Direct execution and shared queue
 
 `cy` and stage commands run directly with native device settings. They do not import
-queue implementation, inspect availability, reserve GPUs, substitute devices or wait.
+queue implementation, perform admission, reserve GPUs, substitute devices or wait.
+Explicit training `batch=null` checks hardware compatibility for saved
+[batch estimation](batch-estimation.md); this is separate from queue scheduling.
 `cy -m` uses sequential Hydra execution. Scheduling belongs to the separate
 `cy-queue` distribution and `cy_queue` Python namespace. Dependency direction is
 `cy-queue` → `clearml-yolo`; CY never imports the queue package.
@@ -234,7 +236,23 @@ get different tags. Ordinary RUN leaves tags unchanged. See the
 Remove native GPU selectors from queued configurations: allocation supplies all training
 devices and the first device for inference/comparison, while explicit CPU phases remain CPU.
 `CUDA_VISIBLE_DEVICES` is set before the fresh pipeline process. Compilation, AMP, batch and
-model settings are retained. Training holds the full allocation. After native training
+model settings are retained. Submission preserves explicit training `batch=null`;
+the executing worker resolves it after dataset preparation against its assigned GPUs
+and accessible `CY_HOME/.config/clearml-yolo/batch-estimates.json`. Estimate matching
+requires the dataset vocabulary and maximum train/validation image density to fit
+the synthetic bounds. Lookup prefers an exact-allocation measurement; otherwise it
+uses compatible single-GPU sources for every assigned hardware type/capacity and
+extrapolates `N × min(per_gpu_capacities)`. It never extrapolates across unmeasured
+hardware. Origin, target allocation and source keys/status remain in provenance;
+the requested null remains in replay. Submission does not estimate capacity or
+replace null with a submit-host batch. A miss fails with instructions to measure
+compatible idle hardware or use an explicit value. Global training batches must be
+divisible by the allocated GPU count. OOM keeps normal training failure behavior;
+there is no automatic retry or hidden batch reduction.
+These batch-estimation/native multi-GPU interfaces describe unreleased source changes
+with real multi-GPU acceptance pending.
+
+Training holds the full allocation. After native training
 returns and releases unused model memory, the job notifies its external guardian and
 waits for a bounded acknowledgement. The guardian first durably shrinks the claim to
 the first allocated GPU, then releases the other GPU locks and updates the public

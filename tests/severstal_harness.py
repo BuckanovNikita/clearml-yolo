@@ -13,7 +13,7 @@ from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, override
+from typing import Any, assert_never, override
 from uuid import uuid4
 
 from clearml_yolo.core.models import PRESETS, model_preset
@@ -43,6 +43,12 @@ MODEL_SELECTIONS = (
     "fasterrcnn/swin_tiny",
     "fasterrcnn/dinov2_small",
     "fasterrcnn/dinov3_small",
+    "fcos/resnet50_fpn",
+    "fcos/resnet101_fpn",
+    "fcos/convnext_tiny",
+    "fcos/swin_tiny",
+    "fcos/dinov2_small",
+    "fcos/dinov3_small",
 )
 VARIANTS = ("default", "json", "json_mosaic")
 _REPOSITORY = Path(__file__).resolve().parents[1]
@@ -72,9 +78,11 @@ class SeverstalOptions:
 
 
 def _backbone_file(selection: str, path: Path) -> Path:
-    if selection not in MODEL_SELECTIONS or not selection.startswith(("deimv2/", "fasterrcnn/")):
+    if selection not in MODEL_SELECTIONS or not selection.startswith(
+        ("deimv2/", "fasterrcnn/", "fcos/")
+    ):
         raise ValueError(
-            "--severstal-backbone supports only registered DEIMv2 and Faster R-CNN selections"
+            "--severstal-backbone supports only registered DEIMv2, Faster R-CNN and FCOS selections"
         )
     resolved = path.expanduser().resolve()
     if not resolved.is_file() or not resolved.stat().st_size:
@@ -418,8 +426,12 @@ def _reload_checkpoint(request: dict[str, Any], weights: Path, image_path: str) 
         from clearml_yolo.adapters.deim.backend import predict
     elif config.backend == "rfdetr":
         from clearml_yolo.adapters.rfdetr.backend import predict
-    else:
+    elif config.backend == "fasterrcnn":
         from clearml_yolo.adapters.fasterrcnn.backend import predict
+    elif config.backend == "fcos":
+        from clearml_yolo.adapters.fcos.backend import predict
+    else:
+        assert_never(config.backend)
     predictions = predict(config, descriptor, weights, [image_path], settings)
     assert predictions is not None, "Downloaded detector checkpoint failed inference reload"
 

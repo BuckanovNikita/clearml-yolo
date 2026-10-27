@@ -6,14 +6,19 @@ and implementation evidence by topic; this summary does not replace those contra
 
 `cy` runs the pipeline; `cy-train`, `cy-predict`, `cy-val`, `cy-metrics`, `cy-report`,
 `cy-compare`, and `cy-ground-truth` run individual stages. `cy-export` exports and verifies
-Faster R-CNN deployment bundles.
+Faster R-CNN deployment bundles. The unreleased `cy-batch-estimate` utility measures
+local synthetic training capacity without a ClearML task; see
+[its contract and acceptance limits](batch-estimation.md).
 
 Entrypoints: `cy`, `cy-train`, `cy-predict`, `cy-val`, `cy-metrics`,
-`cy-report`, `cy-compare`, `cy-ground-truth`, `cy-export`, `cy-init-config`, `cy-dedup`, and `cy-queue`.
+`cy-report`, `cy-compare`, `cy-ground-truth`, `cy-export`, `cy-init-config`, `cy-dedup`,
+`cy-batch-estimate`, and `cy-queue`.
 The `cy-queue` command belongs to the separately installed compatible queue source
 package; CY's own entrypoints do not require that package or its configuration.
 `cy-init-config DIRECTORY [--command NAME] [--model PRESET] [--force]` writes one selected
-execution wrapper (default `cy`) and its required groups without a ClearML task. Default
+execution wrapper (default `cy`), a local command base and every application YAML
+referenced by their defaults, without a ClearML task. Private schema names are
+separate from public YAML names; legacy trees remain supported. Default
 YOLO model commands retain both native groups. New detector selections write one model
 preset YAML; non-model commands require neither. Export defaults to Faster R-CNN ResNet-50-FPN.
 See [selected export and runtime isolation](runtime-isolation.md).
@@ -62,8 +67,15 @@ Validation rejects unsupported transforms, targets and preprocessing conflicts; 
 canonical content snapshot and SHA-256 digest make replay independent of the source
 file. Generated training configurations include both profiles and the selected
 model/profile specialization. See the [augmentation contract](augmentation.md).
-Direct `cy` and stage commands execute their configured native devices without project
-GPU discovery, queue storage, reservations, waiting or automatic substitution. `cy -m`
+Direct `cy` and stage commands execute their configured native devices without queue
+storage, reservations, waiting or automatic substitution. Explicit training `batch=null`
+inspects actual hardware and dataset limits for strict saved-estimate lookup. It
+prefers an exact-allocation measurement, otherwise derives an explicitly extrapolated
+global batch from compatible single-GPU measurements for every hardware type/capacity.
+Requested null remains in replay; chosen values, target allocation and source
+keys/boundary or ceiling status are recorded separately. Training never retries OOM
+with a hidden batch reduction. Numeric
+defaults and existing YOLO AutoBatch values keep their behavior. `cy -m`
 uses sequential BasicLauncher. `queue.*`, `autogpu.*` and the former queue launcher
 are rejected with migration guidance. The separate [cy-queue contract](queue.md)
 owns count/exact submissions, complete sweep expansion, owner workers, per-host ordering,
@@ -87,7 +99,8 @@ and persists in queued snapshots. Effective MULTIRUN mode includes one-job sweep
 ordinary RUN adds no tag. See the
 [grouping contract](../specs/000-baseline/spec.md#direct-execution-shared-queue-and-diagnostics).
 
-New `model=deimv2/<preset>`, `model=rfdetr/<preset>` and `model=fasterrcnn/<preset>` groups
+The `model=deimv2/<preset>`, `model=rfdetr/<preset>`, `model=fasterrcnn/<preset>` and
+unreleased `model=fcos/<preset>` groups
 own typed `model.train` and `model.predict` settings. Unsupported controls fail explicitly.
 Changed controls in inactive groups are rejected in both directions; YOLO settings belong
 in `ultralytics`/`ultralytics_predict`, and native settings belong in `model.train`/`model.predict`.
@@ -97,6 +110,10 @@ embedded in each owned checkpoint binds backend, preset, foreground vocabulary,
 preprocessing and source/dependency identity; its external record adds the checkpoint hash.
 See the [backend contract](../specs/000-baseline/spec.md#detector-backends-and-deployment-export) and
 [model guide](multi-model-backends.md) for presets, pretrained sources and limitations.
+Native multi-GPU training uses one supervised rank per GPU, with global microbatches
+divisible by world size and one invocation-owned ClearML task. FCOS uses zero-based
+foreground labels and P3–P7 features; Faster R-CNN retains its label offset. Native
+GPU and real multi-GPU acceptance for these additions remain pending.
 
 Comparisons resolve each checkpoint independently, including YOLO/native pairs. Raw native
 references require explicit backend, preset, foreground labels and preprocessing; assertions

@@ -143,7 +143,9 @@ def test_rfdetr_owner_callbacks_keep_finite_metrics_and_native_epochs() -> None:
     events: list[tuple[str, float, int]] = []
     callback = _OwnerMetrics(lambda name, value, epoch: events.append((name, value, epoch)))
     trainer = SimpleNamespace(
-        callback_metrics={"loss": np.float32(1.25), "unavailable": float("nan")}, current_epoch=3
+        callback_metrics={"loss": np.float32(1.25), "unavailable": float("nan")},
+        current_epoch=3,
+        is_global_zero=True,
     )
     callback.on_train_epoch_end(trainer, None)
     trainer.callback_metrics = {"loss": 0.5, "map": 0.25, "invalid": float("inf")}
@@ -165,7 +167,10 @@ def test_rfdetr_owner_callback_failure_aborts_native_execution(validation: bool)
     callback = _OwnerMetrics(reject)
     hook = callback.on_validation_end if validation else callback.on_train_epoch_end
     with pytest.raises(RuntimeError, match="owner telemetry rejected") as caught:
-        hook(SimpleNamespace(callback_metrics={"loss": 1.0}, current_epoch=0), None)
+        hook(
+            SimpleNamespace(callback_metrics={"loss": 1.0}, current_epoch=0, is_global_zero=True),
+            None,
+        )
     assert caught.value is failure
 
 
@@ -287,3 +292,153 @@ def test_rfdetr_rejects_unsupported_checkpoint_preprocessing(changes: dict[str, 
             [],
             PredictSettings(),
         )
+
+
+def test_rfdetr_nonzero_rank_never_reports_owner_metrics() -> None:
+    from clearml_yolo.adapters.rfdetr.backend import _OwnerMetrics
+
+    events: list[tuple[str, float, int]] = []
+    callback = _OwnerMetrics(lambda *event: events.append(event))
+    callback.on_validation_end(
+        SimpleNamespace(is_global_zero=False, callback_metrics={"loss": 1.0}, current_epoch=0),
+        None,
+    )
+    assert events == []
+    assert callback.metrics == {}
+
+
+def test_rfdetr_external_workers_never_launch_more_processes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from clearml_yolo.adapters.rfdetr.backend import trainer_devices
+
+    for key, value in {
+        "WORLD_SIZE": "2",
+        "RANK": "1",
+        "LOCAL_RANK": "1",
+        "TORCHELASTIC_RUN_ID": "owned-test",
+        "MASTER_ADDR": "127.0.0.1",
+        "MASTER_PORT": "29500",
+    }.items():
+        monkeypatch.setenv(key, value)
+    options = trainer_devices("cuda:1")
+    assert options["devices"] == [0, 1]
+    environment = options["plugins"][0]
+    assert environment.creates_processes_externally is True
+    assert environment.world_size() == 2
+    assert environment.global_rank() == 1
+
+
+def test_rfdetr_multi_rank_requires_supervisor_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    from clearml_yolo.adapters.rfdetr.backend import trainer_devices
+
+    monkeypatch.setenv("WORLD_SIZE", "2")
+    monkeypatch.delenv("TORCHELASTIC_RUN_ID", raising=False)
+    with pytest.raises(ValueError, match="supervised"):
+        trainer_devices("cuda:0")
+
+
+@pytest.mark.parametrize("length", [5, 6, 7, 8])
+def test_rfdetr_distributed_validation_removes_padding_before_forward(length: int) -> None:
+    from clearml_yolo.adapters.rfdetr.backend import unique_validation_count
+
+    evaluated: list[int] = []
+    world, batch = 3, 2
+    padded = list(range(length))
+    padded += padded[: (-length) % world]
+    for rank in range(world):
+        shard = padded[rank::world]
+        for offset in range(0, len(shard), batch):
+            current = shard[offset : offset + batch]
+            keep = unique_validation_count(length, world, rank, offset // batch, batch)
+            evaluated.extend(current[:keep])
+    assert sorted(evaluated) == list(range(length))
+
+
+@pytest.mark.parametrize("length", [1, 5, 7])
+def test_rfdetr_validation_forward_visits_only_unique_images(
+    length: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import torch
+    from torch import distributed
+
+    from clearml_yolo.adapters.rfdetr.backend import _UniqueValidation
+
+    forwarded: list[int] = []
+    normalized: list[int] = []
+    monkeypatch.setattr(distributed, "all_reduce", lambda tensor: tensor.fill_(1))
+
+    class Criterion:
+        def __init__(self) -> None:
+            self.weight_dict = {"loss": 1.0}
+
+        def num_boxes_for_targets(self, _outputs: Any, targets: Any) -> torch.Tensor:
+            normalized.append(len(targets))
+            return torch.tensor(1.0)
+
+        def __call__(self, _outputs: Any, targets: Any, **_kwargs: Any) -> dict[str, Any]:
+            return {"loss": torch.tensor(float(len(targets)))}
+
+    def forward(samples: Any) -> dict[str, Any]:
+        forwarded.extend(int(value) for value in samples.tensors.flatten())
+        return {"pred_logits": samples.tensors}
+
+    dataset = torch.utils.data.TensorDataset(torch.arange(length))
+    for rank in range(3):
+        sampler: torch.utils.data.DistributedSampler[Any] = torch.utils.data.DistributedSampler(
+            dataset, num_replicas=3, rank=rank, shuffle=False
+        )
+        module = SimpleNamespace(
+            trainer=SimpleNamespace(val_dataloaders=SimpleNamespace(sampler=sampler, batch_size=2)),
+            device="cpu",
+            criterion=Criterion(),
+            _resolve_eval_model=lambda: forward,
+            _log_val_loss_metrics=lambda *_args, **_kwargs: None,
+            postprocess=lambda _outputs, sizes: [{} for _ in sizes],
+        )
+        ids = list(sampler)
+        for offset in range(0, len(ids), 2):
+            batch_ids = ids[offset : offset + 2]
+            samples = SimpleNamespace(tensors=torch.tensor(batch_ids), mask=None)
+            targets = [{"orig_size": torch.tensor([32, 32])} for _ in batch_ids]
+            result = _UniqueValidation.validation_step(module, (samples, targets), offset // 2)
+            assert len(result["results"]) == len(result["targets"])
+    assert sorted(forwarded) == list(range(length))
+    assert len(normalized) == 3 * ((length + 5) // 6)
+
+
+def test_global_batch_is_validated_before_native_model_allocation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from clearml_yolo.adapters.rfdetr import backend
+
+    monkeypatch.setenv("WORLD_SIZE", "2")
+    monkeypatch.setattr(backend, "_sdk", lambda: pytest.fail("allocated native model"))
+    config = ModelConfig(backend="rfdetr", preset="nano", train=TrainSettings(batch=3))
+    with pytest.raises(ValueError, match="divisible"):
+        backend.training_configuration(config, ("class",), "cuda:0", tmp_path, tmp_path)
+
+
+def test_rfdetr_native_batch_is_per_rank_and_accumulation_is_preserved(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from clearml_yolo.adapters.rfdetr import backend
+
+    captured: dict[str, Any] = {}
+
+    def get_train_config(**kwargs: Any) -> Any:
+        captured.update(kwargs)
+        return SimpleNamespace(**kwargs)
+
+    monkeypatch.setenv("WORLD_SIZE", "3")
+    facade = SimpleNamespace(model_config=SimpleNamespace(), get_train_config=get_train_config)
+    monkeypatch.setattr(backend, "_sdk", lambda: SimpleNamespace(RFDETRNano=lambda **_: facade))
+    config = ModelConfig(
+        backend="rfdetr",
+        preset="nano",
+        train=TrainSettings(batch=6, grad_accum_steps=4, pretrained=False),
+    )
+    backend.training_configuration(config, ("first", "second"), "cuda:0", tmp_path, tmp_path)
+    assert captured["batch_size"] == 2
+    assert captured["grad_accum_steps"] == 4
+    assert captured["class_names"] == ["first", "second"]

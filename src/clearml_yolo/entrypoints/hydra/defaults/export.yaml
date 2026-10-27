@@ -1,0 +1,4 @@
+defaults:
+- /_cy_schemas/export
+- _self_
+- model: fasterrcnn/resnet50_fpn

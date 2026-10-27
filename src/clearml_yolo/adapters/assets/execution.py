@@ -33,7 +33,9 @@ def _requests(config: ModelConfig, training: bool) -> tuple[AssetSpec, ...]:
         assets.append(
             backbone_asset(config.preset)
             if config.backend == "deimv2"
-            else fasterrcnn_asset(config.preset)
+            else fasterrcnn_asset(
+                config.preset, backend="fcos" if config.backend == "fcos" else "fasterrcnn"
+            )
         )
     return tuple(assets)
 

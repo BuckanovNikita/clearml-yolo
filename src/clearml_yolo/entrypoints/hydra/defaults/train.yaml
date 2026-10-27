@@ -1,0 +1,8 @@
+defaults:
+- /_cy_schemas/train
+- _self_
+- model: ultralytics
+- ultralytics: _defaults
+- ultralytics_predict: _defaults
+- transforms: default
+- transform_overrides: ${model}_${transforms}

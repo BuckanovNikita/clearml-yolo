@@ -41,7 +41,10 @@ def test_selected_model_export_contains_only_required_groups(tmp_path: Path) -> 
     paths = dump_config_tree(tmp_path, command="cy-train", model="rfdetr/small")
     assert {path.relative_to(tmp_path).as_posix() for path in paths} == {
         "cy-train.yaml",
+        "train.yaml",
         "model/rfdetr/small.yaml",
+        "ultralytics/_defaults.yaml",
+        "ultralytics_predict/_defaults.yaml",
         "transforms/default.yaml",
         "transforms/albumentations.yaml",
         "transform_overrides/rfdetr/small_default.yaml",

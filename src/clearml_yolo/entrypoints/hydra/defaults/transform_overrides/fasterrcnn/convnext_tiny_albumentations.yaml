@@ -1,0 +1,4 @@
+# @package _global_
+defaults:
+- /_cy_schemas/transform_overrides/fasterrcnn/convnext_tiny_albumentations@_here_
+- _self_

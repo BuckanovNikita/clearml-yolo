@@ -4,6 +4,11 @@
 и результаты эксперимента в ClearML. Можно запустить только обучение или весь
 процесс: предсказания, подбор порогов, оценку, сравнение моделей и отчёты.
 
+FCOS, оценка batch и multi-GPU для нативных семейств доступны начиная с 0.41.0.
+Проверки на реальных GPU имеют ограничения: подтверждение оценки YOLO и физическая
+проверка DDP пока не завершены; см. [проверки релиза](specs/006-batch-training/evidence/release.md).
+Примеры конфигурации не заменяют проверку выполнения.
+
 ## Обучение одной командой
 
 Нужны установленный пакет для Python `>=3.12.13,<3.14` (Python 3.12 начиная с 3.12.13
@@ -43,6 +48,12 @@ cy-train model=rfdetr/small ground_truth=./ground_truth.csv model.train.device=0
 
 ```bash
 cy-train model=fasterrcnn/resnet50_fpn ground_truth=./ground_truth.csv model.train.device=0 clearml.project_name=detection clearml.task_name=fasterrcnn-train 'clearml.tags=[fasterrcnn,training]'
+```
+
+**FCOS** (начиная с 0.41.0):
+
+```bash
+cy-train model=fcos/resnet50_fpn ground_truth=./ground_truth.csv model.train.device=0 clearml.project_name=detection clearml.task_name=fcos-train 'clearml.tags=[fcos,training]'
 ```
 
 После обучения откройте указанную задачу в проекте ClearML `detection`: ход обучения
@@ -126,16 +137,23 @@ test.jpg,images/test.jpg,helmet,10,20,100,120,test
 | Faster R-CNN + ResNet FPN | `fasterrcnn/resnet50_fpn`, `fasterrcnn/resnet101_fpn` |
 | Faster R-CNN + ConvNeXt/Swin | `fasterrcnn/convnext_tiny`, `fasterrcnn/swin_tiny` |
 | Faster R-CNN + DINO | `fasterrcnn/dinov2_small`, `fasterrcnn/dinov3_small` |
+| FCOS + ResNet FPN | `fcos/resnet50_fpn`, `fcos/resnet101_fpn` |
+| FCOS + ConvNeXt/Swin | `fcos/convnext_tiny`, `fcos/swin_tiny` |
+| FCOS + DINO | `fcos/dinov2_small`, `fcos/dinov3_small` |
 
 Добавляйте параметры к выбранной команде обучения:
 
-| Что изменить | YOLO | DEIMv2, RF-DETR, Faster R-CNN |
+| Что изменить | YOLO | DEIMv2, RF-DETR, Faster R-CNN, FCOS |
 | --- | --- | --- |
 | Число эпох | `ultralytics.epochs=50` | `model.train.epochs=50` |
 | Размер пакета | `ultralytics.batch=8` | `model.train.batch=8` |
 | Размер изображения | `ultralytics.imgsz=640` | `model.train.imgsz=640` |
 | Устройство | `ultralytics.device=0` | `model.train.device=0` |
 | Начать обучение из весов | `ultralytics.model=./best.pt` | `model.train.weights=./best.pth` |
+
+FCOS использует pretrained backbone и новую голову детектора, P3–P7 и размер 800
+по умолчанию. Метки foreground начинаются с нуля; внутренний background Faster R-CNN
+не меняется. Deployment-экспорт остаётся доступен только для Faster R-CNN.
 
 Размер RF-DETR должен быть квадратным и кратным 32. Размеры по умолчанию и
 ограничения backbone приведены в [руководстве по моделям](docs/multi-model-backends.md).
@@ -155,6 +173,61 @@ cy-train ground_truth=./ground_truth.csv ultralytics.model=yolo11n.pt \
 Нативные `data`, `classes`, `fraction` и `single_cls` не заменяют выборку из CSV.
 Если переносите параметры из Ultralytics, используйте префикс `ultralytics.`;
 [различия настроек и миграция](TECH_DETAILS.md#configuration-and-migration) описаны отдельно.
+
+### Оценка batch перед обучением
+
+В текущем исходном коде `cy-batch-estimate` измеряет batch на свободных CUDA GPU
+локально, без задачи ClearML. По умолчанию проверяются 44 стандартных pretrained
+варианта YOLO и все нативные пресеты. Для каждой модели, разрешения и профиля обучения
+поиск выполняется на одном GPU каждого типа и объёма памяти; одинаковые GPU используют
+общее измерение:
+
+```bash
+cy-batch-estimate --imgsz 960
+cy-batch-estimate --imgsz 960 --models rfdetr/small,fcos/resnet50_fpn --devices 0,1
+```
+
+Синтетическая нагрузка по умолчанию — 150 классов и 300 объектов на изображение;
+измените её через `--classes` и `--objects-per-image`. Бюджет памяти — 90% каждого GPU,
+`--search-limit` задаёт предел поиска **на один GPU**, по умолчанию 1024 изображения.
+Выбранный batch проверяется повторно в новом процессе; результат на пределе поиска
+отмечается `ceiling_limited`. Если требуется новое измерение, используется первый
+свободный GPU соответствующего типа среди `--devices`; остальные могут быть заняты.
+Чужие процессы не останавливаются, помехи на измеряемом GPU приводят к ошибке.
+
+`--gpu-counts` фильтрует только вывод: каждое N означает первые N GPU в порядке
+`--devices`. Дополнительных поисков и распределённых проверок нет. Для одинаковых GPU
+глобальный batch равен N × измеренный batch на GPU; для разных — N × наименьшая
+совместимая ёмкость на GPU. Для каждого типа и объёма памяти нужно своё измерение.
+Такие результаты помечаются `extrapolated`: это экстраполяция, а не измеренный
+максимум для нескольких GPU. Глобальный batch может превышать `--search-limit`,
+а статус предела исходных измерений сохраняется. Ошибки и прерванные проверки
+сохраняются отдельно и не становятся рекомендациями.
+
+Результаты сохраняются в `CY_HOME/.config/clearml-yolo/batch-estimates.json`.
+Числовые значения по умолчанию не меняются. Только явный null включает строгий поиск:
+
+```bash
+cy-train ground_truth=./ground_truth.csv ultralytics.model=yolo11n.pt \
+  ultralytics.imgsz=960 ultralytics.device=0 ultralytics.batch=null \
+  clearml.project_name=detection clearml.task_name=yolo-estimated 'clearml.tags=[training]'
+
+cy-train model=fcos/resnet50_fpn ground_truth=./ground_truth.csv \
+  model.train.imgsz=960 model.train.device=0 model.train.batch=null \
+  clearml.project_name=detection clearml.task_name=fcos-estimated 'clearml.tags=[training]'
+```
+
+Состав GPU, параметры обучения, число классов и максимальная плотность объектов
+в `train`/`val` должны соответствовать сохранённым измерениям. Сначала выбирается
+совместимое измерение для точного состава GPU, включая старые записи; иначе
+рекомендация вычисляется из совместимых измерений на одном GPU. При несовпадении
+запуск останавливается с инструкцией. Исходный null остаётся в replay, а выбранный
+batch, происхождение, состав GPU и ключи/статусы исходных измерений записываются
+отдельно. Очередь сохраняет null, а worker разрешает его на выделенных GPU.
+OOM при обучении не вызывает автоматический повтор или скрытое уменьшение batch. Пользовательский Albumentations JSON
+требует явного batch. Значение batch — глобальный микробатч по всем GPU, кратный их
+числу; накопление градиентов отдельно определяет размер шага оптимизатора.
+Подробности поиска, совместимости и ограничений — в [руководстве](docs/batch-estimation.md).
 
 ### Свои аугментации и Mosaic
 
@@ -453,11 +526,17 @@ cy --config-dir cy-config --config-name cy ultralytics.epochs=20
 cy-init-config train-config --command cy-train --model rfdetr/small
 ```
 
+Свежий экспорт включает локальную базу: `pipeline.yaml` для `cy`, `train.yaml` для
+`cy-train`, выбранную модель, оба профиля аугментаций и все YAML из их `defaults`.
+Ранее `pipeline` мог разрешаться из встроенного ConfigStore без файла в каталоге.
+Публичные имена YAML теперь отделены от имён схем; старые деревья продолжают работать
+без автоматической перезаписи. Интерполяция, приоритет локальных файлов и CLI сохраняются.
+
 Редактируйте `train-config/cy-train.yaml` и `train-config/model/rfdetr/small.yaml`,
 затем запускайте `cy-train --config-dir train-config --config-name cy-train`.
 `--command` поддерживает `cy`, `cy-train`, `cy-predict`, `cy-val`, `cy-metrics`,
 `cy-compare`, `cy-report`, `cy-ground-truth`, `cy-export`. Команды работы с таблицами
-создают только свой YAML; `cy-export` по умолчанию выбирает Faster R-CNN.
+создают обёртку и локальную базу; `cy-export` по умолчанию выбирает Faster R-CNN.
 Существующие выбранные файлы вызывают ошибку; `--force` заменяет их, сохраняя файлы
 других команд. Перед обновлением сохраните свои настройки; см.
 [миграцию конфигураций](TECH_DETAILS.md#configuration-and-migration).
@@ -481,9 +560,12 @@ cy --config-dir cy-config --config-name cy -m ultralytics.epochs=10,20
 cy --config-dir cy-config --config-name cy 'ultralytics.device=[0,1]' ultralytics_predict.device=0
 ```
 
-DEIMv2, RF-DETR и Faster R-CNN поддерживают CPU или один CUDA GPU; DDP для этих
-адаптеров не реализован. Проверки реального multi-GPU запуска описаны в
-[руководстве DDP](docs/ddp-testing.md).
+В текущем исходном коде DEIMv2, RF-DETR, Faster R-CNN и FCOS принимают несколько
+устройств обучения через `'model.train.device=[0,1]'`. Глобальный `model.train.batch`
+должен делиться на число GPU. Внешний процесс владеет единственной задачей ClearML,
+rank zero — чекпойнтами и агрегированными метриками. Предсказания используют один GPU,
+а очередь после обучения сохраняет первый выделенный GPU. Реальная multi-GPU
+приёмка остаётся открытой; [руководство DDP](docs/ddp-testing.md) описывает проверки.
 
 ## Выполнение через ClearML Agent
 
@@ -757,6 +839,7 @@ cy-dedup
 | Проблема | Что проверить |
 | --- | --- |
 | Нет изображений или выборки | Пути относительно CSV; `train`/`val` для обучения и `test` для полного процесса |
+| Нет совместимой оценки batch | Повторите `cy-batch-estimate` на нужных свободных GPU с подходящей нагрузкой либо задайте числовой batch; см. [контракт](docs/batch-estimation.md) |
 | Неизвестный параметр | Правильную группу; создайте свежий YAML через `cy-init-config` в новом каталоге |
 | Не загружается модель | Семейство, пресет, совместимость весов и зависимости; [сообщение о недостающих файлах](docs/model-assets.md#offline-placement-and-access) содержит исходный URL, абсолютный путь и параметр для ручного размещения |
 | Требуется подпись модели | Передайте `model_label` или подписи ModelRef; сохраните файлы происхождения |

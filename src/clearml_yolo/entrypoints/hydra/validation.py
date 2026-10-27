@@ -278,19 +278,24 @@ def _inspect_saved_configuration(directory: Path, name: str, visited: set[Path])
                     _inspect_saved_configuration(directory, f"{group}/{selection}", visited)
 
 
-def validate_launch_arguments(name: str) -> None:
-    """Compose actual CLI inputs before Hydra logging/output directory creation."""
+def validate_launch_arguments(name: str) -> str | None:
+    """Preflight CLI inputs and return the local source that must precede package defaults."""
     from hydra import initialize, initialize_config_dir
     from hydra._internal.utils import get_args_parser
     from hydra.core.hydra_config import HydraConfig
 
     arguments = get_args_parser().parse_args()
+    local_source = (
+        str(Path(arguments.config_dir).expanduser().resolve())
+        if arguments.config_dir is not None
+        else None
+    )
     for override in arguments.overrides:
         key = override.split("=", 1)[0].lstrip("+~").split(".", 1)[0]
         if key in _LEGACY_CONTROLS or override.lstrip("+~") == "hydra/launcher=cy_queue":
             raise ValueError(_MIGRATION)
     if arguments.help or arguments.hydra_help or arguments.shell_completion or arguments.info:
-        return
+        return local_source
     selected_name = arguments.config_name or name
     directory = arguments.config_dir or arguments.config_path
     if directory is not None:
@@ -317,6 +322,7 @@ def validate_launch_arguments(name: str) -> None:
                 validate_project_destinations(job)
     finally:
         HydraConfig.instance().cfg = previous
+    return local_source
 
 
 def validate_hydra_destinations(config: DictConfig, *, multirun: bool = False) -> None:

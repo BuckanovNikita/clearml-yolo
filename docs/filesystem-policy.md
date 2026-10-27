@@ -1,6 +1,6 @@
 # Filesystem ownership
 
-The application execution commands and `cy-init-config` initialize project paths through a
+The application execution commands, `cy-batch-estimate` and `cy-init-config` initialize project paths through a
 stdlib-only bootstrap. Ordinary package imports remain inert. `CY_HOME` defaults to the
 launch working directory; relative values resolve against that directory before Hydra
 changes cwd. Explicit relative inputs and outputs retain their working-directory semantics.
@@ -14,6 +14,7 @@ beside the selected destination and are cleaned there.
 | Task-owned runs and latest shortcut | `runs/` |
 | Hydra logs and sweeps | `outputs/`, `multirun/` |
 | Shared CSV datasets | `.cache/clearml-yolo/datasets/` |
+| Training batch estimates | `.config/clearml-yolo/batch-estimates.json` |
 | Managed non-YOLO weights | `.cache/clearml-yolo/models/<backend>/<preset>/<asset-id>/<filename>` |
 | Managed DEIM source archive and tree | `.cache/clearml-yolo/sources/DEIMv2/<revision>.tar.gz` and adjacent `<revision>/` |
 | Invocation scratch and capture logs | `.tmp/cy-runtime-*` |
@@ -24,6 +25,11 @@ XDG. `CY_RUNTIME_TEMP_ROOT` selects the parent of invocation arenas; its default
 `CY_HOME/.tmp`, and a relative selection resolves against `CY_HOME`. Explicit inputs may live outside the workspace. Application-owned outputs, cache, logs,
 configuration snapshots and temporary destinations must resolve beneath CY_HOME, including
 through symlinks. Invalid destinations fail before creation. Existing data is neither migrated nor deleted.
+
+The unreleased [batch estimator](batch-estimation.md) uses a versioned JSON catalogue
+with a native file lock and atomic replacement beneath `CY_HOME`. It records successful
+and failed cases, diagnostics and provenance without creating a ClearML task. Its
+configuration location is independent of queue configuration discovery.
 
 Hydra preflight checks generated configuration files and log destinations using each
 run's actual directory, including every sequential sweep member and the sweep manifest.

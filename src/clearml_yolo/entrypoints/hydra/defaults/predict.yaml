@@ -1,0 +1,6 @@
+defaults:
+- /_cy_schemas/predict
+- _self_
+- model: ultralytics
+- ultralytics: _defaults
+- ultralytics_predict: _defaults

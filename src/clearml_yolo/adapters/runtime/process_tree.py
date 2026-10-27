@@ -162,6 +162,10 @@ class LinuxProcessTree:
         self._owned()
         return tuple(sorted(self._identities.items()))
 
+    def live_pids(self) -> tuple[int, ...]:
+        """Expose currently confirmed owners without trusting historical PID numbers."""
+        return tuple(sorted(process.pid for process in self._owned()))
+
     def adopt_children(self, parent: int) -> None:
         """A subreaper may retain descendants adopted after their parent exits."""
         for process in self._table().values():
@@ -335,6 +339,33 @@ class LinuxProcessTree:
                 if time.monotonic() >= graceful:
                     self.signal(signal.SIGKILL)
                 time.sleep(0.05)
+
+    def reap_children(self) -> None:
+        """Reap recorded adopted zombies after direct Popen statuses are consumed."""
+        for pid, born in tuple(self._identities.items()):
+            current = _read_process(pid)
+            if (
+                current is not None
+                and current.born == born
+                and current.parent == os.getpid()
+                and current.state == "Z"
+            ):
+                self._reap(current)
+
+    @staticmethod
+    def _reap(process: _Process) -> None:
+        """Reap only a recorded own child; never consume a publisher's status."""
+        try:
+            descriptor = os.pidfd_open(process.pid)
+        except ProcessLookupError:
+            return
+        try:
+            current = _read_process(process.pid)
+            if current is not None and current.born == process.born:
+                with suppress(ChildProcessError, ProcessLookupError):
+                    os.waitid(os.P_PIDFD, descriptor, os.WEXITED | os.WNOHANG)
+        finally:
+            os.close(descriptor)
 
 
 class SubreaperProcessTree(LinuxProcessTree):
@@ -630,21 +661,6 @@ class _NativeProcessTree(LinuxProcessTree):
                 and pid not in protected
             ):
                 self._reap(process)
-
-    @staticmethod
-    def _reap(process: _Process) -> None:
-        """Reap only a recorded own child; never consume a publisher's status."""
-        try:
-            descriptor = os.pidfd_open(process.pid)
-        except ProcessLookupError:
-            return
-        try:
-            current = _read_process(process.pid)
-            if current is not None and current.born == process.born:
-                with suppress(ChildProcessError, ProcessLookupError):
-                    os.waitid(os.P_PIDFD, descriptor, os.WEXITED | os.WNOHANG)
-        finally:
-            os.close(descriptor)
 
     @override
     def running(self) -> bool:

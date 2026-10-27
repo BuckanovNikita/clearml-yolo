@@ -34,13 +34,14 @@ layers =
     pipeline
     val | report
     metrics
-    compare | predict | train | ground_truth | export
+    compare | predict | train | ground_truth | export | batch_estimate
     publication
 
 [importlinter:contract:every-command-entrypoint-stands-alone]
 name = Every command entrypoint stands alone
 type = independence
 modules =
+    clearml_yolo.entrypoints.batch_estimate
     clearml_yolo.entrypoints.compare
     clearml_yolo.entrypoints.config_tree
     clearml_yolo.entrypoints.dedup
@@ -70,6 +71,9 @@ ignore_imports =
     clearml_yolo.adapters.yolo.ground_truth -> ultralytics
     clearml_yolo.adapters.yolo.inference -> ultralytics
     clearml_yolo.adapters.yolo.reinfer -> ultralytics
+    clearml_yolo.adapters.yolo.batch_probe -> ultralytics
+    clearml_yolo.adapters.integrations.batch_resolution -> ultralytics
+
 
 [importlinter:contract:torch-sdk-has-explicit-owners]
 name = torch SDK has explicit owners
@@ -88,17 +92,28 @@ ignore_imports =
     clearml_yolo.adapters.export.swin -> torch
     clearml_yolo.adapters.export.tensors -> torch
     clearml_yolo.adapters.export.verification -> torch
-    clearml_yolo.adapters.fasterrcnn.data -> torch
-    clearml_yolo.adapters.fasterrcnn.assets -> torch
-    clearml_yolo.adapters.fasterrcnn.evaluation -> torch
-    clearml_yolo.adapters.fasterrcnn.inference -> torch
-    clearml_yolo.adapters.fasterrcnn.model -> torch
-    clearml_yolo.adapters.fasterrcnn.training -> torch
-    clearml_yolo.adapters.fasterrcnn.transform -> torch
     clearml_yolo.adapters.integrations.native_runtime -> torch
     clearml_yolo.adapters.deim.backend -> torch
+    clearml_yolo.adapters.deim.probe -> torch
     clearml_yolo.adapters.rfdetr.backend -> torch
+    clearml_yolo.adapters.rfdetr.probe -> torch
     clearml_yolo.adapters.export.onnx -> torch
+    clearml_yolo.adapters.runtime.distributed -> torch
+    clearml_yolo.adapters.runtime.gpu_memory -> torch
+    clearml_yolo.adapters.integrations.training_worker -> torch
+    clearml_yolo.adapters.integrations.probe_worker -> torch
+    clearml_yolo.adapters.yolo.batch_probe -> torch
+    clearml_yolo.adapters.torchvision.assets -> torch
+    clearml_yolo.adapters.torchvision.backbone -> torch
+    clearml_yolo.adapters.torchvision.checkpoint -> torch
+    clearml_yolo.adapters.torchvision.data -> torch
+    clearml_yolo.adapters.torchvision.distributed -> torch
+    clearml_yolo.adapters.torchvision.evaluation -> torch
+    clearml_yolo.adapters.torchvision.inference -> torch
+    clearml_yolo.adapters.torchvision.probe -> torch
+    clearml_yolo.adapters.torchvision.training -> torch
+    clearml_yolo.adapters.torchvision.transform -> torch
+
 
 [importlinter:contract:clearml-sdk-has-explicit-owners]
 name = clearml SDK has explicit owners
@@ -244,6 +259,8 @@ type = forbidden
 source_modules =
     clearml_yolo.adapters.storage
 forbidden_modules =
+    clearml_yolo.adapters.fcos
+    clearml_yolo.adapters.torchvision
     clearml_yolo.adapters.augmentation
     clearml_yolo.adapters.deim
     clearml_yolo.adapters.rfdetr
@@ -267,6 +284,8 @@ type = forbidden
 source_modules =
     clearml_yolo.adapters.observability
 forbidden_modules =
+    clearml_yolo.adapters.fcos
+    clearml_yolo.adapters.torchvision
     clearml_yolo.adapters.augmentation
     clearml_yolo.adapters.deim
     clearml_yolo.adapters.rfdetr
@@ -291,6 +310,8 @@ type = forbidden
 source_modules =
     clearml_yolo.adapters.yolo
 forbidden_modules =
+    clearml_yolo.adapters.fcos
+    clearml_yolo.adapters.torchvision
     clearml_yolo.adapters.augmentation
     clearml_yolo.adapters.deim
     clearml_yolo.adapters.rfdetr
@@ -306,6 +327,7 @@ forbidden_modules =
 allow_indirect_imports = true
 ignore_imports =
     clearml_yolo.adapters.yolo.augmentation -> clearml_yolo.adapters.augmentation.pipeline
+    clearml_yolo.adapters.yolo.batch_probe -> clearml_yolo.adapters.runtime.gpu_memory
 
 [importlinter:contract:evaluation-adapter-peer-ownership]
 name = evaluation adapter peer ownership
@@ -313,6 +335,8 @@ type = forbidden
 source_modules =
     clearml_yolo.adapters.evaluation
 forbidden_modules =
+    clearml_yolo.adapters.fcos
+    clearml_yolo.adapters.torchvision
     clearml_yolo.adapters.augmentation
     clearml_yolo.adapters.deim
     clearml_yolo.adapters.rfdetr
@@ -334,6 +358,8 @@ type = forbidden
 source_modules =
     clearml_yolo.adapters.reporting
 forbidden_modules =
+    clearml_yolo.adapters.fcos
+    clearml_yolo.adapters.torchvision
     clearml_yolo.adapters.augmentation
     clearml_yolo.adapters.deim
     clearml_yolo.adapters.rfdetr
@@ -354,6 +380,8 @@ type = forbidden
 source_modules =
     clearml_yolo.adapters.clearml
 forbidden_modules =
+    clearml_yolo.adapters.fcos
+    clearml_yolo.adapters.torchvision
     clearml_yolo.adapters.augmentation
     clearml_yolo.adapters.deim
     clearml_yolo.adapters.rfdetr
@@ -376,6 +404,8 @@ type = forbidden
 source_modules =
     clearml_yolo.adapters.fiftyone
 forbidden_modules =
+    clearml_yolo.adapters.fcos
+    clearml_yolo.adapters.torchvision
     clearml_yolo.adapters.augmentation
     clearml_yolo.adapters.deim
     clearml_yolo.adapters.rfdetr
@@ -401,6 +431,8 @@ type = forbidden
 source_modules =
     clearml_yolo.adapters.runtime
 forbidden_modules =
+    clearml_yolo.adapters.fcos
+    clearml_yolo.adapters.torchvision
     clearml_yolo.adapters.augmentation
     clearml_yolo.adapters.deim
     clearml_yolo.adapters.rfdetr
@@ -423,6 +455,8 @@ type = forbidden
 source_modules =
     clearml_yolo.adapters.integrations
 forbidden_modules =
+    clearml_yolo.adapters.fcos
+    clearml_yolo.adapters.torchvision
     clearml_yolo.adapters.augmentation
     clearml_yolo.adapters.deim
     clearml_yolo.adapters.rfdetr
@@ -459,6 +493,30 @@ ignore_imports =
     clearml_yolo.adapters.integrations.training -> clearml_yolo.adapters.clearml.session
     clearml_yolo.adapters.integrations.training -> clearml_yolo.adapters.yolo.config
     clearml_yolo.adapters.integrations.detectors -> clearml_yolo.adapters.assets.execution
+    clearml_yolo.adapters.integrations.detectors -> clearml_yolo.adapters.fcos.backend
+    clearml_yolo.adapters.integrations.detectors -> clearml_yolo.adapters.runtime.distributed
+    clearml_yolo.adapters.integrations.distributed_training -> clearml_yolo.adapters.runtime.distributed
+    clearml_yolo.adapters.integrations.distributed_training -> clearml_yolo.adapters.runtime.workers
+    clearml_yolo.adapters.integrations.training_worker -> clearml_yolo.adapters.runtime.distributed
+    clearml_yolo.adapters.integrations.training_worker -> clearml_yolo.adapters.deim.backend
+    clearml_yolo.adapters.integrations.training_worker -> clearml_yolo.adapters.rfdetr.backend
+    clearml_yolo.adapters.integrations.training_worker -> clearml_yolo.adapters.fasterrcnn.backend
+    clearml_yolo.adapters.integrations.training_worker -> clearml_yolo.adapters.fcos.backend
+    clearml_yolo.adapters.integrations.probe_worker -> clearml_yolo.adapters.runtime.distributed
+    clearml_yolo.adapters.integrations.probe_worker -> clearml_yolo.adapters.deim.probe
+    clearml_yolo.adapters.integrations.probe_worker -> clearml_yolo.adapters.rfdetr.probe
+    clearml_yolo.adapters.integrations.probe_worker -> clearml_yolo.adapters.fasterrcnn.backend
+    clearml_yolo.adapters.integrations.probe_worker -> clearml_yolo.adapters.fcos.backend
+    clearml_yolo.adapters.integrations.probe_worker -> clearml_yolo.adapters.yolo.batch_probe
+    clearml_yolo.adapters.integrations.batch_probe -> clearml_yolo.adapters.assets.execution
+    clearml_yolo.adapters.integrations.batch_probe -> clearml_yolo.adapters.runtime.gpu_inventory
+    clearml_yolo.adapters.integrations.batch_probe -> clearml_yolo.adapters.runtime.workers
+    clearml_yolo.adapters.integrations.batch_profiles -> clearml_yolo.adapters.assets.execution
+    clearml_yolo.adapters.integrations.batch_profiles -> clearml_yolo.adapters.runtime.gpu_inventory
+    clearml_yolo.adapters.integrations.batch_profiles -> clearml_yolo.adapters.yolo.config
+    clearml_yolo.adapters.integrations.batch_resolution -> clearml_yolo.adapters.runtime.distributed
+    clearml_yolo.adapters.integrations.batch_resolution -> clearml_yolo.adapters.runtime.gpu_inventory
+
 
 [importlinter:contract:openpyxl-sdk-has-explicit-owners]
 name = openpyxl SDK has explicit owners
@@ -476,6 +534,8 @@ type = forbidden
 source_modules =
     clearml_yolo.adapters.deim
 forbidden_modules =
+    clearml_yolo.adapters.fcos
+    clearml_yolo.adapters.torchvision
     clearml_yolo.adapters.augmentation
     clearml_yolo.adapters.storage
     clearml_yolo.adapters.yolo
@@ -495,6 +555,8 @@ ignore_imports =
     clearml_yolo.adapters.deim.transforms -> clearml_yolo.adapters.augmentation.pipeline
     clearml_yolo.adapters.deim.transforms -> clearml_yolo.adapters.augmentation.torch_data
     clearml_yolo.adapters.deim.backend -> clearml_yolo.adapters.storage.filesystem
+    clearml_yolo.adapters.deim.backend -> clearml_yolo.adapters.runtime.distributed
+    clearml_yolo.adapters.deim.probe -> clearml_yolo.adapters.runtime.gpu_memory
     clearml_yolo.adapters.deim.source -> clearml_yolo.adapters.storage.filesystem
     clearml_yolo.adapters.deim.backend -> clearml_yolo.adapters.assets.sources
     clearml_yolo.adapters.deim.source -> clearml_yolo.adapters.assets.archive
@@ -506,6 +568,8 @@ type = forbidden
 source_modules =
     clearml_yolo.adapters.rfdetr
 forbidden_modules =
+    clearml_yolo.adapters.fcos
+    clearml_yolo.adapters.torchvision
     clearml_yolo.adapters.augmentation
     clearml_yolo.adapters.storage
     clearml_yolo.adapters.yolo
@@ -525,6 +589,9 @@ ignore_imports =
     clearml_yolo.adapters.rfdetr.transforms -> clearml_yolo.adapters.augmentation.pipeline
     clearml_yolo.adapters.rfdetr.transforms -> clearml_yolo.adapters.augmentation.torch_data
     clearml_yolo.adapters.rfdetr.backend -> clearml_yolo.adapters.storage.filesystem
+    clearml_yolo.adapters.rfdetr.backend -> clearml_yolo.adapters.runtime.distributed
+    clearml_yolo.adapters.rfdetr.probe -> clearml_yolo.adapters.runtime.distributed
+    clearml_yolo.adapters.rfdetr.probe -> clearml_yolo.adapters.runtime.gpu_memory
 
 [importlinter:contract:fasterrcnn-adapter-peer-ownership]
 name = fasterrcnn adapter peer ownership
@@ -532,6 +599,8 @@ type = forbidden
 source_modules =
     clearml_yolo.adapters.fasterrcnn
 forbidden_modules =
+    clearml_yolo.adapters.fcos
+    clearml_yolo.adapters.torchvision
     clearml_yolo.adapters.augmentation
     clearml_yolo.adapters.storage
     clearml_yolo.adapters.yolo
@@ -548,9 +617,20 @@ forbidden_modules =
 allow_indirect_imports = true
 # Exact read-only containment helper; other storage effects remain forbidden.
 ignore_imports =
-    clearml_yolo.adapters.fasterrcnn.data -> clearml_yolo.adapters.augmentation.torch_data
-    clearml_yolo.adapters.fasterrcnn.data -> clearml_yolo.adapters.augmentation.pipeline
-    clearml_yolo.adapters.fasterrcnn.training -> clearml_yolo.adapters.storage.filesystem
+    clearml_yolo.adapters.fasterrcnn.assets -> clearml_yolo.adapters.torchvision.assets
+    clearml_yolo.adapters.fasterrcnn.configuration -> clearml_yolo.adapters.torchvision.configuration
+    clearml_yolo.adapters.fasterrcnn.data -> clearml_yolo.adapters.torchvision.data
+    clearml_yolo.adapters.fasterrcnn.evaluation -> clearml_yolo.adapters.torchvision.evaluation
+    clearml_yolo.adapters.fasterrcnn.inference -> clearml_yolo.adapters.torchvision.inference
+    clearml_yolo.adapters.fasterrcnn.inference -> clearml_yolo.adapters.torchvision.distributed
+    clearml_yolo.adapters.fasterrcnn.training -> clearml_yolo.adapters.torchvision.training
+    clearml_yolo.adapters.fasterrcnn.transform -> clearml_yolo.adapters.torchvision.transform
+    clearml_yolo.adapters.fasterrcnn.model -> clearml_yolo.adapters.torchvision.assets
+    clearml_yolo.adapters.fasterrcnn.model -> clearml_yolo.adapters.torchvision.backbone
+    clearml_yolo.adapters.fasterrcnn.model -> clearml_yolo.adapters.torchvision.checkpoint
+    clearml_yolo.adapters.fasterrcnn.model -> clearml_yolo.adapters.torchvision.transform
+    clearml_yolo.adapters.fasterrcnn.backend -> clearml_yolo.adapters.torchvision.probe
+
 
 [importlinter:contract:export-adapter-peer-ownership]
 name = export adapter peer ownership
@@ -558,6 +638,8 @@ type = forbidden
 source_modules =
     clearml_yolo.adapters.export
 forbidden_modules =
+    clearml_yolo.adapters.fcos
+    clearml_yolo.adapters.torchvision
     clearml_yolo.adapters.augmentation
     clearml_yolo.adapters.storage
     clearml_yolo.adapters.yolo
@@ -596,10 +678,13 @@ unmatched_ignore_imports_alerting = none
 ignore_imports =
     clearml_yolo.adapters.augmentation.torch_data -> torchvision
     clearml_yolo.adapters.deim.backend -> torchvision
-    clearml_yolo.adapters.fasterrcnn.assets -> torchvision
     clearml_yolo.adapters.fasterrcnn.model -> torchvision
-    clearml_yolo.adapters.fasterrcnn.transform -> torchvision
     clearml_yolo.adapters.export.tensors -> torchvision
+    clearml_yolo.adapters.torchvision.assets -> torchvision
+    clearml_yolo.adapters.torchvision.backbone -> torchvision
+    clearml_yolo.adapters.torchvision.transform -> torchvision
+    clearml_yolo.adapters.fcos.model -> torchvision
+
 
 [importlinter:contract:timm-sdk-has-explicit-owners]
 name = timm SDK has explicit owners
@@ -613,8 +698,9 @@ allow_indirect_imports = true
 unmatched_ignore_imports_alerting = none
 ignore_imports =
     clearml_yolo.adapters.export.swin -> timm
-    clearml_yolo.adapters.fasterrcnn.assets -> timm
-    clearml_yolo.adapters.fasterrcnn.model -> timm
+    clearml_yolo.adapters.torchvision.assets -> timm
+    clearml_yolo.adapters.torchvision.backbone -> timm
+
 
 [importlinter:contract:rfdetr-sdk-has-explicit-owners]
 name = rfdetr SDK has explicit owners
@@ -629,6 +715,7 @@ unmatched_ignore_imports_alerting = none
 ignore_imports =
     clearml_yolo.adapters.rfdetr.backend -> rfdetr
     clearml_yolo.adapters.rfdetr.assets -> rfdetr
+    clearml_yolo.adapters.rfdetr.probe -> rfdetr
 
 [importlinter:contract:pytorch-lightning-sdk-has-explicit-owners]
 name = pytorch_lightning SDK has explicit owners
@@ -642,6 +729,7 @@ allow_indirect_imports = true
 unmatched_ignore_imports_alerting = none
 ignore_imports =
     clearml_yolo.adapters.rfdetr.backend -> pytorch_lightning
+    clearml_yolo.adapters.rfdetr.probe -> pytorch_lightning
 
 [importlinter:contract:pycocotools-sdk-has-explicit-owners]
 name = pycocotools SDK has explicit owners
@@ -654,8 +742,9 @@ allow_indirect_imports = true
 # Optional SDKs load lazily; architecture tests add and check their dynamic edges.
 unmatched_ignore_imports_alerting = none
 ignore_imports =
-    clearml_yolo.adapters.fasterrcnn.evaluation -> pycocotools
     clearml_yolo.adapters.export.quality -> pycocotools
+    clearml_yolo.adapters.torchvision.evaluation -> pycocotools
+
 
 [importlinter:contract:onnx-sdk-has-explicit-owners]
 name = onnx SDK has explicit owners
@@ -704,7 +793,7 @@ containers =
     clearml_yolo.adapters
 # Peers share a classification level; the peer contracts enforce their allowed edges.
 layers =
-    augmentation:storage:observability:yolo:evaluation:reporting:clearml:fiftyone:runtime:integrations:deim:rfdetr:fasterrcnn:export:assets
+    augmentation:storage:observability:yolo:evaluation:reporting:clearml:fiftyone:runtime:integrations:deim:rfdetr:fasterrcnn:fcos:torchvision:export:assets
 exhaustive = true
 
 [importlinter:contract:exhaustive-application-classification]
@@ -715,7 +804,8 @@ containers =
 layers =
     use_cases
     evaluation | ground_truth
-    ports
+    ports:batch_ports
+    training_workers
     contracts
 exhaustive = true
 
@@ -749,6 +839,8 @@ type = forbidden
 source_modules =
     clearml_yolo.adapters.augmentation
 forbidden_modules =
+    clearml_yolo.adapters.fcos
+    clearml_yolo.adapters.torchvision
     clearml_yolo.adapters.storage
     clearml_yolo.adapters.yolo
     clearml_yolo.adapters.clearml
@@ -771,6 +863,8 @@ type = forbidden
 source_modules =
     clearml_yolo.adapters.assets
 forbidden_modules =
+    clearml_yolo.adapters.fcos
+    clearml_yolo.adapters.torchvision
     clearml_yolo.adapters.augmentation
     clearml_yolo.adapters.clearml
     clearml_yolo.adapters.deim
@@ -797,7 +891,7 @@ type = layers
 containers =
     clearml_yolo.entrypoints
 layers =
-    compare:composition:config_tree:dedup:export:ground_truth:hydra:metrics:pipeline:predict:report:train:val
+    batch_estimate:compare:composition:config_tree:dedup:export:ground_truth:hydra:metrics:pipeline:predict:report:train:val
 exhaustive = true
 
 [importlinter:contract:safetensors-sdk-has-explicit-owners]
@@ -810,3 +904,89 @@ forbidden_modules =
 allow_indirect_imports = true
 ignore_imports =
     clearml_yolo.adapters.assets.resolver -> safetensors
+
+[importlinter:contract:fcos-adapter-peer-ownership]
+name = fcos adapter peer ownership
+type = forbidden
+source_modules =
+    clearml_yolo.adapters.fcos
+forbidden_modules =
+    clearml_yolo.adapters.augmentation
+    clearml_yolo.adapters.storage
+    clearml_yolo.adapters.yolo
+    clearml_yolo.adapters.evaluation
+    clearml_yolo.adapters.reporting
+    clearml_yolo.adapters.clearml
+    clearml_yolo.adapters.fiftyone
+    clearml_yolo.adapters.runtime
+    clearml_yolo.adapters.integrations
+    clearml_yolo.adapters.deim
+    clearml_yolo.adapters.rfdetr
+    clearml_yolo.adapters.fasterrcnn
+    clearml_yolo.adapters.export
+    clearml_yolo.adapters.assets
+    clearml_yolo.adapters.torchvision
+allow_indirect_imports = true
+ignore_imports =
+    clearml_yolo.adapters.fcos.backend -> clearml_yolo.adapters.torchvision.configuration
+    clearml_yolo.adapters.fcos.backend -> clearml_yolo.adapters.torchvision.training
+    clearml_yolo.adapters.fcos.backend -> clearml_yolo.adapters.torchvision.inference
+    clearml_yolo.adapters.fcos.backend -> clearml_yolo.adapters.torchvision.probe
+    clearml_yolo.adapters.fcos.model -> clearml_yolo.adapters.torchvision.assets
+    clearml_yolo.adapters.fcos.model -> clearml_yolo.adapters.torchvision.backbone
+    clearml_yolo.adapters.fcos.model -> clearml_yolo.adapters.torchvision.transform
+
+
+[importlinter:contract:torchvision-adapter-peer-ownership]
+name = torchvision adapter peer ownership
+type = forbidden
+source_modules =
+    clearml_yolo.adapters.torchvision
+forbidden_modules =
+    clearml_yolo.adapters.augmentation
+    clearml_yolo.adapters.storage
+    clearml_yolo.adapters.yolo
+    clearml_yolo.adapters.evaluation
+    clearml_yolo.adapters.reporting
+    clearml_yolo.adapters.clearml
+    clearml_yolo.adapters.fiftyone
+    clearml_yolo.adapters.runtime
+    clearml_yolo.adapters.integrations
+    clearml_yolo.adapters.deim
+    clearml_yolo.adapters.rfdetr
+    clearml_yolo.adapters.fasterrcnn
+    clearml_yolo.adapters.export
+    clearml_yolo.adapters.assets
+    clearml_yolo.adapters.fcos
+allow_indirect_imports = true
+ignore_imports =
+    clearml_yolo.adapters.torchvision.data -> clearml_yolo.adapters.augmentation.torch_data
+    clearml_yolo.adapters.torchvision.data -> clearml_yolo.adapters.augmentation.pipeline
+    clearml_yolo.adapters.torchvision.training -> clearml_yolo.adapters.storage.filesystem
+    clearml_yolo.adapters.torchvision.inference -> clearml_yolo.adapters.observability.progress
+    clearml_yolo.adapters.torchvision.probe -> clearml_yolo.adapters.runtime.gpu_memory
+
+
+[importlinter:contract:lightning-fabric-sdk-has-explicit-owners]
+name = lightning_fabric SDK has explicit owners
+type = forbidden
+source_modules =
+    clearml_yolo
+forbidden_modules =
+    lightning_fabric
+allow_indirect_imports = true
+unmatched_ignore_imports_alerting = none
+ignore_imports =
+    clearml_yolo.adapters.rfdetr.backend -> lightning_fabric
+
+[importlinter:contract:faster-coco-eval-sdk-has-explicit-owners]
+name = faster_coco_eval SDK has explicit owners
+type = forbidden
+source_modules =
+    clearml_yolo
+forbidden_modules =
+    faster_coco_eval
+allow_indirect_imports = true
+unmatched_ignore_imports_alerting = none
+ignore_imports =
+    clearml_yolo.adapters.deim.probe -> faster_coco_eval

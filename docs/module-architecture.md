@@ -27,6 +27,8 @@ flowchart TD
 | Core | Values → policy, validation and evaluation records | No filesystem, environment, process, network or SDK effects | Explicit validation errors; architecture negative fixtures |
 | Evaluation / reporting | Scientific inputs → values / rendered reports | Evaluation owns pinned metric integration; reporting owns workbook/plot writes | Geometry policy and metric parity tests; no hidden rendering during computation |
 | Assets | Typed source request → verified local path and provenance | CY outer resolver owns HTTP/cache/locks/extraction; backend owns native loading | Explicit missing inputs fail; proxy/offline/integrity and native-loader tests |
+| Batch estimation | Model/hardware profile → validated batch and trial history | Pure core search/compatibility; injected application probe/store ports; adapters own GPU/process/JSON effects | Only repeated compatible successful trials are reusable; OOM, contamination, crash and timeout stay distinct |
+| Native workers | Typed request → rank receipts and rank-zero checkpoint | Owner supervises one rank per GPU and exclusively publishes ClearML; shared Torchvision accepts family builders | Failed ranks terminate owned peers; global batch divisibility, unique validation and receipt identities checked |
 | cy_queue / CY runtime | Requests and process identities → claims and cleanup evidence | Separate queue owns admission; CY runtime owns scoped process supervision and lifecycle messages | Unknown coordination fails closed; queue subprocess/generation tests and CY lifecycle tests |
 
 Adapter peer permissions and exact bridges are enumerated in the

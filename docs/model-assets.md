@@ -1,7 +1,7 @@
 # Model assets and offline recovery
 
-Non-YOLO execution prepares matching native model assets for DEIMv2, RF-DETR and
-Faster R-CNN. Dependency installation remains externally managed. Ultralytics
+Non-YOLO execution prepares matching native model assets for DEIMv2, RF-DETR,
+Faster R-CNN and FCOS. Dependency installation remains externally managed. Ultralytics
 configuration, downloads and initialization remain unchanged. Help, configuration
 inspection and queue submission do not resolve assets.
 

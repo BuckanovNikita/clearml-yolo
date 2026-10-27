@@ -7,14 +7,16 @@ Lightning objects are intentionally opaque at this boundary; project records rem
 import importlib
 import importlib.metadata
 import math
-from collections.abc import Callable, Sequence
+import os
+from collections.abc import Callable, Sequence, Sized
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 import yaml
 
 from clearml_yolo.adapters.observability.progress import image_progress
+from clearml_yolo.adapters.runtime.distributed import global_batch_per_rank
 from clearml_yolo.adapters.storage.filesystem import validate_output_tree
 from clearml_yolo.application.contracts import PREDICTION_COLUMNS, PreparedDataset
 from clearml_yolo.core.models import (
@@ -109,6 +111,8 @@ class _OwnerMetrics:
         self.metrics: dict[str, float] = {}
 
     def _emit(self, trainer: Any) -> None:
+        if not trainer.is_global_zero:
+            return
         for name, tensor in trainer.callback_metrics.items():
             value = float(tensor)
             if math.isfinite(value):
@@ -120,6 +124,141 @@ class _OwnerMetrics:
 
     def on_validation_end(self, trainer: Any, _module: Any) -> None:
         self._emit(trainer)
+
+
+def trainer_devices(device: str) -> dict[str, Any]:
+    """Select native Lightning devices without letting it relaunch the public command."""
+    world = int(os.environ.get("WORLD_SIZE", "1"))
+    if world == 1:
+        return {"devices": [int(device.split(":")[1])] if ":" in device else 1}
+    required = ("RANK", "LOCAL_RANK", "MASTER_ADDR", "MASTER_PORT", "TORCHELASTIC_RUN_ID")
+    if world < 1 or any(not os.environ.get(key) for key in required):
+        raise ValueError("RF-DETR multi-GPU training requires the supervised worker environment")
+    local_rank = int(os.environ["LOCAL_RANK"])
+    if not 0 <= local_rank < world or device != f"cuda:{local_rank}":
+        raise ValueError("RF-DETR rank device disagrees with the supervised worker environment")
+    environments = importlib.import_module("lightning_fabric.plugins.environments")
+    return {
+        "devices": list(range(world)),
+        "plugins": [environments.TorchElasticEnvironment()],
+    }
+
+
+def unique_validation_count(length: int, world: int, rank: int, step: int, batch: int) -> int:
+    """Remove the sequential DistributedSampler's padded tail before model evaluation."""
+    owned = len(range(rank, length, world))
+    return min(batch, max(0, owned - step * batch))
+
+
+class _UniqueValidation:
+    """Pinned native-module mixin; all ranks retain the same collective schedule."""
+
+    def validation_step(self: Any, batch: tuple[Any, Any], batch_idx: int) -> dict[str, Any]:
+        import torch
+        from torch import distributed
+
+        loader = self.trainer.val_dataloaders
+        sampler = loader.sampler
+        if not isinstance(sampler, torch.utils.data.DistributedSampler) or sampler.shuffle:
+            raise RuntimeError("RF-DETR validation requires its sequential distributed sampler")
+        length = len(cast(Sized, sampler.dataset))
+        samples, targets = batch
+        count = unique_validation_count(
+            length, sampler.num_replicas, sampler.rank, batch_idx, loader.batch_size
+        )
+        targets = targets[:count]
+        samples.tensors = samples.tensors[:count]
+        if samples.mask is not None:
+            samples.mask = samples.mask[:count]
+        # Empty padded slots do no forward work, but still participate in native
+        # box normalization and the epoch's metric collectives alongside peers.
+        outputs = (
+            self._resolve_eval_model()(samples)
+            if count
+            else {"pred_logits": torch.empty(0, device=self.device)}
+        )
+        normalizer = self.criterion.num_boxes_for_targets(outputs, targets)
+        global_count = torch.tensor(count, device=self.device)
+        distributed.all_reduce(global_count)
+        # Use a common component set even when this rank's final batch is empty.
+        losses = {key: torch.zeros((), device=self.device) for key in self.criterion.weight_dict}
+        if count:
+            computed = self.criterion(outputs, targets, num_boxes=normalizer)
+            losses.update({key: value for key, value in computed.items() if key in losses})
+        loss = sum(losses[key] * weight for key, weight in self.criterion.weight_dict.items())
+        self._log_val_loss_metrics(loss, losses, batch_size=int(global_count))
+        results = (
+            self.postprocess(outputs, torch.stack([target["orig_size"] for target in targets]))
+            if count
+            else []
+        )
+        return {"results": results, "targets": targets}
+
+
+def training_configuration(
+    config: ModelConfig,
+    names: tuple[str, ...],
+    device: str,
+    output: Path,
+    dataset: Path,
+    *,
+    custom: bool = False,
+) -> tuple[Any, Any]:
+    """Construct pinned native recipes while releasing the SDK's temporary detector."""
+    settings = config.train
+    per_rank_batch = global_batch_per_rank(settings.batch, int(os.environ.get("WORLD_SIZE", "1")))
+    sdk = _sdk()
+    variant, _ = _VARIANTS[config.preset]
+    constructor = getattr(sdk, variant)
+    initial = settings.weights
+    if initial is None and settings.pretrained:
+        raise ValueError("Prepare the RF-DETR pretrained asset before native construction")
+    if initial is not None and not initial.is_file():
+        raise FileNotFoundError(initial)
+    model = constructor(
+        pretrain_weights=str(initial.resolve()) if initial is not None else None,
+        device=device,
+        num_classes=len(names),
+        resolution=settings.imgsz,
+    )
+    if initial is not None:
+        _verify_pretrained(model, initial)
+    model.model_config.model_name = variant
+    arguments = {
+        "dataset_dir": str(dataset),
+        "dataset_file": "roboflow",
+        "output_dir": str(output),
+        "epochs": settings.epochs,
+        "batch_size": per_rank_batch,
+        "grad_accum_steps": settings.grad_accum_steps,
+        "num_workers": settings.workers,
+        "lr": settings.lr,
+        "weight_decay": settings.weight_decay,
+        "seed": settings.seed,
+        "amp_dtype": "auto" if settings.amp else None,
+        "use_ema": settings.use_ema,
+        "class_names": list(names),
+        "tensorboard": False,
+        "wandb": False,
+        "mlflow": False,
+        "clearml": False,
+        "run_test": False,
+        "compute_val_loss": True,
+        "accelerator": "cpu" if device == "cpu" else "gpu",
+    }
+    if custom:
+        arguments.update(
+            aug_config={},
+            augmentation_backend="torchvision",
+            scale_jitter=False,
+            multi_scale="off",
+        )
+    native_config = model.get_train_config(**arguments)
+    model_config = model.model_config
+    # RFDETRModelModule builds and loads its own model. Keeping this facade alive
+    # doubles resident model memory throughout training and invalidates probes.
+    del model
+    return model_config, native_config
 
 
 def train(
@@ -138,72 +277,41 @@ def train(
         raise ValueError("RF-DETR backbone_weights is unsupported; use a full native weights file")
     names = _names(prepared)
     device = _device(settings.device)
+    devices = trainer_devices(device)
     output.mkdir(parents=True, exist_ok=True)
-    sdk = _sdk()
     training = importlib.import_module("rfdetr.training")
     lightning = importlib.import_module("pytorch_lightning")
     lightning.seed_everything(settings.seed, workers=True)
-    variant, _ = _VARIANTS[config.preset]
-    constructor = getattr(sdk, variant)
-    initial = settings.weights
-    if initial is None and settings.pretrained:
-        raise ValueError("Prepare the RF-DETR pretrained asset before native construction")
-    model = constructor(
-        pretrain_weights=str(initial.resolve()) if initial is not None else None,
-        device=device,
-        num_classes=len(names),
-        resolution=settings.imgsz,
-    )
-    if initial is not None and not initial.is_file():
-        raise FileNotFoundError(f"RF-DETR pretrained asset was not downloaded: {initial}")
-    if initial is not None:
-        _verify_pretrained(model, initial)
-    model.model_config.model_name = variant
-    arguments = {
-        "dataset_dir": str(prepared.data.parent),
-        "dataset_file": "roboflow",
-        "output_dir": str(output),
-        "epochs": settings.epochs,
-        "batch_size": settings.batch,
-        "grad_accum_steps": settings.grad_accum_steps,
-        "num_workers": settings.workers,
-        "lr": settings.lr,
-        "weight_decay": settings.weight_decay,
-        "seed": settings.seed,
-        "amp_dtype": "auto" if settings.amp else None,
-        "use_ema": settings.use_ema,
-        "class_names": list(names),
-        "tensorboard": False,
-        "wandb": False,
-        "mlflow": False,
-        "clearml": False,
-        "run_test": False,
-        "compute_val_loss": True,
-        "accelerator": "cpu" if device == "cpu" else "gpu",
-    }
     custom = transforms is not None and transforms.mode == "albumentations"
-    if custom:
-        arguments.update(
-            aug_config={},
-            augmentation_backend="torchvision",
-            scale_jitter=False,
-            multi_scale="off",
-        )
-    native_config = model.get_train_config(**arguments)
-    module = training.RFDETRModelModule(model.model_config, native_config)
-    datamodule = training.RFDETRDataModule(model.model_config, native_config)
+    model_config, native_config = training_configuration(
+        config,
+        names,
+        device,
+        output,
+        prepared.data.parent,
+        custom=custom,
+    )
+    world = int(os.environ.get("WORLD_SIZE", "1"))
+    module_type = (
+        type("UniqueValidationRFDETR", (_UniqueValidation, training.RFDETRModelModule), {})
+        if world > 1
+        else training.RFDETRModelModule
+    )
+    module = module_type(model_config, native_config)
+    datamodule = training.RFDETRDataModule(model_config, native_config)
     if transforms is not None and custom:
         from clearml_yolo.adapters.rfdetr.transforms import install_training_transforms
 
         datamodule.setup("fit")
         install_training_transforms(datamodule, transforms, seed=settings.seed)
-    devices: int | list[int] = [int(device.split(":")[1])] if ":" in device else 1
-    trainer = training.build_trainer(native_config, model.model_config, devices=devices)
+    trainer = training.build_trainer(native_config, model_config, **devices)
     callback_type = type("OwnerMetrics", (_OwnerMetrics, lightning.Callback), {})
     callback = callback_type(report)
     trainer.callbacks.append(callback)
     validate_output_tree(output)
     trainer.fit(module, datamodule)
+    if world > 1:
+        trainer.strategy.barrier("cy-rfdetr-checkpoints-complete")
     weights = output / "checkpoint_best_total.pth"
     if not weights.is_file():
         raise RuntimeError("RF-DETR native training did not produce checkpoint_best_total.pth")
@@ -218,7 +326,9 @@ def train(
         },
     )
     effective = native_config.model_dump(mode="json")
-    effective["model"] = model.model_config.model_dump(mode="json")
+    effective["model"] = model_config.model_dump(mode="json")
+    effective["global_batch"] = settings.batch
+    effective["world_size"] = world
     return BackendTrainResult(
         weights=weights,
         metadata=metadata,

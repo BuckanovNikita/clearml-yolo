@@ -324,6 +324,8 @@ def _validate_native_values(values: dict[str, Any], group: str) -> None:
     for key, value in values.items():
         qualified = f"{group}.{key}"
         if value is None:
+            if key == "batch" and group == "ultralytics":
+                continue
             if key == "amp" or (key in typed and defaults.get(key) is not None):
                 raise ValueError(f"{qualified} must not be null")
             continue

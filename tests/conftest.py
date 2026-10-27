@@ -79,7 +79,10 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         action="append",
         default=[],
         metavar="MODEL=PATH",
-        help="Local pretrained backbone for a DEIMv2/Faster R-CNN selection; repeat for each model",
+        help=(
+            "Local pretrained backbone for a DEIMv2/Faster R-CNN/FCOS selection; "
+            "repeat for each model"
+        ),
     )
 
 

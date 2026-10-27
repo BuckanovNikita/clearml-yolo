@@ -1,0 +1,4 @@
+# @package _global_
+defaults:
+- /_cy_schemas/transform_overrides/fasterrcnn/dinov2_small_albumentations@_here_
+- _self_

@@ -1,0 +1,4 @@
+# @package model
+defaults:
+- /_cy_schemas/model/fasterrcnn/resnet101_fpn@_here_
+- _self_

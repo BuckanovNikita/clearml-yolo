@@ -1,0 +1,4 @@
+# @package model
+defaults:
+- /_cy_schemas/model/fcos/swin_tiny@_here_
+- _self_

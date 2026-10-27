@@ -1,0 +1,4 @@
+# @package model
+defaults:
+- /_cy_schemas/model/rfdetr/large@_here_
+- _self_

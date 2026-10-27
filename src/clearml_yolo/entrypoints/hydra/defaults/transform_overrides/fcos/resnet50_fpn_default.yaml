@@ -1,0 +1,4 @@
+# @package _global_
+defaults:
+- /_cy_schemas/transform_overrides/fcos/resnet50_fpn_default@_here_
+- _self_

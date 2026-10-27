@@ -40,6 +40,7 @@ def test_export_config_defaults_and_selected_inventory(tmp_path: Path) -> None:
     paths = dump_config_tree(tmp_path, command="cy-export")
     assert {p.relative_to(tmp_path).as_posix() for p in paths} == {
         "cy-export.yaml",
+        "export.yaml",
         "model/fasterrcnn/resnet50_fpn.yaml",
     }
     store.add_to_hydra_store(overwrite_ok=True)

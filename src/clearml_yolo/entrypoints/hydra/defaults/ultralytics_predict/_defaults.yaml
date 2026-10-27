@@ -1,0 +1,4 @@
+# @package ultralytics_predict
+defaults:
+- /_cy_schemas/ultralytics_predict/_defaults@_here_
+- _self_

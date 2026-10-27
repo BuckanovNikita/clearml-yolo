@@ -11,6 +11,9 @@
 - Record verification reuse release evidence
   ([`d0a47a6`](https://github.com/BuckanovNikita/clearml-yolo/commit/d0a47a657e71ea8d818403c8a1b63909455c1c73))
 
+- Require compatible CY and queue releases
+  ([`9fd2294`](https://github.com/BuckanovNikita/clearml-yolo/commit/9fd2294ab219c534fcce87b59eea7b56e9d01173))
+
 
 ## v0.40.0 (2026-10-24)
 

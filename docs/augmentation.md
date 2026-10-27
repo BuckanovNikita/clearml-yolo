@@ -1,7 +1,8 @@
 # Custom training augmentation
 
 `cy-train` and the training stage of `cy` accept one standard Albumentations JSON
-pipeline for every registered YOLO, DEIMv2, RF-DETR and Faster R-CNN selection.
+pipeline for every registered YOLO, DEIMv2, RF-DETR, Faster R-CNN and FCOS selection. FCOS support describes
+unreleased source changes; native GPU acceptance remains pending.
 The default `transforms=default` keeps each backend's native augmentation recipe.
 Select `transforms=albumentations` to replace optional native augmentation with your
 JSON. Prediction, validation and export keep their normal preprocessing.
@@ -37,7 +38,7 @@ cy-train model=rfdetr/nano ground_truth=./ground_truth.csv \
 ```
 
 The same two `transforms` overrides work with `model=ultralytics`, all four DEIMv2
-presets, all four RF-DETR presets and all six Faster R-CNN presets. Keep training
+presets, all four RF-DETR presets, all six Faster R-CNN presets and all six FCOS presets. Keep training
 settings in `ultralytics.*` for YOLO or `model.train.*` for the other families.
 For a complete experiment, use `cy` with the same overrides and a CSV containing
 train, validation and test splits. See the [model guide](multi-model-backends.md).
@@ -86,7 +87,7 @@ training. Invalid JSON settings are rejected rather than corrected silently.
 | YOLO | HSV, random affine/perspective, flips, BGR probability, native Mosaic/MixUp/CutMix/copy-paste, auto augmentation, erasing, multi-scale, close-Mosaic scheduling and native `augmentations` | Letterbox to the configured size, box formatting, RGB tensor layout and trainer scaling |
 | DEIMv2 | Native image augmentation, Mosaic policy, batch MixUp/copy-blend and repeated-size scheduling | Resize, tensor conversion, normalization and native box conversion |
 | RF-DETR | Native augmentation recipe, scale jitter and multi-scale | Deterministic native resize, tensor conversion and normalization |
-| Faster R-CNN | No optional native dataset augmentation is present | Tensor conversion and the detector's normal resize, padding and normalization |
+| Faster R-CNN / FCOS | No optional native dataset augmentation is present | Tensor conversion and the detector's normal resize, padding and normalization |
 
 Custom transforms consume raw RGB `uint8` images. You may include geometric
 operations such as `Resize` or crops, but their output shape is followed by the
@@ -135,9 +136,11 @@ transformation for every sample.
 ## Editable configurations and replay
 
 `cy-init-config DIRECTORY --command cy-train --model rfdetr/nano` exports the command
-wrapper, selected model, `transforms/default.yaml`, `transforms/albumentations.yaml`,
+wrapper, local `train.yaml` base, selected model, `transforms/default.yaml`,
+`transforms/albumentations.yaml`,
 and the selected model's `transform_overrides` files. The `cy` export includes the
-same training profiles. The root defaults select the specialization for the chosen
+same training profiles with local `pipeline.yaml`. Fresh trees contain every application
+YAML referenced by their defaults. The root defaults select the specialization for the chosen
 model/profile pair, making effective disabled values visible in `--cfg job` output.
 
 Before execution or queue serialization, the selected JSON is validated and copied
@@ -149,11 +152,15 @@ a fresh invocation without a snapshot reads the file again, and selecting a diff
 file replaces the old snapshot. Keep the JSON under version control with the run
 configuration for reviewable experiments.
 
+Saved [batch estimates](batch-estimation.md) currently describe native augmentation
+profiles. Custom Albumentations mode requires an explicit numeric training batch;
+`batch=null` fails instead of reusing an estimate for a different augmentation recipe.
+
 ## Severstal execution checks
 
-The opt-in [Severstal suite](../tests/test_severstal_gpu.py) covers 15 model choices:
-YOLO26n, four DEIMv2, four RF-DETR and six Faster R-CNN presets, each with native,
-JSON and JSON+Mosaic variants. These 45 smoke scenarios use one epoch, batch one and FP32
+The opt-in [Severstal suite](../tests/test_severstal_gpu.py) covers every registered model:
+YOLO26n, four DEIMv2, four RF-DETR, six Faster R-CNN and six FCOS presets, each with native,
+JSON and JSON+Mosaic variants. Each smoke scenario uses one epoch, batch one and FP32
 on a frozen 160/40/40 training/validation/test subset of the official Kaggle data.
 They check execution, optimization, checkpoint reload, held-out predictions and
 ClearML evidence; they do not establish model accuracy or equivalence between recipes.

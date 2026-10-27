@@ -1,0 +1,3 @@
+defaults:
+- /_cy_schemas/metrics
+- _self_

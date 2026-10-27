@@ -1,4 +1,4 @@
-"""Explicitly authorized native Kaggle acceptance: 15 presets x 3 augmentation modes."""
+"""Explicitly authorized native Kaggle acceptance for every registered preset."""
 
 import pytest
 

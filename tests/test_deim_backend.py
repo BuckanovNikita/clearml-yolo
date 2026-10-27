@@ -190,6 +190,65 @@ def test_deim_missing_source_is_actionable(tmp_path: Path) -> None:
         )
 
 
+@pytest.mark.parametrize("batch", [None, 1, 3])
+def test_deim_global_batch_is_validated_before_native_construction(
+    monkeypatch: pytest.MonkeyPatch,
+    batch: int | None,
+) -> None:
+    import torch.distributed as dist
+
+    from clearml_yolo.adapters.deim.backend import training_world
+
+    monkeypatch.setattr(dist, "is_initialized", lambda: True)
+    monkeypatch.setattr(dist, "get_world_size", lambda: 2)
+    monkeypatch.setattr(dist, "get_rank", lambda: 1)
+    config = ModelConfig(backend="deimv2", preset="s", train=TrainSettings(batch=batch))
+    with pytest.raises(ValueError, match=r"batch=null|divisible"):
+        training_world(config)
+
+
+def test_deim_refuses_uninitialized_distributed_launch(monkeypatch: pytest.MonkeyPatch) -> None:
+    import torch.distributed as dist
+
+    from clearml_yolo.adapters.deim.backend import training_world
+
+    monkeypatch.setenv("WORLD_SIZE", "2")
+    monkeypatch.setattr(dist, "is_initialized", lambda: False)
+    with pytest.raises(RuntimeError, match="initialized matching process group"):
+        training_world(ModelConfig(backend="deimv2", preset="s"))
+
+
+@pytest.mark.parametrize(("length", "world"), [(0, 4), (1, 4), (5, 2), (9, 4)])
+def test_deim_validation_shards_never_duplicate_or_drop_samples(length: int, world: int) -> None:
+    from clearml_yolo.adapters.deim.backend import _ValidationShard
+
+    shards = [_ValidationShard(length, rank, world) for rank in range(world)]
+    samples = [index for shard in shards for index in shard]
+    assert sorted(samples) == list(range(length))
+    assert all(len(shard) == len(list(shard)) for shard in shards)
+
+
+def test_deim_empty_validation_shard_only_adjusts_native_progress_denominator() -> None:
+    from clearml_yolo.adapters.deim.backend import _ValidationLoader
+
+    calls: list[str] = []
+    loader = _ValidationLoader([], lambda: calls.append("synchronized"))
+    assert len(loader) == 1
+    assert list(loader) == []
+    assert calls == ["synchronized"]
+
+
+def test_deim_nonowner_writer_does_not_publish() -> None:
+    from clearml_yolo.adapters.deim.backend import _OwnerWriter
+
+    reports = []
+    writer = _OwnerWriter(lambda *args: reports.append(args))
+    writer.enabled = False
+    writer.add_scalar("metric", 1.0, 0)
+    assert reports == []
+    assert writer.metrics == {}
+
+
 def test_deim_pretrained_never_silently_falls_back_to_random(tmp_path: Path) -> None:
     from clearml_yolo.adapters.deim.backend import train
 

@@ -15,7 +15,11 @@ from clearml_yolo.adapters.yolo.config import (
     render_native_yaml,
 )
 from clearml_yolo.core.models import model_preset
-from clearml_yolo.entrypoints.hydra.configs import NATIVE_COMMANDS, PREDICTION_COMMANDS
+from clearml_yolo.entrypoints.hydra.configs import (
+    NATIVE_COMMANDS,
+    PREDICTION_COMMANDS,
+    command_document,
+)
 from clearml_yolo.entrypoints.hydra.transforms import (
     TRAINING_COMMANDS,
     native_overlay,
@@ -43,6 +47,7 @@ def _header(config_name: str, command: str, directory: Path, model: str = "ultra
             f"--config-name {command}"
         ),
         "# Replace ??? with your required inputs before running.",
+        f"# Shared command defaults: {config_name}.yaml.",
         "# Relative input paths are resolved from the working directory.",
         "# Set clearml.project_name, clearml.task_name and clearml.tags for your run.",
         "# Implicit outputs use runs/<safe-project>/<safe-task>-<task-id>/.",
@@ -142,10 +147,15 @@ def _groups(config_name: str, model: str) -> dict[Path, str]:
                 "# @package _global_\n"
                 + OmegaConf.to_yaml(OmegaConf.create(native_overlay(model, profile)))
             )
-    if config_name in NATIVE_COMMANDS and model != "ultralytics":
+    if config_name in NATIVE_COMMANDS:
         groups[Path("model") / f"{model}.yaml"] = OmegaConf.to_yaml(
             OmegaConf.create(selected.model_dump(mode="json"))
         )
+    if config_name in PREDICTION_COMMANDS:
+        # These remain in every native command's defaults even when its selected
+        # model uses a different backend or its wrapper overrides the YOLO group.
+        groups[Path("ultralytics/_defaults.yaml")] = "{}\n"
+        groups[Path("ultralytics_predict/_defaults.yaml")] = "{}\n"
     if config_name in NATIVE_COMMANDS and model == "ultralytics":
         groups[Path("ultralytics/default.yaml")] = render_native_yaml(
             native_defaults(), "train", example=True
@@ -163,8 +173,8 @@ def _command_yaml(config_name: str, model: str) -> str:
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
         overrides = [f"model={model}"] if config_name in NATIVE_COMMANDS else []
         config = compose(config_name=config_name, overrides=overrides)
-        # Reference the registered command schema to keep inherited values lazy;
-        # group YAML remains plain native YAML and can be pasted unchanged.
+        # Reference the exported command base; its explicit schema and ordinary
+        # YAML groups preserve lazy values without automatic schema matching.
         values = OmegaConf.to_container(config, resolve=False)
         if not isinstance(values, dict):
             raise TypeError("Command configuration must be a mapping")
@@ -197,6 +207,7 @@ def dump_config_tree(
     contents = {
         Path(f"{command}.yaml"): _header(config_name, command, target, selection)
         + _command_yaml(config_name, selection),
+        Path(f"{config_name}.yaml"): OmegaConf.to_yaml(command_document(config_name)),
         **_groups(config_name, selection),
     }
     paths = [target / path for path in contents]

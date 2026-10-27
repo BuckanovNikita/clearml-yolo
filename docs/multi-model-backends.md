@@ -1,12 +1,15 @@
 # Native detector backends
 
-The model group selects Ultralytics YOLO, DEIMv2, RF-DETR or Faster R-CNN for
+The model group selects Ultralytics YOLO, DEIMv2, RF-DETR, Faster R-CNN or FCOS for
 `cy`, `cy-train`, `cy-predict`, `cy-val` and `cy-compare`. These commands share CSV
 inputs, prediction records, calibration, evaluation, comparison and ClearML ownership.
 The default remains `model=ultralytics`, with its existing `ultralytics` and
 `ultralytics_predict` groups.
 
-This guide documents the implemented interfaces. Configuration examples are not execution evidence.
+FCOS, native multi-GPU training and [batch estimation](batch-estimation.md) are
+available from version 0.41.0. Native confirmation and physical DDP verification
+limits are recorded in the [release evidence](../specs/006-batch-training/evidence/release.md).
+Configuration examples are not execution evidence.
 Use the [verification ledger](https://github.com/BuckanovNikita/clearml-yolo/blob/d74945c83dc24094c599388bbcfd5e987daeb9bf/specs/025-multi-model-backends/verification.md) for
 observed results and the [acceptance guide](../specs/000-baseline/spec.md#detector-backends-and-deployment-export)
 for the required checks. The [backend contract](../specs/000-baseline/spec.md#detector-backends-and-deployment-export)
@@ -46,6 +49,9 @@ No model SDK or ClearML task is initialized by configuration export or compositi
 | `fasterrcnn/convnext_tiny` | timm ConvNeXt-Tiny with FPN | 800 |
 | `fasterrcnn/swin_tiny` | timm Swin-Tiny with FPN | 800 |
 | `fasterrcnn/dinov2_small`, `fasterrcnn/dinov3_small` | timm Small patch-token backbones with explicit feature pyramids | 800 |
+| `fcos/resnet50_fpn`, `fcos/resnet101_fpn` | ResNet-50/101 with P3–P7 FPN | 800 |
+| `fcos/convnext_tiny`, `fcos/swin_tiny` | ConvNeXt-Tiny/Swin-Tiny with P3–P7 FPN | 800 |
+| `fcos/dinov2_small`, `fcos/dinov3_small` | DINOv2/DINOv3 Small with P3–P7 feature pyramids | 800 |
 
 These are fixed registered presets. Arbitrary timm names and the original DEIM family
 are not model selections. Missing packages, incompatible weights, unavailable pretrained
@@ -54,16 +60,18 @@ or silently start from random weights.
 
 ## Editable configuration and commands
 
-Generate only the selected command wrapper and model file:
+Generate the selected command and its local configuration dependencies:
 
 ```bash
 cy-init-config detector-config --command cy-train --model rfdetr/small
 cy-train --config-dir detector-config --config-name cy-train --cfg job
 ```
 
-This writes `detector-config/cy-train.yaml`, the selected
-`detector-config/model/rfdetr/small.yaml`, both `transforms` profiles, and the
-selected model's `transform_overrides` specializations. Edit the model's `train`
+This writes `detector-config/cy-train.yaml`, its local `train.yaml` base, the selected
+`detector-config/model/rfdetr/small.yaml`, both `transforms` profiles, the selected
+model's `transform_overrides` specializations, and other application YAML referenced
+by their defaults. Public YAML names are separate from private typed schema names;
+fresh exports need no packaged application YAML fallback. Edit the model's `train`
 and `predict` sections, retaining `backend` and `preset`. Set the CSV and ClearML project, task name
 and tags in the wrapper. `--cfg job` composes configuration without executing a model.
 Existing selected files require `--force`; unrelated command files are preserved.
@@ -135,8 +143,8 @@ cy-train model=deimv2/s ground_truth=./ground_truth.csv \
 ```
 
 The [asset guide](model-assets.md) defines source/cache paths, GitHub proxy semantics,
-access-gated assets and offline recovery. It also covers RF-DETR and every Faster
-R-CNN preset. Canonical replay retains original selectors including nulls; resolved
+access-gated assets and offline recovery. It also covers RF-DETR and the shared Torchvision backbone assets used by Faster
+R-CNN and FCOS. Canonical replay retains original selectors including nulls; resolved
 paths, original URLs and hashes are recorded in the separate `model_assets`
 ClearML Configuration Object. Dependencies remain
 externally installed, and Ultralytics downloads and defaults remain unchanged.
@@ -156,7 +164,7 @@ YOLO-only population controls, such as class filters, that a native backend cann
 
 | Training key | Default | Meaning |
 | --- | --- | --- |
-| `epochs`, `batch`, `workers` | 100, 4, 4 | Native training duration, batch size and data workers |
+| `epochs`, `batch`, `workers` | 100, 4, 4 | Native training duration, global microbatch and data workers |
 | `imgsz` | Preset table above | Integer square size, or supported `[height,width]` pair |
 | `device` | `null` | Device request handled by the selected execution mode |
 | `lr`, `weight_decay`, `seed` | 0.0001, 0.0001, 0 | Optimizer controls and native seed |
@@ -168,12 +176,21 @@ YOLO-only population controls, such as class filters, that a native backend cann
 RF-DETR supports full native `weights`, or resolves its preset pretrained detector
 from the existing asset registry when `pretrained=true` and no weights are supplied.
 Managed assets use the [model cache](model-assets.md#cache-locations), not a per-run download. It rejects `backbone_weights`.
-Faster R-CNN uses Torchvision/timm pretrained backbones with task-specific detection heads;
-`backbone_weights` selects a compatible local backbone state, and `weights` loads a full
+Faster R-CNN and FCOS use Torchvision/timm pretrained backbones with newly initialized
+task-specific detection heads. `backbone_weights` selects a compatible local backbone state, and `weights` loads a full
 detector state strictly. Full detector weights must match the architecture and class-head
-shape. Faster R-CNN uses AdamW, supports gradient accumulation and EMA, and selects its
+shape. Both Torchvision families use AdamW, support gradient accumulation and EMA, and select the
 best checkpoint by validation COCO mAP50–95. RF-DETR and DEIMv2 retain their native best
-checkpoint selection.
+checkpoint selection. FCOS has five P3–P7 pyramid levels and one square anchor per
+location. Its foreground labels start at zero; Faster R-CNN retains its internal
+background offset. These are distinct checkpoint architectures.
+
+Training `batch` means the global microbatch across all ranks and must be divisible
+by GPU count. Accumulation multiplies that value to obtain the effective optimizer
+batch. Explicit `model.train.batch=null` selects a compatible saved estimate; missing
+or incompatible evidence stops training. Numeric defaults stay unchanged. Read
+[batch estimation](batch-estimation.md) for synthetic limits, cache compatibility and
+queue resolution.
 
 Explicit `weights` or supported `backbone_weights` are still used when `pretrained=false`.
 To request random initialization, set `pretrained=false` and leave both paths null.
@@ -185,12 +202,12 @@ starts a new training run; it does not resume optimizer or scheduler state.
 | `device`, `batch` | `null`, 1 | Shared inference device and batch size |
 | `imgsz` | `null` | Use checkpoint preprocessing size for standalone inference |
 | `conf`, `iou`, `max_det` | 0.001, 0.7, 300 | Prediction filtering, supported NMS control and detection limit |
-| `half` | `false` | Faster R-CNN CUDA autocast; unsupported for DEIMv2/RF-DETR |
+| `half` | `false` | Faster R-CNN/FCOS CUDA autocast; unsupported for DEIMv2/RF-DETR |
 
 DEIMv2 and RF-DETR use native DETR postprocessing without NMS. They reject nondefault
 `iou` and `half=true`. RF-DETR requires a square integer resolution divisible by 32.
 DEIMv2 dimensions must be at least 128 and divisible by 32; training additionally
-requires a square size. Faster R-CNN supports rectangular canvases, rounding dimensions
+requires a square size. Faster R-CNN and FCOS support rectangular canvases, rounding dimensions
 up to stride 32, preserving aspect ratio and padding on the right/bottom in normalized
 RGB space. All adapters return boxes in original-image pixel coordinates and exact
 foreground class strings. Faster R-CNN's internal background offset is never a public class.
@@ -217,15 +234,21 @@ JSON examples, generated configuration files and frozen snapshot replay behavior
 
 ### Devices, scheduling and replay
 
-New adapters currently support CPU and a single CUDA device. Multi-device requests
-fail explicitly; the existing Ultralytics DDP behavior does not imply native DDP support
-for these adapters. MPS is not an accepted cross-backend execution target in this guide.
+Since 0.41.0, native training accepts CPU, one CUDA device, or a
+CUDA device list such as `model.train.device=[0,1]` for DEIMv2, RF-DETR, Faster R-CNN
+and FCOS. Real multi-GPU acceptance remains pending. The invocation owner supervises
+one process per GPU and exclusively publishes to ClearML; rank zero writes aggregate
+metrics and checkpoints. DEIMv2 uses its native DDP, RF-DETR uses Lightning DDP, and
+the Torchvision families use distributed sampling, accumulation-aware synchronization,
+synchronized EMA and validation without padded duplicate samples. Prediction remains
+single-device. MPS is not an accepted cross-backend execution target in this guide.
 
 Direct commands pass `model.train.device` and `model.predict.device` to the native
-backend without admission, waiting or remapping. Install the separate queue and use
+backend without admission, waiting or automatic device substitution. Install the separate queue and use
 `cy-queue submit --gpus 1 -- ...` for a complete pipeline, or
-`cy-queue submit --command train --gpus 1 -- ...` for standalone training. The [queue](queue.md) supplies the allocated device
-to GPU phases and preserves explicit CPU phases. Comparison uses one shared inference
+`cy-queue submit --command train --gpus 1 -- ...` for standalone training. The [queue](queue.md) supplies the allocated devices
+to training and the first allocated device to inference, and preserves explicit CPU
+phases. Comparison uses one shared inference
 device for both models. The former `queue.*` and `autogpu.*` settings are rejected.
 
 Queue snapshots preserve resource requests and validate both package identities before
@@ -336,8 +359,8 @@ Retry into a fresh output directory and require the normal publication checks to
 
 ## Cross-contract integration
 
-New detector groups own typed `model.train` and `model.predict` controls. DEIMv2, RF-DETR
-and Faster R-CNN share CSV-derived COCO preparation, canonical prediction records and
+New detector groups own typed `model.train` and `model.predict` controls. DEIMv2, RF-DETR,
+Faster R-CNN and FCOS share CSV-derived COCO preparation, canonical prediction records and
 evaluation policy. Embedded checkpoint metadata survives standalone copies/downloads;
 hash/selection conflicts fail before execution. Mixed comparisons resolve each checkpoint
 independently and preserve current image membership, frozen thresholds and the shared

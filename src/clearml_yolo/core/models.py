@@ -15,7 +15,7 @@ from pydantic import (
     model_validator,
 )
 
-BackendName = Literal["ultralytics", "deimv2", "rfdetr", "fasterrcnn"]
+BackendName = Literal["ultralytics", "deimv2", "rfdetr", "fasterrcnn", "fcos"]
 Device = str | StrictInt | list[StrictInt] | None
 ImageSize = (
     Annotated[int, Field(strict=True, gt=0)]
@@ -27,6 +27,14 @@ PRESETS: dict[str, dict[str, int]] = {
     "deimv2": {"s": 640, "m": 640, "l": 640, "x": 640},
     "rfdetr": {"nano": 384, "small": 512, "medium": 576, "large": 704},
     "fasterrcnn": {
+        "resnet50_fpn": 800,
+        "resnet101_fpn": 800,
+        "convnext_tiny": 800,
+        "swin_tiny": 800,
+        "dinov2_small": 800,
+        "dinov3_small": 800,
+    },
+    "fcos": {
         "resnet50_fpn": 800,
         "resnet101_fpn": 800,
         "convnext_tiny": 800,
@@ -71,7 +79,7 @@ class TrainSettings(BaseModel):
 
     device: Device = None
     epochs: Annotated[int, Field(strict=True, gt=0)] = 100
-    batch: Annotated[int, Field(strict=True, gt=0)] = 4
+    batch: Annotated[int, Field(strict=True, gt=0)] | None = 4
     imgsz: ImageSize = 640
     workers: Annotated[int, Field(strict=True, ge=0)] = 4
     lr: Annotated[float, Field(gt=0)] = 0.0001
@@ -130,6 +138,7 @@ class ModelConfig(BaseModel):
             "deimv2": DeimAugmentationOverrides,
             "rfdetr": RFDETRAugmentationOverrides,
             "fasterrcnn": EmptyAugmentationOverrides,
+            "fcos": EmptyAugmentationOverrides,
         }
         if augmentation is not None and (
             self.backend not in expected or not isinstance(augmentation, expected[self.backend])

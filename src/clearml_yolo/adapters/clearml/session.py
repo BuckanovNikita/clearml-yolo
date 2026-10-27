@@ -146,6 +146,9 @@ def replay_training_parameters(task: Any, values: Mapping[str, Any]) -> dict[str
         key: inherited[f"General/{key}"]
         for key in scientific
         if f"General/{key}" in inherited
+        # General records the last execution's resolved capacity. Explicit null
+        # requests a new lookup against this invocation's assigned hardware.
+        and not (key == "batch" and values.get("batch") is None)
         # A redacted observation is never executable credential material.
         and inherited[f"General/{key}"] != sanitized[key]
     }

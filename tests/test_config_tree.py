@@ -34,6 +34,8 @@ def test_installed_command_creates_examples(
     entrypoints[0].load()()
     assert {path.name for path in target.iterdir()} == {
         "cy.yaml",
+        "pipeline.yaml",
+        "model",
         "ultralytics",
         "ultralytics_predict",
         "transforms",
@@ -321,7 +323,7 @@ def test_selection_writes_only_required_outputs(tmp_path: Path, command: str) ->
     from clearml_yolo.entrypoints.hydra.config_tree import dump_config_tree
 
     written = dump_config_tree(tmp_path, command=command)
-    expected = {f"{command}.yaml"}
+    expected = {f"{command}.yaml", f"{COMMANDS[command]}.yaml"}
     if command in {"cy", "cy-train"}:
         expected |= {
             "transforms/default.yaml",
@@ -330,7 +332,13 @@ def test_selection_writes_only_required_outputs(tmp_path: Path, command: str) ->
             "transform_overrides/ultralytics_albumentations.yaml",
         }
     if command in {"cy", "cy-train", "cy-predict", "cy-val", "cy-compare"}:
-        expected |= {"ultralytics/default.yaml", "ultralytics_predict/default.yaml"}
+        expected |= {
+            "model/ultralytics.yaml",
+            "ultralytics/_defaults.yaml",
+            "ultralytics_predict/_defaults.yaml",
+            "ultralytics/default.yaml",
+            "ultralytics_predict/default.yaml",
+        }
     assert {str(path.relative_to(tmp_path)) for path in written} == expected
     assert {str(path.relative_to(tmp_path)) for path in tmp_path.rglob("*.yaml")} == expected
 
@@ -382,7 +390,7 @@ def test_cli_selector_and_invalid_choice(tmp_path: Path, monkeypatch: pytest.Mon
     target = tmp_path / "selected"
     monkeypatch.setattr("sys.argv", ["cy-init-config", str(target), "--command", "cy-report"])
     main()
-    assert [path.name for path in target.iterdir()] == ["cy-report.yaml"]
+    assert {path.name for path in target.iterdir()} == {"cy-report.yaml", "report.yaml"}
     invalid_target = tmp_path / "invalid"
     monkeypatch.setattr("sys.argv", ["cy-init-config", str(invalid_target), "--command", "report"])
     with pytest.raises(SystemExit) as caught:

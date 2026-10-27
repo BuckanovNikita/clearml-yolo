@@ -1,0 +1,4 @@
+# @package ultralytics
+defaults:
+- /_cy_schemas/ultralytics/_defaults@_here_
+- _self_

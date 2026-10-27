@@ -1,0 +1,4 @@
+# @package model
+defaults:
+- /_cy_schemas/model/fcos/dinov2_small@_here_
+- _self_

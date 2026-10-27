@@ -23,8 +23,13 @@ def execute_training(
     *,
     transforms: TransformConfig | None = None,
 ) -> TrainResult:
+    from clearml_yolo.adapters.integrations.batch_resolution import resolve_yolo_batch
     from clearml_yolo.adapters.integrations.native_trainer import trainer_with_transforms
 
+    requested = requested_settings(settings, "train") | {"model": str(architecture)}
+    settings, batch_estimate = resolve_yolo_batch(architecture, settings, prepared, transforms)
+    if batch_estimate is not None:
+        record_run_configuration(task, {"training_batch_estimate": batch_estimate})
     with trace_operation("native.import.yolo"):
         from ultralytics.models import YOLO
 
@@ -32,7 +37,6 @@ def execute_training(
         model = YOLO(model_weights_path(architecture))
     if model.task != "detect":
         raise ValueError(f"Training requires a detection model; loaded task={model.task!r}")
-    requested = requested_settings(settings, "train") | {"model": str(architecture)}
     write_native_yaml(
         Path(settings["project"]) / ".configs" / settings["name"] / "ultralytics_requested.yaml",
         requested,

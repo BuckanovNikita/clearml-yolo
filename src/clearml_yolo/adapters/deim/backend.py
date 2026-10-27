@@ -7,8 +7,10 @@ here. No SDK, task or telemetry ownership is imported from ClearML.
 import importlib
 import importlib.metadata
 import math
-from collections.abc import Callable, Sequence
+import os
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import chdir
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
@@ -22,6 +24,7 @@ from clearml_yolo.adapters.deim.transforms import (
     custom_training_recipe,
 )
 from clearml_yolo.adapters.observability.progress import image_progress
+from clearml_yolo.adapters.runtime.distributed import global_batch_per_rank
 from clearml_yolo.adapters.storage.filesystem import validate_output_tree
 from clearml_yolo.application.contracts import PREDICTION_COLUMNS, PreparedDataset
 from clearml_yolo.core.models import (
@@ -68,9 +71,10 @@ class _OwnerWriter:
     def __init__(self, report: Callable[[str, float, int], None]) -> None:
         self.report = report
         self.metrics: dict[str, float] = {}
+        self.enabled = True
 
     def add_scalar(self, tag: str, value: float, step: int) -> None:
-        if math.isfinite(value):
+        if self.enabled and math.isfinite(value):
             self.metrics[tag] = value
             self.report(tag, value, step)
 
@@ -168,6 +172,129 @@ def _validate_training(config: ModelConfig) -> None:
         raise ValueError("DEIMv2 pretrained training requires explicit weights or backbone_weights")
 
 
+def training_world(config: ModelConfig) -> tuple[int, int]:
+    """Verify the supervisor initialized distribution before native construction."""
+    import torch.distributed as dist
+
+    requested = int(os.environ.get("WORLD_SIZE", "1"))
+    world = dist.get_world_size() if dist.is_initialized() else 1
+    rank = dist.get_rank() if dist.is_initialized() else 0
+    if requested > 1 and requested != world:
+        raise RuntimeError(
+            "DEIMv2 distributed workers require an initialized matching process group"
+        )
+    global_batch_per_rank(config.train.batch, world)
+    return rank, world
+
+
+def synchronize_buffers(model: Any) -> None:
+    """Make rank-zero running statistics authoritative before EMA/evaluation."""
+    import torch
+    import torch.distributed as dist
+
+    if dist.is_initialized():
+        with torch.no_grad():
+            for buffer in model.buffers():
+                dist.broadcast(buffer, src=0)
+
+
+@dataclass(frozen=True)
+class _ValidationShard:
+    length: int
+    rank: int
+    world: int
+
+    def __iter__(self) -> Iterator[int]:
+        return iter(range(self.rank, self.length, self.world))
+
+    def __len__(self) -> int:
+        return len(range(self.rank, self.length, self.world))
+
+
+@dataclass(frozen=True)
+class _ValidationLoader:
+    loader: Any
+    synchronize: Callable[[], None]
+
+    def __iter__(self) -> Iterator[Any]:
+        self.synchronize()
+        yield from self.loader
+
+    def __len__(self) -> int:
+        # Native progress divides by len(loader) even for empty shards. Reporting
+        # a denominator of one avoids that bug without fabricating any samples.
+        return max(1, len(self.loader))
+
+
+class _SynchronizedEMA:
+    """Wrap the opaque native EMA without replacing upstream methods or classes."""
+
+    def __init__(self, native: Any) -> None:
+        self.native = native
+
+    @property
+    def module(self) -> Any:
+        return self.native.module
+
+    @property
+    def decay(self) -> float:
+        return float(self.native.decay)
+
+    @decay.setter
+    def decay(self, value: float) -> None:
+        self.native.decay = value
+
+    def update(self, model: Any) -> None:
+        synchronize_buffers(model)
+        self.native.update(model)
+
+    def state_dict(self) -> Any:
+        return self.native.state_dict()
+
+    def load_state_dict(self, state: Any) -> None:
+        self.native.load_state_dict(state)
+
+
+class _DistributedSolver:
+    """Native solver mixin for exact validation shards and synchronized EMA buffers."""
+
+    cfg: Any
+    model: Any
+    ema: Any
+    optimizer: Any
+    val_dataloader: Any
+
+    def train(self) -> None:
+        import torch.distributed as dist
+
+        # The other base is loaded from the verified native registry at runtime.
+        cast(Any, super()).train()
+        self.model.broadcast_buffers = False
+        if self.ema is not None:
+            self.ema = _SynchronizedEMA(self.ema)
+
+        def synchronize_after_step(_optimizer: Any, _args: Any, _kwargs: Any) -> None:
+            synchronize_buffers(self.model)
+
+        self.optimizer.register_step_post_hook(synchronize_after_step)
+        loader = self.val_dataloader
+        shard = _ValidationShard(len(loader.dataset), dist.get_rank(), dist.get_world_size())
+        validation = type(loader)(
+            loader.dataset,
+            batch_size=loader.batch_size,
+            sampler=shard,
+            drop_last=False,
+            collate_fn=loader.collate_fn,
+            pin_memory=loader.pin_memory,
+            num_workers=loader.num_workers,
+        )
+        # With broadcast_buffers disabled, native no-grad evaluation has no DDP
+        # forward collectives. Unequal/empty shards can reach the final gather safely.
+        self.val_dataloader = _ValidationLoader(
+            validation, lambda: synchronize_buffers(self.ema.module if self.ema else self.model)
+        )
+
+
 def _validate_tuning(model: Any, weights: Path) -> None:
     torch = importlib.import_module("torch")
     payload = torch.load(weights, map_location="cpu", weights_only=True)
@@ -191,25 +318,12 @@ def _fit(solver: Any, output: Path) -> None:
         solver.fit()
 
 
-def train(
-    config: ModelConfig,
-    prepared: PreparedDataset,
-    output: Path,
-    report: Callable[[str, float, int], None],
-    *,
-    transforms: TransformConfig | None = None,
-) -> BackendTrainResult:
-    output = validate_output_tree(output)
+def training_configuration(
+    config: ModelConfig, names: tuple[str, ...], output: Path
+) -> tuple[Any, Any]:
+    """Resolve the same native optimizer, precision, EMA and pretrained recipe for probes."""
     _validate_training(config)
-    output = output.resolve()
-    prepared = prepared.model_copy(update={"data": prepared.data.resolve()})
-    contents = yaml.safe_load(prepared.data.read_text())
-    configured_names = contents["names"]
-    names = (
-        tuple(configured_names[key] for key in sorted(configured_names))
-        if isinstance(configured_names, dict)
-        else tuple(configured_names)
-    )
+    training_world(config)
     size = _size(config.train.imgsz)
     device = _device(config.train.device)
     cfg = _config(config, names, size)
@@ -238,19 +352,51 @@ def train(
     )
     cfg.yaml_cfg["optimizer"]["lr"] = config.train.lr
     cfg.yaml_cfg["optimizer"]["weight_decay"] = config.train.weight_decay
-    writer = _native_writer(report)
-    cfg.writer = writer
-    with native_coco_modules():
-        _prepare_loaders(cfg, prepared, config, transforms)
     if config.train.weights is not None:
         cfg.tuning = str(config.train.weights.resolve())
         cfg.yaml_cfg["tuning"] = cfg.tuning
         _validate_tuning(cfg.model, config.train.weights.resolve())
-    solver = solver_module.TASKS["detection"](cfg)
+    return cfg, solver_module
+
+
+def train(
+    config: ModelConfig,
+    prepared: PreparedDataset,
+    output: Path,
+    report: Callable[[str, float, int], None],
+    *,
+    transforms: TransformConfig | None = None,
+) -> BackendTrainResult:
+    output = validate_output_tree(output)
+    _validate_training(config)
+    output = output.resolve()
+    prepared = prepared.model_copy(update={"data": prepared.data.resolve()})
+    contents = yaml.safe_load(prepared.data.read_text())
+    configured_names = contents["names"]
+    names = (
+        tuple(configured_names[key] for key in sorted(configured_names))
+        if isinstance(configured_names, dict)
+        else tuple(configured_names)
+    )
+    rank, world = training_world(config)
+    cfg, solver_module = training_configuration(config, names, output)
+    writer = _native_writer(report)
+    writer.enabled = rank == 0
+    cfg.writer = writer
+    with native_coco_modules():
+        _prepare_loaders(cfg, prepared, config, transforms)
+    solver_type = solver_module.TASKS["detection"]
+    if world > 1:
+        solver_type = type("CYDistributedDEIMSolver", (_DistributedSolver, solver_type), {})
+    solver = solver_type(cfg)
     try:
         _fit(solver, output)
     finally:
         writer.close()
+    if world > 1:
+        import torch.distributed as dist
+
+        dist.barrier()
     stage_two = output / "best_stg2.pth"
     weights = stage_two if stage_two.is_file() else output / "best_stg1.pth"
     if not weights.is_file():

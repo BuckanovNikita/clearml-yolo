@@ -47,6 +47,7 @@ from clearml_yolo.adapters.storage.run_identity import task_run_dir
 from clearml_yolo.adapters.yolo.config import requested_devices
 from clearml_yolo.core.models import ModelConfig, model_preset
 from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_file
+from clearml_yolo.entrypoints.hydra.configs import command_schema
 from clearml_yolo.entrypoints.hydra.sweeps import new_multirun_tag, tag_multirun_job
 from clearml_yolo.entrypoints.hydra.transforms import prepare_transforms, profile_values
 from clearml_yolo.entrypoints.hydra.validation import (
@@ -130,9 +131,7 @@ def _builtin_defaults(name: str, config: DictConfig) -> dict[str, Any]:
     """Compose the registered project root and selected preset without user overrides."""
     # The local Zen store retains built-in roots even when a YAML search path
     # shadows their names. Re-entering Hydra would inherit that user's search path.
-    defaults = OmegaConf.structured(store[None, name])
-    if not isinstance(defaults, DictConfig):
-        raise TypeError("Built-in command defaults must be a mapping")
+    defaults = command_schema(name)
     with open_dict(defaults):
         defaults.pop("defaults", None)
         if name in {"train", "pipeline"}:
@@ -332,11 +331,13 @@ def _launch(name: str, function: Callable[..., Any]) -> None:
     with trace_operation("configuration.startup", context={"stage": name}):
         initialize_filesystem()
         store.add_to_hydra_store(overwrite_ok=True)
-        validate_launch_arguments(name)
+        config_path = validate_launch_arguments(name)
 
     multirun_tag: str | None = None
+    # Hydra appends --config-dir after search-path plugins. Make that directory
+    # the main source too, keeping edited local groups ahead of packaged fallbacks.
 
-    @hydra.main(config_name=name, config_path=None, version_base="1.3")
+    @hydra.main(config_name=name, config_path=config_path, version_base="1.3")
     def execute(config: DictConfig) -> None:
         nonlocal multirun_tag
         if HydraConfig.initialized() and HydraConfig.get().mode == RunMode.MULTIRUN:

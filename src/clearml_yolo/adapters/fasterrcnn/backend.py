@@ -7,6 +7,7 @@ import pandas as pd
 
 from clearml_yolo.adapters.fasterrcnn.configuration import validate_preprocessing
 from clearml_yolo.application.contracts import PreparedDataset
+from clearml_yolo.application.training_workers import BatchProbeRequest, ProbeRankResult
 from clearml_yolo.core.models import (
     BackendTrainResult,
     CheckpointMetadata,
@@ -32,7 +33,6 @@ def train(
 ) -> BackendTrainResult:
     if config.backend != "fasterrcnn":
         raise ValueError("Faster R-CNN training requires its own model configuration")
-    validate_device(config.train.device)
     from clearml_yolo.adapters.fasterrcnn.training import train_native
 
     return train_native(config, prepared, output, report, transforms=transforms)
@@ -52,3 +52,10 @@ def predict(
     from clearml_yolo.adapters.fasterrcnn.inference import predict_native
 
     return predict_native(descriptor, weights, image_paths, settings)
+
+
+def probe(request: BatchProbeRequest) -> ProbeRankResult:
+    from clearml_yolo.adapters.fasterrcnn.model import build_model
+    from clearml_yolo.adapters.torchvision.probe import probe as probe_torchvision
+
+    return probe_torchvision(request, build_model=build_model, label_offset=1)

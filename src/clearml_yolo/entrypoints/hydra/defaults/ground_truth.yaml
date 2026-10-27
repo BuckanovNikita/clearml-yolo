@@ -1,0 +1,3 @@
+defaults:
+- /_cy_schemas/ground_truth
+- _self_

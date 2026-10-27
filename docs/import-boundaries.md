@@ -50,8 +50,8 @@ dependencies are forbidden in both application and core.
 |---|---|
 | Ultralytics | YOLO adapters and named native integration bridges |
 | Torch / Torchvision / timm | Explicit native detector, export and integration modules |
-| RF-DETR / Lightning | RF-DETR backend |
-| pycocotools | Faster R-CNN evaluation and export quality |
+| RF-DETR / Lightning / Lightning Fabric | RF-DETR backend and native probe |
+| pycocotools / faster-coco-eval | Shared Torchvision evaluation, export quality / DEIM probe |
 | ONNX / TensorRT | Export adapters |
 | ClearML | ClearML adapters and named native integration bridges |
 | digital-metrics | Evaluation and reporting adapters |
@@ -69,10 +69,12 @@ backend/export contracts explicitly permit absent imports and the same configure
 contracts evaluate the AST-enriched graph containing literal dynamic edges. Indirect SDK use through an approved adapter is normal;
 the layer rules still prevent a core or application module from reaching that adapter.
 
-GPU inventory and the disposable visibility probe moved to `cy_queue`; its
-architecture contracts own their SDK edges. CY cannot import `cy_queue`, Textual
-or NVML. Direct commands and ClearML Agents do not discover or wait for queue
-capacity. The permitted dependency direction is queue → CY shared interfaces.
+Queue admission and its disposable visibility probe belong to `cy_queue`; its
+architecture contracts own their SDK edges. CY's local estimator separately owns
+idle-GPU telemetry and fresh native trials; explicit training `batch=null` discovers
+assigned hardware for compatible lookup. CY cannot import `cy_queue`, Textual or
+NVML, and does not wait for queue capacity. The permitted dependency direction is
+queue → CY shared interfaces.
 
 ## Adapter peers
 
@@ -88,7 +90,7 @@ capacity. The permitted dependency direction is queue → CY shared interfaces.
 | Runtime | Observability |
 | Assets | Storage, observability |
 | Integrations | Storage, observability |
-| DEIMv2, RF-DETR, Faster R-CNN, export | Observability |
+| DEIMv2, RF-DETR, Faster R-CNN, FCOS, Torchvision, export | Observability |
 
 The following exact bridges supplement this map; they are checked independently
 of SDK ownership:
@@ -113,6 +115,13 @@ of SDK ownership:
   Faster R-CNN adapters. DEIM source loading uses manifest verification from
   `assets.archive`. Model asset selection/loading uses immutable core descriptions. HTTP, cache writes, locks and extraction stay outside core and
   application workflows; native detector adapters retain checkpoint transformations.
+- Faster R-CNN and FCOS inject their model builders and label conventions into
+  shared `torchvision` data, training, evaluation, prediction and probe modules.
+  Shared execution cannot import either family or ClearML publication.
+- Integration adapters compose estimate profiles, local storage, telemetry and
+  supervised workers. Pure search/compatibility remains in core; application
+  estimation uses `batch_ports`. `training_workers` carries typed rank records.
+  Native ranks use runtime distributed setup; the invocation owner publishes results.
 
 The authoritative exact-edge lists are `ignore_imports` in
 [.importlinter](../.importlinter); there is no second Python ownership table.

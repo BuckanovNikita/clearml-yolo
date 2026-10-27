@@ -74,14 +74,13 @@ def test_actual_graph_obeys_every_configured_contract_including_dynamic_imports(
         ("clearml_yolo.adapters.clearml.cache", "clearml_yolo.adapters.clearml.session", True),
         ("clearml_yolo.adapters.clearml.cache", "clearml_yolo.adapters.storage.filesystem", True),
         ("clearml_yolo.adapters.clearml.parameters", "yaml", True),
-    ] + [
+    ]
+    + [
         ("clearml_yolo.core.identity", dependency, False)
         for dependency in ("pydantic", "pandera", "pandas", "numpy", "scipy", "math")
     ],
 )
-def test_unique_dependency_allowlists(
-    importer: str, imported: str, rejected: bool
-) -> None:
+def test_unique_dependency_allowlists(importer: str, imported: str, rejected: bool) -> None:
     candidate = grimp.ImportGraph()
     candidate.add_module(importer)
     candidate.add_module(imported)
@@ -342,7 +341,53 @@ def test_console_command_inventory_matches_configured_independence(
         ),
         ("timm SDK has explicit owners", "clearml_yolo.adapters.rfdetr.backend", "timm"),
         ("timm SDK has explicit owners", "clearml_yolo.adapters.export.metadata", "timm"),
+        ("torch SDK has explicit owners", "clearml_yolo.application.training_workers", "torch"),
+        (
+            "Clean architecture inward layers",
+            "clearml_yolo.core.batch_estimation",
+            "clearml_yolo.adapters.runtime.gpu_memory",
+        ),
+        (
+            "runtime adapter peer ownership",
+            "clearml_yolo.adapters.runtime.gpu_memory",
+            "clearml_yolo.adapters.yolo.batch_probe",
+        ),
+        (
+            "yolo adapter peer ownership",
+            "clearml_yolo.adapters.yolo.inference",
+            "clearml_yolo.adapters.runtime.gpu_memory",
+        ),
         ("rfdetr SDK has explicit owners", "clearml_yolo.adapters.deim.backend", "rfdetr"),
+        (
+            "Clean architecture inward layers",
+            "clearml_yolo.core.batch_estimation",
+            "clearml_yolo.adapters.runtime.gpu_inventory",
+        ),
+        (
+            "Clean architecture inward layers",
+            "clearml_yolo.application.use_cases.batch_estimate",
+            "clearml_yolo.adapters.storage.batch_estimates",
+        ),
+        (
+            "torchvision adapter peer ownership",
+            "clearml_yolo.adapters.torchvision.training",
+            "clearml_yolo.adapters.fcos.model",
+        ),
+        (
+            "fcos adapter peer ownership",
+            "clearml_yolo.adapters.fcos.backend",
+            "clearml_yolo.adapters.clearml.session",
+        ),
+        (
+            "lightning_fabric SDK has explicit owners",
+            "clearml_yolo.application.training_workers",
+            "lightning_fabric",
+        ),
+        (
+            "faster_coco_eval SDK has explicit owners",
+            "clearml_yolo.core.batch_estimation",
+            "faster_coco_eval",
+        ),
         (
             "pytorch_lightning SDK has explicit owners",
             "clearml_yolo.application.contracts",
@@ -415,9 +460,11 @@ def test_transitive_adapter_escape_is_rejected_by_configured_layers(
         importer="clearml_yolo.application.helper",
         imported="clearml_yolo.adapters.yolo.inference",
     )
-    assert not _contract(import_options, "Clean architecture inward layers").check(
-        candidate, verbose=False
-    ).kept
+    assert (
+        not _contract(import_options, "Clean architecture inward layers")
+        .check(candidate, verbose=False)
+        .kept
+    )
 
 
 def test_type_only_imports_remain_in_the_configured_graph(
@@ -744,8 +791,17 @@ def test_runtime_target_resolution_respects_scopes_and_reexports(
 )
 @pytest.mark.parametrize(
     "sdk",
-    ["clearml", "torch", "torchvision", "timm", "rfdetr", "pytorch_lightning",
-     "onnx", "tensorrt", "safetensors"],
+    [
+        "clearml",
+        "torch",
+        "torchvision",
+        "timm",
+        "rfdetr",
+        "pytorch_lightning",
+        "onnx",
+        "tensorrt",
+        "safetensors",
+    ],
 )
 def test_dynamic_import_graph_resolves_scoped_import_aliases(
     tmp_path: Path,

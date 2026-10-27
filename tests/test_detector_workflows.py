@@ -46,6 +46,7 @@ from clearml_yolo.core.models import (
     BackendTrainResult,
     CheckpointDescriptor,
     CheckpointMetadata,
+    Device,
     ModelConfig,
     PredictSettings,
     Preprocessing,
@@ -384,10 +385,13 @@ def test_native_general_connection_failure_prevents_publication(
     assert harness.published == []
 
 
+@pytest.mark.parametrize("device", ["cpu", -1, "-1", [-1]])
 def test_programmatic_native_training_selects_coco_by_default(
     detector_harness: Callable[[str], _Harness],
+    device: Device,
 ) -> None:
     harness = detector_harness("rfdetr/small")
+    harness.config.train.device = device
     train(
         harness.config.train.model_dump(mode="json") | {"model": "small"},
         ClearMLConfig(),

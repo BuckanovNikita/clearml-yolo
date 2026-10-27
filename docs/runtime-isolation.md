@@ -8,11 +8,19 @@ retained scratch. Feature 024 and older GPU specifications remain historical rec
 
 `cy-init-config DIRECTORY [--command NAME] [--model PRESET] [--force]` accepts `cy`, `cy-train`,
 `cy-predict`, `cy-val`, `cy-metrics`, `cy-report`, `cy-compare`, `cy-ground-truth` and `cy-export`.
-The default is `cy`. Each invocation writes exactly one `<command>.yaml` wrapper.
+The default is `cy`. Each invocation writes one `<command>.yaml` wrapper and its
+local command base: for example, `cy.yaml` includes `pipeline.yaml`, while
+`cy-train.yaml` includes `train.yaml`. Public YAML and private `_cy_schemas`
+ConfigStore names are distinct, avoiding automatic schema matching. Fresh exports
+include the application YAML dependency closure; legacy trees can still resolve
+packaged public defaults without rewriting. Local files, interpolation, CLI overrides,
+multirun and explicit validation retain their precedence and behavior.
 The five existing model commands default to YOLO and also write `ultralytics/default.yaml`
 and `ultralytics_predict/default.yaml`. A new-detector selection instead writes
 `model/<backend>/<preset>.yaml`; `cy-export` defaults to `fasterrcnn/resnet50_fpn` and accepts
-only Faster R-CNN. Metrics, report and ground-truth commands require no model group files.
+only Faster R-CNN. Training exports include both augmentation profiles and selected
+model/profile specializations. Metrics, report and ground-truth commands require no
+model group files, but still receive their local base.
 Only selected destinations and their parents participate in overwrite preflight.
 Unrelated files remain unchanged. Existing selected files fail without `--force`;
 force replaces regular files only, never symlinks or directories. No ClearML task
@@ -101,6 +109,19 @@ pycocotools module identities around upstream import/dataset construction. Concu
 detector families require separate processes because the DEIM module alias boundary is
 sequential. Agent replay restores its backend before either runtime is initialized.
 
+## Native training workers
+
+The native multi-GPU implementation, available from 0.41.0, keeps the invocation owner outside
+distributed ranks. Supervised fresh workers receive typed requests, report typed
+results and never own ClearML publication. A rank failure, timeout or cancellation
+terminates the owned group before another trial starts. Rank zero owns aggregate
+metrics and unwrapped checkpoints; the invocation owner records selected batch
+provenance and publishes the experiment. Estimation also uses fresh supervised
+workers with exactly one GPU per trial, observes that GPU's memory and leaves unrelated
+workloads intact. Multi-GPU batch recommendations are extrapolated from compatible
+single-GPU evidence. Physical DDP training acceptance remains a separate gate; see
+[batch estimation](batch-estimation.md).
+
 ## ClearML Agent execution
 
 CY supports its existing recorded `pipeline` and `train` module entrypoints under
@@ -117,8 +138,10 @@ the existing precedence; observed General values do not override native detector
 `model` settings. Original output ownership and task identity are preserved.
 
 Agent-provided `CUDA_VISIBLE_DEVICES` and configured native logical device settings
-remain unchanged. No queue package, configuration, GPU inventory or reservation is
-required. Dependencies are installed by the Agent's environment; CY does not install
+remain unchanged. No queue package, configuration or reservation is required.
+Explicit training `batch=null` inspects the assigned hardware to resolve a saved
+[batch estimate](batch-estimation.md), without queue admission. Dependencies are
+installed by the Agent's environment; CY does not install
 them at execution time and introduces no separate task-submission interface.
 
 Non-YOLO assets resolve only after canonical inputs are recorded and only in an

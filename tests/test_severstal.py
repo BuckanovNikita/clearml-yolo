@@ -2,11 +2,14 @@
 
 import csv
 import hashlib
+import importlib
 import json
 import os
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
@@ -15,6 +18,7 @@ from PIL import Image
 from severstal_harness import (
     MODEL_SELECTIONS,
     SeverstalOptions,
+    _reload_checkpoint,
     _verify_initialization,
     parse_backbone_options,
     scenario_overrides,
@@ -235,7 +239,7 @@ def test_native_matrix_uses_every_registered_preset(tmp_path: Path) -> None:
         for preset in presets
     }
     assert set(MODEL_SELECTIONS) == expected
-    assert len(MODEL_SELECTIONS) == 15
+    assert len(MODEL_SELECTIONS) == len(expected), "Native matrix must not duplicate presets"
     options = SeverstalOptions(tmp_path, tmp_path, "acceptance", ("owned",))
     home = Path(worker_environment(tmp_path)["CY_HOME"])
     for selection in MODEL_SELECTIONS:
@@ -263,6 +267,7 @@ def test_native_matrix_uses_every_registered_preset(tmp_path: Path) -> None:
         "rfdetr/nano=backbone.pt",
         "deimv2/unknown=backbone.pt",
         "fasterrcnn/unknown=backbone.pt",
+        "fcos/unknown=backbone.pt",
     ],
 )
 def test_backbone_options_reject_invalid_or_unsupported_selections(entry: str) -> None:
@@ -307,8 +312,9 @@ def test_backbone_options_preserve_legacy_constructor_and_local_path_characters(
 ) -> None:
     path = tmp_path / "backbone = large.pt"
     path.write_bytes(b"checkpoint")
-    parsed = parse_backbone_options([f"deimv2/l={path}", f"fasterrcnn/dinov3_small={path}"])
-    assert parsed == {"deimv2/l": path.resolve(), "fasterrcnn/dinov3_small": path.resolve()}
+    selections = ("deimv2/l", "fasterrcnn/dinov3_small", "fcos/dinov3_small")
+    parsed = parse_backbone_options([f"{selection}={path}" for selection in selections])
+    assert parsed == dict.fromkeys(selections, path.resolve())
     previous = SeverstalOptions(tmp_path, tmp_path, "acceptance", ("owned",), "1", 900)
     assert previous.backbone_weights == {}
     assert previous.device == "1"
@@ -336,7 +342,14 @@ def test_backbone_mapping_is_validated_and_frozen_between_variants(tmp_path: Pat
         )
 
 
-@pytest.mark.parametrize("selection", ["deimv2/l", "fasterrcnn/dinov3_small"])
+@pytest.mark.parametrize(
+    "selection",
+    [
+        "deimv2/l",
+        "fasterrcnn/dinov3_small",
+        *(s for s in MODEL_SELECTIONS if s.startswith("fcos/")),
+    ],
+)
 @pytest.mark.parametrize("variant", ["default", "json", "json_mosaic"])
 def test_backbone_override_composes_only_for_matching_selection(
     tmp_path: Path, selection: str, variant: str
@@ -380,6 +393,48 @@ def test_saved_mosaic_recipe_is_standard_albumentations_json(tmp_path: Path) -> 
     assert isinstance(restored.transforms[0], alb.Mosaic)
     assert restored.transforms[0].p == 1
     assert restored.transforms[0].target_size == (384, 384)
+
+
+@pytest.mark.parametrize("selection", [s for s in MODEL_SELECTIONS if s != "ultralytics"])
+def test_downloaded_checkpoint_reload_uses_its_detector_family(
+    selection: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from clearml_yolo.adapters.storage import checkpoint
+    from clearml_yolo.core.models import CheckpointMetadata, Preprocessing, model_preset
+
+    config = model_preset(selection)
+    descriptor = CheckpointMetadata(
+        backend=config.backend,
+        preset=config.preset,
+        class_names=("0", "4"),
+        preprocessing=Preprocessing(resize="letterbox", size=800),
+    )
+    monkeypatch.setattr(checkpoint, "read_checkpoint_descriptor", lambda _path: descriptor)
+    calls: list[tuple[str, tuple[Any, ...]]] = []
+
+    def record(backend: str) -> Callable[..., object]:
+        def predict(*arguments: Any) -> object:
+            calls.append((backend, arguments))
+            return object()
+
+        return predict
+
+    for backend in ("deim", "rfdetr", "fasterrcnn", "fcos"):
+        module = importlib.import_module(f"clearml_yolo.adapters.{backend}.backend")
+        monkeypatch.setattr(module, "predict", record(backend))
+    weights = tmp_path / "downloaded.pth"
+    _reload_checkpoint({"selection": selection, "device": "cpu"}, weights, "image.png")
+    expected = "deim" if config.backend == "deimv2" else config.backend
+    assert len(calls) == 1
+    assert calls[0][0] == expected
+    received_config, received_descriptor, received_weights, paths, settings = calls[0][1]
+    assert received_config.backend == config.backend
+    assert received_config.preset == config.preset
+    assert received_descriptor is descriptor
+    assert received_descriptor.class_names == ("0", "4")
+    assert received_weights == weights
+    assert paths == ["image.png"]
+    assert settings.device == "cpu"
 
 
 def test_optimizer_evidence_observes_real_parameter_update() -> None:

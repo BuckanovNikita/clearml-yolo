@@ -68,7 +68,7 @@ def native_overlay(selection: str, profile: str) -> dict[str, Any]:
     backend = selection.split("/", maxsplit=1)[0]
     if backend == "ultralytics":
         return {"ultralytics": YOLO_DISABLED}
-    values = {"deimv2": DEIM_DISABLED, "rfdetr": RFDETR_DISABLED, "fasterrcnn": {}}
+    values = {"deimv2": DEIM_DISABLED, "rfdetr": RFDETR_DISABLED, "fasterrcnn": {}, "fcos": {}}
     return {"model": {"train": {"augmentation": values[backend]}}}
 
 
