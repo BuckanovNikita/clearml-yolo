@@ -36,7 +36,7 @@ The user explicitly requested logic verification only, with no live Artifactory 
 
 ## Remaining acceptance
 
-Code commit/tag/push remains open. No unfinished or unavailable gate is reported as passed.
+Code commit/tag/push completed; final identities and evidence are recorded below. No unfinished or unavailable gate is reported as passed.
 
 ## Companion and asset reviews
 
@@ -57,3 +57,13 @@ A fresh read-only reviewer returned ship for the complete integrated source, wit
 ## Canonical acceptance
 
 The stabilized final run completed successfully on 2026-10-29 and recorded its normal verifier receipt. Ruff, strict mypy, Vulture and import-linter passed; pytest passed with 4,445 passed, 30 skipped, 81 deselected and 182 upstream/expected warnings in 1,023.82 seconds. The receipt was produced by the unchanged canonical verifier after its full before/after input comparison, without exemptions or bypasses. The previous source-only ship review applies to the same runtime/test files. All requested native, public-download, Artifactory-fixture and paired-source behavior checks are complete; live Artifactory remains deliberately untested. Documentation and architecture are reconciled below before code delivery.
+
+## Released identities and final paired acceptance
+
+Published CY [v0.44.0](https://github.com/BuckanovNikita/clearml-yolo/tree/v0.44.0), release commit `8f95e095508ab48e523628f4fd2d106126fa28bc`, following feature commit `b6fead4`. All contributor and generated-version hooks passed; the generated version commit changed only CHANGELOG.md and the project/root-lock version tokens, without resolving or altering dependency pins. The first contributor attempt correctly stopped for a generated changelog update; the reviewed output was staged and the normal commit retried. No hooks were bypassed. The exact master and annotated-tag refs were pushed and read back from GitHub.
+
+The actual released CY source and queue 0.1.5 were installed together through normal resolution with the approved external sources. Installed/source versions, requirements, editable origins and imports agreed; pip consistency and CLI help passed. The queue suite passed again with 518 passed and 7 physical opt-in tests deselected. Runtime, test, script and user-guide bytes matched the earlier proposed-pair inventory. Queue [commit 397753c](https://github.com/BuckanovNikita/cy-queue/commit/397753c123f379ade50f06a2babf5e4b1476b9d2) was committed and pushed on main, and its remote identity verified. No queue tag or package publication was created.
+
+Final independent review confirmed all twelve inspected runtime/manifest/test files retained their reviewed hashes and accepted the successful canonical/documentation/architecture evidence. The isolated delivery checkouts preserve original workspace edits, branch positions and local source overrides. No operational environment or installed skill was upgraded. The task-owned archives and verification caches remain available; temporary fixture servers and verification processes completed. Live Artifactory remains outside the explicitly requested verification scope.
+
+The companion usage collection was published as [v0.6.3](https://github.com/BuckanovNikita/custom-opencode-skills/tree/v0.6.3), commit `9da53d6dd7b5e89538f5c232541f2faa95b1f72a`, with verified main and annotated-tag refs. GitHub redirected the maintained corp-skills remote to its renamed custom-opencode-skills repository. Final Markdown/local-link checks and independent status-guard review passed. Installed skill copies remain unchanged.

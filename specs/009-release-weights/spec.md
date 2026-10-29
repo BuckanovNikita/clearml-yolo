@@ -1,7 +1,7 @@
 # Feature Specification: Independently versioned model-weight releases
 
 **Created**: 2026-10-29
-**Status**: Implemented and verified; code delivery pending
+**Status**: Released as CY 0.44.0 with weights-2026-10-29
 **Input**: Download the supported catalogue, publish multiple tar archives in this repository, and make weight preparation use those releases without republishing weights for every code release.
 **Baseline**: [stage zero](../000-baseline/spec.md); extends the existing [native preparation](../007-download-weights/spec.md).
 

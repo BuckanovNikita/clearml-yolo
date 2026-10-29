@@ -23,7 +23,7 @@
 - [x] T010 Run canonical application/docs checks, assess mutation scope, verify latest paired sources/proposed versions and reconcile task-owned diff.
 - [x] T011 Obtain fresh independent review of final integrated change/evidence and validate architecture acceptance.
 - [x] T012 Publish the authorized weights release/assets; download/verify remote results and record immutable links/checksums.
-- [ ] T013 Complete authorized task-scoped commit and native code release, verify branch/tag refs and preserve unrelated work/local overrides.
+- [x] T013 Complete authorized task-scoped commit and native code release, verify branch/tag refs and preserve unrelated work/local overrides.
 
 ## Dependencies and coverage
 
