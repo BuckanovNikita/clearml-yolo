@@ -1,12 +1,17 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.43.0 (2026-10-29)
 
 ### Documentation
 
 - Record CY 0.42.0 release verification
   ([`f8eb8a3`](https://github.com/BuckanovNikita/clearml-yolo/commit/f8eb8a3c198806c08c0a41161aa4e8034dec0273))
+
+### Features
+
+- Add local Russian configuration reference and tutorials
+  ([`6009164`](https://github.com/BuckanovNikita/clearml-yolo/commit/60091649dd71087e5dac2a9a712098eaa5be5de6))
 
 
 ## v0.42.0 (2026-10-29)
