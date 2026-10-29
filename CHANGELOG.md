@@ -1,12 +1,17 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.44.0 (2026-10-29)
 
 ### Documentation
 
 - Record CY 0.43.0 release verification
   ([`0b5f3f7`](https://github.com/BuckanovNikita/clearml-yolo/commit/0b5f3f725fd65c760f21ea428faf2bbb5e2b6376))
+
+### Features
+
+- **weights**: Restore catalogue from pinned GitHub releases
+  ([`b6fead4`](https://github.com/BuckanovNikita/clearml-yolo/commit/b6fead47f7da17435634a1aa744dd6551b9a5fba))
 
 
 ## v0.43.0 (2026-10-29)
