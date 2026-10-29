@@ -1,12 +1,17 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.42.0 (2026-10-29)
 
 ### Documentation
 
 - Record CY 0.41.0 release verification
   ([`0037059`](https://github.com/BuckanovNikita/clearml-yolo/commit/0037059dcf8a8ed16582f256b98036480cabd842))
+
+### Features
+
+- Prepare model weights in native discovery caches
+  ([`9266772`](https://github.com/BuckanovNikita/clearml-yolo/commit/9266772328422e3f6131144a3b1008327e1d83af))
 
 
 ## v0.41.0 (2026-10-27)
