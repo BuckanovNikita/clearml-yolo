@@ -99,3 +99,9 @@ and all unrelated source/configuration changes are excluded by isolated capture.
 Queue and portable-skill changes remain limited to their reviewed compatibility,
 regression tests and usage/release records. Final acceptance still requires the
 canonical receipt, architecture check and final committed paired metadata.
+
+Final delivery gates subsequently passed as recorded in
+[verification](verification.md): the isolated canonical receipt, architecture
+acceptance and exact committed CY 0.42.0/queue 0.1.3 compatibility check. The
+release-generated changelog/root-version changes are included in the final
+scope; they introduce no additional runtime behavior.

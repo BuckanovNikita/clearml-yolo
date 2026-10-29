@@ -20,7 +20,8 @@
     "README.md",
     "specs/007-download-weights",
     "src/clearml_yolo/adapters/assets/validation.py",
-    "src/clearml_yolo/adapters/assets/http.py"
+    "src/clearml_yolo/adapters/assets/http.py",
+    "CHANGELOG.md"
   ],
   "impact": "modules",
   "rules": "Constitution II and docs/agent-workflow.md: inward dependencies, explicit SDK owners, inert imports and adapter-owned effects. Native asset writes alone may use SDK roots outside CY_HOME.",
@@ -351,7 +352,7 @@
       }
     }
   ],
-  "documentation": "README, model-assets/filesystem/project contracts, current index and authoritative portable clearml-yolo usage/evaluation source; dated verification records mutation applicability.",
+  "documentation": "README, model-assets/filesystem/project contracts, current index and authoritative portable clearml-yolo usage/evaluation source; dated verification records mutation applicability. Native release-generated CHANGELOG.md and root version metadata are included in final scope reconciliation.",
   "review": {
     "status": "accepted",
     "reviewer": "Fresh full-scope final_review and acceptance_review; focused privacy_acceptance/privacy_final with final ship closure; parent reconciled all results",

@@ -157,5 +157,40 @@ was unchanged across the complete run.
 Private application run ID is `6137ac971b25470094f976dc9206c8c8`; the accepted
 receipt is `.git/verification/application.json` in the isolated checkout.
 Documentation validation passed with zero Markdown/local-link issues, and the
-reconciled architecture acceptance validator exited zero. Release metadata and
-actual committed paired versions remain to be reconciled before pushing.
+reconciled architecture acceptance validator exited zero.
+
+## Git-only delivery
+
+The contributor commit is `9266772` (`feat: prepare model weights in native
+discovery caches`). Its hooks passed after the documented changelog regeneration
+was reviewed and staged. The native release hook created version commit
+`335370d28cc2f066bc3ccec897ecb38c63efe9dc` and annotated tag `v0.42.0`; only
+CHANGELOG and root project/lock versions changed in that generated commit.
+Version-commit checks passed using the verifier's validated release metadata path.
+No local uv source override was committed.
+
+The final actual-commit paired check read these committed metadata files with
+`git show`, compared them with the verified proposal, repeated normal installation
+and all queue checks, and passed:
+
+- CY 0.42.0 at `335370d28cc2f066bc3ccec897ecb38c63efe9dc`.
+- Queue 0.1.3 at `4205b9ba58f70cd69ffd9d8380ef0dd5556a3937`.
+- Exact source/installed version and import-origin checks, 282 compatible
+  dependencies, Ruff/format/mypy, both queue import contracts and installed help.
+- All 518 ordinary queue tests passed; seven physical cases were deselected,
+  with four existing warnings, in 121.40 seconds.
+
+CY master and its annotated tag were pushed atomically; queue main was pushed.
+Remote readback matched both commits, with tag object
+`28252e633983d2a75ebb400b9830b611814965fb` peeling to the CY release commit.
+This evidence-only closure does not alter the tagged implementation. Architecture
+scope includes the release-generated changelog and metadata. No GitHub Release,
+release asset, registry package or deployment was created.
+
+The portable skill companion is prepared as collection 0.6.1 with its own
+structural/behavioral review and release evidence. Installed skill copies and the
+original dirty collection checkout were preserved. The verified CY checkout is
+isolated because another task was editing the shared checkout; concurrent source
+work and its local overrides were left intact. Stand resources and task-owned
+run processes were cleaned; native caches and retained verification evidence stay
+available.

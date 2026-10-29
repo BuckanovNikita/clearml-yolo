@@ -32,7 +32,7 @@
 - [x] T016 Run canonical application/docs gates and applicable mutation checks; reconcile all task-owned paths and architecture record in verification.md.
 - [x] T017 Verify latest paired CY/cy-queue sources with proposed release versions using normal resolution, installed metadata and integration suite.
 - [x] T018 Obtain fresh independent review after integration/verification; resolve findings, validate architecture acceptance and record review.md.
-- [ ] T019 Complete authorized Conventional Commit and native Git-only release; verify remote branch/tag refs and preserve local overrides.
+- [x] T019 Complete authorized Conventional Commit and native Git-only release; verify remote branch/tag refs and preserve local overrides.
 
 ## Dependencies and parallel execution
 

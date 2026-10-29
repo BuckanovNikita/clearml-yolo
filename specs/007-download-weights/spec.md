@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-29
 
-**Status**: Implemented and verified; release in progress
+**Status**: Released as v0.42.0
 
 **Input**: Implement the supplied download-weights plan, retaining the current
 [baseline](../000-baseline/spec.md) and existing configuration semantics.
