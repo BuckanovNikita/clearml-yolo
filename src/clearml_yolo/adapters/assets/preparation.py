@@ -10,6 +10,7 @@ from filelock import FileLock
 from loguru import logger
 from pydantic import ValidationError
 
+from clearml_yolo.adapters.assets.bundles import load_manifest, seed_bundle_asset
 from clearml_yolo.adapters.assets.resolver import (
     AssetResolutionError,
     asset_destination,
@@ -104,6 +105,12 @@ def _discover() -> tuple[
         except Exception as error:  # noqa: BLE001 - source discovery is independent of weights
             failures.append(_failure("deimv2/source", "Asset discovery failed", error))
             identities.append({"selection": "deimv2/source", "discovery": "unavailable"})
+    try:
+        manifest = load_manifest()
+        manifest_identity = manifest.identity if manifest is not None else "unavailable"
+    except (OSError, ValueError):
+        manifest_identity = "invalid"
+    identities.append({"selection": "weight-bundle", "manifest": manifest_identity})
     payload = json.dumps(
         sorted(identities, key=lambda item: str(item["selection"])),
         sort_keys=True,
@@ -171,6 +178,7 @@ def _prepare(*, automatic: bool) -> PreparationResult:
             receipt.unlink(missing_ok=True)
             for selection, spec in requests:
                 try:
+                    seed_bundle_asset(spec)
                     record = _resolve(spec)
                     assets.append(record)
                     logger.info("Prepared model asset {} at {}", selection, record.path)

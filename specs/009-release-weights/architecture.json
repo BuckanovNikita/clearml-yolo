@@ -1,0 +1,233 @@
+{
+  "schema_version": 1,
+  "task": "009 independently versioned weights releases",
+  "scope": [
+    "src/clearml_yolo/core/weight_bundles.py",
+    "src/clearml_yolo/adapters/assets/bundles.py",
+    "src/clearml_yolo/adapters/assets/hub.py",
+    "src/clearml_yolo/adapters/assets/preparation.py",
+    "scripts/package_weights.py",
+    "src/clearml_yolo/adapters/assets/weights-manifest.json",
+    "tests",
+    "docs",
+    "README.md",
+    "AGENTS.md",
+    ".importlinter",
+    "specs/009-release-weights",
+    "src/clearml_yolo/entrypoints/download_weights.py",
+    "src/clearml_yolo/adapters/documentation/assets/tutorials"
+  ],
+  "impact": "modules",
+  "rules": "Constitution II and docs/agent-workflow.md: pure core, adapter-owned effects, inward dependencies and exact SDK ownership.",
+  "modules": [
+    {
+      "id": "manifest",
+      "path": "src/clearml_yolo/core/weight_bundles.py",
+      "change": "add",
+      "responsibility": "Validated immutable bundle manifest",
+      "interface": "Manifest schema v1; rejects duplicate/unsafe records",
+      "layer": "core",
+      "allowed_dependencies": [
+        "standard library",
+        "Pydantic"
+      ],
+      "forbidden_dependencies": [
+        "adapters",
+        "SDKs",
+        "network/filesystem effects"
+      ],
+      "effects": "None",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "bundles",
+      "path": "src/clearml_yolo/adapters/assets/bundles.py",
+      "change": "add",
+      "responsibility": "Pinned archive retrieval and native cache seeding",
+      "interface": "seed_bundle_asset(AssetSpec); failures allow existing resolver recovery",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "core",
+        "assets http/storage/resolver/hub",
+        "storage filesystem"
+      ],
+      "forbidden_dependencies": [
+        "entrypoints",
+        "application use cases"
+      ],
+      "effects": "Owns archive IO/network/locks/member validation and atomic placement",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "hub",
+      "path": "src/clearml_yolo/adapters/assets/hub.py",
+      "change": "modify",
+      "responsibility": "Restore real native Hub snapshot and config",
+      "interface": "Mirror restoration reuses native publication and validation without metadata network",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "core",
+        "huggingface_hub",
+        "assets storage/validation",
+        "storage filesystem"
+      ],
+      "forbidden_dependencies": [
+        "entrypoints",
+        "application use cases"
+      ],
+      "effects": "Owns blobs/snapshots/refs and config writes",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "preparation",
+      "path": "src/clearml_yolo/adapters/assets/preparation.py",
+      "change": "modify",
+      "responsibility": "Catalogue preparation with mirror preference",
+      "interface": "Existing public result/CLI contract; fingerprint includes pinned manifest",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "core",
+        "assets",
+        "backend discovery",
+        "storage"
+      ],
+      "forbidden_dependencies": [
+        "entrypoints",
+        "application use cases"
+      ],
+      "effects": "Invokes bundle seeding and normal resolver; owns receipts",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "packager",
+      "path": "scripts/package_weights.py",
+      "change": "add",
+      "responsibility": "Explicit maintainer archive packaging",
+      "interface": "Output directory/tag/size/notices CLI; complete manifest and independent tars",
+      "layer": "script",
+      "allowed_dependencies": [
+        "standard library",
+        "core",
+        "assets adapters"
+      ],
+      "forbidden_dependencies": [
+        "entrypoints",
+        "application use cases"
+      ],
+      "effects": "Owns staging archive IO and explicit catalogue preparation, never upload",
+      "contracts": [
+        "packager-imports"
+      ]
+    },
+    {
+      "id": "cli",
+      "path": "src/clearml_yolo/entrypoints/download_weights.py",
+      "change": "modify",
+      "responsibility": "Manual preparation failure recovery guidance",
+      "interface": "Existing CLI status/report plus conditional safe GH/GHR/HF setup and retry hints on failure",
+      "layer": "entrypoint",
+      "allowed_dependencies": [
+        "core",
+        "adapters",
+        "standard library"
+      ],
+      "forbidden_dependencies": [
+        "queue",
+        "application use cases"
+      ],
+      "effects": "Console reporting only; network, SDKs and storage stay adapter owned.",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "imports",
+      "path": ".importlinter",
+      "status": "existing",
+      "rules": "Inward layers, exhaustive core/adapters, SDK/peer ownership; no new external SDK owner.",
+      "check": "canonical"
+    },
+    {
+      "id": "negative",
+      "path": "tests/test_architecture.py",
+      "status": "existing",
+      "rules": "Dynamic imports, SDK ownership, core side effects and injected forbidden edges.",
+      "check": "canonical"
+    },
+    {
+      "id": "packager-imports",
+      "path": "tests/test_tooling_boundaries.py",
+      "status": "existing",
+      "rules": "Maintainer packager permits standard library and exact existing assets/core APIs; rejects SDK, application, entrypoint, unrelated and dynamic imports, including negative cases.",
+      "check": "canonical"
+    }
+  ],
+  "checks": [
+    {
+      "id": "canonical",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync python scripts/verify.py",
+      "expectation": "Static/import gates and full suite including negative architecture cases pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/009-release-weights/verification.md"
+      }
+    },
+    {
+      "id": "docs",
+      "kind": "documentation",
+      "command": "uv run --frozen --no-sync python scripts/verify.py --docs",
+      "expectation": "Markdown/links and changed examples pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/009-release-weights/verification.md"
+      }
+    },
+    {
+      "id": "native",
+      "kind": "behavior",
+      "command": "Real bundle packaging, fresh-cache restore and offline native-loader checks recorded in verification.md",
+      "expectation": "Complete catalogue hashes and metadata match; native family loads pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/009-release-weights/verification.md"
+      }
+    },
+    {
+      "id": "paired",
+      "kind": "behavior",
+      "command": "Normal current-source CY/cy-queue install and integration suite per docs/development.md",
+      "expectation": "Current proposed release pair resolves and passes integration checks.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/009-release-weights/verification.md"
+      }
+    }
+  ],
+  "documentation": "README, model assets/current/project contracts, release policy, usage skill; dated licence and GitHub publication evidence.",
+  "review": {
+    "status": "accepted",
+    "reviewer": "Fresh independent native final code reviewer, 2026-10-29",
+    "evidence": "specs/009-release-weights/verification.md",
+    "reconciliation": "Reviewed all 31 task-owned tracked and untracked paths, including new manifest/core/adapter/packager and tests, existing Hub/preparation/CLI modifications, generated tutorial HTML and scoped documentation. Architecture maps every changed runtime/script module to existing package graph/negative contracts or the new exact packager import guard. No dependency/source pin or workflow tooling changed. Original stale workspace and pre-existing 007/008 edits were preserved through isolated latest-source delivery. Final source review found no blocking issues; canonical receipt, native/public download and paired checks passed on unchanged runtime/test inputs."
+  }
+}

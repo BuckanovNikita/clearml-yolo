@@ -30,6 +30,7 @@ from clearml_yolo.adapters.assets.storage import promote_asset
 from clearml_yolo.adapters.assets.validation import validate_asset
 from clearml_yolo.adapters.storage.filesystem import cy_home
 from clearml_yolo.core.assets import AssetSpec, HubAsset, ResolvedAsset
+from clearml_yolo.core.weight_bundles import BundleAsset
 
 _PUBLIC_ENDPOINT = "https://huggingface.co"
 _COMMIT = re.compile(r"[0-9a-fA-F]{40}")
@@ -602,3 +603,72 @@ def resolve_hub_asset(spec: AssetSpec) -> ResolvedAsset:
         return _resolve_hub_asset(spec)
     except (OSError, ValueError, Timeout) as error:
         raise _failure(hub, [type(error).__name__]) from error
+
+
+def bundle_asset_ready(spec: AssetSpec) -> bool:
+    """Check complete native cache readiness without requesting Hub metadata."""
+    existing, _ = _cached(spec)
+    return existing is not None and not _needs_config_repair(spec, existing)
+
+
+def restore_bundle_asset(
+    spec: AssetSpec, asset: BundleAsset, weight_path: Path, config_path: Path
+) -> ResolvedAsset:
+    """Restore a real pinned snapshot without a metadata or config network request."""
+    hub = _request(spec)
+    metadata = asset.hub
+    if (
+        metadata is None
+        or metadata.repository != hub.repository
+        or metadata.revision != hub.revision
+        or metadata.filename not in _filenames(hub)
+    ):
+        raise ValueError("Bundle does not match native Hub request")
+    digest = validate_asset(weight_path, _file_spec(spec, metadata.filename))
+    if digest != asset.sha256 or weight_path.stat().st_size != asset.size:
+        raise ValueError("Bundle weight checksum mismatch")
+    if not _etag_matches(weight_path, metadata.etag, digest):
+        raise ValueError("Bundle weight ETag mismatch")
+    config_digest = _validate_config_data(config_path, metadata.config.etag)
+    if (
+        config_digest != metadata.config.sha256
+        or config_path.stat().st_size != metadata.config.size
+    ):
+        raise ValueError("Bundle config checksum mismatch")
+    key = hashlib.sha256(f"{hub.repository}@{hub.revision}".encode()).hexdigest()
+    lock = _contained(hub.cache_dir, hub.cache_dir / ".locks" / "clearml-yolo" / f"{key}.lock")
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    with FileLock(lock, timeout=1260):
+        existing, _ = _cached(spec)
+        if existing is not None and not _needs_config_repair(spec, existing):
+            return existing
+        repo = _repo_root(hub)
+        blob = _contained(hub.cache_dir, repo / "blobs" / metadata.config.etag)
+        snapshot = _contained(hub.cache_dir, repo / "snapshots" / metadata.commit / "config.json")
+        validate_config = partial(_validate_config_data, etag=metadata.config.etag)
+        promote_asset(config_path, blob, validator=validate_config)
+        snapshot.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(dir=snapshot.parent, delete=False) as temporary:
+            link = Path(temporary.name)
+        link.unlink()
+        try:
+            try:
+                link.symlink_to(os.path.relpath(blob, snapshot.parent))
+                link.replace(snapshot)
+            except OSError:
+                promote_asset(blob, snapshot, validator=validate_config)
+        finally:
+            link.unlink(missing_ok=True)
+        native = HfFileMetadata(
+            commit_hash=metadata.commit,
+            etag=metadata.etag,
+            size=asset.size,
+            location=hf_hub_url(
+                hub.repository,
+                metadata.filename,
+                revision=metadata.commit,
+                endpoint=_PUBLIC_ENDPOINT,
+            ),
+            xet_file_data=None,
+        )
+        return _publish_legacy(weight_path, spec, metadata.filename, native, digest)

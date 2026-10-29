@@ -327,7 +327,7 @@ queue at runtime. This is a mandatory release acceptance step alongside the hook
 
 ## Local releases
 
-Releases contain Git commits and annotated version tags only. Do not build,
+Code releases contain Git commits and annotated version tags only. Do not build,
 upload or offer project `.whl` wheels or `.tar.gz` source archives as release
 deliverables. Distribution builds and isolated archive installs are allowed only
 for a concrete debugging purpose; they are not routine release acceptance gates.
@@ -364,7 +364,50 @@ uv run --locked --no-sync python scripts/local_release.py
 After checking the result, complete authorized delivery by pushing the intended branch
 and any newly created version tag explicitly, then verify the remote refs. A no-release
 evaluation is a valid outcome for documentation-only history; do not force a version bump.
-Publish Git tags only: no GitHub Releases, release assets or registry packages. The
+Publish Git tags only for code: no code GitHub Releases, project distribution assets
+or registry packages. The separate [model-weight procedure](#model-weight-releases)
+is the only model-assets exception. The
 [release contract](../specs/000-baseline/spec.md#local-release-interface) describes
 version policy, dirty-tree deferral, concurrency and recovery. The
 [validation guide](../specs/000-baseline/spec.md#local-release-interface) covers checks and changelog refresh.
+
+## Model-weight releases
+
+The user-authorized model-assets exception permits `weights-*` GitHub Releases in
+`BuckanovNikita/clearml-yolo` containing verified model-weight/source tar archives,
+manifest, checksums and upstream notices. It does not authorize project wheels,
+source distributions or registry packages. Weight tags have an independent cadence
+from application versions; ordinary release hooks neither package nor upload weights.
+Reuse the current snapshot across code releases until its catalogue needs an update.
+
+Inspect the current [eligible catalogue](model-assets.md#catalogue-and-automatic-execution),
+native caches and [licence inventory](../specs/009-release-weights/licenses.md), then
+assemble a complete snapshot with the explicit maintainer command:
+
+```bash
+uv run --frozen --no-sync python scripts/package_weights.py \
+  --output ./weight-release --tag weights-YYYY-MM-DD --notices ./weight-notices
+```
+
+Replace the example date and notice directory deliberately. The script resolves the
+eligible catalogue and writes independent `.tar` files, `manifest.json` and
+`SHA256SUMS`; any unresolved entry fails packaging. Its default archive target is
+1,900,000,000 bytes, including tar overhead and notices, below the 2 GiB hosting limit.
+It performs no upload and does not change the runtime pin. Include every applicable
+licence and attribution, source availability directions for AGPL assets, and DEIMv2's
+non-commercial restriction. Preserve original upstream identities and real Hub
+snapshot/configuration metadata; never fabricate a snapshot commit from a file hash.
+
+Before publication, verify catalogue completeness, archive/member size and hashes,
+safe members and fresh-cache offline native loading. Publish the manifest, checksum
+file and all archives under the chosen new weight tag, then verify the actual hosted
+bytes against the manifest. Record the tag, sources, licence notices, executed checks
+and limitations in dated feature evidence. Do not replace published bytes in place;
+corrections use a new snapshot identity.
+
+After verifying publication, deliberately update the packaged
+`src/clearml_yolo/adapters/assets/weights-manifest.json` pin to that manifest and run
+the applicable architecture, behavior, documentation, paired compatibility and
+independent review gates before code delivery. The pin participates in automatic
+preparation fingerprints. Packaging, mocked transport or an uploaded asset alone
+does not establish successful native restoration or complete code-release acceptance.

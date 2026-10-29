@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record CY 0.43.0 release verification
+  ([`0b5f3f7`](https://github.com/BuckanovNikita/clearml-yolo/commit/0b5f3f725fd65c760f21ea428faf2bbb5e2b6376))
+
+
 ## v0.43.0 (2026-10-29)
 
 ### Documentation

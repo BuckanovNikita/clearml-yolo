@@ -32,6 +32,19 @@ def main(argv: Sequence[str] | None = None) -> None:
             f"Prepared {len(result.assets)} assets; {len(result.failures)} failures.\n"
         )
         if result.failures:
+            sys.stdout.write(
+                "If Artifactory is required, configure its repository roots and retry:\n"
+                "  export GHR=https://artifactory.example/artifactory/github-releases\n"
+                "  export GH=https://artifactory.example/artifactory/github-vcs\n"
+                "  # Optional Hub mirror for native Hub assets:\n"
+                "  export HF_ENDPOINT=https://artifactory.example/artifactory/api/"
+                "huggingfaceml/hf-remote\n"
+                "Use per-host ~/.netrc credentials for GH/GHR HTTP requests; "
+                "use HF_TOKEN only for the configured Hub endpoint.\n"
+                "Keep TLS verification enabled; configure SSL_CERT_FILE for a private CA.\n"
+                "Retry: cy-download-weights\n"
+                "Details: docs/model-assets.md\n"
+            )
             raise SystemExit(1)
 
 

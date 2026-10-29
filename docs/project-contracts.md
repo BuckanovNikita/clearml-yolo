@@ -256,7 +256,13 @@ Explicit model preparation may write model assets,
 locks, temporary sibling downloads and native HF metadata into configured native caches
 outside `CY_HOME`; preparation receipts and all project outputs remain contained.
 `cy-download-weights` retries the eligible catalogue and exits nonzero on incomplete
-preparation. Actual `cy` alone performs the once-per-catalogue/location bulk attempt,
+preparation. Valid native assets precede the packaged `weights-*` release pin, then
+ordinary upstream fallback. Independent tar archives and members require size/SHA-256
+validation and safe paths before native publication; HF restoration includes real
+snapshot/configuration metadata without an upstream metadata request. Original source
+identities remain provenance. Weight releases have their own cadence; code releases
+reuse the pin without uploading assets. Actual `cy` alone performs the
+once-per-catalogue/manifest/location bulk attempt,
 including completed partial failures; help, inspection, submission and standalone
 stages do not. See [model preparation](model-assets.md) for exclusions and recovery.
 Project temporary files receive explicit retained invocation arenas; global SDK temporary

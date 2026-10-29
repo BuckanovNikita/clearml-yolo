@@ -1,0 +1,3 @@
+# Validation quickstart
+
+Run `cy-download-weights` with empty task-owned native caches and allow only the pinned GitHub release endpoint. Verify every asset against the manifest, then block network and load the native model families. Repeat preparation to verify no transfer, corrupt one native file to test recovery, and corrupt an archive fixture to test rejection. Maintainers run `python scripts/package_weights.py --output /path/to/staging --tag weights-YYYY-MM-DD --notices /path/to/notices`; inspect manifest, licences, checksums and archive sizes before explicit upload. Normal software releases need no packaging command.

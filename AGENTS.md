@@ -42,7 +42,11 @@ for every task.
 
 ## Dependencies and Git
 
-- Releases consist only of Git commits and annotated version tags. Build project
+- Code releases consist only of Git commits and annotated version tags. Independently
+  versioned `weights-*` GitHub Releases may contain the project's verified model
+  asset tar archives, manifests, checksums and upstream notices under the explicit
+  model-assets exception; follow [weight releases](docs/development.md#model-weight-releases).
+  Code-release hooks do not publish these assets. Build project
   `.whl` wheels and `.tar.gz` source archives only for a concrete debugging task;
   never build or present them as release deliverables or routine release checks.
   This project rule overrides generic distribution-build guidance in shared skills.
