@@ -18,6 +18,7 @@ from omegaconf import DictConfig, OmegaConf, open_dict
 # Populate the shared ConfigStore in fresh CLI processes before Hydra composes examples.
 import clearml_yolo.entrypoints.hydra.configs  # noqa: F401
 from clearml_yolo.adapters.assets.execution import prepare_model_assets
+from clearml_yolo.adapters.assets.preparation import prepare_catalogue
 from clearml_yolo.adapters.clearml.naming import initialize_naming
 from clearml_yolo.adapters.clearml.session import (
     RemoteReplay,
@@ -263,6 +264,8 @@ def _execution_model(name: str, config: DictConfig) -> ModelConfig:
 
 
 def _execute_direct(name: str, config: DictConfig, function: Callable[..., Any]) -> None:
+    if name == "pipeline":
+        prepare_catalogue(automatic=True)
     materialize_model_config(config)
     effective = deepcopy(config)
     requests: dict[str, Any] = {}

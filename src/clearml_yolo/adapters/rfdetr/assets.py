@@ -22,5 +22,6 @@ def pretrained_asset(preset: str) -> AssetSpec:
         checksum_algorithm="md5",
         revision=VERSION,
         override="model.train.weights",
-        cache_candidates=(Path(registry.get_model_cache_dir()) / filename, Path.cwd() / filename),
+        native_cache=Path(registry.get_model_cache_dir()).expanduser().resolve(),
+        cache_candidates=(Path.cwd() / filename,),
     )

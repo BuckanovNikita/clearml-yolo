@@ -1,0 +1,361 @@
+{
+  "schema_version": 1,
+  "task": "007 native weight preparation",
+  "scope": [
+    "src/clearml_yolo/core/assets.py",
+    "src/clearml_yolo/adapters/assets/resolver.py",
+    "src/clearml_yolo/adapters/assets/storage.py",
+    "src/clearml_yolo/adapters/assets/hub.py",
+    "src/clearml_yolo/adapters/assets/preparation.py",
+    "src/clearml_yolo/adapters/yolo/assets.py",
+    "src/clearml_yolo/adapters/torchvision/assets.py",
+    "src/clearml_yolo/adapters/rfdetr/assets.py",
+    "src/clearml_yolo/entrypoints/download_weights.py",
+    "src/clearml_yolo/entrypoints/hydra/common.py",
+    "pyproject.toml",
+    "uv.lock",
+    ".importlinter",
+    "tests",
+    "docs",
+    "README.md",
+    "specs/007-download-weights",
+    "src/clearml_yolo/adapters/assets/validation.py",
+    "src/clearml_yolo/adapters/assets/http.py"
+  ],
+  "impact": "modules",
+  "rules": "Constitution II and docs/agent-workflow.md: inward dependencies, explicit SDK owners, inert imports and adapter-owned effects. Native asset writes alone may use SDK roots outside CY_HOME.",
+  "modules": [
+    {
+      "id": "types",
+      "path": "src/clearml_yolo/core/assets.py",
+      "change": "modify",
+      "responsibility": "Immutable native asset requests and preparation results",
+      "interface": "Typed values, identities and result records; no effects",
+      "layer": "core",
+      "allowed_dependencies": [
+        "standard library",
+        "Pydantic",
+        "core model catalogue"
+      ],
+      "forbidden_dependencies": [
+        "adapters",
+        "entrypoints",
+        "SDKs"
+      ],
+      "effects": "None; pure values only.",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "resolver",
+      "path": "src/clearml_yolo/adapters/assets/resolver.py",
+      "change": "modify",
+      "responsibility": "Validation, cache promotion and URL resolution",
+      "interface": "resolve_asset(AssetSpec) returns actual ResolvedAsset; incomplete files never published",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "core",
+        "assets storage/http/hub/archive"
+      ],
+      "forbidden_dependencies": [
+        "entrypoints",
+        "application use cases"
+      ],
+      "effects": "Owns URL retrieval, destination locks, validation dispatch and atomic file publication; receives explicit native roots and never changes SDK settings.",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "storage",
+      "path": "src/clearml_yolo/adapters/assets/storage.py",
+      "change": "add",
+      "responsibility": "Native asset storage boundary",
+      "interface": "Native root and single filename produce confined native leaf without CY_HOME restriction",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "standard library"
+      ],
+      "forbidden_dependencies": [
+        "core effects",
+        "SDK settings mutation"
+      ],
+      "effects": "Owns native-root containment checks and temporary sibling copy/fsync/replace; performs no network calls or SDK configuration writes.",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "hub",
+      "path": "src/clearml_yolo/adapters/assets/hub.py",
+      "change": "add",
+      "responsibility": "HF native cache and endpoint ownership",
+      "interface": "Resolve HubAsset using native metadata and endpoint-scoped credentials",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "huggingface_hub",
+        "core",
+        "assets validation/storage",
+        "storage.filesystem CY_HOME selector",
+        "standard-library context/thread coordination and third-party diagnostic logging boundary"
+      ],
+      "forbidden_dependencies": [
+        "entrypoints",
+        "application use cases"
+      ],
+      "effects": "Owns endpoint-scoped HF SDK calls, native cache locks, validated blobs/configuration/refs/snapshots and compatible legacy promotion; never mutates SDK global selectors. Scopes third-party diagnostic redaction to the active SDK context, coordinating temporary filters without altering unrelated thread output or persistent logger configuration.",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "preparation",
+      "path": "src/clearml_yolo/adapters/assets/preparation.py",
+      "change": "add",
+      "responsibility": "Catalogue preparation and durable attempt state",
+      "interface": "prepare_catalogue(*, automatic: bool) -> PreparationResult; completion-only receipts",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "core",
+        "backend asset discovery",
+        "assets resolver/sources",
+        "storage"
+      ],
+      "forbidden_dependencies": [
+        "application use cases",
+        "entrypoints"
+      ],
+      "effects": "Owns runtime SDK discovery orchestration, per-asset resolver calls, catalogue locking and atomic completed-attempt receipts beneath CY_HOME; no import-time preparation.",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "yolo",
+      "path": "src/clearml_yolo/adapters/yolo/assets.py",
+      "change": "add",
+      "responsibility": "Ultralytics native discovery",
+      "interface": "Named asset to AssetSpec using effective weights_dir and release identity",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "Ultralytics",
+        "core"
+      ],
+      "forbidden_dependencies": [
+        "application use cases",
+        "entrypoints"
+      ],
+      "effects": "Reads effective Ultralytics settings and installed native release/name helpers at runtime; no model construction, settings writes or downloads.",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "torchvision",
+      "path": "src/clearml_yolo/adapters/torchvision/assets.py",
+      "change": "modify",
+      "responsibility": "Torchvision/timm native discovery",
+      "interface": "pretrained_asset preserves source choice and SDK cache locations",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "Torchvision",
+        "timm",
+        "HF constants",
+        "core"
+      ],
+      "forbidden_dependencies": [
+        "application use cases",
+        "entrypoints"
+      ],
+      "effects": "Reads installed Torchvision/timm pretrained descriptors and native Torch/HF cache selection at runtime, including native source precedence; no settings writes or model construction.",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "rfdetr",
+      "path": "src/clearml_yolo/adapters/rfdetr/assets.py",
+      "change": "modify",
+      "responsibility": "RF-DETR native discovery",
+      "interface": "pretrained_asset returns registry filename and native cache",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "RF-DETR",
+        "core"
+      ],
+      "forbidden_dependencies": [
+        "application use cases",
+        "entrypoints"
+      ],
+      "effects": "Imports native RF-DETR asset registry and reads filenames/checksums/cache selection at runtime; no model construction, settings writes or downloads.",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "cli",
+      "path": "src/clearml_yolo/entrypoints/download_weights.py",
+      "change": "add",
+      "responsibility": "Manual preparation command",
+      "interface": "main help no effects; explicit retry reports failures and exits nonzero",
+      "layer": "entrypoint",
+      "allowed_dependencies": [
+        "adapters",
+        "core",
+        "standard library"
+      ],
+      "forbidden_dependencies": [
+        "queue"
+      ],
+      "effects": "Owns argument parsing, runtime bootstrap, explicit manual adapter invocation, redacted console reporting and process exit status; storage/network remain adapter-owned.",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "startup",
+      "path": "src/clearml_yolo/entrypoints/hydra/common.py",
+      "change": "modify",
+      "responsibility": "Pipeline execution invocation policy",
+      "interface": "Only actual pipeline execution triggers automatic preparation before construction",
+      "layer": "entrypoint",
+      "allowed_dependencies": [
+        "adapters",
+        "core",
+        "Hydra"
+      ],
+      "forbidden_dependencies": [
+        "queue"
+      ],
+      "effects": "Owns invocation policy: calls preparation only during actual pipeline execution before existing model/configuration materialization; preserves standalone and inspection paths.",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "validation",
+      "path": "src/clearml_yolo/adapters/assets/validation.py",
+      "change": "add",
+      "responsibility": "Shared content validation independent of transport",
+      "interface": "validate_asset(Path, AssetSpec) -> SHA256; rejects invalid content",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "core",
+        "safetensors",
+        "assets archive",
+        "standard library"
+      ],
+      "forbidden_dependencies": [
+        "entrypoints",
+        "application use cases"
+      ],
+      "effects": "Reads and hashes files, validates archive/safetensors/checkpoint structure; performs no writes, downloads or model construction.",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "http",
+      "path": "src/clearml_yolo/adapters/assets/http.py",
+      "change": "modify",
+      "already_applied": true,
+      "responsibility": "Bounded HTTP downloads and credential-safe asset source diagnostics",
+      "interface": "asset_source_url retains only public Google Drive identity query; other query/credentials redacted",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "Requests",
+        "standard library"
+      ],
+      "forbidden_dependencies": [
+        "entrypoints",
+        "application use cases"
+      ],
+      "effects": "Owns HTTP file streaming; source diagnostic helper is pure.",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "imports",
+      "path": ".importlinter",
+      "status": "existing",
+      "rules": "Exhaustive layers and entrypoints; exact SDK ownership and peer bridges; inward core/application dependencies.",
+      "check": "canonical"
+    },
+    {
+      "id": "negative",
+      "path": "tests/test_architecture.py",
+      "status": "existing",
+      "rules": "Dynamic imports, forbidden SDK/core/queue edges, effects, inert initializers and injected negative graph checks.",
+      "check": "canonical"
+    }
+  ],
+  "checks": [
+    {
+      "id": "canonical",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync python scripts/verify.py",
+      "expectation": "Static checks, import contracts, ordinary suite and architecture negative cases pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/007-download-weights/verification.md"
+      }
+    },
+    {
+      "id": "docs",
+      "kind": "documentation",
+      "command": "uv run --frozen --no-sync python scripts/verify.py --docs",
+      "expectation": "Markdown and local links pass, changed examples checked.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/007-download-weights/verification.md"
+      }
+    },
+    {
+      "id": "native",
+      "kind": "behavior",
+      "command": "Feature 007 native acceptance harness documented in verification.md",
+      "expectation": "Real prefetched assets load offline via normal native loaders and custom configuration.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/007-download-weights/verification.md"
+      }
+    },
+    {
+      "id": "paired",
+      "kind": "behavior",
+      "command": "Normal paired editable install and cy-queue integration/static checks per docs/development.md",
+      "expectation": "Latest CY and queue sources/installed versions and proposed release compatible.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/007-download-weights/verification.md"
+      }
+    }
+  ],
+  "documentation": "README, model-assets/filesystem/project contracts, current index and authoritative portable clearml-yolo usage/evaluation source; dated verification records mutation applicability.",
+  "review": {
+    "status": "accepted",
+    "reviewer": "Fresh full-scope final_review and acceptance_review; focused privacy_acceptance/privacy_final with final ship closure; parent reconciled all results",
+    "evidence": "specs/007-download-weights/review.md",
+    "reconciliation": "Inspected complete isolated feature007 tracked/untracked diff: core/adapters/entrypoints, metadata, exact import contracts, tests, user/contract docs and native feature artifacts. Byte-identical task-owned capture excludes concurrent feature008 and all unrelated shared-checkout edits. All confirmed findings have real-path regression and fresh independent closure; Executed canonical, native, paired and documentation results are reconciled separately before acceptance."
+  }
+}

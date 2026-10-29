@@ -36,6 +36,7 @@ def test_bare_agent_restores_before_required_inputs_and_runtime(
     snapshot = session.RemoteReplay("agent-task", canonical if has_canonical else None, {})
     monkeypatch.setattr(common, "fetch_remote_replay", lambda: snapshot)
     monkeypatch.setattr(common, "initialize_filesystem", lambda: None)
+    monkeypatch.setattr(common, "prepare_catalogue", lambda **kwargs: None)
     monkeypatch.setattr(common, "release_training_memory", lambda: None)
     monkeypatch.setattr(common, "initialize_naming", lambda task: None)
     monkeypatch.setattr(common, "publish_run_configuration", lambda *args: None)

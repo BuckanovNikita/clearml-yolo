@@ -234,6 +234,7 @@ def test_general_precedes_workflow_and_optional_publisher_and_skipped_training_h
         monkeypatch.setattr(common, "initialize_naming", lambda task: None)
         monkeypatch.setattr(common, "release_training_memory", lambda: None)
         monkeypatch.setattr(common, "prepare_model_assets", lambda model, **kwargs: (model, ()))
+        monkeypatch.setattr(common, "prepare_catalogue", lambda **kwargs: None)
 
         def enter_workflow(*args: Any, **kwargs: Any) -> None:
             assert events == ([] if skip_train else ["General"])

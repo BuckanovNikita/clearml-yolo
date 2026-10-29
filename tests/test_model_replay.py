@@ -16,6 +16,12 @@ from clearml_yolo.entrypoints.hydra import common
 from clearml_yolo.entrypoints.hydra.validation import validate_wrapper_keys
 
 
+@pytest.fixture(autouse=True)
+def isolate_asset_preparation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Replay tests isolate external effects; preparation has dedicated coverage."""
+    monkeypatch.setattr(common, "prepare_catalogue", lambda **kwargs: None)
+
+
 @pytest.fixture
 def isolated_owner(monkeypatch: pytest.MonkeyPatch) -> list[str]:
     events: list[str] = []

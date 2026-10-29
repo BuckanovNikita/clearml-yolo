@@ -3,7 +3,7 @@
 import os
 import time
 from pathlib import Path
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import parse_qsl, urlsplit, urlunsplit
 
 import requests
 
@@ -18,6 +18,20 @@ def redacted_url(url: str) -> str:
     parts = urlsplit(url)
     host = parts.netloc.rsplit("@", 1)[-1]
     return urlunsplit((parts.scheme, host, parts.path, "redacted" if parts.query else "", ""))
+
+
+def asset_source_url(url: str) -> str:
+    """Keep public Drive asset IDs usable while hiding authentication material."""
+    parts = urlsplit(url)
+    if (
+        parts.hostname == "drive.usercontent.google.com"
+        and parts.path == "/download"
+        and all(key in {"id", "export", "confirm"} for key, _ in parse_qsl(parts.query))
+    ):
+        return urlunsplit(
+            (parts.scheme, parts.netloc.rsplit("@", 1)[-1], parts.path, parts.query, "")
+        )
+    return redacted_url(url)
 
 
 def _headers(url: str) -> dict[str, str]:

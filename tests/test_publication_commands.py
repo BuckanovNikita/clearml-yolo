@@ -27,6 +27,7 @@ def isolate_fake_cli_and_console(monkeypatch: pytest.MonkeyPatch) -> None:
     from clearml_yolo.entrypoints.hydra import common
 
     monkeypatch.setattr(common, "validate_launch_arguments", lambda name: None)
+    monkeypatch.setattr(common, "prepare_catalogue", lambda **kwargs: None)
     monkeypatch.setattr(
         "clearml_yolo.adapters.clearml.session._start_console_publisher", lambda *_args: None
     )

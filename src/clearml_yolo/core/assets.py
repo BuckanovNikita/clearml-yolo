@@ -10,6 +10,17 @@ from pydantic import BaseModel, ConfigDict, field_validator
 DEIM_REVISION = "1d2ca42171570c713e78fc6a766ec5104b7f4724"
 
 
+class HubAsset(BaseModel):
+    """Native Hub discovery request; resolved provenance uses the actual commit."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    repository: str
+    revision: str = "main"
+    filename: str = "pytorch_model.bin"
+    cache_dir: Path
+
+
 class AssetCache(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -33,6 +44,8 @@ class AssetSpec(BaseModel):
     access_requirement: str | None = None
     cache_candidates: tuple[Path, ...] = ()
     equivalent_caches: tuple[AssetCache, ...] = ()
+    native_cache: Path | None = None
+    hub: HubAsset | None = None
 
     @field_validator("backend", "preset", "filename")
     @classmethod
@@ -56,3 +69,20 @@ class ResolvedAsset(BaseModel):
     sha256: str
     override: str
     revision: str | None = None
+
+
+class PreparationFailure(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    selection: str
+    message: str
+
+
+class PreparationResult(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    fingerprint: str
+    locations: tuple[Path, ...] = ()
+    assets: tuple[ResolvedAsset, ...] = ()
+    failures: tuple[PreparationFailure, ...] = ()
+    skipped: bool = False

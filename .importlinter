@@ -45,6 +45,7 @@ modules =
     clearml_yolo.entrypoints.compare
     clearml_yolo.entrypoints.config_tree
     clearml_yolo.entrypoints.dedup
+    clearml_yolo.entrypoints.download_weights
     clearml_yolo.entrypoints.export
     clearml_yolo.entrypoints.ground_truth
     clearml_yolo.entrypoints.metrics
@@ -62,11 +63,14 @@ source_modules =
 forbidden_modules =
     ultralytics
 allow_indirect_imports = true
+# Asset discovery is lazy; AST architecture tests enforce this exact SDK edge.
+unmatched_ignore_imports_alerting = none
 ignore_imports =
     clearml_yolo.adapters.integrations.native_ddp -> ultralytics
     clearml_yolo.adapters.integrations.native_runtime -> ultralytics
     clearml_yolo.adapters.integrations.native_trainer -> ultralytics
     clearml_yolo.adapters.integrations.training -> ultralytics
+    clearml_yolo.adapters.yolo.assets -> ultralytics
     clearml_yolo.adapters.yolo.augmentation -> ultralytics
     clearml_yolo.adapters.yolo.ground_truth -> ultralytics
     clearml_yolo.adapters.yolo.inference -> ultralytics
@@ -884,6 +888,10 @@ ignore_imports =
     clearml_yolo.adapters.assets.execution -> clearml_yolo.adapters.fasterrcnn.assets
     clearml_yolo.adapters.assets.execution -> clearml_yolo.adapters.rfdetr.assets
     clearml_yolo.adapters.assets.sources -> clearml_yolo.adapters.deim.assets
+    clearml_yolo.adapters.assets.preparation -> clearml_yolo.adapters.deim.assets
+    clearml_yolo.adapters.assets.preparation -> clearml_yolo.adapters.torchvision.assets
+    clearml_yolo.adapters.assets.preparation -> clearml_yolo.adapters.rfdetr.assets
+    clearml_yolo.adapters.assets.preparation -> clearml_yolo.adapters.yolo.assets
 
 [importlinter:contract:exhaustive-entrypoint-classification]
 name = Exhaustive entrypoint classification
@@ -891,7 +899,7 @@ type = layers
 containers =
     clearml_yolo.entrypoints
 layers =
-    batch_estimate:compare:composition:config_tree:dedup:export:ground_truth:hydra:metrics:pipeline:predict:report:train:val
+    batch_estimate:compare:composition:config_tree:dedup:download_weights:export:ground_truth:hydra:metrics:pipeline:predict:report:train:val
 exhaustive = true
 
 [importlinter:contract:safetensors-sdk-has-explicit-owners]
@@ -903,7 +911,7 @@ forbidden_modules =
     safetensors
 allow_indirect_imports = true
 ignore_imports =
-    clearml_yolo.adapters.assets.resolver -> safetensors
+    clearml_yolo.adapters.assets.validation -> safetensors
 
 [importlinter:contract:fcos-adapter-peer-ownership]
 name = fcos adapter peer ownership
@@ -990,3 +998,16 @@ allow_indirect_imports = true
 unmatched_ignore_imports_alerting = none
 ignore_imports =
     clearml_yolo.adapters.deim.probe -> faster_coco_eval
+
+[importlinter:contract:huggingface-hub-sdk-has-explicit-owners]
+name = huggingface_hub SDK has explicit owners
+type = forbidden
+source_modules =
+    clearml_yolo
+forbidden_modules =
+    huggingface_hub
+allow_indirect_imports = true
+unmatched_ignore_imports_alerting = none
+ignore_imports =
+    clearml_yolo.adapters.assets.hub -> huggingface_hub
+    clearml_yolo.adapters.torchvision.assets -> huggingface_hub

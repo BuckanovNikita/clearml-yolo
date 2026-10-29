@@ -315,6 +315,7 @@ def test_console_command_inventory_matches_configured_independence(
         ),
         ("clearml SDK has explicit owners", "clearml_yolo.application.contracts", "clearml"),
         ("safetensors SDK has explicit owners", "clearml_yolo.application.ports", "safetensors"),
+        ("huggingface_hub SDK has explicit owners", "clearml_yolo.core.assets", "huggingface_hub"),
         ("Exhaustive root layer classification", "clearml_yolo.misc", None),
         ("Exhaustive adapter responsibility classification", "clearml_yolo.adapters.misc", None),
         ("Exhaustive application classification", "clearml_yolo.application.misc", None),

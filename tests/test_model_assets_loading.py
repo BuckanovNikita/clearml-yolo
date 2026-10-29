@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 import torch
 
-from clearml_yolo.adapters.assets import execution, resolver
+from clearml_yolo.adapters.assets import execution, resolver, validation
 from clearml_yolo.adapters.fasterrcnn import assets as fasterrcnn_assets
 from clearml_yolo.adapters.rfdetr import assets as rfdetr_assets
 from clearml_yolo.core.assets import AssetCache
@@ -48,7 +48,7 @@ def test_malformed_safetensors_use_asset_value_error_boundary(
         update={"filename": path.name, "checksum": None}
     )
     with pytest.raises(ValueError, match=r"[Ss]afetensors"):
-        resolver.validate_asset(path, spec)
+        validation.validate_asset(path, spec)
 
 
 def test_valid_zero_element_tensor_is_distinct_from_no_tensors(tmp_path: Path) -> None:
@@ -56,7 +56,7 @@ def test_valid_zero_element_tensor_is_distinct_from_no_tensors(tmp_path: Path) -
     path.write_bytes(
         _safetensors_payload({"x": {"dtype": "F32", "shape": [0], "data_offsets": [0, 0]}}, b"")
     )
-    resolver._safetensors(path)
+    validation._safetensors(path)
 
 
 def test_malformed_safetensors_cache_falls_through_to_valid_candidate(
@@ -68,7 +68,12 @@ def test_malformed_safetensors_cache_falls_through_to_valid_candidate(
         _safetensors_payload({"x": {"dtype": "F32", "shape": [1], "data_offsets": [0, 4]}})
     )
     spec = fasterrcnn_assets.pretrained_asset("resnet50_fpn").model_copy(
-        update={"filename": cache.name, "checksum": None, "cache_candidates": (cache,)}
+        update={
+            "filename": cache.name,
+            "checksum": None,
+            "cache_candidates": (cache,),
+            "native_cache": None,
+        }
     )
     destination = resolver.asset_destination(spec)
     destination.parent.mkdir(parents=True)
@@ -187,7 +192,7 @@ def test_valid_library_cache_is_reused_without_writes(
     cache.parent.mkdir()
     torch.save({"weight": torch.ones(1)}, cache)
     spec = fasterrcnn_assets.pretrained_asset("resnet50_fpn").model_copy(
-        update={"checksum": None, "cache_candidates": (cache,)}
+        update={"checksum": None, "cache_candidates": (cache,), "native_cache": None}
     )
     monkeypatch.setattr(resolver, "_download", lambda *args: pytest.fail("existing cache"))
     record = resolver.resolve_asset(spec)
@@ -211,6 +216,7 @@ def test_hf_safetensors_cache_keeps_the_loading_suffix(
     spec = fasterrcnn_assets.pretrained_asset("resnet50_fpn").model_copy(
         update={
             "cache_candidates": (),
+            "native_cache": None,
             "equivalent_caches": (
                 AssetCache(
                     path=cached,

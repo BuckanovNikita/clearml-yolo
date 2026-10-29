@@ -1,6 +1,6 @@
 # Filesystem ownership
 
-The application execution commands, `cy-batch-estimate` and `cy-init-config` initialize project paths through a
+The application execution commands, `cy-batch-estimate`, `cy-download-weights` and `cy-init-config` initialize project paths through a
 stdlib-only bootstrap. Ordinary package imports remain inert. `CY_HOME` defaults to the
 launch working directory; relative values resolve against that directory before Hydra
 changes cwd. Explicit relative inputs and outputs retain their working-directory semantics.
@@ -15,8 +15,9 @@ beside the selected destination and are cleaned there.
 | Hydra logs and sweeps | `outputs/`, `multirun/` |
 | Shared CSV datasets | `.cache/clearml-yolo/datasets/` |
 | Training batch estimates | `.config/clearml-yolo/batch-estimates.json` |
-| Managed non-YOLO weights | `.cache/clearml-yolo/models/<backend>/<preset>/<asset-id>/<filename>` |
+| Managed DEIM weights and legacy compatible assets | `.cache/clearml-yolo/models/<backend>/<preset>/<asset-id>/<filename>` |
 | Managed DEIM source archive and tree | `.cache/clearml-yolo/sources/DEIMv2/<revision>.tar.gz` and adjacent `<revision>/` |
+| Model preparation receipts and locks | `.cache/clearml-yolo/preparation/` |
 | Invocation scratch and capture logs | `.tmp/cy-runtime-*` |
 | Guardian diagnostics and progress | `.cy/queue-logs/`, `.cy/queue-status/` |
 
@@ -24,7 +25,8 @@ beside the selected destination and are cleaned there.
 XDG. `CY_RUNTIME_TEMP_ROOT` selects the parent of invocation arenas; its default is
 `CY_HOME/.tmp`, and a relative selection resolves against `CY_HOME`. Explicit inputs may live outside the workspace. Application-owned outputs, cache, logs,
 configuration snapshots and temporary destinations must resolve beneath CY_HOME, including
-through symlinks. Invalid destinations fail before creation. Existing data is neither migrated nor deleted.
+through symlinks. Invalid destinations fail before creation. Existing data is neither migrated nor deleted. Native model asset publication is the
+specific exception described below; it does not relax project destination checks.
 
 The unreleased [batch estimator](batch-estimation.md) uses a versioned JSON catalogue
 with a native file lock and atomic replacement beneath `CY_HOME`. It records successful
@@ -51,13 +53,16 @@ AWS credential-provider discovery remains the SDK's responsibility. SDK selector
 files, substitutes private SDK constants, or changes cwd for imports. Relative selectors
 therefore follow the selected library's own semantics.
 
-Ultralytics checkpoint names and remote URIs pass through unchanged; its library
-determines download/cache locations. Non-YOLO pretrained assets use the explicit
-[asset resolver](model-assets.md), which may reuse verified native library caches
-without changing global SDK settings. Explicit local inputs remain authoritative. Existing local checkpoint strings are recognized as
-`Path` inputs at their original locations, allowing local comparison without cache lookup.
-The application does not redirect native dataset, weight or run defaults through global
-Ultralytics settings. Its explicit training outputs and CSV-prepared data remain project-owned.
+Ultralytics checkpoint names and remote URIs retain native semantics. Explicit native
+[model preparation](model-assets.md) populates effective Ultralytics, Torchvision,
+timm/HF and RF-DETR caches, even when those native roots are outside `CY_HOME`.
+Only model asset publication, its locks, temporary sibling downloads and native HF
+metadata use this exception. Preparation does not rewrite SDK settings or redirect
+native dataset/run defaults. DEIM source/weights, durable preparation receipts,
+application outputs and CSV-prepared data remain project-owned beneath `CY_HOME`.
+Explicit local inputs remain authoritative. Existing local checkpoint strings are
+recognized as `Path` inputs at their original locations, allowing local comparison
+without cache lookup. Relative inputs follow the consuming process's cwd.
 
 ### Managed model assets
 
