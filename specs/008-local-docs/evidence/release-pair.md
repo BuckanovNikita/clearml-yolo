@@ -70,3 +70,56 @@ reinstallation and metadata refresh remain required before pushing. Independent
 review and CY canonical/native acceptance remain separately recorded in their own
 feature evidence. These queue checks do not establish physical GPU/NCCL,
 multiuser/NFS, remote publication or operational environment upgrades.
+
+
+## Final committed-pair refresh
+
+Date: 2026-10-29. The final refresh passed before delivery, using only the retained
+private paired environment. The canonical CY verification environment and the
+original proposed-source snapshots were not modified.
+
+- CY release commit: `dbde23565a9938cfb7556819ab6a5beee24d5423`, version 0.43.0;
+  feature parent: `60091649dd71087e5dac2a9a712098eaa5be5de6`.
+- Annotated Git tag `v0.43.0`: object
+  `877480264094557b82ae1166b1ebbbecbbd27011`, peeling to that release commit.
+- Queue commit: `114b97272ab5bb406a90c146ea62d8fdd19d75b1`, version 0.1.4,
+  requiring `clearml-yolo>=0.38,<0.44`.
+
+Both repositories were clean at capture. Each copied file was verified against
+its committed Git blob identity. Both actual `pyproject.toml` files and CY's
+`uv.lock` match the tested proposal byte-for-byte. Every runtime, test, script,
+browser-test and checking-configuration file also matches; only changelog and task
+acceptance prose differ. Both approved external source trees are unchanged.
+
+The committed sources were installed normally from a fresh frozen export into the
+retained private environment, without `--no-deps`. Resolution accepted 285 packages;
+only the four editable origins were refreshed. Dependency consistency and exact
+source/installed versions, normalized requirements, module origins and editable
+URLs passed again for all four distributions.
+
+The complete queue suite again passed: **518 passed, 7 deselected, 19 upstream
+warnings**, in 120.44 seconds. Ruff, formatting, strict mypy (69 files), both
+import contracts, installed help and deny-documentation pipeline/train composition
+all passed. The installed `cy-docs --check` passed with 467 fields, 156 configurations
+and 8 tutorials. An isolated catalog probe explicitly asserted installed CY version
+and catalog version both equal **0.43.0**.
+
+Final committed snapshot manifest hashes:
+
+| Package | SHA-256 of sorted path/hash mapping |
+| --- | --- |
+| clearml-yolo | `6045f9c9eecbbbffd0c331c1e7615ecc59d8abc29aeeef55438bd6d4a9aebe8d` |
+| cy-queue | `b6e7975e6c5606ff4c4151e8c56722deef8e17ffe6558fbb23036d34a6449f71` |
+
+The external manifest hashes remain those recorded above. Post-check source
+inventories found **no drift in any of the four source repositories**. This
+appendix is the subsequent evidence-only change. Markdown/local-link validation
+passed for both appended records.
+
+Private evidence retains `committed-source-manifests.json`,
+`committed-proposal-comparison.json`, `committed-source-drift.json`,
+`committed-identities.json`, `committed-evidence-hashes.json`, exact commands in
+`results.json` and `committed-*.log`. Recorded command log hashes were independently
+recomputed and matched. Fresh integrated reviews are recorded separately; final
+committed pairing is now accepted. Remote push status remains the delivery owner's
+responsibility, and the stated physical-execution limitations still apply.

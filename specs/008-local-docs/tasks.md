@@ -36,7 +36,7 @@
 - [x] T020 Run canonical verification, cy-docs --check and docs checks; record evidence/verification.md.
 - [x] T021 Verify separate source installation and native YOLO/non-YOLO pipelines/artifacts; record evidence/native.md.
 - [x] T022 Obtain fresh independent final review, reconcile actual diff and validate architecture acceptance.
-- [ ] T023 Complete paired CY/cy-queue checks and authorized Git-only release, recording exact delivery state.
+- [x] T023 Complete paired CY/cy-queue checks and authorized Git-only release, recording exact delivery state.
 
 ## Dependencies and parallelism
 
@@ -63,3 +63,11 @@ history confirms 007 already shipped as 0.42.0; integrate 008 into that accepted
 baseline, retain its fixes, and verify CY 0.43.0 with the intended queue version.
 The earlier acceptance outcome above is a historical checkpoint. See the
 [updated delivery record](evidence/delivery.md#authorized-release-resumption).
+
+## Delivery completed — 2026-10-29
+
+T023 is complete: CY v0.43.0, compatible queue 0.1.4 source and portable collection
+v0.6.2 are published with verified remote refs. Fresh integrated review, stable
+canonical receipt, actual committed-version pairing and source installation passed.
+See the [completed delivery record](evidence/delivery.md#completed-git-only-delivery).
+Earlier pending states above remain historical checkpoints.

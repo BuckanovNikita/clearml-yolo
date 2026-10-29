@@ -142,3 +142,13 @@ The companion `verification/2026-10-29-local-docs.md` and architecture record co
 the candidate scope, full commands, preservation observations and pending review/
 publication boundary. No skill installation, experiment, queue job or deployment
 was performed by this documentation reconciliation.
+
+## Portable guidance published
+
+After independent approval and verified CY 0.43.0 publication, the isolated eight-path
+collection change was committed as `6d8f8be4eb83bcd5ac05eae7386451c6b2dd3667`.
+Collection 0.6.2 and annotated `v0.6.2` were pushed atomically; remote branch and
+peeled tag both match that commit. Full discovery, Markdownlint and local links
+passed, followed by checked final evidence text. No unrelated shared collection
+edit or installed skill copy was changed. Exact identities and preservation are
+recorded in [delivery](delivery.md#completed-git-only-delivery).

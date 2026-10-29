@@ -73,3 +73,56 @@ The remaining work already maps to T023; convergence inspection found no new
 implementation requirement to append. Prior completed tasks and historical
 verification remain unchanged. The portable guidance is being reconciled with
 its separately published 0.6.1 collection baseline in another isolated checkout.
+
+## Completed Git-only delivery
+
+All required implementation, architecture, documentation, browser, installed-source,
+native and paired gates are accepted. Fresh `release_final_review` returned ship;
+its sole evidence-link correction was applied and checked. The stable integrated
+canonical receipt covers 4,373 passing tests and all static/import checks. No hook
+was bypassed. The first commit attempt performed ordinary whitespace/changelog
+maintenance; those exact generated changes were inspected, staged and rechecked.
+
+The feature commit is `60091649dd71087e5dac2a9a712098eaa5be5de6`. The native
+post-commit hook created release commit `dbde23565a9938cfb7556819ab6a5beee24d5423`
+and annotated tag **v0.43.0**, object
+`877480264094557b82ae1166b1ebbbecbbd27011`. That release commit changes only the
+generated changelog and root project/lock version. Dependency sources, revisions
+and non-root lock metadata are unchanged; no local uv source override was committed.
+The committed project metadata exactly matches the separately installed 0.43.0
+proposal. The verifier accepted the validated release metadata transition and
+retained both verified source fingerprints.
+
+The [final committed pair](release-pair.md#final-committed-pair-refresh) passed
+normal installation, exact metadata/origins, all 518 ordinary queue tests and its
+static/import/isolation checks. Installed documentation coverage and catalog version
+checks passed for 0.43.0. Those tests used a separate immutable environment;
+the canonical environment remained unchanged through commit and release hooks.
+
+CY master and `v0.43.0` were pushed atomically. Remote readback matched release
+commit `dbde23565a9938cfb7556819ab6a5beee24d5423` and the annotated/peeled tag
+identities above. This final evidence-only closure follows that implementation tag;
+it does not change the tagged runtime or package metadata.
+
+Queue 0.1.4's compatibility commit is
+`114b97272ab5bb406a90c146ea62d8fdd19d75b1`. Its evidence-only closure is
+`4e18ec622121c228474dd454b0b46d4af902cf92`; queue main was pushed and that remote
+identity verified. Its functional/package files are unchanged from the final pair.
+No queue version tag was invented because its workflow publishes source commits.
+
+Portable usage guidance was published as collection **v0.6.2** at
+`6d8f8be4eb83bcd5ac05eae7386451c6b2dd3667`, annotated tag object
+`d3399c68df5922d5bac356deb91ddfb7390c2d13`. The eight-path update retains published
+007 guidance and adds the reviewed local-documentation instructions/evaluation cases.
+Collection main/tag were pushed atomically and remote readback matched. The legacy
+corp-skills remote redirects to the collection's current custom-opencode-skills
+location. Original shared working changes and installed skill copies were preserved.
+
+The original shared CY checkout was not advanced or rewritten; delivery used the
+isolated checkout of current published history. Task-owned verification processes
+are stopped, temporary resources are cleaned after the closing checks, and private
+logs/source manifests are retained for audit. The separately saved local uv source
+section is restored only as an unstaged local override after hooks finish.
+No GitHub Release objects, release assets, registry packages or deployment were
+created. Optional physical queue/NCCL and other previously stated native capability
+limits remain explicit in their evidence; they are not claimed as passing checks.
