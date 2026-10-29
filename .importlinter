@@ -45,6 +45,7 @@ modules =
     clearml_yolo.entrypoints.compare
     clearml_yolo.entrypoints.config_tree
     clearml_yolo.entrypoints.dedup
+    clearml_yolo.entrypoints.docs
     clearml_yolo.entrypoints.download_weights
     clearml_yolo.entrypoints.export
     clearml_yolo.entrypoints.ground_truth
@@ -212,6 +213,9 @@ ignore_imports =
     clearml_yolo.entrypoints.hydra.configs -> hydra
     clearml_yolo.entrypoints.hydra.sweeps -> hydra
     clearml_yolo.entrypoints.hydra.validation -> hydra
+    clearml_yolo.entrypoints.documentation.catalog -> hydra
+    clearml_yolo.entrypoints.documentation.controls -> hydra
+    clearml_yolo.entrypoints.documentation.preview -> hydra
 
 [importlinter:contract:hydra-zen-sdk-has-explicit-owners]
 name = hydra_zen SDK has explicit owners
@@ -225,6 +229,9 @@ ignore_imports =
     clearml_yolo.entrypoints.hydra.common -> hydra_zen
     clearml_yolo.entrypoints.hydra.config_tree -> hydra_zen
     clearml_yolo.entrypoints.hydra.configs -> hydra_zen
+    clearml_yolo.entrypoints.documentation.catalog -> hydra_zen
+    clearml_yolo.entrypoints.documentation.preview -> hydra_zen
+    clearml_yolo.entrypoints.hydra.declarations -> hydra_zen
 
 [importlinter:contract:omegaconf-sdk-has-explicit-owners]
 name = omegaconf SDK has explicit owners
@@ -242,6 +249,10 @@ ignore_imports =
     clearml_yolo.entrypoints.hydra.sweeps -> omegaconf
     clearml_yolo.entrypoints.hydra.validation -> omegaconf
     clearml_yolo.entrypoints.hydra.transforms -> omegaconf
+    clearml_yolo.entrypoints.documentation.catalog -> omegaconf
+    clearml_yolo.entrypoints.documentation.preview -> omegaconf
+    clearml_yolo.entrypoints.documentation.validation -> omegaconf
+    clearml_yolo.entrypoints.hydra.declarations -> omegaconf
 
 [importlinter:contract:core-and-application-have-no-logging-or-rendering-dependency]
 name = Core and application have no logging or rendering dependency
@@ -797,7 +808,7 @@ containers =
     clearml_yolo.adapters
 # Peers share a classification level; the peer contracts enforce their allowed edges.
 layers =
-    augmentation:storage:observability:yolo:evaluation:reporting:clearml:fiftyone:runtime:integrations:deim:rfdetr:fasterrcnn:fcos:torchvision:export:assets
+    documentation:augmentation:storage:observability:yolo:evaluation:reporting:clearml:fiftyone:runtime:integrations:deim:rfdetr:fasterrcnn:fcos:torchvision:export:assets
 exhaustive = true
 
 [importlinter:contract:exhaustive-application-classification]
@@ -899,7 +910,7 @@ type = layers
 containers =
     clearml_yolo.entrypoints
 layers =
-    batch_estimate:compare:composition:config_tree:dedup:download_weights:export:ground_truth:hydra:metrics:pipeline:predict:report:train:val
+    docs:documentation:options:batch_estimate:compare:composition:config_tree:dedup:download_weights:export:ground_truth:hydra:metrics:pipeline:predict:report:train:val
 exhaustive = true
 
 [importlinter:contract:safetensors-sdk-has-explicit-owners]
@@ -1011,3 +1022,26 @@ unmatched_ignore_imports_alerting = none
 ignore_imports =
     clearml_yolo.adapters.assets.hub -> huggingface_hub
     clearml_yolo.adapters.torchvision.assets -> huggingface_hub
+
+[importlinter:contract:documentation-isolation]
+name = Documentation serving is isolated from ordinary execution
+type = forbidden
+source_modules =
+    clearml_yolo.core
+    clearml_yolo.application
+    clearml_yolo.entrypoints.hydra
+    clearml_yolo.entrypoints.composition
+    clearml_yolo.entrypoints.train
+    clearml_yolo.entrypoints.predict
+    clearml_yolo.entrypoints.pipeline
+    clearml_yolo.entrypoints.compare
+    clearml_yolo.entrypoints.metrics
+    clearml_yolo.entrypoints.report
+    clearml_yolo.entrypoints.ground_truth
+    clearml_yolo.entrypoints.val
+    clearml_yolo.entrypoints.export
+    clearml_yolo.entrypoints.options
+forbidden_modules =
+    clearml_yolo.adapters.documentation
+    clearml_yolo.entrypoints.documentation
+    clearml_yolo.entrypoints.docs

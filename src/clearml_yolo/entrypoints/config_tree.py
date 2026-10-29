@@ -6,6 +6,12 @@ from clearml_yolo.adapters.runtime.bootstrap import (
     initialize_runtime_environment,
     runtime_environment,
 )
+from clearml_yolo.entrypoints.options import parser_for
+
+
+def parser() -> argparse.ArgumentParser:
+    """Return an inert parser backed by shared option declarations."""
+    return parser_for("cy-init-config")
 
 
 def main() -> None:
@@ -23,29 +29,8 @@ def _owned_main() -> None:
 def _main() -> None:
     from clearml_yolo.adapters.observability.tracing import trace_operation
 
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("directory", help="directory for example YAML configurations")
-    parser.add_argument(
-        "--command",
-        choices=(
-            "cy",
-            "cy-train",
-            "cy-predict",
-            "cy-val",
-            "cy-metrics",
-            "cy-report",
-            "cy-compare",
-            "cy-ground-truth",
-            "cy-export",
-        ),
-        default="cy",
-        help="execution command to configure (default: cy)",
-    )
-    parser.add_argument("--force", action="store_true", help="overwrite existing example files")
-    parser.add_argument(
-        "--model", help="model preset (default: ultralytics; Faster R-CNN for cy-export)"
-    )
-    arguments = parser.parse_args()
+    argument_parser = parser()
+    arguments = argument_parser.parse_args()
 
     # Initialization is local file generation; it needs neither a task nor model runtime.
     from clearml_yolo.entrypoints.hydra.config_tree import dump_config_tree
@@ -71,7 +56,7 @@ def _main() -> None:
             level="DEBUG",
             context={"destination": arguments.directory},
         )
-        parser.error(
+        argument_parser.error(
             f"Cannot initialize configuration directory {redact_text(arguments.directory)}: "
             + exception_summary(error)
         )

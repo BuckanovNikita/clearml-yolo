@@ -28,14 +28,100 @@ def gpu_device_index(device: Device) -> int:
 class ExportSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    operation: Literal["onnx", "build", "verify"] = "onnx"
-    device: Device = "cpu"
-    precision: Literal["fp32", "fp16"] = "fp32"
-    onnx: Path | None = None
-    engine: Path | None = None
-    metadata: Path | None = None
-    workspace_gib: Annotated[float, Field(gt=0)] = 4
-    split: Literal["train", "val", "test"] = "test"
+    operation: Literal["onnx", "build", "verify"] = Field(
+        default="onnx",
+        description=(
+            "Операция: onnx экспортирует граф, build собирает TensorRT, verify "
+            "проверяет качество движка."
+        ),
+        examples=["onnx"],
+        json_schema_extra={
+            "shapes": "Literal['onnx', 'build', 'verify']",
+            "applicability": "ExportSettings",
+            "source": "clearml_yolo.core.export_requests.ExportSettings.operation",
+            "classification": "input",
+        },
+    )
+    device: Device = Field(
+        default="cpu",
+        description="Для onnx только cpu; для build/verify требуется ровно один явный GPU.",
+        examples=["cpu"],
+        json_schema_extra={
+            "shapes": "Device",
+            "applicability": "ExportSettings",
+            "source": "clearml_yolo.core.export_requests.ExportSettings.device",
+            "classification": "input",
+        },
+    )
+    precision: Literal["fp32", "fp16"] = Field(
+        default="fp32",
+        description=(
+            "Точность fp32 или fp16. ONNX экспортируется на CPU только в fp32; "
+            "fp16 выбирается при сборке движка."
+        ),
+        examples=["fp32"],
+        json_schema_extra={
+            "shapes": "Literal['fp32', 'fp16']",
+            "applicability": "ExportSettings",
+            "source": "clearml_yolo.core.export_requests.ExportSettings.precision",
+            "classification": "input",
+        },
+    )
+    onnx: Path | None = Field(
+        default=None,
+        description="Путь к графу ONNX; обязателен при operation=build.",
+        examples=["model.onnx"],
+        json_schema_extra={
+            "shapes": "Path | None",
+            "applicability": "ExportSettings",
+            "source": "clearml_yolo.core.export_requests.ExportSettings.onnx",
+            "classification": "input",
+        },
+    )
+    engine: Path | None = Field(
+        default=None,
+        description="Путь к движку TensorRT; обязателен при operation=verify.",
+        examples=["model.engine"],
+        json_schema_extra={
+            "shapes": "Path | None",
+            "applicability": "ExportSettings",
+            "source": "clearml_yolo.core.export_requests.ExportSettings.engine",
+            "classification": "input",
+        },
+    )
+    metadata: Path | None = Field(
+        default=None,
+        description="Путь к метаданным экспорта; null использует соседние данные графа или движка.",
+        examples=["model.metadata.json"],
+        json_schema_extra={
+            "shapes": "Path | None",
+            "applicability": "ExportSettings",
+            "source": "clearml_yolo.core.export_requests.ExportSettings.metadata",
+            "classification": "input",
+        },
+    )
+    workspace_gib: Annotated[float, Field(gt=0)] = Field(
+        default=4,
+        description="Положительный объём рабочего пространства TensorRT в GiB.",
+        examples=[4.0],
+        json_schema_extra={
+            "shapes": "Annotated[float, Field(gt=0)]",
+            "applicability": "ExportSettings",
+            "source": "clearml_yolo.core.export_requests.ExportSettings.workspace_gib",
+            "classification": "input",
+        },
+    )
+    split: Literal["train", "val", "test"] = Field(
+        default="test",
+        description="Размеченный сплит проверки качества экспорта: train, val или test.",
+        examples=["test"],
+        json_schema_extra={
+            "shapes": "Literal['train', 'val', 'test']",
+            "applicability": "ExportSettings",
+            "source": "clearml_yolo.core.export_requests.ExportSettings.split",
+            "classification": "input",
+        },
+    )
 
     @model_validator(mode="after")
     def one_device(self) -> Self:

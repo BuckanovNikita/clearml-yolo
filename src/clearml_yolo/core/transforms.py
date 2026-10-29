@@ -28,9 +28,49 @@ class TransformSnapshot(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    pipeline: dict[str, JsonValue]
-    sha256: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
-    source: Annotated[str, Field(min_length=1)]
+    pipeline: dict[str, JsonValue] = Field(
+        description=(
+            "Сгенерированное сериализованное содержимое Albumentations pipeline; "
+            "проверяется по sha256."
+        ),
+        examples=[
+            {
+                "__version__": "2.0.8",
+                "transform": {"__class_fullname__": "Compose", "transforms": []},
+            }
+        ],
+        json_schema_extra={
+            "shapes": "dict[str, JsonValue]",
+            "applicability": "TransformSnapshot",
+            "source": "clearml_yolo.core.transforms.TransformSnapshot.pipeline",
+            "classification": "generated",
+        },
+    )
+    sha256: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")] = Field(
+        description=(
+            "Сгенерированный SHA-256 канонического JSON pipeline, ровно 64 "
+            "шестнадцатеричных символа."
+        ),
+        examples=["0000000000000000000000000000000000000000000000000000000000000000"],
+        json_schema_extra={
+            "shapes": "Annotated[str, Field(pattern='^[0-9a-f]{64}$')]",
+            "applicability": "TransformSnapshot",
+            "source": "clearml_yolo.core.transforms.TransformSnapshot.sha256",
+            "classification": "generated",
+        },
+    )
+    source: Annotated[str, Field(min_length=1)] = Field(
+        description=(
+            "Сохранённое непустое имя источника pipeline; служит происхождением при replay."
+        ),
+        examples=["augmentations.yaml"],
+        json_schema_extra={
+            "shapes": "Annotated[str, Field(min_length=1)]",
+            "applicability": "TransformSnapshot",
+            "source": "clearml_yolo.core.transforms.TransformSnapshot.source",
+            "classification": "generated",
+        },
+    )
 
     @field_validator("pipeline", mode="before")
     @classmethod
@@ -50,9 +90,49 @@ class TransformConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    mode: Literal["native", "albumentations"] = "native"
-    pipeline_file: Path | None = None
-    snapshot: TransformSnapshot | None = None
+    mode: Literal["native", "albumentations"] = Field(
+        default="native",
+        description=(
+            "Режим аугментации: native оставляет нативный trainer, albumentations"
+            " использует общий сериализованный pipeline."
+        ),
+        examples=["native"],
+        json_schema_extra={
+            "shapes": "Literal['native', 'albumentations']",
+            "applicability": "TransformConfig",
+            "source": "clearml_yolo.core.transforms.TransformConfig.mode",
+            "classification": "input",
+        },
+    )
+    pipeline_file: Path | None = Field(
+        default=None,
+        description=(
+            "Путь к YAML/JSON Albumentations; допустим только в режиме "
+            "albumentations. Читается при запуске, но не при preview."
+        ),
+        examples=["augmentations.yaml"],
+        json_schema_extra={
+            "shapes": "Path | None",
+            "applicability": "TransformConfig",
+            "source": "clearml_yolo.core.transforms.TransformConfig.pipeline_file",
+            "classification": "input",
+        },
+    )
+    snapshot: TransformSnapshot | None = Field(
+        default=None,
+        description=(
+            "Сгенерированный снимок pipeline, хеша и происхождения для "
+            "воспроизведения. Пользователь выбирает pipeline_file; снимок создаёт"
+            " владелец конфигурации."
+        ),
+        examples=[None],
+        json_schema_extra={
+            "shapes": "TransformSnapshot | None",
+            "applicability": "TransformConfig",
+            "source": "clearml_yolo.core.transforms.TransformConfig.snapshot",
+            "classification": "generated",
+        },
+    )
 
     @model_validator(mode="after")
     def selected_source(self) -> Self:

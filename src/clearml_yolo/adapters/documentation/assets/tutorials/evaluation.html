@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Предсказания, метрики и сравнение — CY</title><link rel="stylesheet" href="/style.css"></head>
+<body><main class="tutorial-page">
+<nav><a href="/">← Справочник CY</a></nav><h1>Предсказания, метрики и сравнение</h1>
+<h2>Предварительные условия</h2>
+<p>Нужны CSV с непересекающимися <code>val</code> и <code>test</code>, обученные веса, доступ к ClearML и
+рабочий каталог внутри <code>CY_HOME</code>. Подготовьте их по <a href="quickstart.html">первому уроку</a>
+и <a href="training.html">уроку обучения</a>. В примерах <code>./best.pt</code> — реальный YOLO-чекпойнт;
+замените путь на полученный при обучении. Для других семейств выберите <code>model=...</code>
+и <code>model.predict.device</code> вместо <code>ultralytics_predict.device</code>.</p>
+<h2>Пример</h2>
+<h3>Сохранить предсказания отдельно</h3>
+<pre><code class="language-bash">cy-predict weights=./best.pt ground_truth=./tutorial-data/ground_truth.csv \
+  'splits=[val,test]' ultralytics_predict.device=cpu \
+  output=./prediction/predictions.csv model_label=tutorial-yolo fiftyone.enabled=false \
+  clearml.project_name=cy-tutorial clearml.task_name=predict 'clearml.tags=[tutorial,predict]'
+</code></pre>
+<p><a href="/#field=splits">splits</a> выбирает изображения. <a href="/#field=image_name">image_name</a>
+оставьте <code>name</code> для дальнейшей оценки. <code>stem</code> и <code>path</code> допустимы только для сырого
+экспорта и не поддерживаются оценкой. CSV содержит имя изображения, строковый
+класс, confidence и абсолютные пиксельные координаты. Отсутствие детекций на
+изображении допустимо; его принадлежность набору известна из ground truth.</p>
+<p><a href="/#field=ultralytics_predict.conf">ultralytics_predict.conf</a> — фильтр вывода модели,
+а не итоговый калиброванный порог класса. Слишком высокий фильтр заранее удалит
+детекции, необходимые для анализа precision/recall. Стандартное низкое значение
+<code>0.001</code> сохраняет кандидатов для дальнейшей оценки.</p>
+<h3>Оценить уже сохранённый CSV</h3>
+<pre><code class="language-bash">cy-metrics ground_truth=./tutorial-data/ground_truth.csv \
+  predictions=./prediction/predictions.csv 'splits=[val,test]' \
+  output_dir=./metrics model_label=tutorial-yolo fiftyone.enabled=false \
+  calibration_split=val evaluation.iou_threshold=0.5 \
+  clearml.project_name=cy-tutorial clearml.task_name=metrics 'clearml.tags=[tutorial,metrics]'
+</code></pre>
+<p>Эта команда не запускает модель. <a href="/#field=calibration_split">calibration_split</a>
+должен быть <code>val</code>: пороги подбираются на валидации и без изменений применяются к
+<code>test</code>. Предсказания должны включать калибровочную выборку даже при
+<code>splits=[test]</code>. Подбор порогов по test нарушает контракт и отклоняется.</p>
+<p><a href="/#field=evaluation.iou_threshold">evaluation.iou_threshold</a>,
+<a href="/#field=evaluation.matching_strategy">evaluation.matching_strategy</a> и
+<a href="/#field=evaluation.ap_method">evaluation.ap_method</a> описывают оценку; они отличаются
+от NMS IoU при инференсе. Изменяя метод, применяйте одинаковый протокол к обеим
+моделям. Предобработка оценки включается отдельно через
+<a href="/#field=evaluation.preprocess">evaluation.preprocess</a>, а nullable-пороги
+предобработки не следует подменять итоговыми per-class thresholds.</p>
+<p>Для инференса и оценки одной командой:</p>
+<pre><code class="language-bash">cy-val weights=./best.pt ground_truth=./tutorial-data/ground_truth.csv \
+  'splits=[val,test]' model_label=tutorial-yolo ultralytics_predict.device=cpu \
+  output_dir=./validation clearml.project_name=cy-tutorial \
+  clearml.task_name=validate 'clearml.tags=[tutorial,validation]'
+</code></pre>
+<p>У <code>cy-val</code> нет группы <code>fiftyone</code>. Валидация всё равно использует <code>val</code> для
+калибровки, если в списке оцениваемых выборок оставить только <code>test</code>.</p>
+<h3>Сравнить baseline и candidate</h3>
+<p>После двух завершённых экспериментов с сохранёнными весами и порогами:</p>
+<pre><code class="language-bash">cy-compare ground_truth=./tutorial-data/ground_truth.csv \
+  baseline_model.task_id=BASELINE_TASK_ID candidate_model.task_id=CANDIDATE_TASK_ID \
+  ultralytics_predict.device=cpu output_dir=./comparison \
+  clearml.project_name=cy-tutorial clearml.task_name=compare 'clearml.tags=[tutorial,comparison]'
+</code></pre>
+<p>Замените ID реальными задачами. Обе модели заново предсказывают на одинаковых
+текущих test-изображениях. Исторические показатели не подменяют новую оценку.
+<a href="/#field=inference.reuse_existing">inference.reuse_existing</a> разрешает совместимый
+кэш; его наличие не даёт права использовать другие изображения или настройки.</p>
+<p>Для локальных моделей сохраните YAML со ссылками. Значения thresholds ниже
+показаны как форма: замените их <strong>точной</strong> картой, полученной при калибровке каждой
+модели; не используйте один произвольный порог для обоих чекпойнтов.</p>
+<pre><code class="language-yaml">baseline_model:
+  source: local
+  weights: ./baseline/best.pt
+  label: baseline-yolo
+  thresholds: {square: 0.37}
+candidate_model:
+  source: local
+  weights: ./candidate/best.pt
+  label: candidate-yolo
+  thresholds: {square: 0.42}
+</code></pre>
+<p>Смотрите <a href="/#field=baseline_model.thresholds">baseline_model.thresholds</a> и
+<a href="/#field=candidate_model.thresholds">candidate_model.thresholds</a>. Числа в примере
+не являются измерением этого урока. Для внешних native-весов без встроенного
+описания также нужны согласованные backend, preset, class_names и preprocessing.
+Смешанные семейства поддерживаются через отдельные ссылки на модели.</p>
+<h3>Построить отчёты и открыть FiftyOne</h3>
+<pre><code class="language-bash">cy-report comparison_dir=./comparison output_dir=./reports \
+  clearml.project_name=cy-tutorial clearml.task_name=reports 'clearml.tags=[tutorial,reports]'
+</code></pre>
+<p><a href="/#field=comparison_dir">comparison_dir</a> должен содержать манифест и обе оценённые
+книги сравнения. Для своего шаблона задайте
+<a href="/#field=report_config_path">report_config_path</a>. Для старого манифеста без
+идентичности предусмотрены <code>baseline_label</code> и <code>candidate_label</code>.</p>
+<p>FiftyOne — отдельная необязательная публикация изображений и оценок. В командах
+с группой <a href="/#field=fiftyone.enabled">fiftyone.enabled</a> можно включить её после
+настройки сервера и media-доступа. Датасет и его evaluation keys указаны в
+опубликованной конфигурации; приложение просмотра открывается отдельно. Для
+нативного просмотра CY-оценок требуется установленный на сервере/backend плагин
+<code>@clearml-yolo/evaluation</code>; публикация не устанавливает его автоматически.
+Работа с выборкой в App не означает автоматического пересчёта исходного отчёта.</p>
+<h2>Ожидаемый результат</h2>
+<p><code>cy-predict</code> сохраняет CSV и sidecar происхождения, но сам не оценивает модель.
+<code>cy-metrics</code> и <code>cy-val</code> создают frozen thresholds, книги метрик и графики;
+standalone metrics не регистрирует новую модель. Сравнение создаёт
+<code>comparison_manifest.json</code>, парные оценённые книги и таблицы сравнения. Отчётный
+шаг создаёт технический и бизнес-отчёты XLSX.</p>
+<h2>Частые ошибки</h2>
+<ul>
+<li>Нет val-предсказаний: добавьте <code>val</code> при инференсе, даже если интересует только test.</li>
+<li>Неизвестные имена изображений: используйте canonical basename и исходный ground truth.</li>
+<li>Нет происхождения: задайте <a href="/#field=model_label">model_label</a> для локальных
+входов; это подпись, а не выдуманный ID обучающей задачи.</li>
+<li>Hash mismatch: перенесите исходные CSV/веса вместе с их sidecar; не редактируйте
+подписанные результаты на месте. Книги для повторного использования пересоздавайте.</li>
+<li>FiftyOne недоступен: необязательная публикация выдаёт предупреждение;
+обязательная загрузка в ClearML по-прежнему должна завершиться успешно.</li>
+</ul>
+<h2>Проверка</h2>
+<p>Сопоставьте <code>gt_csv</code> и <code>predicts_csv</code> с исходными строками и выборками; сохраните
+<code>.identity.json</code> и <code>.provenance.json</code>. Сверьте пороги val с применёнными test-порогами,
+checkpoint identity и настройки обеих моделей. Откройте confusion matrix и test
+precision-recall; отсутствие GT и отсутствие предсказаний — разные случаи.
+Для сравнения проверьте одинаковое текущее image membership, обе книги и манифест;
+для отчётов — реальные созданные XLSX и опубликованные артефакты.</p>
+</main></body></html>
+<!-- source-sha256: 3256a995996b14be80cfe56815cf5efd97f8b4fd6a4ab49f3ebb577657a133be -->

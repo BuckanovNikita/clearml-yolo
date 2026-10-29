@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Первый эксперимент: установка и небольшой датасет — CY</title><link rel="stylesheet" href="/style.css"></head>
+<body><main class="tutorial-page">
+<nav><a href="/">← Справочник CY</a></nav><h1>Первый эксперимент: установка и небольшой датасет</h1>
+<p>Этот урок создаёт воспроизводимый набор изображений и запускает одну эпоху YOLO.
+Синтетические квадраты проверяют работоспособность конвейера; качество на них не
+характеризует качество модели на производственных данных.</p>
+<h2>Предварительные условия</h2>
+<p>Нужны Python <code>&gt;=3.12.13,&lt;3.14</code>, поддерживаемая Linux-среда с <code>pidfd</code>, доступ к
+ClearML и удалённому хранилищу артефактов. Все поддерживаемые детекторы и ONNX
+входят в обычную установку CY. TensorRT и отдельный пакет <code>cy-queue</code> имеют свои
+предварительные условия. Установка не требует Node.js.</p>
+<p>При установке из исходников подготовьте утверждённые копии <code>digital-metrics</code> и
+<code>report-generator</code> в <code>external/</code>, следуя инструкции поставляемой версии. Сам
+lockfile не скачивает эти деревья. Затем из каталога исходников:</p>
+<pre><code class="language-bash">uv sync --frozen
+uv run --frozen --no-sync cy-docs
+</code></pre>
+<p>После активации установленного Python-окружения достаточно <code>cy-docs</code>. Для запуска
+без автоматического открытия браузера используйте <code>cy-docs --no-browser</code>; команда
+напечатает локальный адрес. <code>cy-docs --check</code> проверяет документацию без сервера.
+Справочник и предпросмотр работают без интернета. Эксперименты выполняются командами
+терминала и требуют своих входов и настроенного ClearML.</p>
+<p>Настройте SDK обычным способом, например <code>clearml-init</code>, указав свои адреса и
+учётные данные. Не записывайте секреты в YAML урока. Должно быть доступно удалённое
+хранилище: <a href="/#field=clearml.output_uri">clearml.output_uri</a> по умолчанию равно <code>true</code>;
+<code>null</code>, <code>false</code> и пустая строка не отключают публикацию, а вызывают ошибку.</p>
+<h2>Пример</h2>
+<p>Создайте отдельный рабочий каталог и запускайте последующие команды из него.
+<code>CY_HOME</code> по умолчанию совпадает с каталогом запуска. Все выходные файлы должны
+находиться внутри этого корня; исходные данные могут быть внешними.</p>
+<p>Сохраните как <code>make_dataset.py</code> и выполните <code>python make_dataset.py</code>:</p>
+<pre><code class="language-python">import csv
+from pathlib import Path
+
+from PIL import Image, ImageDraw
+
+root = Path(&quot;tutorial-data&quot;)
+images = root / &quot;images&quot;
+images.mkdir(parents=True, exist_ok=True)
+columns = [
+    &quot;image_name&quot;,
+    &quot;image_path&quot;,
+    &quot;instance_label&quot;,
+    &quot;bbox_x_tl&quot;,
+    &quot;bbox_y_tl&quot;,
+    &quot;bbox_x_br&quot;,
+    &quot;bbox_y_br&quot;,
+    &quot;split&quot;,
+]
+with (root / &quot;ground_truth.csv&quot;).open(&quot;w&quot;, newline=&quot;&quot;, encoding=&quot;utf-8&quot;) as stream:
+    writer = csv.writer(stream)
+    writer.writerow(columns)
+    for split_index, split in enumerate((&quot;train&quot;, &quot;val&quot;, &quot;test&quot;)):
+        for index in range(4):
+            name = f&quot;{split}-{index}.png&quot;
+            image = Image.new(&quot;RGB&quot;, (160, 128), (20 + split_index * 10, 30, 40))
+            if index == 3:
+                annotation = [&quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;]
+            else:
+                left = 12 + index * 24 + split_index
+                box = [left, 30, left + 30, 70]
+                ImageDraw.Draw(image).rectangle(box, fill=(230, 170, 70))
+                annotation = [&quot;square&quot;, *box]
+            image.save(images / name)
+            writer.writerow([name, f&quot;images/{name}&quot;, *annotation, split])
+print(root / &quot;ground_truth.csv&quot;)
+</code></pre>
+<p>Одна строка описывает объект; для нескольких объектов повторите имя изображения.
+Строка без класса и координат сохраняет пустое изображение. Не смешивайте её с
+объектами того же изображения. <code>image_name</code> совпадает с basename файла, координаты
+измеряются в пикселях. Изображения разных выборок не должны совпадать. Относительные
+пути разрешаются от каталога CSV, а не от каталога запуска. Строковые классы <code>NA</code>,
+<code>NULL</code>, <code>0001</code> и Unicode сохраняются буквально.</p>
+<pre><code class="language-bash">cy-train ground_truth=./tutorial-data/ground_truth.csv \
+  ultralytics.model=yolo11n.pt ultralytics.epochs=1 ultralytics.imgsz=128 \
+  ultralytics.batch=2 ultralytics.device=cpu ultralytics.workers=0 \
+  ultralytics.compile=false clearml.project_name=cy-tutorial \
+  clearml.task_name=first-training 'clearml.tags=[tutorial,quickstart]'
+</code></pre>
+<p>CPU выбран явно и действительно выполняет обучение. Для доступного GPU замените
+<code>ultralytics.device=cpu</code> на <code>ultralytics.device=0</code>. Первый запуск может скачать веса;
+варианты подготовки для закрытой сети описаны в <a href="operations.html">операционном уроке</a>.</p>
+<h3>Вместо локального CSV — ClearML Dataset</h3>
+<p><a href="/#field=ground_truth">ground_truth</a> также принимает один из двух селекторов:</p>
+<pre><code class="language-yaml">ground_truth:
+  dataset_id: YOUR_FINALIZED_DATASET_ID
+</code></pre>
+<pre><code class="language-yaml">ground_truth:
+  project_name: annotations
+  name: ground-truth
+  version: &quot;1.2.0&quot;
+</code></pre>
+<p>В паре проект/имя версия необязательна, но явная версия делает выбор стабильнее.
+Нельзя совместить ID с проектом/именем/версией. Набор должен быть финализирован и
+содержать только корневой <code>dataset.csv</code>, без изображений и ссылок. При загрузке
+CSV не меняется; его относительные пути считаются от места загруженного CSV.
+Для переносимого набора используйте доступные выполняющему процессу абсолютные
+пути к изображениям. Предпросмотр не скачивает Dataset и не проверяет эти пути.</p>
+<p>Для исходной YOLO-разметки есть конвертер:</p>
+<pre><code class="language-bash">cy-ground-truth data_yaml=./source-data/data.yaml output=./converted/ground_truth.csv \
+  test_fraction=0.5 seed=0 clearml.project_name=cy-tutorial \
+  clearml.task_name=convert-data 'clearml.tags=[tutorial,conversion]'
+</code></pre>
+<p>Если исходный набор не содержит <code>test</code>, конвертер выделит её из <code>val</code> согласно
+<a href="/#field=test_fraction">test_fraction</a> и <a href="/#field=seed">seed</a>. Проверьте разбиение
+перед обучением; <code>cy-train</code> сам выборки не создаёт.</p>
+<h2>Ожидаемый результат</h2>
+<p>Генератор создаёт 12 изображений: по четыре в каждой выборке, включая одно пустое.
+Обучение создаёт одну задачу ClearML, журнал, скаляры и лучший чекпойнт.
+Локальный путь к весам напечатан в журнале; по умолчанию результаты лежат в
+<code>runs/&lt;проект&gt;/&lt;задача&gt;-&lt;task-id&gt;/</code>. В ClearML лучший чекпойнт находится в
+<code>Output Models</code>. Численные метрики на этом наборе могут быть низкими.</p>
+<h2>Частые ошибки</h2>
+<ul>
+<li><code>ground_truth=???</code>: обязательный вход не заполнен. Выберите локальный CSV или Dataset.</li>
+<li>Нет <code>train</code>/<code>val</code>: обучение требует обе непустые выборки; полный <code>cy</code> также
+использует <code>test</code> по умолчанию.</li>
+<li>Изображения не найдены: проверьте пути относительно CSV и точное имя файла.</li>
+<li>Ошибка ClearML или загрузки артефактов: проверьте конфигурацию SDK и хранилище;
+успешное создание локальных весов ещё не означает успешное завершение задачи.</li>
+<li>Не хватает памяти: уменьшите batch/разрешение по <a href="training.html">уроку обучения</a>.</li>
+</ul>
+<h2>Проверка</h2>
+<p>Сверьте число изображений и выборок, убедитесь в отсутствии пересечений и наличии
+пустых строк. Проверьте код завершения обучения, журнал, <code>Output Models</code>, артефакт
+<code>gt_csv</code> и <code>Configuration / run</code> задачи. Скачайте веса и сравните их с локальным
+чекпойнтом перед следующим шагом. Сохраните идентификационный sidecar рядом с весами.
+Для полного эксперимента перейдите к <a href="pipeline.html">конвейеру</a>.</p>
+</main></body></html>
+<!-- source-sha256: bf0ade8374d92adefbd3807b514725632d6b348576e1aa1358a60dc3262cc8f5 -->

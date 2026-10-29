@@ -1,0 +1,3289 @@
+{
+  "captured": "2026-10-29 before feature 008 declarations",
+  "schemas": {
+    "pipeline": {
+      "model": {},
+      "ultralytics": {
+        "task": "detect",
+        "mode": "train",
+        "model": "yolo11n.pt",
+        "data": null,
+        "epochs": 100,
+        "time": null,
+        "patience": 100,
+        "batch": 16,
+        "imgsz": 960,
+        "save": true,
+        "save_period": -1,
+        "cache": false,
+        "device": null,
+        "workers": 8,
+        "project": null,
+        "name": null,
+        "exist_ok": false,
+        "pretrained": true,
+        "cls_remap": true,
+        "optimizer": "auto",
+        "verbose": true,
+        "seed": 0,
+        "deterministic": true,
+        "single_cls": false,
+        "rect": false,
+        "cos_lr": false,
+        "close_mosaic": 10,
+        "resume": false,
+        "amp": true,
+        "fraction": 1.0,
+        "profile": false,
+        "freeze": null,
+        "multi_scale": 0.0,
+        "compile": true,
+        "channels_last": null,
+        "val": true,
+        "split": "val",
+        "save_json": false,
+        "conf": null,
+        "iou": 0.7,
+        "max_det": 300,
+        "quantize": null,
+        "plots": true,
+        "nms": true,
+        "visualize": false,
+        "augment": false,
+        "agnostic_nms": false,
+        "classes": null,
+        "save_txt": false,
+        "save_conf": false,
+        "show_labels": true,
+        "show_conf": true,
+        "lr0": 0.01,
+        "lrf": 0.01,
+        "momentum": 0.937,
+        "weight_decay": 0.0005,
+        "warmup_epochs": 3.0,
+        "warmup_momentum": 0.8,
+        "warmup_bias_lr": 0.1,
+        "distill_model": null,
+        "dis": 6.0,
+        "box": 7.5,
+        "cls": 0.5,
+        "cls_pw": 0.0,
+        "dfl": 1.5,
+        "nbs": 64,
+        "hsv_h": 0.015,
+        "hsv_s": 0.7,
+        "hsv_v": 0.4,
+        "degrees": 0.0,
+        "translate": 0.1,
+        "scale": 0.5,
+        "shear": 0.0,
+        "perspective": 0.0,
+        "flipud": 0.0,
+        "fliplr": 0.5,
+        "bgr": 0.0,
+        "mosaic": 1.0,
+        "mixup": 0.0,
+        "cutmix": 0.0
+      },
+      "ultralytics_predict": {
+        "task": "${ultralytics.task}",
+        "mode": "predict",
+        "model": null,
+        "data": "${ultralytics.data}",
+        "batch": 1,
+        "imgsz": "${ultralytics.imgsz}",
+        "save": false,
+        "device": [
+          -1
+        ],
+        "project": null,
+        "name": null,
+        "exist_ok": "${ultralytics.exist_ok}",
+        "verbose": false,
+        "rect": true,
+        "compile": "${ultralytics.compile}",
+        "channels_last": "${ultralytics.channels_last}",
+        "conf": 0.001,
+        "iou": "${ultralytics.iou}",
+        "max_det": "${ultralytics.max_det}",
+        "quantize": "${ultralytics.quantize}",
+        "dnn": false,
+        "nms": "${ultralytics.nms}",
+        "source": null,
+        "visualize": "${ultralytics.visualize}",
+        "augment": "${ultralytics.augment}",
+        "agnostic_nms": "${ultralytics.agnostic_nms}",
+        "classes": "${ultralytics.classes}",
+        "show": false,
+        "save_txt": "${ultralytics.save_txt}",
+        "save_conf": "${ultralytics.save_conf}",
+        "save_crop": false,
+        "show_labels": "${ultralytics.show_labels}",
+        "show_conf": "${ultralytics.show_conf}",
+        "show_boxes": true,
+        "line_width": null
+      },
+      "transforms": {
+        "mode": "native",
+        "pipeline_file": null,
+        "snapshot": null
+      },
+      "metrics": {
+        "evaluation": {
+          "_target_": "clearml_yolo.core.evaluation.models.EvaluationConfig",
+          "iou_threshold": 0.5,
+          "matching_strategy": "iou_prior",
+          "ap_method": "interp",
+          "confidence_optimization": "per_class",
+          "skip_cohen_kappa": true,
+          "preprocess": false,
+          "preprocess_preds_conf_threshold": null,
+          "preprocess_preds_nms_containment_threshold": null,
+          "preprocess_preds_nms_iou_threshold": null,
+          "backend": null
+        },
+        "calibration_split": "val"
+      },
+      "compare": {
+        "baseline_model": {
+          "_target_": "clearml_yolo.application.contracts.ModelRef",
+          "source": "clearml",
+          "task_id": null,
+          "project_name": null,
+          "task_name": null,
+          "tags": [
+            "prod"
+          ],
+          "weights": null,
+          "thresholds": null,
+          "label": null,
+          "backend": null,
+          "preset": null,
+          "source_dir": null,
+          "class_names": null,
+          "preprocessing": null
+        },
+        "q": 0.05,
+        "bootstrap_iterations": 10000,
+        "seed": 0
+      },
+      "report": {
+        "report_config_path": null
+      },
+      "clearml": {
+        "_target_": "clearml_yolo.application.contracts.ClearMLConfig",
+        "project_name": "clearml-yolo",
+        "task_name": "yolo-run",
+        "task_type": "training",
+        "tags": [],
+        "output_uri": true
+      },
+      "ground_truth": "???",
+      "splits": [
+        "train",
+        "val",
+        "test"
+      ],
+      "dataset_format": "ndjson",
+      "dataset_cache_dir": null,
+      "weights": null,
+      "model_label": null,
+      "run_id": null,
+      "run_dir": null,
+      "skip_train": false,
+      "skip_predict": false,
+      "skip_metrics": false,
+      "skip_report": false,
+      "skip_compare": false,
+      "fiftyone": {
+        "_target_": "clearml_yolo.core.publication.FiftyOneConfig",
+        "enabled": true,
+        "preflight_timeout_seconds": 60.0,
+        "publish_timeout_seconds": 900.0,
+        "lock_timeout_seconds": 30.0,
+        "dataset_prefix": "clearml-yolo"
+      }
+    },
+    "train": {
+      "model": {},
+      "ultralytics": {
+        "task": "detect",
+        "mode": "train",
+        "model": "yolo11n.pt",
+        "data": null,
+        "epochs": 100,
+        "time": null,
+        "patience": 100,
+        "batch": 16,
+        "imgsz": 960,
+        "save": true,
+        "save_period": -1,
+        "cache": false,
+        "device": null,
+        "workers": 8,
+        "project": null,
+        "name": null,
+        "exist_ok": false,
+        "pretrained": true,
+        "cls_remap": true,
+        "optimizer": "auto",
+        "verbose": true,
+        "seed": 0,
+        "deterministic": true,
+        "single_cls": false,
+        "rect": false,
+        "cos_lr": false,
+        "close_mosaic": 10,
+        "resume": false,
+        "amp": true,
+        "fraction": 1.0,
+        "profile": false,
+        "freeze": null,
+        "multi_scale": 0.0,
+        "compile": true,
+        "channels_last": null,
+        "val": true,
+        "split": "val",
+        "save_json": false,
+        "conf": null,
+        "iou": 0.7,
+        "max_det": 300,
+        "quantize": null,
+        "plots": true,
+        "nms": true,
+        "visualize": false,
+        "augment": false,
+        "agnostic_nms": false,
+        "classes": null,
+        "save_txt": false,
+        "save_conf": false,
+        "show_labels": true,
+        "show_conf": true,
+        "lr0": 0.01,
+        "lrf": 0.01,
+        "momentum": 0.937,
+        "weight_decay": 0.0005,
+        "warmup_epochs": 3.0,
+        "warmup_momentum": 0.8,
+        "warmup_bias_lr": 0.1,
+        "distill_model": null,
+        "dis": 6.0,
+        "box": 7.5,
+        "cls": 0.5,
+        "cls_pw": 0.0,
+        "dfl": 1.5,
+        "nbs": 64,
+        "hsv_h": 0.015,
+        "hsv_s": 0.7,
+        "hsv_v": 0.4,
+        "degrees": 0.0,
+        "translate": 0.1,
+        "scale": 0.5,
+        "shear": 0.0,
+        "perspective": 0.0,
+        "flipud": 0.0,
+        "fliplr": 0.5,
+        "bgr": 0.0,
+        "mosaic": 1.0,
+        "mixup": 0.0,
+        "cutmix": 0.0
+      },
+      "ultralytics_predict": {
+        "task": "${ultralytics.task}",
+        "mode": "predict",
+        "model": null,
+        "data": "${ultralytics.data}",
+        "batch": 1,
+        "imgsz": "${ultralytics.imgsz}",
+        "save": false,
+        "device": [
+          -1
+        ],
+        "project": null,
+        "name": null,
+        "exist_ok": "${ultralytics.exist_ok}",
+        "verbose": false,
+        "rect": true,
+        "compile": "${ultralytics.compile}",
+        "channels_last": "${ultralytics.channels_last}",
+        "conf": 0.001,
+        "iou": "${ultralytics.iou}",
+        "max_det": "${ultralytics.max_det}",
+        "quantize": "${ultralytics.quantize}",
+        "dnn": false,
+        "nms": "${ultralytics.nms}",
+        "source": null,
+        "visualize": "${ultralytics.visualize}",
+        "augment": "${ultralytics.augment}",
+        "agnostic_nms": "${ultralytics.agnostic_nms}",
+        "classes": "${ultralytics.classes}",
+        "show": false,
+        "save_txt": "${ultralytics.save_txt}",
+        "save_conf": "${ultralytics.save_conf}",
+        "save_crop": false,
+        "show_labels": "${ultralytics.show_labels}",
+        "show_conf": "${ultralytics.show_conf}",
+        "show_boxes": true,
+        "line_width": null
+      },
+      "transforms": {
+        "mode": "native",
+        "pipeline_file": null,
+        "snapshot": null
+      },
+      "clearml": {
+        "_target_": "clearml_yolo.application.contracts.ClearMLConfig",
+        "project_name": "clearml-yolo",
+        "task_name": "yolo-run",
+        "task_type": "training",
+        "tags": [],
+        "output_uri": true
+      },
+      "ground_truth": "???",
+      "dataset_format": "ndjson",
+      "dataset_cache_dir": null,
+      "required_splits": null
+    },
+    "predict": {
+      "model": {},
+      "ultralytics": {
+        "task": "detect",
+        "mode": "train",
+        "model": "yolo11n.pt",
+        "data": null,
+        "epochs": 100,
+        "time": null,
+        "patience": 100,
+        "batch": 16,
+        "imgsz": 960,
+        "save": true,
+        "save_period": -1,
+        "cache": false,
+        "device": null,
+        "workers": 8,
+        "project": null,
+        "name": null,
+        "exist_ok": false,
+        "pretrained": true,
+        "cls_remap": true,
+        "optimizer": "auto",
+        "verbose": true,
+        "seed": 0,
+        "deterministic": true,
+        "single_cls": false,
+        "rect": false,
+        "cos_lr": false,
+        "close_mosaic": 10,
+        "resume": false,
+        "amp": true,
+        "fraction": 1.0,
+        "profile": false,
+        "freeze": null,
+        "multi_scale": 0.0,
+        "compile": true,
+        "channels_last": null,
+        "val": true,
+        "split": "val",
+        "save_json": false,
+        "conf": null,
+        "iou": 0.7,
+        "max_det": 300,
+        "quantize": null,
+        "plots": true,
+        "nms": true,
+        "visualize": false,
+        "augment": false,
+        "agnostic_nms": false,
+        "classes": null,
+        "save_txt": false,
+        "save_conf": false,
+        "show_labels": true,
+        "show_conf": true,
+        "lr0": 0.01,
+        "lrf": 0.01,
+        "momentum": 0.937,
+        "weight_decay": 0.0005,
+        "warmup_epochs": 3.0,
+        "warmup_momentum": 0.8,
+        "warmup_bias_lr": 0.1,
+        "distill_model": null,
+        "dis": 6.0,
+        "box": 7.5,
+        "cls": 0.5,
+        "cls_pw": 0.0,
+        "dfl": 1.5,
+        "nbs": 64,
+        "hsv_h": 0.015,
+        "hsv_s": 0.7,
+        "hsv_v": 0.4,
+        "degrees": 0.0,
+        "translate": 0.1,
+        "scale": 0.5,
+        "shear": 0.0,
+        "perspective": 0.0,
+        "flipud": 0.0,
+        "fliplr": 0.5,
+        "bgr": 0.0,
+        "mosaic": 1.0,
+        "mixup": 0.0,
+        "cutmix": 0.0
+      },
+      "ultralytics_predict": {
+        "task": "${ultralytics.task}",
+        "mode": "predict",
+        "model": null,
+        "data": "${ultralytics.data}",
+        "batch": 1,
+        "imgsz": "${ultralytics.imgsz}",
+        "save": false,
+        "device": [
+          -1
+        ],
+        "project": null,
+        "name": null,
+        "exist_ok": "${ultralytics.exist_ok}",
+        "verbose": false,
+        "rect": true,
+        "compile": "${ultralytics.compile}",
+        "channels_last": "${ultralytics.channels_last}",
+        "conf": 0.001,
+        "iou": "${ultralytics.iou}",
+        "max_det": "${ultralytics.max_det}",
+        "quantize": "${ultralytics.quantize}",
+        "dnn": false,
+        "nms": "${ultralytics.nms}",
+        "source": null,
+        "visualize": "${ultralytics.visualize}",
+        "augment": "${ultralytics.augment}",
+        "agnostic_nms": "${ultralytics.agnostic_nms}",
+        "classes": "${ultralytics.classes}",
+        "show": false,
+        "save_txt": "${ultralytics.save_txt}",
+        "save_conf": "${ultralytics.save_conf}",
+        "save_crop": false,
+        "show_labels": "${ultralytics.show_labels}",
+        "show_conf": "${ultralytics.show_conf}",
+        "show_boxes": true,
+        "line_width": null
+      },
+      "weights": null,
+      "model_label": null,
+      "ground_truth": "???",
+      "output": null,
+      "splits": null,
+      "image_name": "name",
+      "clearml": {
+        "_target_": "clearml_yolo.application.contracts.ClearMLConfig",
+        "project_name": "clearml-yolo",
+        "task_name": "yolo-run",
+        "task_type": "training",
+        "tags": [],
+        "output_uri": true
+      },
+      "fiftyone": {
+        "_target_": "clearml_yolo.core.publication.FiftyOneConfig",
+        "enabled": true,
+        "preflight_timeout_seconds": 60.0,
+        "publish_timeout_seconds": 900.0,
+        "lock_timeout_seconds": 30.0,
+        "dataset_prefix": "clearml-yolo"
+      }
+    },
+    "val": {
+      "model": {},
+      "ultralytics": {
+        "task": "detect",
+        "mode": "train",
+        "model": "yolo11n.pt",
+        "data": null,
+        "epochs": 100,
+        "time": null,
+        "patience": 100,
+        "batch": 16,
+        "imgsz": 960,
+        "save": true,
+        "save_period": -1,
+        "cache": false,
+        "device": null,
+        "workers": 8,
+        "project": null,
+        "name": null,
+        "exist_ok": false,
+        "pretrained": true,
+        "cls_remap": true,
+        "optimizer": "auto",
+        "verbose": true,
+        "seed": 0,
+        "deterministic": true,
+        "single_cls": false,
+        "rect": false,
+        "cos_lr": false,
+        "close_mosaic": 10,
+        "resume": false,
+        "amp": true,
+        "fraction": 1.0,
+        "profile": false,
+        "freeze": null,
+        "multi_scale": 0.0,
+        "compile": true,
+        "channels_last": null,
+        "val": true,
+        "split": "val",
+        "save_json": false,
+        "conf": null,
+        "iou": 0.7,
+        "max_det": 300,
+        "quantize": null,
+        "plots": true,
+        "nms": true,
+        "visualize": false,
+        "augment": false,
+        "agnostic_nms": false,
+        "classes": null,
+        "save_txt": false,
+        "save_conf": false,
+        "show_labels": true,
+        "show_conf": true,
+        "lr0": 0.01,
+        "lrf": 0.01,
+        "momentum": 0.937,
+        "weight_decay": 0.0005,
+        "warmup_epochs": 3.0,
+        "warmup_momentum": 0.8,
+        "warmup_bias_lr": 0.1,
+        "distill_model": null,
+        "dis": 6.0,
+        "box": 7.5,
+        "cls": 0.5,
+        "cls_pw": 0.0,
+        "dfl": 1.5,
+        "nbs": 64,
+        "hsv_h": 0.015,
+        "hsv_s": 0.7,
+        "hsv_v": 0.4,
+        "degrees": 0.0,
+        "translate": 0.1,
+        "scale": 0.5,
+        "shear": 0.0,
+        "perspective": 0.0,
+        "flipud": 0.0,
+        "fliplr": 0.5,
+        "bgr": 0.0,
+        "mosaic": 1.0,
+        "mixup": 0.0,
+        "cutmix": 0.0
+      },
+      "ultralytics_predict": {
+        "task": "${ultralytics.task}",
+        "mode": "predict",
+        "model": null,
+        "data": "${ultralytics.data}",
+        "batch": 1,
+        "imgsz": "${ultralytics.imgsz}",
+        "save": false,
+        "device": [
+          -1
+        ],
+        "project": null,
+        "name": null,
+        "exist_ok": "${ultralytics.exist_ok}",
+        "verbose": false,
+        "rect": true,
+        "compile": "${ultralytics.compile}",
+        "channels_last": "${ultralytics.channels_last}",
+        "conf": 0.001,
+        "iou": "${ultralytics.iou}",
+        "max_det": "${ultralytics.max_det}",
+        "quantize": "${ultralytics.quantize}",
+        "dnn": false,
+        "nms": "${ultralytics.nms}",
+        "source": null,
+        "visualize": "${ultralytics.visualize}",
+        "augment": "${ultralytics.augment}",
+        "agnostic_nms": "${ultralytics.agnostic_nms}",
+        "classes": "${ultralytics.classes}",
+        "show": false,
+        "save_txt": "${ultralytics.save_txt}",
+        "save_conf": "${ultralytics.save_conf}",
+        "save_crop": false,
+        "show_labels": "${ultralytics.show_labels}",
+        "show_conf": "${ultralytics.show_conf}",
+        "show_boxes": true,
+        "line_width": null
+      },
+      "weights": null,
+      "model_label": null,
+      "ground_truth": "???",
+      "output_dir": null,
+      "splits": [
+        "train",
+        "val",
+        "test"
+      ],
+      "evaluation": {
+        "_target_": "clearml_yolo.core.evaluation.models.EvaluationConfig",
+        "iou_threshold": 0.5,
+        "matching_strategy": "iou_prior",
+        "ap_method": "interp",
+        "confidence_optimization": "per_class",
+        "skip_cohen_kappa": true,
+        "preprocess": false,
+        "preprocess_preds_conf_threshold": null,
+        "preprocess_preds_nms_containment_threshold": null,
+        "preprocess_preds_nms_iou_threshold": null,
+        "backend": null
+      },
+      "clearml": {
+        "_target_": "clearml_yolo.application.contracts.ClearMLConfig",
+        "project_name": "clearml-yolo",
+        "task_name": "yolo-run",
+        "task_type": "training",
+        "tags": [],
+        "output_uri": true
+      }
+    },
+    "metrics": {
+      "predictions": "???",
+      "model_label": null,
+      "ground_truth": "???",
+      "output_dir": null,
+      "splits": [
+        "train",
+        "val",
+        "test"
+      ],
+      "calibration_split": "val",
+      "evaluation": {
+        "_target_": "clearml_yolo.core.evaluation.models.EvaluationConfig",
+        "iou_threshold": 0.5,
+        "matching_strategy": "iou_prior",
+        "ap_method": "interp",
+        "confidence_optimization": "per_class",
+        "skip_cohen_kappa": true,
+        "preprocess": false,
+        "preprocess_preds_conf_threshold": null,
+        "preprocess_preds_nms_containment_threshold": null,
+        "preprocess_preds_nms_iou_threshold": null,
+        "backend": null
+      },
+      "clearml": {
+        "_target_": "clearml_yolo.application.contracts.ClearMLConfig",
+        "project_name": "clearml-yolo",
+        "task_name": "yolo-run",
+        "task_type": "training",
+        "tags": [],
+        "output_uri": true
+      },
+      "fiftyone": {
+        "_target_": "clearml_yolo.core.publication.FiftyOneConfig",
+        "enabled": true,
+        "preflight_timeout_seconds": 60.0,
+        "publish_timeout_seconds": 900.0,
+        "lock_timeout_seconds": 30.0,
+        "dataset_prefix": "clearml-yolo"
+      }
+    },
+    "report": {
+      "comparison_dir": "???",
+      "baseline_label": null,
+      "candidate_label": null,
+      "output_dir": null,
+      "report_config_path": null,
+      "clearml": {
+        "_target_": "clearml_yolo.application.contracts.ClearMLConfig",
+        "project_name": "clearml-yolo",
+        "task_name": "yolo-run",
+        "task_type": "training",
+        "tags": [],
+        "output_uri": true
+      }
+    },
+    "compare": {
+      "baseline_model": {
+        "_target_": "clearml_yolo.application.contracts.ModelRef",
+        "source": "clearml",
+        "task_id": null,
+        "project_name": null,
+        "task_name": null,
+        "tags": [
+          "prod"
+        ],
+        "weights": null,
+        "thresholds": null,
+        "label": null,
+        "backend": null,
+        "preset": null,
+        "source_dir": null,
+        "class_names": null,
+        "preprocessing": null
+      },
+      "candidate_model": {
+        "_target_": "clearml_yolo.application.contracts.ModelRef",
+        "source": "clearml",
+        "task_id": null,
+        "project_name": null,
+        "task_name": null,
+        "tags": [
+          "prod"
+        ],
+        "weights": null,
+        "thresholds": null,
+        "label": null,
+        "backend": null,
+        "preset": null,
+        "source_dir": null,
+        "class_names": null,
+        "preprocessing": null
+      },
+      "ground_truth": "???",
+      "output_dir": null,
+      "split": "test",
+      "model": {},
+      "ultralytics": {
+        "task": "detect",
+        "mode": "train",
+        "model": "yolo11n.pt",
+        "data": null,
+        "epochs": 100,
+        "time": null,
+        "patience": 100,
+        "batch": 16,
+        "imgsz": 960,
+        "save": true,
+        "save_period": -1,
+        "cache": false,
+        "device": null,
+        "workers": 8,
+        "project": null,
+        "name": null,
+        "exist_ok": false,
+        "pretrained": true,
+        "cls_remap": true,
+        "optimizer": "auto",
+        "verbose": true,
+        "seed": 0,
+        "deterministic": true,
+        "single_cls": false,
+        "rect": false,
+        "cos_lr": false,
+        "close_mosaic": 10,
+        "resume": false,
+        "amp": true,
+        "fraction": 1.0,
+        "profile": false,
+        "freeze": null,
+        "multi_scale": 0.0,
+        "compile": true,
+        "channels_last": null,
+        "val": true,
+        "split": "val",
+        "save_json": false,
+        "conf": null,
+        "iou": 0.7,
+        "max_det": 300,
+        "quantize": null,
+        "plots": true,
+        "nms": true,
+        "visualize": false,
+        "augment": false,
+        "agnostic_nms": false,
+        "classes": null,
+        "save_txt": false,
+        "save_conf": false,
+        "show_labels": true,
+        "show_conf": true,
+        "lr0": 0.01,
+        "lrf": 0.01,
+        "momentum": 0.937,
+        "weight_decay": 0.0005,
+        "warmup_epochs": 3.0,
+        "warmup_momentum": 0.8,
+        "warmup_bias_lr": 0.1,
+        "distill_model": null,
+        "dis": 6.0,
+        "box": 7.5,
+        "cls": 0.5,
+        "cls_pw": 0.0,
+        "dfl": 1.5,
+        "nbs": 64,
+        "hsv_h": 0.015,
+        "hsv_s": 0.7,
+        "hsv_v": 0.4,
+        "degrees": 0.0,
+        "translate": 0.1,
+        "scale": 0.5,
+        "shear": 0.0,
+        "perspective": 0.0,
+        "flipud": 0.0,
+        "fliplr": 0.5,
+        "bgr": 0.0,
+        "mosaic": 1.0,
+        "mixup": 0.0,
+        "cutmix": 0.0
+      },
+      "ultralytics_predict": {
+        "task": "${ultralytics.task}",
+        "mode": "predict",
+        "model": null,
+        "data": "${ultralytics.data}",
+        "batch": 1,
+        "imgsz": "${ultralytics.imgsz}",
+        "save": false,
+        "device": [
+          -1
+        ],
+        "project": null,
+        "name": null,
+        "exist_ok": "${ultralytics.exist_ok}",
+        "verbose": false,
+        "rect": true,
+        "compile": "${ultralytics.compile}",
+        "channels_last": "${ultralytics.channels_last}",
+        "conf": 0.001,
+        "iou": "${ultralytics.iou}",
+        "max_det": "${ultralytics.max_det}",
+        "quantize": "${ultralytics.quantize}",
+        "dnn": false,
+        "nms": "${ultralytics.nms}",
+        "source": null,
+        "visualize": "${ultralytics.visualize}",
+        "augment": "${ultralytics.augment}",
+        "agnostic_nms": "${ultralytics.agnostic_nms}",
+        "classes": "${ultralytics.classes}",
+        "show": false,
+        "save_txt": "${ultralytics.save_txt}",
+        "save_conf": "${ultralytics.save_conf}",
+        "save_crop": false,
+        "show_labels": "${ultralytics.show_labels}",
+        "show_conf": "${ultralytics.show_conf}",
+        "show_boxes": true,
+        "line_width": null
+      },
+      "inference": {
+        "reuse_existing": true,
+        "image_name": "name"
+      },
+      "q": 0.05,
+      "bootstrap_iterations": 10000,
+      "seed": 0,
+      "evaluation": {
+        "_target_": "clearml_yolo.core.evaluation.models.EvaluationConfig",
+        "iou_threshold": 0.5,
+        "matching_strategy": "iou_prior",
+        "ap_method": "interp",
+        "confidence_optimization": "per_class",
+        "skip_cohen_kappa": true,
+        "preprocess": false,
+        "preprocess_preds_conf_threshold": null,
+        "preprocess_preds_nms_containment_threshold": null,
+        "preprocess_preds_nms_iou_threshold": null,
+        "backend": null
+      },
+      "clearml": {
+        "_target_": "clearml_yolo.application.contracts.ClearMLConfig",
+        "project_name": "clearml-yolo",
+        "task_name": "yolo-run",
+        "task_type": "training",
+        "tags": [],
+        "output_uri": true
+      }
+    },
+    "ground_truth": {
+      "data_yaml": "???",
+      "output": null,
+      "test_fraction": 0.5,
+      "seed": 0,
+      "clearml": {
+        "_target_": "clearml_yolo.application.contracts.ClearMLConfig",
+        "project_name": "clearml-yolo",
+        "task_name": "yolo-run",
+        "task_type": "training",
+        "tags": [],
+        "output_uri": true
+      }
+    },
+    "export": {
+      "model": {},
+      "export": {
+        "operation": "onnx",
+        "device": "cpu",
+        "precision": "fp32",
+        "onnx": null,
+        "engine": null,
+        "metadata": null,
+        "workspace_gib": 4.0,
+        "split": "test"
+      },
+      "weights": null,
+      "ground_truth": null,
+      "output_dir": null,
+      "clearml": {
+        "_target_": "clearml_yolo.application.contracts.ClearMLConfig",
+        "project_name": "clearml-yolo",
+        "task_name": "yolo-run",
+        "task_type": "training",
+        "tags": [],
+        "output_uri": true
+      }
+    }
+  },
+  "compositions": [
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=ultralytics",
+        "transforms=default"
+      ],
+      "unresolved": "74b1a180ffc2b7fa229c72a3879501d9bccd7f7bffc10d97b632290533c74b14",
+      "resolved": "4c66556ac66c890fd50b7b9c04c4e1ba7ba5cfa230d7ed9daedbf50243b1132a"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=ultralytics",
+        "transforms=albumentations"
+      ],
+      "unresolved": "69e63fe44938d55eec74a72da98e76e145ce6db99ec300035c18e31093e3034b",
+      "resolved": "09e968cb24d4bf191d5a291902ac71368fca14398a7f4fcd9f6788c4d7106495"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=deimv2/s",
+        "transforms=default"
+      ],
+      "unresolved": "4341d29d3f0285de6e1e548914ee4fe210d4d2e48cca04d8313ebf0d3a2017b0",
+      "resolved": "e82ff221f038e354e7a5a41634d8fc92307d7f276796f88e20ae030653c4df37"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=deimv2/s",
+        "transforms=albumentations"
+      ],
+      "unresolved": "d076bc22a607f728bb61f7612628da872ccd249ebb274785571cd8d29b4ffd89",
+      "resolved": "9271054ce1796381ec213efe87f77fce9ff61f0596ca19d71ebe745a0749eae0"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=deimv2/m",
+        "transforms=default"
+      ],
+      "unresolved": "77d2d9fd6f59b96a50260813a96f2350a1c4c75627edf7e573677004734fe22a",
+      "resolved": "c802f3ca8876950b33de7128cd6a3fe3a78db0fe7f1d10de131fa167da8579f9"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=deimv2/m",
+        "transforms=albumentations"
+      ],
+      "unresolved": "5c81cfa7eb78eee1e244d003f387e33a0e09a5e1f94a77ce215621963d153fee",
+      "resolved": "95bb2092e89e139bd795d46263496633467a67eb4925a6884716842d52293926"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=deimv2/l",
+        "transforms=default"
+      ],
+      "unresolved": "0431440a296bbb313848fd3fa0fa26f7bca11d871bf8a12ad9dc1b7df15f858c",
+      "resolved": "5cb2c8ae06e0804e48d50b7312e115f556dc6255eb680bd984828e6b59bb918e"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=deimv2/l",
+        "transforms=albumentations"
+      ],
+      "unresolved": "c5a3087790caf6bb12a115e2a880b205e65b86441df47ce4f3670079afb115cf",
+      "resolved": "c0f47dd3398082f892b58c819f7031cd3e396e3637ab00acfe0302893b1a818e"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=deimv2/x",
+        "transforms=default"
+      ],
+      "unresolved": "fd53549123e6dc2a98b403a7a82200181a2725b9b944be4e63331dbb88050452",
+      "resolved": "ef777785c58cfe51da1bdf6854a0ad4f446d9780469daa8573953a7ce0d77b85"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=deimv2/x",
+        "transforms=albumentations"
+      ],
+      "unresolved": "27260ac8dafa9e19bfa583845147a2df27ee8f80f4cb40c1782d6b2cfb732f94",
+      "resolved": "666daa2ae543a05d75de4adbd622f063ab39b70159612685195b6716c54792e8"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=rfdetr/nano",
+        "transforms=default"
+      ],
+      "unresolved": "09a2caf291133cb4a853f9c436fd1bbd862e24a026c9667aa58ad30e9b5eafa8",
+      "resolved": "71b84b8a81429ff3e11ad8430c04967e39e7c8d021a92565b32ec87a4f7e8af1"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=rfdetr/nano",
+        "transforms=albumentations"
+      ],
+      "unresolved": "b54f727e5c620c7bc2f4ef597c2594a553f53da7af750d0ac941157f554ff4fb",
+      "resolved": "33d94a684e23fa8da5d2708c8a00de99608991706dd33d7abd28aea625a469a8"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=rfdetr/small",
+        "transforms=default"
+      ],
+      "unresolved": "53d24b42fdbbaaea91b3a4518355f903eb8849ce0cc0c52283537fd7c4b21783",
+      "resolved": "dbbcfc053ad72f9d661dedf34d5cf16481f3dfcf238df5503ad9c2f3ceb26147"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=rfdetr/small",
+        "transforms=albumentations"
+      ],
+      "unresolved": "9d216c4f272078aa19751cd1770ce6071e2d11d88a2c324076c623acd5a0074d",
+      "resolved": "d90c069b44fc90cdec7923d51a063a2348c0964642ea29b182a2de9e0e95c2d0"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=rfdetr/medium",
+        "transforms=default"
+      ],
+      "unresolved": "be1f41d227f55341cc24a8d5a5bff9311d199386fcff9bfd44dcfdde2512fb16",
+      "resolved": "12728f9fcb789f2a9a883ae15a93df1c79e0d6650f9aee7575ecac46a03971fb"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=rfdetr/medium",
+        "transforms=albumentations"
+      ],
+      "unresolved": "2d73353dfb2ed21b339c7124579bc69316d4ef3b4ceab230dcea45bc15e124ec",
+      "resolved": "f5c123f805c91e99b3e0bd332b01097935deb5c3f11784d26c20f11738054e19"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=rfdetr/large",
+        "transforms=default"
+      ],
+      "unresolved": "7b2399eaa14bc9d08fd3dbc80fe747e2dd1fabcc0d33e63bd2ffbae9b86b9f48",
+      "resolved": "4940492000ccc0ab6e04f5ce913339a4f215907df94eb98c73c19c50ddf3d568"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=rfdetr/large",
+        "transforms=albumentations"
+      ],
+      "unresolved": "3421c822a4119d4dc68fa316c92f0e844227a96983fa46e43bb9cdfe7cd920a6",
+      "resolved": "db28b55ab5ff3b6caa3a1d0c8c9fdb0916c2ee7f7504f389908676690833273d"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=fasterrcnn/resnet50_fpn",
+        "transforms=default"
+      ],
+      "unresolved": "5abece7a5ffd9f7437c3cd9a93bb7acb28bed54f6bba24908c4c83ff7279674e",
+      "resolved": "d72fd52af05c68249883646f4f5af72bc33b461a79d245e400f51dd58d5454e0"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=fasterrcnn/resnet50_fpn",
+        "transforms=albumentations"
+      ],
+      "unresolved": "06b94cc158dcd61c37128e3a0db94caa30cd30a0c83fd28aa29e1c09d7cb9683",
+      "resolved": "20f50d88e89752019b6aa183eb9c44d680c240c6a83a59f4c651e75f6c58a718"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=fasterrcnn/resnet101_fpn",
+        "transforms=default"
+      ],
+      "unresolved": "52a38bdc8b411b5bbc4fd1e882d324dc263feea7378547a127c7e6632a4d9df7",
+      "resolved": "8b05f4a83a275d1ab89cb6faa170731b0a78c38a78f6322e8f6f7b45d4eb4f4a"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=fasterrcnn/resnet101_fpn",
+        "transforms=albumentations"
+      ],
+      "unresolved": "4d7e2bd2cb5f4129bd944c4afecbe4ee5e907e7ed55d392c07f9ed50a8c0af0c",
+      "resolved": "6b158ee59b07644eb76641eb15c67327d1e3ebcd5fa93d203910debba53b1963"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=fasterrcnn/convnext_tiny",
+        "transforms=default"
+      ],
+      "unresolved": "75109acf98423afb56eb5118fd31b47b813d1aec9db999e2fa146054aaaa9676",
+      "resolved": "da4b91646477ac4969f0f8ff43eec4e7339f2e3f1cfb6e77f7d20aaca99271b6"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=fasterrcnn/convnext_tiny",
+        "transforms=albumentations"
+      ],
+      "unresolved": "418f8736b28a62f8d9ca669064a879466d8e0e8fac52fbed1bb67243cfd1c205",
+      "resolved": "f55c4ab8c85ce12681484f1c46171315da412cc3824ba96d42bedc5026e05fb1"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=fasterrcnn/swin_tiny",
+        "transforms=default"
+      ],
+      "unresolved": "ac13fc35eb02292b1143baab5c2ace74ed872c9d4a7bcb70362258eaf117c85e",
+      "resolved": "4b5695426beb9e16a06deb6a503f5ec3cfcfca769df91c7f303a972be7478e99"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=fasterrcnn/swin_tiny",
+        "transforms=albumentations"
+      ],
+      "unresolved": "225634955abd5b902f7a01496eb2b66cfba38ef1a94676068d4ebb373130c82d",
+      "resolved": "8ab74e01204155c6a5cabe0ad95548e54df601e4260b91d808ca01f6e58e03a5"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=fasterrcnn/dinov2_small",
+        "transforms=default"
+      ],
+      "unresolved": "ec94ed14aabe2cde6aff7990c9b06c0a6b7c4d279360add844a9cba9d50d4e7c",
+      "resolved": "e8cecc1b2a1caa35d5d70ca223e28316a10517aeadc1977266ad64f19f3b86d3"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=fasterrcnn/dinov2_small",
+        "transforms=albumentations"
+      ],
+      "unresolved": "b599f9a67b65b9e7bfb210cf3834a23f077740811c07d8ed74749cd17d2e7640",
+      "resolved": "ae7fc171c2ed5fc7b2beef0adbd0a34ff05d333b1ba7e928416474b688f861e8"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=fasterrcnn/dinov3_small",
+        "transforms=default"
+      ],
+      "unresolved": "c4d4df01dd50d7abddb70c4b07cc911e6557606ca89a2c55653b5144c6b68266",
+      "resolved": "b1bd7d44d74ccf9b81389c848287b4541e1f828b9a74dc45e96aff31400808fc"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=fasterrcnn/dinov3_small",
+        "transforms=albumentations"
+      ],
+      "unresolved": "85ce9dc67506fa8f91e7871579e12268bcb7e9eecd3218099e301241020c600d",
+      "resolved": "a2ef01302ae6b0caea0d3c2189ec9056fad4441c4d0205e744df58bd7be60577"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=fcos/resnet50_fpn",
+        "transforms=default"
+      ],
+      "unresolved": "b4e3cc3b0d86e64890c179ac0a3396336dc7c18939282b66feffcaa237cd4cac",
+      "resolved": "deff83ab48273073f5a7c025d0daaa3e48f85daf3c6ae42a87aacfa5c7265453"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=fcos/resnet50_fpn",
+        "transforms=albumentations"
+      ],
+      "unresolved": "50d827f668f1b9059d89509db769ee860cf933280e726ec7e4d771d8224ffded",
+      "resolved": "49b9df32abf11b09e53896865aeda8d53df193811c8eeb21629d3993792df703"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=fcos/resnet101_fpn",
+        "transforms=default"
+      ],
+      "unresolved": "0b493aa0d8fa6bc80791924d9e50047b75a1403940edf280ccbd274764b1d124",
+      "resolved": "65aa4c7d91d27b6d7a9d29dbe9f48863a55fbd3f9d634f81e98411cbc8d73a13"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=fcos/resnet101_fpn",
+        "transforms=albumentations"
+      ],
+      "unresolved": "dc04ac7b733b275d6c97426311af2d3c68eb309d38e31358849f7f3feb0346bf",
+      "resolved": "a43e8556367e81a6790eba6b90972680fff5e3fc1309017185c8855cc01adbc8"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=fcos/convnext_tiny",
+        "transforms=default"
+      ],
+      "unresolved": "f211d317fdae291aba8da9031f4e3b7154c0f6aece7c742a752e5179a05b4337",
+      "resolved": "4c30281c8b098162420f1e8b89b78b437738bfb00d9496d2690fb2c2f7abd336"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=fcos/convnext_tiny",
+        "transforms=albumentations"
+      ],
+      "unresolved": "da1d7680011b31c2732ff27553afdc880fa44414fa9ffacc7f75fc74d961ed3b",
+      "resolved": "bb0240972b1b62313e6c91c5bd3c1dd0de46de2b74cc3209f36f8c2b6057ef78"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=fcos/swin_tiny",
+        "transforms=default"
+      ],
+      "unresolved": "7f427c165162c00afd6cc2f0b993631e26636b513584017038f2fe86a09c2b90",
+      "resolved": "ae5d9afeebc5b5ff36e0e7558692b9dc87e845ed239e1070e82e66294f0f3c4a"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=fcos/swin_tiny",
+        "transforms=albumentations"
+      ],
+      "unresolved": "d88a1bb79e3664f0b28541eda0d785728fa94e6a27bd1560b26c034ce36c0457",
+      "resolved": "160989fa1b0c998f1cdcc9e5271f1f610a72fe22b7770171a42f1a0ecc340714"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=fcos/dinov2_small",
+        "transforms=default"
+      ],
+      "unresolved": "45c3d7d1ba5588b94ba2438a6377624b6e71017569a755633f4eaa4153d99c24",
+      "resolved": "47c36b2f2bc1e3f3026a97dd32e0cb2e9e2fd493660de348b8556dbedcca36dd"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=fcos/dinov2_small",
+        "transforms=albumentations"
+      ],
+      "unresolved": "c7b827614858f62420b999be1939d17489734df2a972559107c0f83203ec7a29",
+      "resolved": "58e7de50c3385ef9ac5d896eade22abc8607401aa9fcff896dd15df353d3a970"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=fcos/dinov3_small",
+        "transforms=default"
+      ],
+      "unresolved": "9c24745cc035b01fafddca817ddf5f80b172608ff0d09cc4e5cae0f39fb264eb",
+      "resolved": "ca30435cb5b580692744abe9141ba688631fe2620bbc4877b72c88147e005a1f"
+    },
+    {
+      "name": "pipeline",
+      "overrides": [
+        "model=fcos/dinov3_small",
+        "transforms=albumentations"
+      ],
+      "unresolved": "dae5ef4b2c6108ac8d3bbda811435aeac2bd9e75bdfc79efba6e78d49da58baa",
+      "resolved": "4dfd45dcae59d89e936727027e33e50742dece4a99274a1ad6fd93729d58245d"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=ultralytics",
+        "transforms=default"
+      ],
+      "unresolved": "7cec9052077e0013c6f189c6de5fe23f59218e1d7135bc6175789383163e2a55",
+      "resolved": "0cf5a4286d01a57860d6059c758f0085e6a01d5afdc2aba4a8e72ac241742347"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=ultralytics",
+        "transforms=albumentations"
+      ],
+      "unresolved": "b84d6bcfcdf4061698064876d56e04ed60a4d4a88dfb5f2fbe284e31f0d86b8b",
+      "resolved": "96956e77ffe6c0088fbb0a715e8182351371a68681472441b58713f55b80d75d"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=deimv2/s",
+        "transforms=default"
+      ],
+      "unresolved": "93527ec19e987a2288f7643aebbd1e3074f8ae8806bfc87b41c68741c437b4a8",
+      "resolved": "f82f0956d506e5b0a82e9a7e8a58fe3fccadec87ff0831dfc1512774b9ae282a"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=deimv2/s",
+        "transforms=albumentations"
+      ],
+      "unresolved": "5a6054543b92a8b193ddb895949e7fce34e2e33f9df302542f297911426e54ed",
+      "resolved": "d844bf31a437f8e3e08bc018b54550af2eb0b8c334425697349461c8eb508521"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=deimv2/m",
+        "transforms=default"
+      ],
+      "unresolved": "66f578b9a8f438f20e7586a857d9e0a6f0d01050c255cc9a8618898737f06b12",
+      "resolved": "0d6d028c5395e9165d363f65b70b117257859d2bbdfaa6cd5188934021aef8aa"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=deimv2/m",
+        "transforms=albumentations"
+      ],
+      "unresolved": "d99dacef091e12c285516939c45b75a1f92b134b7364976dcd0645c1dceac7fb",
+      "resolved": "00b7b50ee8297e4a3a7c09827945d2b038e6ef71fd05eb0e023448c8e7770e66"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=deimv2/l",
+        "transforms=default"
+      ],
+      "unresolved": "c90353c0afd13d9be83e9832d495861d8ccbafda1d96df1b2a4315ada86dabab",
+      "resolved": "fb31c97b6289c47b5ba95b8a5451f529a9c3079ab827096dd57cb95ac1bbedfb"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=deimv2/l",
+        "transforms=albumentations"
+      ],
+      "unresolved": "4769c90ac7ea69f30379983d7ecdf74d53cf86bcb7e198d20dcb38f2d4003d60",
+      "resolved": "762c7728fcd1437912c6832afc5948876c5a6527a74028f5c440acd13ce5cf2b"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=deimv2/x",
+        "transforms=default"
+      ],
+      "unresolved": "bbd7d09f9ebbac275ca01fc9c3136f4b4346776918559d200eef906bc6620818",
+      "resolved": "712eb6ea8da3b5c442fb857bdf7301181e2afcfa1f59672e4e1091eebd31c8a5"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=deimv2/x",
+        "transforms=albumentations"
+      ],
+      "unresolved": "7c650fa9ec3cf652440cad2e1527093cb191d8393c1b2e7c4f0481cb9aea11f0",
+      "resolved": "caaaea23d1835dbb624f5a18b9ac11f5d3ac5b7537adde28c37855c4ca1eb5dc"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=rfdetr/nano",
+        "transforms=default"
+      ],
+      "unresolved": "7775636bf7ff3e52f1765e265dde74b5b508d47132ca3b4e3b88511420637f7b",
+      "resolved": "8c1aad706b0ebe56b449621536310c243691a9ce6e811d7a19cc34e58f1035a8"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=rfdetr/nano",
+        "transforms=albumentations"
+      ],
+      "unresolved": "2df83e2dbbecaeb4ad37976c26d3c37b0b7287c15eda8b1e3a0198ffdabc7047",
+      "resolved": "c77c1bc88f5db1dae703bb6710bf45008ad7531ebbd760d2f3242da693876246"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=rfdetr/small",
+        "transforms=default"
+      ],
+      "unresolved": "1aa497858150345f12fd4d4871b08ef686b99cc5e9eaf9741fadccff6e390413",
+      "resolved": "634851fad0a7e5001b2ca924fef6bcf8f78ae481379755c3969662749b0ca5a5"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=rfdetr/small",
+        "transforms=albumentations"
+      ],
+      "unresolved": "bbf0c2b0e3b26dc670abbc3c5df94ed080f26a55826fe80f6ff2449eba95b658",
+      "resolved": "d6a971410130865836747be2ccb6e730ca25c2156c84ac88905f2e8b7aa9180c"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=rfdetr/medium",
+        "transforms=default"
+      ],
+      "unresolved": "0215331888d3120d0929cddb9e37ca3c55bee71bbb4f876777ce4c568ad89fe0",
+      "resolved": "f0d8a1d8cf61a6e9ed7ec08fd2c51721c751cbf779c9b563682c0d886ab3bd58"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=rfdetr/medium",
+        "transforms=albumentations"
+      ],
+      "unresolved": "37f16090c6e51dd768fc0f971cc89ee1ea20800bd3e8c4f12940ba4045386d0a",
+      "resolved": "6b49daf9e16a8106e2c8807736ffb9c48fe9e8e0dbe47fb10480baca02d2b7da"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=rfdetr/large",
+        "transforms=default"
+      ],
+      "unresolved": "87726eccc441b3133e8847e040eb0277d8d50ce3ce765e7ed2eea6bd4e5a76b9",
+      "resolved": "a5f9c7af19fb4489b9d655144ac0efd962cdc59e6ab720e58dcd555b63e8aa52"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=rfdetr/large",
+        "transforms=albumentations"
+      ],
+      "unresolved": "d0cfb45ef113a26f14d84ee9732a3325a9f6201c4af63c791b434b400b7c9bcb",
+      "resolved": "7b159dc3b7e9da24c3e717c5991480463e0c138cd019696edde3978c6a8e2758"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=fasterrcnn/resnet50_fpn",
+        "transforms=default"
+      ],
+      "unresolved": "9439585dd5358364fce14f219602dc02440a37ec7bf663af75432bbff84a4c09",
+      "resolved": "b3bf95f6df333da03ddadc449b2172c1a21639ba3691a693da715968561c0212"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=fasterrcnn/resnet50_fpn",
+        "transforms=albumentations"
+      ],
+      "unresolved": "6f29bc262563abf65d8f4d84dccf2f6ac7703a4c56e87060a3bf722e8b24e0e6",
+      "resolved": "ad53ecc5eb37d0f2f4bcbd30dc0b74d2f54ff9081c4136cd9308f790628810ea"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=fasterrcnn/resnet101_fpn",
+        "transforms=default"
+      ],
+      "unresolved": "37c8ee71b32fddf3c391f0ab026eee81f171176859286bb7cd858417599cc74f",
+      "resolved": "ede0f01a04984aa6e6d35d960e02417fc56422c1856721f5ae4972177bdf632e"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=fasterrcnn/resnet101_fpn",
+        "transforms=albumentations"
+      ],
+      "unresolved": "2ecede744fac2364af22674c6056e1ea29e5de226caf4711841bfd83e32a738c",
+      "resolved": "2c70fb7af7d9defabed9f2fd2f323aa202ed6c5636283e26be2cb2e2de76855e"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=fasterrcnn/convnext_tiny",
+        "transforms=default"
+      ],
+      "unresolved": "b1c844b82df8a3976523c616fd03c738cb9b521a8a1142191c2a72ce8b549b0c",
+      "resolved": "4b31767fbfd5dbf75deb98c1afbddc52945086a03a0e1610d376f611340f0582"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=fasterrcnn/convnext_tiny",
+        "transforms=albumentations"
+      ],
+      "unresolved": "af8fbe21770c9a8e0c9feee59d8d603e05bb1fc2573a08ec389ed37787531536",
+      "resolved": "dfbc9968f703d90d5cdfa8b46d814e72b91b675f6eecafe4ac9c1d57118db5e6"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=fasterrcnn/swin_tiny",
+        "transforms=default"
+      ],
+      "unresolved": "13d1953526b9e70de497b6aaf02d06d1c220a1f19f3d944ac03c153c2f564cf7",
+      "resolved": "a5d2e4e68fc163ea71cae9cf22835fa844fd0e22b87ac10017c3ef14a604b71c"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=fasterrcnn/swin_tiny",
+        "transforms=albumentations"
+      ],
+      "unresolved": "8714d418aa47875ba2e6991e30d1fcf21318d32c4cb0b89624c1b25fe4225d9f",
+      "resolved": "cc3e7b4b8f26e1e7ff9c6be3a51876632e0aa262c896e85213b289316cc78b1a"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=fasterrcnn/dinov2_small",
+        "transforms=default"
+      ],
+      "unresolved": "180f8ad878b635f0e94ab178a7c485af8990b60da98bf07efeb8fda0c8edd3e5",
+      "resolved": "010cc66a9d6a08e52e4bd42173622e98621c6b70f1e6a1745d117922f56d1b85"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=fasterrcnn/dinov2_small",
+        "transforms=albumentations"
+      ],
+      "unresolved": "6f71b0f86eb27ebf3f4d2e83cfeaac4365409d04760bfcc6e8cbb3703b966399",
+      "resolved": "b8c9c09e1e35f18c6499799dce30c365f33d858e069eb14471c1771cb70234bc"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=fasterrcnn/dinov3_small",
+        "transforms=default"
+      ],
+      "unresolved": "598ac4512e9fcd833b344f4ffcca4f665c6e0f125af6dfb1cd8bab21778bd23a",
+      "resolved": "164347044affbe80623f30f15f0b9fb1589dc1bc1ba371bdcd10e6636f0439f6"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=fasterrcnn/dinov3_small",
+        "transforms=albumentations"
+      ],
+      "unresolved": "a6908030607a9cf42e81e2aa3b19b0b27aef078d81afc780dab0d0c1f889f644",
+      "resolved": "eec81bafa93a213dfd73527624bac3e8d1f0df62fbb68d071aef9f3291fd2f36"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=fcos/resnet50_fpn",
+        "transforms=default"
+      ],
+      "unresolved": "cc7ce77bb692d01995da4d0ef8ba590bacb60511ed358f8aa39dc9ddf2689013",
+      "resolved": "5763f7251ba9136c476e224f2f755fede5fdb903bd8a8c5d6d4781b682655904"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=fcos/resnet50_fpn",
+        "transforms=albumentations"
+      ],
+      "unresolved": "dcaeee8efe57d2a8ce19d0d21bba117efcd6c994dfa3d7411dd4be40b8289454",
+      "resolved": "763e98add874007b4f4e9cff5fa6137395cbd7450b0cb7e207449191b0bb98dc"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=fcos/resnet101_fpn",
+        "transforms=default"
+      ],
+      "unresolved": "229e4f836d993dd99a3e561ccadf81a1e65094a123c86bbf8a35896ef6fe06f0",
+      "resolved": "4be11507eafdf3c692b692d3e287f820a7aa3405c5afce092f0ad2519bad8572"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=fcos/resnet101_fpn",
+        "transforms=albumentations"
+      ],
+      "unresolved": "8e496d6f6394a116a8fc30512e7a1fa25db3088308ad14a7ed57be19fabb46ec",
+      "resolved": "abfbb6ffdf8d713e5f4eb61a8fcfa72bba1ef4af301bf1812b1b944ca109de69"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=fcos/convnext_tiny",
+        "transforms=default"
+      ],
+      "unresolved": "fee14f0c49dbc9c17175f5d081807ec79f5ff68fe73efe6518d0173cd5505c58",
+      "resolved": "6d70f3431c1f914a640dd4c156fca0750ea9d6999b7a36a25b2bb55a9fdd6b00"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=fcos/convnext_tiny",
+        "transforms=albumentations"
+      ],
+      "unresolved": "643defa17ff68a1aada6b853b4fa3420fd2c7f17837d50d39085b5002983fa50",
+      "resolved": "e99316d291a116c666dfe2cd8238406eb982627739652ecb2851e41acb5c9f3c"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=fcos/swin_tiny",
+        "transforms=default"
+      ],
+      "unresolved": "d5330c6d2a63a947fe3abc2323c37f0490cd0932e3a98c953c3cb1a00225df4b",
+      "resolved": "4e85e0a62e6374b259c09e82b51bab81abccf4a87ecc087eb8e6c8c786adcf45"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=fcos/swin_tiny",
+        "transforms=albumentations"
+      ],
+      "unresolved": "3e50d8f02f24f7edfbe7709b02aa2b495484920f74518ab2ed7f29eb223e66bb",
+      "resolved": "16ca5055b5dbc31aec1f693801f3c787f461abbac6619d4dc98fa82a2fc36feb"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=fcos/dinov2_small",
+        "transforms=default"
+      ],
+      "unresolved": "9d818b39795113e25d41e6b6be478e3acc51c31e028d8eee86c2df79e22a088e",
+      "resolved": "c349a4731e890e6a416e0d28f4fbfa8554f8874c84de82637091618e425c09e3"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=fcos/dinov2_small",
+        "transforms=albumentations"
+      ],
+      "unresolved": "28693539a5925074bfa1a3f976a5f0a8070f2d3178c39d347f3af69b92322b13",
+      "resolved": "50cd251b39d28cef47b1e2fea15f6863de0fdcc085cdb9b3b0351c2d6b5bf767"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=fcos/dinov3_small",
+        "transforms=default"
+      ],
+      "unresolved": "9af19ac2c971d401892e16a48fd70235fe790622b858d63a18edd81c420e6986",
+      "resolved": "bffcbefb8017b49b1320148de0f76668d0472e6e9da93414fc0d47c4dc2d04da"
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=fcos/dinov3_small",
+        "transforms=albumentations"
+      ],
+      "unresolved": "ee60b657ce8e89db42328e403d82d137fd5d2109fc91d7262eb16ed4118311fc",
+      "resolved": "7b30ddd4144730aa86d53fe2036916ffd6264eff23c8865654d787e78fd8f960"
+    },
+    {
+      "name": "predict",
+      "overrides": [
+        "model=ultralytics"
+      ],
+      "unresolved": "5ce071fa0310f87c5c4897a77f27808e091a76a727a404340f131769e83fc8bc",
+      "resolved": "813797be11cfbccae248bf136a484406631a2c5391591ca101a8612194f3a5e7"
+    },
+    {
+      "name": "predict",
+      "overrides": [
+        "model=deimv2/s"
+      ],
+      "unresolved": "5a5d2cb28bd0dfe8521a117c334b0c36fe00a998798e1772bc3e5570c653f8b5",
+      "resolved": "67dc4f7fb5035a5e6d9999e99adc2cd3398698a9d94130a68ace12bddc848c7d"
+    },
+    {
+      "name": "predict",
+      "overrides": [
+        "model=deimv2/m"
+      ],
+      "unresolved": "16ae62a10f7be9be4aa4cf94e9a27576f2de8b1e2d430526f65739ccc4b7b21c",
+      "resolved": "c2a040f3bccdd22f725717387a1687ed7479c200a43dff527bab2b6f4b04ca86"
+    },
+    {
+      "name": "predict",
+      "overrides": [
+        "model=deimv2/l"
+      ],
+      "unresolved": "16172fc0bd98225e766283cad63ccf51acc5e904b5f6790d1fbfef3e736fb2ac",
+      "resolved": "fff2496380eea3047a699380be8a102d5652b051da4b5d2b09cac703e5124d7f"
+    },
+    {
+      "name": "predict",
+      "overrides": [
+        "model=deimv2/x"
+      ],
+      "unresolved": "4dba3c547e4e0c642be9a8e336fb6638c917a3de04c4f1d1413ce94910edb32d",
+      "resolved": "9083af196d425a9fc652a6c9863940c3277d86a645968557c2c91c6e78b001e1"
+    },
+    {
+      "name": "predict",
+      "overrides": [
+        "model=rfdetr/nano"
+      ],
+      "unresolved": "d2e6711a4b99c12b2177ac8b0dbdc22932396155f48744640369a1ef89b0263e",
+      "resolved": "2f307e6e52fee4e89eb50f4a237ad471ae472fd55d1920158acc52f7bd7955ae"
+    },
+    {
+      "name": "predict",
+      "overrides": [
+        "model=rfdetr/small"
+      ],
+      "unresolved": "59c9f2f4cbed29d170ec2dd4502aa449ae0d19603af41fda4ab51d12e8528962",
+      "resolved": "34a663e20e5590fb40674171d89e21ee87245d119958f3fdebd581c87dc1d32a"
+    },
+    {
+      "name": "predict",
+      "overrides": [
+        "model=rfdetr/medium"
+      ],
+      "unresolved": "fe59aa4eb49f6ed1bbfafb8d21fc3243fb4eac8ef1d356a2e706965ba32e9143",
+      "resolved": "b88be01e155828c3b0d090d74e52f8259892cdf1187cea911a5ba29f27b00ba8"
+    },
+    {
+      "name": "predict",
+      "overrides": [
+        "model=rfdetr/large"
+      ],
+      "unresolved": "743893617fc6e2b7e7a87019427d9c89ab4470567ba35934fcb3e6c419866b12",
+      "resolved": "c3a89b5f331606a69ddd4126abdffbb70cc35d6e0ba401a9c9ce6558d8260b08"
+    },
+    {
+      "name": "predict",
+      "overrides": [
+        "model=fasterrcnn/resnet50_fpn"
+      ],
+      "unresolved": "2690e824182f10bf2ad09f127e11516d9525d2bf3ea9615aefd074f2f8fec786",
+      "resolved": "3547a5efbab8ca27f71e5e0eed840e868b317123e68efc9680d78153d231a643"
+    },
+    {
+      "name": "predict",
+      "overrides": [
+        "model=fasterrcnn/resnet101_fpn"
+      ],
+      "unresolved": "e574da1c04925f06c510b3a94f4073722aa83fc48e61d9d312731cf6579bd5d0",
+      "resolved": "fea26565d8bfa2455416b977fee148a37dd840d068c5b6495b9bf3758a99971e"
+    },
+    {
+      "name": "predict",
+      "overrides": [
+        "model=fasterrcnn/convnext_tiny"
+      ],
+      "unresolved": "8072d8e41f985e91ed2b572d0b3546cd1afe46cc6af3813879cf07fb9146fdfc",
+      "resolved": "f297bfba353d10dbce8c59173ca409e9e88f420b4383e8cf703db78163c7ee23"
+    },
+    {
+      "name": "predict",
+      "overrides": [
+        "model=fasterrcnn/swin_tiny"
+      ],
+      "unresolved": "249596987fa20808f971f84a858cc0f21ca18d4e4df02607b8c01edc0159691a",
+      "resolved": "3537262db71f186bfb7c87216d3340e258f5308ebf245858d662d979ad8e00ce"
+    },
+    {
+      "name": "predict",
+      "overrides": [
+        "model=fasterrcnn/dinov2_small"
+      ],
+      "unresolved": "bc1662240ada2d99ee47a18b11527468b6b9928fe1b444e3b4cad7634b5b8275",
+      "resolved": "92a0903d271e90a3c83a5910f958534c007ba9079988157b646ed490e6cbb3d4"
+    },
+    {
+      "name": "predict",
+      "overrides": [
+        "model=fasterrcnn/dinov3_small"
+      ],
+      "unresolved": "3ef70528abbb6385d92eca822452e83026839bd665cdc5296d007ecc6a64b7d2",
+      "resolved": "754ff03e3fd2a1bcd117f6321c831bda4dea30d1c6cab24d6c38b4a5017ef81f"
+    },
+    {
+      "name": "predict",
+      "overrides": [
+        "model=fcos/resnet50_fpn"
+      ],
+      "unresolved": "f6f4f4a79382d6d3f5857b679bedabc604dad3c3120f6282bc8fe7f656ad8057",
+      "resolved": "f0fd747ec60acd31ad0671f6cff1e352fa1249b1dcf4a7f81a29b625d51a3e2a"
+    },
+    {
+      "name": "predict",
+      "overrides": [
+        "model=fcos/resnet101_fpn"
+      ],
+      "unresolved": "207ac9c520f4cd49722dae54e53fd4f3d81ccc12f2d55c3058de8421513f1e92",
+      "resolved": "671cedfafc572f6c5cbdcc33613a07c69b0fce3aef5cd4b99e0f3966902f81ea"
+    },
+    {
+      "name": "predict",
+      "overrides": [
+        "model=fcos/convnext_tiny"
+      ],
+      "unresolved": "4d09513e98c6b045546b92d047befb77422a95619978afe06118c49d84a5b54d",
+      "resolved": "23c7f7685b0a4a8458a278d6e92ca7be0da55b85a425a9c3ad48a4f8ca638130"
+    },
+    {
+      "name": "predict",
+      "overrides": [
+        "model=fcos/swin_tiny"
+      ],
+      "unresolved": "b0f7dafaab1d6bc865a86ec22a63d435b0ed78cc572abe62dd426a8f95c5a250",
+      "resolved": "c1a6c852de59cc39d4ee627862122346adcf54e3f9aa3c365021f9f4c67425fe"
+    },
+    {
+      "name": "predict",
+      "overrides": [
+        "model=fcos/dinov2_small"
+      ],
+      "unresolved": "757029aebb2e3f203e66280dca5f7e47935cf885d467eb7b9400aee4da0d1959",
+      "resolved": "aae3a3113610db35b81ea43435bc87bb64c2fc00081a4a408d2a0dbfe95211c7"
+    },
+    {
+      "name": "predict",
+      "overrides": [
+        "model=fcos/dinov3_small"
+      ],
+      "unresolved": "eff21ff6d0330b539aabfffc7e0d253aef4f6edf26e0ef0823688055ffc4c531",
+      "resolved": "ec4e08f533374c2c6f43f463b2901b0d6927f7c0ab9b29710d2ab43a965cf8ed"
+    },
+    {
+      "name": "val",
+      "overrides": [
+        "model=ultralytics"
+      ],
+      "unresolved": "33c1521506f57d093f336291499b24eeede998fcc61f75317d64f7cb3b75f911",
+      "resolved": "b7d7f4ff50fc16afae538baf10fbd8ecc1d03b8ed170af33cee3c4c030a1a588"
+    },
+    {
+      "name": "val",
+      "overrides": [
+        "model=deimv2/s"
+      ],
+      "unresolved": "f9592fa41ec94f276649102a51c5cb02920048779d847d603d4a367d929a0af6",
+      "resolved": "906408cccdd86b6f0480b4bf557b87df25d9f414715d78b8676c46e86a47f9ff"
+    },
+    {
+      "name": "val",
+      "overrides": [
+        "model=deimv2/m"
+      ],
+      "unresolved": "d1b5def51a9a3940395a1ad2eb1a436247282e9752bcef99bb8a2096622ffe6c",
+      "resolved": "67a11b158dd03160d3a98463914731af7ec375ffbcdecd708a020893a9ac94af"
+    },
+    {
+      "name": "val",
+      "overrides": [
+        "model=deimv2/l"
+      ],
+      "unresolved": "5d639fe08bece6e748c22edc019f5a9fb1321e281d42a2b9dd98e38c67668c58",
+      "resolved": "4ef64c5c62ecf09350fce8d24527511be7d42add9d7380ea749777133a65ea90"
+    },
+    {
+      "name": "val",
+      "overrides": [
+        "model=deimv2/x"
+      ],
+      "unresolved": "fc0565e1bc5a148b7f6879679f38f28b2acb5d9c3f2833e77bc1015054c36bfe",
+      "resolved": "76b632b521bd5859802b98f63b0f53e4922be5da66f52154b8e6fef034d8bc70"
+    },
+    {
+      "name": "val",
+      "overrides": [
+        "model=rfdetr/nano"
+      ],
+      "unresolved": "cc3a2fc2b79e4a3a4bc22c7d8536c3fed58d901b8f1cd216c57d700f44eb158e",
+      "resolved": "5354f37ca08db687ff2caa1d45dfe07ef0875a019846b011b321d2b170be84f6"
+    },
+    {
+      "name": "val",
+      "overrides": [
+        "model=rfdetr/small"
+      ],
+      "unresolved": "275630f3700c4f611f164b70934e4d459ca3336f16bdbe8a9fbee7b5a352b342",
+      "resolved": "043b940b9044d113fb555367078c342144bd1e58a7720e2e866008b11dd13d18"
+    },
+    {
+      "name": "val",
+      "overrides": [
+        "model=rfdetr/medium"
+      ],
+      "unresolved": "94af182b65f68933a46ebd3ba0775bd31b4370aa386c1bf45b1103948076ede1",
+      "resolved": "681d73870aab52955de59cdc3777017070025907eb2c700522f1fc79953310d5"
+    },
+    {
+      "name": "val",
+      "overrides": [
+        "model=rfdetr/large"
+      ],
+      "unresolved": "0d4a3ef70df4736529f5e656b2bf811379da4a4dce679063b26e11ed7cfffd38",
+      "resolved": "28da189389f5a07d5b8b2edf5cad8b164b333873a8056cc82e97c66662e532fe"
+    },
+    {
+      "name": "val",
+      "overrides": [
+        "model=fasterrcnn/resnet50_fpn"
+      ],
+      "unresolved": "994ff824ecdb5623079252c44209a706f5609a13d9c364be5d838153fc71d251",
+      "resolved": "31b9d6e89a111b9a836c80b3ec1977b82c17a39b41897318d4a1a234ea47a1bd"
+    },
+    {
+      "name": "val",
+      "overrides": [
+        "model=fasterrcnn/resnet101_fpn"
+      ],
+      "unresolved": "430755c24ea6286c0dd0b8016838fca44c452974bf5256c2ca511d5a15d9634b",
+      "resolved": "c253c524fa9941d45ca94d62880cbde05020fdd0b46ef2d0abeaeebb0530d15f"
+    },
+    {
+      "name": "val",
+      "overrides": [
+        "model=fasterrcnn/convnext_tiny"
+      ],
+      "unresolved": "638c86238cd8873fe5aff60928713672002ee1ae03f55c5e1da9f2c7f90de482",
+      "resolved": "44dedbdee1637d6ea202a4ca126352be25bcdfb92b8c7215ac55f1c543790532"
+    },
+    {
+      "name": "val",
+      "overrides": [
+        "model=fasterrcnn/swin_tiny"
+      ],
+      "unresolved": "0218a5a0f3bf2de7df55ed6e1ca06d9a817ec0c2e45f9ee5179bbb3a1cf027b0",
+      "resolved": "836a4c562c4265fb9bd6bcd819c8110b7658b21ec763065b12c2307626d277d7"
+    },
+    {
+      "name": "val",
+      "overrides": [
+        "model=fasterrcnn/dinov2_small"
+      ],
+      "unresolved": "844b20e3419d69cd320c17ab22b8f43da7c26dd3880c25a294cb184c95042a6a",
+      "resolved": "9707d5b0ea4aeaf22fea1e8880bee6c9702ddf238ca488710cedd75a98c24fc1"
+    },
+    {
+      "name": "val",
+      "overrides": [
+        "model=fasterrcnn/dinov3_small"
+      ],
+      "unresolved": "673215639bffe2370d67769640f78a9a49fe685b51e0e24f14894cda5e4e1525",
+      "resolved": "1a42524f6fef23e9176f541b6d93c861611c865ed2d8eb32d9525d5d558d66ad"
+    },
+    {
+      "name": "val",
+      "overrides": [
+        "model=fcos/resnet50_fpn"
+      ],
+      "unresolved": "8affa98677fb8280ba8d1305bfb6dad9bbfb4e827e64a8bb99dc9be8837a68d8",
+      "resolved": "23060766c8d576c690000b41973e4aab8010a771ccddf537fee6cf44c547f431"
+    },
+    {
+      "name": "val",
+      "overrides": [
+        "model=fcos/resnet101_fpn"
+      ],
+      "unresolved": "71a14a77874c8438c9c0b15b64d1045dce2619bc5d121ce5846dd20af521981e",
+      "resolved": "92ce9c705b50419638d957a3b668f32ce8f3769ec78a194849c03ba57ee7e484"
+    },
+    {
+      "name": "val",
+      "overrides": [
+        "model=fcos/convnext_tiny"
+      ],
+      "unresolved": "3b07dfe3f186fc2a9be8697f33359edcc3e3d7e39459cfd92646a6cae4cdf160",
+      "resolved": "f52559be15d11b9b95ccea58325c2bd95e1a35d18b7f628209e0eb238a59e447"
+    },
+    {
+      "name": "val",
+      "overrides": [
+        "model=fcos/swin_tiny"
+      ],
+      "unresolved": "951a5893751f0b24e819aad43e13ddb35ca4d2198b7470a026138a6789f16f9c",
+      "resolved": "3a1b263c68a4b6c993e511d5cc46a7438e28e6fba548f27dc2d62928805cbea1"
+    },
+    {
+      "name": "val",
+      "overrides": [
+        "model=fcos/dinov2_small"
+      ],
+      "unresolved": "802d7f8ca4d68de6ea24dadd384b579e476c91631c5e35084eea249dcbd9729b",
+      "resolved": "a3cd8faae09973006ffe69772fa510d1299911c526771a2e139411effc80c6dd"
+    },
+    {
+      "name": "val",
+      "overrides": [
+        "model=fcos/dinov3_small"
+      ],
+      "unresolved": "16fa5535f33717be8ea31dbd7cc7104b445803ecae0c19f9a15066dd3f1a545a",
+      "resolved": "8ce4a2b8987f8e24c5922cc9ff49dde3fccad0574916b3e933dd1b4de2c91587"
+    },
+    {
+      "name": "metrics",
+      "overrides": [],
+      "unresolved": "71a5a0a3f0dc76c31bd712c88c493538149578ddfff6979634dd37b3a3203f91",
+      "resolved": "71a5a0a3f0dc76c31bd712c88c493538149578ddfff6979634dd37b3a3203f91"
+    },
+    {
+      "name": "report",
+      "overrides": [],
+      "unresolved": "56295761d1d8250c4f3cdae3d982460c212c534e13df4158232a564529c5a488",
+      "resolved": "56295761d1d8250c4f3cdae3d982460c212c534e13df4158232a564529c5a488"
+    },
+    {
+      "name": "compare",
+      "overrides": [
+        "model=ultralytics"
+      ],
+      "unresolved": "d76a9394fb8e84715ed3ccde4bcb7611dd4dd82790f171888c2b6b273f05744a",
+      "resolved": "9dc6b4fdfdf01b6123dd7b1e0916435c46c7595b09d35c46a00fab66ed5956f9"
+    },
+    {
+      "name": "compare",
+      "overrides": [
+        "model=deimv2/s"
+      ],
+      "unresolved": "1fa12042c27e2b70f3eb0c4768df98714f904e6d2e55ff8e5acd7ac466797ba4",
+      "resolved": "9a9253e980e0b50fb91efa397769bb673bb567e80aa55ee9536c465d791f7241"
+    },
+    {
+      "name": "compare",
+      "overrides": [
+        "model=deimv2/m"
+      ],
+      "unresolved": "c2ed1450f5cd523c61b288157aa0d0728f1ea6c516fccc3de31b010be0cea6e8",
+      "resolved": "bd45b8ab46d2dc94c25c00770bd0cb9109d130f08606c23c07c8f39455229e49"
+    },
+    {
+      "name": "compare",
+      "overrides": [
+        "model=deimv2/l"
+      ],
+      "unresolved": "d954e54ed63fe95f3f6615d076a1e2db8fcfbe50dbdf32d9ef7d748ade16409e",
+      "resolved": "ad5ddb749b714365fee97b775db5c1394e567971ec71dd70a74266d90a40af1e"
+    },
+    {
+      "name": "compare",
+      "overrides": [
+        "model=deimv2/x"
+      ],
+      "unresolved": "4c945faf1fa58cd01c6cfeb5ebc372f825b6f0fa5b418cc766d491d5b87d7d59",
+      "resolved": "fd06b8ce69cd49f67df02fce72491dfd03522b83c5da0f4a8a621b081f30e80a"
+    },
+    {
+      "name": "compare",
+      "overrides": [
+        "model=rfdetr/nano"
+      ],
+      "unresolved": "6c23b23d24a67fbd61b997a1aa636191667452679c5ec9e7ed66abc673545e73",
+      "resolved": "5005daec36a9c66424e81e09b8a23e37eab234f54db911b0e2d502c75838178d"
+    },
+    {
+      "name": "compare",
+      "overrides": [
+        "model=rfdetr/small"
+      ],
+      "unresolved": "d3c08838a07534a46f2dac24c82227202f4a61a5e616ff655b886bcfb7f28e83",
+      "resolved": "6733e43aafb91e61201cc785fe7502d700f1b603a9f0cb461e8ab0f19da3dcb5"
+    },
+    {
+      "name": "compare",
+      "overrides": [
+        "model=rfdetr/medium"
+      ],
+      "unresolved": "868ea49f0a848b63d9d568e2e76074ef9794f2d1afbe45082b8bacb6a1c0264c",
+      "resolved": "58ca770d1a53da0f019b88ac2614e3d3cac99676d7d117507bb42962f3488116"
+    },
+    {
+      "name": "compare",
+      "overrides": [
+        "model=rfdetr/large"
+      ],
+      "unresolved": "b85b606f499c6ce9bc011598793bc20d5b0a6b22298c6620c27b16fb6f3d0be5",
+      "resolved": "25c4aeab2b022c8c77c11620e0168403e49e46067d91c95ae184e94e34f54b5e"
+    },
+    {
+      "name": "compare",
+      "overrides": [
+        "model=fasterrcnn/resnet50_fpn"
+      ],
+      "unresolved": "ef087eb4652b9509110a48680bc16c955e54407395170df92f08b2eb926a21df",
+      "resolved": "98efc1740376ab87692d2a4ecc4c27ff7bf8498cb181dec7a5ea20fe518d5e36"
+    },
+    {
+      "name": "compare",
+      "overrides": [
+        "model=fasterrcnn/resnet101_fpn"
+      ],
+      "unresolved": "633bb251f8a7897666b7cb0feeb1d42bcdd3018b7937271f3a113fde6a61ae45",
+      "resolved": "31e0b371447fa73ccba84a16d5869892a769cc2a00121e2d58e0216764ff0502"
+    },
+    {
+      "name": "compare",
+      "overrides": [
+        "model=fasterrcnn/convnext_tiny"
+      ],
+      "unresolved": "b97a7d15b1f40da2ca87e80a7962ab29ab788a9044678115e6af3194737bb7a5",
+      "resolved": "07899d0200aaed77b892616b9468a9a8544c6d68de1fb882b026dae48abd3024"
+    },
+    {
+      "name": "compare",
+      "overrides": [
+        "model=fasterrcnn/swin_tiny"
+      ],
+      "unresolved": "6c1ce7a5044b73d8b127667d3268ff50a0069978b716ceccd641f1061d8f8dbb",
+      "resolved": "45224877be9ffa4e01a57ae05641c594cf267b14cb6bddce24d025db250c485e"
+    },
+    {
+      "name": "compare",
+      "overrides": [
+        "model=fasterrcnn/dinov2_small"
+      ],
+      "unresolved": "8a5b33f63b30f86007116ea6a094daf16090f12fb9cc321032e605777119258b",
+      "resolved": "71f1c3f9e29fa5828b05e0ddae2b3fd2401f1d1da2b1523469b74dcd5fea9c3f"
+    },
+    {
+      "name": "compare",
+      "overrides": [
+        "model=fasterrcnn/dinov3_small"
+      ],
+      "unresolved": "4bb3c3e993bf3ccae2b754f48638c09f28356645c42db1732cdd4c370e2a5428",
+      "resolved": "d8b93d744e9b9355f3c715848a0217192ab9c488ed7e7015fc7810dcf986b5bd"
+    },
+    {
+      "name": "compare",
+      "overrides": [
+        "model=fcos/resnet50_fpn"
+      ],
+      "unresolved": "188d650d7e087321ea836f5acb3707797c4d810f48519b5c5aef311bca08276b",
+      "resolved": "550b63b40bb0fe0dc89ad9d3a63586bbf0113dcd055eaa2206a0729ec57d0360"
+    },
+    {
+      "name": "compare",
+      "overrides": [
+        "model=fcos/resnet101_fpn"
+      ],
+      "unresolved": "2bc7eaaef654bf96693d16fb1162c9c88d98eea89fb2bb0c9c4fbd59507ec75c",
+      "resolved": "ebb18e1e0f2ac03cc23674bbc8c02a0112fd9ebae63783543c2583f468326b35"
+    },
+    {
+      "name": "compare",
+      "overrides": [
+        "model=fcos/convnext_tiny"
+      ],
+      "unresolved": "234767c43ac35fab8971a9c63bd85d2dc7381128a8d9b8830eb32e61725a52aa",
+      "resolved": "fc665d2a32707b75eb4813e33c71e8658b79eb203086cd87ef6eed378d5e32ac"
+    },
+    {
+      "name": "compare",
+      "overrides": [
+        "model=fcos/swin_tiny"
+      ],
+      "unresolved": "74ebff770ec92e1bb3e82cc95f3a10a276d15b67e7060ce94970f4f4a6d1217f",
+      "resolved": "729953d94cb08a422b18889a96507333f59b52d54d3dfeca9e3d61f44f648837"
+    },
+    {
+      "name": "compare",
+      "overrides": [
+        "model=fcos/dinov2_small"
+      ],
+      "unresolved": "cd1b7cfdac68dd229022345a337981f637db941a71cad17006f9a564d4e8fd4e",
+      "resolved": "397109636cf0c29a9bb848da4186e5ec3de769eacbe3dfbc5508d72f08eed367"
+    },
+    {
+      "name": "compare",
+      "overrides": [
+        "model=fcos/dinov3_small"
+      ],
+      "unresolved": "b1055c2c95f6a7bafff9cfbe90fc3423936aa17a4a64f7f37ba02b7c455266d4",
+      "resolved": "607d2ff867f98b6d4a8e736a16f78a18c78ff4c842fc4b9d9fed6f9d8fc3d8e1"
+    },
+    {
+      "name": "ground_truth",
+      "overrides": [],
+      "unresolved": "60ec8833672f2619a3a086776a84bb6edc4630bd118ea78577c5f318fe91e647",
+      "resolved": "60ec8833672f2619a3a086776a84bb6edc4630bd118ea78577c5f318fe91e647"
+    },
+    {
+      "name": "export",
+      "overrides": [
+        "model=fasterrcnn/resnet50_fpn"
+      ],
+      "unresolved": "2a6a75a66914210b8f17bdb6d70898079464ef7529c0f9f7b000d9efb8b7aecb",
+      "resolved": "2a6a75a66914210b8f17bdb6d70898079464ef7529c0f9f7b000d9efb8b7aecb"
+    },
+    {
+      "name": "export",
+      "overrides": [
+        "model=fasterrcnn/resnet101_fpn"
+      ],
+      "unresolved": "4e12644249b93a39bc8a864bb71c19cf9c4cf051731e1f37f432839d82d16e40",
+      "resolved": "4e12644249b93a39bc8a864bb71c19cf9c4cf051731e1f37f432839d82d16e40"
+    },
+    {
+      "name": "export",
+      "overrides": [
+        "model=fasterrcnn/convnext_tiny"
+      ],
+      "unresolved": "ba986e6fd2c36eac40b36ecdb683134798da86c5923699306ea86b9f76ae3c7c",
+      "resolved": "ba986e6fd2c36eac40b36ecdb683134798da86c5923699306ea86b9f76ae3c7c"
+    },
+    {
+      "name": "export",
+      "overrides": [
+        "model=fasterrcnn/swin_tiny"
+      ],
+      "unresolved": "8aa0333d4ef435793f7b311a71ead2e3d54da249e257dc9a6c8ab5f85c221158",
+      "resolved": "8aa0333d4ef435793f7b311a71ead2e3d54da249e257dc9a6c8ab5f85c221158"
+    },
+    {
+      "name": "export",
+      "overrides": [
+        "model=fasterrcnn/dinov2_small"
+      ],
+      "unresolved": "cebe6c2f9e5b02e9120e2881386706618cde39fe4c720cde0fa702291331638d",
+      "resolved": "cebe6c2f9e5b02e9120e2881386706618cde39fe4c720cde0fa702291331638d"
+    },
+    {
+      "name": "export",
+      "overrides": [
+        "model=fasterrcnn/dinov3_small"
+      ],
+      "unresolved": "e6136774364f6684f21c6a95c558afc45e18d796a92a0b8d27b8e374aa2d6815",
+      "resolved": "e6136774364f6684f21c6a95c558afc45e18d796a92a0b8d27b8e374aa2d6815"
+    }
+  ],
+  "representatives": [
+    {
+      "name": "pipeline",
+      "overrides": [
+        "ground_truth=truth.csv",
+        "skip_train=perhaps",
+        "clearml.tags=3"
+      ],
+      "values": {
+        "model": {
+          "backend": "ultralytics",
+          "preset": "default",
+          "source_dir": null,
+          "train": {
+            "device": null,
+            "epochs": 100,
+            "batch": 4,
+            "imgsz": 640,
+            "workers": 4,
+            "lr": 0.0001,
+            "weight_decay": 0.0001,
+            "seed": 0,
+            "pretrained": true,
+            "weights": null,
+            "backbone_weights": null,
+            "amp": true,
+            "grad_accum_steps": 1,
+            "use_ema": true,
+            "augmentation": null
+          },
+          "predict": {
+            "device": null,
+            "batch": 1,
+            "imgsz": null,
+            "conf": 0.001,
+            "iou": 0.7,
+            "max_det": 300,
+            "half": false
+          }
+        },
+        "ultralytics": {
+          "task": "detect",
+          "mode": "train",
+          "model": "yolo11n.pt",
+          "data": null,
+          "epochs": 100,
+          "time": null,
+          "patience": 100,
+          "batch": 16,
+          "imgsz": 960,
+          "save": true,
+          "save_period": -1,
+          "cache": false,
+          "device": null,
+          "workers": 8,
+          "project": null,
+          "name": null,
+          "exist_ok": false,
+          "pretrained": true,
+          "cls_remap": true,
+          "optimizer": "auto",
+          "verbose": true,
+          "seed": 0,
+          "deterministic": true,
+          "single_cls": false,
+          "rect": false,
+          "cos_lr": false,
+          "close_mosaic": 10,
+          "resume": false,
+          "amp": true,
+          "fraction": 1.0,
+          "profile": false,
+          "freeze": null,
+          "multi_scale": 0.0,
+          "compile": true,
+          "channels_last": null,
+          "val": true,
+          "split": "val",
+          "save_json": false,
+          "conf": null,
+          "iou": 0.7,
+          "max_det": 300,
+          "quantize": null,
+          "plots": true,
+          "nms": true,
+          "visualize": false,
+          "augment": false,
+          "agnostic_nms": false,
+          "classes": null,
+          "save_txt": false,
+          "save_conf": false,
+          "show_labels": true,
+          "show_conf": true,
+          "lr0": 0.01,
+          "lrf": 0.01,
+          "momentum": 0.937,
+          "weight_decay": 0.0005,
+          "warmup_epochs": 3.0,
+          "warmup_momentum": 0.8,
+          "warmup_bias_lr": 0.1,
+          "distill_model": null,
+          "dis": 6.0,
+          "box": 7.5,
+          "cls": 0.5,
+          "cls_pw": 0.0,
+          "dfl": 1.5,
+          "nbs": 64,
+          "hsv_h": 0.015,
+          "hsv_s": 0.7,
+          "hsv_v": 0.4,
+          "degrees": 0.0,
+          "translate": 0.1,
+          "scale": 0.5,
+          "shear": 0.0,
+          "perspective": 0.0,
+          "flipud": 0.0,
+          "fliplr": 0.5,
+          "bgr": 0.0,
+          "mosaic": 1.0,
+          "mixup": 0.0,
+          "cutmix": 0.0
+        },
+        "ultralytics_predict": {
+          "task": "${ultralytics.task}",
+          "mode": "predict",
+          "model": null,
+          "data": "${ultralytics.data}",
+          "batch": 1,
+          "imgsz": "${ultralytics.imgsz}",
+          "save": false,
+          "device": [
+            -1
+          ],
+          "project": null,
+          "name": null,
+          "exist_ok": "${ultralytics.exist_ok}",
+          "verbose": false,
+          "rect": true,
+          "compile": "${ultralytics.compile}",
+          "channels_last": "${ultralytics.channels_last}",
+          "conf": 0.001,
+          "iou": "${ultralytics.iou}",
+          "max_det": "${ultralytics.max_det}",
+          "quantize": "${ultralytics.quantize}",
+          "dnn": false,
+          "nms": "${ultralytics.nms}",
+          "source": null,
+          "visualize": "${ultralytics.visualize}",
+          "augment": "${ultralytics.augment}",
+          "agnostic_nms": "${ultralytics.agnostic_nms}",
+          "classes": "${ultralytics.classes}",
+          "show": false,
+          "save_txt": "${ultralytics.save_txt}",
+          "save_conf": "${ultralytics.save_conf}",
+          "save_crop": false,
+          "show_labels": "${ultralytics.show_labels}",
+          "show_conf": "${ultralytics.show_conf}",
+          "show_boxes": true,
+          "line_width": null
+        },
+        "transforms": {
+          "mode": "native",
+          "pipeline_file": null,
+          "snapshot": null
+        },
+        "metrics": {
+          "evaluation": {
+            "_target_": "clearml_yolo.core.evaluation.models.EvaluationConfig",
+            "iou_threshold": 0.5,
+            "matching_strategy": "iou_prior",
+            "ap_method": "interp",
+            "confidence_optimization": "per_class",
+            "skip_cohen_kappa": true,
+            "preprocess": false,
+            "preprocess_preds_conf_threshold": null,
+            "preprocess_preds_nms_containment_threshold": null,
+            "preprocess_preds_nms_iou_threshold": null,
+            "backend": null
+          },
+          "calibration_split": "val"
+        },
+        "compare": {
+          "baseline_model": {
+            "_target_": "clearml_yolo.application.contracts.ModelRef",
+            "source": "clearml",
+            "task_id": null,
+            "project_name": null,
+            "task_name": null,
+            "tags": [
+              "prod"
+            ],
+            "weights": null,
+            "thresholds": null,
+            "label": null,
+            "backend": null,
+            "preset": null,
+            "source_dir": null,
+            "class_names": null,
+            "preprocessing": null
+          },
+          "q": 0.05,
+          "bootstrap_iterations": 10000,
+          "seed": 0
+        },
+        "report": {
+          "report_config_path": null
+        },
+        "clearml": {
+          "_target_": "clearml_yolo.application.contracts.ClearMLConfig",
+          "project_name": "clearml-yolo",
+          "task_name": "yolo-run",
+          "task_type": "training",
+          "tags": 3,
+          "output_uri": true
+        },
+        "ground_truth": "truth.csv",
+        "splits": [
+          "train",
+          "val",
+          "test"
+        ],
+        "dataset_format": "ndjson",
+        "dataset_cache_dir": null,
+        "weights": null,
+        "model_label": null,
+        "run_id": null,
+        "run_dir": null,
+        "skip_train": "perhaps",
+        "skip_predict": false,
+        "skip_metrics": false,
+        "skip_report": false,
+        "skip_compare": false,
+        "fiftyone": {
+          "_target_": "clearml_yolo.core.publication.FiftyOneConfig",
+          "enabled": true,
+          "preflight_timeout_seconds": 60.0,
+          "publish_timeout_seconds": 900.0,
+          "lock_timeout_seconds": 30.0,
+          "dataset_prefix": "clearml-yolo"
+        }
+      }
+    },
+    {
+      "name": "predict",
+      "overrides": [
+        "ground_truth={dataset_id:demo}",
+        "splits=null",
+        "ultralytics_predict.imgsz=[640,960]"
+      ],
+      "values": {
+        "model": {
+          "backend": "ultralytics",
+          "preset": "default",
+          "source_dir": null,
+          "train": {
+            "device": null,
+            "epochs": 100,
+            "batch": 4,
+            "imgsz": 640,
+            "workers": 4,
+            "lr": 0.0001,
+            "weight_decay": 0.0001,
+            "seed": 0,
+            "pretrained": true,
+            "weights": null,
+            "backbone_weights": null,
+            "amp": true,
+            "grad_accum_steps": 1,
+            "use_ema": true,
+            "augmentation": null
+          },
+          "predict": {
+            "device": null,
+            "batch": 1,
+            "imgsz": null,
+            "conf": 0.001,
+            "iou": 0.7,
+            "max_det": 300,
+            "half": false
+          }
+        },
+        "ultralytics": {
+          "task": "detect",
+          "mode": "train",
+          "model": "yolo11n.pt",
+          "data": null,
+          "epochs": 100,
+          "time": null,
+          "patience": 100,
+          "batch": 16,
+          "imgsz": 960,
+          "save": true,
+          "save_period": -1,
+          "cache": false,
+          "device": null,
+          "workers": 8,
+          "project": null,
+          "name": null,
+          "exist_ok": false,
+          "pretrained": true,
+          "cls_remap": true,
+          "optimizer": "auto",
+          "verbose": true,
+          "seed": 0,
+          "deterministic": true,
+          "single_cls": false,
+          "rect": false,
+          "cos_lr": false,
+          "close_mosaic": 10,
+          "resume": false,
+          "amp": true,
+          "fraction": 1.0,
+          "profile": false,
+          "freeze": null,
+          "multi_scale": 0.0,
+          "compile": true,
+          "channels_last": null,
+          "val": true,
+          "split": "val",
+          "save_json": false,
+          "conf": null,
+          "iou": 0.7,
+          "max_det": 300,
+          "quantize": null,
+          "plots": true,
+          "nms": true,
+          "visualize": false,
+          "augment": false,
+          "agnostic_nms": false,
+          "classes": null,
+          "save_txt": false,
+          "save_conf": false,
+          "show_labels": true,
+          "show_conf": true,
+          "lr0": 0.01,
+          "lrf": 0.01,
+          "momentum": 0.937,
+          "weight_decay": 0.0005,
+          "warmup_epochs": 3.0,
+          "warmup_momentum": 0.8,
+          "warmup_bias_lr": 0.1,
+          "distill_model": null,
+          "dis": 6.0,
+          "box": 7.5,
+          "cls": 0.5,
+          "cls_pw": 0.0,
+          "dfl": 1.5,
+          "nbs": 64,
+          "hsv_h": 0.015,
+          "hsv_s": 0.7,
+          "hsv_v": 0.4,
+          "degrees": 0.0,
+          "translate": 0.1,
+          "scale": 0.5,
+          "shear": 0.0,
+          "perspective": 0.0,
+          "flipud": 0.0,
+          "fliplr": 0.5,
+          "bgr": 0.0,
+          "mosaic": 1.0,
+          "mixup": 0.0,
+          "cutmix": 0.0
+        },
+        "ultralytics_predict": {
+          "task": "${ultralytics.task}",
+          "mode": "predict",
+          "model": null,
+          "data": "${ultralytics.data}",
+          "batch": 1,
+          "imgsz": [
+            640,
+            960
+          ],
+          "save": false,
+          "device": [
+            -1
+          ],
+          "project": null,
+          "name": null,
+          "exist_ok": "${ultralytics.exist_ok}",
+          "verbose": false,
+          "rect": true,
+          "compile": "${ultralytics.compile}",
+          "channels_last": "${ultralytics.channels_last}",
+          "conf": 0.001,
+          "iou": "${ultralytics.iou}",
+          "max_det": "${ultralytics.max_det}",
+          "quantize": "${ultralytics.quantize}",
+          "dnn": false,
+          "nms": "${ultralytics.nms}",
+          "source": null,
+          "visualize": "${ultralytics.visualize}",
+          "augment": "${ultralytics.augment}",
+          "agnostic_nms": "${ultralytics.agnostic_nms}",
+          "classes": "${ultralytics.classes}",
+          "show": false,
+          "save_txt": "${ultralytics.save_txt}",
+          "save_conf": "${ultralytics.save_conf}",
+          "save_crop": false,
+          "show_labels": "${ultralytics.show_labels}",
+          "show_conf": "${ultralytics.show_conf}",
+          "show_boxes": true,
+          "line_width": null
+        },
+        "weights": null,
+        "model_label": null,
+        "ground_truth": {
+          "dataset_id": "demo"
+        },
+        "output": null,
+        "splits": null,
+        "image_name": "name",
+        "clearml": {
+          "_target_": "clearml_yolo.application.contracts.ClearMLConfig",
+          "project_name": "clearml-yolo",
+          "task_name": "yolo-run",
+          "task_type": "training",
+          "tags": [],
+          "output_uri": true
+        },
+        "fiftyone": {
+          "_target_": "clearml_yolo.core.publication.FiftyOneConfig",
+          "enabled": true,
+          "preflight_timeout_seconds": 60.0,
+          "publish_timeout_seconds": 900.0,
+          "lock_timeout_seconds": 30.0,
+          "dataset_prefix": "clearml-yolo"
+        }
+      }
+    },
+    {
+      "name": "compare",
+      "overrides": [
+        "baseline_model.source=local",
+        "baseline_model.weights=model.pt",
+        "+baseline_model.thresholds.cat=0.4",
+        "inference.reuse_existing=false"
+      ],
+      "values": {
+        "baseline_model": {
+          "_target_": "clearml_yolo.application.contracts.ModelRef",
+          "source": "local",
+          "task_id": null,
+          "project_name": null,
+          "task_name": null,
+          "tags": [
+            "prod"
+          ],
+          "weights": "model.pt",
+          "thresholds": {
+            "cat": 0.4
+          },
+          "label": null,
+          "backend": null,
+          "preset": null,
+          "source_dir": null,
+          "class_names": null,
+          "preprocessing": null
+        },
+        "candidate_model": {
+          "_target_": "clearml_yolo.application.contracts.ModelRef",
+          "source": "clearml",
+          "task_id": null,
+          "project_name": null,
+          "task_name": null,
+          "tags": [
+            "prod"
+          ],
+          "weights": null,
+          "thresholds": null,
+          "label": null,
+          "backend": null,
+          "preset": null,
+          "source_dir": null,
+          "class_names": null,
+          "preprocessing": null
+        },
+        "ground_truth": "???",
+        "output_dir": null,
+        "split": "test",
+        "model": {
+          "backend": "ultralytics",
+          "preset": "default",
+          "source_dir": null,
+          "train": {
+            "device": null,
+            "epochs": 100,
+            "batch": 4,
+            "imgsz": 640,
+            "workers": 4,
+            "lr": 0.0001,
+            "weight_decay": 0.0001,
+            "seed": 0,
+            "pretrained": true,
+            "weights": null,
+            "backbone_weights": null,
+            "amp": true,
+            "grad_accum_steps": 1,
+            "use_ema": true,
+            "augmentation": null
+          },
+          "predict": {
+            "device": null,
+            "batch": 1,
+            "imgsz": null,
+            "conf": 0.001,
+            "iou": 0.7,
+            "max_det": 300,
+            "half": false
+          }
+        },
+        "ultralytics": {
+          "task": "detect",
+          "mode": "train",
+          "model": "yolo11n.pt",
+          "data": null,
+          "epochs": 100,
+          "time": null,
+          "patience": 100,
+          "batch": 16,
+          "imgsz": 960,
+          "save": true,
+          "save_period": -1,
+          "cache": false,
+          "device": null,
+          "workers": 8,
+          "project": null,
+          "name": null,
+          "exist_ok": false,
+          "pretrained": true,
+          "cls_remap": true,
+          "optimizer": "auto",
+          "verbose": true,
+          "seed": 0,
+          "deterministic": true,
+          "single_cls": false,
+          "rect": false,
+          "cos_lr": false,
+          "close_mosaic": 10,
+          "resume": false,
+          "amp": true,
+          "fraction": 1.0,
+          "profile": false,
+          "freeze": null,
+          "multi_scale": 0.0,
+          "compile": true,
+          "channels_last": null,
+          "val": true,
+          "split": "val",
+          "save_json": false,
+          "conf": null,
+          "iou": 0.7,
+          "max_det": 300,
+          "quantize": null,
+          "plots": true,
+          "nms": true,
+          "visualize": false,
+          "augment": false,
+          "agnostic_nms": false,
+          "classes": null,
+          "save_txt": false,
+          "save_conf": false,
+          "show_labels": true,
+          "show_conf": true,
+          "lr0": 0.01,
+          "lrf": 0.01,
+          "momentum": 0.937,
+          "weight_decay": 0.0005,
+          "warmup_epochs": 3.0,
+          "warmup_momentum": 0.8,
+          "warmup_bias_lr": 0.1,
+          "distill_model": null,
+          "dis": 6.0,
+          "box": 7.5,
+          "cls": 0.5,
+          "cls_pw": 0.0,
+          "dfl": 1.5,
+          "nbs": 64,
+          "hsv_h": 0.015,
+          "hsv_s": 0.7,
+          "hsv_v": 0.4,
+          "degrees": 0.0,
+          "translate": 0.1,
+          "scale": 0.5,
+          "shear": 0.0,
+          "perspective": 0.0,
+          "flipud": 0.0,
+          "fliplr": 0.5,
+          "bgr": 0.0,
+          "mosaic": 1.0,
+          "mixup": 0.0,
+          "cutmix": 0.0
+        },
+        "ultralytics_predict": {
+          "task": "${ultralytics.task}",
+          "mode": "predict",
+          "model": null,
+          "data": "${ultralytics.data}",
+          "batch": 1,
+          "imgsz": "${ultralytics.imgsz}",
+          "save": false,
+          "device": [
+            -1
+          ],
+          "project": null,
+          "name": null,
+          "exist_ok": "${ultralytics.exist_ok}",
+          "verbose": false,
+          "rect": true,
+          "compile": "${ultralytics.compile}",
+          "channels_last": "${ultralytics.channels_last}",
+          "conf": 0.001,
+          "iou": "${ultralytics.iou}",
+          "max_det": "${ultralytics.max_det}",
+          "quantize": "${ultralytics.quantize}",
+          "dnn": false,
+          "nms": "${ultralytics.nms}",
+          "source": null,
+          "visualize": "${ultralytics.visualize}",
+          "augment": "${ultralytics.augment}",
+          "agnostic_nms": "${ultralytics.agnostic_nms}",
+          "classes": "${ultralytics.classes}",
+          "show": false,
+          "save_txt": "${ultralytics.save_txt}",
+          "save_conf": "${ultralytics.save_conf}",
+          "save_crop": false,
+          "show_labels": "${ultralytics.show_labels}",
+          "show_conf": "${ultralytics.show_conf}",
+          "show_boxes": true,
+          "line_width": null
+        },
+        "inference": {
+          "reuse_existing": false,
+          "image_name": "name"
+        },
+        "q": 0.05,
+        "bootstrap_iterations": 10000,
+        "seed": 0,
+        "evaluation": {
+          "_target_": "clearml_yolo.core.evaluation.models.EvaluationConfig",
+          "iou_threshold": 0.5,
+          "matching_strategy": "iou_prior",
+          "ap_method": "interp",
+          "confidence_optimization": "per_class",
+          "skip_cohen_kappa": true,
+          "preprocess": false,
+          "preprocess_preds_conf_threshold": null,
+          "preprocess_preds_nms_containment_threshold": null,
+          "preprocess_preds_nms_iou_threshold": null,
+          "backend": null
+        },
+        "clearml": {
+          "_target_": "clearml_yolo.application.contracts.ClearMLConfig",
+          "project_name": "clearml-yolo",
+          "task_name": "yolo-run",
+          "task_type": "training",
+          "tags": [],
+          "output_uri": true
+        }
+      }
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "ground_truth=truth.csv",
+        "+model.train.extra_setting=true",
+        "ultralytics.batch=null"
+      ],
+      "values": {
+        "model": {
+          "backend": "ultralytics",
+          "preset": "default",
+          "source_dir": null,
+          "train": {
+            "device": null,
+            "epochs": 100,
+            "batch": 4,
+            "imgsz": 640,
+            "workers": 4,
+            "lr": 0.0001,
+            "weight_decay": 0.0001,
+            "seed": 0,
+            "pretrained": true,
+            "weights": null,
+            "backbone_weights": null,
+            "amp": true,
+            "grad_accum_steps": 1,
+            "use_ema": true,
+            "augmentation": null,
+            "extra_setting": true
+          },
+          "predict": {
+            "device": null,
+            "batch": 1,
+            "imgsz": null,
+            "conf": 0.001,
+            "iou": 0.7,
+            "max_det": 300,
+            "half": false
+          }
+        },
+        "ultralytics": {
+          "task": "detect",
+          "mode": "train",
+          "model": "yolo11n.pt",
+          "data": null,
+          "epochs": 100,
+          "time": null,
+          "patience": 100,
+          "batch": null,
+          "imgsz": 960,
+          "save": true,
+          "save_period": -1,
+          "cache": false,
+          "device": null,
+          "workers": 8,
+          "project": null,
+          "name": null,
+          "exist_ok": false,
+          "pretrained": true,
+          "cls_remap": true,
+          "optimizer": "auto",
+          "verbose": true,
+          "seed": 0,
+          "deterministic": true,
+          "single_cls": false,
+          "rect": false,
+          "cos_lr": false,
+          "close_mosaic": 10,
+          "resume": false,
+          "amp": true,
+          "fraction": 1.0,
+          "profile": false,
+          "freeze": null,
+          "multi_scale": 0.0,
+          "compile": true,
+          "channels_last": null,
+          "val": true,
+          "split": "val",
+          "save_json": false,
+          "conf": null,
+          "iou": 0.7,
+          "max_det": 300,
+          "quantize": null,
+          "plots": true,
+          "nms": true,
+          "visualize": false,
+          "augment": false,
+          "agnostic_nms": false,
+          "classes": null,
+          "save_txt": false,
+          "save_conf": false,
+          "show_labels": true,
+          "show_conf": true,
+          "lr0": 0.01,
+          "lrf": 0.01,
+          "momentum": 0.937,
+          "weight_decay": 0.0005,
+          "warmup_epochs": 3.0,
+          "warmup_momentum": 0.8,
+          "warmup_bias_lr": 0.1,
+          "distill_model": null,
+          "dis": 6.0,
+          "box": 7.5,
+          "cls": 0.5,
+          "cls_pw": 0.0,
+          "dfl": 1.5,
+          "nbs": 64,
+          "hsv_h": 0.015,
+          "hsv_s": 0.7,
+          "hsv_v": 0.4,
+          "degrees": 0.0,
+          "translate": 0.1,
+          "scale": 0.5,
+          "shear": 0.0,
+          "perspective": 0.0,
+          "flipud": 0.0,
+          "fliplr": 0.5,
+          "bgr": 0.0,
+          "mosaic": 1.0,
+          "mixup": 0.0,
+          "cutmix": 0.0
+        },
+        "ultralytics_predict": {
+          "task": "${ultralytics.task}",
+          "mode": "predict",
+          "model": null,
+          "data": "${ultralytics.data}",
+          "batch": 1,
+          "imgsz": "${ultralytics.imgsz}",
+          "save": false,
+          "device": [
+            -1
+          ],
+          "project": null,
+          "name": null,
+          "exist_ok": "${ultralytics.exist_ok}",
+          "verbose": false,
+          "rect": true,
+          "compile": "${ultralytics.compile}",
+          "channels_last": "${ultralytics.channels_last}",
+          "conf": 0.001,
+          "iou": "${ultralytics.iou}",
+          "max_det": "${ultralytics.max_det}",
+          "quantize": "${ultralytics.quantize}",
+          "dnn": false,
+          "nms": "${ultralytics.nms}",
+          "source": null,
+          "visualize": "${ultralytics.visualize}",
+          "augment": "${ultralytics.augment}",
+          "agnostic_nms": "${ultralytics.agnostic_nms}",
+          "classes": "${ultralytics.classes}",
+          "show": false,
+          "save_txt": "${ultralytics.save_txt}",
+          "save_conf": "${ultralytics.save_conf}",
+          "save_crop": false,
+          "show_labels": "${ultralytics.show_labels}",
+          "show_conf": "${ultralytics.show_conf}",
+          "show_boxes": true,
+          "line_width": null
+        },
+        "transforms": {
+          "mode": "native",
+          "pipeline_file": null,
+          "snapshot": null
+        },
+        "clearml": {
+          "_target_": "clearml_yolo.application.contracts.ClearMLConfig",
+          "project_name": "clearml-yolo",
+          "task_name": "yolo-run",
+          "task_type": "training",
+          "tags": [],
+          "output_uri": true
+        },
+        "ground_truth": "truth.csv",
+        "dataset_format": "ndjson",
+        "dataset_cache_dir": null,
+        "required_splits": null
+      }
+    },
+    {
+      "name": "train",
+      "overrides": [
+        "model=rfdetr/small",
+        "model.train.imgsz=64",
+        "transforms=albumentations",
+        "transforms.pipeline_file=custom.yaml"
+      ],
+      "values": {
+        "model": {
+          "backend": "rfdetr",
+          "preset": "small",
+          "source_dir": null,
+          "train": {
+            "device": null,
+            "epochs": 100,
+            "batch": 4,
+            "imgsz": 64,
+            "workers": 4,
+            "lr": 0.0001,
+            "weight_decay": 0.0001,
+            "seed": 0,
+            "pretrained": true,
+            "weights": null,
+            "backbone_weights": null,
+            "amp": true,
+            "grad_accum_steps": 1,
+            "use_ema": true,
+            "augmentation": {
+              "aug_config": {},
+              "augmentation_backend": "torchvision",
+              "scale_jitter": false,
+              "multi_scale": "off"
+            }
+          },
+          "predict": {
+            "device": null,
+            "batch": 1,
+            "imgsz": null,
+            "conf": 0.001,
+            "iou": 0.7,
+            "max_det": 300,
+            "half": false
+          }
+        },
+        "ultralytics": {
+          "task": "detect",
+          "mode": "train",
+          "model": "yolo11n.pt",
+          "data": null,
+          "epochs": 100,
+          "time": null,
+          "patience": 100,
+          "batch": 16,
+          "imgsz": 960,
+          "save": true,
+          "save_period": -1,
+          "cache": false,
+          "device": null,
+          "workers": 8,
+          "project": null,
+          "name": null,
+          "exist_ok": false,
+          "pretrained": true,
+          "cls_remap": true,
+          "optimizer": "auto",
+          "verbose": true,
+          "seed": 0,
+          "deterministic": true,
+          "single_cls": false,
+          "rect": false,
+          "cos_lr": false,
+          "close_mosaic": 10,
+          "resume": false,
+          "amp": true,
+          "fraction": 1.0,
+          "profile": false,
+          "freeze": null,
+          "multi_scale": 0.0,
+          "compile": true,
+          "channels_last": null,
+          "val": true,
+          "split": "val",
+          "save_json": false,
+          "conf": null,
+          "iou": 0.7,
+          "max_det": 300,
+          "quantize": null,
+          "plots": true,
+          "nms": true,
+          "visualize": false,
+          "augment": false,
+          "agnostic_nms": false,
+          "classes": null,
+          "save_txt": false,
+          "save_conf": false,
+          "show_labels": true,
+          "show_conf": true,
+          "lr0": 0.01,
+          "lrf": 0.01,
+          "momentum": 0.937,
+          "weight_decay": 0.0005,
+          "warmup_epochs": 3.0,
+          "warmup_momentum": 0.8,
+          "warmup_bias_lr": 0.1,
+          "distill_model": null,
+          "dis": 6.0,
+          "box": 7.5,
+          "cls": 0.5,
+          "cls_pw": 0.0,
+          "dfl": 1.5,
+          "nbs": 64,
+          "hsv_h": 0.015,
+          "hsv_s": 0.7,
+          "hsv_v": 0.4,
+          "degrees": 0.0,
+          "translate": 0.1,
+          "scale": 0.5,
+          "shear": 0.0,
+          "perspective": 0.0,
+          "flipud": 0.0,
+          "fliplr": 0.5,
+          "bgr": 0.0,
+          "mosaic": 1.0,
+          "mixup": 0.0,
+          "cutmix": 0.0
+        },
+        "ultralytics_predict": {
+          "task": "${ultralytics.task}",
+          "mode": "predict",
+          "model": null,
+          "data": "${ultralytics.data}",
+          "batch": 1,
+          "imgsz": "${ultralytics.imgsz}",
+          "save": false,
+          "device": [
+            -1
+          ],
+          "project": null,
+          "name": null,
+          "exist_ok": "${ultralytics.exist_ok}",
+          "verbose": false,
+          "rect": true,
+          "compile": "${ultralytics.compile}",
+          "channels_last": "${ultralytics.channels_last}",
+          "conf": 0.001,
+          "iou": "${ultralytics.iou}",
+          "max_det": "${ultralytics.max_det}",
+          "quantize": "${ultralytics.quantize}",
+          "dnn": false,
+          "nms": "${ultralytics.nms}",
+          "source": null,
+          "visualize": "${ultralytics.visualize}",
+          "augment": "${ultralytics.augment}",
+          "agnostic_nms": "${ultralytics.agnostic_nms}",
+          "classes": "${ultralytics.classes}",
+          "show": false,
+          "save_txt": "${ultralytics.save_txt}",
+          "save_conf": "${ultralytics.save_conf}",
+          "save_crop": false,
+          "show_labels": "${ultralytics.show_labels}",
+          "show_conf": "${ultralytics.show_conf}",
+          "show_boxes": true,
+          "line_width": null
+        },
+        "transforms": {
+          "mode": "albumentations",
+          "pipeline_file": "custom.yaml",
+          "snapshot": null
+        },
+        "clearml": {
+          "_target_": "clearml_yolo.application.contracts.ClearMLConfig",
+          "project_name": "clearml-yolo",
+          "task_name": "yolo-run",
+          "task_type": "training",
+          "tags": [],
+          "output_uri": true
+        },
+        "ground_truth": "???",
+        "dataset_format": "ndjson",
+        "dataset_cache_dir": null,
+        "required_splits": null
+      }
+    }
+  ],
+  "parser_help": {
+    "cy-init-config": "usage: cy-init-config [-h]\n                      [--command {cy,cy-train,cy-predict,cy-val,cy-metrics,cy-report,cy-compare,cy-ground-truth,cy-export}]\n                      [--force] [--model MODEL]\n                      directory\n\nCLI: initialize a directory with editable example configurations.\n\npositional arguments:\n  directory             directory for example YAML configurations\n\noptions:\n  -h, --help            show this help message and exit\n  --command {cy,cy-train,cy-predict,cy-val,cy-metrics,cy-report,cy-compare,cy-ground-truth,cy-export}\n                        execution command to configure (default: cy)\n  --force               overwrite existing example files\n  --model MODEL         model preset (default: ultralytics; Faster R-CNN for\n                        cy-export)\n",
+    "cy-dedup": "usage: cy-dedup [-h] [--dry-run] [directory]\n\nReflink identical, same-named cache images without starting application\nservices.\n\npositional arguments:\n  directory   cache to scan (default: CY_HOME/.cache or .cache in the current\n              directory)\n\noptions:\n  -h, --help  show this help message and exit\n  --dry-run   report duplicate candidates without creating or replacing files\n",
+    "cy-batch-estimate": "usage: cy-batch-estimate [-h] --imgsz IMGSZ [--classes CLASSES]\n                         [--objects-per-image OBJECTS_PER_IMAGE]\n                         [--models MODELS] [--devices DEVICES]\n                         [--gpu-counts GPU_COUNTS] [--refresh]\n                         [--memory-budget MEMORY_BUDGET]\n                         [--search-limit SEARCH_LIMIT]\n                         [--trial-timeout TRIAL_TIMEOUT]\n\nMeasure single-GPU training capacity and extrapolate selected allocations.\n\noptions:\n  -h, --help            show this help message and exit\n  --imgsz IMGSZ         nominal square training resolution\n  --classes CLASSES     synthetic classes (default: 150)\n  --objects-per-image OBJECTS_PER_IMAGE\n                        synthetic objects (default: 300)\n  --models MODELS       comma-separated model presets or YOLO asset names;\n                        default: all\n  --devices DEVICES     ordered logical visible CUDA indexes; default: all\n  --gpu-counts GPU_COUNTS\n                        report recommendations for first N selected GPUs; no\n                        extra searches; default: 1..all\n  --refresh             repeat completed compatible cases\n  --memory-budget MEMORY_BUDGET\n                        fraction of each GPU's total memory (default: 0.9)\n  --search-limit SEARCH_LIMIT\n                        per-GPU search ceiling (default: 1024); extrapolated\n                        global batches may exceed it\n  --trial-timeout TRIAL_TIMEOUT\n                        seconds per fresh trial group (default: 300)\n",
+    "cy-download-weights": "usage: cy-download-weights [-h]\n\nPrepare supported named model weights in their native discovery caches.\n\noptions:\n  -h, --help  show this help message and exit\n"
+  }
+}

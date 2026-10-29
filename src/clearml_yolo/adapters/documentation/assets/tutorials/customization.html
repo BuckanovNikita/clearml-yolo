@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Свои аугментации и программная композиция — CY</title><link rel="stylesheet" href="/style.css"></head>
+<body><main class="tutorial-page">
+<nav><a href="/">← Справочник CY</a></nav><h1>Свои аугментации и программная композиция</h1>
+<h2>Предварительные условия</h2>
+<p>Нужны установленный CY, реальные входы и ClearML из <a href="quickstart.html">первого урока</a>.
+Для аугментаций используйте установленную совместимую версию Albumentations.
+Программные workflows создают реальные файлы и задачи; вызывающая программа
+владеет полным временем жизни ресурсов и публикации.</p>
+<h2>Пример</h2>
+<h3>Сохранить Albumentations JSON</h3>
+<p>Сохраните этот код как <code>make_augmentation.py</code> и выполните его в рабочем каталоге:</p>
+<pre><code class="language-python">from pathlib import Path
+
+import albumentations as A
+
+pipeline = A.Compose(
+    [A.HorizontalFlip(p=0.5), A.RandomBrightnessContrast(p=0.2)],
+    bbox_params=A.BboxParams(format=&quot;pascal_voc&quot;, label_fields=[&quot;class_labels&quot;]),
+)
+A.save(pipeline, Path(&quot;augmentation.json&quot;), data_format=&quot;json&quot;)
+</code></pre>
+<pre><code class="language-bash">cy-train model=rfdetr/nano ground_truth=./tutorial-data/ground_truth.csv \
+  transforms=albumentations transforms.pipeline_file=./augmentation.json \
+  model.train.epochs=1 model.train.batch=2 model.train.device=0 \
+  clearml.project_name=cy-tutorial clearml.task_name=custom-augmentation \
+  'clearml.tags=[tutorial,augmentation]'
+</code></pre>
+<p><a href="/#field=transforms">transforms</a> выбирает профиль, а
+<a href="/#field=transforms.pipeline_file">transforms.pipeline_file</a> — редактируемый вход.
+<code>transforms=default</code> оставляет нативный рецепт. При <code>albumentations</code> случайные
+аугментации backend отключаются, включая native Mosaic; конфликты заменяются
+с диагностикой. Backend всё равно владеет окончательным resize, тензорами и
+нормализацией. Не добавляйте <code>Normalize</code>, <code>ToFloat</code> и <code>ToTensorV2</code> в JSON.</p>
+<h3>Добавить Mosaic</h3>
+<pre><code class="language-python">from pathlib import Path
+
+import albumentations as A
+
+pipeline = A.Compose(
+    [
+        A.Mosaic(
+            grid_yx=(2, 2),
+            target_size=(512, 512),
+            cell_shape=(512, 512),
+            p=0.5,
+        ),
+        A.HorizontalFlip(p=0.5),
+    ],
+    bbox_params=A.BboxParams(format=&quot;pascal_voc&quot;, label_fields=[&quot;class_labels&quot;]),
+)
+A.save(pipeline, Path(&quot;mosaic.json&quot;), data_format=&quot;json&quot;)
+</code></pre>
+<p>Поставьте единственный Mosaic первым в корневом <code>Compose</code>; вспомогательные
+изображения выбираются только из training population. Замените путь в команде
+на <code>mosaic.json</code>. Размер Mosaic не подменяет размер входа выбранной модели.
+При runtime содержимое JSON проверяется, снимок и digest сохраняются для replay
+без исходного файла. <code>snapshot</code> — сгенерированное происхождение, а не поле для
+ручного заполнения. Предпросмотр конфигурации файл JSON не загружает.</p>
+<h3>Вставить свою обработку между этапами</h3>
+<p>Отдельные CLI позволяют встроить анализ в обычный shell-конвейер:</p>
+<pre><code class="language-bash">cy-predict weights=./best.pt ground_truth=./tutorial-data/ground_truth.csv \
+  'splits=[val,test]' output=./prediction/predictions.csv model_label=tutorial-yolo \
+  ultralytics_predict.device=cpu fiftyone.enabled=false clearml.project_name=cy-tutorial \
+  clearml.task_name=predict-for-analysis 'clearml.tags=[tutorial,custom]'
+python inspect_predictions.py
+cy-metrics ground_truth=./tutorial-data/ground_truth.csv \
+  predictions=./prediction/predictions.csv 'splits=[val,test]' \
+  output_dir=./metrics-after-inspection model_label=tutorial-yolo fiftyone.enabled=false \
+  clearml.project_name=cy-tutorial clearml.task_name=score-after-analysis \
+  'clearml.tags=[tutorial,custom]'
+</code></pre>
+<p>Например, <code>inspect_predictions.py</code> читает результат и пишет отдельный сводный файл:</p>
+<pre><code class="language-python">from pathlib import Path
+
+import pandas as pd
+
+frame = pd.read_csv(
+    &quot;prediction/predictions.csv&quot;,
+    keep_default_na=False,
+    dtype={&quot;image_name&quot;: str, &quot;instance_label&quot;: str},
+    float_precision=&quot;round_trip&quot;,
+)
+summary = frame.groupby(&quot;instance_label&quot;, dropna=False).size()
+Path(&quot;analysis&quot;).mkdir(exist_ok=True)
+summary.to_csv(&quot;analysis/prediction-counts.csv&quot;, header=[&quot;detections&quot;])
+</code></pre>
+<p>Это анализ сырых детекций, не замена метрик. Не перезаписывайте подписанный CSV
+и его provenance: изменение байтов делает прежний digest недействительным.
+Для преобразования данных создавайте новый вход и явно учитывайте его происхождение.
+Каждая standalone-команда имеет собственную задачу ClearML.</p>
+<h3>Заменить типизированную зависимость через Python</h3>
+<p>Workflows принимают <code>WorkflowDependencies</code>, объявленный в <code>application.ports</code>.
+<code>build_dependencies()</code> создаёт независимый bundle для одного вызова;
+<code>dataclasses.replace</code> подменяет выбранный port без глобального service locator.
+Ниже полный metrics-вызов с опциональной реализацией <code>EvaluationEngine</code>:</p>
+<pre><code class="language-python">from dataclasses import replace
+from pathlib import Path
+from typing import Any
+
+from clearml_yolo.application.contracts import MetricsResult
+from clearml_yolo.application.ports import EvaluationEngine
+
+
+def run_metrics(engine: EvaluationEngine | None = None) -&gt; MetricsResult:
+    from clearml_yolo.adapters.runtime.bootstrap import runtime_environment
+
+    with runtime_environment():
+        from clearml_yolo.adapters.clearml.session import invocation
+        from clearml_yolo.application.contracts import ClearMLConfig
+        from clearml_yolo.application.use_cases.metrics import compute_metrics
+        from clearml_yolo.core.evaluation.models import EvaluationConfig
+        from clearml_yolo.core.publication import FiftyOneConfig
+        from clearml_yolo.entrypoints.composition import build_dependencies
+
+        tracking = ClearMLConfig(
+            project_name=&quot;cy-tutorial&quot;, task_name=&quot;python-metrics&quot;, tags=[&quot;tutorial&quot;, &quot;python&quot;]
+        )
+        evaluation = EvaluationConfig()
+        publication = FiftyOneConfig(enabled=False)
+        deps = build_dependencies()
+        if engine is not None:
+            deps = replace(deps, evaluation=engine)
+        inputs: dict[str, Any] = {
+            &quot;ground_truth&quot;: &quot;tutorial-data/ground_truth.csv&quot;,
+            &quot;predictions&quot;: &quot;prediction/predictions.csv&quot;,
+            &quot;output_dir&quot;: &quot;python-metrics&quot;,
+            &quot;splits&quot;: [&quot;val&quot;, &quot;test&quot;],
+            &quot;calibration_split&quot;: &quot;val&quot;,
+            &quot;model_label&quot;: &quot;tutorial-yolo&quot;,
+            &quot;evaluation&quot;: evaluation.model_dump(mode=&quot;json&quot;),
+            &quot;clearml&quot;: tracking.model_dump(mode=&quot;json&quot;),
+            &quot;fiftyone&quot;: publication.model_dump(mode=&quot;json&quot;),
+        }
+        with invocation(tracking, &quot;metrics&quot;, resolved_config=inputs):
+            return compute_metrics(
+                predictions=Path(inputs[&quot;predictions&quot;]),
+                ground_truth=Path(inputs[&quot;ground_truth&quot;]),
+                output_dir=Path(inputs[&quot;output_dir&quot;]),
+                clearml=tracking,
+                evaluation=evaluation,
+                splits=[&quot;val&quot;, &quot;test&quot;],
+                calibration_split=&quot;val&quot;,
+                fiftyone=publication,
+                model_label=&quot;tutorial-yolo&quot;,
+                deps=deps,
+            )
+
+
+if __name__ == &quot;__main__&quot;:
+    run_metrics()
+</code></pre>
+<p><code>run_metrics()</code> использует штатный движок. Интеграция передаёт свой объект как
+<code>run_metrics(my_engine)</code>, реализовав <strong>все</strong> методы <code>EvaluationEngine</code> с теми же
+типами и инвариантами. За научную сопоставимость иной реализации отвечает её
+проверка; вызов <code>replace</code> сам её не доказывает. Полный <code>resolved_config</code> нужен для
+воспроизводимости: прямой use-case не собирает снимок за вызывающую программу.</p>
+<p>Этот пример владеет scratch и ClearML invocation и не запускает модель/FiftyOne.
+При программном training/inference дополнительно требуются native runtime,
+process supervision и cleanup, соответствующие выбранному backend; их образец —
+<code>entrypoints.hydra.common.execute_owned</code>. Для обычной композиции этапов используйте
+CLI выше. Произвольные pipeline stages нельзя заменить строками <code>_target_</code>
+в Hydra: bundle создаётся entrypoint, а не пользовательским YAML.</p>
+<h2>Ожидаемый результат</h2>
+<p>Аугментации изменяют только training pipeline; финальная подготовка входов остаётся
+у backend. Снимок JSON позволяет повторить запуск без исходного файла. Анализ
+между CLI оставляет исходные predictions/provenance нетронутыми. Python-пример
+создаёт один metrics invocation, сохраняет полный снимок входов и завершает
+публикацию до выхода из контекстов.</p>
+<h2>Частые ошибки</h2>
+<ul>
+<li>Задан JSON при <code>transforms=default</code>: выберите профиль albumentations.</li>
+<li>Normalize/ToTensor в JSON: удалите их, чтобы не дублировать backend preprocessing.</li>
+<li>Mosaic не первый или вложен несколько раз: оставьте один root-first оператор.</li>
+<li>Изменены подписанные predictions: получите новый корректный результат и provenance.</li>
+<li>Прямой вызов use-case без владельца invocation: используйте полный lifecycle.</li>
+<li>Подмена <code>_target_</code> вместо port: используйте Python <code>WorkflowDependencies</code>.</li>
+</ul>
+<h2>Проверка</h2>
+<p>Сверьте training configuration, diagnostics конфликтов и сохранённый digest JSON.
+Убедитесь, что source dataset неизменен и val/test не получают training аугментации.
+Для Python-интеграции проверьте типы port, реальные результаты, закрытие задачи,
+обязательные uploads и содержимое <code>Configuration / run</code>. Тестирование preview
+не проверяет JSON операторов, произвольную реализацию port или native обучение.</p>
+</main></body></html>
+<!-- source-sha256: 601beae6361148a0e2c6baaaeff9b1fdd94c337c95e2530d26c995520a8217c1 -->

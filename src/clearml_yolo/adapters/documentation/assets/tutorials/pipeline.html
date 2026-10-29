@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Полный эксперимент и восстановление после сбоя — CY</title><link rel="stylesheet" href="/style.css"></head>
+<body><main class="tutorial-page">
+<nav><a href="/">← Справочник CY</a></nav><h1>Полный эксперимент и восстановление после сбоя</h1>
+<h2>Предварительные условия</h2>
+<p>Используйте подготовленные CSV/изображения, доступный ClearML и выбранную модель.
+Полный <code>cy</code> по умолчанию потребляет непустые <code>train</code>, <code>val</code> и <code>test</code>. Отдельные
+этапы описаны в <a href="evaluation.html">уроке оценки</a>. Создайте новый рабочий каталог
+для нового эксперимента и оставляйте проектные выходы внутри <code>CY_HOME</code>.</p>
+<h2>Пример</h2>
+<pre><code class="language-bash">cy ground_truth=./tutorial-data/ground_truth.csv ultralytics.model=yolo11n.pt \
+  ultralytics.epochs=1 ultralytics.imgsz=128 ultralytics.batch=2 \
+  ultralytics.device=cpu ultralytics.compile=false ultralytics.workers=0 \
+  ultralytics_predict.device=cpu run_dir=./runs/tutorial-01 fiftyone.enabled=false \
+  clearml.project_name=cy-tutorial clearml.task_name=experiment-01 \
+  'clearml.tags=[tutorial,pipeline]'
+</code></pre>
+<p>Порядок работы: подготовка данных → обучение → предсказания → калибровка на val
+и оценка → сравнение на текущем test → отчёты. Все этапы находятся под одной
+задачей ClearML. Для другого семейства выберите <code>model=...</code> и соответствующие
+<code>model.train</code>/<code>model.predict</code>, как в <a href="training.html">уроке обучения</a>.</p>
+<h3>Первый эксперимент без baseline</h3>
+<p>Автоматический baseline — последняя завершённая задача с тегом <code>prod</code> в том же
+проекте, кроме текущей. Если такой задачи нет, сравнение и парные отчёты пропускаются
+с записанной причиной. Предсказания, метрики и графики candidate сохраняются.
+Чтобы использовать завершённую модель как baseline, присвойте её задаче <code>prod</code>
+в ClearML после проверки результата. Чтобы выбрать её явно, добавьте:</p>
+<pre><code class="language-yaml">compare:
+  baseline_model:
+    task_id: YOUR_COMPLETED_BASELINE_TASK
+</code></pre>
+<p>Недоступный явно указанный baseline — ошибка, а не автоматический пропуск.
+<a href="/#field=compare.baseline_model">compare.baseline_model</a> ссылается на модель с
+сохранёнными порогами; не используйте test для их повторного подбора.</p>
+<h3>Повторно использовать завершённое обучение</h3>
+<p>Для нового эксперимента с существующими весами отключите обучение и укажите
+настоящий чекпойнт:</p>
+<pre><code class="language-bash">cy ground_truth=./tutorial-data/ground_truth.csv skip_train=true weights=./best.pt \
+  model_label=tutorial-yolo ultralytics_predict.device=cpu \
+  run_dir=./runs/reuse-weights fiftyone.enabled=false \
+  clearml.project_name=cy-tutorial clearml.task_name=reuse-weights \
+  'clearml.tags=[tutorial,recovery]'
+</code></pre>
+<p><a href="/#field=skip_train">skip_train</a> не продолжает optimizer state; это запуск этапов
+после обучения. Для результатов без обучающей идентичности нужен <code>model_label</code>.
+При модели другого семейства сохраните её выбор и native metadata.</p>
+<p>Если уже имеются корректные предсказания в том же
+<a href="/#field=run_dir">run_dir</a>, <code>skip_predict=true</code> использует ожидаемые файлы этого
+конвейера. Аналогично <code>skip_metrics</code>, <code>skip_compare</code> и <code>skip_report</code> отключают
+свои этапы. Пропуск не создаёт недостающий результат и не ищет произвольный файл
+в другом запуске. Для явных путей проще применить standalone-команды:</p>
+<pre><code class="language-bash">cy-metrics ground_truth=./tutorial-data/ground_truth.csv \
+  predictions=./runs/tutorial-01/predictions.csv 'splits=[val,test]' \
+  model_label=tutorial-yolo output_dir=./recovered-metrics fiftyone.enabled=false \
+  clearml.project_name=cy-tutorial clearml.task_name=recover-metrics \
+  'clearml.tags=[tutorial,recovery]'
+</code></pre>
+<p>Это отдельная задача. Проверьте фактическое имя и завершённость CSV перед запуском;
+незавершённый файл после прерывания не является пригодным результатом.</p>
+<h3>Найти точную конфигурацию и причину ошибки</h3>
+<p>В ClearML <code>Configuration / run</code> хранит полные очищенные от секретов входы для
+replay, включая реальное устройство. <code>Configuration / run_overrides</code> показывает
+отличия от встроенных настроек той же команды и выбранного пресета. Это
+сгенерированные снимки/происхождение; они не являются дополнительными полями
+редактора исходной конфигурации.</p>
+<p><code>General</code> содержит научные параметры без execution-only маршрутизации и
+сгенерированных путей данных. Он не заменяет полный <code>run</code>. При пропуске обучения
+нативные параметры обучения не создаются. В клонах исторических задач могут
+оставаться прежние ключи General: публикация не удаляет такую историю.</p>
+<p>При сбое сначала сохраните журнал, код завершения, локальные файлы и статус задачи.
+Готовые артефакты публикуются по ходу работы; более поздняя ошибка не уничтожает их.
+Общий <code>predicts_csv</code> публикуется после завершения всех включённых производителей
+строк, поэтому незавершённый общий CSV может остаться только локально.</p>
+<h2>Ожидаемый результат</h2>
+<p>В <code>run_dir</code> находятся результаты этапов, а в ClearML — одна задача с Console,
+Scalars, Plots, Configuration, артефактами и одним лучшим Output Model при
+обучении. Для первого эксперимента без baseline отсутствие парных отчётов ожидаемо.
+Пороги candidate получены на val, а baseline остаются замороженными.</p>
+<h2>Частые ошибки</h2>
+<ul>
+<li>Неполный набор: полный pipeline требует выборки, которые используют включённые этапы.</li>
+<li>Конфликт <code>project</code>/<code>name</code>: маршрутизацию pipeline задаёт <code>run_dir</code>; не назначайте
+независимые native-каталоги внутри этапов.</li>
+<li><code>skip_*</code> с пустым каталогом: сначала проверьте ожидаемые завершённые выходы.</li>
+<li>Изменённые данные при прежнем пути: кэш не доказывает неизменность изображения;
+управляйте входными версиями и выполняйте явное idle-обслуживание кэша.</li>
+<li>Локальные результаты есть, но задача failed: обязательный upload/flush мог
+завершиться ошибкой. Это незавершённая публикация, а не успешный эксперимент.</li>
+</ul>
+<h2>Проверка</h2>
+<p>Сверьте включённые этапы с фактическими файлами и статусами. Откройте <code>run</code> и
+<code>run_overrides</code>, проверьте исходный selector и фактическое происхождение Dataset,
+модель, resolved settings и причины пропусков. Скачайте обязательные артефакты и
+лучший Output Model. Для повторного использования сохраните подписанные CSV,
+checkpoint sidecar и книги без ручного пересохранения. Удаляйте только собственные
+временные ресурсы, когда все процессы завершились; invocation scratch сохраняется
+после успеха, ошибки и отмены намеренно.</p>
+</main></body></html>
+<!-- source-sha256: 92211380933ca76932dfed37fd98401ad80bdfdacd4b64d99367d9128037c0ef -->

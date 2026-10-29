@@ -9,11 +9,73 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, JsonValue
 class FiftyOneConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    enabled: bool = True
-    preflight_timeout_seconds: float = Field(default=60.0, gt=0, allow_inf_nan=False)
-    publish_timeout_seconds: float = Field(default=900.0, gt=0, allow_inf_nan=False)
-    lock_timeout_seconds: float = Field(default=30.0, gt=0, allow_inf_nan=False)
-    dataset_prefix: str = Field(default="clearml-yolo", pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$")
+    enabled: bool = Field(
+        default=True,
+        description="Публиковать результаты в FiftyOne. false отключает эту операцию.",
+        examples=[True],
+        json_schema_extra={
+            "shapes": "bool",
+            "applicability": "FiftyOneConfig",
+            "source": "clearml_yolo.core.publication.FiftyOneConfig.enabled",
+            "classification": "input",
+        },
+    )
+    preflight_timeout_seconds: float = Field(
+        default=60.0,
+        gt=0,
+        allow_inf_nan=False,
+        description="Положительный конечный таймаут предварительной проверки FiftyOne в секундах.",
+        examples=[60.0],
+        json_schema_extra={
+            "shapes": "float",
+            "applicability": "FiftyOneConfig",
+            "source": "clearml_yolo.core.publication.FiftyOneConfig.preflight_timeout_seconds",
+            "classification": "input",
+        },
+    )
+    publish_timeout_seconds: float = Field(
+        default=900.0,
+        gt=0,
+        allow_inf_nan=False,
+        description="Положительный конечный таймаут публикации FiftyOne в секундах.",
+        examples=[900.0],
+        json_schema_extra={
+            "shapes": "float",
+            "applicability": "FiftyOneConfig",
+            "source": "clearml_yolo.core.publication.FiftyOneConfig.publish_timeout_seconds",
+            "classification": "input",
+        },
+    )
+    lock_timeout_seconds: float = Field(
+        default=30.0,
+        gt=0,
+        allow_inf_nan=False,
+        description=(
+            "Положительный конечный таймаут ожидания блокировки набора FiftyOne в секундах."
+        ),
+        examples=[30.0],
+        json_schema_extra={
+            "shapes": "float",
+            "applicability": "FiftyOneConfig",
+            "source": "clearml_yolo.core.publication.FiftyOneConfig.lock_timeout_seconds",
+            "classification": "input",
+        },
+    )
+    dataset_prefix: str = Field(
+        default="clearml-yolo",
+        pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+        description=(
+            "Префикс имени набора: латинские буквы, цифры, дефис и подчёркивание;"
+            " первый символ — буква или цифра."
+        ),
+        examples=["clearml-yolo"],
+        json_schema_extra={
+            "shapes": "str",
+            "applicability": "FiftyOneConfig",
+            "source": "clearml_yolo.core.publication.FiftyOneConfig.dataset_prefix",
+            "classification": "input",
+        },
+    )
 
 
 class PublicationRequest(BaseModel):

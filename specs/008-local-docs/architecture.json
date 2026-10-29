@@ -1,0 +1,313 @@
+{
+  "schema_version": 1,
+  "task": "008-local-docs",
+  "impact": "modules",
+  "scope": [
+    "src/clearml_yolo/entrypoints/hydra/declarations.py",
+    "src/clearml_yolo/entrypoints/hydra/configs.py",
+    "src/clearml_yolo/entrypoints/options.py",
+    "src/clearml_yolo/entrypoints",
+    "src/clearml_yolo/application/contracts.py",
+    "src/clearml_yolo/core",
+    "src/clearml_yolo/entrypoints/documentation",
+    "src/clearml_yolo/adapters/documentation",
+    "tests",
+    ".importlinter",
+    "pyproject.toml",
+    "scripts",
+    "browser_tests",
+    "ruff.toml",
+    "uv.lock",
+    "docs/local-documentation.md",
+    "README.md",
+    "docs/current-contracts.md",
+    "docs/project-contracts.md",
+    "specs/008-local-docs",
+    "CHANGELOG.md"
+  ],
+  "rules": "Constitution inward layers; core/application have no effects or documentation adapter imports; adapters cannot import entrypoints. Ordinary commands remain independent of documentation assets.",
+  "modules": [
+    {
+      "id": "declarations",
+      "path": "src/clearml_yolo/entrypoints/hydra/declarations.py",
+      "change": "add",
+      "responsibility": "Named documented command declarations; preserve permissive projection",
+      "interface": "command_values(name) returns fresh permissive mappings projected from named dataclass defaults; metadata describes Russian meaning/shapes/constraints/applicability/examples. Preserve missing markers, targets, interpolation and unrestricted Hydra composition.",
+      "layer": "entrypoints",
+      "allowed_dependencies": [
+        "dataclasses/typing",
+        "OmegaConf missing marker",
+        "existing public configuration models"
+      ],
+      "forbidden_dependencies": [
+        "documentation serving from inner layers",
+        "adapter imports of entrypoints",
+        "application runtime execution from previews"
+      ],
+      "effects": "Compose schemas and dependencies explicitly; delegate socket/file/process effects to adapters.",
+      "contracts": [
+        "existing-inward",
+        "docs-isolation"
+      ]
+    },
+    {
+      "id": "registration",
+      "path": "src/clearml_yolo/entrypoints/hydra/configs.py",
+      "change": "modify",
+      "responsibility": "Project declarations into compatible Hydra registrations",
+      "interface": "Register existing _cy_schemas command/group keys from command_values; retain defaults, package paths, native overlays and command_schema/document outputs.",
+      "layer": "entrypoints",
+      "allowed_dependencies": [
+        "Hydra/hydra-zen/OmegaConf",
+        "documented declarations and existing model/profile helpers",
+        "existing filesystem/default asset access"
+      ],
+      "forbidden_dependencies": [
+        "documentation serving from inner layers",
+        "adapter imports of entrypoints",
+        "application runtime execution from previews"
+      ],
+      "effects": "Compose schemas and dependencies explicitly; delegate socket/file/process effects to adapters.",
+      "contracts": [
+        "existing-inward",
+        "docs-isolation"
+      ]
+    },
+    {
+      "id": "options",
+      "path": "src/clearml_yolo/entrypoints/options.py",
+      "change": "add",
+      "responsibility": "Inert documented utility parser declarations shared by commands",
+      "interface": "parser_for(command) returns an inert fresh argparse parser from OptionDeclaration values. Preserve all old option spellings, help bytes, defaults and parsing; add cy-docs controls.",
+      "layer": "entrypoints",
+      "allowed_dependencies": [
+        "argparse/dataclasses/pathlib/typing"
+      ],
+      "forbidden_dependencies": [
+        "documentation serving from inner layers",
+        "adapter imports of entrypoints",
+        "application runtime execution from previews"
+      ],
+      "effects": "Compose schemas and dependencies explicitly; delegate socket/file/process effects to adapters.",
+      "contracts": [
+        "existing-inward",
+        "docs-isolation"
+      ]
+    },
+    {
+      "id": "utilities",
+      "path": "src/clearml_yolo/entrypoints",
+      "change": "modify",
+      "responsibility": "Utility parsers and docs invocation composition",
+      "interface": "Existing utility parser() factories share option declarations. docs.main composes a Catalog and callbacks, then starts DocumentationServer with PreviewWorkers. Documentation faults return documentation errors and never become ordinary-command imports.",
+      "layer": "entrypoints",
+      "allowed_dependencies": [
+        "shared inert option declarations",
+        "documentation assembly, typed records and effect adapters only from docs entrypoint",
+        "ordinary utility dependencies unchanged"
+      ],
+      "forbidden_dependencies": [
+        "documentation serving from inner layers",
+        "adapter imports of entrypoints",
+        "application runtime execution from previews"
+      ],
+      "effects": "Compose schemas and dependencies explicitly; delegate socket/file/process effects to adapters.",
+      "contracts": [
+        "existing-inward",
+        "docs-isolation"
+      ]
+    },
+    {
+      "id": "contracts",
+      "path": "src/clearml_yolo/application/contracts.py",
+      "change": "modify",
+      "responsibility": "Document public configuration fields without changing validation",
+      "interface": "Public Pydantic models retain class locations, types/defaults/validators; field description/examples/json_schema_extra add Russian reference metadata only.",
+      "layer": "application",
+      "allowed_dependencies": [
+        "Pydantic",
+        "existing pure core contracts"
+      ],
+      "forbidden_dependencies": [
+        "documentation serving from inner layers",
+        "adapter imports of entrypoints",
+        "application runtime execution from previews"
+      ],
+      "effects": "No new effects; field metadata only.",
+      "contracts": [
+        "existing-inward",
+        "docs-isolation"
+      ]
+    },
+    {
+      "id": "records",
+      "path": "src/clearml_yolo/core",
+      "change": "modify",
+      "responsibility": "Existing public model descriptions and typed documentation records",
+      "interface": "FieldDetails/FieldDoc carry command-specific variants; ConfigurationDoc separates YAML/expressions/selected values; Catalog includes tutorials; bounded PreviewRequest and typed PreviewResult cross entrypoint/adapter callbacks. Other public model changes add metadata only.",
+      "layer": "core",
+      "allowed_dependencies": [
+        "Pydantic",
+        "existing pure core dependencies"
+      ],
+      "forbidden_dependencies": [
+        "documentation serving from inner layers",
+        "adapter imports of entrypoints",
+        "application runtime execution from previews"
+      ],
+      "effects": "No effects; typed data records and field metadata only.",
+      "contracts": [
+        "existing-inward",
+        "docs-isolation"
+      ]
+    },
+    {
+      "id": "assembly",
+      "path": "src/clearml_yolo/entrypoints/documentation",
+      "change": "add",
+      "responsibility": "Catalog/default assembly, coverage and isolated safe composition",
+      "interface": "build_catalog/check_coverage/check_catalog assemble declarations, installed Hydra/native inventories and tutorials. preview(PreviewRequest) returns unresolved YAML, safe selected values, schema errors/deferred checks and shell-quoted command; never launch/instantiate/resolve custom expressions. worker blocks external Hydra plugin discovery before composition.",
+      "layer": "entrypoints",
+      "allowed_dependencies": [
+        "Hydra/hydra-zen/OmegaConf at explicit import-owner edges",
+        "existing pure validators/workflow signatures (inspection only)",
+        "typed core records",
+        "documentation file adapter for packaged inputs and confined temporary documents"
+      ],
+      "forbidden_dependencies": [
+        "documentation serving from inner layers",
+        "adapter imports of entrypoints",
+        "application runtime execution from previews"
+      ],
+      "effects": "Compose schemas and dependencies explicitly; delegate socket/file/process effects to adapters.",
+      "contracts": [
+        "existing-inward",
+        "docs-isolation"
+      ]
+    },
+    {
+      "id": "serving",
+      "path": "src/clearml_yolo/adapters/documentation",
+      "change": "add",
+      "responsibility": "Loopback HTTP, packaged-file access, confined preview files, worker process ownership and offline browser assets",
+      "interface": "DocumentationServer accepts a typed Catalog and preview callback. PreviewWorkers accepts an injected worker argv, enforces 15s/2workers/output bounds and kills/reaps owned groups. File adapter confines named documents and reads packaged assets; serving has no entrypoint import.",
+      "layer": "adapters",
+      "allowed_dependencies": [
+        "standard-library HTTP/sockets/subprocess/selectors/importlib.resources",
+        "Pydantic and core documentation records"
+      ],
+      "forbidden_dependencies": [
+        "documentation serving from inner layers",
+        "adapter imports of entrypoints",
+        "application runtime execution from previews"
+      ],
+      "effects": "Own socket/package/process effects; worker command and composition callback are injected.",
+      "contracts": [
+        "existing-inward",
+        "docs-isolation"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "existing-inward",
+      "path": ".importlinter",
+      "status": "existing",
+      "rules": "Inward layers, exhaustive classification, command isolation and SDK effect owners.",
+      "check": "canonical"
+    },
+    {
+      "id": "docs-isolation",
+      "path": "tests/test_docs_isolation.py",
+      "status": "existing",
+      "rules": "Reject injected serving/rendering imports from core/application and ordinary commands; docs assets/failures cannot break runtime imports.",
+      "check": "canonical"
+    }
+  ],
+  "checks": [
+    {
+      "id": "canonical",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync python scripts/verify.py",
+      "expectation": "Ruff, mypy, Vulture, import contracts and full tests including negative imports and CPU DDP pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/008-local-docs/evidence/verification.md"
+      }
+    },
+    {
+      "id": "docs",
+      "kind": "documentation",
+      "command": "uv run --frozen --no-sync python scripts/verify.py --docs",
+      "expectation": "Markdown, links and changed examples pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/008-local-docs/evidence/verification.md"
+      }
+    },
+    {
+      "id": "coverage",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync cy-docs --check",
+      "expectation": "Packaged assets, field/group/option coverage, links and tutorial preview cases pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/008-local-docs/evidence/verification.md"
+      }
+    },
+    {
+      "id": "browser",
+      "kind": "behavior",
+      "command": "CY_DOCS_BROWSER_CHANNEL=chrome uv run --frozen --no-sync pytest -q browser_tests",
+      "expectation": "Search, keyboard editor, preview, downloads, offline, errors and shutdown pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/008-local-docs/evidence/verification.md"
+      }
+    },
+    {
+      "id": "native",
+      "kind": "behavior",
+      "command": "Native acceptance commands recorded in evidence/native.md",
+      "expectation": "Fresh YOLO and non-YOLO runs publish verified actual outputs/artifacts.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/008-local-docs/evidence/native.md"
+      }
+    },
+    {
+      "id": "installation",
+      "kind": "behavior",
+      "command": "Noneditable proposed-version source installation and real installed worker checks recorded in evidence/installation.md",
+      "expectation": "All packaged files/assets match source, installed commands work outside checkout, preview input files remain untouched and owned workers/directories clean up.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/008-local-docs/evidence/installation.md"
+      }
+    },
+    {
+      "id": "paired",
+      "kind": "behavior",
+      "command": "Normal proposed CY0.43.0 / queue0.1.4 source install, metadata, complete ordinary queue suite and configured checks recorded in evidence/release-pair.md",
+      "expectation": "Latest intended-version source pair resolves normally and preserves queue composition/import behavior.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/008-local-docs/evidence/release-pair.md"
+      }
+    }
+  ],
+  "documentation": "README, current/project contracts, local-documentation guide, packaged Russian tutorials and portable corp-skills usage package.",
+  "review": {
+    "status": "accepted",
+    "reviewer": "Fresh native read-only release_final_review after integrated stable canonical verification; release_companion_review for companion scope",
+    "evidence": "specs/008-local-docs/evidence/review.md",
+    "reconciliation": "Reconciled all18 modified and65 initial added008paths plus release evidence against accepted007baseline f8eb8a3. All337 package files match previously accepted008except two unchanged released007native-cache modules. Sixpublic-modelmodules preserve non-documentation AST. No runtime renames/deletions or new effects beyond recorded documentation owners. Stable canonical4373 tests/52contracts, browser11,467-field coverage, installed337-file snapshot, unchanged008native evidence and proposed0.43/queue0.1.4 checks passed. Companion changes independently reviewed. Final metadata refresh and remote delivery remain separate required release steps."
+  }
+}

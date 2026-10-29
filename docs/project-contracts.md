@@ -12,7 +12,7 @@ local synthetic training capacity without a ClearML task; see
 
 Entrypoints: `cy`, `cy-train`, `cy-predict`, `cy-val`, `cy-metrics`,
 `cy-report`, `cy-compare`, `cy-ground-truth`, `cy-export`, `cy-init-config`, `cy-dedup`,
-`cy-batch-estimate`, and `cy-queue`.
+`cy-batch-estimate`, `cy-docs`, and `cy-queue`.
 The `cy-queue` command belongs to the separately installed compatible queue source
 package; CY's own entrypoints do not require that package or its configuration.
 `cy-init-config DIRECTORY [--command NAME] [--model PRESET] [--force]` writes one selected
@@ -26,6 +26,15 @@ See [selected export and runtime isolation](runtime-isolation.md).
 or tracking. It reflinks identical same-named images, preserving paths and content;
 unsupported reflinks are reported skips. See the
 [deduplication contract](../specs/000-baseline/spec.md#explicit-cache-deduplication).
+
+`cy-docs [--port PORT] [--no-browser] [--check]` opens the packaged Russian reference
+and tutorials on loopback. Its catalog derives fields and effective defaults from
+the installed declarations. Configuration editing and isolated composition previews
+produce YAML and commands for terminal execution; they do not launch workflows or
+resolve external inputs. `--check` verifies the catalog, assets, links and tutorial
+composition cases without starting a server. Documentation failures stay within
+documentation operations. See the [local documentation contract](local-documentation.md)
+for preview restrictions, completeness checks and maintenance ownership.
 
 Python imports follow `core`, `application`, `adapters` and `entrypoints` boundaries.
 Public workflows receive explicit typed dependencies from CLI composition; Hydra

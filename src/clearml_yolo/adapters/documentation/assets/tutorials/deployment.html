@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ONNX и TensorRT: экспорт, сборка и проверка — CY</title><link rel="stylesheet" href="/style.css"></head>
+<body><main class="tutorial-page">
+<nav><a href="/">← Справочник CY</a></nav><h1>ONNX и TensorRT: экспорт, сборка и проверка</h1>
+<h2>Предварительные условия</h2>
+<p>Экспорт поддерживается для шести зарегистрированных пресетов <strong>Faster R-CNN</strong>.
+Другие семейства могут обучаться и оцениваться, но не приобретают поддержку
+<code>cy-export</code> от одной замены <code>model=</code>. Нужен реальный чекпойнт с проверенным
+descriptor, словарём классов и preprocessing. ONNX-зависимости входят в CY;
+TensorRT и совместимый CUDA runtime устанавливаются отдельно.</p>
+<p>Для CPU/FP32 ONNX GPU не нужен. Сборка engine и его проверка требуют GPU,
+поддерживаемых библиотек и достаточной памяти. Приведённые команды — интерфейс,
+а не свидетельство прохождения всех preset/precision/target проверок.
+Совместимость с целевым CUDA 11.8 здесь не подтверждена.</p>
+<h2>Пример</h2>
+<h3>Экспортировать ONNX на CPU</h3>
+<pre><code class="language-bash">cy-init-config export-config --command cy-export --model fasterrcnn/resnet50_fpn
+cy-export model=fasterrcnn/resnet50_fpn weights=./best.pth \
+  export.operation=onnx export.device=cpu export.precision=fp32 \
+  output_dir=./exported/onnx clearml.project_name=cy-tutorial \
+  clearml.task_name=export-onnx 'clearml.tags=[tutorial,export]'
+</code></pre>
+<p><a href="/#field=export.operation">export.operation</a> разделяет три операции. При <code>onnx</code>
+разрешены только <code>device=cpu</code> и <code>precision=fp32</code>. Настройки confidence, NMS IoU и
+max detections из <a href="/#field=model.predict">model.predict</a> встраиваются в граф;
+для их изменения требуется новый экспорт. Исходный native-чекпойнт не изменяется.</p>
+<h3>Собрать engine</h3>
+<pre><code class="language-bash">cy-export model=fasterrcnn/resnet50_fpn export.operation=build \
+  export.onnx=./exported/onnx/model.onnx export.device=0 export.precision=fp32 \
+  output_dir=./exported/engine-fp32 clearml.project_name=cy-tutorial \
+  clearml.task_name=build-engine 'clearml.tags=[tutorial,export]'
+</code></pre>
+<p>Повторите с <code>export.precision=fp16</code> и новым output directory для FP16-варианта.
+Внешние image/detection tensors остаются float32; FP16 меняет разрешённые внутренние
+операции engine. <a href="/#field=export.workspace_gib">export.workspace_gib</a> управляет
+builder workspace, а не верхним пределом памяти инференса. Некоторым backbone
+нужен больший workspace; ошибка сборки не означает, что другой режим проверен.</p>
+<p>Храните <code>model.onnx</code> вместе с <code>model.onnx.json</code>, <code>model.engine</code> вместе с
+<code>model.engine.json</code>. <a href="/#field=export.metadata">export.metadata</a> может указать
+явный sidecar. Они связывают хеши, source checkpoint, классы, preprocessing,
+профили, runtime и plugin identities. Не редактируйте metadata для обхода mismatch.</p>
+<h3>Проверить engine на размеченном наборе</h3>
+<pre><code class="language-bash">cy-export model=fasterrcnn/resnet50_fpn export.operation=verify \
+  weights=./best.pth export.engine=./exported/engine-fp32/model.engine \
+  ground_truth=./tutorial-data/ground_truth.csv export.split=test \
+  export.device=0 export.precision=fp32 output_dir=./exported/verification \
+  clearml.project_name=cy-tutorial clearml.task_name=verify-engine \
+  'clearml.tags=[tutorial,export]'
+</code></pre>
+<p>Для meaningful quality acceptance нужен репрезентативный размеченный корпус и
+native-модель с ненулевым качеством. Маленький набор из первого урока удобен для
+проверки выполнения, но не доказывает допустимую потерю production accuracy.
+Проверяйте одинаковые байты checkpoint/corpus, preprocessing и evaluator source.</p>
+<h3>Самостоятельный inference runner</h3>
+<p>Runner может работать в отдельно подготовленном окружении без Torch и ClearML.
+Нужны соответствующие версии CY source, NumPy/Pydantic, TensorRT/CUDA и декодер
+изображений. Не смешивайте такое узкое deployment-окружение с обычной установкой
+для обучения или <code>cy-export verify</code>.</p>
+<pre><code class="language-python">from pathlib import Path
+
+import numpy as np
+from PIL import Image
+
+from clearml_yolo.adapters.export.metadata import read_metadata
+from clearml_yolo.adapters.export.preprocessing import postprocess, preprocess
+from clearml_yolo.adapters.export.runtime import TensorRTRunner
+
+metadata = read_metadata(Path(&quot;exported/engine-fp32/model.engine.json&quot;))
+rgb = np.asarray(Image.open(&quot;tutorial-data/images/test-0.png&quot;).convert(&quot;RGB&quot;))
+images, sizes = preprocess(
+    [rgb],
+    (608, 960),
+    mean=metadata.descriptor.preprocessing.mean,
+    std=metadata.descriptor.preprocessing.std,
+)
+runner = TensorRTRunner(Path(&quot;exported/engine-fp32/model.engine&quot;), metadata, device=0)
+detections, counts = runner(images, sizes)
+results = postprocess(
+    detections,
+    counts,
+    [rgb.shape[:2]],
+    sizes,
+    class_count=len(metadata.descriptor.class_names),
+)
+print(results)
+</code></pre>
+<p>Объект runner используйте последовательно; один execution context не предназначен
+для одновременных вызовов. Конструирование загружает TensorRT и создаёт CUDA
+resources, поэтому выбирайте разрешённое устройство до этого момента. Сам runner
+не создаёт ClearML task и не подменяет engine native-моделью при ошибке.</p>
+<h3>Формы и динамические профили</h3>
+<p>Вход <code>images</code> — float32 NCHW; <code>image_sizes</code> — int64 <code>[B,2]</code> с valid resized H/W.
+Выход <code>detections</code> — float32 <code>[B,max_det,6]</code>, а <code>counts</code> задаёт действительное число
+строк. Нулевые хвосты исключаются. Внутри engine foreground IDs начинаются с 1;
+<code>postprocess</code> переводит их в нулевую индексацию словаря.</p>
+<table>
+<thead>
+<tr>
+<th>Профиль</th>
+<th>Минимум NCHW</th>
+<th>Оптимум</th>
+<th>Максимум</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Полные кадры</td>
+<td><code>[1,3,608,960]</code></td>
+<td><code>[2,3,608,960]</code></td>
+<td><code>[4,3,736,960]</code></td>
+</tr>
+<tr>
+<td>Полосы</td>
+<td><code>[1,3,128,1536]</code></td>
+<td><code>[2,3,256,1920]</code></td>
+<td><code>[4,3,256,1920]</code></td>
+</tr>
+</tbody>
+</table>
+<p>Форма целиком должна попадать в один профиль, H/W кратны 32. Например,
+<code>[3,3,192,1728]</code> допустима для полос, а <code>[1,3,736,1920]</code> смешивает два профиля
+и отклоняется. Не считайте диапазон декларации доказательством динамичности всех
+операций: нужны реальные прогоны крайних/внутренних размеров и переходов профилей.</p>
+<h2>Ожидаемый результат</h2>
+<p>ONNX operation создаёт граф и metadata, build — engine и metadata, verify —
+измеренные результаты сопоставления с native-моделью. Standalone runner возвращает
+детекции в координатах исходных изображений. Версии TensorRT/CUDA и engine identity
+должны соответствовать metadata; изменение окружения может потребовать пересборки.</p>
+<h2>Частые ошибки</h2>
+<ul>
+<li>ONNX запрошен на GPU/FP16: используйте CPU/FP32 и выберите FP16 на этапе build.</li>
+<li><code>build</code> без ONNX или <code>verify</code> без weights/engine/ground truth: заполните все входы.</li>
+<li>Sidecar отсутствует/хеш неверен: восстановите исходную пару artifact + metadata.</li>
+<li>Форма пересекает профили: выберите один поддерживаемый canvas/batch.</li>
+<li>Недостаточно workspace или несовместим TensorRT: проверьте действительное
+окружение и builder diagnostics; успешный ONNX не доказывает сборку engine.</li>
+<li>Пустые предсказания: проверьте counts, словарь и качество модели; не удаляйте
+пустые изображения из evaluation population.</li>
+</ul>
+<h2>Проверка</h2>
+<p>Проверьте код каждой операции, реальные файлы и хеши, загрузите опубликованные
+артефакты. Выполните native-versus-engine проверку на неизменном размеченном
+корпусе и отдельно standalone execution без Torch/ClearML. Для каждого целевого
+preset/precision проверьте все нужные batch/shape/profile transitions, пустые и
+плотные сцены, rejection cases и accuracy loss. Заявляйте только реально
+проверенные устройства и runtime-версии.</p>
+</main></body></html>
+<!-- source-sha256: a4182793e79530711c4ca000e43e240622009aff9ef8a9b059b74454b943c9f4 -->

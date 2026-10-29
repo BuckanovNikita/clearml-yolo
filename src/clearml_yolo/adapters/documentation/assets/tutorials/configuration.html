@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hydra: YAML, переопределения, переборы и DDP — CY</title><link rel="stylesheet" href="/style.css"></head>
+<body><main class="tutorial-page">
+<nav><a href="/">← Справочник CY</a></nav><h1>Hydra: YAML, переопределения, переборы и DDP</h1>
+<h2>Предварительные условия</h2>
+<p>Нужен установленный CY. Просмотр композиции не требует датасета или модели, но
+реальное выполнение требует всех входов из <a href="quickstart.html">первого урока</a>.
+Обычные CLI <code>--help</code>/<code>--cfg</code> могут создать локальные scratch/логи; проверяйте их
+в отдельном рабочем каталоге. Предпросмотр <code>cy-docs</code> не запускает приложение.</p>
+<h2>Пример</h2>
+<h3>Сгенерировать самостоятельное дерево</h3>
+<pre><code class="language-bash">cy-init-config train-config --command cy-train --model rfdetr/small
+cy-train --config-dir train-config --config-name cy-train --cfg job
+</code></pre>
+<p>Экспорт содержит wrapper <code>cy-train.yaml</code>, локальную базу <code>train.yaml</code>, выбранную
+модель, оба профиля аугментаций и YAML их defaults. При YOLO экспортируются обе
+native-группы. Команды metrics/report/ground-truth не используют model group;
+<code>cy-export</code> выбирает Faster R-CNN. Если <code>--command</code> опущен, экспортируется только <code>cy</code>.</p>
+<p>Сохраните существующие файлы перед намеренным <code>--force</code>; новая папка удобна для
+сравнения. Не удаляйте сгенерированный <code>defaults</code>: он задаёт порядок композиции.
+В <code>train-config/cy-train.yaml</code> измените входы, а в
+<code>train-config/model/rfdetr/small.yaml</code> — параметры <code>train</code> и <code>predict</code>.</p>
+<p>Для YOLO файлы <code>ultralytics/default.yaml</code> и <code>ultralytics_predict/default.yaml</code>
+содержат <strong>bare keys</strong>, без дополнительной обёртки <code>ultralytics:</code>.</p>
+<pre><code class="language-yaml">epochs: 10
+imgsz: 640
+batch: 4
+device: cpu
+</code></pre>
+<p>В wrapper входы имеют обычную форму:</p>
+<pre><code class="language-yaml">ground_truth: ./tutorial-data/ground_truth.csv
+clearml:
+  project_name: cy-tutorial
+  task_name: configured-training
+  tags: [tutorial, configuration]
+</code></pre>
+<h3>Порядок и типы переопределений</h3>
+<p>CLI применяется поверх выбранной композиции; последнее переопределение одного
+значения побеждает. Выбор <code>model=rfdetr/small</code> заменяет группу, а
+<code>model.train.epochs=2</code> меняет поле выбранного объекта.</p>
+<pre><code class="language-bash">cy-train --config-dir train-config --config-name cy-train \
+  model.train.epochs=2 model.train.device=cpu --cfg job
+</code></pre>
+<p>Hydra использует собственную грамматику: кавычки shell сохраняют один аргумент,
+списки пишутся <code>[a,b]</code>, nullable-ввод — <code>null</code>, а не строка <code>&quot;null&quot;</code>.</p>
+<pre><code class="language-bash">cy-predict ground_truth=./tutorial-data/ground_truth.csv weights=./best.pt \
+  'splits=[val,test]' ultralytics_predict.device=cpu fiftyone.enabled=false --cfg job
+cy-train ground_truth=./tutorial-data/ground_truth.csv ultralytics.batch=null --cfg job
+</code></pre>
+<p><code>+key=value</code> добавляет отсутствующий ключ на уровне композиции, <code>++key=value</code>
+добавляет или заменяет, <code>~key</code> удаляет. Возможность создать ключ в Hydra не означает,
+что runtime CY принимает этот ключ. Предпочитайте существующие публичные поля
+справочника. Nullable <a href="/#field=dataset_cache_dir">dataset_cache_dir</a> и
+<a href="/#field=ultralytics.batch">ultralytics.batch</a> имеют разные значения <code>null</code>;
+объяснение находится у каждого поля.</p>
+<h3>Интерполяция и предпросмотр</h3>
+<pre><code class="language-yaml">ultralytics:
+  imgsz: 640
+ultralytics_predict:
+  imgsz: ${ultralytics.imgsz}
+</code></pre>
+<p>Справочник показывает исходное выражение и выбранное значение отдельно. Изменение
+training image size меняет унаследованный prediction size, пока он не переопределён
+явно. Prediction batch/conf/device имеют собственные defaults.</p>
+<p>В редакторе <code>cy-docs</code> выберите команду, добавьте именованные YAML-документы и
+упорядоченные overrides. Сравните итоговый YAML и различия, исправьте schema errors,
+затем скопируйте команду и скачайте конфигурацию. <code>???</code> означает обязательный
+незаполненный ввод. Выражения вида <code>${oc.env:DATASET_CSV}</code> и custom resolvers остаются
+неразрешёнными: предпросмотр не читает ваше окружение и не вызывает пользовательские
+функции. Он также не читает датасеты, веса или JSON аугментаций.</p>
+<p>Ограничения preview: 32 документа, 1 MiB запроса, не более 100 вариантов sweep,
+15 секунд на worker. Имена документов должны оканчиваться на <code>.yaml</code>, как требует
+источник файлов Hydra; <code>.yml</code> не принимается. Пользовательские блоки <code>hydra</code>,
+Hydra overrides, внешние search paths и замена plugins/launcher/sweeper отклоняются
+до композиции. Параметры runtime Hydra передавайте в терминале. Произвольные Python
+targets не исполняются. Для реального запуска
+действуют runtime-проверки и доступность внешних ресурсов.</p>
+<h3>Перебор параметров</h3>
+<pre><code class="language-bash">cy-train -m ground_truth=./tutorial-data/ground_truth.csv ultralytics.model=yolo11n.pt \
+  ultralytics.epochs=1,2 ultralytics.batch=2 ultralytics.device=cpu \
+  ultralytics.compile=false clearml.project_name=cy-tutorial \
+  clearml.task_name=sweep 'clearml.tags=[tutorial,sweep]'
+</code></pre>
+<p>Прямой multirun использует последовательный BasicLauncher. Запятая в override
+задаёт варианты; список в квадратных скобках — одно значение. Для диапазонов
+используйте грамматику Hydra, например <code>'ultralytics.epochs=range(1,4)'</code>.
+В <code>cy-docs</code> включите sweep-предпросмотр и проверьте число jobs перед запуском.
+Перебор использует порядок и обработку повторных ключей штатного BasicSweeper Hydra;
+не смешивайте удаление, добавление и повторную замену одного ключа внутри sweep.
+Multirun добавляет один общий читаемый тег, сохраняя ваши теги.</p>
+<h3>Несколько GPU — один эксперимент</h3>
+<p>DDP отличается от sweep: одна модель обучается несколькими процессами. Выберите
+реально доступные устройства и отдельное устройство предсказаний:</p>
+<pre><code class="language-bash">cy ground_truth=./tutorial-data/ground_truth.csv ultralytics.model=yolo11n.pt \
+  'ultralytics.device=[0,1]' ultralytics.batch=8 ultralytics_predict.device=0 \
+  run_dir=./runs/ddp-yolo fiftyone.enabled=false clearml.project_name=cy-tutorial \
+  clearml.task_name=ddp-yolo 'clearml.tags=[tutorial,ddp]'
+</code></pre>
+<p>Для DEIMv2/RF-DETR/Faster R-CNN/FCOS служит <code>'model.train.device=[0,1]'</code>, а
+<code>model.predict.device=0</code> остаётся single-device. Публичный native batch глобальный,
+делится поровну между ranks; accumulation отдельно определяет эффективный optimizer
+batch. Используйте <a href="/#field=model.train.batch">model.train.batch</a> и настройки
+выбранного backend. Только владелец invocation публикует ClearML, rank zero владеет
+чекпойнтом. Наличие схемы и CPU-DDP тестов не подтверждает физический GPU/NCCL запуск
+на вашей машине. Для очереди устройства выбираются её интерфейсом, см.
+<a href="operations.html">операционный урок</a>.</p>
+<h2>Ожидаемый результат</h2>
+<p><code>--cfg job</code> и preview показывают composed YAML; <code>--resolve</code> у настоящего CLI может
+разрешить доступные ему выражения. Сайт показывает unresolved значения и отложенные
+runtime-проверки. Реальный sweep создаёт несколько запусков, DDP — один эксперимент
+с несколькими native ranks.</p>
+<h2>Частые ошибки</h2>
+<ul>
+<li>Потерян defaults: восстановите свежий экспорт в другом каталоге и сравните.</li>
+<li>Ключ находится не в той группе: фильтруйте справочник по команде и модели.</li>
+<li>Shell разделил список или интерполяцию: заключите весь override в одинарные кавычки.</li>
+<li>Preview отклонил external search path: перенесите нужные локальные YAML как
+именованные документы; plugin replacement в этой функции не поддерживается.</li>
+<li>DDP batch не делится на ranks или GPU занят: исправьте конфигурацию/выбор ресурсов;
+не подменяйте это успешной композицией.</li>
+</ul>
+<h2>Проверка</h2>
+<p>Сравните экспортированный wrapper, итоговую композицию и CLI overrides. Убедитесь,
+что нет незаполненных обязательных полей, и отдельно проверьте внешние входы.
+Для запуска сверяйте effective configuration из ClearML. Для DDP подтвердите
+реальные ranks, один best Output Model, owner-only публикацию и корректное завершение
+всех дочерних процессов; для sweep — число jobs и общий тег.</p>
+<p>Справочник общих флагов Hydra: <a href="/#field=hydra.--cfg">вывод конфигурации</a>,
+<a href="/#field=hydra.--config-dir">каталог</a>, <a href="/#field=hydra.--config-name">имя</a>,
+<a href="/#field=hydra.--multirun">перебор</a>. Эти флаги передаются в терминале;
+редактор принимает YAML и упорядоченные переопределения полей.</p>
+</main></body></html>
+<!-- source-sha256: 11b5ca2aa196866eb9f6ed32c7200cb80d7887ae885148d53dda6195367dbfc2 -->

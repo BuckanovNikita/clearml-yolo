@@ -2,7 +2,13 @@
 
 import argparse
 import sys
-from pathlib import Path
+
+from clearml_yolo.entrypoints.options import parser_for
+
+
+def parser() -> argparse.ArgumentParser:
+    """Return an inert parser backed by shared option declarations."""
+    return parser_for("cy-dedup")
 
 
 def main() -> None:
@@ -14,19 +20,8 @@ def main() -> None:
 
 
 def _main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "directory",
-        nargs="?",
-        type=Path,
-        help="cache to scan (default: CY_HOME/.cache or .cache in the current directory)",
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="report duplicate candidates without creating or replacing files",
-    )
-    arguments = parser.parse_args()
+    argument_parser = parser()
+    arguments = argument_parser.parse_args()
 
     from clearml_yolo.adapters.storage.dedup import deduplicate
     from clearml_yolo.adapters.storage.filesystem import cy_home
@@ -37,7 +32,7 @@ def _main() -> None:
     try:
         result = deduplicate(directory.expanduser(), dry_run=arguments.dry_run)
     except (OSError, ValueError) as error:
-        parser.error(str(error))
+        argument_parser.error(str(error))
 
     for issue in result.issues:
         sys.stderr.write(f"{issue}\n")

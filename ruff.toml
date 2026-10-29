@@ -67,6 +67,10 @@ ignore = [
     "ARG", "B903", "FURB118", "INP001", "PLC2701", "PLC2801", "PLR0904", "PLR2004",
     "RUF027", "RUF069", "S101", "S108", "S405", "SLF001",
 ]
+"browser_tests/**" = [
+    "ARG", "B903", "FURB118", "INP001", "PLC2701", "PLC2801", "PLR0904", "PLR2004",
+    "RUF027", "RUF069", "S101", "S108", "S405", "SLF001",
+]
 # Native dict mutation bypasses persistent SDK setters; frozen ResourceRequest validation
 # normalizes its default with object.__setattr__.
 "src/clearml_yolo/adapters/integrations/native_runtime.py" = ["PLC2801"]

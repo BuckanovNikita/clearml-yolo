@@ -1,0 +1,598 @@
+[
+  {
+    "id": "quickstart",
+    "title": "Первый эксперимент: установка и небольшой датасет",
+    "file": "quickstart.md",
+    "commands": [
+      "cy-docs",
+      "cy-train",
+      "cy-ground-truth"
+    ],
+    "groups": [
+      "clearml"
+    ],
+    "scenarios": [
+      "installation",
+      "clearml-setup",
+      "tiny-reproducible-dataset",
+      "csv-annotations",
+      "empty-images",
+      "disjoint-splits",
+      "local-input-paths",
+      "clearml-dataset-selector",
+      "yolo-annotation-conversion"
+    ],
+    "previews": [
+      {
+        "command": "train",
+        "documents": {},
+        "overrides": [
+          "ground_truth=./tutorial-data/ground_truth.csv",
+          "clearml.project_name=cy-tutorial",
+          "clearml.task_name=preview",
+          "clearml.tags=[tutorial]",
+          "ultralytics.model=yolo11n.pt",
+          "ultralytics.device=cpu",
+          "ultralytics.epochs=1",
+          "ultralytics.imgsz=128",
+          "ultralytics.batch=2",
+          "ultralytics.compile=false"
+        ],
+        "sweep": false
+      }
+    ]
+  },
+  {
+    "id": "training",
+    "title": "Обучение: семейства моделей, веса и память",
+    "file": "training.md",
+    "commands": [
+      "cy-train",
+      "cy-batch-estimate"
+    ],
+    "groups": [
+      "model",
+      "ultralytics"
+    ],
+    "scenarios": [
+      "all-model-families",
+      "architecture-versus-weights",
+      "fine-tuning",
+      "device-selection",
+      "image-size",
+      "batch-estimation",
+      "memory-errors",
+      "pretrained-initialization",
+      "offline-assets"
+    ],
+    "previews": [
+      {
+        "command": "train",
+        "documents": {},
+        "overrides": [
+          "ground_truth=./tutorial-data/ground_truth.csv",
+          "clearml.project_name=cy-tutorial",
+          "clearml.task_name=preview",
+          "clearml.tags=[tutorial]",
+          "model=ultralytics"
+        ],
+        "sweep": false
+      },
+      {
+        "command": "train",
+        "documents": {},
+        "overrides": [
+          "ground_truth=./tutorial-data/ground_truth.csv",
+          "clearml.project_name=cy-tutorial",
+          "clearml.task_name=preview",
+          "clearml.tags=[tutorial]",
+          "model=deimv2/s"
+        ],
+        "sweep": false
+      },
+      {
+        "command": "train",
+        "documents": {},
+        "overrides": [
+          "ground_truth=./tutorial-data/ground_truth.csv",
+          "clearml.project_name=cy-tutorial",
+          "clearml.task_name=preview",
+          "clearml.tags=[tutorial]",
+          "model=deimv2/m"
+        ],
+        "sweep": false
+      },
+      {
+        "command": "train",
+        "documents": {},
+        "overrides": [
+          "ground_truth=./tutorial-data/ground_truth.csv",
+          "clearml.project_name=cy-tutorial",
+          "clearml.task_name=preview",
+          "clearml.tags=[tutorial]",
+          "model=deimv2/l"
+        ],
+        "sweep": false
+      },
+      {
+        "command": "train",
+        "documents": {},
+        "overrides": [
+          "ground_truth=./tutorial-data/ground_truth.csv",
+          "clearml.project_name=cy-tutorial",
+          "clearml.task_name=preview",
+          "clearml.tags=[tutorial]",
+          "model=deimv2/x"
+        ],
+        "sweep": false
+      },
+      {
+        "command": "train",
+        "documents": {},
+        "overrides": [
+          "ground_truth=./tutorial-data/ground_truth.csv",
+          "clearml.project_name=cy-tutorial",
+          "clearml.task_name=preview",
+          "clearml.tags=[tutorial]",
+          "model=rfdetr/nano"
+        ],
+        "sweep": false
+      },
+      {
+        "command": "train",
+        "documents": {},
+        "overrides": [
+          "ground_truth=./tutorial-data/ground_truth.csv",
+          "clearml.project_name=cy-tutorial",
+          "clearml.task_name=preview",
+          "clearml.tags=[tutorial]",
+          "model=rfdetr/small"
+        ],
+        "sweep": false
+      },
+      {
+        "command": "train",
+        "documents": {},
+        "overrides": [
+          "ground_truth=./tutorial-data/ground_truth.csv",
+          "clearml.project_name=cy-tutorial",
+          "clearml.task_name=preview",
+          "clearml.tags=[tutorial]",
+          "model=rfdetr/medium"
+        ],
+        "sweep": false
+      },
+      {
+        "command": "train",
+        "documents": {},
+        "overrides": [
+          "ground_truth=./tutorial-data/ground_truth.csv",
+          "clearml.project_name=cy-tutorial",
+          "clearml.task_name=preview",
+          "clearml.tags=[tutorial]",
+          "model=rfdetr/large"
+        ],
+        "sweep": false
+      },
+      {
+        "command": "train",
+        "documents": {},
+        "overrides": [
+          "ground_truth=./tutorial-data/ground_truth.csv",
+          "clearml.project_name=cy-tutorial",
+          "clearml.task_name=preview",
+          "clearml.tags=[tutorial]",
+          "model=fasterrcnn/resnet50_fpn"
+        ],
+        "sweep": false
+      },
+      {
+        "command": "train",
+        "documents": {},
+        "overrides": [
+          "ground_truth=./tutorial-data/ground_truth.csv",
+          "clearml.project_name=cy-tutorial",
+          "clearml.task_name=preview",
+          "clearml.tags=[tutorial]",
+          "model=fasterrcnn/resnet101_fpn"
+        ],
+        "sweep": false
+      },
+      {
+        "command": "train",
+        "documents": {},
+        "overrides": [
+          "ground_truth=./tutorial-data/ground_truth.csv",
+          "clearml.project_name=cy-tutorial",
+          "clearml.task_name=preview",
+          "clearml.tags=[tutorial]",
+          "model=fasterrcnn/convnext_tiny"
+        ],
+        "sweep": false
+      },
+      {
+        "command": "train",
+        "documents": {},
+        "overrides": [
+          "ground_truth=./tutorial-data/ground_truth.csv",
+          "clearml.project_name=cy-tutorial",
+          "clearml.task_name=preview",
+          "clearml.tags=[tutorial]",
+          "model=fasterrcnn/swin_tiny"
+        ],
+        "sweep": false
+      },
+      {
+        "command": "train",
+        "documents": {},
+        "overrides": [
+          "ground_truth=./tutorial-data/ground_truth.csv",
+          "clearml.project_name=cy-tutorial",
+          "clearml.task_name=preview",
+          "clearml.tags=[tutorial]",
+          "model=fasterrcnn/dinov2_small"
+        ],
+        "sweep": false
+      },
+      {
+        "command": "train",
+        "documents": {},
+        "overrides": [
+          "ground_truth=./tutorial-data/ground_truth.csv",
+          "clearml.project_name=cy-tutorial",
+          "clearml.task_name=preview",
+          "clearml.tags=[tutorial]",
+          "model=fasterrcnn/dinov3_small"
+        ],
+        "sweep": false
+      },
+      {
+        "command": "train",
+        "documents": {},
+        "overrides": [
+          "ground_truth=./tutorial-data/ground_truth.csv",
+          "clearml.project_name=cy-tutorial",
+          "clearml.task_name=preview",
+          "clearml.tags=[tutorial]",
+          "model=fcos/resnet50_fpn"
+        ],
+        "sweep": false
+      },
+      {
+        "command": "train",
+        "documents": {},
+        "overrides": [
+          "ground_truth=./tutorial-data/ground_truth.csv",
+          "clearml.project_name=cy-tutorial",
+          "clearml.task_name=preview",
+          "clearml.tags=[tutorial]",
+          "model=fcos/resnet101_fpn"
+        ],
+        "sweep": false
+      },
+      {
+        "command": "train",
+        "documents": {},
+        "overrides": [
+          "ground_truth=./tutorial-data/ground_truth.csv",
+          "clearml.project_name=cy-tutorial",
+          "clearml.task_name=preview",
+          "clearml.tags=[tutorial]",
+          "model=fcos/convnext_tiny"
+        ],
+        "sweep": false
+      },
+      {
+        "command": "train",
+        "documents": {},
+        "overrides": [
+          "ground_truth=./tutorial-data/ground_truth.csv",
+          "clearml.project_name=cy-tutorial",
+          "clearml.task_name=preview",
+          "clearml.tags=[tutorial]",
+          "model=fcos/swin_tiny"
+        ],
+        "sweep": false
+      },
+      {
+        "command": "train",
+        "documents": {},
+        "overrides": [
+          "ground_truth=./tutorial-data/ground_truth.csv",
+          "clearml.project_name=cy-tutorial",
+          "clearml.task_name=preview",
+          "clearml.tags=[tutorial]",
+          "model=fcos/dinov2_small"
+        ],
+        "sweep": false
+      },
+      {
+        "command": "train",
+        "documents": {},
+        "overrides": [
+          "ground_truth=./tutorial-data/ground_truth.csv",
+          "clearml.project_name=cy-tutorial",
+          "clearml.task_name=preview",
+          "clearml.tags=[tutorial]",
+          "model=fcos/dinov3_small"
+        ],
+        "sweep": false
+      }
+    ]
+  },
+  {
+    "id": "evaluation",
+    "title": "Предсказания, метрики и сравнение",
+    "file": "evaluation.md",
+    "commands": [
+      "cy-predict",
+      "cy-val",
+      "cy-metrics",
+      "cy-compare",
+      "cy-report"
+    ],
+    "groups": [
+      "ultralytics_predict",
+      "evaluation",
+      "fiftyone"
+    ],
+    "scenarios": [
+      "prediction",
+      "validation",
+      "saved-prediction-metrics",
+      "val-calibration-test-thresholds",
+      "baseline-candidate-comparison",
+      "local-model-reference",
+      "per-class-thresholds",
+      "reports",
+      "fiftyone",
+      "artifact-provenance"
+    ],
+    "previews": [
+      {
+        "command": "metrics",
+        "documents": {},
+        "overrides": [
+          "ground_truth=./tutorial-data/ground_truth.csv",
+          "clearml.project_name=cy-tutorial",
+          "clearml.task_name=preview",
+          "clearml.tags=[tutorial]",
+          "predictions=./prediction/predictions.csv",
+          "output_dir=./metrics",
+          "splits=[val,test]",
+          "model_label=tutorial-yolo",
+          "fiftyone.enabled=false"
+        ],
+        "sweep": false
+      }
+    ]
+  },
+  {
+    "id": "pipeline",
+    "title": "Полный эксперимент и восстановление после сбоя",
+    "file": "pipeline.md",
+    "commands": [
+      "cy",
+      "cy-metrics"
+    ],
+    "groups": [
+      "metrics",
+      "compare",
+      "report"
+    ],
+    "scenarios": [
+      "complete-pipeline",
+      "first-experiment-without-baseline",
+      "explicit-baseline",
+      "individual-stages",
+      "skip-completed-work",
+      "reuse-outputs",
+      "failure-recovery",
+      "published-configuration",
+      "generated-snapshots-versus-inputs"
+    ],
+    "previews": [
+      {
+        "command": "pipeline",
+        "documents": {},
+        "overrides": [
+          "ground_truth=./tutorial-data/ground_truth.csv",
+          "clearml.project_name=cy-tutorial",
+          "clearml.task_name=preview",
+          "clearml.tags=[tutorial]",
+          "ultralytics.model=yolo11n.pt",
+          "ultralytics.device=cpu",
+          "ultralytics_predict.device=cpu",
+          "ultralytics.epochs=1",
+          "run_dir=./runs/tutorial-01",
+          "fiftyone.enabled=false"
+        ],
+        "sweep": false
+      }
+    ]
+  },
+  {
+    "id": "configuration",
+    "title": "Hydra: YAML, переопределения, переборы и DDP",
+    "file": "configuration.md",
+    "commands": [
+      "cy-init-config",
+      "cy-docs",
+      "cy",
+      "cy-train",
+      "cy-predict"
+    ],
+    "groups": [
+      "model",
+      "ultralytics",
+      "ultralytics_predict",
+      "transforms",
+      "transform_overrides"
+    ],
+    "scenarios": [
+      "generated-config-tree",
+      "defaults-composition",
+      "cli-precedence",
+      "interpolation",
+      "nested-overrides",
+      "list-overrides",
+      "null-overrides",
+      "sweeps",
+      "backend-specific-settings",
+      "ddp",
+      "preview-limits",
+      "deferred-runtime-checks"
+    ],
+    "previews": [
+      {
+        "command": "train",
+        "documents": {},
+        "overrides": [
+          "ground_truth=./tutorial-data/ground_truth.csv",
+          "clearml.project_name=cy-tutorial",
+          "clearml.task_name=preview",
+          "clearml.tags=[tutorial]",
+          "model=rfdetr/small",
+          "model.train.epochs=2",
+          "model.train.device=cpu"
+        ],
+        "sweep": false
+      },
+      {
+        "command": "train",
+        "documents": {},
+        "overrides": [
+          "ground_truth=./tutorial-data/ground_truth.csv",
+          "clearml.project_name=cy-tutorial",
+          "clearml.task_name=preview",
+          "clearml.tags=[tutorial]",
+          "ultralytics.epochs=1,2"
+        ],
+        "sweep": true
+      }
+    ]
+  },
+  {
+    "id": "customization",
+    "title": "Свои аугментации и программная композиция",
+    "file": "customization.md",
+    "commands": [
+      "cy-train",
+      "cy-predict",
+      "cy-metrics"
+    ],
+    "groups": [
+      "transforms",
+      "transform_overrides"
+    ],
+    "scenarios": [
+      "albumentations-json",
+      "mosaic",
+      "backend-preprocessing",
+      "separate-stage-composition",
+      "custom-processing-between-stages",
+      "workflow-dependencies",
+      "dataclasses-replace",
+      "complete-invocation-lifecycle",
+      "augmentation-snapshot"
+    ],
+    "previews": [
+      {
+        "command": "train",
+        "documents": {},
+        "overrides": [
+          "ground_truth=./tutorial-data/ground_truth.csv",
+          "clearml.project_name=cy-tutorial",
+          "clearml.task_name=preview",
+          "clearml.tags=[tutorial]",
+          "model=rfdetr/nano",
+          "transforms=albumentations",
+          "transforms.pipeline_file=./augmentation.json"
+        ],
+        "sweep": false
+      }
+    ]
+  },
+  {
+    "id": "operations",
+    "title": "Операции: Agent, очередь, кэши и подготовка весов",
+    "file": "operations.md",
+    "commands": [
+      "cy-download-weights",
+      "cy-dedup",
+      "cy-init-config",
+      "cy-queue"
+    ],
+    "groups": [
+      "clearml",
+      "model"
+    ],
+    "scenarios": [
+      "clearml-agent-replay",
+      "queue-installation",
+      "queue-submission",
+      "queue-recovery",
+      "queue-archive",
+      "queue-gpu-ownership",
+      "cache-maintenance",
+      "weight-preparation",
+      "offline-assets",
+      "proxy-troubleshooting"
+    ],
+    "previews": [
+      {
+        "command": "train",
+        "documents": {},
+        "overrides": [
+          "ground_truth=./tutorial-data/ground_truth.csv",
+          "clearml.project_name=cy-tutorial",
+          "clearml.task_name=preview",
+          "clearml.tags=[tutorial]",
+          "ultralytics.model=yolo11n.pt"
+        ],
+        "sweep": false
+      }
+    ]
+  },
+  {
+    "id": "deployment",
+    "title": "ONNX и TensorRT: экспорт, сборка и проверка",
+    "file": "deployment.md",
+    "commands": [
+      "cy-export",
+      "cy-init-config"
+    ],
+    "groups": [
+      "model",
+      "export"
+    ],
+    "scenarios": [
+      "onnx-export",
+      "tensorrt-build",
+      "tensorrt-verification",
+      "standalone-runner",
+      "dynamic-shapes",
+      "artifact-metadata",
+      "deployment-troubleshooting",
+      "native-capability-limitations"
+    ],
+    "previews": [
+      {
+        "command": "export",
+        "documents": {},
+        "overrides": [
+          "model=fasterrcnn/resnet50_fpn",
+          "weights=./best.pth",
+          "export.operation=onnx",
+          "export.device=cpu",
+          "export.precision=fp32",
+          "output_dir=./exported/onnx",
+          "clearml.project_name=cy-tutorial",
+          "clearml.task_name=export-preview",
+          "clearml.tags=[tutorial]"
+        ],
+        "sweep": false
+      }
+    ]
+  }
+]

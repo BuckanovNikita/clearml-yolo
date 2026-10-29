@@ -1,5 +1,7 @@
 """Project-owned requests and results shared by workflows and their adapters."""
 
+# ruff: noqa: RUF001 -- Public configuration documentation is intentionally Russian.
+
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -39,10 +41,59 @@ class ClearMLDatasetRef(BaseModel):
     """One immutable dataset ID or a named dataset with an optional version."""
 
     model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
-    dataset_id: str | None = None
-    project_name: str | None = None
-    name: str | None = None
-    version: str | None = None
+    dataset_id: str | None = Field(
+        default=None,
+        description=(
+            "Идентификатор неизменяемой версии ClearML Dataset. Не совмещается с "
+            "именованным селектором."
+        ),
+        examples=["dataset-id"],
+        json_schema_extra={
+            "shapes": "str | None",
+            "applicability": "ClearMLDatasetRef",
+            "source": "clearml_yolo.application.contracts.ClearMLDatasetRef.dataset_id",
+            "classification": "input",
+        },
+    )
+    project_name: str | None = Field(
+        default=None,
+        description=(
+            "Имя проекта ClearML Dataset; обязательно вместе с name, когда dataset_id не задан."
+        ),
+        examples=["datasets"],
+        json_schema_extra={
+            "shapes": "str | None",
+            "applicability": "ClearMLDatasetRef",
+            "source": "clearml_yolo.application.contracts.ClearMLDatasetRef.project_name",
+            "classification": "input",
+        },
+    )
+    name: str | None = Field(
+        default=None,
+        description=(
+            "Имя набора ClearML Dataset; обязательно вместе с project_name при поиске по имени."
+        ),
+        examples=["inspection"],
+        json_schema_extra={
+            "shapes": "str | None",
+            "applicability": "ClearMLDatasetRef",
+            "source": "clearml_yolo.application.contracts.ClearMLDatasetRef.name",
+            "classification": "input",
+        },
+    )
+    version: str | None = Field(
+        default=None,
+        description=(
+            "Версия именованного ClearML Dataset; null оставляет выбор версии механизму ClearML."
+        ),
+        examples=["1.0.0"],
+        json_schema_extra={
+            "shapes": "str | None",
+            "applicability": "ClearMLDatasetRef",
+            "source": "clearml_yolo.application.contracts.ClearMLDatasetRef.version",
+            "classification": "input",
+        },
+    )
 
     @field_validator("dataset_id", "project_name", "name", "version")
     @classmethod
@@ -73,20 +124,79 @@ class ResolvedGroundTruth:
     csv_sha256: str | None = None
 
 
-type GroundTruthInput = (
-    str | Path | ClearMLDatasetRef | Mapping[str, object] | ResolvedGroundTruth
-)
+type GroundTruthInput = str | Path | ClearMLDatasetRef | Mapping[str, object] | ResolvedGroundTruth
 
 
 class ClearMLConfig(BaseModel):
     """Identity of the ClearML experiment this run belongs to."""
 
     model_config = ConfigDict(extra="forbid")
-    project_name: str = DEFAULT_PROJECT_NAME
-    task_name: str = "yolo-run"
-    task_type: str = "training"
-    tags: list[str] = Field(default_factory=list)
-    output_uri: str | bool | None = True
+    project_name: str = Field(
+        default=DEFAULT_PROJECT_NAME,
+        description=(
+            "Проект ClearML для текущего эксперимента. Задавайте явно, чтобы "
+            "разделять рабочие запуски."
+        ),
+        examples=["experiments"],
+        json_schema_extra={
+            "shapes": "str",
+            "applicability": "ClearMLConfig",
+            "source": "clearml_yolo.application.contracts.ClearMLConfig.project_name",
+            "classification": "input",
+        },
+    )
+    task_name: str = Field(
+        default="yolo-run",
+        description=(
+            "Читаемое имя задачи ClearML; влияет также на безопасное имя неявного"
+            " каталога результатов."
+        ),
+        examples=["first-training"],
+        json_schema_extra={
+            "shapes": "str",
+            "applicability": "ClearMLConfig",
+            "source": "clearml_yolo.application.contracts.ClearMLConfig.task_name",
+            "classification": "input",
+        },
+    )
+    task_type: str = Field(
+        default="training",
+        description="Тип задачи ClearML, публикуемой владельцем операции.",
+        examples=["training"],
+        json_schema_extra={
+            "shapes": "str",
+            "applicability": "ClearMLConfig",
+            "source": "clearml_yolo.application.contracts.ClearMLConfig.task_type",
+            "classification": "input",
+        },
+    )
+    tags: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Теги задачи ClearML; задавайте список строк для поиска и группировки экспериментов."
+        ),
+        examples=[["tutorial"]],
+        json_schema_extra={
+            "shapes": "list[str]",
+            "applicability": "ClearMLConfig",
+            "source": "clearml_yolo.application.contracts.ClearMLConfig.tags",
+            "classification": "input",
+        },
+    )
+    output_uri: str | bool | None = Field(
+        default=True,
+        description=(
+            "Удалённое хранилище артефактов: true использует настройки ClearML, "
+            "строка задаёт URI. false, null и пустая строка запрещены."
+        ),
+        examples=[True],
+        json_schema_extra={
+            "shapes": "str | bool | None",
+            "applicability": "ClearMLConfig",
+            "source": "clearml_yolo.application.contracts.ClearMLConfig.output_uri",
+            "classification": "input",
+        },
+    )
 
     @model_validator(mode="after")
     def _validate_tracking_destination(self) -> Self:
@@ -200,19 +310,173 @@ class ModelRef(BaseModel):
     """A checkpoint and the exact thresholds calibrated for it."""
 
     model_config = ConfigDict(extra="forbid")
-    source: ModelSource = "clearml"
-    task_id: str | None = None
-    project_name: str | None = None
-    task_name: str | None = None
-    tags: list[str] = Field(default_factory=lambda: ["prod"])
-    weights: Path | None = None
-    thresholds: dict[str, float] | None = None
-    label: str | None = None
-    backend: BackendName | None = None
-    preset: str | None = None
-    source_dir: Path | None = None
-    class_names: tuple[str, ...] | None = None
-    preprocessing: Preprocessing | None = None
+    source: ModelSource = Field(
+        default="clearml",
+        description=(
+            "Источник checkpoint: clearml для поиска опубликованной модели либо local для файла."
+        ),
+        examples=["clearml"],
+        json_schema_extra={
+            "shapes": "ModelSource",
+            "applicability": "ModelRef",
+            "source": "clearml_yolo.application.contracts.ModelRef.source",
+            "classification": "input",
+        },
+    )
+    task_id: str | None = Field(
+        default=None,
+        description="Точный идентификатор задачи ClearML; не допускается с source=local.",
+        examples=["task-id"],
+        json_schema_extra={
+            "shapes": "str | None",
+            "applicability": "ModelRef",
+            "source": "clearml_yolo.application.contracts.ModelRef.task_id",
+            "classification": "input",
+        },
+    )
+    project_name: str | None = Field(
+        default=None,
+        description="Проект поиска задачи ClearML, если точный task_id не задан.",
+        examples=["experiments"],
+        json_schema_extra={
+            "shapes": "str | None",
+            "applicability": "ModelRef",
+            "source": "clearml_yolo.application.contracts.ModelRef.project_name",
+            "classification": "input",
+        },
+    )
+    task_name: str | None = Field(
+        default=None,
+        description="Имя задачи при поиске checkpoint в ClearML.",
+        examples=["baseline"],
+        json_schema_extra={
+            "shapes": "str | None",
+            "applicability": "ModelRef",
+            "source": "clearml_yolo.application.contracts.ModelRef.task_name",
+            "classification": "input",
+        },
+    )
+    tags: list[str] = Field(
+        default_factory=lambda: ["prod"],
+        description="Теги поиска опубликованной модели; по умолчанию выбирается prod.",
+        examples=[["prod"]],
+        json_schema_extra={
+            "shapes": "list[str]",
+            "applicability": "ModelRef",
+            "source": "clearml_yolo.application.contracts.ModelRef.tags",
+            "classification": "input",
+        },
+    )
+    weights: Path | None = Field(
+        default=None,
+        description=(
+            "Локальный checkpoint; обязателен для source=local и запрещён для source=clearml."
+        ),
+        examples=["best.pth"],
+        json_schema_extra={
+            "shapes": "Path | None",
+            "applicability": "ModelRef",
+            "source": "clearml_yolo.application.contracts.ModelRef.weights",
+            "classification": "input",
+        },
+    )
+    thresholds: dict[str, float] | None = Field(
+        default=None,
+        description=(
+            "Точные пороги уверенности по именам классов, откалиброванные для "
+            "этого checkpoint на val. Для local непустая карта обязательна."
+        ),
+        examples=[{"defect": 0.35}],
+        json_schema_extra={
+            "shapes": "dict[str, float] | None",
+            "applicability": "ModelRef",
+            "source": "clearml_yolo.application.contracts.ModelRef.thresholds",
+            "classification": "input",
+        },
+    )
+    label: str | None = Field(
+        default=None,
+        description=(
+            "Читаемая подпись модели в сравнении; null использует разрешённую идентичность."
+        ),
+        examples=["baseline"],
+        json_schema_extra={
+            "shapes": "str | None",
+            "applicability": "ModelRef",
+            "source": "clearml_yolo.application.contracts.ModelRef.label",
+            "classification": "input",
+        },
+    )
+    backend: BackendName | None = Field(
+        default=None,
+        description=(
+            "Семейство нативного checkpoint; задаётся вместе с preset для "
+            "проверки или описания сырых весов."
+        ),
+        examples=["fasterrcnn"],
+        json_schema_extra={
+            "shapes": "BackendName | None",
+            "applicability": "ModelRef",
+            "source": "clearml_yolo.application.contracts.ModelRef.backend",
+            "classification": "input",
+        },
+    )
+    preset: str | None = Field(
+        default=None,
+        description=(
+            "Архитектура checkpoint из реестра выбранного backend; backend и "
+            "preset задаются вместе."
+        ),
+        examples=["resnet50_fpn"],
+        json_schema_extra={
+            "shapes": "str | None",
+            "applicability": "ModelRef",
+            "source": "clearml_yolo.application.contracts.ModelRef.preset",
+            "classification": "input",
+        },
+    )
+    source_dir: Path | None = Field(
+        default=None,
+        description=(
+            "Путь к исходникам DEIMv2 для сырых checkpoint; требует backend и "
+            "preset, для остальных семейств запрещён."
+        ),
+        examples=["vendor/DEIMv2"],
+        json_schema_extra={
+            "shapes": "Path | None",
+            "applicability": "ModelRef",
+            "source": "clearml_yolo.application.contracts.ModelRef.source_dir",
+            "classification": "input",
+        },
+    )
+    class_names: tuple[str, ...] | None = Field(
+        default=None,
+        description=(
+            "Имена foreground-классов сырых весов в порядке выходов модели. "
+            "Требуют backend и preset."
+        ),
+        examples=[["defect"]],
+        json_schema_extra={
+            "shapes": "tuple[str, ...] | None",
+            "applicability": "ModelRef",
+            "source": "clearml_yolo.application.contracts.ModelRef.class_names",
+            "classification": "input",
+        },
+    )
+    preprocessing: Preprocessing | None = Field(
+        default=None,
+        description=(
+            "Явная схема подготовки изображений для сырых checkpoint. Требует "
+            "backend и preset; не меняет обученные веса."
+        ),
+        examples=[{"resize": "shortest_edge", "size": 800}],
+        json_schema_extra={
+            "shapes": "Preprocessing | None",
+            "applicability": "ModelRef",
+            "source": "clearml_yolo.application.contracts.ModelRef.preprocessing",
+            "classification": "input",
+        },
+    )
 
     @model_validator(mode="after")
     def _validate_source(self) -> Self:

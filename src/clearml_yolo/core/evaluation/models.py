@@ -17,16 +17,146 @@ class EvaluationConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    iou_threshold: float = Field(default=0.5, ge=0, le=1, allow_inf_nan=False)
-    matching_strategy: Literal["greedy", "hungarian", "iou_prior"] = "iou_prior"
-    ap_method: Literal["interp", "continuous"] = "interp"
-    confidence_optimization: str = "per_class"
-    skip_cohen_kappa: bool = True
-    preprocess: bool = False
-    preprocess_preds_conf_threshold: float | None = None
-    preprocess_preds_nms_containment_threshold: float | None = None
-    preprocess_preds_nms_iou_threshold: float | None = None
-    backend: str | None = None
+    iou_threshold: float = Field(
+        default=0.5,
+        ge=0,
+        le=1,
+        allow_inf_nan=False,
+        description="Минимальный IoU совпадения разметки и предсказания, от 0 до 1 включительно.",
+        examples=[0.5],
+        json_schema_extra={
+            "shapes": "float",
+            "applicability": "EvaluationConfig",
+            "source": "clearml_yolo.core.evaluation.models.EvaluationConfig.iou_threshold",
+            "classification": "input",
+        },
+    )
+    matching_strategy: Literal["greedy", "hungarian", "iou_prior"] = Field(
+        default="iou_prior",
+        description="Стратегия сопоставления детекций: greedy, hungarian либо iou_prior.",
+        examples=["iou_prior"],
+        json_schema_extra={
+            "shapes": "Literal['greedy', 'hungarian', 'iou_prior']",
+            "applicability": "EvaluationConfig",
+            "source": "clearml_yolo.core.evaluation.models.EvaluationConfig.matching_strategy",
+            "classification": "input",
+        },
+    )
+    ap_method: Literal["interp", "continuous"] = Field(
+        default="interp",
+        description=(
+            "Метод расчёта AP: интерполированная кривая interp либо непрерывный continuous."
+        ),
+        examples=["interp"],
+        json_schema_extra={
+            "shapes": "Literal['interp', 'continuous']",
+            "applicability": "EvaluationConfig",
+            "source": "clearml_yolo.core.evaluation.models.EvaluationConfig.ap_method",
+            "classification": "input",
+        },
+    )
+    confidence_optimization: str = Field(
+        default="per_class",
+        description=(
+            "Подбор порогов на val: per_class отдельно для каждого класса либо global для всех."
+        ),
+        examples=["per_class"],
+        json_schema_extra={
+            "shapes": "str",
+            "applicability": "EvaluationConfig",
+            "source": (
+                "clearml_yolo.core.evaluation.models.EvaluationConfig.confidence_optimization"
+            ),
+            "classification": "input",
+        },
+    )
+    skip_cohen_kappa: bool = Field(
+        default=True,
+        description="Пропустить вычисление коэффициента согласия Коэна.",
+        examples=[True],
+        json_schema_extra={
+            "shapes": "bool",
+            "applicability": "EvaluationConfig",
+            "source": "clearml_yolo.core.evaluation.models.EvaluationConfig.skip_cohen_kappa",
+            "classification": "input",
+        },
+    )
+    preprocess: bool = Field(
+        default=False,
+        description="Включить предварительную обработку предсказаний перед расчётом метрик.",
+        examples=[False],
+        json_schema_extra={
+            "shapes": "bool",
+            "applicability": "EvaluationConfig",
+            "source": "clearml_yolo.core.evaluation.models.EvaluationConfig.preprocess",
+            "classification": "input",
+        },
+    )
+    preprocess_preds_conf_threshold: float | None = Field(
+        default=None,
+        description=(
+            "Порог уверенности предварительной фильтрации; null сохраняет "
+            "поведение движка метрик. Действует при preprocess=true."
+        ),
+        examples=[0.001],
+        json_schema_extra={
+            "shapes": "float | None",
+            "applicability": "EvaluationConfig",
+            "source": (
+                "clearml_yolo.core.evaluation.models.EvaluationConfig."
+                "preprocess_preds_conf_threshold"
+            ),
+            "classification": "input",
+        },
+    )
+    preprocess_preds_nms_containment_threshold: float | None = Field(
+        default=None,
+        description=(
+            "Порог вложенности для предварительного NMS; null оставляет выбор "
+            "движку. Действует при preprocess=true."
+        ),
+        examples=[0.9],
+        json_schema_extra={
+            "shapes": "float | None",
+            "applicability": "EvaluationConfig",
+            "source": (
+                "clearml_yolo.core.evaluation.models.EvaluationConfig."
+                "preprocess_preds_nms_containment_threshold"
+            ),
+            "classification": "input",
+        },
+    )
+    preprocess_preds_nms_iou_threshold: float | None = Field(
+        default=None,
+        description=(
+            "Порог IoU для предварительного NMS; null оставляет выбор движку. "
+            "Действует при preprocess=true."
+        ),
+        examples=[0.7],
+        json_schema_extra={
+            "shapes": "float | None",
+            "applicability": "EvaluationConfig",
+            "source": (
+                "clearml_yolo.core.evaluation.models.EvaluationConfig."
+                "preprocess_preds_nms_iou_threshold"
+            ),
+            "classification": "input",
+        },
+    )
+    backend: str | None = Field(
+        default=None,
+        description=(
+            "Backend библиотеки digital-metrics; null использует её штатный "
+            "выбор. Допустимость проверяется во время вычисления."
+        ),
+        examples=[None],
+        json_schema_extra={
+            "shapes": "str | None",
+            "applicability": "EvaluationConfig",
+            "source": "clearml_yolo.core.evaluation.models.EvaluationConfig.backend",
+            "classification": "input",
+        },
+    )
 
 
 class DetectionMetrics(BaseModel):

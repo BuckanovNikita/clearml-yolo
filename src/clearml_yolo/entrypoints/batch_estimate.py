@@ -24,6 +24,7 @@ from clearml_yolo.core.batch_estimation import (
     select_models,
     select_recommendation,
 )
+from clearml_yolo.entrypoints.options import parser_for
 
 
 class _Options(BaseModel):
@@ -38,56 +39,9 @@ class _Options(BaseModel):
     refresh: bool
 
 
-def _integers(value: str) -> tuple[int, ...]:
-    try:
-        result = tuple(int(part.strip()) for part in value.split(","))
-    except ValueError as error:
-        raise argparse.ArgumentTypeError("Use comma-separated integer values") from error
-    if not result or len(set(result)) != len(result) or min(result) < 0:
-        raise argparse.ArgumentTypeError("Values must be unique nonnegative integers")
-    return result
-
-
-def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="cy-batch-estimate", description=__doc__)
-    parser.add_argument(
-        "--imgsz", type=int, required=True, help="nominal square training resolution"
-    )
-    parser.add_argument("--classes", type=int, default=150, help="synthetic classes (default: 150)")
-    parser.add_argument(
-        "--objects-per-image", type=int, default=300, help="synthetic objects (default: 300)"
-    )
-    parser.add_argument(
-        "--models", help="comma-separated model presets or YOLO asset names; default: all"
-    )
-    parser.add_argument(
-        "--devices", type=_integers, help="ordered logical visible CUDA indexes; default: all"
-    )
-    parser.add_argument(
-        "--gpu-counts",
-        type=_integers,
-        help="report recommendations for first N selected GPUs; no extra searches; default: 1..all",
-    )
-    parser.add_argument("--refresh", action="store_true", help="repeat completed compatible cases")
-    parser.add_argument(
-        "--memory-budget",
-        type=float,
-        default=0.9,
-        help="fraction of each GPU's total memory (default: 0.9)",
-    )
-    parser.add_argument(
-        "--search-limit",
-        type=int,
-        default=1024,
-        help="per-GPU search ceiling (default: 1024); extrapolated global batches may exceed it",
-    )
-    parser.add_argument(
-        "--trial-timeout",
-        type=float,
-        default=300,
-        help="seconds per fresh trial group (default: 300)",
-    )
-    return parser
+def parser() -> argparse.ArgumentParser:
+    """Return an inert parser backed by shared option declarations."""
+    return parser_for("cy-batch-estimate")
 
 
 def _options(arguments: argparse.Namespace) -> _Options:
@@ -230,14 +184,14 @@ def _execute(options: _Options) -> bool:
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    parser = _parser()
-    arguments = parser.parse_args(argv)
+    argument_parser = parser()
+    arguments = argument_parser.parse_args(argv)
     try:
         options = _options(arguments)
         with runtime_environment():
             successful = _execute(options)
     except (OSError, RuntimeError, ValueError) as error:
-        parser.error(str(error))
+        argument_parser.error(str(error))
     if not successful:
         raise SystemExit(1)
 

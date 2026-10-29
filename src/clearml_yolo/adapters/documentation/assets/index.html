@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>CY · Справочник конфигурации</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">К содержимому</a>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="CY — главная"><span class="brand-mark">CY</span><span>Рабочая тетрадь<small>конфигурация и эксперименты</small></span></a>
+    <span class="local-badge"><span aria-hidden="true">●</span> Локально · без интернета</span>
+  </header>
+  <main id="main">
+    <section class="intro" aria-labelledby="page-title">
+      <div><p class="eyebrow">CLEARML YOLO <span id="version"></span></p><h1 id="page-title">От параметра<br>к эксперименту.</h1><p class="lead">Найдите настройку, соберите конфигурацию и продолжите в терминале.</p></div>
+      <aside class="intro-note"><span class="note-number">01 / 03</span><p>Справочник объясняет значения.<br>Редактор показывает композицию.<br>Уроки связывают шаги в результат.</p><code>cy-docs</code></aside>
+    </section>
+    <nav class="section-nav" aria-label="Разделы документации">
+      <a href="#reference">01 <span>Справочник</span></a><a href="#editor">02 <span>Редактор</span></a><a href="#tutorials">03 <span>Уроки</span></a>
+    </nav>
+    <p id="load-status" class="status" role="status">Загружаем установленную конфигурацию…</p>
+    <div id="load-error" class="alert" role="alert" hidden></div>
+    <div id="workspace" hidden>
+      <section id="reference" class="section" aria-labelledby="reference-title">
+        <div class="section-heading"><div><p class="eyebrow">01 · СПРАВОЧНИК</p><h2 id="reference-title">Настройки без догадок</h2></div><p>Значения берутся из установленной версии CY.</p></div>
+        <form id="filters" class="filter-bar" role="search">
+          <div class="search-control"><label for="search">Найти параметр</label><input id="search" type="search" autocomplete="off" placeholder="batch, ground_truth, порог…" aria-describedby="search-hint"><span id="search-hint" class="hint">Название, описание или пример · клавиша /</span></div>
+          <div><label for="command">Команда</label><select id="command"></select></div>
+          <div><label for="model">Модель</label><select id="model"></select></div>
+          <div><label for="profile">Аугментации</label><select id="profile"></select></div>
+          <label class="check-label inactive-toggle" for="show-inactive"><input id="show-inactive" type="checkbox"> Показать неактивные для выбранной модели поля</label>
+        </form>
+        <div class="reference-grid">
+          <div class="field-index"><p id="field-count" class="small-label" role="status"></p><ul id="field-list" aria-label="Параметры"></ul><p id="no-fields" hidden>Параметры не найдены. Измените запрос или команду.</p></div>
+          <article id="field-detail" class="field-detail" aria-label="Описание параметра" tabindex="-1"><p class="hint">Выберите параметр слева.</p></article>
+        </div>
+      </section>
+      <section id="editor" class="section" aria-labelledby="editor-title">
+        <div class="section-heading"><div><p class="eyebrow">02 · РЕДАКТОР</p><h2 id="editor-title">Проверьте композицию</h2></div><p>Файлы, данные и обучение проверяются при запуске в терминале.</p></div>
+        <p id="editor-context" class="context-line"></p>
+        <div class="editor-grid">
+          <form id="preview-form" class="editor-input">
+            <div class="panel-heading"><h3>Документы YAML</h3><div class="button-row"><button id="add-document" type="button" class="quiet">+ Документ</button><button id="reset-document" type="button" class="quiet">Начальный пример</button></div></div>
+            <p class="hint">Первый документ — корневая конфигурация. Имена остальных используются в defaults.</p>
+            <div id="documents"></div>
+            <label for="overrides">Переопределения по порядку</label><textarea id="overrides" class="code-input" rows="5" spellcheck="false" placeholder="ground_truth=./ground_truth.csv&#10;ultralytics.epochs=1" aria-describedby="override-hint"></textarea>
+            <p id="override-hint" class="hint">Одна запись Hydra на строку. Поздние значения имеют приоритет. Не добавляйте shell-кавычки вокруг всей строки.</p>
+            <label class="check-label" for="sweep"><input id="sweep" type="checkbox"> Развернуть перебор параметров (до 100 запусков)</label>
+            <div class="action-row"><button id="preview" class="primary" type="submit">Предпросмотр <span aria-hidden="true">→</span></button><span class="hint">Ctrl / ⌘ + Enter</span></div>
+          </form>
+          <aside class="editor-help" aria-label="Подсказки редактора"><h3>Рядом с конфигурацией</h3><p>Нажмите пример в справочнике, чтобы добавить переопределение. Вложенные значения и списки записываются синтаксисом Hydra.</p><div id="editor-field-help"></div><details><summary>Исходная композиция</summary><p class="hint">Для выбранных команды, модели и профиля; выражения сохраняются.</p><pre id="default-yaml" tabindex="0"></pre></details><p class="hint">Секреты из окружения не подставляются. Предпросмотр не читает датасет и файл аугментаций.</p></aside>
+        </div>
+        <div id="preview-status" class="status" role="status" aria-live="polite"></div>
+        <div id="preview-error" class="alert" role="alert" hidden></div>
+        <section id="result" class="result" aria-label="Результат предпросмотра" hidden>
+          <div class="panel-heading"><h3>Собранная конфигурация</h3><div class="job-choice"><label for="job">Запуск</label><select id="job"></select></div></div>
+          <div id="job-errors" class="alert" hidden></div>
+          <div class="result-grid"><div><div class="button-row"><button id="copy-yaml" type="button" class="quiet">Копировать YAML</button><button id="download-yaml" type="button" class="quiet">Скачать YAML</button></div><pre id="result-yaml" tabindex="0" aria-label="Собранный YAML"></pre></div><div class="differences"><h4>Изменения от исходной композиции</h4><div id="diff"></div><h4>Неразрешённые значения</h4><ul id="unresolved"></ul></div></div>
+          <h4>Команда для терминала</h4><p class="hint">Сохраните редактируемые документы с теми же именами в каталог конфигурации. JSON содержит пары «имя документа → YAML»; собранный YAML скачивается отдельно.</p><pre id="result-command" tabindex="0"></pre><div class="button-row"><button id="copy-command" type="button" class="quiet">Копировать команду</button><button id="download-command" type="button" class="quiet">Скачать команду</button><button id="download-documents" type="button" class="quiet">Скачать документы JSON</button></div>
+          <details class="deferred" open><summary>Что проверить при реальном запуске</summary><ul id="deferred-checks"></ul></details>
+        </section>
+      </section>
+      <section id="tutorials" class="section" aria-labelledby="tutorials-title"><div class="section-heading"><div><p class="eyebrow">03 · УРОКИ</p><h2 id="tutorials-title">Пройдите весь путь</h2></div><p>От первого набора данных до своего сценария обработки.</p></div><div id="tutorial-list" class="tutorial-grid"></div></section>
+    </div>
+  </main>
+  <footer><span>CY · Русская документация</span><span>Обучение и публикация запускаются из терминала.</span></footer>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

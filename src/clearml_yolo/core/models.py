@@ -1,5 +1,7 @@
 """Validated detector recipes and portable checkpoint metadata, without SDK imports."""
 
+# ruff: noqa: RUF001 -- Public configuration documentation is intentionally Russian.
+
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Annotated, Any, Literal, Self
@@ -50,20 +52,105 @@ class DeimAugmentationOverrides(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    mosaic_prob: Annotated[float, Field(ge=0, le=1)]
-    mixup_prob: Annotated[float, Field(ge=0, le=1)]
-    copyblend_prob: Annotated[float, Field(ge=0, le=1)]
-    base_size_repeat: StrictInt | None
-    ops: list[dict[str, JsonValue]]
+    mosaic_prob: Annotated[float, Field(ge=0, le=1)] = Field(
+        description=(
+            "Вероятность нативного Mosaic DEIMv2 от 0 до 1; общий Albumentations-профиль задаёт 0."
+        ),
+        examples=[0.0],
+        json_schema_extra={
+            "shapes": "Annotated[float, Field(ge=0, le=1)]",
+            "applicability": "DeimAugmentationOverrides",
+            "source": "clearml_yolo.core.models.DeimAugmentationOverrides.mosaic_prob",
+            "classification": "input",
+        },
+    )
+    mixup_prob: Annotated[float, Field(ge=0, le=1)] = Field(
+        description="Вероятность нативного MixUp DEIMv2 от 0 до 1; общий профиль задаёт 0.",
+        examples=[0.0],
+        json_schema_extra={
+            "shapes": "Annotated[float, Field(ge=0, le=1)]",
+            "applicability": "DeimAugmentationOverrides",
+            "source": "clearml_yolo.core.models.DeimAugmentationOverrides.mixup_prob",
+            "classification": "input",
+        },
+    )
+    copyblend_prob: Annotated[float, Field(ge=0, le=1)] = Field(
+        description="Вероятность нативного CopyBlend DEIMv2 от 0 до 1; общий профиль задаёт 0.",
+        examples=[0.0],
+        json_schema_extra={
+            "shapes": "Annotated[float, Field(ge=0, le=1)]",
+            "applicability": "DeimAugmentationOverrides",
+            "source": "clearml_yolo.core.models.DeimAugmentationOverrides.copyblend_prob",
+            "classification": "input",
+        },
+    )
+    base_size_repeat: StrictInt | None = Field(
+        description="Нативный повтор выбора базового размера DEIMv2; общий профиль задаёт null.",
+        examples=[None],
+        json_schema_extra={
+            "shapes": "StrictInt | None",
+            "applicability": "DeimAugmentationOverrides",
+            "source": "clearml_yolo.core.models.DeimAugmentationOverrides.base_size_repeat",
+            "classification": "input",
+        },
+    )
+    ops: list[dict[str, JsonValue]] = Field(
+        description="Список нативных операций DEIMv2; при общем pipeline остаётся пустым.",
+        examples=[[]],
+        json_schema_extra={
+            "shapes": "list[dict[str, JsonValue]]",
+            "applicability": "DeimAugmentationOverrides",
+            "source": "clearml_yolo.core.models.DeimAugmentationOverrides.ops",
+            "classification": "input",
+        },
+    )
 
 
 class RFDETRAugmentationOverrides(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    aug_config: dict[str, JsonValue]
-    augmentation_backend: str
-    scale_jitter: StrictBool
-    multi_scale: str
+    aug_config: dict[str, JsonValue] = Field(
+        description=(
+            "Карта нативной аугментации RF-DETR; общий pipeline отключает её пустой картой."
+        ),
+        examples=[{}],
+        json_schema_extra={
+            "shapes": "dict[str, JsonValue]",
+            "applicability": "RFDETRAugmentationOverrides",
+            "source": "clearml_yolo.core.models.RFDETRAugmentationOverrides.aug_config",
+            "classification": "input",
+        },
+    )
+    augmentation_backend: str = Field(
+        description="Нативный backend RF-DETR; общий профиль использует torchvision.",
+        examples=["torchvision"],
+        json_schema_extra={
+            "shapes": "str",
+            "applicability": "RFDETRAugmentationOverrides",
+            "source": "clearml_yolo.core.models.RFDETRAugmentationOverrides.augmentation_backend",
+            "classification": "input",
+        },
+    )
+    scale_jitter: StrictBool = Field(
+        description="Нативное случайное изменение масштаба RF-DETR; общий pipeline задаёт false.",
+        examples=[False],
+        json_schema_extra={
+            "shapes": "StrictBool",
+            "applicability": "RFDETRAugmentationOverrides",
+            "source": "clearml_yolo.core.models.RFDETRAugmentationOverrides.scale_jitter",
+            "classification": "input",
+        },
+    )
+    multi_scale: str = Field(
+        description="Нативный режим нескольких разрешений RF-DETR; общий pipeline задаёт off.",
+        examples=["off"],
+        json_schema_extra={
+            "shapes": "str",
+            "applicability": "RFDETRAugmentationOverrides",
+            "source": "clearml_yolo.core.models.RFDETRAugmentationOverrides.multi_scale",
+            "classification": "input",
+        },
+    )
 
 
 class EmptyAugmentationOverrides(BaseModel):
@@ -77,45 +164,371 @@ class TrainSettings(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    device: Device = None
-    epochs: Annotated[int, Field(strict=True, gt=0)] = 100
-    batch: Annotated[int, Field(strict=True, gt=0)] | None = 4
-    imgsz: ImageSize = 640
-    workers: Annotated[int, Field(strict=True, ge=0)] = 4
-    lr: Annotated[float, Field(gt=0)] = 0.0001
-    weight_decay: Annotated[float, Field(ge=0)] = 0.0001
-    seed: StrictInt = 0
-    pretrained: StrictBool = True
-    weights: Path | None = None
-    backbone_weights: Path | None = None
-    amp: StrictBool = True
-    grad_accum_steps: Annotated[int, Field(strict=True, gt=0)] = 1
-    use_ema: StrictBool = True
+    device: Device = Field(
+        default=None,
+        description=(
+            "Нативный выбор устройств: cpu, строка CUDA, один индекс или список "
+            "видимых индексов. null сохраняет выбор адаптера."
+        ),
+        examples=["cpu"],
+        json_schema_extra={
+            "shapes": "Device",
+            "applicability": "TrainSettings",
+            "source": "clearml_yolo.core.models.TrainSettings.device",
+            "classification": "input",
+        },
+    )
+    epochs: Annotated[int, Field(strict=True, gt=0)] = Field(
+        default=100,
+        description="Положительное целое число эпох обучения.",
+        examples=[10],
+        json_schema_extra={
+            "shapes": "Annotated[int, Field(strict=True, gt=0)]",
+            "applicability": "TrainSettings",
+            "source": "clearml_yolo.core.models.TrainSettings.epochs",
+            "classification": "input",
+        },
+    )
+    batch: Annotated[int, Field(strict=True, gt=0)] | None = Field(
+        default=4,
+        description=(
+            "Глобальный положительный размер пакета; null запрашивает подбор из "
+            "совместимых измерений cy-batch-estimate."
+        ),
+        examples=[4],
+        json_schema_extra={
+            "shapes": "Annotated[int, Field(strict=True, gt=0)] | None",
+            "applicability": "TrainSettings",
+            "source": "clearml_yolo.core.models.TrainSettings.batch",
+            "classification": "input",
+        },
+    )
+    imgsz: ImageSize = Field(
+        default=640,
+        description=(
+            "Номинальное разрешение: положительное целое либо пара высота/ширина."
+            " RF-DETR требует квадрат и кратность 32."
+        ),
+        examples=[640],
+        json_schema_extra={
+            "shapes": "ImageSize",
+            "applicability": "TrainSettings",
+            "source": "clearml_yolo.core.models.TrainSettings.imgsz",
+            "classification": "input",
+        },
+    )
+    workers: Annotated[int, Field(strict=True, ge=0)] = Field(
+        default=4,
+        description="Число процессов загрузки данных; ноль выполняет загрузку в основном процессе.",
+        examples=[4],
+        json_schema_extra={
+            "shapes": "Annotated[int, Field(strict=True, ge=0)]",
+            "applicability": "TrainSettings",
+            "source": "clearml_yolo.core.models.TrainSettings.workers",
+            "classification": "input",
+        },
+    )
+    lr: Annotated[float, Field(gt=0)] = Field(
+        default=0.0001,
+        description="Положительная начальная скорость обучения нативного оптимизатора.",
+        examples=[0.0001],
+        json_schema_extra={
+            "shapes": "Annotated[float, Field(gt=0)]",
+            "applicability": "TrainSettings",
+            "source": "clearml_yolo.core.models.TrainSettings.lr",
+            "classification": "input",
+        },
+    )
+    weight_decay: Annotated[float, Field(ge=0)] = Field(
+        default=0.0001,
+        description="Неотрицательный коэффициент регуляризации весов.",
+        examples=[0.0001],
+        json_schema_extra={
+            "shapes": "Annotated[float, Field(ge=0)]",
+            "applicability": "TrainSettings",
+            "source": "clearml_yolo.core.models.TrainSettings.weight_decay",
+            "classification": "input",
+        },
+    )
+    seed: StrictInt = Field(
+        default=0,
+        description="Целочисленный seed нативного обучения.",
+        examples=[0],
+        json_schema_extra={
+            "shapes": "StrictInt",
+            "applicability": "TrainSettings",
+            "source": "clearml_yolo.core.models.TrainSettings.seed",
+            "classification": "input",
+        },
+    )
+    pretrained: StrictBool = Field(
+        default=True,
+        description=(
+            "Использовать поддерживаемые предварительно обученные веса. false "
+            "разрешает обучение без их загрузки."
+        ),
+        examples=[True],
+        json_schema_extra={
+            "shapes": "StrictBool",
+            "applicability": "TrainSettings",
+            "source": "clearml_yolo.core.models.TrainSettings.pretrained",
+            "classification": "input",
+        },
+    )
+    weights: Path | None = Field(
+        default=None,
+        description=(
+            "Явный локальный checkpoint для дообучения. Имеет приоритет над "
+            "автоматической подготовкой именованных весов."
+        ),
+        examples=["weights/best.pth"],
+        json_schema_extra={
+            "shapes": "Path | None",
+            "applicability": "TrainSettings",
+            "source": "clearml_yolo.core.models.TrainSettings.weights",
+            "classification": "input",
+        },
+    )
+    backbone_weights: Path | None = Field(
+        default=None,
+        description=(
+            "Локальные веса backbone для DEIMv2, Faster R-CNN или FCOS. RF-DETR "
+            "не поддерживает отдельные backbone_weights."
+        ),
+        examples=["weights/backbone.pth"],
+        json_schema_extra={
+            "shapes": "Path | None",
+            "applicability": "TrainSettings",
+            "source": "clearml_yolo.core.models.TrainSettings.backbone_weights",
+            "classification": "input",
+        },
+    )
+    amp: StrictBool = Field(
+        default=True,
+        description=(
+            "Включить смешанную точность нативного обучения, если она "
+            "поддерживается устройством и адаптером."
+        ),
+        examples=[True],
+        json_schema_extra={
+            "shapes": "StrictBool",
+            "applicability": "TrainSettings",
+            "source": "clearml_yolo.core.models.TrainSettings.amp",
+            "classification": "input",
+        },
+    )
+    grad_accum_steps: Annotated[int, Field(strict=True, gt=0)] = Field(
+        default=1,
+        description=(
+            "Положительное число шагов накопления градиента. DEIMv2 поддерживает только 1."
+        ),
+        examples=[1],
+        json_schema_extra={
+            "shapes": "Annotated[int, Field(strict=True, gt=0)]",
+            "applicability": "TrainSettings",
+            "source": "clearml_yolo.core.models.TrainSettings.grad_accum_steps",
+            "classification": "input",
+        },
+    )
+    use_ema: StrictBool = Field(
+        default=True,
+        description=(
+            "Использовать экспоненциальное усреднение весов в поддерживающем его нативном тренере."
+        ),
+        examples=[True],
+        json_schema_extra={
+            "shapes": "StrictBool",
+            "applicability": "TrainSettings",
+            "source": "clearml_yolo.core.models.TrainSettings.use_ema",
+            "classification": "input",
+        },
+    )
     augmentation: (
         DeimAugmentationOverrides | RFDETRAugmentationOverrides | EmptyAugmentationOverrides | None
-    ) = None
+    ) = Field(
+        default=None,
+        description=(
+            "Карта отключаемых нативных аугментаций для "
+            "transforms=albumentations; схема зависит от backend. В "
+            "native-профиле должна быть null."
+        ),
+        examples=[None],
+        json_schema_extra={
+            "shapes": (
+                "DeimAugmentationOverrides | RFDETRAugmentationOverrides | "
+                "EmptyAugmentationOverrides | None"
+            ),
+            "applicability": "TrainSettings",
+            "source": "clearml_yolo.core.models.TrainSettings.augmentation",
+            "classification": "input",
+        },
+    )
 
 
 class PredictSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    device: Device = None
-    batch: Annotated[int, Field(strict=True, gt=0)] = 1
-    imgsz: ImageSize | None = None
-    conf: Annotated[float, Field(ge=0, le=1)] = 0.001
-    iou: Annotated[float, Field(gt=0, le=1)] = 0.7
-    max_det: Annotated[int, Field(strict=True, gt=0)] = 300
-    half: StrictBool = False
+    device: Device = Field(
+        default=None,
+        description=(
+            "Независимый выбор устройства предсказания; null оставляет решение нативному адаптеру."
+        ),
+        examples=["cpu"],
+        json_schema_extra={
+            "shapes": "Device",
+            "applicability": "PredictSettings",
+            "source": "clearml_yolo.core.models.PredictSettings.device",
+            "classification": "input",
+        },
+    )
+    batch: Annotated[int, Field(strict=True, gt=0)] = Field(
+        default=1,
+        description="Положительное число изображений в пакете предсказания.",
+        examples=[1],
+        json_schema_extra={
+            "shapes": "Annotated[int, Field(strict=True, gt=0)]",
+            "applicability": "PredictSettings",
+            "source": "clearml_yolo.core.models.PredictSettings.batch",
+            "classification": "input",
+        },
+    )
+    imgsz: ImageSize | None = Field(
+        default=None,
+        description=(
+            "Разрешение предсказания; null наследует обученное разрешение "
+            "checkpoint. RF-DETR требует квадрат, кратный 32."
+        ),
+        examples=[640],
+        json_schema_extra={
+            "shapes": "ImageSize | None",
+            "applicability": "PredictSettings",
+            "source": "clearml_yolo.core.models.PredictSettings.imgsz",
+            "classification": "input",
+        },
+    )
+    conf: Annotated[float, Field(ge=0, le=1)] = Field(
+        default=0.001,
+        description=(
+            "Минимальная уверенность сохраняемых детекций от 0 до 1. Для "
+            "последующей калибровки оставляйте низкий порог."
+        ),
+        examples=[0.001],
+        json_schema_extra={
+            "shapes": "Annotated[float, Field(ge=0, le=1)]",
+            "applicability": "PredictSettings",
+            "source": "clearml_yolo.core.models.PredictSettings.conf",
+            "classification": "input",
+        },
+    )
+    iou: Annotated[float, Field(gt=0, le=1)] = Field(
+        default=0.7,
+        description="Порог IoU подавления пересекающихся детекций, строго больше 0 и не больше 1.",
+        examples=[0.7],
+        json_schema_extra={
+            "shapes": "Annotated[float, Field(gt=0, le=1)]",
+            "applicability": "PredictSettings",
+            "source": "clearml_yolo.core.models.PredictSettings.iou",
+            "classification": "input",
+        },
+    )
+    max_det: Annotated[int, Field(strict=True, gt=0)] = Field(
+        default=300,
+        description="Положительное максимальное количество детекций на изображение.",
+        examples=[300],
+        json_schema_extra={
+            "shapes": "Annotated[int, Field(strict=True, gt=0)]",
+            "applicability": "PredictSettings",
+            "source": "clearml_yolo.core.models.PredictSettings.max_det",
+            "classification": "input",
+        },
+    )
+    half: StrictBool = Field(
+        default=False,
+        description=(
+            "Использовать FP16 при предсказании, если это поддерживают устройство и адаптер."
+        ),
+        examples=[False],
+        json_schema_extra={
+            "shapes": "StrictBool",
+            "applicability": "PredictSettings",
+            "source": "clearml_yolo.core.models.PredictSettings.half",
+            "classification": "input",
+        },
+    )
 
 
 class ModelConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    backend: BackendName = "ultralytics"
-    preset: str = "default"
-    source_dir: Path | None = None
-    train: TrainSettings = Field(default_factory=TrainSettings)
-    predict: PredictSettings = Field(default_factory=PredictSettings)
+    backend: BackendName = Field(
+        default="ultralytics",
+        description=(
+            "Семейство детектора. Для Ultralytics активны группы ultralytics и ultralytics_predict."
+        ),
+        examples=["rfdetr"],
+        json_schema_extra={
+            "shapes": "BackendName",
+            "applicability": "ModelConfig",
+            "source": "clearml_yolo.core.models.ModelConfig.backend",
+            "classification": "input",
+        },
+    )
+    preset: str = Field(
+        default="default",
+        description=(
+            "Зарегистрированная архитектура выбранного семейства; определяет "
+            "исходное разрешение обучения."
+        ),
+        examples=["small"],
+        json_schema_extra={
+            "shapes": "str",
+            "applicability": "ModelConfig",
+            "source": "clearml_yolo.core.models.ModelConfig.preset",
+            "classification": "input",
+        },
+    )
+    source_dir: Path | None = Field(
+        default=None,
+        description=(
+            "Каталог исходников DEIMv2; null разрешает штатную подготовку. Для "
+            "других семейств запрещён."
+        ),
+        examples=["vendor/DEIMv2"],
+        json_schema_extra={
+            "shapes": "Path | None",
+            "applicability": "ModelConfig",
+            "source": "clearml_yolo.core.models.ModelConfig.source_dir",
+            "classification": "input",
+        },
+    )
+    train: TrainSettings = Field(
+        default_factory=TrainSettings,
+        description=(
+            "Параметры обучения не-YOLO детекторов. Для Ultralytics оставьте "
+            "значения по умолчанию и настройте ultralytics."
+        ),
+        examples=[{"epochs": 10}],
+        json_schema_extra={
+            "shapes": "TrainSettings",
+            "applicability": "ModelConfig",
+            "source": "clearml_yolo.core.models.ModelConfig.train",
+            "classification": "input",
+        },
+    )
+    predict: PredictSettings = Field(
+        default_factory=PredictSettings,
+        description=(
+            "Параметры предсказания не-YOLO детекторов. Для Ultralytics "
+            "используйте ultralytics_predict."
+        ),
+        examples=[{"batch": 2}],
+        json_schema_extra={
+            "shapes": "PredictSettings",
+            "applicability": "ModelConfig",
+            "source": "clearml_yolo.core.models.ModelConfig.predict",
+            "classification": "input",
+        },
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -165,12 +578,73 @@ def model_preset(selection: str) -> ModelConfig:
 class Preprocessing(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    resize: Literal["stretch", "letterbox", "shortest_edge"]
-    size: ImageSize
-    mean: tuple[float, float, float] = (0.485, 0.456, 0.406)
-    std: tuple[float, float, float] = (0.229, 0.224, 0.225)
-    stride: Annotated[int, Field(strict=True, gt=0)] = 32
-    color: Literal["RGB"] = "RGB"
+    resize: Literal["stretch", "letterbox", "shortest_edge"] = Field(
+        description=(
+            "Способ изменения размера: stretch, letterbox либо shortest_edge; "
+            "должен совпадать с подготовкой входа checkpoint."
+        ),
+        examples=["shortest_edge"],
+        json_schema_extra={
+            "shapes": "Literal['stretch', 'letterbox', 'shortest_edge']",
+            "applicability": "Preprocessing",
+            "source": "clearml_yolo.core.models.Preprocessing.resize",
+            "classification": "input",
+        },
+    )
+    size: ImageSize = Field(
+        description="Положительное разрешение либо пара высота/ширина подготовки изображения.",
+        examples=[800],
+        json_schema_extra={
+            "shapes": "ImageSize",
+            "applicability": "Preprocessing",
+            "source": "clearml_yolo.core.models.Preprocessing.size",
+            "classification": "input",
+        },
+    )
+    mean: tuple[float, float, float] = Field(
+        default=(0.485, 0.456, 0.406),
+        description="Три средних значения нормализации каналов RGB.",
+        examples=[[0.485, 0.456, 0.406]],
+        json_schema_extra={
+            "shapes": "tuple[float, float, float]",
+            "applicability": "Preprocessing",
+            "source": "clearml_yolo.core.models.Preprocessing.mean",
+            "classification": "input",
+        },
+    )
+    std: tuple[float, float, float] = Field(
+        default=(0.229, 0.224, 0.225),
+        description="Три значения стандартного отклонения для нормализации каналов RGB.",
+        examples=[[0.229, 0.224, 0.225]],
+        json_schema_extra={
+            "shapes": "tuple[float, float, float]",
+            "applicability": "Preprocessing",
+            "source": "clearml_yolo.core.models.Preprocessing.std",
+            "classification": "input",
+        },
+    )
+    stride: Annotated[int, Field(strict=True, gt=0)] = Field(
+        default=32,
+        description="Положительная кратность пространственных размеров, необходимая модели.",
+        examples=[32],
+        json_schema_extra={
+            "shapes": "Annotated[int, Field(strict=True, gt=0)]",
+            "applicability": "Preprocessing",
+            "source": "clearml_yolo.core.models.Preprocessing.stride",
+            "classification": "input",
+        },
+    )
+    color: Literal["RGB"] = Field(
+        default="RGB",
+        description="Порядок цветовых каналов; поддерживается только RGB.",
+        examples=["RGB"],
+        json_schema_extra={
+            "shapes": "Literal['RGB']",
+            "applicability": "Preprocessing",
+            "source": "clearml_yolo.core.models.Preprocessing.color",
+            "classification": "input",
+        },
+    )
 
 
 class CheckpointMetadata(BaseModel):

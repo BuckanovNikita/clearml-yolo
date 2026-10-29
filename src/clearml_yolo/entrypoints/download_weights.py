@@ -7,11 +7,17 @@ from collections.abc import Sequence
 from clearml_yolo.adapters.assets.preparation import prepare_catalogue
 from clearml_yolo.adapters.observability.diagnostics import redact_text
 from clearml_yolo.adapters.runtime.bootstrap import runtime_environment
+from clearml_yolo.entrypoints.options import parser_for
+
+
+def parser() -> argparse.ArgumentParser:
+    """Return an inert parser backed by shared option declarations."""
+    return parser_for("cy-download-weights")
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(prog="cy-download-weights", description=__doc__)
-    parser.parse_args(argv)
+    argument_parser = parser()
+    argument_parser.parse_args(argv)
     with runtime_environment():
         result = prepare_catalogue(automatic=False)
         for location in result.locations:

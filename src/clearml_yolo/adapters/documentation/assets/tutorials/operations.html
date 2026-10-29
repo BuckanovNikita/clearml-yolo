@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Операции: Agent, очередь, кэши и подготовка весов — CY</title><link rel="stylesheet" href="/style.css"></head>
+<body><main class="tutorial-page">
+<nav><a href="/">← Справочник CY</a></nav><h1>Операции: Agent, очередь, кэши и подготовка весов</h1>
+<h2>Предварительные условия</h2>
+<p>Нужны установленные CY и совместимые зависимости. Для экспериментов настройте
+ClearML и хранилище; для ClearML Agent подготовьте его собственное окружение.
+Очередь — отдельный пакет <code>cy-queue</code>, установленный в то же Python-окружение.
+Документация CY использует существующий интерфейс очереди и не вводит её схемы
+или plugin API. Сохраните чужие процессы, настройки и данные.</p>
+<h2>Пример</h2>
+<h3>Подготовить pretrained-веса до отключения сети</h3>
+<pre><code class="language-bash">cy-download-weights
+</code></pre>
+<p>Команда проверяет и готовит поддерживаемые детекторные YOLO-веса, RF-DETR,
+подходящие backbone Faster R-CNN/FCOS и DEIMv2 small/medium с закреплёнными
+исходниками. DEIMv2 large/xlarge и <code>dinov3_small</code> исключены из массовой подготовки;
+их явный выбор сохраняет отдельные требования к доступу и локальным файлам.
+Штатные веса помещаются в native-кэши библиотек, DEIM — под <code>CY_HOME</code>.
+Конфигурация SDK не переписывается.</p>
+<p>Ненулевой код означает неполную подготовку. Повтор команды повторяет недостающие
+загрузки, сохраняя проверенные файлы. При выполнении полного <code>cy</code> автоматическая
+попытка каталога происходит один раз для его расположений кэшей; частичные ошибки
+дают предупреждение, а затем продолжается обычное разрешение выбранной модели.
+<code>cy-train</code>, справка, config preview и queue submission массовую подготовку не запускают.</p>
+<p>При сетевых ограничениях используйте поддерживаемые библиотеками proxy/cache
+настройки: <code>GHR</code> для GitHub Releases, <code>GH</code> для DEIM archive через VCS Artifactory,
+<code>HF_ENDPOINT</code> и штатную авторизацию Hugging Face. Не включайте токены в конфигурацию
+эксперимента или журналы. При ошибке разместите <strong>указанные в диагностике</strong> файлы по
+точным путям, затем повторите; не угадывайте имена. Явные пути
+<a href="/#field=model.source_dir">model.source_dir</a>,
+<a href="/#field=model.train.weights">model.train.weights</a> и
+<a href="/#field=ultralytics.model">ultralytics.model</a> остаются авторитетными.</p>
+<h3>Повторить задачу через ClearML Agent</h3>
+<p>Проверьте завершённый запуск: сохранены <code>Configuration / run</code>, код/окружение,
+доступный ground truth и веса. Клонируйте задачу через штатный интерфейс ClearML,
+назначьте ей Agent queue и запускайте Agent в подготовленном окружении.
+CY читает <code>run</code> до проверки обязательных входов/выбора backend и присоединяется
+к той же задаче, даже если Agent не повторяет исходные CLI-аргументы.</p>
+<p>Для явного изменения Configuration Object в своём ClearML-клиенте передавайте
+полный JSON, например <code>json.dumps(full_run_config, ensure_ascii=False)</code>;
+не отправляйте только изменённый фрагмент вместо полного документа. Сохранённые
+<code>model_assets</code> и snapshots аугментаций описывают разрешённые ресурсы отдельно от
+редактируемого исходного ввода.</p>
+<p>Отсутствующий <code>run</code> допускает полный явный набор аргументов; пустой или некорректный
+<code>run</code> — ошибка. Устройства Agent видны в логическом пространстве его
+<code>CUDA_VISIBLE_DEVICES</code>; локальная очередь CY в таком запуске не участвует.
+Зависимости устанавливает окружение Agent, а не preview или model resolver.</p>
+<h3>Настроить и использовать отдельную очередь</h3>
+<p>После установки CY установите совместимый источник очереди в то же окружение:</p>
+<pre><code class="language-bash">uv pip install --python .venv/bin/python -e . -e ../cy-queue
+uv pip check --python .venv/bin/python
+cy-queue --help
+</code></pre>
+<p>Эти команды предполагают реальные checkouts CY и cy-queue, а не наличие пакетов
+на PyPI. Перед обновлением работающих участников следуйте согласованной процедуре
+drain/upgrade; смена установленного кода может потребовать повторной отправки
+ожидающих задач.</p>
+<p>Пользовательский TOML расположен в <code>$XDG_CONFIG_HOME/clearml-yolo/queue.toml</code>
+или <code>~/.config/clearml-yolo/queue.toml</code>. Все поля обязательны. Пути ниже — пример;
+используйте подготовленные оператором доступные абсолютные каталоги:</p>
+<pre><code class="language-toml">[queue]
+name = &quot;Team training&quot;
+root = &quot;/srv/clearml-yolo/queue&quot;
+coordination_root = &quot;/var/lib/clearml-yolo/coordination&quot;
+</code></pre>
+<p>Абсолютный <code>CY_QUEUE_CONFIG</code> может выбрать общий файл. <code>cy-queue config --json</code>
+показывает фактический источник настроек без создания директорий/задач. Файл не
+создаётся автоматически. NFS требует согласованных UID и поддерживаемых условий
+host locking; локальная проверка не доказывает двухпользовательскую или двуххостовую
+корректность.</p>
+<p>Сначала заполните экспортированный training YAML: ground truth, модель, ClearML
+project/task/tags. Уберите явные native GPU overrides из queued-конфигурации.</p>
+<pre><code class="language-bash">cy-init-config train-config --command cy-train
+cy-queue config --json
+cy-queue submit --command train --gpus 1 -- --config-dir train-config --config-name cy-train
+cy-queue worker
+</code></pre>
+<p><code>submit</code> сохраняет неизменяемый снимок, worker выполняет его в отдельном процессе.
+До старта нет экспериментальной задачи ClearML. В другом терминале:</p>
+<pre><code class="language-bash">cy-queue list --json
+cy-queue cancel job-17
+cy-queue recover job-17
+</code></pre>
+<p>Замените <code>job-17</code> реальным номером. <code>cancel</code> запрашивает отмену принадлежащего вам
+запуска; <code>recover</code> предназначен для восстановления после нештатного завершения и
+сохраняет проверки владельца/остаточных процессов. Не используйте его как способ
+обойти занятую GPU. Для завершённых задач:</p>
+<pre><code class="language-bash">cy-queue archive job-17
+cy-queue list --archived
+cy-queue restore job-17
+</code></pre>
+<p>Архивирование меняет видимость, а не удаляет результаты. <code>cy-queue tui</code> открывает
+терминальный интерфейс. Для очереди pipeline опустите <code>--command train</code>; для
+перебора передайте <code>-m</code> после <code>--</code>, как при прямом Hydra запуске.</p>
+<p>Очередь выбирает GPU, а не исправляет недостаток памяти модели. Автоматический
+допуск требует используемой памяти строго меньше 2 GiB и отсутствия reservation/hold.
+После обучения освобождаются дополнительные GPU; первая остаётся до завершения
+pipeline/потомков. Без подтверждённого training-finished удерживается вся allocation.
+Операторские <code>cy-queue gpu list/disable/enable/free/release</code> используют физические
+индексы <code>nvidia-smi</code>; обычные submission-индексы — логические CUDA-visible.
+<code>gpu free INDEX</code> очищает reservation/hold, но не завершает работающие процессы.</p>
+<h3>Обслужить кэш без изменения содержимого</h3>
+<p>Приостановите запись в <strong>свой</strong> выбранный кэш и просмотрите кандидатов:</p>
+<pre><code class="language-bash">cy-dedup --dry-run
+cy-dedup
+</code></pre>
+<p>По умолчанию это <code>$CY_HOME/.cache</code>; можно передать каталог позиционным аргументом.
+На поддерживаемой Linux reflink-файловой системе одинаковые изображения разделят
+блоки с copy-on-write, сохранив пути и байты. Это не удаление устаревшего dataset
+cache и не подтверждение неизменности исходных изображений. Изменение байтов
+изображения по тому же пути требует явного idle-обслуживания соответствующего
+dataset cache; cache hit не проверяет image mtime/contents заново.</p>
+<h2>Ожидаемый результат</h2>
+<p>Подготовка весов печатает cache destinations и результаты каждого asset. Agent
+восстанавливает backend и полные входы из сохранённой задачи. Queue submission
+возвращает job reference, worker меняет её состояние и запускает эксперимент.
+Dedup показывает scanned/duplicates/reflinked/skipped/failures и код завершения.</p>
+<h2>Частые ошибки</h2>
+<ul>
+<li>Команда отсутствует: проверьте установленную версию и источник Python-окружения.</li>
+<li>Queue config отсутствует: заполните TOML, а не добавляйте устаревшие <code>queue.*</code>
+или <code>autogpu.*</code> ключи Hydra.</li>
+<li>Job ожидает GPU: проверьте readable reason, reservation/hold и память; preview
+не проверяет admission. <code>--gpus 0</code> не означает CPU очередь и не поддерживается.</li>
+<li>Agent выбрал другое устройство: проверьте его CUDA visibility и полный <code>run</code>.</li>
+<li>После обновления job несовместим: сохраните старую запись и отправьте новый снимок.</li>
+<li>Неполная подготовка весов: используйте диагностику точных путей и повторите команду.</li>
+</ul>
+<h2>Проверка</h2>
+<p>Проверьте коды завершения, native cache discovery и реальную загрузку выбранных
+весов без сети. Для replay сравните <code>run</code>, выбранный backend, model assets и
+артефакты завершённой задачи. Для queue проверьте состояние своей job, журналы
+worker, создание одной задачи и освобождение собственных ресурсов после выхода.
+Повторный запуск dedup dry-run должен сохранять содержимое и имена файлов.
+Ни один из этих результатов не следует из успешного предпросмотра конфигурации.</p>
+</main></body></html>
+<!-- source-sha256: f7d4b06432d89e739cf58110c3d112e518ab581a10bbdf5aed765f12aa19e133 -->
