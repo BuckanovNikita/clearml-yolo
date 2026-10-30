@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.44.4 (2026-10-30)
+
+### Performance Improvements
+
+- **batch**: Accelerate capacity searches across idle GPUs
+  ([`80615fe`](https://github.com/BuckanovNikita/clearml-yolo/commit/80615fe4e090beb915950cdc9972e72e04959086))
+
+
 ## v0.44.3 (2026-10-30)
 
 ### Bug Fixes
