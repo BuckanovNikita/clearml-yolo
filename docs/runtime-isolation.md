@@ -119,10 +119,23 @@ distributed ranks. Supervised fresh workers receive typed requests, report typed
 results and never own ClearML publication. A rank failure, timeout or cancellation
 terminates the owned group before another trial starts. Rank zero owns aggregate
 metrics and unwrapped checkpoints; the invocation owner records selected batch
-provenance and publishes the experiment. Estimation also uses fresh supervised
-workers with exactly one GPU per trial, observes that GPU's memory and leaves unrelated
-workloads intact. Multi-GPU batch recommendations are extrapolated from compatible
-single-GPU evidence. Physical DDP training acceptance remains a separate gate; see
+provenance and publishes the experiment. Estimation uses separate case processes for
+independent searches, with one GPU UUID pinned through `CUDA_VISIBLE_DEVICES` for each
+complete case. Each candidate and optimizer path still runs in a fresh supervised
+trial process. Automatic concurrency uses idle selected GPUs; positive `--jobs`
+caps the number of cases and `--jobs 1` serializes them. No two active cases share
+an assigned GPU, and ordinary measurement or case-result failures do not terminate
+independent peers. Unrecoverable process-supervision failures stop the invocation
+while preserving already accepted results.
+
+A distinct inherited case-owner marker tracks descendants across nested trial
+supervision. The parent validates the case token/key receipt, successful exit and
+owned descendant cleanup before saving usable evidence or reusing that GPU slot.
+Pending snapshots remain unusable even after confirmation while cleanup is pending.
+Cancellation terminates only owned workers and retains completed peer results;
+foreign GPU activity still fails the affected measurement. Multi-GPU batch
+recommendations are extrapolated from compatible single-GPU evidence. Physical DDP
+training acceptance remains a separate gate; see
 [batch estimation](batch-estimation.md).
 
 ## ClearML Agent execution

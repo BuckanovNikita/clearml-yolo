@@ -1,14 +1,51 @@
 """CLI filters and composition remain local and require explicit idle devices."""
 
 from pathlib import Path
-from typing import Any
+from types import SimpleNamespace
+from typing import Any, Self
+from uuid import uuid4
 
 import pytest
 
 from clearml_yolo.adapters.runtime.gpu_inventory import GPUDevice
 from clearml_yolo.adapters.storage.batch_estimates import FileBatchEstimateStore
+from clearml_yolo.application.training_workers import BatchCaseRequest
 from clearml_yolo.entrypoints import batch_estimate as cli
+from clearml_yolo.entrypoints import batch_estimate_worker
 from test_batch_estimate_workflow import RecordingProbe
+
+
+class RecordingCasePool:
+    """Execute bounded fake probes while retaining dispatch/completion ordering."""
+
+    def __init__(self) -> None:
+        self.started: list[tuple[str, str]] = []
+        self.pending: list[SimpleNamespace] = []
+        self.maximum_active = 0
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *_args: object) -> None:
+        pass
+
+    def start(self, key: str, command: Any) -> None:
+        path = Path(command.argv[-1])
+        request = BatchCaseRequest.model_validate_json(path.read_text(encoding="utf-8"))
+        visibility = command.environment["CUDA_VISIBLE_DEVICES"]
+        assert visibility == request.profile.gpus[0].uuid
+        assert all(visibility != item.gpu for item in self.pending)
+        self.started.append((key, visibility))
+        code = batch_estimate_worker.run(path)
+        self.pending.append(SimpleNamespace(
+            key=key, gpu=visibility, exit_code=code, cleanup_complete=True, diagnostic="",
+        ))
+        self.maximum_active = max(self.maximum_active, len(self.pending))
+
+    def poll(self) -> tuple[Any, ...]:
+        completed = tuple(reversed(self.pending))
+        self.pending.clear()
+        return completed
 
 
 def _available_devices() -> tuple[GPUDevice, ...]:
@@ -36,6 +73,8 @@ def _install(
     )
     probe = RecordingProbe(capacity=capacity)
     monkeypatch.setattr(cli, "_make_probe", lambda: probe)
+    monkeypatch.setattr(batch_estimate_worker, "_make_probe", lambda: probe)
+    monkeypatch.setattr(cli, "_make_pool", RecordingCasePool, raising=False)
     return probe, idle_checks
 
 
@@ -66,7 +105,7 @@ def test_filters_defaults_resume_and_refresh(
         "4",
     ]
     cli.main(arguments)
-    assert checks == [(2,), (2,)]
+    assert checks == [(2,), (0,)]
     cases = FileBatchEstimateStore().read().cases
     assert len(cases) == 2
     assert {case.profile.world_size for case in cases} == {1}
@@ -128,6 +167,8 @@ def test_count_and_workload_controls_are_forwarded(monkeypatch: pytest.MonkeyPat
         ["--search-limit", "0"],
         ["--classes", "0"],
         ["--trial-timeout", "-1"],
+        ["--jobs", "0"],
+        ["--jobs", "-1"],
     ],
 )
 def test_invalid_options_fail_without_trials(
@@ -228,3 +269,138 @@ def test_mixed_hardware_measures_each_group_once(
     assert {p.gpus[0].name for p in probe.probed_profiles} == {"GPU", "different"}
     assert all(p.world_size == 1 for p in probe.probed_profiles)
     assert "gpus=3\tglobal_batch=12" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(("jobs", "expected"), [(None, 3), (1, 1), (2, 2)])
+def test_jobs_bound_independent_cases_and_preserve_model_order(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+    jobs: int | None, expected: int,
+) -> None:
+    _install(monkeypatch)
+    pool = RecordingCasePool()
+    monkeypatch.setattr(cli, "_make_pool", lambda: pool)
+    arguments = [
+        "--imgsz", "640", "--models", "yolo11n,yolo11s,yolo11m,yolo11l",
+        "--gpu-counts", "1", "--search-limit", "1",
+    ]
+    if jobs is not None:
+        arguments += ["--jobs", str(jobs)]
+    cli.main(arguments)
+    assert pool.maximum_active == expected
+    assert len(pool.started) == 4
+    selections = [line.split("\t")[0] for line in capsys.readouterr().out.splitlines()[:-1]]
+    assert selections == [f"ultralytics/yolo11{size}" for size in "nsml"]
+
+
+def test_interrupted_spawn_has_already_invalidated_refresh(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install(monkeypatch)
+    args = ["--imgsz", "640", "--models", "yolo11n", "--search-limit", "1"]
+    cli.main(args)
+    assert FileBatchEstimateStore().read().cases[0].usable
+
+    def interrupted(*_args: Any) -> None:
+        assert not FileBatchEstimateStore().read().cases[0].usable
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(RecordingCasePool, "start", interrupted)
+    with pytest.raises(KeyboardInterrupt):
+        cli.main([*args, "--refresh"])
+    assert not FileBatchEstimateStore().read().cases[0].usable
+
+
+def test_next_launch_reuses_verified_models_and_retries_only_failed_cases(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    probe, _ = _install(monkeypatch)
+    original_run = probe.run
+    failing = True
+    measured: list[str] = []
+
+    def run(profile: Any, *args: Any, **kwargs: Any) -> Any:
+        measured.append(profile.model.selection)
+        trial = original_run(profile, *args, **kwargs)
+        if failing and profile.model.selection == "ultralytics/yolo11s":
+            return trial.model_copy(update={"status": "oom"})
+        return trial
+
+    monkeypatch.setattr(probe, "run", run)
+    args = [
+        "--imgsz", "640", "--models", "yolo11n,yolo11s", "--devices", "0,1",
+        "--search-limit", "4",
+    ]
+    with pytest.raises(SystemExit) as stopped:
+        cli.main(args)
+    assert stopped.value.code == 1
+    verified = next(case for case in FileBatchEstimateStore().read().cases if case.usable)
+    previous = verified.model_dump_json()
+    measured.clear()
+    failing = False
+    cli.main([*args, "--jobs", "1"])
+    assert set(measured) == {"ultralytics/yolo11s"}
+    assert next(
+        case for case in FileBatchEstimateStore().read().cases
+        if case.profile.model.selection == "ultralytics/yolo11n"
+    ).model_dump_json() == previous
+
+
+def test_cache_survives_device_order_report_count_and_jobs_changes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    probe, _ = _install(monkeypatch)
+    args = ["--imgsz", "640", "--models", "yolo11n,yolo11s", "--search-limit", "4"]
+    cli.main([*args, "--devices", "0,1", "--jobs", "1", "--gpu-counts", "1"])
+    calls = probe.calls
+    monkeypatch.setattr(cli, "require_idle", lambda _: pytest.fail("cache hit checked idle GPU"))
+    monkeypatch.setattr(cli, "_make_pool", lambda: pytest.fail("cache hit created worker pool"))
+    cli.main([*args, "--devices", "1,0", "--jobs", "2", "--gpu-counts", "2"])
+    assert probe.calls == calls
+
+
+@pytest.mark.parametrize("damage", ["missing", "token", "gpu", "exit", "cleanup"])
+def test_unaccepted_case_receipts_cannot_publish_success_or_fail_peers(
+    monkeypatch: pytest.MonkeyPatch, damage: str,
+) -> None:
+    _install(monkeypatch)
+    pool = RecordingCasePool()
+    original_start = pool.start
+
+    def start(key: str, command: Any) -> None:
+        original_start(key, command)
+        request = BatchCaseRequest.model_validate_json(
+            Path(command.argv[-1]).read_text(encoding="utf-8")
+        )
+        if request.profile.model.selection != "ultralytics/yolo11n":
+            return
+        receipt = request.output / "result.json"
+        if damage == "missing":
+            receipt.unlink()
+        elif damage in {"token", "gpu"}:
+            import json
+
+            raw = json.loads(receipt.read_text(encoding="utf-8"))
+            if damage == "token":
+                raw["token"] = uuid4().hex
+            else:
+                raw["case"]["profile"]["gpus"][0]["uuid"] = "GPU-foreign"
+            receipt.write_text(json.dumps(raw), encoding="utf-8")
+        elif damage == "exit":
+            pool.pending[-1].exit_code = 1
+        else:
+            pool.pending[-1].cleanup_complete = False
+
+    monkeypatch.setattr(pool, "start", start)
+    monkeypatch.setattr(cli, "_make_pool", lambda: pool)
+    with pytest.raises(SystemExit) as stopped:
+        cli.main([
+            "--imgsz", "640", "--models", "yolo11n,yolo11s,yolo11m", "--devices", "0,1",
+            "--search-limit", "1",
+        ])
+    assert stopped.value.code == 1
+    cases = {case.profile.model.selection: case for case in FileBatchEstimateStore().read().cases}
+    assert not cases["ultralytics/yolo11n"].usable
+    assert cases["ultralytics/yolo11s"].usable
+    assert cases["ultralytics/yolo11m"].usable
+    if damage == "cleanup":
+        assert pool.started[-1][1] == "GPU-1"

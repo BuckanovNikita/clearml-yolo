@@ -53,7 +53,7 @@ def test_reported_binary_search_recovers_only_after_fresh_confirmation() -> None
     profile = _profile().model_copy(
         update={"gpus": (GPUHardware(name="NVIDIA A40", total_memory_bytes=47697690624),)}
     )
-    search = BatchSearch.start(profile, SearchSettings())
+    search = BatchSearch.start(profile, SearchSettings(search_strategy="exponential_binary_v1"))
     for batch, peak in (
         (1, 4756602880), (2, 5726273536), (4, 8884584448), (8, 14624489472),
         (16, 27496808448), (32, 47381217280), (24, 40339767296),
@@ -132,7 +132,7 @@ def test_legacy_terminal_numerical_failure_remains_readable_without_promotion() 
     raw = {
         "profile": search.profile.model_dump(mode="json"),
         "workload": SyntheticWorkload().model_dump(mode="json"),
-        "settings": search.settings.model_dump(mode="json"),
+        "settings": search.settings.model_dump(mode="json", exclude={"search_strategy"}),
         "status": "failed", "trials": [t.model_dump(mode="json") for t in search.trials],
         "created_at": "2026-10-30T00:00:00Z", "diagnostic": "",
     }
@@ -143,6 +143,11 @@ def test_legacy_terminal_numerical_failure_remains_readable_without_promotion() 
 
 def test_schema_upgrade_is_write_only_and_preserves_peer_cases(tmp_path: Path) -> None:
     peer = sample_case()
+    peer = peer.model_copy(
+        update={"settings": peer.settings.model_copy(
+            update={"search_strategy": "exponential_binary_v1"}
+        )}
+    )
     store = FileBatchEstimateStore(tmp_path / "estimates.json")
     payload = json.dumps({"schema_version": 1, "cases": [peer.model_dump(mode="json")]})
     store.path.write_text(payload)
@@ -150,7 +155,7 @@ def test_schema_upgrade_is_write_only_and_preserves_peer_cases(tmp_path: Path) -
     assert store.path.read_text() == payload
     case = limited_case()
     store.save(case)
-    assert json.loads(store.path.read_text())["schema_version"] == 2
+    assert json.loads(store.path.read_text())["schema_version"] == 3
     assert store.read().cases == (peer, case)
     with pytest.raises(ValidationError, match="schema"):
         EstimateCatalogue.model_validate(

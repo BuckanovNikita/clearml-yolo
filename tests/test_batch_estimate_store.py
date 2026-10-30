@@ -1,6 +1,8 @@
 """Atomic cache replacement never discards peer cases or overwrites corruption."""
 
 from concurrent.futures import ThreadPoolExecutor
+from multiprocessing import get_context
+from multiprocessing.synchronize import Barrier
 from pathlib import Path
 
 import pytest
@@ -28,7 +30,7 @@ def test_cache_round_trip_replaces_only_the_same_case(tmp_path: Path) -> None:
     assert not list(tmp_path.glob(".batch-estimates-*.tmp"))
 
 
-@pytest.mark.parametrize("payload", [b"truncated{", b'{"schema_version":3,"cases":[]}', b"\xff"])
+@pytest.mark.parametrize("payload", [b"truncated{", b'{"schema_version":4,"cases":[]}', b"\xff"])
 def test_corrupted_cache_is_preserved_and_blocks_reads_and_writes(
     tmp_path: Path,
     payload: bytes,
@@ -94,6 +96,50 @@ def test_rejects_copied_success_with_missing_confirmation(tmp_path: Path) -> Non
     with pytest.raises(ValueError, match="evidence"):
         store.save(forged)
     assert not store.path.exists()
+
+
+def _process_save(path: Path, payload: str, barrier: Barrier) -> None:
+    case = EstimateCase.model_validate_json(payload)
+    store = FileBatchEstimateStore(path)
+    barrier.wait(timeout=10)
+    for revision in range(3):
+        store.save(case.model_copy(update={"created_at": f"revision-{revision}"}))
+
+
+def test_multiprocess_writers_preserve_peer_cases_and_latest_revisions(tmp_path: Path) -> None:
+    path = tmp_path / "estimates.json"
+    template = sample_case()
+    context = get_context("spawn")
+    barrier = context.Barrier(4)
+    processes = []
+    try:
+        for index in range(4):
+            case = template.model_copy(
+                update={"profile": template.profile.model_copy(
+                    update={"dependencies": {"torch": f"process-{index}"}}
+                )}
+            )
+            process = context.Process(
+                target=_process_save, args=(path, case.model_dump_json(), barrier)
+            )
+            process.start()
+            processes.append(process)
+        for process in processes:
+            process.join(timeout=15)
+            assert process.exitcode == 0
+    finally:
+        for process in processes:
+            if process.is_alive():
+                process.terminate()
+            process.join(timeout=5)
+            process.close()
+    saved = FileBatchEstimateStore(path).read()
+    assert saved.schema_version == 3
+    assert len(saved.cases) == 4
+    assert {case.profile.dependencies["torch"] for case in saved.cases} == {
+        f"process-{index}" for index in range(4)
+    }
+    assert all(case.created_at == "revision-2" for case in saved.cases)
 
 
 def test_outside_symlink_destination_is_rejected(tmp_path: Path) -> None:

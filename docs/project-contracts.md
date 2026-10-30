@@ -6,8 +6,10 @@ and implementation evidence by topic; this summary does not replace those contra
 
 `cy` runs the pipeline; `cy-train`, `cy-predict`, `cy-val`, `cy-metrics`, `cy-report`,
 `cy-compare`, and `cy-ground-truth` run individual stages. `cy-export` exports and verifies
-Faster R-CNN deployment bundles. The unreleased `cy-batch-estimate` utility measures
-local synthetic training capacity without a ClearML task; see
+Faster R-CNN deployment bundles. The `cy-batch-estimate` utility measures local
+synthetic training capacity without a ClearML task. Memory-guided candidate selection
+retains full trials and confirmation; independent cases can run on separate idle
+selected GPUs, with `--jobs` controlling concurrency. See
 [its contract and acceptance limits](batch-estimation.md).
 
 Entrypoints: `cy`, `cy-train`, `cy-predict`, `cy-val`, `cy-metrics`,

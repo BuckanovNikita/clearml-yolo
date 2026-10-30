@@ -171,3 +171,37 @@ Saved values are recommendations for the recorded workload, not arbitrary-datase
 The 2026-10-27 simplification supersedes the original estimator count-matrix search
 and acceptance requirement. Separate real multi-GPU training correctness gates remain
 in SC-003. Earlier dated verification records retain their historical meaning.
+
+## Search speedup and independent concurrency amendment (2026-10-30)
+
+This amendment retains the single-GPU measurement and linear extrapolation contract.
+It adds faster candidate selection and parallel independent model/hardware cases.
+
+- **FR-013**: New searches use two successful memory observations to guide bounded
+  growth, fall back to exponential growth without a positive slope, and use exact
+  binary refinement after an observed capacity failure. Predictions are never evidence.
+  Every successful trial retains five warm-up and ten measured optimizer updates,
+  all optimizer paths, native validation and fresh winner confirmation.
+- **FR-014**: Persist the search strategy and write schema 3; read schemas 1/2 with
+  legacy replay and unchanged legacy estimate keys. Reject forged strategies/history.
+  Read-only access does not rewrite catalogues. Numerical recovery remains unchanged;
+  different candidate ordering may change the last independently confirmed good batch.
+- **FR-015**: Run independent deduplicated cases on idle selected compatible GPUs,
+  one case per UUID, with optional positive `--jobs` and automatic concurrency by
+  default. Cache hits need no idle device; multi-GPU counts add no measurements.
+  Each case pins its UUID in a separate process. Retain per-trial deadlines.
+- **FR-016**: Ordinary measurement or case-result failures do not terminate peers.
+  Unrecoverable process-supervision failures stop the invocation while preserving
+  already accepted results. Persist pending evidence before
+  spawn, validate token/key-matched receipts, and verify owned descendant cleanup
+  before reusing slots. Cancellation preserves unrelated workloads and saved peers.
+- **SC-006**: Deterministic linear-memory cases use fewer trials than legacy search
+  with identical confirmed capacities. Native one-GPU comparisons report actual
+  elapsed time, trial count and outcomes with matching workload/assets.
+- **SC-007**: Real CPU subprocess tests prove overlap, exclusive slots, independent
+  failures, cancellation and cleanup. The user explicitly permits release without
+  physical multi-GPU execution, which must remain documented as unverified.
+
+The approved delivery includes ordinary/architecture/documentation verification,
+fresh independent review, current/proposed paired CY/queue checks and a new Git-only
+code release. Existing historical acceptance limitations remain visible.

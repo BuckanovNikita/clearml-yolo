@@ -26,6 +26,9 @@ type TrialStatus = Literal[
 ]
 type UsableStatus = Literal["validated", "ceiling_limited", "numerically_limited"]
 type SearchStatus = Literal["searching", "no_capacity", "failed"] | UsableStatus
+type SearchStrategy = Literal["exponential_binary_v1", "memory_guided_v1"]
+
+_STRATEGY_SCHEMA_VERSION = 3
 
 
 class _Record(BaseModel):
@@ -155,6 +158,7 @@ class TrainingProfile(_Record):
 
 
 class SearchSettings(_Record):
+    search_strategy: SearchStrategy = "memory_guided_v1"
     memory_fraction: Annotated[float, Field(gt=0, le=1, allow_inf_nan=False)] = 0.9
     max_global_batch: PositiveInt = 1024
     warmup_steps: PositiveInt = 5
@@ -209,7 +213,7 @@ def _trial_observation(
 
 
 class BatchSearch(_Record):
-    """Immutable exponential/binary search whose only output is the next trial.
+    """Versioned capacity search whose only output is the next measured trial.
 
     Bounds count images per rank so every candidate divides exactly by world size.
     Successful discovery is followed by a fresh trial at the winner. Numerical
@@ -313,9 +317,29 @@ class BatchSearch(_Record):
                 }
             )
         candidate = (
-            min(self.lower * 2, ceiling) if self.upper is None else (self.lower + self.upper) // 2
+            self._growth_candidate(ceiling)
+            if self.upper is None else (self.lower + self.upper) // 2
         )
         return self.model_copy(update={"next_batch": candidate * self.profile.world_size})
+
+    def _growth_candidate(self, ceiling: int) -> int:
+        fallback = min(self.lower * 2, ceiling)
+        if self.settings.search_strategy == "exponential_binary_v1" or len(self.trials) <= 1:
+            return fallback
+        # Before any observed upper bound, every completed discovery trial is a
+        # fully evidenced under-budget success. Failures either bound or stop it.
+        previous, current = self.trials[-2:]
+        first = previous.global_batch // self.profile.world_size
+        second = current.global_batch // self.profile.world_size
+        predictions = []
+        for before, after, gpu in zip(
+            previous.peak_memory_bytes, current.peak_memory_bytes, self.profile.gpus, strict=True
+        ):
+            if after <= before:
+                return fallback
+            budget = int(gpu.total_memory_bytes * self.settings.memory_fraction)
+            predictions.append(second + (budget - after) * (second - first) // (after - before))
+        return max(self.lower + 1, min(*predictions, 4 * self.lower, ceiling))
 
 
 class EstimateCase(_Record):
@@ -328,6 +352,19 @@ class EstimateCase(_Record):
     trials: tuple[TrialResult, ...] = ()
     created_at: NonemptyString
     diagnostic: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def historical_search_strategy(cls, value: object) -> object:
+        # Only a persisted case gets legacy inference. New direct SearchSettings
+        # calls default to guided search; do not mutate a caller's raw history.
+        if isinstance(value, dict):
+            settings = value.get("settings")
+            if isinstance(settings, dict) and "search_strategy" not in settings:
+                return value | {
+                    "settings": settings | {"search_strategy": "exponential_binary_v1"}
+                }
+        return value
 
     @model_validator(mode="after")
     def verified_evidence(self) -> Self:
@@ -357,9 +394,27 @@ class EstimateCase(_Record):
 
 
 class EstimateCatalogue(_Record):
-    # Read historical catalogues unchanged; the next ordinary save writes v2.
-    schema_version: Literal[1, 2] = 2
+    # Read historical catalogues unchanged; ordinary saves write explicit strategies.
+    schema_version: Literal[1, 2, 3] = 3
     cases: tuple[EstimateCase, ...] = ()
+
+    @model_validator(mode="before")
+    @classmethod
+    def explicit_current_strategies(cls, value: object) -> object:
+        if (
+            isinstance(value, dict)
+            and value.get("schema_version", _STRATEGY_SCHEMA_VERSION) == _STRATEGY_SCHEMA_VERSION
+        ):
+            cases = value.get("cases", ())
+            if isinstance(cases, (list, tuple)):
+                for case in cases:
+                    if isinstance(case, dict):
+                        settings = case.get("settings")
+                        if isinstance(settings, dict) and "search_strategy" not in settings:
+                            raise ValueError(
+                                "Catalogue schema 3 requires an explicit search strategy"
+                            )
+        return value
 
     @model_validator(mode="after")
     def legacy_statuses(self) -> Self:
@@ -367,6 +422,10 @@ class EstimateCatalogue(_Record):
             case.status == "numerically_limited" for case in self.cases
         ):
             raise ValueError("Numerically limited estimates require catalogue schema 2")
+        if self.schema_version < _STRATEGY_SCHEMA_VERSION and any(
+            case.settings.search_strategy != "exponential_binary_v1" for case in self.cases
+        ):
+            raise ValueError("Memory-guided estimates require catalogue schema 3")
         return self
 
 
@@ -374,10 +433,15 @@ def estimate_key(
     profile: TrainingProfile, workload: SyntheticWorkload, settings: SearchSettings
 ) -> str:
     """Stable storage key; actual device UUIDs and observation times are provenance."""
+    settings_data = settings.model_dump(mode="json")
+    if settings.search_strategy == "exponential_binary_v1":
+        # Existing source keys are durable provenance, including when old cases
+        # are written into a schema-3 catalogue alongside guided measurements.
+        settings_data.pop("search_strategy")
     payload = {
         "profile": profile.compatibility_data(),
         "workload": workload.model_dump(mode="json"),
-        "settings": settings.model_dump(mode="json"),
+        "settings": settings_data,
     }
     return hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()

@@ -154,6 +154,16 @@ OPTION_DECLARATIONS: dict[str, tuple[OptionDeclaration, ...]] = {
             ("--gpu-counts 1,2",),
         ),
         OptionDeclaration(
+            ("--jobs",),
+            {
+                "type": int,
+                "help": "maximum concurrent single-GPU searches; default: available selected GPUs",
+            },
+            "Положительный предел одновременных поисков; "
+            "по умолчанию используются свободные выбранные GPU.",
+            ("--jobs 1",),
+        ),
+        OptionDeclaration(
             ("--refresh",),
             {"action": "store_true", "help": "repeat completed compatible cases"},
             "Повторить уже завершённые совместимые измерения вместо использования кэша.",

@@ -380,6 +380,21 @@ def test_console_command_inventory_matches_configured_independence(
             "clearml_yolo.adapters.storage.batch_estimates",
         ),
         (
+            "Clean architecture inward layers",
+            "clearml_yolo.application.training_workers",
+            "clearml_yolo.adapters.runtime.worker_pool",
+        ),
+        (
+            "Adapters depend only on application ports and contracts",
+            "clearml_yolo.adapters.runtime.worker_pool",
+            "clearml_yolo.application.use_cases.batch_estimate",
+        ),
+        (
+            "runtime adapter peer ownership",
+            "clearml_yolo.adapters.runtime.worker_pool",
+            "clearml_yolo.adapters.storage.batch_estimates",
+        ),
+        (
             "torchvision adapter peer ownership",
             "clearml_yolo.adapters.torchvision.training",
             "clearml_yolo.adapters.fcos.model",

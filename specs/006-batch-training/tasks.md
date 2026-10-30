@@ -140,3 +140,38 @@ T022/T031 and full architecture acceptance remain open; missing checks are not p
 T033 precedes T034. T035 requires successful ordinary checks and review; only the
 disclosed native YOLO confirmation, broader FCOS/backend matrix and physical DDP
 acceptance gaps are release exceptions.
+
+## Search speedup amendment (2026-10-30)
+
+- [x] T036 Record FR-013–FR-016/SC-006–SC-007 decisions and validate specs/006-batch-training/speedup/architecture.json before implementation.
+- [x] T037 [P] [US1] Implement memory-guided search, strategy replay, schema-3 compatibility and regression tests in core/batch_estimation.py and tests/test_batch_search_strategy.py (FR-013, FR-014).
+- [x] T038 [P] [US1] Implement independent process pool and real subprocess lifecycle tests in adapters/runtime/worker_pool.py and tests/test_worker_pool.py (FR-015, FR-016).
+- [x] T039 [US1] Add case contracts, private entrypoint, idle hardware scheduling, jobs CLI and receipt/cancellation tests in application/training_workers.py and entrypoints/batch_estimate*.py (FR-015, FR-016).
+- [x] T040 [US1] Extend architecture contracts/negative cases, catalogue multiprocess tests and integrated CLI/docs compatibility coverage in .importlinter and tests/ (FR-014–FR-016).
+- [ ] T041 Record matching native one-GPU legacy/guided benchmarks in specs/006-batch-training/speedup/verification.md (SC-006); physical multi-GPU execution remains explicitly unverified (SC-007).
+- [x] T042 Update docs/batch-estimation.md, README.md, active feature interfaces and portable usage source; validate Markdown, links, generated docs and examples (FR-013–FR-016).
+- [x] T043 Run canonical verification, applicable mutation checks and latest/proposed paired CY/queue integration/static checks; record exact source identities and limitations in speedup evidence.
+- [ ] T044 Obtain fresh independent review after integration/checks, resolve findings, reconcile task-owned diff and validate speedup architecture acceptance.
+- [ ] T045 Complete the authorized new code release through normal commits/hooks, annotated tag and explicit verified pushes; preserve original dirty workspace and UV source overrides.
+
+T036 precedes T037/T038; parent freezes case contracts before T039 integration.
+T037 and T038 have exclusive write ownership. T040–T043 follow integration;
+T044 follows parent verification, and T045 follows accepted review and release checks.
+Historical tasks are not reopened or relabelled by this amendment.
+
+T036–T040, T042 and T043 are complete; canonical verification passed 4,571 tests and
+all static/import checks. Fresh independent review accepted the implementation with
+no unresolved findings; see [review](speedup/review.md). T041 remains open after two
+idle-preflight failures before native work. T044's design/diff reconciliation is done,
+but full architecture acceptance remains open for that native check. T045 is pending
+an idle-GPU benchmark or an explicit release exception for this separate gap. The
+physical two-GPU exception alone does not waive the one-GPU comparison.
+
+## Explicit delivery authorization, 2026-10-30
+
+After disclosure of the two failed idle preflights and the separate single-GPU
+benchmark gate, the user instructed **“push”**. This authorizes the Git-only 0.44.4
+delivery with that benchmark gap recorded, in addition to the earlier physical
+multi-GPU exception. It does not turn T041 or full architecture acceptance into
+passes. Ordinary checks, independent review, final paired-source verification and
+normal release hooks remain required; no native guarantee or idle criterion changes.

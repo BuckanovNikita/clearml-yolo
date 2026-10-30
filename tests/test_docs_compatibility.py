@@ -80,6 +80,7 @@ def test_option_declarations_preserve_parsing_types_and_defaults() -> None:
         "models": None,
         "devices": (2, 0),
         "gpu_counts": (1, 2),
+        "jobs": None,
         "refresh": False,
         "memory_budget": 0.9,
         "search_limit": 1024,

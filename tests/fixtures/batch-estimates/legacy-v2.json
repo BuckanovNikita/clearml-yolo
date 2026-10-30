@@ -1,0 +1,134 @@
+{
+  "schema_version": 2,
+  "cases": [
+    {
+      "profile": {
+        "model": {
+          "selection": "ultralytics/yolo11n",
+          "backend": "ultralytics",
+          "preset": "default",
+          "architecture": "yolo11n.pt"
+        },
+        "nominal_size": [
+          960,
+          960
+        ],
+        "effective_size": [
+          960,
+          960
+        ],
+        "gpus": [
+          {
+            "name": "Test GPU",
+            "total_memory_bytes": 1000,
+            "uuid": "GPU-0"
+          }
+        ],
+        "dependencies": {
+          "torch": "2.13",
+          "ultralytics": "8.4.184"
+        },
+        "precision": "fp16",
+        "compilation": true,
+        "optimizers": [
+          "AdamW",
+          "MuSGD"
+        ],
+        "accumulation": "max(round(64/global_batch),1)",
+        "ema": true,
+        "augmentation": "native-v1",
+        "implementation_revision": "probe-v1"
+      },
+      "workload": {
+        "classes": 150,
+        "objects_per_image": 300
+      },
+      "settings": {
+        "memory_fraction": 0.9,
+        "max_global_batch": 1024,
+        "warmup_steps": 5,
+        "measured_steps": 10,
+        "trial_timeout_seconds": 300.0
+      },
+      "status": "numerically_limited",
+      "global_batch": 2,
+      "per_gpu_batch": 2,
+      "trials": [
+        {
+          "global_batch": 1,
+          "status": "success",
+          "trial_id": "group-0",
+          "actual_global_batch": 1,
+          "peak_memory_bytes": [
+            800
+          ],
+          "warmup_steps": 5,
+          "measured_steps": 10,
+          "validation_steps": 1,
+          "optimizer_paths": [
+            "AdamW",
+            "MuSGD"
+          ],
+          "diagnostic": "observed trial",
+          "duration_seconds": 0.0
+        },
+        {
+          "global_batch": 2,
+          "status": "success",
+          "trial_id": "group-1",
+          "actual_global_batch": 2,
+          "peak_memory_bytes": [
+            800
+          ],
+          "warmup_steps": 5,
+          "measured_steps": 10,
+          "validation_steps": 1,
+          "optimizer_paths": [
+            "AdamW",
+            "MuSGD"
+          ],
+          "diagnostic": "observed trial",
+          "duration_seconds": 0.0
+        },
+        {
+          "global_batch": 4,
+          "status": "nonfinite",
+          "trial_id": "group-2",
+          "actual_global_batch": 4,
+          "peak_memory_bytes": [
+            800
+          ],
+          "warmup_steps": 5,
+          "measured_steps": 10,
+          "validation_steps": 1,
+          "optimizer_paths": [
+            "AdamW",
+            "MuSGD"
+          ],
+          "diagnostic": "FloatingPointError: YOLO probe produced nonfinite validation loss",
+          "duration_seconds": 0.0
+        },
+        {
+          "global_batch": 2,
+          "status": "success",
+          "trial_id": "group-3",
+          "actual_global_batch": 2,
+          "peak_memory_bytes": [
+            800
+          ],
+          "warmup_steps": 5,
+          "measured_steps": 10,
+          "validation_steps": 1,
+          "optimizer_paths": [
+            "AdamW",
+            "MuSGD"
+          ],
+          "diagnostic": "",
+          "duration_seconds": 0.0
+        }
+      ],
+      "created_at": "2026-10-26T10:00:00Z",
+      "diagnostic": "Numerical failure at global batch 4: FloatingPointError: YOLO probe produced nonfinite validation loss; independently confirmed global batch 2; maximum capacity was not determined"
+    }
+  ]
+}

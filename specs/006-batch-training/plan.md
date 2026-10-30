@@ -1,5 +1,44 @@
 # Implementation Plan: Batch estimation and native distributed training
 
+## Approved speedup amendment (2026-10-30)
+
+Architecture and gates: [speedup record](speedup/architecture.json).
+The implementation starts from released 0.44.3 in an isolated checkout; original
+workspace changes remain intact. No dependency recipe or native trial is shortened.
+
+For successful observations `(b1,m1)`, `(b2,m2)`, predict
+`b2 + ((budget-m2)*(b2-b1)) // (m2-m1)` using integer arithmetic. Start at 1 then 2;
+clamp growth to `[lower+1, min(4*lower, ceiling)]`. Nonpositive/missing slopes use
+doubling. Observed OOM/budget bounds use existing binary refinement and confirmation.
+Core owns deterministic strategy dispatch, legacy replay and schema-3 validation.
+
+Composition builds/deduplicates all model/hardware cases, handles cache/reporting,
+and admits ready work by compatible idle GPU UUID. `--jobs` caps concurrency;
+the default uses available selected GPUs. Cases wait for this invocation's busy
+slots, without blocking other hardware groups; foreign activity is never stopped.
+One private case entrypoint calls the existing singleton application use case.
+Typed requests/receipts live in application worker contracts. A generic runtime
+pool owns independent subprocesses, a distinct inherited ownership marker, one
+parent native-descendant scope and cleanup barriers. Pin UUID visibility before
+child imports; preserve output order and atomic catalogue writes. A pending snapshot
+precedes launch; receipts require matching token/key and successful process cleanup.
+Keep the existing cooperating-rank supervisor's fail-fast semantics unchanged.
+
+Independent ownership after contract freeze: search/replay agent owns core and
+search/storage tests; runtime agent owns pool and process tests; parent owns request
+contracts, private entrypoint, scheduling/CLI, architecture and integration.
+Documentation follows fixed interfaces. Integration and canonical/docs/native checks
+precede a fresh independent review and release. Bounded agents do not delegate.
+
+Acceptance uses the canonical verifier, docs verifier, scoped mutation applicability,
+legacy/forged catalogue tests, actual concurrent CPU processes and multiprocess
+catalogue writers, and paired-source queue checks. Compare legacy/guided native YOLO
+and FCOS searches on one idle GPU with prepared assets. Physical multi-GPU execution
+is explicitly waived for this release only; no GPU scaling claim follows CPU overlap.
+Update batch-estimation guidance, Russian README, generated CLI docs and canonical
+corp-skills usage/evaluation guidance. Release through normal commits, annotated tag
+and explicit pushes after current/proposed compatibility and review; no code assets.
+
 Date: 2026-10-26. Specification: [spec.md](spec.md).
 
 ## Summary
@@ -124,3 +163,12 @@ release preparation while preserving unrelated dirty source artifacts. Freeze qu
 source before CY verification, use isolated copy-mode dependency installs, and check
 the actual final versions before pushing. Publish only intended Git refs; no GitHub
 Release, assets, registry package or operational installation.
+
+## Explicit delivery authorization, 2026-10-30
+
+After disclosure of the two failed idle preflights and the separate single-GPU
+benchmark gate, the user instructed **“push”**. This authorizes the Git-only 0.44.4
+delivery with that benchmark gap recorded, in addition to the earlier physical
+multi-GPU exception. It does not turn T041 or full architecture acceptance into
+passes. Ordinary checks, independent review, final paired-source verification and
+normal release hooks remain required; no native guarantee or idle criterion changes.

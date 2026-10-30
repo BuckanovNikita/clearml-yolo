@@ -1,0 +1,211 @@
+{
+  "schema_version": 1,
+  "task": "006 batch search speedup and independent concurrency",
+  "scope": [
+    "src/clearml_yolo/core/batch_estimation.py",
+    "src/clearml_yolo/application/training_workers.py",
+    "src/clearml_yolo/adapters/runtime/worker_pool.py",
+    "src/clearml_yolo/entrypoints/batch_estimate.py",
+    "src/clearml_yolo/entrypoints/batch_estimate_worker.py",
+    "src/clearml_yolo/entrypoints/options.py",
+    "tests",
+    ".importlinter",
+    "README.md",
+    "docs",
+    "specs/006-batch-training",
+    "src/clearml_yolo/adapters/documentation/assets/tutorials"
+  ],
+  "impact": "modules",
+  "rules": "AGENTS.md, constitution and existing exhaustive import/AST contracts; pure policy, explicit composition and adapter-owned effects.",
+  "modules": [
+    {
+      "id": "policy",
+      "path": "src/clearml_yolo/core/batch_estimation.py",
+      "change": "modify",
+      "responsibility": "Deterministic measured-memory search and versioned evidence replay",
+      "interface": "SearchSettings.search_strategy, BatchSearch, EstimateCatalogue schemas1/2/3; predictions never prove capacity",
+      "layer": "core",
+      "allowed_dependencies": [
+        "Standard library hashing/JSON and existing Pydantic/core model dependencies"
+      ],
+      "forbidden_dependencies": [
+        "Core/application cannot import adapters or perform IO",
+        "Runtime pool cannot import storage, use cases or entrypoints"
+      ],
+      "effects": "None; pure validation and transitions",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "records",
+      "path": "src/clearml_yolo/application/training_workers.py",
+      "change": "modify",
+      "responsibility": "Serializable case launch and completion contracts",
+      "interface": "BatchCaseRequest and BatchCaseResult carry token, profile/settings/workload, store/output paths and verified estimate identity",
+      "layer": "application",
+      "allowed_dependencies": [
+        "pathlib value types, Pydantic and application/core record contracts"
+      ],
+      "forbidden_dependencies": [
+        "Core/application cannot import adapters or perform IO",
+        "Runtime pool cannot import storage, use cases or entrypoints"
+      ],
+      "effects": "None; values only",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "pool",
+      "path": "src/clearml_yolo/adapters/runtime/worker_pool.py",
+      "change": "add",
+      "responsibility": "Independent subprocess ownership and completion barriers",
+      "interface": "IndependentWorkerPool context manager, start and poll; distinct case ownership and no peer fail-fast",
+      "layer": "adapters.runtime",
+      "allowed_dependencies": [
+        "Standard library processes/signals/contexts, runtime process_tree and WorkerCommand values"
+      ],
+      "forbidden_dependencies": [
+        "Core/application cannot import adapters or perform IO",
+        "Runtime pool cannot import storage, use cases or entrypoints"
+      ],
+      "effects": "Own subprocesses, logs, supervision and cleanup; no application/store imports",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "cli",
+      "path": "src/clearml_yolo/entrypoints/batch_estimate.py",
+      "change": "modify",
+      "responsibility": "Deduplicate, schedule and report complete capacity cases",
+      "interface": "Compatible idle UUID affinity, positive optional jobs cap, ordered reporting and cache reuse",
+      "layer": "entrypoints",
+      "allowed_dependencies": [
+        "Runtime bootstrap/GPU inventory/worker pool, storage filesystem/catalogue, application probe ports and worker records, pure batch policy and shared options"
+      ],
+      "forbidden_dependencies": [
+        "Core/application cannot import adapters or perform IO",
+        "Runtime pool cannot import storage, use cases or entrypoints"
+      ],
+      "effects": "Compose probe/store/pool; perform admission and request/receipt IO",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "case-worker",
+      "path": "src/clearml_yolo/entrypoints/batch_estimate_worker.py",
+      "change": "add",
+      "responsibility": "Execute one isolated complete case",
+      "interface": "Validate request, compose singleton estimate_batches and atomically write token/key receipt",
+      "layer": "entrypoints",
+      "allowed_dependencies": [
+        "Runtime bootstrap, storage filesystem/catalogue, application probe ports/worker records/estimate_batches and pure case records; lazy native probe composition"
+      ],
+      "forbidden_dependencies": [
+        "Core/application cannot import adapters or perform IO",
+        "Runtime pool cannot import storage, use cases or entrypoints"
+      ],
+      "effects": "Compose adapters in private process; no imports from public command",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "options",
+      "path": "src/clearml_yolo/entrypoints/options.py",
+      "change": "modify",
+      "responsibility": "Inert shared CLI declarations",
+      "interface": "Optional --jobs positive concurrency ceiling; default auto",
+      "layer": "entrypoints",
+      "allowed_dependencies": [
+        "Existing standard-library argparse and declarative option metadata dependencies"
+      ],
+      "forbidden_dependencies": [
+        "Core/application cannot import adapters or perform IO",
+        "Runtime pool cannot import storage, use cases or entrypoints"
+      ],
+      "effects": "None at import",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "imports",
+      "path": ".importlinter",
+      "status": "existing",
+      "rules": "Inward layers, exhaustive entrypoint/runtime classification, runtime cannot import use cases or storage.",
+      "check": "canonical"
+    },
+    {
+      "id": "negative",
+      "path": "tests/test_architecture.py",
+      "status": "existing",
+      "rules": "Forbidden direct/transitive effects, pool and worker target/classification negative cases.",
+      "check": "canonical"
+    }
+  ],
+  "checks": [
+    {
+      "id": "canonical",
+      "kind": "imports",
+      "command": "CUDA_VISIBLE_DEVICES= uv run --frozen --no-sync python scripts/verify.py",
+      "expectation": "Ruff, strict mypy, Vulture, import contracts and full pytest including negative cases and CPU-DDP pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/006-batch-training/speedup/verification.md"
+      }
+    },
+    {
+      "id": "behavior",
+      "kind": "behavior",
+      "command": "CUDA_VISIBLE_DEVICES= uv run --frozen --no-sync python -m pytest tests/test_batch_estimate_cli.py tests/test_batch_case_worker.py tests/test_architecture.py",
+      "expectation": "CLI scheduling, cache preservation, receipt validation, pending worker snapshots and executable architecture negative cases pass; full strategy/store/process coverage is included in canonical verification.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/006-batch-training/speedup/verification.md"
+      }
+    },
+    {
+      "id": "docs",
+      "kind": "documentation",
+      "command": "uv run --frozen --no-sync python scripts/verify.py --docs",
+      "expectation": "Changed Markdown, links and documented CLI examples pass; portable companion checks recorded separately.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/006-batch-training/speedup/verification.md"
+      }
+    },
+    {
+      "id": "native",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync python ../native_benchmark.py ../native-benchmark",
+      "expectation": "Matched full-trial native legacy/guided searches and cached relaunch succeed on one idle GPU; physical two-GPU execution is a separately accepted release limitation.",
+      "result": {
+        "status": "failed",
+        "exit_code": 2,
+        "evidence": "specs/006-batch-training/speedup/verification.md"
+      }
+    }
+  ],
+  "documentation": "Update batch-estimation guide, Russian README, active feature docs, shared option/rendered docs and corp-skills usage/evaluation references. Record native single-GPU timings and the explicit physical multi-GPU release limitation in dated evidence.",
+  "review": {
+    "status": "accepted",
+    "reviewer": "Fresh read-only native agent review_batch_speedup; implementation accepted with native acceptance gap retained",
+    "evidence": "specs/006-batch-training/speedup/review.md",
+    "reconciliation": "Reviewed all tracked changes and untracked additions against released0.44.3: six runtime/composition/value modules, shared/generated docs, existing import contracts, tests and fixtures. Original dirty checkout excluded/preserved; dependencies and installed workflow tooling unchanged. Native benchmark remains failed and blocks full acceptance. After disclosure, the user instructed push: release is authorized with the single-GPU benchmark gap recorded; the failed native check remains unchanged."
+  }
+}

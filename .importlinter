@@ -911,7 +911,7 @@ type = layers
 containers =
     clearml_yolo.entrypoints
 layers =
-    docs:documentation:options:batch_estimate:compare:composition:config_tree:dedup:download_weights:export:ground_truth:hydra:metrics:pipeline:predict:report:train:val
+    docs:documentation:options:batch_estimate:batch_estimate_worker:compare:composition:config_tree:dedup:download_weights:export:ground_truth:hydra:metrics:pipeline:predict:report:train:val
 exhaustive = true
 
 [importlinter:contract:safetensors-sdk-has-explicit-owners]

@@ -10,9 +10,11 @@ Configuration examples and CPU tests do not establish native GPU outcomes.
 task. It tests registered pretrained YOLO variants and all registered DEIMv2,
 RF-DETR, Faster R-CNN and FCOS presets. It searches once per model, resolution,
 training profile and distinct GPU name/total-memory capacity. Identical GPUs share
-one measurement. For a hardware group needing measurement, it uses the first idle
-GPU in the selected order. Only the probed GPU must be idle; unrelated workloads
-remain running. Missing or unidentifiable telemetry fails the measurement.
+one measurement. Independent cases run concurrently on idle selected GPUs, with
+one complete search pinned to each assigned GPU. Each case uses the first idle
+compatible GPU in the selected order that this invocation has not assigned to
+another case. Unrelated workloads remain running. Missing or unidentifiable
+telemetry fails the affected measurement.
 
 ## Measure selected cases
 
@@ -20,6 +22,7 @@ remain running. Missing or unidentifiable telemetry fails the measurement.
 cy-batch-estimate --imgsz 960
 cy-batch-estimate --imgsz 960 --classes 150 --objects-per-image 300
 cy-batch-estimate --imgsz 960 --models rfdetr/small,fcos/resnet50_fpn --devices 0,1
+cy-batch-estimate --imgsz 960 --models rfdetr/small,fcos/resnet50_fpn --devices 0,1 --jobs 1
 ```
 
 The default catalogue includes the 44 standard pretrained YOLO detection variants
@@ -35,6 +38,7 @@ when no compatible measurement exists.
 | `--objects-per-image N` | Synthetic target density for every image; 300 |
 | `--models LIST` | Comma-separated catalogue selections; all registered cases |
 | `--devices LIST` | Ordered logical indexes within inherited CUDA visibility; all visible GPUs |
+| `--jobs N` | Positive maximum concurrent independent searches; default uses available selected GPUs; 1 runs serially |
 | `--gpu-counts LIST` | Output counts over the first N selected GPUs; default 1 through selected count; launches no additional searches |
 | `--memory-budget FRACTION` | Fraction of each GPU's total memory; 0.9 |
 | `--search-limit N` | Per-GPU search ceiling; 1024; extrapolated global batches may exceed it |
@@ -48,6 +52,16 @@ both recommendations. A heterogeneous selection needs a compatible single-GPU
 measurement for every distinct name/capacity group. No distributed probe or
 multi-GPU confirmation is launched.
 
+Parallelism is between model/hardware cases. Two identical idle GPUs can search
+two different models concurrently; a single model on identical GPUs still needs
+only one search. Candidates and optimizer paths within a case remain sequential.
+Cases waiting for a compatible GPU used by this invocation start after its previous
+case has exited and its owned descendants have been cleaned up. Busy unrelated
+GPUs are never reserved, stopped or waited on indefinitely. Ordinary measurement
+or case-result failures do not terminate peers. If process supervision cannot be
+established or recovered safely, the invocation stops while preserving already
+accepted results. Output retains the requested model and GPU-count order.
+
 ## Search and evidence
 
 Before launching YOLO workers, the estimator persists an absolute Ultralytics
@@ -60,8 +74,14 @@ see [cache setup and recovery](model-assets.md#cache-locations).
 
 The public training batch is the **global microbatch across all training GPUs**.
 Every estimator trial uses exactly one GPU, so its measured global and per-GPU
-batches are equal. Search grows exponentially, refines the boundary by binary
-search, and confirms the selected batch in a fresh supervised process.
+batches are equal. New searches start at batches 1 and 2, unless a failure or the
+ceiling ends discovery earlier. Subsequent candidates use the measured memory
+growth between the two latest successful, under-budget trials, with jumps capped
+at four times the last successful batch and by the search ceiling. Missing, flat
+or decreasing memory growth falls back to doubling. A predicted batch is only a
+candidate: only observed CUDA OOM or memory-budget excess establishes a capacity
+upper bound. The search then refines that bound by exact binary search and confirms
+the winner in a fresh supervised process.
 Each trial performs five warm-up optimizer updates and ten measured updates,
 including native loss/backward, optimizer state, configured EMA and bounded validation.
 Native mixed precision and compilation settings remain part of the measured recipe.
@@ -96,6 +116,9 @@ failure is never OOM or a memory upper bound; the result does not establish a
 capacity maximum. A numerical failure before any successful candidate, any failed
 confirmation (including nonfinite, OOM, memory-budget excess or timeout), or another
 failure remains unusable. Recovery does not retry a failed confirmation.
+Because memory-guided search visits different candidates, its last good batch after
+a numerical failure can differ from the older exponential search. Both strategies
+require the same complete independent confirmation and retain the numerical cause.
 
 A failed case has no usable recommendation; a nonzero command status can
 coexist with completed results for other cases.
@@ -115,21 +138,31 @@ defaults to the launch working directory. The versioned JSON records global and
 per-GPU batches separately, trial outcomes, synthetic limits and provenance.
 Stored trial evidence is unchanged: extrapolations are derived during lookup and
 reporting, never saved as manufactured measurements. Legacy measured allocations
-remain readable. Schema 1 remains readable; ordinary saves write schema 2, which
-supports `numerically_limited`. Upgrade older CY readers before sharing a schema-2
-catalogue with them. Read-only access does not migrate or rewrite existing files.
+remain readable. Schemas 1 and 2 remain readable; ordinary saves write schema 3
+with an explicit search strategy for every case. New cases use `memory_guided_v1`.
+Historical cases without a strategy replay as `exponential_binary_v1`, preserving
+their trial sequence and source estimate keys. Schema 1 still excludes
+`numerically_limited`; schemas 1/2 cannot contain memory-guided histories. Unknown
+strategies, mismatched histories and schema-3 cases without a strategy are rejected.
+Upgrade older CY readers before sharing a schema-3 catalogue with them. Read-only
+access does not migrate or rewrite existing files.
 Historical failed cases remain intact; inspect the new case matching the current
 implementation and dependency versions after rerunning.
 Updates use a native file lock and atomic replacement. A malformed catalogue is
 reported as corruption and is not silently overwritten or treated as an empty cache.
 
 Rerunning the same request reuses completed compatible cases. Failed or interrupted
-cases are retried. `--refresh` invalidates each old matching success before probing
-it again, so an interrupted refresh cannot leave a success that appears fresh.
+cases are retried. Cache hits require no idle GPU. `--refresh` invalidates each old
+matching success before its case process is launched, so an interrupted refresh
+cannot leave a success that appears fresh.
 Preserve the catalogue when investigating failures. Progress snapshots deliberately
-retain status `failed` and null batch values until independent confirmation succeeds.
-Their pending-confirmation diagnostic means the search may still be running or may
-have been interrupted; the snapshot is never usable training evidence.
+retain status `failed` and null batch values until independent confirmation succeeds
+and the invocation owner validates the case receipt, successful process exit and
+owned descendant cleanup. The receipt must match the launched case token and
+estimate key. A confirmation-complete snapshot can still be waiting for owner
+cleanup; it remains unusable. Pending diagnostics can mean the search is running
+or was interrupted. Cancellation cleans up only owned processes and retains
+completed peer cases plus the latest unusable progress for unfinished cases.
 
 After upgrading, rerun failed cases. The changed implementation fingerprint makes
 older measurements incompatible with the new recipe; use fresh measurements rather
@@ -178,7 +211,8 @@ YOLO's existing AutoBatch values retain their behavior. CPU/MPS, custom augmenta
 non-square lookup requests and unsupported/custom model profiles require an explicit
 batch when the standard estimator cannot supply matching evidence. Training keeps
 its normal failure behavior: an OOM does not trigger an automatic retry or hidden
-batch reduction. This utility does not reserve GPUs or replace the [queue](queue.md).
+batch reduction. Its internal GPU assignments do not reserve devices against other
+programs or replace the [queue](queue.md).
 
 ## Numerical-search recovery on older versions
 

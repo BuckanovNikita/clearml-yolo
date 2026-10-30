@@ -1,0 +1,343 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "profile": {
+        "model": {
+          "selection": "ultralytics/yolo11n",
+          "backend": "ultralytics",
+          "preset": "default",
+          "architecture": "yolo11n.pt"
+        },
+        "nominal_size": [
+          960,
+          960
+        ],
+        "effective_size": [
+          960,
+          960
+        ],
+        "gpus": [
+          {
+            "name": "GPU",
+            "total_memory_bytes": 1000,
+            "uuid": null
+          }
+        ],
+        "dependencies": {
+          "torch": "test"
+        },
+        "precision": "fp16",
+        "compilation": true,
+        "optimizers": [
+          "AdamW",
+          "MuSGD"
+        ],
+        "accumulation": "fixed:1",
+        "ema": true,
+        "augmentation": "native",
+        "implementation_revision": "probe-v1"
+      },
+      "workload": {
+        "classes": 150,
+        "objects_per_image": 300
+      },
+      "settings": {
+        "memory_fraction": 0.9,
+        "max_global_batch": 8,
+        "warmup_steps": 5,
+        "measured_steps": 10,
+        "trial_timeout_seconds": 300.0
+      },
+      "status": "validated",
+      "global_batch": 4,
+      "per_gpu_batch": 4,
+      "trials": [
+        {
+          "global_batch": 1,
+          "status": "success",
+          "trial_id": "group-1",
+          "actual_global_batch": 1,
+          "peak_memory_bytes": [
+            800
+          ],
+          "warmup_steps": 5,
+          "measured_steps": 10,
+          "validation_steps": 1,
+          "optimizer_paths": [
+            "AdamW",
+            "MuSGD"
+          ],
+          "diagnostic": "",
+          "duration_seconds": 0.0
+        },
+        {
+          "global_batch": 2,
+          "status": "success",
+          "trial_id": "group-2",
+          "actual_global_batch": 2,
+          "peak_memory_bytes": [
+            800
+          ],
+          "warmup_steps": 5,
+          "measured_steps": 10,
+          "validation_steps": 1,
+          "optimizer_paths": [
+            "AdamW",
+            "MuSGD"
+          ],
+          "diagnostic": "",
+          "duration_seconds": 0.0
+        },
+        {
+          "global_batch": 4,
+          "status": "success",
+          "trial_id": "group-3",
+          "actual_global_batch": 4,
+          "peak_memory_bytes": [
+            800
+          ],
+          "warmup_steps": 5,
+          "measured_steps": 10,
+          "validation_steps": 1,
+          "optimizer_paths": [
+            "AdamW",
+            "MuSGD"
+          ],
+          "diagnostic": "",
+          "duration_seconds": 0.0
+        },
+        {
+          "global_batch": 8,
+          "status": "oom",
+          "trial_id": "group-4",
+          "actual_global_batch": 8,
+          "peak_memory_bytes": [
+            800
+          ],
+          "warmup_steps": 5,
+          "measured_steps": 10,
+          "validation_steps": 1,
+          "optimizer_paths": [
+            "AdamW",
+            "MuSGD"
+          ],
+          "diagnostic": "",
+          "duration_seconds": 0.0
+        },
+        {
+          "global_batch": 6,
+          "status": "oom",
+          "trial_id": "group-5",
+          "actual_global_batch": 6,
+          "peak_memory_bytes": [
+            800
+          ],
+          "warmup_steps": 5,
+          "measured_steps": 10,
+          "validation_steps": 1,
+          "optimizer_paths": [
+            "AdamW",
+            "MuSGD"
+          ],
+          "diagnostic": "",
+          "duration_seconds": 0.0
+        },
+        {
+          "global_batch": 5,
+          "status": "oom",
+          "trial_id": "group-6",
+          "actual_global_batch": 5,
+          "peak_memory_bytes": [
+            800
+          ],
+          "warmup_steps": 5,
+          "measured_steps": 10,
+          "validation_steps": 1,
+          "optimizer_paths": [
+            "AdamW",
+            "MuSGD"
+          ],
+          "diagnostic": "",
+          "duration_seconds": 0.0
+        },
+        {
+          "global_batch": 4,
+          "status": "success",
+          "trial_id": "group-7",
+          "actual_global_batch": 4,
+          "peak_memory_bytes": [
+            800
+          ],
+          "warmup_steps": 5,
+          "measured_steps": 10,
+          "validation_steps": 1,
+          "optimizer_paths": [
+            "AdamW",
+            "MuSGD"
+          ],
+          "diagnostic": "",
+          "duration_seconds": 0.0
+        }
+      ],
+      "created_at": "2026-10-26T12:00:00Z",
+      "diagnostic": ""
+    },
+    {
+      "profile": {
+        "model": {
+          "selection": "ultralytics/yolo11n",
+          "backend": "ultralytics",
+          "preset": "default",
+          "architecture": "yolo11n.pt"
+        },
+        "nominal_size": [
+          960,
+          960
+        ],
+        "effective_size": [
+          960,
+          960
+        ],
+        "gpus": [
+          {
+            "name": "GPU",
+            "total_memory_bytes": 1000,
+            "uuid": null
+          },
+          {
+            "name": "GPU",
+            "total_memory_bytes": 1000,
+            "uuid": null
+          }
+        ],
+        "dependencies": {
+          "torch": "test"
+        },
+        "precision": "fp16",
+        "compilation": true,
+        "optimizers": [
+          "AdamW",
+          "MuSGD"
+        ],
+        "accumulation": "fixed:1",
+        "ema": true,
+        "augmentation": "native",
+        "implementation_revision": "probe-v1"
+      },
+      "workload": {
+        "classes": 150,
+        "objects_per_image": 300
+      },
+      "settings": {
+        "memory_fraction": 0.9,
+        "max_global_batch": 8,
+        "warmup_steps": 5,
+        "measured_steps": 10,
+        "trial_timeout_seconds": 300.0
+      },
+      "status": "validated",
+      "global_batch": 4,
+      "per_gpu_batch": 2,
+      "trials": [
+        {
+          "global_batch": 2,
+          "status": "success",
+          "trial_id": "group-1",
+          "actual_global_batch": 2,
+          "peak_memory_bytes": [
+            800,
+            800
+          ],
+          "warmup_steps": 5,
+          "measured_steps": 10,
+          "validation_steps": 1,
+          "optimizer_paths": [
+            "AdamW",
+            "MuSGD"
+          ],
+          "diagnostic": "",
+          "duration_seconds": 0.0
+        },
+        {
+          "global_batch": 4,
+          "status": "success",
+          "trial_id": "group-2",
+          "actual_global_batch": 4,
+          "peak_memory_bytes": [
+            800,
+            800
+          ],
+          "warmup_steps": 5,
+          "measured_steps": 10,
+          "validation_steps": 1,
+          "optimizer_paths": [
+            "AdamW",
+            "MuSGD"
+          ],
+          "diagnostic": "",
+          "duration_seconds": 0.0
+        },
+        {
+          "global_batch": 8,
+          "status": "oom",
+          "trial_id": "group-3",
+          "actual_global_batch": 8,
+          "peak_memory_bytes": [
+            800,
+            800
+          ],
+          "warmup_steps": 5,
+          "measured_steps": 10,
+          "validation_steps": 1,
+          "optimizer_paths": [
+            "AdamW",
+            "MuSGD"
+          ],
+          "diagnostic": "",
+          "duration_seconds": 0.0
+        },
+        {
+          "global_batch": 6,
+          "status": "oom",
+          "trial_id": "group-4",
+          "actual_global_batch": 6,
+          "peak_memory_bytes": [
+            800,
+            800
+          ],
+          "warmup_steps": 5,
+          "measured_steps": 10,
+          "validation_steps": 1,
+          "optimizer_paths": [
+            "AdamW",
+            "MuSGD"
+          ],
+          "diagnostic": "",
+          "duration_seconds": 0.0
+        },
+        {
+          "global_batch": 4,
+          "status": "success",
+          "trial_id": "group-5",
+          "actual_global_batch": 4,
+          "peak_memory_bytes": [
+            800,
+            800
+          ],
+          "warmup_steps": 5,
+          "measured_steps": 10,
+          "validation_steps": 1,
+          "optimizer_paths": [
+            "AdamW",
+            "MuSGD"
+          ],
+          "diagnostic": "",
+          "duration_seconds": 0.0
+        }
+      ],
+      "created_at": "2026-10-26T12:00:00Z",
+      "diagnostic": ""
+    }
+  ]
+}
