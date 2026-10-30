@@ -17,12 +17,17 @@ Shared backbones use the same native cache entry.
 
 ## Pinned project archives
 
-Bulk preparation reuses valid native files, then seeds missing assets from the
-project's pinned `weights-*` GitHub Release before ordinary upstream resolution.
-The packaged `adapters/assets/weights-manifest.json` selects the release in
-`BuckanovNikita/clearml-yolo`; preparation does not discover a moving latest release.
-Source checkouts can precede initial publication: the manifest and dated publication
-evidence, rather than a code version alone, identify an available snapshot.
+Bulk preparation reuses validated native files, then restores missing assets only
+from the project's pinned `weights-*` GitHub Release. The packaged
+`adapters/assets/weights-manifest.json` selects the snapshot in
+`BuckanovNikita/clearml-yolo`; preparation never discovers a moving latest release.
+The current pin is `weights-2026-10-30`.
+
+A missing, mismatched or unavailable pin produces a release-specific failure. Bulk
+preparation does not fall back to Google Drive, Google Storage, download.pytorch.org
+or Hugging Face. Both cache lookup and post-restoration verification are local-only,
+including Hub metadata. Original URLs remain provenance and are not bulk download
+routes. Standalone selected-model execution retains its ordinary resolution rules.
 
 Each independent `.tar` is below 2 GiB. Preparation verifies its byte size and
 SHA-256 before reading it, rejects unsafe paths, links, duplicate members and special
@@ -30,13 +35,23 @@ files, and verifies each selected member before atomic native publication. Downl
 archives are reused under `CY_HOME/.cache/clearml-yolo/weight-bundles/` with coordinated
 locks. A partial or interrupted transfer is not a completed archive.
 
+The elapsed streaming budget for each archive attempt defaults to 1800 seconds.
+Set `CY_WEIGHTS_DOWNLOAD_TIMEOUT` to a positive finite number of seconds before
+launch when the connection requires more time. The budget is checked between
+completed chunks; it is not a hard wall-clock deadline. Connection and socket-read
+inactivity timeouts remain 10 and 30 seconds respectively. Continuously arriving
+headers or a slowly completed chunk can exceed the streaming budget before a check.
+Archive locks have a separate finite wait of four times the configured budget plus
+60 seconds; that wait can expire while a slow writer is still active. Ordinary
+selected-model downloads retain their existing 300-second streaming budget; this
+setting applies to project weight archives only.
+
 Hub assets include the native configuration, actual snapshot commit, requested
 revision reference and blob metadata. Restoration requires no upstream metadata
-request; ordinary timm discovery can use the restored cache offline. Original
-upstream URL/revision identities remain provenance; the mirror URL does not replace
-them. An unavailable or invalid mirror warns and falls back to the existing upstream
-route. Future asset identities absent from the pin also retain that route. Standalone
-selected-model execution retains its normal asset resolution.
+request; ordinary timm discovery can use the restored cache offline. ResNet archives
+remain usable across supported Torchvision versions when the original filename,
+URL and checksum identity are unchanged. Changed weights or source revisions are
+not treated as equivalent.
 
 Weight snapshots have a separate release cadence from application versions. Ordinary
 code releases reuse the existing pin and do not build or upload weights. See the
@@ -132,95 +147,77 @@ unchanged. See [filesystem ownership](filesystem-policy.md#library-configuration
 
 ## Proxies
 
-Bulk preparation checks valid native content, then the pinned project archive using
-`GHR` when configured and GitHub otherwise, then ordinary upstream resolution.
-The upstream route checks local/cache content, a configured proxy and the original
-URL. Missing or empty proxy variables use the corresponding original endpoints.
-Other sources keep their original endpoints except configured HF routing.
+Bulk preparation checks valid native content, then the pinned project archive via
+`GHR` when configured, with public GitHub as a fallback for that same archive.
+Failure stays on this release route and is reported with the archive and sanitized
+transport/status details. It does not switch to the model's original host.
 
-`HF_ENDPOINT` selects the Hugging Face endpoint, including an Artifactory Hugging
-Face API endpoint. `HF_TOKEN` or the SDK's standard token configuration supplies
-endpoint-scoped authentication. Credentials must not be sent to unrelated origins
-or redirected hosts. Keep tokens out of command examples and diagnostic reports.
-HF preparation retains the native Hub cache layout and metadata for offline timm
-loading; successful HTTP transfer alone does not prove offline loader discovery.
+`GHR` is the root of an Artifactory **Files (Generic) remote repository** whose
+upstream URL is `https://github.com`. The complete GitHub path is appended directly:
 
-`GHR` is the root of a Generic remote repository whose upstream URL is
-`https://github.com`. The resolver appends the complete
-`owner/repository/releases/download/tag/filename` suffix. For example,
-`https://github.com/owner/repo/releases/download/tag/file.tar` becomes
-`https://artifactory.example/artifactory/github-releases/owner/repo/releases/download/tag/file.tar`.
-Supply the repository root, not a particular release/file URL or the GitHub API.
-This follows Artifactory's [remote repository layout](https://docs.jfrog.com/artifactory/docs/remote-repositories).
+```text
+GHR/BuckanovNikita/clearml-yolo/releases/download/weights-2026-10-30/weights-001.tar
+```
 
-`GH` is an Artifactory VCS repository root used by the original DEIM source fallback.
-For `https://artifactory.example/artifactory/github-vcs`, CY constructs
-`https://artifactory.example/artifactory/api/vcs/downloadCommit/github-vcs/owner/repo/commit?ext=tar.gz`
-using the [downloadCommit API](https://docs.jfrog.com/artifactory/reference/downloadvcscommit),
-not Git clone access. The complete project bundle can also supply DEIM source through
-`GHR`, so `GH` is optional unless that fallback is needed. `CH` is not a supported
-alias; use `GH`.
+For example, a root `https://artifactory.example/artifactory/github-files` yields
+`https://artifactory.example/artifactory/github-files/BuckanovNikita/clearml-yolo/releases/download/weights-2026-10-30/weights-001.tar`.
+Supply the repository root, not a file URL, browser UI URL, GitHub API or VCS API.
+This follows Artifactory's [remote file access](https://docs.jfrog.com/artifactory/docs/remote-repositories).
 
-HTTP operations use bounded requests/retries, standard authentication/TLS settings,
-per-asset locks, temporary files and atomic publication. Available checksums and
-content checks reject incomplete or invalid downloads. Diagnostics redact proxy
-credentials while retaining full original asset URLs.
+`GH` is a separate **VCS remote repository** of the same `https://github.com` upstream.
+Ordinary selected-model DEIM source resolution uses its
+[downloadCommit API](https://docs.jfrog.com/artifactory/reference/downloadvcscommit):
+`https://artifactory.example/artifactory/api/vcs/downloadCommit/github-vcs/owner/repo/commit?ext=tar.gz`.
+The project release includes DEIM source, so bulk preparation needs neither `GH`
+nor a separate HF endpoint. `CH` is not an alias for `GH`.
 
 ### Configure a clean process and retry
 
-Set network, authentication and endpoint variables in the shell or worker environment
-**before starting** CY. Replace the public example hostname/repository keys with your
-administrator-provided values. A minimal complete-bundle proxy setup is:
+Set the environment before starting CY. Replace the example hostname and repository
+key with the actual Files remote root:
 
 ```bash
-export GHR="https://artifactory.example/artifactory/github-releases"
+export GHR="https://artifactory.example/artifactory/github-files"
+# Optional for a slow connection; seconds per archive attempt:
+export CY_WEIGHTS_DOWNLOAD_TIMEOUT=3600
+cy-download-weights
 ```
 
-For authenticated `GH`/`GHR` downloads, configure a private per-host `.netrc` entry for
-the actual Artifactory hostname using the approved credential store, and restrict the
-file to its owner (`chmod 600 ~/.netrc`). Requests uses that host entry; `HF_TOKEN`
-is not GitHub/VCS proxy authentication. Do not put credentials in URLs, example
-commands, experiment YAML or diagnostic reports.
+For authenticated Files/VCS requests, configure a private per-host `.netrc` entry
+using the approved credential store and restrict access (`chmod 600 ~/.netrc`).
+`HF_TOKEN` is not Files/VCS authentication. Keep credentials out of URLs, YAML and
+reports. For a private CA, set `SSL_CERT_FILE` and/or `REQUESTS_CA_BUNDLE` to the
+administrator-provided CA bundle before launch; keep TLS verification enabled.
 
-Set these additional routes only if their original-source fallbacks are needed:
+HTTP 401 indicates authentication failure; 403 concerns permissions or access policy.
+For 404, check the Files repository root and full project release path, including
+repository access rules. A working proxy for another GitHub owner does not prove
+access to this project's release. For timeout failures, increase the archive budget
+if appropriate. For checksum/size/content failures, correct the proxy/cache response
+and retry; do not disable integrity checks or delete valid native files.
+
+A missing packaged manifest requires an installation containing the pin. A matching
+release archive is required for missing catalogue weights; changing `GH` or
+`HF_ENDPOINT` does not repair a failed bulk release download. Rerunning the explicit
+command retries incomplete preparation even after an automatic partial-attempt receipt.
+
+### Ordinary selected-model source routes
+
+Standalone model execution may resolve original sources when its local inputs are
+missing. That resolver retains its existing cache/proxy/original behavior:
 
 ```bash
 export GH="https://artifactory.example/artifactory/github-vcs"
 export HF_ENDPOINT="https://artifactory.example/artifactory/api/huggingfaceml/hf-remote"
 ```
 
-The Hugging Face endpoint must use the
-[Artifactory Hugging Face API path](https://docs.jfrog.com/artifactory/docs/use-hugging-face-with-jfrog-cli),
-not a Generic repository URL. If it requires `HF_TOKEN`, load the token through a
-secret manager or a protected SDK token file. An interactive Bash alternative avoids
-putting its value in command history:
+The Hub endpoint uses the [Artifactory Hugging Face API](https://docs.jfrog.com/artifactory/docs/use-hugging-face-with-jfrog-cli).
+Load `HF_TOKEN` through a secret manager or protected SDK token file, scoped to the
+configured Hub endpoint. It is not forwarded to unrelated origins or redirected hosts.
 
-```bash
-read -r -s -p 'Hugging Face endpoint token: ' HF_TOKEN
-export HF_TOKEN
-```
-
-Keep that token scoped to the selected HF endpoint; it is not forwarded to unrelated
-public-origin fallback requests. If a private CA is required, set `SSL_CERT_FILE`
-and/or `REQUESTS_CA_BUNDLE` to the administrator-provided CA bundle before launch.
-Keep certificate verification enabled. Then start a fresh process:
-
-```bash
-cy-download-weights
-```
-
-An HTTP 401 points to missing/invalid authentication; 403 to repository/token read
-permissions or access policy. For 404, check the repository root, key and full
-upstream path as well as upstream availability or blocking; it does not by itself
-prove that model bytes do not exist. For checksum/size/content failures, retain the
-diagnostic, correct the proxy/cache response and retry; do not skip integrity checks
-or clear valid native caches. Rerunning the explicit command reuses validated files
-and retries incomplete preparation even after an automatic partial-attempt receipt.
-
-Protocol fixtures verify URL construction, environment/authentication boundaries,
-fallback and retry logic. They do not establish any live Artifactory connectivity,
-credentials, repository permissions or server-side cache state. This setup guidance
-does not require contacting a live stand to test the client logic.
+Protocol fixtures verify Files/VCS URL construction, authentication, release recovery
+and absence of upstream traffic during bulk preparation. They do not establish live
+Artifactory connectivity, credentials, repository permissions or server cache state.
 
 ## Offline placement and access
 

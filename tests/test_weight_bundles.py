@@ -81,7 +81,7 @@ def test_restore_and_offline_cache_reuse(tmp_path: Path, monkeypatch: pytest.Mon
     monkeypatch.setattr(bundles, "write_path", lambda path: path)
     transfers: list[str] = []
 
-    def download(url: str, destination: Path) -> None:
+    def download(url: str, destination: Path, **kwargs: object) -> None:
         transfers.append(url)
         destination.write_bytes(archive.read_bytes())
 
@@ -114,7 +114,9 @@ def test_reject_unsafe_archive_before_publication(
     monkeypatch.setattr(bundles, "cy_home", lambda: tmp_path)
     monkeypatch.setattr(bundles, "write_path", lambda path: path)
     monkeypatch.setattr(
-        bundles, "download", lambda url, destination: destination.write_bytes(archive.read_bytes())
+        bundles,
+        "download",
+        lambda url, destination, **kwargs: destination.write_bytes(archive.read_bytes()),
     )
     bundles.seed_bundle_asset(spec, manifest)
     assert not asset_destination(spec).exists()
@@ -134,7 +136,9 @@ def test_checksum_failures_never_publish(
     monkeypatch.setattr(bundles, "cy_home", lambda: tmp_path)
     monkeypatch.setattr(bundles, "write_path", lambda path: path)
     monkeypatch.setattr(
-        bundles, "download", lambda url, destination: destination.write_bytes(archive.read_bytes())
+        bundles,
+        "download",
+        lambda url, destination, **kwargs: destination.write_bytes(archive.read_bytes()),
     )
     bundles.seed_bundle_asset(spec, manifest)
     assert not asset_destination(spec).exists()
@@ -149,7 +153,7 @@ def test_proxy_failure_recovers_at_original(
     monkeypatch.setenv("GHR", "https://proxy.example/releases")
     attempts: list[str] = []
 
-    def download(url: str, destination: Path) -> None:
+    def download(url: str, destination: Path, **kwargs: object) -> None:
         attempts.append(url)
         if "proxy.example" in url:
             raise OSError("secret transport credential")
@@ -182,41 +186,33 @@ def test_duplicate_archive_members_rejected(
     monkeypatch.setattr(bundles, "cy_home", lambda: tmp_path)
     monkeypatch.setattr(bundles, "write_path", lambda path: path)
     monkeypatch.setattr(
-        bundles, "download", lambda url, destination: destination.write_bytes(archive.read_bytes())
+        bundles,
+        "download",
+        lambda url, destination, **kwargs: destination.write_bytes(archive.read_bytes()),
     )
     bundles.seed_bundle_asset(spec, manifest)
     assert not asset_destination(spec).exists()
 
 
-def test_unavailable_mirror_retains_upstream_resolution(
+def test_valid_native_cache_does_not_require_a_manifest(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from clearml_yolo.adapters.assets import preparation
-    from clearml_yolo.core.assets import ResolvedAsset
 
-    spec, manifest, _ = fixture_bundle(tmp_path)
-    monkeypatch.setattr(bundles, "cy_home", lambda: tmp_path)
-    monkeypatch.setattr(bundles, "write_path", lambda path: path)
-    monkeypatch.setattr(bundles, "load_manifest", lambda: manifest)
-    monkeypatch.setattr(preparation, "cy_home", lambda: tmp_path)
-    monkeypatch.setattr(preparation, "write_path", lambda path: path)
+    spec, _, _ = fixture_bundle(tmp_path)
+    destination = asset_destination(spec)
+    destination.parent.mkdir(parents=True)
+    destination.write_bytes(WEIGHT)
+    monkeypatch.setattr(bundles, "load_manifest", lambda: None)
     monkeypatch.setattr(
         preparation, "_discover", lambda: ("fixture", (), (("example/small", spec),), ())
     )
-
-    def unavailable(url: str, destination: Path) -> None:
-        raise OSError("private credential")
-
-    monkeypatch.setattr(bundles, "download", unavailable)
-    record = ResolvedAsset(
-        canonical_url=spec.canonical_url,
-        path=tmp_path / "upstream.pt",
-        sha256=digest(WEIGHT),
-        override=spec.override,
+    monkeypatch.setattr(
+        bundles, "download", lambda *args, **kwargs: pytest.fail("release network requested")
     )
-    monkeypatch.setattr(preparation, "_resolve", lambda requested: record)
     result = preparation.prepare_catalogue(automatic=False)
-    assert result.assets == (record,)
+    assert len(result.assets) == 1
+    assert result.assets[0].path == destination
     assert not result.failures
 
 
@@ -241,7 +237,9 @@ def test_extraction_scratch_stays_under_cy_home(
     monkeypatch.setattr(bundles, "cy_home", lambda: tmp_path)
     monkeypatch.setattr(bundles, "write_path", lambda path: path)
     monkeypatch.setattr(
-        bundles, "download", lambda url, destination: destination.write_bytes(archive.read_bytes())
+        bundles,
+        "download",
+        lambda url, destination, **kwargs: destination.write_bytes(archive.read_bytes()),
     )
     default_temp = tempfile.gettempdir()
     original_verify = bundles._verify
@@ -277,7 +275,7 @@ def test_mirror_repairs_native_zip_with_invalid_central_directory(
     monkeypatch.setattr(bundles, "write_path", lambda path: path)
     transfers: list[str] = []
 
-    def download(url: str, destination: Path) -> None:
+    def download(url: str, destination: Path, **kwargs: object) -> None:
         transfers.append(url)
         destination.write_bytes(archive.read_bytes())
 
@@ -296,7 +294,7 @@ def test_concurrent_native_publication_is_preserved_under_destination_lock(
     monkeypatch.setattr(bundles, "write_path", lambda path: path)
     concurrent_weight = WEIGHT + b"valid concurrent native representation"
 
-    def download(url: str, destination: Path) -> None:
+    def download(url: str, destination: Path, **kwargs: object) -> None:
         native = asset_destination(spec)
         native.parent.mkdir(parents=True, exist_ok=True)
         native.write_bytes(concurrent_weight)
@@ -305,3 +303,221 @@ def test_concurrent_native_publication_is_preserved_under_destination_lock(
     monkeypatch.setattr(bundles, "download", download)
     bundles.seed_bundle_asset(spec, manifest)
     assert asset_destination(spec).read_bytes() == concurrent_weight
+
+
+def test_resnet_bundle_matches_same_content_across_torchvision_versions() -> None:
+    manifest = bundles.load_manifest()
+    assert manifest is not None
+    asset = next(item for item in manifest.assets if item.preset == "resnet50_fpn")
+    spec = AssetSpec(
+        backend=asset.backend,
+        preset=asset.preset,
+        filename=asset.filename,
+        canonical_url=asset.source_url,
+        revision="0.28.0",
+        checksum="11ad3fa6",
+        override="model.train.backbone_weights",
+    )
+    assert bundles._matches(spec, asset)
+    for updates in (
+        {"canonical_url": "https://unrelated.example/model.pth"},
+        {"checksum": "00000000"},
+        {"checksum": None},
+        {"preset": "resnet101_fpn"},
+        {"filename": "another.pth"},
+        {"kind": "deim-source"},
+    ):
+        assert not bundles._matches(spec.model_copy(update=updates), asset)
+    deim = next(item for item in manifest.assets if item.backend == "deimv2")
+    changed_source = AssetSpec(
+        backend=deim.backend,
+        preset=deim.preset,
+        filename=deim.filename,
+        canonical_url=deim.source_url,
+        revision="b" * 40,
+        override="model.train.backbone_weights",
+    )
+    assert not bundles._matches(changed_source, deim)
+
+
+def test_bulk_release_failure_never_contacts_upstream(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import requests
+
+    from clearml_yolo.adapters.assets import preparation, resolver
+
+    spec, manifest, _ = fixture_bundle(tmp_path)
+    monkeypatch.setattr(bundles, "load_manifest", lambda: manifest)
+    monkeypatch.setattr(
+        preparation, "_discover", lambda: ("release-only", (), (("example/small", spec),), ())
+    )
+    monkeypatch.setenv("GHR", "https://user:secret@private.example/artifactory/files?token=hidden")
+    attempts: list[str] = []
+
+    def unavailable(url: str, destination: Path, **kwargs: object) -> None:
+        attempts.append(url)
+        response = requests.Response()
+        response.status_code = 401
+        raise requests.HTTPError("opaque-private-secret", response=response)
+
+    upstream: list[str] = []
+
+    def forbidden(url: str, destination: Path) -> None:
+        upstream.append(url)
+        raise requests.ConnectionError("opaque-private-secret")
+
+    monkeypatch.setattr(bundles, "download", unavailable)
+    monkeypatch.setattr(resolver, "_download", forbidden)
+    result = preparation.prepare_catalogue(automatic=False)
+    assert not upstream
+    assert len(attempts) == 4
+    assert len(result.failures) == 1
+    message = result.failures[0].message
+    assert "GHR Files remote: HTTP 401" in message
+    assert "GitHub release: HTTP 401" in message
+    assert "weights.tar" in message
+    assert all(
+        secret not in message for secret in ("opaque-private-secret", "hidden", "private.example")
+    )
+    assert not asset_destination(spec).exists()
+
+
+@pytest.mark.parametrize("manifest_state", ["missing", "no-match", "false-success"])
+def test_bulk_unavailable_pin_or_incomplete_restore_never_uses_upstream(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, manifest_state: str
+) -> None:
+    from clearml_yolo.adapters.assets import preparation, resolver
+
+    spec, manifest, _ = fixture_bundle(tmp_path)
+    selected = None if manifest_state == "missing" else manifest
+    if manifest_state == "no-match":
+        spec = spec.model_copy(update={"revision": "changed"})
+    monkeypatch.setattr(bundles, "load_manifest", lambda: selected)
+    monkeypatch.setattr(
+        preparation, "_discover", lambda: (manifest_state, (), (("example/small", spec),), ())
+    )
+    if manifest_state == "false-success":
+        monkeypatch.setattr(preparation, "seed_bundle_asset", lambda requested: None)
+    upstream: list[str] = []
+
+    def forbidden(url: str, destination: Path) -> None:
+        upstream.append(url)
+        raise OSError("blocked original host")
+
+    monkeypatch.setattr(resolver, "_download", forbidden)
+    result = preparation.prepare_catalogue(automatic=False)
+    assert not upstream
+    assert len(result.failures) == 1
+    expected = {
+        "missing": "manifest is missing",
+        "no-match": "no matching asset",
+        "false-success": "local cache",
+    }
+    assert expected[manifest_state] in result.failures[0].message
+
+
+@pytest.mark.parametrize("configured", [None, "3600", "0", "nan", "inf", "private-secret"])
+def test_archive_timeout_is_configurable_and_invalid_values_are_private(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, configured: str | None
+) -> None:
+    spec, manifest, archive = fixture_bundle(tmp_path)
+    if configured is None:
+        monkeypatch.delenv("CY_WEIGHTS_DOWNLOAD_TIMEOUT", raising=False)
+    else:
+        monkeypatch.setenv("CY_WEIGHTS_DOWNLOAD_TIMEOUT", configured)
+    observed: list[float] = []
+
+    def download(url: str, destination: Path, *, max_seconds: float) -> None:
+        observed.append(max_seconds)
+        destination.write_bytes(archive.read_bytes())
+
+    monkeypatch.setattr(bundles, "download", download)
+    failure = bundles.seed_bundle_asset(spec, manifest)
+    if configured in {None, "3600"}:
+        assert failure is None
+        assert observed == [1800 if configured is None else 3600]
+        assert asset_destination(spec).read_bytes() == WEIGHT
+    else:
+        assert not observed
+        assert failure is not None
+        assert "CY_WEIGHTS_DOWNLOAD_TIMEOUT" in failure
+        assert "positive finite" in failure
+        assert "private-secret" not in failure
+
+
+def test_http_extended_budget_does_not_change_ordinary_download_limit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import time
+    from contextlib import nullcontext
+    from unittest.mock import Mock
+
+    import requests
+
+    from clearml_yolo.adapters.assets import http
+
+    response = Mock()
+    response.headers = {"Content-Length": "8"}
+    response.iter_content.side_effect = lambda **kwargs: iter([b"12345678"])
+    session = Mock()
+    session.get.side_effect = lambda *args, **kwargs: nullcontext(response)
+    monkeypatch.setattr(requests, "Session", lambda: nullcontext(session))
+    monkeypatch.setattr(time, "monotonic", iter([0.0, 301.0, 0.0, 301.0]).__next__)
+    with pytest.raises(TimeoutError):
+        http.download("https://example.invalid/file", tmp_path / "ordinary")
+    http.download("https://example.invalid/archive", tmp_path / "archive", max_seconds=1800)
+    assert (tmp_path / "archive").read_bytes() == b"12345678"
+
+
+@pytest.mark.parametrize("weight_cached", [False, True])
+def test_local_only_hub_resolution_never_repairs_metadata_over_network(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, weight_cached: bool
+) -> None:
+    from clearml_yolo.adapters.assets import hub, resolver
+    from clearml_yolo.core.assets import HubAsset
+
+    spec = AssetSpec(
+        backend="fasterrcnn",
+        preset="dinov2_small",
+        filename="original.pth",
+        canonical_url="https://original.example/checkpoint.pth",
+        override="model.train.backbone_weights",
+        hub=HubAsset(repository="timm/example", cache_dir=tmp_path / "hub"),
+    )
+    if weight_cached:
+        repo = tmp_path / "hub" / "models--timm--example"
+        commit = "a" * 40
+        snapshot = repo / "snapshots" / commit
+        snapshot.mkdir(parents=True)
+        (snapshot / "pytorch_model.bin").write_bytes(WEIGHT)
+        (repo / "refs").mkdir()
+        (repo / "refs" / "main").write_text(commit)
+    monkeypatch.setattr(hub, "hf_hub_download", lambda **kw: pytest.fail("Hub download requested"))
+    monkeypatch.setattr(
+        hub, "get_hf_file_metadata", lambda **kw: pytest.fail("Hub metadata requested")
+    )
+    with pytest.raises(resolver.AssetResolutionError, match="local cache"):
+        resolver.resolve_asset(spec, local_only=True)
+
+
+def test_bulk_success_from_release_does_not_contact_original_host(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from clearml_yolo.adapters.assets import preparation, resolver
+
+    spec, manifest, archive = fixture_bundle(tmp_path)
+    monkeypatch.setattr(bundles, "load_manifest", lambda: manifest)
+    monkeypatch.setattr(
+        preparation, "_discover", lambda: ("release-success", (), (("example/small", spec),), ())
+    )
+    monkeypatch.setattr(
+        bundles,
+        "download",
+        lambda url, destination, **kwargs: destination.write_bytes(archive.read_bytes()),
+    )
+    monkeypatch.setattr(resolver, "_download", lambda *args: pytest.fail("original host requested"))
+    result = preparation.prepare_catalogue(automatic=False)
+    assert not result.failures
+    assert len(result.assets) == 1
+    assert result.assets[0].path.read_bytes() == WEIGHT

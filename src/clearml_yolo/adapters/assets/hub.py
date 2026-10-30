@@ -569,7 +569,7 @@ def _retrieve(spec: AssetSpec, corrupt: set[str]) -> ResolvedAsset:
     raise _failure(hub, failures)
 
 
-def _resolve_hub_asset(spec: AssetSpec) -> ResolvedAsset:
+def _resolve_hub_asset(spec: AssetSpec, *, local_only: bool = False) -> ResolvedAsset:
     """Resolve timm's selected representation into the ordinary native Hub cache."""
     hub = _request(spec)
     _repo_root(hub)
@@ -577,6 +577,8 @@ def _resolve_hub_asset(spec: AssetSpec) -> ResolvedAsset:
     existing, _ = _cached(spec)
     if existing is not None and not _needs_config_repair(spec, existing):
         return existing
+    if local_only:
+        raise _failure(hub, ["local cache lacks validated weights or config.json"])
     key = hashlib.sha256(f"{hub.repository}@{hub.revision}".encode()).hexdigest()
     lock = _contained(hub.cache_dir, hub.cache_dir / ".locks" / "clearml-yolo" / f"{key}.lock")
     lock.parent.mkdir(parents=True, exist_ok=True)
@@ -596,11 +598,11 @@ def _resolve_hub_asset(spec: AssetSpec) -> ResolvedAsset:
         return _retrieve(spec, corrupt)
 
 
-def resolve_hub_asset(spec: AssetSpec) -> ResolvedAsset:
+def resolve_hub_asset(spec: AssetSpec, *, local_only: bool = False) -> ResolvedAsset:
     """Keep local cache, permission and locking failures within the public boundary."""
     hub = _request(spec)
     try:
-        return _resolve_hub_asset(spec)
+        return _resolve_hub_asset(spec, local_only=local_only)
     except (OSError, ValueError, Timeout) as error:
         raise _failure(hub, [type(error).__name__]) from error
 

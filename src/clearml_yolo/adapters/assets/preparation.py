@@ -10,7 +10,11 @@ from filelock import FileLock
 from loguru import logger
 from pydantic import ValidationError
 
-from clearml_yolo.adapters.assets.bundles import load_manifest, seed_bundle_asset
+from clearml_yolo.adapters.assets.bundles import (
+    BundlePreparationError,
+    load_manifest,
+    seed_bundle_asset,
+)
 from clearml_yolo.adapters.assets.resolver import (
     AssetResolutionError,
     asset_destination,
@@ -36,7 +40,7 @@ from clearml_yolo.core.batch_estimation import ModelVariant, model_catalogue
 def _failure(selection: str, operation: str, error: Exception) -> PreparationFailure:
     # Opaque SDK errors can contain bare credentials, beyond recognizable URL/auth
     # patterns. Report their type only; the selected model retains normal handling.
-    if isinstance(error, AssetResolutionError):
+    if isinstance(error, (AssetResolutionError, BundlePreparationError)):
         # Only the resolver-owned outer report is public. Even its explicit or
         # implicit causes may retain opaque transport messages.
         message = redact_text(str(error)).strip()
@@ -110,7 +114,9 @@ def _discover() -> tuple[
         manifest_identity = manifest.identity if manifest is not None else "unavailable"
     except (OSError, ValueError):
         manifest_identity = "invalid"
-    identities.append({"selection": "weight-bundle", "manifest": manifest_identity})
+    identities.append(
+        {"selection": "weight-bundle", "manifest": manifest_identity, "policy": "release-only-v1"}
+    )
     payload = json.dumps(
         sorted(identities, key=lambda item: str(item["selection"])),
         sort_keys=True,
@@ -150,15 +156,28 @@ def _write_receipt(path: Path, result: PreparationResult) -> None:
 
 def _resolve(spec: AssetSpec) -> ResolvedAsset:
     if spec.kind != "deim-source":
-        return resolve_asset(spec)
+        return resolve_asset(spec, local_only=True)
     existing = existing_source(spec)
     if existing is not None:
         return existing
-    extract_resolved_source(resolve_asset(spec))
+    extract_resolved_source(resolve_asset(spec, local_only=True))
     prepared = existing_source(spec)
     if prepared is None:
         raise RuntimeError("Extracted DEIM source is unavailable")
     return prepared
+
+
+def _prepare_asset(spec: AssetSpec) -> ResolvedAsset:
+    try:
+        return _resolve(spec)
+    except AssetResolutionError:
+        # A cache miss may be repaired only by the pinned project release. The
+        # standalone resolver retains upstream behavior; bulk preparation never uses it.
+        pass
+    failure = seed_bundle_asset(spec)
+    if failure is not None:
+        raise BundlePreparationError(failure)
+    return _resolve(spec)
 
 
 def _prepare(*, automatic: bool) -> PreparationResult:
@@ -178,8 +197,7 @@ def _prepare(*, automatic: bool) -> PreparationResult:
             receipt.unlink(missing_ok=True)
             for selection, spec in requests:
                 try:
-                    seed_bundle_asset(spec)
-                    record = _resolve(spec)
+                    record = _prepare_asset(spec)
                     assets.append(record)
                     logger.info("Prepared model asset {} at {}", selection, record.path)
                 except Exception as error:  # noqa: BLE001 - continue independent model assets

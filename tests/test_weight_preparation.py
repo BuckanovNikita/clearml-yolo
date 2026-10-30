@@ -46,7 +46,8 @@ class Catalogue:
             native_cache=self.root,
         )
 
-    def resolve(self, spec: AssetSpec) -> ResolvedAsset:
+    def resolve(self, spec: AssetSpec, *, local_only: bool = False) -> ResolvedAsset:
+        assert local_only
         self.attempts.append(spec.filename)
         if self.interrupt:
             raise KeyboardInterrupt
@@ -72,6 +73,7 @@ def catalogue(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Catalogue:
     )
     monkeypatch.setattr(module, "deim_backbone_asset", lambda preset: fixture.spec(preset + ".pt"))
     monkeypatch.setattr(module, "resolve_asset", fixture.resolve)
+    monkeypatch.setattr(module, "seed_bundle_asset", lambda requested: None)
     return fixture
 
 
@@ -101,7 +103,8 @@ def test_automatic_completion_is_reused(tmp_path: Path, monkeypatch: pytest.Monk
     )
     attempts: list[str] = []
 
-    def resolve(spec: AssetSpec) -> ResolvedAsset:
+    def resolve(spec: AssetSpec, *, local_only: bool = False) -> ResolvedAsset:
+        assert local_only
         attempts.append(spec.filename)
         return ResolvedAsset(
             canonical_url=spec.canonical_url,
@@ -154,7 +157,8 @@ def test_resolution_failures_keep_safe_actionable_diagnostics(
 ) -> None:
     from clearml_yolo.adapters.assets.resolver import AssetResolutionError
 
-    def fail(spec: AssetSpec) -> ResolvedAsset:
+    def fail(spec: AssetSpec, *, local_only: bool = False) -> ResolvedAsset:
+        assert local_only
         raise AssetResolutionError("Copy checkpoint to /offline/weights/yolo11n.pt")
 
     monkeypatch.setattr(catalogue.module, "resolve_asset", fail)
@@ -180,7 +184,8 @@ def test_synthetic_chained_failure_keeps_public_report_and_discards_opaque_messa
     public_marker = "synthetic-public-credential"
     destination = "/offline/weights/yolo11n.pt"
 
-    def fail(spec: AssetSpec) -> ResolvedAsset:
+    def fail(spec: AssetSpec, *, local_only: bool = False) -> ResolvedAsset:
+        assert local_only
         try:
             raise RuntimeError(opaque_marker)  # noqa: TRY301 - synthetic transport fault
         except RuntimeError as error:
@@ -317,10 +322,11 @@ def test_concurrent_automatic_starts_share_completed_pass(
     entered = threading.Event()
     release = threading.Event()
 
-    def blocked(spec: AssetSpec) -> ResolvedAsset:
+    def blocked(spec: AssetSpec, *, local_only: bool = False) -> ResolvedAsset:
+        assert local_only
         entered.set()
         assert release.wait(5)
-        return catalogue.resolve(spec)
+        return catalogue.resolve(spec, local_only=True)
 
     monkeypatch.setattr(catalogue.module, "resolve_asset", blocked)
     with ThreadPoolExecutor(max_workers=2) as executor:

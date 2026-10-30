@@ -1,5 +1,6 @@
 """Bounded streamed downloads with standard Requests authentication and TLS settings."""
 
+import math
 import os
 import time
 from pathlib import Path
@@ -50,7 +51,9 @@ def _headers(url: str) -> dict[str, str]:
     return result
 
 
-def download(url: str, destination: Path) -> None:
+def download(url: str, destination: Path, *, max_seconds: float = _DOWNLOAD_SECONDS) -> None:
+    if not math.isfinite(max_seconds) or max_seconds <= 0:
+        raise ValueError("Download time limit must be positive and finite")
     if urlsplit(url).scheme not in {"http", "https"}:
         raise ValueError("Asset downloads require HTTP or HTTPS")
     started = time.monotonic()
@@ -72,7 +75,7 @@ def download(url: str, destination: Path) -> None:
         with destination.open("wb") as target:
             for chunk in response.iter_content(chunk_size=_CHUNK_SIZE):
                 total += len(chunk)
-                if total > _MAX_WEIGHT_BYTES or time.monotonic() - started > _DOWNLOAD_SECONDS:
+                if total > _MAX_WEIGHT_BYTES or time.monotonic() - started > max_seconds:
                     raise TimeoutError("Asset download exceeded its size or time bound")
                 target.write(chunk)
             target.flush()

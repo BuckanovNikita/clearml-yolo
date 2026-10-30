@@ -1,0 +1,238 @@
+{
+  "schema_version": 1,
+  "task": "weight-files-remote",
+  "scope": [
+    "src/clearml_yolo/adapters/assets/http.py",
+    "src/clearml_yolo/adapters/assets/bundles.py",
+    "src/clearml_yolo/adapters/assets/preparation.py",
+    "src/clearml_yolo/entrypoints/download_weights.py",
+    "tests",
+    "README.md",
+    "docs",
+    "src/clearml_yolo/adapters/documentation/assets/tutorials",
+    "CHANGELOG.md",
+    "pyproject.toml",
+    "uv.lock",
+    "src/clearml_yolo/adapters/assets/weights-manifest.json",
+    "src/clearml_yolo/adapters/assets/resolver.py",
+    "src/clearml_yolo/adapters/assets/hub.py"
+  ],
+  "impact": "modules",
+  "rules": "Project constitution and docs/agent-workflow.md require inward imports, adapter-owned network/filesystem effects and unchanged dependency pins.",
+  "modules": [
+    {
+      "id": "http",
+      "path": "src/clearml_yolo/adapters/assets/http.py",
+      "change": "modify",
+      "responsibility": "Authenticated streamed HTTP downloads with chunk-checked budgets and separate inactivity timeouts",
+      "interface": "download(url, destination, optional elapsed streaming budget); checks between chunks, separate connection/read inactivity timeouts, no hard wall-clock guarantee",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "standard library",
+        "project core",
+        "existing adapters"
+      ],
+      "forbidden_dependencies": [
+        "queue runtime",
+        "application use-case construction"
+      ],
+      "effects": "Network and temporary-file bytes through explicit arguments",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "bundles",
+      "path": "src/clearml_yolo/adapters/assets/bundles.py",
+      "change": "modify",
+      "responsibility": "Pinned release matching, archive retrieval and native cache restoration",
+      "interface": "Native cache readiness and pinned release restoration; safe failure details; no bulk upstream fallback",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "standard library",
+        "project core",
+        "existing adapters"
+      ],
+      "forbidden_dependencies": [
+        "queue runtime",
+        "application use-case construction"
+      ],
+      "effects": "Archive network, locks, validation and atomic native publication",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "preparation",
+      "path": "src/clearml_yolo/adapters/assets/preparation.py",
+      "change": "modify",
+      "responsibility": "Catalogue preparation and final failures",
+      "interface": "Existing PreparationResult; release-only bulk restoration with sanitized archive failures, no upstream network fallback",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "standard library",
+        "project core",
+        "existing adapters"
+      ],
+      "forbidden_dependencies": [
+        "queue runtime",
+        "application use-case construction"
+      ],
+      "effects": "Coordinates adapters and owns attempt receipts",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "cli",
+      "path": "src/clearml_yolo/entrypoints/download_weights.py",
+      "change": "modify",
+      "responsibility": "Manual preparation reporting and environment instructions",
+      "interface": "Existing CLI with no new flags; clear GHR Files/GH VCS and timeout instructions",
+      "layer": "entrypoint",
+      "allowed_dependencies": [
+        "standard library",
+        "project core",
+        "existing adapters"
+      ],
+      "forbidden_dependencies": [
+        "queue runtime",
+        "application use-case construction"
+      ],
+      "effects": "Console output; adapters retain network and storage ownership",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "resolver",
+      "path": "src/clearml_yolo/adapters/assets/resolver.py",
+      "change": "modify",
+      "responsibility": "Native cache resolution with an explicit offline boundary",
+      "interface": "Backward-compatible local_only=False keyword; true forbids all upstream transport/metadata operations",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "standard library",
+        "project core",
+        "existing assets/storage adapters",
+        "existing owned SDKs"
+      ],
+      "forbidden_dependencies": [
+        "entrypoints",
+        "application use cases"
+      ],
+      "effects": "Owns native cache validation/publication; network permitted only outside local_only calls",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "hub",
+      "path": "src/clearml_yolo/adapters/assets/hub.py",
+      "change": "modify",
+      "responsibility": "Native cache resolution with an explicit offline boundary",
+      "interface": "Backward-compatible local_only=False keyword; true forbids all upstream transport/metadata operations",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "standard library",
+        "project core",
+        "existing assets/storage adapters",
+        "existing owned SDKs"
+      ],
+      "forbidden_dependencies": [
+        "entrypoints",
+        "application use cases"
+      ],
+      "effects": "Owns native cache validation/publication; network permitted only outside local_only calls",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "imports",
+      "path": ".importlinter",
+      "status": "existing",
+      "rules": "Inward package graph and adapter/SDK ownership.",
+      "check": "canonical"
+    },
+    {
+      "id": "negative",
+      "path": "tests/test_architecture.py",
+      "status": "existing",
+      "rules": "Negative forbidden imports, dynamic edges and inner effect checks.",
+      "check": "canonical"
+    }
+  ],
+  "checks": [
+    {
+      "id": "focused",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync python -m pytest -q tests/test_weight_bundles.py tests/test_artifactory_assets.py tests/test_weight_preparation.py tests/test_hub_weight_bundles.py tests/test_hub_assets.py tests/test_model_assets.py tests/test_model_assets_loading.py tests/test_native_assets.py",
+      "expectation": "Files/VCS routes, failures, credentials, time limits and content identity pass local regression fixtures.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/weight-files-remote/test.md"
+      }
+    },
+    {
+      "id": "canonical",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync python scripts/verify.py",
+      "expectation": "Static tools, import graph, full pytest and architecture negative cases pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/weight-files-remote/test.md"
+      }
+    },
+    {
+      "id": "docs",
+      "kind": "documentation",
+      "command": "uv run --frozen --no-sync python scripts/verify.py --docs",
+      "expectation": "Markdown, links and changed examples pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/weight-files-remote/test.md"
+      }
+    },
+    {
+      "id": "paired",
+      "kind": "behavior",
+      "command": "Normal latest-source proposed/final CY and queue install, pip check and queue integration per docs/development.md",
+      "expectation": "Source/installed metadata agree and latest queue checks pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/weight-files-remote/test.md"
+      }
+    },
+    {
+      "id": "hosted",
+      "kind": "behavior",
+      "command": "Verify new release assets/digests and restore from hosted archives with original weight hosts denied",
+      "expectation": "Published weights-2026-10-30 has complete artifacts and pinned bulk restoration performs no upstream-host requests.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/weight-files-remote/test.md"
+      }
+    }
+  ],
+  "documentation": "README/model-assets/current-contracts, packaged operations tutorial and external portable usage/evaluation sources.",
+  "review": {
+    "status": "accepted",
+    "reviewer": "Fresh independent native Terra reviewer; source review and documentation-only recheck on 2026-10-30",
+    "evidence": "docs/bugs/weight-files-remote/test.md",
+    "reconciliation": "Reviewed all task-owned runtime, tests, pinned manifest, README/contracts, release guidance, generated packaged tutorial and bug artifacts. Existing modules retain adapter-owned effects and inward imports; local_only keywords preserve standalone defaults. Resolved timeout claim through explicit documentation of chunk-checked budgets and separate inactivity/lock waits. Original dirty workspace edits were merged from preserved inputs, not reset. Full final package-input gate, docs/architecture validation and actual release-pair metadata must pass before delivery. Hooks may add only reviewed generated changelog and project/root-lock version updates. Final unchanged canonical retry passed with normal stable-input receipt; the preceding native SIGILL is retained as unresolved evidence and was independently reassessed. Actual hook-generated release metadata and final pair verification remain pre-push checks."
+  }
+}

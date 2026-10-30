@@ -400,8 +400,10 @@ snapshot/configuration metadata; never fabricate a snapshot commit from a file h
 
 Before publication, verify catalogue completeness, archive/member size and hashes,
 safe members and fresh-cache offline native loading. Publish the manifest, checksum
-file and all archives under the chosen new weight tag, then verify the actual hosted
-bytes against the manifest. Record the tag, sources, licence notices, executed checks
+file and all archives under the chosen new weight tag. Make the deliberate model
+release visible as GitHub Latest so users can find its assets; runtime selection
+still uses the packaged pin and never the moving latest endpoint. Verify the actual
+hosted bytes against the manifest. Record the tag, sources, licence notices, executed checks
 and limitations in dated feature evidence. Do not replace published bytes in place;
 corrections use a new snapshot identity.
 

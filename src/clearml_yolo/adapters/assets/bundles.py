@@ -1,6 +1,7 @@
 """Seed ordinary native caches from pinned, verified release archives."""
 
 import hashlib
+import math
 import os
 import shutil
 import tarfile
@@ -29,6 +30,34 @@ from clearml_yolo.core.weight_bundles import (
 )
 
 
+class BundlePreparationError(ValueError):
+    """A project-owned release failure containing only safe diagnostic details."""
+
+
+def _download_budget() -> float:
+    try:
+        seconds = float(os.environ.get("CY_WEIGHTS_DOWNLOAD_TIMEOUT", "1800"))
+    except ValueError:
+        raise BundlePreparationError(
+            "CY_WEIGHTS_DOWNLOAD_TIMEOUT must be positive finite seconds"
+        ) from None
+    if seconds <= 0 or not math.isfinite(seconds * 4 + 60):
+        raise BundlePreparationError("CY_WEIGHTS_DOWNLOAD_TIMEOUT must be positive finite seconds")
+    return seconds
+
+
+def _attempt_failure(error: Exception) -> str:
+    if isinstance(error, requests.HTTPError) and error.response is not None:
+        return f"HTTP {error.response.status_code}"
+    if isinstance(error, TimeoutError):
+        return "download timeout; increase CY_WEIGHTS_DOWNLOAD_TIMEOUT"
+    if isinstance(error, BundlePreparationError):
+        return str(error)
+    if isinstance(error, OSError) and error.errno is not None:
+        return f"{type(error).__name__} (errno {error.errno})"
+    return type(error).__name__
+
+
 def load_manifest() -> BundleManifest | None:
     """Read the installed pin only; source checkouts may precede initial packaging."""
     resource = files("clearml_yolo.adapters.assets").joinpath("weights-manifest.json")
@@ -40,11 +69,11 @@ def load_manifest() -> BundleManifest | None:
 
 def _verify(path: Path, size: int, digest: str) -> str:
     if path.stat().st_size != size:
-        raise ValueError("Bundle size mismatch")
+        raise BundlePreparationError("archive/member size mismatch")
     with path.open("rb") as stream:
         actual = hashlib.file_digest(stream, "sha256").hexdigest()
     if actual != digest:
-        raise ValueError("Bundle checksum mismatch")
+        raise BundlePreparationError("archive/member SHA-256 mismatch")
     return actual
 
 
@@ -52,7 +81,8 @@ def _archive_path(manifest: BundleManifest, archive: BundleArchive) -> Path:
     root = write_path(cy_home() / ".cache" / "clearml-yolo" / "weight-bundles")
     root.mkdir(parents=True, exist_ok=True)
     destination = write_path(root / f"{archive.sha256}.tar")
-    with FileLock(str(destination) + ".lock", timeout=1260):
+    seconds = _download_budget()
+    with FileLock(str(destination) + ".lock", timeout=seconds * 4 + 60):
         try:
             _verify(destination, archive.size, archive.sha256)
         except (OSError, ValueError):
@@ -63,24 +93,35 @@ def _archive_path(manifest: BundleManifest, archive: BundleArchive) -> Path:
             f"https://github.com/{manifest.repository}/releases/download/"
             f"{manifest.release_tag}/{archive.name}"
         )
-        proxy = release_proxy_url(original, os.environ.get("GHR"))
-        urls = (proxy, original) if proxy and proxy != original else (original,)
+        try:
+            proxy = release_proxy_url(original, os.environ.get("GHR"))
+        except ValueError:
+            raise BundlePreparationError("Invalid GHR Files remote repository root") from None
+        urls = (
+            (("GHR Files remote", proxy), ("GitHub release", original))
+            if proxy and proxy != original
+            else (("GitHub release (GHR not configured)", original),)
+        )
+        failures: list[str] = []
         with tempfile.NamedTemporaryFile(dir=root, delete=False) as stream:
             staging = Path(stream.name)
         try:
-            for url in urls:
+            for route, url in urls:
                 for _ in range(2):
                     try:
-                        download(url, staging)
+                        download(url, staging, max_seconds=seconds)
                         _verify(staging, archive.size, archive.sha256)
                         staging.replace(destination)
-                    except (OSError, ValueError, requests.RequestException):
-                        continue
+                    except (OSError, ValueError, requests.RequestException) as error:
+                        failures.append(f"{route}: {_attempt_failure(error)}")
                     else:
                         return destination
         finally:
             staging.unlink(missing_ok=True)
-    raise ValueError("Pinned release archive unavailable")
+    attempts = "; ".join(dict.fromkeys(failures))
+    raise BundlePreparationError(
+        f"Pinned release {manifest.release_tag} archive {archive.name} unavailable; {attempts}"
+    )
 
 
 def _members(archive: tarfile.TarFile) -> dict[str, tarfile.TarInfo]:
@@ -115,13 +156,28 @@ def _copy_member(
 
 
 def _matches(spec: AssetSpec, asset: BundleAsset) -> bool:
+    # Torchvision versions describe the loader, not a revision of the URL checkpoint.
+    # Reuse only the same checksum-bearing ResNet request; source/Hub revisions stay exact.
+    resnet = (
+        spec.backend in {"fasterrcnn", "fcos"}
+        and spec.preset in {"resnet50_fpn", "resnet101_fpn"}
+        and spec.kind == "weights"
+        and spec.hub is None
+        and spec.checksum is not None
+        and spec.checksum_algorithm == "sha256"
+    )
+    identity = (
+        spec.model_copy(update={"revision": asset.source_revision}).identity
+        if resnet
+        else spec.identity
+    )
     return (
-        asset.identity == spec.identity
+        asset.identity == identity
         and asset.backend == spec.backend
         and asset.preset == spec.preset
         and asset.filename == spec.filename
         and asset.source_url == spec.canonical_url
-        and asset.source_revision == spec.revision
+        and (resnet or asset.source_revision == spec.revision)
         and asset.kind == spec.kind
         and (
             (asset.hub is None and spec.hub is None)
@@ -146,7 +202,10 @@ def _flat_ready(spec: AssetSpec, path: Path) -> bool:
 def _seed(spec: AssetSpec, manifest: BundleManifest) -> None:
     asset = next((item for item in manifest.assets if _matches(spec, item)), None)
     if asset is None:
-        return
+        raise BundlePreparationError(
+            f"Pinned release {manifest.release_tag} has no matching asset for "
+            f"{spec.backend}/{spec.preset}; install a compatible catalogue and weights pin"
+        )
     if spec.hub is not None:
         if bundle_asset_ready(spec):
             return
@@ -183,12 +242,16 @@ def _seed(spec: AssetSpec, manifest: BundleManifest) -> None:
                 promote_asset(weight, destination, validator=validate_staging)
 
 
-def seed_bundle_asset(spec: AssetSpec, manifest: BundleManifest | None = None) -> None:
-    """Best effort mirror seeding; normal upstream resolution remains authoritative."""
+def seed_bundle_asset(spec: AssetSpec, manifest: BundleManifest | None = None) -> str | None:
+    """Restore a pinned asset; return a safe reason if release preparation fails."""
     try:
         selected = manifest if manifest is not None else load_manifest()
-        if selected is not None:
-            _seed(spec, selected)
+        if selected is None:
+            raise BundlePreparationError(
+                "Packaged weights manifest is missing; "
+                "reinstall a release with weights-manifest.json"
+            )
+        _seed(spec, selected)
     except (
         OSError,
         ValueError,
@@ -199,7 +262,8 @@ def seed_bundle_asset(spec: AssetSpec, manifest: BundleManifest | None = None) -
         ValidationError,
         zipfile.BadZipFile,
     ) as error:
-        # Never expose transport URLs, credentials, or untrusted archive messages.
-        logger.warning(
-            "Weight release mirror unavailable for {}: {}", spec.identity, type(error).__name__
-        )
+        # Never expose raw transport URLs, credentials, or untrusted archive messages.
+        reason = _attempt_failure(error)
+        logger.warning("Weight release mirror unavailable for {}: {}", spec.identity, reason)
+        return reason
+    return None

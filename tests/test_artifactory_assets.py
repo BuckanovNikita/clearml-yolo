@@ -137,9 +137,10 @@ def test_own_bundle_uses_prefixed_ghr_and_netrc_without_hub_token(
     artifactory: LocalArtifactory, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     spec, manifest, payload = _bundle()
-    path = "/artifactory/github-releases" + _own_path()
+    path = "/artifactory/github-files" + _own_path()
     artifactory.routes[path] = (200, payload, {})
-    monkeypatch.setenv("GHR", artifactory.root + "/artifactory/github-releases/")
+    monkeypatch.setenv("GHR", artifactory.root + "/artifactory/github-files/")
+    monkeypatch.setenv("GH", artifactory.root + "/artifactory/github-vcs/")
     bundles.seed_bundle_asset(spec, manifest)
     assert resolver.asset_destination(spec).read_bytes() == WEIGHT
     expected_auth = "Basic " + base64.b64encode(b"mirror-user:mirror-password").decode()
@@ -171,7 +172,7 @@ def test_own_bundle_proxy_failure_recovers_at_original_release(
     original = "https://github.com" + _own_path()
     attempts: list[str] = []
 
-    def download(url: str, target: Path) -> None:
+    def download(url: str, target: Path, **kwargs: object) -> None:
         attempts.append(url)
         if url == original:
             http.download(artifactory.root + "/original-release", target)
@@ -266,7 +267,7 @@ def test_mirror_failure_warning_never_contains_transport_secrets(
     messages: list[str] = []
     sink = logger.add(lambda message: messages.append(str(message)))
 
-    def unavailable(url: str, target: Path) -> None:
+    def unavailable(url: str, target: Path, **kwargs: object) -> None:
         raise OSError(f"private transport: {url}")
 
     monkeypatch.setattr(bundles, "download", unavailable)
@@ -311,8 +312,12 @@ def test_manual_failure_prints_static_setup_and_retry_only_when_needed(
     output = capsys.readouterr().out
     assert "export GHR=" in output if failed else "export GHR=" not in output
     if failed:
-        assert "export GH=https://artifactory.example/artifactory/github-vcs" in output
-        assert "HF_ENDPOINT=" in output
+        assert "export GH=" not in output
+        assert "export HF_ENDPOINT=" not in output
+        assert "Files remote of https://github.com" in output
+        assert "GH (VCS) and HF_ENDPOINT apply only to standalone" in output
+        assert "CY_WEIGHTS_DOWNLOAD_TIMEOUT=3600" in output
+        assert "pinned release only" in output
         assert "per-host ~/.netrc" in output
         assert "Retry: cy-download-weights" in output
     assert all(

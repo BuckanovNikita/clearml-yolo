@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record weight release and paired verification
+  ([`2c494c6`](https://github.com/BuckanovNikita/clearml-yolo/commit/2c494c65cea32cfaccd91a2607333d764b1691ec))
+
+
 ## v0.44.0 (2026-10-29)
 
 ### Documentation

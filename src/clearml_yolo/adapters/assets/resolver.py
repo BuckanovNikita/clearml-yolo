@@ -191,12 +191,12 @@ def _publish_existing(spec: AssetSpec, record: ResolvedAsset, destination: Path)
     return _record(spec, destination, validate_asset(destination, spec))
 
 
-def resolve_asset(spec: AssetSpec) -> ResolvedAsset:
+def resolve_asset(spec: AssetSpec, *, local_only: bool = False) -> ResolvedAsset:
     if spec.hub is not None:
         from clearml_yolo.adapters.assets.hub import HubResolutionError, resolve_hub_asset
 
         try:
-            return resolve_hub_asset(spec)
+            return resolve_hub_asset(spec, local_only=local_only)
         except HubResolutionError as error:
             raise AssetResolutionError(str(error)) from error
     destination = asset_destination(spec)
@@ -212,11 +212,11 @@ def resolve_asset(spec: AssetSpec) -> ResolvedAsset:
         )
         with FileLock(lock, timeout=_LOCK_TIMEOUT):
             existing = _existing(spec, destination)
-            return (
-                _publish_existing(spec, existing, destination)
-                if existing is not None
-                else _retrieve(spec, destination)
-            )
+            if existing is not None:
+                return _publish_existing(spec, existing, destination)
+            if local_only:
+                raise AssetResolutionError("Prepared asset is unavailable in its local cache")
+            return _retrieve(spec, destination)
     except Timeout as error:
         raise AssetResolutionError(_failure(spec, destination, "asset lock timeout")) from error
 
