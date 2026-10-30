@@ -104,6 +104,11 @@ def _report(case: ResolvedRecommendation, cached: bool) -> None:
     )
     if cached:
         message += "\tcached"
+    limitations = dict.fromkeys(
+        source.diagnostic for source in case.sources if source.status == "numerically_limited"
+    )
+    if limitations:
+        message += "\tdiagnostic=" + "; ".join(limitations)
     sys.stdout.write(message + "\n")
     sys.stdout.flush()
 

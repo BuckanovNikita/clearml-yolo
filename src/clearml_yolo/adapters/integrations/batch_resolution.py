@@ -40,6 +40,7 @@ def batch_provenance(recommendation: ResolvedRecommendation) -> dict[str, Any]:
                 "global_batch": source.global_batch,
                 "per_gpu_batch": source.per_gpu_batch,
                 "status": source.status,
+                "diagnostic": source.diagnostic,
                 "created_at": source.created_at,
                 "synthetic_workload": source.workload.model_dump(mode="json"),
                 "profile": source.profile.model_dump(mode="json"),

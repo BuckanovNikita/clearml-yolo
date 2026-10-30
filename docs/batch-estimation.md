@@ -79,19 +79,32 @@ without additional trials and explicitly labelled `extrapolated`:
 
 Both formulas produce a global batch divisible by N. Missing compatible evidence
 for any GPU type/capacity prevents extrapolation. These recommendations are not
-measured multi-GPU maxima. A source at the search ceiling keeps its
-`ceiling_limited` status in the recommendation; extrapolation does not establish
-a capacity boundary or remove that limit on the evidence.
+measured multi-GPU maxima. Exact lookup and extrapolation preserve source limitations:
+`numerically_limited` takes precedence over `ceiling_limited`, which takes precedence
+over `validated`. Neither lookup nor extrapolation establishes a missing capacity
+boundary; source diagnostics remain part of the recommendation.
 
 Confirmed CUDA allocation failure and exceeding the per-GPU memory budget bound
 capacity. Timeout, rank crash, nonfinite computation, missing assets and interference
 from another workload are distinct failures. The supervisor terminates only its own
-workers. A failed case has no usable recommendation; a nonzero command status can
+workers. During discovery only, nonfinite computation after a fully successful,
+under-budget candidate schedules one fresh confirmation of that last good batch.
+A complete successful confirmation, including every required optimizer path,
+validation and memory check, yields a usable `numerically_limited` result. The
+failed numerical trial and its diagnostic remain in the evidence. The numerical
+failure is never OOM or a memory upper bound; the result does not establish a
+capacity maximum. A numerical failure before any successful candidate, any failed
+confirmation (including nonfinite, OOM, memory-budget excess or timeout), or another
+failure remains unusable. Recovery does not retry a failed confirmation.
+
+A failed case has no usable recommendation; a nonzero command status can
 coexist with completed results for other cases.
 
 `validated` records a confirmed capacity boundary. `ceiling_limited` records a
 confirmed batch at the requested ceiling and remains usable, but does not claim
-an unconstrained maximum. `no_capacity` and `failed` results retain diagnostics.
+an unconstrained maximum. `numerically_limited` records the independently repeated
+last good batch after discovery stopped numerically, with no capacity maximum claim.
+`no_capacity` and `failed` results retain diagnostics.
 Even a validated batch is a recommendation for the recorded synthetic workload
 and recipe, not a guarantee for arbitrary datasets or concurrent GPU use.
 
@@ -102,13 +115,25 @@ defaults to the launch working directory. The versioned JSON records global and
 per-GPU batches separately, trial outcomes, synthetic limits and provenance.
 Stored trial evidence is unchanged: extrapolations are derived during lookup and
 reporting, never saved as manufactured measurements. Legacy measured allocations
-remain readable. Updates use a native file lock and atomic replacement. A malformed catalogue is
+remain readable. Schema 1 remains readable; ordinary saves write schema 2, which
+supports `numerically_limited`. Upgrade older CY readers before sharing a schema-2
+catalogue with them. Read-only access does not migrate or rewrite existing files.
+Historical failed cases remain intact; inspect the new case matching the current
+implementation and dependency versions after rerunning.
+Updates use a native file lock and atomic replacement. A malformed catalogue is
 reported as corruption and is not silently overwritten or treated as an empty cache.
 
 Rerunning the same request reuses completed compatible cases. Failed or interrupted
 cases are retried. `--refresh` invalidates each old matching success before probing
 it again, so an interrupted refresh cannot leave a success that appears fresh.
-Preserve the catalogue when investigating failures.
+Preserve the catalogue when investigating failures. Progress snapshots deliberately
+retain status `failed` and null batch values until independent confirmation succeeds.
+Their pending-confirmation diagnostic means the search may still be running or may
+have been interrupted; the snapshot is never usable training evidence.
+
+After upgrading, rerun failed cases. The changed implementation fingerprint makes
+older measurements incompatible with the new recipe; use fresh measurements rather
+than editing catalogue versions, statuses or trial records.
 
 Compatibility covers architecture, nominal/effective resolution, GPU types and
 capacities, relevant dependency and implementation versions, precision, compilation,
@@ -142,8 +167,8 @@ estimator command and the alternative of setting an explicit batch.
 The requested null stays in canonical replay configuration. The resolved batch and
 recommendation provenance are recorded separately as `training_batch_estimate`:
 measured/extrapolated origin, target allocation, source estimate keys, global and
-per-GPU batches, and source boundary/ceiling status. Effective native arguments
-contain the chosen value. Queue submission preserves
+per-GPU batches, source boundary/ceiling/numerical status and retained diagnostics.
+Effective native arguments contain the chosen value. Queue submission preserves
 null; the executing worker uses its assigned GPUs and accessible `CY_HOME` catalogue.
 Run estimation on matching idle hardware before submission; queue submission does
 not measure capacity.
@@ -154,3 +179,22 @@ non-square lookup requests and unsupported/custom model profiles require an expl
 batch when the standard estimator cannot supply matching evidence. Training keeps
 its normal failure behavior: an OOM does not trigger an automatic retry or hidden
 batch reduction. This utility does not reserve GPUs or replace the [queue](queue.md).
+
+## Numerical-search recovery on older versions
+
+Older versions abort discovery on any nonfinite result, even after smaller batches
+passed. For a workload already observed to pass at batch 24 with YOLOv3u, square
+960 images, 100 classes and 300 objects/image, a bounded retry is:
+
+```bash
+cy-batch-estimate --imgsz 960 --classes 100 --objects-per-image 300 \
+  --models ultralytics/yolov3u --search-limit 24
+```
+
+Use the same `CY_HOME` and selected devices as the intended training run. This
+requests a new search and independent confirmation at the lower ceiling; earlier
+success alone is insufficient. Batch 24 is a workload-specific example, not a
+general hardware recommendation. A confirmed result is `ceiling_limited`. Upgrade
+and rerun failed cases to use numerical recovery. Neither approach fixes or
+identifies the underlying native numerical cause; changing AMP, optimizer paths
+or finite checks to hide it is not part of this recovery.

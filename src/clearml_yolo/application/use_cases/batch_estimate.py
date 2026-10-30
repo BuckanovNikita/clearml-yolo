@@ -31,7 +31,10 @@ def _snapshot(
         trials=search.trials,
         created_at=timestamp,
         diagnostic=diagnostic
-        or ("Search interrupted before independent confirmation" if pending else search.diagnostic),
+        or (
+            "Independent confirmation pending; search may still be running or was interrupted"
+            if pending else search.diagnostic
+        ),
     )
 
 

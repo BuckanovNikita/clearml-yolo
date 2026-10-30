@@ -28,7 +28,7 @@ def test_cache_round_trip_replaces_only_the_same_case(tmp_path: Path) -> None:
     assert not list(tmp_path.glob(".batch-estimates-*.tmp"))
 
 
-@pytest.mark.parametrize("payload", [b"truncated{", b'{"schema_version":2,"cases":[]}', b"\xff"])
+@pytest.mark.parametrize("payload", [b"truncated{", b'{"schema_version":3,"cases":[]}', b"\xff"])
 def test_corrupted_cache_is_preserved_and_blocks_reads_and_writes(
     tmp_path: Path,
     payload: bytes,

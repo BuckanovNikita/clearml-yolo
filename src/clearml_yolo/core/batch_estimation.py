@@ -24,8 +24,8 @@ type TrialStatus = Literal[
     "cancelled",
     "error",
 ]
-type SearchStatus = Literal["searching", "validated", "ceiling_limited", "no_capacity", "failed"]
-type UsableStatus = Literal["validated", "ceiling_limited"]
+type UsableStatus = Literal["validated", "ceiling_limited", "numerically_limited"]
+type SearchStatus = Literal["searching", "no_capacity", "failed"] | UsableStatus
 
 
 class _Record(BaseModel):
@@ -212,8 +212,8 @@ class BatchSearch(_Record):
     """Immutable exponential/binary search whose only output is the next trial.
 
     Bounds count images per rank so every candidate divides exactly by world size.
-    Successful discovery is followed by a fresh trial at the winner. Failures other
-    than OOM/budget exhaustion abort the case, never imply a capacity boundary.
+    Successful discovery is followed by a fresh trial at the winner. Numerical
+    failure can confirm a smaller candidate, but never implies a capacity boundary.
     """
 
     profile: TrainingProfile
@@ -227,6 +227,7 @@ class BatchSearch(_Record):
     per_gpu_batch: PositiveInt | None = None
     trials: tuple[TrialResult, ...] = ()
     diagnostic: str = ""
+    numerical_failure: str = ""
 
     @classmethod
     def start(cls, profile: TrainingProfile, settings: SearchSettings) -> Self:
@@ -246,25 +247,48 @@ class BatchSearch(_Record):
                 "diagnostic": diagnostic,
             }
         )
+        if self.confirming:
+            return BatchSearch._confirmed(current, status, diagnostic)
+        if status == "nonfinite" and self.lower > 0:
+            return current.model_copy(
+                update={
+                    "confirming": True,
+                    "next_batch": self.lower * self.profile.world_size,
+                    "numerical_failure": (
+                        f"Numerical failure at global batch {trial.global_batch}: {diagnostic}"
+                    ),
+                }
+            )
         if status not in {"success", "oom", "memory_limit"}:
             return BatchSearch._finish(current, "failed")
-        if self.confirming:
-            if status != "success":
-                return BatchSearch._finish(
-                    current, "failed", diagnostic="Fresh winner confirmation failed: " + diagnostic
-                )
-            ceiling = self.settings.max_global_batch // self.profile.world_size
-            return BatchSearch._finish(
-                current,
-                "ceiling_limited" if self.lower == ceiling else "validated",
-                batch=trial.global_batch,
-            )
         per_rank = trial.global_batch // self.profile.world_size
         if status == "success":
             return BatchSearch._advance(current.model_copy(update={"lower": per_rank}))
         if per_rank == 1:
             return BatchSearch._finish(current, "no_capacity")
         return BatchSearch._advance(current.model_copy(update={"upper": per_rank}))
+
+    def _confirmed(self, status: TrialStatus, diagnostic: str) -> Self:
+        cause = f"{self.numerical_failure}; " if self.numerical_failure else ""
+        if status != "success":
+            return BatchSearch._finish(
+                self, "failed", diagnostic=f"{cause}Fresh winner confirmation failed: {diagnostic}"
+            )
+        batch = self.lower * self.profile.world_size
+        if self.numerical_failure:
+            return BatchSearch._finish(
+                self,
+                "numerically_limited",
+                batch=batch,
+                diagnostic=(
+                    f"{cause}independently confirmed global batch {batch}; "
+                    "maximum capacity was not determined"
+                ),
+            )
+        ceiling = self.settings.max_global_batch // self.profile.world_size
+        return BatchSearch._finish(
+            self, "ceiling_limited" if self.lower == ceiling else "validated", batch=batch
+        )
 
     def _finish(
         self, status: SearchStatus, *, batch: int | None = None, diagnostic: str | None = None
@@ -313,7 +337,10 @@ class EstimateCase(_Record):
         for trial in self.trials:
             search = search.observe(trial)
         if self.status == "failed" and self.global_batch is None and self.per_gpu_batch is None:
-            if not self.diagnostic and search.status != "failed":
+            # Schema-1 readers accepted a terminal numerical failure without a
+            # case diagnostic. Preserve that failed history, never promote it.
+            terminal_nonfinite = bool(self.trials) and self.trials[-1].status == "nonfinite"
+            if not self.diagnostic and search.status != "failed" and not terminal_nonfinite:
                 raise ValueError("Interrupted/failed cases require diagnostic evidence")
             return self
         if (self.status, self.global_batch, self.per_gpu_batch) != (
@@ -326,12 +353,21 @@ class EstimateCase(_Record):
 
     @property
     def usable(self) -> bool:
-        return self.status in {"validated", "ceiling_limited"}
+        return self.status in {"validated", "ceiling_limited", "numerically_limited"}
 
 
 class EstimateCatalogue(_Record):
-    schema_version: Literal[1] = 1
+    # Read historical catalogues unchanged; the next ordinary save writes v2.
+    schema_version: Literal[1, 2] = 2
     cases: tuple[EstimateCase, ...] = ()
+
+    @model_validator(mode="after")
+    def legacy_statuses(self) -> Self:
+        if self.schema_version == 1 and any(
+            case.status == "numerically_limited" for case in self.cases
+        ):
+            raise ValueError("Numerically limited estimates require catalogue schema 2")
+        return self
 
 
 def estimate_key(
@@ -434,6 +470,8 @@ class ResolvedRecommendation(_Record):
 
     @property
     def status(self) -> UsableStatus:
+        if "numerically_limited" in self.source_statuses:
+            return "numerically_limited"
         return "ceiling_limited" if "ceiling_limited" in self.source_statuses else "validated"
 
 
@@ -445,7 +483,10 @@ def _recommendation(
     statuses: list[UsableStatus] = []
     capacities = []
     for source in sources:
-        if source.status not in ("validated", "ceiling_limited") or source.per_gpu_batch is None:
+        if (
+            source.status not in ("validated", "ceiling_limited", "numerically_limited")
+            or source.per_gpu_batch is None
+        ):
             raise ValueError("A recommendation requires usable measured sources")
         statuses.append(source.status)
         capacities.append(source.per_gpu_batch)

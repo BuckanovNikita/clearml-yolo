@@ -152,7 +152,7 @@ def test_search_finds_divisible_capacity_and_independently_confirms(
 
 @pytest.mark.parametrize(
     "failure",
-    ["timeout", "crash", "nonfinite", "missing_asset", "contaminated", "cancelled", "error"],
+    ["timeout", "crash", "missing_asset", "contaminated", "cancelled", "error"],
 )
 def test_noncapacity_failures_do_not_become_capacity_bounds(failure: str) -> None:
     search = BatchSearch.start(_profile(), SearchSettings())
@@ -164,7 +164,7 @@ def test_noncapacity_failures_do_not_become_capacity_bounds(failure: str) -> Non
     assert not _case(search).usable
 
 
-@pytest.mark.parametrize("failure", ["oom", "memory_limit", "timeout"])
+@pytest.mark.parametrize("failure", ["oom", "memory_limit", "timeout", "nonfinite"])
 def test_failed_fresh_repeat_invalidates_entire_estimate(failure: str) -> None:
     search = _search(
         2,

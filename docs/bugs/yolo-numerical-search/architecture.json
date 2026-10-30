@@ -1,0 +1,185 @@
+{
+  "schema_version": 1,
+  "task": "yolo-numerical-search",
+  "scope": [
+    "src/clearml_yolo/core/batch_estimation.py",
+    "src/clearml_yolo/application/use_cases/batch_estimate.py",
+    "src/clearml_yolo/entrypoints/batch_estimate.py",
+    "tests/test_batch_estimation.py",
+    "tests/test_batch_estimate_workflow.py",
+    "tests/test_batch_estimate_store.py",
+    "tests/test_batch_estimate_cli.py",
+    "tests/test_batch_lookup.py",
+    "docs/batch-estimation.md",
+    "README.md",
+    "specs/006-batch-training/spec.md",
+    "docs/project-contracts.md",
+    "docs/bugs/yolo-numerical-search",
+    "CHANGELOG.md",
+    "pyproject.toml",
+    "uv.lock",
+    "src/clearml_yolo/adapters/integrations/batch_resolution.py",
+    "tests/test_batch_numerical_recovery.py",
+    "specs/006-batch-training/data-model.md"
+  ],
+  "impact": "modules",
+  "rules": "AGENTS.md, constitution and docs/agent-workflow.md govern inward dependencies, explicit effect ownership, native workflow and architecture acceptance. Reuse .importlinter and architecture negative tests.",
+  "modules": [
+    {
+      "id": "search",
+      "path": "src/clearml_yolo/core/batch_estimation.py",
+      "change": "modify",
+      "responsibility": "Pure capacity search, evidence replay, schema and recommendation policy",
+      "interface": "TrialResult to next candidate or independently confirmed limited recommendation; reject invalid evidence",
+      "layer": "core",
+      "allowed_dependencies": [
+        "Standard library and approved domain libraries",
+        "Inner policy and explicit ports appropriate to the existing layer"
+      ],
+      "forbidden_dependencies": [
+        "Outer layer imports from inner modules",
+        "SDK/GPU/file/process effects in core and application",
+        "Queue runtime dependency"
+      ],
+      "effects": "None; deterministic policy only.",
+      "contracts": [
+        "inward",
+        "negative"
+      ]
+    },
+    {
+      "id": "progress",
+      "path": "src/clearml_yolo/application/use_cases/batch_estimate.py",
+      "change": "modify",
+      "responsibility": "Coordinate search through injected probe/storage/clock ports",
+      "interface": "Persist unusable progress snapshots until confirmation; retain cancellation safety",
+      "layer": "application",
+      "allowed_dependencies": [
+        "Standard library and approved domain libraries",
+        "Inner policy and explicit ports appropriate to the existing layer"
+      ],
+      "forbidden_dependencies": [
+        "Outer layer imports from inner modules",
+        "SDK/GPU/file/process effects in core and application",
+        "Queue runtime dependency"
+      ],
+      "effects": "All effects delegated to injected ports.",
+      "contracts": [
+        "inward",
+        "negative"
+      ]
+    },
+    {
+      "id": "cli",
+      "path": "src/clearml_yolo/entrypoints/batch_estimate.py",
+      "change": "modify",
+      "responsibility": "Present estimator invocation results and numerical limitations",
+      "interface": "Existing flags and output fields with additional status and diagnostic; success requires usable evidence",
+      "layer": "entrypoints",
+      "allowed_dependencies": [
+        "Standard library and approved domain libraries",
+        "Inner policy and explicit ports appropriate to the existing layer"
+      ],
+      "forbidden_dependencies": [
+        "Outer layer imports from inner modules",
+        "SDK/GPU/file/process effects in core and application",
+        "Queue runtime dependency"
+      ],
+      "effects": "Explicit invocation composes adapters and writes CLI output; imports/help stay inert.",
+      "contracts": [
+        "inward",
+        "negative"
+      ]
+    },
+    {
+      "id": "provenance",
+      "path": "src/clearml_yolo/adapters/integrations/batch_resolution.py",
+      "change": "modify",
+      "responsibility": "Compose training batch lookup and preserve recommendation provenance",
+      "interface": "Existing training provenance dictionary carries original source diagnostics with limited status",
+      "layer": "adapters/integrations",
+      "allowed_dependencies": [
+        "Core policy, application contracts and explicit runtime/storage adapters"
+      ],
+      "forbidden_dependencies": [
+        "Application use cases",
+        "Entrypoints",
+        "Queue runtime"
+      ],
+      "effects": "Existing explicit GPU discovery and storage composition remain; provenance construction itself is pure.",
+      "contracts": [
+        "inward",
+        "negative"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "inward",
+      "path": ".importlinter",
+      "status": "existing",
+      "rules": "Enforce inward layers, independent command entrypoints, no application use cases in adapters, explicit SDK owners.",
+      "check": "canonical"
+    },
+    {
+      "id": "negative",
+      "path": "tests/test_architecture.py",
+      "status": "existing",
+      "rules": "Reject forbidden layer/SDK/effect dependencies and non-inert initialization; classify all modules and dynamic targets.",
+      "check": "canonical"
+    }
+  ],
+  "checks": [
+    {
+      "id": "canonical",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync python scripts/verify.py",
+      "expectation": "Ruff, strict mypy, Vulture, import-linter and complete ordinary pytest including architecture negatives and CPU-DDP pass unchanged inputs.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/yolo-numerical-search/test.md"
+      }
+    },
+    {
+      "id": "focused",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync pytest tests/test_batch_estimation.py tests/test_batch_estimate_workflow.py tests/test_batch_estimate_store.py tests/test_batch_estimate_cli.py tests/test_batch_lookup.py tests/test_batch_probe.py tests/test_batch_numerical_recovery.py",
+      "expectation": "Reported numerical discovery sequence returns only independently confirmed limited evidence; every failed or incomplete confirmation rejects; migration, history, lookup, CLI and unchanged native finite checks pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/yolo-numerical-search/test.md"
+      }
+    },
+    {
+      "id": "paired",
+      "kind": "behavior",
+      "command": "Normal editable CY/queue install, uv pip check, queue static/import checks and full configured pytest",
+      "expectation": "Latest source and actual release versions match installed metadata and queue integration passes.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/yolo-numerical-search/test.md"
+      }
+    },
+    {
+      "id": "docs",
+      "kind": "documentation",
+      "command": "uv run --frozen --no-sync python scripts/verify.py --docs",
+      "expectation": "Changed Markdown, links and documented estimator examples validate; portable guidance reconciled.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/yolo-numerical-search/test.md"
+      }
+    }
+  ],
+  "documentation": "Update docs/batch-estimation.md, README.md, feature 006 spec and affected project summary; inspect/update canonical portable clearml-yolo usage skill and record its validation. Preserve historical task ledgers.",
+  "review": {
+    "status": "accepted",
+    "reviewer": "Fresh native agent numerical_final_review; requested gpt-6.1-sol/high, no inherited context or write ownership.",
+    "evidence": "docs/bugs/yolo-numerical-search/review.md",
+    "reconciliation": "Parent inspected all four modified runtime modules, three test files, five maintained guidance/specification documents, new bug artifacts and planned native release metadata. No additions/removals of runtime modules, dependency or import-rule changes. Existing dirty original work and historical reports are excluded; private isolated checkouts own releases. Companion portable-source edits have their own no-impact record and reviewed evaluation evidence."
+  }
+}

@@ -32,6 +32,12 @@ selects only a compatible successful result after inspecting its dataset and dev
 5. Given requested output counts, reporting derives the first N selected allocations
    without distributed probes or confirmation. Extrapolated totals may exceed the
    per-GPU ceiling and never claim measured multi-GPU maxima.
+6. Given discovery-time nonfinite computation after a fully successful under-budget
+   candidate, repeat that last good batch once in a fresh process. Only a full
+   successful repeat yields usable `numerically_limited`; preserve the failed
+   numerical trial and diagnostic without claiming a memory upper bound or maximum.
+   First-candidate numerical failure, every failed confirmation and other failures
+   retain no recommendation.
 
 ### User Story 2 — Train native detectors across GPUs (Priority: P1)
 
@@ -95,7 +101,10 @@ failed winner repetition, and orphaned distributed workers must fail or report e
 - **FR-004**: Save atomic versioned JSON under `CY_HOME/.config/clearml-yolo/`, retaining
   successful/failed cases, global/per-GPU batches, diagnostics and provenance.
   Preserve stored trial evidence and legacy records; derive extrapolations only at
-  lookup/report time, without manufacturing measured cases or trials.
+  lookup/report time, without manufacturing measured cases or trials. Read schema 1;
+  normal saves write schema 2 and require upgraded readers. Read-only access never
+  rewrites files. Pending snapshots remain failed with null batches and a diagnostic
+  that confirmation is pending, whether the search is active or interrupted.
 - **FR-005**: Compatibility covers architecture, nominal/effective resolution, hardware
   types/capacities, dependencies, precision, compilation, optimizer, accumulation,
   EMA and augmentation. Real class count and maximum object density fit synthetic bounds.
@@ -103,10 +112,13 @@ failed winner repetition, and orphaned distributed workers must fail or report e
   compatible single-GPU measurements for every target type/capacity and use
   `global_batch = N × min(per_gpu_capacities)`. Identical hardware shares one source.
   Never extrapolate across unmeasured hardware; global batch remains divisible by N.
+  Exact lookup and extrapolation retain source diagnostics and status precedence:
+  `numerically_limited`, then `ceiling_limited`, then `validated`.
 - **FR-006**: Null selects an estimate only during training, after dataset/device
   resolution; requested null remains in replay and chosen provenance is separate.
   A typed recommendation records measured/extrapolated origin, target allocation,
-  source estimate keys, global/per-GPU batches and source boundary/ceiling status.
+  source estimate keys, global/per-GPU batches, source boundary/ceiling/numerical
+  status and retained diagnostics.
   Explicit batches and worker-side queue resolution are preserved. Normal training
   failure behavior remains: no automatic OOM retry or hidden batch reduction.
 - **FR-007**: Native distributed training has global microbatch semantics, supervised
@@ -119,6 +131,13 @@ failed winner repetition, and orphaned distributed workers must fail or report e
   and storage behind explicit interfaces. Executable boundaries include negative tests.
 - **FR-011**: Documentation, canonical verification, applicable mutation, paired latest
   CY/queue checks, native acceptance and fresh independent review precede release.
+- **FR-012**: Recover discovery-time nonfinite computation only by one fresh repeat
+  of the last fully successful under-budget candidate. Every required native
+  optimizer path, update, validation and memory check remains mandatory. A full
+  successful repeat yields `numerically_limited`, retaining failed trial and
+  diagnostic without establishing a capacity maximum or numerical memory bound.
+  Numerical failure before any success and every failed confirmation remain failed;
+  other failures abort. This does not fix the underlying native numerical cause.
 
 ### Key Entities
 
@@ -132,8 +151,8 @@ training request/result.
   exhaustive estimator multi-GPU matrix. Checks cover identical/mixed hardware,
   missing/stale/failed sources, ceilings, refresh, provenance, assigned queue allocations
   and divisibility, and prove every trial launches one GPU regardless of output counts.
-  Failures and ceiling-limited measurements remain visible; derived recommendations
-  are explicitly extrapolated and never masquerade as measured multi-GPU maxima.
+  Failures, ceiling-limited and numerically limited measurements remain visible;
+  derived recommendations are explicitly extrapolated and never masquerade as measured multi-GPU maxima.
 - **SC-002**: Incompatible estimates never silently influence training.
 - **SC-003**: Real multi-GPU evidence exists for every supported training backend before
   distributed acceptance; unavailable hardware is an explicit acceptance gap.

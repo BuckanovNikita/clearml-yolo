@@ -82,9 +82,16 @@ inspects actual hardware and dataset limits for strict saved-estimate lookup. It
 prefers an exact-allocation measurement, otherwise derives an explicitly extrapolated
 global batch from compatible single-GPU measurements for every hardware type/capacity.
 Requested null remains in replay; chosen values, target allocation and source
-keys/boundary or ceiling status are recorded separately. Training never retries OOM
-with a hidden batch reduction. Numeric
-defaults and existing YOLO AutoBatch values keep their behavior. `cy -m`
+keys, boundary/ceiling/numerical status and diagnostics are recorded separately.
+Discovery-time nonfinite computation after a fully successful under-budget candidate
+permits one fresh repeat of that last good batch. Only a full successful repeat
+yields usable `numerically_limited` evidence; every failed confirmation remains
+failed. Numerical failure never bounds memory or establishes a capacity maximum.
+Exact lookup and extrapolation retain numerical limitations ahead of ceiling and
+validated status. Schema-1 catalogues remain readable; saves write schema 2, which
+requires upgraded readers, and read-only access never rewrites historical files.
+Pending snapshots remain failed with null batches until confirmation succeeds.
+Training never retries OOM with a hidden batch reduction. Numeric defaults and existing YOLO AutoBatch values keep their behavior. `cy -m`
 uses sequential BasicLauncher. `queue.*`, `autogpu.*` and the former queue launcher
 are rejected with migration guidance. The separate [cy-queue contract](queue.md)
 owns count/exact submissions, complete sweep expansion, owner workers, per-host ordering,
