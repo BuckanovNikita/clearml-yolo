@@ -86,7 +86,10 @@ still use retained files. Deliberate maintenance requires confirming that the re
 workspace and all descendants are idle.
 
 Libraries retain normal environment, user settings, cwd configuration discovery, caches
-and credential-provider behavior. Selectors outside `CY_HOME` remain valid and unchanged.
+and credential-provider behavior. Selectors outside `CY_HOME` remain valid. Explicit
+model preparation and YOLO estimator setup persist an absolute Ultralytics
+`weights_dir`; this [cache setup exception](model-assets.md#cache-locations)
+preserves unrelated settings and does not run during imports or inspection.
 SDK imports use normal cwd and SDK constants; the project does not create config
 placeholders or bind later workspace selection to an SDK root. SDKs may retain their own
 imported settings, independently of changes to `CY_HOME`. Existing earlier project-local

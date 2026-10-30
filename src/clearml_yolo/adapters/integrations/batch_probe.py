@@ -16,6 +16,7 @@ from clearml_yolo.adapters.runtime.gpu_inventory import (
 )
 from clearml_yolo.adapters.runtime.workers import WorkerCommand, run_workers
 from clearml_yolo.adapters.storage.filesystem import temporary_root
+from clearml_yolo.adapters.yolo.assets import configure_weights_directory
 from clearml_yolo.application.training_workers import BatchProbeRequest, ProbeRankResult
 from clearml_yolo.core.batch_estimation import (
     ModelVariant,
@@ -142,7 +143,9 @@ class NativeBatchProbe:
         output = temporary_root() / "batch-estimate" / token / optimizer
         output.mkdir(parents=True)
         config = None
-        if profile.model.backend != "ultralytics":
+        if profile.model.backend == "ultralytics":
+            configure_weights_directory()
+        else:
             config = model_preset(profile.model.selection)
             config.train.imgsz = profile.nominal_size[0]
             config.train.batch = global_batch

@@ -299,6 +299,16 @@ def test_console_command_inventory_matches_configured_independence(
             "clearml_yolo.adapters.clearml.session",
         ),
         (
+            "integrations adapter peer ownership",
+            "clearml_yolo.adapters.integrations.batch_profiles",
+            "clearml_yolo.adapters.yolo.assets",
+        ),
+        (
+            "integrations adapter peer ownership",
+            "clearml_yolo.adapters.integrations.batch_probe",
+            "clearml_yolo.adapters.yolo.inference",
+        ),
+        (
             "storage adapter peer ownership",
             "clearml_yolo.adapters.storage.dataset",
             "clearml_yolo.adapters.assets.sources",

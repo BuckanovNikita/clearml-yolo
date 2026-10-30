@@ -8,11 +8,19 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import ModuleType
+from typing import Any
 
 import pytest
 
 from clearml_yolo.core.assets import AssetSpec, HubAsset, ResolvedAsset
 from clearml_yolo.core.batch_estimation import ModelVariant
+
+
+@pytest.fixture(autouse=True)
+def isolate_weights_configuration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Mocked catalogue tests must never mutate the user's native settings."""
+    module = importlib.import_module("clearml_yolo.adapters.assets.preparation")
+    monkeypatch.setattr(module, "configure_weights_directory", lambda: tmp_path / "weights")
 
 
 @dataclass
@@ -120,6 +128,53 @@ def test_automatic_completion_is_reused(tmp_path: Path, monkeypatch: pytest.Monk
     assert second.skipped
     assert attempts == ["yolo11n.pt"]
     assert second.assets == first.assets
+
+
+@pytest.mark.parametrize("automatic", [False, True])
+def test_settings_configuration_precedes_discovery_and_receipt_reuse(
+    automatic: bool, catalogue: Catalogue, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    events: list[str] = []
+    module = catalogue.module
+    discover = module._discover
+
+    def configure() -> Path:
+        events.append("configure")
+        return catalogue.root
+
+    def observed_discovery() -> Any:
+        events.append("discover")
+        return discover()
+
+    monkeypatch.setattr(module, "configure_weights_directory", configure)
+    monkeypatch.setattr(module, "_discover", observed_discovery)
+    first = module.prepare_catalogue(automatic=automatic)
+    second = module.prepare_catalogue(automatic=automatic)
+    assert events == ["configure", "discover", "configure", "discover"]
+    assert not first.failures
+    assert second.skipped is automatic
+
+
+@pytest.mark.parametrize("automatic", [False, True])
+def test_configuration_failure_is_actionable_and_stops_discovery(
+    automatic: bool, catalogue: Catalogue, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = catalogue.module
+
+    def configure() -> Path:
+        raise module.WeightCacheConfigurationError(
+            "Cannot persist /isolated/settings.json; rerun cy-download-weights"
+        )
+
+    def forbidden() -> None:
+        pytest.fail("Failed settings configuration must stop discovery")
+
+    monkeypatch.setattr(module, "configure_weights_directory", configure)
+    monkeypatch.setattr(module, "_discover", forbidden)
+    result = module.prepare_catalogue(automatic=automatic)
+    assert len(result.failures) == 1
+    assert "settings.json" in result.failures[0].message
+    assert "cy-download-weights" in result.failures[0].message
 
 
 def test_source_provenance_uses_extracted_manifest_not_archive_digest(
@@ -470,8 +525,8 @@ import sys
 
 class NoClearML(importlib.abc.MetaPathFinder):
     def find_spec(self, fullname, path=None, target=None):
-        if fullname == "clearml" or fullname.startswith("clearml."):
-            raise AssertionError("help imported ClearML")
+        if fullname.split('.')[0] in {'clearml', 'ultralytics'}:
+            raise AssertionError("help imported a native SDK")
 
 def no_network(*args, **kwargs):
     raise AssertionError("help opened network")

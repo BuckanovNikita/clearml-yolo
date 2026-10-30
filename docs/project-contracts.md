@@ -251,7 +251,16 @@ capture, record interpretation, output bounds and native scheduling limits.
 
 Project paths follow [filesystem ownership](filesystem-policy.md): `CY_HOME` owns outputs
 and the CSV dataset cache, while SDK configuration/cache/defaults remain discoverable
-through their normal environment and user settings. External selectors stay unchanged.
+through their normal environment and user settings. Explicit preparation and YOLO
+estimator setup persist an absolute Ultralytics `weights_dir` before catalogue reuse
+or worker startup: relative values resolve against invocation cwd; existing absolute
+values are retained. CY coordinates through an adjacent settings-file lock, verifies
+readback and synchronizes live SDK `weights_dir` and `WEIGHTS_DIR`, without rewriting
+already-correct settings or changing unrelated disk settings, process-only callback
+switches or cached files. Imports, help and configuration inspection remain inert.
+Rerun `cy-download-weights` once from the original preparation directory to migrate
+an older relative cache, reusing valid files. Errors identify the settings file and
+JSON/permissions/retry recovery. Other external selectors stay unchanged.
 Explicit model preparation may write model assets,
 locks, temporary sibling downloads and native HF metadata into configured native caches
 outside `CY_HOME`; preparation receipts and all project outputs remain contained.

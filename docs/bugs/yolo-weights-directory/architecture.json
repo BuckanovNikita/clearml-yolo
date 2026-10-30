@@ -1,0 +1,212 @@
+{
+  "schema_version": 1,
+  "task": "Persist YOLO weights directory for prepared-cache discovery",
+  "scope": [
+    "src/clearml_yolo/adapters/yolo/assets.py",
+    "src/clearml_yolo/adapters/assets/preparation.py",
+    "src/clearml_yolo/adapters/integrations/batch_probe.py",
+    "tests/test_yolo_weights_settings.py",
+    "tests/test_weight_preparation.py",
+    "tests/test_batch_probe.py",
+    "docs/model-assets.md",
+    "docs/filesystem-policy.md",
+    "docs/project-contracts.md",
+    "docs/current-contracts.md",
+    "README.md",
+    "specs/007-download-weights",
+    "docs/bugs/yolo-weights-directory",
+    "docs/batch-estimation.md",
+    "docs/runtime-isolation.md",
+    "src/clearml_yolo/adapters/documentation/assets/tutorials/operations.md",
+    "src/clearml_yolo/adapters/documentation/assets/tutorials/operations.html",
+    ".importlinter",
+    "tests/test_architecture.py",
+    "CHANGELOG.md",
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "impact": "modules",
+  "rules": "Constitution II and docs/module-architecture.md: SDK/storage/process effects stay in explicit outer adapters; core/application isolated; imports and package initialization inert.",
+  "modules": [
+    {
+      "id": "yolo-assets",
+      "path": "src/clearml_yolo/adapters/yolo/assets.py",
+      "change": "modify",
+      "responsibility": "Native YOLO asset descriptions and explicit persistent settings setup",
+      "interface": "configure_weights_directory() -> Path; actionable RuntimeError subclass on failure; pretrained_asset remains descriptive",
+      "layer": "Adapters",
+      "allowed_dependencies": [
+        "core records",
+        "application contracts",
+        "explicit adapter peers permitted by .importlinter",
+        "standard library and owned SDK/filelock boundary"
+      ],
+      "forbidden_dependencies": [
+        "entrypoints",
+        "application use cases",
+        "unowned SDKs"
+      ],
+      "effects": "SDK JSON and native file lock; public SDK update with readback; explicit call only",
+      "contracts": [
+        "import-boundaries",
+        "architecture-negative"
+      ]
+    },
+    {
+      "id": "preparation",
+      "path": "src/clearml_yolo/adapters/assets/preparation.py",
+      "change": "modify",
+      "responsibility": "Coordinate catalogue preparation and durable attempt receipts",
+      "interface": "prepare_catalogue(automatic=...) retains result schema and best-effort failures; configure before discovery/receipt",
+      "layer": "Adapters",
+      "allowed_dependencies": [
+        "core records",
+        "application contracts",
+        "explicit adapter peers permitted by .importlinter",
+        "standard library and owned SDK/filelock boundary"
+      ],
+      "forbidden_dependencies": [
+        "entrypoints",
+        "application use cases",
+        "unowned SDKs"
+      ],
+      "effects": "Invokes YOLO settings boundary before native discovery; owns preparation receipts",
+      "contracts": [
+        "import-boundaries",
+        "architecture-negative"
+      ]
+    },
+    {
+      "id": "batch-probe",
+      "path": "src/clearml_yolo/adapters/integrations/batch_probe.py",
+      "change": "modify",
+      "responsibility": "Compose and supervise isolated native batch estimator trials",
+      "interface": "NativeBatchProbe configures YOLO before workers; preserves trial directories and TrialResult schema",
+      "layer": "Adapters",
+      "allowed_dependencies": [
+        "core records",
+        "application contracts",
+        "explicit adapter peers permitted by .importlinter",
+        "standard library and owned SDK/filelock boundary"
+      ],
+      "forbidden_dependencies": [
+        "entrypoints",
+        "application use cases",
+        "unowned SDKs"
+      ],
+      "effects": "Invokes SDK configuration adapter; owns trial outputs and processes",
+      "contracts": [
+        "import-boundaries",
+        "architecture-negative"
+      ]
+    },
+    {
+      "id": "boundary-enforcement",
+      "path": ".importlinter",
+      "change": "modify",
+      "responsibility": "Declare the exact batch_probe to yolo.assets composition edge while retaining peer isolation",
+      "interface": "Only the explicit settings adapter call is allowed; other YOLO peer imports remain rejected",
+      "layer": "Architecture verification configuration",
+      "allowed_dependencies": [
+        "Existing configured import graph"
+      ],
+      "forbidden_dependencies": [
+        "Broad peer exemptions"
+      ],
+      "effects": "Read-only graph validation via import-linter",
+      "contracts": [
+        "import-boundaries",
+        "architecture-negative"
+      ]
+    },
+    {
+      "id": "boundary-regressions",
+      "path": "tests/test_architecture.py",
+      "change": "modify",
+      "responsibility": "Prove the new exact-edge allowance does not permit other estimator or YOLO peer edges",
+      "interface": "Real graph accepted; injected batch_profiles to yolo.assets and batch_probe to yolo.inference rejected",
+      "layer": "Architecture tests",
+      "allowed_dependencies": [
+        "grimp",
+        "import-linter",
+        "existing architecture fixtures"
+      ],
+      "forbidden_dependencies": [
+        "Weakening production graph rules"
+      ],
+      "effects": "Read-only/in-memory graph validation",
+      "contracts": [
+        "architecture-negative"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "import-boundaries",
+      "path": ".importlinter",
+      "status": "existing",
+      "rules": "SDK ownership, inward dependencies and exact peer edges; preparation to YOLO already allowed. Explicit batch_probe to yolo.assets edge is declared; no broad exemption.",
+      "check": "canonical"
+    },
+    {
+      "id": "architecture-negative",
+      "path": "tests/test_architecture.py",
+      "status": "existing",
+      "rules": "Dynamic SDK imports, forbidden SDK/layer edges and inert initializers checked with injected negative cases.",
+      "check": "canonical"
+    }
+  ],
+  "checks": [
+    {
+      "id": "canonical",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync python scripts/verify.py",
+      "expectation": "Ruff, strict mypy, Vulture, import-linter and full pytest including negative architecture/CPU DDP pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/yolo-weights-directory/test.md"
+      }
+    },
+    {
+      "id": "focused",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync pytest tests/test_yolo_weights_settings.py tests/test_weight_preparation.py tests/test_native_assets.py tests/test_batch_probe.py -q",
+      "expectation": "Cache persistence, stale constants, concurrency, failure diagnostics, inert CLI and composition regressions pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/yolo-weights-directory/test.md"
+      }
+    },
+    {
+      "id": "native-offline",
+      "kind": "behavior",
+      "command": "Isolated CPU YOLO load of cached yolo11n.pt and yolo26n.pt in current/fresh worker cwd with downloads blocked",
+      "expectation": "Real cached selected/AMP checkpoints load without network; original files remain unchanged.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/yolo-weights-directory/test.md"
+      }
+    },
+    {
+      "id": "docs",
+      "kind": "documentation",
+      "command": "uv run --frozen --no-sync python scripts/verify.py --docs",
+      "expectation": "Governed Markdown and local paths/anchors pass, including new bug evidence.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/yolo-weights-directory/test.md"
+      }
+    }
+  ],
+  "documentation": "Update model-assets, filesystem/project contracts, current index, README, active preparation contract/quickstart; portable corp-skills usage/evaluation; migration reuses caches from original preparation cwd.",
+  "review": {
+    "status": "accepted",
+    "reviewer": "Fresh native final_review agent; read-only independent code, architecture and portable guidance review",
+    "evidence": "docs/bugs/yolo-weights-directory/review.md",
+    "reconciliation": "Inspected full task delta including new tests/bug records, exact import rule and negative tests, three runtime adapters, current cache/setup documentation, appended historical notes and generated tutorial HTML. Transferred only task delta to latest master 3636404. Preserved original metadata/lock/instructions and all unrelated pending work; no dependency or schema changes. Stable canonical, focused/native offline and documentation evidence reconciled. Native release additionally owns generated changelog and root-version-only pyproject/lock updates; no dependency resolution is part of those hooks."
+  }
+}

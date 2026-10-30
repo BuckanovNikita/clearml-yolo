@@ -524,6 +524,7 @@ ignore_imports =
     clearml_yolo.adapters.integrations.probe_worker -> clearml_yolo.adapters.fcos.backend
     clearml_yolo.adapters.integrations.probe_worker -> clearml_yolo.adapters.yolo.batch_probe
     clearml_yolo.adapters.integrations.batch_probe -> clearml_yolo.adapters.assets.execution
+    clearml_yolo.adapters.integrations.batch_probe -> clearml_yolo.adapters.yolo.assets
     clearml_yolo.adapters.integrations.batch_probe -> clearml_yolo.adapters.runtime.gpu_inventory
     clearml_yolo.adapters.integrations.batch_probe -> clearml_yolo.adapters.runtime.workers
     clearml_yolo.adapters.integrations.batch_profiles -> clearml_yolo.adapters.assets.execution

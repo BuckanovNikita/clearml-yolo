@@ -50,6 +50,14 @@ multi-GPU confirmation is launched.
 
 ## Search and evidence
 
+Before launching YOLO workers, the estimator persists an absolute Ultralytics
+`weights_dir` and synchronizes the current process's native cache constant.
+Relative directories are anchored to the estimator invocation cwd; existing
+absolute directories are retained. Workers keep their trial directories while
+finding selected and auxiliary AMP weights in that cache. For older prepared
+caches, rerun `cy-download-weights` once from the original preparation directory;
+see [cache setup and recovery](model-assets.md#cache-locations).
+
 The public training batch is the **global microbatch across all training GPUs**.
 Every estimator trial uses exactly one GPU, so its measured global and per-GPU
 batches are equal. Search grows exponentially, refines the boundary by binary

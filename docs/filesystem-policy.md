@@ -46,7 +46,7 @@ These checks assume cooperating callers do not replace filesystem entries concur
 
 Libraries retain their ordinary environment, user configuration, cwd discovery and cache
 policies. `HOME`, XDG selectors, ClearML and legacy Trains selectors, FiftyOne and ETA
-selectors, Ultralytics settings, Matplotlib/fontconfig, Torch/Triton/CUDA/Numba, Hugging Face,
+selectors, Ultralytics configuration roots, Matplotlib/fontconfig, Torch/Triton/CUDA/Numba, Hugging Face,
 RF-DETR/Roboflow, Keras, Python bytecode, Requests/netrc and AWS configuration are unchanged.
 AWS credential-provider discovery remains the SDK's responsibility. SDK selectors outside
 `CY_HOME` are valid; bootstrap neither validates nor normalizes them, synthesizes config
@@ -57,8 +57,15 @@ Ultralytics checkpoint names and remote URIs retain native semantics. Explicit n
 [model preparation](model-assets.md) populates effective Ultralytics, Torchvision,
 timm/HF and RF-DETR caches, even when those native roots are outside `CY_HOME`.
 Only model asset publication, its locks, temporary sibling downloads and native HF
-metadata use this exception. Preparation does not rewrite SDK settings or redirect
-native dataset/run defaults. DEIM source/weights, durable preparation receipts,
+metadata use this exception. Explicit preparation and YOLO batch-estimator setup
+also persist an absolute Ultralytics `weights_dir`, resolving a relative value
+against the invocation cwd and retaining an existing absolute destination. CY uses
+an adjacent settings-file lock, verifies the persisted mapping and synchronizes
+live SDK `weights_dir` and `WEIGHTS_DIR`; correct repeated calls do not rewrite it.
+Unrelated disk settings, process-only switches, cache files and native dataset/run
+defaults are preserved. Imports, help and configuration inspection remain inert.
+See [cache migration and recovery](model-assets.md#cache-locations) for a one-time
+rerun from the original preparation directory and settings-file/permission errors. DEIM source/weights, durable preparation receipts,
 application outputs and CSV-prepared data remain project-owned beneath `CY_HOME`.
 Explicit local inputs remain authoritative. Existing local checkpoint strings are
 recognized as `Path` inputs at their original locations, allowing local comparison

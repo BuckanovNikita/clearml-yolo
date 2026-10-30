@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- **weights**: Record final release and paired verification
+  ([`3636404`](https://github.com/BuckanovNikita/clearml-yolo/commit/3636404eafaf0c32312fddb4269b8aad0e2b12eb))
+
+
 ## v0.44.1 (2026-10-30)
 
 ### Bug Fixes

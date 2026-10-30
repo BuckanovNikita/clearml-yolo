@@ -29,6 +29,12 @@ from test_batch_estimate_workflow import sample_profile
 from test_batch_profiles import sample_devices
 
 
+@pytest.fixture(autouse=True)
+def isolate_weights_configuration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fake worker tests never persist real user SDK settings."""
+    monkeypatch.setattr(adapter, "configure_weights_directory", lambda: tmp_path / "weights")
+
+
 def _profile(selection: str = "yolo11n") -> TrainingProfile:
     return sample_profile().model_copy(
         update={
@@ -146,6 +152,49 @@ def _install_workers(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, workers: _
     monkeypatch.setattr(adapter, "monitor_devices", lambda devices, pids: (500,))
     monkeypatch.setattr(adapter, "run_workers", workers.run)
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "GPU-physical-a,GPU-physical-b")
+
+
+def test_yolo_configures_cache_before_worker_launch(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    workers = _Workers()
+    _install_workers(monkeypatch, tmp_path, workers)
+    events: list[str] = []
+
+    def configure() -> Path:
+        events.append("configure")
+        return tmp_path / "weights"
+
+    def run(*args: Any, **kwargs: Any) -> WorkerOutcome:
+        assert events[-1] == "configure"
+        events.append("worker")
+        return workers.run(*args, **kwargs)
+
+    monkeypatch.setattr(adapter, "configure_weights_directory", configure)
+    monkeypatch.setattr(adapter, "run_workers", run)
+    result = adapter.NativeBatchProbe().run(_profile(), SyntheticWorkload(), SearchSettings(), 4)
+    assert result.status == "success"
+    assert events == ["configure", "worker", "configure", "worker"]
+
+
+def test_yolo_configuration_failure_stops_worker_launch(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from clearml_yolo.adapters.yolo.assets import WeightCacheConfigurationError
+
+    workers = _Workers()
+    _install_workers(monkeypatch, tmp_path, workers)
+
+    def configure() -> Path:
+        raise WeightCacheConfigurationError(
+            "Cannot persist settings.json; rerun cy-download-weights"
+        )
+
+    monkeypatch.setattr(adapter, "configure_weights_directory", configure)
+    result = adapter.NativeBatchProbe().run(_profile(), SyntheticWorkload(), SearchSettings(), 4)
+    assert result.status == "error"
+    assert "cy-download-weights" in result.diagnostic
+    assert not workers.commands
 
 
 def test_both_yolo_optimizer_paths_use_fresh_workers_and_maximum_whole_gpu_peaks(
@@ -312,6 +361,11 @@ def test_native_requests_preserve_default_recipe_while_binding_global_batch_and_
 ) -> None:
     workers = _Workers()
     _install_workers(monkeypatch, tmp_path, workers)
+
+    def forbidden() -> Path:
+        pytest.fail("Non-YOLO estimator paths must not configure Ultralytics settings")
+
+    monkeypatch.setattr(adapter, "configure_weights_directory", forbidden)
 
     def prepare(config: ModelConfig, *, training: bool) -> tuple[ModelConfig, tuple[()]]:
         assert training

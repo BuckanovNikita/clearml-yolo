@@ -3,7 +3,8 @@
 `cy-download-weights` prepares the maintained detection-model catalogue in the
 locations used by ordinary native loaders. Check installed command help before using
 this interface with an older package. Preparation does not install dependencies,
-train a model, create a ClearML task or change SDK settings.
+train a model or create a ClearML task. Explicit preparation configures the persistent
+Ultralytics weights directory as described below.
 
 ```bash
 cy-download-weights
@@ -119,6 +120,29 @@ Native asset destinations follow the installed libraries' effective settings:
 | timm Hugging Face backbones | Effective Hugging Face Hub cache, with native repository/revision metadata and discoverable snapshots |
 | RF-DETR weights | RF-DETR's configured model cache |
 
+Before catalogue discovery or reuse of a completed attempt, explicit preparation
+resolves a relative Ultralytics `weights_dir` against the invocation working
+directory without expanding a literal `~`, and persists that absolute path through
+the SDK settings API. An existing
+absolute destination is retained. YOLO batch-estimator setup does the same before
+launching trial workers, so selected weights and auxiliary AMP weights remain
+available after workers change directory. The live SDK `weights_dir` and
+`ultralytics.utils.WEIGHTS_DIR` are synchronized after verified persistence.
+
+CY callers coordinate with an adjacent settings-file lock and verify the saved
+mapping by reading it back. Unrelated persisted settings, process-only callback
+switches and cache files are preserved. An already-correct absolute destination
+causes no settings rewrite on repeated calls. Imports, help and configuration
+inspection do not perform this setup. Native ClearML callback switches remain
+in-memory changes only.
+
+For an older preparation made with a relative directory, rerun `cy-download-weights`
+once from the original preparation directory. Valid files are reused while the
+absolute location is recorded. If setup fails, use the settings-file path in the
+error to check its JSON and directory permissions, then retry from the original
+preparation directory.
+Do not delete settings or caches to hide the error.
+
 Do not copy a timm/HF weight into an arbitrary similarly named directory: native
 repository/revision discovery and metadata must be preserved. The installed timm
 pretrained configuration determines whether a backbone uses a URL or HF Hub.
@@ -142,7 +166,8 @@ are supplied only to execution configuration.
 
 Native model asset writes may use configured caches outside `CY_HOME`; this narrow
 exception does not permit external application outputs, datasets, logs, scratch or
-preparation state. SDK configuration roots, cache selectors and environment remain
+preparation state. The persistent Ultralytics `weights_dir` update above is the only
+SDK settings change; configuration roots, other cache selectors and environment remain
 unchanged. See [filesystem ownership](filesystem-policy.md#library-configuration-and-storage).
 
 ## Proxies

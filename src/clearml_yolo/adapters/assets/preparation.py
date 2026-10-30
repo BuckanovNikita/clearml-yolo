@@ -27,6 +27,10 @@ from clearml_yolo.adapters.observability.diagnostics import exception_summary, r
 from clearml_yolo.adapters.rfdetr.assets import pretrained_asset as rfdetr_asset
 from clearml_yolo.adapters.storage.filesystem import cy_home, write_path
 from clearml_yolo.adapters.torchvision.assets import pretrained_asset as torchvision_asset
+from clearml_yolo.adapters.yolo.assets import (
+    WeightCacheConfigurationError,
+    configure_weights_directory,
+)
 from clearml_yolo.adapters.yolo.assets import pretrained_asset as yolo_asset
 from clearml_yolo.core.assets import (
     AssetSpec,
@@ -40,7 +44,9 @@ from clearml_yolo.core.batch_estimation import ModelVariant, model_catalogue
 def _failure(selection: str, operation: str, error: Exception) -> PreparationFailure:
     # Opaque SDK errors can contain bare credentials, beyond recognizable URL/auth
     # patterns. Report their type only; the selected model retains normal handling.
-    if isinstance(error, (AssetResolutionError, BundlePreparationError)):
+    if isinstance(
+        error, (AssetResolutionError, BundlePreparationError, WeightCacheConfigurationError)
+    ):
         # Only the resolver-owned outer report is public. Even its explicit or
         # implicit causes may retain opaque transport messages.
         message = redact_text(str(error)).strip()
@@ -181,6 +187,7 @@ def _prepare_asset(spec: AssetSpec) -> ResolvedAsset:
 
 
 def _prepare(*, automatic: bool) -> PreparationResult:
+    configure_weights_directory()
     fingerprint, locations, requests, discovery_failures = _discover()
     assets: list[ResolvedAsset] = []
     failures = list(discovery_failures)
