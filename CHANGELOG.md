@@ -1,7 +1,12 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.44.1 (2026-10-30)
+
+### Bug Fixes
+
+- **weights**: Download catalogue only from project releases
+  ([`254e988`](https://github.com/BuckanovNikita/clearml-yolo/commit/254e988f4a098a2da7cefa294c4e78d84b0916e4))
 
 ### Documentation
 
