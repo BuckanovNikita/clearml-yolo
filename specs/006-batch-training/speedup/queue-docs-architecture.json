@@ -2,6 +2,7 @@
   "schema_version": 1,
   "task": "Document configurable queue GPU memory admission",
   "scope": [
+    "CHANGELOG.md",
     "README.md",
     "docs/queue.md",
     "docs/queue-lifecycles.md",
@@ -10,6 +11,7 @@
     "src/clearml_yolo/adapters/documentation/assets/tutorials/operations.md",
     "src/clearml_yolo/adapters/documentation/assets/tutorials/operations.html",
     "specs/006-batch-training/speedup",
+    "specs/006-batch-training/tasks.md",
     "docs/project-contracts.md",
     "docs/diagnostics.md",
     "docs/runtime-isolation.md"

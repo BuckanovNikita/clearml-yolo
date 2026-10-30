@@ -153,3 +153,23 @@ application receipt. Fresh source inventory checks again matched all 560 selecte
 CY files and 73 queue files with zero differences. Final Markdown/link verification
 passed before the documentation commit. Public ref verification remains pending
 the authorized pushes; native benchmark gaps remain unchanged.
+
+## Verified publication, 2026-10-30
+
+The documentation follow-up committed through normal hooks as
+`ffd294c3ac3240a282f87b76b7f40fa6dd963a44`, without another version bump. An atomic
+push published CY master at that commit and annotated `v0.44.4`. Remote inspection
+matched tag object `969f800b4a7de8541c75ff49fa4479214fb6adeb` and its peeled release
+commit `fb2c6ff4bb5bbad936958e3651712b05b8c11a9a`. Queue main was pushed and remotely
+verified at `2fbaed25fa7c572757d30cb9b1b343d22e645e3a` (source version 0.1.6).
+
+The companion usage collection's annotated `v0.6.7` and main branch were also
+atomically pushed and remotely verified; see [exact refs](portable.md#verified-publication).
+T045 and T046 are complete. The final closure commit changes only this dated
+evidence and the task ledger; it requires documentation checks and unchanged-input
+hook verification, without a new version bump.
+
+The original dirty workspace, its source overrides and pre-existing workloads were
+preserved. No GitHub Release object, release asset, package publication or deployment
+was created. T041 and full T044 native acceptance remain open under the explicit
+delivery exception; successful CPU/process checks do not close those gaps.

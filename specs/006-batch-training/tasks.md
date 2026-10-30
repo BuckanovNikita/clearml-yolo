@@ -152,7 +152,7 @@ acceptance gaps are release exceptions.
 - [x] T042 Update docs/batch-estimation.md, README.md, active feature interfaces and portable usage source; validate Markdown, links, generated docs and examples (FR-013–FR-016).
 - [x] T043 Run canonical verification, applicable mutation checks and latest/proposed paired CY/queue integration/static checks; record exact source identities and limitations in speedup evidence.
 - [ ] T044 Obtain fresh independent review after integration/checks, resolve findings, reconcile task-owned diff and validate speedup architecture acceptance.
-- [ ] T045 Complete the authorized new code release through normal commits/hooks, annotated tag and explicit verified pushes; preserve original dirty workspace and UV source overrides.
+- [x] T045 Complete the authorized new code release through normal commits/hooks, annotated tag and explicit verified pushes; preserve original dirty workspace and UV source overrides.
 
 T036 precedes T037/T038; parent freezes case contracts before T039 integration.
 T037 and T038 have exclusive write ownership. T040–T043 follow integration;
@@ -163,8 +163,9 @@ T036–T040, T042 and T043 are complete; canonical verification passed 4,571 tes
 all static/import checks. Fresh independent review accepted the implementation with
 no unresolved findings; see [review](speedup/review.md). T041 remains open after two
 idle-preflight failures before native work. T044's design/diff reconciliation is done,
-but full architecture acceptance remains open for that native check. T045 is pending
-an idle-GPU benchmark or an explicit release exception for this separate gap. The
+but full architecture acceptance remains open for that native check. At this
+pre-authorization checkpoint, T045 awaited an idle-GPU benchmark or an explicit
+release exception for this separate gap. The
 physical two-GPU exception alone does not waive the one-GPU comparison.
 
 ## Explicit delivery authorization, 2026-10-30
@@ -184,7 +185,12 @@ review. CY's follow-up changes only portable guides, the baseline contract, the 
 verification skill and the generated operations tutorial; its
 [no-impact record](speedup/queue-docs-architecture.json) was validated before editing.
 
-- [ ] T046 Reconcile CY queue guidance with the configured threshold, verify generated documentation and the final CY 0.44.4/queue 0.1.6 pair, and publish the reviewed companion sources with the authorized release.
+- [x] T046 Reconcile CY queue guidance with the configured threshold, verify generated documentation and the final CY 0.44.4/queue 0.1.6 pair, and publish the reviewed companion sources with the authorized release.
 
 No queue setting changes the estimator's separate idle/activity checks. The disclosed
 native timing gap and its explicit delivery exception remain unchanged.
+
+T045 and T046 are complete: normal hooks, final canonical and paired checks passed;
+CY 0.44.4, queue 0.1.6 and companion collection 0.6.7 were pushed with exact remote
+ref verification. See [publication evidence](speedup/verification.md#verified-publication-2026-10-30)
+and [companion refs](speedup/portable.md#verified-publication).

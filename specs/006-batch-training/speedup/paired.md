@@ -158,3 +158,9 @@ The committed-version pairing gate is satisfied. The parent still owns canonical
 CY acceptance, the documentation follow-up commit, release publication and
 verification of public release refs. These CPU/process/integration checks do not close native single-GPU
 confirmation/timing or physical multi-GPU verification gaps documented separately.
+
+CY master was subsequently pushed and remotely verified at
+`ffd294c3ac3240a282f87b76b7f40fa6dd963a44`, with the annotated version tag and peeled
+release commit above. Queue main was remotely verified at its recorded 0.1.6 commit.
+The final selected source inventories remained unchanged through these commits and
+pushes. The later release-record closure changes only task evidence and the ledger.

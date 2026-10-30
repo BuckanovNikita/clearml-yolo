@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- **queue**: Document configurable GPU admission
+  ([`ffd294c`](https://github.com/BuckanovNikita/clearml-yolo/commit/ffd294c3ac3240a282f87b76b7f40fa6dd963a44))
+
+
 ## v0.44.4 (2026-10-30)
 
 ### Performance Improvements
