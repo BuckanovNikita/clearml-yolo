@@ -1,7 +1,12 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.44.2 (2026-10-30)
+
+### Bug Fixes
+
+- **weights**: Persist absolute Ultralytics cache directory
+  ([`597985f`](https://github.com/BuckanovNikita/clearml-yolo/commit/597985fa39476b262bc05daa66ee3fb3e468724a))
 
 ### Documentation
 
