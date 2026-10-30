@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.44.3 (2026-10-30)
+
+### Bug Fixes
+
+- **batch**: Confirm smaller batches after numerical probe failures
+  ([`0cf39a0`](https://github.com/BuckanovNikita/clearml-yolo/commit/0cf39a07e17ba1e4d528dbdde91293fb160afc0f))
+
+
 ## v0.44.2 (2026-10-30)
 
 ### Bug Fixes
