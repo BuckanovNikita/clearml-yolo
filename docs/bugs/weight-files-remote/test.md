@@ -3,7 +3,7 @@
 ## Scope and preservation
 
 Implementation uses an isolated latest-source checkout at CY 2c494c6 (0.44.0).
-The original dirty workspace and all pre-existing work are preserved. Proposed code
+The original dirty workspace and all pre-existing work are preserved. Verified code
 release is 0.44.1; queue remains at latest 397753c (0.1.5). Approved digital-metrics
 and report-generator sources and dependency versions remain unchanged. No live
 Artifactory, GPU, training or ClearML publication was performed.
@@ -163,8 +163,8 @@ A successful retry would not prove the crash fixed.
 The unchanged full retry completed normally: Ruff, strict mypy, Vulture and
 import-linter passed, followed by 4,460 passed tests, 30 skips, 81 deselections and
 182 warnings in 1,004.57 seconds. The unmodified verifier issued its normal stable-input
-success receipt (`application-af23c323163b4585a740330de8275cd6-*` logs). No new core file
-was produced. The intermittent native SIGILL above remains unresolved; this passing
+success receipt (`application-af23c323163b4585a740330de8275cd6-*` logs). No further native
+crash was observed. The intermittent native SIGILL above remains unresolved; this passing
 run is not presented as a crash fix. Both remotes were fetched again before release;
 CY and queue still matched the source identities recorded above.
 
@@ -173,3 +173,28 @@ three regression-test files, current documentation and rendered tutorial, plus t
 bug artifacts. Existing import contracts and their negative tests remain unchanged
 and passed in the full suite. No approved dependency source or version changed.
 Final Markdown/local-link validation and architecture acceptance validation passed.
+
+## Released-source pair and delivery
+
+Normal hooks accepted fix commit `254e988`, generated release commit
+`ad7204c10baf00abafe23b92bb8882e2fea22171` and created annotated tag `v0.44.1`.
+The generated release diff contains only the changelog and project/root-lock version
+updates; dependency sources, versions and metadata are otherwise unchanged. The
+hook's first changelog refresh was reviewed and staged before the successful retry.
+There was no local UV source-override section in this isolated checkout; the original
+workspace's overrides remain intact.
+
+Normal dependency resolution then installed that exact released source alongside
+queue `397753c123f379ade50f06a2babf5e4b1476b9d2` (0.1.5) in the isolated pair environment.
+Pip check, matching source/installed versions, editable origins, imports and queue
+help passed before/after verification. Ruff, formatting, strict mypy and both import
+contracts passed. The final queue suite passed 518 tests, with seven physical opt-in
+cases deselected and 19 warnings in 121.78 seconds. This replaces the proposed-pair
+qualification above; no queue source or requirement change was needed.
+
+Code delivery uses the normal master branch and
+[v0.44.1 tag](https://github.com/BuckanovNikita/clearml-yolo/tree/v0.44.1).
+The independently versioned
+[weights-2026-10-30 release](https://github.com/BuckanovNikita/clearml-yolo/releases/tag/weights-2026-10-30)
+contains the verified archives, manifest and checksums. No code GitHub Release,
+project distribution assets or package-registry publication is part of this delivery.
