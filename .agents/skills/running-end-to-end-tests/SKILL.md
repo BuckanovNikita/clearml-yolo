@@ -50,7 +50,8 @@ this branch.
    remaining durable claim without restoring released extras. Verify repeated
    signals, worker/guardian forced death and retained uncertain-cleanup evidence. Verify
    active allocations stay exclusive, stale unlocked records do not veto capacity, and
-   automatic admission uses only used VRAM strictly below 2 GiB with a fresh launch check.
+   automatic admission uses only used VRAM strictly below the configured threshold
+   (default 2.0 GiB), with the same frozen value in the fresh guardian launch check.
    Verify physical-index `gpu free`/`release` clears only the selected device's reservations
    and holds without tokens, reasons, force flags, confirmation, memory/process checks,
    signals or original queue access. Existing processes, sibling reservations and job

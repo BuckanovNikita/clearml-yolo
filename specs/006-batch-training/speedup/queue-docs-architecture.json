@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "task": "Document configurable queue GPU memory admission",
+  "scope": [
+    "README.md",
+    "docs/queue.md",
+    "docs/queue-lifecycles.md",
+    "specs/000-baseline/spec.md",
+    ".agents/skills/running-end-to-end-tests",
+    "src/clearml_yolo/adapters/documentation/assets/tutorials/operations.md",
+    "src/clearml_yolo/adapters/documentation/assets/tutorials/operations.html",
+    "specs/006-batch-training/speedup",
+    "docs/project-contracts.md",
+    "docs/diagnostics.md",
+    "docs/runtime-isolation.md"
+  ],
+  "impact": "none",
+  "rationale": "The inspected follow-up updates portable queue configuration contracts, examples and generated tutorial content for the separately implemented cy-queue 0.1.6 threshold. No CY runtime module, dependency direction, executable import contract or process effect changes. Machine-specific preferences remain in private global instructions; portable documentation retains the 2.0 GiB default and generic examples."
+}

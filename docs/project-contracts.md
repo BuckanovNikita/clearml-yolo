@@ -106,10 +106,11 @@ failing a completed successful task. Recovery still requires conservative owners
 stale unlocked records alone do not veto GPU admission.
 Queue allocation preserves explicit
 CPU phases, compilation, AMP, batch and model settings. Inference uses the first allocated
-device. Automatic GPU availability uses only used VRAM strictly below 2 GiB (2048 MiB),
-checked again immediately before launch. Exactly 2 GiB is unavailable. Current queue
-allocations and explicit holds remain exclusive unless released. This fixed limit does
-not guarantee that compilation/training fits.
+device. Automatic GPU availability uses only used VRAM strictly below the configured
+`queue.max_used_memory_gib` (default 2.0 GiB). The worker freezes this positive finite
+threshold in each guardian payload for the fresh check immediately before launch;
+equality is unavailable. Current queue allocations and explicit holds remain exclusive
+unless released. The threshold does not guarantee that compilation/training fits.
 
 Each direct or queued multirun adds one shared readable `multirun-<UTC date/time>-<word phrase>` ClearML
 tag to all its jobs, preserving explicit tags. The group is fresh per launch/submission

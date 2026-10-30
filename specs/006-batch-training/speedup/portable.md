@@ -2,8 +2,9 @@
 
 The canonical corp-skills source was fetched and inspected. An isolated clone starts
 at `b4fdd473ef85571fa81f75b47dd0ece8a10e1659` (collection 0.6.6), preserving all
-original sibling working-tree changes. Collection patch **0.6.7** is prepared;
-it remains uncommitted until fresh review and parent release coordination.
+original sibling working-tree changes. Collection patch **0.6.7** is locally
+committed at `914f81b0d27fe6b2888adb2a4462bec47f90a145` after fresh review;
+its tag/push waits for verified public CY and queue release refs.
 
 Changed paths are `skills/clearml-yolo/SKILL.md`, `references/usage.md`,
 `references/evaluation.md`, collection VERSION/CHANGELOG.md and dated no-impact
@@ -48,3 +49,35 @@ invocation while preserving accepted results. The reviewer checked the correctio
 and reran Markdown/local-link and whitespace checks. There are no unresolved findings.
 The companion's dated verification record retains prompt outcomes and reviewed checks.
 No routing or live OpenCode/target-model result is inferred from this native-agent review.
+
+## Queue threshold follow-up and local commit
+
+The user's queue memory-threshold follow-up adds guidance for cy-queue 0.1.6's
+optional `[queue].max_used_memory_gib`. The portable example uses 6.0, retains the
+2.0 default and required queue roots, and requires a positive finite numeric value.
+It explains the strict used-VRAM boundary, missing-telemetry rejection, effective
+configuration diagnostics, owned-worker restart and frozen launch values. Existing
+holds, reservations and manual-free behavior remain distinct from memory admission;
+the setting neither reserves VRAM nor changes direct CY checks. Retired worker flags
+and Hydra overrides remain unsupported. Private machine preferences are outside this
+portable source.
+
+An isolated source-CLI example verified the documented custom value, omitted default,
+invalid-string rejection and absence of queue-state creation. Existing fixed-threshold
+evaluation cases were reconciled, and a fourth new explanation-only prompt covers
+configuration, equality at the threshold and unchanged contracts. Fresh read-only
+agent `review_queue_memory` returned **ship** for the queue implementation and this
+portable follow-up, with no findings. Its explicit-reading response passed the new
+prompt, including the distinction between currently loaded config output and already
+running worker/guardian settings. It independently passed 88 queue tests, verified
+the frozen source inventory, and passed package consistency, changed Markdown/local
+links and architecture acceptance.
+
+The seven task-owned collection files were explicitly staged and committed as
+`docs(clearml-yolo): document faster batch search and queue thresholds`. Final
+collection checks passed: four-skill discovery, all 72 Markdown files, five changed
+documents/local links, metadata validation, architecture acceptance and staged
+whitespace/diff inspection. The collection working tree is clean. The application
+pair is recorded in [paired verification](paired.md); collection publication remains
+pending its public-release gate. No collection tag, push or installed-skill replacement
+has occurred at this checkpoint.

@@ -96,9 +96,12 @@ to its descendants; recovery keeps conservative global ownership proof.
 
 A persistent same-user worker executes private immutable snapshots in fresh processes;
 closing a submission terminal or TUI does not stop it. No ClearML task exists while waiting.
-Automatic availability uses only NVML used VRAM strictly below 2 GiB (2048 MiB),
-independently of model/compiler memory fit. The limit is fixed and checked again
-immediately before launch; exactly 2 GiB is busy. Current reservations and explicit
+Automatic availability uses only NVML used VRAM strictly below
+`queue.max_used_memory_gib` (default 2.0 GiB, or 2048 MiB), independently of
+model/compiler memory fit. The worker freezes this positive finite TOML setting
+in each guardian payload and checks it again immediately before launch; equality
+is busy. Restart the owned worker to adopt a changed setting. Existing guardians
+retain their launch value; missing telemetry remains unavailable. Current reservations and explicit
 holds stay excluded across queue roots. Stale unlocked records alone do not veto
 admission. Unknown telemetry/protocol, unsupported MIG and damaged
 coordination stop admission. Excessive whole-GPU demand remains pending with its reason.

@@ -86,11 +86,75 @@ both import contracts passed. The full queue suite passed **518 tests**, with
 in 138.10 seconds. Help passed. This is the proposed-version pair acceptance;
 physical multi-GPU execution remains unverified.
 
-## Final committed pair
+## Queue threshold follow-up
 
-The final version commit has not yet occurred. After hooks produce its version,
-the final source must match the captured implementation and root metadata, then
-normal installation and the final paired check must be refreshed before pushing.
-Run the inventory comparison above without `--before-version-commit` for the
-committed 0.44.4 metadata. Any implementation difference invalidates this frozen
-pair's evidence and requires verification of the changed source.
+The user's additional queue threshold request produced compatible queue **0.1.6**.
+Before commits, normal resolution paired its frozen source with the proposed CY
+0.44.4 snapshot. That pair passed **544 tests**, with seven physical-GPU cases
+deselected and 19 existing Pydantic warnings, in 133.74 seconds. Ruff/format, strict
+mypy, both import contracts, help, package consistency and explicit source/installed
+origins and versions passed. Queue's 73 source/test/check/metadata files have aggregate
+SHA-256 `144e304da02e2b14fc2e9b25f38c7742a89b72c7eaf35bdae732be622c203af6`.
+The final queue commit preserves those files exactly; subsequent changes were dated
+documentation and acceptance records.
+
+## Final committed versions and source checks
+
+The CY hook produced release **0.44.4**, commit
+`fb2c6ff4bb5bbad936958e3651712b05b8c11a9a`, from contributor commit
+`80615fe4e090beb915950cdc9972e72e04959086`. The annotated `v0.44.4` tag object is
+`969f800b4a7de8541c75ff49fa4479214fb6adeb`. Queue **0.1.6** is committed at
+`2fbaed25fa7c572757d30cb9b1b343d22e645e3a`. Both source versions, installed
+versions, editable origins and imported module locations match the actual release
+checkouts. Queue retains `clearml-yolo>=0.38,<0.45`; approved external revisions
+listed above remain unchanged.
+
+After the CY version commit, the parent updated queue guidance, including packaged
+`operations.md` and `operations.html` tutorial assets. The old proposed inventory
+comparison correctly reports those **two documentation asset differences**; the
+other 558 selected source/test/check/metadata files match exactly. This is not an
+exact match to the earlier complete source/assets snapshot. No Python runtime,
+test or verification-script source changed. The final check includes the updated
+assets before the documentation follow-up commit.
+
+The fresh inventory captures 830 repository files, including 560 selected
+source/test/check/metadata files with aggregate SHA-256
+`b0cc692d911b1cc0d9c7e0a5b408ac868bf444fc575996192ba8d236640ad849`.
+The runtime/source-assets aggregate is
+`7e8fd4c9df2f103b5ff359b4ce22699768e23e636a2e3e4039e0213fbfbf9938`.
+Task-local `paired-env/evidence/final-cy-source-inventory.json` and
+`queue016-source-inventory.json` retain individual hashes. Their verification helpers
+passed all 560 CY and 73 queue selected files with zero differences after installation.
+
+Executed from the committed queue checkout, using the isolated environment explicitly:
+
+```bash
+UV_LINK_MODE=copy uv pip install --python ../paired-env/bin/python \
+  -e ../repo -e . \
+  -e ../repo/external/digital-metrics -e ../repo/external/report-generator
+uv pip check --python ../paired-env/bin/python
+export UV_PROJECT_ENVIRONMENT=../paired-env
+CUDA_VISIBLE_DEVICES= uv run --frozen --no-sync --project ../repo python -m pytest -q
+uv run --frozen --no-sync --project ../repo python -m ruff check .
+uv run --frozen --no-sync --project ../repo python -m ruff format --check .
+uv run --frozen --no-sync --project ../repo python -m mypy .
+uv run --frozen --no-sync --project ../repo lint-imports
+CUDA_VISIBLE_DEVICES= uv run --frozen --no-sync --project ../repo cy-queue --help
+../paired-env/bin/python ../paired-env/evidence/verify_final_pair.py
+../paired-env/bin/python ../paired-env/evidence/verify_final_cy_source.py
+../paired-env/bin/python ../paired-env/evidence/verify_queue_source.py
+```
+
+Final normal resolution and pip consistency passed for 286 installed packages.
+Ruff/format passed (93 files), strict mypy passed (69 source files), and both import
+contracts passed. The full queue suite passed **544 tests**, with **7 physical-GPU
+cases deselected** and 19 existing Pydantic warnings, in **131.87 seconds**. Help,
+explicit installed/source identities and both source inventories passed. Logs and
+identity JSON are retained under task-local `paired-env/evidence/final-pair-*`.
+The main verification environment, queue source and approved external source checkouts
+were not modified by this companion refresh.
+
+The committed-version pairing gate is satisfied. The parent still owns canonical
+CY acceptance, the documentation follow-up commit, release publication and
+verification of public release refs. These CPU/process/integration checks do not close native single-GPU
+confirmation/timing or physical multi-GPU verification gaps documented separately.

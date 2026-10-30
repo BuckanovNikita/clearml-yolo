@@ -175,3 +175,16 @@ delivery with that benchmark gap recorded, in addition to the earlier physical
 multi-GPU exception. It does not turn T041 or full architecture acceptance into
 passes. Ordinary checks, independent review, final paired-source verification and
 normal release hooks remain required; no native guarantee or idle criterion changes.
+
+## Configurable queue admission follow-up (2026-10-30)
+
+The later user request adds an optional queue admission threshold. Its implementation
+belongs to cy-queue 0.1.6, with its own architecture, checks and fresh independent
+review. CY's follow-up changes only portable guides, the baseline contract, the local
+verification skill and the generated operations tutorial; its
+[no-impact record](speedup/queue-docs-architecture.json) was validated before editing.
+
+- [ ] T046 Reconcile CY queue guidance with the configured threshold, verify generated documentation and the final CY 0.44.4/queue 0.1.6 pair, and publish the reviewed companion sources with the authorized release.
+
+No queue setting changes the estimator's separate idle/activity checks. The disclosed
+native timing gap and its explicit delivery exception remain unchanged.

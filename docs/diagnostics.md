@@ -121,8 +121,11 @@ for diagnostics; scientific core records and algorithms remain independent of it
 Direct commands do not perform GPU admission. `cy-queue list --json` and the TUI expose
 pending order, owner UID, requested resources, allocation and the current wait reason.
 Admission selects the earliest runnable job using its owner's available worker and full
-GPU set. Automatic availability uses only used VRAM strictly below 2 GiB (2048 MiB),
-including a fresh check immediately before launch; equality is busy. The limit is fixed.
+GPU set. Automatic availability uses only used VRAM strictly below the configured
+`queue.max_used_memory_gib` (default 2.0 GiB). The worker freezes this value in the
+guardian payload for the fresh check immediately before launch; equality is busy.
+`cy-queue config --json` shows the file's effective value; restart the owned worker
+after changing it, since existing workers and guardians retain their loaded values.
 Current reservations and explicit holds exclude capacity regardless of low memory;
 stale unlocked records alone do not. Queue text, JSON, TUI, status logs and errors use
 physical GPU indexes or word aliases for absent devices, never full GPU UUIDs or claim tokens.

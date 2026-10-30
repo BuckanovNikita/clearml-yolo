@@ -655,8 +655,11 @@ compatible. Upgrades stop all participants together, preserve records and resubm
 pending work after environment changes; see the [offline upgrade](../../docs/queue.md#coordinated-package-upgrade). Owner workers execute only their UID's jobs; collaborators may reorder pending jobs through
 revision-checked public operations. Per-host earliest runnable ordering and whole-allocation claims apply
 across roots. CPU phases remain CPU; inference retains the first allocated device. Used VRAM must be
-strictly below 2048 MiB immediately before launch; unknown required telemetry, visible MIG or damaged
-coordination fail closed. The fixed cutoff is not a promise the workload fits.
+strictly below `queue.max_used_memory_gib` (default 2.0 GiB) immediately before launch.
+The worker freezes its configured threshold in each guardian payload; unknown required
+telemetry, visible MIG or damaged coordination fail closed. This cutoff is not a promise
+the workload fits. Changing the TOML setting requires a new worker; existing guardians
+retain their launch value. Older queue readers require an upgrade before using the field.
 
 Every effective MULTIRUN, including one-job sweeps, receives one fresh shared
 `multirun-YYYYMMDD-HHMMSS-<six-word-phrase>` UTC tag. Explicit user tags survive; ordinary RUN adds none.

@@ -108,3 +108,48 @@ delivery with that benchmark gap recorded, in addition to the earlier physical
 multi-GPU exception. It does not turn T041 or full architecture acceptance into
 passes. Ordinary checks, independent review, final paired-source verification and
 normal release hooks remain required; no native guarantee or idle criterion changes.
+
+## Release hooks and queue follow-up
+
+The normal hooks committed the batch implementation as
+`80615fe4e090beb915950cdc9972e72e04959086` and created version commit
+`fb2c6ff4bb5bbad936958e3651712b05b8c11a9a` with annotated tag `v0.44.4`.
+The hook's full canonical run `c735be26bf924513ad8c6473b1fe8b72` passed 4,571 tests,
+30 skipped, 81 deselected and 178 warnings in 1,058.53 seconds, plus all static/import
+checks. An earlier hook attempt was interrupted after detecting a different CUDA
+visibility environment; it is not a passing check. No hook was bypassed.
+
+The subsequent queue configuration request is implemented separately in queue 0.1.6,
+commit `2fbaed25fa7c572757d30cb9b1b343d22e645e3a`. Fresh independent review accepted
+its implementation and portable guidance. CY's portable documentation now describes
+the optional positive finite `queue.max_used_memory_gib`, default 2.0, strict-below
+admission, a frozen guardian startup value and worker restart/upgrade requirements.
+The existing queue roots, coordination ownership and direct estimator checks remain
+unchanged. Only the operations tutorial's Markdown/HTML changes packaged content;
+no additional CY runtime Python or tests changed. Its separate no-impact architecture
+record passed both validation phases.
+
+The final source environment was normally resolved and installed as CY 0.44.4 plus
+queue 0.1.6, and all 286 packages passed `uv pip check`. The original source overrides
+and operational environment remain untouched. The earlier proposed-pair checks are
+retained as history; final checks below cover the actual source and metadata view.
+
+
+The final queue pair passed 544 tests with seven physical-GPU cases deselected,
+plus static/import, help, dependency and source/installed identity checks; see
+[final pair evidence](paired.md). The queue documentation follow-up passed all
+199 documentation/catalogue compatibility tests and the complete Markdown/link
+verifier. Fresh reviewer `review_queue_memory` found two stale fixed-limit guides
+and a private numeric preference in the no-impact record. The parent corrected
+those, additionally reconciled runtime-isolation guidance, and expanded the record's
+scope. The reviewer rechecked the final guides, generated operations HTML, whitespace
+and no-impact acceptance and returned **ship** with no unresolved findings. No CY
+Python or tests changed during this documentation follow-up.
+
+Final canonical run `66a11f98161148a385e459119a55a23f` passed Ruff, strict mypy,
+Vulture, all 52 import contracts and **4,571 tests**, with 30 skipped, 81 deselected
+and 178 warnings, in 1,042.12 seconds. The verifier recorded its successful
+application receipt. Fresh source inventory checks again matched all 560 selected
+CY files and 73 queue files with zero differences. Final Markdown/link verification
+passed before the documentation commit. Public ref verification remains pending
+the authorized pushes; native benchmark gaps remain unchanged.

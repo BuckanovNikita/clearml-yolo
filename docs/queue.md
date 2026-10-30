@@ -90,21 +90,30 @@ and recovery retains the reduced claim without restoring released extra GPUs.
 Every queue command except help requires a filled TOML configuration. Each user
 creates `$XDG_CONFIG_HOME/clearml-yolo/queue.toml`, or
 `~/.config/clearml-yolo/queue.toml` when XDG_CONFIG_HOME is unset, empty or relative.
-There is no automatic config creation or implicit system-wide search. Every field
-below is required; all users sharing a queue select the same metadata and coordination
-paths:
+There is no automatic config creation or implicit system-wide search. The `name`,
+`root` and `coordination_root` fields are required; all users sharing a queue select
+the same metadata and coordination paths:
 
 ```toml
 [queue]
 name = "Team training"
 root = "/srv/clearml-yolo/queue"
 coordination_root = "/var/lib/clearml-yolo/coordination"
+# Optional in cy-queue >=0.1.6; default is 2.0 GiB:
+max_used_memory_gib = 2.0
 ```
 
 ```bash
 cy-queue config
 cy-queue config --json
 ```
+
+`queue.max_used_memory_gib` accepts positive finite TOML integers/floats; strings,
+booleans, zero, negative and nonfinite values are rejected. It sets the existing-VRAM
+admission threshold, not a reservation or model-fit guarantee. `cy-queue config`
+shows the file's effective value. Restart the owned worker after changing it; existing
+guardians retain the value frozen in their launch payload. Older queue readers reject
+the new field, so coordinate a package upgrade before adding it to their shared file.
 
 An explicit absolute `CY_QUEUE_CONFIG` overrides the user file. For example, an
 administrator can provide one shared file, selected in every participating login
@@ -265,9 +274,11 @@ has durably shrunk the claim, later record-write or acknowledgement failure does
 restore released GPUs. A failed or unacknowledged handoff stops the pipeline before
 inference; cleanup/recovery follows the remaining durable claim. This is not successful
 pipeline completion.
-Automatic GPU availability uses only total used VRAM strictly below 2 GiB (2048 MiB).
-Exactly 2 GiB is busy. This fixed limit is checked again after reserving the complete
-allocation and immediately before workload launch; missing or higher telemetry returns
+Automatic GPU availability uses only total used VRAM strictly below
+`queue.max_used_memory_gib` (default 2.0 GiB, or 2048 MiB). Equality is busy. The
+worker's configured threshold is frozen into each guardian's payload and checked
+again after reserving the complete allocation and immediately before workload
+launch; missing telemetry or usage at/above the threshold returns
 the attempted job to pending and releases its reservation. Process lists and utilization
 do not determine availability. Current queue allocations and explicit operator holds
 remain exclusive until released; stale unlocked bookkeeping alone does not exclude a GPU.
@@ -499,8 +510,8 @@ released reservation, overwrite a newer one, or clear a newer allocation during 
 recovery or cleanup. Existing processes continue, and their job outcomes remain independent
 of freeing capacity. `free` does not cancel a job or declare it completed or failed.
 
-There is no persistent admission bypass: every new job still checks used VRAM below
-2048 MiB immediately before launch. A later `disable` or a new queue reservation applies
+There is no persistent admission bypass: every new job still checks used VRAM
+strictly below its configured threshold immediately before launch. A later `disable` or a new queue reservation applies
 normally. Use `cancel` or owner `recover` when process cleanup or job recovery is the intent.
 
 Upgrade all cooperating workers on a host before using GPU controls. Worker startup and control mutations
@@ -536,8 +547,9 @@ Add `--json` to scripts that previously consumed default machine output. Existin
 job references remain accepted; old pending snapshots whose installation identity no
 longer matches must be resubmitted. Upgrade all cooperating workers together.
 
-Remove `worker --max-used-memory-gib` from worker commands: admission now uses the fixed
-2 GiB limit. Remove `--reason`, `--claim-token` and `--force` from GPU control commands;
+Remove `worker --max-used-memory-gib` from worker commands: that flag remains invalid.
+With cy-queue 0.1.6 or newer, configure `queue.max_used_memory_gib` in TOML instead;
+omission retains the 2.0 GiB default. Remove `--reason`, `--claim-token` and `--force` from GPU control commands;
 `gpu release INDEX` now means the same per-device manual action as `gpu free INDEX`.
 
 [Filesystem ownership](filesystem-policy.md) constrains application outputs/cache/logs/scratch
@@ -558,9 +570,9 @@ shared random ClearML tag per direct launch or queued submission. Keep the share
 Hydra tag helper, direct callback lifetime and frozen queue tags consistent. Explicit
 user tags survive; ordinary RUN adds no tag.
 
-Direct commands never schedule. Queue automatic availability uses only used VRAM strictly
-below 2 GiB (2048 MiB), with fresh admission checks immediately before launch and no
-configurable threshold. Current allocations and explicit holds stay exclusive; stale
+Direct commands never schedule. Queue automatic availability uses only used VRAM
+strictly below `queue.max_used_memory_gib` (default 2.0 GiB), with a fresh check
+using the frozen threshold immediately before launch. Current allocations and explicit holds stay exclusive; stale
 unlocked metadata alone does not veto capacity. The cutoff is independent of training
 capacity. Keep [queue](queue.md), direct Hydra defaults, private snapshots, owner/guardian
 adapters, CLI/TUI and README consistent.

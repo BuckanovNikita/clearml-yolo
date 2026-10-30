@@ -222,7 +222,8 @@ flags, confirmation, memory/process checks or access to the original queue root 
 send no signals. Existing processes, sibling reservations and job outcomes remain
 unchanged. Per-device generations prevent older guardian writes, training handoff,
 recovery and cleanup from restoring a freed reservation or affecting a newer allocation.
-Every new job still needs used VRAM below 2 GiB immediately before launch.
+Every new job still needs used VRAM strictly below its configured threshold
+(default 2.0 GiB), using the guardian's frozen value immediately before launch.
 No heartbeat expiry, missing parent or low GPU-memory observation establishes cleanup.
 Live guardians follow only their own child topology across threads, recorded births
 and subreaper adoption; unrelated same-UID `/proc` access denials cannot poison that
