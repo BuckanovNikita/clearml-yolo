@@ -22,7 +22,7 @@ Bulk preparation reuses validated native files, then restores missing assets onl
 from the project's pinned `weights-*` GitHub Release. The packaged
 `adapters/assets/weights-manifest.json` selects the snapshot in
 `BuckanovNikita/clearml-yolo`; preparation never discovers a moving latest release.
-The current pin is `weights-2026-10-30`.
+The current pin is `weights-2026-10-31`.
 
 A missing, mismatched or unavailable pin produces a release-specific failure. Bulk
 preparation does not fall back to Google Drive, Google Storage, download.pytorch.org
@@ -59,14 +59,20 @@ code releases reuse the existing pin and do not build or upload weights. See the
 [maintainer procedure](development.md#model-weight-releases) and
 [licence inventory](../specs/009-release-weights/licenses.md). Each file retains its
 own terms: YOLO uses AGPL-3.0; DEIMv2 materials permit non-commercial use and
-redistribution only. Bundled notices do not grant a common licence to the collection.
+redistribution only. DINOv3 retains its separate Meta agreement and use restrictions;
+archives include the exact model licence, linked Meta agreement and model card.
+Bundled notices do not grant a common licence to the collection.
+
+**Built with DINOv3.** The supported DINOv3 small backbone is the unmodified timm
+conversion, with its genuine Hub snapshot/configuration provenance. It is shared
+between Faster R-CNN and FCOS and included once in the weight snapshot.
 
 ## Catalogue and automatic execution
 
 The catalogue covers maintained YOLO detection names, RF-DETR, eligible Faster R-CNN
 and FCOS backbones, and DEIMv2 small/medium plus its pinned source. Bulk preparation
-excludes DEIMv2 large/xlarge and `dinov3_small`; explicitly selecting those models
-retains their normal execution behavior and access requirements.
+includes `dinov3_small` and excludes DEIMv2 large/xlarge; explicitly selecting
+those DEIMv2 models retains their normal execution behavior and access requirements.
 
 Actual `cy` pipeline execution attempts the catalogue before model construction,
 including when the selected model already has local weights. It records a completed
@@ -181,11 +187,11 @@ transport/status details. It does not switch to the model's original host.
 upstream URL is `https://github.com`. The complete GitHub path is appended directly:
 
 ```text
-GHR/BuckanovNikita/clearml-yolo/releases/download/weights-2026-10-30/weights-001.tar
+GHR/BuckanovNikita/clearml-yolo/releases/download/weights-2026-10-31/weights-001.tar
 ```
 
 For example, a root `https://artifactory.example/artifactory/github-files` yields
-`https://artifactory.example/artifactory/github-files/BuckanovNikita/clearml-yolo/releases/download/weights-2026-10-30/weights-001.tar`.
+`https://artifactory.example/artifactory/github-files/BuckanovNikita/clearml-yolo/releases/download/weights-2026-10-31/weights-001.tar`.
 Supply the repository root, not a file URL, browser UI URL, GitHub API or VCS API.
 This follows Artifactory's [remote file access](https://docs.jfrog.com/artifactory/docs/remote-repositories).
 

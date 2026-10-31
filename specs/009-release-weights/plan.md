@@ -35,3 +35,29 @@ Update README in Russian, model-assets/project/current contracts, development re
 ## Artifactory amendment
 
 Existing GH/GHR routing remains unchanged. Add local protocol fixtures for release bundle retrieval through a prefixed Artifactory-style GHR root, VCS downloadCommit routing and authentication/redirect redaction. Add conditional setup hints at the manual CLI failure boundary; adapters retain transfer/error ownership. Documentation includes safe placeholder roots and endpoint-specific authentication guidance. User explicitly excludes live Artifactory verification.
+
+## DINOv3 publication amendment — 2026-10-31
+
+Reuse the current implementation at latest remote master. Remove only the DINOv3
+exclusion in `adapters.assets.preparation._discover`; existing discovery deduplicates
+the Faster R-CNN/FCOS shared checkpoint. Package a complete `weights-2026-10-31`
+snapshot using the established maintainer script, real native caches and combined
+licence notices. Update the packaged pin only after publication verification.
+No dependency, loader, schema, CLI or network-ownership changes are required.
+
+The task-specific [architecture record](dinov3/architecture.json) covers this
+amendment without rewriting the completed initial release record. Reuse inward
+import contracts, architecture negative tests and native Hub restoration tests.
+The existing catalogue test will first assert inclusion/deduplication of DINOv3,
+while continuing to assert DEIMv2 exclusions and a single source extraction.
+
+Parent owns implementation, tests, repository docs, packaging, integration and
+release. A bounded licence investigator owns only temporary DINOv3 notice inputs;
+a bounded documentation agent may update the portable usage source independently.
+Fresh final read-only review follows canonical, native and paired checks.
+
+Documentation scope: README (Russian), model-assets, project contract summary,
+current-contract index and dated licence inventory; feature 007's historical
+exclusion is superseded by this dated amendment, not erased. Inspect portable
+usage/evaluation references and update their exclusion statements. Preserve all
+pre-existing work by performing delivery in an isolated latest-source checkout.

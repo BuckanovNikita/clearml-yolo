@@ -50,3 +50,21 @@ The user additionally requires preserving GH/GHR Artifactory routing and clean e
 
 - **FR-009**: Preserve exact GHR repository-relative release paths and GH downloadCommit VCS requests, including proxy failures, authentication boundaries and credential-safe diagnostics. Verify with local fixtures, not a live Artifactory deployment.
 - **FR-010**: Failed manual preparation prints concise conditional Artifactory setup and retry instructions. Documentation explains repository roots, GH/GHR roles, optional HF API endpoint/authentication, TLS/permissions failures and native-cache recovery without exposing credentials.
+
+## DINOv3 publication amendment — 2026-10-31
+
+The user explicitly selected public, licence-compliant publication of the supported
+DINOv3 small weights alongside the other maintained weights. This supersedes only
+the DINOv3 bulk exclusion inherited from feature 007; DEIMv2 large/xlarge stay excluded.
+
+- **FR-011**: Include the shared `dinov3_small` timm checkpoint and native Hub config
+  in the bulk catalogue and a new immutable complete weight snapshot. Preserve the
+  real Hub revision, checksums and conversion provenance; never relabel it as
+  byte-identical to Meta's original checkpoint.
+- **FR-012**: Distribute the exact bundled DINOv3 agreement, preserve the separately
+  linked Meta agreement and model card, prominently display “Built with DINOv3”,
+  and retain each asset's individual restrictions without relicensing the collection.
+
+Acceptance requires local archive/member verification, native offline DINOv3 loading,
+actual hosted-byte checks, applicable canonical/docs/architecture and current paired
+CY/queue checks, fresh independent review and normal authorized Git-only code delivery.

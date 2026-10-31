@@ -275,7 +275,10 @@ Explicit model preparation may write model assets,
 locks, temporary sibling downloads and native HF metadata into configured native caches
 outside `CY_HOME`; preparation receipts and all project outputs remain contained.
 `cy-download-weights` retries the eligible catalogue and exits nonzero on incomplete
-preparation. Valid native assets precede the packaged `weights-*` release pin. Bulk
+preparation, including the shared `dinov3_small` backbone. DEIMv2 large/xlarge
+remain excluded. **Built with DINOv3.** Redistributed DINOv3 retains its Meta
+agreement and use restrictions, with complete notices in the weight archives.
+Valid native assets precede the packaged `weights-*` release pin. Bulk
 preparation never falls back to original model hosts; release failures retain safe
 archive diagnostics. GHR is a GitHub Files remote and GH a separate VCS remote used
 by ordinary selected-model source resolution. Independent tar archives and members require size/SHA-256

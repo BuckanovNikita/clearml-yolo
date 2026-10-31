@@ -395,7 +395,11 @@ eligible catalogue and writes independent `.tar` files, `manifest.json` and
 1,900,000,000 bytes, including tar overhead and notices, below the 2 GiB hosting limit.
 It performs no upload and does not change the runtime pin. Include every applicable
 licence and attribution, source availability directions for AGPL assets, and DEIMv2's
-non-commercial restriction. Preserve original upstream identities and real Hub
+non-commercial restriction. For DINOv3, preserve the exact bundled agreement,
+the separately linked Meta website agreement and the timm model card; prominently
+display “Built with DINOv3” in release notes and related product documentation.
+Retain the genuine converted-checkpoint provenance and applicable use restrictions.
+Preserve original upstream identities and real Hub
 snapshot/configuration metadata; never fabricate a snapshot commit from a file hash.
 
 Before publication, verify catalogue completeness, archive/member size and hashes,

@@ -1,27 +1,27 @@
 {
   "schema_version": 1,
   "repository": "BuckanovNikita/clearml-yolo",
-  "release_tag": "weights-2026-10-30",
+  "release_tag": "weights-2026-10-31",
   "archives": [
     {
       "name": "weights-001.tar",
-      "size": 1885511680,
-      "sha256": "4c981c9fc7a683c2a61c0c8b963c69d3eb9595e9b0ce1eb3f988d5394559f9a3"
+      "size": 1888911360,
+      "sha256": "7d188773e5ef738b5a9f0b76d20c1f2c3ad17933b98eeb3ae7b272c3b9bcc9ad"
     },
     {
       "name": "weights-002.tar",
-      "size": 1871441920,
-      "sha256": "58fdadeecd5c9f4158ef7f546611b54fe8bd1631e9ec2c7e64b57597bc8d4155"
+      "size": 1815398400,
+      "sha256": "9df3198c30282914587c157533a56a2caa45d69343423a67eabfd1b37d3980bb"
     },
     {
       "name": "weights-003.tar",
-      "size": 1025710080,
-      "sha256": "79bc2e8aaa603b2dad1eecb49869ac60ef50df9254b4bba3d71377d870d68dbd"
+      "size": 1164830720,
+      "sha256": "f2271cad2442968514b428166dfdd1a5487a22a3a4b711a1e10842e14023b857"
     },
     {
       "name": "deim-noncommercial-001.tar",
-      "size": 61747200,
-      "sha256": "263b29492a7ad329ce6f5d7bafd679dee600d540e064740391b512746567e64a"
+      "size": 61788160,
+      "sha256": "5e8f9f88ff681ad49772d39a86fe06d3fa904680d5bd8b064d85f608e553425d"
     }
   ],
   "assets": [
@@ -262,6 +262,32 @@
       "hub": null
     },
     {
+      "identity": "5d3932c5eebf75488f534a18",
+      "backend": "fasterrcnn",
+      "preset": "dinov3_small",
+      "filename": "pytorch_model.bin",
+      "source_url": "https://huggingface.co/timm/vit_small_patch16_dinov3.lvd1689m/resolve/main/pytorch_model.bin",
+      "source_revision": "1.0.30:vit_small_patch16_dinov3.lvd1689m",
+      "kind": "weights",
+      "archive": "weights-001.tar",
+      "member": "assets/5d3932c5eebf75488f534a18/model.safetensors",
+      "size": 86362376,
+      "sha256": "2a1ec16ae28ffa07bc0ead0241ee7df9fc26451fe6f9f839b7b3afa0a906b040",
+      "hub": {
+        "repository": "timm/vit_small_patch16_dinov3.lvd1689m",
+        "revision": "main",
+        "commit": "3bf4720a82ec2066db88137180ff1f83a675cef0",
+        "filename": "model.safetensors",
+        "etag": "2a1ec16ae28ffa07bc0ead0241ee7df9fc26451fe6f9f839b7b3afa0a906b040",
+        "config": {
+          "member": "assets/5d3932c5eebf75488f534a18/config.json",
+          "size": 670,
+          "sha256": "8eb1eeb3a94a3faddfcdd9ae693607a9cd9c8b91c34381578f7f0a48ce454eef",
+          "etag": "3ffe9c85d38c30e7920af2d98ca629b03143c905"
+        }
+      }
+    },
+    {
       "identity": "6020ae1fe9771b3cffd46956",
       "backend": "ultralytics",
       "preset": "yolo12m",
@@ -435,7 +461,7 @@
       "source_url": "https://github.com/ultralytics/assets/releases/download/v8.4.0/yolov5m6u.pt",
       "source_revision": "v8.4.0",
       "kind": "weights",
-      "archive": "weights-001.tar",
+      "archive": "weights-002.tar",
       "member": "assets/88b083c6f67977f950697f3d/yolov5m6u.pt",
       "size": 83003066,
       "sha256": "c30fd1128a9c255b614ca3415c637499048387b45d488cd9193a2e0fccc6d780",
@@ -715,7 +741,7 @@
       "source_url": "https://github.com/ultralytics/assets/releases/download/v8.4.0/yolo11x.pt",
       "source_revision": "v8.4.0",
       "kind": "weights",
-      "archive": "weights-002.tar",
+      "archive": "weights-003.tar",
       "member": "assets/d34773e4bf34c2c295055c85/yolo11x.pt",
       "size": 114636239,
       "sha256": "7bc158aa95c0ebfdd87f70f01653c1131b93e92522dbe15c228bcd742e773a24",
@@ -729,7 +755,7 @@
       "source_url": "https://github.com/ultralytics/assets/releases/download/v8.4.0/yolov3-tinyu.pt",
       "source_revision": "v8.4.0",
       "kind": "weights",
-      "archive": "weights-002.tar",
+      "archive": "weights-003.tar",
       "member": "assets/d9110bde746c328e362e09d2/yolov3-tinyu.pt",
       "size": 24440067,
       "sha256": "def5c43360675b9666fe9a3add6a1be849cea2bec3cf20d32b75b85840ed4887",

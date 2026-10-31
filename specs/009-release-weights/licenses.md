@@ -101,3 +101,35 @@ offline native restoration separately, following the
 [weight release procedure](../../docs/development.md#model-weight-releases).
 Ordinary code-release tags neither republish weights nor authorize project
 distribution or registry uploads.
+
+## DINOv3 small addition — 2026-10-31
+
+**Built with DINOv3.** The public, ungated
+[timm model snapshot](https://huggingface.co/timm/vit_small_patch16_dinov3.lvd1689m/tree/3bf4720a82ec2066db88137180ff1f83a675cef0)
+is now included for both `fasterrcnn/dinov3_small` and `fcos/dinov3_small`, sharing
+one checkpoint. This supersedes the initial DINOv3 exclusion above. DEIMv2
+large/xlarge remain excluded.
+
+The snapshot's [model card](https://huggingface.co/timm/vit_small_patch16_dinov3.lvd1689m/blob/3bf4720a82ec2066db88137180ff1f83a675cef0/README.md)
+identifies a timm conversion: zero QKV biases are removed and RoPE periods are
+generated in fp32. The redistributed timm checkpoint is unmodified by this project;
+it is not described as byte-identical to Meta's original checkpoint. Preserve the
+model card, real Hub commit, config, hashes and original source links.
+
+The exact [bundled licence](https://huggingface.co/timm/vit_small_patch16_dinov3.lvd1689m/blob/3bf4720a82ec2066db88137180ff1f83a675cef0/LICENSE.md)
+is dated August 19, 2025. Section 1 permits redistribution under that agreement and
+requires supplying a copy. The [Meta website agreement](https://ai.meta.com/resources/models-and-libraries/dinov3-license/)
+linked by the model card is dated August 14, 2025 and additionally requires prominent
+“Built with DINOv3” attribution. Preserve complete copies as separately identified
+notice files; do not imply the texts are identical. Display the attribution in
+release notes and related product documentation. Research publications must
+acknowledge DINOv3 use. Applicable-law, trade-control and restricted-use provisions
+remain attached; the collection is not relicensed under this project's licence.
+DINOv3 is not subject to DEIMv2's separate blanket non-commercial condition.
+
+The exact `model.safetensors` is 86,362,376 bytes, SHA-256
+`2a1ec16ae28ffa07bc0ead0241ee7df9fc26451fe6f9f839b7b3afa0a906b040`.
+The exact config is 670 bytes, SHA-256
+`8eb1eeb3a94a3faddfcdd9ae693607a9cd9c8b91c34381578f7f0a48ce454eef`.
+Packaging and hosted verification outcomes are recorded in the dated
+[DINOv3 evidence](dinov3/verification.md).

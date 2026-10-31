@@ -39,3 +39,16 @@ FR-001/002/004/005/007/008 map to T004–T005,T008. FR-003 maps to T004,T006,T00
 T014/T015 precede final T010/T011 acceptance; no live Artifactory calls are authorized by this amendment.
 
 - [x] T016 Close the inspected maintainer-script boundary gap with an exact import contract and negative tests in tests/test_tooling_boundaries.py; include it in final canonical and architecture review.
+
+## DINOv3 publication — 2026-10-31
+
+- [x] T017 Record FR-011/012, inspect exact source/licences, plan scoped architecture and validate plan record.
+- [x] T018 Update and run the catalogue regression before changing the DINOv3 exclusion; then verify shared-backbone inclusion with existing failure/restore tests. Depends on T017.
+- [x] T019 Retrieve the genuine timm snapshot, assemble exact licence/model-card notices, package a complete new weight snapshot, verify all members and native offline DINOv3 loading. Depends on T018.
+- [x] T020 Update repository and portable usage guidance, attribution and licence inventory; validate docs/examples. Depends on T018/T019.
+- [x] T021 Verify final canonical source, current and proposed paired CY/queue metadata/integration, and obtain fresh independent architecture/release review. Depends on T019/T020.
+- [x] T022 Publish the new verified weights snapshot, read back actual hosted bytes, deliberately update the packaged pin, reconcile final diff and architecture acceptance. Depends on applicable T021 checks.
+- [ ] T023 Complete normal task-scoped commit/version-tag workflow and authorized pushes; verify final paired versions and remote refs. Depends on T021/T022.
+
+Scope is the supported DINOv3 small backbone, not every DINOv3 size. No user data,
+checkpoint modification, dependency upgrade, deployment or project package upload.

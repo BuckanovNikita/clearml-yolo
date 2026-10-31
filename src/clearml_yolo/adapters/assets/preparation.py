@@ -77,10 +77,7 @@ def _discover() -> tuple[
     variants = tuple(
         variant
         for variant in model_catalogue()
-        if not (
-            (variant.backend == "deimv2" and variant.preset in {"l", "x"})
-            or variant.preset == "dinov3_small"
-        )
+        if not (variant.backend == "deimv2" and variant.preset in {"l", "x"})
     )
     requests: list[tuple[str, AssetSpec]] = []
     failures: list[PreparationFailure] = []

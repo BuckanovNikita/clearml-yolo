@@ -430,7 +430,7 @@ def test_shared_backbones_are_resolved_once_but_each_selection_changes_identity(
     assert catalogue.module.prepare_catalogue(automatic=True).fingerprint != result.fingerprint
 
 
-def test_bulk_catalogue_excludes_restricted_models_and_extracts_source_once(
+def test_bulk_catalogue_prepares_shared_dinov3_and_excludes_large_deim(
     catalogue: Catalogue, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from clearml_yolo.core.batch_estimation import model_catalogue
@@ -463,12 +463,13 @@ def test_bulk_catalogue_excludes_restricted_models_and_extracts_source_once(
     result = catalogue.module.prepare_catalogue(automatic=False)
     assert not result.failures
     assert sum(name.startswith(("yolo",)) for name in catalogue.attempts) == 44
-    assert "dinov3_small.pth" not in catalogue.attempts
+    assert catalogue.attempts.count("dinov3_small.pth") == 1
+    assert sum(asset.path.name == "dinov3_small.pth" for asset in result.assets) == 1
     assert "l.pt" not in catalogue.attempts
     assert "x.pt" not in catalogue.attempts
     assert catalogue.attempts.count("source.tar.gz") == 1
     assert len(extracted) == 1
-    assert len(catalogue.attempts) == 56
+    assert len(catalogue.attempts) == 57
 
 
 def test_storage_failure_is_result_not_automatic_startup_error(

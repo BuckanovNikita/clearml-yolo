@@ -8,6 +8,9 @@
 - **queue**: Document configurable GPU admission
   ([`ffd294c`](https://github.com/BuckanovNikita/clearml-yolo/commit/ffd294c3ac3240a282f87b76b7f40fa6dd963a44))
 
+- **release**: Record verified batch search publication
+  ([`b23952c`](https://github.com/BuckanovNikita/clearml-yolo/commit/b23952c433f2addbbdc981fbed1fd8073602cd01))
+
 
 ## v0.44.4 (2026-10-30)
 
