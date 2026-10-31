@@ -1,7 +1,12 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.44.5 (2026-10-31)
+
+### Bug Fixes
+
+- **weights**: Include licensed DINOv3 in bulk preparation
+  ([`d276172`](https://github.com/BuckanovNikita/clearml-yolo/commit/d2761725835dae6fd5d8605308f9ccbe3029e7dc))
 
 ### Documentation
 
