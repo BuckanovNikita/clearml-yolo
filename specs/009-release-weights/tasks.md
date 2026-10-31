@@ -48,7 +48,7 @@ T014/T015 precede final T010/T011 acceptance; no live Artifactory calls are auth
 - [x] T020 Update repository and portable usage guidance, attribution and licence inventory; validate docs/examples. Depends on T018/T019.
 - [x] T021 Verify final canonical source, current and proposed paired CY/queue metadata/integration, and obtain fresh independent architecture/release review. Depends on T019/T020.
 - [x] T022 Publish the new verified weights snapshot, read back actual hosted bytes, deliberately update the packaged pin, reconcile final diff and architecture acceptance. Depends on applicable T021 checks.
-- [ ] T023 Complete normal task-scoped commit/version-tag workflow and authorized pushes; verify final paired versions and remote refs. Depends on T021/T022.
+- [x] T023 Complete normal task-scoped commit/version-tag workflow and authorized pushes; verify final paired versions and remote refs. Depends on T021/T022.
 
 Scope is the supported DINOv3 small backbone, not every DINOv3 size. No user data,
 checkpoint modification, dependency upgrade, deployment or project package upload.

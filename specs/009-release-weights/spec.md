@@ -68,3 +68,6 @@ the DINOv3 bulk exclusion inherited from feature 007; DEIMv2 large/xlarge stay e
 Acceptance requires local archive/member verification, native offline DINOv3 loading,
 actual hosted-byte checks, applicable canonical/docs/architecture and current paired
 CY/queue checks, fresh independent review and normal authorized Git-only code delivery.
+
+**DINOv3 amendment outcome**: released as CY 0.44.5 with public
+`weights-2026-10-31`; see [dated acceptance](dinov3/verification.md).

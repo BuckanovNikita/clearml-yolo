@@ -197,3 +197,42 @@ receipt: Ruff, strict mypy, Vulture and import-linter passed; pytest again passe
 Its normal before/after stability comparison passed. The independent source review
 requires no source correction. Current-context canonical, native, paired and
 documentation checks are all successful before commit.
+
+## Released identities and final delivery acceptance
+
+The normal contributor commit is
+`d2761725835dae6fd5d8605308f9ccbe3029e7dc`. Its normal post-commit hook
+created CY [v0.44.5](https://github.com/BuckanovNikita/clearml-yolo/tree/v0.44.5),
+release commit `d4f566cbd79839be8d6b0767e11cb349ddf4ab8e`. The release commit
+changed only CHANGELOG.md and the project/root-lock version tokens. All normal
+contributor/generated-version hooks passed, reusing checked inputs through the
+maintained verifier's own matching/attestation rules. No hook was bypassed.
+
+The actual committed CY 0.44.5 source and queue 0.1.6 were installed together
+through normal resolution. Source/installed versions, editable origins and
+requirements match; pip consistency passed. The final runtime, scripts, tests,
+manifest, check configuration and release metadata exactly match the already
+tested proposed pair. The final actual-version queue suite passed again:
+544 passed, seven physical opt-in tests deselected, 19 warnings in 133.69 seconds;
+actual command help passed. Approved external source revisions remain unchanged.
+
+The intended master and annotated v0.44.5 tag were pushed atomically and read
+back from GitHub. The tag object is
+`c98ac69a5a150e5277bac5f1dccb57632931bbe9`, dereferencing to the exact tested
+release commit above. No code GitHub Release, project distribution or registry
+publication was created.
+
+The companion portable collection was published as
+[v0.6.8](https://github.com/BuckanovNikita/custom-opencode-skills/tree/v0.6.8),
+commit `83982d2483bdcdd2488a6252f80909d65d7292e0`, with verified main and
+annotated-tag refs. Final parent Markdown lint passed for 73 documents, and
+explicit-root local-link checks passed for 73 documents. Fresh native reading
+evaluation and independent review remain as recorded above; no installed skill
+copy was updated. All architecture, behavior, documentation and release tasks
+are reconciled with the final owned diff.
+
+Only task-owned fixture servers and test processes were used; fixture servers
+closed normally. Original workspace edits, branch position, services and local
+dependency overrides are preserved. Verification archives/logs and native-cache
+fixtures remain retained as task evidence. The final documentation-only closure
+uses normal hooks and does not require another version.

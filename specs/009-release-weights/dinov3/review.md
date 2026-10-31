@@ -44,3 +44,10 @@ The parent confirmed the required resumed-context canonical success receipt
 (4,571 passes; unchanged input comparison) before architecture acceptance and
 commit. No source correction was required. Final actual-version paired checks
 and release/push verification remain the native delivery task.
+
+The actual committed 0.44.5/queue 0.1.6 pair passed normal installation,
+metadata/origin/requirements consistency, pip checks and all 544 ordinary queue
+tests. Reviewed runtime/test/data bytes match the proposed pair exactly; automatic
+release changed only its three permitted metadata/changelog files. The intended
+code branch/tag and companion guidance refs were pushed and independently read
+back. These final evidence/ledger amendments add no runtime or dependency change.
