@@ -1,7 +1,12 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.44.6 (2026-11-01)
+
+### Bug Fixes
+
+- Simplify verification and stabilize native cleanup
+  ([`9054b96`](https://github.com/BuckanovNikita/clearml-yolo/commit/9054b960f731f83d336ea242e5dc86ad3b280cbd))
 
 ### Documentation
 
