@@ -123,3 +123,11 @@ Rerun `cy-download-weights` once from the original preparation directory to reus
 older relative caches. Errors identify the settings file and JSON/permissions/retry
 recovery. Public command/report schemas and other path semantics are unchanged.
 See the [current cache contract](../../docs/model-assets.md#cache-locations) for authoritative guidance.
+
+## Current bulk-resolution authority — 2026-11-01
+
+Earlier upstream-fallback promises above are superseded by the accepted
+[release-only correction](../../docs/bugs/weight-files-remote/assessment.md).
+The [current asset contract](../../docs/model-assets.md#pinned-project-archives)
+owns bulk resolution and its distinction from standalone selected-model execution.
+Original dated intent and completed release evidence remain historical.

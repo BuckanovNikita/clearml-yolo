@@ -300,6 +300,24 @@ def _legacy_candidates(spec: AssetSpec) -> tuple[Path, ...]:
     return (*spec.cache_candidates, *(cached.path for cached in spec.equivalent_caches), legacy)
 
 
+def _publish_snapshot(
+    blob: Path, snapshot: Path, *, validator: Callable[[Path], str]
+) -> None:
+    """Publish a native blob link, retaining validated atomic copy fallback."""
+    snapshot.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(dir=snapshot.parent, delete=False) as temporary:
+        link = Path(temporary.name)
+    link.unlink()
+    try:
+        try:
+            link.symlink_to(os.path.relpath(blob, snapshot.parent))
+            link.replace(snapshot)
+        except OSError:
+            promote_asset(blob, snapshot, validator=validator)
+    finally:
+        link.unlink(missing_ok=True)
+
+
 def _publish_legacy(
     source: Path, spec: AssetSpec, filename: str, metadata: HfFileMetadata, digest: str
 ) -> ResolvedAsset:
@@ -324,18 +342,7 @@ def _publish_legacy(
     promote_asset(source, blob, validator=validate_staging)
     # Preserve the native blob link where the filesystem supports symlinks. A
     # plain snapshot copy is the SDK's supported fallback on other filesystems.
-    snapshot.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile(dir=snapshot.parent, delete=False) as temporary:
-        link = Path(temporary.name)
-    link.unlink()
-    try:
-        try:
-            link.symlink_to(os.path.relpath(blob, snapshot.parent))
-            link.replace(snapshot)
-        except OSError:
-            promote_asset(blob, snapshot, validator=validate_staging)
-    finally:
-        link.unlink(missing_ok=True)
+    _publish_snapshot(blob, snapshot, validator=validate_staging)
     if hub.revision != commit:
         reference = _contained(hub.cache_dir, repo / "refs" / _relative(hub.revision))
         reference.parent.mkdir(parents=True, exist_ok=True)
@@ -649,18 +656,7 @@ def restore_bundle_asset(
         snapshot = _contained(hub.cache_dir, repo / "snapshots" / metadata.commit / "config.json")
         validate_config = partial(_validate_config_data, etag=metadata.config.etag)
         promote_asset(config_path, blob, validator=validate_config)
-        snapshot.parent.mkdir(parents=True, exist_ok=True)
-        with tempfile.NamedTemporaryFile(dir=snapshot.parent, delete=False) as temporary:
-            link = Path(temporary.name)
-        link.unlink()
-        try:
-            try:
-                link.symlink_to(os.path.relpath(blob, snapshot.parent))
-                link.replace(snapshot)
-            except OSError:
-                promote_asset(blob, snapshot, validator=validate_config)
-        finally:
-            link.unlink(missing_ok=True)
+        _publish_snapshot(blob, snapshot, validator=validate_config)
         native = HfFileMetadata(
             commit_hash=metadata.commit,
             etag=metadata.etag,

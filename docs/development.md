@@ -83,6 +83,16 @@ mypy boundary exceptions and Vulture's confidence threshold. Install the locked 
 dependencies before verification; in a deliberately prepared environment, an inexact
 sync preserves additional external runtime packages.
 
+Finish environment provisioning before canonical verification, including native SDK
+optional decoders exercised by the selected tests. The installed Ultralytics image
+fallback can request `pi-heif` for an unidentified image; provision that verification
+prerequisite deliberately rather than relying on a mid-suite installation. Do not
+install or update packages during a check. Shared package-cache hardlinks can also
+change stability metadata when another environment is provisioned; independent
+package copies avoid that coupling. A passing pytest result with a rejected receipt
+is not canonical acceptance. See the [dated environment investigation](../specs/010-cleanup/execution.md#baseline-receipt-refusal-and-corrected-execution-conditions)
+for the observed case; no project dependency pin was changed.
+
 Documentation-only work needs Markdown and local-link validation rather than the
 application suite. Inspect [.pre-commit-config.yaml](../.pre-commit-config.yaml) before
 running hooks: it includes changelog generation and a post-commit release hook.

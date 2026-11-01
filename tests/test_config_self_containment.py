@@ -36,22 +36,6 @@ def test_export_contains_editable_command_base(tmp_path: Path) -> None:
     assert list(values.splits) == ["train", "val", "test"]
 
 
-@pytest.mark.parametrize("profile", ["default", "albumentations"])
-@pytest.mark.parametrize("selection", ["ultralytics", "fasterrcnn/resnet50_fpn"])
-def test_export_composes_without_schema_matching_warnings(
-    tmp_path: Path, profile: str, selection: str
-) -> None:
-    dump_config_tree(tmp_path, model=selection)
-    with (
-        warnings.catch_warnings(),
-        initialize_config_dir(config_dir=str(tmp_path), version_base="1.3"),
-    ):
-        warnings.filterwarnings("error", message="(?s).*validated against ConfigStore schema.*")
-        config = compose(config_name="cy", overrides=[f"transforms={profile}"])
-    assert config.model.backend == selection.split("/", maxsplit=1)[0]
-    assert config.transforms.mode == ("native" if profile == "default" else "albumentations")
-
-
 @pytest.mark.parametrize(("name", "command", "selection"), COMMAND_MODELS)
 def test_every_export_composes_with_packaged_application_defaults_disabled(
     tmp_path: Path,
@@ -74,6 +58,14 @@ def test_every_export_composes_with_packaged_application_defaults_disabled(
                 isolated.setattr(ApplicationSearchPath, "manipulate_search_path", lambda *_: None)
                 with initialize_config_dir(config_dir=str(tmp_path), version_base="1.3"):
                     exported = compose(config_name=command, overrides=overrides)
+            assert "clearml" in exported
+            assert "enabled" not in exported.clearml
+            if name in NATIVE_COMMANDS:
+                assert exported.model.backend == selection.split("/", maxsplit=1)[0]
+            if profile is not None:
+                assert exported.transforms.mode == (
+                    "native" if profile == "default" else "albumentations"
+                )
             assert OmegaConf.to_container(exported, resolve=False) == OmegaConf.to_container(
                 baseline, resolve=False
             )

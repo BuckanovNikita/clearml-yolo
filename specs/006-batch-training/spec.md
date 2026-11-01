@@ -2,7 +2,8 @@
 
 **Created**: 2026-10-26
 
-**Status**: Implementation in progress
+**Status**: Implementation released; physical/native acceptance limitations and scoped
+delivery exceptions remain in [tasks.md](tasks.md).
 
 **Input**: Implement the supplied batch estimation, multi-GPU training, FCOS and
 self-contained configuration export plan. Baseline: [stage zero](../000-baseline/spec.md).

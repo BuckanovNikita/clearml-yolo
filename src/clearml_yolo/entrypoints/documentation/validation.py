@@ -4,7 +4,7 @@ import inspect
 from collections.abc import Callable
 from dataclasses import fields
 from functools import cache
-from typing import Any, get_args
+from typing import Any, Literal, get_args
 
 from omegaconf import OmegaConf
 from pydantic import BaseModel, JsonValue, TypeAdapter, ValidationError
@@ -24,7 +24,7 @@ from clearml_yolo.application.use_cases.val import validate
 from clearml_yolo.core.comparison.significance import validate_q
 from clearml_yolo.core.evaluation.models import EvaluationConfig
 from clearml_yolo.core.evaluation.policy import validate_evaluation_image_name
-from clearml_yolo.core.export_requests import ExportSettings
+from clearml_yolo.core.export_requests import ExportSettings, validate_export_input_presence
 from clearml_yolo.core.models import ModelConfig
 from clearml_yolo.core.publication import FiftyOneConfig
 from clearml_yolo.core.transforms import TransformConfig
@@ -283,8 +283,39 @@ def _ground_truth_errors(value: dict[str, JsonValue], command: str) -> list[str]
     return []
 
 
+def _export_input_errors(value: dict[str, JsonValue]) -> list[str]:
+    settings = value.get("export")
+    if not isinstance(settings, dict):
+        return []
+    selected = settings.get("operation", "onnx")
+    if unresolved(selected):
+        return []
+    try:
+        operation: Literal["onnx", "build", "verify"] = TypeAdapter(
+            Literal["onnx", "build", "verify"]
+        ).validate_python(selected)
+    except ValidationError:
+        # The ordinary settings validator already reports an invalid operation.
+        return []
+    try:
+        # Unresolved strings remain potentially present; this detects independent
+        # known absences without evaluating external resolvers or opening paths.
+        validate_export_input_presence(
+            operation,
+            has_onnx=settings.get("onnx") is not None,
+            has_engine=settings.get("engine") is not None,
+            has_weights=value.get("weights") is not None,
+            has_ground_truth=value.get("ground_truth") is not None,
+        )
+    except ValueError as error:
+        return [str(error)]
+    return []
+
+
 def _specific_errors(value: dict[str, JsonValue], command: str) -> list[str]:
     errors = _comparison_errors(value)
+    if command == "export":
+        errors.extend(_export_input_errors(value))
     if command == "ground_truth":
         fraction = value.get("test_fraction", "???")
         if not unresolved(fraction):

@@ -351,7 +351,7 @@ def test_release_normalization_requires_exact_bytes_paths_and_parent(
 
 def test_application_command_selection_is_one_complete_suite() -> None:
     commands = verify.check_commands(Path.cwd(), docs=False)
-    assert commands[-1] == [sys.executable, "-m", "pytest"]
+    assert commands[-1] == [sys.executable, "-m", "pytest", "--durations=25"]
     assert len(commands) == 5
     assert not any(
         "test_architecture.py" in argument for command in commands for argument in command

@@ -61,3 +61,11 @@ current-contract index and dated licence inventory; feature 007's historical
 exclusion is superseded by this dated amendment, not erased. Inspect portable
 usage/evaluation references and update their exclusion statements. Preserve all
 pre-existing work by performing delivery in an isolated latest-source checkout.
+
+## Current bulk-resolution authority — 2026-11-01
+
+Earlier upstream-fallback promises above are superseded by the accepted
+[release-only correction](../../docs/bugs/weight-files-remote/assessment.md).
+The [current asset contract](../../docs/model-assets.md#pinned-project-archives)
+owns bulk resolution and its distinction from standalone selected-model execution.
+Original dated intent and completed release evidence remain historical.

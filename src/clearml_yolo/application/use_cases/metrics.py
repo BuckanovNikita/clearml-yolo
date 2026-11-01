@@ -1,7 +1,6 @@
 """Calibrate on validation once, score each split, and publish readable evidence."""
 
 __all__ = ["EvaluationConfig", "MetricsResult"]
-import json
 from pathlib import Path
 from typing import Any
 
@@ -51,17 +50,6 @@ def _publish_split(
             f"{artifact_names.METRICS_SECTION}_{artifact_names.split_component(split)}",
             summary,
         )
-
-
-def _methodology_frame(values: dict[str, Any]) -> pd.DataFrame:
-    return pd.DataFrame(
-        {
-            "parameter": list(values),
-            "value": [
-                json.dumps(value, ensure_ascii=False, sort_keys=True) for value in values.values()
-            ],
-        }
-    )
 
 
 def _write_evaluation_workbook(

@@ -2,6 +2,8 @@
 
 import json
 import os
+import re
+import shutil
 import subprocess
 import sys
 import tomllib
@@ -46,23 +48,50 @@ def commit(repo: Path, message: str) -> None:
     git(repo, "commit", "-m", message)
 
 
-@pytest.fixture
-def release_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    # In-process failure probes also need isolation when pytest itself runs inside
-    # a real release commit's hooks, which export Git's temporary index and guard.
-    for key in tuple(os.environ):
-        if key.startswith("GIT_") or key == "CLEARML_YOLO_RELEASE_ACTIVE":
-            monkeypatch.delenv(key)
-    repo = tmp_path / "repository with spaces — репозиторий"
+def semantic_release_policy(project: str) -> str:
+    """Copy the project's canonical tool tables without unrelated local settings."""
+    selected: list[str] = []
+    include = False
+    for line in project.splitlines(keepends=True):
+        if header := re.fullmatch(r"\s*\[\[?([\w.-]+)\]\]?\s*(?:#.*)?", line):
+            name = header[1]
+            include = name == "tool.semantic_release" or name.startswith("tool.semantic_release.")
+        if include:
+            selected.append(line)
+    policy = "".join(selected)
+    assert tomllib.loads(policy) == {
+        "tool": {"semantic_release": tomllib.loads(project)["tool"]["semantic_release"]}
+    }
+    return policy
+
+
+@pytest.mark.parametrize(
+    "following",
+    [
+        '[tool.uv.sources]\nprivate = { path = "external/private" }\n',
+        '[tool.semantic_release_extra]\nkeep = "outside"\n',
+        '[project.optional-dependencies]\nextra = ["example"]\n',
+    ],
+)
+def test_release_fixture_copies_only_semantic_release_tables(following: str) -> None:
+    policy = (
+        '[tool.semantic_release]\ncommit_parser = "conventional"\n'
+        '[tool.semantic_release.branches.master]\nmatch = "^master$"\n'
+    )
+    project = '[project]\nname = "original"\n' + policy + following
+    assert tomllib.loads(semantic_release_policy(project)) == tomllib.loads(policy)
+
+
+def create_release_repository(repo: Path) -> Path:
     repo.mkdir()
     git(repo, "init", "-b", "master")
     git(repo, "config", "user.name", "Release Test")
     git(repo, "config", "user.email", "release@example.invalid")
     git(repo, "remote", "add", "origin", "https://github.com/example/release-fixture.git")
-    policy = (ROOT / "pyproject.toml").read_text().split("[tool.semantic_release]", 1)[1]
+    policy = semantic_release_policy((ROOT / "pyproject.toml").read_text())
     (repo / "pyproject.toml").write_text(
         '[project]\nname = "release-fixture"\nversion = "0.3.0"\n'
-        'requires-python = ">=3.12"\n[tool.semantic_release]' + policy
+        'requires-python = ">=3.12"\n' + policy
     )
     (repo / "uv.lock").write_text(
         'version = 1\nrevision = 3\nrequires-python = ">=3.12"\n\n'
@@ -105,6 +134,22 @@ def release_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     command(repo, sys.executable, str(HELPER), "--install-hooks")
     assert git(repo, "tag", "--list") == "v0.3.0"
     return repo
+
+
+@pytest.fixture(scope="module")
+def release_seed(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    return create_release_repository(tmp_path_factory.mktemp("release-seed") / "repository")
+
+
+@pytest.fixture
+def release_repo(release_seed: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    # In-process failure probes also need isolation when pytest itself runs inside
+    # a real release commit's hooks, which export Git's temporary index and guard.
+    for key in tuple(os.environ):
+        if key.startswith("GIT_") or key == "CLEARML_YOLO_RELEASE_ACTIVE":
+            monkeypatch.delenv(key)
+    # Copy writable Git state and installed hooks; no test mutates the shared seed.
+    return Path(shutil.copytree(release_seed, tmp_path / "repository with spaces — репозиторий"))
 
 
 @pytest.fixture

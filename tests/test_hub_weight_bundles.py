@@ -61,10 +61,16 @@ def _fixture(tmp_path: Path) -> tuple[AssetSpec, BundleAsset, Path, Path]:
     return spec, asset, weight, config
 
 
+@pytest.mark.parametrize("copy_fallback", [False, True], ids=["symlink", "copy"])
 def test_restore_real_snapshot_and_config_offline(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, copy_fallback: bool
 ) -> None:
     spec, asset, weight, config = _fixture(tmp_path)
+    if copy_fallback:
+        def unavailable_symlink(_self: Path, _target: str) -> None:
+            raise OSError("Symlinks unavailable on test filesystem")
+
+        monkeypatch.setattr(Path, "symlink_to", unavailable_symlink)
     monkeypatch.setattr(hub, "hf_hub_download", lambda **kw: pytest.fail("network requested"))
     monkeypatch.setattr(hub, "get_hf_file_metadata", lambda **kw: pytest.fail("metadata requested"))
     result = hub.restore_bundle_asset(spec, asset, weight, config)
@@ -81,6 +87,9 @@ def test_restore_real_snapshot_and_config_offline(
     assert isinstance(cached_config, str)
     assert Path(cached_config).read_bytes() == config.read_bytes()
     assert result.path.read_bytes() == WEIGHT
+    assert result.path.is_symlink() is not copy_fallback
+    assert Path(cached_config).is_symlink() is not copy_fallback
+    assert weight.read_bytes() == WEIGHT
 
 
 @pytest.mark.parametrize("corrupt", ["weight", "config", "etag"])

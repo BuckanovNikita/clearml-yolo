@@ -28,7 +28,7 @@ configuration snapshots and temporary destinations must resolve beneath CY_HOME,
 through symlinks. Invalid destinations fail before creation. Existing data is neither migrated nor deleted. Native model asset publication is the
 specific exception described below; it does not relax project destination checks.
 
-The unreleased [batch estimator](batch-estimation.md) uses a versioned JSON catalogue
+The [batch estimator](batch-estimation.md) uses a versioned JSON catalogue
 with a native file lock and atomic replacement beneath `CY_HOME`. It records successful
 and failed cases, diagnostics and provenance without creating a ClearML task. Its
 configuration location is independent of queue configuration discovery.

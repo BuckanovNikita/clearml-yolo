@@ -71,3 +71,11 @@ CY/queue checks, fresh independent review and normal authorized Git-only code de
 
 **DINOv3 amendment outcome**: released as CY 0.44.5 with public
 `weights-2026-10-31`; see [dated acceptance](dinov3/verification.md).
+
+## Current bulk-resolution authority — 2026-11-01
+
+Earlier upstream-fallback promises above are superseded by the accepted
+[release-only correction](../../docs/bugs/weight-files-remote/assessment.md).
+The [current asset contract](../../docs/model-assets.md#pinned-project-archives)
+owns bulk resolution and its distinction from standalone selected-model execution.
+Original dated intent and completed release evidence remain historical.

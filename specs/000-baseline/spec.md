@@ -32,7 +32,7 @@ installed Spec Kit tooling and current topic guides remain in place. Future task
 feature/bug/documentation route, module architecture acceptance, required documentation and authorized
 release workflow. This reset does not authorize changes to installed workflow tooling.
 
-The unreleased [feature 006](../006-batch-training/spec.md) extends this baseline with
+The released [feature 006](../006-batch-training/spec.md) extends this baseline with
 local capacity estimation, explicit null-batch lookup, native distributed training,
 FCOS and self-contained configuration exports. Its [ledger](../006-batch-training/tasks.md)
 and dated evidence record acceptance gaps; earlier single-device restrictions remain

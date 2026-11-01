@@ -421,7 +421,7 @@ def check_commands(root: Path, *, docs: bool) -> list[list[str]]:
         [sys.executable, "-m", "mypy", "."],
         [sys.executable, "-m", "vulture"],
         [str(Path(sys.executable).parent / "lint-imports")],
-        [sys.executable, "-m", "pytest"],
+        [sys.executable, "-m", "pytest", "--durations=25"],
     ]
 
 

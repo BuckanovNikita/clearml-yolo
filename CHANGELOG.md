@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- **weights**: Record DINOv3 publication acceptance
+  ([`e82cc49`](https://github.com/BuckanovNikita/clearml-yolo/commit/e82cc49bca1fdb82981bf844897b6f6bdad3a78e))
+
+
 ## v0.44.5 (2026-10-31)
 
 ### Bug Fixes

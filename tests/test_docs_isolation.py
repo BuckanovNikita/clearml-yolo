@@ -2,29 +2,20 @@
 
 import subprocess
 import sys
+from collections.abc import Callable
 from copy import deepcopy
 
 import grimp
 import pytest
-from importlinter.adapters.user_options import IniFileUserOptionReader
-from importlinter.application.user_options import UserOptions
-from importlinter.configuration import configure
 from importlinter.contracts.forbidden import ForbiddenContract
+from importlinter.domain.contract import Contract
 
 
 @pytest.fixture(scope="module")
-def docs_import_contract() -> ForbiddenContract:
-    configure()  # type: ignore[no-untyped-call]
-    options: UserOptions | None = IniFileUserOptionReader().read_options(".importlinter")
-    assert options is not None
-    contract = next(
-        item
-        for item in options.contracts_options
-        if item["name"] == "Documentation serving is isolated from ordinary execution"
-    )
-    return ForbiddenContract(
-        name=contract["name"], session_options=options.session_options, contract_options=contract
-    )
+def docs_import_contract(configured_contract: Callable[[str], Contract]) -> ForbiddenContract:
+    contract = configured_contract("Documentation serving is isolated from ordinary execution")
+    assert isinstance(contract, ForbiddenContract)
+    return contract
 
 
 @pytest.mark.parametrize(
@@ -37,17 +28,17 @@ def docs_import_contract() -> ForbiddenContract:
     ],
 )
 def test_documentation_import_boundary_rejects_injected_edges(
-    docs_import_contract: ForbiddenContract, source: str
+    docs_import_contract: ForbiddenContract, source: str, graph: grimp.ImportGraph
 ) -> None:
-    graph = grimp.build_graph("clearml_yolo", include_external_packages=True)
     assert docs_import_contract.check(deepcopy(graph), verbose=False).kept
-    graph.add_import(
+    candidate = deepcopy(graph)
+    candidate.add_import(
         importer=source,
         imported="clearml_yolo.adapters.documentation.server",
         line_number=1,
         line_contents="injected forbidden import",
     )
-    assert not docs_import_contract.check(graph, verbose=False).kept
+    assert not docs_import_contract.check(candidate, verbose=False).kept
 
 
 @pytest.mark.parametrize(

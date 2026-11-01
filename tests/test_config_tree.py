@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import pytest
-from hydra import compose, initialize_config_dir, initialize_config_module
+from hydra import compose, initialize_config_dir
 from omegaconf import OmegaConf
 
 COMMANDS = {
@@ -41,20 +41,6 @@ def test_installed_command_creates_examples(
         "transforms",
         "transform_overrides",
     }
-
-
-@pytest.mark.parametrize(("command", "config_name"), COMMANDS.items())
-def test_examples_round_trip_through_hydra(tmp_path: Path, command: str, config_name: str) -> None:
-    from clearml_yolo.entrypoints.hydra.config_tree import dump_config_tree
-
-    dump_config_tree(tmp_path, command=command)
-    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
-        builtin = compose(config_name=config_name)
-    assert "clearml" in builtin
-    assert "enabled" not in builtin.clearml
-    with initialize_config_dir(config_dir=str(tmp_path), version_base="1.3"):
-        example = compose(config_name=command)
-    assert OmegaConf.to_container(example) == OmegaConf.to_container(builtin)
 
 
 def test_generated_pipeline_accepts_inputs_and_native_overrides(tmp_path: Path) -> None:

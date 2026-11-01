@@ -8,6 +8,23 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from clearml_yolo.core.models import Device
 
 
+def validate_export_input_presence(
+    operation: Literal["onnx", "build", "verify"],
+    *,
+    has_onnx: bool,
+    has_engine: bool,
+    has_weights: bool,
+    has_ground_truth: bool,
+) -> None:
+    """Check operation inputs from supplied presence, without resolving external values."""
+    if operation == "onnx" and not has_weights:
+        raise ValueError("ONNX export requires weights")
+    if operation == "build" and not has_onnx:
+        raise ValueError("Engine build requires an ONNX graph and its metadata")
+    if operation == "verify" and (not has_engine or not has_weights or not has_ground_truth):
+        raise ValueError("Verification requires engine, weights and labeled ground_truth")
+
+
 def gpu_device_index(device: Device) -> int:
     """Resolve one admitted visible index, retaining native default-device semantics."""
     if isinstance(device, list):
@@ -138,14 +155,13 @@ class ExportSettings(BaseModel):
 
     def validate_input_presence(self, *, has_weights: bool, has_ground_truth: bool) -> None:
         """Reject incomplete operations before task creation or remote resolution."""
-        if self.operation == "onnx" and not has_weights:
-            raise ValueError("ONNX export requires weights")
-        if self.operation == "build" and self.onnx is None:
-            raise ValueError("Engine build requires an ONNX graph and its metadata")
-        if self.operation == "verify" and (
-            self.engine is None or not has_weights or not has_ground_truth
-        ):
-            raise ValueError("Verification requires engine, weights and labeled ground_truth")
+        validate_export_input_presence(
+            self.operation,
+            has_onnx=self.onnx is not None,
+            has_engine=self.engine is not None,
+            has_weights=has_weights,
+            has_ground_truth=has_ground_truth,
+        )
 
 
 class ExportRequest(ExportSettings):

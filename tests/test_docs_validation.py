@@ -9,6 +9,69 @@ from clearml_yolo.entrypoints.documentation.validation import schema_errors
 
 
 @pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        ([], "ONNX export requires weights"),
+        (
+            ["export.operation=build", "export.device=0"],
+            "Engine build requires an ONNX graph and its metadata",
+        ),
+        (
+            ["export.operation=verify", "export.device=0"],
+            "Verification requires engine, weights and labeled ground_truth",
+        ),
+        (
+            ["export.metadata=${oc.env:METADATA}"],
+            "ONNX export requires weights",
+        ),
+        (
+            [
+                "export.operation=verify",
+                "export.device=0",
+                "weights=${oc.env:WEIGHTS}",
+                "ground_truth=${oc.env:TRUTH}",
+            ],
+            "Verification requires engine, weights and labeled ground_truth",
+        ),
+    ],
+)
+def test_export_preview_requires_operation_inputs(overrides: list[str], message: str) -> None:
+    result = preview(PreviewRequest(command="export", overrides=overrides))
+    assert not result.errors
+    assert message in result.jobs[0].errors
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        ["weights=/not/opened.pth"],
+        ["export.operation=build", "export.device=0", "export.onnx=/not/opened.onnx"],
+        [
+            "export.operation=verify",
+            "export.device=0",
+            "export.engine=/not/opened.engine",
+            "weights=/not/opened.pth",
+            "ground_truth=/not/opened.csv",
+        ],
+        ["weights=${oc.env:WEIGHTS}"],
+        ["export.operation=build", "export.device=0", "export.onnx=${oc.env:GRAPH}"],
+        [
+            "export.operation=verify",
+            "export.device=0",
+            "export.engine=${oc.env:ENGINE}",
+            "weights=${oc.env:WEIGHTS}",
+            "ground_truth=${oc.env:TRUTH}",
+        ],
+        ["export.operation=${oc.env:OPERATION}"],
+    ],
+)
+def test_export_preview_preserves_present_and_deferred_inputs(overrides: list[str]) -> None:
+    result = preview(PreviewRequest(command="export", overrides=overrides))
+    assert not result.errors
+    assert not result.jobs[0].errors
+
+
+@pytest.mark.parametrize(
     ("command", "overrides", "message"),
     [
         ("pipeline", ["skip_train=perhaps"], "skip_train"),

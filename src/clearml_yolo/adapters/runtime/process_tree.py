@@ -368,13 +368,8 @@ class LinuxProcessTree:
             os.close(descriptor)
 
 
-class SubreaperProcessTree(LinuxProcessTree):
-    """Own a live supervisor's descendants without global marker discovery.
-
-    The supervisor must be dedicated to this invocation and remain its subreaper.
-    Every child branch is consequently owned, including orphans adopted after a
-    native fork. Historical recovery still uses ``LinuxProcessTree`` and markers.
-    """
+class _ScopedProcessTree(LinuxProcessTree):
+    """Discover a live anchor's descendants with identity-fenced thread child lists."""
 
     def __init__(
         self, root: int, token: str, *, subreaper: int, born: int | None = None,
@@ -473,6 +468,15 @@ class SubreaperProcessTree(LinuxProcessTree):
             pending.extend((child, None, process) for child in self._children(process))
         return table
 
+
+class SubreaperProcessTree(_ScopedProcessTree):
+    """Own a live supervisor's descendants without global marker discovery.
+
+    The supervisor must be dedicated to this invocation and remain its subreaper.
+    Every child branch is consequently owned, including orphans adopted after a
+    native fork. Historical recovery still uses ``LinuxProcessTree`` and markers.
+    """
+
     @override
     def _owned(self) -> list[_Process]:
         table = self._begin_scan()
@@ -554,16 +558,13 @@ def _subreaper(enabled: bool | None = None) -> bool:
     return bool(flag.value)
 
 
-class _NativeProcessTree(LinuxProcessTree):
+class _NativeProcessTree(_ScopedProcessTree):
     """An unsignallable caller anchor with protected preexisting branches."""
 
     def __init__(self, current: _Process, token: str, reader: int) -> None:
-        super().__init__(
-            current.pid,
-            token,
-            owner_env=DIRECT_OWNER_ENV,
-            excluded={current.pid: current.born},
-        )
+        super().__init__(current.pid, token, subreaper=current.pid)
+        self._marker = f"{DIRECT_OWNER_ENV}={token}".encode()
+        self._excluded[current.pid] = current.born
         self._reader = reader
         self._records = b""
         self._ambiguous: set[int] = set()
@@ -622,6 +623,10 @@ class _NativeProcessTree(LinuxProcessTree):
         owners = {
             pid for pid in self._known_owners(table) if pid != self.root and pid not in protected
         }
+        owners.update(
+            pid for pid in self._threaded_zombies
+            if self._identities.get(pid) == table[pid].born and pid not in protected
+        )
         owners.update(process.pid for process in table.values() if self._marked(process))
         changed = True
         while changed:
@@ -638,7 +643,7 @@ class _NativeProcessTree(LinuxProcessTree):
             if (
                 process.parent == self.root
                 and process.pid not in owners | protected
-                and process.state != "Z"
+                and (process.state != "Z" or process.pid in self._threaded_zombies)
             ):
                 self._ambiguous.add(process.pid)
         if self._ambiguous:
@@ -646,7 +651,10 @@ class _NativeProcessTree(LinuxProcessTree):
         for pid in owners:
             self._identities[pid] = table[pid].born
         self._reap_owned(table, protected)
-        return [table[pid] for pid in owners if table[pid].state != "Z"]
+        return [
+            table[pid] for pid in owners
+            if table[pid].state != "Z" or pid in self._threaded_zombies
+        ]
 
     def _reap_owned(self, table: Mapping[int, _Process], protected: set[int]) -> None:
         """Keep dead recorded children available for reaping after live revalidation."""
@@ -656,6 +664,7 @@ class _NativeProcessTree(LinuxProcessTree):
                 process is not None
                 and process.born == born
                 and process.state == "Z"
+                and pid not in self._threaded_zombies
                 and process.parent == self.root
                 and pid != self.root
                 and pid not in protected

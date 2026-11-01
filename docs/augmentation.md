@@ -1,8 +1,8 @@
 # Custom training augmentation
 
 `cy-train` and the training stage of `cy` accept one standard Albumentations JSON
-pipeline for every registered YOLO, DEIMv2, RF-DETR, Faster R-CNN and FCOS selection. FCOS support describes
-unreleased source changes; native GPU acceptance remains pending.
+pipeline for every registered YOLO, DEIMv2, RF-DETR, Faster R-CNN and FCOS selection. FCOS support shipped with feature 006; its native GPU acceptance limitations remain
+recorded in the [feature ledger](../specs/006-batch-training/tasks.md).
 The default `transforms=default` keeps each backend's native augmentation recipe.
 Select `transforms=albumentations` to replace optional native augmentation with your
 JSON. Prediction, validation and export keep their normal preprocessing.

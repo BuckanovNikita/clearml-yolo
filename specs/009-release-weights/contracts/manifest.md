@@ -1,6 +1,9 @@
 # Weight bundle manifest v1
 
-The UTF-8 JSON object has `schema_version: 1`, `repository: "BuckanovNikita/clearml-yolo"`, `release_tag: "weights-2026-10-29"`, `archives` and `assets` arrays. Reject unknown fields and duplicate identifiers. Never accept arbitrary repository or traversal-bearing paths from remote content; package data is the source of this manifest.
+The UTF-8 JSON object has `schema_version: 1`, `repository: "BuckanovNikita/clearml-yolo"`, `release_tag` (an immutable `weights-*` snapshot identifier), `archives` and `assets` arrays. Reject unknown fields and duplicate identifiers. Never accept arbitrary repository or traversal-bearing paths from remote content; package data is the source of this manifest.
+
+The packaged runtime manifest selects the active pin. A dated value such as
+`weights-2026-10-29` is an example, not a fixed wire-format requirement.
 
 An archive has `name` (single .tar filename), `size` (positive bytes below 2 GiB), `sha256` (64 lowercase hex).
 

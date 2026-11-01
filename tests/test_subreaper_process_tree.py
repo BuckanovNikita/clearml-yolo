@@ -292,3 +292,111 @@ assert _read_process(child) is None, 'Descendant survived verified cleanup'
         for pid in pids:
             with suppress(ProcessLookupError):
                 os.kill(pid, signal.SIGKILL)
+
+
+@pytest.fixture
+def native_topology(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Iterator[tuple[ProcessTopology, process_tree._NativeProcessTree]]:
+    topology = ProcessTopology(monkeypatch)
+    # Native ownership may also inspect launch markers for ambiguous adopted children.
+    monkeypatch.setattr(Path, "read_bytes", lambda _path: b"")
+    topology.children[101][101] = []
+    reader, writer = os.pipe2(os.O_NONBLOCK)
+    try:
+        tree = process_tree._NativeProcessTree(topology.supervisor, "token", reader)
+        yield topology, tree
+    finally:
+        os.close(reader)
+        os.close(writer)
+
+
+def test_native_scope_ignores_unrelated_churn_and_permissions(
+    native_topology: tuple[ProcessTopology, process_tree._NativeProcessTree],
+) -> None:
+    topology, tree = native_topology
+    topology.denied_identity.add(999)
+    assert not tree.running()
+    topology.processes[998] = process_tree._Process(998, 1, 998, 99, "S")
+    assert not tree.running(), "Unrelated process churn cannot retain an empty native scope"
+
+
+@pytest.mark.parametrize("denial", ["identity", "topology", "children"])
+def test_native_scope_inaccessible_descendant_blocks_cleanup(
+    native_topology: tuple[ProcessTopology, process_tree._NativeProcessTree], denial: str,
+) -> None:
+    topology, tree = native_topology
+    topology.children[101][101] = [202]
+    if denial == "identity":
+        topology.denied_identity.add(202)
+    elif denial == "topology":
+        topology.denied_topology.add(202)
+    else:
+        topology.denied_children.add(202)
+    with pytest.raises(process_tree.UnverifiableProcessTreeError, match="access denied"):
+        tree.running()
+
+
+def test_native_scope_finds_children_from_all_threads_and_live_zombie_groups(
+    native_topology: tuple[ProcessTopology, process_tree._NativeProcessTree],
+) -> None:
+    topology, tree = native_topology
+    topology.children[101][111] = [202]
+    topology.processes[202] = process_tree._Process(202, 101, 202, 11, "Z")
+    topology.children[202][212] = []
+    assert tree.live_pids() == (202,), "Live threads survive their zombie leader"
+    assert tree.running(), "A zombie leader cannot establish native thread-group cleanup"
+
+
+def test_native_scope_retains_recorded_threaded_zombie_with_helpers(
+    native_topology: tuple[ProcessTopology, process_tree._NativeProcessTree],
+) -> None:
+    topology, tree = native_topology
+    tree._has_helpers = True
+    tree._identities[202] = 11
+    topology.children[101][101] = [202]
+    topology.processes[202] = process_tree._Process(202, 101, 202, 11, "Z")
+    topology.children[202][212] = []
+    assert tree.live_pids() == (202,), "Recorded native threads retain positive ownership"
+
+
+def test_native_scope_unknown_threaded_zombie_with_helpers_is_ambiguous(
+    native_topology: tuple[ProcessTopology, process_tree._NativeProcessTree],
+) -> None:
+    topology, tree = native_topology
+    tree._has_helpers = True
+    topology.children[101][101] = [202]
+    topology.processes[202] = process_tree._Process(202, 101, 202, 11, "Z")
+    topology.children[202][212] = []
+    with pytest.raises(process_tree.UnverifiableProcessTreeError, match="Cannot prove native"):
+        tree.running()
+
+
+def test_native_scope_rejects_retained_pid_replacement(
+    native_topology: tuple[ProcessTopology, process_tree._NativeProcessTree],
+) -> None:
+    topology, tree = native_topology
+    tree._identities[202] = 11
+    topology.processes[202] = process_tree._Process(202, 1, 202, 50, "S")
+    topology.denied_topology.add(202)
+    assert not tree.running(), "A retained PID replacement has no caller ancestry"
+
+
+def test_native_scope_second_scan_finds_late_adoption(
+    native_topology: tuple[ProcessTopology, process_tree._NativeProcessTree],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    topology, tree = native_topology
+    original = topology.read_text
+    scans = 0
+
+    def late_child(path: Path, encoding: str | None = None, errors: str | None = None) -> str:
+        nonlocal scans
+        if path == Path("/proc/101/task/101/children"):
+            scans += 1
+            if scans > 1:
+                return "202"
+        return original(path, encoding, errors)
+
+    monkeypatch.setattr(Path, "read_text", late_child)
+    assert tree.running(), "Native cleanup must check for late adopted children"

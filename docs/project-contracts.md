@@ -14,7 +14,7 @@ selected GPUs, with `--jobs` controlling concurrency. See
 
 Entrypoints: `cy`, `cy-train`, `cy-predict`, `cy-val`, `cy-metrics`,
 `cy-report`, `cy-compare`, `cy-ground-truth`, `cy-export`, `cy-init-config`, `cy-dedup`,
-`cy-batch-estimate`, `cy-docs`, and `cy-queue`.
+`cy-batch-estimate`, `cy-download-weights`, `cy-docs`, and `cy-queue`.
 The `cy-queue` command belongs to the separately installed compatible queue source
 package; CY's own entrypoints do not require that package or its configuration.
 `cy-init-config DIRECTORY [--command NAME] [--model PRESET] [--force]` writes one selected
@@ -90,8 +90,8 @@ permits one fresh repeat of that last good batch. Only a full successful repeat
 yields usable `numerically_limited` evidence; every failed confirmation remains
 failed. Numerical failure never bounds memory or establishes a capacity maximum.
 Exact lookup and extrapolation retain numerical limitations ahead of ceiling and
-validated status. Schema-1 catalogues remain readable; saves write schema 2, which
-requires upgraded readers, and read-only access never rewrites historical files.
+validated status. Schemas 1 and 2 remain readable; saves write schema 3 with explicit
+search strategies. Read-only access never rewrites historical files.
 Pending snapshots remain failed with null batches until confirmation succeeds.
 Training never retries OOM with a hidden batch reduction. Numeric defaults and existing YOLO AutoBatch values keep their behavior. `cy -m`
 uses sequential BasicLauncher. `queue.*`, `autogpu.*` and the former queue launcher
@@ -119,7 +119,7 @@ ordinary RUN adds no tag. See the
 [grouping contract](../specs/000-baseline/spec.md#direct-execution-shared-queue-and-diagnostics).
 
 The `model=deimv2/<preset>`, `model=rfdetr/<preset>`, `model=fasterrcnn/<preset>` and
-unreleased `model=fcos/<preset>` groups
+`model=fcos/<preset>` groups
 own typed `model.train` and `model.predict` settings. Unsupported controls fail explicitly.
 Changed controls in inactive groups are rejected in both directions; YOLO settings belong
 in `ultralytics`/`ultralytics_predict`, and native settings belong in `model.train`/`model.predict`.

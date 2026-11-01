@@ -5,17 +5,14 @@ import json
 import subprocess
 import sys
 import tomllib
+from collections.abc import Callable
 from copy import deepcopy
 from pathlib import Path
 
 import grimp
 import pytest
-from importlinter.adapters.user_options import IniFileUserOptionReader
 from importlinter.application.user_options import UserOptions
-from importlinter.configuration import configure
-from importlinter.contracts.forbidden import ForbiddenContract
-from importlinter.contracts.independence import IndependenceContract
-from importlinter.contracts.layers import LayersContract
+from importlinter.domain.contract import Contract
 
 import architecture_helpers as architecture
 
@@ -23,42 +20,13 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 
 
-@pytest.fixture(scope="module")
-def import_options() -> UserOptions:
-    # Use the same reader as lint-imports, including native INI list/boolean handling.
-    configure()  # type: ignore[no-untyped-call]
-    options = IniFileUserOptionReader().read_options(str(ROOT / ".importlinter"))
-    assert options is not None
-    assert options.contracts_options
-    return options
-
-
-@pytest.fixture(scope="module")
-def graph() -> grimp.ImportGraph:
-    imported = grimp.build_graph("clearml_yolo", include_external_packages=True, cache_dir=None)
-    architecture.add_dynamic_imports(imported, SRC)
-    return imported
-
-
-def _contract(
-    options: UserOptions, name: str
-) -> LayersContract | ForbiddenContract | IndependenceContract:
-    selected = next(contract for contract in options.contracts_options if contract["name"] == name)
-    classes: dict[str, type[LayersContract | ForbiddenContract | IndependenceContract]] = {
-        "layers": LayersContract,
-        "forbidden": ForbiddenContract,
-        "independence": IndependenceContract,
-    }
-    return classes[selected["type"]](
-        name=name, session_options=options.session_options, contract_options=selected
-    )
-
-
 def test_actual_graph_obeys_every_configured_contract_including_dynamic_imports(
-    graph: grimp.ImportGraph, import_options: UserOptions
+    graph: grimp.ImportGraph,
+    import_options: UserOptions,
+    configured_contract: Callable[[str], Contract],
 ) -> None:
     for options in import_options.contracts_options:
-        contract = _contract(import_options, options["name"])
+        contract = configured_contract(options["name"])
         # Contracts remove ignored edges, so each gets its own graph.
         result = contract.check(deepcopy(graph), verbose=False)
         assert result.kept, (contract.name, result.metadata)
@@ -257,11 +225,11 @@ def test_legacy_missing_module_and_missing_attribute_targets_are_rejected(
 
 
 def test_console_command_inventory_matches_configured_independence(
-    import_options: UserOptions,
+    configured_contract: Callable[[str], Contract],
 ) -> None:
     config = tomllib.loads((ROOT / "pyproject.toml").read_text())
     commands = {target.split(":")[0] for target in config["project"]["scripts"].values()}
-    options = _contract(import_options, "Every command entrypoint stands alone").contract_options
+    options = configured_contract("Every command entrypoint stands alone").contract_options
     assert commands == set(options["modules"])
 
 
@@ -458,9 +426,9 @@ def test_actual_configured_import_linter_contract_rejects_mutated_graph(
     importer: str,
     imported: str | None,
     graph: grimp.ImportGraph,
-    import_options: UserOptions,
+    configured_contract: Callable[[str], Contract],
 ) -> None:
-    contract = _contract(import_options, name)
+    contract = configured_contract(name)
     actual = contract.check(deepcopy(graph), verbose=False)
     assert actual.kept
     mutated = deepcopy(graph)
@@ -474,7 +442,7 @@ def test_actual_configured_import_linter_contract_rejects_mutated_graph(
 
 
 def test_transitive_adapter_escape_is_rejected_by_configured_layers(
-    graph: grimp.ImportGraph, import_options: UserOptions
+    graph: grimp.ImportGraph, configured_contract: Callable[[str], Contract]
 ) -> None:
     candidate = deepcopy(graph)
     candidate.add_module("clearml_yolo.application.helper")
@@ -487,7 +455,7 @@ def test_transitive_adapter_escape_is_rejected_by_configured_layers(
         imported="clearml_yolo.adapters.yolo.inference",
     )
     assert (
-        not _contract(import_options, "Clean architecture inward layers")
+        not configured_contract("Clean architecture inward layers")
         .check(candidate, verbose=False)
         .kept
     )
@@ -815,6 +783,21 @@ def test_runtime_target_resolution_respects_scopes_and_reexports(
         ),
     ],
 )
+def test_dynamic_import_graph_resolves_scoped_import_aliases(
+    tmp_path: Path, source: str, expected: bool
+) -> None:
+    package = tmp_path / "clearml_yolo/adapters/storage"
+    package.mkdir(parents=True)
+    (package / "helper.py").write_text(source)
+    candidate = grimp.ImportGraph()
+    candidate.add_module("clearml_yolo.adapters.storage.helper")
+    candidate.add_module("torch")
+    architecture.add_dynamic_imports(candidate, tmp_path)
+    assert candidate.direct_import_exists(
+        importer="clearml_yolo.adapters.storage.helper", imported="torch"
+    ) is expected
+
+
 @pytest.mark.parametrize(
     "sdk",
     [
@@ -829,22 +812,22 @@ def test_runtime_target_resolution_respects_scopes_and_reexports(
         "safetensors",
     ],
 )
-def test_dynamic_import_graph_resolves_scoped_import_aliases(
+def test_configured_sdk_owner_rejects_dynamic_import(
     tmp_path: Path,
     sdk: str,
-    source: str,
-    expected: bool,
     graph: grimp.ImportGraph,
-    import_options: UserOptions,
+    configured_contract: Callable[[str], Contract],
 ) -> None:
     package = tmp_path / "clearml_yolo/adapters/storage"
     package.mkdir(parents=True)
-    (package / "helper.py").write_text(source.replace("torch", sdk))
+    (package / "helper.py").write_text(
+        f"from importlib import import_module\nimport_module({sdk!r})"
+    )
     candidate = deepcopy(graph)
     candidate.add_module("clearml_yolo.adapters.storage.helper")
     architecture.add_dynamic_imports(candidate, tmp_path)
-    contract = _contract(import_options, f"{sdk} SDK has explicit owners")
-    assert contract.check(candidate, verbose=False).kept is not expected
+    contract = configured_contract(f"{sdk} SDK has explicit owners")
+    assert not contract.check(candidate, verbose=False).kept
 
 
 def test_runtime_target_inventory_includes_nested_colon_attributes(tmp_path: Path) -> None:

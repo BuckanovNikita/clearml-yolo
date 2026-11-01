@@ -1,0 +1,347 @@
+{
+  "schema_version": 1,
+  "task": "010-cleanup: preserve behavior and consolidate verification",
+  "scope": [
+    "src/clearml_yolo/core/export_requests.py",
+    "src/clearml_yolo/entrypoints/documentation/validation.py",
+    "src/clearml_yolo/application/use_cases/metrics.py",
+    "src/clearml_yolo/adapters/assets",
+    "scripts/verify.py",
+    "tests",
+    "docs/project-contracts.md",
+    "docs/filesystem-policy.md",
+    "docs/augmentation.md",
+    "docs/queue.md",
+    "docs/implementation-status.md",
+    "specs/000-baseline/spec.md",
+    "specs/006-batch-training/spec.md",
+    "specs/007-download-weights/spec.md",
+    "specs/009-release-weights/spec.md",
+    "specs/009-release-weights/plan.md",
+    "specs/009-release-weights/contracts/manifest.md",
+    "specs/010-cleanup",
+    "docs/bugs/cleanup-export-preview",
+    "docs/bugs/cleanup-release-fixture",
+    "tests/test_verify.py",
+    "docs/development.md",
+    "CHANGELOG.md",
+    "pyproject.toml",
+    "uv.lock",
+    "src/clearml_yolo/adapters/runtime/process_tree.py",
+    "tests/test_direct_descendants.py",
+    "tests/test_subreaper_process_tree.py",
+    "docs/bugs/cleanup-native-process-churn"
+  ],
+  "impact": "modules",
+  "rules": "Project constitution II and current module/import contracts: pure core predicates; application uses ports and core; adapters own filesystem/network/SDK effects; entrypoints compose dependencies; verification tooling retains its explicit external effect boundary. Preserve existing exact-edge ownership.",
+  "modules": [
+    {
+      "id": "export-inputs",
+      "path": "src/clearml_yolo/core/export_requests.py",
+      "change": "modify",
+      "responsibility": "Own operation-specific export input-presence policy shared by runtime and preview.",
+      "interface": "Pure operation and presence flags raise the existing ValueError messages; existing ExportSettings method delegates with exact is-not-None semantics.",
+      "layer": "core",
+      "allowed_dependencies": [
+        "standard library",
+        "Pydantic",
+        "existing project core"
+      ],
+      "forbidden_dependencies": [
+        "application",
+        "adapters",
+        "entrypoints",
+        "filesystem/network/process effects"
+      ],
+      "effects": "None; presence flags are supplied by callers.",
+      "contracts": [
+        "runtime-boundaries"
+      ]
+    },
+    {
+      "id": "preview-validation",
+      "path": "src/clearml_yolo/entrypoints/documentation/validation.py",
+      "change": "modify",
+      "responsibility": "Validate known preview inputs while preserving deferred expressions.",
+      "interface": "Existing schema_errors returns errors without instantiation, IO, resolver execution or task creation; invokes shared pure export policy.",
+      "layer": "entrypoints",
+      "allowed_dependencies": [
+        "existing application contracts and pure validation",
+        "core",
+        "existing inert Hydra and native configuration helpers"
+      ],
+      "forbidden_dependencies": [
+        "workflow execution",
+        "model loading",
+        "publication",
+        "filesystem presence checks"
+      ],
+      "effects": "No new effects; consumes already composed values and does not resolve external inputs.",
+      "contracts": [
+        "runtime-boundaries",
+        "preview-isolation"
+      ]
+    },
+    {
+      "id": "metrics",
+      "path": "src/clearml_yolo/application/use_cases/metrics.py",
+      "change": "modify",
+      "responsibility": "Coordinate evaluation through existing injected ports; remove orphan rendering helper.",
+      "interface": "Keep public metrics signature, numerical outputs and publication behavior unchanged.",
+      "layer": "application",
+      "allowed_dependencies": [
+        "core",
+        "application ports/contracts"
+      ],
+      "forbidden_dependencies": [
+        "concrete adapters",
+        "rendering SDKs",
+        "entrypoints"
+      ],
+      "effects": "All external effects remain supplied through ports.",
+      "contracts": [
+        "runtime-boundaries"
+      ]
+    },
+    {
+      "id": "native-assets",
+      "path": "src/clearml_yolo/adapters/assets",
+      "change": "modify",
+      "responsibility": "Prepare the already approved catalogue and publish validated native Hub files and the pinned snapshot.",
+      "interface": "Existing preparation and resolver APIs remain; consolidate internal snapshot publication with supplied validator callback; preserve explicit failure, lock, containment and atomic replacement behavior.",
+      "layer": "adapters",
+      "allowed_dependencies": [
+        "core",
+        "existing asset/storage helpers",
+        "currently approved exact backend bridges",
+        "owned Requests and Hugging Face SDK interfaces"
+      ],
+      "forbidden_dependencies": [
+        "application use cases",
+        "entrypoints",
+        "new cross-adapter bridges"
+      ],
+      "effects": "Own filesystem, locks, downloads and native cache publication; no import-time activity or selected-model behavior changes.",
+      "contracts": [
+        "runtime-boundaries"
+      ]
+    },
+    {
+      "id": "canonical-verifier",
+      "path": "scripts/verify.py",
+      "change": "modify",
+      "responsibility": "Run complete canonical checks with duration diagnostics and existing trustworthy receipt reuse.",
+      "interface": "Retain ordinary/docs/force/hook CLI and byte-based input identity; add pytest duration reporting without changing selection.",
+      "layer": "maintenance tooling",
+      "allowed_dependencies": [
+        "existing standard-library dependencies"
+      ],
+      "forbidden_dependencies": [
+        "application runtime imports",
+        "SDK initialization"
+      ],
+      "effects": "Own subprocesses and Git-private receipts/logs; no dependency resolution.",
+      "contracts": [
+        "tooling-boundaries"
+      ]
+    },
+    {
+      "id": "test-infrastructure",
+      "path": "tests",
+      "change": "modify",
+      "responsibility": "Enforce architecture and verification behavior with independent fixtures while removing duplicate scenarios.",
+      "interface": "Lazy graph/options and a typed configured-contract factory in pytest composition serve existing tests; AST/graph helpers retain standard-library/grimp-only ownership. Mutations use copies. Release repositories copy an immutable seed into independent writable directories.",
+      "layer": "test infrastructure",
+      "allowed_dependencies": [
+        "existing pytest, grimp and import-linter APIs",
+        "project modules under isolated test control",
+        "standard-library filesystem and subprocess APIs for task-owned resources"
+      ],
+      "forbidden_dependencies": [
+        "new live service effects without explicit opt-in",
+        "shared writable fixture repositories or graph state",
+        "weakened complete-suite or receipt-trust assertions",
+        "import-linter or inspected runtime imports in the AST/graph helper"
+      ],
+      "effects": "Test helpers own temporary repositories/processes and source inspection; session-shared graphs/options and module seeds are read-only inputs copied before mutation.",
+      "contracts": [
+        "test-infrastructure-rejection",
+        "ast-helper-ownership"
+      ]
+    },
+    {
+      "id": "native-process-scope",
+      "path": "src/clearml_yolo/adapters/runtime/process_tree.py",
+      "change": "modify",
+      "responsibility": "Discover and clean only invocation-owned live native descendants without depending on unrelated host process churn.",
+      "interface": "Keep native_descendant_scope and existing public tree signatures, marker/restoration behavior, pidfd identity checks and bounded deadlines. Use caller thread-child traversal plus retained birth-fenced identities; preserve unknown/helper failure rules and global historical recovery.",
+      "layer": "runtime adapter",
+      "allowed_dependencies": [
+        "existing standard-library ctypes, os, signal, pathlib, threading and time interfaces",
+        "existing identity-safe subreaper discovery within the same module"
+      ],
+      "forbidden_dependencies": [
+        "core/application filesystem or process effects",
+        "queue package imports",
+        "new SDKs or global ownership relaxations"
+      ],
+      "effects": "Own Linux /proc discovery, pidfd signaling/reaping, subreaper and temporary invocation markers; never signal the caller or protected/unverified processes.",
+      "contracts": [
+        "runtime-boundaries",
+        "native-process-safety"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "runtime-boundaries",
+      "path": ".importlinter",
+      "status": "existing",
+      "rules": "Inward layers, adapter peer and SDK ownership, exhaustive classification, inert initialization and dynamic negative cases exercised by ordinary architecture suite.",
+      "check": "canonical"
+    },
+    {
+      "id": "preview-isolation",
+      "path": "tests/test_docs_isolation.py",
+      "status": "existing",
+      "rules": "Forbidden documentation imports and fresh-process ordinary-help isolation; preview tests retain no-effect guards.",
+      "check": "canonical"
+    },
+    {
+      "id": "tooling-boundaries",
+      "path": "tests/test_tooling_boundaries.py",
+      "status": "existing",
+      "rules": "Verification and release maintenance scripts do not import application runtime or SDKs; retain injected prohibited-import rejection.",
+      "check": "canonical"
+    },
+    {
+      "id": "test-infrastructure-rejection",
+      "path": "tests/test_architecture.py",
+      "status": "existing",
+      "rules": "Existing architecture tests exercise the actual configured contracts and helper parsing with retained positive and injected-negative cases; lazy shared input graphs are copied before destructive contract checks.",
+      "check": "canonical"
+    },
+    {
+      "id": "ast-helper-ownership",
+      "path": "tests/test_tooling_boundaries.py",
+      "status": "existing",
+      "rules": "AST/graph helpers import only the standard library and grimp; injected forbidden SDK/runtime imports remain rejected without widening the allowlist.",
+      "check": "canonical"
+    },
+    {
+      "id": "native-process-safety",
+      "path": "tests/test_direct_descendants.py",
+      "status": "existing",
+      "rules": "Real native/Python fork and deterministic topology regressions preserve exact child ownership, helper and caller protection, inaccessible/ambiguous failure, identity fences and original restoration; add unrelated-churn negatives without weakening existing assertions.",
+      "check": "native-process-regression"
+    }
+  ],
+  "checks": [
+    {
+      "id": "canonical",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync python scripts/verify.py",
+      "expectation": "Ruff, strict mypy, Vulture, configured import contracts and complete ordinary pytest pass, including negative architecture cases and CPU-DDP.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/010-cleanup/execution.md"
+      }
+    },
+    {
+      "id": "bugs-and-reductions",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync python scripts/verify.py",
+      "expectation": "The same single canonical run used by the imports check includes original bug regressions, retained configuration/dynamic-import/ownership scenarios and independent fixtures; no second complete suite is required.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/010-cleanup/execution.md"
+      }
+    },
+    {
+      "id": "documentation",
+      "kind": "documentation",
+      "command": "uv run --frozen --no-sync python scripts/verify.py --docs",
+      "expectation": "Changed Markdown and local links pass, current topic/spec contradictions reconciled and completed history preserved.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/010-cleanup/execution.md"
+      }
+    },
+    {
+      "id": "native-restoration",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync python .tmp/verify-native-cache.py local",
+      "expectation": "Fresh caches restore verified project assets with unchanged settings and no upstream requests; real DINOv3 forward is finite after Hub refactor.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/010-cleanup/execution.md"
+      }
+    },
+    {
+      "id": "browser",
+      "kind": "behavior",
+      "command": "PLAYWRIGHT_BROWSERS_PATH=.tmp/playwright uv run --frozen --no-sync pytest browser_tests -q",
+      "expectation": "All existing browser scenarios pass with task-owned browser resources.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/010-cleanup/execution.md"
+      }
+    },
+    {
+      "id": "catalog",
+      "kind": "documentation",
+      "command": "uv run --frozen --no-sync cy-docs --check",
+      "expectation": "Catalog, assets, tutorial examples and reference coverage pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/010-cleanup/execution.md"
+      }
+    },
+    {
+      "id": "paired-source",
+      "kind": "behavior",
+      "command": "Normal-resolution current/proposed CY and latest queue source installs, pip consistency, queue pytest and configured static/import checks",
+      "expectation": "Before release, current/proposed source and installed metadata agree and pass integration. Generated committed-version reconciliation is a separate T022 delivery check before push.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/010-cleanup/execution.md"
+      }
+    },
+    {
+      "id": "mutation",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync mutmut run --max-children 2 'clearml_yolo.core.*' and inspect individual results",
+      "expectation": "All configured mutants are killed or independently reviewed equivalent, with no untested, timeout or runner-error outcomes after shared fixture changes.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/010-cleanup/mutation.md"
+      }
+    },
+    {
+      "id": "native-process-regression",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync pytest tests/test_direct_descendants.py tests/test_subreaper_process_tree.py tests/test_gpu_cancellation.py tests/test_process_capabilities.py",
+      "expectation": "Original native-fork cleanup and unrelated churn pass with unchanged bounds; real/deterministic ownership, helper, threaded process, PID reuse, inaccessible and late-fork negative cases remain enforced. Include the owned four-sibling stress reproduction.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/010-cleanup/execution.md"
+      }
+    }
+  ],
+  "documentation": "Reconcile schema-3 summary, release-only bulk preparation, current entrypoint/status navigation and immutable manifest identity; preserve dated evidence; update pending snapshot notices, Russian README and authoritative portable usage sources. Native hook-generated changelog and root-version-only pyproject/lock updates are within delivery scope; no dependency content/revision changes are authorized.",
+  "review": {
+    "status": "accepted",
+    "reviewer": "fresh independent native agent cleanup_final_acceptance",
+    "evidence": "specs/010-cleanup/acceptance.md",
+    "reconciliation": "Parent and reviewer inspected all 30 modified and 22 new task-owned paths, retained contracts and negative assertions, removals, composition and effect ownership. Original dirty worktrees/index/local overrides and external dependency sources are excluded and preserved. Native generated root-version-only pyproject/lock/changelog changes remain explicit T022 delivery scope; final installed pairing and remote refs are pending release gates."
+  }
+}

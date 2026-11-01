@@ -258,8 +258,9 @@ replace null with a submit-host batch. A miss fails with instructions to measure
 compatible idle hardware or use an explicit value. Global training batches must be
 divisible by the allocated GPU count. OOM keeps normal training failure behavior;
 there is no automatic retry or hidden batch reduction.
-These batch-estimation/native multi-GPU interfaces describe unreleased source changes
-with real multi-GPU acceptance pending.
+These batch-estimation/native multi-GPU interfaces shipped with feature 006.
+Real multi-GPU acceptance limitations remain in its
+[ledger](../specs/006-batch-training/tasks.md); release does not establish that evidence.
 
 Training holds the full allocation. After native training
 returns and releases unused model memory, the job notifies its external guardian and

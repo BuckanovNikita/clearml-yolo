@@ -294,7 +294,7 @@ def test_native_scope_checks_second_empty_scan_for_late_fork(
     child = process_tree._Process(202, current.pid, 202, 11, "S")
     reader, writer = os.pipe2(os.O_NONBLOCK)
     monkeypatch.setattr(process_tree, "_read_process", lambda _pid: current)
-    monkeypatch.setattr(process_tree.LinuxProcessTree, "_table", lambda _self: {101: current})
+    monkeypatch.setattr(process_tree._ScopedProcessTree, "_table", lambda _self: {101: current})
     try:
         tree = process_tree._NativeProcessTree(current, "direct-token", reader)
         snapshots = iter(({101: current}, {101: current, 202: child}))
@@ -319,7 +319,7 @@ def test_native_scope_fork_record_after_table_requires_new_scan(
     current = process_tree._Process(101, 1, 101, 10, "S")
     reader, writer = os.pipe2(os.O_NONBLOCK)
     monkeypatch.setattr(process_tree, "_read_process", lambda _pid: current)
-    monkeypatch.setattr(process_tree.LinuxProcessTree, "_table", lambda _self: {101: current})
+    monkeypatch.setattr(process_tree._ScopedProcessTree, "_table", lambda _self: {101: current})
     monkeypatch.setattr(Path, "read_bytes", lambda _path: b"")
     try:
         tree = process_tree._NativeProcessTree(current, "direct-token", reader)

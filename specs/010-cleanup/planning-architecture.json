@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "task": "Write and verify cleanup planning artifacts",
+  "scope": [
+    "specs/010-cleanup"
+  ],
+  "impact": "none",
+  "rationale": "Only new specification, planning, task and evidence documents are written. Existing runtime modules, executable import rules, checking tools, configuration and composition targets remain unchanged. architecture.json describes future runtime work, not implementation acceptance."
+}
