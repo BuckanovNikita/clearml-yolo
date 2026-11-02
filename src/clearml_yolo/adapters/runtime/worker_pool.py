@@ -11,6 +11,7 @@ from uuid import uuid4
 
 from clearml_yolo.adapters.runtime.process_tree import (
     LinuxProcessTree,
+    ScopedProcessTree,
     defer_interruptions,
     native_descendant_scope,
 )
@@ -38,7 +39,9 @@ class _Worker:
 
 def _tree(worker: _Worker) -> LinuxProcessTree:
     if worker.tree is None:
-        worker.tree = LinuxProcessTree(worker.process.pid, worker.token, owner_env=_CASE_OWNER)
+        worker.tree = ScopedProcessTree(
+            worker.process.pid, worker.token, subreaper=os.getpid(), owner_env=_CASE_OWNER
+        )
     return worker.tree
 
 

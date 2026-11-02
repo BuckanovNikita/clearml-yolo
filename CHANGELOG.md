@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record verified aligned batch release
+  ([`73bb044`](https://github.com/BuckanovNikita/clearml-yolo/commit/73bb044c333852f76f849e41b4fd35b7d5db674c))
+
+
 ## v0.44.7 (2026-11-02)
 
 ### Bug Fixes

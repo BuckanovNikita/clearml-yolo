@@ -5,7 +5,7 @@ import signal
 import subprocess
 import sys
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
@@ -301,3 +301,20 @@ def test_real_repeated_signals_finish_owned_cleanup(tmp_path: Path, signum: sign
         for path in pids:
             if path.is_file() and not _gone(int(path.read_text())):
                 os.kill(int(path.read_text()), signal.SIGKILL)
+
+
+def test_pool_cleanup_never_scans_unrelated_processes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original = Path.iterdir
+
+    def scoped_entries(path: Path) -> Iterator[Path]:
+        assert path != Path("/proc"), "Cleanup scanned unrelated inaccessible processes"
+        return original(path)
+
+    monkeypatch.setattr(Path, "iterdir", scoped_entries)
+    with IndependentWorkerPool() as pool:
+        pool.start("case", _command("pass", tmp_path / "case.log"))
+        (completed,) = _collect(pool, 1)
+        assert completed.exit_code == 0
+        assert completed.cleanup_complete

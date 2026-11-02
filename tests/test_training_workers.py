@@ -4,7 +4,7 @@ import os
 import subprocess
 import sys
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from contextlib import suppress
 from pathlib import Path
 
@@ -182,3 +182,18 @@ def test_gpu_telemetry_accepts_owned_child_spawned_during_its_query(
     assert len(observed) == 1
     with pytest.raises(ProcessLookupError):
         os.kill(observed[0], 0)
+
+
+def test_training_cleanup_never_scans_unrelated_processes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original = Path.iterdir
+
+    def scoped_entries(path: Path) -> Iterator[Path]:
+        assert path != Path("/proc"), "Cleanup scanned unrelated inaccessible processes"
+        return original(path)
+
+    monkeypatch.setattr(Path, "iterdir", scoped_entries)
+    outcome = run_workers([_command("pass", tmp_path / "worker.log")], timeout_seconds=10)
+    assert outcome.status == "success"
+    assert outcome.exit_codes == (0,)

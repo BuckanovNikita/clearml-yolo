@@ -114,6 +114,15 @@ sequential. Agent replay restores its backend before either runtime is initializ
 
 ## Native training workers
 
+Training ranks and independent batch-estimation cases discover processes through the
+live invocation caller's all-thread child topology and recorded births, rather than
+scanning every same-user process on the host. Each worker/case retains its own marker:
+cleanup of a finished case never grants ownership of a sibling case. Detached marked
+descendants adopted by the caller remain discoverable. Unrelated host process permissions
+cannot poison this live scan. Inaccessible relevant caller descendants still block
+verified cleanup; historical recovery keeps conservative global marker discovery.
+
+
 The native multi-GPU implementation, available from 0.41.0, keeps the invocation owner outside
 distributed ranks. Supervised fresh workers receive typed requests, report typed
 results and never own ClearML publication. A rank failure, timeout or cancellation

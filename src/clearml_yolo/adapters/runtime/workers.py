@@ -13,7 +13,11 @@ from pathlib import Path
 from typing import BinaryIO, Literal
 from uuid import uuid4
 
-from clearml_yolo.adapters.runtime.process_tree import LinuxProcessTree, native_descendant_scope
+from clearml_yolo.adapters.runtime.process_tree import (
+    LinuxProcessTree,
+    ScopedProcessTree,
+    native_descendant_scope,
+)
 
 _WORKER_OWNER = "CY_TRAINING_WORKER_OWNER"
 
@@ -116,7 +120,9 @@ def run_workers(
                     start_new_session=True,
                 )
                 processes.append(process)
-                trees.append(LinuxProcessTree(process.pid, token, owner_env=_WORKER_OWNER))
+                trees.append(ScopedProcessTree(
+                    process.pid, token, subreaper=os.getpid(), owner_env=_WORKER_OWNER
+                ))
             status = _await_workers(processes, trees, time.monotonic() + timeout_seconds, monitor)
         finally:
             primary = sys.exception()

@@ -368,13 +368,19 @@ class LinuxProcessTree:
             os.close(descriptor)
 
 
-class _ScopedProcessTree(LinuxProcessTree):
-    """Discover a live anchor's descendants with identity-fenced thread child lists."""
+class ScopedProcessTree(LinuxProcessTree):
+    """Discover caller descendants and filter ownership by recorded births/markers.
+
+    The live subreaper anchors discovery; sibling markers do not grant ownership.
+    Unreadable relevant descendants still prevent verified cleanup. Historical
+    recovery without a live anchor continues to use ``LinuxProcessTree``.
+    """
 
     def __init__(
         self, root: int, token: str, *, subreaper: int, born: int | None = None,
+        owner_env: str = OWNER_ENV,
     ) -> None:
-        super().__init__(root, token, born=born)
+        super().__init__(root, token, born=born, owner_env=owner_env)
         supervisor = _read_process(subreaper)
         if supervisor is None:
             raise RuntimeError("Live supervisor process identity is unavailable")
@@ -469,7 +475,7 @@ class _ScopedProcessTree(LinuxProcessTree):
         return table
 
 
-class SubreaperProcessTree(_ScopedProcessTree):
+class SubreaperProcessTree(ScopedProcessTree):
     """Own a live supervisor's descendants without global marker discovery.
 
     The supervisor must be dedicated to this invocation and remain its subreaper.
@@ -558,7 +564,7 @@ def _subreaper(enabled: bool | None = None) -> bool:
     return bool(flag.value)
 
 
-class _NativeProcessTree(_ScopedProcessTree):
+class _NativeProcessTree(ScopedProcessTree):
     """An unsignallable caller anchor with protected preexisting branches."""
 
     def __init__(self, current: _Process, token: str, reader: int) -> None:

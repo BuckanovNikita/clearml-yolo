@@ -1,0 +1,144 @@
+{
+  "schema_version": 1,
+  "task": "batch-cleanup-permissions",
+  "scope": [
+    "src/clearml_yolo/adapters/runtime/process_tree.py",
+    "src/clearml_yolo/adapters/runtime/workers.py",
+    "src/clearml_yolo/adapters/runtime/worker_pool.py",
+    "tests/test_training_workers.py",
+    "tests/test_direct_descendants.py",
+    "tests/test_worker_pool.py",
+    "docs/runtime-isolation.md",
+    "docs/bugs/batch-cleanup-permissions",
+    "CHANGELOG.md"
+  ],
+  "impact": "modules",
+  "rules": "Runtime adapters own proc, subprocess and signal effects; inner layers and entrypoints remain independent.",
+  "modules": [
+    {
+      "id": "process_tree",
+      "path": "src/clearml_yolo/adapters/runtime/process_tree.py",
+      "change": "modify",
+      "responsibility": "Discover and terminate only invocation-owned processes",
+      "interface": "Verified cleanup before return; preserve primary errors and unrelated helpers",
+      "layer": "adapters/runtime",
+      "allowed_dependencies": [
+        "Python standard library",
+        "Other runtime adapters"
+      ],
+      "forbidden_dependencies": [
+        "Entrypoints",
+        "Application use cases",
+        "cy_queue"
+      ],
+      "effects": "Explicit proc reads, process launch and identity-checked signals at invocation boundaries",
+      "contracts": [
+        "runtime-isolation"
+      ]
+    },
+    {
+      "id": "workers",
+      "path": "src/clearml_yolo/adapters/runtime/workers.py",
+      "change": "modify",
+      "responsibility": "Launch and coordinate native training workers",
+      "interface": "Verified cleanup before return; preserve primary errors and unrelated helpers",
+      "layer": "adapters/runtime",
+      "allowed_dependencies": [
+        "Python standard library",
+        "Other runtime adapters"
+      ],
+      "forbidden_dependencies": [
+        "Entrypoints",
+        "Application use cases",
+        "cy_queue"
+      ],
+      "effects": "Explicit proc reads, process launch and identity-checked signals at invocation boundaries",
+      "contracts": [
+        "runtime-isolation"
+      ]
+    },
+    {
+      "id": "worker_pool",
+      "path": "src/clearml_yolo/adapters/runtime/worker_pool.py",
+      "change": "modify",
+      "responsibility": "Own independent concurrent estimation case lifecycles without signalling sibling cases",
+      "interface": "Verified cleanup before return; preserve primary errors and unrelated helpers",
+      "layer": "adapters/runtime",
+      "allowed_dependencies": [
+        "Python standard library",
+        "Other runtime adapters"
+      ],
+      "forbidden_dependencies": [
+        "Entrypoints",
+        "Application use cases",
+        "cy_queue"
+      ],
+      "effects": "Explicit proc reads, process launch and identity-checked signals at invocation boundaries",
+      "contracts": [
+        "runtime-isolation"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "runtime-isolation",
+      "path": "tests/test_architecture.py",
+      "status": "existing",
+      "rules": "Layer, effect and SDK ownership with forbidden-import negative cases; import-linter verifies actual graph",
+      "check": "canonical"
+    }
+  ],
+  "checks": [
+    {
+      "id": "canonical",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync python scripts/verify.py",
+      "expectation": "Static, import and complete pytest suite pass, including negative architecture and CPU-DDP",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/batch-cleanup-permissions/test.md"
+      }
+    },
+    {
+      "id": "focused",
+      "kind": "behavior",
+      "command": ".venv/bin/python -m pytest -q tests/test_worker_pool.py tests/test_training_workers.py tests/test_direct_descendants.py tests/test_subreaper_process_tree.py tests/test_process_capabilities.py",
+      "expectation": "Unrelated proc denial cannot poison cleanup; actual descendant denial fails closed; native forks, adoption and helpers preserved",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/batch-cleanup-permissions/test.md"
+      }
+    },
+    {
+      "id": "docs",
+      "kind": "documentation",
+      "command": "uv run --frozen --no-sync python scripts/verify.py --docs",
+      "expectation": "Markdown and links pass",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/batch-cleanup-permissions/test.md"
+      }
+    },
+    {
+      "id": "paired",
+      "kind": "behavior",
+      "command": "Normal editable CY/queue source installation, uv pip check, queue pytest, Ruff, mypy, lint-imports and cy-queue --help",
+      "expectation": "Latest source versions and final release metadata match installed packages; normal resolver and queue integration pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/batch-cleanup-permissions/test.md"
+      }
+    }
+  ],
+  "documentation": "Update runtime-isolation guidance; inspect portable usage source and record internal-only no-change reason.",
+  "review": {
+    "status": "accepted",
+    "reviewer": "Fresh native cleanup_final_review, requested gpt-6.1-sol/high, no inherited context or write ownership",
+    "evidence": "docs/bugs/batch-cleanup-permissions/review.md",
+    "reconciliation": "Parent reconciled the three runtime modules, three test files, runtime guidance and task-owned bug artifacts. Only existing scoped discovery is exposed and reused; no module addition, dependency revision, configuration or import-rule changes. Extensive pre-existing original-checkout changes are excluded and preserved. Release metadata remains unchanged because the required native GPU gate is blocked. The native changelog hook also generated the upstream documentation entry for parent commit 73bb044; parent inspected its eight added lines and included only that required generated metadata."
+  }
+}
