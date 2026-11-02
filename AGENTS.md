@@ -2,7 +2,7 @@
 
 `clearml-yolo` supports Python `>=3.12.13,<3.14` and provides Hydra/hydra-zen applications for native
 Ultralytics YOLO training, prediction, validation, metrics, reports and comparison.
-`AGENTS.md` is the shared instruction source; keep `CLAUDE.md` a relative symlink to it.
+`AGENTS.md` is the shared instruction source; keep `CLAUDE.md` a regular file importing it with `@AGENTS.md`.
 
 Use the shared `python-project-workflow` skill for Python repository work. Apply its
 compatibility, architecture, verification and release requirements within this project's
