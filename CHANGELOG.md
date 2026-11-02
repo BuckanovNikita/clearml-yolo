@@ -1,7 +1,12 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.44.7 (2026-11-02)
+
+### Bug Fixes
+
+- **batch**: Align automatic search to eight per GPU
+  ([`b3c9b39`](https://github.com/BuckanovNikita/clearml-yolo/commit/b3c9b39b003c26152fea54efe8b94651d4d516aa))
 
 ### Documentation
 
