@@ -22,7 +22,7 @@ documentation validators and architecture checks remain unchanged.
 - [x] Run relevant documentation checks and inspect the exact task-owned diff.
 - [x] Record dated results and validate architecture acceptance.
 - [x] Coordinating parent obtains fresh independent review after verification.
-- [ ] Complete the authorized task-scoped commit and applicable release workflow.
+- [x] Complete the authorized task-scoped commit and applicable release workflow.
 
 The entrypoint edits depend on the planning check. Parent integration and final
 verification precede independent review. Other repositories are independent

@@ -92,3 +92,19 @@ AGENTS instruction and this documentation directory. Architecture acceptance
 and final documentation checks precede the native commit and automatic release
 evaluation. Documentation alone is not expected to produce a new version; the
 coordinating publication receipt records the actual final commits and refs.
+
+## Publication and receipt closure
+
+Instruction commit `3e38d11` was pushed to `origin/master` after fresh independent
+documentation review returned SHIP. All installed native commit checks passed,
+including exact source/dependency verification and automatic local release
+evaluation. The documentation-only commit produced no version commit or tag;
+source version `0.44.8` and the existing version tag remain unchanged. The
+working tree was clean after that publication. This documentation-only receipt
+closure does not change application inputs; the paired queue remains frozen
+until CY's final receipt publication completes. No assets or deployments occurred.
+
+The receipt commit's first hook attempt stopped after the native changelog
+generator added its eight-line Unreleased documentation entry for `3e38d11`.
+The exact generated block was inspected and staged, its documentation-only
+architecture scope recorded, and the commit retried through unchanged hooks.

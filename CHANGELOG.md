@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Standardize shared agent instruction discovery
+  ([`3e38d11`](https://github.com/BuckanovNikita/clearml-yolo/commit/3e38d11f374868769a2c6f011905f5699081972a))
+
+
 ## v0.44.8 (2026-11-02)
 
 ### Bug Fixes
