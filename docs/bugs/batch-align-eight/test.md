@@ -78,5 +78,32 @@ Fresh independent review returned **ship** without blocking findings; see
 [review.md](review.md). The reviewer independently reran 214 alignment/strategy/
 numerical-recovery cases and evaluated the portable explanation scenarios.
 Task-owned runtime scope and full diff are reconciled in the architecture record.
-Its acceptance validator and documentation validation must pass before the normal
+Its acceptance validator and documentation validation passed before the normal
 release commit. The final committed pair and publication refs are recorded below.
+
+
+## Final committed pair and verified publication
+
+Normal contributor and version hooks passed. Contributor commit `b3c9b39` contains
+the fix; annotated Git tag `v0.44.7` points to release commit
+`bcc8b494b0675e81b80257f5c3786862353540b1`. Release metadata changed only the root
+version tokens in pyproject.toml/uv.lock and the generated changelog; approved
+external dependencies and sources remained unchanged. No local source overrides
+existed in this isolated clone; original checkout overrides were preserved.
+
+The actual tagged source, rather than only the proposed snapshot, was normally
+installed together with queue source `32bea017b609a258300619cef2d170a14a8aa2a7`
+(version 0.1.7) into a separate environment. Source and installed versions, declared
+requirements, editable import origins and the queue's CY version bound agreed.
+Dependency consistency and installed help passed. The fresh complete queue suite
+passed 582 tests, with seven physical opt-ins deselected, 19 warnings and 126.87
+seconds. Final estimator bytes match the proposed snapshot. Original installed
+environments, source changes and pre-existing workloads remained untouched.
+
+CY master and annotated/peeled `v0.44.7`, queue main at `32bea01`, and portable
+collection main at `2a1869f562e286893bf571fa88a7c8a9e798c080` with annotated/peeled
+`v0.6.9` were pushed and verified with exact remote-ref comparisons. The companion
+portable review/evaluation and validation evidence is committed with that collection.
+This documentation-only completion commit records delivery after those verified pushes;
+it adds no application version or runtime change. Physical CUDA speedup, native
+estimator success on a particular GPU and physical queue behavior remain unclaimed.

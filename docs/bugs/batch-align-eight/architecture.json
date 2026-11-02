@@ -8,7 +8,10 @@
     "README.md",
     "specs/006-batch-training",
     "docs/bugs/batch-align-eight",
-    "src/clearml_yolo/adapters/documentation/assets/tutorials"
+    "src/clearml_yolo/adapters/documentation/assets/tutorials",
+    "pyproject.toml",
+    "uv.lock",
+    "CHANGELOG.md"
   ],
   "impact": "modules",
   "rules": "Core is pure policy; outer adapters own GPU, storage, SDK and process effects under the constitution and .importlinter.",
@@ -86,6 +89,6 @@
     "status": "accepted",
     "reviewer": "Fresh native independent agent /root/final_review",
     "evidence": "docs/bugs/batch-align-eight/review.md",
-    "reconciliation": "Reviewed all task-owned staged/unstaged additions and modifications: pure core policy, batch tests, static training tutorial assets, maintained contracts, feature amendments and bug evidence. No imports, effects or runtime modules added; existing 52 import contracts and negative cases pass. Original dirty workspaces and other feature history excluded. Queue test-only and portable prose companions independently reviewed."
+    "reconciliation": "Reviewed all task-owned staged/unstaged additions and modifications: pure core policy, batch tests, static training tutorial assets, maintained contracts, feature amendments and bug evidence. No imports, effects or runtime modules added; existing 52 import contracts and negative cases pass. Original dirty workspaces and other feature history excluded. Queue test-only and portable prose companions independently reviewed. Parent inspected the native generated release diff: only root version tokens in pyproject.toml/uv.lock and generated CHANGELOG.md; no dependency changes. Final actual-source pair and exact published refs are recorded in test.md."
   }
 }

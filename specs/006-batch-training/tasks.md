@@ -201,7 +201,17 @@ and [companion refs](speedup/portable.md#verified-publication).
 - [x] T047 Assess the eight-image per-GPU policy, historical replay and affected contracts; record docs/bugs/batch-align-eight/assessment.md and architecture.json.
 - [x] T048 Add failing regression, implement versioned aligned search and automatic lookup filtering, and reconcile affected batch fixtures.
 - [x] T049 Update and validate CY and portable usage documentation; complete focused, canonical and latest/proposed paired checks.
-- [ ] T050 Obtain fresh independent review, accept the reconciled architecture record, and complete the authorized patch release through hooks and verified Git pushes.
+- [x] T050 Obtain fresh independent review, accept the reconciled architecture record, and complete the authorized patch release through hooks and verified Git pushes.
 
 T047 precedes T048; T049 follows integration; T050 requires passing checks and review.
 Historical performance/DDP limitations and delivery exceptions remain unchanged.
+
+
+T047–T050 are complete. The aligned-policy regression and 461 focused batch cases
+pass; canonical verification accepted 4,701 ordinary passes and all static/import
+checks. Fresh independent review returned ship and architecture acceptance passed.
+Final actual CY 0.44.7/queue 0.1.7 pairing passed 582 queue cases after normal
+resolution and source/installed consistency checks. The annotated CY version tag,
+queue test companion and portable collection 0.6.9 were pushed with exact remote
+ref verification. See [dated evidence](../../docs/bugs/batch-align-eight/test.md).
+Historical native timing/DDP limitations remain unchanged.
