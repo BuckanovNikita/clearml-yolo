@@ -3,6 +3,11 @@
 
 ## Unreleased
 
+### Bug Fixes
+
+- **runtime**: Scope batch worker cleanup to invocation descendants
+  ([`2bfe1d8`](https://github.com/BuckanovNikita/clearml-yolo/commit/2bfe1d877e1aa4a62edbaeb371aab27db1ac4030))
+
 ### Documentation
 
 - Record verified aligned batch release

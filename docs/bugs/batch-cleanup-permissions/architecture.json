@@ -10,7 +10,10 @@
     "tests/test_worker_pool.py",
     "docs/runtime-isolation.md",
     "docs/bugs/batch-cleanup-permissions",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "docs/bugs/batch-cleanup-permissions/release.md",
+    "pyproject.toml",
+    "uv.lock"
   ],
   "impact": "modules",
   "rules": "Runtime adapters own proc, subprocess and signal effects; inner layers and entrypoints remain independent.",
@@ -34,7 +37,8 @@
       "effects": "Explicit proc reads, process launch and identity-checked signals at invocation boundaries",
       "contracts": [
         "runtime-isolation"
-      ]
+      ],
+      "already_applied": true
     },
     {
       "id": "workers",
@@ -55,7 +59,8 @@
       "effects": "Explicit proc reads, process launch and identity-checked signals at invocation boundaries",
       "contracts": [
         "runtime-isolation"
-      ]
+      ],
+      "already_applied": true
     },
     {
       "id": "worker_pool",
@@ -76,7 +81,8 @@
       "effects": "Explicit proc reads, process launch and identity-checked signals at invocation boundaries",
       "contracts": [
         "runtime-isolation"
-      ]
+      ],
+      "already_applied": true
     }
   ],
   "contracts": [
@@ -132,6 +138,17 @@
         "exit_code": 0,
         "evidence": "docs/bugs/batch-cleanup-permissions/test.md"
       }
+    },
+    {
+      "id": "native-release",
+      "kind": "behavior",
+      "command": "Tagged actual CPU and single-GPU pipeline execution in IndependentWorkerPool, forced artifact/model readback, paired current-test comparison, threshold/report audits and scoped cleanup",
+      "expectation": "Both native tasks complete, required readback and checkpoint provenance match, paired evaluation uses same current test images, cleanup verified with unrelated workloads preserved.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/batch-cleanup-permissions/release.md"
+      }
     }
   ],
   "documentation": "Update runtime-isolation guidance; inspect portable usage source and record internal-only no-change reason.",
@@ -139,6 +156,6 @@
     "status": "accepted",
     "reviewer": "Fresh native cleanup_final_review, requested gpt-6.1-sol/high, no inherited context or write ownership",
     "evidence": "docs/bugs/batch-cleanup-permissions/review.md",
-    "reconciliation": "Parent reconciled the three runtime modules, three test files, runtime guidance and task-owned bug artifacts. Only existing scoped discovery is exposed and reused; no module addition, dependency revision, configuration or import-rule changes. Extensive pre-existing original-checkout changes are excluded and preserved. Release metadata remains unchanged because the required native GPU gate is blocked. The native changelog hook also generated the upstream documentation entry for parent commit 73bb044; parent inspected its eight added lines and included only that required generated metadata."
+    "reconciliation": "Parent reconciled the three runtime modules, three test files, runtime guidance and task-owned bug artifacts. Only existing scoped discovery is exposed and reused; no module addition, dependency revision, configuration or import-rule changes. Extensive pre-existing original-checkout changes are excluded and preserved. Release metadata remains unchanged because the required native GPU gate is blocked. The native changelog hook also generated the upstream documentation entry for parent commit 73bb044; parent inspected its eight added lines and included only that required generated metadata. Release continuation adds only portable dated evidence and native-generated root version/changelog metadata. Actual CPU/GPU native gate and proposed 0.44.8/queue 0.1.7 integration passed; fresh independent evidence review closed the historical native block. No further runtime, dependency revision or import-rule change."
   }
 }

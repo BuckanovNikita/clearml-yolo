@@ -1,7 +1,7 @@
 # Verification: batch cleanup permissions
 
 - Date: 2026-11-02
-- Status: source fix verified; native release blocked
+- Status: source and native gates verified; release continuation below
 - Assessment: [assessment.md](assessment.md)
 - Fix: [fix.md](fix.md)
 - Independent review: [review.md](review.md)
@@ -105,3 +105,11 @@ upstream documentation change `73bb044`. The parent reviewed that exact diff and
 staged it for the required retry. The exact source/dependency hook passed using
 the successful canonical evidence. Package version and lockfile remain unchanged;
 no local source-override section exists in this isolated checkout.
+
+## Release gate closure — 2026-11-02
+
+The repaired infrastructure allowed real CPU/single-GPU pipelines, required readback,
+paired comparison and owned cleanup. The former native block is resolved. See
+[release acceptance](release.md) and the fresh gate review in [review.md](review.md).
+The proposed 0.44.8/queue 0.1.7 pair also passed normal resolution and integration;
+actual post-hook package metadata is refreshed and rechecked before delivery.

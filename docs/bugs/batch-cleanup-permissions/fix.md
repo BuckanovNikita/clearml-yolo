@@ -1,7 +1,7 @@
 # Bug fix: batch worker cleanup permissions
 
 - Date: 2026-11-02
-- Status: applied and software-verified; native release blocked
+- Status: applied and verified; native gate resolved in release follow-up
 - Assessment: [assessment.md](assessment.md)
 
 ## Changes
@@ -47,3 +47,10 @@ paired queue, documentation and architecture checks passed; see [test.md](test.m
 Required native GPU release evidence is unavailable because the shared Kubernetes
 API certificate fails its preflight. Preserve the verified source fix on a dedicated
 branch without creating a version tag or pushing an unaccepted release.
+
+## Release follow-up — 2026-11-02
+
+The user requested merge and release; shared-stand repair subsequently unblocked
+native verification. [Release acceptance](release.md) records actual successful
+CPU/GPU execution and publication/readback. The earlier blocked outcome above
+remains historical evidence. No additional runtime fix was required.

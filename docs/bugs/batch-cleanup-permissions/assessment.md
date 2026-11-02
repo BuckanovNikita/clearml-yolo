@@ -43,3 +43,14 @@ scoped tree and add its owner environment parameter; leave global recovery uncha
 Conservative failure on inaccessible relevant caller descendants remains deliberate.
 The initial old-checkout exploration was backed up and reverted without touching
 pre-existing changes. This isolated current-source checkout owns the final patch.
+
+## Release continuation — 2026-11-02
+
+Explicit user authorization covers merging to master and releasing. Reuse the
+accepted runtime patch and source checks. The planned next version is 0.44.8;
+normal paired source installation tests that version with latest queue 0.1.7.
+The repaired stand permits actual CPU/GPU pipeline acceptance, artifact/model
+readback and paired current-test comparison. Record closure in [release.md](release.md),
+then execute native version/changelog hooks and recheck actual installed metadata
+before pushing master and the annotated Git tag. Only root version/changelog
+metadata and task-owned prose may change; no dependency resolution changes are committed.

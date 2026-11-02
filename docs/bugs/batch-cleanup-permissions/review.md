@@ -18,3 +18,13 @@ paired queue and architecture checks; reviewer approval does not establish those
 
 Exact remote PID permissions were unavailable. Relevant inaccessible caller descendants
 deliberately remain cleanup blockers. No change to that conservative policy was requested.
+
+## Fresh native gate closure review — 2026-11-02
+
+The independent `release_gate_scope` agent inspected native summaries, final audit,
+comparison manifest, production readback guard and cleanup logs. It independently
+verified SHA-256 for all 28 downloaded artifacts and two models. Verdict: ship for
+this process-only patch after final version/pair checks and native release hooks.
+The former shared-stand gate is closed; no new blocking finding. Random-weight,
+optional publication/catalogue, browser and physical multi-GPU limitations remain
+explicit in [release acceptance](release.md). No further runtime code changed.
