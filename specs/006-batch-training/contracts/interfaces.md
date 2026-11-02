@@ -14,11 +14,13 @@ per-GPU ceiling (default 1024); extrapolated global batches may exceed it. Refre
 memory-budget and trial-timeout controls apply to actual single-GPU measurements.
 The trial timeout is not a timeout for the complete search.
 
-New `SearchSettings.search_strategy` values default to `memory_guided_v1`; explicit
-`exponential_binary_v1` retains the historical transition policy. Guided search starts
-at 1 and 2, predicts from full successful memory observations with bounded growth,
+New `SearchSettings.search_strategy` values default to `memory_guided_aligned_v1`;
+explicit `memory_guided_v1` and `exponential_binary_v1` retain their historical
+transition policies. Aligned search starts at 8 and 16 per GPU, predicts from full successful memory observations with bounded growth,
 falls back to doubling without a positive slope and uses exact binary refinement
-after an observed capacity bound. Full warm-up/measured steps, all optimizer paths,
+after an observed capacity bound, all on an eight-image per-GPU grid. Ceilings
+round down to multiples of eight and must cover eight per GPU. Failure at eight
+yields `no_capacity`; no unaligned fallback is supplied. Full warm-up/measured steps, all optimizer paths,
 validation and fresh confirmation remain required. Numerical recovery preserves
 the cause and the independently confirmed last good candidate, which can differ
 between strategies.
@@ -35,7 +37,9 @@ trees. Slots with unverifiable cleanup cannot host another case in that invocati
 
 `cy-train ... ultralytics.batch=null` and native `model.train.batch=null` request strict
 local lookup. Queue snapshots preserve null. Compatibility and actual dataset bounds
-must pass before native execution. Prefer compatible exact-allocation evidence;
+must pass before native execution. Unaligned historical per-GPU results remain
+readable but cannot supply automatic lookup; rerun measurement rather than round
+saved evidence. Explicit numeric training batches retain their existing behavior. Prefer compatible exact-allocation evidence;
 otherwise require compatible single-GPU sources for every target hardware group and
 derive `N × min(per_gpu_capacities)`. Typed recommendations retain measured/extrapolated
 origin, target allocation, source keys and boundary/ceiling status. Stored trials remain

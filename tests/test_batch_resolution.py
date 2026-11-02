@@ -141,12 +141,12 @@ def test_queue_assigned_allocation_uses_extrapolated_batch_and_retains_null(
     )
     resolved, provenance = resolution.resolve_native_batch(config, _dataset(tmp_path), None)
     assert config.train.batch is None
-    assert resolved.train.batch == 8
+    assert resolved.train.batch == 16
     assert resolved.train.device == [2, 0]
     assert provenance is not None
     assert provenance["origin"] == "extrapolated"
-    assert provenance["global_batch"] == 8
-    assert provenance["per_gpu_batch"] == 4
+    assert provenance["global_batch"] == 16
+    assert provenance["per_gpu_batch"] == 8
     assert provenance["source_statuses"] == ["validated"]
     assert "estimate_key" not in provenance
     assert [gpu["uuid"] for gpu in provenance["profile"]["gpus"]] == [
@@ -154,7 +154,7 @@ def test_queue_assigned_allocation_uses_extrapolated_batch_and_retains_null(
         "queue-assigned-0",
     ]
     assert len(provenance["sources"]) == 1
-    assert provenance["sources"][0]["global_batch"] == 4
+    assert provenance["sources"][0]["global_batch"] == 8
     assert len(provenance["sources"][0]["profile"]["gpus"]) == 1
 
 

@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record cleanup release verification
+  ([`6cccd55`](https://github.com/BuckanovNikita/clearml-yolo/commit/6cccd554e30e359a06ac3c1553ed5789b3e4ccf7))
+
+
 ## v0.44.6 (2026-11-01)
 
 ### Bug Fixes

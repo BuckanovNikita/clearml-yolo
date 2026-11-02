@@ -41,7 +41,7 @@ when no compatible measurement exists.
 | `--jobs N` | Positive maximum concurrent independent searches; default uses available selected GPUs; 1 runs serially |
 | `--gpu-counts LIST` | Output counts over the first N selected GPUs; default 1 through selected count; launches no additional searches |
 | `--memory-budget FRACTION` | Fraction of each GPU's total memory; 0.9 |
-| `--search-limit N` | Per-GPU search ceiling; 1024; extrapolated global batches may exceed it |
+| `--search-limit N` | Per-GPU search ceiling; 1024; rounded down to a multiple of 8, minimum 8; extrapolated global batches may exceed it |
 | `--trial-timeout SECONDS` | Deadline for each fresh trial group; 300 |
 | `--refresh` | Replace completed compatible cases with fresh measurements |
 
@@ -74,13 +74,17 @@ see [cache setup and recovery](model-assets.md#cache-locations).
 
 The public training batch is the **global microbatch across all training GPUs**.
 Every estimator trial uses exactly one GPU, so its measured global and per-GPU
-batches are equal. New searches start at batches 1 and 2, unless a failure or the
-ceiling ends discovery earlier. Subsequent candidates use the measured memory
+batches are equal. New searches use `memory_guided_aligned_v1` and start at batches
+8 and 16, unless a failure or the ceiling ends discovery earlier. Every candidate
+and confirmed recommendation is divisible by 8 per GPU. The ceiling is rounded
+down to that grid; a ceiling below 8 is rejected. If batch 8 exceeds capacity,
+the result is `no_capacity`; smaller batches require explicit training configuration. Subsequent candidates use the measured memory
 growth between the two latest successful, under-budget trials, with jumps capped
 at four times the last successful batch and by the search ceiling. Missing, flat
 or decreasing memory growth falls back to doubling. A predicted batch is only a
 candidate: only observed CUDA OOM or memory-budget excess establishes a capacity
-upper bound. The search then refines that bound by exact binary search and confirms
+upper bound. Predictions and binary midpoints round down to the grid, advancing
+by at least 8. The search refines the aligned bound by binary search and confirms
 the winner in a fresh supervised process.
 Each trial performs five warm-up optimizer updates and ten measured updates,
 including native loss/backward, optimizer state, configured EMA and bounded validation.
@@ -97,7 +101,7 @@ without additional trials and explicitly labelled `extrapolated`:
 - Identical hardware: `global_batch = N × measured_per_gpu_batch`.
 - Mixed hardware: `global_batch = N × min(compatible_per_gpu_capacities)`.
 
-Both formulas produce a global batch divisible by N. Missing compatible evidence
+Both formulas produce a global batch divisible by `8 × N`. Missing compatible evidence
 for any GPU type/capacity prevents extrapolation. These recommendations are not
 measured multi-GPU maxima. Exact lookup and extrapolation preserve source limitations:
 `numerically_limited` takes precedence over `ceiling_limited`, which takes precedence
@@ -123,8 +127,8 @@ require the same complete independent confirmation and retain the numerical caus
 A failed case has no usable recommendation; a nonzero command status can
 coexist with completed results for other cases.
 
-`validated` records a confirmed capacity boundary. `ceiling_limited` records a
-confirmed batch at the requested ceiling and remains usable, but does not claim
+`validated` records a confirmed boundary on the aligned grid, rather than an
+image-by-image maximum. `ceiling_limited` records a confirmed batch at the rounded-down ceiling and remains usable, but does not claim
 an unconstrained maximum. `numerically_limited` records the independently repeated
 last good batch after discovery stopped numerically, with no capacity maximum claim.
 `no_capacity` and `failed` results retain diagnostics.
@@ -139,7 +143,11 @@ per-GPU batches separately, trial outcomes, synthetic limits and provenance.
 Stored trial evidence is unchanged: extrapolations are derived during lookup and
 reporting, never saved as manufactured measurements. Legacy measured allocations
 remain readable. Schemas 1 and 2 remain readable; ordinary saves write schema 3
-with an explicit search strategy for every case. New cases use `memory_guided_v1`.
+with an explicit search strategy for every case. New cases use
+`memory_guided_aligned_v1`. Existing `memory_guided_v1` and `exponential_binary_v1`
+histories retain their original candidate rules and keys. Unaligned historical
+per-GPU results remain readable evidence but cannot supply automatic recommendations;
+rerun the estimator. Old evidence is never rounded into an unmeasured recommendation.
 Historical cases without a strategy replay as `exponential_binary_v1`, preserving
 their trial sequence and source estimate keys. Schema 1 still excludes
 `numerically_limited`; schemas 1/2 cannot contain memory-guided histories. Unknown

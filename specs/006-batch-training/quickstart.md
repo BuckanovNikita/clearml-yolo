@@ -20,10 +20,11 @@ provenance, ceiling propagation, totals above the per-GPU search ceiling, divisi
 missing/stale/failed sources, dataset bounds and worker-assigned queue allocations.
 The estimator gate no longer requires an exhaustive distributed probe matrix.
 
-Verify that new cases record `memory_guided_v1` and a schema-3 catalogue. Load frozen
+Verify that new cases record `memory_guided_aligned_v1` and a schema-3 catalogue. Load frozen
 schema-1/2 records without rewriting their bytes; their original keys and legacy trial
 sequence must still validate. Reject unknown strategies and mismatched histories.
-Check exact confirmed capacity and fewer trials on deterministic linear-memory cases,
+Check confirmed capacity on the eight-image per-GPU grid, rounded ceilings,
+rejection of unaligned historical automatic recommendations and deterministic linear-memory cases,
 plus nonlinear/flat memory growth, observed OOM/budget refinement, ceilings and
 numerical recovery. A numerical limit may retain a different last good batch after
 candidate ordering changes; it must never claim a measured maximum.

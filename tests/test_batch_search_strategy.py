@@ -55,7 +55,7 @@ def _run_curve(
 
 
 def test_new_calls_default_to_guided_search_and_schema_three() -> None:
-    assert SearchSettings().search_strategy == GUIDED
+    assert SearchSettings().search_strategy == "memory_guided_aligned_v1"
     assert EstimateCatalogue().schema_version == 3
 
 
@@ -231,7 +231,9 @@ def test_legacy_inference_does_not_mutate_supplied_payload() -> None:
     parsed = EstimateCase.model_validate(raw)
     assert parsed.settings.search_strategy == LEGACY
     assert raw == before
-    assert SearchSettings.model_validate(raw["settings"]).search_strategy == GUIDED
+    assert (
+        SearchSettings.model_validate(raw["settings"]).search_strategy == "memory_guided_aligned_v1"
+    )
 
 
 @pytest.mark.parametrize("version", [1, 2])

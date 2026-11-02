@@ -115,7 +115,7 @@ def test_failed_refresh_removes_source_from_extrapolated_lookup(tmp_path: Path) 
         }
     )
     prepared = _dataset(tmp_path)
-    assert resolve_batch_estimate(target, prepared, store).global_batch == 8
+    assert resolve_batch_estimate(target, prepared, store).global_batch == 16
     store.save(
         case.model_copy(
             update={

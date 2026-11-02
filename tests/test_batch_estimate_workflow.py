@@ -51,7 +51,7 @@ class MemoryStore:
 
 
 class RecordingProbe:
-    def __init__(self, *, capacity: int = 4) -> None:
+    def __init__(self, *, capacity: int = 8) -> None:
         self.calls = 0
         self.capacity = capacity
         self.probed_profiles: list[TrainingProfile] = []
@@ -92,10 +92,10 @@ def sample_case(count: int = 1) -> EstimateCase:
         # Retain legacy distributed evidence without invoking today's estimator.
         profile, settings, workload = (
             sample_profile(count),
-            SearchSettings(max_global_batch=8),
+            SearchSettings(max_global_batch=16 * count, search_strategy="exponential_binary_v1"),
             SyntheticWorkload(),
         )
-        probe = RecordingProbe()
+        probe = RecordingProbe(capacity=8 * count)
         search = BatchSearch.start(profile, settings)
         while search.next_batch is not None:
             search = search.observe(probe.run(profile, workload, settings, search.next_batch))
@@ -112,7 +112,7 @@ def sample_case(count: int = 1) -> EstimateCase:
     return estimate_batches(
         (sample_profile(count),),
         SyntheticWorkload(),
-        SearchSettings(max_global_batch=8),
+        SearchSettings(max_global_batch=16),
         probe=RecordingProbe(),
         store=MemoryStore(),
         now=lambda: "2026-10-26T12:00:00Z",
@@ -126,7 +126,7 @@ def test_completed_case_is_reused_and_refresh_repeats_trials() -> None:
         profiles, workload, settings, probe=probe, store=store, now=lambda: "2026-10-26T12:00:00Z"
     )
     calls, writes = probe.calls, len(store.writes)
-    assert first[0].global_batch == 4
+    assert first[0].global_batch == 8
     assert all(not case.usable for case in store.writes[:-1])
     assert (
         estimate_batches(

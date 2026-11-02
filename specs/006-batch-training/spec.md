@@ -206,3 +206,16 @@ It adds faster candidate selection and parallel independent model/hardware cases
 The approved delivery includes ordinary/architecture/documentation verification,
 fresh independent review, current/proposed paired CY/queue checks and a new Git-only
 code release. Existing historical acceptance limitations remain visible.
+
+
+## Aligned automatic search amendment (2026-11-02)
+
+New automatic searches use an eight-image per-GPU grid for discovery, memory-guided
+predictions, binary refinement and fresh confirmation. Ceilings round down; a ceiling
+below eight per GPU is invalid. Failure at eight yields no aligned capacity, without
+an unaligned fallback. Automatic exact lookup and extrapolation exclude unaligned
+historical per-GPU results, while evidence replay and old keys remain unchanged.
+Explicit training batches keep their existing semantics. See the
+[task assessment](../../docs/bugs/batch-align-eight/assessment.md) and
+[batch contract](../../docs/batch-estimation.md). This policy makes no measured
+throughput improvement claim and does not reopen historical acceptance exceptions.

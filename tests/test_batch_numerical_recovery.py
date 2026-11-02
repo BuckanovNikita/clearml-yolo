@@ -24,19 +24,22 @@ from clearml_yolo.core.batch_estimation import (
 from clearml_yolo.entrypoints import batch_estimate as cli
 from clearml_yolo.entrypoints.batch_estimate import _report
 from test_batch_estimate_cli import _install
-from test_batch_estimate_workflow import MemoryStore, RecordingProbe, sample_case, sample_profile
+from test_batch_estimate_workflow import MemoryStore, RecordingProbe, sample_profile
 from test_batch_estimation import _case, _profile, _search, _trial
 from test_batch_lookup import _dataset
 
 CAUSE = "FloatingPointError: YOLO probe produced nonfinite validation loss"
 
 
-def _pending() -> BatchSearch:
-    search = BatchSearch.start(_profile(), SearchSettings())
+def _pending(*, legacy: bool = False) -> BatchSearch:
+    settings = (
+        SearchSettings(search_strategy="exponential_binary_v1") if legacy else SearchSettings()
+    )
+    search = BatchSearch.start(_profile(), settings)
     for _ in range(2):
         search = search.observe(_trial(search))
     search = search.observe(_trial(search, "nonfinite", diagnostic=CAUSE))
-    assert search.next_batch == 2
+    assert search.next_batch == (2 if legacy else 16)
     assert search.confirming
     assert search.status == "searching"
     assert search.upper is None
@@ -128,7 +131,7 @@ def test_recovery_cannot_reuse_trial_identity_or_forge_confirmation() -> None:
 
 
 def test_legacy_terminal_numerical_failure_remains_readable_without_promotion() -> None:
-    search = _pending()
+    search = _pending(legacy=True)
     raw = {
         "profile": search.profile.model_dump(mode="json"),
         "workload": SyntheticWorkload().model_dump(mode="json"),
@@ -142,12 +145,7 @@ def test_legacy_terminal_numerical_failure_remains_readable_without_promotion() 
 
 
 def test_schema_upgrade_is_write_only_and_preserves_peer_cases(tmp_path: Path) -> None:
-    peer = sample_case()
-    peer = peer.model_copy(
-        update={"settings": peer.settings.model_copy(
-            update={"search_strategy": "exponential_binary_v1"}
-        )}
-    )
+    peer = _case(_search(8))
     store = FileBatchEstimateStore(tmp_path / "estimates.json")
     payload = json.dumps({"schema_version": 1, "cases": [peer.model_dump(mode="json")]})
     store.path.write_text(payload)
@@ -175,7 +173,7 @@ def test_limited_lookup_extrapolation_cli_and_training_preserve_cause(
     derived = select_recommendation((case,), target, case.workload)
     assert exact.status == derived.status == "numerically_limited"
     assert derived.origin == "extrapolated"
-    assert derived.global_batch == 4
+    assert derived.global_batch == 32
     assert derived.source_statuses == ("numerically_limited",)
     provenance = batch_provenance(derived)
     assert provenance["sources"][0]["diagnostic"] == case.diagnostic
@@ -196,7 +194,7 @@ def test_application_progress_cache_and_refresh_keep_confirmation_safety(
         result = original(*args)
         return (
             result.model_copy(update={"status": "nonfinite", "diagnostic": CAUSE})
-            if result.global_batch == 4 else result
+            if result.global_batch == 32 else result
         )
 
     monkeypatch.setattr(probe, "run", run)
@@ -206,7 +204,7 @@ def test_application_progress_cache_and_refresh_keep_confirmation_safety(
     args = ((sample_profile(),), SyntheticWorkload(), SearchSettings())
     (case,) = estimate_batches(*args, **kwargs)
     assert case.status == "numerically_limited"
-    assert [trial.global_batch for trial in case.trials] == [1, 2, 4, 2]
+    assert [trial.global_batch for trial in case.trials] == [8, 16, 32, 16]
     assert all(not snapshot.usable for snapshot in store.writes[:-1])
     assert "pending" in store.writes[0].diagnostic
     assert "running" in store.writes[0].diagnostic
@@ -223,10 +221,10 @@ def test_mixed_hardware_preserves_numerical_limit_over_ceiling_status() -> None:
     other_profile = case.profile.model_copy(
         update={"gpus": (GPUHardware(name="Other GPU", total_memory_bytes=1000),)}
     )
-    other = _case(_search(4, ceiling=4, profile=other_profile))
+    other = _case(_search(24, ceiling=24, profile=other_profile))
     target = case.profile.model_copy(update={"gpus": (*case.profile.gpus, *other.profile.gpus)})
     result = select_recommendation((case, other), target, case.workload)
-    assert result.global_batch == 4
+    assert result.global_batch == 32
     assert result.source_statuses == ("numerically_limited", "ceiling_limited")
     assert result.status == "numerically_limited"
 
@@ -238,7 +236,7 @@ def test_null_batch_lookup_accepts_confirmed_limited_source_within_dataset_bound
     store.save(case)
     result = resolve_batch_estimate(case.profile, _dataset(tmp_path), store)
     assert result.status == "numerically_limited"
-    assert result.global_batch == 2
+    assert result.global_batch == 16
     with pytest.raises(ValueError, match="explicit training batch"):
         resolve_batch_estimate(
             case.profile,
@@ -257,15 +255,15 @@ def test_cli_returns_usable_limited_result_and_reuses_it_without_more_trials(
         result = original(*args)
         return (
             result.model_copy(update={"status": "nonfinite", "diagnostic": CAUSE})
-            if result.global_batch == 4 else result
+            if result.global_batch == 32 else result
         )
 
     monkeypatch.setattr(probe, "run", run)
     args = ["--imgsz", "960", "--models", "yolov3u", "--gpu-counts", "1,2"]
     cli.main(args)
     output = capsys.readouterr().out
-    assert "gpus=1\tglobal_batch=2" in output
-    assert "gpus=2\tglobal_batch=4" in output
+    assert "gpus=1\tglobal_batch=16" in output
+    assert "gpus=2\tglobal_batch=32" in output
     assert output.count(CAUSE) == 2
     assert "unavailable" not in output
     calls = probe.calls

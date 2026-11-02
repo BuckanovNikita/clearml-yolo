@@ -72,7 +72,10 @@ def _search(
     profile: TrainingProfile | None = None,
     observe: Callable[[BatchSearch], TrialResult] | None = None,
 ) -> BatchSearch:
-    search = BatchSearch.start(profile or _profile(count), SearchSettings(max_global_batch=ceiling))
+    search = BatchSearch.start(
+        profile or _profile(count),
+        SearchSettings(search_strategy="exponential_binary_v1", max_global_batch=ceiling),
+    )
     while search.next_batch is not None:
         trial = (
             observe(search)
@@ -155,7 +158,7 @@ def test_search_finds_divisible_capacity_and_independently_confirms(
     ["timeout", "crash", "missing_asset", "contaminated", "cancelled", "error"],
 )
 def test_noncapacity_failures_do_not_become_capacity_bounds(failure: str) -> None:
-    search = BatchSearch.start(_profile(), SearchSettings())
+    search = BatchSearch.start(_profile(), SearchSettings(search_strategy="exponential_binary_v1"))
     search = search.observe(_trial(search))
     search = search.observe(_trial(search, failure))
     assert search.status == "failed"
@@ -191,13 +194,13 @@ def test_failed_fresh_repeat_invalidates_entire_estimate(failure: str) -> None:
     ],
 )
 def test_incomplete_success_evidence_fails(updates: dict[str, Any]) -> None:
-    search = BatchSearch.start(_profile(2), SearchSettings())
+    search = BatchSearch.start(_profile(2), SearchSettings(search_strategy="exponential_binary_v1"))
     search = search.observe(_trial(search, **updates))
     assert search.status == "failed"
 
 
 def test_memory_budget_is_per_rank_and_inclusive() -> None:
-    search = BatchSearch.start(_profile(2), SearchSettings())
+    search = BatchSearch.start(_profile(2), SearchSettings(search_strategy="exponential_binary_v1"))
     search = search.observe(_trial(search, peak_memory_bytes=(900, 900)))
     assert search.next_batch == 4
     search = search.observe(_trial(search, peak_memory_bytes=(901, 800)))
@@ -219,19 +222,21 @@ def test_heterogeneous_memory_and_order_are_checked_per_rank() -> None:
             )
         }
     )
-    search = BatchSearch.start(profile, SearchSettings(max_global_batch=2))
+    search = BatchSearch.start(
+        profile, SearchSettings(search_strategy="exponential_binary_v1", max_global_batch=2)
+    )
     search = search.observe(_trial(search, peak_memory_bytes=(1800, 900)))
     search = search.observe(_trial(search, peak_memory_bytes=(1800, 900)))
     case = _case(search)
     swapped = profile.model_copy(update={"gpus": tuple(reversed(profile.gpus))})
     assert compatibility_issues(case, swapped, SyntheticWorkload())
-    over = BatchSearch.start(profile, SearchSettings())
+    over = BatchSearch.start(profile, SearchSettings(search_strategy="exponential_binary_v1"))
     over = over.observe(_trial(over, peak_memory_bytes=(1700, 901)))
     assert over.status == "no_capacity"
 
 
 def test_trial_identity_and_candidate_are_checked() -> None:
-    search = BatchSearch.start(_profile(), SearchSettings())
+    search = BatchSearch.start(_profile(), SearchSettings(search_strategy="exponential_binary_v1"))
     with pytest.raises(ValueError, match="candidate"):
         search.observe(_trial(search, global_batch=2))
     prior = _trial(search)
@@ -256,13 +261,13 @@ def test_trial_identity_and_candidate_are_checked() -> None:
     ],
 )
 def test_profile_changes_are_incompatible(changes: dict[str, Any]) -> None:
-    case = _case(_search(4))
+    case = _case(_search(8))
     requested = TrainingProfile.model_validate(case.profile.model_dump() | changes)
     assert compatibility_issues(case, requested, SyntheticWorkload())
 
 
 def test_hardware_compatibility_uses_ordered_capabilities_not_uuid() -> None:
-    case = _case(_search(4))
+    case = _case(_search(8))
     same = case.profile.model_copy(
         update={
             "gpus": (GPUHardware(name="Test GPU", total_memory_bytes=1000, uuid="replacement"),)
@@ -277,7 +282,7 @@ def test_hardware_compatibility_uses_ordered_capabilities_not_uuid() -> None:
 
 
 def test_density_and_class_bounds_are_upper_limits() -> None:
-    case = _case(_search(4))
+    case = _case(_search(8))
     assert not compatibility_issues(
         case, case.profile, SyntheticWorkload(classes=1, objects_per_image=1)
     )
@@ -289,12 +294,12 @@ def test_density_and_class_bounds_are_upper_limits() -> None:
 
 
 def test_saved_success_requires_valid_search_evidence() -> None:
-    case = _case(_search(4))
+    case = _case(_search(8))
     values = case.model_dump()
     values["trials"] = values["trials"][:-1]
     with pytest.raises(ValidationError, match="evidence"):
         EstimateCase.model_validate(values)
-    values = case.model_dump() | {"global_batch": 8, "per_gpu_batch": 8}
+    values = case.model_dump() | {"global_batch": 16, "per_gpu_batch": 16}
     with pytest.raises(ValidationError, match="evidence"):
         EstimateCase.model_validate(values)
     catalogue = EstimateCatalogue(cases=(case,))
@@ -302,11 +307,15 @@ def test_saved_success_requires_valid_search_evidence() -> None:
 
 
 def test_case_key_is_stable_and_includes_workload_and_search_policy() -> None:
-    case = _case(_search(4))
+    case = _case(_search(8))
     key = estimate_key(case.profile, case.workload, case.settings)
     assert key == estimate_key(case.profile, case.workload, case.settings)
     assert key != estimate_key(case.profile, SyntheticWorkload(classes=151), case.settings)
-    assert key != estimate_key(case.profile, case.workload, SearchSettings(memory_fraction=0.8))
+    assert key != estimate_key(
+        case.profile,
+        case.workload,
+        SearchSettings(search_strategy="exponential_binary_v1", memory_fraction=0.8),
+    )
 
 
 @pytest.mark.parametrize("values", [{"classes": 0}, {"objects_per_image": True}])
@@ -317,18 +326,20 @@ def test_workload_rejects_invalid_bounds(values: dict[str, Any]) -> None:
 
 def test_ceiling_below_world_size_is_invalid() -> None:
     with pytest.raises(ValueError, match="world size"):
-        BatchSearch.start(_profile(4), SearchSettings(max_global_batch=3))
+        BatchSearch.start(
+            _profile(4), SearchSettings(search_strategy="exponential_binary_v1", max_global_batch=3)
+        )
 
 
 def test_recommendation_retains_target_and_actual_source_provenance() -> None:
-    case = _case(_search(5))
+    case = _case(_search(16))
     target = case.profile.model_copy(
         update={"gpus": (case.profile.gpus[0].model_copy(update={"uuid": "assigned-gpu"}),)}
     )
     recommendation = select_recommendation((case,), target, SyntheticWorkload())
     assert recommendation.origin == "measured"
     assert recommendation.profile == target
-    assert recommendation.global_batch == recommendation.per_gpu_batch == 5
+    assert recommendation.global_batch == recommendation.per_gpu_batch == 16
     assert recommendation.source_estimate_keys == (
         estimate_key(case.profile, case.workload, case.settings),
     )
@@ -337,13 +348,13 @@ def test_recommendation_retains_target_and_actual_source_provenance() -> None:
 
 
 def test_identical_gpus_share_one_source_and_exceed_the_per_gpu_ceiling() -> None:
-    source = _case(_search(99, ceiling=5))
+    source = _case(_search(99, ceiling=16))
     saved = source.model_dump_json()
     target = _profile(3)
     recommendation = select_recommendation((source,), target, SyntheticWorkload())
     assert recommendation.origin == "extrapolated"
-    assert recommendation.global_batch == 15
-    assert recommendation.per_gpu_batch == 5
+    assert recommendation.global_batch == 48
+    assert recommendation.per_gpu_batch == 16
     assert recommendation.global_batch % target.world_size == 0
     assert recommendation.status == "ceiling_limited"
     assert recommendation.source_statuses == ("ceiling_limited",)
@@ -354,12 +365,12 @@ def test_identical_gpus_share_one_source_and_exceed_the_per_gpu_ceiling() -> Non
 def test_mixed_gpus_use_the_smallest_compatible_single_gpu_capacity() -> None:
     larger_gpu = GPUHardware(name="Different GPU", total_memory_bytes=2000, uuid="different")
     fast_profile = _profile().model_copy(update={"gpus": (larger_gpu,)})
-    slower, faster = _case(_search(3)), _case(_search(99, profile=fast_profile, ceiling=8))
+    slower, faster = _case(_search(8)), _case(_search(99, profile=fast_profile, ceiling=16))
     target = _profile(2).model_copy(update={"gpus": (*_profile(2).gpus, larger_gpu)})
     recommendation = select_recommendation((faster, slower), target, SyntheticWorkload())
     assert recommendation.origin == "extrapolated"
-    assert recommendation.global_batch == 9
-    assert recommendation.per_gpu_batch == 3
+    assert recommendation.global_batch == 24
+    assert recommendation.per_gpu_batch == 8
     assert recommendation.sources == (slower, faster)
     assert recommendation.source_statuses == ("validated", "ceiling_limited")
     assert recommendation.status == "ceiling_limited"
@@ -374,7 +385,7 @@ def test_mixed_gpus_use_the_smallest_compatible_single_gpu_capacity() -> None:
     ],
 )
 def test_extrapolation_requires_each_gpu_type_and_capacity(hardware: GPUHardware) -> None:
-    source = _case(_search(5))
+    source = _case(_search(16))
     target = _profile().model_copy(update={"gpus": (*source.profile.gpus, hardware)})
     with pytest.raises(ValueError, match=r"compatible.*single-GPU"):
         select_recommendation((source,), target, SyntheticWorkload())
@@ -382,7 +393,7 @@ def test_extrapolation_requires_each_gpu_type_and_capacity(hardware: GPUHardware
 
 @pytest.mark.parametrize("invalid", ["failed", "no_capacity", "stale", "classes", "density"])
 def test_invalid_sources_never_support_extrapolation(invalid: str) -> None:
-    source = _case(_search(5))
+    source = _case(_search(16))
     target, workload = _profile(2), SyntheticWorkload()
     if invalid == "failed":
         source = _case(_search(5, observe=lambda search: _trial(search, "timeout")))
@@ -399,20 +410,20 @@ def test_invalid_sources_never_support_extrapolation(invalid: str) -> None:
 
 
 def test_legacy_exact_allocation_measurement_precedes_extrapolation() -> None:
-    single, exact = _case(_search(5)), _case(_search(6, count=2))
+    single, exact = _case(_search(16)), _case(_search(16, count=2))
     restored = EstimateCatalogue.model_validate_json(
         EstimateCatalogue(cases=(single, exact)).model_dump_json()
     )
     recommendation = select_recommendation(restored.cases, _profile(2), SyntheticWorkload())
     assert recommendation.origin == "measured"
-    assert recommendation.global_batch == 6
+    assert recommendation.global_batch == 16
     assert recommendation.sources == (exact,)
 
 
 def test_multiple_compatible_single_gpu_measurements_are_conservative() -> None:
-    larger, smaller = _case(_search(5)), _case(_search(3, ceiling=16))
+    larger, smaller = _case(_search(16)), _case(_search(8, ceiling=16))
     recommendation = select_recommendation((larger, smaller), _profile(2), SyntheticWorkload())
-    assert recommendation.global_batch == 6
+    assert recommendation.global_batch == 16
     assert recommendation.sources == (smaller,)
 
 
@@ -429,14 +440,14 @@ def test_multiple_compatible_single_gpu_measurements_are_conservative() -> None:
 def test_recommendation_rejects_inconsistent_allocation_and_evidence(
     updates: dict[str, Any],
 ) -> None:
-    source = _case(_search(5))
+    source = _case(_search(16))
     recommendation = select_recommendation((source,), _profile(2), SyntheticWorkload())
     with pytest.raises(ValidationError):
         ResolvedRecommendation.model_validate(recommendation.model_dump() | updates)
 
 
 def test_recommendation_serialization_preserves_sources_without_inventing_trials() -> None:
-    source = _case(_search(5))
+    source = _case(_search(16))
     recommendation = select_recommendation((source,), _profile(2), SyntheticWorkload())
     restored = ResolvedRecommendation.model_validate_json(recommendation.model_dump_json())
     assert restored == recommendation

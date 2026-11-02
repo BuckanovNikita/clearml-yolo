@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "task": "Align automatic training batch search to eight per GPU",
+  "scope": [
+    "src/clearml_yolo/core/batch_estimation.py",
+    "tests",
+    "docs/batch-estimation.md",
+    "README.md",
+    "specs/006-batch-training",
+    "docs/bugs/batch-align-eight",
+    "src/clearml_yolo/adapters/documentation/assets/tutorials"
+  ],
+  "impact": "modules",
+  "rules": "Core is pure policy; outer adapters own GPU, storage, SDK and process effects under the constitution and .importlinter.",
+  "modules": [
+    {
+      "id": "batch-policy",
+      "path": "src/clearml_yolo/core/batch_estimation.py",
+      "change": "modify",
+      "responsibility": "Versioned candidate selection, historical evidence replay and compatible automatic batch recommendations.",
+      "interface": "New candidates and recommendations use multiples of eight per GPU; historical algorithms and keys remain replayable; explicit batches unchanged.",
+      "layer": "Core",
+      "allowed_dependencies": [
+        "Python standard library data operations",
+        "Pydantic",
+        "clearml_yolo.core.models"
+      ],
+      "forbidden_dependencies": [
+        "clearml_yolo.application",
+        "clearml_yolo.adapters",
+        "clearml_yolo.entrypoints",
+        "GPU, storage and process effects"
+      ],
+      "effects": "None; callers supply trial observations and persisted records.",
+      "contracts": [
+        "core-isolation"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "core-isolation",
+      "path": ".importlinter",
+      "status": "existing",
+      "rules": "Core cannot depend on outer layers or effect-owning SDKs; tests/test_architecture.py includes forbidden-edge negative cases.",
+      "check": "canonical"
+    }
+  ],
+  "checks": [
+    {
+      "id": "canonical",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync python scripts/verify.py",
+      "expectation": "Ruff, strict mypy, Vulture, import contracts and complete ordinary pytest including negative architecture and CPU-DDP pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/batch-align-eight/test.md"
+      }
+    },
+    {
+      "id": "batch-behavior",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync pytest tests/test_batch*.py -q",
+      "expectation": "Aligned boundary, fresh confirmation, numerical recovery, historical replay/keys, cache, lookup and CLI regressions pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/batch-align-eight/test.md"
+      }
+    },
+    {
+      "id": "docs",
+      "kind": "documentation",
+      "command": "uv run --frozen --no-sync python scripts/verify.py --docs",
+      "expectation": "Markdown and local links pass; changed command guidance agrees with implementation.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/batch-align-eight/test.md"
+      }
+    }
+  ],
+  "documentation": "Update batch-estimation.md, Russian README and feature spec/data model/interfaces; inspect/update portable usage source separately. Update and regenerate packaged training tutorial and inventory; static asset content only, no documentation-server module behavior changes.",
+  "review": {
+    "status": "accepted",
+    "reviewer": "Fresh native independent agent /root/final_review",
+    "evidence": "docs/bugs/batch-align-eight/review.md",
+    "reconciliation": "Reviewed all task-owned staged/unstaged additions and modifications: pure core policy, batch tests, static training tutorial assets, maintained contracts, feature amendments and bug evidence. No imports, effects or runtime modules added; existing 52 import contracts and negative cases pass. Original dirty workspaces and other feature history excluded. Queue test-only and portable prose companions independently reviewed."
+  }
+}

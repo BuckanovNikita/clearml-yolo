@@ -63,7 +63,7 @@ def _available_devices() -> tuple[GPUDevice, ...]:
 
 
 def _install(
-    monkeypatch: pytest.MonkeyPatch, *, capacity: int = 4
+    monkeypatch: pytest.MonkeyPatch, *, capacity: int = 8
 ) -> tuple[RecordingProbe, list[tuple[int, ...]]]:
     devices = _available_devices()
     idle_checks: list[tuple[int, ...]] = []
@@ -102,7 +102,7 @@ def test_filters_defaults_resume_and_refresh(
         "--devices",
         "2,0",
         "--search-limit",
-        "4",
+        "8",
     ]
     cli.main(arguments)
     assert checks == [(2,), (0,)]
@@ -118,7 +118,7 @@ def test_filters_defaults_resume_and_refresh(
     assert probe.calls == calls
     output = capsys.readouterr().out
     assert "cached" in output
-    assert "gpus=2\tglobal_batch=8" in output
+    assert "gpus=2\tglobal_batch=16" in output
     assert "extrapolated" in output
     assert all(profile.world_size == 1 for profile in probe.probed_profiles)
     cli.main([*arguments, "--refresh"])
@@ -142,7 +142,7 @@ def test_count_and_workload_controls_are_forwarded(monkeypatch: pytest.MonkeyPat
             "--memory-budget",
             "0.85",
             "--search-limit",
-            "4",
+            "8",
             "--trial-timeout",
             "17",
         ]
@@ -209,9 +209,9 @@ def test_counts_only_filter_output_and_global_batch_can_exceed_search_limit(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     probe, checks = _install(monkeypatch)
-    cli.main(["--imgsz", "640", "--models", "yolo11n", "--gpu-counts", "3", "--search-limit", "1"])
+    cli.main(["--imgsz", "640", "--models", "yolo11n", "--gpu-counts", "3", "--search-limit", "8"])
     output = capsys.readouterr().out
-    assert "gpus=3\tglobal_batch=3\tper_gpu_batch=1" in output
+    assert "gpus=3\tglobal_batch=24\tper_gpu_batch=8" in output
     assert "ceiling_limited\textrapolated" in output
     assert "gpus=1" not in output
     assert checks == [(0,)]
@@ -229,7 +229,7 @@ def test_first_idle_identical_device_is_used_and_cached_run_ignores_busy_devices
             raise RuntimeError("GPU 0 is busy")
 
     monkeypatch.setattr(cli, "require_idle", idle)
-    args = ["--imgsz", "640", "--models", "yolo11n", "--gpu-counts", "2", "--search-limit", "4"]
+    args = ["--imgsz", "640", "--models", "yolo11n", "--gpu-counts", "2", "--search-limit", "8"]
     cli.main(args)
     assert checks == [(0,), (1,)]
     assert {profile.gpus[0].uuid for profile in probe.probed_profiles} == {"GPU-1"}
@@ -263,12 +263,12 @@ def test_mixed_hardware_measures_each_group_once(
         )
 
     monkeypatch.setattr(probe, "profile", profile)
-    cli.main(["--imgsz", "640", "--models", "yolo11n", "--gpu-counts", "3", "--search-limit", "4"])
+    cli.main(["--imgsz", "640", "--models", "yolo11n", "--gpu-counts", "3", "--search-limit", "8"])
     assert checks == [(0,), (1,)]
     assert len(FileBatchEstimateStore().read().cases) == 2
     assert {p.gpus[0].name for p in probe.probed_profiles} == {"GPU", "different"}
     assert all(p.world_size == 1 for p in probe.probed_profiles)
-    assert "gpus=3\tglobal_batch=12" in capsys.readouterr().out
+    assert "gpus=3\tglobal_batch=24" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize(("jobs", "expected"), [(None, 3), (1, 1), (2, 2)])
@@ -281,7 +281,7 @@ def test_jobs_bound_independent_cases_and_preserve_model_order(
     monkeypatch.setattr(cli, "_make_pool", lambda: pool)
     arguments = [
         "--imgsz", "640", "--models", "yolo11n,yolo11s,yolo11m,yolo11l",
-        "--gpu-counts", "1", "--search-limit", "1",
+        "--gpu-counts", "1", "--search-limit", "8",
     ]
     if jobs is not None:
         arguments += ["--jobs", str(jobs)]
@@ -296,7 +296,7 @@ def test_interrupted_spawn_has_already_invalidated_refresh(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _install(monkeypatch)
-    args = ["--imgsz", "640", "--models", "yolo11n", "--search-limit", "1"]
+    args = ["--imgsz", "640", "--models", "yolo11n", "--search-limit", "8"]
     cli.main(args)
     assert FileBatchEstimateStore().read().cases[0].usable
 
@@ -328,7 +328,7 @@ def test_next_launch_reuses_verified_models_and_retries_only_failed_cases(
     monkeypatch.setattr(probe, "run", run)
     args = [
         "--imgsz", "640", "--models", "yolo11n,yolo11s", "--devices", "0,1",
-        "--search-limit", "4",
+        "--search-limit", "8",
     ]
     with pytest.raises(SystemExit) as stopped:
         cli.main(args)
@@ -349,7 +349,7 @@ def test_cache_survives_device_order_report_count_and_jobs_changes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     probe, _ = _install(monkeypatch)
-    args = ["--imgsz", "640", "--models", "yolo11n,yolo11s", "--search-limit", "4"]
+    args = ["--imgsz", "640", "--models", "yolo11n,yolo11s", "--search-limit", "8"]
     cli.main([*args, "--devices", "0,1", "--jobs", "1", "--gpu-counts", "1"])
     calls = probe.calls
     monkeypatch.setattr(cli, "require_idle", lambda _: pytest.fail("cache hit checked idle GPU"))
@@ -395,7 +395,7 @@ def test_unaccepted_case_receipts_cannot_publish_success_or_fail_peers(
     with pytest.raises(SystemExit) as stopped:
         cli.main([
             "--imgsz", "640", "--models", "yolo11n,yolo11s,yolo11m", "--devices", "0,1",
-            "--search-limit", "1",
+            "--search-limit", "8",
         ])
     assert stopped.value.code == 1
     cases = {case.profile.model.selection: case for case in FileBatchEstimateStore().read().cases}

@@ -194,3 +194,14 @@ T045 and T046 are complete: normal hooks, final canonical and paired checks pass
 CY 0.44.4, queue 0.1.6 and companion collection 0.6.7 were pushed with exact remote
 ref verification. See [publication evidence](speedup/verification.md#verified-publication-2026-10-30)
 and [companion refs](speedup/portable.md#verified-publication).
+
+
+## Aligned automatic search follow-up (2026-11-02)
+
+- [x] T047 Assess the eight-image per-GPU policy, historical replay and affected contracts; record docs/bugs/batch-align-eight/assessment.md and architecture.json.
+- [x] T048 Add failing regression, implement versioned aligned search and automatic lookup filtering, and reconcile affected batch fixtures.
+- [x] T049 Update and validate CY and portable usage documentation; complete focused, canonical and latest/proposed paired checks.
+- [ ] T050 Obtain fresh independent review, accept the reconciled architecture record, and complete the authorized patch release through hooks and verified Git pushes.
+
+T047 precedes T048; T049 follows integration; T050 requires passing checks and review.
+Historical performance/DDP limitations and delivery exceptions remain unchanged.

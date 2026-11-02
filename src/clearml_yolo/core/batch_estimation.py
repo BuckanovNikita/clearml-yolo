@@ -26,7 +26,9 @@ type TrialStatus = Literal[
 ]
 type UsableStatus = Literal["validated", "ceiling_limited", "numerically_limited"]
 type SearchStatus = Literal["searching", "no_capacity", "failed"] | UsableStatus
-type SearchStrategy = Literal["exponential_binary_v1", "memory_guided_v1"]
+type SearchStrategy = Literal[
+    "exponential_binary_v1", "memory_guided_v1", "memory_guided_aligned_v1"
+]
 
 _STRATEGY_SCHEMA_VERSION = 3
 
@@ -158,7 +160,7 @@ class TrainingProfile(_Record):
 
 
 class SearchSettings(_Record):
-    search_strategy: SearchStrategy = "memory_guided_v1"
+    search_strategy: SearchStrategy = "memory_guided_aligned_v1"
     memory_fraction: Annotated[float, Field(gt=0, le=1, allow_inf_nan=False)] = 0.9
     max_global_batch: PositiveInt = 1024
     warmup_steps: PositiveInt = 5
@@ -215,7 +217,8 @@ def _trial_observation(
 class BatchSearch(_Record):
     """Versioned capacity search whose only output is the next measured trial.
 
-    Bounds count images per rank so every candidate divides exactly by world size.
+    Bounds count images per rank. New searches use an eight-image grid per rank;
+    historical strategies retain their original single-image grid for replay.
     Successful discovery is followed by a fresh trial at the winner. Numerical
     failure can confirm a smaller candidate, but never implies a capacity boundary.
     """
@@ -235,9 +238,21 @@ class BatchSearch(_Record):
 
     @classmethod
     def start(cls, profile: TrainingProfile, settings: SearchSettings) -> Self:
-        if settings.max_global_batch < profile.world_size:
-            raise ValueError("Search ceiling must cover at least one image per rank/world size")
-        return cls(profile=profile, settings=settings, next_batch=profile.world_size)
+        step = 8 if settings.search_strategy == "memory_guided_aligned_v1" else 1
+        if settings.max_global_batch < step * profile.world_size:
+            raise ValueError(
+                f"Search ceiling must cover at least {step} images per rank/world size"
+            )
+        return cls(profile=profile, settings=settings, next_batch=step * profile.world_size)
+
+    @property
+    def _batch_step(self) -> int:
+        return 8 if self.settings.search_strategy == "memory_guided_aligned_v1" else 1
+
+    @property
+    def _ceiling(self) -> int:
+        per_rank = self.settings.max_global_batch // self.profile.world_size
+        return per_rank // self._batch_step * self._batch_step
 
     def observe(self, trial: TrialResult) -> Self:
         if self.status != "searching" or trial.global_batch != self.next_batch:
@@ -268,7 +283,7 @@ class BatchSearch(_Record):
         per_rank = trial.global_batch // self.profile.world_size
         if status == "success":
             return BatchSearch._advance(current.model_copy(update={"lower": per_rank}))
-        if per_rank == 1:
+        if per_rank == self._batch_step:
             return BatchSearch._finish(current, "no_capacity")
         return BatchSearch._advance(current.model_copy(update={"upper": per_rank}))
 
@@ -289,7 +304,7 @@ class BatchSearch(_Record):
                     "maximum capacity was not determined"
                 ),
             )
-        ceiling = self.settings.max_global_batch // self.profile.world_size
+        ceiling = self._ceiling
         return BatchSearch._finish(
             self, "ceiling_limited" if self.lower == ceiling else "validated", batch=batch
         )
@@ -308,8 +323,10 @@ class BatchSearch(_Record):
         )
 
     def _advance(self) -> Self:
-        ceiling = self.settings.max_global_batch // self.profile.world_size
-        if self.lower == ceiling or (self.upper is not None and self.upper - self.lower == 1):
+        ceiling = self._ceiling
+        if self.lower == ceiling or (
+            self.upper is not None and self.upper - self.lower == self._batch_step
+        ):
             return self.model_copy(
                 update={
                     "confirming": True,
@@ -318,7 +335,13 @@ class BatchSearch(_Record):
             )
         candidate = (
             self._growth_candidate(ceiling)
-            if self.upper is None else (self.lower + self.upper) // 2
+            if self.upper is None
+            else (self.lower + self.upper) // 2
+        )
+        # Round predictions and binary midpoints down without revisiting the lower
+        # bound; aligned bounds guarantee this stays below an observed upper bound.
+        candidate = max(
+            self.lower + self._batch_step, candidate // self._batch_step * self._batch_step
         )
         return self.model_copy(update={"next_batch": candidate * self.profile.world_size})
 
@@ -339,7 +362,7 @@ class BatchSearch(_Record):
                 return fallback
             budget = int(gpu.total_memory_bytes * self.settings.memory_fraction)
             predictions.append(second + (budget - after) * (second - first) // (after - before))
-        return max(self.lower + 1, min(*predictions, 4 * self.lower, ceiling))
+        return max(self.lower + self._batch_step, min(*predictions, 4 * self.lower, ceiling))
 
 
 class EstimateCase(_Record):
@@ -361,9 +384,7 @@ class EstimateCase(_Record):
         if isinstance(value, dict):
             settings = value.get("settings")
             if isinstance(settings, dict) and "search_strategy" not in settings:
-                return value | {
-                    "settings": settings | {"search_strategy": "exponential_binary_v1"}
-                }
+                return value | {"settings": settings | {"search_strategy": "exponential_binary_v1"}}
         return value
 
     @model_validator(mode="after")
@@ -454,6 +475,8 @@ def compatibility_issues(
     issues = []
     if not case.usable:
         issues.append(f"estimate status is {case.status}")
+    if case.per_gpu_batch is not None and case.per_gpu_batch % 8:
+        issues.append("automatic per-GPU batch must be divisible by 8; rerun cy-batch-estimate")
     saved, requested = case.profile.compatibility_data(), profile.compatibility_data()
     issues.extend(f"profile {key} differs" for key in saved if saved[key] != requested[key])
     if workload.classes > case.workload.classes:

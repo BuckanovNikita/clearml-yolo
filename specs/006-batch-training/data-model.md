@@ -8,14 +8,19 @@ GPU records retain visible identity, type and total capacity. Measurement groupi
 GPU name and total-memory capacity; UUIDs preserve provenance. Exact-allocation lookup
 matches ordered capabilities and count. Otherwise every distinct target group needs a
 compatible single-GPU source. The global batch is positive and divisible by target
-world size; per-GPU batch is stored separately.
+world size; per-GPU batch is stored separately. Automatic recommendations require
+a per-GPU batch divisible by eight; unaligned historical evidence remains readable
+but is excluded from automatic lookup without rounding its measurements.
 
-A search settings record identifies `memory_guided_v1` or `exponential_binary_v1`.
-New API/CLI settings default to memory-guided search. Discovery starts at batches 1
-and 2. For the two latest successful under-budget aggregate peaks `(b1, m1)` and
+A search settings record identifies `memory_guided_aligned_v1`, `memory_guided_v1`
+or `exponential_binary_v1`. New API/CLI settings default to the aligned strategy.
+Discovery starts at batches 8 and 16 per GPU. Ceilings round down to multiples of
+eight and must cover at least eight per GPU; failure at eight yields `no_capacity`.
+Historical strategies replay unchanged with their original one-image grid. For the two latest successful under-budget aggregate peaks `(b1, m1)` and
 `(b2, m2)`, positive growth predicts
 `b2 + ((budget - m2) * (b2 - b1)) // (m2 - m1)`. Clamp the next candidate to
-`lower + 1` through `min(4 * lower, ceiling)`. Missing/nonpositive slopes use
+`lower + 8` through `min(4 * lower, aligned_ceiling)`, rounding down to the
+eight-image grid. Binary refinement uses that same grid. Missing/nonpositive slopes use
 doubling. Only observed capacity failures establish bounds for binary refinement.
 The strategy changes candidate selection, never the required trial evidence.
 

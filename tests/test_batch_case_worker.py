@@ -17,7 +17,7 @@ def request_for(tmp_path: Path) -> BatchCaseRequest:
     profile = sample_profile().model_copy(
         update={"gpus": (sample_profile().gpus[0].model_copy(update={"uuid": "GPU-test"}),)}
     )
-    workload, settings = SyntheticWorkload(), SearchSettings(max_global_batch=4)
+    workload, settings = SyntheticWorkload(), SearchSettings(max_global_batch=8)
     return BatchCaseRequest(
         token=uuid4().hex,
         estimate_key=estimate_key(profile, workload, settings),

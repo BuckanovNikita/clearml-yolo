@@ -236,7 +236,7 @@ def test_budget_peak_combines_disjoint_memory_without_adding_the_baseline_twice(
     monkeypatch.setattr(adapter, "monitor_devices", lambda *_: (polled,))
     profile = _profile().model_copy(update={"gpus": _profile().gpus[:1], "optimizers": ("AdamW",)})
     settings = SearchSettings(memory_fraction=0.9)
-    result = adapter.NativeBatchProbe().run(profile, SyntheticWorkload(), settings, 1)
+    result = adapter.NativeBatchProbe().run(profile, SyntheticWorkload(), settings, 8)
     assert result.peak_memory_bytes == (expected,)
     state = BatchSearch.start(profile, settings).observe(result)
     assert state.status == ("no_capacity" if expected > 900 else "searching")
