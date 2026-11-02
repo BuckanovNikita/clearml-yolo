@@ -1,6 +1,6 @@
 # Integrated cleanup acceptance — 2026-11-01
 
-**Status**: Parent verification and fresh independent review accepted; delivery pending.
+**Status**: CY source and corrected companion integration accepted and published; see release.md.
 
 ## Scope and decisions
 
@@ -71,3 +71,39 @@ external symlink exclusion preserves the exact governed inventory and dependency
 fingerprints; the project CLI successfully reused canonical acceptance after exact
 metadata restoration. Structural architecture acceptance is recorded in execution.md.
 Normal release hooks and final installed-version pairing/ref checks remain required.
+
+## Subsequent delivery blocker
+
+The committed-version queue integration run failed one real stale-completion race
+(543 passed, one failed). No GitHub push occurred. Prior source/review evidence
+remains historical; current paired acceptance is failed, not complete. The
+[confirmed assessment](../../docs/bugs/cleanup-queue-completion-race/assessment.md)
+and T026–T028 record the pending companion scope decision and required remediation.
+
+## Resumed companion remediation — 2026-11-02
+
+The user reactivated delivery after the scope decision was requested. The bounded
+queue-only conditional transition, tests, patch metadata/docs and delivery are now
+in progress, with a validated queue-local architecture record. CY source is unchanged.
+Failed paired acceptance remains open until the fixed latest pair passes and receives
+fresh independent review; prior failed evidence is preserved.
+
+## Resolved companion gate — 2026-11-02
+
+The corrected latest pair CY0.44.6 / queue0.1.7 passed normal resolution, matched
+metadata/import identity, all queue static/import/help/pip checks and 582 ordinary
+tests (7 physical opt-ins deselected). Parent original+new regression checks passed
+39 tests. Fresh queue_corrected_acceptance returned ship after the first review's
+claim-release finding was fixed. Queue acceptance record and docs checks passed.
+Queue main now contains implementation b976789301d814a4249d3683739b8d6918819a73 and verified documentation
+closure 4e539f227f06e600d95753e27049baf6df517398. The failed gate above remains historical evidence;
+current paired acceptance is passed. CY code and its prior full verification/review
+remain unchanged. Final CY push/ref checks and delivery closure remain required.
+
+## Delivered outcome
+
+CY master and annotated v0.44.6 were atomically pushed and remote branch/tag/peel
+identities verified after corrected latest-pair acceptance. Queue0.1.7 main source
+and closure refs are published/verified. All delivery gates above are now complete;
+[release.md](release.md) records exact identities, checks and preserved limitations.
+The following documentation completion commit changes no runtime inputs.

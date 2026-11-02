@@ -1,7 +1,7 @@
 # Implementation plan: behavior-preserving cleanup
 
 **Date**: 2026-11-01
-**Status**: Implementation and independent acceptance complete; release pending.
+**Status**: Implemented, independently accepted and delivered as CY0.44.6 / queue0.1.7; see release.md.
 The original planning scope below is superseded by the dated authorization at the end.
 **Specification**: [spec.md](spec.md)
 **Ledger**: [tasks.md](tasks.md)

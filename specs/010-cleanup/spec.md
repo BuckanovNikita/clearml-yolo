@@ -1,7 +1,7 @@
 # Feature Specification: Simplify maintenance and complete pending delivery
 
 **Created**: 2026-11-01
-**Status**: Planning; implementation and delivery have not started
+**Status**: Implemented, independently accepted and delivered; see [release](release.md).
 **Baseline**: [Stage zero](../000-baseline/spec.md)
 
 ## Intent and boundaries
@@ -11,9 +11,10 @@ reconcile current specifications, and reduce release verification cost without
 changing supported public behavior or weakening ordinary acceptance.
 
 The user selected preservation of public behavior, completion of genuinely pending
-work, and optimization of the full verification gate. The current task stops at
-creating and validating planning artifacts; subsequent implementation follows the
-[plan](plan.md) and [task ledger](tasks.md).
+work, and optimization of the full verification gate. The initial request stopped at
+creating and validating planning artifacts. Later implementation and delivery requests
+continued the [plan](plan.md) through the completed [task ledger](tasks.md).
+The original planning baseline below predates the refreshed-source amendment at the end.
 
 The root checkout is stale relative to the locally recorded `origin/master` at
 `b23952c` (CY 0.44.4). Previously delivered features 007–009 must not be implemented
@@ -127,3 +128,11 @@ Fetched CY origin/master is e82cc49 (0.44.5), including completed DINOv3 tasks
 T020–T023 and published weights-2026-10-31. Retain that delivered work; no duplicate
 asset publication or intermediate code release is needed. The isolated cleanup
 workspace starts at that source; both original dirty worktrees remain untouched.
+
+## Delivered outcome — 2026-11-02
+
+Implementation, corrected companion integration, required documentation, independent
+review and Git source delivery are complete. [Release evidence](release.md) and the
+completed ledger supersede historical pending checkpoints without deleting them.
+Supported public contracts and approved dependency sources remain preserved; all
+recorded physical/live-stand evidence limits remain explicit.

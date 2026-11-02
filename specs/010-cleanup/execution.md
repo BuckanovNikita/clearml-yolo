@@ -333,3 +333,65 @@ normal hooks, final committed pairing and intended GitHub branch/tag verificatio
 
 Architecture record validation in acceptance phase exited zero after the final review
 and scope reconciliation. Final Markdown/local-link validation also exited zero.
+
+## Final committed-version gate failure — push blocked
+
+Native hooks passed and created source 9054b96 plus release 6fcc78c and annotated
+v0.44.6. Parent verified the release diff is exactly generated changelog plus root
+version tokens in pyproject/lock; the checkout is clean. Final committed pairing
+then failed one queue admission completion test: 543 passed, one failed, 7 deselected,
+19 warnings in 137.69 seconds. All resolver/metadata/static/import/help/pip checks
+passed, but the failed integration blocks push. No GitHub delivery is claimed.
+
+Read-only investigation confirmed a pre-existing companion queue stale-refresh race,
+not a native cleanup timeout. See the [assessment](../../docs/bugs/cleanup-queue-completion-race/assessment.md).
+The failed logs and job artifacts are archived privately. A cross-repository scope
+question is pending; no queue source was changed. CY's original accepted source
+verification remains valid, while final paired delivery acceptance is currently failed.
+
+## Companion correction and paired acceptance — 2026-11-02
+
+The bounded companion fix resumed after the user reactivated the blocked goal.
+Queue-local architecture planning preceded source edits. A conditional storage
+revision/state guard fixes stale-publication overwrites. Fresh first review found
+a second same-revision terminal/claim-release ordering; the correction rereads the
+full claim after dead liveness and defers released/changed ownership observations.
+Genuinely retained dead claims still require recovery. No cleanup, signal, lease
+release, timeout, protocol, dependency bound or import exemption changed.
+
+Both deterministic RED stages failed before correction. Corrected proposed/current
+CY0.44.6 / queue0.1.7 resolved normally with exact source/installed/import identity.
+Pip consistency, Ruff, formatting (96 files), strict mypy (70 source files), both
+queue import contracts and installed help passed. Full queue suite: 582 passed,
+7 physical opt-ins deselected, 19 warnings in 128.66 seconds. Parent original case
+plus all 38 regressions separately passed 39 tests in 1.14 seconds. No physical
+GPU/live-stand result is inferred. Earlier failed and 567-case evidence is preserved.
+
+Fresh queue_corrected_acceptance reviewed the complete correction and integrated
+evidence, returned ship with no code blocker, and confirmed architecture/ownership
+and lock ordering. Queue architecture acceptance and four-document Markdown/link
+checks passed. Implementation b976789301d814a4249d3683739b8d6918819a73 (0.1.7) and documentation closure
+4e539f227f06e600d95753e27049baf6df517398 were pushed to queue main; both remote identities were verified.
+No queue tags or GitHub Release objects/assets were created.
+
+CY source is unchanged since the accepted canonical receipt and prior fresh CY
+review. Its primary verification environment remains unchanged, including the old
+optional queue checkout; CY never imports queue. The latest pair is independently
+verified above in a separate environment. Root selected mutation dependencies are
+unchanged and do not import queue runtime. Final primary source/installed version
+reconciliation follows normal completion commits, without weakening receipt checks.
+
+The companion blocker is resolved. CY master/tag push and actual ref evidence remain
+T022 delivery work. Original dirty worktrees, approved sources and services remain
+preserved; this task changes no operational installation.
+
+## Actual CY source delivery
+
+After corrected queue delivery, current committed CY0.44.6/queue0.1.7 source, installed
+metadata and import paths were rechecked. CY master 6fcc78c08ff9f37b98faf6bdfb1f26285829b7b3 and
+annotated v0.44.6 object 74c9b7e8eec37f0ae01be2b50cc2f00b24d799ed were atomically pushed; remote branch,
+tag object and peeled release commit were verified exactly. Queue current main
+4e539f227f06e600d95753e27049baf6df517398 was verified before the CY push. No release object/assets,
+registry publication or deployment occurred. Complete task disposition and limits
+are recorded in release.md. Normal documentation closure and its own remote identity
+are checked after this dated record; no application source changes are introduced.

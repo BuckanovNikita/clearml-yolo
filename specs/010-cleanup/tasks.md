@@ -42,7 +42,7 @@ intent; dated checkpoints below and execution.md supply actual check evidence.
 
 - [x] T020 Run final canonical verifier, documentation verifier, `cy-docs --check`, affected browser acceptance and mutation applicability/checks. Repeat scoped fresh-cache Hub restoration and genuine offline DINOv3 loading after T010; verify latest/current/proposed CY–queue normal resolution, installed metadata, integration/static checks. Record every skip and unavailable check explicitly. (FR-010)
 - [x] T021 Obtain fresh independent review after parent verification; resolve findings, rerun affected checks, reconcile full diff/ledger and architecture record, then validate architecture acceptance. Historical hardware exceptions retain their scoped limits. (FR-009/010/011)
-- [ ] T022 Complete 009 T023 and the cleanup's authorized code delivery together: preserve/remove exact local uv sources through final checks and hooks, stage task-owned changes only, create native Conventional Commit/version/annotated tag, refresh final installed version pairing, push intended refs and verify them; restore overrides unstaged on success or failure. No code GitHub Release or package publication. (FR-001/002/010/011)
+- [x] T022 Complete 009 T023 and the cleanup's authorized code delivery together: preserve/remove exact local uv sources through final checks and hooks, stage task-owned changes only, create native Conventional Commit/version/annotated tag, refresh final installed version pairing, push intended refs and verify them; restore overrides unstaged on success or failure. No code GitHub Release or package publication. (FR-001/002/010/011)
 
 ## Dependencies and bounded ownership
 
@@ -166,3 +166,48 @@ and survivor equivalences, architecture and retained negative/unique coverage. P
 reconciled all task-owned paths; see acceptance.md. T021 is complete after the linked
 architecture validator passes acceptance. T022 native hooks, final committed pairing
 and GitHub ref verification remain mandatory before delivery completion.
+
+## Final pairing blocker and proposed scope amendment
+
+T022 native hooks/local commit/tag succeeded, but final queue integration failed one
+confirmed stale-completion overwrite; no branch/tag push occurred. Prior accepted
+checks remain dated evidence; this failed delivery gate must be resolved.
+
+- [x] T026 Capture final pairing failure and confirm the companion queue stale-refresh mechanism without source edits; preserve failure evidence and architecture/remediation proposal.
+- [x] T027 After explicit cross-repository scope approval, plan and fix only the queue transactional stale-recovery transition, regressions and patch-version/documentation changes in an isolated checkout; preserve genuine loss/retained-claim protection.
+- [x] T028 Verify/review the latest committed CY/queue pair, complete authorized companion delivery and refresh final refs before resuming T022. No retries-until-green, increased deadlines or test bypasses.
+
+T027 depends on the pending scope answer and its queue-local architecture plan;
+T028 depends on T027 and fresh verification/review. CY code changes are unnecessary
+for the confirmed queue mechanism. If scope is declined, delivery remains blocked.
+
+## Resumed delivery — 2026-11-02
+
+The user reactivated the blocked goal after the bounded companion fix/delivery scope
+was explained. Treat this resumption as authorization for T027/T028: queue-only
+transaction guard, regressions, patch metadata/docs, paired verification/review and
+main delivery. No unrelated companion features/dependencies or operational deployment.
+Use a fresh queue checkout; preserve the old primary verification inputs. Existing
+failure evidence and completed CY implementation/review history remain unchanged.
+
+## Companion acceptance and delivery
+
+T027/T028 completed: two reproduced stale-observation orderings fixed with retained
+ownership/recovery protection, 582 queue tests and all configured pair/static/import/
+documentation checks pass. Fresh corrected independent review returned ship and
+queue architecture acceptance passed. Queue 0.1.7 implementation and closure are
+pushed and verified; exact refs are in execution.md. CY runtime/source is unchanged.
+T022 now resumes CY atomic branch/tag push and final delivery records/metadata/ref
+checks; no companion acceptance gap remains.
+
+## Git delivery completion — 2026-11-02
+
+T022 completed: native contributor/version hooks passed; CY source/release commits
+and annotated v0.44.6 were atomically pushed and remote branch/tag/peel verified.
+Latest committed CY0.44.6 / queue0.1.7 normal installed versions/origins agree and
+all required integration checks pass. Queue source/main delivery is also verified.
+Exact published identities and all residual evidence limits are in release.md.
+This documentation closure uses normal hooks and preserves the unchanged verified
+source/dependency view. No unrelated original paths, local overrides or services
+were changed. All T001–T028 task obligations are complete; historical checkpoints
+above retain their original failed/pending observations and are superseded here.

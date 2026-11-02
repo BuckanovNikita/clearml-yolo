@@ -30,7 +30,8 @@
     "src/clearml_yolo/adapters/runtime/process_tree.py",
     "tests/test_direct_descendants.py",
     "tests/test_subreaper_process_tree.py",
-    "docs/bugs/cleanup-native-process-churn"
+    "docs/bugs/cleanup-native-process-churn",
+    "docs/bugs/cleanup-queue-completion-race"
   ],
   "impact": "modules",
   "rules": "Project constitution II and current module/import contracts: pure core predicates; application uses ports and core; adapters own filesystem/network/SDK effects; entrypoints compose dependencies; verification tooling retains its explicit external effect boundary. Preserve existing exact-edge ownership.",
@@ -340,8 +341,8 @@
   "documentation": "Reconcile schema-3 summary, release-only bulk preparation, current entrypoint/status navigation and immutable manifest identity; preserve dated evidence; update pending snapshot notices, Russian README and authoritative portable usage sources. Native hook-generated changelog and root-version-only pyproject/lock updates are within delivery scope; no dependency content/revision changes are authorized.",
   "review": {
     "status": "accepted",
-    "reviewer": "fresh independent native agent cleanup_final_acceptance",
+    "reviewer": "fresh CY cleanup_final_acceptance and fresh corrected companion queue_corrected_acceptance",
     "evidence": "specs/010-cleanup/acceptance.md",
-    "reconciliation": "Parent and reviewer inspected all 30 modified and 22 new task-owned paths, retained contracts and negative assertions, removals, composition and effect ownership. Original dirty worktrees/index/local overrides and external dependency sources are excluded and preserved. Native generated root-version-only pyproject/lock/changelog changes remain explicit T022 delivery scope; final installed pairing and remote refs are pending release gates."
+    "reconciliation": "Reconciled original 52 CY implementation paths and generated root-version-only release metadata, plus subsequent task-owned scope/race/acceptance records. Original CY code review remains accepted with no source changes; corrected queue-only runtime/storage/tests/package/docs have a separate validated architecture record, parent full latest-pair verification and fresh ship review. Original dirty workspaces and frozen primary verified inputs are preserved. Queue remote commits verified; CY intended branch/tag push and completion records remain T022 delivery gates. Corrected queue source/closure and CY master/annotated tag/peel are now published and remote-verified; normal documentation closure remains within the inspected task scope and changes no runtime inputs."
   }
 }
