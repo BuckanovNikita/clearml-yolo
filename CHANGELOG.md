@@ -1,7 +1,7 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.44.8 (2026-11-02)
 
 ### Bug Fixes
 
@@ -9,6 +9,9 @@
   ([`2bfe1d8`](https://github.com/BuckanovNikita/clearml-yolo/commit/2bfe1d877e1aa4a62edbaeb371aab27db1ac4030))
 
 ### Documentation
+
+- Record native acceptance for batch cleanup release
+  ([`1897fac`](https://github.com/BuckanovNikita/clearml-yolo/commit/1897fac7cf55526691a2d86edccd7078e4b567ad))
 
 - Record verified aligned batch release
   ([`73bb044`](https://github.com/BuckanovNikita/clearml-yolo/commit/73bb044c333852f76f849e41b4fd35b7d5db674c))
