@@ -150,3 +150,36 @@ The complete queue suite passed 583 tests, seven physical opt-ins deselected,
 bytes exactly; no source/lockfile change remained. The copied verification view
 was not modified. Architecture acceptance validation and fresh Markdown checks
 passed after post-canonical review. Master release and actual committed pair follow.
+
+
+## Actual release and companion publication (2026-11-04, Moscow)
+
+Normal pre/post-commit hooks passed, creating feature a89e486 and version commit
+850557ccba23f5e39a6fbdcca77e64fb1aab6a5b (0.45.0). The annotated tag object is
+ad711bf56cb3a8b893ba1315dc24173bf89db1b4. Only the generated changelog and two
+root version tokens changed in the version commit; dependency references/revisions
+and runtime source remain unchanged. Post-release verification reused the exact
+successful copied-environment receipt through the documented metadata guard.
+
+The actual committed CY0.45.0/queue0.1.8 pair resolved normally and passed pip check,
+source/installed version checks, released CY import-origin and exact queue Python
+module-byte comparisons. All 583 queue tests passed, seven physical opt-ins
+deselected, 19 upstream warnings. Queue help and generated documentation validation
+passed (469 fields, 156 configurations, eight tutorials).
+
+Verified published identities:
+
+- CY master and peeled v0.45.0 initially matched 850557c; this documentation-only
+  closure follows the immutable code tag without changing its runtime contents.
+- Queue main: 4cf32f0cd84730aebd3cf930829f80ba47d5af24, package0.1.8; no tag created.
+- Portable collection main/peeled v0.7.2: 5e1cb87471e5d56660a6cc7f3139ab3b7cff37da.
+  The legacy corp-skills remote redirected to custom-opencode-skills; both exact
+  branch/tag identities were verified after the authorized atomic push.
+
+The original checkout remains on preserve/local-work-before-batch-list-20261104
+at its original commit. Every one of its 180 snapshotted changed/untracked file
+contents remains identical. No reset, stash, unrelated staging, shared-service
+intervention, installed-skill update, deployment or registry publication occurred.
+Task-owned test processes completed. The auxiliary copied verification environment
+is retained through the final hooks and scheduled for cleanup after publication;
+the isolated source worktree and its ordinary tested environment are retained.

@@ -131,6 +131,6 @@
     "status": "accepted",
     "reviewer": "Fresh post-canonical independent reviewer review_release_acceptance",
     "evidence": "specs/006-batch-training/list/review.md",
-    "reconciliation": "Reviewed all tracked/untracked task-owned runtime, tests, authored/generated docs and release metadata scope against84166d5 after successful stable canonical verification; all raw log hashes checked. Original dirty checkout excluded; schemas/search/dependency revisions unchanged. Native release helper alone owns later root version metadata; actual committed-pair and push gates remain required."
+    "reconciliation": "Reviewed all tracked/untracked task-owned runtime, tests, authored/generated docs and release metadata scope against84166d5 after successful stable canonical verification; all raw log hashes checked. Original dirty checkout excluded; schemas/search/dependency revisions unchanged. Native release helper alone owns later root version metadata; actual committed-pair and push gates remain required. Final native release changed only generated changelog/root version tokens; actual committed CY0.45.0/queue0.1.8 normal installation, metadata/module identity and583 integration cases passed. CY/queue/portable refs were published and verified; this closure changes documentation only."
   }
 }
