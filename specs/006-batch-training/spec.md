@@ -219,3 +219,20 @@ Explicit training batches keep their existing semantics. See the
 [task assessment](../../docs/bugs/batch-align-eight/assessment.md) and
 [batch contract](../../docs/batch-estimation.md). This policy makes no measured
 throughput improvement claim and does not reopen historical acceptance exceptions.
+
+
+## Saved coverage listing amendment (2026-11-03)
+
+`cy-batch-estimate --list` reports registered models without any usable saved
+estimate, without requiring `--imgsz`, CUDA, runtime initialization or writes.
+`--models` retains aliases; output follows catalogue order. A missing catalogue
+means no saved attempts. Existing failures show saved status, diagnostic (falling
+back to trial evidence/status), resolution, GPU hardware and workload context.
+All distinct unsuccessful contexts remain visible. Any usable case, including
+ceiling/numerically limited cases, covers a model regardless of other failures.
+Coverage is historical evidence, not current training compatibility. Output includes
+selected/covered/missing totals and catalogue path; all-covered is explicit.
+Explicit measurement-only flags are rejected with `--list`. Measurement still
+requires positive `--imgsz`. Report success exits 0 even when estimates are missing;
+invalid arguments or unreadable/corrupt catalogues exit 2. Persisted schemas and
+measurement/search/lookup behavior remain unchanged. See [design](list/design.md).

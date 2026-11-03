@@ -14,6 +14,15 @@ per-GPU ceiling (default 1024); extrapolated global batches may exceed it. Refre
 memory-budget and trial-timeout controls apply to actual single-GPU measurements.
 The trial timeout is not a timeout for the complete search.
 
+`cy-batch-estimate --list [--models SELECTIONS]` is a separate offline read-only
+mode. It requires no resolution or GPU and accepts no explicit measurement flags.
+It lists only registered models with no usable saved estimate under any recorded
+configuration, in catalogue order. Saved failure rows include status, diagnostic
+and resolution/GPU/workload context; absent records say No saved attempt. A usable
+case covers its model even alongside failures, without establishing current-run
+compatibility. Report success exits 0; invalid options or unreadable/corrupt
+evidence exit 2. Measurement mode continues to require positive `--imgsz`.
+
 New `SearchSettings.search_strategy` values default to `memory_guided_aligned_v1`;
 explicit `memory_guided_v1` and `exponential_binary_v1` retain their historical
 transition policies. Aligned search starts at 8 and 16 per GPU, predicts from full successful memory observations with bounded growth,

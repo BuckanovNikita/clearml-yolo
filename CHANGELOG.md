@@ -5,6 +5,9 @@
 
 ### Documentation
 
+- Record verified instruction publication
+  ([`84166d5`](https://github.com/BuckanovNikita/clearml-yolo/commit/84166d53baf765bfd3e5bd13b89c4135df0f9dcf))
+
 - Standardize shared agent instruction discovery
   ([`3e38d11`](https://github.com/BuckanovNikita/clearml-yolo/commit/3e38d11f374868769a2c6f011905f5699081972a))
 

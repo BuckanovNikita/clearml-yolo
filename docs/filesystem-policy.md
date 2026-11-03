@@ -1,11 +1,15 @@
 # Filesystem ownership
 
-The application execution commands, `cy-batch-estimate`, `cy-download-weights` and `cy-init-config` initialize project paths through a
+The application execution commands, batch measurement, `cy-download-weights` and `cy-init-config` initialize project paths through a
 stdlib-only bootstrap. Ordinary package imports remain inert. `CY_HOME` defaults to the
 launch working directory; relative values resolve against that directory before Hydra
 changes cwd. Explicit relative inputs and outputs retain their working-directory semantics.
 `cy-dedup` initializes no application directories or SDKs; its atomic temporary files live
 beside the selected destination and are cleaned there.
+
+`cy-batch-estimate --list` reads saved coverage without initializing runtime paths
+or creating directories, locks or catalogue files, including when `CY_HOME` does not
+yet exist. Only ordinary measurement mode initializes estimator scratch.
 
 ## Defaults and explicit destinations
 

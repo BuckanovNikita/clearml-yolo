@@ -74,6 +74,7 @@ def test_option_declarations_preserve_parsing_types_and_defaults() -> None:
         ["--imgsz", "640", "--devices", "2,0", "--gpu-counts", "1,2"]
     )
     assert vars(arguments) == {
+        "list": False,
         "imgsz": 640,
         "classes": 150,
         "objects_per_image": 300,

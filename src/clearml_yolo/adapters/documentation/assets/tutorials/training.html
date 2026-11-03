@@ -104,6 +104,17 @@ DEIMv2 при выполнении готовит исходники утвер�
 <a href="/#field=model.train.batch">model.train.batch</a> задаёт batch обучения.
 Явное <code>null</code> использует совместимую сохранённую оценку, а не запускает измерение
 автоматически. Для подготовки оценки на свободном GPU:</p>
+<p>Без GPU можно проверить сохранённые оценки:</p>
+<pre><code class="language-bash">cy-batch-estimate --list
+cy-batch-estimate --list --models yolo11n.pt,rfdetr/small
+</code></pre>
+<p>Список показывает модели без пригодной сохранённой оценки: <code>No saved attempt</code> при
+отсутствии записей, иначе сохранённую причину, разрешение, GPU и нагрузку. В конце —
+число выбранных, покрытых и отсутствующих моделей и путь к каталогу. Любая оценка
+<code>validated</code>, <code>ceiling_limited</code> или <code>numerically_limited</code> покрывает модель независимо
+от других неудач; это история, а не совместимость с текущим обучением. Каталог
+не изменяется, <code>--imgsz</code> не нужен; параметры измерения вместе с <code>--list</code> запрещены.
+Отсутствие оценки возвращает код 0; повреждённый или недоступный каталог — код 2.</p>
 <pre><code class="language-bash">cy-batch-estimate --imgsz 512 --models rfdetr/small --devices 0
 </code></pre>
 <p>Это реальные локальные CUDA-пробы, без задачи ClearML. По умолчанию синтетическая
@@ -171,4 +182,4 @@ descriptor/sidecar. Совпадающее расширение файла не�
 справочнике не заменяет его реальный запуск на вашем устройстве; ограничения
 физического multi-GPU и deployment-проверок остаются отдельными.</p>
 </main></body></html>
-<!-- source-sha256: 86c463fc30a3bf89f90a26f7d42768c364e444fc4021666e773472be09940592 -->
+<!-- source-sha256: a9daf843a13597bd1ec6f4d6398f199b2d3a19b9ec4f5cd4e2140360b4f50ae3 -->

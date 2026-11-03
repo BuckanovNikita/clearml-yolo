@@ -172,3 +172,27 @@ delivery with that benchmark gap recorded, in addition to the earlier physical
 multi-GPU exception. It does not turn T041 or full architecture acceptance into
 passes. Ordinary checks, independent review, final paired-source verification and
 normal release hooks remain required; no native guarantee or idle criterion changes.
+
+
+## Saved coverage listing implementation (2026-11-03)
+
+Approved user plan: add offline saved-coverage `--list`, implemented in an isolated
+worktree based on origin/master 84166d5; preserve the original dirty checkout.
+Pure core classification maps selected catalogue models and saved cases to coverage
+records; CLI owns rendering and composes the existing read-only store before any
+runtime/GPU/probe effects. Shared inert option declarations expose the new flag.
+No schema or training policy change. Existing import/negative architecture contracts
+cover inward dependencies and pure core effect ownership; listing tests reject
+runtime, probe, GPU and write calls. See [architecture](list/architecture.json).
+
+Sequence: native specify/plan/tasks amendments, consistency analysis and architecture
+plan validation; failing focused tests, implementation, documentation and focused/full
+verification; fresh independent review and acceptance; paired latest/proposed queue
+verification, normal commits/hooks and Git-only release. Core/CLI changes are
+sequential; portable companion documentation can proceed independently in its own
+worktree, then joins documentation/review acceptance. Queue compatibility metadata
+must permit the proposed 0.45.0 release after verifying actual integration.
+
+Documentation scope: Russian README, batch-estimation guide, current contracts,
+shared CLI option metadata/help fixture, generated training tutorial/inventory and
+portable usage references/evaluation. Record checks and release in list/verification.md.

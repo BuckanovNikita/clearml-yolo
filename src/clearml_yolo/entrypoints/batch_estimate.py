@@ -1,6 +1,7 @@
 """Measure single-GPU training capacity and extrapolate selected allocations."""
 
 import argparse
+import json
 import sys
 import time
 from collections.abc import Sequence
@@ -26,11 +27,13 @@ from clearml_yolo.core.batch_estimation import (
     SearchSettings,
     SyntheticWorkload,
     TrainingProfile,
+    estimate_diagnostic,
     estimate_key,
+    model_coverage,
     select_models,
     select_recommendation,
 )
-from clearml_yolo.entrypoints.options import parser_for
+from clearml_yolo.entrypoints.options import OPTION_DECLARATIONS, parser_for
 
 if TYPE_CHECKING:
     from clearml_yolo.adapters.runtime.worker_pool import IndependentWorkerPool, WorkerCompletion
@@ -341,10 +344,81 @@ def _execute(options: _Options) -> bool:
     return successful
 
 
+def _list_arguments(
+    argument_parser: argparse.ArgumentParser, tokens: Sequence[str]
+) -> None:
+    # parse_args already resolved abbreviations and rejected ambiguous/unknown flags.
+    # Inspect explicit tokens so even measurement values equal to defaults are rejected.
+    measurement_flags = tuple(
+        flag
+        for option in OPTION_DECLARATIONS["cy-batch-estimate"]
+        for flag in option.flags
+        if flag not in {"--list", "--models", "--help", "-h"}
+    )
+    for token in tokens:
+        name = token.partition("=")[0]
+        if (
+            name.startswith("--")
+            and name != "--"
+            and any(flag.startswith(name) for flag in measurement_flags)
+        ):
+            argument_parser.error(f"{name} cannot be used with --list")
+
+
+def _cell(value: str) -> str:
+    # Keep Unicode names readable while escaping embedded controls and terminal escapes.
+    encoded = json.dumps(value, ensure_ascii=False)[1:-1]
+    return "".join(char if char.isprintable() else ascii(char)[1:-1] for char in encoded)
+
+
+def _list_saved(selections: str | None) -> None:
+    models = select_models(
+        tuple(value.strip() for value in selections.split(",")) if selections is not None else None
+    )
+    store = FileBatchEstimateStore()
+    coverage = model_coverage(models, store.read().cases)
+    missing = tuple(item for item in coverage if not item.covered)
+    sys.stdout.write(
+        "Saved coverage across recorded configurations; not current training compatibility.\n"
+        "MODEL\tSTATUS\tREASON\tCONTEXT\n"
+    )
+    for item in missing:
+        if not item.attempts:
+            sys.stdout.write(f"{item.model.selection}\tnot_attempted\tNo saved attempt\t-\n")
+        for case in item.attempts:
+            profile = case.profile
+            hardware = ", ".join(
+                f"{gpu.name} ({gpu.total_memory_bytes} bytes)" for gpu in profile.gpus
+            )
+            context = (
+                f"imgsz={profile.nominal_size[0]}x{profile.nominal_size[1]}; "
+                f"gpus={profile.world_size}: {hardware}; "
+                f"classes={case.workload.classes}; "
+                f"objects_per_image={case.workload.objects_per_image}"
+            )
+            sys.stdout.write(
+                f"{item.model.selection}\t{case.status}\t{_cell(estimate_diagnostic(case))}"
+                f"\t{_cell(context)}\n"
+            )
+    if not missing:
+        sys.stdout.write("All selected models have a usable saved estimate.\n")
+    sys.stdout.write(
+        f"Summary: selected={len(coverage)}\tcovered={len(coverage) - len(missing)}"
+        f"\tmissing={len(missing)}\nResults: {_cell(str(store.path))}\n"
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> None:
     argument_parser = parser()
-    arguments = argument_parser.parse_args(argv)
+    tokens = list(argv) if argv is not None else sys.argv[1:]
+    arguments = argument_parser.parse_args(tokens)
     try:
+        if arguments.list:
+            _list_arguments(argument_parser, tokens)
+            _list_saved(arguments.models)
+            return
+        if arguments.imgsz is None:
+            argument_parser.error("--imgsz is required unless --list is used")
         options = _options(arguments)
         with runtime_environment():
             successful = _execute(options)

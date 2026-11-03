@@ -3,6 +3,14 @@
 Run from a prepared source environment; use isolated CY_HOME/output roots and explicit
 ClearML project/tags for native execution. No test may stop unrelated GPU workloads.
 
+For saved coverage alone, run `cy-batch-estimate --list` or
+`cy-batch-estimate --list --models yolo11n.pt,rfdetr/small` with CUDA visibility
+empty and an isolated `CY_HOME`. Confirm a missing catalogue creates no files,
+reports missing models with No saved attempt and exits 0. With saved records,
+verify statuses/reasons/context, model totals, any-usable coverage and unchanged
+bytes; corrupt input and explicit measurement flags must exit 2. This validates
+listing without running the native measurement scenarios below.
+
 ```bash
 CUDA_VISIBLE_DEVICES='' uv run --frozen --no-sync python scripts/verify.py
 CUDA_VISIBLE_DEVICES='' uv run --frozen --no-sync python scripts/verify.py --docs

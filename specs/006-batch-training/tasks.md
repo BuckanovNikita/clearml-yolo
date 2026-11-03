@@ -215,3 +215,16 @@ resolution and source/installed consistency checks. The annotated CY version tag
 queue test companion and portable collection 0.6.9 were pushed with exact remote
 ref verification. See [dated evidence](../../docs/bugs/batch-align-eight/test.md).
 Historical native timing/DDP limitations remain unchanged.
+
+
+## Saved coverage listing (2026-11-03)
+
+- [x] T051 Specify saved-coverage listing, architecture/effect ownership and dependency-ordered implementation; analyze consistency without rewriting historical acceptance.
+- [x] T052 Add failing pure coverage and read-only CLI tests, implement report classification/rendering and conditional argument validation.
+- [x] T053 Update README, batch contract, shared/help/generated documentation and portable usage skill; validate examples, metadata, links and discovery.
+- [x] T054 Run focused and canonical verification, documentation validation and latest/proposed CY/queue compatibility checks.
+- [ ] T055 Obtain fresh independent review, reconcile task diff/architecture and checks, then release to master using normal hooks and verified Git-only pushes.
+
+T051 precedes T052. T053 portable work may run independently; final generated docs
+follow CLI changes. T054 requires T052/T053; T055 requires all acceptance evidence.
+Prior native timing and physical-DDP limitations remain historical and unchanged.

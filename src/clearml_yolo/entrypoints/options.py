@@ -106,9 +106,18 @@ OPTION_DECLARATIONS: dict[str, tuple[OptionDeclaration, ...]] = {
     "cy-batch-estimate": (
         _HELP,
         OptionDeclaration(
+            ("--list",),
+            {
+                "action": "store_true",
+                "help": "list models without any usable saved estimate; no GPU needed",
+            },
+            "Показать модели без пригодной сохранённой оценки и причины; GPU не требуется.",
+            ("--list", "--list --models yolo11n,rfdetr/small"),
+        ),
+        OptionDeclaration(
             ("--imgsz",),
-            {"type": int, "required": True, "help": "nominal square training resolution"},
-            "Обязательное положительное квадратное разрешение измерения обучающего пакета.",
+            {"type": int, "help": "nominal square training resolution; required unless --list"},
+            "Положительное квадратное разрешение измерения; обязательно, кроме режима --list.",
             ("--imgsz 640",),
         ),
         OptionDeclaration(

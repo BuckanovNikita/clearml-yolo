@@ -60,3 +60,14 @@ identical hardware shares a source. Source workload and training-profile checks 
 strict. Extrapolation creates no trial or stored measured case. The persisted settings
 and evidence schema remain readable; new searches interpret the CLI ceiling per GPU
 because every trial uses a single-GPU profile.
+
+
+## Saved coverage report values (2026-11-03)
+
+`ModelCoverage` is a frozen presentation-policy value containing a catalogue
+`ModelVariant` and its saved `EstimateCase` attempts. Its derived `covered` property
+uses existing `EstimateCase.usable`. `model_coverage` filters selected registered
+models, retaining catalogue order and every saved context without compatibility
+checks. `estimate_diagnostic` prefers the case diagnostic, then the latest
+unsuccessful trial diagnostic/status, then the saved case status. These values are
+not persisted; catalogue schemas, estimate keys and training lookup are unchanged.

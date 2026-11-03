@@ -62,6 +62,37 @@ or case-result failures do not terminate peers. If process supervision cannot be
 established or recovered safely, the invocation stops while preserving already
 accepted results. Output retains the requested model and GPU-count order.
 
+## Inspect saved coverage without measuring
+
+```bash
+cy-batch-estimate --list
+cy-batch-estimate --list --models yolo11n.pt,rfdetr/small
+```
+
+`--list` reads the existing catalogue and lists only selected models with no usable
+saved estimate. It needs neither `--imgsz` nor CUDA, performs no GPU discovery or
+native probes, and creates no runtime directories, locks or catalogue updates.
+The default selects the full model catalogue; `--models` accepts the usual aliases.
+Rows follow catalogue order and include saved status, reason, nominal resolution,
+GPU hardware and synthetic workload for each unsuccessful saved configuration.
+Control characters in stored text are escaped to keep diagnostics on one row.
+
+`not_attempted` means **No saved attempt**, including when the catalogue is absent.
+It does not prove that the model was never run. Failed or incomplete records retain
+their diagnostics; a pending confirmation may still be running or may have been
+interrupted. When the case has no diagnostic, the latest unsuccessful trial diagnostic
+or trial status is used, then the saved case status. No failure cause is inferred from missing data.
+
+Any `validated`, `ceiling_limited` or `numerically_limited` saved case counts as
+coverage, even if other configurations failed. This is historical coverage across
+recorded configurations, **not current training compatibility**. Resolution,
+hardware, workload, recipe and dependency matching still apply during training.
+The summary prints selected/covered/missing model totals and the catalogue path;
+all-covered output is explicit. Missing estimates exit successfully with code 0.
+Malformed/unreadable catalogues and invalid arguments exit 2, preserving evidence.
+Only `--list`, `--models` and help apply to listing; explicit measurement options,
+including `--imgsz`, `--devices`, `--jobs` and `--refresh`, are rejected.
+
 ## Search and evidence
 
 Before launching YOLO workers, the estimator persists an absolute Ultralytics

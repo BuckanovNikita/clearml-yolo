@@ -450,6 +450,44 @@ class EstimateCatalogue(_Record):
         return self
 
 
+class ModelCoverage(_Record):
+    """Saved evidence for one catalogue model, independent of current hardware."""
+
+    model: ModelVariant
+    attempts: tuple[EstimateCase, ...]
+
+    @property
+    def covered(self) -> bool:
+        return any(case.usable for case in self.attempts)
+
+
+def model_coverage(
+    models: tuple[ModelVariant, ...], cases: tuple[EstimateCase, ...]
+) -> tuple[ModelCoverage, ...]:
+    """Report selected models in catalogue order without testing current compatibility."""
+    selected = {model.selection for model in models}
+    return tuple(
+        ModelCoverage(
+            model=model,
+            attempts=tuple(
+                case for case in cases if case.profile.model.selection == model.selection
+            ),
+        )
+        for model in model_catalogue()
+        if model.selection in selected
+    )
+
+
+def estimate_diagnostic(case: EstimateCase) -> str:
+    """Use recorded failure evidence; never invent a cause for absent observations."""
+    if case.diagnostic.strip():
+        return case.diagnostic
+    for trial in reversed(case.trials):
+        if trial.status != "success":
+            return trial.diagnostic if trial.diagnostic.strip() else trial.status
+    return case.status
+
+
 def estimate_key(
     profile: TrainingProfile, workload: SyntheticWorkload, settings: SearchSettings
 ) -> str:

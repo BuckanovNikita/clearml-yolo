@@ -452,3 +452,83 @@ def test_recommendation_serialization_preserves_sources_without_inventing_trials
     restored = ResolvedRecommendation.model_validate_json(recommendation.model_dump_json())
     assert restored == recommendation
     assert restored.sources[0].trials == source.trials
+
+
+def test_saved_coverage_orders_selected_models_and_retains_failure_contexts() -> None:
+    from clearml_yolo.core import batch_estimation as policy
+
+    failed = _case(_search(0))
+    other = failed.model_copy(
+        update={
+            "profile": failed.profile.model_copy(update={"nominal_size": (640, 640)}),
+            "diagnostic": "batch 1 did not fit",
+        }
+    )
+    selected = select_models(("rfdetr/small", "yolo11n.pt"))
+    coverage = policy.model_coverage(selected, (failed, other))
+    assert tuple(item.model.selection for item in coverage) == (
+        "ultralytics/yolo11n",
+        "rfdetr/small",
+    )
+    assert coverage[0].attempts == (failed, other)
+    assert not any(item.covered for item in coverage)
+    assert coverage[1].attempts == ()
+
+
+@pytest.mark.parametrize(("capacity", "ceiling"), [(16, 32), (32, 32)])
+def test_saved_coverage_accepts_any_usable_evidence(capacity: int, ceiling: int) -> None:
+    from clearml_yolo.core import batch_estimation as policy
+
+    good = _case(_search(capacity, ceiling=ceiling))
+    failed = _case(_search(0))
+    (coverage,) = policy.model_coverage(select_models(("yolo11n",)), (good, failed))
+    assert coverage.covered
+
+
+def test_saved_coverage_accepts_numerically_limited_evidence() -> None:
+    from clearml_yolo.core import batch_estimation as policy
+
+    case = _case(
+        _search(
+            16,
+            observe=lambda search: _trial(
+                search,
+                "success"
+                if search.next_batch is not None and search.next_batch <= 8
+                else "nonfinite",
+            ),
+        )
+    )
+    assert case.status == "numerically_limited"
+    (coverage,) = policy.model_coverage(select_models(("yolo11n",)), (case,))
+    assert coverage.covered
+
+
+def test_saved_diagnostic_prefers_case_then_failed_trial_then_status() -> None:
+    from clearml_yolo.core import batch_estimation as policy
+
+    failed = _case(_search(16, observe=lambda search: _trial(search, "timeout")))
+    assert policy.estimate_diagnostic(
+        failed.model_copy(update={"diagnostic": "owner timed out"})
+    ) == ("owner timed out")
+    assert (
+        policy.estimate_diagnostic(failed.model_copy(update={"diagnostic": ""})) == "observed trial"
+    )
+    snapshot = failed.model_copy(update={"diagnostic": "", "trials": ()})
+    assert policy.estimate_diagnostic(snapshot) == "failed"
+
+
+def test_saved_diagnostic_does_not_blame_an_earlier_capacity_boundary() -> None:
+    from clearml_yolo.core import batch_estimation as policy
+
+    def observe(search: BatchSearch) -> TrialResult:
+        if search.confirming:
+            return _trial(search, "crash", diagnostic="")
+        return _trial(
+            search,
+            "success" if (search.next_batch or 0) <= 8 else "oom",
+            diagnostic="Earlier capacity observation",
+        )
+
+    failed = _case(_search(8, observe=observe)).model_copy(update={"diagnostic": ""})
+    assert policy.estimate_diagnostic(failed) == "crash"
