@@ -592,7 +592,7 @@ wheels = [
 
 [[package]]
 name = "clearml-yolo"
-version = "0.44.8"
+version = "0.45.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },

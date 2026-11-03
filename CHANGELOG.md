@@ -1,7 +1,7 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.45.0 (2026-11-04)
 
 ### Documentation
 
@@ -10,6 +10,11 @@
 
 - Standardize shared agent instruction discovery
   ([`3e38d11`](https://github.com/BuckanovNikita/clearml-yolo/commit/3e38d11f374868769a2c6f011905f5699081972a))
+
+### Features
+
+- **batch**: List models without saved estimates
+  ([`a89e486`](https://github.com/BuckanovNikita/clearml-yolo/commit/a89e4869b0ee801c28ac31f9d99573d9485ac4e3))
 
 
 ## v0.44.8 (2026-11-02)
