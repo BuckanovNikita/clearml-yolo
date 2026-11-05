@@ -165,6 +165,7 @@ class _RunStorage:
     absolute = staticmethod(Path.absolute)
     read_text = staticmethod(file_io.read_text)
     write_text = staticmethod(file_io.write_text)
+    atomic_write_text = staticmethod(file_io.atomic_write_text)
     read_csv = staticmethod(file_io.read_csv)
     read_detection_csv = staticmethod(file_io.read_detection_csv)
     read_ground_truth = staticmethod(file_io.read_ground_truth)
@@ -185,6 +186,9 @@ class _ExecutionResources:
 
 
 class _TrackingSession:
+    training_counts = staticmethod(clearml_session.training_counts)
+    preserve_training_success = staticmethod(clearml_session.preserve_training_success)
+    record_pipeline_outcome = staticmethod(clearml_session.record_pipeline_outcome)
     publish_training_parameters = staticmethod(clearml_session.publish_training_parameters)
     declare_result_producers = staticmethod(clearml_results.declare_result_producers)
     complete_result_producer = staticmethod(clearml_results.complete_result_producer)

@@ -15,6 +15,7 @@ from clearml_yolo.adapters.storage.filesystem import initialize_filesystem
 
 OWNER_PID_ENV = "CY_CLEARML_OWNER_PID"
 OWNER_TASK_ENV = "CY_CLEARML_OWNER_TASK_ID"
+_FINAL_EVALUATION: ContextVar[bool] = ContextVar("native_final_evaluation", default=False)
 _SCALAR_CALLBACK: ContextVar[bool] = ContextVar("native_scalar_callback", default=False)
 _REPLAYED_SCALARS: ContextVar[bool] = ContextVar("native_replayed_scalars", default=False)
 _SANITIZED_CALLBACK: ContextVar[bool] = ContextVar("native_sanitized_callback", default=False)
@@ -144,6 +145,57 @@ def _without_training_pr(callback: Callable[[Any], None]) -> Callable[[Any], Non
     return publish
 
 
+
+def _completed_training_publication(callback: Callable[[Any], None]) -> Callable[[Any], None]:
+    """Isolate the installed final upload callback after native training has ended."""
+    def publish(trainer: Any) -> None:
+        from clearml_yolo.adapters.clearml.session import (
+            active_task,
+            preserve_training_success,
+            record_training_publication_failure,
+        )
+
+        task = active_task()
+        best = Path(trainer.best)
+        # on_train_end is emitted after the native training loop and final validation.
+        # Earlier checkpoints alone cannot establish successful training.
+        if best.is_file() and best.stat().st_size > 0:
+            preserve_training_success(
+                task, best, Path(trainer.save_dir).parent.parent / "pipeline_outcome.json",
+            )
+        try:
+            callback(trainer)
+        except Exception as error:
+            if not record_training_publication_failure(task, error):
+                raise
+
+    return publish
+
+
+@contextmanager
+def final_training_evaluation() -> Iterator[None]:
+    """Identify final validation callbacks separately from ordinary epoch callbacks."""
+    token = _FINAL_EVALUATION.set(True)
+    try:
+        yield
+    finally:
+        _FINAL_EVALUATION.reset(token)
+
+
+def _in_final_training_evaluation() -> bool:
+    return _FINAL_EVALUATION.get()
+
+
+def _final_evaluation_publication(callback: Callable[[Any], None]) -> Callable[[Any], None]:
+    @wraps(callback)
+    def publish(trainer: Any) -> None:
+        if _in_final_training_evaluation():
+            _completed_training_publication(callback)(trainer)
+        else:
+            callback(trainer)
+
+    return publish
+
 def _enable_owner(integration: Any, settings: Any) -> None:
     import clearml
     from clearml import Task
@@ -155,7 +207,10 @@ def _enable_owner(integration: Any, settings: Any) -> None:
     callbacks["on_pretrain_routine_start"] = _checked_pretrain(
         integration, callbacks["on_pretrain_routine_start"]
     )
-    callbacks["on_train_end"] = _without_training_pr(callbacks["on_train_end"])
+    callbacks["on_train_end"] = _completed_training_publication(
+        _without_training_pr(callbacks["on_train_end"]),
+    )
+    callbacks["on_fit_epoch_end"] = _final_evaluation_publication(callbacks["on_fit_epoch_end"])
     for event in ("on_train_epoch_end", "on_fit_epoch_end"):
         callbacks[event] = _journal_scalars(callbacks[event])
     integration.callbacks = callbacks

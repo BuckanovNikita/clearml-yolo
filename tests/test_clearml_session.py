@@ -140,9 +140,14 @@ class FakeTask:
         self.failed.append(kwargs)
         return object()
 
-    def mark_completed(self, **kwargs: Any) -> object:
+    def mark_completed(
+        self, ignore_errors: bool = True, status_message: str | None = None, force: bool = False
+    ) -> object:
         self.events.append("completed")
-        self.completed.append(kwargs)
+        completion: dict[str, Any] = {"ignore_errors": ignore_errors, "force": force}
+        if status_message is not None:
+            completion["status_message"] = status_message
+        self.completed.append(completion)
         return object()
 
 

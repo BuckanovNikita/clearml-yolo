@@ -11,6 +11,7 @@ from digital_metrics.reporting import render_evaluation as render_shared_evaluat
 from digital_metrics.types import Metrics
 
 from clearml_yolo.adapters.observability.tracing import trace_operation
+from clearml_yolo.adapters.reporting.count_issues import apply_training_counts
 from clearml_yolo.adapters.reporting.workbook_identity import annotate_workbook, humanize_workbook
 from clearml_yolo.adapters.storage.filesystem import write_path
 from clearml_yolo.core.artifact_names import PLOT_METRICS, split_component
@@ -116,6 +117,8 @@ def render_evaluation(
             },
             caption=caption,
         )
+    apply_training_counts(rendered.dashboard, dashboard_path, computed.training_counts)
+    apply_training_counts(rendered.dtrk_dashboard, dtrk_path, computed.training_counts)
     _humanize_plot_classes(rendered.plots, human_labels(visible_metrics))
     for path in plot_paths.values():
         if not path.is_file():

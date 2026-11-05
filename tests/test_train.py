@@ -420,6 +420,7 @@ def test_native_ddp_events_replay_before_model_finalization(
         dataset_format="ndjson",
         artifacts=[],
     )
+    prepared.ground_truth.write_text("instance_label,split\ncat,train\n", encoding="utf-8")
     _execute_training(
         types.SimpleNamespace(id="task"),
         "model.pt",

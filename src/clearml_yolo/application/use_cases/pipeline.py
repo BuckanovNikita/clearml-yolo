@@ -1,7 +1,7 @@
 """Compose native execution and current-data evaluation under one tracking owner."""
 
 import json
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import fields, is_dataclass, replace
 from pathlib import Path
 from typing import Any
@@ -28,12 +28,111 @@ from clearml_yolo.application.use_cases.predict import predict as run_prediction
 from clearml_yolo.application.use_cases.publication import prepare_publisher, publish_results
 from clearml_yolo.application.use_cases.report import report as run_report
 from clearml_yolo.application.use_cases.train import train as run_training
+from clearml_yolo.core.pipeline_outcome import PipelineOutcome, StageOutcome
 from clearml_yolo.core.publication import FiftyOneConfig
+from clearml_yolo.core.redaction import redact_text
 
 PREDICTIONS_NAME = "predictions.csv"
 METRICS_DIR = "metrics"
 REPORTS_DIR = "reports"
 COMPARISON_DIR = "comparison"
+
+
+class _PipelineStages:
+    """Own stage boundaries; all persistence and tracking cross explicit ports."""
+
+    def __init__(
+        self, directory: Path, task: TaskHandle | None, deps: WorkflowDependencies
+    ) -> None:
+        self.directory = directory
+        self.task = task
+        self.deps = deps
+        self.outcome = PipelineOutcome()
+
+    def persist(self) -> None:
+        try:
+            self.deps.tracking.record_pipeline_outcome(self.task, self.outcome)
+        except Exception as error:
+            if not self.outcome.training_succeeded:
+                raise
+            self._persistence_failure("outcome_publication", error)
+        try:
+            self.deps.storage.atomic_write_text(
+                self.directory / "pipeline_outcome.json", self.outcome.model_dump_json(indent=2)
+            )
+            self.deps.storage.atomic_write_text(
+                self.directory / "pipeline_outcome.txt", self.outcome.summary()
+            )
+        except Exception as error:
+            if not self.outcome.training_succeeded:
+                raise
+            self._persistence_failure("outcome_storage", error)
+
+    def _persistence_failure(self, stage: str, error: Exception) -> None:
+        self.outcome.stages[stage] = StageOutcome(
+            status="failed", reason=redact_text(str(error))
+        )
+        self.deps.resources.log_exception("Pipeline outcome persistence failed", error)
+
+    def skip(self, name: str, reason: str) -> None:
+        self.outcome.stages[name] = StageOutcome(status="skipped", reason=reason)
+        self.persist()
+
+    def run[Result](self, name: str, operation: Callable[[], Result]) -> Result | None:
+        try:
+            result = operation()
+        except Exception as error:  # Stage boundary retains the actual failure.
+            self.outcome.stages[name] = StageOutcome(
+                status="failed", reason=redact_text(str(error))
+            )
+            try:
+                self.persist()
+            except Exception as persistence_error:  # noqa: BLE001 - preserve original stage error
+                self.deps.resources.log_exception(
+                    "Could not record failed stage outcome", persistence_error
+                )
+            if not self.outcome.training_succeeded:
+                raise
+            self.deps.resources.log_exception(
+                "Pipeline stage failed; successful training retained", error,
+                context={"stage": name},
+            )
+            return None
+        except BaseException as error:
+            self.outcome.fatal_error = True
+            self.outcome.stages[name] = StageOutcome(
+                status="failed", reason=redact_text(f"{type(error).__name__}: {error}")
+            )
+            try:
+                self.persist()
+            except Exception as persistence_error:  # noqa: BLE001 - retain interruption
+                self.deps.resources.log_exception(
+                    "Could not record interrupted stage outcome", persistence_error
+                )
+            raise
+        self.outcome.stages[name] = StageOutcome(status="succeeded")
+        self.persist()
+        return result
+
+    def succeeded(self, name: str) -> bool:
+        return self.outcome.stages[name].status == "succeeded"
+
+    def resources_ready(self) -> bool:
+        if not self.outcome.training_succeeded or self.succeeded("training_resources"):
+            return True
+        # Queue contraction may already be durable: never infer that old leases remain valid.
+        for name in ("prediction", "metrics", "comparison", "report", "visualization"):
+            self.skip(name, "Post-training resource transition failed; compute admission unknown")
+        return False
+
+    def finish(self, results: dict[str, Any]) -> dict[str, Any]:
+        self.persist()
+        results["outcome"] = self.outcome.model_dump(mode="json")
+        self.deps.resources.log(
+            "WARNING" if self.outcome.status == "completed_with_warnings" else "INFO",
+            "{}", self.outcome.summary(),
+        )
+        return results
 
 
 def _as_dict(config: Any) -> dict[str, Any]:
@@ -181,8 +280,6 @@ def _train_from_ground_truth(
     dataset_format: DatasetFormat,
     dataset_cache_dir: str | Path | None,
     required_splits: list[str],
-    prediction_data_overrides: dict[str, dict[str, Any]],
-    task: TaskHandle | None,
     *,
     deps: WorkflowDependencies,
 ) -> tuple[Path, ResolvedGroundTruth]:
@@ -195,10 +292,6 @@ def _train_from_ground_truth(
         required_splits=required_splits,
         deps=deps,
     )
-    deps.tracking.record_run_configuration(
-        task, {"prediction_data_overrides": prediction_data_overrides}
-    )
-    deps.resources.training_finished()
     return trained.weights, replace(ground_truth, path=trained.cleaned_ground_truth)
 
 
@@ -310,106 +403,221 @@ def run_pipeline(
         deps.tracking.declare_result_producers(
             task, _result_producers(skip_predict, skip_metrics, skip_compare), output_dir=directory
         )
+        stages = _PipelineStages(directory, task, deps)
         results: dict[str, Any] = {"run_dir": directory}
         checkpoint = weights if weights is not None else directory / "detect/train/weights/best.pt"
         effective_ground_truth = resolved_truth
         if not skip_train:
             checkpoint, effective_ground_truth = _train_from_ground_truth(
-                train_params,
-                clearml,
-                resolved_truth,
-                dataset_format,
-                dataset_cache_dir,
+                train_params, clearml, resolved_truth, dataset_format, dataset_cache_dir,
                 _required_training_splits(
-                    splits,
-                    skip_predict=skip_predict,
-                    skip_metrics=skip_metrics,
+                    splits, skip_predict=skip_predict, skip_metrics=skip_metrics,
                     skip_compare=skip_compare,
                 ),
-                prediction_data_overrides,
-                task,
                 deps=deps,
             )
+            if not deps.storage.is_file(checkpoint) or deps.storage.stat(checkpoint).st_size == 0:
+                raise ValueError(f"Training did not produce a usable checkpoint: {checkpoint}")
+            stages.outcome.training_succeeded = True
+            stages.outcome.stages["training"] = StageOutcome(
+                status="succeeded", artifacts=[str(checkpoint)]
+            )
+            deps.tracking.preserve_training_success(
+                task, checkpoint, directory / "pipeline_outcome.json"
+            )
+            stages.persist()
             results["weights"] = checkpoint
-        predictions, prediction_splits = (
-            directory / PREDICTIONS_NAME,
-            list(dict.fromkeys(["val", *splits])),
-        )
-        if not skip_predict:
-            predicted = run_prediction(
-                checkpoint,
-                effective_ground_truth,
-                predictions,
-                clearml,
-                train_params,
-                splits=prediction_splits,
-                ultralytics_predict=predict_params,
-                fiftyone=FiftyOneConfig(enabled=False),
-                model_label=model_label,
-                deps=deps,
+            stages.run("training_resources", deps.resources.training_finished)
+            stages.run(
+                "training_metadata",
+                lambda: deps.tracking.record_run_configuration(
+                    task, {"prediction_data_overrides": prediction_data_overrides}
+                ),
             )
+        else:
+            stages.skip("training", "Disabled by configuration")
+        return _run_downstream(
+            stages, results, directory, checkpoint, effective_ground_truth, resolved_truth,
+            clearml, train_params, predict_params, metrics_cfg, compare_cfg, report_cfg,
+            splits, model_label, skip_train, skip_predict, skip_metrics, skip_compare,
+            skip_report, publisher, task, deps,
+        )
+
+
+def _run_downstream(
+    stages: _PipelineStages,
+    results: dict[str, Any],
+    directory: Path,
+    checkpoint: str | Path,
+    effective_ground_truth: ResolvedGroundTruth,
+    resolved_truth: ResolvedGroundTruth,
+    clearml: ClearMLConfig,
+    train_params: dict[str, Any],
+    predict_params: dict[str, Any],
+    metrics_cfg: dict[str, Any],
+    compare_cfg: dict[str, Any],
+    report_cfg: dict[str, Any],
+    splits: list[str],
+    model_label: str | None,
+    skip_train: bool,
+    skip_predict: bool,
+    skip_metrics: bool,
+    skip_compare: bool,
+    skip_report: bool,
+    publisher: Publisher,
+    task: TaskHandle | None,
+    deps: WorkflowDependencies,
+) -> dict[str, Any]:
+    if not stages.resources_ready():
+        return stages.finish(results)
+    predictions = directory / PREDICTIONS_NAME
+    prediction_splits = list(dict.fromkeys(["val", *splits]))
+    if skip_predict:
+        stages.skip("prediction", "Disabled by configuration")
+    else:
+        predicted = stages.run(
+            "prediction",
+            lambda: run_prediction(
+                checkpoint, effective_ground_truth, predictions, clearml, train_params,
+                splits=prediction_splits, ultralytics_predict=predict_params,
+                fiftyone=FiftyOneConfig(enabled=False), model_label=model_label, deps=deps,
+            ),
+        )
+        if predicted is not None:
             predictions = predicted.predictions
             results["predictions"] = predictions
-        thresholds_path = directory / METRICS_DIR / "frozen_thresholds.json"
-        evaluations: dict[str, Path] = {}
-        if not skip_metrics:
-            evaluated = compute_metrics(
-                predictions,
-                effective_ground_truth,
-                directory / METRICS_DIR,
-                clearml,
-                splits=splits,
-                fiftyone=FiftyOneConfig(enabled=False),
-                model_label=model_label,
-                **metrics_cfg,
-                deps=deps,
+            stages.outcome.stages["prediction"].artifacts = [str(predictions)]
+    # A failed producer's previous/partial file is never an eligible input.
+    predictions_ready = skip_predict or stages.succeeded("prediction")
+    if not skip_train and skip_predict:
+        predictions_ready = False
+    evaluations, thresholds = _pipeline_metrics(
+        stages, results, directory, predictions, predictions_ready, effective_ground_truth,
+        clearml, splits, model_label, metrics_cfg, skip_metrics, skip_train, skip_compare, deps,
+    )
+    comparison_ready = False
+    if skip_compare:
+        stages.skip("comparison", "Disabled by configuration")
+        comparison_ready = skip_train
+    elif thresholds is None:
+        stages.skip("comparison", "Calibration thresholds unavailable in this attempt")
+    else:
+        compared = stages.run(
+            "comparison",
+            lambda: _compare_and_report(
+                compare_cfg, checkpoint, thresholds, effective_ground_truth, directory,
+                clearml, _comparison_settings(predict_params), metrics_cfg["evaluation"],
+                report_cfg, True,
+                candidate_task_id=str(task.id) if not skip_train and task is not None else None,
+                model_label=model_label, deps=deps,
+            ),
+        )
+        if compared is not None:
+            results.update(compared)
+            comparison_ready = "comparison" in compared
+            if not comparison_ready:
+                stages.skip("comparison", "Automatic baseline unavailable")
+    _pipeline_report(
+        stages, results, directory, clearml, report_cfg, skip_report, comparison_ready, deps
+    )
+    if predictions_ready:
+        stages.run(
+            "visualization",
+            lambda: _publish_pipeline(
+                publisher, task, directory, effective_ground_truth.path, resolved_truth.path,
+                predictions, prediction_splits, evaluations, checkpoint, metrics_cfg,
+                skip_predict, deps=deps,
+            ),
+        )
+    else:
+        stages.skip("visualization", "Prediction output unavailable in this attempt")
+    return stages.finish(results)
+
+
+def _pipeline_metrics(
+    stages: _PipelineStages,
+    results: dict[str, Any],
+    directory: Path,
+    predictions: Path,
+    predictions_ready: bool,
+    effective_ground_truth: ResolvedGroundTruth,
+    clearml: ClearMLConfig,
+    splits: list[str],
+    model_label: str | None,
+    metrics_cfg: dict[str, Any],
+    skip_metrics: bool,
+    skip_train: bool,
+    skip_compare: bool,
+    deps: WorkflowDependencies,
+) -> tuple[dict[str, Path], dict[str, float] | None]:
+    thresholds_path = directory / METRICS_DIR / "frozen_thresholds.json"
+    evaluations: dict[str, Path] = {}
+    thresholds: dict[str, float] | None = None
+    if skip_metrics:
+        stages.skip("metrics", "Disabled by configuration")
+        if skip_train and not skip_compare:
+            thresholds = stages.run(
+                "thresholds", lambda: json.loads(deps.storage.read_text(thresholds_path))
             )
-            thresholds = next(iter(evaluated.best_confidences.values()))
-            deps.storage.write_text(thresholds_path, json.dumps(thresholds))
+    elif not predictions_ready:
+        stages.skip("metrics", "No successful prediction producer in this training attempt")
+    else:
+        evaluated = stages.run(
+            "metrics",
+            lambda: compute_metrics(
+                predictions, effective_ground_truth, directory / METRICS_DIR, clearml,
+                splits=splits, fiftyone=FiftyOneConfig(enabled=False),
+                model_label=model_label, **metrics_cfg, deps=deps,
+            ),
+        )
+        if evaluated is not None:
             results["metrics"] = evaluated
             evaluations = evaluated.evaluations
-        elif not skip_compare:
-            thresholds = json.loads(deps.storage.read_text(thresholds_path))
-        else:
-            thresholds = {}
-        if not skip_compare:
-            results.update(
-                _compare_and_report(
-                    compare_cfg,
-                    checkpoint,
-                    thresholds,
-                    effective_ground_truth,
-                    directory,
-                    clearml,
-                    _comparison_settings(predict_params),
-                    metrics_cfg["evaluation"],
-                    report_cfg,
-                    skip_report,
-                    candidate_task_id=str(task.id) if not skip_train and task is not None else None,
-                    model_label=model_label,
-                    deps=deps,
+            thresholds = stages.run(
+                "thresholds", lambda: next(iter(evaluated.best_confidences.values()))
+            )
+            if thresholds is not None:
+                stages.run(
+                    "threshold_publication",
+                    lambda: deps.storage.atomic_write_text(
+                        thresholds_path, json.dumps(thresholds)
+                    ),
                 )
-            )
-        elif not skip_report:
-            results["reports"] = run_report(
+    return evaluations, thresholds
+
+
+def _pipeline_report(
+    stages: _PipelineStages,
+    results: dict[str, Any],
+    directory: Path,
+    clearml: ClearMLConfig,
+    report_cfg: dict[str, Any],
+    skip_report: bool,
+    comparison_ready: bool,
+    deps: WorkflowDependencies,
+) -> None:
+    if skip_report:
+        stages.skip("report", "Disabled by configuration")
+    elif not comparison_ready:
+        stages.skip("report", "No successful comparison producer in this attempt")
+    else:
+        reported = stages.run(
+            "report",
+            lambda: run_report(
                 comparison_dir=directory / COMPARISON_DIR,
-                output_dir=directory / REPORTS_DIR,
-                clearml=clearml,
-                **report_cfg,
-                deps=deps,
-            )
-        _publish_pipeline(
-            publisher,
-            task,
-            directory,
-            effective_ground_truth.path,
-            resolved_truth.path,
-            predictions,
-            prediction_splits,
-            evaluations,
-            checkpoint,
-            metrics_cfg,
-            skip_predict,
-            deps=deps,
+                output_dir=directory / REPORTS_DIR, clearml=clearml,
+                **report_cfg, deps=deps,
+            ),
         )
-        return results
+        if reported is not None:
+            results["reports"] = reported
+            artifacts = [str(path) for path in (
+                *reported.dev_reports.values(), *reported.business_reports.values()
+            )]
+            stages.outcome.stages["report"].artifacts = artifacts
+            if reported.issues:
+                stages.outcome.stages["report"] = StageOutcome(
+                    status="completed_with_warnings",
+                    reason=f"{len(reported.issues)} training count issues; see report Issues sheet",
+                    artifacts=artifacts,
+                )

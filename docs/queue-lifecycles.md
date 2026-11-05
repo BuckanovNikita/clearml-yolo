@@ -4,6 +4,10 @@ The [queue contract](queue.md) is authoritative. Archive/restore is visibility m
 not a job-state transition: it preserves outcomes and reservations, and recovery-required
 jobs remain in the main view. These are separate state machines:
 manual GPU freeing changes capacity bookkeeping without completing or cancelling a job.
+A pipeline that preserves successful training may finish with warnings despite failed downstream
+stages. Inspect its `pipeline_outcome.json`; queue completion does not establish full publication.
+The failure edge below applies when CY treats the error as fatal; downstream warning completion
+after verified training follows the completion edge.
 
 ```mermaid
 stateDiagram-v2

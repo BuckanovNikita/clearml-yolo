@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from clearml_yolo.core.evaluation.policy import validate_thresholds
 from clearml_yolo.core.identity import ModelIdentity
 from clearml_yolo.core.models import BackendName, ModelConfig, Preprocessing
+from clearml_yolo.core.report_counts import TrainingCountIssue
 
 DEFAULT_PROJECT_NAME = "clearml-yolo"
 DatasetFormat = Literal["ndjson", "flat", "coco"]
@@ -304,6 +305,7 @@ class ReportResult(BaseModel):
     dev_reports: dict[str, Path] = Field(default_factory=dict)
     business_reports: dict[str, Path] = Field(default_factory=dict)
     skipped_splits: list[str] = Field(default_factory=list)
+    issues: tuple[TrainingCountIssue, ...] = ()
 
 
 class ModelRef(BaseModel):

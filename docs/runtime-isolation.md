@@ -244,7 +244,8 @@ A completed successful ClearML task is not retroactively failed by subsequent gu
 cleanup uncertainty: the queue reports `recovery_required` and retains recovery evidence.
 Current allocations stay exclusive unless explicitly freed; stale unlocked records alone
 do not veto capacity.
-Required computation/upload failures retain their failure semantics. Old cancellation work
+Required computation/upload failures follow the
+[pipeline outcome policy](../specs/000-baseline/spec.md#required-publication-and-task-lifecycle). Old cancellation work
 is retained in generic process supervision and guardian regression tests; forced
 termination is covered separately.
 Normal queue cancellation gives the verified pipeline owner up to 90 seconds to
@@ -260,12 +261,15 @@ An attach-only publisher batches console/scalar events for the existing task and
 lifecycle transitions. Diagnostics use a separate local file to prevent feedback loops.
 An acknowledged workload checkpoint precedes SDK close/completion. Final offsets include
 SDK shutdown output and a finite deadline governs publisher shutdown; uncertain delivery is not
-automatically replayed. Required publication failure fails the run and retains its logs,
-while cleanup preserves the original computation exception. The owner task finalization
+automatically replayed. Required publication failure retains logs and fails standalone runs;
+a pipeline with verified successful training records warning completion and unverified uploads.
+Cleanup preserves the original computation exception. The owner task finalization
 uses a 10-minute (600-second) Unix main-thread deadline for required uploads, flush,
 readback and close in both direct and queued runs. The budget includes both the
 explicit flush and the SDK's own close-time drain; publisher receipt waits retain
 their separate shorter bound. Incompatible embedding timers fail explicitly.
+After verified pipeline training, finalization operations use separate non-nested deadlines
+so one failed publication boundary does not prevent the next outcome/status attempt.
 Separate failure cleanup and console/status handling use the same 10-minute owner
 deadline per scope; this is not a total queue-job or total process-exit timeout.
 If task initialization or owner shutdown cannot complete, later invocations in that

@@ -184,6 +184,7 @@ ignore_imports =
     clearml_yolo.adapters.reporting.metrics_reader -> report_generator
     clearml_yolo.adapters.reporting.report_layout -> report_generator
     clearml_yolo.adapters.reporting.reports -> report_generator
+    clearml_yolo.adapters.reporting.count_issues -> report_generator
     clearml_yolo.adapters.reporting.workbook_identity -> report_generator
 
 [importlinter:contract:fiftyone-sdk-has-explicit-owners]
@@ -543,6 +544,7 @@ forbidden_modules =
     openpyxl
 allow_indirect_imports = true
 ignore_imports =
+    clearml_yolo.adapters.reporting.count_issues -> openpyxl
 
 [importlinter:contract:deim-adapter-peer-ownership]
 name = deim adapter peer ownership

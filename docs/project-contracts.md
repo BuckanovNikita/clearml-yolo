@@ -227,12 +227,18 @@ FD-level project capture retains stdout/stderr from Python, native writes and DD
 A network-independent terminal mirror and attach-only publisher serve the existing task;
 the publisher creates no task and changes no task state. Required console/scalar publication
 uses approximately two-second batches and a bounded final-offset barrier. Local logs survive
-failure; incomplete required publication fails the command without replacing an original
-computation error. No automatic replay of uncertain deliveries occurs. Prediction explicitly
+failure; incomplete required publication follows the standalone/pipeline outcome policy below
+without replacing an original computation error. No automatic replay of uncertain deliveries occurs. Prediction explicitly
 uses verbose=false and one rate-limited operation progress indicator across supported backends.
-Complete a task only after all required artifacts and the native best Output Model
-are uploaded, verified and flushed. Fail task and command on computation, upload, flush, or interruption
-errors while retaining local output. Keep credentials out of published configuration and
+Standalone execution completes only after required artifacts and the native best Output Model
+are uploaded, verified and flushed. Standalone computation, upload and flush errors fail the
+command while retaining local output. A pipeline with a verified nonempty trained checkpoint
+preserves training success when downstream prediction, metrics, comparison, reporting or
+publication fails. It records failed/skipped stages and unavailable artifacts in
+`pipeline_outcome.json` and a readable summary, returning warning completion. Missing uploads
+remain unverified; unreachable ClearML status updates remain explicit local warnings.
+Interruptions and training failures still fail the command. Pipelines using `skip_train=true`
+retain strict failure behavior. Keep credentials out of published configuration and
 failure status. Native owner-only training/validation image previews are permitted.
 FiftyOne visualization is optional: setup and publication errors warn and cannot fail
 otherwise successful computation or the ClearML task. Fresh isolated workers bound imports,
@@ -313,3 +319,13 @@ explicit JSON, raw captures and link targets; see [readable output](readable-out
 Startup `run`/`run_overrides` views and early training General follow the
 [configuration contract](../specs/000-baseline/spec.md#configuration-resolution-and-replay).
 Selected executable inputs remain distinct from observed normalization and result provenance.
+
+### Training counts and report warnings
+
+Generated dashboards use training counts tied to the exact trained checkpoint. Evaluation
+annotations are not training provenance. Unknown counts remain unavailable; confirmed zero
+remains zero. Legacy dashboard inputs with valid declared counts remain supported.
+Reports preserve metrics for classes with unavailable counts in an `Unknown training count`
+worksheet, exclude them from eligibility-dependent aggregates, and explain the exclusions
+in an issues worksheet. An entirely unknown population produces unavailable summaries,
+not invented zeros. Original input workbooks remain unchanged.

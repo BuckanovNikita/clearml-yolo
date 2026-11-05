@@ -43,7 +43,10 @@ def published(
 ) -> dict[str, pd.DataFrame]:
     """Everything the stage would have published to ClearML, keyed by section/series."""
     tables: dict[str, pd.DataFrame] = {}
-    for method in ("declare_result_producers", "complete_result_producer", "register_ground_truth"):
+    for method in (
+        "declare_result_producers", "complete_result_producer", "register_ground_truth",
+        "record_pipeline_outcome",
+    ):
         monkeypatch.setattr(workflow_dependencies.tracking, method, lambda *_a, **_k: None)
 
     def report_table(

@@ -130,7 +130,7 @@ def build_reports(
                 f"{artifact_names.split_component(split)}.xlsx"
             )
         )
-        deps.renderer.build_reports(
+        issues = deps.renderer.build_reports(
             candidate_path, baseline_path, dev_path, business_path, effective_config_path
         )
         for name, path in zip(expected, (dev_path, business_path), strict=True):
@@ -138,7 +138,8 @@ def build_reports(
             if task is not None:
                 deps.tracking.upload_artifact(task, name, path)
         result = ReportResult(
-            dev_reports={split: dev_path}, business_reports={split: business_path}
+            dev_reports={split: dev_path}, business_reports={split: business_path},
+            issues=issues or (),
         )
         deps.resources.log(
             "INFO", "Split {!r}: {} and {}", split, dev_path.name, business_path.name

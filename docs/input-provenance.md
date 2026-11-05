@@ -94,7 +94,7 @@ flowchart TD
 | Dataset cache | CSV digest, resolved image-reference identity, format, preparation version → entry | Different resolved images separate entries; identical absolute references may reuse; old entries remain | Hit avoids image-content hashing, mtime checks, copy and conversion; unchanged-path image edits require explicit invalidation |
 | Prediction provenance | Prediction bytes and checkpoint identity → hash-bound naming mode | New sidecars record `prediction_image_name`; source row lineage remains intact | Hash conflicts fail; historical missing mode is accepted only with canonical membership |
 | Evaluation | Canonical `image_name=name` predictions and selected current GT → metrics | `stem`/`path` are raw-export modes; unknown image identities cannot silently disappear | Reject incompatible mode or membership before scoring; canonical baseline parity tests |
-| Publication | Raw/evaluated rows plus contexts → canonical artifacts | Raw media association uses explicit naming mode and never claims evaluation; evaluated rows preserve source IDs | Required uploads/flush fail the invocation; download/readback proves lexical identity and lineage |
+| Publication | Raw/evaluated rows plus contexts → canonical artifacts | Raw media association uses explicit naming mode and never claims evaluation; evaluated rows preserve source IDs | Required upload/flush failures stay unverified and follow the pipeline outcome policy; download/readback proves lexical identity and lineage |
 
 Validation calibrates candidate thresholds; test and comparison consume frozen thresholds.
 Historical source recovery follows the [ordered recovery contract](../specs/000-baseline/spec.md#evaluation-comparison-and-historical-model-recovery),

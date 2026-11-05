@@ -416,8 +416,11 @@ A successful computation with required uploads can complete its ClearML task bef
 the guardian finishes cleanup. Later supervisor uncertainty reports `recovery_required`
 and retains cleanup evidence; current reservations remain exclusive, while stale unlocked
 metadata does not veto automatic admission. It does not retroactively fail that successful task.
-Computation and mandatory publication failures still fail the task. A completed task
-or local artifacts alone do not prove that queue capacity is safe to reclaim.
+Training failures and interruptions fail the task. After verified pipeline training, downstream
+failures produce warning completion with explicit failed/skipped stages and unverified uploads;
+inspect `pipeline_outcome.json` even when the command exits zero. Standalone and
+`skip_train=true` execution remain strict. A completed task or local artifacts alone do not
+prove that queue capacity is safe to reclaim.
 
 Worker registration, the snapshot's Python interpreter and guardian startup all check
 Linux process supervision before admission or native launch. A Python build missing

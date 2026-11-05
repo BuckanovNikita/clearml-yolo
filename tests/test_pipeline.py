@@ -25,7 +25,10 @@ def fake_result_producers(
     monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
     """These routing tests stub nested stages; adapter lifecycle has separate coverage."""
-    for method in ("declare_result_producers", "complete_result_producer"):
+    for method in (
+        "declare_result_producers", "complete_result_producer", "preserve_training_success",
+        "record_pipeline_outcome",
+    ):
         monkeypatch.setattr(workflow_dependencies.tracking, method, lambda *_a, **_k: None)
 
 
@@ -54,6 +57,7 @@ def test_hydra_pipeline_passes_real_stage_objects(
     from clearml_yolo.application.use_cases import pipeline
 
     calls: list[Any] = []
+    (tmp_path / "actual.pt").write_bytes(b"checkpoint")
     patch_workflow(
         monkeypatch, workflow_dependencies, pipeline, "init_task", lambda *a, **k: object()
     )
@@ -122,6 +126,7 @@ def test_pipeline_routes_cleaned_truth_and_prediction_policy_after_csv_training(
     from clearml_yolo.application.use_cases import pipeline
 
     cleaned = tmp_path / "cleaned.csv"
+    (tmp_path / "actual.pt").write_bytes(b"checkpoint")
     calls: dict[str, Any] = {"truth": [], "uploads": [], "resolve": [], "warnings": []}
     source = Path("source.csv")
     resolved = ResolvedGroundTruth(path=source, dataset_id="dataset-id" if remote else None)

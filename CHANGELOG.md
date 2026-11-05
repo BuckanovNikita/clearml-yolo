@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- Record batch estimate listing release
+  ([`8be76e4`](https://github.com/BuckanovNikita/clearml-yolo/commit/8be76e4faaeeb20305f4b9e3be856d8855fc5609))
+
+
 ## v0.45.0 (2026-11-04)
 
 ### Documentation

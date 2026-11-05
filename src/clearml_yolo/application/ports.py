@@ -34,7 +34,9 @@ from clearml_yolo.core.evaluation.models import (
 from clearml_yolo.core.export_requests import ExportRequest, ExportResult
 from clearml_yolo.core.identity import ModelIdentity
 from clearml_yolo.core.models import CheckpointMetadata
+from clearml_yolo.core.pipeline_outcome import PipelineOutcome
 from clearml_yolo.core.publication import FiftyOneConfig, PublicationReceipt, PublicationRequest
+from clearml_yolo.core.report_counts import TrainingCountIssue
 
 Stage = Literal["train", "predict"]
 ResultProducer = Literal["predict", "metrics", "compare"]
@@ -276,14 +278,14 @@ class ReportRenderer(Protocol):
         dev_path: Path,
         business_path: Path,
         config_path: str | Path | None,
-    ) -> None: ...
+    ) -> tuple[TrainingCountIssue, ...]: ...
 
     def write_evaluation_workbook(
         self, path: Path, evaluated: EvaluatedSplit, *, methodology: dict[str, Any]
     ) -> dict[str, Path]: ...
 
 
-class RunStorage(Protocol):
+class RunStorage(Protocol):  # noqa: PLR0904 - cohesive filesystem capability boundary
     def model_weights_path(self, value: str | Path) -> str | Path: ...
 
     def point_latest_at(self, root: Path, run_dir: Path) -> None: ...
@@ -307,6 +309,8 @@ class RunStorage(Protocol):
     def read_text(self, path: Path, *, encoding: str = "utf-8") -> str: ...
 
     def write_text(self, path: Path, content: str, *, encoding: str = "utf-8") -> None: ...
+
+    def atomic_write_text(self, path: Path, content: str, *, encoding: str = "utf-8") -> None: ...
 
     def read_csv(
         self,
@@ -370,6 +374,18 @@ class ExecutionResources(Protocol):
 
 # One invocation owns this tracking lifecycle; preserve the published port as a whole.
 class TrackingSession(Protocol):  # noqa: PLR0904
+    def training_counts(
+        self, identity: ModelIdentity | None
+    ) -> dict[str, int] | None: ...
+
+    def preserve_training_success(
+        self, task: TaskHandle | None, checkpoint: Path, outcome_path: Path
+    ) -> None: ...
+
+    def record_pipeline_outcome(
+        self, task: TaskHandle | None, outcome: PipelineOutcome
+    ) -> None: ...
+
     def publish_training_parameters(
         self, task: TaskHandle | None, values: Mapping[str, Any]
     ) -> None: ...

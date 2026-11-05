@@ -465,7 +465,10 @@ completion assembles/uploads one complete `predicts_csv` before later comparison
 optional publication. Finalization verifies contributor completion and all required upload/model/flush
 barriers; it never publishes an incomplete aggregate. A later failure preserves earlier complete uploads and
 local incomplete shards. Missing output, callback, journal, computation, upload, readback, flush or
-interruption errors fail task and command while retaining local output. Required owner finalization has the
+interruption errors fail standalone task and command while retaining local output. For a pipeline with
+verified successful training, downstream errors instead retain training success and produce explicit
+warning completion. Fatal interruptions still fail. Pipelines with `skip_train=true` remain strict.
+Required owner finalization has the
 current ten-minute main-thread Unix deadline. Do not replace an original computation exception with
 cleanup/finalization errors.
 
@@ -489,6 +492,7 @@ enclosing checkout. Historical tasks are not backfilled.
 | `comparison_ROLE_dashboard_full_SPLIT`, `comparison_ROLE_dashboard_dtrk_SPLIT` | Candidate/baseline current reinference dashboards |
 | `compare_workbook_SPLIT`, `compare_workbook_SPLIT_excluded` | Paired XLSX retaining `Сравнение`; excluded-class CSV |
 | `report_dev_SPLIT`, `report_business_SPLIT` | Final paired developer/business XLSX |
+| `pipeline_outcome` | Pipeline stage outcomes, warning/fatal status and available artifact references |
 | `export_onnx`, `export_engine`, `export_metadata` | Operation-produced deployment artifact and metadata |
 | `export_verification`, `export_corpus` | Verification report and fixed-corpus manifest |
 | Configuration Objects | Active executable `run`, informational `run_overrides`, resolved asset provenance `model_assets`, consumed dataset, explicit report and meaningful provenance |
@@ -510,7 +514,9 @@ Exact validation thresholds upload after calibration and final CSV writing. Each
 uploads after final identity annotation, before the next evaluation or comparison statistics. Comparison and
 report workbooks upload after their final annotations. Ground-truth repeat registration is a no-op only for
 identical effective truth; conflicting truth fails. Existing canonical artifact names remain unchanged and
-no intermediate replacement uploads are introduced. Best Output Model publication still follows finalized
+no intermediate replacement uploads are introduced for scientific artifacts. The pipeline outcome may
+be updated at finalization to record a late publication failure; uncertain scientific deliveries are not
+replayed. Atomic local JSON/text outcomes survive remote failure. Best Output Model publication still follows finalized
 checkpoint selection and retains its native ownership and download/metadata verification.
 
 ### Canonical result rows
@@ -569,6 +575,14 @@ readback, and extend the original completion barrier with these expectations. St
 creates or mutates models. The exact threshold CSV remains required.
 
 ## Reports and readable visualization
+
+Training counts must be finite nonnegative integers from the model's verified training population.
+Generated dashboards never substitute the evaluation population. Unknown or malformed counts remain
+NA; valid zero remains zero. Reports retain affected metrics in an `Unknown training count` worksheet,
+exclude those classes from eligibility-dependent aggregates, and open on the issues worksheet when
+warnings exist. Diagnostics must not become class rows on subsequent machine reads. All-unknown input
+produces explicit unavailable summaries. Legacy valid declared dashboard counts remain accepted.
+
 
 The [readable-output guide](../../docs/readable-output.md) governs human text across CLI/TUI, diagnostics,
 consoles, workbooks and plots. Readable names/roles and distinct aliases replace opaque identifiers in

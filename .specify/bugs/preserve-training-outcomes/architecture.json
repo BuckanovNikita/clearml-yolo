@@ -1,0 +1,380 @@
+{
+  "schema_version": 1,
+  "task": "preserve-training-outcomes",
+  "scope": [
+    "src/clearml_yolo/core/report_counts.py",
+    "src/clearml_yolo/core/pipeline_outcome.py",
+    "src/clearml_yolo/adapters/reporting",
+    "src/clearml_yolo/application/use_cases/pipeline.py",
+    "src/clearml_yolo/adapters/clearml/session.py",
+    "src/clearml_yolo/adapters/storage/file_io.py",
+    "src/clearml_yolo/application/ports.py",
+    "src/clearml_yolo/entrypoints/composition.py",
+    "src/clearml_yolo/adapters/integrations/training.py",
+    "src/clearml_yolo/adapters/integrations/detectors.py",
+    "src/clearml_yolo/application/evaluation.py",
+    "src/clearml_yolo/core/evaluation/models.py",
+    "src/clearml_yolo/application/contracts.py",
+    "src/clearml_yolo/application/use_cases/report.py",
+    "src/clearml_yolo/adapters/integrations/native_runtime.py",
+    "src/clearml_yolo/adapters/integrations/native_trainer.py",
+    ".importlinter",
+    "tests",
+    "README.md",
+    "docs/project-contracts.md",
+    ".specify/bugs/preserve-training-outcomes",
+    "specs/000-baseline/spec.md",
+    "CHANGELOG.md",
+    "pyproject.toml",
+    "uv.lock",
+    "TECH_DETAILS.md",
+    "docs/runtime-isolation.md",
+    "docs/queue.md",
+    "docs/module-architecture.md",
+    "docs/input-provenance.md",
+    "docs/queue-lifecycles.md"
+  ],
+  "impact": "modules",
+  "rules": "Project inward dependency rules in .importlinter and tests/test_architecture.py; effects belong to adapters.",
+  "modules": [
+    {
+      "id": "counts",
+      "path": "src/clearml_yolo/core/report_counts.py",
+      "change": "add",
+      "responsibility": "Pure training count policy",
+      "interface": "training_count(value) -> int | None; TrainingCountIssue records source/class/reason without coercing unknown to zero.",
+      "layer": "core",
+      "allowed_dependencies": [
+        "Python standard library, existing declared scientific/value-model dependencies"
+      ],
+      "forbidden_dependencies": [
+        "application, adapters, entrypoints, SDK and filesystem effects"
+      ],
+      "effects": "None; values and pure policy only.",
+      "contracts": [
+        "boundaries"
+      ]
+    },
+    {
+      "id": "outcome",
+      "path": "src/clearml_yolo/core/pipeline_outcome.py",
+      "change": "add",
+      "responsibility": "Typed stage outcomes",
+      "interface": "StageOutcome and PipelineOutcome encode stage results, fatal interruption and training-aware aggregate status.",
+      "layer": "core",
+      "allowed_dependencies": [
+        "Python standard library, existing declared scientific/value-model dependencies"
+      ],
+      "forbidden_dependencies": [
+        "application, adapters, entrypoints, SDK and filesystem effects"
+      ],
+      "effects": "None; values and pure policy only.",
+      "contracts": [
+        "boundaries"
+      ]
+    },
+    {
+      "id": "reporting",
+      "path": "src/clearml_yolo/adapters/reporting",
+      "change": "modify",
+      "responsibility": "Workbook partition and issue presentation",
+      "interface": "Report rendering returns explicit count issues; writer uses checkpoint-bound counts and appends diagnostic sheets without changing class identities.",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "core, application contracts/ports, existing adapter peer contracts and explicitly declared SDK owners"
+      ],
+      "forbidden_dependencies": [
+        "entrypoints and undeclared SDK ownership"
+      ],
+      "effects": "Owns its existing storage, workbook, native runtime or ClearML SDK boundary; SDK allowlists remain exact.",
+      "contracts": [
+        "boundaries"
+      ]
+    },
+    {
+      "id": "pipeline",
+      "path": "src/clearml_yolo/application/use_cases/pipeline.py",
+      "change": "modify",
+      "responsibility": "Stage dependencies and completion policy",
+      "interface": "Pipeline workflow returns existing result mapping while recording dependencies and typed outcomes through storage/tracking ports.",
+      "layer": "application",
+      "allowed_dependencies": [
+        "core, application contracts and declared ports"
+      ],
+      "forbidden_dependencies": [
+        "concrete adapters and SDK imports"
+      ],
+      "effects": "Delegates filesystem, model, reporting and tracking effects through WorkflowDependencies ports.",
+      "contracts": [
+        "boundaries"
+      ]
+    },
+    {
+      "id": "tracking",
+      "path": "src/clearml_yolo/adapters/clearml/session.py",
+      "change": "modify",
+      "responsibility": "Invocation finalization and publication",
+      "interface": "preserve_training_success, record_pipeline_outcome and exact-checkpoint training_counts; finalization owns ClearML deadlines and truthful completion status.",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "core, application contracts/ports, existing adapter peer contracts and explicitly declared SDK owners"
+      ],
+      "forbidden_dependencies": [
+        "entrypoints and undeclared SDK ownership"
+      ],
+      "effects": "Owns its existing storage, workbook, native runtime or ClearML SDK boundary; SDK allowlists remain exact.",
+      "contracts": [
+        "boundaries"
+      ]
+    },
+    {
+      "id": "storage",
+      "path": "src/clearml_yolo/adapters/storage/file_io.py",
+      "change": "modify",
+      "responsibility": "Atomic outcome persistence",
+      "interface": "atomic_write_text(path, content) publishes JSON via same-directory temporary file, fsync and replace.",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "core, application contracts/ports, existing adapter peer contracts and explicitly declared SDK owners"
+      ],
+      "forbidden_dependencies": [
+        "entrypoints and undeclared SDK ownership"
+      ],
+      "effects": "Owns its existing storage, workbook, native runtime or ClearML SDK boundary; SDK allowlists remain exact.",
+      "contracts": [
+        "boundaries"
+      ]
+    },
+    {
+      "id": "ports",
+      "path": "src/clearml_yolo/application/ports.py",
+      "change": "modify",
+      "responsibility": "Typed effect interfaces",
+      "interface": "RunStorage.atomic_write_text and TrackingSession outcome/provenance methods define effects without adapter imports.",
+      "layer": "application",
+      "allowed_dependencies": [
+        "core, application contracts and declared ports"
+      ],
+      "forbidden_dependencies": [
+        "concrete adapters and SDK imports"
+      ],
+      "effects": "Delegates filesystem, model, reporting and tracking effects through WorkflowDependencies ports.",
+      "contracts": [
+        "boundaries"
+      ]
+    },
+    {
+      "id": "composition",
+      "path": "src/clearml_yolo/entrypoints/composition.py",
+      "change": "modify",
+      "responsibility": "Wire concrete effects",
+      "interface": "Concrete storage/tracking implementations satisfy the new ports in the per-invocation bundle.",
+      "layer": "entrypoint",
+      "allowed_dependencies": [
+        "application ports and concrete adapters at the composition root"
+      ],
+      "forbidden_dependencies": [
+        "business policy owned by core/application"
+      ],
+      "effects": "Constructs adapter-backed dependencies; delegates execution.",
+      "contracts": [
+        "boundaries"
+      ]
+    },
+    {
+      "id": "native",
+      "path": "src/clearml_yolo/adapters/integrations/training.py",
+      "change": "modify",
+      "responsibility": "Propagate verified checkpoint provenance and explicit warning results",
+      "interface": "Native TrainResult is retained before publication; prepared train population counts are bound to checkpoint SHA.",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "core, application contracts/ports, existing adapter peer contracts and explicitly declared SDK owners"
+      ],
+      "forbidden_dependencies": [
+        "entrypoints and undeclared SDK ownership"
+      ],
+      "effects": "Owns its existing storage, workbook, native runtime or ClearML SDK boundary; SDK allowlists remain exact.",
+      "contracts": [
+        "boundaries"
+      ]
+    },
+    {
+      "id": "detectors",
+      "path": "src/clearml_yolo/adapters/integrations/detectors.py",
+      "change": "modify",
+      "responsibility": "Propagate verified checkpoint provenance and explicit warning results",
+      "interface": "Detector training registers checkpoint-bound training counts through the tracking adapter.",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "core, application contracts/ports, existing adapter peer contracts and explicitly declared SDK owners"
+      ],
+      "forbidden_dependencies": [
+        "entrypoints and undeclared SDK ownership"
+      ],
+      "effects": "Owns its existing storage, workbook, native runtime or ClearML SDK boundary; SDK allowlists remain exact.",
+      "contracts": [
+        "boundaries"
+      ]
+    },
+    {
+      "id": "eval",
+      "path": "src/clearml_yolo/application/evaluation.py",
+      "change": "modify",
+      "responsibility": "Propagate verified checkpoint provenance and explicit warning results",
+      "interface": "Computed evaluation receives counts for the evaluated model identity through TrackingSession.",
+      "layer": "application",
+      "allowed_dependencies": [
+        "core, application contracts and declared ports"
+      ],
+      "forbidden_dependencies": [
+        "concrete adapters and SDK imports"
+      ],
+      "effects": "Delegates filesystem, model, reporting and tracking effects through WorkflowDependencies ports.",
+      "contracts": [
+        "boundaries"
+      ]
+    },
+    {
+      "id": "evalmodel",
+      "path": "src/clearml_yolo/core/evaluation/models.py",
+      "change": "modify",
+      "responsibility": "Propagate verified checkpoint provenance and explicit warning results",
+      "interface": "ComputedEvaluation.training_counts is optional explicit training-population evidence.",
+      "layer": "core",
+      "allowed_dependencies": [
+        "Python standard library, existing declared scientific/value-model dependencies"
+      ],
+      "forbidden_dependencies": [
+        "application, adapters, entrypoints, SDK and filesystem effects"
+      ],
+      "effects": "None; values and pure policy only.",
+      "contracts": [
+        "boundaries"
+      ]
+    },
+    {
+      "id": "contracts",
+      "path": "src/clearml_yolo/application/contracts.py",
+      "change": "modify",
+      "responsibility": "Propagate verified checkpoint provenance and explicit warning results",
+      "interface": "ReportResult.issues returns immutable training-count diagnostics.",
+      "layer": "application",
+      "allowed_dependencies": [
+        "core, application contracts and declared ports"
+      ],
+      "forbidden_dependencies": [
+        "concrete adapters and SDK imports"
+      ],
+      "effects": "Delegates filesystem, model, reporting and tracking effects through WorkflowDependencies ports.",
+      "contracts": [
+        "boundaries"
+      ]
+    },
+    {
+      "id": "report",
+      "path": "src/clearml_yolo/application/use_cases/report.py",
+      "change": "modify",
+      "responsibility": "Propagate verified checkpoint provenance and explicit warning results",
+      "interface": "Report workflow propagates renderer diagnostics in ReportResult.",
+      "layer": "application",
+      "allowed_dependencies": [
+        "core, application contracts and declared ports"
+      ],
+      "forbidden_dependencies": [
+        "concrete adapters and SDK imports"
+      ],
+      "effects": "Delegates filesystem, model, reporting and tracking effects through WorkflowDependencies ports.",
+      "contracts": [
+        "boundaries"
+      ]
+    },
+    {
+      "id": "native_runtime",
+      "path": "src/clearml_yolo/adapters/integrations/native_runtime.py",
+      "change": "modify",
+      "responsibility": "Scope native completion publication separately from actual training and validation",
+      "interface": "Only completed on_train_end/final-evaluation publication callbacks become warning results after a verified checkpoint.",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "core, application contracts/ports, existing adapter peer contracts and explicitly declared SDK owners"
+      ],
+      "forbidden_dependencies": [
+        "entrypoints and undeclared SDK ownership"
+      ],
+      "effects": "Owns its existing storage, workbook, native runtime or ClearML SDK boundary; SDK allowlists remain exact.",
+      "contracts": [
+        "boundaries"
+      ]
+    },
+    {
+      "id": "native_trainer",
+      "path": "src/clearml_yolo/adapters/integrations/native_trainer.py",
+      "change": "modify",
+      "responsibility": "Scope native completion publication separately from actual training and validation",
+      "interface": "final_eval scopes callback publication policy; actual validator computation remains strict.",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "core, application contracts/ports, existing adapter peer contracts and explicitly declared SDK owners"
+      ],
+      "forbidden_dependencies": [
+        "entrypoints and undeclared SDK ownership"
+      ],
+      "effects": "Owns its existing storage, workbook, native runtime or ClearML SDK boundary; SDK allowlists remain exact.",
+      "contracts": [
+        "boundaries"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "boundaries",
+      "path": "tests/test_architecture.py",
+      "status": "existing",
+      "rules": "Inward imports, pure core/application, effect ownership and negative forbidden-edge checks. Explicit exact SDK edges permit only the count diagnostics adapter to own its workbook and report-generator operations; generic negative tests still reject other SDK consumers.",
+      "check": "verify"
+    }
+  ],
+  "checks": [
+    {
+      "id": "verify",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync python scripts/verify.py",
+      "expectation": "Canonical checks and complete suite including negative import cases pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": ".specify/bugs/preserve-training-outcomes/test.md"
+      }
+    },
+    {
+      "id": "native",
+      "kind": "behavior",
+      "command": "Run native CPU pipeline with induced downstream metrics failure and inspect local/remote outcomes",
+      "expectation": "Verified checkpoint survives, warning completion, truthful missing artifacts.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": ".specify/bugs/preserve-training-outcomes/test.md"
+      }
+    },
+    {
+      "id": "docs",
+      "kind": "documentation",
+      "command": "uv run --frozen --no-sync python scripts/verify.py --docs",
+      "expectation": "Markdown links and changed examples valid.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": ".specify/bugs/preserve-training-outcomes/test.md"
+      }
+    }
+  ],
+  "documentation": "Update report, publication/recovery/queue boundary contracts, technical guide, README and portable usage skill; queue state-machine semantics remain unchanged.",
+  "review": {
+    "status": "accepted",
+    "reviewer": "Independent native agent /root/review",
+    "evidence": ".specify/bugs/preserve-training-outcomes/review.md",
+    "reconciliation": "Compared all modified/added task paths, including native callbacks, explicit workbook SDK ownership, tests and baseline publication contract. No deletions, dependency source changes or unrelated changes included. Generated changelog and root-only release version metadata are included; release metadata changes no dependencies or module boundaries."
+  }
+}

@@ -2,7 +2,9 @@
 
 import csv
 import io
+import os
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from typing import Literal
 
 import pandas as pd
@@ -26,6 +28,24 @@ def write_text(path: Path, content: str, *, encoding: str = "utf-8") -> None:
     with trace_operation("storage.text.write", context={"path": str(path)}):
         write_path(path).write_text(content, encoding=encoding)
 
+
+
+def atomic_write_text(path: Path, content: str, *, encoding: str = "utf-8") -> None:
+    """Replace a complete text snapshot without exposing a partially written file."""
+    destination = write_path(path)
+    temporary: Path | None = None
+    try:
+        with NamedTemporaryFile(
+            mode="w", encoding=encoding, dir=destination.parent, delete=False,
+        ) as stream:
+            temporary = Path(stream.name)
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+        temporary.replace(destination)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 def read_csv(
     path: str | Path,

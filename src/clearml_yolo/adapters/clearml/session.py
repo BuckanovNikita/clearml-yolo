@@ -49,11 +49,14 @@ from clearml_yolo.adapters.observability.diagnostics import (
     log_exception_safely,
 )
 from clearml_yolo.adapters.observability.tracing import trace_operation, trace_task
+from clearml_yolo.adapters.storage.file_io import atomic_write_text
 from clearml_yolo.adapters.storage.filesystem import temporary_root
 from clearml_yolo.application.contracts import (
     ClearMLConfig as ClearMLConfig,  # noqa: PLC0414 - typed adapter interface
 )
 from clearml_yolo.core.assets import ResolvedAsset
+from clearml_yolo.core.identity import ModelIdentity
+from clearml_yolo.core.pipeline_outcome import PipelineOutcome, StageOutcome
 from clearml_yolo.core.presentation import human_text
 from clearml_yolo.core.redaction import (
     sanitize_configuration as sanitize_configuration,  # noqa: PLC0414 - typed adapter re-export
@@ -217,6 +220,9 @@ class _InvocationState:
     resources: dict[str, object] = field(default_factory=dict)
     routing_identity: tuple[str, str, str] | None = None
     console_publisher: ConsolePublisher | None = None
+    pipeline_outcome: PipelineOutcome | None = None
+    outcome_path: Path | None = None
+    checkpoint_training_counts: dict[str, dict[str, int]] = field(default_factory=dict)
 
     def enter_stage(self, stage: str) -> None:
         self.current_stage = stage
@@ -331,6 +337,143 @@ def _active_state(task: Any, operation: str) -> _InvocationState:
     return active
 
 
+
+
+def register_training_counts(
+    task: Any, checkpoint: Path, counts: dict[str, int] | None
+) -> None:
+    """Bind verified training-population counts to the exact produced checkpoint."""
+    if task is None or counts is None:
+        return
+    state = _ACTIVE_INVOCATION.get()
+    if state is None or state.task is not task:
+        return
+    with checkpoint.open("rb") as stream:
+        digest = hashlib.file_digest(stream, "sha256").hexdigest()
+    state.checkpoint_training_counts[digest] = dict(counts)
+
+
+def training_counts(identity: ModelIdentity | None) -> dict[str, int] | None:
+    """Return counts only for a locally registered, identical model checkpoint."""
+    state = _ACTIVE_INVOCATION.get()
+    if state is None or identity is None or identity.checkpoint_sha256 is None:
+        return None
+    counts = state.checkpoint_training_counts.get(
+        identity.checkpoint_sha256,
+    )
+    return dict(counts) if counts is not None else None
+
+def preserve_training_success(task: Any, checkpoint: Path, outcome_path: Path) -> None:
+    """Enable warning completion only for a pipeline's verified durable checkpoint."""
+    if task is None:
+        return
+    state = _ACTIVE_INVOCATION.get()
+    if state is None or state.task is not task or state.stages[0] != "pipeline":
+        return
+    if not checkpoint.is_file() or checkpoint.stat().st_size == 0:
+        raise ValueError("Successful training requires a nonempty checkpoint")
+    state.outcome_path = outcome_path
+    if state.pipeline_outcome is None:
+        state.pipeline_outcome = PipelineOutcome(training_succeeded=True)
+        state.pipeline_outcome.stages["training"] = StageOutcome(
+            status="succeeded", artifacts=[str(checkpoint)],
+        )
+    _persist_pipeline_outcome(state)
+
+
+def record_pipeline_outcome(task: Any, outcome: PipelineOutcome) -> None:
+    """Retain the latest stage record; publication occurs at the terminal barrier."""
+    if task is None:
+        return
+    state = _active_state(task, "Pipeline outcome recording")
+    previous = state.pipeline_outcome
+    state.pipeline_outcome = outcome
+    if previous is not None and "publication" in previous.stages:
+        outcome.stages["publication"] = previous.stages["publication"]
+
+
+def _persist_pipeline_outcome(state: _InvocationState) -> None:
+    if state.outcome_path is None or state.pipeline_outcome is None:
+        return
+    try:
+        atomic_write_text(state.outcome_path, state.pipeline_outcome.model_dump_json(indent=2))
+        atomic_write_text(
+            state.outcome_path.with_suffix(".txt"), state.pipeline_outcome.summary(),
+        )
+    except OSError as error:
+        log_exception_safely("Could not persist pipeline outcome; checkpoint retained", error)
+
+
+def record_training_publication_failure(task: Any, error: Exception) -> bool:
+    """Return whether verified pipeline training permits a publication warning."""
+    if task is None:
+        return False
+    state = _ACTIVE_INVOCATION.get()
+    if state is None or state.task is not task:
+        return False
+    if state.pipeline_outcome is None or not state.pipeline_outcome.training_succeeded:
+        return False
+    _publication_warning(state, error)
+    return True
+
+
+def _publication_warning(state: _InvocationState, error: Exception) -> None:
+    outcome = state.pipeline_outcome
+    if outcome is None:
+        raise RuntimeError("Publication warning requires a pipeline outcome")
+    missing = [item.name for item in state.artifacts if item.required and not item.uploaded]
+    reason = f"{type(error).__name__}: publication incomplete; see local diagnostics"
+    if missing:
+        reason += "; missing artifacts: " + ", ".join(missing)
+    outcome.stages["publication"] = StageOutcome(status="failed", reason=reason)
+    _persist_pipeline_outcome(state)
+    log_exception_safely("Training succeeded; publication incomplete", error)
+
+
+def _finalize_preserving_training(state: _InvocationState) -> None:
+    try:
+        with sdk_deadline(FINALIZATION_TIMEOUT_SECONDS):
+            _finalize(state)
+    except Exception as error:
+        if state.pipeline_outcome is None or not state.pipeline_outcome.training_succeeded:
+            raise
+        _publication_warning(state, error)
+        try:
+            with sdk_deadline(FINALIZATION_TIMEOUT_SECONDS):
+                _sync_upload(
+                    state.task, "pipeline_outcome", state.pipeline_outcome.model_dump(mode="json"),
+                )
+        except Exception as publication_error:  # noqa: BLE001 - preserve local warning evidence
+            _record_remote_outcome_failure(state, "Outcome upload", publication_error)
+        try:
+            with sdk_deadline(FINALIZATION_TIMEOUT_SECONDS):
+                _release_failure_monitor(state)
+                closed_task = _close_for_failure(state, error)
+                closed_task.mark_completed(
+                    ignore_errors=False, force=True,
+
+                    status_message=(
+                        "completed_with_warnings: "
+                        "Training succeeded; publication incomplete; see local outcome"
+                    ),
+                )
+        except Exception as status_error:  # noqa: BLE001 - local outcome remains authoritative
+            detach_sdk_exit_callback(state.task)
+            _record_remote_outcome_failure(state, "Completion status update", status_error)
+
+
+def _record_remote_outcome_failure(
+    state: _InvocationState, operation: str, error: Exception,
+) -> None:
+    outcome = state.pipeline_outcome
+    if outcome is None:
+        raise RuntimeError("Remote warning requires a pipeline outcome")
+    stage = outcome.stages["publication"]
+    stage.reason = f"{stage.reason}; {operation} failed ({type(error).__name__})"
+    _persist_pipeline_outcome(state)
+    log_exception_safely("Remote pipeline outcome could not be updated", error)
+
+
 def _finalize(state: _InvocationState) -> None:
     for finalize in state.finalizers:
         with trace_operation("clearml.publication.finalizer"):
@@ -354,6 +497,9 @@ def _finalize(state: _InvocationState) -> None:
         for verify in state.model_barriers:
             with trace_operation("clearml.model.verify"):
                 verify()
+    if state.pipeline_outcome is not None:
+        _persist_pipeline_outcome(state)
+        _sync_upload(state.task, "pipeline_outcome", state.pipeline_outcome.model_dump(mode="json"))
     if state.console_publisher is not None:
         state.console_publisher.barrier()
     # close() waits for repository detection and shuts down the status monitor.
@@ -362,7 +508,16 @@ def _finalize(state: _InvocationState) -> None:
     with trace_operation("clearml.task.terminal", cleanup=True):
         closed_task = _close_task(state.task)
         with trace_operation("clearml.task.mark_completed", cleanup=True):
-            closed_task.mark_completed(ignore_errors=False, force=True)
+            if state.pipeline_outcome is not None and state.pipeline_outcome.status != "succeeded":
+                closed_task.mark_completed(
+                    ignore_errors=False, force=True,
+                    status_message=(
+                        "completed_with_warnings: "
+                        "Pipeline completed; inspect pipeline_outcome for details"
+                    ),
+                )
+            else:
+                closed_task.mark_completed(ignore_errors=False, force=True)
 
 
 def _close_task(task: Any) -> Any:
@@ -605,8 +760,7 @@ def invocation(
         if resolved_config is not None:
             _replay_initial_configuration(task, resolved_config)
         yield task
-        with sdk_deadline(FINALIZATION_TIMEOUT_SECONDS):
-            _finalize(state)
+        _finalize_preserving_training(state)
 
 
 @contextmanager
@@ -643,6 +797,9 @@ def _task_owner(
             yield state
         except BaseException as error:
             primary_error = error
+            if state.pipeline_outcome is not None:
+                state.pipeline_outcome.fatal_error = True
+                _persist_pipeline_outcome(state)
             # Include the original safe diagnostic before the publisher's final barrier.
             log_exception_safely("Invocation failed", error, context={"task": task_name})
             if isinstance(error, TaskFinalizationError):
@@ -709,6 +866,36 @@ def _finish_console(state: _InvocationState, primary_error: BaseException | None
     except BaseException as error:
         if isinstance(error, TaskFinalizationError):
             detach_sdk_exit_callback(state.task)
+        if (
+            isinstance(error, Exception)
+            and primary_error is None
+            and state.pipeline_outcome is not None
+            and state.pipeline_outcome.training_succeeded
+        ):
+            _publication_warning(state, error)
+            try:
+                with sdk_deadline(FINALIZATION_TIMEOUT_SECONDS):
+                    _sync_upload(
+                        state.task, "pipeline_outcome",
+                        state.pipeline_outcome.model_dump(mode="json"),
+                    )
+                    state.task.mark_completed(
+                        ignore_errors=False, force=True,
+                        status_message=(
+                            "completed_with_warnings: "
+                            "Training succeeded; console publication incomplete"
+                        ),
+                    )
+            except Exception as status_error:  # noqa: BLE001 - local warning survives remote outage
+                _record_remote_outcome_failure(state, "Console outcome update", status_error)
+            return
+        if state.pipeline_outcome is not None:
+            state.pipeline_outcome.fatal_error = True
+            state.pipeline_outcome.stages["console"] = StageOutcome(
+                status="failed",
+                reason=f"{type(error).__name__}: final console delivery interrupted",
+            )
+            _persist_pipeline_outcome(state)
         if primary_error is not None:
             log_exception_safely("Console publication failed", error)
             return
@@ -727,7 +914,9 @@ def _finish_console(state: _InvocationState, primary_error: BaseException | None
 
 
 def _cleanup_invocation(state: _InvocationState, primary_error: BaseException | None) -> None:
-    if primary_error is not None:
+    if primary_error is not None or (
+        state.pipeline_outcome is not None and state.pipeline_outcome.status != "succeeded"
+    ):
         # A failed close/upload may still have consumers; retain their input files.
         return
     with trace_operation("clearml.temporary.cleanup", cleanup=True):

@@ -23,7 +23,7 @@ flowchart TD
 | --- | --- | --- | --- |
 | Composition | Typed configuration → injected dependencies | Entrypoints construct adapters; no global service lookup | Strict configuration errors; generated configuration and installed-help checks |
 | Storage | CSV/path/checkpoint → typed records and resolved media | Storage owns lexical parsing, filesystem resolution and persistence | Invalid data/hash/path fails with context; storage and workflow regression tests |
-| Application | Records and ports → workflow results | Effects cross explicit ports; no concrete adapters or SDK construction | Propagate required computation/publication failure; workflow tests |
+| Application | Records and ports → workflow results | Effects cross explicit ports; no concrete adapters or SDK construction | Propagate training/interruption and standalone failures; verified training enables explicit downstream warning outcomes; workflow tests |
 | Core | Values → policy, validation and evaluation records | No filesystem, environment, process, network or SDK effects | Explicit validation errors; architecture negative fixtures |
 | Evaluation / reporting | Scientific inputs → values / rendered reports | Evaluation owns pinned metric integration; reporting owns workbook/plot writes | Geometry policy and metric parity tests; no hidden rendering during computation |
 | Assets | Typed source request → verified local path and provenance | CY outer resolver owns HTTP/cache/locks/extraction; backend owns native loading | Explicit missing inputs fail; proxy/offline/integrity and native-loader tests |

@@ -244,6 +244,7 @@ class ComputedEvaluation:
     pr_curves: list[PRCurve]
     result_rows: pd.DataFrame
     model_identity: ModelIdentity | None = None
+    training_counts: dict[str, int] | None = None
 
 
 @dataclass(frozen=True)

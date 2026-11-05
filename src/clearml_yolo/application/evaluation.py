@@ -1,6 +1,7 @@
 """Coordinate scientific evaluation and artifact rendering through independent ports."""
 
 from collections.abc import Mapping
+from dataclasses import replace
 from pathlib import Path
 
 import pandas as pd
@@ -50,6 +51,10 @@ def evaluate_split(
             source_ground_truth=source_ground_truth,
             source_predictions=source_predictions,
             model_identity=model_identity,
+        )
+        computed = replace(
+            computed,
+            training_counts=deps.tracking.training_counts(model_identity),
         )
         artifacts = deps.evaluation_writer.render_evaluation(
             computed, output_dir=output_dir, suffix=suffix, dashboard_classes=dashboard_classes

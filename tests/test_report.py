@@ -4,6 +4,7 @@ import sys
 import types
 from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import pytest
@@ -26,22 +27,17 @@ def report_generator(
 ) -> list[tuple[Path, Path]]:
     pairs: list[tuple[Path, Path]] = []
 
-    class FakeReader:
-        def __init__(self, path: str | Path) -> None:
-            self.file_path = Path(path)
-
-        def read(self) -> pd.DataFrame:
-            return pd.read_excel(self.file_path, index_col=0)
-
     class FakeBuilder:
         def __init__(
-            self, candidate: FakeReader, baseline: FakeReader, *_: object, **_options: object
+            self, candidate: Any, baseline: Any, *_: object, **_options: object
         ) -> None:
             self.candidate = candidate
             self.baseline = baseline
 
         def build(self, path: str | Path) -> None:
-            pairs.append((self.candidate.file_path, self.baseline.file_path))
+            assert self.candidate.source_path is not None
+            assert self.baseline.source_path is not None
+            pairs.append((self.candidate.source_path, self.baseline.source_path))
             pd.DataFrame({"metric": ["f1"]}).to_excel(path, index=False)
 
     class FakeConfig:
@@ -55,10 +51,8 @@ def report_generator(
         monkeypatch.setitem(sys.modules, name, module)
 
     install("report_generator.config", "Config", FakeConfig)
-    install("report_generator.core.reader", "MetricsReader", FakeReader)
     monkeypatch.setattr("report_generator.v2.DevReportBuilder", FakeBuilder)
     monkeypatch.setattr("report_generator.v2.BusinessReportBuilder", FakeBuilder)
-    monkeypatch.setattr("report_generator.v2.read_metrics_table", FakeReader)
     patch_workflow(
         monkeypatch,
         workflow_dependencies,
@@ -73,8 +67,12 @@ def _comparison_dir(tmp_path: Path) -> tuple[Path, Path, Path]:
     directory.mkdir()
     baseline = directory / "full_dashboard_baseline_test.xlsx"
     candidate = directory / "full_dashboard_candidate_test.xlsx"
-    pd.DataFrame({"tp": [1]}, index=["cat"]).to_excel(baseline)
-    pd.DataFrame({"tp": [2]}, index=["cat"]).to_excel(candidate)
+    pd.DataFrame(
+        {"tp": [1], "ap50": [0.5], "Количество примеров train": [30]}, index=["cat"]
+    ).to_excel(baseline)
+    pd.DataFrame(
+        {"tp": [2], "ap50": [0.6], "Количество примеров train": [30]}, index=["cat"]
+    ).to_excel(candidate)
     (directory / MANIFEST_NAME).write_text(
         ComparisonManifest(
             split="test",

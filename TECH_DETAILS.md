@@ -154,10 +154,13 @@ metrics for current comparison. See the [task recovery contract](specs/000-basel
 ## Provenance and publication
 
 One execution invocation owns one ClearML task. Pipeline stages reuse it; native DDP
-children do not create tasks or upload. Completion requires verified mandatory
+children do not create tasks or upload. Complete publication requires verified mandatory
 artifacts, the native best Output Model where applicable, and publication flush.
-Computation, upload, flush or interruption failures fail the command/task while
-retaining local output. Optional FiftyOne failure has different semantics below.
+Standalone computation, upload and flush failures fail the command/task. A pipeline with
+verified successful training preserves its checkpoint and records downstream failures in
+`pipeline_outcome.json` with warning completion; missing uploads remain unverified.
+Training failures, interruptions and `skip_train=true` retain strict failure semantics.
+Optional FiftyOne failure has different semantics below.
 
 The [publication contract](specs/000-baseline/spec.md#required-publication-and-task-lifecycle)
 is the maintained inventory. It covers canonical invocation-owned `gt_csv` and
@@ -512,7 +515,8 @@ calls can delay diagnostic scheduling. Inspect native library output before shar
 Python, native and DDP console output is retained in project-local append-only logs.
 A network-independent terminal mirror and attach-only publisher feed the existing
 ClearML task. Required publication uses bounded final-offset checks; local logs survive
-failure, and incomplete mandatory publication fails execution. Predictions use one
+failure, and incomplete mandatory publication follows the pipeline warning-completion
+policy above or fails standalone execution. Predictions use one
 rate-limited progress indicator with native verbose output disabled. See
 [runtime isolation](docs/runtime-isolation.md) and
 [ClearML transport troubleshooting](docs/multi-model-backends.md#clearml-reporting-transport-errors),

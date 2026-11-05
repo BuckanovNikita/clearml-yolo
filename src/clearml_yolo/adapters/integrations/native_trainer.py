@@ -6,7 +6,10 @@ from ultralytics.cfg import get_save_dir
 from ultralytics.models.yolo.detect import DetectionTrainer
 from ultralytics.utils.torch_utils import unwrap_model
 
-from clearml_yolo.adapters.integrations.native_runtime import native_runtime
+from clearml_yolo.adapters.integrations.native_runtime import (
+    final_training_evaluation,
+    native_runtime,
+)
 from clearml_yolo.adapters.storage.filesystem import validate_output_tree
 from clearml_yolo.core.transforms import TransformConfig
 
@@ -61,6 +64,11 @@ class OwnedDetectionTrainer(DetectionTrainer):
         # including its directory increment and supported resume normalization.
         super().check_resume(overrides)  # type: ignore[no-untyped-call]
         validate_output_tree(get_save_dir(self.args))
+
+    @override
+    def final_eval(self) -> None:
+        with final_training_evaluation():
+            super().final_eval()  # type: ignore[no-untyped-call]  # Native validation has no annotations.
 
     @override
     def train(self) -> None:
