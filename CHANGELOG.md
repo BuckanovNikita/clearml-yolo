@@ -1,7 +1,12 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.45.1 (2026-11-05)
+
+### Bug Fixes
+
+- Preserve training outcomes and report unavailable counts
+  ([`42bff25`](https://github.com/BuckanovNikita/clearml-yolo/commit/42bff25c80db044dc757953b0a4bc071a827cc0a))
 
 ### Documentation
 
