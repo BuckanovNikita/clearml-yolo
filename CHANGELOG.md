@@ -1,7 +1,7 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.46.1 (2026-11-07)
 
 ### Bug Fixes
 
@@ -32,6 +32,9 @@
 
 - **plans**: Record independent review of agent-instruction refactor
   ([`f04bd98`](https://github.com/BuckanovNikita/clearml-yolo/commit/f04bd98cfceb00d7fdeec70f839af88b858ff7e9))
+
+- **plans**: Tick Phase-1 remaining-work boxes after landing WP0, WP6 and WP2a
+  ([`2a3a95c`](https://github.com/BuckanovNikita/clearml-yolo/commit/2a3a95c060683340786f3fd7cc0029d987112508))
 
 - **review**: Narrow WP2a verdict scope and add a rules lens
   ([`d288428`](https://github.com/BuckanovNikita/clearml-yolo/commit/d288428dc38c5b2039063e4999bb8b73e74c5490))
