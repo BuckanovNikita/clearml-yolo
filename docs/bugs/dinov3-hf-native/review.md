@@ -98,3 +98,33 @@ hooks) and were not reviewed. `tests/fixtures/docs-compatibility.json`,
 from `c16dbb1`; their diffs (the `--force` help text and `False` default, and a stub that
 keeps the AdamW default-accelerator probe off CUDA in the CPU harness) were read and are
 consistent with forced admission and the harness intent; nothing more was examined.
+
+### Independent rules lens — 2026-11-07
+
+A separate reviewer with fresh context checked the whole runtime diff
+`git diff v0.45.1 v0.46.0 -- src tests` (runtime change `c16dbb1`; the tooling
+changes from `8a1d5a9` were counted as outside the runtime scope) against the
+constitution and `docs/project-contracts.md`, covering all four T2a.1 topics.
+
+Verdict: **approve**, no rule violation. Checks run on `f8f2c51`, whose `src`,
+`.importlinter` and `pyproject.toml` are byte-identical to `v0.46.0`:
+`lint-imports` (52 contracts kept, 0 broken), strict mypy on the changed modules and
+their tests (56 files, no issues), `ruff check src tests` (clean) and pytest on
+`tests/test_architecture.py`, `tests/test_dinov3_hf_weights.py` and
+`tests/test_gpu_inventory.py` (294 passed).
+
+It confirmed typed access with explained third-party exceptions, specific exception
+boundaries (`resolve_backbone` falls back only on `AssetResolutionError`), opt-in
+`--force` with ordinary serialization unchanged for pre-0.46 readers, and test
+conventions without GPU or native claims.
+
+Informational notes, not required by the constitution:
+
+- `_cached` in `adapters/deim/hf_weights.py` rebuilds a rejected cache without
+  logging why it was rejected.
+- `adapters/assets/execution.py` hardcodes the DINOv3 presets `{"l", "x"}` twice,
+  copying the keys of `_DINO`/`_HUB_DINO` in `adapters/deim/assets.py`; a shared
+  predicate would keep selection and conversion in step.
+
+The lens also covers the force, accelerator-OOM and scoped-campaign topics; their
+records point here.

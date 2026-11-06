@@ -41,3 +41,9 @@ hooks) and were not reviewed. `tests/fixtures/docs-compatibility.json`,
 from `c16dbb1`; their diffs (the `--force` help text and `False` default, and a stub that
 keeps the AdamW default-accelerator probe off CUDA in the CPU harness) were read and are
 consistent with forced admission and the harness intent; nothing more was examined.
+
+### Independent rules lens — 2026-11-07
+
+A separate fresh-context reviewer checked the whole runtime diff against the
+constitution and `docs/project-contracts.md` and approved it with no rule violation;
+see the [DINOv3 review record](../dinov3-hf-native/review.md#independent-rules-lens--2026-11-07).

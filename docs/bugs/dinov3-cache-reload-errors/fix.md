@@ -35,9 +35,21 @@ original record.
 
 None.
 
+## Known behaviour
+
+Recorded 2026-11-07 after the [fix review](review.md). The broad catch also turns
+`MemoryError` into `ValueError`. During the cache check this causes one reconversion,
+which the assessment accepts. During the staging reload in `_publish`, a real
+out-of-memory error surfaces as `ValueError("Unreadable converted DINOv3 checkpoint:
+...")` naming an already deleted temporary path, with `MemoryError` as the chained
+`__cause__`. Read the cause when diagnosing such a failure.
+
 ## Follow-ups
 
 - Patch release and the paired queue check (remaining-work plan T2a.2) are outside
   this branch step.
 - Review note, not fixed here: a hard kill during conversion leaves `.conversion-*`
   staging directories behind.
+- Review follow-up, not done here: a test for the staging-reload failure path that
+  asserts the `ValueError` from `_publish`, a chained `TypeError` cause and no
+  published `.pth`/`.json` file.

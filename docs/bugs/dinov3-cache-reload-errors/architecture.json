@@ -85,6 +85,9 @@
   ],
   "documentation": "No user-facing contract changes (docs/model-assets.md already states corrupt derived caches are rebuilt); dated bug and review records only.",
   "review": {
-    "status": "pending"
+    "status": "accepted",
+    "reviewer": "Fresh independent fix reviewer (2026-11-07), verdict approve for d084dd2",
+    "evidence": "docs/bugs/dinov3-cache-reload-errors/review.md",
+    "reconciliation": "The task-owned runtime diff of d084dd2 is hf_weights.py (_reload normalizes torch.load failures to a chained ValueError) and one parametrized regression in tests/test_dinov3_hf_weights.py, matching the single conversion module in scope. No import edge, interface, composition target or effect owner changed; existing .importlinter and tests/test_architecture.py coverage applies. Remaining branch paths are dated bug and review records. Two low findings (MemoryError relabelling on the staging reload; no staging-path test) are recorded as known behaviour and a follow-up in fix.md, not defects blocking acceptance."
   }
 }
