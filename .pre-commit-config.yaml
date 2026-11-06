@@ -38,6 +38,9 @@ repos:
         always_run: true
         pass_filenames: false
         require_serial: true
+        # A regenerated changelog rejects the commit anyway; stop before analysis and
+        # tests run, so only the retry (with the changelog staged) pays for them.
+        fail_fast: true
 
       - id: untracked-sources
         name: No untracked files under src, tests or scripts

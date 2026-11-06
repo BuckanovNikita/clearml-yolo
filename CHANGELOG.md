@@ -8,6 +8,9 @@
 - **specs**: Record 011 commit, release-skip and delivery evidence
   ([`9582e4c`](https://github.com/BuckanovNikita/clearml-yolo/commit/9582e4c3703c3240af8a2789fd931e1d1c68808a))
 
+- **specs**: Record resolved CY 0.46 paired delivery check
+  ([`dcf3a39`](https://github.com/BuckanovNikita/clearml-yolo/commit/dcf3a39c61b8c4d4339fdbedae22c809d1932850))
+
 
 ## v0.46.0 (2026-11-06)
 

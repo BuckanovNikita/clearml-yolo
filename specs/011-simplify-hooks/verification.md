@@ -113,3 +113,29 @@ release first.
 metadata `0.46.0` / `0.1.9`, the complete queue suite (584 passed, 7 physical
 opt-ins deselected) and `cy-queue --help`. The full record is in cy-queue
 `docs/plans/cy-046-compatibility/verification.md`.
+
+## Follow-up: changelog fail-fast and constitution amendment (2026-11-06)
+
+**Observation.** The `docs(specs)` commit that became `dcf3a39` was rejected on its
+first attempt because the `changelog` hook regenerated `CHANGELOG.md`. Before
+rejecting it, the remaining hooks still ran. That included testmon's complete rerun
+after the environment changed (the editable `cy-queue` install), which took about
+20 minutes for a commit that had to be retried. The retry, with the changelog
+staged, took 5.6 s.
+
+**Fix.** At the user's direction, the `changelog` hook is kept and given
+`fail_fast: true`. It already runs before the analysis and test hooks.
+`test_changelog_rewrite_stops_before_heavy_hooks` asserts the flag and the order. With
+the flag removed, that test failed. A scratch prek 0.5.10 probe showed that a failing
+`fail_fast: true` hook stops later hooks even when the top-level `fail_fast` is false.
+
+**Constitution amendment 9.0.1 (PATCH, explicitly requested by the user).**
+
+- Change: the full hook command now reads `uv run prek run --all-files` instead of
+  `uv run pre-commit run --all-files`.
+- Reason: prek replaced pre-commit as the hook runner in this feature.
+- Affected principle: the verification gates. They are unchanged in substance, the
+  hooks still must not be bypassed, and the rule needs no migration.
+
+The unused Git-private `.git/verification/` receipt and log data was deleted at the
+user's request.

@@ -748,3 +748,14 @@ def test_skipped_heavy_hooks_name_configured_hooks(monkeypatch: pytest.MonkeyPat
     assert set(HEAVY_HOOKS) <= configured
     # Light checks keep validating generated release commits.
     assert {"changelog", "check-docs", "check-toml"} <= configured - set(HEAVY_HOOKS)
+
+
+def test_changelog_rewrite_stops_before_heavy_hooks() -> None:
+    config = yaml.safe_load((ROOT / ".pre-commit-config.yaml").read_text())
+    order = [hook["id"] for repo in config["repos"] for hook in repo["hooks"]]
+    changelog = next(
+        hook for repo in config["repos"] for hook in repo["hooks"] if hook["id"] == "changelog"
+    )
+    assert changelog.get("fail_fast") is True
+    heavy = ("mypy", "pytest-full", "pytest")
+    assert order.index("changelog") < min(order.index(name) for name in heavy)

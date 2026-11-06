@@ -28,3 +28,6 @@ evidence.
   acceptance.
 - [x] T008 Commit through the real hooks and confirm the release-commit hook skips.
   Evaluate the release workflow. Delivery is blocked by the queue range; see verification.
+- [x] T009 Follow-up: give the `changelog` hook `fail_fast` (with a regression), amend the
+  constitution's hook command (9.0.1) and delete `.git/verification/`, all as requested by
+  the user.

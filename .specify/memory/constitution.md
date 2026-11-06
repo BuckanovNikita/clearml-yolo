@@ -131,7 +131,7 @@ Code changes MUST run the relevant repository gates through `uv run`: `pytest`,
 `ruff check .`, `mypy .`, and `lint-imports`. Verification MUST broaden when impact crosses
 boundaries. Commit work MUST satisfy the applicable checks in
 [.pre-commit-config.yaml](../../.pre-commit-config.yaml); hooks MUST NOT be bypassed to hide
-failures. `uv run pre-commit run --all-files` is the repository's full hook check.
+failures. `uv run prek run --all-files` is the repository's full hook check.
 
 Tests MUST assert observable behavior and contracts. They MUST use isolated temporary paths,
 controlled clocks or identities, and explicit external-dependency substitutes where needed
@@ -297,4 +297,4 @@ that deliberately alters a governing rule MUST include an explicit amendment rat
 quietly weakening checks. Constitution updates MUST remain confined to this document;
 dependent template or implementation changes require their own authorized work.
 
-**Version**: 9.0.0 | **Ratified**: 2026-09-19 | **Last Amended**: 2026-10-15
+**Version**: 9.0.1 | **Ratified**: 2026-09-19 | **Last Amended**: 2026-11-06
