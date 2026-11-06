@@ -10,6 +10,9 @@
 
 ### Documentation
 
+- **plans**: Plan completion of remaining work after CY 0.46.0
+  ([`be56215`](https://github.com/BuckanovNikita/clearml-yolo/commit/be562156242c56cf399f87e3fda1af8111fce92c))
+
 - **specs**: Record 006 delivery state after CY 0.46.0 release
   ([`55bd2b0`](https://github.com/BuckanovNikita/clearml-yolo/commit/55bd2b09aeba85263c6a6636403d69ed61d0d9a5))
 

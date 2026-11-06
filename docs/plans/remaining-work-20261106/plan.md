@@ -36,7 +36,6 @@ new bug workflow (`speckit-bug-*`), with its own regression, release and paired 
 | 3 | WP1 Native forced-estimator acceptance | single GPU | WP2a findings resolved |
 | 4 | WP2b Architecture acceptance for force, DINOv3 and OOM | offline | WP1, WP2a, WP3 |
 | 5 | WP4 Original campaign recovery | single GPU, long | WP1 telemetry fix (T1.1) |
-| later | WP5 Physical multi-GPU acceptance | two or more GPUs | hardware not available on this host |
 
 The WP0, WP2a, WP3 and WP6 tasks touch disjoint files and can run in parallel with
 exclusive write ownership. The GPU packages run one at a time: there is one GPU
@@ -49,7 +48,7 @@ evidence. Do not rewrite dated history; add a short dated note next to the box o
 group instead.
 
 - [ ] T0.1 CY [006 tasks](../../../specs/006-batch-training/tasks.md):
-  - T024: done. Residual T022 lives in WP5. Evidence: tasks.md "Fresh review" section,
+  - T024: done. Residual T022 is waived (T0.8). Evidence: tasks.md "Fresh review" section,
     the 006 `architecture.json` accepted review and `evidence/release.md`.
   - T025: delivered as v0.41.0 through T033–T035.
   - T031: superseded by T064. Record the forced yolo11n confirmation in
@@ -81,6 +80,11 @@ group instead.
   `not-run` but have passing evidence (scoped test.md:71 and :113-120; force
   verification.md:228-235). Re-run `scripts/check_docs.py --all` and record those
   checks as passed with a dated evidence reference.
+- [ ] T0.8 CY [006 tasks](../../../specs/006-batch-training/tasks.md) T022, and the
+  `ddp-native` check in the 006 architecture record: annotate them as **waived by
+  user decision (2026-11-06)**. Record that physical multi-GPU DDP verification will
+  not be done here. Do not mark them passed. cy-queue's seven `ddp_gpu` opt-ins stay
+  deselected and are recorded the same way in the queue's dated evidence.
 - [ ] T0.7 cy-queue:
   - `docs/plans/2026-10-30-gpu-memory-threshold/plan.md:46`: done. Evidence: CY T046
     and CY `specs/006-batch-training/speedup/verification.md:157-166` (v0.44.4,
@@ -242,18 +246,12 @@ repetitions need CPU time; follow pcboard throttling.
 - [ ] T4.6 Close the campaign record (`test.md`, `assessment.md`, `fix.md`,
   `architecture.json`) and the cleanup plan's open gates.
 
-## WP5: Physical multi-GPU acceptance (blocked by hardware)
+## Dropped: physical multi-GPU acceptance
 
-This host has one GPU. These items stay open, and are disclosed as such, until a
-machine with two or more GPUs and ClearML access is available.
-
-- [ ] T5.1 Run the 16 CY T026 physical DDP scenarios (DEIMv2, RF-DETR, Faster R-CNN
-  and FCOS) for 006 T022 and the `ddp-native` check in the 006 architecture record.
-- [ ] T5.2 Run the queue's seven `ddp_gpu` CUDA/NCCL opt-in scenarios
-  (`pytest --help` lists their options), with the owned devices, project and
-  evidence paths.
-- [ ] T5.3 Record dated evidence in CY 006 and in the queue's `docs/evidence/`, then
-  tick T022.
+On 2026-11-06 the user decided that physical multi-GPU (DDP) verification is not to
+be attempted. This covers CY 006 T022, the 16 T026 DDP scenarios, the `ddp-native`
+check and the queue's seven `ddp_gpu` opt-ins. They are waived, not passed:
+T0.8 records the decision, and no package plans them.
 
 ## Completion definition
 
@@ -261,7 +259,7 @@ All existing work is finished when:
 
 - every box in this plan is ticked, or recorded as an explicit and accepted limitation;
 - no `architecture.json` in either repository is left with a `pending` review;
-- the cleanup plan's "Open gates" list is empty or contains only WP5 hardware items;
+- the cleanup plan's "Open gates" list is empty, apart from the waived multi-GPU gates;
 - both repositories are clean, have one branch each and are pushed;
 - the last release (if any) passed the paired CY/queue check.
 
