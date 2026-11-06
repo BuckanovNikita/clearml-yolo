@@ -122,7 +122,13 @@ def _sha256(path: Path) -> str:
 
 def _reload(path: Path, expected: Mapping[str, "Tensor"], native: "nn.Module") -> None:
     torch = importlib.import_module("torch")
-    loaded = torch.load(path, map_location="cpu", weights_only=True)
+    try:
+        loaded = torch.load(path, map_location="cpu", weights_only=True)
+    except Exception as error:
+        # Weights-only unpickling raises open-ended types (TypeError, KeyError,
+        # IndexError, AssertionError and others from allowlisted reducers and opcodes).
+        # Normalize them so _cached rebuilds a stale checkpoint; staging stays loud.
+        raise ValueError(f"Unreadable converted DINOv3 checkpoint: {path}") from error
     if not isinstance(loaded, dict) or loaded.keys() != expected.keys():
         raise ValueError("Invalid converted DINOv3 tensor inventory")
     if any(

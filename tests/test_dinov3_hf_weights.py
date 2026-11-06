@@ -249,6 +249,32 @@ def test_corrupt_derived_cache_is_rebuilt_from_verified_source(
     assert repaired == result
 
 
+@pytest.mark.parametrize(
+    "payload",
+    [
+        # An allowlisted OrderedDict reduce with a non-iterable argument raises TypeError.
+        b"\x80\x02ccollections\nOrderedDict\nK\x05R.",
+        # A memo lookup of an unset index raises KeyError.
+        b"\x80\x02h\x05.",
+        # STOP on an empty stack raises IndexError.
+        b"\x80\x02.",
+    ],
+    ids=["type-error", "key-error", "index-error"],
+)
+def test_unreadable_derived_checkpoint_with_matching_receipt_is_rebuilt(
+    source_record: SourceRecord, payload: bytes
+) -> None:
+    """Weights-only unpickling errors outside the usual types still trigger reconversion."""
+    preset, source = source_record
+    result = hf_weights._publish(source, preset, Path("source"))
+    result.path.write_bytes(payload)
+    result.path.with_suffix(".json").write_text(
+        result.model_copy(update={"sha256": hashlib.sha256(payload).hexdigest()}).model_dump_json()
+    )
+    repaired = hf_weights._publish(source, preset, Path("source"))
+    assert repaired == result
+
+
 def test_concurrent_conversion_publishes_one_valid_checkpoint(source_record: SourceRecord) -> None:
     preset, source = source_record
     with ThreadPoolExecutor(max_workers=2) as executor:
