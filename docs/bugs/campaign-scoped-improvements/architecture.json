@@ -154,6 +154,9 @@
   ],
   "documentation": "Update docs/multi-model-backends.md nonfinite error guidance; parent reconciles portable usage and preserves original full recovery as unresolved.",
   "review": {
-    "status": "pending"
+    "status": "accepted",
+    "reviewer": "WP2a integrated source review (OOM/scoped-export lens with skeptic pass) and the independent fresh-context rules lens, 2026-11-07; both no finding for this scope",
+    "evidence": "docs/bugs/campaign-scoped-improvements/review.md",
+    "reconciliation": "The scoped runtime diff in v0.45.1..v0.46.0 is the bulk _enrich_rows conversion in core/evaluation/result_rows.py and the Torchvision nonfinite-loss and scalar-capture messages, matching the modules in scope. A differential Hypothesis comparison against the v0.45.1 implementation (700 examples) found no counterexample; the rules lens confirmed core purity (pandas, NumPy, standard library and core only) and found no rule violation, with lint-imports 52 contracts kept. Canonical, focused, parity, docs and paired checks are passed with dated evidence. Portable usage is reconciled by corp-skills v0.7.5 (11b6866). The source was delivered in CY 0.46.0 before this acceptance, as the 006 delivery note records. No native gate applies to this record."
   }
 }

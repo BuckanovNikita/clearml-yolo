@@ -354,3 +354,11 @@ This check covers CY Markdown only. The record's portable-guidance expectation
 is not established by it; the corp-skills guide still predates `--force` and is
 owned by WP3/T065. The record's `docs` check therefore stays `not-run`, with this
 partial result in its reason; WP3/T065 revisits it.
+
+### T065 portable guidance — 2026-11-07
+
+The portable-guidance part of T065 is done: corp-skills v0.7.5 (`11b6866`) documents
+CY 0.46.0 `--force`, its `forced/background-sensitive` label, the reader upgrade and
+the DINOv3 HF guidance; see the
+[force verification](force/verification.md#portable-usage-guide-release--2026-11-07).
+T065 stays unticked for its review, architecture acceptance and delivery parts.

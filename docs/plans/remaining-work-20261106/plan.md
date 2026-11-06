@@ -47,9 +47,11 @@ Tick or annotate boxes whose work is already done or superseded, citing their
 evidence. Do not rewrite dated history; add a short dated note next to the box or
 group instead.
 
-- [ ] T0.1 CY [006 tasks](../../../specs/006-batch-training/tasks.md):
-  - T024: done. Residual T022 is waived (T0.8). Evidence: tasks.md "Fresh review" section,
-    the 006 `architecture.json` accepted review and `evidence/release.md`.
+- [x] T0.1 CY [006 tasks](../../../specs/006-batch-training/tasks.md):
+  - T024: review and ledger parts done, but the box stays open until WP1 closes T031
+    and the record's failed `native` check. Residual T022 is waived (T0.8), not passed.
+    Evidence: tasks.md "Fresh review" section, the 006 `architecture.json` accepted
+    review and `evidence/release.md`.
   - T025: delivered as v0.41.0 through T033–T035.
   - T031: superseded by T064. Record the forced yolo11n confirmation in
     `speedup/verification.md` (2026-11-05). **Decision needed:** does forced
@@ -58,34 +60,36 @@ group instead.
   - T058 and T060: superseded by T064 and T065. T060's release part is done (v0.46.0).
   - T059: pair and README parts done in `c16dbb1` and the 0.46.0 pair. Its
     portable-guide part moves to WP3/T065.
-- [ ] T0.2 CY [DINOv3 HF fix](../../bugs/dinov3-hf-native/fix.md):
+- [x] T0.2 CY [DINOv3 HF fix](../../bugs/dinov3-hf-native/fix.md):
   - `:74` superseded by T064 (fix.md:89-104);
   - `:78` delivered in v0.46.0 (`60edd4b`).
-- [ ] T0.3 CY [scoped improvements assessment](../../bugs/campaign-scoped-improvements/assessment.md):
+- [x] T0.3 CY [scoped improvements assessment](../../bugs/campaign-scoped-improvements/assessment.md):
   - `:57` closed by test.md:78-111. Confirm this against the conflicting note in
     [cleanup verification](../unfinished-work-cleanup-20261106/verification.md)
     that says 50,000-row parity is still open.
   - `:58` done (test.md:113-120, and the queue `cy-046-compatibility/verification.md`
     committed pair).
   - `:60` delivered in v0.46.0.
-- [ ] T0.4 CY [campaign assessment](../../bugs/campaign-20261102/assessment.md):
+- [x] T0.4 CY [campaign assessment](../../bugs/campaign-20261102/assessment.md):
   - `:37`, `:38`, `:39`, `:43` and `:140`–`:153` are superseded by the 2026-11-03
     checkpoint `:166`–`:180`. `:150` and `:153` map to the still-open `:176` and `:180`.
   - `:93`, `:98`, `:100` are done (assessment.md:112-127; test.md:244-276).
   - [fix](../../bugs/campaign-20261102/fix.md) `:137` is done (test.md:433-447,
     plus the 0.46.0 hooks and pair).
-- [ ] T0.5 CY [agent-instructions plan](../agent-instructions-refactor-20261104/plan.md)
+- [x] T0.5 CY [agent-instructions plan](../agent-instructions-refactor-20261104/plan.md)
   `:32`: committed as `43de5af` and released in v0.46.0. `:31` stays open (WP6).
-- [ ] T0.6 In the scoped and force `architecture.json`, the `docs` checks are
+- [x] T0.6 In the scoped and force `architecture.json`, the `docs` checks are
   `not-run` but have passing evidence (scoped test.md:71 and :113-120; force
   verification.md:228-235). Re-run `scripts/check_docs.py --all` and record those
-  checks as passed with a dated evidence reference.
-- [ ] T0.8 CY [006 tasks](../../../specs/006-batch-training/tasks.md) T022, and the
+  checks as passed with a dated evidence reference. *(2026-11-07: done for the scoped
+  record. The force record's `docs` check stays `not-run` with a partial result,
+  because the command covers CY Markdown only; WP2b revisits it.)*
+- [x] T0.8 CY [006 tasks](../../../specs/006-batch-training/tasks.md) T022, and the
   `ddp-native` check in the 006 architecture record: annotate them as **waived by
   user decision (2026-11-06)**. Record that physical multi-GPU DDP verification will
   not be done here. Do not mark them passed. cy-queue's seven `ddp_gpu` opt-ins stay
   deselected and are recorded the same way in the queue's dated evidence.
-- [ ] T0.7 cy-queue:
+- [x] T0.7 cy-queue:
   - `docs/plans/2026-10-30-gpu-memory-threshold/plan.md:46`: done. Evidence: CY T046
     and CY `specs/006-batch-training/speedup/verification.md:157-166` (v0.44.4,
     queue `2fbaed2`).
@@ -99,7 +103,7 @@ per repository (no release) through the hooks, then push.
 
 ## WP2a: Fresh integrated source review (offline)
 
-- [ ] T2a.1 Run a fresh independent review of the runtime diff `v0.45.1..v0.46.0`
+- [x] T2a.1 Run a fresh independent review of the runtime diff `v0.45.1..v0.46.0`
   (`git diff v0.45.1 v0.46.0 -- src tests`). It covers:
   - forced admission and the persisted `settings.force` policy, including the
     post-review omission fix and its regression;
@@ -112,10 +116,10 @@ per repository (no release) through the hooks, then push.
 - [ ] T2a.2 Resolve the findings. A runtime defect becomes a `speckit-bug-*` record
   with a failing regression first, then a fix, the full suite, a patch release and
   the paired check.
-- [ ] T2a.3 Record the verdict in `docs/bugs/dinov3-hf-native/review.md`, in a
+- [x] T2a.3 Record the verdict in `docs/bugs/dinov3-hf-native/review.md`, in a
   `review.md` for accelerator-oom-receipts and campaign-scoped-improvements, and in
   the force record (`specs/006-batch-training/force/verification.md`).
-- [ ] T2a.4 Accept the scoped campaign architecture record. It has no native gate.
+- [x] T2a.4 Accept the scoped campaign architecture record. It has no native gate.
   After T0.6, validate it with `--phase acceptance` and tick
   [scoped assessment](../../bugs/campaign-scoped-improvements/assessment.md) `:59`
   once WP3 lands.
@@ -126,31 +130,31 @@ The corp-skills `skills/clearml-yolo` main branch (`0a3ed5e`, collection v0.7.4)
 describes `--force` as unreleased and says "CY 0.45.0 has no --force"
 (`references/usage.md:477-494, :540`).
 
-- [ ] T3.1 Inventory both corp-skills checkouts named in the
+- [x] T3.1 Inventory both corp-skills checkouts named in the
   [baseline](#purpose-and-baseline). Snapshot their diffs and untracked files outside
   the repository before any change.
-- [ ] T3.2 On a fresh branch from corp-skills `main`:
+- [x] T3.2 On a fresh branch from corp-skills `main`:
   - fold in the DINOv3 HF guidance (`usage.md`, `evaluation.md` and the
     `verification/dinov3-selected-20261105/` evidence);
   - fold in the force guidance;
   - state CY 0.46.0 as the version that ships `--force`, its
     `forced/background-sensitive` labelling and the reader-upgrade requirement;
   - follow [batch estimation](../../batch-estimation.md) as the authoritative source.
-- [ ] T3.3 Validate with the corp-skills MAINTENANCE checks, then release corp-skills
+- [x] T3.3 Validate with the corp-skills MAINTENANCE checks, then release corp-skills
   through its own workflow (Git-only, authorized push).
 - [ ] T3.4 Remove the two superseded corp-skills checkouts only after their content
   is confirmed on corp-skills `main`.
-- [ ] T3.5 Record the corp-skills commit and version in a dated section of
+- [x] T3.5 Record the corp-skills commit and version in a dated section of
   `specs/006-batch-training/force/verification.md`. Mark the portable part of T065
   done.
 
 ## WP6: Instruction-refactor review (offline, small)
 
-- [ ] T6.1 Run a fresh read-only review of `43de5af` (AGENTS.md, skills and
+- [x] T6.1 Run a fresh read-only review of `43de5af` (AGENTS.md, skills and
   references) against the rule-preservation acceptance in its
   [plan](../agent-instructions-refactor-20261104/plan.md).
 - [ ] T6.2 Check skill discovery in a fresh Claude session and a fresh Codex session.
-- [ ] T6.3 Tick plan `:31` and update the "Pending" list in its
+- [x] T6.3 Tick plan `:31` and update the "Pending" list in its
   `verification-2026-11-05.md`.
 
 ## WP1: Native forced-estimator acceptance (single GPU)
@@ -268,3 +272,24 @@ All existing work is finished when:
 This plan is planning documentation only. See [architecture.json](architecture.json)
 (impact `none`). Runtime work that comes out of a package uses its owning record.
 New defects get new bug records with module-impact architecture.
+
+## Progress — 2026-11-07
+
+Phase 1 landed on `master` (WP0, WP6 and WP2a branches) and cy-queue `main` (WP0).
+
+- **T0.1:** reconciled in 006 [tasks.md](../../../specs/006-batch-training/tasks.md#ledger-reconciliation-2026-11-07).
+  T024 stays open until WP1 closes T031 and the native check; T022 is waived.
+- **T2a.1:** the per-topic lenses and an independent rules lens approved the
+  `v0.45.1..v0.46.0` runtime diff; see the
+  [DINOv3 review record](../../bugs/dinov3-hf-native/review.md#independent-rules-lens--2026-11-07).
+  The one defect found is
+  [dinov3-cache-reload-errors](../../bugs/dinov3-cache-reload-errors/review.md).
+- **T2a.4:** the scoped campaign
+  [architecture record](../../bugs/campaign-scoped-improvements/architecture.json)
+  passes `--phase acceptance`; its review cites the WP2a review and the rules lens.
+- **T3.1–T3.3:** corp-skills `main` `11b6866`, collection v0.7.5 (annotated tag
+  pushed; Git only). T3.5 is recorded in the
+  [force verification](../../../specs/006-batch-training/force/verification.md#portable-usage-guide-release--2026-11-07).
+- **Open for the owner:** T3.4 (remove the superseded corp-skills checkouts) and T6.2
+  (fresh-session skill discovery). T2a.2 closes with the 0.46.1 patch release and its
+  paired check.

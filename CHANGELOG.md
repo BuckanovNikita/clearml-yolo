@@ -6,7 +6,7 @@
 ### Bug Fixes
 
 - **deim**: Rebuild derived DINOv3 checkpoints that fail weights-only unpickling
-  ([`d084dd2`](https://github.com/BuckanovNikita/clearml-yolo/commit/d084dd2397da7c5433c756c98dbea73aa646a979))
+  ([`96581a4`](https://github.com/BuckanovNikita/clearml-yolo/commit/96581a445eac15841da24f4b4d1134458ca662ad))
 
 ### Build System
 
@@ -15,8 +15,14 @@
 
 ### Documentation
 
+- **ledger**: Correct WP0 reconciliation per verifier findings
+  ([`1a83ff7`](https://github.com/BuckanovNikita/clearml-yolo/commit/1a83ff70ab98c0bbb917dd23f5662e4b8c1e4880))
+
 - **ledger**: Reconcile WP0 boxes with existing evidence
   ([`4e5b50b`](https://github.com/BuckanovNikita/clearml-yolo/commit/4e5b50b5d735a2e0c1df1707a02bf6b5964b50f4))
+
+- **plans**: Address WP6 review verification findings
+  ([`29d8030`](https://github.com/BuckanovNikita/clearml-yolo/commit/29d8030ab05b7fefa204b5fa8df17b8fdafec618))
 
 - **plans**: Drop physical multi-GPU verification by user decision
   ([`f8f2c51`](https://github.com/BuckanovNikita/clearml-yolo/commit/f8f2c5191a25439fc423aae76f322e09fab39afe))
@@ -25,7 +31,16 @@
   ([`be56215`](https://github.com/BuckanovNikita/clearml-yolo/commit/be562156242c56cf399f87e3fda1af8111fce92c))
 
 - **plans**: Record independent review of agent-instruction refactor
-  ([`061f502`](https://github.com/BuckanovNikita/clearml-yolo/commit/061f502b2642021fc5ab0ad6e94ebe87cb812248))
+  ([`f04bd98`](https://github.com/BuckanovNikita/clearml-yolo/commit/f04bd98cfceb00d7fdeec70f839af88b858ff7e9))
+
+- **review**: Narrow WP2a verdict scope and add a rules lens
+  ([`d288428`](https://github.com/BuckanovNikita/clearml-yolo/commit/d288428dc38c5b2039063e4999bb8b73e74c5490))
+
+- **review**: Record the d084dd2 fix review and the WP2a rules lens
+  ([`4428ec7`](https://github.com/BuckanovNikita/clearml-yolo/commit/4428ec72c65828a848b2fe5d8f7123989d2bc519))
+
+- **review**: Record WP2a integrated source review verdicts
+  ([`e1973ff`](https://github.com/BuckanovNikita/clearml-yolo/commit/e1973ff12893ac8d471795d64b2a965d2ca0755b))
 
 - **specs**: Record 006 delivery state after CY 0.46.0 release
   ([`55bd2b0`](https://github.com/BuckanovNikita/clearml-yolo/commit/55bd2b09aeba85263c6a6636403d69ed61d0d9a5))

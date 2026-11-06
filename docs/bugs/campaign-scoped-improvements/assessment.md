@@ -56,7 +56,7 @@ reviewed isolated DINOv3 changes, which are excluded from this write ownership.
 - [x] Pass focused diagnostics/export/CPU observer and architecture checks.
 - [x] Parent verifies retained 50,000-row exact parity and scoped profiling.
 - [x] Parent runs final integrated canonical, docs and prospective CY/queue pair.
-- [ ] Parent reconciles portable usage, fresh integrated review and architecture acceptance.
+- [x] Parent reconciles portable usage, fresh integrated review and architecture acceptance.
 - [x] Parent completes authorized Git-only delivery after all integrated gates.
 
 The final integrated source includes subsequent force work. No intermediate release
@@ -97,3 +97,10 @@ Mutation-selected sources, tests and dependency revisions are unchanged.
   `uv run --frozen --no-sync python scripts/check_docs.py --all` exited 0 with
   "Checked 268 Markdown files; 0 issue(s)." The architecture `docs` check now
   records this command, because `scripts/verify.py --docs` no longer exists.
+
+## Acceptance — 2026-11-07
+
+Line 59 is ticked. Portable usage: corp-skills v0.7.5 (`11b6866`) states CY 0.46.0
+guidance. Fresh integrated review: [review.md](review.md), no finding, including the
+independent rules lens. Architecture: [architecture.json](architecture.json) review is
+`accepted` and the record passes `validate_architecture.py --phase acceptance`.

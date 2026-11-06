@@ -328,3 +328,29 @@ consistent with forced admission and the harness intent; nothing more was examin
 A separate fresh-context reviewer checked the whole runtime diff against the
 constitution and `docs/project-contracts.md` and approved it with no rule violation;
 see the [DINOv3 review record](../../../docs/bugs/dinov3-hf-native/review.md#independent-rules-lens--2026-11-07).
+
+## Portable usage guide release — 2026-11-07
+
+Remaining-work WP3 (T3.1–T3.3) released the portable `clearml-yolo` usage skill for
+CY 0.46.0 from corp-skills `main`:
+
+- commit `11b686662c748adbf7876840af4c5dfdb965c01b`, collection version 0.7.5,
+  annotated tag `v0.7.5` (tag object `ef61536`), pushed to
+  `git@github.com:BuckanovNikita/custom-opencode-skills.git`, which is the same
+  repository as `BuckanovNikita/corp-skills` (both remotes list `main` and
+  `v0.7.5^{}` at `11b6866`);
+- branch `docs/clearml-yolo-046-20261107`: `fa0780a` (CY 0.46.0 force and DINOv3 HF
+  guidance) and `11b6866` (forced-record reader upgrade expectation);
+- changed skill paths: `skills/clearml-yolo/SKILL.md`,
+  `skills/clearml-yolo/references/usage.md` and
+  `skills/clearml-yolo/references/evaluation.md`, with
+  `verification/clearml-yolo-046-20261107/` and
+  `verification/dinov3-selected-20261105/`;
+- checks on the branch tip: `npx skills@1.7.1 add . --list` found the 4 expected
+  skills, markdownlint-cli2 0.23.3 reported 0 issues in 89 files and
+  `git diff --check` was clean. A pre-release review approved the content against
+  CY v0.46.0 with two optional nits left unfixed.
+
+This completes the portable-guidance part of T065. Limits: no target-model or
+behavioural evaluation and no native run; the native, architecture and remaining
+T065 parts stay open.
