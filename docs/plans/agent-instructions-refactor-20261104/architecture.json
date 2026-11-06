@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "task": "Refactor agent instructions and project skill structure",
+  "scope": [
+    "AGENTS.md",
+    ".agents/skills/running-end-to-end-tests",
+    "docs/plans/agent-instructions-refactor-20261104",
+    "CHANGELOG.md"
+  ],
+  "impact": "none",
+  "rationale": "Inspected AGENTS.md, CLAUDE.md, the authored end-to-end skill and its references, linked workflow docs and generated Spec Kit manifests. Restructures instruction prose and skill progressive disclosure only; no runtime module, dependency contract, composition target or architecture enforcement changes. Generated Spec Kit skills and .specify are unchanged."
+}

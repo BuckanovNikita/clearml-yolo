@@ -1,5 +1,23 @@
 # Pipeline prerequisites
 
+## Contents
+
+- Environment and packages
+- Workspace and filesystem
+- Ground-truth sources
+- Configuration and commands
+- Detector backends
+- Devices and queue execution
+- Queue worker and admission
+- GPU operator commands
+- Queue acceptance environment
+- FiftyOne isolation
+- Comparison inputs
+- Identity sidecars and descriptors
+- Detection identity acceptance
+
+## Environment and packages
+
 Use Python and dependency bounds from `pyproject.toml` and selected versions from
 `uv.lock`. Detector and ONNX export dependencies install with CY; the queue TUI
 and NVML belong to the separate `cy-queue` source package. Install CY first, then
@@ -7,6 +25,8 @@ a compatible queue version into the same environment when queue testing is requi
 Neither package is assumed available on PyPI; project extras are removed. Keep development tools in the separate `dev` group. Configure ClearML
 through normal SDK environment/user configuration; external selectors are valid.
 Infrastructure access and resource capacity come from the environment, not this repository.
+
+## Workspace and filesystem
 
 Set `CY_HOME` to the invocation workspace (default: launch directory) for project datasets,
 outputs and scratch. Bootstrap preserves SDK configuration/cache selectors, cwd discovery,
@@ -18,6 +38,8 @@ Deliberate maintenance requires an idle workspace and descendants. Invalid datas
 are preserved and fail clearly; native lock failures have no soft fallback. See the
 [filesystem contract](../../../../docs/filesystem-policy.md). Preserve source images,
 existing user settings and old local SDK caches; reuse old local selectors explicitly.
+
+## Ground-truth sources
 
 Supply a local ground-truth CSV or a finalized ClearML dataset containing only root
 `dataset.csv`; additional files or linked entries must fail before download.
@@ -44,6 +66,8 @@ For existing YOLO annotations, build the CSV before consuming it:
 uv run --frozen --no-sync cy-ground-truth data_yaml=data.yaml output=ground_truth.csv
 ```
 
+## Configuration and commands
+
 `cy` composes the packaged wrapper configuration. For default YOLO, generate examples with
 `cy-init-config configs`, then paste native YAML into `configs/ultralytics/default.yaml`.
 Prediction overrides live in `configs/ultralytics_predict/default.yaml`. Invoke generated
@@ -61,6 +85,8 @@ include both native groups for default YOLO; new detector selections write only 
 accepts only Faster R-CNN presets; `cy-metrics`, `cy-report` and `cy-ground-truth` use no model group.
 Only selected files/parents participate in overwrite checks.
 
+## Detector backends
+
 New detectors use typed `model.train` and `model.predict` settings and derive COCO working
 data from the same CSV using the default runtime dependencies. DEIMv2 uses its
 verified source checkout when explicit, otherwise an approved manifest-verified
@@ -71,6 +97,8 @@ for cache, proxies and offline placement. Follow the
 the [multi-model acceptance guide](../../../../specs/000-baseline/spec.md#detector-backends-and-deployment-export)
 for the native/download/comparison matrices. Use `uv run --frozen --no-sync` after preparing
 a backend environment so verification does not remove additional external runtime packages.
+
+## Devices and queue execution
 
 Select the backend's supported device, batch and precision controls for the environment.
 Direct commands and `cy-export` run their explicit native devices without queue discovery,
@@ -94,6 +122,8 @@ completed successful ClearML task, while
 required computation/upload failures still fail. Live guardian discovery is scoped
 to its descendants; recovery keeps conservative global ownership proof.
 
+## Queue worker and admission
+
 A persistent same-user worker executes private immutable snapshots in fresh processes;
 closing a submission terminal or TUI does not stop it. No ClearML task exists while waiting.
 Automatic availability uses only NVML used VRAM strictly below
@@ -107,6 +137,8 @@ admission. Unknown telemetry/protocol, unsupported MIG and damaged
 coordination stop admission. Excessive whole-GPU demand remains pending with its reason.
 CPU ONNX export needs no GPU; engine build and verification require one GPU.
 
+## GPU operator commands
+
 Operator commands use physical `nvidia-smi` indexes independently of CUDA visibility;
 public output uses those indexes or short absent-device labels, with full GPU UUIDs
 and claim tokens kept internal. Verify `gpu disable INDEX`, `enable INDEX`, `free INDEX`
@@ -115,6 +147,8 @@ selected GPU's existing reservations and holds across roots without memory/proce
 checks, signals or original queue access. It preserves sibling reservations, processes
 and job outcomes, and older guardian writes cannot affect newer reservations. The next
 job still needs fresh memory admission; manual freeing grants no persistent bypass.
+
+## Queue acceptance environment
 
 Before acceptance preserve unrelated compute and establish available hardware. Verify
 matching direct/queued settings, one/five physical GPUs eager/compiled, independent live
@@ -125,6 +159,8 @@ sharing NFS retain independent order/capacity. Mount aliases and multiple queue 
 not duplicate local GPU allocation. Record unavailable hardware/NFS and unresolved native
 errors as acceptance gaps. See the [queue contract](../../../../docs/queue.md).
 
+## FiftyOne isolation
+
 Optional FiftyOne workers use finite preflight/publication/lock deadlines of 60/900/30
 seconds and no GPU/queue/ClearML ownership. Fault injection must prove bounded import,
 work and shutdown plus at most ten seconds cleanup; publication success requires zero
@@ -133,9 +169,13 @@ remains cancellation. Normal SDK configuration discovery, unchanged selectors/gl
 settings and retained project scratch are required acceptance evidence; process cleanup and
 receipt validation remain independent requirements. See [runtime isolation](../../../../docs/runtime-isolation.md).
 
+## Comparison inputs
+
 Full comparison requires validation/test data and exact baseline thresholds. Candidate
 thresholds come from validation only. Both checkpoints must use the same current test
 image membership and inference settings; reports consume the resulting `comparison_dir`.
+
+## Identity sidecars and descriptors
 
 Preserve checkpoint `.identity.json` and prediction `.provenance.json` sidecars when
 moving local inputs. Stored identity takes precedence over a fallback label and hashes
