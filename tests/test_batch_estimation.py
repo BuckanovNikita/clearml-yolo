@@ -1,10 +1,11 @@
 """Capacity policy accepts measured, repeatable results rather than optimistic guesses."""
 
+import json
 from collections.abc import Callable
 from typing import Any
 
 import pytest
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 from clearml_yolo.core.batch_estimation import (
     BatchSearch,
@@ -532,3 +533,33 @@ def test_saved_diagnostic_does_not_blame_an_earlier_capacity_boundary() -> None:
 
     failed = _case(_search(8, observe=observe)).model_copy(update={"diagnostic": ""})
     assert policy.estimate_diagnostic(failed) == "crash"
+
+
+def test_force_settings_are_strict_persisted_and_have_distinct_cache_keys() -> None:
+    ordinary = SearchSettings()
+    assert not ordinary.force
+    forced = SearchSettings(force=True)
+    assert SearchSettings.model_validate_json(forced.model_dump_json()).force
+    assert estimate_key(_profile(), SyntheticWorkload(), ordinary) != estimate_key(
+        _profile(), SyntheticWorkload(), forced
+    )
+    with pytest.raises(ValidationError):
+        SearchSettings.model_validate({"force": "true"})
+
+
+def test_ordinary_settings_stay_readable_by_pre_force_strict_readers() -> None:
+    class PreForceSettings(BaseModel):
+        model_config = ConfigDict(extra="forbid", frozen=True)
+
+        search_strategy: str
+        memory_fraction: float
+        max_global_batch: int
+        warmup_steps: int
+        measured_steps: int
+        trial_timeout_seconds: float
+
+    ordinary = SearchSettings().model_dump_json()
+    assert "force" not in json.loads(ordinary)
+    PreForceSettings.model_validate_json(ordinary)
+    assert SearchSettings.model_validate_json(ordinary) == SearchSettings()
+    assert json.loads(SearchSettings(force=True).model_dump_json())["force"] is True

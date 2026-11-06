@@ -69,7 +69,8 @@ def _install(
     idle_checks: list[tuple[int, ...]] = []
     monkeypatch.setattr(cli, "discover_gpus", lambda: devices)
     monkeypatch.setattr(
-        cli, "require_idle", lambda selected: idle_checks.append(tuple(g.index for g in selected))
+        cli, "require_idle",
+        lambda selected, **_kwargs: idle_checks.append(tuple(g.index for g in selected))
     )
     probe = RecordingProbe(capacity=capacity)
     monkeypatch.setattr(cli, "_make_probe", lambda: probe)
@@ -184,7 +185,7 @@ def test_invalid_options_fail_without_trials(
 def test_busy_gpu_aborts_without_native_work(monkeypatch: pytest.MonkeyPatch) -> None:
     probe, _ = _install(monkeypatch)
 
-    def busy(*args: Any) -> None:
+    def busy(*args: Any, **_kwargs: Any) -> None:
         raise RuntimeError("selected GPU is busy")
 
     monkeypatch.setattr(cli, "require_idle", busy)
@@ -223,7 +224,7 @@ def test_first_idle_identical_device_is_used_and_cached_run_ignores_busy_devices
 ) -> None:
     probe, checks = _install(monkeypatch)
 
-    def idle(devices: tuple[GPUDevice, ...]) -> None:
+    def idle(devices: tuple[GPUDevice, ...], **_kwargs: Any) -> None:
         checks.append(tuple(device.index for device in devices))
         if devices[0].index == 0:
             raise RuntimeError("GPU 0 is busy")
@@ -233,7 +234,9 @@ def test_first_idle_identical_device_is_used_and_cached_run_ignores_busy_devices
     cli.main(args)
     assert checks == [(0,), (1,)]
     assert {profile.gpus[0].uuid for profile in probe.probed_profiles} == {"GPU-1"}
-    monkeypatch.setattr(cli, "require_idle", lambda _: pytest.fail("cached run checked idle"))
+    monkeypatch.setattr(
+        cli, "require_idle", lambda _, **_kwargs: pytest.fail("cached run checked idle")
+    )
     cli.main(args)
 
 
@@ -352,7 +355,9 @@ def test_cache_survives_device_order_report_count_and_jobs_changes(
     args = ["--imgsz", "640", "--models", "yolo11n,yolo11s", "--search-limit", "8"]
     cli.main([*args, "--devices", "0,1", "--jobs", "1", "--gpu-counts", "1"])
     calls = probe.calls
-    monkeypatch.setattr(cli, "require_idle", lambda _: pytest.fail("cache hit checked idle GPU"))
+    monkeypatch.setattr(
+        cli, "require_idle", lambda _, **_kwargs: pytest.fail("cache hit checked idle GPU")
+    )
     monkeypatch.setattr(cli, "_make_pool", lambda: pytest.fail("cache hit created worker pool"))
     cli.main([*args, "--devices", "1,0", "--jobs", "2", "--gpu-counts", "2"])
     assert probe.calls == calls
@@ -404,3 +409,30 @@ def test_unaccepted_case_receipts_cannot_publish_success_or_fail_peers(
     assert cases["ultralytics/yolo11m"].usable
     if damage == "cleanup":
         assert pool.started[-1][1] == "GPU-1"
+
+
+def test_force_reaches_case_worker_and_reports_cached_and_extrapolated_sources(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+) -> None:
+    probe, _ = _install(monkeypatch)
+    observed: list[bool] = []
+
+    def preflight(devices: tuple[GPUDevice, ...], *, force: bool = False) -> None:
+        observed.append(force)
+        if not force:
+            raise RuntimeError("GPU has unattributed activity")
+
+    monkeypatch.setattr(cli, "require_idle", preflight)
+    arguments = ["--imgsz", "640", "--models", "yolo11n", "--search-limit", "8", "--force"]
+    cli.main(arguments)
+    assert observed == [True]
+    assert FileBatchEstimateStore().read().cases[0].settings.force
+    calls = probe.calls
+    output = capsys.readouterr().out
+    assert "forced/background-sensitive" in output
+    assert "extrapolated" in output
+    cli.main(arguments)
+    assert probe.calls == calls
+    output = capsys.readouterr().out
+    assert "cached" in output
+    assert "forced/background-sensitive" in output

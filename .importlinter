@@ -100,6 +100,7 @@ ignore_imports =
     clearml_yolo.adapters.integrations.native_runtime -> torch
     clearml_yolo.adapters.deim.backend -> torch
     clearml_yolo.adapters.deim.probe -> torch
+    clearml_yolo.adapters.deim.hf_weights -> torch
     clearml_yolo.adapters.rfdetr.backend -> torch
     clearml_yolo.adapters.rfdetr.probe -> torch
     clearml_yolo.adapters.export.onnx -> torch
@@ -568,7 +569,7 @@ forbidden_modules =
     clearml_yolo.adapters.export
     clearml_yolo.adapters.assets
 allow_indirect_imports = true
-# Exact read-only containment helper; other storage effects remain forbidden.
+# Exact containment and derived-checkpoint storage owners; other effects remain forbidden.
 ignore_imports =
     clearml_yolo.adapters.deim.transforms -> clearml_yolo.adapters.augmentation.pipeline
     clearml_yolo.adapters.deim.transforms -> clearml_yolo.adapters.augmentation.torch_data
@@ -579,6 +580,9 @@ ignore_imports =
     clearml_yolo.adapters.deim.backend -> clearml_yolo.adapters.assets.sources
     clearml_yolo.adapters.deim.source -> clearml_yolo.adapters.assets.archive
     clearml_yolo.adapters.deim.source -> clearml_yolo.adapters.assets.sources
+    clearml_yolo.adapters.deim.hf_weights -> clearml_yolo.adapters.assets.resolver
+    clearml_yolo.adapters.deim.hf_weights -> clearml_yolo.adapters.assets.validation
+    clearml_yolo.adapters.deim.hf_weights -> clearml_yolo.adapters.storage.filesystem
 
 [importlinter:contract:rfdetr-adapter-peer-ownership]
 name = rfdetr adapter peer ownership
@@ -899,6 +903,7 @@ allow_indirect_imports = true
 ignore_imports =
     clearml_yolo.adapters.assets.execution -> clearml_yolo.adapters.deim.assets
     clearml_yolo.adapters.assets.execution -> clearml_yolo.adapters.deim.source
+    clearml_yolo.adapters.assets.execution -> clearml_yolo.adapters.deim.hf_weights
     clearml_yolo.adapters.assets.execution -> clearml_yolo.adapters.fasterrcnn.assets
     clearml_yolo.adapters.assets.execution -> clearml_yolo.adapters.rfdetr.assets
     clearml_yolo.adapters.assets.sources -> clearml_yolo.adapters.deim.assets
@@ -926,6 +931,7 @@ forbidden_modules =
 allow_indirect_imports = true
 ignore_imports =
     clearml_yolo.adapters.assets.validation -> safetensors
+    clearml_yolo.adapters.deim.hf_weights -> safetensors
 
 [importlinter:contract:fcos-adapter-peer-ownership]
 name = fcos adapter peer ownership
@@ -1025,6 +1031,7 @@ unmatched_ignore_imports_alerting = none
 ignore_imports =
     clearml_yolo.adapters.assets.hub -> huggingface_hub
     clearml_yolo.adapters.torchvision.assets -> huggingface_hub
+    clearml_yolo.adapters.deim.assets -> huggingface_hub
 
 [importlinter:contract:documentation-isolation]
 name = Documentation serving is isolated from ordinary execution

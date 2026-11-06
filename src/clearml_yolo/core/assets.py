@@ -60,6 +60,18 @@ class AssetSpec(BaseModel):
         return hashlib.sha256(json.dumps(selected).encode()).hexdigest()[:24]
 
 
+class AssetDerivation(BaseModel):
+    """Source bytes and deterministic transformation behind a native checkpoint."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    source_url: str
+    source_revision: str
+    source_sha256: str
+    converter: str
+    native_revision: str
+
+
 class ResolvedAsset(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -69,6 +81,7 @@ class ResolvedAsset(BaseModel):
     sha256: str
     override: str
     revision: str | None = None
+    derivation: AssetDerivation | None = None
 
 
 class PreparationFailure(BaseModel):

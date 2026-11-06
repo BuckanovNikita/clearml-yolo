@@ -85,6 +85,7 @@ def test_list_reports_saved_failure_context_and_preserves_file(
         ["--gpu-counts", "1"],
         ["--jobs", "1"],
         ["--refresh"],
+        ["--force"],
         ["--memory-budget", "0.9"],
         ["--search-limit", "1024"],
         ["--trial-timeout", "300"],

@@ -79,7 +79,10 @@ def append_scalar(title: str, series: str, value: float, iteration: int) -> bool
     if selected is None:
         return False
     if not math.isfinite(value):
-        raise ValueError("Native scalar must be finite")
+        raise ValueError(
+            "Native scalar must be finite: "
+            f"title={title!r}, series={series!r}, iteration={iteration}, value={value!r}"
+        )
     record = {"title": title, "series": series, "value": value, "iteration": iteration}
     payload = (json.dumps(record, ensure_ascii=False, allow_nan=False) + "\n").encode()
     descriptor = os.open(project_write_path(selected), os.O_WRONLY | os.O_APPEND)

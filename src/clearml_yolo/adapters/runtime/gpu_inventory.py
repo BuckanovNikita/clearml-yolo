@@ -106,9 +106,9 @@ def discover_gpus() -> tuple[GPUDevice, ...]:
     return tuple(devices)
 
 
-def require_idle(devices: tuple[GPUDevice, ...]) -> tuple[int, ...]:
+def require_idle(devices: tuple[GPUDevice, ...], *, force: bool = False) -> tuple[int, ...]:
     # Utilization covers a sampling interval and can outlive the previous owned
-    # CUDA context. Wait briefly for an actually idle sample; never waive it.
+    # CUDA context. Force permits unattributed activity, never known compute PIDs.
     deadline = time.monotonic() + 2
     while True:
         states = gpu_states()
@@ -117,7 +117,7 @@ def require_idle(devices: tuple[GPUDevice, ...]) -> tuple[int, ...]:
             state = states.get(device.uuid)
             if state is None or state.pids:
                 raise RuntimeError(f"GPU {device.index} is busy or its telemetry is unavailable")
-            if state.utilization:
+            if state.utilization and not force:
                 active.append(device.index)
         if not active:
             return tuple(states[device.uuid].used for device in devices)
@@ -127,9 +127,10 @@ def require_idle(devices: tuple[GPUDevice, ...]) -> tuple[int, ...]:
 
 
 def monitor_devices(
-    devices: tuple[GPUDevice, ...], owned_pids: Callable[[], tuple[int, ...]]
+    devices: tuple[GPUDevice, ...], owned_pids: Callable[[], tuple[int, ...]],
+    *, force: bool = False,
 ) -> tuple[int, ...]:
-    """Reject foreign or unidentifiable active compute; never terminate its workload."""
+    """Reject foreign compute; force permits activity with no attributable PID."""
     states = gpu_states()
     # Native compiler/loader children may start during the query. Verify current
     # births afterwards; disappeared or replaced PIDs remain unidentifiable.
@@ -144,7 +145,7 @@ def monitor_devices(
             raise RuntimeError(
                 f"GPU {device.index} measurement contaminated by foreign PIDs {sorted(foreign)}"
             )
-        if state.utilization and not state.pids:
+        if state.utilization and not state.pids and not force:
             raise RuntimeError(
                 f"GPU {device.index} measurement contaminated: active compute has no PID telemetry"
             )

@@ -130,3 +130,23 @@ def test_malformed_numeric_telemetry_is_an_actionable_unavailable_failure(
     monkeypatch.setattr(gpu, "_query", lambda _: next(queries))
     with pytest.raises(RuntimeError, match=f"GPU telemetry unavailable.*{field}"):
         gpu.gpu_states()
+
+
+def test_force_allows_unattributed_activity_but_keeps_live_memory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(gpu, "gpu_states", lambda: {"GPU-test": gpu.GPUState(70, 65, frozenset())})
+    assert gpu.require_idle((_device(),), force=True) == (70,)
+    assert gpu.monitor_devices((_device(),), lambda: (), force=True) == (70,)
+
+
+@pytest.mark.parametrize("missing", [False, True])
+def test_force_still_rejects_foreign_compute_and_missing_telemetry(
+    monkeypatch: pytest.MonkeyPatch, missing: bool,
+) -> None:
+    states = {} if missing else {"GPU-test": gpu.GPUState(70, 65, frozenset({42}))}
+    monkeypatch.setattr(gpu, "gpu_states", lambda: states)
+    with pytest.raises(RuntimeError, match=r"busy|unavailable"):
+        gpu.require_idle((_device(),), force=True)
+    with pytest.raises(RuntimeError, match=r"foreign PIDs|telemetry disappeared"):
+        gpu.monitor_devices((_device(),), lambda: (10,), force=True)

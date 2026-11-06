@@ -236,3 +236,8 @@ Explicit measurement-only flags are rejected with `--list`. Measurement still
 requires positive `--imgsz`. Report success exits 0 even when estimates are missing;
 invalid arguments or unreadable/corrupt catalogues exit 2. Persisted schemas and
 measurement/search/lookup behavior remain unchanged. See [design](list/design.md).
+
+
+## Explicit forced-admission follow-up (2026-11-03)
+
+The user requests forced GPU estimation and Git-only release after verification. Add opt-in `--force` to permit nonzero utilization and active telemetry without attributable compute PIDs. Explicit foreign compute PIDs, unavailable telemetry, hardware changes, whole-device memory budgets, finite native updates, optimizer coverage and independent confirmation remain required. Persist the force policy and visibly label forced recommendations as background-sensitive, including cache hits and extrapolations. They describe the observed background workload, not an uncontended maximum. Existing strict behavior remains the default. Older strict catalogue readers must upgrade before consuming records with the new setting.

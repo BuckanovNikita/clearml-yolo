@@ -326,7 +326,10 @@ def test_cpu_observer_tracks_real_updates_hashes_and_original_samples(
     model = torch.nn.Linear(2, 1)
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.01)
     ema = AveragedModel(model)
-    # Only readiness telemetry is stubbed; optimizer, EMA, serialization and hashes run on CPU.
+    # Readiness telemetry is synthetic; optimizer, EMA, serialization and hashes run on CPU.
+    # AdamW probes the default accelerator even for CPU parameters. Keep that probe
+    # off CUDA while readiness intentionally supplies incomplete device properties.
+    monkeypatch.setattr(torch.accelerator, "current_accelerator", lambda **_options: None)
     monkeypatch.setenv("LOCAL_RANK", "1")
     monkeypatch.setattr(torch.distributed, "is_initialized", lambda: True)
     monkeypatch.setattr(torch.distributed, "get_backend", lambda: "nccl")

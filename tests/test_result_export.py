@@ -107,3 +107,65 @@ def test_relationships_namespace_explicit_source_ids_by_row_type() -> None:
     assert len(gt_relations) == len(pred_relations) == 1
     assert gt_relations[0]["pred_source_row_id"] is None
     assert pred_relations[0]["gt_source_row_id"] is None
+
+
+def test_enrichment_retains_extension_metadata_and_all_exclusion_reasons() -> None:
+    """Bulk export retains each original occurrence, lexical value and audit status."""
+    from clearml_yolo.core.evaluation.result_rows import _enrich_rows
+
+    source = pd.DataFrame([
+        ("a", "cat", 0, 0, 10, 10, 0.5),
+        ("a", "other", 0, 0, 10, 10, 0.8),
+        ("a", "cat", 0, 0, 0, 10, 0.2),
+        ("a", "cat", 10, 0, 0, 10, 0.3),
+        ("a", "cat", float("inf"), 0, 10, 10, 0.4),
+        ("a", "cat", None, 0, 10, 10, 0.6),
+        ("a", "cat", "bad", 0, 10, 10, 0.7),
+    ], columns=[*COLUMNS, "confidence"])
+    source["lexical"] = pd.array(["NA", "NULL", "nan", "None", "猫", "01", None],
+                                 dtype="string")
+    source["counter"] = pd.array([2**60, 0, 1, 2, 3, 4, None], dtype="Int64")
+    rows = build_prediction_rows(source)
+    enriched = _enrich_rows(
+        rows, "prediction", prepared_mapping={0: "pred:0", 1: "pred:1"},
+        thresholds={"cat": 0.5}, before={}, after={},
+    )
+    assert list(enriched.columns) == list(rows.columns)
+    assert enriched.source_row_id.tolist() == [f"pred:{i}" for i in range(len(source))]
+    assert enriched.lexical.iloc[:6].tolist() == ["NA", "NULL", "nan", "None", "猫", "01"]
+    assert pd.isna(enriched.lexical.iloc[6])
+    # Nullable integer metadata follows the existing record-to-frame inference.
+    assert enriched.counter.iloc[0] == 2**60
+    assert enriched.evaluation_status.tolist() == ["filtered", *["excluded"] * 6]
+    assert enriched.exclusion_reason.tolist() == [
+        "confidence_threshold", "class_not_evaluated", "invalid_geometry:zero_area",
+        "invalid_geometry:reversed_corners", "invalid_geometry:nonfinite",
+        "invalid_geometry:missing", "invalid_geometry:nonnumeric",
+    ]
+    assert not enriched.is_below_threshold.iloc[0]
+    assert pd.isna(enriched.is_below_threshold.iloc[1])
+    assert enriched.matches_pre_threshold.tolist() == ["[]"] * len(source)
+    assert enriched.matches_post_threshold.tolist() == ["[]"] * len(source)
+
+
+def test_background_rows_preserve_original_numeric_audit_column_boxing() -> None:
+    """Background null boxing must not change canonical CSV flags from 1/0 to text."""
+    gt = assign_source_ids(pd.DataFrame([
+        ("a", "cat", 0, 0, 10, 10), ("b", None, None, None, None, None),
+    ], columns=COLUMNS).assign(split="test"), row_type="ground_truth")
+    predictions = assign_source_ids(pd.DataFrame([
+        ("a", "cat", 0, 0, 10, 10, 0.5),
+    ], columns=[*COLUMNS, "confidence"]), row_type="prediction")
+    prepared_gt = prepare_ground_truth(gt, deduplicate=False)
+    matches = match_boxes(prepared_gt, predictions, 0.5, strategy="greedy",
+                          split_image_names=["a", "b"])
+    rows = build_result_rows(
+        gt, predictions, prepared_ground_truth=prepared_gt,
+        prepared_predictions=predictions, split="test", thresholds={"cat": 0.6},
+        matches_pre_threshold=matches,
+        matches_post_threshold=slice_by_conf(matches, ["cat"], {"cat": 0.6}),
+    )
+    assert str(rows.confidence_threshold.dtype) == "float64"
+    assert str(rows.is_below_threshold.dtype) == "float64"
+    assert rows.is_below_threshold.iloc[-1] == 1.0
+    assert rows.is_below_threshold.to_csv(index=False, header=False).splitlines()[-1] == "1.0"

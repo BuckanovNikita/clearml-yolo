@@ -357,6 +357,29 @@ established environment. Changing the reporting worker leaves the
 application's queue, GPU admission and native model workers under their existing contracts.
 Retry into a fresh output directory and require the normal publication checks to pass.
 
+## Non-finite native training values
+
+A non-finite native scalar or training loss fails the invocation. The scalar
+error identifies its title, series, iteration and value; shared Torchvision
+training errors identify the zero-based batch, target image IDs and individual
+loss components. Retain the native results and failing configuration when
+investigating these errors. A scalar rejection can expose a numerical failure
+already present in native validation; removing that scalar does not repair it.
+
+Check finite inputs, model/EMA state and the first failing computation separately.
+Finite checkpoint tensors do not establish finite intermediate activations under
+AMP. Keep any diagnostic precision comparison separate from the scientific run;
+changing precision, optimizer, batch or data creates a different recipe. No
+automatic precision fallback or invalid-value substitution is performed.
+
+Compare the effective preprocessing implementation as well as installed package
+versions. Distributions can overlap one import namespace, so identical metadata
+does not prove identical native image transforms. Record imported paths and native
+binary hashes and compare actual prepared tensors before attributing changed
+numerical behavior to the model. Saved native checkpoints may also transform
+model state during serialization; capture live model and EMA state separately
+when diagnosing a failing validation computation.
+
 ## Cross-contract integration
 
 New detector groups own typed `model.train` and `model.predict` controls. DEIMv2, RF-DETR,

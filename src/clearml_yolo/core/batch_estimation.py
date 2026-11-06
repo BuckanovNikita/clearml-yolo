@@ -4,7 +4,15 @@ import hashlib
 import json
 from typing import Annotated, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SerializerFunctionWrapHandler,
+    StrictBool,
+    model_serializer,
+    model_validator,
+)
 
 from clearml_yolo.core.models import PRESETS, BackendName
 
@@ -160,12 +168,22 @@ class TrainingProfile(_Record):
 
 
 class SearchSettings(_Record):
+    force: StrictBool = False
     search_strategy: SearchStrategy = "memory_guided_aligned_v1"
     memory_fraction: Annotated[float, Field(gt=0, le=1, allow_inf_nan=False)] = 0.9
     max_global_batch: PositiveInt = 1024
     warmup_steps: PositiveInt = 5
     measured_steps: PositiveInt = 10
     trial_timeout_seconds: Annotated[float, Field(gt=0, allow_inf_nan=False)] = 300
+
+    @model_serializer(mode="wrap")
+    def _omit_ordinary_force(self, handler: SerializerFunctionWrapHandler) -> dict[str, object]:
+        # Ordinary records omit the default policy, so strict pre-force readers
+        # (CY 0.45 and earlier) can still read catalogues rewritten by this version.
+        data: dict[str, object] = handler(self)
+        if not self.force:
+            data.pop("force", None)
+        return data
 
 
 class TrialResult(_Record):
@@ -492,6 +510,8 @@ def estimate_key(
     profile: TrainingProfile, workload: SyntheticWorkload, settings: SearchSettings
 ) -> str:
     """Stable storage key; actual device UUIDs and observation times are provenance."""
+    # Ordinary settings serialize without ``force``, retaining historical
+    # source/cache identities; forced settings include it and get distinct keys.
     settings_data = settings.model_dump(mode="json")
     if settings.search_strategy == "exponential_binary_v1":
         # Existing source keys are durable provenance, including when old cases

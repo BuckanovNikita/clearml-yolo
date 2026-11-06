@@ -72,7 +72,7 @@ between Faster R-CNN and FCOS and included once in the weight snapshot.
 The catalogue covers maintained YOLO detection names, RF-DETR, eligible Faster R-CNN
 and FCOS backbones, and DEIMv2 small/medium plus its pinned source. Bulk preparation
 includes `dinov3_small` and excludes DEIMv2 large/xlarge; explicitly selecting
-those DEIMv2 models retains their normal execution behavior and access requirements.
+those DEIMv2 models uses the selected-model resolution described below.
 
 Actual `cy` pipeline execution attempts the catalogue before model construction,
 including when the selected model already has local weights. It records a completed
@@ -169,6 +169,25 @@ source is verified against a packaged manifest from the approved revision. Unsaf
 archive members and modified managed source contents fail verification. Explicit
 source checkouts retain revision/content validation. Resolved source/weight paths
 are supplied only to execution configuration.
+
+For selected DEIMv2 L/X training or batch estimation, a locally validated original
+Meta `.pth` takes precedence. If absent, CY resolves the pinned official Hugging
+Face `facebook/dinov3-vits16-pretrain-lvd1689m` (L) or
+`facebook/dinov3-vits16plus-pretrain-lvd1689m` (X) snapshot. Accept the repository's
+DINOv3 license and supply `HF_TOKEN` or the standard Hugging Face token file for
+network access. A complete validated Hub snapshot, including `config.json`, works
+offline. Unauthorized access and checksum failures remain explicit errors.
+
+The official Transformers safetensors are converted on CPU to the pinned native
+DEIM tensor layout, strictly loaded, and cached as `hf-dinov3-to-deim-v1.pth` under
+a separate asset identity. They are never renamed to an original Meta filename or
+checked against its serialization hash. Provenance retains the source URL, commit
+and SHA-256, converter version, native source revision and converted-file SHA-256.
+Reuse verifies the receipt and every derived tensor against the pinned source;
+corrupt derived files are rebuilt atomically. Explicit `model.train.weights` and
+`model.train.backbone_weights` retain precedence. No additional flag is required.
+This selected-model fallback does not expand the bulk catalogue or change the
+published timm weights used by Faster R-CNN and FCOS.
 
 Native model asset writes may use configured caches outside `CY_HOME`; this narrow
 exception does not permit external application outputs, datasets, logs, scratch or

@@ -14,7 +14,8 @@ one measurement. Independent cases run concurrently on idle selected GPUs, with
 one complete search pinned to each assigned GPU. Each case uses the first idle
 compatible GPU in the selected order that this invocation has not assigned to
 another case. Unrelated workloads remain running. Missing or unidentifiable
-telemetry fails the affected measurement.
+telemetry fails the affected measurement. The opt-in force policy below allows
+unattributed activity while retaining explicit foreign-compute protection.
 
 ## Measure selected cases
 
@@ -40,6 +41,7 @@ when no compatible measurement exists.
 | `--devices LIST` | Ordered logical indexes within inherited CUDA visibility; all visible GPUs |
 | `--jobs N` | Positive maximum concurrent independent searches; default uses available selected GPUs; 1 runs serially |
 | `--gpu-counts LIST` | Output counts over the first N selected GPUs; default 1 through selected count; launches no additional searches |
+| `--force` | Allow nonzero utilization and activity without attributable compute PIDs; default false; retains telemetry, identity, foreign-PID and memory checks |
 | `--memory-budget FRACTION` | Fraction of each GPU's total memory; 0.9 |
 | `--search-limit N` | Per-GPU search ceiling; 1024; rounded down to a multiple of 8, minimum 8; extrapolated global batches may exceed it |
 | `--trial-timeout SECONDS` | Deadline for each fresh trial group; 300 |
@@ -91,7 +93,32 @@ The summary prints selected/covered/missing model totals and the catalogue path;
 all-covered output is explicit. Missing estimates exit successfully with code 0.
 Malformed/unreadable catalogues and invalid arguments exit 2, preserving evidence.
 Only `--list`, `--models` and help apply to listing; explicit measurement options,
-including `--imgsz`, `--devices`, `--jobs` and `--refresh`, are rejected.
+including `--imgsz`, `--devices`, `--jobs`, `--refresh` and `--force`, are rejected.
+
+## Forced measurement with background activity
+
+```bash
+cy-batch-estimate --imgsz 960 --devices 0 --force
+```
+
+`--force` allows nonzero utilization and activity that the driver cannot attribute
+to compute PIDs. It does not establish that activity is graphics-only: some drivers
+also omit competing compute processes. Explicit foreign compute PIDs and missing or
+invalid telemetry still reject the case. Hardware identity, whole-device memory
+budgets (including the observed background baseline), native finite checks, all
+optimizer paths and independent winner confirmation remain required. No existing
+process is stopped.
+
+The catalogue persists `settings.force` only for forced searches, and measurement
+keys distinguish forced and ordinary searches; ordinary records omit the default
+false policy, preserving historical source keys and readability by earlier CY.
+Every recommendation with a forced source is labelled
+`forced/background-sensitive`, including cached and extrapolated recommendations.
+It describes capacity under the recorded workload and observed background, not an
+uncontended maximum or a guarantee under changing activity. Compatible training
+lookup can reuse it; source settings retain the policy in training provenance.
+Older strict catalogue readers must upgrade before reading a catalogue that contains
+forced records. Omit `--force` to retain the ordinary strict idle policy.
 
 ## Search and evidence
 

@@ -74,6 +74,7 @@ def _options(arguments: argparse.Namespace) -> _Options:
             classes=arguments.classes, objects_per_image=arguments.objects_per_image
         ),
         settings=SearchSettings(
+            force=arguments.force,
             memory_fraction=arguments.memory_budget,
             max_global_batch=arguments.search_limit,
             trial_timeout_seconds=arguments.trial_timeout,
@@ -124,6 +125,8 @@ def _report(case: ResolvedRecommendation, cached: bool) -> None:
     )
     if cached:
         message += "\tcached"
+    if any(source.settings.force for source in case.sources):
+        message += "\tforced/background-sensitive"
     limitations = dict.fromkeys(
         source.diagnostic for source in case.sources if source.status == "numerically_limited"
     )
@@ -133,14 +136,16 @@ def _report(case: ResolvedRecommendation, cached: bool) -> None:
     sys.stdout.flush()
 
 
-def _idle_profile(profile: TrainingProfile, devices: tuple[GPUDevice, ...]) -> TrainingProfile:
+def _idle_profile(
+    profile: TrainingProfile, devices: tuple[GPUDevice, ...], *, force: bool = False
+) -> TrainingProfile:
     hardware = profile.gpus[0]
     failures = []
     for device in devices:
         if (device.name, device.total_memory_bytes) != (hardware.name, hardware.total_memory_bytes):
             continue
         try:
-            require_idle((device,))
+            require_idle((device,), force=force)
         except RuntimeError as error:
             failures.append(str(error))
             continue
@@ -236,7 +241,7 @@ class _CaseScheduler:
                 and _hardware_matches(profile, device)
             )
             try:
-                selected = _idle_profile(profile, candidates)
+                selected = _idle_profile(profile, candidates, force=self.options.settings.force)
             except RuntimeError as error:
                 # Another owned case can release a compatible GPU. Foreign busy
                 # devices alone never make this command wait indefinitely.

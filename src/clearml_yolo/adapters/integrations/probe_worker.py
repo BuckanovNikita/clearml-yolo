@@ -9,6 +9,8 @@ from pathlib import Path
 from clearml_yolo.adapters.runtime.distributed import native_rank
 from clearml_yolo.application.training_workers import BatchProbeRequest, ProbeRankResult
 
+_CUDA_OUT_OF_MEMORY = 2
+
 
 def run(request_path: Path) -> int:
     request = BatchProbeRequest.model_validate_json(request_path.read_text(encoding="utf-8"))
@@ -30,8 +32,17 @@ def run(request_path: Path) -> int:
     except Exception as error:  # noqa: BLE001 - every private-process failure needs a receipt
         import torch
 
+        # Torch's C++ binding attaches this native CUDA code; its stubs and
+        # Python-only exception constructors omit the opaque SDK field.
+        accelerator_code: object = (
+            getattr(error, "error_code", None)
+            if isinstance(error, torch.AcceleratorError)
+            else None
+        )
         status = "error"
-        if isinstance(error, torch.cuda.OutOfMemoryError):
+        if isinstance(error, torch.cuda.OutOfMemoryError) or (
+            isinstance(accelerator_code, int) and accelerator_code == _CUDA_OUT_OF_MEMORY
+        ):
             status = "oom"
         elif isinstance(error, FloatingPointError):
             status = "nonfinite"

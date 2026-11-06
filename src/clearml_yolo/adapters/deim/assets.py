@@ -1,6 +1,9 @@
 """Approved DEIM source and matching native backbone selections."""
 
-from clearml_yolo.core.assets import DEIM_REVISION, AssetSpec
+import importlib
+from pathlib import Path
+
+from clearml_yolo.core.assets import DEIM_REVISION, AssetSpec, HubAsset
 
 _REPOSITORY = "https://github.com/Intellindust-AI-Lab/DEIMv2"
 _DISTILLED = {
@@ -8,6 +11,43 @@ _DISTILLED = {
     "m": ("vittplus_distill.pt", "1COHfjzq5KfnEaXTluVGEOMdhpuVcG6Jt"),
 }
 _DINO = {"l": ("vits16", "08c60483"), "x": ("vits16plus", "4057cbaa")}
+_HUB_DINO = {
+    "l": (
+        "114c1379950215c8b35dfcd4e90a5c251dde0d32",
+        "4610ad75edef83e75afdebf162d148dc628045ea6cbb83d67d4708c709c4f91d",
+    ),
+    "x": (
+        "c93d816fc9e567563bc068f01475bec89cc634a6",
+        "208146e499dace99e4c9376ddb8a26f77d64c31c46c4dc4b86ff8bc63b0235e2",
+    ),
+}
+
+
+def huggingface_backbone_asset(preset: str) -> AssetSpec:
+    """Pinned official source representation, distinct from original Meta files."""
+    name, _ = _DINO[preset]
+    revision, checksum = _HUB_DINO[preset]
+    repository = f"facebook/dinov3-{name}-pretrain-lvd1689m"
+    constants = importlib.import_module("huggingface_hub.constants")
+    return AssetSpec(
+        backend="deimv2",
+        preset=preset,
+        filename="model.safetensors",
+        canonical_url=f"https://huggingface.co/{repository}/resolve/{revision}/model.safetensors",
+        revision=revision,
+        checksum=checksum,
+        override="model.train.backbone_weights",
+        hub=HubAsset(
+            repository=repository,
+            revision=revision,
+            filename="model.safetensors",
+            cache_dir=Path(constants.HF_HUB_CACHE).expanduser().resolve(),
+        ),
+        access_requirement=(
+            "Accept the official Facebook DINOv3 repository license and use HF_TOKEN "
+            "or the standard Hugging Face token file, or provide the original Meta .pth."
+        ),
+    )
 
 
 def source_asset() -> AssetSpec:

@@ -73,7 +73,15 @@ def _training_epoch(
                 loss = torch.stack(list(losses.values())).sum()
             value = float(loss.detach())
             if not math.isfinite(value):
-                raise FloatingPointError("Torchvision training produced a nonfinite loss")
+                components = {name: float(component.detach()) for name, component in losses.items()}
+                image_ids = [
+                    target["image_id"].item() if "image_id" in target else None
+                    for target in targets
+                ]
+                raise FloatingPointError(
+                    "Torchvision training produced a nonfinite loss: "
+                    f"batch={index}, image_ids={image_ids}, losses={components!r}"
+                )
             total += value
             # Torch's Tensor.backward implementation lacks a complete typed signature.
             scaler.scale(loss / window).backward()  # type: ignore[no-untyped-call]

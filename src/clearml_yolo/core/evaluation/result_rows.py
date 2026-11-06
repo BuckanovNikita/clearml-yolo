@@ -2,7 +2,7 @@
 
 import json
 import math
-from collections.abc import Mapping, Sequence
+from collections.abc import Hashable, Mapping, Sequence
 from typing import Any, Literal
 
 import numpy as np
@@ -69,7 +69,7 @@ def build_prediction_rows(
     return rows
 
 
-def _geometry_reason(row: pd.Series) -> str | None:
+def _geometry_reason(row: Mapping[Hashable, Any]) -> str | None:
     boxes = [row[column] for column in _BOX_COLUMNS]
     if any(pd.isna(value) for value in boxes):
         return "missing"
@@ -140,7 +140,7 @@ def _relationship_lists(
 
 
 def _row_status(
-    row: pd.Series,
+    row: Mapping[Hashable, Any],
     row_type: RowType,
     prepared_indices: dict[str, int],
     post_relationships: Relationships,
@@ -176,11 +176,20 @@ def _enrich_rows(
     after: Relationships,
 ) -> pd.DataFrame:
     prepared_indices = {source_id: index for index, source_id in prepared_mapping.items()}
-    records: list[dict[str, Any]] = []
-    for _, row in rows.iterrows():
-        source_id = str(row["source_row_id"])
-        record = {str(key): value for key, value in row.to_dict().items()}
-        status, reason = _row_status(row, row_type, prepared_indices, after)
+    # Convert columns once instead of constructing a pandas Series for every source row.
+    # records preserves native scalar/null boxing and the previous string-key projection.
+    records = rows.set_axis([str(column) for column in rows.columns], axis="columns").to_dict(
+        orient="records"
+    )
+    for position in range(len(records)):
+        record = records[position]
+        # iterrows infers string dtype for sparse all-text rows (notably empty-image GT),
+        # boxing their nulls as NaN. Retain that rare-row inference for exact CSV parity.
+        if pd.api.types.infer_dtype(list(record.values()), skipna=True) == "string":
+            record = pd.Series(record).to_dict()
+            records[position] = record
+        source_id = str(record["source_row_id"])
+        status, reason = _row_status(record, row_type, prepared_indices, after)
         record.update(
             evaluation_status=status,
             exclusion_reason=reason,
@@ -194,14 +203,13 @@ def _enrich_rows(
                 separators=(",", ":"),
             )
         if row_type == "prediction":
-            threshold = thresholds.get(str(row["instance_label"]))
+            threshold = thresholds.get(str(record["instance_label"]))
             record["confidence_threshold"] = threshold
             record["is_below_threshold"] = (
-                None if threshold is None else float(row["confidence"]) < threshold
+                None if threshold is None else float(record["confidence"]) < threshold
             )
             if threshold is None and status == "filtered":
                 record.update(evaluation_status="excluded", exclusion_reason="class_not_evaluated")
-        records.append(record)
     return pd.DataFrame(records, columns=rows.columns)
 
 

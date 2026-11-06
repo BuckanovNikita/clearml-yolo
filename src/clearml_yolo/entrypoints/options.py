@@ -173,6 +173,18 @@ OPTION_DECLARATIONS: dict[str, tuple[OptionDeclaration, ...]] = {
             ("--jobs 1",),
         ),
         OptionDeclaration(
+            ("--force",),
+            {
+                "action": "store_true",
+                "help": (
+                    "allow unattributed GPU activity; retain telemetry and foreign-process checks"
+                ),
+            },
+            "Разрешить неатрибутированную активность GPU с сохранением проверок телеметрии "
+            "и посторонних вычислительных процессов.",
+            ("--force",),
+        ),
+        OptionDeclaration(
             ("--refresh",),
             {"action": "store_true", "help": "repeat completed compatible cases"},
             "Повторить уже завершённые совместимые измерения вместо использования кэша.",

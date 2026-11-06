@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- **agents**: Refactor agent instructions and skills to current best practices
+  ([`43de5af`](https://github.com/BuckanovNikita/clearml-yolo/commit/43de5af1d2466b15048551075c8dfb76b261c6ee))
+
+
 ## v0.45.1 (2026-11-05)
 
 ### Bug Fixes

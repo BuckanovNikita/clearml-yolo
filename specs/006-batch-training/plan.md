@@ -196,3 +196,12 @@ must permit the proposed 0.45.0 release after verifying actual integration.
 Documentation scope: Russian README, batch-estimation guide, current contracts,
 shared CLI option metadata/help fixture, generated training tutorial/inventory and
 portable usage references/evaluation. Record checks and release in list/verification.md.
+
+
+## Forced admission amendment (2026-11-03)
+
+Use explicit immutable `SearchSettings.force` to carry policy from CLI scheduling through serialized case/worker requests to every telemetry boundary. Runtime adapters alone relax utilization/unattributed-activity rejection; explicit foreign compute PIDs and all memory/identity checks remain. Core search and optimizer behavior stay intact. CLI output labels any recommendation whose source settings were forced. Search keys distinguish forced trials; normal training can reuse their recorded conservative capacity and retains source settings in provenance. No new dependency or import exception is needed. See [force architecture](force/architecture.json).
+
+Parent owns the plan, environment, native matrix, documentation and release integration. A bounded implementer owns the five runtime/CLI files and focused tests; a fresh reviewer examines the final integrated changes after parent verification. Work is isolated on latest origin/master, preserving all unrelated main-checkout edits. Latest/proposed CY and queue pairing is required before publication.
+
+Native acceptance replays the completed catalogue and original optimizer receipts through a task-owned audit. Legitimate `no_capacity` is a verified capacity outcome even though the estimator returns nonzero; failed or interrupted searches block release. The audit process must exit zero before acceptance. Raw command paths stay in private machine evidence. Proposed-version pairing uses an isolated source fixture before native release hooks, then repeats against the actual release metadata before push.

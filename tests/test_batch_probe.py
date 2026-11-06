@@ -120,7 +120,9 @@ def test_completed_receipts_fence_telemetry_during_cuda_context_teardown(
     monkeypatch.setattr(adapter, "_TELEMETRY_INTERVAL_SECONDS", 0)
     observations: list[tuple[int, ...]] = []
 
-    def telemetry(devices: Any, owned_pids: Callable[[], tuple[int, ...]]) -> tuple[int, ...]:
+    def telemetry(
+        devices: Any, owned_pids: Callable[[], tuple[int, ...]], **_kwargs: Any
+    ) -> tuple[int, ...]:
         pids = owned_pids()
         observations.append(pids)
         if not pids:
@@ -146,10 +148,12 @@ def test_completed_receipts_fence_telemetry_during_cuda_context_teardown(
 
 def _install_workers(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, workers: _Workers) -> None:
     monkeypatch.setattr(adapter, "discover_gpus", sample_devices)
-    monkeypatch.setattr(adapter, "require_idle", lambda devices: tuple(10 for _ in devices))
+    monkeypatch.setattr(
+        adapter, "require_idle", lambda devices, **_kwargs: tuple(10 for _ in devices)
+    )
     monkeypatch.setattr(adapter, "temporary_root", lambda: tmp_path)
     monkeypatch.setattr(adapter, "_port", lambda: "12345")
-    monkeypatch.setattr(adapter, "monitor_devices", lambda devices, pids: (500,))
+    monkeypatch.setattr(adapter, "monitor_devices", lambda devices, pids, **_kwargs: (500,))
     monkeypatch.setattr(adapter, "run_workers", workers.run)
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "GPU-physical-a,GPU-physical-b")
 
@@ -232,8 +236,8 @@ def test_budget_peak_combines_disjoint_memory_without_adding_the_baseline_twice(
 ) -> None:
     workers = _Workers(receipts=("success",), allocator_peak=allocator, non_allocator=non_allocator)
     _install_workers(monkeypatch, tmp_path, workers)
-    monkeypatch.setattr(adapter, "require_idle", lambda _: (100,))
-    monkeypatch.setattr(adapter, "monitor_devices", lambda *_: (polled,))
+    monkeypatch.setattr(adapter, "require_idle", lambda _, **_kwargs: (100,))
+    monkeypatch.setattr(adapter, "monitor_devices", lambda *_, **_kwargs: (polled,))
     profile = _profile().model_copy(update={"gpus": _profile().gpus[:1], "optimizers": ("AdamW",)})
     settings = SearchSettings(memory_fraction=0.9)
     result = adapter.NativeBatchProbe().run(profile, SyntheticWorkload(), settings, 8)
@@ -257,7 +261,7 @@ def test_each_optimizer_path_refreshes_its_baseline_after_asset_setup(
     baselines = iter([(10,), (100,), (200,)])
     sampled: list[tuple[int, ...]] = []
 
-    def idle(_: Any) -> tuple[int, ...]:
+    def idle(_: Any, **_kwargs: Any) -> tuple[int, ...]:
         baseline = next(baselines)
         sampled.append(baseline)
         return baseline
@@ -307,8 +311,9 @@ def test_forged_receipt_identity_is_not_a_success_or_capacity_observation(
 
 
 @pytest.mark.parametrize("failure", ["missing", "changed", "busy"])
+@pytest.mark.parametrize("force", [False, True])
 def test_changed_or_busy_hardware_stops_before_launch(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, failure: str
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, failure: str, force: bool
 ) -> None:
     workers = _Workers()
     _install_workers(monkeypatch, tmp_path, workers)
@@ -320,11 +325,13 @@ def test_changed_or_busy_hardware_stops_before_launch(
         monkeypatch.setattr(adapter, "discover_gpus", lambda: (changed, devices[1]))
     else:
 
-        def busy(_: Any) -> None:
+        def busy(_: Any, **_kwargs: Any) -> None:
             raise RuntimeError("GPU 0 is busy")
 
         monkeypatch.setattr(adapter, "require_idle", busy)
-    result = adapter.NativeBatchProbe().run(_profile(), SyntheticWorkload(), SearchSettings(), 4)
+    result = adapter.NativeBatchProbe().run(
+        _profile(), SyntheticWorkload(), SearchSettings(force=force), 4
+    )
     assert result.status == "contaminated"
     assert not workers.requests
 
@@ -388,6 +395,28 @@ def test_native_requests_preserve_default_recipe_while_binding_global_batch_and_
     assert config.train.backbone_weights == tmp_path / "backbone.pth"
 
 
+def _check_worker_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    error: Exception,
+    expected: TrialStatus,
+) -> None:
+    request = _request(tmp_path)
+    path = tmp_path / "request.json"
+    path.write_text(request.model_dump_json())
+    monkeypatch.setenv("LOCAL_RANK", "0")
+    monkeypatch.setattr(probe_worker, "native_rank", lambda **_: nullcontext())
+
+    def fail(_: Any) -> Any:
+        raise error
+
+    monkeypatch.setattr(yolo, "probe", fail)
+    assert probe_worker.run(path) == 1
+    result = ProbeRankResult.model_validate_json((tmp_path / "rank-0.json").read_text())
+    assert result.status == expected
+    assert result.token == request.token
+
+
 @pytest.mark.parametrize(
     ("error_type", "expected"),
     [
@@ -402,20 +431,10 @@ def test_worker_classifies_typed_failures_without_matching_error_text(
     error_type: type[Exception],
     expected: TrialStatus,
 ) -> None:
-    request = _request(tmp_path)
-    path = tmp_path / "request.json"
-    path.write_text(request.model_dump_json())
-    monkeypatch.setenv("LOCAL_RANK", "0")
-    monkeypatch.setattr(probe_worker, "native_rank", lambda **_: nullcontext())
-
-    def fail(_: Any) -> Any:
-        raise error_type("CUDA out of memory appears in arbitrary diagnostic text")
-
-    monkeypatch.setattr(yolo, "probe", fail)
-    assert probe_worker.run(path) == 1
-    result = ProbeRankResult.model_validate_json((tmp_path / "rank-0.json").read_text())
-    assert result.status == expected
-    assert result.token == request.token
+    _check_worker_failure(
+        monkeypatch, tmp_path,
+        error_type("CUDA out of memory appears in arbitrary diagnostic text"), expected,
+    )
 
 
 def test_worker_recognizes_actual_cuda_oom_exception_without_using_cuda(
@@ -426,6 +445,49 @@ def test_worker_recognizes_actual_cuda_oom_exception_without_using_cuda(
     test_worker_classifies_typed_failures_without_matching_error_text(
         monkeypatch, tmp_path, torch.cuda.OutOfMemoryError, "oom"
     )
+
+
+def test_worker_recognizes_native_accelerator_oom_code_without_error_text(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import torch
+
+    error = torch.AcceleratorError("Opaque device failure")
+    # The C++ binding attaches this field; Python-only constructors omit it.
+    monkeypatch.setattr(error, "error_code", 2, raising=False)
+    _check_worker_failure(monkeypatch, tmp_path, error, "oom")
+
+
+@pytest.mark.parametrize("code", [None, 1, 710, "2", 2.0, True, False, [], {"code": 2}])
+def test_worker_rejects_unconfirmed_accelerator_oom_despite_error_text(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, code: object
+) -> None:
+    import torch
+
+    error = torch.AcceleratorError("CUDA error: out of memory")
+    if code is not None:
+        monkeypatch.setattr(error, "error_code", code, raising=False)
+    _check_worker_failure(monkeypatch, tmp_path, error, "error")
+
+
+def test_worker_rejects_accelerator_code_on_arbitrary_runtime_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    error = RuntimeError("CUDA error: out of memory")
+    monkeypatch.setattr(error, "error_code", 2, raising=False)
+    _check_worker_failure(monkeypatch, tmp_path, error, "error")
+
+
+def test_worker_does_not_promote_oom_with_cleanup_failure_to_capacity(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import torch
+
+    error = ExceptionGroup("Native execution and cleanup failed", [
+        torch.cuda.OutOfMemoryError("Confirmed native OOM"),
+        RuntimeError("Descendant cleanup incomplete"),
+    ])
+    _check_worker_failure(monkeypatch, tmp_path, error, "error")
 
 
 def _cpu_trainer() -> Any:
@@ -822,3 +884,33 @@ def test_native_estimator_rejects_multi_gpu_before_discovery(
     )
     with pytest.raises(ValueError, match="exactly one GPU"):
         adapter.NativeBatchProbe().run(sample_profile(2), SyntheticWorkload(), SearchSettings(), 4)
+
+
+def test_force_reaches_each_optimizer_boundary_and_retains_memory_budget(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    workers = _Workers(allocator_peak=850)
+    _install_workers(monkeypatch, tmp_path, workers)
+    preflight_flags: list[bool] = []
+    monitor_flags: list[bool] = []
+
+    def preflight(devices: Any, *, force: bool = False) -> tuple[int, ...]:
+        preflight_flags.append(force)
+        if not force:
+            raise RuntimeError("GPU has unattributed activity")
+        return (100,)
+
+    def monitor(devices: Any, pids: Any, *, force: bool = False) -> tuple[int, ...]:
+        monitor_flags.append(force)
+        return (950,)
+
+    monkeypatch.setattr(adapter, "require_idle", preflight)
+    monkeypatch.setattr(adapter, "monitor_devices", monitor)
+    settings = SearchSettings(force=True, search_strategy="exponential_binary_v1")
+    result = adapter.NativeBatchProbe().run(_profile(), SyntheticWorkload(), settings, 1)
+    assert result.status == "success"
+    assert preflight_flags == [True, True, True]
+    assert monitor_flags == [True, True]
+    assert all(request.settings.force for request in workers.requests)
+    assert result.peak_memory_bytes == (950,)
+    assert BatchSearch.start(_profile(), settings).observe(result).status == "no_capacity"

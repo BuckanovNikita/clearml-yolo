@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "task": "accelerator-oom-receipts",
+  "scope": [
+    "src/clearml_yolo/adapters/integrations/probe_worker.py",
+    "tests/test_batch_probe.py",
+    "docs/bugs/accelerator-oom-receipts"
+  ],
+  "impact": "modules",
+  "rules": "AGENTS.md and docs/agent-workflow.md require inward layers, explicit adapter SDK ownership and effects, truthful capacity receipts and preservation of failed cleanup.",
+  "modules": [
+    {
+      "id": "worker",
+      "path": "src/clearml_yolo/adapters/integrations/probe_worker.py",
+      "change": "modify",
+      "responsibility": "Translate private native CUDA probe failures into typed rank receipts without conflating execution/cleanup failures with capacity",
+      "interface": "Existing request/token/rank and atomic receipt schema remain unchanged; only confirmed typed CUDA AcceleratorError integer code2 gains existing OOM status",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "Existing typed application/core receipt declarations",
+        "Existing runtime native-rank boundary and backend adapters",
+        "Explicitly owned Torch SDK and standard-library IO/traceback"
+      ],
+      "forbidden_dependencies": [
+        "Application use-case orchestration",
+        "Undeclared SDK owners or peer adapters",
+        "New core effects"
+      ],
+      "effects": "Retains existing native backend dispatch, stderr traceback and atomic rank-receipt file publication; no new effect",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "imports",
+      "path": ".importlinter",
+      "status": "existing",
+      "rules": "Existing precise probe_worker Torch/backend/runtime edges and inward-layer rules remain unchanged",
+      "check": "canonical"
+    },
+    {
+      "id": "negative",
+      "path": "tests/test_architecture.py",
+      "status": "existing",
+      "rules": "Existing exhaustive module/effect classification and hypothetical forbidden-edge tests cover the unchanged import surface",
+      "check": "canonical"
+    }
+  ],
+  "checks": [
+    {
+      "id": "canonical",
+      "kind": "imports",
+      "command": "CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=2 MPLBACKEND=Agg uv run --frozen --no-sync python scripts/verify.py",
+      "expectation": "Parent final integrated static/import/ordinary suite including architecture negative cases passes",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/accelerator-oom-receipts/test.md"
+      }
+    },
+    {
+      "id": "focused",
+      "kind": "behavior",
+      "command": "CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=2 MKL_NUM_THREADS=2 MPLBACKEND=Agg uv run --frozen --no-sync python -m pytest -q tests/test_batch_probe.py tests/test_architecture.py",
+      "expectation": "Native-shaped integer code2 is OOM without diagnostic matching; malformed/missing/other codes, arbitrary RuntimeError and mixed cleanup groups stay errors; legacy typed OOM remains recognized",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/accelerator-oom-receipts/test.md"
+      }
+    },
+    {
+      "id": "statics",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync ruff check src/clearml_yolo/adapters/integrations/probe_worker.py tests/test_batch_probe.py; uv run --frozen --no-sync mypy src/clearml_yolo/adapters/integrations/probe_worker.py tests/test_batch_probe.py; uv run --frozen --no-sync lint-imports",
+      "expectation": "Scoped lint/type checks and existing precise SDK/import contracts pass",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/accelerator-oom-receipts/test.md"
+      }
+    },
+    {
+      "id": "docs",
+      "kind": "documentation",
+      "command": "uv run --frozen --no-sync python scripts/check_docs.py --all",
+      "expectation": "New dated bug Markdown and local links pass",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/accelerator-oom-receipts/test.md"
+      }
+    },
+    {
+      "id": "native",
+      "kind": "behavior",
+      "command": "Parent refreshes frozen candidate/source profile and replays selected native OOM with raw receipt and verified cleanup",
+      "expectation": "Native AcceleratorError code2 is recorded as OOM only with complete ownership cleanup; eight-aligned no-capacity is distinguished from successful confirmation and unresolved L cleanup",
+      "result": {
+        "status": "not-run",
+        "reason": "Parent owns final integrated/native acceptance"
+      }
+    }
+  ],
+  "documentation": "Dated SDK representation/remediation evidence only; public flags, status schema, confirmed-OOM requirement and eight-aligned policy unchanged. Parent reconciles final native/release guidance.",
+  "review": {
+    "status": "pending"
+  }
+}

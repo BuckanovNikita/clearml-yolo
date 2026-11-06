@@ -233,6 +233,16 @@ cy-batch-estimate --imgsz 960 --models rfdetr/small,fcos/resnet50_fpn --devices 
 cy-batch-estimate --imgsz 960 --models rfdetr/small,fcos/resnet50_fpn --devices 0,1 --jobs 1
 ```
 
+Если GPU занят фоновой графической активностью, явный `--force` разрешает
+ненулевую загрузку и активность без определяемого compute PID. Проверки известных
+чужих compute-процессов, телеметрии, памяти и независимого подтверждения сохраняются.
+Такие рекомендации помечаются `forced/background-sensitive` и зависят от наблюдаемой
+фоновой нагрузки; это не оценка максимума на свободном GPU.
+
+```bash
+cy-batch-estimate --imgsz 960 --devices 0 --force
+```
+
 Синтетическая нагрузка по умолчанию — 150 классов и 300 объектов на изображение;
 измените её через `--classes` и `--objects-per-image`. Бюджет памяти — 90% каждого GPU,
 `--search-limit` задаёт предел поиска **на один GPU**, по умолчанию 1024 изображения.

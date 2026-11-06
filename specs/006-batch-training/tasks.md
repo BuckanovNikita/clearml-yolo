@@ -148,10 +148,10 @@ acceptance gaps are release exceptions.
 - [x] T038 [P] [US1] Implement independent process pool and real subprocess lifecycle tests in adapters/runtime/worker_pool.py and tests/test_worker_pool.py (FR-015, FR-016).
 - [x] T039 [US1] Add case contracts, private entrypoint, idle hardware scheduling, jobs CLI and receipt/cancellation tests in application/training_workers.py and entrypoints/batch_estimate*.py (FR-015, FR-016).
 - [x] T040 [US1] Extend architecture contracts/negative cases, catalogue multiprocess tests and integrated CLI/docs compatibility coverage in .importlinter and tests/ (FR-014–FR-016).
-- [ ] T041 Record matching native one-GPU legacy/guided benchmarks in specs/006-batch-training/speedup/verification.md (SC-006); physical multi-GPU execution remains explicitly unverified (SC-007).
+- [x] T041 Record matching native one-GPU legacy/guided benchmarks in specs/006-batch-training/speedup/verification.md (SC-006); physical multi-GPU execution remains explicitly unverified (SC-007).
 - [x] T042 Update docs/batch-estimation.md, README.md, active feature interfaces and portable usage source; validate Markdown, links, generated docs and examples (FR-013–FR-016).
 - [x] T043 Run canonical verification, applicable mutation checks and latest/proposed paired CY/queue integration/static checks; record exact source identities and limitations in speedup evidence.
-- [ ] T044 Obtain fresh independent review after integration/checks, resolve findings, reconcile task-owned diff and validate speedup architecture acceptance.
+- [x] T044 Obtain fresh independent review after integration/checks, resolve findings, reconcile task-owned diff and validate speedup architecture acceptance.
 - [x] T045 Complete the authorized new code release through normal commits/hooks, annotated tag and explicit verified pushes; preserve original dirty workspace and UV source overrides.
 
 T036 precedes T037/T038; parent freezes case contracts before T039 integration.
@@ -237,3 +237,56 @@ CY0.45.0/queue0.1.8 pair passed normal installation, source/installed identity a
 583 queue cases. Queue main and portable collection v0.7.2 were published with
 exact ref verification. See [release evidence](list/verification.md). Existing
 native timing and physical-DDP limitations remain historical and unchanged.
+
+
+## Forced admission follow-up (2026-11-03)
+
+- [x] T056 Record force requirements, architecture, source isolation and current dependency pair.
+- [x] T057 Add regressions and implement force admission, persisted policy and visible source limitations; preserve strict defaults and foreign-workload protection.
+- [ ] T058 Run the requested native catalogue and canonical checks; report actual failures without inventing capacity.
+- [ ] T059 Reconcile README, maintained contracts and portable usage; validate docs and actual proposed-version CY/queue pairing.
+- [ ] T060 Obtain fresh independent review, reconcile architecture and complete Git-only release when all applicable verification gates pass.
+
+T056 precedes T057; T058/T059 follow implementation; T060 requires their evidence and review. Historical failed/unavailable physical gates remain recorded.
+
+### Current-source reconciliation (2026-11-04)
+
+The preserved force branch used T051–T055 before the independently delivered saved
+listing occupied those IDs. This integration retains the delivered listing history
+and maps only the unpublished force tasks to T056–T060. The original branch and
+its dated evidence remain preserved. Runtime changes were ported onto CY 0.45.0;
+the listing remains inert and explicitly rejects `--force`. The combined help
+fixture retains `--list` and its conditional `--imgsz` requirement. Focused checks
+are recorded in [the reconciliation evidence](force/reconciliation-2026-11-04.md).
+Historical proposed CY 0.44.9/queue 0.1.7 results do not establish acceptance for
+this current integration or its eventual release versions.
+
+### Sequential integration continuation (2026-11-05)
+
+DINOv3 and scoped campaign source precede this force port; preserve completed
+T001–T057 history. Current integrated runtime evidence is separate from historical
+pilot source/version results. No intermediate release precedes final native gates.
+
+- [x] T061 Reconcile and validate the current force architecture plan, reproduce a force regression before runtime port, and port only owned implementation/tests/docs.
+- [x] T062 Run focused CPU force/list/cache/telemetry regressions, current lint/docs checks, and reconcile the exact force diff.
+- [ ] T063 Parent verifies final integrated canonical checks, compatible latest/proposed source metadata and normal CY/queue resolution.
+- [ ] T064 Parent verifies all 64 final-source native models and raw optimizer receipts, with fresh selected DINOv3 L/X confirmation; failed/interrupted cases remain gaps.
+- [ ] T065 Parent completes portable guidance, fresh integrated review and architecture acceptance, then normal Git-only delivery and final actual-version pair recheck.
+
+T061 precedes T062; T063/T064 require the frozen final source/environment; T065
+requires every acceptance gate. Physical multi-GPU limits remain disclosed.
+
+## Matched native search comparison, 2026-11-05
+
+T041 is complete through the current explicit force path: two matched models and
+three strategies, actual full native optimizer trials, fresh confirmation and
+unchanged cached relaunch. Dated [benchmark evidence](speedup/verification.md)
+retains original idle-preflight failures, the harness correction and raw timing
+limitations. No idle-device, statistical speedup or physical multi-GPU claim is
+made. T044 remains pending final record review and architecture validation.
+
+
+T044 is complete: fresh independent native comparison review accepted the seven
+retained cases and 43 optimizer receipts; parent architecture acceptance and current
+documentation validation passed. Earlier failed idle-preflight receipts remain
+historical evidence. Current full catalogue and physical DDP acceptance are separate.

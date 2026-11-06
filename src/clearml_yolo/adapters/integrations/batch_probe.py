@@ -71,7 +71,7 @@ class NativeBatchProbe:
         path_peaks: list[tuple[int, ...]] = []
         try:
             devices = _devices(profile)
-            require_idle(devices)
+            require_idle(devices, force=settings.force)
             for optimizer in profile.optimizers:
                 path_results, peaks = self._path(
                     profile,
@@ -186,7 +186,7 @@ class NativeBatchProbe:
         ]
         # Asset setup can take time and previous optimizer paths can leave driver
         # reservations behind. Recheck idle state and baseline immediately before launch.
-        baseline = require_idle(devices)
+        baseline = require_idle(devices, force=settings.force)
         peaks = list(baseline)
         checked_at = 0.0
 
@@ -204,7 +204,9 @@ class NativeBatchProbe:
             )
             if not active:
                 return
-            current = monitor_devices(tuple(device for _, device in active), owned_pids)
+            current = monitor_devices(
+                tuple(device for _, device in active), owned_pids, force=settings.force
+            )
             for (rank, _device), used in zip(active, current, strict=True):
                 peaks[rank] = max(peaks[rank], used)
 

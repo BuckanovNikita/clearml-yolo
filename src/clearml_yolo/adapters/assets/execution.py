@@ -3,6 +3,7 @@
 from clearml_yolo.adapters.assets.resolver import resolve_assets
 from clearml_yolo.adapters.assets.sources import existing_source, extract_resolved_source
 from clearml_yolo.adapters.deim.assets import backbone_asset, source_asset
+from clearml_yolo.adapters.deim.hf_weights import resolve_backbone
 from clearml_yolo.adapters.deim.source import validate_checkout
 from clearml_yolo.adapters.fasterrcnn.assets import pretrained_asset as fasterrcnn_asset
 from clearml_yolo.adapters.rfdetr.assets import pretrained_asset as rfdetr_asset
@@ -30,6 +31,8 @@ def _requests(config: ModelConfig, training: bool) -> tuple[AssetSpec, ...]:
             raise ValueError("RF-DETR backbone_weights is unsupported; use model.train.weights")
         assets.append(rfdetr_asset(config.preset))
     elif config.train.backbone_weights is None:
+        if config.backend == "deimv2" and config.preset in {"l", "x"}:
+            return tuple(assets)
         assets.append(
             backbone_asset(config.preset)
             if config.backend == "deimv2"
@@ -79,4 +82,17 @@ def prepare_model_assets(
             model.train.weights = record.path
         elif record.override == "model.train.backbone_weights":
             model.train.backbone_weights = record.path
+    if (
+        model.backend == "deimv2"
+        and model.preset in {"l", "x"}
+        and training
+        and model.train.pretrained
+        and model.train.weights is None
+        and model.train.backbone_weights is None
+    ):
+        if model.source_dir is None:
+            raise ValueError("DEIMv2 source must be resolved before backbone conversion")
+        backbone = resolve_backbone(model.preset, model.source_dir)
+        model.train.backbone_weights = backbone.path
+        records = (*records, backbone)
     return model, records

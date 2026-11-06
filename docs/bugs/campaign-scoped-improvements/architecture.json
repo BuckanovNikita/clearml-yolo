@@ -1,0 +1,158 @@
+{
+  "schema_version": 1,
+  "task": "campaign-scoped-improvements",
+  "scope": [
+    "src/clearml_yolo/core/evaluation/result_rows.py",
+    "src/clearml_yolo/adapters/observability/capture.py",
+    "src/clearml_yolo/adapters/torchvision/training.py",
+    "tests/test_native_backend_ddp_harness.py",
+    "tests/test_result_export.py",
+    "tests/test_campaign_numerics.py",
+    "docs/multi-model-backends.md",
+    "docs/bugs/campaign-scoped-improvements"
+  ],
+  "impact": "modules",
+  "rules": "AGENTS.md and docs/agent-workflow.md require inward layers, pure core, explicit adapter effects, existing SDK ownership and executable negative contracts. Preserve scientific and output contracts.",
+  "modules": [
+    {
+      "id": "rows",
+      "path": "src/clearml_yolo/core/evaluation/result_rows.py",
+      "change": "modify",
+      "responsibility": "Build complete source-row audit lineage efficiently without effects",
+      "interface": "DataFrames and match/threshold mappings produce identical canonical row fields and boxing",
+      "layer": "core",
+      "allowed_dependencies": [
+        "Existing core evaluation declarations",
+        "pandas and numpy pure data operations",
+        "Standard-library typing, collections, JSON and math"
+      ],
+      "forbidden_dependencies": [
+        "Outer orchestration imports",
+        "Filesystem/network/process effects in core"
+      ],
+      "effects": "None; pure pandas/JSON transformations",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "capture",
+      "path": "src/clearml_yolo/adapters/observability/capture.py",
+      "change": "modify",
+      "responsibility": "Reject invalid native scalars with actionable event context",
+      "interface": "Finite scalar appends unchanged journal event; invalid scalar raises ValueError before write",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "Existing inward project interfaces",
+        "Existing explicitly owned pure libraries or adapter SDKs"
+      ],
+      "forbidden_dependencies": [
+        "Outer orchestration imports",
+        "Filesystem/network/process effects in core"
+      ],
+      "effects": "Owns existing bound journal and progress file writes",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    },
+    {
+      "id": "torchvision",
+      "path": "src/clearml_yolo/adapters/torchvision/training.py",
+      "change": "modify",
+      "responsibility": "Execute unchanged native training and contextualize nonfinite loss",
+      "interface": "Preserves exception type and fails before backward/update, reporting batch/image/component context",
+      "layer": "adapter",
+      "allowed_dependencies": [
+        "Existing inward project interfaces",
+        "Existing explicitly owned pure libraries or adapter SDKs"
+      ],
+      "forbidden_dependencies": [
+        "Outer orchestration imports",
+        "Filesystem/network/process effects in core"
+      ],
+      "effects": "Owns existing Torch optimizer/GPU/checkpoint effects; no new effect",
+      "contracts": [
+        "imports",
+        "negative"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "imports",
+      "path": ".importlinter",
+      "status": "existing",
+      "rules": "Existing inward layer/SDK and adapter-peer rules forbid outer orchestration imports and effects in core; preserve all current DINOv3 exceptions without modification",
+      "check": "canonical"
+    },
+    {
+      "id": "negative",
+      "path": "tests/test_architecture.py",
+      "status": "existing",
+      "rules": "Exhaustive module/effect classification and hypothetical prohibited-edge tests reject forbidden dependencies; no new import surface requires an exception",
+      "check": "canonical"
+    }
+  ],
+  "checks": [
+    {
+      "id": "canonical",
+      "kind": "imports",
+      "command": "CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=2 MPLBACKEND=Agg uv run --frozen --no-sync python scripts/verify.py",
+      "expectation": "Final integrated static/import checks, full ordinary suite, architecture negatives and CPU-DDP pass",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/campaign-scoped-improvements/test.md"
+      }
+    },
+    {
+      "id": "focused",
+      "kind": "behavior",
+      "command": "CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=2 MPLBACKEND=Agg uv run --frozen --no-sync python -m pytest -q tests/test_campaign_numerics.py tests/test_result_export.py tests/test_native_backend_ddp_harness.py::test_cpu_observer_tracks_real_updates_hashes_and_original_samples tests/test_architecture.py",
+      "expectation": "Diagnostics fail safely with exact context; row/export edge semantics and real CPU observer evidence pass; existing forbidden-edge tests reject violations",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/campaign-scoped-improvements/test.md"
+      }
+    },
+    {
+      "id": "parity",
+      "kind": "behavior",
+      "command": "Run task-owned adaptation of retained 50,000-row parity/profile drivers with the final integrated environment",
+      "expectation": "Exact original/current DataFrame and lineage parity; record scoped timing only, without end-to-end or accuracy claim",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/campaign-scoped-improvements/test.md"
+      }
+    },
+    {
+      "id": "docs",
+      "kind": "documentation",
+      "command": "uv run --frozen --no-sync python scripts/verify.py --docs",
+      "expectation": "Updated backend guidance and native bug Markdown/local links validate",
+      "result": {
+        "status": "not-run",
+        "reason": "New scoped current-master integration awaits its recorded checks"
+      }
+    },
+    {
+      "id": "paired",
+      "kind": "behavior",
+      "command": "Run documented final current/prospective CY and queue normal installation, metadata, tests, static/import and help checks",
+      "expectation": "Both latest/proposed source versions resolve normally and source/installed metadata match; no stale pair accepted",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/campaign-scoped-improvements/test.md"
+      }
+    }
+  ],
+  "documentation": "Update docs/multi-model-backends.md nonfinite error guidance; parent reconciles portable usage and preserves original full recovery as unresolved.",
+  "review": {
+    "status": "pending"
+  }
+}
