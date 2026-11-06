@@ -3,6 +3,11 @@
 
 ## Unreleased
 
+### Bug Fixes
+
+- **deim**: Rebuild derived DINOv3 checkpoints that fail weights-only unpickling
+  ([`d084dd2`](https://github.com/BuckanovNikita/clearml-yolo/commit/d084dd2397da7c5433c756c98dbea73aa646a979))
+
 ### Build System
 
 - **hooks**: Stop on changelog rewrite before heavy checks

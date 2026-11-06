@@ -275,3 +275,31 @@ focused batch estimation, CLI, listing, resolution and search-strategy suites pa
 recorded in the
 [consolidation verification](../../../docs/plans/unfinished-work-cleanup-20261106/verification.md).
 Native gates listed above are unchanged.
+
+## WP2a integrated source review — 2026-11-07
+
+Scope: `git diff v0.45.1 v0.46.0 -- src tests`, forced admission and the persisted
+`settings.force` policy, including the ordinary-record omission fix. Lens: forced
+admission, followed by a skeptic pass.
+
+Checked: `SearchSettings.force` is a `StrictBool` omitted only when false; ordinary
+estimate keys equal v0.45.1 keys and forced keys differ. Force reaches scheduling,
+preflight, the serialized worker request and the monitor. It relaxes only the
+zero-utilization rule and unattributed activity; unavailable telemetry, preflight
+PIDs, foreign PIDs and invalid telemetry still raise. Temporary tests loaded the real
+v0.45.1 `core/batch_estimation.py` and showed that ordinary catalogues written now
+validate under the v0.45.1 strict reader, v0.45.1 catalogues read as `force=False`,
+and v0.45.1 rejects forced catalogues as documented. Training may select a forced
+estimate: [plan.md](../plan.md) line 203 and `docs/batch-estimation.md` allow it,
+`select_estimate` picks the smallest compatible batch and provenance keeps
+`force: true`. Temporary probes (15 tests) and 282 focused tests passed. The temporary
+tests were not kept.
+
+Findings: none. Nonblocking: `--list` counts a usable forced estimate as covered
+without the forced label; the documentation promises the label for recommendations,
+not coverage lists.
+
+Verdict: no change required within the stated scope. Limits: CPU only; native GPU
+and real `nvidia-smi` telemetry were not exercised. The review brief named the
+constitution and `docs/project-contracts.md`; the lens report does not confirm
+reading them. Native forced-estimator acceptance (WP1) remains open.
