@@ -10,6 +10,9 @@
 
 ### Documentation
 
+- **specs**: Record 006 delivery state after CY 0.46.0 release
+  ([`55bd2b0`](https://github.com/BuckanovNikita/clearml-yolo/commit/55bd2b09aeba85263c6a6636403d69ed61d0d9a5))
+
 - **specs**: Record 011 commit, release-skip and delivery evidence
   ([`9582e4c`](https://github.com/BuckanovNikita/clearml-yolo/commit/9582e4c3703c3240af8a2789fd931e1d1c68808a))
 
