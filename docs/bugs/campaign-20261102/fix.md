@@ -134,6 +134,15 @@ review are reset to pending for the integrated source. Parent integration owns
 the final paired versions, native replay, fresh review and release.
 
 - [x] Port the seven task-owned runtime/test/document paths and verify focused CPU regressions.
-- [ ] Run parent canonical/docs/current-and-proposed pair checks on the final integrated revision.
+- [x] Run parent canonical/docs/current-and-proposed pair checks on the final integrated revision.
 - [ ] Reconcile the twenty-case native matrix and unexplained SIGILL gate without weakening original scientific requirements.
 - [ ] Obtain fresh independent review and validate architecture acceptance before delivery.
+
+### Ledger reconciliation, 2026-11-07
+
+Line 137 is ticked: [test.md](test.md#current-integrated-verification--2026-11-04)
+records the integrated canonical run (4,790 passed), documentation validation and
+the proposed CY 0.46.0 / queue 0.1.9 pair (583 queue tests, seven physical cases
+deselected). The CY 0.46.0 release hooks and the committed-version pair (584 queue
+tests, in cy-queue `docs/plans/cy-046-compatibility/verification.md`) followed.
+The counts come from separate runs. Lines 138 and 139 stay open for WP4.

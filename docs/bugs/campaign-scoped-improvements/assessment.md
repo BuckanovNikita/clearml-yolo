@@ -54,10 +54,10 @@ reviewed isolated DINOv3 changes, which are excluded from this write ownership.
 - [x] Capture the four diagnostic baseline failures.
 - [x] Port the exact scoped runtime, tests and backend guidance.
 - [x] Pass focused diagnostics/export/CPU observer and architecture checks.
-- [ ] Parent verifies retained 50,000-row exact parity and scoped profiling.
-- [ ] Parent runs final integrated canonical, docs and prospective CY/queue pair.
+- [x] Parent verifies retained 50,000-row exact parity and scoped profiling.
+- [x] Parent runs final integrated canonical, docs and prospective CY/queue pair.
 - [ ] Parent reconciles portable usage, fresh integrated review and architecture acceptance.
-- [ ] Parent completes authorized Git-only delivery after all integrated gates.
+- [x] Parent completes authorized Git-only delivery after all integrated gates.
 
 The final integrated source includes subsequent force work. No intermediate release
 is claimed. DINOv3 native evidence and the force catalogue gate remain owned by
@@ -70,3 +70,29 @@ Update the nonfinite-native-value troubleshooting in `docs/multi-model-backends.
 The parent owns companion portable usage inspection/update and validation for
 contextual failures; no installed skill or private automation source is changed.
 Mutation-selected sources, tests and dependency revisions are unchanged.
+
+## Ledger reconciliation — 2026-11-07
+
+- Line 57 is ticked: [test.md](test.md#parent-relationship-edge-confirmation)
+  records the 50,000-row exact frame/CSV comparison and the relationship-edge
+  confirmation that together close scoped export parity, and the architecture
+  `parity` check is passed. The "still-open" parity item in the
+  [cleanup verification](../../plans/unfinished-work-cleanup-20261106/verification.md)
+  reflects this box before reconciliation; it is not open work. That dated record is
+  left unchanged.
+- Line 58 is ticked: [test.md](test.md#final-integrated-verification-checkpoint)
+  records the final canonical run (4,844 passed) and the proposed CY 0.46.0 /
+  queue 0.1.9 pair (583 queue tests). The committed-version pair (584 queue tests,
+  7 physical opt-ins deselected) is in cy-queue
+  `docs/plans/cy-046-compatibility/verification.md`. The two counts come from
+  separate runs.
+- Line 59 stays open for WP2a/WP3 (portable usage, fresh integrated review and
+  architecture acceptance).
+- Line 60 is ticked with an exception: this source was delivered in CY 0.46.0
+  (`60edd4b`, tag `v0.46.0`) before the line 59 gates finished, as the 006
+  [delivery note](../../../specs/006-batch-training/tasks.md#delivery-note-2026-11-06)
+  records. The release does not claim those gates.
+- Documentation check: on 2026-11-07,
+  `uv run --frozen --no-sync python scripts/check_docs.py --all` exited 0 with
+  "Checked 268 Markdown files; 0 issue(s)." The architecture `docs` check now
+  records this command, because `scripts/verify.py --docs` no longer exists.

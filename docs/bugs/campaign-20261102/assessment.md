@@ -90,14 +90,14 @@ User authorized continued non-GPU work, then prohibited heavy load until
 2026-11-03 01:00 Europe/Moscow. Until that time use static inspection, small
 metadata/document checks and preparation only; no suites or Torch/model diagnostics.
 
-- [ ] Correct the CPU observer test fixture so accelerator discovery cannot
+- [x] Correct the CPU observer test fixture so accelerator discovery cannot
   initialize CUDA while readiness properties are deliberately stubbed. Existing
   retained failure traces reach AdamW accelerator health probing at optimizer.step.
   Keep real CPU optimizer, EMA, serialization and digest checks. This affects only
   tests/test_native_backend_ddp_harness.py; runtime interfaces/effects stay unchanged.
-- [ ] After the restriction, verify that fixture and preserve full test collection
+- [x] After the restriction, verify that fixture and preserve full test collection
   when selecting the minimal numerical/asset pair for the SIGILL investigation.
-- [ ] Complete remaining canonical CPU, source-release and new-snapshot export
+- [x] Complete remaining canonical CPU, source-release and new-snapshot export
   checks; keep native twenty-case acceptance separate and pending.
 
 Current export correction: the independently released 390c91a snapshot was
@@ -191,3 +191,25 @@ All fifteen blocked arms received eligibility checks only. Twelve have strict
 final-source accepted baseline evidence; three Faster50 dependencies retain the
 legacy proof gap. No blocked experiment, interrupted original or pending original
 was executed. The original campaign ledger and logs remain protected.
+
+## Ledger reconciliation, 2026-11-07
+
+Earlier sections and their boxes stay as written. This note records which
+unticked boxes are done and which are superseded.
+
+- Ticked lines 93, 98 and 100: the CPU observer fixture regression and the
+  full-collection minimal probe passed ("Heavy CPU work resumed" above); the
+  current-source canonical CPU run, helper source release and exact-snapshot export
+  are recorded in "Final CPU-stage reconciliation" above and in
+  [test.md](test.md#current-source-canonical-success-2026-11-03).
+- Superseded, left unticked, by the 2026-11-03 checkpoint (lines 166–180):
+  - line 37 → lines 168 and 170 (done);
+  - line 38 → line 178 (open);
+  - line 39 → line 176 (open);
+  - line 43 → line 180 (open);
+  - line 140 → line 166, line 142 → line 168, line 144 → line 170,
+    line 146 → line 172, line 148 → line 174 (all done);
+  - line 150 → line 176 (open), line 153 → line 180 (open).
+- The open native matrix, numerical failures, SIGILL and release gates (lines 176,
+  178 and 180) belong to WP4 of the
+  [remaining-work plan](../../plans/remaining-work-20261106/plan.md).

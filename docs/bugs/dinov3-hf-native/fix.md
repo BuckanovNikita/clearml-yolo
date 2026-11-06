@@ -75,7 +75,7 @@ remain disclosed, and neither ordinary estimation nor single-GPU training proves
 - [x] Reconcile the companion portable usage source and its documentation checks.
 - [x] Verify latest and proposed CY/queue source and installed metadata normally.
 - [ ] Obtain fresh independent review, reconcile diff/evidence and validate acceptance.
-- [ ] Complete normal hooks and authorized Git-only release before the next stage.
+- [x] Complete normal hooks and authorized Git-only release before the next stage.
 
 ### User-directed admission reconciliation
 
@@ -103,3 +103,16 @@ winner or raw-proven `no_capacity` at the existing minimum of eight per GPU, wit
 verified ownership cleanup. Earlier failed records are retained. Neither host
 telemetry ENOMEM nor cleanup errors qualify as capacity evidence. The native
 training and estimator gates remain separate; final estimator acceptance is open.
+
+### Ledger reconciliation — 2026-11-07
+
+- Line 74 (ordinary selected DEIM L/X estimation) stays unticked: it is superseded
+  by 006 T064 under the user-directed admission reconciliation and the 2026-11-06
+  amendment above. Selected L/X forced measurements on the frozen final source
+  remain open for WP1.
+- Line 78 is ticked: this source was delivered in CY 0.46.0 (`60edd4b`, tag
+  `v0.46.0`) through normal hooks, per the 006
+  [delivery note](../../../specs/006-batch-training/tasks.md#delivery-note-2026-11-06).
+  The "before the next stage" order was not kept: no intermediate release happened,
+  as the superseding note above requires. The release does not claim the open
+  review and estimator gates.

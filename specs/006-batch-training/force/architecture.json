@@ -196,11 +196,12 @@
     {
       "id": "docs",
       "kind": "documentation",
-      "command": "uv run --frozen --no-sync python scripts/verify.py --docs",
+      "command": "uv run --frozen --no-sync python scripts/check_docs.py --all",
       "expectation": "Markdown, links, examples and portable guidance match force semantics",
       "result": {
-        "status": "not-run",
-        "reason": "Final current-master sequential integration verification is pending; historical results remain dated."
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/006-batch-training/tasks.md"
       }
     },
     {

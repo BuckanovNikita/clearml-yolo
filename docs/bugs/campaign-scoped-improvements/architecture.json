@@ -132,11 +132,12 @@
     {
       "id": "docs",
       "kind": "documentation",
-      "command": "uv run --frozen --no-sync python scripts/verify.py --docs",
+      "command": "uv run --frozen --no-sync python scripts/check_docs.py --all",
       "expectation": "Updated backend guidance and native bug Markdown/local links validate",
       "result": {
-        "status": "not-run",
-        "reason": "New scoped current-master integration awaits its recorded checks"
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/campaign-scoped-improvements/assessment.md"
       }
     },
     {

@@ -254,7 +254,7 @@
       "expectation": "Real supported-backend DDP correctness, failure recovery, sharding, checkpoint and owner publication evidence",
       "result": {
         "status": "not-run",
-        "reason": "The current machine exposes one GPU; physical multi-GPU training requires at least two. Full architecture acceptance remains open. The later explicit release request is recorded in evidence/release.md; it does not make this unexecuted gate pass."
+        "reason": "The current machine exposes one GPU; physical multi-GPU training requires at least two. Full architecture acceptance remains open. The later explicit release request is recorded in evidence/release.md; it does not make this unexecuted gate pass. Waived by user decision (2026-11-06): physical multi-GPU DDP verification will not be done here; this is a waiver, not a pass. See tasks.md, Ledger reconciliation (2026-11-07)."
       }
     }
   ],

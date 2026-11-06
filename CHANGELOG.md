@@ -10,6 +10,9 @@
 
 ### Documentation
 
+- **plans**: Drop physical multi-GPU verification by user decision
+  ([`f8f2c51`](https://github.com/BuckanovNikita/clearml-yolo/commit/f8f2c5191a25439fc423aae76f322e09fab39afe))
+
 - **plans**: Plan completion of remaining work after CY 0.46.0
   ([`be56215`](https://github.com/BuckanovNikita/clearml-yolo/commit/be562156242c56cf399f87e3fda1af8111fce92c))
 
