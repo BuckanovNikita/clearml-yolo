@@ -113,7 +113,7 @@ per repository (no release) through the hooks, then push.
 
   Give the reviewer the code, the four bug/feature records, and the project rules
   (constitution, `docs/project-contracts.md`).
-- [ ] T2a.2 Resolve the findings. A runtime defect becomes a `speckit-bug-*` record
+- [x] T2a.2 Resolve the findings. A runtime defect becomes a `speckit-bug-*` record
   with a failing regression first, then a fix, the full suite, a patch release and
   the paired check.
 - [x] T2a.3 Record the verdict in `docs/bugs/dinov3-hf-native/review.md`, in a
@@ -291,5 +291,6 @@ Phase 1 landed on `master` (WP0, WP6 and WP2a branches) and cy-queue `main` (WP0
   pushed; Git only). T3.5 is recorded in the
   [force verification](../../../specs/006-batch-training/force/verification.md#portable-usage-guide-release--2026-11-07).
 - **Open for the owner:** T3.4 (remove the superseded corp-skills checkouts) and T6.2
-  (fresh-session skill discovery). T2a.2 closes with the 0.46.1 patch release and its
-  paired check.
+  (fresh-session skill discovery). T2a.2 is closed: CY 0.46.1 (`v0.46.1`) passed the paired
+  check with cy-queue 0.1.9 `0c486b5`; see the
+  [bug verification](../../bugs/dinov3-cache-reload-errors/test.md#release-and-paired-check--2026-11-07).

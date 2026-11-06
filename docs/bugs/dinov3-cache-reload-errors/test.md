@@ -34,3 +34,34 @@ is missing from the registry, so `--frozen --no-sync` was used.
 
 Reviewed `docs/model-assets.md` lines 186-187, which already promise that corrupt
 derived files are rebuilt. No contract or portable usage-skill change is needed.
+
+## Release and paired check — 2026-11-07
+
+The fix landed on `master` as `96581a4` (rebased from `d084dd2`) and was released as
+CY 0.46.1: release commit `1ff9a66fd4bd1b4b94fae396a433ab89e5ad6990`, annotated tag
+`v0.46.1`, created by the post-commit release hook.
+
+Before landing, on the rebased branch tip `4428ec7` (same `src` and `tests` as the
+release): `ruff check .`, strict `mypy .` (465 files), `vulture` and `lint-imports`
+(52 contracts kept) passed, and
+`env -u PYTEST_ADDOPTS CUDA_VISIBLE_DEVICES= nice -n19 uv run --frozen --no-sync pytest --testmon-noselect`
+gave 4817 passed, 30 skipped, 81 deselected, exit 0 (19 min 45 s). The commit hooks
+also passed on the commit that triggered the release.
+
+Paired CY/queue check, run from the cy-queue checkout with the CY `.venv` (no queue
+worker was running):
+
+| Item | Value |
+| --- | --- |
+| CY source | `1ff9a66fd4bd1b4b94fae396a433ab89e5ad6990`, version 0.46.1 |
+| cy-queue source | `0c486b5257da8950932aded99dc2a2f1b3680286` (`origin/main`), version 0.1.9, requirement `clearml-yolo>=0.38,<0.47` |
+| `uv pip install -e ../clearml-yolo -e .` | normal resolution, installed `clearml-yolo==0.46.1`, `cy-queue==0.1.9` |
+| `uv pip check` | all 281 installed packages compatible |
+| Installed metadata | `clearml-yolo` 0.46.1, `cy-queue` 0.1.9 |
+| Queue `pytest -q` | 584 passed, 7 deselected (physical `ddp_gpu` opt-ins, waived) |
+| `cy-queue --help` | exit 0 |
+| Queue `ruff check .`, `ruff format --check .` | passed; 222 files already formatted |
+| Queue `mypy .`, `lint-imports` | no issues in 70 files; 2 contracts kept |
+
+Limits: CPU only, `CUDA_VISIBLE_DEVICES` empty; no GPU, native conversion or live
+stand run.
