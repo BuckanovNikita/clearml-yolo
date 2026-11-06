@@ -42,7 +42,7 @@ Input: [plan](plan.md), [specification](spec.md), [architecture](architecture.js
 - [x] T021 Run canonical scripts/verify.py, --docs and applicable scoped mutation; record specs/006-batch-training/evidence/verification.md (FR-010, FR-011).
 - [ ] T022 Execute serialized estimator matrix and native distributed/FCOS acceptance using the completed T026 harness; record failures and unavailable multi-GPU evidence honestly (SC-001–SC-005).
 - [x] T023 Verify latest paired CY/queue source and proposed versions with normal resolution and integration/static checks (FR-011).
-- [x] T024 Obtain fresh independent reviews after parent integration/checks, resolve findings, reconcile architecture and ledger (FR-010, FR-011).
+- [ ] T024 Obtain fresh independent reviews after parent integration/checks, resolve findings, reconcile architecture and ledger (FR-010, FR-011).
 - [x] T025 Complete authorized commit and annotated-tag/push workflow only after acceptance; preserve local uv sources and dependency revisions (FR-011).
 - [x] T026 Implement the missing opt-in physical DDP harness for DEIMv2, RF-DETR, Faster R-CNN and FCOS, with real rank/publication observations, fault recovery and offline harness contract checks (FR-007, SC-003).
 
@@ -321,13 +321,18 @@ dated sections stay unchanged; missing checks are not relabelled as passes.
   (2026-11-06)**; it will not be done here and is not passed. The box stays
   unticked. Its estimator-matrix part was already superseded by T031 (see the
   2026-10-27 amendment). The 16 T026 DDP scenarios stay unexecuted.
-- **T024:** ticked. The 006 [architecture record](architecture.json) review is
-  `accepted` (reviewer `release_final_review`), with prior reviews in
+- **T024:** stays unticked. The review and ledger parts are done: the 006
+  [architecture record](architecture.json) review is `accepted` (reviewer
+  `release_final_review`), with prior reviews in
   [evidence/review.md](evidence/review.md) and the release review in
-  [evidence/release.md](evidence/release.md). The remaining residual is T022 (waived).
-  The record's failed `native` and not-run `ddp-native` results stay as recorded.
+  [evidence/release.md](evidence/release.md). Architecture acceptance stays open
+  until T031 and the record's failed `native` check close in WP1. T022 and the
+  not-run `ddp-native` check are waived, not passed. The record's results stay as
+  recorded.
 - **T025:** ticked. Delivered as CY v0.41.0 through T033–T035 under the explicit
-  release request of 2026-10-27, with its disclosed native exceptions.
+  release request of 2026-10-27, with its disclosed native exceptions. That
+  release exception replaced the box's "only after acceptance" order: delivery
+  preceded architecture acceptance, which stays open with T024.
 - **T031:** stays **open for WP1**. Owner decision: the forced yolo11n
   confirmation in [speedup/verification.md](speedup/verification.md#completed-matched-native-comparison--2026-11-05)
   is not the strict-idle confirmation T031 asks for. WP1/T064 closes it.
@@ -347,4 +352,5 @@ command no longer exists in the repository, so the record now names the command
 that was run.
 This check covers CY Markdown only. The record's portable-guidance expectation
 is not established by it; the corp-skills guide still predates `--force` and is
-owned by WP3/T065.
+owned by WP3/T065. The record's `docs` check therefore stays `not-run`, with this
+partial result in its reason; WP3/T065 revisits it.

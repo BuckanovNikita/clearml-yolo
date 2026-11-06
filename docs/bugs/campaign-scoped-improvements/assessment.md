@@ -78,8 +78,9 @@ Mutation-selected sources, tests and dependency revisions are unchanged.
   confirmation that together close scoped export parity, and the architecture
   `parity` check is passed. The "still-open" parity item in the
   [cleanup verification](../../plans/unfinished-work-cleanup-20261106/verification.md)
-  reflects this box before reconciliation; it is not open work. That dated record is
-  left unchanged.
+  most likely reflects this then-unticked box (an inference: no record states why
+  that review called parity open). Parity is closed per test.md and the passed
+  architecture `parity` check. That dated record is left unchanged.
 - Line 58 is ticked: [test.md](test.md#final-integrated-verification-checkpoint)
   records the final canonical run (4,844 passed) and the proposed CY 0.46.0 /
   queue 0.1.9 pair (583 queue tests). The committed-version pair (584 queue tests,

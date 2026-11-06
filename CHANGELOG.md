@@ -10,6 +10,9 @@
 
 ### Documentation
 
+- **ledger**: Reconcile WP0 boxes with existing evidence
+  ([`4e5b50b`](https://github.com/BuckanovNikita/clearml-yolo/commit/4e5b50b5d735a2e0c1df1707a02bf6b5964b50f4))
+
 - **plans**: Drop physical multi-GPU verification by user decision
   ([`f8f2c51`](https://github.com/BuckanovNikita/clearml-yolo/commit/f8f2c5191a25439fc423aae76f322e09fab39afe))
 

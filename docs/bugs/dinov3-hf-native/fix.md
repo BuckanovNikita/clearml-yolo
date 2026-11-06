@@ -114,5 +114,8 @@ training and estimator gates remain separate; final estimator acceptance is open
   `v0.46.0`) through normal hooks, per the 006
   [delivery note](../../../specs/006-batch-training/tasks.md#delivery-note-2026-11-06).
   The "before the next stage" order was not kept: no intermediate release happened,
-  as the superseding note above requires. The release does not claim the open
-  review and estimator gates.
+  as the superseding note above requires. That note also holds all release until
+  final integrated verification, fresh review and the native forced catalogue gate
+  pass; 0.46.0 shipped before those gates, which the delivery note lists as
+  "still open, and published regardless". The release does not claim the open
+  review, catalogue and estimator gates.
