@@ -14,7 +14,7 @@
 | Related suites | plus `tests/test_model_assets_loading.py tests/test_deim_backend.py` | pass | 111 passed |
 | Full offline suite | `env -u PYTEST_ADDOPTS CUDA_VISIBLE_DEVICES='' nice -n19 uv run --frozen --no-sync pytest -q -p no:cacheprovider` | pass | 4817 passed, 30 skipped, 81 deselected, exit 0 (18 min) |
 | Lint and types | `ruff check .`; `mypy` on the two changed files | pass | the commit hooks rerun ruff, mypy, vulture and lint-imports on the whole tree |
-| Documentation | `python scripts/check_docs.py --all` | pass | 268 Markdown files, 0 issues |
+| Documentation | `python scripts/check_docs.py --all` | pass | rerun 2026-11-07 at `4e9c832`, after this record existed: 273 Markdown files, 0 issues (the earlier 268 predated the record) |
 
 All pytest commands ran with `CUDA_VISIBLE_DEVICES=''` under
 `nice -n19 uv run --frozen --no-sync`.

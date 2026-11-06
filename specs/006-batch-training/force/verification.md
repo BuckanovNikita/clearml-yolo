@@ -303,3 +303,22 @@ Verdict: no change required within the stated scope. Limits: CPU only; native GP
 and real `nvidia-smi` telemetry were not exercised. The review brief named the
 constitution and `docs/project-contracts.md`; the lens report does not confirm
 reading them. Native forced-estimator acceptance (WP1) remains open.
+
+### Scope correction and rules lens — 2026-11-07
+
+A follow-up agent with fresh context, part of the same WP2a workflow rather than an
+independent reviewer, read `.specify/memory/constitution.md` (300 lines) and
+`docs/project-contracts.md` (331 lines) in full and checked the topic above against them.
+
+Principle II: `core/batch_estimation.py` changes stay Pydantic records without effects.
+Principle IV: evidence stays CPU-only and claims no native forced run. No new finding.
+
+Scope narrowed: the diff examined is `git diff v0.45.1 v0.46.0 -- src tests`, but the
+review covers only the T2a.1 topic named above. Tooling-only test changes in that diff
+were outside every lens: `tests/test_verify.py` (removed), `tests/test_local_release.py`
+and `tests/test_tooling_boundaries.py` come from `8a1d5a9` (verify.py replaced by prek
+hooks) and were not reviewed. `tests/fixtures/docs-compatibility.json`,
+`tests/test_docs_compatibility.py` and `tests/test_native_backend_ddp_harness.py` come
+from `c16dbb1`; their diffs (the `--force` help text and `False` default, and a stub that
+keeps the AdamW default-accelerator probe off CUDA in the CPU harness) were read and are
+consistent with forced admission and the harness intent; nothing more was examined.

@@ -69,3 +69,32 @@ Verdict: one low-severity defect, fixed on the branch; a patch release and the p
 queue check are still required. Limits: CPU-only tests; real-tensor parity relies on
 earlier recorded evidence. This lens did not read the constitution or
 `docs/project-contracts.md`, which T2a.1 asked reviewers to receive.
+
+### Scope correction and rules lens — 2026-11-07
+
+A follow-up agent with fresh context, part of the same WP2a workflow rather than an
+independent reviewer, read `.specify/memory/constitution.md` (300 lines) and
+`docs/project-contracts.md` (331 lines) in full and checked the topic above against them.
+
+Documented deviation (constitution Principle I, specific exception types where
+possible): the fix in `adapters/deim/hf_weights.py` `_reload` catches `Exception`.
+Rationale: the weights-only unpickler raises open-ended types (including
+`AssertionError`), so a fixed list would leave stale checkpoints unrepairable. The
+error is never discarded: it is re-raised as `ValueError` with the original as cause,
+`_cached` reconverts, and a freshly converted checkpoint that still fails stays loud.
+Principle II: the new `core/assets.py` `AssetDerivation` is a frozen Pydantic record
+with `extra="forbid"` and no effects. Principle IV: evidence stays CPU-only and claims
+no GPU result. Leaving `.conversion-*` staging after a hard kill matches
+`docs/project-contracts.md:298-299` (no startup scratch recovery or recursive
+deletion), so it remains nonblocking. No new finding. The fresh independent review of
+the fix commit `d084dd2` is still pending.
+
+Scope narrowed: the diff examined is `git diff v0.45.1 v0.46.0 -- src tests`, but the
+review covers only the T2a.1 topic named above. Tooling-only test changes in that diff
+were outside every lens: `tests/test_verify.py` (removed), `tests/test_local_release.py`
+and `tests/test_tooling_boundaries.py` come from `8a1d5a9` (verify.py replaced by prek
+hooks) and were not reviewed. `tests/fixtures/docs-compatibility.json`,
+`tests/test_docs_compatibility.py` and `tests/test_native_backend_ddp_harness.py` come
+from `c16dbb1`; their diffs (the `--force` help text and `False` default, and a stub that
+keeps the AdamW default-accelerator probe off CUDA in the CPU harness) were read and are
+consistent with forced admission and the harness intent; nothing more was examined.
