@@ -86,8 +86,10 @@ Principle II: the new `core/assets.py` `AssetDerivation` is a frozen Pydantic re
 with `extra="forbid"` and no effects. Principle IV: evidence stays CPU-only and claims
 no GPU result. Leaving `.conversion-*` staging after a hard kill matches
 `docs/project-contracts.md:298-299` (no startup scratch recovery or recursive
-deletion), so it remains nonblocking. No new finding. The fresh independent review of
-the fix commit `d084dd2` is still pending.
+deletion), so it remains nonblocking. No new finding. Status update 2026-11-07: the fresh independent review of the fix
+commit `96581a4` (pre-rebase `d084dd2`) is recorded, with verdict approve, in the
+[cache-reload bug review](../dinov3-cache-reload-errors/review.md), and the fix shipped
+in CY 0.46.1 (`v0.46.1`).
 
 Scope narrowed: the diff examined is `git diff v0.45.1 v0.46.0 -- src tests`, but the
 review covers only the T2a.1 topic named above. Tooling-only test changes in that diff

@@ -16,6 +16,10 @@ Each work package still updates the record that owns its gate.
   - `../cy-force-20261103/portable` (branch `docs/force-batch-20261103`, uncommitted
     `CHANGELOG.md`/`VERSION`).
 
+  Update 2026-11-07: both checkouts, and `../cy-closure-20261104/portable`, are retired;
+  the owner removed them after their content was released as corp-skills v0.7.5
+  (`11b6866`). See T3.4.
+
 The inventory comes from a read-only audit of every unchecked box, every pending
 architecture review and the dated sections of each record (2026-11-06). Items whose
 work is already done or superseded are handled by [WP0](#wp0-ledger-reconciliation-offline).
@@ -142,8 +146,11 @@ describes `--force` as unreleased and says "CY 0.45.0 has no --force"
   - follow [batch estimation](../../batch-estimation.md) as the authoritative source.
 - [x] T3.3 Validate with the corp-skills MAINTENANCE checks, then release corp-skills
   through its own workflow (Git-only, authorized push).
-- [ ] T3.4 Remove the two superseded corp-skills checkouts only after their content
-  is confirmed on corp-skills `main`.
+- [x] T3.4 Remove the two superseded corp-skills checkouts only after their content
+  is confirmed on corp-skills `main`. Done 2026-11-07: the owner removed
+  `../corp-skills-dinov3-20261105`, `../cy-force-20261103/portable` and
+  `../cy-closure-20261104/portable` after their content was released as corp-skills
+  v0.7.5 (`11b6866`). The T3.1 snapshots are kept in the owner's cleanup archive.
 - [x] T3.5 Record the corp-skills commit and version in a dated section of
   `specs/006-batch-training/force/verification.md`. Mark the portable part of T065
   done.
@@ -153,7 +160,9 @@ describes `--force` as unreleased and says "CY 0.45.0 has no --force"
 - [x] T6.1 Run a fresh read-only review of `43de5af` (AGENTS.md, skills and
   references) against the rule-preservation acceptance in its
   [plan](../agent-instructions-refactor-20261104/plan.md).
-- [ ] T6.2 Check skill discovery in a fresh Claude session and a fresh Codex session.
+- [x] T6.2 Check skill discovery in a fresh Claude session and a fresh Codex session.
+  Done 2026-11-07: both hosts listed the 19 project skills; see the
+  [verification update](../agent-instructions-refactor-20261104/verification-2026-11-05.md#update-2026-11-07-fresh-session-skill-discovery).
 - [x] T6.3 Tick plan `:31` and update the "Pending" list in its
   `verification-2026-11-05.md`.
 
@@ -291,6 +300,7 @@ Phase 1 landed on `master` (WP0, WP6 and WP2a branches) and cy-queue `main` (WP0
   pushed; Git only). T3.5 is recorded in the
   [force verification](../../../specs/006-batch-training/force/verification.md#portable-usage-guide-release--2026-11-07).
 - **Open for the owner:** T3.4 (remove the superseded corp-skills checkouts) and T6.2
-  (fresh-session skill discovery). T2a.2 is closed: CY 0.46.1 (`v0.46.1`) passed the paired
+  (fresh-session skill discovery); both closed later on 2026-11-07, see the task notes.
+  T2a.2 is closed: CY 0.46.1 (`v0.46.1`) passed the paired
   check with cy-queue 0.1.9 `0c486b5`; see the
   [bug verification](../../bugs/dinov3-cache-reload-errors/test.md#release-and-paired-check--2026-11-07).

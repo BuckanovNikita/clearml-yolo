@@ -2,7 +2,8 @@
 
 ## Fresh independent fix review — 2026-11-07
 
-Scope: fix commit `d084dd2` (`src/clearml_yolo/adapters/deim/hf_weights.py`,
+Scope: fix commit `d084dd2`, landed on `master` as `96581a4`
+(`src/clearml_yolo/adapters/deim/hf_weights.py`,
 `tests/test_dinov3_hf_weights.py`) with [assessment.md](assessment.md),
 [fix.md](fix.md), [test.md](test.md) and [architecture.json](architecture.json).
 The reviewer had fresh context and did not write the fix.

@@ -67,6 +67,30 @@ Status of each 2026-11-05 item above:
   added by a later changelog hook run.
 - Paired CY/queue release check: credited to v0.46.0 by the remaining-work plan; not
   re-verified here.
-- Fresh-session skill discovery in Claude and Codex: pending (remaining-work T6.2, owner).
+- Fresh-session skill discovery in Claude and Codex: pending (remaining-work T6.2, owner);
+  done later the same day, see the next section.
 - Fresh independent review: done in [review-2026-11-07.md](review-2026-11-07.md), pass with
   one minor rule narrowing.
+
+### Update 2026-11-07: fresh-session skill discovery
+
+Remaining-work T6.2. Each host ran once, non-interactively, from the repository root of
+the primary `master` checkout at `255c69c`:
+
+- Claude: `claude -p "List the names of the project skills available to you in this
+  repository, one per line, nothing else." --max-turns 1` exited 1 with
+  `Error: Reached max turns (1)` and no answer, which suggests the session attempted a
+  tool call. The rerun with the prompt prefixed by "Without using any tools," and the
+  same `--max-turns 1` exited 0.
+- Codex: `codex exec "List the names of the project skills available to you in this
+  repository, one per line, nothing else."` exited 0 without running any command.
+
+Both answers listed the same 19 names, which equal the directories in `.agents/skills/`
+and the `.claude/skills/` links: `running-end-to-end-tests`, `speckit-analyze`,
+`speckit-assess-decide`, `speckit-assess-define`, `speckit-assess-intake`,
+`speckit-assess-research`, `speckit-assess-shape`, `speckit-bug-assess`,
+`speckit-bug-fix`, `speckit-bug-test`, `speckit-checklist`, `speckit-clarify`,
+`speckit-constitution`, `speckit-converge`, `speckit-implement`, `speckit-plan`,
+`speckit-specify`, `speckit-tasks` and `speckit-taskstoissues`. `AGENTS.md` and
+`CLAUDE.md` name only `running-end-to-end-tests`, so the full list came from each host's
+skill discovery. Fresh-session discovery passes in both hosts.
