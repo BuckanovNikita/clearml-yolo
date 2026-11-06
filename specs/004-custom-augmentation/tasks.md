@@ -24,8 +24,8 @@
 ## Phase 4 — Native acceptance
 
 - [x] T013 Retrieve official Severstal inputs and prepare/freeze conversion and split manifests (T006).
-- [ ] T014 Execute all 45 smoke scenarios with real optimizer/checkpoint/prediction evidence (T007-T013).
-- [ ] T015 Verify downloaded checkpoint/configuration evidence and preserve scoped cleanup receipts.
+- [x] T014 Execute all 45 smoke scenarios with real optimizer/checkpoint/prediction evidence (T007-T013).
+- [x] T015 Verify downloaded checkpoint/configuration evidence and preserve scoped cleanup receipts.
 - [x] T016 Run complete applicable pytest/static/import/dependency compatibility checks.
 
 ## Phase 5 — Documentation, review and delivery
@@ -33,7 +33,7 @@
 - [x] T017 Update README, augmentation/backend/contracts/examples and validate Markdown/links/examples.
 - [x] T018 Update and validate portable usage skill source and companion task-owned changes.
 - [x] T019 Reconcile diff and architecture record; obtain fresh independent review after verification.
-- [ ] T020 Validate architecture acceptance and deliver through checked Git-only release.
+- [x] T020 Validate architecture acceptance and deliver through checked Git-only release.
 - [x] T021 Record separate full Severstal training task, pending explicit post-release approval.
 
 ## Dependencies and stopping rules
@@ -103,3 +103,27 @@ The [delivery receipt](evidence/release.md) records identities, the investigated
 interpreter crash, preserved local overrides and the remaining native gap.
 T020's delivery portion is complete under the explicit exception; its full
 acceptance portion and T014/T015 remain open.
+
+
+## Native acceptance closeout, 2026-11-04
+
+[The dated acceptance receipt](verification.md) closes T014/T015 with the retained
+39 passes and six fresh default-HF DEIMv2-L/X passes. Independent rehashing verified
+all 45 native checkpoints and downloaded artifacts, identical per-preset
+initialization, finite losses and the actual 240/80 ground-truth/prediction
+populations. Both dataset manifests and prepared CSVs validate; retained image
+records and source bytes prove the same frozen 160/40/40 subset. The differing
+annotation CSV schemas normalize to identical positive mask records.
+
+This resumption changes only the ledger, architecture evidence index and dated
+verification receipt; it has no runtime, interface, dependency or effect ownership
+impact. Existing historical evidence and completed release identities are preserved.
+Current canonical verification passed 4,790 tests with 30 skips and 81 deselections,
+plus static/import checks; native success comes from the dated real-run receipts.
+The documentation-only closeout does not authorize or claim new full-data training,
+physical multi-GPU acceptance or a fresh 45-case execution on one source revision.
+
+Architecture acceptance validation and canonical documentation verification both
+passed with exit zero, as did task-scoped whitespace checks. T020 is now complete:
+its native/architecture gap is closed, while its already completed Git-only
+delivery remains the immutable v0.39.0/v0.4.4 receipt.

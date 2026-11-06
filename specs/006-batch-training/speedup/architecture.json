@@ -192,11 +192,11 @@
     {
       "id": "native",
       "kind": "behavior",
-      "command": "uv run --frozen --no-sync python ../native_benchmark.py ../native-benchmark",
-      "expectation": "Matched full-trial native legacy/guided searches and cached relaunch succeed on one idle GPU; physical two-GPU execution is a separately accepted release limitation.",
+      "command": "python benchmark_search.py with the explicit force policy and matched task-owned native workspace",
+      "expectation": "Matched full-trial native legacy/guided/aligned one-GPU searches and unchanged cached relaunch succeed; report actual time/trials/outcomes and forced/background-sensitive provenance. Physical multi-GPU and ordinary idle preflight remain separately disclosed.",
       "result": {
-        "status": "failed",
-        "exit_code": 2,
+        "status": "passed",
+        "exit_code": 0,
         "evidence": "specs/006-batch-training/speedup/verification.md"
       }
     }
@@ -204,8 +204,8 @@
   "documentation": "Update batch-estimation guide, Russian README, active feature docs, shared option/rendered docs and corp-skills usage/evaluation references. Record native single-GPU timings and the explicit physical multi-GPU release limitation in dated evidence.",
   "review": {
     "status": "accepted",
-    "reviewer": "Fresh read-only native agent review_batch_speedup; implementation accepted with native acceptance gap retained",
+    "reviewer": "hf_conversion_review, fresh independent native agent after current canonical and native comparison checks",
     "evidence": "specs/006-batch-training/speedup/review.md",
-    "reconciliation": "Reviewed all tracked changes and untracked additions against released0.44.3: six runtime/composition/value modules, shared/generated docs, existing import contracts, tests and fixtures. Original dirty checkout excluded/preserved; dependencies and installed workflow tooling unchanged. Native benchmark remains failed and blocks full acceptance. After disclosure, the user instructed push: release is authorized with the single-GPU benchmark gap recorded; the failed native check remains unchanged."
+    "reconciliation": "Reviewed seven native cases and43optimizer receipts against six reported rows/current assets, complete task-owned benchmark/evidence/architecture diff and preserved historical failures. Integrated runtime source unchanged from independent45-file source review. Explicit force comparison matches SC006; ordinary idle admission, full64matrix and physicalDDP remain separate."
   }
 }

@@ -8,6 +8,11 @@
 - **agents**: Refactor agent instructions and skills to current best practices
   ([`43de5af`](https://github.com/BuckanovNikita/clearml-yolo/commit/43de5af1d2466b15048551075c8dfb76b261c6ee))
 
+### Features
+
+- **batch**: Add forced estimation and official HF DINOv3 weights
+  ([`c16dbb1`](https://github.com/BuckanovNikita/clearml-yolo/commit/c16dbb19d0b59df30c173696406a5f76ec1ac768))
+
 
 ## v0.45.1 (2026-11-05)
 

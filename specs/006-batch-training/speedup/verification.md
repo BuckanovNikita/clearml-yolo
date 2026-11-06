@@ -173,3 +173,65 @@ The original dirty workspace, its source overrides and pre-existing workloads we
 preserved. No GitHub Release object, release asset, package publication or deployment
 was created. T041 and full T044 native acceptance remain open under the explicit
 delivery exception; successful CPU/process checks do not close those gaps.
+
+
+## Completed matched native comparison — 2026-11-05
+
+The explicit force amendment now provides the authorized execution path for the
+SC-006 comparison on this host. The original idle-preflight failures above remain
+historical failures. This run is **forced/background-sensitive**, not idle-device
+evidence; strict ordinary admission remains unchanged. SC-006 requires actual
+elapsed time, trial count and outcomes with matching workload/assets.
+
+All six one-GPU searches completed through the production case-worker path using
+320-pixel inputs, four classes, twenty objects per image, a batch ceiling of eight,
+90% memory budget, 300-second trial deadlines, every native optimizer, five warmup
+and ten measured steps plus validation. Every result is ceiling-limited batch eight,
+with a fresh independent confirmation. Raw requests and rank receipts match the
+profile, workload, strategy, token, optimizer, batch and step counts. Assets and
+resolved profiles match across strategies for each model.
+
+| Model | Strategy | Elapsed seconds | Trials | Confirmed batch |
+| --- | --- | --- | --- | --- |
+| yolo11n.pt | exponential_binary_v1 | 517.49 | 5 | 8 |
+| fcos/resnet50_fpn | exponential_binary_v1 | 58.45 | 5 | 8 |
+| yolo11n.pt | memory_guided_v1 | 265.60 | 4 | 8 |
+| fcos/resnet50_fpn | memory_guided_v1 | 41.12 | 4 | 8 |
+| yolo11n.pt | memory_guided_aligned_v1 | 88.66 | 2 | 8 |
+| fcos/resnet50_fpn | memory_guided_aligned_v1 | 25.14 | 2 | 8 |
+
+Each ordinary relaunch reused saved evidence without changing catalogue bytes or
+creating new case directories. The first harness incorrectly required the CLI's
+`cached` label, which can refer to another selected recommendation strategy. That
+assertion failure, first script, logs and two completed timing rows are preserved.
+The corrected harness additionally forbids worker-pool creation during cache replay;
+all four remaining cases passed that stronger direct check. It changes no product
+code. The original valid legacy timings are retained, not repeated or relabeled.
+
+These are one observation per model/strategy in execution order, with native compile
+caches and concurrent bounded CPU checks; host load and cache warmth were not
+controlled. They are measured timings, not a statistical or isolated speedup claim.
+Deterministic linear-memory trial savings remain covered by the ordinary tests.
+The full 64-model capacity matrix and physical multi-GPU acceptance are separate.
+
+Both benchmark ownership receipts verify native process exit and released GPU
+claims. The resumed invocation exited zero. Retained `search-benchmark.json` has
+SHA-256 `223102ffe7283c904be36b62a08b026a015a0f6d828ad4ec95b00d84dc42b66c`; native request/receipt files remain in the task-owned evidence
+inventory. Runtime/profile bytes remained frozen. The final integrated canonical
+run passed 4,790 tests, static/import checks and architecture negatives; the proposed
+CY 0.46.0 / queue 0.1.9 pair passed 583 ordinary tests with seven physical cases
+explicitly deselected. Documentation validation and final record review follow.
+
+
+Fresh independent reviewer `hf_conversion_review` accepted SC-006 after inspecting
+all seven retained native case results and 43 optimizer rank receipts. Six reported
+rows uniquely match the final cases; current assets rehash correctly and candidate
+runtime source bytes match integration. The initial guided YOLO case completed
+five trials before the harness assertion failed; the resumed reported case used
+four. Both remain retained. This variation further limits any performance inference;
+it is not hidden by the corrected harness or the six-row report.
+
+The reviewer accepted the explicit force-path comparison and conservative timing
+claims, confirmed exact preservation of the first two legacy rows and ownership
+cleanup, and found no blocking gap. See [review.md](review.md). This acceptance does
+not cover the full model matrix or physical DDP.

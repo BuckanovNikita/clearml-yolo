@@ -52,3 +52,26 @@ delivery with that benchmark gap recorded, in addition to the earlier physical
 multi-GPU exception. It does not turn T041 or full architecture acceptance into
 passes. Ordinary checks, independent review, final paired-source verification and
 normal release hooks remain required; no native guarantee or idle criterion changes.
+
+
+## Final native comparison review — 2026-11-05
+
+Fresh bounded read-only reviewer `hf_conversion_review` returned ACCEPT for SC-006
+and T041, with no blocking findings. It independently inspected seven retained
+native cases, 43 optimizer rank receipts and the six-row report. Settings, profiles,
+workloads, tokens, batches, complete optimizer paths, five warmup/ten measured steps,
+validation and independent batch-eight confirmations match. Asset hashes are current;
+integration/proposed runtime bytes are identical.
+
+The first two timing rows are exactly preserved. The failed first harness invocation
+and its cleanup evidence remain retained; the resumed owner exited zero and released
+ownership. Direct cache checks and unchanged saved records support reuse. The old
+idle-only invocation expectation is superseded for SC-006 by the explicit authorized
+force-path comparison; ordinary strict admission is unchanged. Forced/background
+sensitivity, compile cache, concurrent CPU work, single observations and the extra
+historical guided run are disclosed. There is no idle/statistical speedup claim.
+
+The current reconciliation changes task evidence and the architecture expectation,
+not runtime code or dependency contracts. Source/architecture review of the integrated
+45-file change already passed separately. Full catalogue and physical DDP gates
+remain separate. T044 may complete after parent record validation.

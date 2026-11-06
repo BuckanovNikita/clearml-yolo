@@ -82,3 +82,29 @@ evaluation. The complete owned diff matches the architecture record and remediat
 The final architecture acceptance validator and documentation checks passed before
 release. The actual post-hook CY/queue pair is checked again before the authorized
 Git commit/tag pushes; no package assets or GitHub Release objects are published.
+
+## Preserved receipt reconciliation, 2026-11-04
+
+The following historical delivery receipt was recovered from the preserved checkout.
+Its commit and tag identities were corroborated against local Git objects. The
+reported historical checks and remote readback were not rerun for this amendment;
+this is retained history, not acceptance of the current closure candidate. No runtime,
+dependency or architecture contract changes accompany this documentation recovery.
+
+## Delivery outcome
+
+The authorized release completed: contributor `0cf39a0`, release commit
+`02e2d50ad9f3dd6ea619f69adfe5ffc45c32f361`, annotated tag **v0.44.3**. Branch and
+tag were atomically pushed and remote refs verified. Final actual-source pairing
+with latest queue **0.1.5** passed normal resolution, metadata/dependency checks and
+**518 queue tests** (7 deselected). Portable guidance **v0.6.6** was published at
+`b4fdd473ef85571fa81f75b47dd0ece8a10e1659` with an annotated tag. HTTPS with existing
+authentication completed delivery after SSH authentication failed; no credential
+values were logged and persistent remotes were preserved.
+
+Task-owned source/documentation changes were mirrored into the original checkouts.
+An original-tree byte comparison found only the 17 intended CY paths changed;
+unrelated pending source, historical reports, index, AGENTS.md, package metadata,
+lockfile and local dependency overrides were preserved. Original package installations
+were not upgraded. Source/evidence were retained; task-owned temporary environments
+and compiler cache were cleaned after all processes finished.

@@ -105,3 +105,28 @@ Git delivery follows the native hooks after acceptance. Post-hook installation,
 source/installed metadata and remote commit/tag ref checks remain delivery steps;
 the release handoff reports their actual outcome. No package or release asset
 publication, installed-skill update or GPU training outcome is claimed.
+
+## Preserved receipt reconciliation, 2026-11-04
+
+The following historical delivery receipt was recovered from the preserved checkout.
+Its commit and tag identities were corroborated against local Git objects. The
+reported historical checks and remote readback were not rerun for this amendment;
+this is retained history, not acceptance of the current closure candidate. No runtime,
+dependency or architecture contract changes accompany this documentation recovery.
+
+## Git delivery confirmed
+
+Implementation commit: 597985fa39476b262bc05daa66ee3fb3e468724a.
+Native version commit: dccb0a2f6b47fc6318bda2111f8ba1dda9f542c7, annotated
+v0.44.2 tag. Atomic push succeeded; remote master and peeled tag match the release
+commit, and the remote tag object matches the local annotated tag.
+
+Post-hook normal installation from that exact source with queue 0.1.5 at
+397753c123f379ade50f06a2babf5e4b1476b9d2 passed pip compatibility, exact source/
+installed metadata, import paths, CLI and 518 queue tests (seven deselected,
+19 warnings). Runtime hashes are identical to the tested proposal.
+
+Portable usage guidance was committed as 80c930c and atomically pushed with the
+annotated collection tag v0.6.5. Remote main and tag refs were verified. Source
+releases used isolated checkouts; original pending work and installed environments
+remain preserved. No GitHub Release objects, packages or assets were published.

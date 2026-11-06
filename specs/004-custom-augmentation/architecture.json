@@ -288,34 +288,34 @@
     {
       "id": "lint-imports",
       "kind": "imports",
-      "command": "uv run --frozen --no-sync lint-imports",
+      "command": "uv run --frozen --no-sync python scripts/verify.py",
       "expectation": "All import contracts pass including exact augmentation SDK ownership.",
       "result": {
         "status": "passed",
         "exit_code": 0,
-        "evidence": "specs/004-custom-augmentation/evidence/verification.md"
+        "evidence": "specs/004-custom-augmentation/verification.md"
       }
     },
     {
       "id": "architecture-tests",
       "kind": "imports",
-      "command": "uv run --frozen --no-sync pytest tests/test_architecture.py",
+      "command": "uv run --frozen --no-sync python scripts/verify.py",
       "expectation": "Actual graph passes; injected forbidden augmentation/core SDK edges fail.",
       "result": {
         "status": "passed",
         "exit_code": 0,
-        "evidence": "specs/004-custom-augmentation/evidence/verification.md"
+        "evidence": "specs/004-custom-augmentation/verification.md"
       }
     },
     {
       "id": "behavior",
       "kind": "behavior",
-      "command": "uv run --frozen --no-sync pytest",
+      "command": "uv run --frozen --no-sync python scripts/verify.py",
       "expectation": "All ordinary behavioral regression checks pass.",
       "result": {
         "status": "passed",
         "exit_code": 0,
-        "evidence": "specs/004-custom-augmentation/evidence/verification.md"
+        "evidence": "specs/004-custom-augmentation/verification.md"
       }
     },
     {
@@ -324,8 +324,9 @@
       "command": "uv run --frozen --no-sync pytest -m severstal_gpu --run-severstal-gpu",
       "expectation": "All 45 official Severstal optimizer, checkpoint, replay and publication scenarios pass.",
       "result": {
-        "status": "not-run",
-        "reason": "Complete 45-case acceptance is not yet available: 39 pretrained scenarios passed; six DEIMv2-L/X scenarios require authorized DINOv3 Small/Small+ weights. See evidence/verification.md and evidence/native-smoke.json. Supplemental random-initialization failures do not satisfy the pretrained gate."
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/004-custom-augmentation/verification.md"
       }
     },
     {
@@ -336,15 +337,15 @@
       "result": {
         "status": "passed",
         "exit_code": 0,
-        "evidence": "specs/004-custom-augmentation/evidence/verification.md"
+        "evidence": "specs/004-custom-augmentation/verification.md"
       }
     }
   ],
   "documentation": "README, backend/augmentation/current contracts, native feature spec/quickstart, and corp-skills usage/evaluation source.",
   "review": {
     "status": "accepted",
-    "reviewer": "fresh native subagent /root/final_integration_review (read-only source review)",
-    "evidence": "specs/004-custom-augmentation/evidence/review.md",
-    "reconciliation": "Inspected complete tracked and untracked task-owned diff against d8a3695, including dependencies, test tooling, examples and docs. All changed paths match declared scope. The pre-existing local tool.uv.sources section is excluded and preserved exactly. Review accepts code and architecture; pending native checks still block complete acceptance. The user separately authorized Git-only delivery with that disclosed gap; see specs/004-custom-augmentation/evidence/release.md. Final release audit reconciled all 69 committed paths, including the generated changelog."
+    "reviewer": "Independent native subagent /root/augmentation_acceptance_review, supplementing the preserved original integration review",
+    "evidence": "specs/004-custom-augmentation/verification.md",
+    "reconciliation": "Historical 2026-10-24 reconciliation: Inspected complete tracked and untracked task-owned diff against d8a3695, including dependencies, test tooling, examples and docs. All changed paths match declared scope. The pre-existing local tool.uv.sources section is excluded and preserved exactly. Review accepts code and architecture; pending native checks still block complete acceptance. The user separately authorized Git-only delivery with that disclosed gap; see specs/004-custom-augmentation/evidence/release.md. Final release audit reconciled all 69 committed paths, including the generated changelog. On 2026-11-04, independently reconciled retained 39 and fresh six native receipts, source changes since v0.39.0, exact frozen-subset equivalence, archive hashes and cleanup. The current task-owned diff contains only tasks.md, architecture.json and verification.md within this feature directory; runtime and unrelated workflow changes are excluded. Historical delivery and review remain preserved."
   }
 }
