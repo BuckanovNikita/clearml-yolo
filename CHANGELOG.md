@@ -1,7 +1,12 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.46.0 (2026-11-06)
+
+### Build System
+
+- Replace verify.py with plain prek hooks and cached pytest
+  ([`8a1d5a9`](https://github.com/BuckanovNikita/clearml-yolo/commit/8a1d5a9253458ec9e36b8f444aeebd44b6357fbd))
 
 ### Documentation
 
