@@ -269,12 +269,32 @@ pilot source/version results. No intermediate release precedes final native gate
 
 - [x] T061 Reconcile and validate the current force architecture plan, reproduce a force regression before runtime port, and port only owned implementation/tests/docs.
 - [x] T062 Run focused CPU force/list/cache/telemetry regressions, current lint/docs checks, and reconcile the exact force diff.
-- [ ] T063 Parent verifies final integrated canonical checks, compatible latest/proposed source metadata and normal CY/queue resolution.
+- [x] T063 Parent verifies final integrated canonical checks, compatible latest/proposed source metadata and normal CY/queue resolution.
 - [ ] T064 Parent verifies all 64 final-source native models and raw optimizer receipts, with fresh selected DINOv3 L/X confirmation; failed/interrupted cases remain gaps.
 - [ ] T065 Parent completes portable guidance, fresh integrated review and architecture acceptance, then normal Git-only delivery and final actual-version pair recheck.
 
 T061 precedes T062; T063/T064 require the frozen final source/environment; T065
 requires every acceptance gate. Physical multi-GPU limits remain disclosed.
+
+### Delivery note (2026-11-06)
+
+The local release hook published this integrated source as **CY 0.46.0**
+(`60edd4b`, tag `v0.46.0`). It fired on the first master commit after the
+consolidation, `8a1d5a9` from [feature 011](../011-simplify-hooks/verification.md).
+The user then authorized pushing that release together with cy-queue 0.1.9.
+
+T063 is satisfied by:
+- the complete CY suite and static checks run by the hooks on `8a1d5a9`;
+- the committed-pair check: normal install, `uv pip check`, matching metadata and
+  584 queue tests (recorded in cy-queue `docs/plans/cy-046-compatibility/verification.md`).
+
+**Still open, and published regardless:**
+- **T064:** native 64-model forced catalogue and fresh DINOv3 L/X confirmation.
+- **T065:** portable guidance, fresh integrated review of the force and DINOv3 changes,
+  and force architecture acceptance. Its delivery and final pair recheck are done; the
+  other parts remain open.
+
+The release does not claim those gates. Complete them as post-release acceptance.
 
 ## Matched native search comparison, 2026-11-05
 

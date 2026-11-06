@@ -3,6 +3,11 @@
 
 ## Unreleased
 
+### Build System
+
+- **hooks**: Stop on changelog rewrite before heavy checks
+  ([`e1f65fa`](https://github.com/BuckanovNikita/clearml-yolo/commit/e1f65faf4ffe81b7008bc7229acbf131bb2eede5))
+
 ### Documentation
 
 - **specs**: Record 011 commit, release-skip and delivery evidence
