@@ -85,3 +85,25 @@ A fresh read-only reviewer returned "accept with fixes". Applied:
 
 After the fixes: focused `tests/test_local_release.py tests/test_tooling_boundaries.py`
 104 passed; `ruff check .` passed; `check_docs.py --all` reported 0 issues.
+
+## Real commit and release (2026-11-06)
+
+`git commit` of `8a1d5a9` through the installed prek hooks passed every pre-commit hook,
+including `pytest-full` (the complete suite after the review fixes), and the post-commit
+`local-release` hook. The command took 1136.6 s wall in total.
+
+Unreleased `c16dbb1 feat(batch)` history produced `60edd4b chore(release): 0.46.0`
+and the annotated tag `v0.46.0`. Git takes the commit date before pre-commit hooks run:
+- `8a1d5a9` is dated 16:47:55.
+- The testmon database was last written at 17:06:48, at the end of the contributor
+  commit's pytest hooks.
+- `60edd4b` is dated 17:06:51.
+
+The generated release commit therefore took about 3 s, so its heavy hooks were
+skipped, and one full suite ran per release.
+
+**Delivery blocker.** The latest `cy-queue` (`origin/main` `29d2284`, version
+0.1.8) requires `clearml-yolo>=0.38,<0.46`. CY 0.46.0 is outside that range, so the
+[paired release check](../../docs/development.md#paired-cy-and-queue-release-check)
+fails and nothing was pushed. Delivery needs a verified queue bound update and a queue
+release first.

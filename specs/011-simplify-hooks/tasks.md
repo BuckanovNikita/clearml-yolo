@@ -26,5 +26,5 @@ evidence.
 - [x] T007 Run focused and full checks, check cache behaviour, and reinstall hooks.
   Get a fresh independent review. Reconcile the diff and validate architecture
   acceptance.
-- [ ] T008 Commit through the real hooks and confirm the release-commit hook skips.
-  Evaluate the release workflow.
+- [x] T008 Commit through the real hooks and confirm the release-commit hook skips.
+  Evaluate the release workflow. Delivery is blocked by the queue range; see verification.
