@@ -127,10 +127,9 @@ interfaces incrementally instead of replacing suppression comments with equally 
 
 ```bash
 uv run --frozen --no-sync vulture
-uv run --frozen --no-sync python scripts/verify.py
 ```
 
-The canonical verification hook uses the locked development environment and scans `src`, `scripts` and
+The `vulture` hook uses the locked development environment and scans `src`, `scripts` and
 `tests` together through `[tool.vulture]`; staged filenames are not passed to it.
 Its 80% threshold includes unused arguments/unreachable code (100%) and imports (90%).
 It deliberately does not gate most attributes, functions and variables (60%).

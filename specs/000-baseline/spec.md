@@ -720,11 +720,12 @@ work requires fresh independent review. Documentation and portable usage guidanc
 Missing/failing required checks remain gaps. Historical waivers apply only to their specified targets.
 
 Use [development checks](../../docs/development.md#verification) and [static-analysis
-policy](../../docs/static-analysis.md): the canonical `scripts/verify.py` runs Ruff, strict mypy,
-Vulture, import-linter and one complete ordinary pytest suite, including architecture and CPU-DDP.
-Documentation uses separate `--docs` evidence; scoped mutation acceptance remains outside hooks.
-Matching private receipts permit reuse across contributor and strictly validated version commits;
-`--force` requires fresh checks. Required hooks invoke the same canonical entrypoint. Ruff rules live
+policy](../../docs/static-analysis.md): acceptance runs Ruff, strict mypy, Vulture, import-linter and
+one complete ordinary `pytest --testmon-noselect` suite, including architecture and CPU-DDP, plus
+`scripts/check_docs.py --all`; scoped mutation acceptance remains outside hooks. prek hooks run the same
+locked commands, selected by staged files, with testmon-limited pytest for Python changes. Strictly
+validated generated version commits and tag recovery skip the heavy hooks
+([amendment 011](../011-simplify-hooks/spec.md)). Ruff rules live
 in `ruff.toml`, import contracts in `.importlinter`; `pyproject.toml` keeps package/small tool settings.
 Advisory unused-code findings need callsite/dynamic-consumer/contract evidence before deletion.
 Documentation checker tests include negative cases; its parser does not validate external links, command
@@ -747,8 +748,8 @@ and inspect generated changelog changes; do not bypass hooks, reset or stash to 
 without staging; changed output requires review/retry. Shallow history is rejected without automatic fetch;
 detached refresh is skipped.
 
-`scripts/local_release.py --install-hooks` installs owned pre/post-commit hooks and refuses unrelated custom
-post-commit replacement. Normal/manual release runs on master only: fix/perf patch, feat minor, breaking
+`scripts/local_release.py --install-hooks` installs owned prek pre/post-commit hooks and refuses to replace
+unrelated custom hooks. Normal/manual release runs on master only: fix/perf patch, feat minor, breaking
 minor below 1.0, nonrelease types alone no version. It includes unreleased reachable history, creates a
 checked version commit and annotated `vX.Y.Z`, and edits only root version tokens/changelog plus private Git
 recovery metadata; no dependency resolution or automatic push/fetch/build occurs. Concurrency, dirty

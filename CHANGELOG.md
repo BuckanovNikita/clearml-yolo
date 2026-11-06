@@ -5,6 +5,9 @@
 
 ### Documentation
 
+- Reconcile closure records and record work consolidation
+  ([`b07aa33`](https://github.com/BuckanovNikita/clearml-yolo/commit/b07aa33414f574f5045f2487eef2c8f8be5a1620))
+
 - **agents**: Refactor agent instructions and skills to current best practices
   ([`43de5af`](https://github.com/BuckanovNikita/clearml-yolo/commit/43de5af1d2466b15048551075c8dfb76b261c6ee))
 

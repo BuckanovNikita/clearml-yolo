@@ -43,9 +43,10 @@ user request for those actions.
 
 ### 1. Static checks
 
-Run `uv run --frozen --no-sync python scripts/verify.py` (Ruff, strict mypy, Vulture,
-import-linter, full pytest) and `--docs` for documentation. Include applicable pre-commit
-hooks (`uv run --frozen --no-sync pre-commit run --all-files`) for release or commit work.
+Run the [verification commands](../../../docs/development.md#verification): Ruff, strict
+mypy, Vulture, import-linter, the complete `pytest --testmon-noselect` suite and
+`scripts/check_docs.py --all`. Include the prek hooks
+(`uv run --frozen --no-sync prek run --all-files`) for release or commit work.
 
 ### 2. Isolated run setup
 

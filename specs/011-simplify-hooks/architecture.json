@@ -1,0 +1,154 @@
+{
+  "schema_version": 1,
+  "task": "Replace scripts/verify.py with plain prek hooks and cached pytest",
+  "scope": [
+    "scripts/verify.py",
+    "scripts/local_release.py",
+    ".pre-commit-config.yaml",
+    "pyproject.toml",
+    "uv.lock",
+    ".gitignore",
+    "tests/test_verify.py",
+    "tests/test_local_release.py",
+    "tests/test_tooling_boundaries.py",
+    "ruff.toml",
+    "AGENTS.md",
+    "docs/development.md",
+    "docs/agent-workflow.md",
+    "docs/static-analysis.md",
+    "docs/current-contracts.md",
+    "docs/local-documentation.md",
+    "docs/import-boundaries.md",
+    "specs/000-baseline/spec.md",
+    ".agents/skills/running-end-to-end-tests/SKILL.md"
+  ],
+  "impact": "modules",
+  "rules": "Maintenance tooling stays independent of application runtime, SDK and analysis imports (tests/test_tooling_boundaries.py release_import_findings allowlist); analysis tools never become runtime dependencies (same test file); docs/development.md owns the release and hook procedure.",
+  "modules": [
+    {
+      "id": "release-helper",
+      "path": "scripts/local_release.py",
+      "change": "modify",
+      "responsibility": "Create validated local version commits and tags, install the project's Git hooks, and own the byte-exact root version token rewrite.",
+      "interface": "The CLI modes --install-hooks, --post-commit and --changelog, plus the default retry, are unchanged. version_bytes(content, version, lock=, name=) keeps the verifier's behaviour: exactly one root version token is replaced and anything else raises an error. Generated release commits and tag recovery run hooks with SKIP set to the heavy hook IDs.",
+      "layer": "maintenance tooling",
+      "allowed_dependencies": [
+        "Python standard library",
+        "loguru",
+        "pydantic"
+      ],
+      "forbidden_dependencies": [
+        "scripts.verify",
+        "application runtime packages",
+        "SDKs",
+        "analysis tools"
+      ],
+      "effects": "Owns Git, semantic-release and prek subprocesses, the release lock, the attempt record and hook files. Effects stay within its CLI.",
+      "contracts": [
+        "release-helper-imports"
+      ]
+    },
+    {
+      "id": "canonical-verifier",
+      "path": "scripts/verify.py",
+      "change": "remove",
+      "responsibility": "Removed. Fingerprinted receipt reuse is replaced by prek hook file filters, testmon selection and SKIP on generated release commits.",
+      "interface": "No interface remains. Current guidance points to the direct commands.",
+      "layer": "maintenance tooling",
+      "allowed_dependencies": [],
+      "forbidden_dependencies": [],
+      "effects": "None after removal. The private .git/verification data is left untouched for the user.",
+      "contracts": [
+        "release-helper-imports"
+      ]
+    },
+    {
+      "id": "hook-configuration",
+      "path": ".pre-commit-config.yaml",
+      "change": "modify",
+      "responsibility": "Declare hygiene, changelog, static analysis, cached pytest, documentation and post-commit release hooks for prek.",
+      "interface": "Hook IDs ruff, mypy, vulture, import-linter, pytest-full, pytest and check-docs. The release helper skips the heavy IDs by name.",
+      "layer": "maintenance tooling configuration",
+      "allowed_dependencies": [
+        "locked dev tools through uv run --frozen --no-sync",
+        "pinned pre-commit-hooks"
+      ],
+      "forbidden_dependencies": [
+        "unlocked second copies of analysis tools"
+      ],
+      "effects": "prek runs the configured subprocesses serially. pytest-testmon writes the ignored .testmondata file.",
+      "contracts": [
+        "analysis-dependency-boundary"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "release-helper-imports",
+      "path": "tests/test_tooling_boundaries.py",
+      "status": "existing",
+      "rules": "local_release.py imports only the standard library, loguru and pydantic. Runtime, SDK, dynamic-import and relative-import forms are rejected by the negative parametrized cases. The scripts.verify allowance is removed.",
+      "check": "tooling-boundaries"
+    },
+    {
+      "id": "analysis-dependency-boundary",
+      "path": "tests/test_tooling_boundaries.py",
+      "status": "existing",
+      "rules": "Analysis packages, including prek and pytest-testmon, are never runtime dependencies.",
+      "check": "tooling-boundaries"
+    }
+  ],
+  "checks": [
+    {
+      "id": "tooling-boundaries",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync pytest tests/test_tooling_boundaries.py",
+      "expectation": "The release helper passes the import allowlist. Injected runtime, SDK and dynamic imports are rejected. Runtime dependencies contain no analysis packages.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/011-simplify-hooks/verification.md"
+      }
+    },
+    {
+      "id": "release-lifecycle",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync pytest tests/test_local_release.py",
+      "expectation": "Real-Git release fixtures pass. The heavy pytest hook runs on the contributor commit and is skipped on the release commit and tag recovery. A failing quality check leaves no tag. version_bytes cases pass.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/011-simplify-hooks/verification.md"
+      }
+    },
+    {
+      "id": "static-and-full-suite",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync ruff check . && uv run --frozen --no-sync mypy . && uv run --frozen --no-sync vulture && uv run --frozen --no-sync lint-imports && uv run --frozen --no-sync pytest --testmon-noselect",
+      "expectation": "Every check exits 0. The complete ordinary suite, including the architecture negatives and CPU-DDP, passes.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/011-simplify-hooks/verification.md"
+      }
+    },
+    {
+      "id": "docs",
+      "kind": "documentation",
+      "command": "uv run --frozen --no-sync python scripts/check_docs.py --all",
+      "expectation": "Markdown and local links are valid after the guidance updates and the verify.py removal.",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "specs/011-simplify-hooks/verification.md"
+      }
+    }
+  ],
+  "documentation": "AGENTS.md, docs/development.md, docs/agent-workflow.md, docs/static-analysis.md, docs/current-contracts.md, docs/local-documentation.md, specs/000-baseline/spec.md (current contract text) and .agents/skills/running-end-to-end-tests/SKILL.md.",
+  "review": {
+    "status": "accepted",
+    "reviewer": "Fresh independent read-only general-purpose subagent (initial review: accept with fixes; re-review after fixes: accept)",
+    "evidence": "specs/011-simplify-hooks/verification.md",
+    "reconciliation": "Compared with the complete task-owned diff. Modified: scripts/local_release.py, .pre-commit-config.yaml, pyproject.toml (dev group), uv.lock (pre-commit chain removed; prek and pytest-testmon added; external entries unchanged), .gitignore (.testmondata*), tests/test_local_release.py, tests/test_tooling_boundaries.py, and the current-guidance documents in scope. Deleted: scripts/verify.py and tests/test_verify.py. Added: specs/011-simplify-hooks/*. CHANGELOG.md holds the changelog-hook-generated entry for b07aa33 and is included as hook output. Excluded: .specify/memory/constitution.md still names `pre-commit run`, because installed Spec Kit files are not edited without explicit request; the untracked .git/verification private data is left in place."
+  }
+}

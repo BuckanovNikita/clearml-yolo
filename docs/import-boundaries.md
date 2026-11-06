@@ -17,7 +17,7 @@ core/adapter dependency allowlists, explicit-effect and runtime-target checks.
 the complete module graph, responsibility classification, cycles, core dependency
 allowlist, explicit effects, initializers and runtime targets. Negative tests mutate
 graphs and run unique AST checks and actual configured import-linter contracts. The
-canonical verifier includes both commands without a separate architecture pytest run.
+[verification commands](development.md#verification) cover both without a separate architecture pytest run.
 
 ## Layers and effects
 

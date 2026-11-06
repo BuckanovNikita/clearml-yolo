@@ -11,9 +11,10 @@ Authoritative details and prerequisites: [development procedures](docs/developme
 
 ```bash
 uv sync --frozen --dev                                     # after populating external/ (docs/development.md#external-dependencies)
-uv run --frozen --no-sync python scripts/verify.py         # Ruff, mypy, Vulture, import-linter, full pytest
-uv run --frozen --no-sync python scripts/verify.py --docs  # Markdown and local-link validation
-uv run --frozen --no-sync pre-commit run --all-files
+uv run --frozen --no-sync python scripts/local_release.py --install-hooks  # prek hooks
+uv run --frozen --no-sync prek run --all-files                # Ruff, mypy, Vulture, import-linter, cached pytest, docs
+uv run --frozen --no-sync pytest --testmon-noselect           # complete suite: acceptance, refreshes testmon
+uv run --frozen --no-sync python scripts/check_docs.py --all  # Markdown and local-link validation
 ```
 
 ## Read when relevant

@@ -141,7 +141,7 @@ development Markdown dependency:
 ```bash
 uv run --frozen --no-sync python scripts/render_docs.py
 uv run --frozen --no-sync cy-docs --check
-uv run --frozen --no-sync python scripts/verify.py --docs
+uv run --frozen --no-sync python scripts/check_docs.py --all
 ```
 
 `cy-docs --check` rejects missing/stale assets, unknown field links, uncovered commands

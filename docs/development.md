@@ -47,51 +47,63 @@ checkouts and files remain authoritative. Dependency installation is always exte
 
 ## Verification
 
-Use one canonical entrypoint for ordinary verification and hooks:
+Run the locked tools directly; the hooks run the same commands:
 
 ```bash
-uv run --frozen --no-sync python scripts/verify.py
-uv run --frozen --no-sync python scripts/verify.py --force
-uv run --frozen --no-sync python scripts/verify.py --docs
-uv run --frozen --no-sync pre-commit run --all-files
+uv run --frozen --no-sync ruff check .
+uv run --frozen --no-sync mypy .
+uv run --frozen --no-sync vulture
+uv run --frozen --no-sync lint-imports
+uv run --frozen --no-sync pytest --testmon-noselect      # complete ordinary suite
+uv run --frozen --no-sync python scripts/check_docs.py --all
+uv run --frozen --no-sync prek run --all-files
 ```
 
-The default runs Ruff, strict mypy, Vulture, import-linter and one complete ordinary
-pytest suite. That pytest run includes architecture negative cases and native CPU-DDP;
-no additional architecture or full-suite invocation is needed to satisfy those gates.
-Focused commands remain useful while developing. `--force` requires fresh ordinary
-checks. `--docs` validates documentation separately, including new governed Markdown.
-Documentation validation runs fresh because link-target existence can change independently.
+These are Ruff, strict mypy, Vulture, import-linter, one complete ordinary pytest
+suite and the documentation checker. The pytest run includes architecture negative
+cases and native CPU-DDP, so no separate architecture or full-suite run is needed for
+those gates. Focused commands are still useful while developing. Unset
+`PYTEST_ADDOPTS` for acceptance so that selection flags cannot turn the run into a
+partial or collection-only one.
 
-Successful application checks record commands, results and log references in Git-private
-storage. Reuse requires matching governed source, tests, fixtures, package data, check
-configuration, lockfile, interpreter, installed dependency file identities, editable
-contents and test-affecting environment, including new/untracked inputs. Environment
-values are digested rather than logged. Git hook invocation noise is normalized in
-the actual check environment; nonempty `PYTEST_ADDOPTS` is rejected so selection flags
-cannot turn ordinary acceptance into a partial or collection-only run. Success is written atomically only after all
-checks pass and a second input snapshot is unchanged. Missing, malformed, stale,
-failed or interrupted evidence runs fresh checks. Hook checks reject an index/worktree
-view mismatch; partial staging or path-limited commits cannot borrow success for a
-different file view. Ignored root files and nested fixtures are also fingerprinted.
-Ignored local fixture data is treated as an external input; code and checking
-configuration must match the staged view. Documentation-only evidence updates do not invalidate application
-checks. Keep local receipts/logs private; dated feature evidence records outcomes.
+### Hooks and cached tests
+
+[prek](https://prek.j178.dev) runs [.pre-commit-config.yaml](../.pre-commit-config.yaml)
+serially, in file order. Install the hooks with the
+[release helper](#local-releases). prek stashes unstaged changes to tracked files, but
+untracked files stay visible to the checks. The `untracked-sources` hook therefore
+rejects untracked files under `src/`, `tests/` and `scripts/`; stage or remove them.
+
+Every commit runs the hygiene, `changelog`, `untracked-sources`, Ruff, mypy, Vulture,
+import-linter, `pytest --testmon` and `check-docs` hooks. They always run because
+staged file lists omit deleted files; their caches keep unchanged runs short. A
+commit that only deletes non-Python test or package data does not trigger the full
+suite, which is one more reason to run full acceptance. The
+full `pytest --testmon-noselect` hook runs only for staged non-Python files under
+`src/`, `tests/` or `scripts/`, or for `pyproject.toml`, `uv.lock`, `ruff.toml`,
+`.importlinter` or `.pre-commit-config.yaml`.
+
+[pytest-testmon](https://testmon.org) records which source each test executes, in the
+ignored `.testmondata` file. `--testmon` reruns only the tests affected by changed
+Python, plus tests that previously failed. `--testmon-noselect` runs every test and
+refreshes the database. After a full acceptance run, a commit of unchanged code
+therefore selects no tests. Run the full command as the acceptance step before a
+commit or release. testmon does not see code that runs only in child processes (such as
+CPU-DDP or supervision) or environment changes that leave files unchanged, so the
+incremental hook is a fast gate, not acceptance. Mypy, Ruff and import-linter keep
+their own incremental caches. Generated release commits skip the heavy hooks; see
+[local releases](#local-releases).
 
 See the [static analysis policy](static-analysis.md) for Ruff selections and exclusions,
 mypy boundary exceptions and Vulture's confidence threshold. Install the locked dev
 dependencies before verification; in a deliberately prepared environment, an inexact
 sync preserves additional external runtime packages.
 
-Finish environment provisioning before canonical verification, including native SDK
+Finish environment provisioning before verification, including native SDK
 optional decoders exercised by the selected tests. The installed Ultralytics image
 fallback can request `pi-heif` for an unidentified image; provision that verification
 prerequisite deliberately rather than relying on a mid-suite installation. Do not
-install or update packages during a check. Shared package-cache hardlinks can also
-change stability metadata when another environment is provisioned; independent
-package copies avoid that coupling. A passing pytest result with a rejected receipt
-is not canonical acceptance. See the [dated environment investigation](../specs/010-cleanup/execution.md#baseline-receipt-refusal-and-corrected-execution-conditions)
-for the observed case; no project dependency pin was changed.
+install or update packages during a check.
 
 Documentation-only work needs Markdown and local-link validation rather than the
 application suite. Inspect [.pre-commit-config.yaml](../.pre-commit-config.yaml) before
@@ -102,7 +114,8 @@ dated real-run evidence and the
 
 `scripts/check_docs.py --all` reads tracked project Markdown, checking local paths,
 GitHub-style anchors (including duplicate/Unicode headings), reference links and
-fences. Pass new file paths explicitly before staging. It excludes generated changelogs,
+fences. `--all` reads the Git index: stage new Markdown first or pass the new
+file paths explicitly. It excludes generated changelogs,
 symlinks and installed workflow assets; it never fetches external links, executes
 examples or rewrites files. See the [checker contract](../specs/000-baseline/spec.md#verification-and-delivery-requirements)
 for scope and exit codes. Mermaid grammar needs a separate render and visual review.
@@ -111,7 +124,7 @@ for scope and exit codes. Mermaid grammar needs a separate render and visual rev
 
 The `ddp_cpu` suite runs real native YOLO training, validation and checkpoint creation
 in two-rank and four-rank CPU/Gloo process groups. It is included in `uv run pytest`
-and the canonical verification commit hook. To select it directly:
+and in full acceptance runs. To select it directly:
 
 ```bash
 uv run pytest -m ddp_cpu
@@ -209,8 +222,7 @@ code may use NumPy, pandas, SciPy, Pydantic and Pandera, but owns no SDK calls, 
 configuration, rendering or filesystem effects. Keep the pinned `digital-metrics`
 algorithms in evaluation adapters and copy exact values into core evaluation records.
 
-The canonical verification runs `lint-imports` and the architecture tests within its
-ordinary suite when changing imports, package initializers, composition or subprocess/plugin targets. Updating a dependency boundary also requires
+Run `lint-imports` and the complete ordinary suite, which contains the architecture tests, when changing imports, package initializers, composition or subprocess/plugin targets. Updating a dependency boundary also requires
 regenerated YAML checks and installed command helps, including DDP callback and
 FiftyOne extension targets. Check CY source installs include its bounded console
 publisher, terminal mirror and FiftyOne worker; the queue source install must include
@@ -291,9 +303,9 @@ digital-metrics = { path = "external/digital-metrics", editable = true }
 report-generator = { path = "external/report-generator", editable = true }
 ```
 
-Preserve the exact local section before removing it. Perform final canonical verification
+Preserve the exact local section before removing it. Perform final verification
 after removal and keep the section absent through independent review and automatic
-release. This permits the same success receipt to cover those unchanged inputs. Stage only the section removal
+release, so the checked inputs are the committed ones. Stage only the section removal
 and other authorized changes; verify that the staged `pyproject.toml` has no
 `[tool.uv.sources]` section. Preserve unrelated staged and unstaged edits. Run the
 applicable commit checks without bypassing hooks. This temporary removal does not
@@ -350,8 +362,10 @@ After installing dependencies, install both repository hooks:
 uv run --locked --no-sync python scripts/local_release.py --install-hooks
 ```
 
-The installer preserves unrelated hooks and refuses to overwrite an existing custom
-post-commit hook. Pre-commit regenerates CHANGELOG.md from committed history. If that
+The installer runs `prek install --force` for the pre-commit hook. It replaces a hook
+generated by pre-commit or prek instead of chaining it as `pre-commit.legacy`, which
+would run every check twice. It refuses to replace any other existing pre-commit or
+post-commit hook. The `changelog` hook regenerates CHANGELOG.md from committed history. If that
 changes the file, inspect and stage the generated change, then retry the commit.
 Do not edit the generated changelog by hand.
 
@@ -360,10 +374,15 @@ changes produce a checked version commit and an annotated version tag. Documenta
 commits alone do not bump the version. Release preparation updates only the root
 package version in `uv.lock`; it does not resolve dependencies. The committed dependency
 sources, versions and metadata remain unchanged while local source overrides are absent.
-Generated version commits may reuse source verification only after validating the exact
-expected source parent, the three release paths, root-version-only metadata changes and
-the prepared changelog hash. Tag recovery retains metadata, ownership, concurrency and
-conflicting-tag checks; a commit message alone never authorizes reuse.
+The helper validates the exact expected source parent, the three release paths,
+root-version-only metadata changes and the prepared changelog hash. Because of that,
+the generated version commit and the tag-recovery hook run set `SKIP` to the heavy hook
+IDs (`HEAVY_HOOKS` in [the helper](../scripts/local_release.py)): Ruff, mypy, Vulture,
+import-linter and both pytest hooks. The hygiene, changelog and documentation hooks
+still run. Tag recovery retains metadata, ownership, concurrency and conflicting-tag
+checks. A commit message alone never authorizes skipping. Recovery runs
+`untracked-sources`, so stage or remove untracked files under `src/`, `tests/` and
+`scripts/` before retrying.
 A failed post-commit hook does not undo the
 original commit; inspect its output. To retry or check the release workflow manually:
 

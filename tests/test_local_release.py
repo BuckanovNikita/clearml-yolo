@@ -14,13 +14,22 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 HELPER = ROOT / "scripts/local_release.py"
+PREK = str(Path(sys.executable).parent / "prek")
+
+
+def outer_hook_variable(key: str) -> bool:
+    """The suite itself runs inside prek hooks; their state must not reach fixtures."""
+    return (
+        key.startswith(("GIT_", "PREK_", "PRE_COMMIT"))
+        or key in {"CLEARML_YOLO_RELEASE_ACTIVE", "SKIP"}
+    )
 
 
 def command(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     # Fixture commits must not inherit the enclosing real pre-commit invocation's index.
     for key in tuple(env):
-        if key.startswith("GIT_") or key == "CLEARML_YOLO_RELEASE_ACTIVE":
+        if outer_hook_variable(key):
             env.pop(key)
     env.update(
         GIT_CONFIG_GLOBAL=os.devnull,
@@ -28,7 +37,6 @@ def command(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedP
         UV_PROJECT_ENVIRONMENT=str(Path(sys.executable).parent.parent),
         UV_OFFLINE="1",
     )
-    env.pop("PRE_COMMIT_ALLOW_NO_CONFIG", None)
     return subprocess.run(  # noqa: S603 - fixed tool arguments in task-owned repositories
         args, cwd=repo, env=env, capture_output=True, text=True, check=check
     )
@@ -146,7 +154,7 @@ def release_repo(release_seed: Path, tmp_path: Path, monkeypatch: pytest.MonkeyP
     # In-process failure probes also need isolation when pytest itself runs inside
     # a real release commit's hooks, which export Git's temporary index and guard.
     for key in tuple(os.environ):
-        if key.startswith("GIT_") or key == "CLEARML_YOLO_RELEASE_ACTIVE":
+        if outer_hook_variable(key):
             monkeypatch.delenv(key)
     # Copy writable Git state and installed hooks; no test mutates the shared seed.
     return Path(shutil.copytree(release_seed, tmp_path / "repository with spaces — репозиторий"))
@@ -196,10 +204,10 @@ def test_release_preserves_protected_lock_without_resolving(
     before = (repo / "uv.lock").read_bytes()
     original = local_release.run
 
-    def without_resolution(root: Path, *args: str) -> str:
+    def without_resolution(root: Path, *args: str, skip_heavy: bool = False) -> str:
         if args[:2] == ("uv", "lock"):
             pytest.fail("Release must not resolve protected dependencies")
-        return original(root, *args)
+        return original(root, *args, skip_heavy=skip_heavy)
 
     monkeypatch.setattr(local_release, "run", without_resolution)
     local_release.release(repo)
@@ -557,11 +565,11 @@ def test_concurrent_staging_is_not_included_in_release_commit(
     git(repo, "merge", "--ff-only", "feature/concurrent")
     original = local_release.run
 
-    def concurrent_staging(root: Path, *args: str) -> str:
+    def concurrent_staging(root: Path, *args: str, skip_heavy: bool = False) -> str:
         if args[:2] == ("git", "commit"):
             (root / "unrelated.txt").write_text("contributor work\n")
             original(root, "git", "add", "unrelated.txt")
-        return original(root, *args)
+        return original(root, *args, skip_heavy=skip_heavy)
 
     monkeypatch.setattr(local_release, "run", concurrent_staging)
     with pytest.raises(local_release.ReleaseError):
@@ -615,7 +623,7 @@ def test_pre_commit_refreshes_history_without_staging(release_repo: Path) -> Non
     git(repo, "switch", "-c", "feature/changelog")
     commit(repo, "feat: historical change")
     install_changelog_hook(repo)
-    result = command(repo, sys.executable, "-m", "pre_commit", "run", "--all-files", check=False)
+    result = command(repo, PREK, "run", "--all-files", check=False)
     assert result.returncode == 1
     changelog = (repo / "CHANGELOG.md").read_text()
     assert "historical change" in changelog.casefold()
@@ -623,7 +631,7 @@ def test_pre_commit_refreshes_history_without_staging(release_repo: Path) -> Non
     assert "v0.3.0" in changelog
     assert git(repo, "ls-files", "CHANGELOG.md") == ""
     git(repo, "add", "CHANGELOG.md")
-    result = command(repo, sys.executable, "-m", "pre_commit", "run", "--all-files", check=False)
+    result = command(repo, PREK, "run", "--all-files", check=False)
     assert result.returncode == 0, result.stdout + result.stderr
     assert (repo / "CHANGELOG.md").read_text() == changelog
     assert git(repo, "rev-list", "--count", "HEAD") == "2"
@@ -643,14 +651,14 @@ def test_changelog_hook_preserves_release_and_tag_retry(release_repo: Path) -> N
     assert "## v0.3.1 (" in changelog
     assert "finalized release entry" in changelog.casefold()
     assert "Unreleased" not in changelog
-    # Manual pre-commit during recovery must preserve the untagged release section.
-    command(repo, sys.executable, "-m", "pre_commit", "run", "--all-files")
+    # A manual hook run during recovery must preserve the untagged release section.
+    command(repo, PREK, "run", "--all-files")
     assert (repo / "CHANGELOG.md").read_text() == changelog
     hook.unlink()
     result = retry(repo)
     assert result.returncode == 0, result.stderr
     assert git(repo, "rev-parse", "v0.3.1^{commit}") == head
-    result = command(repo, sys.executable, "-m", "pre_commit", "run", "--all-files", check=False)
+    result = command(repo, PREK, "run", "--all-files", check=False)
     assert result.returncode == 0, result.stdout + result.stderr
     assert (repo / "CHANGELOG.md").read_text() == changelog
 
@@ -670,47 +678,73 @@ def test_recovery_rejects_changed_changelog(release_repo: Path) -> None:
     assert git(repo, "tag", "--list") == "v0.3.0"
 
 
-def test_one_suite_across_verification_commit_version_and_tag_recovery(release_repo: Path) -> None:
-    """Real pre-commit/PSR/Git lifecycle reuses an ordinary pytest fixture suite."""
+def test_release_commit_and_tag_recovery_skip_heavy_hooks(release_repo: Path) -> None:
+    """Heavy checks run once on the contributor commit; generated commits skip them."""
     repo = release_repo
-    # Only tool selection/dependency inventory are replaced. Receipt bytes, effective
-    # index, release normalization and all Git/PSR operations are production code.
-    (repo / "verify_fixture.py").write_text(
-        "import sys\nfrom pathlib import Path\n"
-        f"sys.path.insert(0, {str(ROOT)!r})\n"
-        "from scripts import verify\n"
-        "verify.dependency_files = lambda root: iter(())\n"
-        "verify.check_commands = lambda *a, **k: [[sys.executable, '-m', 'pytest', '-q']]\n"
-        "raise SystemExit(verify.main())\n"
-    )
-    (repo / "test_suite.py").write_text(
-        "from pathlib import Path\n"
-        "def test_checked_source():\n"
-        "    with Path('.git/suites').open('a') as stream: stream.write('suite\\n')\n"
-        "    assert Path('change.txt').read_text() == 'checked contributor\\n'\n"
-    )
     config_path = repo / ".pre-commit-config.yaml"
     config = yaml.safe_load(config_path.read_text())
-    check_hook = config["repos"][0]["hooks"][0]
-    launcher = ["uv", "run", "--frozen", "--no-sync", "python"]
-    check_hook["entry"] = " ".join([*launcher, "verify_fixture.py", "--hook"])
-    config["repos"][0]["hooks"][1]["entry"] = " ".join([*launcher, f'"{HELPER}"'])
+    hooks = config["repos"][0]["hooks"]
+    # The id is what the helper skips by name; the entry only counts invocations.
+    hooks.insert(
+        1,
+        {
+            "id": "pytest",
+            "name": "Counting heavy check",
+            "entry": f'{sys.executable} -c "import pathlib; '
+            "pathlib.Path('.git/heavy').open('a').write('run\\n')\"",
+            "language": "system",
+            "always_run": True,
+            "pass_filenames": False,
+        },
+    )
     config_path.write_text(yaml.safe_dump(config))
-    (repo / "change.txt").write_text("checked contributor\n")
-    git(repo, "add", ".")
-    manual = command(repo, *launcher, "verify_fixture.py")
-    assert "Successful application checks" in manual.stdout
+    git(repo, "add", ".pre-commit-config.yaml")
     tag_hook = refuse_tag(repo)
-    git(repo, "commit", "-m", "fix: reuse checked contributor")
+    commit(repo, "fix: count heavy checks")
     assert git(repo, "log", "-1", "--format=%s") == "chore(release): 0.3.1"
-    assert (repo / ".git/suites").read_text().splitlines() == ["suite"]
+    assert git(repo, "tag", "--list") == "v0.3.0"
+    assert (repo / ".git/heavy").read_text().splitlines() == ["run"]
+    # The light quality hook still checks the generated release commit.
+    assert (repo / ".git/checks").read_text().splitlines() == ["0.3.0", "0.3.1"]
     tag_hook.unlink()
     result = retry(repo)
     assert result.returncode == 0, result.stdout + result.stderr
     assert git(repo, "rev-parse", "v0.3.1^{commit}") == git(repo, "rev-parse", "HEAD")
-    assert (repo / ".git/suites").read_text().splitlines() == ["suite"]
-    assert git(repo, "rev-list", "--count", "HEAD") == "3"
+    assert (repo / ".git/heavy").read_text().splitlines() == ["run"]
+    assert (repo / ".git/checks").read_text().splitlines() == ["0.3.0", "0.3.1", "0.3.1"]
 
-    after_release = command(repo, *launcher, "verify_fixture.py")
-    assert "Reused successful" in after_release.stdout
-    assert (repo / ".git/suites").read_text().splitlines() == ["suite"]
+
+def test_version_bytes_replaces_exactly_one_root_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.syspath_prepend(str(ROOT))
+    from scripts.local_release import ReleaseError, version_bytes
+
+    project = (
+        b'[project]\r\nname = "fixture"\r\nversion = \'0.3.0\' # kept\r\n'
+        b'[tool.x]\r\nversion = "9"\r\n'
+    )
+    assert version_bytes(project, "0.3.1", lock=False, name="fixture") == project.replace(
+        b"0.3.0", b"0.3.1"
+    )
+    lock = (
+        b'[[package]]\nname = "dep"\nversion = "1.0.0"\n\n'
+        b'[[package]]\nname = "fixture"\nversion = "0.3.0"\n'
+    )
+    assert version_bytes(lock, "0.3.1", lock=True, name="fixture") == lock.replace(
+        b'"0.3.0"', b'"0.3.1"'
+    )
+    missing = b'[project]\nname = "fixture"\n'
+    duplicate = b'[project]\nversion = "1"\nversion = "2"\n'
+    for ambiguous in (missing, duplicate):
+        with pytest.raises(ReleaseError, match="exactly one root package version token"):
+            version_bytes(ambiguous, "0.3.1", lock=False, name="fixture")
+
+
+def test_skipped_heavy_hooks_name_configured_hooks(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.syspath_prepend(str(ROOT))
+    from scripts.local_release import HEAVY_HOOKS
+
+    config = yaml.safe_load((ROOT / ".pre-commit-config.yaml").read_text())
+    configured = {hook["id"] for repo in config["repos"] for hook in repo["hooks"]}
+    assert set(HEAVY_HOOKS) <= configured
+    # Light checks keep validating generated release commits.
+    assert {"changelog", "check-docs", "check-toml"} <= configured - set(HEAVY_HOOKS)

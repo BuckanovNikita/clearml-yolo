@@ -22,13 +22,13 @@ ANALYSIS_PACKAGES = {
     "pytest-cov",
     "coverage",
     "mutmut",
+    "prek",
+    "pytest-testmon",
 }
 
 
-def release_import_findings(source: str, *, stdlib_only: bool = False) -> set[str]:
-    allowed = sys.stdlib_module_names | (
-        set() if stdlib_only else {"loguru", "pydantic", "scripts", "verify"}
-    )
+def release_import_findings(source: str) -> set[str]:
+    allowed = sys.stdlib_module_names | {"loguru", "pydantic"}
     findings: set[str] = set()
     for node in ast.walk(ast.parse(source)):
         if isinstance(node, ast.Import):
@@ -36,14 +36,12 @@ def release_import_findings(source: str, *, stdlib_only: bool = False) -> set[st
                 alias.name
                 for alias in node.names
                 if alias.name.split(".")[0] not in allowed
-                or (alias.name.startswith("scripts") and alias.name != "scripts.verify")
             )
         elif isinstance(node, ast.ImportFrom):
             if (
                 node.level
                 or node.module is None
                 or node.module.split(".")[0] not in allowed
-                or (node.module.startswith("scripts") and node.module != "scripts.verify")
             ):
                 findings.add(node.module or "relative import")
             # This helper has no plugin boundary: dynamic loading would evade its allowlist.
@@ -72,10 +70,6 @@ def test_release_helper_uses_only_its_owned_dependencies() -> None:
     )
 
 
-def test_verifier_uses_only_standard_library_without_runtime_imports() -> None:
-    assert not release_import_findings((ROOT / "scripts/verify.py").read_text(), stdlib_only=True)
-
-
 @pytest.mark.parametrize(
     "source",
     [
@@ -88,6 +82,7 @@ def test_verifier_uses_only_standard_library_without_runtime_imports() -> None:
         "__import__('torch')",
         "from scripts.runtime import train",
         "import scripts.runtime",
+        "from scripts.verify import version_bytes",
     ],
 )
 def test_release_import_guard_rejects_injected_violations(source: str) -> None:

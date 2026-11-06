@@ -87,7 +87,7 @@ dev = [
     "pandas-stubs",
     "types-PyYAML",
     "types-requests>=2.32.0",
-    "pre-commit>=4.6.1",
+    "prek>=0.5.10",
     "pytest>=8.0",
     "ruff>=0.16.1,<0.17",
     "scipy-stubs==1.18.0.1",
@@ -96,6 +96,7 @@ dev = [
     "python-semantic-release>=10.5,<11",
     "hypothesis>=6.169.1",
     "pytest-cov>=7.1.0",
+    "pytest-testmon>=2.1",
     "mutmut>=3.8,<3.9",
 ]
 
