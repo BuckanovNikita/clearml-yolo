@@ -28,14 +28,15 @@ validators and architecture checks remain unchanged.
   without changing its text.
 - [x] Run the available documentation, frontmatter, size, adapter and preservation checks;
   record dated results.
-- [x] Coordinating parent obtains fresh independent review after verification
-  ([review-2026-11-07.md](review-2026-11-07.md), pass).
+- [x] Coordinating parent obtains fresh independent review after verification.
 - [ ] Commit with hooks in a provisioned worktree and evaluate the native release workflow
   (documentation-only; no version expected) after the paired CY/queue check. Committed in
-  `43de5af` and released in v0.46.0 (`git tag --contains 43de5af` lists `v0.46.0`).
+  `43de5af` and released in v0.46.0 (`git tag --contains 43de5af` lists `v0.46.0`); hook
+  execution for that commit is not independently evidenced.
 
 The skill edits depend on the planning check. Parent integration and final verification
-precede independent review and commit.
+precede independent review and commit. The 2026-11-07 review is in
+[review-2026-11-07.md](review-2026-11-07.md): pass with one minor rule narrowing.
 
 ## Acceptance
 

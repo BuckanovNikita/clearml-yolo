@@ -44,12 +44,29 @@ no-impact architecture, dated checks) is in this directory.
 
 ## Pending
 
-Updated 2026-11-07:
+As of 2026-11-05:
 
-- Fresh independent review: done, pass, in [review-2026-11-07.md](review-2026-11-07.md).
-- Commit with hooks: done as `43de5af`, released in v0.46.0. `scripts/verify.py` no longer
-  exists on the current `master`; `scripts/check_docs.py --all` and
-  `pytest tests/test_check_docs.py` were rerun on 2026-11-07 (see the review).
-- Paired CY/queue release check: delivered with v0.46.0 (recorded in the remaining-work
-  plan, not re-verified here).
-- Fresh-session skill discovery in Claude and Codex (remaining-work T6.2, owner): pending.
+- `uv run --frozen --no-sync python scripts/verify.py --docs` and
+  `uv run --frozen --no-sync pytest tests/test_check_docs.py -q` need a provisioned
+  worktree environment.
+- Commit hooks (`pre-commit`, `changelog`, `verify --hook`) run at commit time.
+- Paired CY/queue release check before delivery.
+- Fresh-session skill discovery in Claude and Codex.
+- Fresh independent review.
+
+### Update 2026-11-07
+
+Status of each 2026-11-05 item above:
+
+- `verify.py --docs` and `pytest tests/test_check_docs.py`: `scripts/verify.py` no longer
+  exists on the current `master`, so `scripts/check_docs.py --all` was run as a substitute,
+  together with `pytest tests/test_check_docs.py -q`, on 2026-11-07 (see
+  [review-2026-11-07.md](review-2026-11-07.md)).
+- Commit hooks: committed as `43de5af`, released in v0.46.0 (`git tag --contains 43de5af`).
+  Hook execution for that commit is not independently evidenced; its CHANGELOG entry was
+  added by a later changelog hook run.
+- Paired CY/queue release check: credited to v0.46.0 by the remaining-work plan; not
+  re-verified here.
+- Fresh-session skill discovery in Claude and Codex: pending (remaining-work T6.2, owner).
+- Fresh independent review: done in [review-2026-11-07.md](review-2026-11-07.md), pass with
+  one minor rule narrowing.
