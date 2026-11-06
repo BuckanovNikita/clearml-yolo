@@ -107,3 +107,9 @@ skipped, and one full suite ran per release.
 [paired release check](../../docs/development.md#paired-cy-and-queue-release-check)
 fails and nothing was pushed. Delivery needs a verified queue bound update and a queue
 release first.
+
+**Blocker resolved (2026-11-06).** cy-queue `4498e64` (`0.1.9`) widens the bound to
+`<0.47`. The committed pair passed the paired check: normal install, `uv pip check`,
+metadata `0.46.0` / `0.1.9`, the complete queue suite (584 passed, 7 physical
+opt-ins deselected) and `cy-queue --help`. The full record is in cy-queue
+`docs/plans/cy-046-compatibility/verification.md`.
