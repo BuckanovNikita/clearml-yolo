@@ -44,10 +44,12 @@ no-impact architecture, dated checks) is in this directory.
 
 ## Pending
 
-- `uv run --frozen --no-sync python scripts/verify.py --docs` and
-  `uv run --frozen --no-sync pytest tests/test_check_docs.py -q` need a provisioned
-  worktree environment.
-- Commit hooks (`pre-commit`, `changelog`, `verify --hook`) run at commit time.
-- Paired CY/queue release check before delivery.
-- Fresh-session skill discovery in Claude and Codex.
-- Fresh independent review.
+Updated 2026-11-07:
+
+- Fresh independent review: done, pass, in [review-2026-11-07.md](review-2026-11-07.md).
+- Commit with hooks: done as `43de5af`, released in v0.46.0. `scripts/verify.py` no longer
+  exists on the current `master`; `scripts/check_docs.py --all` and
+  `pytest tests/test_check_docs.py` were rerun on 2026-11-07 (see the review).
+- Paired CY/queue release check: delivered with v0.46.0 (recorded in the remaining-work
+  plan, not re-verified here).
+- Fresh-session skill discovery in Claude and Codex (remaining-work T6.2, owner): pending.
