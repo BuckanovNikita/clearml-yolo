@@ -43,10 +43,8 @@ user request for those actions.
 
 ### 1. Static checks
 
-Run the [verification commands](../../../docs/development.md#verification): Ruff, strict
-mypy, Vulture, import-linter, the complete `pytest --testmon-noselect` suite and
-`scripts/check_docs.py --all`. Include the prek hooks
-(`uv run --frozen --no-sync prek run --all-files`) for release or commit work.
+Run `uv run --frozen --no-sync prek run --all-files`; the hook configuration owns
+the verification tool inventory. Follow the native Spec Kit workflow for documentation.
 
 ### 2. Isolated run setup
 

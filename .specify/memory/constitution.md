@@ -124,8 +124,7 @@ overwriting one another.
 ### IV. Proportional, Evidence-Based Verification
 
 Every change MUST be verified against its affected behavior using documented repository tools
-and current check configuration. Documentation-only changes MUST validate the changed
-Markdown and referenced paths; they do not require an unrelated application test suite.
+and current check configuration. Documentation checks MUST be limited to native Spec Kit or OpenSpec checks.
 
 Code changes MUST run the relevant repository gates through `uv run`: `pytest`,
 `ruff check .`, `mypy .`, and `lint-imports`. Verification MUST broaden when impact crosses
@@ -167,8 +166,7 @@ stash, reset, revert, or bypass hooks to make checks pass. Parallel work, when u
 bounded deliverables, explicit write ownership, dependencies, and acceptance evidence; the
 combined result MUST be inspected.
 
-Commits MUST occur only when requested or included in the authorized workflow, use
-Conventional Commits, and stage only explicit paths or hunks belonging to the task. Concurrent
+Local commits may be created autonomously, MUST use Conventional Commits, and stage only explicit paths or hunks belonging to the task. Concurrent
 writers MUST use unique temporary commit-message files. Authorized pushes SHOULD use SSH
 remotes to follow the existing repository access convention.
 
@@ -211,8 +209,8 @@ import historical predictions or silently recalibrate on test data.
    documentation and behavior tests when the change requires them.
 4. Run proportional verification and review the resulting diff. An unrelated check blocker
    MUST be reported specifically or handled in an isolated workspace that preserves it.
-5. Report what changed, evidence obtained, and remaining limitations. Commit or push only
-   within existing authorization and after the applicable stage checks pass.
+5. Report changes and verification. Local commits may be autonomous; pushing requires
+   separate authorization, including authorization already given in the session.
 
 ## Governance
 

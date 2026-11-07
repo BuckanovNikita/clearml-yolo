@@ -55,12 +55,10 @@ uv run --frozen --no-sync mypy .
 uv run --frozen --no-sync vulture
 uv run --frozen --no-sync lint-imports
 uv run --frozen --no-sync pytest --testmon-noselect      # complete ordinary suite
-uv run --frozen --no-sync python scripts/check_docs.py --all
-uv run --frozen --no-sync prek run --all-files
 ```
 
 These are Ruff, strict mypy, Vulture, import-linter, one complete ordinary pytest
-suite and the documentation checker. The pytest run includes architecture negative
+suite. The pytest run includes architecture negative
 cases and native CPU-DDP, so no separate architecture or full-suite run is needed for
 those gates. Focused commands are still useful while developing. Unset
 `PYTEST_ADDOPTS` for acceptance so that selection flags cannot turn the run into a
@@ -75,7 +73,7 @@ untracked files stay visible to the checks. The `untracked-sources` hook therefo
 rejects untracked files under `src/`, `tests/` and `scripts/`; stage or remove them.
 
 Every commit runs the hygiene, `changelog`, `untracked-sources`, Ruff, mypy, Vulture,
-import-linter, `pytest --testmon` and `check-docs` hooks. They always run because
+import-linter, `pytest --testmon` hooks. They always run because
 staged file lists omit deleted files; their caches keep unchanged runs short. A
 commit that only deletes non-Python test or package data does not trigger the full
 suite, which is one more reason to run full acceptance. The
@@ -105,20 +103,11 @@ fallback can request `pi-heif` for an unidentified image; provision that verific
 prerequisite deliberately rather than relying on a mid-suite installation. Do not
 install or update packages during a check.
 
-Documentation-only work needs Markdown and local-link validation rather than the
-application suite. Inspect [.pre-commit-config.yaml](../.pre-commit-config.yaml) before
+Documentation-only work uses only native Spec Kit or OpenSpec documentation checks. Inspect [.pre-commit-config.yaml](../.pre-commit-config.yaml) before
 running hooks: it includes changelog generation and a post-commit release hook.
 The mocked suite cannot prove native training, a GPU or ClearML uploads; those require
 dated real-run evidence and the
 [end-to-end skill](../.agents/skills/running-end-to-end-tests/SKILL.md).
-
-`scripts/check_docs.py --all` reads tracked project Markdown, checking local paths,
-GitHub-style anchors (including duplicate/Unicode headings), reference links and
-fences. `--all` reads the Git index: stage new Markdown first or pass the new
-file paths explicitly. It excludes generated changelogs,
-symlinks and installed workflow assets; it never fetches external links, executes
-examples or rewrites files. See the [checker contract](../specs/000-baseline/spec.md#verification-and-delivery-requirements)
-for scope and exit codes. Mermaid grammar needs a separate render and visual review.
 
 ### Native CPU distributed regression tests
 

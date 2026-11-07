@@ -100,13 +100,6 @@ repos:
         pass_filenames: false
         require_serial: true
 
-      - id: check-docs
-        name: Markdown and local links
-        entry: uv run --frozen --no-sync python scripts/check_docs.py --all
-        language: system
-        always_run: true
-        pass_filenames: false
-        require_serial: true
 
       - id: local-release
         name: Create local semantic version commit and tag

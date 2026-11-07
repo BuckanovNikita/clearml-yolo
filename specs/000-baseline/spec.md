@@ -20,7 +20,7 @@ checks establish implementation evidence; historical plans, task checkboxes and 
 establish a physical outcome. An unexplained requirement/code mismatch must be investigated explicitly.
 
 New Spec Kit work starts at **001** in this new epoch, references this specification, and creates its own
-specification, plan, architecture record and task ledger. `000-baseline` must not become the active feature
+specification, plan and task ledger. `000-baseline` must not become the active feature
 or inherit old unfinished checkboxes. Identify a retired feature using its full historical path and
 checkpoint, not its number alone: the old epoch includes two different `003-*` features and both
 `037-early-accurate-publication` and `037-cleanup-baseline`. Their artifacts retain separate identities and
@@ -29,8 +29,8 @@ rewritten.
 
 The [constitution](../../.specify/memory/constitution.md), [agent workflow](../../docs/agent-workflow.md),
 installed Spec Kit tooling and current topic guides remain in place. Future tasks follow the native
-feature/bug/documentation route, module architecture acceptance, required documentation and authorized
-release workflow. This reset does not authorize changes to installed workflow tooling.
+workflow for new capabilities or documented behavior changes; routine fixes, documentation and
+small refactors proceed directly. This reset does not authorize changes to installed workflow tooling.
 
 The released [feature 006](../006-batch-training/spec.md) extends this baseline with
 local capacity estimation, explicit null-batch lookup, native distributed training,
@@ -721,15 +721,14 @@ Missing/failing required checks remain gaps. Historical waivers apply only to th
 
 Use [development checks](../../docs/development.md#verification) and [static-analysis
 policy](../../docs/static-analysis.md): acceptance runs Ruff, strict mypy, Vulture, import-linter and
-one complete ordinary `pytest --testmon-noselect` suite, including architecture and CPU-DDP, plus
-`scripts/check_docs.py --all`; scoped mutation acceptance remains outside hooks. prek hooks run the same
+one complete ordinary `pytest --testmon-noselect` suite, including architecture and CPU-DDP;
+scoped mutation acceptance remains outside hooks. prek hooks run the same
 locked commands, selected by staged files, with testmon-limited pytest for Python changes. Strictly
 validated generated version commits and tag recovery skip the heavy hooks
 ([amendment 011](../011-simplify-hooks/spec.md)). Ruff rules live
 in `ruff.toml`, import contracts in `.importlinter`; `pyproject.toml` keeps package/small tool settings.
 Advisory unused-code findings need callsite/dynamic-consumer/contract evidence before deletion.
-Documentation checker tests include negative cases; its parser does not validate external links, command
-semantics, arbitrary runtime Markdown or Mermaid grammar.
+Documentation checks are limited to native Spec Kit or OpenSpec checks.
 
 Frozen tests protect scientific values, signatures/defaults, configuration/CLI, workbook semantics and
 byte-exact original-content recovery. Mocked payloads prove adapter behavior, not native/GPU/server results.

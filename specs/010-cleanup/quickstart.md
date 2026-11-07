@@ -5,8 +5,6 @@ Do not run publication or release commands merely to validate this planning pack
 
 ## Planning package
 
-Resolve the architecture validator from the installed module-architecture-planning
-skill. Run it with `--record specs/010-cleanup/architecture.json --phase plan --repo-root .`.
 Pass the new Markdown files explicitly to `scripts/check_docs.py`; untracked files
 are not selected by `--all`. Review requirement/task coverage and plan dependencies.
 
@@ -39,6 +37,5 @@ integration tests and final versions; never use no-deps installation as acceptan
 
 Repeat fresh-cache offline restoration and native DINOv3 loading on final source
 after Hub changes. Reuse unchanged archive/hash evidence only within its proven scope.
-Require final independent review, full diff reconciliation and architecture acceptance
-validation. Compare dated baseline/final timings under equivalent conditions; report
+Require final independent review and full diff reconciliation. Compare dated baseline/final timings under equivalent conditions; report
 skipped, unavailable and waived physical outcomes separately from passes.

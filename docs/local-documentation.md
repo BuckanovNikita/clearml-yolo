@@ -135,13 +135,12 @@ Documentation assets are loaded only by explicit documentation operations, so mi
 assets, malformed tutorials and preview-worker failures cannot become ordinary
 library-import or application-command dependencies.
 
-After changing tutorial Markdown, regenerate the shipped pages using the existing
-development Markdown dependency:
+For changes to the shipped documentation-rendering feature, its development
+commands are:
 
 ```bash
 uv run --frozen --no-sync python scripts/render_docs.py
 uv run --frozen --no-sync cy-docs --check
-uv run --frozen --no-sync python scripts/check_docs.py --all
 ```
 
 `cy-docs --check` rejects missing/stale assets, unknown field links, uncovered commands
