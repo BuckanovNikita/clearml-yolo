@@ -358,7 +358,7 @@ cross-filesystem pairs are skipped; unexpected I/O errors produce nonzero exit.
 are permitted only with `--dry-run`; mutations stay inside `CY_HOME`. Reported file/
 duplicate/reflink counts do not measure freed space. Temporary replacement files sit
 beside their image and are removed after the operation. SDKs and GPU are not required.
-See the [dedup contract](specs/000-baseline/spec.md).
+See the [dedup contract](docs/experiment-records.md#explicit-cache-deduplication).
 
 ## Queue operations
 

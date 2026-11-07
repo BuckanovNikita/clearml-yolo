@@ -27,7 +27,7 @@ See [selected export and runtime isolation](runtime-isolation.md).
 `cy-dedup [DIRECTORY] [--dry-run]` is local cache maintenance without application startup
 or tracking. It reflinks identical same-named images, preserving paths and content;
 unsupported reflinks are reported skips. See the
-[deduplication contract](../specs/000-baseline/spec.md).
+[deduplication contract](experiment-records.md#explicit-cache-deduplication).
 
 `cy-docs [--port PORT] [--no-browser] [--check]` opens the packaged Russian reference
 and tutorials on loopback. Its catalog derives fields and effective defaults from
