@@ -28,9 +28,7 @@ def dependency_findings(source: str) -> set[str]:
     forbidden: set[str] = set()
     for node in ast.walk(ast.parse(source)):
         if isinstance(node, ast.Import):
-            forbidden.update(
-                alias.name for alias in node.names if alias.name.split(".")[0] not in allowed
-            )
+            forbidden.update(alias.name for alias in node.names if alias.name.split(".")[0] not in allowed)
         elif isinstance(node, ast.ImportFrom) and (
             node.level or not node.module or node.module.split(".")[0] not in allowed
         ):
@@ -79,9 +77,7 @@ def test_dependency_is_declared_at_locked_version_in_development() -> None:
     assert not any(item.startswith("markdown-it-py") for item in project["project"]["dependencies"])
     root = next(package for package in lock["package"] if package["name"] == "clearml-yolo")
     assert {"name": "markdown-it-py"} in root["dev-dependencies"]["dev"]
-    assert {"name": "markdown-it-py", "specifier": f"=={parser['version']}"} in root["metadata"][
-        "requires-dev"
-    ]["dev"]
+    assert {"name": "markdown-it-py", "specifier": f"=={parser['version']}"} in root["metadata"]["requires-dev"]["dev"]
 
 
 def test_links_unicode_duplicates_html_and_reference_forms(tmp_path: Path) -> None:
@@ -150,9 +146,7 @@ def test_indented_code_cannot_close_a_fence(tmp_path: Path, content: str) -> Non
         "    ```\n    text\n    ```\n",
     ],
 )
-def test_parser_recognized_fences_and_indented_examples_are_valid(
-    tmp_path: Path, content: str
-) -> None:
+def test_parser_recognized_fences_and_indented_examples_are_valid(tmp_path: Path, content: str) -> None:
     assert parse_document(tmp_path / "source.md", content).issues == []
 
 
@@ -168,13 +162,9 @@ def test_parser_recognized_fences_and_indented_examples_are_valid(
         ("![`label`][missing]", "missing"),
     ],
 )
-def test_undefined_explicit_references_preserve_inline_grammar(
-    tmp_path: Path, reference: str, label: str
-) -> None:
+def test_undefined_explicit_references_preserve_inline_grammar(tmp_path: Path, reference: str, label: str) -> None:
     document = parse_document(tmp_path / "source.md", f"# Doc\n\n{reference}\n")
-    assert [(issue.line, issue.message) for issue in document.issues] == [
-        (3, f"undefined reference: {label}")
-    ]
+    assert [(issue.line, issue.message) for issue in document.issues] == [(3, f"undefined reference: {label}")]
 
 
 def test_defined_formatted_multiline_and_escaped_references(tmp_path: Path) -> None:
@@ -189,9 +179,7 @@ def test_defined_formatted_multiline_and_escaped_references(tmp_path: Path) -> N
         encoding="utf-8",
     )
     assert check_documents(tmp_path, [source]) == []
-    assert [link.target for link in parse_document(source, source.read_text()).links] == [
-        "#doc"
-    ] * 5
+    assert [link.target for link in parse_document(source, source.read_text()).links] == ["#doc"] * 5
 
 
 @pytest.mark.parametrize(
@@ -207,9 +195,7 @@ def test_defined_formatted_multiline_and_escaped_references(tmp_path: Path) -> N
         ("[r]: first.md\n[r]: second.md\n", "duplicate reference definition: R", 2),
     ],
 )
-def test_document_failures_have_source_locations(
-    tmp_path: Path, content: str, message: str, line: int
-) -> None:
+def test_document_failures_have_source_locations(tmp_path: Path, content: str, message: str, line: int) -> None:
     source = tmp_path / "source.md"
     source.write_text(content, encoding="utf-8")
     issues = check_documents(tmp_path, [source])

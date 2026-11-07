@@ -181,10 +181,7 @@ def harness(tmp_path: Path) -> Harness:
 def _source_agent_env(harness: Harness, *args: str, **extra_env: str) -> ShellResult:
     """Source the script in a fresh bash and read back its status and the environment it left."""
     marker = "__ENV__"
-    script = (
-        f'source {SCRIPTS / "agent_env.sh"} "$@"; status=$?; '
-        f"printf '{marker}'; env -0; exit $status"
-    )
+    script = f"source {SCRIPTS / 'agent_env.sh'} \"$@\"; status=$?; printf '{marker}'; env -0; exit $status"
     completed = subprocess.run(  # noqa: S603  the command is this test's own script
         [BASH, "-c", script, "agent_env", *args],
         check=False,
@@ -199,14 +196,10 @@ def _source_agent_env(harness: Harness, *args: str, **extra_env: str) -> ShellRe
         name, separator, value = entry.partition("=")
         if separator:
             environment[name] = value
-    return ShellResult(
-        completed.returncode, stdout, completed.stderr, environment, harness.helper_calls()
-    )
+    return ShellResult(completed.returncode, stdout, completed.stderr, environment, harness.helper_calls())
 
 
-def _run(
-    script: str, harness: Harness, *args: str, **extra_env: str
-) -> subprocess.CompletedProcess[str]:
+def _run(script: str, harness: Harness, *args: str, **extra_env: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(  # noqa: S603  the command is this test's own script
         [str(SCRIPTS / script), *args],
         check=False,
@@ -231,9 +224,7 @@ def test_shared_mongodb_env_is_loaded_before_publication(harness: Harness) -> No
     assert result.status == 0, result.stderr
     assert result.environment["FIFTYONE_DATABASE_NAME"] == "clearml_yolo"
     assert result.environment["FIFTYONE_DATABASE_URI"] == "mongodb://private@stand"
-    assert result.environment["FIFTYONE_DATABASE_DIR"] == str(
-        harness.scratch / "home/.cache/clearml-yolo/fiftyone"
-    )
+    assert result.environment["FIFTYONE_DATABASE_DIR"] == str(harness.scratch / "home/.cache/clearml-yolo/fiftyone")
     assert "private@stand" not in result.stdout + result.stderr
 
 
@@ -334,8 +325,7 @@ def test_the_report_at_the_end_names_the_stand_it_authenticated_against(harness:
     result = _source_agent_env(harness, "smoke")
 
     assert (
-        f"OK   ClearML {CLUSTER_API} — authenticated "
-        "(endpoint from environment, credentials from environment)"
+        f"OK   ClearML {CLUSTER_API} — authenticated (endpoint from environment, credentials from environment)"
     ) in result.stdout
 
 
@@ -404,9 +394,7 @@ def test_a_refused_mint_exports_no_empty_tag(harness: Harness) -> None:
 
 
 def test_without_a_skill_the_script_says_where_it_looked(harness: Harness) -> None:
-    result = _source_agent_env(
-        harness, "smoke", K8S_INFRA_SKILL_DIR=str(harness.scratch / "nowhere")
-    )
+    result = _source_agent_env(harness, "smoke", K8S_INFRA_SKILL_DIR=str(harness.scratch / "nowhere"))
 
     assert result.status == 1
     assert "no k8s-infra skill found" in result.stderr
@@ -497,14 +485,10 @@ def test_cleanup_dry_run_lists_and_keeps_everything(harness: Harness) -> None:
     run_dir = harness.scratch / TAG
     run_dir.mkdir(parents=True)
 
-    completed = _run(
-        "agent_cleanup.sh", harness, "--dry-run", CY_RUN_TAG=TAG, CY_RUN_DIR=str(run_dir)
-    )
+    completed = _run("agent_cleanup.sh", harness, "--dry-run", CY_RUN_TAG=TAG, CY_RUN_DIR=str(run_dir))
 
     assert completed.returncode == 0, completed.stderr
-    assert harness.helper_calls()[0] == (
-        f"clearml.py --project clearml-yolo cleanup --prefix {TAG} --dry-run"
-    )
+    assert harness.helper_calls()[0] == (f"clearml.py --project clearml-yolo cleanup --prefix {TAG} --dry-run")
     assert run_dir.exists()
     assert f"would remove {run_dir}" in completed.stdout
 
@@ -551,8 +535,7 @@ def test_check_env_reads_the_environment_before_the_config_file(harness: Harness
 
     assert completed.returncode == 0
     assert (
-        f"OK   ClearML {CLUSTER_API} — authenticated "
-        "(endpoint from environment, credentials from environment)"
+        f"OK   ClearML {CLUSTER_API} — authenticated (endpoint from environment, credentials from environment)"
     ) in completed.stdout
     assert HOST_STAND_API not in completed.stdout
     assert "WARN ClearML" not in completed.stdout
@@ -567,8 +550,7 @@ def test_check_env_falls_back_to_the_config_file_and_warns_about_the_host_stand(
 
     assert completed.returncode == 0
     assert (
-        f"OK   ClearML {HOST_STAND_API} — authenticated "
-        f"(endpoint from {conf}, credentials from {conf})"
+        f"OK   ClearML {HOST_STAND_API} — authenticated (endpoint from {conf}, credentials from {conf})"
     ) in completed.stdout
     assert f"WARN ClearML {HOST_STAND_API} is the user's host stand" in completed.stdout
     assert "agent_env.sh" in completed.stdout
@@ -579,13 +561,10 @@ def test_check_env_mixes_an_environment_endpoint_with_file_credentials_and_says_
 ) -> None:
     conf = _write_conf(harness, HOST_STAND_API, GOOD_PAIR)
 
-    completed = _run(
-        "check_env.sh", harness, CLEARML_CONFIG_FILE=str(conf), CLEARML_API_HOST=CLUSTER_API
-    )
+    completed = _run("check_env.sh", harness, CLEARML_CONFIG_FILE=str(conf), CLEARML_API_HOST=CLUSTER_API)
 
     assert (
-        f"OK   ClearML {CLUSTER_API} — authenticated "
-        f"(endpoint from environment, credentials from {conf})"
+        f"OK   ClearML {CLUSTER_API} — authenticated (endpoint from environment, credentials from {conf})"
     ) in completed.stdout
 
 
@@ -601,8 +580,7 @@ def test_check_env_reports_rejected_credentials_against_the_endpoint_it_tried(
     )
 
     assert (
-        f"FAIL ClearML {CLUSTER_API} (from environment) — reachable but the credentials "
-        "from environment are rejected"
+        f"FAIL ClearML {CLUSTER_API} (from environment) — reachable but the credentials from environment are rejected"
     ) in completed.stdout
 
 
@@ -610,9 +588,7 @@ def test_check_env_warns_about_the_host_stand_even_when_it_is_down(harness: Harn
     """An agent pointed at the host stand must learn so whether or not the stand answers."""
     conf = _write_conf(harness, HOST_STAND_API, GOOD_PAIR)
 
-    completed = _run(
-        "check_env.sh", harness, CLEARML_CONFIG_FILE=str(conf), FAKE_UNREACHABLE=HOST_STAND_API
-    )
+    completed = _run("check_env.sh", harness, CLEARML_CONFIG_FILE=str(conf), FAKE_UNREACHABLE=HOST_STAND_API)
 
     assert f"FAIL ClearML {HOST_STAND_API} (from {conf}) — unreachable" in completed.stdout
     assert f"WARN ClearML {HOST_STAND_API} is the user's host stand" in completed.stdout
@@ -691,9 +667,7 @@ def test_check_env_reports_a_login_timeout_as_incomplete_not_as_rejected_credent
 def test_check_env_without_a_file_or_an_endpoint_points_agents_at_agent_env(
     harness: Harness,
 ) -> None:
-    completed = _run(
-        "check_env.sh", harness, CLEARML_CONFIG_FILE=str(harness.scratch / "absent.conf")
-    )
+    completed = _run("check_env.sh", harness, CLEARML_CONFIG_FILE=str(harness.scratch / "absent.conf"))
 
     assert "FAIL clearml.conf" in completed.stdout
     assert "agent_env.sh" in completed.stdout
@@ -741,9 +715,7 @@ def test_check_env_reports_a_handshake_failure_separately_from_trust_and_outage(
     )
 
     assert completed.returncode == 0
-    expected = (
-        f"FAIL ClearML {CLUSTER_API} (from environment) — TLS handshake failed (curl exit 35)"
-    )
+    expected = f"FAIL ClearML {CLUSTER_API} (from environment) — TLS handshake failed (curl exit 35)"
     assert expected in completed.stdout
     assert "TLS verification failed" not in completed.stdout
     assert "unreachable" not in completed.stdout

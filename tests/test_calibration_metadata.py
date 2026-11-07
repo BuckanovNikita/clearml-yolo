@@ -114,9 +114,7 @@ def test_silently_dropped_metadata_fails_immediate_readback(
         associate_calibration_thresholds(task, {"cat": 0.4}, prediction_checkpoint_sha256=digest)
 
 
-@pytest.mark.parametrize(
-    "thresholds", [{}, {"cat": float("nan")}, {"cat": 1.1}, {"": 0.3}, {"cat": True}]
-)
+@pytest.mark.parametrize("thresholds", [{}, {"cat": float("nan")}, {"cat": 1.1}, {"": 0.3}, {"cat": True}])
 def test_invalid_thresholds_fail_before_mutation(
     owned_model: tuple[_Task, _Record, str, list[Callable[[], None]]], thresholds: dict[str, Any]
 ) -> None:
@@ -132,9 +130,7 @@ def test_test_split_cannot_calibrate_an_owned_model(
 ) -> None:
     task, _, digest, _ = owned_model
     with pytest.raises(NativeModelError, match="val"):
-        associate_calibration_thresholds(
-            task, {"cat": 0.3}, prediction_checkpoint_sha256=digest, split="test"
-        )
+        associate_calibration_thresholds(task, {"cat": 0.3}, prediction_checkpoint_sha256=digest, split="test")
 
 
 def test_owned_association_revalidates_stable_model_identity(
@@ -154,10 +150,7 @@ def test_unicode_numeric_labels_and_extreme_precision_are_retained(
     associate_calibration_thresholds(task, thresholds, prediction_checkpoint_sha256=digest)
     assert json.loads(record.metadata["clearml_yolo_confidence_thresholds"]["value"]) == thresholds
     assert record.metadata["clearml_yolo_confidence_threshold/001"]["value"] == "1e-17"
-    assert (
-        record.metadata["clearml_yolo_confidence_threshold/труба/猫"]["value"]
-        == "0.9876543210987654"
-    )
+    assert record.metadata["clearml_yolo_confidence_threshold/труба/猫"]["value"] == "0.9876543210987654"
     barriers[0]()
 
 
@@ -175,9 +168,7 @@ def test_finalization_retains_requested_training_name_and_checkpoint_path(
         "clearml_yolo.adapters.clearml.native.resolve_model_name",
         resolve,
     )
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.clearml.native.register_model_barrier", lambda *_args: None
-    )
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.native.register_model_barrier", lambda *_args: None)
     model, trainer = _training_objects(checkpoint)
     model_id = finalize_native_model(task, model, trainer, "yolo11n.pt")
     assert model_id == "model-id"

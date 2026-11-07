@@ -19,14 +19,10 @@ from clearml_yolo.application.ports import TaskHandle, WorkflowDependencies
 TRAIN_DIR = "detect"
 
 
-def _project_of_this_run(
-    project: str | None, task: TaskHandle | None, *, deps: WorkflowDependencies
-) -> Path:
+def _project_of_this_run(project: str | None, task: TaskHandle | None, *, deps: WorkflowDependencies) -> Path:
     if project is not None:
         return deps.storage.resolve(deps.storage.write_path(project))
-    directory = deps.storage.task_run_dir(
-        deps.storage.runs_root(), *deps.tracking.task_identity(task)
-    )
+    directory = deps.storage.task_run_dir(deps.storage.runs_root(), *deps.tracking.task_identity(task))
     deps.storage.mkdir(directory, parents=True, exist_ok=True)
     deps.storage.point_latest_at(deps.storage.runs_root(), directory)
     return directory / TRAIN_DIR
@@ -70,9 +66,7 @@ def _prepare_csv_dataset(
                     }
                 },
             )
-        deps.tracking.connect_config_file(
-            task, "dataset", prepared.data, allow_remote_override=False
-        )
+        deps.tracking.connect_config_file(task, "dataset", prepared.data, allow_remote_override=False)
         yield (prepared, effective)
 
 
@@ -106,9 +100,7 @@ def train(
         settings = deps.model.execution_settings(ultralytics, "train")
         architecture = settings.pop("model")
         if not architecture:
-            raise ValueError(
-                "Set ultralytics.model explicitly; no training model fallback is provided"
-            )
+            raise ValueError("Set ultralytics.model explicitly; no training model fallback is provided")
         settings["mode"] = "train"
         settings["project"] = str(_project_of_this_run(settings.get("project"), task, deps=deps))
         settings["name"] = settings.get("name") or deps.storage.safe_path_component(

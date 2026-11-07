@@ -65,9 +65,7 @@ class TrainingTransform:
         image, target = self.dataset.load_item(index)
         return detection_sample(image, target)
 
-    def __call__(
-        self, image: Image.Image, target: dict[str, Any], dataset: Any
-    ) -> tuple[Any, Any, Any]:
+    def __call__(self, image: Image.Image, target: dict[str, Any], dataset: Any) -> tuple[Any, Any, Any]:
         if self.pipeline is None:
             raise RuntimeError("Custom training requires an augmentation pipeline")
         index = int(target["idx"])

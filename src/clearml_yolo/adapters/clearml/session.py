@@ -139,9 +139,7 @@ def replay_training_parameters(task: Any, values: Mapping[str, Any]) -> dict[str
         return dict(values)
     active = _active_state(task, "Training parameter replay")
     inherited = (
-        active.remote_replay.parameters
-        if active.remote_replay is not None
-        else task.get_parameters(cast=True) or {}
+        active.remote_replay.parameters if active.remote_replay is not None else task.get_parameters(cast=True) or {}
     )
     scientific = project_native_parameters(values)
     sanitized = prepare_native_parameters(values)
@@ -231,9 +229,7 @@ class _InvocationState:
 
     def config_path(self, suffix: str) -> Path:
         if self.config_directory is None:
-            self.config_directory = Path(
-                mkdtemp(prefix="clearml-yolo-config-", dir=temporary_root())
-            )
+            self.config_directory = Path(mkdtemp(prefix="clearml-yolo-config-", dir=temporary_root()))
         path = self.config_directory / f"{self.config_file_count:04d}{suffix}"
         self.config_file_count += 1
         return path
@@ -250,9 +246,7 @@ class _InvocationState:
             shutil.rmtree(self.config_directory)
 
 
-_ACTIVE_INVOCATION: ContextVar[_InvocationState | None] = ContextVar(
-    "clearml_yolo_active_invocation", default=None
-)
+_ACTIVE_INVOCATION: ContextVar[_InvocationState | None] = ContextVar("clearml_yolo_active_invocation", default=None)
 
 
 @dataclass
@@ -285,14 +279,8 @@ def _is_worker() -> bool:
     if owner_pid and os.environ.get(OWNER_TASK_ENV) and owner_pid != str(os.getpid()):
         return True
     local_rank = os.environ.get("LOCAL_RANK")
-    if (
-        local_rank is not None
-        and local_rank != "-1"
-        and not (owner_pid and os.environ.get(OWNER_TASK_ENV))
-    ):
-        raise ValueError(
-            "Top-level LOCAL_RANK launches are unsupported; invoke the cy command directly"
-        )
+    if local_rank is not None and local_rank != "-1" and not (owner_pid and os.environ.get(OWNER_TASK_ENV)):
+        raise ValueError("Top-level LOCAL_RANK launches are unsupported; invoke the cy command directly")
     return False
 
 
@@ -337,11 +325,7 @@ def _active_state(task: Any, operation: str) -> _InvocationState:
     return active
 
 
-
-
-def register_training_counts(
-    task: Any, checkpoint: Path, counts: dict[str, int] | None
-) -> None:
+def register_training_counts(task: Any, checkpoint: Path, counts: dict[str, int] | None) -> None:
     """Bind verified training-population counts to the exact produced checkpoint."""
     if task is None or counts is None:
         return
@@ -363,6 +347,7 @@ def training_counts(identity: ModelIdentity | None) -> dict[str, int] | None:
     )
     return dict(counts) if counts is not None else None
 
+
 def preserve_training_success(task: Any, checkpoint: Path, outcome_path: Path) -> None:
     """Enable warning completion only for a pipeline's verified durable checkpoint."""
     if task is None:
@@ -376,7 +361,8 @@ def preserve_training_success(task: Any, checkpoint: Path, outcome_path: Path) -
     if state.pipeline_outcome is None:
         state.pipeline_outcome = PipelineOutcome(training_succeeded=True)
         state.pipeline_outcome.stages["training"] = StageOutcome(
-            status="succeeded", artifacts=[str(checkpoint)],
+            status="succeeded",
+            artifacts=[str(checkpoint)],
         )
     _persist_pipeline_outcome(state)
 
@@ -398,7 +384,8 @@ def _persist_pipeline_outcome(state: _InvocationState) -> None:
     try:
         atomic_write_text(state.outcome_path, state.pipeline_outcome.model_dump_json(indent=2))
         atomic_write_text(
-            state.outcome_path.with_suffix(".txt"), state.pipeline_outcome.summary(),
+            state.outcome_path.with_suffix(".txt"),
+            state.pipeline_outcome.summary(),
         )
     except OSError as error:
         log_exception_safely("Could not persist pipeline outcome; checkpoint retained", error)
@@ -441,7 +428,9 @@ def _finalize_preserving_training(state: _InvocationState) -> None:
         try:
             with sdk_deadline(FINALIZATION_TIMEOUT_SECONDS):
                 _sync_upload(
-                    state.task, "pipeline_outcome", state.pipeline_outcome.model_dump(mode="json"),
+                    state.task,
+                    "pipeline_outcome",
+                    state.pipeline_outcome.model_dump(mode="json"),
                 )
         except Exception as publication_error:  # noqa: BLE001 - preserve local warning evidence
             _record_remote_outcome_failure(state, "Outcome upload", publication_error)
@@ -450,11 +439,10 @@ def _finalize_preserving_training(state: _InvocationState) -> None:
                 _release_failure_monitor(state)
                 closed_task = _close_for_failure(state, error)
                 closed_task.mark_completed(
-                    ignore_errors=False, force=True,
-
+                    ignore_errors=False,
+                    force=True,
                     status_message=(
-                        "completed_with_warnings: "
-                        "Training succeeded; publication incomplete; see local outcome"
+                        "completed_with_warnings: Training succeeded; publication incomplete; see local outcome"
                     ),
                 )
         except Exception as status_error:  # noqa: BLE001 - local outcome remains authoritative
@@ -463,7 +451,9 @@ def _finalize_preserving_training(state: _InvocationState) -> None:
 
 
 def _record_remote_outcome_failure(
-    state: _InvocationState, operation: str, error: Exception,
+    state: _InvocationState,
+    operation: str,
+    error: Exception,
 ) -> None:
     outcome = state.pipeline_outcome
     if outcome is None:
@@ -478,9 +468,7 @@ def _finalize(state: _InvocationState) -> None:
     for finalize in state.finalizers:
         with trace_operation("clearml.publication.finalizer"):
             finalize()
-    missing = [
-        artifact.name for artifact in state.artifacts if artifact.required and not artifact.uploaded
-    ]
+    missing = [artifact.name for artifact in state.artifacts if artifact.required and not artifact.uploaded]
     if missing:
         raise ArtifactUploadError(f"Required artifacts were not uploaded: {', '.join(missing)}")
     if state.model_barriers:
@@ -510,10 +498,10 @@ def _finalize(state: _InvocationState) -> None:
         with trace_operation("clearml.task.mark_completed", cleanup=True):
             if state.pipeline_outcome is not None and state.pipeline_outcome.status != "succeeded":
                 closed_task.mark_completed(
-                    ignore_errors=False, force=True,
+                    ignore_errors=False,
+                    force=True,
                     status_message=(
-                        "completed_with_warnings: "
-                        "Pipeline completed; inspect pipeline_outcome for details"
+                        "completed_with_warnings: Pipeline completed; inspect pipeline_outcome for details"
                     ),
                 )
             else:
@@ -572,9 +560,7 @@ def _start_console_publisher(task: Any, capture: OutputCapture) -> ConsolePublis
         publisher = ConsolePublisher(str(task.id), capture, offline_folder=offline)
         publisher.start()
     except OSError as error:
-        raise ConsolePublicationError(
-            "Console publisher could not start; local logs retained"
-        ) from error
+        raise ConsolePublicationError("Console publisher could not start; local logs retained") from error
     return publisher
 
 
@@ -611,16 +597,12 @@ def _release_failure_monitor(state: _InvocationState) -> None:
         missing = object()
         monitor = getattr(state.task, "_dev_worker", missing)
         if monitor is missing:
-            raise TaskFinalizationError(
-                "Installed ClearML SDK cannot release the owner status monitor"
-            )
+            raise TaskFinalizationError("Installed ClearML SDK cannot release the owner status monitor")
         if monitor is None:
             return
         unregister = getattr(monitor, "unregister", None)
         if not callable(unregister):
-            raise TaskFinalizationError(
-                "Installed ClearML SDK cannot release the owner status monitor"
-            )
+            raise TaskFinalizationError("Installed ClearML SDK cannot release the owner status monitor")
         if unregister() is not True:
             raise TaskFinalizationError("ClearML owner status monitor did not confirm release")
 
@@ -694,8 +676,7 @@ def invocation(
 
     if _INCOMPLETE_OWNER.pid is not None:
         raise RuntimeError(
-            "Previous ClearML owner did not confirm closure; "
-            "start a fresh process before another invocation"
+            "Previous ClearML owner did not confirm closure; start a fresh process before another invocation"
         )
 
     owns_signal = threading.current_thread() is threading.main_thread()
@@ -776,9 +757,7 @@ def _task_owner(
     # Partially initialized SDK tasks can lack a name during failure cleanup.
     task_name = human_text(str(getattr(task, "name", None) or resolve_task_name(config, stage)))
     with trace_task(task_name):
-        state = _InvocationState(
-            task=task, stages=[stage], current_stage=stage, config_resolver=config_resolver
-        )
+        state = _InvocationState(task=task, stages=[stage], current_stage=stage, config_resolver=config_resolver)
         token = _ACTIVE_INVOCATION.set(state)
         previous_owner = os.environ.get(OWNER_PID_ENV)
         os.environ[OWNER_PID_ENV] = str(os.getpid())
@@ -876,15 +855,14 @@ def _finish_console(state: _InvocationState, primary_error: BaseException | None
             try:
                 with sdk_deadline(FINALIZATION_TIMEOUT_SECONDS):
                     _sync_upload(
-                        state.task, "pipeline_outcome",
+                        state.task,
+                        "pipeline_outcome",
                         state.pipeline_outcome.model_dump(mode="json"),
                     )
                     state.task.mark_completed(
-                        ignore_errors=False, force=True,
-                        status_message=(
-                            "completed_with_warnings: "
-                            "Training succeeded; console publication incomplete"
-                        ),
+                        ignore_errors=False,
+                        force=True,
+                        status_message=("completed_with_warnings: Training succeeded; console publication incomplete"),
                     )
             except Exception as status_error:  # noqa: BLE001 - local warning survives remote outage
                 _record_remote_outcome_failure(state, "Console outcome update", status_error)
@@ -975,9 +953,7 @@ def expect_artifacts(task: Any, names: list[str]) -> None:
             raise ValueError("Expected artifact names must be non-empty")
         if any(artifact.name == name for artifact in active.artifacts):
             raise ValueError(f"Required artifact {name!r} was already registered")
-        active.artifacts.append(
-            _ArtifactRecord(stage=active.current_stage, name=name, local_path=None)
-        )
+        active.artifacts.append(_ArtifactRecord(stage=active.current_stage, name=name, local_path=None))
 
 
 def publish_table(task: Any, name: str, path: Path) -> None:
@@ -1055,9 +1031,7 @@ def register_model_barrier(task: Any, verifier: Callable[[], None]) -> None:
 def _meaningful(value: Any) -> Any:
     if isinstance(value, Mapping):
         mapping_result = {
-            str(key): cleaned
-            for key, item in value.items()
-            if (cleaned := _meaningful(item)) is not _EMPTY
+            str(key): cleaned for key, item in value.items() if (cleaned := _meaningful(item)) is not _EMPTY
         }
         return mapping_result or _EMPTY
     if isinstance(value, (list, tuple, set, frozenset)):
@@ -1078,9 +1052,7 @@ def _merge_configuration(target: dict[str, Any], update: Mapping[str, Any]) -> N
 
 _EMPTY = object()
 
-_OVERRIDE_ROUTING = frozenset(
-    {"run_id", "run_dir", "output", "output_dir", "dataset_cache_dir", "display_names"}
-)
+_OVERRIDE_ROUTING = frozenset({"run_id", "run_dir", "output", "output_dir", "dataset_cache_dir", "display_names"})
 _OVERRIDE_PROVENANCE = frozenset(
     {
         "training_data_overrides",
@@ -1116,9 +1088,7 @@ def _override_inputs(values: Mapping[str, Any]) -> dict[str, Any]:
     return result
 
 
-def _configuration_difference(
-    values: Mapping[str, Any], defaults: Mapping[str, Any]
-) -> dict[str, Any]:
+def _configuration_difference(values: Mapping[str, Any], defaults: Mapping[str, Any]) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for key, value in values.items():
         default = defaults.get(key, _EMPTY)
@@ -1138,8 +1108,7 @@ def _same_configuration_value(value: Any, default: Any) -> bool:
         return False
     if isinstance(value, list):
         return len(value) == len(default) and all(
-            _same_configuration_value(item, other)
-            for item, other in zip(value, default, strict=True)
+            _same_configuration_value(item, other) for item, other in zip(value, default, strict=True)
         )
     if isinstance(value, dict):
         return value.keys() == default.keys() and all(
@@ -1156,9 +1125,7 @@ def _publish_json(task: Any, name: str, values: Mapping[str, Any]) -> None:
     )
 
 
-def publish_run_configuration(
-    task: Any, values: Mapping[str, Any], defaults: Mapping[str, Any]
-) -> None:
+def publish_run_configuration(task: Any, values: Mapping[str, Any], defaults: Mapping[str, Any]) -> None:
     """Freeze resolved executable inputs and publish their informational differences."""
     if _is_worker():
         return
@@ -1210,9 +1177,7 @@ def record_run_configuration(task: Any, values: dict[str, Any]) -> dict[str, Any
     with trace_operation("clearml.configuration.connect"):
         task.set_configuration_object(
             name="run",
-            config_text=json.dumps(
-                _plain_config_document(active.run_configuration), ensure_ascii=False
-            ),
+            config_text=json.dumps(_plain_config_document(active.run_configuration), ensure_ascii=False),
             config_type="json",
         )
     return dict(active.run_configuration)
@@ -1242,22 +1207,14 @@ def replay_configuration(
         raise ValueError("Canonical run configuration must not be empty")
     # Canonical replay must not inherit the SDK's ignore-override parameter or
     # expose connected proxy containers to Hydra/application configuration.
-    canonical = (
-        active.remote_replay.canonical
-        if active.remote_replay is not None
-        else _remote_run_configuration(task)
-    )
+    canonical = active.remote_replay.canonical if active.remote_replay is not None else _remote_run_configuration(task)
     effective = values if canonical is None else canonical
     if not isinstance(effective, Mapping):
         raise TypeError("ClearML run configuration override must be a mapping")
     if not effective:
         raise ValueError("Effective ClearML run configuration must not be empty")
     executable = _plain_config_document(effective)
-    if (
-        legacy_native_general
-        and not task.running_locally()
-        and (canonical is None or "ultralytics" not in canonical)
-    ):
+    if legacy_native_general and not task.running_locally() and (canonical is None or "ultralytics" not in canonical):
         # Historical tasks stored YOLO settings only in General, including tasks
         # without a run object. Preserve their actual execution values in the new
         # full snapshot without reconnecting excluded parameters. A present native
@@ -1277,9 +1234,7 @@ def replay_configuration(
         with trace_operation("clearml.configuration.connect"):
             task.set_configuration_object(
                 name="run",
-                config_text=json.dumps(
-                    _plain_config_document(active.run_configuration), ensure_ascii=False
-                ),
+                config_text=json.dumps(_plain_config_document(active.run_configuration), ensure_ascii=False),
                 config_type="json",
             )
     # Redaction is a storage boundary, not a mutation of executable inputs.
@@ -1294,9 +1249,7 @@ def _configuration_secrets(value: Any, *, sensitive: bool = False) -> set[str]:
             for secret in _configuration_secrets(item, sensitive=sensitive or _sensitive_key(key))
         }
     if isinstance(value, (list, tuple)):
-        return {
-            secret for item in value for secret in _configuration_secrets(item, sensitive=sensitive)
-        }
+        return {secret for item in value for secret in _configuration_secrets(item, sensitive=sensitive)}
     if sensitive and isinstance(value, (bool, int, float)):
         return {str(value)}
     if isinstance(value, str):
@@ -1325,9 +1278,7 @@ def _sanitize_yaml_comment(value: str, secrets: set[str]) -> str:
             newline = "\n" if line.endswith("\n") else ""
             lines.append(f"# {REDACTED}{newline}")
         else:
-            lines.append(
-                re.sub(r"[A-Za-z][\w+.-]*://[^\s<>]+", lambda m: _sanitize_url(m[0]), line)
-            )
+            lines.append(re.sub(r"[A-Za-z][\w+.-]*://[^\s<>]+", lambda m: _sanitize_url(m[0]), line))
     sanitized = "".join(lines)
     for secret in sorted(secrets, key=len, reverse=True):
         sanitized = sanitized.replace(secret, REDACTED)
@@ -1364,9 +1315,7 @@ def _sanitize_yaml_configuration(value: Any, secrets: set[str]) -> Any:
         if not isinstance(value, CommentedMap):
             value = dict(value)
         for key, item in value.items():
-            value[key] = (
-                REDACTED if _sensitive_key(key) else _sanitize_yaml_configuration(item, secrets)
-            )
+            value[key] = REDACTED if _sensitive_key(key) else _sanitize_yaml_configuration(item, secrets)
         return value
     if isinstance(value, list):
         for index, item in enumerate(value):
@@ -1378,9 +1327,7 @@ def _sanitize_yaml_configuration(value: Any, secrets: set[str]) -> Any:
 def _plain_config_document(value: Any) -> Any:
     """Detach round-trip containers and scalar wrappers from the resolver input."""
     if isinstance(value, Mapping):
-        return {
-            _plain_config_document(key): _plain_config_document(item) for key, item in value.items()
-        }
+        return {_plain_config_document(key): _plain_config_document(item) for key, item in value.items()}
     if isinstance(value, (list, tuple)):
         return [_plain_config_document(item) for item in value]
     if isinstance(value, str):
@@ -1397,9 +1344,7 @@ def _requires_config_resolver(value: Any) -> bool:
         return any(_requires_config_resolver(item) for item in value.values())
     if isinstance(value, list):
         return any(_requires_config_resolver(item) for item in value)
-    return isinstance(value, str) and (
-        value == "???" or re.search(r"(?<!\\)(?:\\\\)*\$\{", value) is not None
-    )
+    return isinstance(value, str) and (value == "???" or re.search(r"(?<!\\)(?:\\\\)*\$\{", value) is not None)
 
 
 def _update_yaml_values(original: Any, resolved: Any) -> Any:
@@ -1420,9 +1365,7 @@ def _update_yaml_values(original: Any, resolved: Any) -> Any:
         del original[len(resolved) :]
         return original
     if isinstance(resolved, Mapping):
-        return CommentedMap(
-            {key: _update_yaml_values(None, item) for key, item in resolved.items()}
-        )
+        return CommentedMap({key: _update_yaml_values(None, item) for key, item in resolved.items()})
     if isinstance(resolved, list):
         return CommentedSeq([_update_yaml_values(None, item) for item in resolved])
     return resolved
@@ -1466,8 +1409,7 @@ def _load_config_document(path: Path, yaml: YAML) -> Any:
             include_message=False,
         )
         raise ValueError(
-            f"Invalid YAML configuration file: {path}: "
-            + exception_summary(error, include_message=False)
+            f"Invalid YAML configuration file: {path}: " + exception_summary(error, include_message=False)
         ) from None
 
 
@@ -1502,8 +1444,7 @@ def _prepared_config_file(state: _InvocationState, path: Path) -> tuple[Path, Pa
                 include_message=False,
             )
             raise ValueError(
-                "Configuration values could not be resolved: "
-                + exception_summary(error, include_message=False)
+                "Configuration values could not be resolved: " + exception_summary(error, include_message=False)
             ) from None
 
     try:
@@ -1527,16 +1468,13 @@ def _prepared_config_file(state: _InvocationState, path: Path) -> tuple[Path, Pa
             include_message=False,
         )
         raise ValueError(
-            "Configuration file could not be prepared: "
-            + exception_summary(error, include_message=False)
+            "Configuration file could not be prepared: " + exception_summary(error, include_message=False)
         ) from None
     return execution_path, sanitized_path
 
 
 @trace_operation("clearml.configuration.file")
-def connect_config_file(
-    task: Any, name: str, path: Path, *, allow_remote_override: bool = True
-) -> Path:
+def connect_config_file(task: Any, name: str, path: Path, *, allow_remote_override: bool = True) -> Path:
     """Attach a sanitized consumed configuration object and return the path to read.
 
     The return value is the path that must be read from here on, and it is not always the
@@ -1580,9 +1518,7 @@ def connect_config_file(
             name=name,
             ignore_remote_overrides=True,
         )
-    logger.info(
-        "Connected {} to ClearML as configuration {!r}", human_text(str(path)), human_text(name)
-    )
+    logger.info("Connected {} to ClearML as configuration {!r}", human_text(str(path)), human_text(name))
     # Sanitization is for storage, not model execution: preserve local source values
     # (including externally managed credentials) or use the clone's effective source.
     return execution_path

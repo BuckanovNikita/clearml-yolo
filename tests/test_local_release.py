@@ -19,10 +19,7 @@ PREK = str(Path(sys.executable).parent / "prek")
 
 def outer_hook_variable(key: str) -> bool:
     """The suite itself runs inside prek hooks; their state must not reach fixtures."""
-    return (
-        key.startswith(("GIT_", "PREK_", "PRE_COMMIT"))
-        or key in {"CLEARML_YOLO_RELEASE_ACTIVE", "SKIP"}
-    )
+    return key.startswith(("GIT_", "PREK_", "PRE_COMMIT")) or key in {"CLEARML_YOLO_RELEASE_ACTIVE", "SKIP"}
 
 
 def command(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -67,9 +64,7 @@ def semantic_release_policy(project: str) -> str:
         if include:
             selected.append(line)
     policy = "".join(selected)
-    assert tomllib.loads(policy) == {
-        "tool": {"semantic_release": tomllib.loads(project)["tool"]["semantic_release"]}
-    }
+    assert tomllib.loads(policy) == {"tool": {"semantic_release": tomllib.loads(project)["tool"]["semantic_release"]}}
     return policy
 
 
@@ -98,8 +93,7 @@ def create_release_repository(repo: Path) -> Path:
     git(repo, "remote", "add", "origin", "https://github.com/example/release-fixture.git")
     policy = semantic_release_policy((ROOT / "pyproject.toml").read_text())
     (repo / "pyproject.toml").write_text(
-        '[project]\nname = "release-fixture"\nversion = "0.3.0"\n'
-        'requires-python = ">=3.12"\n' + policy
+        '[project]\nname = "release-fixture"\nversion = "0.3.0"\nrequires-python = ">=3.12"\n' + policy
     )
     (repo / "uv.lock").write_text(
         'version = 1\nrevision = 3\nrequires-python = ">=3.12"\n\n'
@@ -109,9 +103,7 @@ def create_release_repository(repo: Path) -> Path:
     # Use the real post-commit hook definition, substituting only the already-installed
     # interpreter so fixture projects need no environment installation or network.
     config = yaml.safe_load((ROOT / ".pre-commit-config.yaml").read_text())
-    release_hook = next(
-        hook for item in config["repos"] for hook in item["hooks"] if hook["id"] == "local-release"
-    )
+    release_hook = next(hook for item in config["repos"] for hook in item["hooks"] if hook["id"] == "local-release")
     release_hook["entry"] = f'{sys.executable} "{HELPER}"'
     config["repos"] = [
         {
@@ -168,8 +160,7 @@ def protected_release_repo(release_repo: Path) -> Path:
     project.write_text(
         project.read_text().replace(
             'requires-python = ">=3.12"\n',
-            'requires-python = ">=3.12"\n'
-            'dependencies = ["digital-metrics>=0.6.1", "report-generator>=0.1.2"]\n',
+            'requires-python = ">=3.12"\ndependencies = ["digital-metrics>=0.6.1", "report-generator>=0.1.2"]\n',
         )
     )
     (repo / "uv.lock").write_bytes(
@@ -215,9 +206,7 @@ def test_release_preserves_protected_lock_without_resolving(
         b"version = '0.3.0' # Only this version changes.",
         b"version = '0.3.1' # Only this version changes.",
     )
-    assert "sources" not in tomllib.loads((repo / "pyproject.toml").read_text())["tool"].get(
-        "uv", {}
-    )
+    assert "sources" not in tomllib.loads((repo / "pyproject.toml").read_text())["tool"].get("uv", {})
     assert git(repo, "cat-file", "-t", "v0.3.1") == "tag"
     assert git(repo, "rev-parse", "v0.3.1^{commit}") == git(repo, "rev-parse", "HEAD")
     assert (repo / ".git/checks").read_text().splitlines() == ["0.3.0", "0.3.1"]
@@ -267,9 +256,7 @@ def test_lock_refresh_rejects_invalid_source_without_writing(
         ("fix: replace interface\n\nBREAKING CHANGE: old interface removed", "0.4.0"),
     ],
 )
-def test_commit_updates_metadata_and_tags_once(
-    release_repo: Path, message: str, version: str
-) -> None:
+def test_commit_updates_metadata_and_tags_once(release_repo: Path, message: str, version: str) -> None:
     repo = release_repo
     commit(repo, message)
     assert git(repo, "log", "-1", "--format=%s") == f"chore(release): {version}"
@@ -482,9 +469,7 @@ def test_lock_is_shared_across_worktrees(release_repo: Path, tmp_path: Path) -> 
     assert lock.exists()
 
 
-def test_lock_refresh_cannot_upgrade_dependencies(
-    release_repo: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_lock_refresh_cannot_upgrade_dependencies(release_repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.syspath_prepend(str(ROOT))
     from scripts import local_release
 
@@ -607,9 +592,7 @@ def test_unreachable_tag_conflict_does_not_stamp_metadata(release_repo: Path) ->
 
 def install_changelog_hook(repo: Path) -> None:
     config = yaml.safe_load((ROOT / ".pre-commit-config.yaml").read_text())
-    hook = next(
-        hook for item in config["repos"] for hook in item["hooks"] if hook["id"] == "changelog"
-    )
+    hook = next(hook for item in config["repos"] for hook in item["hooks"] if hook["id"] == "changelog")
     hook["entry"] = f'{sys.executable} "{HELPER}" --changelog'
     path = repo / ".pre-commit-config.yaml"
     fixture_config = yaml.safe_load(path.read_text())
@@ -690,8 +673,7 @@ def test_release_commit_and_tag_recovery_skip_heavy_hooks(release_repo: Path) ->
         {
             "id": "pytest",
             "name": "Counting heavy check",
-            "entry": f'{sys.executable} -c "import pathlib; '
-            "pathlib.Path('.git/heavy').open('a').write('run\\n')\"",
+            "entry": f"{sys.executable} -c \"import pathlib; pathlib.Path('.git/heavy').open('a').write('run\\n')\"",
             "language": "system",
             "always_run": True,
             "pass_filenames": False,
@@ -718,20 +700,10 @@ def test_version_bytes_replaces_exactly_one_root_token(monkeypatch: pytest.Monke
     monkeypatch.syspath_prepend(str(ROOT))
     from scripts.local_release import ReleaseError, version_bytes
 
-    project = (
-        b'[project]\r\nname = "fixture"\r\nversion = \'0.3.0\' # kept\r\n'
-        b'[tool.x]\r\nversion = "9"\r\n'
-    )
-    assert version_bytes(project, "0.3.1", lock=False, name="fixture") == project.replace(
-        b"0.3.0", b"0.3.1"
-    )
-    lock = (
-        b'[[package]]\nname = "dep"\nversion = "1.0.0"\n\n'
-        b'[[package]]\nname = "fixture"\nversion = "0.3.0"\n'
-    )
-    assert version_bytes(lock, "0.3.1", lock=True, name="fixture") == lock.replace(
-        b'"0.3.0"', b'"0.3.1"'
-    )
+    project = b'[project]\r\nname = "fixture"\r\nversion = \'0.3.0\' # kept\r\n[tool.x]\r\nversion = "9"\r\n'
+    assert version_bytes(project, "0.3.1", lock=False, name="fixture") == project.replace(b"0.3.0", b"0.3.1")
+    lock = b'[[package]]\nname = "dep"\nversion = "1.0.0"\n\n[[package]]\nname = "fixture"\nversion = "0.3.0"\n'
+    assert version_bytes(lock, "0.3.1", lock=True, name="fixture") == lock.replace(b'"0.3.0"', b'"0.3.1"')
     missing = b'[project]\nname = "fixture"\n'
     duplicate = b'[project]\nversion = "1"\nversion = "2"\n'
     for ambiguous in (missing, duplicate):
@@ -753,9 +725,7 @@ def test_skipped_heavy_hooks_name_configured_hooks(monkeypatch: pytest.MonkeyPat
 def test_changelog_rewrite_stops_before_heavy_hooks() -> None:
     config = yaml.safe_load((ROOT / ".pre-commit-config.yaml").read_text())
     order = [hook["id"] for repo in config["repos"] for hook in repo["hooks"]]
-    changelog = next(
-        hook for repo in config["repos"] for hook in repo["hooks"] if hook["id"] == "changelog"
-    )
+    changelog = next(hook for repo in config["repos"] for hook in repo["hooks"] if hook["id"] == "changelog")
     assert changelog.get("fail_fast") is True
     heavy = ("mypy", "pytest-full", "pytest")
     assert order.index("changelog") < min(order.index(name) for name in heavy)

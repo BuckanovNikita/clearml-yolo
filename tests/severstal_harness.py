@@ -69,21 +69,14 @@ class SeverstalOptions:
             self,
             "backbone_weights",
             MappingProxyType(
-                {
-                    selection: _backbone_file(selection, path)
-                    for selection, path in self.backbone_weights.items()
-                }
+                {selection: _backbone_file(selection, path) for selection, path in self.backbone_weights.items()}
             ),
         )
 
 
 def _backbone_file(selection: str, path: Path) -> Path:
-    if selection not in MODEL_SELECTIONS or not selection.startswith(
-        ("deimv2/", "fasterrcnn/", "fcos/")
-    ):
-        raise ValueError(
-            "--severstal-backbone supports only registered DEIMv2, Faster R-CNN and FCOS selections"
-        )
+    if selection not in MODEL_SELECTIONS or not selection.startswith(("deimv2/", "fasterrcnn/", "fcos/")):
+        raise ValueError("--severstal-backbone supports only registered DEIMv2, Faster R-CNN and FCOS selections")
     resolved = path.expanduser().resolve()
     if not resolved.is_file() or not resolved.stat().st_size:
         raise ValueError(f"Backbone for {selection} must be an existing nonempty local file")
@@ -112,9 +105,7 @@ def scenario_overrides(
     if selection not in MODEL_SELECTIONS or variant not in VARIANTS:
         raise ValueError("Unknown Severstal model or augmentation scenario")
     if not options.project.strip() or not options.tags or not all(options.tags):
-        raise ValueError(
-            "Severstal acceptance requires explicit ClearML project and ownership tags"
-        )
+        raise ValueError("Severstal acceptance requires explicit ClearML project and ownership tags")
     config = model_preset(selection)
     resolution = PRESETS[config.backend][config.preset]
     result = [
@@ -150,9 +141,7 @@ def scenario_overrides(
     else:
         result += [f"model.predict.device={options.device}"]
     if selection in options.backbone_weights:
-        result.append(
-            f"model.train.backbone_weights={json.dumps(str(options.backbone_weights[selection]))}"
-        )
+        result.append(f"model.train.backbone_weights={json.dumps(str(options.backbone_weights[selection]))}")
     if variant != "default":
         result += [
             "transforms=albumentations",
@@ -175,18 +164,14 @@ def worker_environment(root: Path) -> Mapping[str, str]:
         os.environ
         | {
             "CY_HOME": str(root),
-            "PYTHONPATH": os.pathsep.join(
-                [str(_REPOSITORY / "src"), str(_REPOSITORY), str(_REPOSITORY / "tests")]
-            ),
+            "PYTHONPATH": os.pathsep.join([str(_REPOSITORY / "src"), str(_REPOSITORY), str(_REPOSITORY / "tests")]),
             "HYDRA_FULL_ERROR": "1",
         }
     )
 
 
 def run_scenario(options: SeverstalOptions, selection: str, variant: str) -> Path:
-    root = (
-        options.artifacts.resolve() / f"{selection.replace('/', '-')}-{variant}-{uuid4().hex[:10]}"
-    )
+    root = options.artifacts.resolve() / f"{selection.replace('/', '-')}-{variant}-{uuid4().hex[:10]}"
     root.mkdir(parents=True, exist_ok=False)
     summary: dict[str, Any] = {"selection": selection, "variant": variant, "status": "running"}
     started = time.monotonic()
@@ -209,9 +194,7 @@ def run_scenario(options: SeverstalOptions, selection: str, variant: str) -> Pat
         _run_worker(command, environment, root, options.timeout)
         verification = json.loads((root / "verification.json").read_text(encoding="utf-8"))
         validate_observation(verification["optimizer"])
-        verification["initialization_comparisons"] = _verify_initialization(
-            root, selection, verification
-        )
+        verification["initialization_comparisons"] = _verify_initialization(root, selection, verification)
         summary.update(status="passed", verification=verification)
     except BaseException as error:
         summary.update(status="failed", error=redact(str(error)))
@@ -221,9 +204,7 @@ def run_scenario(options: SeverstalOptions, selection: str, variant: str) -> Pat
         write_json(root / "summary.json", redact_data(summary))
         log = root / "native.log"
         if log.exists():
-            log.write_text(
-                redact(log.read_text(encoding="utf-8", errors="replace")), encoding="utf-8"
-            )
+            log.write_text(redact(log.read_text(encoding="utf-8", errors="replace")), encoding="utf-8")
     return root
 
 
@@ -244,9 +225,7 @@ def _verify_initialization(root: Path, selection: str, result: dict[str, Any]) -
     return comparisons
 
 
-def _run_worker(
-    command: list[str], environment: Mapping[str, str], root: Path, timeout: float
-) -> None:
+def _run_worker(command: list[str], environment: Mapping[str, str], root: Path, timeout: float) -> None:
     with (root / "native.log").open("w", encoding="utf-8") as output:
         process = subprocess.Popen(  # noqa: S603 - fixed project test worker, no shell
             command,
@@ -270,9 +249,7 @@ def _run_worker(
                 process.wait(timeout=10)
             raise
     if status:
-        raise AssertionError(
-            f"Native Severstal worker exited {status}; inspect {root / 'native.log'}"
-        )
+        raise AssertionError(f"Native Severstal worker exited {status}; inspect {root / 'native.log'}")
 
 
 def _worker(root: Path) -> None:
@@ -290,9 +267,7 @@ def _worker(root: Path) -> None:
         raise RuntimeError("Selected native Severstal acceptance requires an available CUDA device")
     config = model_preset(request["selection"])
     if request["variant"] != "default":
-        write_pipeline(
-            root / "pipeline.json", request["variant"], PRESETS[config.backend][config.preset]
-        )
+        write_pipeline(root / "pipeline.json", request["variant"], PRESETS[config.backend][config.preset])
     from clearml_yolo.entrypoints.pipeline import main
 
     observation = OptimizerObservation()
@@ -328,9 +303,7 @@ def _completed_task(request: dict[str, Any]) -> tuple[Any, dict[str, Any]]:
     return task, canonical
 
 
-def _verify_publication(
-    root: Path, request: dict[str, Any], manifest: dict[str, Any]
-) -> dict[str, Any]:
+def _verify_publication(root: Path, request: dict[str, Any], manifest: dict[str, Any]) -> dict[str, Any]:
     import pandas as pd
 
     task, canonical = _completed_task(request)
@@ -347,13 +320,9 @@ def _verify_publication(
     write_json(root / "scalars.json", redact_data(scalars))
     losses = loss_values(scalars)
     expected = {"gt_csv", "predicts_csv", "metrics_best_confidences_val"} | {
-        f"metrics_dashboard_{mode}_{split}"
-        for mode in ("full", "dtrk")
-        for split in ("val", "test")
+        f"metrics_dashboard_{mode}_{split}" for mode in ("full", "dtrk") for split in ("val", "test")
     }
-    assert expected <= set(task.artifacts), (
-        f"Missing native artifacts: {expected - set(task.artifacts)}"
-    )
+    assert expected <= set(task.artifacts), f"Missing native artifacts: {expected - set(task.artifacts)}"
     downloads = root / "downloads"
     downloads.mkdir()
     hashes: dict[str, str] = {}
@@ -368,13 +337,9 @@ def _verify_publication(
         downloaded[name] = destination
     predictions = pd.read_csv(downloaded["predicts_csv"])
     expected_names = {
-        image["image_name"]
-        for image in manifest["images"]
-        if image["smoke"] and image["split"] in {"val", "test"}
+        image["image_name"] for image in manifest["images"] if image["smoke"] and image["split"] in {"val", "test"}
     }
-    assert set(predictions["image_name"]) == expected_names, (
-        "Prediction lost evaluated images or backgrounds"
-    )
+    assert set(predictions["image_name"]) == expected_names, "Prediction lost evaluated images or backgrounds"
     assert {"val", "test"} <= set(predictions["split"])
     for name, path in downloaded.items():
         if name.startswith("metrics_dashboard_"):
@@ -388,12 +353,8 @@ def _verify_publication(
     assert isinstance(native_name, str), "Native best Output Model filename is missing"
     native = list((root / "pipeline").rglob(native_name))
     assert native, "Native best checkpoint is missing"
-    assert any(file_sha256(path) == digest for path in native), (
-        "Downloaded checkpoint differs from native best"
-    )
-    image = next(
-        image for image in manifest["images"] if image["smoke"] and image["split"] == "test"
-    )
+    assert any(file_sha256(path) == digest for path in native), "Downloaded checkpoint differs from native best"
+    image = next(image for image in manifest["images"] if image["smoke"] and image["split"] == "test")
     _reload_checkpoint(request, weights, image["image_path"])
     return {
         "task_id": task.id,
@@ -411,9 +372,7 @@ def _reload_checkpoint(request: dict[str, Any], weights: Path, image_path: str) 
     if config.backend == "ultralytics":
         from ultralytics.models import YOLO
 
-        results = list(
-            YOLO(str(weights)).predict([image_path], device=request["device"], verbose=False)
-        )
+        results = list(YOLO(str(weights)).predict([image_path], device=request["device"], verbose=False))
         assert len(results) == 1, "Downloaded YOLO checkpoint failed inference reload"
         return
     from clearml_yolo.adapters.storage.checkpoint import read_checkpoint_descriptor

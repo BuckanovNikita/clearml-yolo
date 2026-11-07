@@ -30,9 +30,7 @@ SDK_ROOTS = {
     for root in IMPORT_CONTRACTS[section]["forbidden_modules"].split()
 }
 QUEUE_ROOTS = set(
-    IMPORT_CONTRACTS["importlinter:contract:cy-never-imports-extracted-queue"][
-        "forbidden_modules"
-    ].split()
+    IMPORT_CONTRACTS["importlinter:contract:cy-never-imports-extracted-queue"]["forbidden_modules"].split()
 )
 SDK_ROOTS |= QUEUE_ROOTS
 EFFECTFUL_CALLS = {
@@ -209,10 +207,9 @@ def graph_findings(graph: grimp.ImportGraph) -> list[str]:
                 and not any(within(imported, allowed) for allowed in PURE_ADAPTERS[module])
             ):
                 findings.append(f"pure adapter dependency: {module} -> {imported}")
-            if (
-                within(module, "clearml_yolo.core")
-                and external_root not in sys.stdlib_module_names | SCIENTIFIC | {"clearml_yolo"}
-            ):
+            if within(module, "clearml_yolo.core") and external_root not in sys.stdlib_module_names | SCIENTIFIC | {
+                "clearml_yolo"
+            }:
                 findings.append(f"core dependency allowlist: {module} -> {imported}")
     try:
         tuple(TopologicalSorter(dependencies).static_order())
@@ -242,9 +239,7 @@ def _definition_expressions(
             yield node.returns
 
 
-def _scope_nodes(
-    nodes: list[ast.stmt], type_checking: frozenset[str] = frozenset()
-) -> Iterator[ast.AST]:
+def _scope_nodes(nodes: list[ast.stmt], type_checking: frozenset[str] = frozenset()) -> Iterator[ast.AST]:
     """Walk bindings in one Python scope, without entering child namespaces."""
     for node in nodes:
         yield node
@@ -302,9 +297,7 @@ class _EffectVisitor(ast.NodeVisitor):
         self.class_scopes: list[dict[str, str]] = []
         self.findings: list[str] = []
         self.dynamic_imports: set[str] = set()
-        self.deferred: list[
-            tuple[ast.FunctionDef | ast.AsyncFunctionDef | ast.Lambda, list[dict[str, str]]]
-        ] = []
+        self.deferred: list[tuple[ast.FunctionDef | ast.AsyncFunctionDef | ast.Lambda, list[dict[str, str]]]] = []
 
     @override
     def visit_Module(self, node: ast.Module) -> None:
@@ -410,9 +403,7 @@ class _EffectVisitor(ast.NodeVisitor):
         local = _function_locals(statements, node.args)
         # Methods close over surrounding functions/modules, never class namespaces.
         captured = [
-            scope
-            for scope in self.scopes
-            if all(scope is not class_scope for class_scope in self.class_scopes)
+            scope for scope in self.scopes if all(scope is not class_scope for class_scope in self.class_scopes)
         ] + [local]
         self.deferred.append((node, captured))
 
@@ -434,9 +425,7 @@ class _EffectVisitor(ast.NodeVisitor):
             self.visit(expression)
         outer_scopes = self.scopes
         self.scopes = [
-            scope
-            for scope in self.scopes
-            if all(scope is not class_scope for class_scope in self.class_scopes)
+            scope for scope in self.scopes if all(scope is not class_scope for class_scope in self.class_scopes)
         ] + [{}]
         self.class_scopes.append(self.scopes[-1])
         for statement in node.body:
@@ -445,15 +434,11 @@ class _EffectVisitor(ast.NodeVisitor):
         self.scopes = outer_scopes
         self.scopes[-1][node.name] = "@local"
 
-    def comprehension_scope(
-        self, node: ast.ListComp | ast.SetComp | ast.DictComp | ast.GeneratorExp
-    ) -> None:
+    def comprehension_scope(self, node: ast.ListComp | ast.SetComp | ast.DictComp | ast.GeneratorExp) -> None:
         self.visit(node.generators[0].iter)
         outer_scopes = self.scopes
         self.scopes = [
-            scope
-            for scope in self.scopes
-            if all(scope is not class_scope for class_scope in self.class_scopes)
+            scope for scope in self.scopes if all(scope is not class_scope for class_scope in self.class_scopes)
         ] + [{}]
         for index, generator in enumerate(node.generators):
             if index:
@@ -527,14 +512,10 @@ def _type_checking_names(tree: ast.Module) -> set[str]:
     for node in _scope_nodes(tree.body):
         if isinstance(node, ast.Import):
             names.update(
-                f"{alias.asname or alias.name}.TYPE_CHECKING"
-                for alias in node.names
-                if alias.name == "typing"
+                f"{alias.asname or alias.name}.TYPE_CHECKING" for alias in node.names if alias.name == "typing"
             )
         elif isinstance(node, ast.ImportFrom) and node.module == "typing":
-            names.update(
-                alias.asname or alias.name for alias in node.names if alias.name == "TYPE_CHECKING"
-            )
+            names.update(alias.asname or alias.name for alias in node.names if alias.name == "TYPE_CHECKING")
     return names
 
 
@@ -572,24 +553,16 @@ def _eager_targets(path: Path, source_root: Path, modules: set[str]) -> set[str]
         if isinstance(node, ast.Import):
             targets.update(alias.name for alias in node.names)
         elif isinstance(node, ast.ImportFrom):
-            base = (
-                resolve_name("." * node.level + (node.module or ""), package)
-                if node.level
-                else node.module or ""
-            )
+            base = resolve_name("." * node.level + (node.module or ""), package) if node.level else node.module or ""
             targets.add(base)
-            targets.update(
-                f"{base}.{alias.name}" for alias in node.names if f"{base}.{alias.name}" in modules
-            )
+            targets.update(f"{base}.{alias.name}" for alias in node.names if f"{base}.{alias.name}" in modules)
     return targets
 
 
 def initializer_dependency_findings(source_root: Path) -> list[str]:
     """Check eager imports through project re-exports without treating lazy calls as eager."""
     paths = {_module_name(path, source_root): path for path in source_root.rglob("*.py")}
-    edges = {
-        module: _eager_targets(path, source_root, set(paths)) for module, path in paths.items()
-    }
+    edges = {module: _eager_targets(path, source_root, set(paths)) for module, path in paths.items()}
     findings: list[str] = []
 
     def visit(module: str, chain: tuple[str, ...]) -> None:
@@ -627,36 +600,23 @@ def initializer_findings(tree: ast.Module) -> list[str]:
     findings: list[str] = []
     for node in _eager_nodes(tree, _type_checking_names(tree)):
         if isinstance(node, ast.Import | ast.ImportFrom):
-            names = (
-                [alias.name for alias in node.names]
-                if isinstance(node, ast.Import)
-                else [node.module or ""]
-            )
+            names = [alias.name for alias in node.names] if isinstance(node, ast.Import) else [node.module or ""]
             if any(name.split(".")[0] in SDK_ROOTS for name in names):
                 findings.append(f"eager SDK import at line {node.lineno}")
         elif isinstance(node, ast.Call):
             findings.append(f"initializer operation at line {node.lineno}")
         elif isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
-            findings.extend(
-                f"initializer decorator at line {decorator.lineno}"
-                for decorator in node.decorator_list
-            )
+            findings.extend(f"initializer decorator at line {decorator.lineno}" for decorator in node.decorator_list)
     return findings
 
 
 def runtime_targets(source_root: Path, pyproject: Path) -> set[str]:
     """Inventory literal worker/probe/plugin/Hydra and console-script targets."""
-    pattern = re.compile(
-        r"(?:clearml_yolo|hydra_plugins)(?:\.[A-Za-z_]\w*)+(?::[A-Za-z_]\w*(?:\.\w+)*)?"
-    )
+    pattern = re.compile(r"(?:clearml_yolo|hydra_plugins)(?:\.[A-Za-z_]\w*)+(?::[A-Za-z_]\w*(?:\.\w+)*)?")
     targets: set[str] = set()
     for path in source_root.rglob("*.py"):
         for node in ast.walk(ast.parse(path.read_text())):
-            if (
-                isinstance(node, ast.Constant)
-                and isinstance(node.value, str)
-                and pattern.fullmatch(node.value)
-            ):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str) and pattern.fullmatch(node.value):
                 targets.add(node.value)
     config = tomllib.loads(pyproject.read_text(encoding="utf-8"))
     targets.update(config["project"]["scripts"].values())
@@ -681,24 +641,17 @@ def runtime_boundary_findings(source_root: Path) -> list[str]:
         targets = {
             node.value
             for node in ast.walk(tree)
-            if isinstance(node, ast.Constant)
-            and isinstance(node.value, str)
-            and id(node) not in selectors
+            if isinstance(node, ast.Constant) and isinstance(node.value, str) and id(node) not in selectors
         }
         findings.extend(launch_target_findings(importer, targets))
     return findings
 
 
 def _symbol_references(symbols: Mapping[str, ast.AST | str], prefix: str) -> dict[str, str]:
-    return {
-        name: symbol if isinstance(symbol, str) else f"{prefix}.{name}"
-        for name, symbol in symbols.items()
-    }
+    return {name: symbol if isinstance(symbol, str) else f"{prefix}.{name}" for name, symbol in symbols.items()}
 
 
-def _assignment_symbols(
-    node: ast.Assign | ast.AnnAssign, references: Mapping[str, str]
-) -> dict[str, ast.AST | str]:
+def _assignment_symbols(node: ast.Assign | ast.AnnAssign, references: Mapping[str, str]) -> dict[str, ast.AST | str]:
     # An annotation alone does not create a runtime attribute.
     if node.value is None:
         return {}
@@ -733,11 +686,7 @@ def _scope_symbols(
                     alias.name if alias.asname else alias.name.split(".")[0]
                 )
         elif isinstance(node, ast.ImportFrom):
-            base = (
-                resolve_name("." * node.level + (node.module or ""), package)
-                if node.level
-                else node.module or ""
-            )
+            base = resolve_name("." * node.level + (node.module or ""), package) if node.level else node.module or ""
             for alias in node.names:
                 symbols[alias.asname or alias.name] = f"{base}.{alias.name}"
         elif isinstance(node, ast.Assign | ast.AnnAssign):

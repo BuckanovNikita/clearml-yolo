@@ -33,9 +33,7 @@ class TrainingTransform:
         # They bypass __getitem__, and therefore never recursively augment donors.
         image, _ = self.dataset._decode_image(image_id)  # noqa: SLF001
         annotations = self.dataset._load_target(image_id)  # noqa: SLF001
-        image, target = self.dataset.prepare(
-            image, {"image_id": image_id, "annotations": annotations}
-        )
+        image, target = self.dataset.prepare(image, {"image_id": image_id, "annotations": annotations})
         return detection_sample(image, target)
 
     def __call__(self, image: Image.Image, target: dict[str, Any]) -> tuple[Any, Any]:
@@ -49,9 +47,7 @@ class TrainingTransform:
             load_sample=self.raw_sample,
             seed=worker_seed(self.seed),
         )
-        image_out, target_out = self.native(
-            Image.fromarray(sample.image), tensor_target(sample, target)
-        )
+        image_out, target_out = self.native(Image.fromarray(sample.image), tensor_target(sample, target))
         return image_out, target_out
 
 

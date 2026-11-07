@@ -11,9 +11,7 @@ from torch import distributed
 pytestmark = [
     pytest.mark.ddp_cpu,
     pytest.mark.skipif(
-        not sys.platform.startswith("linux")
-        or not distributed.is_available()
-        or not distributed.is_gloo_available(),
+        not sys.platform.startswith("linux") or not distributed.is_available() or not distributed.is_gloo_available(),
         reason="CPU DDP integration requires Linux/WSL and PyTorch Gloo",
     ),
 ]
@@ -60,9 +58,7 @@ def _custom_pipeline(result: dict[str, Any]) -> None:
     [(2, "success"), (4, "success"), (2, "custom_mosaic")],
     ids=["two-ranks", "four-ranks", "custom-mosaic-two-ranks"],
 )
-def test_cpu_ddp_trains_yolo_and_replays_only_rank_zero(
-    tmp_path: Path, ranks: int, scenario: str
-) -> None:
+def test_cpu_ddp_trains_yolo_and_replays_only_rank_zero(tmp_path: Path, ranks: int, scenario: str) -> None:
     result = _run(tmp_path, ranks, scenario)
     assert result["error"] is None, result
     assert result["launcher_returncode"] == 0
@@ -91,16 +87,12 @@ def test_cpu_ddp_trains_yolo_and_replays_only_rank_zero(
         assert all(item["epoch"] == epoch for item in observations)
         assert all(item["parameters_changed"] for item in observations)
         assert all(item["optimizer_steps"] > 0 for item in observations)
-        assert all(
-            math.isfinite(value) for item in observations for value in item["losses"].values()
-        )
+        assert all(math.isfinite(value) for item in observations for value in item["losses"].values())
         assert len({item["parameters_sha256"] for item in observations}) == 1
         samples = [sample for item in observations for sample in item["samples"]]
         assert len(samples) == len(set(samples)) == 8
         assert set(samples) == {f"train-{index}.png" for index in range(8)}
-    assert any(
-        worker["epochs"][0]["samples"] != worker["epochs"][1]["samples"] for worker in workers
-    )
+    assert any(worker["epochs"][0]["samples"] != worker["epochs"][1]["samples"] for worker in workers)
     assert result["live_telemetry"]
     assert result["inference_images"] == 1
     assert result["effective_args"]["imgsz"] == 64
@@ -114,9 +106,7 @@ def test_cpu_ddp_trains_yolo_and_replays_only_rank_zero(
     assert result["captured_events"].count("on_train_epoch_end") == 2
     assert result["captured_events"].count("on_train_end") == 1
     scalars = result["scalars"]
-    assert len({(item["title"], item["series"], item["iteration"]) for item in scalars}) == len(
-        scalars
-    )
+    assert len({(item["title"], item["series"], item["iteration"]) for item in scalars}) == len(scalars)
     for observation in workers[0]["epochs"]:
         for name, value in observation["losses"].items():
             assert any(
@@ -131,9 +121,7 @@ def test_cpu_ddp_trains_yolo_and_replays_only_rank_zero(
 
 
 @pytest.mark.parametrize("failed_rank", [0, 1], ids=["rank-zero", "nonzero-rank"])
-def test_cpu_ddp_worker_failure_stops_peers_without_model_publication(
-    tmp_path: Path, failed_rank: int
-) -> None:
+def test_cpu_ddp_worker_failure_stops_peers_without_model_publication(tmp_path: Path, failed_rank: int) -> None:
     result = _run(tmp_path, 2, f"rank{failed_rank}_error")
     assert result["launcher_returncode"] != 0
     assert result["error"] is not None

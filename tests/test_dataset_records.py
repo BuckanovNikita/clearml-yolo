@@ -170,9 +170,7 @@ def test_drops_each_invalid_annotation_once(
     assert log_messages.count("INFO:Invalid bounding boxes dropped: 1\n") == 1
 
 
-def test_drops_and_counts_each_identical_invalid_annotation(
-    tmp_path: Path, log_messages: list[str]
-) -> None:
+def test_drops_and_counts_each_identical_invalid_annotation(tmp_path: Path, log_messages: list[str]) -> None:
     train = _image(tmp_path / "train.png")
     val = _image(tmp_path / "val.png")
     invalid = _row("train.png", train, "cat", (4, 2, 3, 5), "train")
@@ -333,9 +331,7 @@ def test_rejects_missing_or_unreadable_images(tmp_path: Path, unreadable: bool) 
         validate_ground_truth(source)
 
 
-def test_reads_each_repeated_image_only_once(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_reads_each_repeated_image_only_once(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     source = _valid_dataset(tmp_path)
     real_open = Image.open
     opened: list[str | Path] = []
@@ -461,9 +457,7 @@ def test_validation_does_not_modify_source_images(tmp_path: Path) -> None:
     assert {path: hashlib.sha256(path.read_bytes()).hexdigest() for path in paths} == before
 
 
-def test_requires_train_val_requested_splits_and_a_valid_training_box(
-    tmp_path: Path, log_messages: list[str]
-) -> None:
+def test_requires_train_val_requested_splits_and_a_valid_training_box(tmp_path: Path, log_messages: list[str]) -> None:
     train = _image(tmp_path / "train.png")
     val = _image(tmp_path / "val.png")
     source = _write_csv(
@@ -484,9 +478,7 @@ def test_requires_train_val_requested_splits_and_a_valid_training_box(
         validate_ground_truth(valid_source, required_splits=("test",))
 
 
-def test_warns_for_classes_without_valid_training_examples(
-    tmp_path: Path, log_messages: list[str]
-) -> None:
+def test_warns_for_classes_without_valid_training_examples(tmp_path: Path, log_messages: list[str]) -> None:
     train = _image(tmp_path / "train.png")
     val = _image(tmp_path / "val.png")
     source = _write_csv(

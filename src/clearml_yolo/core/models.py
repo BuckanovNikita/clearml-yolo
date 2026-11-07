@@ -53,9 +53,7 @@ class DeimAugmentationOverrides(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     mosaic_prob: Annotated[float, Field(ge=0, le=1)] = Field(
-        description=(
-            "Вероятность нативного Mosaic DEIMv2 от 0 до 1; общий Albumentations-профиль задаёт 0."
-        ),
+        description=("Вероятность нативного Mosaic DEIMv2 от 0 до 1; общий Albumentations-профиль задаёт 0."),
         examples=[0.0],
         json_schema_extra={
             "shapes": "Annotated[float, Field(ge=0, le=1)]",
@@ -110,9 +108,7 @@ class RFDETRAugmentationOverrides(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     aug_config: dict[str, JsonValue] = Field(
-        description=(
-            "Карта нативной аугментации RF-DETR; общий pipeline отключает её пустой картой."
-        ),
+        description=("Карта нативной аугментации RF-DETR; общий pipeline отключает её пустой картой."),
         examples=[{}],
         json_schema_extra={
             "shapes": "dict[str, JsonValue]",
@@ -264,8 +260,7 @@ class TrainSettings(BaseModel):
     pretrained: StrictBool = Field(
         default=True,
         description=(
-            "Использовать поддерживаемые предварительно обученные веса. false "
-            "разрешает обучение без их загрузки."
+            "Использовать поддерживаемые предварительно обученные веса. false разрешает обучение без их загрузки."
         ),
         examples=[True],
         json_schema_extra={
@@ -306,8 +301,7 @@ class TrainSettings(BaseModel):
     amp: StrictBool = Field(
         default=True,
         description=(
-            "Включить смешанную точность нативного обучения, если она "
-            "поддерживается устройством и адаптером."
+            "Включить смешанную точность нативного обучения, если она поддерживается устройством и адаптером."
         ),
         examples=[True],
         json_schema_extra={
@@ -319,9 +313,7 @@ class TrainSettings(BaseModel):
     )
     grad_accum_steps: Annotated[int, Field(strict=True, gt=0)] = Field(
         default=1,
-        description=(
-            "Положительное число шагов накопления градиента. DEIMv2 поддерживает только 1."
-        ),
+        description=("Положительное число шагов накопления градиента. DEIMv2 поддерживает только 1."),
         examples=[1],
         json_schema_extra={
             "shapes": "Annotated[int, Field(strict=True, gt=0)]",
@@ -332,9 +324,7 @@ class TrainSettings(BaseModel):
     )
     use_ema: StrictBool = Field(
         default=True,
-        description=(
-            "Использовать экспоненциальное усреднение весов в поддерживающем его нативном тренере."
-        ),
+        description=("Использовать экспоненциальное усреднение весов в поддерживающем его нативном тренере."),
         examples=[True],
         json_schema_extra={
             "shapes": "StrictBool",
@@ -343,9 +333,7 @@ class TrainSettings(BaseModel):
             "classification": "input",
         },
     )
-    augmentation: (
-        DeimAugmentationOverrides | RFDETRAugmentationOverrides | EmptyAugmentationOverrides | None
-    ) = Field(
+    augmentation: DeimAugmentationOverrides | RFDETRAugmentationOverrides | EmptyAugmentationOverrides | None = Field(
         default=None,
         description=(
             "Карта отключаемых нативных аугментаций для "
@@ -354,10 +342,7 @@ class TrainSettings(BaseModel):
         ),
         examples=[None],
         json_schema_extra={
-            "shapes": (
-                "DeimAugmentationOverrides | RFDETRAugmentationOverrides | "
-                "EmptyAugmentationOverrides | None"
-            ),
+            "shapes": ("DeimAugmentationOverrides | RFDETRAugmentationOverrides | EmptyAugmentationOverrides | None"),
             "applicability": "TrainSettings",
             "source": "clearml_yolo.core.models.TrainSettings.augmentation",
             "classification": "input",
@@ -370,9 +355,7 @@ class PredictSettings(BaseModel):
 
     device: Device = Field(
         default=None,
-        description=(
-            "Независимый выбор устройства предсказания; null оставляет решение нативному адаптеру."
-        ),
+        description=("Независимый выбор устройства предсказания; null оставляет решение нативному адаптеру."),
         examples=["cpu"],
         json_schema_extra={
             "shapes": "Device",
@@ -444,9 +427,7 @@ class PredictSettings(BaseModel):
     )
     half: StrictBool = Field(
         default=False,
-        description=(
-            "Использовать FP16 при предсказании, если это поддерживают устройство и адаптер."
-        ),
+        description=("Использовать FP16 при предсказании, если это поддерживают устройство и адаптер."),
         examples=[False],
         json_schema_extra={
             "shapes": "StrictBool",
@@ -462,9 +443,7 @@ class ModelConfig(BaseModel):
 
     backend: BackendName = Field(
         default="ultralytics",
-        description=(
-            "Семейство детектора. Для Ultralytics активны группы ultralytics и ultralytics_predict."
-        ),
+        description=("Семейство детектора. Для Ultralytics активны группы ultralytics и ultralytics_predict."),
         examples=["rfdetr"],
         json_schema_extra={
             "shapes": "BackendName",
@@ -475,10 +454,7 @@ class ModelConfig(BaseModel):
     )
     preset: str = Field(
         default="default",
-        description=(
-            "Зарегистрированная архитектура выбранного семейства; определяет "
-            "исходное разрешение обучения."
-        ),
+        description=("Зарегистрированная архитектура выбранного семейства; определяет исходное разрешение обучения."),
         examples=["small"],
         json_schema_extra={
             "shapes": "str",
@@ -489,10 +465,7 @@ class ModelConfig(BaseModel):
     )
     source_dir: Path | None = Field(
         default=None,
-        description=(
-            "Каталог исходников DEIMv2; null разрешает штатную подготовку. Для "
-            "других семейств запрещён."
-        ),
+        description=("Каталог исходников DEIMv2; null разрешает штатную подготовку. Для других семейств запрещён."),
         examples=["vendor/DEIMv2"],
         json_schema_extra={
             "shapes": "Path | None",
@@ -517,10 +490,7 @@ class ModelConfig(BaseModel):
     )
     predict: PredictSettings = Field(
         default_factory=PredictSettings,
-        description=(
-            "Параметры предсказания не-YOLO детекторов. Для Ultralytics "
-            "используйте ultralytics_predict."
-        ),
+        description=("Параметры предсказания не-YOLO детекторов. Для Ultralytics используйте ultralytics_predict."),
         examples=[{"batch": 2}],
         json_schema_extra={
             "shapes": "PredictSettings",

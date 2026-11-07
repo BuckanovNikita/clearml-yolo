@@ -112,9 +112,7 @@ def main() -> None:
                 if dist.is_initialized():
                     dist.destroy_process_group()
             finally:
-                (root / f"rank-{rank}.json").write_text(
-                    json.dumps(evidence, indent=2), encoding="utf-8"
-                )
+                (root / f"rank-{rank}.json").write_text(json.dumps(evidence, indent=2), encoding="utf-8")
 
 
 if __name__ == "__main__":

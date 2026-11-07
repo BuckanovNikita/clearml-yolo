@@ -18,9 +18,7 @@ def _group(tags: list[str], user_tags: list[str]) -> str:
     return tag
 
 
-def _launches(
-    tmp_path: Path, arguments: list[str], *, command: str = "pipeline"
-) -> list[list[str]]:
+def _launches(tmp_path: Path, arguments: list[str], *, command: str = "pipeline") -> list[list[str]]:
     script = """
 import json
 import sys
@@ -54,9 +52,7 @@ common.launch(COMMAND, lambda: None)
 
 @pytest.mark.parametrize("mode", [["-m"], ["--multirun"], ["hydra.mode=MULTIRUN"]])
 @pytest.mark.parametrize("command", ["pipeline", "train"])
-def test_direct_multiruns_share_tags_only_within_each_launch(
-    tmp_path: Path, mode: list[str], command: str
-) -> None:
+def test_direct_multiruns_share_tags_only_within_each_launch(tmp_path: Path, mode: list[str], command: str) -> None:
     tags = _launches(
         tmp_path,
         [*mode, "ground_truth=input.csv", "ultralytics.epochs=1,2", "clearml.tags=[prod,prod]"],
@@ -72,9 +68,7 @@ def test_direct_multiruns_share_tags_only_within_each_launch(
 
 
 @pytest.mark.parametrize("saved_mode", ["MULTIRUN", "RUN"])
-def test_saved_mode_and_one_job_multiruns_receive_fresh_tags(
-    tmp_path: Path, saved_mode: str
-) -> None:
+def test_saved_mode_and_one_job_multiruns_receive_fresh_tags(tmp_path: Path, saved_mode: str) -> None:
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     OmegaConf.save(

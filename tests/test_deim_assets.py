@@ -44,17 +44,13 @@ def test_manual_archive_extracts_offline_and_preserves_null_selector(
     destination = resolver.asset_destination(asset)
     destination.parent.mkdir(parents=True)
     _archive(destination, source_files)
-    monkeypatch.setattr(
-        resolver, "_download", lambda *args: pytest.fail("manual archive is sufficient")
-    )
+    monkeypatch.setattr(resolver, "_download", lambda *args: pytest.fail("manual archive is sufficient"))
     original = model_preset("deimv2/s")
     model, records = execution.prepare_model_assets(original, training=False)
     assert original.source_dir is None
     assert model.source_dir == destination.parent / REVISION
     assert model.source_dir is not None
-    assert (model.source_dir / "engine/__init__.py").read_bytes() == source_files[
-        "engine/__init__.py"
-    ]
+    assert (model.source_dir / "engine/__init__.py").read_bytes() == source_files["engine/__init__.py"]
     assert len(records) == 1
     validate_checkout(model.source_dir)
     destination.unlink()
@@ -102,9 +98,7 @@ def test_source_loader_compiles_verified_bytes_and_rejects_tampering(
     source = tmp_path / "engine/__init__.py"
     source.parent.mkdir()
     source.write_bytes(source_files["engine/__init__.py"])
-    loader = _VerifiedSourceLoader(
-        "test_namespace", str(source), tmp_path, archive.source_manifest()
-    )
+    loader = _VerifiedSourceLoader("test_namespace", str(source), tmp_path, archive.source_manifest())
     assert loader.get_code("test_namespace").co_filename == str(source)
     source.write_text("VALUE = 2\n")
     with pytest.raises(ImportError, match="changed before importing"):

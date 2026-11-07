@@ -70,9 +70,7 @@ def _journal_epoch_scalars(record: dict[str, Any]) -> None:
         values.extend(("lr", name, value) for name, value in record["lr"].items())
     elif event == "on_fit_epoch_end":
         values = [("Epoch Time", "Epoch Time", record["epoch_time"])]
-        values.extend(
-            (name.split("/")[0], name, value) for name, value in record["metrics"].items()
-        )
+        values.extend((name.split("/")[0], name, value) for name, value in record["metrics"].items())
     else:
         return
     journaled = bool(os.environ.get("CY_SCALAR_JOURNAL"))
@@ -294,9 +292,7 @@ class NativeDDPRelay:
         from ultralytics.utils.callbacks import clearml as integration
 
         callbacks: dict[str, Any] = integration.callbacks
-        if set(callbacks) != set(_EVENTS) or not all(
-            callable(callbacks[event]) for event in _EVENTS
-        ):
+        if set(callbacks) != set(_EVENTS) or not all(callable(callbacks[event]) for event in _EVENTS):
             raise RuntimeError("Installed native ClearML callback set changed before DDP replay")
         return callbacks
 
@@ -337,9 +333,7 @@ class NativeDDPRelay:
         if not self._consumed:
             arguments = record.get("args")
             if record["event"] != "on_pretrain_routine_start" or not isinstance(arguments, dict):
-                raise RuntimeError(
-                    "Native DDP event output is incomplete: effective arguments are missing"
-                )
+                raise RuntimeError("Native DDP event output is incomplete: effective arguments are missing")
             self._args = SimpleNamespace(**arguments)
         elif record["event"] == "on_pretrain_routine_start":
             raise RuntimeError("Native DDP event output contains duplicate pretrain events")
@@ -350,15 +344,11 @@ class NativeDDPRelay:
         if get_ident() != self._owner_thread:
             raise RuntimeError("Native DDP SDK callbacks must execute on the owner thread")
         if self._args is None:
-            raise RuntimeError(
-                "Native DDP event output is incomplete: effective arguments are missing"
-            )
+            raise RuntimeError("Native DDP event output is incomplete: effective arguments are missing")
         view = _ReplayTrainer(record, self._args)
         with (
             sdk_deadline(self._callback_seconds),
-            trace_operation(
-                "ddp.callback", context={"event": str(record["event"]), "stage": "train"}
-            ),
+            trace_operation("ddp.callback", context={"event": str(record["event"]), "stage": "train"}),
             _recorded_model_info(record.get("model_info")),
             replayed_scalars(bool(record.get("scalar_journaled", False))),
         ):
@@ -395,9 +385,7 @@ class NativeDDPRelay:
         records = self._consumed
         if not records or self._pending:
             raise RuntimeError("Native DDP event output is incomplete: rank-zero journal")
-        counts = {
-            event: sum(record.get("event") == event for record in records) for event in _EVENTS
-        }
+        counts = {event: sum(record.get("event") == event for record in records) for event in _EVENTS}
         if (
             counts["on_pretrain_routine_start"] != 1
             or counts["on_train_epoch_end"] < 1
@@ -412,9 +400,7 @@ class NativeDDPRelay:
         for name in ("trainer_plots", "validator_plots"):
             for path in final[name]:
                 if not isinstance(path, str) or not Path(path).is_file():
-                    raise RuntimeError(
-                        "Native DDP event output is incomplete: final plot is missing"
-                    )
+                    raise RuntimeError("Native DDP event output is incomplete: final plot is missing")
         best = Path(str(final.get("best", "")))
         if not best.is_file() or best.stat().st_size == 0:
             raise RuntimeError("Native DDP event output is incomplete: best checkpoint is missing")
@@ -452,9 +438,7 @@ class NativeDDPRelay:
         records = self._records()
         final_args = records[-1].get("args")
         if not isinstance(final_args, dict):
-            raise TypeError(
-                "Native DDP event output is incomplete: effective arguments are missing"
-            )
+            raise TypeError("Native DDP event output is incomplete: effective arguments are missing")
         self._args = SimpleNamespace(**final_args)
         self._dispatch(records[-1])
         for name, value in final_args.items():

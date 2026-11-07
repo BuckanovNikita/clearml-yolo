@@ -55,9 +55,7 @@ class _ClassNMSMask(torch.autograd.Function):
         boxcol = g.op("Gather", selected, const([2]), axis_i=1)
         indices = g.op("Concat", batchcol, boxcol, axis_i=1)
         resultshape = g.op("Concat", bc, n, axis_i=0)
-        initial = g.op(
-            "ConstantOfShape", resultshape, value_t=torch.tensor([False], dtype=torch.bool)
-        )
+        initial = g.op("ConstantOfShape", resultshape, value_t=torch.tensor([False], dtype=torch.bool))
         num = g.op("Gather", g.op("Shape", selected), const([0]), axis_i=0)
         updates = g.op("ConstantOfShape", num, value_t=torch.tensor([True], dtype=torch.bool))
         scatter = g.op("ScatterND", initial, indices, updates)
@@ -77,9 +75,7 @@ def padded_nms(
     selected_boxes = torch.gather(boxes.flatten(1, 2), 1, index[:, :, None].expand(-1, -1, 4))
     valid = selected_scores >= 0
     count = valid.sum(1)
-    selected_boxes = torch.where(
-        valid[:, :, None], selected_boxes, torch.zeros_like(selected_boxes)
-    )
+    selected_boxes = torch.where(valid[:, :, None], selected_boxes, torch.zeros_like(selected_boxes))
     return (
         selected_boxes,
         torch.where(valid, selected_scores, torch.zeros_like(selected_scores)),
@@ -113,37 +109,27 @@ class TensorizedDetector(nn.Module):
         self.detection_limit = int(model.roi_heads.detections_per_img)
         if max(self.proposal_limit, self.pre_limit) > MAX_NMS_PROPOSALS:
             raise ValueError("TensorRT per-class NMS supports at most 5000 proposals")
-        if self.detection_limit > self.proposal_limit * (
-            model.roi_heads.box_predictor.cls_score.out_features - 1
-        ):
+        if self.detection_limit > self.proposal_limit * (model.roi_heads.box_predictor.cls_score.out_features - 1):
             raise ValueError("Detection limit exceeds the available class proposals")
 
     @override
     def forward(self, x: Tensor, image_sizes: Tensor) -> tuple[Tensor, Tensor]:
         detection_utils = importlib.import_module("torchvision.models.detection._utils")
-        image_list_type = importlib.import_module(
-            "torchvision.models.detection.image_list"
-        ).ImageList
+        image_list_type = importlib.import_module("torchvision.models.detection.image_list").ImageList
         b = x.shape[0]
         height = x.shape[2]
         width = x.shape[3]
         features = self.model.backbone(x)
         levels = list(features.values())
         objectness, deltas = self.model.rpn.head(levels)
-        anchor_list = self.model.rpn.anchor_generator(
-            image_list_type(x[:1], [(height, width)]), levels
-        )
+        anchor_list = self.model.rpn.anchor_generator(image_list_type(x[:1], [(height, width)]), levels)
         anchors = anchor_list[0]
         offset = 0
         level_boxes = []
         level_scores = []
         for ob, de, feat in zip(objectness, deltas, levels, strict=True):
             score = ob.permute(0, 2, 3, 1).reshape(b, -1)
-            delta = (
-                de.reshape(b, -1, 4, feat.shape[2], feat.shape[3])
-                .permute(0, 3, 4, 1, 2)
-                .reshape(b, -1, 4)
-            )
+            delta = de.reshape(b, -1, 4, feat.shape[2], feat.shape[3]).permute(0, 3, 4, 1, 2).reshape(b, -1, 4)
             count = score.shape[1]
             top = detection_utils._topk_min(score, self.pre_limit, 1)  # noqa: SLF001
             # Reuse torchvision's export-safe min(K, dynamic anchor count).
@@ -161,12 +147,8 @@ class TensorizedDetector(nn.Module):
                 & (probs >= self.model.rpn.score_thresh)
             )
             probs = torch.where(good, probs, torch.full_like(probs, -1))
-            level_boxes.append(
-                torch.nn.functional.pad(boxes, (0, 0, 0, self.pre_limit - boxes.shape[1]))
-            )
-            level_scores.append(
-                torch.nn.functional.pad(probs, (0, self.pre_limit - probs.shape[1]), value=-1)
-            )
+            level_boxes.append(torch.nn.functional.pad(boxes, (0, 0, 0, self.pre_limit - boxes.shape[1])))
+            level_scores.append(torch.nn.functional.pad(probs, (0, self.pre_limit - probs.shape[1]), value=-1))
             offset += count
         rpn_boxes = torch.stack(level_boxes, dim=1)
         rpn_scores = torch.stack(level_scores, dim=1)
@@ -175,20 +157,14 @@ class TensorizedDetector(nn.Module):
         )
         flat_boxes = proposals.reshape(-1, 4)
         pooled = self._pool(levels, proposals)
-        logits, regression = self.model.roi_heads.box_predictor(
-            self.model.roi_heads.box_head(pooled)
-        )
+        logits, regression = self.model.roi_heads.box_predictor(self.model.roi_heads.box_head(pooled))
         classes = logits.shape[-1]
         boxes = self.model.roi_heads.box_coder.decode_single(regression, flat_boxes).reshape(
             b, self.proposal_limit, classes, 4
         )
         boxes = clip_boxes(boxes, image_sizes)[:, :, 1:, :].permute(0, 2, 1, 3)
-        scores = (
-            logits.softmax(-1).reshape(b, self.proposal_limit, classes)[:, :, 1:].transpose(1, 2)
-        )
-        proposal_valid = (
-            torch.arange(self.proposal_limit, device=x.device)[None, :] < proposal_count[:, None]
-        )
+        scores = logits.softmax(-1).reshape(b, self.proposal_limit, classes)[:, :, 1:].transpose(1, 2)
+        proposal_valid = torch.arange(self.proposal_limit, device=x.device)[None, :] < proposal_count[:, None]
         good = (
             proposal_valid[:, None, :]
             & (scores > self.model.roi_heads.score_thresh)
@@ -202,9 +178,7 @@ class TensorizedDetector(nn.Module):
         labels = index // self.proposal_limit + 1
         valid = torch.arange(self.detection_limit, device=x.device)[None, :] < out_count[:, None]
         labels = torch.where(valid, labels, torch.zeros_like(labels))
-        result = torch.cat(
-            (out_boxes, out_scores[:, :, None], labels[:, :, None].to(x.dtype)), dim=-1
-        )
+        result = torch.cat((out_boxes, out_scores[:, :, None], labels[:, :, None].to(x.dtype)), dim=-1)
         return result, out_count
 
     def _pool(self, levels: list[Tensor], proposals: Tensor) -> Tensor:
@@ -222,11 +196,7 @@ class TensorizedDetector(nn.Module):
         rois = torch.cat((batch_ids, flat_boxes), dim=1)
         areas = (flat_boxes[:, 2] - flat_boxes[:, 0]) * (flat_boxes[:, 3] - flat_boxes[:, 1])
         level = (
-            torch.floor(
-                pooler.canonical_level
-                + torch.log2(torch.sqrt(areas) / pooler.canonical_scale)
-                + 1e-6
-            )
+            torch.floor(pooler.canonical_level + torch.log2(torch.sqrt(areas) / pooler.canonical_scale) + 1e-6)
             .clamp(2, 5)
             .to(torch.int64)
         )

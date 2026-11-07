@@ -122,13 +122,9 @@ class TrainingPipeline:
         donors: list[dict[str, Any]] = []
         for donor_index in indices:
             donor = load_sample(donor_index).copy()
-            occurrence_ids = np.arange(
-                next_identity, next_identity + len(donor.boxes), dtype=np.int64
-            )
+            occurrence_ids = np.arange(next_identity, next_identity + len(donor.boxes), dtype=np.int64)
             next_identity += len(donor.boxes)
-            donor = DetectionSample(
-                donor.image, donor.boxes, donor.labels, occurrence_ids, donor.iscrowd
-            )
+            donor = DetectionSample(donor.image, donor.boxes, donor.labels, occurrence_ids, donor.iscrowd)
             donors.append(self._input(donor))
         return donors
 
@@ -150,9 +146,7 @@ class TrainingPipeline:
         data = self._input(sample)
         mosaic = self._compiled.mosaic
         if mosaic is not None:
-            data[mosaic.metadata_key] = self._donors(
-                sample, index=index, size=size, load_sample=load_sample
-            )
+            data[mosaic.metadata_key] = self._donors(sample, index=index, size=size, load_sample=load_sample)
         result = self._compiled.transform(**data)
         image = np.asarray(result["image"])
         output = DetectionSample(

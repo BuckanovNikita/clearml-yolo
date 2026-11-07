@@ -64,8 +64,7 @@ def report_data(report: EvaluationReport | None, *, is_subset: bool) -> dict[str
             "y": curve.precision,
             "customdata": curve.confidence,
             "hovertemplate": (
-                "Recall %{x}<br>Precision %{y}<br>Confidence %{customdata}"
-                "<extra>%{fullData.name}</extra>"
+                "Recall %{x}<br>Precision %{y}<br>Confidence %{customdata}<extra>%{fullData.name}</extra>"
             ),
         }
         for curve in report.pr_curves
@@ -74,9 +73,7 @@ def report_data(report: EvaluationReport | None, *, is_subset: bool) -> dict[str
     return {"available": True, "reason": "", "average_precisions": rows, "curves": curves}
 
 
-def select_evaluation_labels(
-    view: Any, gt_field: str, pred_field: str, gt_ids: list[str], pred_ids: list[str]
-) -> Any:
+def select_evaluation_labels(view: Any, gt_field: str, pred_field: str, gt_ids: list[str], pred_ids: list[str]) -> Any:
     """Keep only exact evaluated labels, removing samples without selected labels."""
     return view.select_labels(ids=[*gt_ids, *pred_ids], fields=[gt_field, pred_field])
 
@@ -106,10 +103,7 @@ def _scenario_definitions(ctx: Any, scenario: dict[str, Any]) -> dict[str, Any]:
     if scenario_type == "sample_field":
         return {name: {"type": "field", "field": field, "value": name} for name in subsets}
     if scenario_type == "label_attribute":
-        return {
-            name: {"type": "attribute", "field": field.split(".")[-1], "value": name}
-            for name in subsets
-        }
+        return {name: {"type": "attribute", "field": field.split(".")[-1], "value": name} for name in subsets}
     raise ValueError(f"Unsupported scenario type: {scenario_type}")
 
 
@@ -136,9 +130,7 @@ def _navigation_ids(
     return gt_ids, pred_ids
 
 
-def _stock_selected(
-    true: str, predicted: str, missing: str, view_type: str, options: dict[str, Any]
-) -> bool:
+def _stock_selected(true: str, predicted: str, missing: str, view_type: str, options: dict[str, Any]) -> bool:
     if view_type == "matrix":
         return true == options.get("y") and predicted == options.get("x")
     if view_type == "class":
@@ -156,9 +148,7 @@ class NativeEvaluationPanel(EvaluationPanel):  # type: ignore[misc, no-any-unimp
 
     @property
     def config(self) -> Any:
-        return PanelConfig(
-            name="native_evaluation", label="Imported Model Evaluation", icon="ssid_chart"
-        )
+        return PanelConfig(name="native_evaluation", label="Imported Model Evaluation", icon="ssid_chart")
 
     def get_tp_fp_fn(self, info: Any, results: Any) -> tuple[Any, Any, Any]:
         if info.config.method == "digital_metrics":
@@ -222,11 +212,7 @@ class NativeEvaluationPanel(EvaluationPanel):  # type: ignore[misc, no-any-unimp
             report = results.report_payload
             if results.is_subset or report is None:
                 return None
-            values = [
-                value.ap50_95
-                for value in report.average_precisions.values()
-                if value.ap50_95 is not None
-            ]
+            values = [value.ap50_95 for value in report.average_precisions.values() if value.ap50_95 is not None]
             return sum(values) / len(values) if values else None
         return super().get_map(results)  # type: ignore[no-any-return]
 
@@ -351,20 +337,14 @@ class NativeEvaluationPanel(EvaluationPanel):  # type: ignore[misc, no-any-unimp
         super().rename_evaluation(ctx)
         state = ctx.panel.get_state("view") or {}
         new_name = ctx.params.get("new_name")
-        if (
-            state.get("key") == ctx.params.get("old_name")
-            and new_name in ctx.dataset.list_evaluations()
-        ):
+        if state.get("key") == ctx.params.get("old_name") and new_name in ctx.dataset.list_evaluations():
             ctx.panel.set_state("view", {**state, "key": new_name, "init": True})
         self.on_load(ctx)
 
     def delete_evaluation(self, ctx: Any) -> None:
         super().delete_evaluation(ctx)
         state = ctx.panel.get_state("view") or {}
-        if (
-            state.get("key") == ctx.params.get("eval_key")
-            and state.get("key") not in ctx.dataset.list_evaluations()
-        ):
+        if state.get("key") == ctx.params.get("eval_key") and state.get("key") not in ctx.dataset.list_evaluations():
             ctx.panel.set_state("view", {"page": "overview", "init": True})
         self.on_load(ctx)
 
@@ -411,9 +391,7 @@ class EvaluationReportsPanel(Panel):  # type: ignore[misc, no-any-unimported]
 
     @property
     def config(self) -> Any:
-        return PanelConfig(
-            name="evaluation_reports", label="Imported AP / PR Reports", icon="show_chart"
-        )
+        return PanelConfig(name="evaluation_reports", label="Imported AP / PR Reports", icon="show_chart")
 
     def on_load(self, ctx: Any) -> None:
         keys = [
@@ -441,9 +419,7 @@ class EvaluationReportsPanel(Panel):  # type: ignore[misc, no-any-unimported]
         ctx.panel.set_data("report", data)
         ctx.panel.set_data("pr_curves", data["curves"])
         ctx.panel.set_data("average_precisions", data["average_precisions"])
-        ctx.panel.set_state(
-            "report_status", {"available": data["available"], "reason": data["reason"]}
-        )
+        ctx.panel.set_state("report_status", {"available": data["available"], "reason": data["reason"]})
 
     def render(self, ctx: Any) -> Any:
         panel = types.Object()

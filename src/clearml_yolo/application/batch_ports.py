@@ -14,9 +14,7 @@ from clearml_yolo.core.batch_estimation import (
 
 
 class BatchProbe(Protocol):
-    def profile(
-        self, model: ModelVariant, imgsz: int, devices: tuple[int, ...]
-    ) -> TrainingProfile: ...
+    def profile(self, model: ModelVariant, imgsz: int, devices: tuple[int, ...]) -> TrainingProfile: ...
 
     def run(
         self,

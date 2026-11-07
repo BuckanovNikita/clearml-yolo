@@ -51,14 +51,9 @@ def test_all_trials_and_confirmed_capacity_follow_the_per_gpu_grid(
     else:
         assert search.global_batch == expected
         assert search.per_gpu_batch == expected // count
-        assert search.status == (
-            "ceiling_limited" if expected == ceiling // quantum * quantum else "validated"
-        )
+        assert search.status == ("ceiling_limited" if expected == ceiling // quantum * quantum else "validated")
         assert search.trials[-1].global_batch == expected
-        assert any(
-            trial.global_batch == expected and trial.status == "success"
-            for trial in search.trials[:-1]
-        )
+        assert any(trial.global_batch == expected and trial.status == "success" for trial in search.trials[:-1])
         assert len({trial.trial_id for trial in search.trials}) == len(search.trials)
         case = _case(search)
         assert EstimateCase.model_validate_json(case.model_dump_json()) == case
@@ -122,8 +117,7 @@ def test_unaligned_history_replays_but_cannot_supply_automatic_lookup(strategy: 
     assert case.global_batch == 11
     assert case.usable
     assert any(
-        "eight" in issue or "8" in issue
-        for issue in compatibility_issues(case, case.profile, SyntheticWorkload())
+        "eight" in issue or "8" in issue for issue in compatibility_issues(case, case.profile, SyntheticWorkload())
     )
     with pytest.raises(ValueError, match="cy-batch-estimate"):
         select_recommendation((case,), case.profile, SyntheticWorkload())

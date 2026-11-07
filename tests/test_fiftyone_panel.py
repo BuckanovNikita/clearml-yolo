@@ -91,9 +91,7 @@ def test_exact_view_removes_unrelated_same_class_labels(dataset: Any, tmp_path: 
         predictions=fo.Detections(detections=predictions),
     )
     dataset.add_sample(sample)
-    view = select_evaluation_labels(
-        dataset.view(), "truth", "predictions", [truth[0].id], [predictions[1].id]
-    )
+    view = select_evaluation_labels(dataset.view(), "truth", "predictions", [truth[0].id], [predictions[1].id])
     assert view.values("truth.detections.id", unwind=True) == [truth[0].id]
     assert view.values("predictions.detections.id", unwind=True) == [predictions[1].id]
     assert len(select_evaluation_labels(dataset.view(), "truth", "predictions", [], [])) == 0
@@ -106,10 +104,7 @@ def evaluated(dataset: Any, payload: Any, tmp_path: Path) -> Any:
     from clearml_yolo.adapters.fiftyone.evaluation import publish_evaluation
 
     truth = [fo.Detection(label=box.label, dm_index=box.index) for box in payload.ground_truth]
-    predictions = [
-        fo.Detection(label=box.label, confidence=0.8, dm_index=box.index)
-        for box in payload.predictions
-    ]
+    predictions = [fo.Detection(label=box.label, confidence=0.8, dm_index=box.index) for box in payload.predictions]
     dataset.add_sample(
         fo.Sample(
             filepath=str(tmp_path / "image.png"),
@@ -198,9 +193,7 @@ def test_plugin_explicit_install_registers_both_panels(
     }
 
 
-def test_matrix_comparison_selects_exact_labels_from_both_runs(
-    evaluated: Any, payload: Any
-) -> None:
+def test_matrix_comparison_selects_exact_labels_from_both_runs(evaluated: Any, payload: Any) -> None:
     import fiftyone as fo
     from fiftyone.core.view import DatasetView
 
@@ -209,15 +202,10 @@ def test_matrix_comparison_selects_exact_labels_from_both_runs(
 
     sample = evaluated.first()
     sample["other_pred"] = fo.Detections(
-        detections=[
-            fo.Detection(label=box.label, confidence=0.8, dm_index=box.index)
-            for box in payload.predictions
-        ]
+        detections=[fo.Detection(label=box.label, confidence=0.8, dm_index=box.index) for box in payload.predictions]
     )
     sample.save()
-    publish_evaluation(
-        evaluated, evaluated.view(), payload, "other", "gt", "other_pred", run_key="other"
-    )
+    publish_evaluation(evaluated, evaluated.view(), payload, "other", "gt", "other_pred", run_key="other")
     ctx = _context(
         evaluated,
         params={
@@ -305,9 +293,7 @@ def test_wrong_class_cell_selects_only_its_exact_pair(evaluated: Any, payload: A
     changed.matches = [payload.matches[index] for index in (0, 3, 2, 1, 4, 5)]
     changed.report.confusion_matrix.counts = [[1, 1, 0], [0, 0, 1], [1, 1, 0]]
     evaluated.delete_evaluation("imported")
-    publish_evaluation(
-        evaluated, evaluated.view(), changed, "imported", "gt", "pred", run_key="run"
-    )
+    publish_evaluation(evaluated, evaluated.view(), changed, "imported", "gt", "pred", run_key="run")
     ctx = _context(evaluated, params={"type": "matrix", "options": {"x": "dog", "y": "cat"}})
     NativeEvaluationPanel().load_view(ctx)
     view = DatasetView._build(evaluated, ctx.executor._requests[-1].params["view"])
@@ -323,9 +309,7 @@ def test_stock_evaluation_retains_builtin_counts(dataset: Any, tmp_path: Path) -
     dataset.add_sample(
         fo.Sample(
             filepath=str(tmp_path / "stock.png"),
-            gt=fo.Detections(
-                detections=[fo.Detection(label="cat", bounding_box=[0.1, 0.1, 0.4, 0.4])]
-            ),
+            gt=fo.Detections(detections=[fo.Detection(label="cat", bounding_box=[0.1, 0.1, 0.4, 0.4])]),
             pred=fo.Detections(
                 detections=[
                     fo.Detection(label="cat", bounding_box=[0.1, 0.1, 0.4, 0.4], confidence=0.9),

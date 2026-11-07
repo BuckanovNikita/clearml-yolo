@@ -30,9 +30,7 @@ class _ConsoleStream:
 
     @property
     def pending_bytes(self) -> int:
-        return len(self.decoder.getstate()[0]) + len(
-            self.text.pending.encode("utf-8", errors="surrogateescape")
-        )
+        return len(self.decoder.getstate()[0]) + len(self.text.pending.encode("utf-8", errors="surrogateescape"))
 
 
 @dataclass
@@ -43,9 +41,7 @@ class PublicationState:
     scalar_labels: HumanSeriesRegistry = field(default_factory=HumanSeriesRegistry)
 
 
-def _publish_text(
-    stream: _ConsoleStream, payload: bytes, sink: Any, *, final: bool, checkpoint: bool
-) -> None:
+def _publish_text(stream: _ConsoleStream, payload: bytes, sink: Any, *, final: bool, checkpoint: bool) -> None:
     text = stream.text.feed(stream.decoder.decode(payload, final=final), final=final)
     if checkpoint and not stream.decoder.getstate()[0]:
         text += stream.text.checkpoint()

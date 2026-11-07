@@ -79,10 +79,7 @@ class PipelineCompareConfig(CommandDeclaration):
         metadata=_metadata(
             "Базовая модель с происхождением checkpoint и калиброванными порогами.",
             "mapping ModelRef",
-            (
-                "Для source=local обязательны weights и непустые thresholds; backend "
-                "и preset задаются вместе."
-            ),
+            ("Для source=local обязательны weights и непустые thresholds; backend и preset задаются вместе."),
             "pipeline",
             "baseline_model.task_id=baseline-task",
         ),
@@ -112,10 +109,7 @@ class PipelineCompareConfig(CommandDeclaration):
         metadata=_metadata(
             "Начальное состояние генератора случайных чисел.",
             "nonnegative integer | null",
-            (
-                "Допустимость null определяется операцией; фиксированное число делает"
-                " разбиение/оценку повторяемыми."
-            ),
+            ("Допустимость null определяется операцией; фиксированное число делает разбиение/оценку повторяемыми."),
             "pipeline",
             "seed=0",
         ),
@@ -167,10 +161,7 @@ class ExportConfig(CommandDeclaration):
         metadata=_metadata(
             "Выбор семейства детектора, архитектуры и параметров нативного адаптера.",
             "mapping; Hydra model=backend/preset",
-            (
-                "Выбирайте зарегистрированный preset; настройки "
-                "model.train/model.predict неактивны для Ultralytics."
-            ),
+            ("Выбирайте зарегистрированный preset; настройки model.train/model.predict неактивны для Ultralytics."),
             "export",
             "model=rfdetr/small",
         ),
@@ -190,10 +181,7 @@ class ExportConfig(CommandDeclaration):
         metadata=_metadata(
             "Путь к готовому checkpoint для инференса или экспорта.",
             "path string | null",
-            (
-                "В полном конвейере допустим только при skip_train=true; обучение "
-                "выбирает веса в настройках модели."
-            ),
+            ("В полном конвейере допустим только при skip_train=true; обучение выбирает веса в настройках модели."),
             "export",
             "weights=best.pt",
         ),
@@ -202,10 +190,7 @@ class ExportConfig(CommandDeclaration):
         default_factory=lambda: None,
         metadata=_metadata(
             "CSV аннотации или ссылка на неизменяемый набор ClearML Dataset.",
-            (
-                "path string | {dataset_id: string} | {project_name: string, name: "
-                "string, version?: string} | null"
-            ),
+            ("path string | {dataset_id: string} | {project_name: string, name: string, version?: string} | null"),
             (
                 "Обязателен там, где значение ???; dataset_id нельзя смешивать с "
                 "именованным селектором. null допустим только для операций без "
@@ -220,10 +205,7 @@ class ExportConfig(CommandDeclaration):
         metadata=_metadata(
             "Каталог результатов текущей команды.",
             "path string | null",
-            (
-                "null выбирает маршрут, принадлежащий запуску; допустимость пути "
-                "проверяется перед записью."
-            ),
+            ("null выбирает маршрут, принадлежащий запуску; допустимость пути проверяется перед записью."),
             "export",
             "output_dir=outputs/evaluation",
         ),
@@ -247,10 +229,7 @@ class TrainConfig(CommandDeclaration):
         metadata=_metadata(
             "Выбор семейства детектора, архитектуры и параметров нативного адаптера.",
             "mapping; Hydra model=backend/preset",
-            (
-                "Выбирайте зарегистрированный preset; настройки "
-                "model.train/model.predict неактивны для Ultralytics."
-            ),
+            ("Выбирайте зарегистрированный preset; настройки model.train/model.predict неактивны для Ultralytics."),
             "train",
             "model=rfdetr/small",
         ),
@@ -260,10 +239,7 @@ class TrainConfig(CommandDeclaration):
         metadata=_metadata(
             "Параметры обучения Ultralytics и встроенной проверки тренера.",
             "mapping",
-            (
-                "Активны только для model=ultralytics; владелец запуска задаёт "
-                "маршруты данных и результатов."
-            ),
+            ("Активны только для model=ultralytics; владелец запуска задаёт маршруты данных и результатов."),
             "train",
             "ultralytics.epochs=10",
         ),
@@ -271,15 +247,9 @@ class TrainConfig(CommandDeclaration):
     ultralytics_predict: Any = field(
         default_factory=prediction_defaults,
         metadata=_metadata(
-            (
-                "Параметры отдельного предсказания Ultralytics; общие значения могут "
-                "наследоваться из обучения."
-            ),
+            ("Параметры отдельного предсказания Ultralytics; общие значения могут наследоваться из обучения."),
             "mapping",
-            (
-                "Изменения в обучении наследуются только через оставленные выражения "
-                "${ultralytics.FIELD}."
-            ),
+            ("Изменения в обучении наследуются только через оставленные выражения ${ultralytics.FIELD}."),
             "train",
             "ultralytics_predict.batch=8",
         ),
@@ -308,10 +278,7 @@ class TrainConfig(CommandDeclaration):
         default_factory=lambda: MISSING,
         metadata=_metadata(
             "CSV аннотации или ссылка на неизменяемый набор ClearML Dataset.",
-            (
-                "path string | {dataset_id: string} | {project_name: string, name: "
-                "string, version?: string} | null"
-            ),
+            ("path string | {dataset_id: string} | {project_name: string, name: string, version?: string} | null"),
             (
                 "Обязателен там, где значение ???; dataset_id нельзя смешивать с "
                 "именованным селектором. null допустим только для операций без "
@@ -336,10 +303,7 @@ class TrainConfig(CommandDeclaration):
         metadata=_metadata(
             "Каталог кэша подготовленного рабочего набора.",
             "path string | null",
-            (
-                "null выбирает CY_HOME/.cache/clearml-yolo/datasets; в конвейере "
-                "каталог должен быть вне run_dir."
-            ),
+            ("null выбирает CY_HOME/.cache/clearml-yolo/datasets; в конвейере каталог должен быть вне run_dir."),
             "train",
             "dataset_cache_dir=cache/datasets",
         ),
@@ -349,10 +313,7 @@ class TrainConfig(CommandDeclaration):
         metadata=_metadata(
             "Сплиты, наличие которых обязательно при подготовке обучающего набора.",
             "list[string] | null",
-            (
-                "null оставляет выбор обязательных сплитов текущей операции; "
-                "изображения сплитов должны быть раздельны."
-            ),
+            ("null оставляет выбор обязательных сплитов текущей операции; изображения сплитов должны быть раздельны."),
             "train",
             "required_splits=[train,val]",
         ),
@@ -366,10 +327,7 @@ class PredictConfig(CommandDeclaration):
         metadata=_metadata(
             "Выбор семейства детектора, архитектуры и параметров нативного адаптера.",
             "mapping; Hydra model=backend/preset",
-            (
-                "Выбирайте зарегистрированный preset; настройки "
-                "model.train/model.predict неактивны для Ultralytics."
-            ),
+            ("Выбирайте зарегистрированный preset; настройки model.train/model.predict неактивны для Ultralytics."),
             "predict",
             "model=rfdetr/small",
         ),
@@ -379,10 +337,7 @@ class PredictConfig(CommandDeclaration):
         metadata=_metadata(
             "Параметры обучения Ultralytics и встроенной проверки тренера.",
             "mapping",
-            (
-                "Активны только для model=ultralytics; владелец запуска задаёт "
-                "маршруты данных и результатов."
-            ),
+            ("Активны только для model=ultralytics; владелец запуска задаёт маршруты данных и результатов."),
             "predict",
             "ultralytics.epochs=10",
         ),
@@ -390,15 +345,9 @@ class PredictConfig(CommandDeclaration):
     ultralytics_predict: Any = field(
         default_factory=prediction_defaults,
         metadata=_metadata(
-            (
-                "Параметры отдельного предсказания Ultralytics; общие значения могут "
-                "наследоваться из обучения."
-            ),
+            ("Параметры отдельного предсказания Ultralytics; общие значения могут наследоваться из обучения."),
             "mapping",
-            (
-                "Изменения в обучении наследуются только через оставленные выражения "
-                "${ultralytics.FIELD}."
-            ),
+            ("Изменения в обучении наследуются только через оставленные выражения ${ultralytics.FIELD}."),
             "predict",
             "ultralytics_predict.batch=8",
         ),
@@ -408,10 +357,7 @@ class PredictConfig(CommandDeclaration):
         metadata=_metadata(
             "Путь к готовому checkpoint для инференса или экспорта.",
             "path string | null",
-            (
-                "В полном конвейере допустим только при skip_train=true; обучение "
-                "выбирает веса в настройках модели."
-            ),
+            ("В полном конвейере допустим только при skip_train=true; обучение выбирает веса в настройках модели."),
             "predict",
             "weights=best.pt",
         ),
@@ -430,10 +376,7 @@ class PredictConfig(CommandDeclaration):
         default_factory=lambda: MISSING,
         metadata=_metadata(
             "CSV аннотации или ссылка на неизменяемый набор ClearML Dataset.",
-            (
-                "path string | {dataset_id: string} | {project_name: string, name: "
-                "string, version?: string} | null"
-            ),
+            ("path string | {dataset_id: string} | {project_name: string, name: string, version?: string} | null"),
             (
                 "Обязателен там, где значение ???; dataset_id нельзя смешивать с "
                 "именованным селектором. null допустим только для операций без "
@@ -448,10 +391,7 @@ class PredictConfig(CommandDeclaration):
         metadata=_metadata(
             "Путь результирующего CSV.",
             "path string | null",
-            (
-                "null выбирает имя результата текущей команды; существующие входы не "
-                "заменяют этим полем."
-            ),
+            ("null выбирает имя результата текущей команды; существующие входы не заменяют этим полем."),
             "predict",
             "output=predictions.csv",
         ),
@@ -461,10 +401,7 @@ class PredictConfig(CommandDeclaration):
         metadata=_metadata(
             "Упорядоченный список сплитов для предсказаний или оценки.",
             "list[string] | null",
-            (
-                "null использует доступные сплиты; калибровочный val и итоговый test "
-                "должны оставаться раздельными."
-            ),
+            ("null использует доступные сплиты; калибровочный val и итоговый test должны оставаться раздельными."),
             "predict",
             "splits=[val,test]",
         ),
@@ -508,10 +445,7 @@ class ValConfig(CommandDeclaration):
         metadata=_metadata(
             "Выбор семейства детектора, архитектуры и параметров нативного адаптера.",
             "mapping; Hydra model=backend/preset",
-            (
-                "Выбирайте зарегистрированный preset; настройки "
-                "model.train/model.predict неактивны для Ultralytics."
-            ),
+            ("Выбирайте зарегистрированный preset; настройки model.train/model.predict неактивны для Ultralytics."),
             "val",
             "model=rfdetr/small",
         ),
@@ -521,10 +455,7 @@ class ValConfig(CommandDeclaration):
         metadata=_metadata(
             "Параметры обучения Ultralytics и встроенной проверки тренера.",
             "mapping",
-            (
-                "Активны только для model=ultralytics; владелец запуска задаёт "
-                "маршруты данных и результатов."
-            ),
+            ("Активны только для model=ultralytics; владелец запуска задаёт маршруты данных и результатов."),
             "val",
             "ultralytics.epochs=10",
         ),
@@ -532,15 +463,9 @@ class ValConfig(CommandDeclaration):
     ultralytics_predict: Any = field(
         default_factory=prediction_defaults,
         metadata=_metadata(
-            (
-                "Параметры отдельного предсказания Ultralytics; общие значения могут "
-                "наследоваться из обучения."
-            ),
+            ("Параметры отдельного предсказания Ultralytics; общие значения могут наследоваться из обучения."),
             "mapping",
-            (
-                "Изменения в обучении наследуются только через оставленные выражения "
-                "${ultralytics.FIELD}."
-            ),
+            ("Изменения в обучении наследуются только через оставленные выражения ${ultralytics.FIELD}."),
             "val",
             "ultralytics_predict.batch=8",
         ),
@@ -550,10 +475,7 @@ class ValConfig(CommandDeclaration):
         metadata=_metadata(
             "Путь к готовому checkpoint для инференса или экспорта.",
             "path string | null",
-            (
-                "В полном конвейере допустим только при skip_train=true; обучение "
-                "выбирает веса в настройках модели."
-            ),
+            ("В полном конвейере допустим только при skip_train=true; обучение выбирает веса в настройках модели."),
             "val",
             "weights=best.pt",
         ),
@@ -572,10 +494,7 @@ class ValConfig(CommandDeclaration):
         default_factory=lambda: MISSING,
         metadata=_metadata(
             "CSV аннотации или ссылка на неизменяемый набор ClearML Dataset.",
-            (
-                "path string | {dataset_id: string} | {project_name: string, name: "
-                "string, version?: string} | null"
-            ),
+            ("path string | {dataset_id: string} | {project_name: string, name: string, version?: string} | null"),
             (
                 "Обязателен там, где значение ???; dataset_id нельзя смешивать с "
                 "именованным селектором. null допустим только для операций без "
@@ -590,10 +509,7 @@ class ValConfig(CommandDeclaration):
         metadata=_metadata(
             "Каталог результатов текущей команды.",
             "path string | null",
-            (
-                "null выбирает маршрут, принадлежащий запуску; допустимость пути "
-                "проверяется перед записью."
-            ),
+            ("null выбирает маршрут, принадлежащий запуску; допустимость пути проверяется перед записью."),
             "val",
             "output_dir=outputs/evaluation",
         ),
@@ -603,10 +519,7 @@ class ValConfig(CommandDeclaration):
         metadata=_metadata(
             "Упорядоченный список сплитов для предсказаний или оценки.",
             "list[string] | null",
-            (
-                "null использует доступные сплиты; калибровочный val и итоговый test "
-                "должны оставаться раздельными."
-            ),
+            ("null использует доступные сплиты; калибровочный val и итоговый test должны оставаться раздельными."),
             "val",
             "splits=[val,test]",
         ),
@@ -659,10 +572,7 @@ class MetricsConfig(CommandDeclaration):
         default_factory=lambda: MISSING,
         metadata=_metadata(
             "CSV аннотации или ссылка на неизменяемый набор ClearML Dataset.",
-            (
-                "path string | {dataset_id: string} | {project_name: string, name: "
-                "string, version?: string} | null"
-            ),
+            ("path string | {dataset_id: string} | {project_name: string, name: string, version?: string} | null"),
             (
                 "Обязателен там, где значение ???; dataset_id нельзя смешивать с "
                 "именованным селектором. null допустим только для операций без "
@@ -677,10 +587,7 @@ class MetricsConfig(CommandDeclaration):
         metadata=_metadata(
             "Каталог результатов текущей команды.",
             "path string | null",
-            (
-                "null выбирает маршрут, принадлежащий запуску; допустимость пути "
-                "проверяется перед записью."
-            ),
+            ("null выбирает маршрут, принадлежащий запуску; допустимость пути проверяется перед записью."),
             "metrics",
             "output_dir=outputs/evaluation",
         ),
@@ -690,10 +597,7 @@ class MetricsConfig(CommandDeclaration):
         metadata=_metadata(
             "Упорядоченный список сплитов для предсказаний или оценки.",
             "list[string] | null",
-            (
-                "null использует доступные сплиты; калибровочный val и итоговый test "
-                "должны оставаться раздельными."
-            ),
+            ("null использует доступные сплиты; калибровочный val и итоговый test должны оставаться раздельными."),
             "metrics",
             "splits=[val,test]",
         ),
@@ -777,10 +681,7 @@ class ReportConfig(CommandDeclaration):
         metadata=_metadata(
             "Каталог результатов текущей команды.",
             "path string | null",
-            (
-                "null выбирает маршрут, принадлежащий запуску; допустимость пути "
-                "проверяется перед записью."
-            ),
+            ("null выбирает маршрут, принадлежащий запуску; допустимость пути проверяется перед записью."),
             "report",
             "output_dir=outputs/evaluation",
         ),
@@ -814,10 +715,7 @@ class CompareConfig(CommandDeclaration):
         metadata=_metadata(
             "Базовая модель с происхождением checkpoint и калиброванными порогами.",
             "mapping ModelRef",
-            (
-                "Для source=local обязательны weights и непустые thresholds; backend "
-                "и preset задаются вместе."
-            ),
+            ("Для source=local обязательны weights и непустые thresholds; backend и preset задаются вместе."),
             "compare",
             "baseline_model.task_id=baseline-task",
         ),
@@ -827,10 +725,7 @@ class CompareConfig(CommandDeclaration):
         metadata=_metadata(
             "Модель-кандидат с checkpoint и собственными калиброванными порогами.",
             "mapping ModelRef",
-            (
-                "Не переносите пороги базовой модели на кандидата; локальный источник"
-                " требует точных thresholds."
-            ),
+            ("Не переносите пороги базовой модели на кандидата; локальный источник требует точных thresholds."),
             "compare",
             "candidate_model.task_id=candidate-task",
         ),
@@ -839,10 +734,7 @@ class CompareConfig(CommandDeclaration):
         default_factory=lambda: MISSING,
         metadata=_metadata(
             "CSV аннотации или ссылка на неизменяемый набор ClearML Dataset.",
-            (
-                "path string | {dataset_id: string} | {project_name: string, name: "
-                "string, version?: string} | null"
-            ),
+            ("path string | {dataset_id: string} | {project_name: string, name: string, version?: string} | null"),
             (
                 "Обязателен там, где значение ???; dataset_id нельзя смешивать с "
                 "именованным селектором. null допустим только для операций без "
@@ -857,10 +749,7 @@ class CompareConfig(CommandDeclaration):
         metadata=_metadata(
             "Каталог результатов текущей команды.",
             "path string | null",
-            (
-                "null выбирает маршрут, принадлежащий запуску; допустимость пути "
-                "проверяется перед записью."
-            ),
+            ("null выбирает маршрут, принадлежащий запуску; допустимость пути проверяется перед записью."),
             "compare",
             "output_dir=outputs/evaluation",
         ),
@@ -880,10 +769,7 @@ class CompareConfig(CommandDeclaration):
         metadata=_metadata(
             "Выбор семейства детектора, архитектуры и параметров нативного адаптера.",
             "mapping; Hydra model=backend/preset",
-            (
-                "Выбирайте зарегистрированный preset; настройки "
-                "model.train/model.predict неактивны для Ultralytics."
-            ),
+            ("Выбирайте зарегистрированный preset; настройки model.train/model.predict неактивны для Ultralytics."),
             "compare",
             "model=rfdetr/small",
         ),
@@ -893,10 +779,7 @@ class CompareConfig(CommandDeclaration):
         metadata=_metadata(
             "Параметры обучения Ultralytics и встроенной проверки тренера.",
             "mapping",
-            (
-                "Активны только для model=ultralytics; владелец запуска задаёт "
-                "маршруты данных и результатов."
-            ),
+            ("Активны только для model=ultralytics; владелец запуска задаёт маршруты данных и результатов."),
             "compare",
             "ultralytics.epochs=10",
         ),
@@ -904,15 +787,9 @@ class CompareConfig(CommandDeclaration):
     ultralytics_predict: Any = field(
         default_factory=prediction_defaults,
         metadata=_metadata(
-            (
-                "Параметры отдельного предсказания Ultralytics; общие значения могут "
-                "наследоваться из обучения."
-            ),
+            ("Параметры отдельного предсказания Ultralytics; общие значения могут наследоваться из обучения."),
             "mapping",
-            (
-                "Изменения в обучении наследуются только через оставленные выражения "
-                "${ultralytics.FIELD}."
-            ),
+            ("Изменения в обучении наследуются только через оставленные выражения ${ultralytics.FIELD}."),
             "compare",
             "ultralytics_predict.batch=8",
         ),
@@ -952,10 +829,7 @@ class CompareConfig(CommandDeclaration):
         metadata=_metadata(
             "Начальное состояние генератора случайных чисел.",
             "nonnegative integer | null",
-            (
-                "Допустимость null определяется операцией; фиксированное число делает"
-                " разбиение/оценку повторяемыми."
-            ),
+            ("Допустимость null определяется операцией; фиксированное число делает разбиение/оценку повторяемыми."),
             "compare",
             "seed=0",
         ),
@@ -999,10 +873,7 @@ class GroundTruthConfig(CommandDeclaration):
         metadata=_metadata(
             "Путь результирующего CSV.",
             "path string | null",
-            (
-                "null выбирает имя результата текущей команды; существующие входы не "
-                "заменяют этим полем."
-            ),
+            ("null выбирает имя результата текущей команды; существующие входы не заменяют этим полем."),
             "ground_truth",
             "output=predictions.csv",
         ),
@@ -1022,10 +893,7 @@ class GroundTruthConfig(CommandDeclaration):
         metadata=_metadata(
             "Начальное состояние генератора случайных чисел.",
             "nonnegative integer | null",
-            (
-                "Допустимость null определяется операцией; фиксированное число делает"
-                " разбиение/оценку повторяемыми."
-            ),
+            ("Допустимость null определяется операцией; фиксированное число делает разбиение/оценку повторяемыми."),
             "ground_truth",
             "seed=0",
         ),
@@ -1049,10 +917,7 @@ class PipelineConfig(CommandDeclaration):
         metadata=_metadata(
             "Выбор семейства детектора, архитектуры и параметров нативного адаптера.",
             "mapping; Hydra model=backend/preset",
-            (
-                "Выбирайте зарегистрированный preset; настройки "
-                "model.train/model.predict неактивны для Ultralytics."
-            ),
+            ("Выбирайте зарегистрированный preset; настройки model.train/model.predict неактивны для Ultralytics."),
             "pipeline",
             "model=rfdetr/small",
         ),
@@ -1062,10 +927,7 @@ class PipelineConfig(CommandDeclaration):
         metadata=_metadata(
             "Параметры обучения Ultralytics и встроенной проверки тренера.",
             "mapping",
-            (
-                "Активны только для model=ultralytics; владелец запуска задаёт "
-                "маршруты данных и результатов."
-            ),
+            ("Активны только для model=ultralytics; владелец запуска задаёт маршруты данных и результатов."),
             "pipeline",
             "ultralytics.epochs=10",
         ),
@@ -1073,15 +935,9 @@ class PipelineConfig(CommandDeclaration):
     ultralytics_predict: Any = field(
         default_factory=prediction_defaults,
         metadata=_metadata(
-            (
-                "Параметры отдельного предсказания Ultralytics; общие значения могут "
-                "наследоваться из обучения."
-            ),
+            ("Параметры отдельного предсказания Ultralytics; общие значения могут наследоваться из обучения."),
             "mapping",
-            (
-                "Изменения в обучении наследуются только через оставленные выражения "
-                "${ultralytics.FIELD}."
-            ),
+            ("Изменения в обучении наследуются только через оставленные выражения ${ultralytics.FIELD}."),
             "pipeline",
             "ultralytics_predict.batch=8",
         ),
@@ -1110,10 +966,7 @@ class PipelineConfig(CommandDeclaration):
         default_factory=lambda: make_config(**_values(PipelineCompareConfig)),
         metadata=_metadata(
             "Настройки сравнения обученной модели с baseline в полном конвейере.",
-            (
-                "{baseline_model: ModelRef, q: number, bootstrap_iterations: integer,"
-                " seed: integer | null}"
-            ),
+            ("{baseline_model: ModelRef, q: number, bootstrap_iterations: integer, seed: integer | null}"),
             "Для запуска сравнения baseline должен разрешаться в существующий checkpoint.",
             "pipeline",
             "compare.baseline_model.task_id=baseline-task",
@@ -1143,10 +996,7 @@ class PipelineConfig(CommandDeclaration):
         default_factory=lambda: MISSING,
         metadata=_metadata(
             "CSV аннотации или ссылка на неизменяемый набор ClearML Dataset.",
-            (
-                "path string | {dataset_id: string} | {project_name: string, name: "
-                "string, version?: string} | null"
-            ),
+            ("path string | {dataset_id: string} | {project_name: string, name: string, version?: string} | null"),
             (
                 "Обязателен там, где значение ???; dataset_id нельзя смешивать с "
                 "именованным селектором. null допустим только для операций без "
@@ -1161,10 +1011,7 @@ class PipelineConfig(CommandDeclaration):
         metadata=_metadata(
             "Упорядоченный список сплитов для предсказаний или оценки.",
             "list[string] | null",
-            (
-                "null использует доступные сплиты; калибровочный val и итоговый test "
-                "должны оставаться раздельными."
-            ),
+            ("null использует доступные сплиты; калибровочный val и итоговый test должны оставаться раздельными."),
             "pipeline",
             "splits=[val,test]",
         ),
@@ -1184,10 +1031,7 @@ class PipelineConfig(CommandDeclaration):
         metadata=_metadata(
             "Каталог кэша подготовленного рабочего набора.",
             "path string | null",
-            (
-                "null выбирает CY_HOME/.cache/clearml-yolo/datasets; в конвейере "
-                "каталог должен быть вне run_dir."
-            ),
+            ("null выбирает CY_HOME/.cache/clearml-yolo/datasets; в конвейере каталог должен быть вне run_dir."),
             "pipeline",
             "dataset_cache_dir=cache/datasets",
         ),
@@ -1197,10 +1041,7 @@ class PipelineConfig(CommandDeclaration):
         metadata=_metadata(
             "Путь к готовому checkpoint для инференса или экспорта.",
             "path string | null",
-            (
-                "В полном конвейере допустим только при skip_train=true; обучение "
-                "выбирает веса в настройках модели."
-            ),
+            ("В полном конвейере допустим только при skip_train=true; обучение выбирает веса в настройках модели."),
             "pipeline",
             "weights=best.pt",
         ),
@@ -1220,10 +1061,7 @@ class PipelineConfig(CommandDeclaration):
         metadata=_metadata(
             "Пользовательский идентификатор общего каталога конвейера.",
             "string | null",
-            (
-                "При отсутствии run_dir задаёт каталог runs/run_id; используйте "
-                "уникальный идентификатор."
-            ),
+            ("При отсутствии run_dir задаёт каталог runs/run_id; используйте уникальный идентификатор."),
             "pipeline",
             "run_id=experiment-01",
         ),
@@ -1233,10 +1071,7 @@ class PipelineConfig(CommandDeclaration):
         metadata=_metadata(
             "Общий каталог всех стадий конвейера.",
             "path string | null",
-            (
-                "Явный путь имеет приоритет перед run_id; нативные маршруты "
-                "результатов должны ему соответствовать."
-            ),
+            ("Явный путь имеет приоритет перед run_id; нативные маршруты результатов должны ему соответствовать."),
             "pipeline",
             "run_dir=runs/experiment-01",
         ),

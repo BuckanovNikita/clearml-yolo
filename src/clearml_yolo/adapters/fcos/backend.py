@@ -56,9 +56,7 @@ def predict(
     from clearml_yolo.adapters.fcos.model import build_model
     from clearml_yolo.adapters.torchvision.inference import predict_native
 
-    return predict_native(
-        descriptor, weights, image_paths, settings, build_model=build_model, label_offset=0
-    )
+    return predict_native(descriptor, weights, image_paths, settings, build_model=build_model, label_offset=0)
 
 
 def probe(request: BatchProbeRequest) -> ProbeRankResult:

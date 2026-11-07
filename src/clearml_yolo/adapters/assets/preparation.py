@@ -44,9 +44,7 @@ from clearml_yolo.core.batch_estimation import ModelVariant, model_catalogue
 def _failure(selection: str, operation: str, error: Exception) -> PreparationFailure:
     # Opaque SDK errors can contain bare credentials, beyond recognizable URL/auth
     # patterns. Report their type only; the selected model retains normal handling.
-    if isinstance(
-        error, (AssetResolutionError, BundlePreparationError, WeightCacheConfigurationError)
-    ):
+    if isinstance(error, (AssetResolutionError, BundlePreparationError, WeightCacheConfigurationError)):
         # Only the resolver-owned outer report is public. Even its explicit or
         # implicit causes may retain opaque transport messages.
         message = redact_text(str(error)).strip()
@@ -71,13 +69,9 @@ def _location(spec: AssetSpec) -> Path:
     return asset_destination(spec).resolve()
 
 
-def _discover() -> tuple[
-    str, tuple[Path, ...], tuple[tuple[str, AssetSpec], ...], tuple[PreparationFailure, ...]
-]:
+def _discover() -> tuple[str, tuple[Path, ...], tuple[tuple[str, AssetSpec], ...], tuple[PreparationFailure, ...]]:
     variants = tuple(
-        variant
-        for variant in model_catalogue()
-        if not (variant.backend == "deimv2" and variant.preset in {"l", "x"})
+        variant for variant in model_catalogue() if not (variant.backend == "deimv2" and variant.preset in {"l", "x"})
     )
     requests: list[tuple[str, AssetSpec]] = []
     failures: list[PreparationFailure] = []
@@ -87,11 +81,7 @@ def _discover() -> tuple[
 
     def discover(selection: str, spec: AssetSpec) -> None:
         location = _location(spec)
-        hub = (
-            (spec.hub.repository, spec.hub.revision, spec.hub.filename)
-            if spec.hub is not None
-            else None
-        )
+        hub = (spec.hub.repository, spec.hub.revision, spec.hub.filename) if spec.hub is not None else None
         identity = json.dumps((spec.identity, spec.kind, hub))
         identities.append({"selection": selection, "asset": identity, "location": str(location)})
         locations.add(location)
@@ -117,9 +107,7 @@ def _discover() -> tuple[
         manifest_identity = manifest.identity if manifest is not None else "unavailable"
     except (OSError, ValueError):
         manifest_identity = "invalid"
-    identities.append(
-        {"selection": "weight-bundle", "manifest": manifest_identity, "policy": "release-only-v1"}
-    )
+    identities.append({"selection": "weight-bundle", "manifest": manifest_identity, "policy": "release-only-v1"})
     payload = json.dumps(
         sorted(identities, key=lambda item: str(item["selection"])),
         sort_keys=True,
@@ -144,9 +132,7 @@ def _read_receipt(path: Path, fingerprint: str) -> PreparationResult | None:
 def _write_receipt(path: Path, result: PreparationResult) -> None:
     temporary: Path | None = None
     try:
-        with tempfile.NamedTemporaryFile(
-            mode="w", encoding="utf-8", dir=path.parent, delete=False
-        ) as stream:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent, delete=False) as stream:
             temporary = Path(stream.name)
             stream.write(result.model_dump_json())
             stream.flush()

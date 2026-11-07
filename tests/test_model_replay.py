@@ -75,18 +75,16 @@ def test_remote_replay_preserves_dataset_selector_and_separates_provenance(
         observed.append(ground_truth)
 
     monkeypatch.setattr(
-        common, "replay_configuration",
-        lambda task, values, **kwargs: values | {
-            "ground_truth": selector, "ground_truth_source": provenance
-        },
+        common,
+        "replay_configuration",
+        lambda task, values, **kwargs: values | {"ground_truth": selector, "ground_truth_source": provenance},
     )
     monkeypatch.setattr(
-        common, "publish_run_configuration",
+        common,
+        "publish_run_configuration",
         lambda task, values, defaults: published.append(values),
     )
-    common.execute_owned(
-        "train", OmegaConf.create({"clearml": {}, "ground_truth": "old-local.csv"}), workflow
-    )
+    common.execute_owned("train", OmegaConf.create({"clearml": {}, "ground_truth": "old-local.csv"}), workflow)
     assert observed == [selector]
     assert published[0]["ground_truth"] == selector
     assert "ground_truth_source" not in published[0]
@@ -180,9 +178,7 @@ def test_local_replay_records_complete_native_group_without_mutating_it(
 
     monkeypatch.setattr(common, "invocation", invocation)
     monkeypatch.setattr(common, "replay_configuration", replay)
-    common.execute_owned(
-        "train", OmegaConf.create({"clearml": {}, "ultralytics": native}), workflow
-    )
+    common.execute_owned("train", OmegaConf.create({"clearml": {}, "ultralytics": native}), workflow)
     assert captured == [{"clearml": {}, "ultralytics": native}]
     assert observed == [native]
 
@@ -227,12 +223,8 @@ def test_legacy_training_replay_restores_general_execution_fields_without_old_ro
             connect=connect,
             get_parameters=get_parameters,
             get_configuration_object_as_dict=lambda name: deepcopy(canonical),
-            get_configuration_object=lambda name: (
-                None if canonical is None else json.dumps(canonical)
-            ),
-            set_configuration_object=lambda **values: recorded.append(
-                json.loads(values["config_text"])
-            ),
+            get_configuration_object=lambda name: None if canonical is None else json.dumps(canonical),
+            set_configuration_object=lambda **values: recorded.append(json.loads(values["config_text"])),
         )
         state = session._InvocationState(task=task, stages=[command], current_stage=command)
         token = session._ACTIVE_INVOCATION.set(state)
@@ -249,9 +241,7 @@ def test_legacy_training_replay_restores_general_execution_fields_without_old_ro
     # Exercise the real session boundary: legacy tasks either omitted the native
     # group from run or had no run Configuration Object at all.
     native = {"device": [0, 1], "epochs": 1, "name": "current", "data": None, "exist_ok": False}
-    common.execute_owned(
-        command, OmegaConf.create({"clearml": {}, "ultralytics": native}), workflow
-    )
+    common.execute_owned(command, OmegaConf.create({"clearml": {}, "ultralytics": native}), workflow)
 
     assert observed == [
         {
@@ -272,9 +262,7 @@ def test_legacy_training_replay_restores_general_execution_fields_without_old_ro
     }
 
 
-@pytest.mark.parametrize(
-    "canonical", [{}, {"device": [], "data": "", "exist_ok": False}, {"device": None}]
-)
+@pytest.mark.parametrize("canonical", [{}, {"device": [], "data": "", "exist_ok": False}, {"device": None}])
 def test_explicit_canonical_native_values_never_fall_back_to_legacy_general(
     monkeypatch: pytest.MonkeyPatch,
     isolated_owner: list[str],
@@ -340,9 +328,7 @@ def test_replay_cannot_cross_initialized_runtime_family(
     monkeypatch.setattr(
         common,
         "replay_configuration",
-        lambda task, values, **kwargs: (
-            values | {"model": {"backend": replayed[0], "preset": replayed[1]}}
-        ),
+        lambda task, values, **kwargs: values | {"model": {"backend": replayed[0], "preset": replayed[1]}},
     )
     with pytest.raises(ValueError, match=r"runtime.*[Rr]elaunch.*model="):
         common.execute_owned("predict", _configuration(*initial), workflow)
@@ -362,8 +348,7 @@ def test_native_replay_materializes_defaults_and_preserves_replayed_device(
         common,
         "replay_configuration",
         lambda task, values, **kwargs: (
-            values
-            | {"model": {"backend": "rfdetr", "preset": "small", "predict": {"device": "cuda:3"}}}
+            values | {"model": {"backend": "rfdetr", "preset": "small", "predict": {"device": "cuda:3"}}}
         ),
     )
     config = _configuration("deimv2", "s")
@@ -376,9 +361,7 @@ def test_native_replay_materializes_defaults_and_preserves_replayed_device(
 
 
 @pytest.mark.parametrize("command", ["train", "pipeline"])
-@pytest.mark.parametrize(
-    ("backend", "preset"), [("deimv2", "s"), ("rfdetr", "nano"), ("fasterrcnn", "resnet50_fpn")]
-)
+@pytest.mark.parametrize(("backend", "preset"), [("deimv2", "s"), ("rfdetr", "nano"), ("fasterrcnn", "resnet50_fpn")])
 def test_detector_training_replay_uses_model_group_without_importing_general_into_yolo(
     monkeypatch: pytest.MonkeyPatch,
     isolated_owner: list[str],
@@ -443,9 +426,7 @@ def test_export_replay_retains_inputs_and_ignores_result_evidence(
     monkeypatch.setattr(
         common,
         "replay_configuration",
-        lambda task, values, **kwargs: (
-            values | {"export_result": {"operation": "onnx", "graph_sha256": "a" * 64}}
-        ),
+        lambda task, values, **kwargs: values | {"export_result": {"operation": "onnx", "graph_sha256": "a" * 64}},
     )
     config = OmegaConf.create(
         {

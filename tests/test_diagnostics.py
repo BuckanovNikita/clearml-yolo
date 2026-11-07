@@ -17,9 +17,7 @@ from clearml_yolo.adapters.observability.diagnostics import (
 @contextmanager
 def captured(level: str) -> Iterator[list[str]]:
     messages: list[str] = []
-    handle = logger.add(
-        lambda message: messages.append(str(message)), level=level, format="{message}"
-    )
+    handle = logger.add(lambda message: messages.append(str(message)), level=level, format="{message}")
     try:
         yield messages
     finally:

@@ -67,10 +67,7 @@ def backbone_asset(preset: str) -> AssetSpec:
         filename, identifier = _DISTILLED[preset]
         url = f"https://drive.usercontent.google.com/download?id={identifier}&export=download&confirm=t"
         checksum = None
-        access = (
-            "Use the official DEIMv2 README's ViT-Tiny/ViT-Tiny+ download "
-            "if Google Drive requests confirmation."
-        )
+        access = "Use the official DEIMv2 README's ViT-Tiny/ViT-Tiny+ download if Google Drive requests confirmation."
     else:
         name, checksum = _DINO[preset]
         filename = f"dinov3_{name}_pretrain_lvd1689m-{checksum}.pth"

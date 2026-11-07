@@ -68,11 +68,7 @@ def test_concurrent_writers_preserve_every_distinct_case(tmp_path: Path) -> None
     template = sample_case()
     cases = tuple(
         template.model_copy(
-            update={
-                "profile": template.profile.model_copy(
-                    update={"dependencies": {"torch": str(index)}}
-                )
-            }
+            update={"profile": template.profile.model_copy(update={"dependencies": {"torch": str(index)}})}
         )
         for index in range(8)
     )
@@ -84,9 +80,7 @@ def test_concurrent_writers_preserve_every_distinct_case(tmp_path: Path) -> None
         tuple(executor.map(save, cases))
     loaded = FileBatchEstimateStore(path).read().cases
     assert len(loaded) == len(cases)
-    assert {case.profile.dependencies["torch"] for case in loaded} == {
-        str(index) for index in range(8)
-    }
+    assert {case.profile.dependencies["torch"] for case in loaded} == {str(index) for index in range(8)}
 
 
 def test_rejects_copied_success_with_missing_confirmation(tmp_path: Path) -> None:
@@ -115,13 +109,9 @@ def test_multiprocess_writers_preserve_peer_cases_and_latest_revisions(tmp_path:
     try:
         for index in range(4):
             case = template.model_copy(
-                update={"profile": template.profile.model_copy(
-                    update={"dependencies": {"torch": f"process-{index}"}}
-                )}
+                update={"profile": template.profile.model_copy(update={"dependencies": {"torch": f"process-{index}"}})}
             )
-            process = context.Process(
-                target=_process_save, args=(path, case.model_dump_json(), barrier)
-            )
+            process = context.Process(target=_process_save, args=(path, case.model_dump_json(), barrier))
             process.start()
             processes.append(process)
         for process in processes:
@@ -136,9 +126,7 @@ def test_multiprocess_writers_preserve_peer_cases_and_latest_revisions(tmp_path:
     saved = FileBatchEstimateStore(path).read()
     assert saved.schema_version == 3
     assert len(saved.cases) == 4
-    assert {case.profile.dependencies["torch"] for case in saved.cases} == {
-        f"process-{index}" for index in range(4)
-    }
+    assert {case.profile.dependencies["torch"] for case in saved.cases} == {f"process-{index}" for index in range(4)}
     assert all(case.created_at == "revision-2" for case in saved.cases)
 
 

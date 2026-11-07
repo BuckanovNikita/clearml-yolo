@@ -76,9 +76,7 @@ def catalogue(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Catalogue:
     monkeypatch.setattr(module, "model_catalogue", lambda: fixture.selections)
     monkeypatch.setattr(module, "yolo_asset", fixture.spec)
     monkeypatch.setattr(module, "rfdetr_asset", lambda preset: fixture.spec(preset + ".pth"))
-    monkeypatch.setattr(
-        module, "torchvision_asset", lambda preset, **kwargs: fixture.spec(preset + ".pth")
-    )
+    monkeypatch.setattr(module, "torchvision_asset", lambda preset, **kwargs: fixture.spec(preset + ".pth"))
     monkeypatch.setattr(module, "deim_backbone_asset", lambda preset: fixture.spec(preset + ".pt"))
     monkeypatch.setattr(module, "resolve_asset", fixture.resolve)
     monkeypatch.setattr(module, "seed_bundle_asset", lambda requested: None)
@@ -162,9 +160,7 @@ def test_configuration_failure_is_actionable_and_stops_discovery(
     module = catalogue.module
 
     def configure() -> Path:
-        raise module.WeightCacheConfigurationError(
-            "Cannot persist /isolated/settings.json; rerun cy-download-weights"
-        )
+        raise module.WeightCacheConfigurationError("Cannot persist /isolated/settings.json; rerun cy-download-weights")
 
     def forbidden() -> None:
         pytest.fail("Failed settings configuration must stop discovery")
@@ -180,9 +176,7 @@ def test_configuration_failure_is_actionable_and_stops_discovery(
 def test_source_provenance_uses_extracted_manifest_not_archive_digest(
     catalogue: Catalogue, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    catalogue.selections = (
-        ModelVariant(selection="deimv2/s", backend="deimv2", preset="s", architecture="deimv2/s"),
-    )
+    catalogue.selections = (ModelVariant(selection="deimv2/s", backend="deimv2", preset="s", architecture="deimv2/s"),)
     source = catalogue.spec("source.tar.gz").model_copy(update={"kind": "deim-source"})
     monkeypatch.setattr(catalogue.module, "deim_source_asset", lambda: source)
     extracted: list[Path] = []
@@ -193,9 +187,7 @@ def test_source_provenance_uses_extracted_manifest_not_archive_digest(
         sha256="b" * 64,
         override=source.override,
     )
-    monkeypatch.setattr(
-        catalogue.module, "existing_source", lambda spec: manifest_record if extracted else None
-    )
+    monkeypatch.setattr(catalogue.module, "existing_source", lambda spec: manifest_record if extracted else None)
 
     def extract(record: ResolvedAsset) -> Path:
         extracted.append(record.path)
@@ -245,8 +237,7 @@ def test_synthetic_chained_failure_keeps_public_report_and_discards_opaque_messa
             raise RuntimeError(opaque_marker)  # noqa: TRY301 - synthetic transport fault
         except RuntimeError as error:
             public = AssetResolutionError(
-                f"Copy checkpoint to {destination}; "
-                f"source=https://user:{public_marker}@weights.example/{spec.filename}"
+                f"Copy checkpoint to {destination}; source=https://user:{public_marker}@weights.example/{spec.filename}"
             )
             if chain == "cause":
                 raise public from error
@@ -259,9 +250,7 @@ def test_synthetic_chained_failure_keeps_public_report_and_discards_opaque_messa
         result = catalogue.module.prepare_catalogue(automatic=True)
     finally:
         logger.remove(sink)
-    receipt = (
-        tmp_path / ".cache/clearml-yolo/preparation" / f"{result.fingerprint}.json"
-    ).read_text(encoding="utf-8")
+    receipt = (tmp_path / ".cache/clearml-yolo/preparation" / f"{result.fingerprint}.json").read_text(encoding="utf-8")
     with pytest.raises(SystemExit) as exit_info:
         download_weights.main([])
     assert exit_info.value.code == 1
@@ -318,9 +307,7 @@ def test_partial_attempt_suppresses_automatic_but_manual_retries(catalogue: Cata
 
 
 @pytest.mark.parametrize("change", ["revision", "root", "selections"])
-def test_changed_identity_location_or_catalogue_reopens_attempt(
-    catalogue: Catalogue, change: str
-) -> None:
+def test_changed_identity_location_or_catalogue_reopens_attempt(catalogue: Catalogue, change: str) -> None:
     first = catalogue.module.prepare_catalogue(automatic=True)
     if change == "revision":
         catalogue.revision = "v2"
@@ -357,9 +344,7 @@ def test_relative_native_cache_uses_consuming_working_directory(
 
 
 @pytest.mark.parametrize("previous_completed", [False, True])
-def test_interrupted_manual_attempt_remains_unfinished(
-    catalogue: Catalogue, previous_completed: bool
-) -> None:
+def test_interrupted_manual_attempt_remains_unfinished(catalogue: Catalogue, previous_completed: bool) -> None:
     if previous_completed:
         catalogue.module.prepare_catalogue(automatic=True)
     catalogue.interrupt = True
@@ -502,15 +487,11 @@ def test_global_discovery_error_is_nonfatal_and_retryable(
 
 
 @pytest.mark.parametrize("corruption", ["truncated", "wrong-fingerprint"])
-def test_incomplete_receipt_cannot_suppress_next_attempt(
-    catalogue: Catalogue, tmp_path: Path, corruption: str
-) -> None:
+def test_incomplete_receipt_cannot_suppress_next_attempt(catalogue: Catalogue, tmp_path: Path, corruption: str) -> None:
     result = catalogue.module.prepare_catalogue(automatic=True)
     receipt = tmp_path / ".cache" / "clearml-yolo" / "preparation" / f"{result.fingerprint}.json"
     receipt.write_text(
-        "{"
-        if corruption == "truncated"
-        else result.model_copy(update={"fingerprint": "other"}).model_dump_json(),
+        "{" if corruption == "truncated" else result.model_copy(update={"fingerprint": "other"}).model_dump_json(),
         encoding="utf-8",
     )
     recovered = catalogue.module.prepare_catalogue(automatic=True)
@@ -550,9 +531,7 @@ main(["--help"])
     assert not list(tmp_path.iterdir())
 
 
-def test_command_help_does_not_prepare(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_command_help_does_not_prepare(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
     command = importlib.import_module("clearml_yolo.entrypoints.download_weights")
 
     def forbidden(*, automatic: bool) -> None:

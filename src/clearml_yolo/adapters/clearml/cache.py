@@ -48,9 +48,7 @@ _RUN_ROUTING = frozenset(
         "display_names",
     }
 )
-_PIPELINE_SKIP_FLAGS = frozenset(
-    {"skip_train", "skip_predict", "skip_metrics", "skip_compare", "skip_report"}
-)
+_PIPELINE_SKIP_FLAGS = frozenset({"skip_train", "skip_predict", "skip_metrics", "skip_compare", "skip_report"})
 _TRACKING_ROUTING = frozenset({"project_name", "task_name", "tags", "output_uri"})
 _PUBLICATION_RECEIPT = frozenset(
     {"dataset_name", "run_key", "dataset_reused", "sample_count", "fields", "evaluation_keys"}
@@ -88,18 +86,12 @@ def _supported_tree(value: Any, ancestors: frozenset[int] = frozenset()) -> bool
         return True
     if type(value) is float:
         return math.isfinite(value)
-    if (
-        not isinstance(value, (dict, list))
-        or id(value) in ancestors
-        or len(ancestors) > _MAX_DOCUMENT_DEPTH
-    ):
+    if not isinstance(value, (dict, list)) or id(value) in ancestors or len(ancestors) > _MAX_DOCUMENT_DEPTH:
         return False
     parents = ancestors | {id(value)}
     if isinstance(value, list):
         return all(_supported_tree(item, parents) for item in value)
-    return all(
-        type(key) in {str, int} and _supported_tree(item, parents) for key, item in value.items()
-    )
+    return all(type(key) in {str, int} and _supported_tree(item, parents) for key, item in value.items())
 
 
 def _document(value: Any, *, dataset: bool = False) -> dict[str, Any] | None:
@@ -115,11 +107,7 @@ def _document(value: Any, *, dataset: bool = False) -> dict[str, Any] | None:
         )
     except (ValueError, yaml.YAMLError, RecursionError):
         return None
-    if (
-        not isinstance(parsed, dict)
-        or any(not isinstance(key, str) for key in parsed)
-        or not _supported_tree(parsed)
-    ):
+    if not isinstance(parsed, dict) or any(not isinstance(key, str) for key in parsed) or not _supported_tree(parsed):
         return None
     if not dataset and _ambiguous_json_escape(value):
         raise _UnsafeProjectionError("The SDK and JSON parser disagree on string escapes")
@@ -158,11 +146,7 @@ def _device(value: Any, consumer: _DeviceConsumer = "single") -> Any:
         value = [value]
     if not isinstance(value, list) or not value or (not native and len(value) != 1):
         return requested
-    if (
-        isinstance(requested, list)
-        and consumer != "native"
-        and any(type(item) is not int for item in requested)
-    ):
+    if isinstance(requested, list) and consumer != "native" and any(type(item) is not int for item in requested):
         return requested
     ordinals = [_ordinal(item, native=native) for item in value]
     if None in ordinals or len(set(ordinals)) != len(ordinals):
@@ -222,9 +206,7 @@ def _dataset_path(value: Any, binding: tuple[str, str] | None) -> Any:
     return f"{_DATASET_PREFIX}{identity}/{relative}"
 
 
-def _native(
-    values: Any, binding: tuple[str, str] | None, consumer: _DeviceConsumer = "single"
-) -> None:
+def _native(values: Any, binding: tuple[str, str] | None, consumer: _DeviceConsumer = "single") -> None:
     if not isinstance(values, dict):
         return
     for key in _NATIVE_ROUTING:
@@ -246,14 +228,10 @@ def _reference_uses_project(reference: Any) -> bool:
 
 def _project_is_input(run: dict[str, Any], command: str) -> bool:
     if command == "compare":
-        return any(
-            _reference_uses_project(run.get(key)) for key in ("baseline_model", "candidate_model")
-        )
+        return any(_reference_uses_project(run.get(key)) for key in ("baseline_model", "candidate_model"))
     if command == "pipeline" and run.get("skip_compare") is not True:
         comparison = run.get("compare")
-        return not isinstance(comparison, dict) or _reference_uses_project(
-            comparison.get("baseline_model")
-        )
+        return not isinstance(comparison, dict) or _reference_uses_project(comparison.get("baseline_model"))
     return False
 
 
@@ -346,15 +324,11 @@ def _normalization(values: Any, binding: tuple[str, str] | None, consumer: _Devi
             for side in ("requested", "effective"):
                 if side in change:
                     change[side] = (
-                        _device(change[side], consumer)
-                        if key == "device"
-                        else _dataset_path(change[side], binding)
+                        _device(change[side], consumer) if key == "device" else _dataset_path(change[side], binding)
                     )
 
 
-def _hyperparameters(
-    values: Any, binding: tuple[str, str] | None, consumer: _DeviceConsumer
-) -> None:
+def _hyperparameters(values: Any, binding: tuple[str, str] | None, consumer: _DeviceConsumer) -> None:
     if not isinstance(values, dict):
         return
     for key in _NATIVE_ROUTING:
@@ -419,9 +393,7 @@ def normalize_task_hash(representation: dict[str, Any]) -> dict[str, Any]:
         consumer = _run_consumer(run, command)
         if run is not None and isinstance(configs, dict):
             _run_document(run, binding, command)
-            configs["run"] = json.dumps(
-                run, sort_keys=True, separators=(",", ":"), allow_nan=False, ensure_ascii=False
-            )
+            configs["run"] = json.dumps(run, sort_keys=True, separators=(",", ":"), allow_nan=False, ensure_ascii=False)
         if isinstance(configs, dict) and binding is not None:
             dataset = _document(configs.get("dataset"), dataset=True)
             if dataset is not None:

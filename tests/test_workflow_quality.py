@@ -69,9 +69,7 @@ def _dataset(root: Path) -> Path:
             "split",
         ],
     ).to_csv(source, index=False)
-    validated = validate_ground_truth(
-        source, required_splits=("val", "test"), require_training=False
-    )
+    validated = validate_ground_truth(source, required_splits=("val", "test"), require_training=False)
     assert set(validated.names.values()) == set(_LABELS)
     assert len(validated.images) == 4
     assert validated.errors == []
@@ -166,9 +164,7 @@ def test_saved_validation_config_freezes_val_thresholds_through_csv_payload_and_
         cast(dict[str, Any], OmegaConf.to_container(config.ultralytics, resolve=True)),
         instantiate(config.evaluation),
         splits=list(config.splits),
-        ultralytics_predict=cast(
-            dict[str, Any], OmegaConf.to_container(config.ultralytics_predict, resolve=True)
-        ),
+        ultralytics_predict=cast(dict[str, Any], OmegaConf.to_container(config.ultralytics_predict, resolve=True)),
         model_label=config.model_label,
         deps=workflow_dependencies,
     )
@@ -221,9 +217,7 @@ def test_comparison_cache_checkpoint_replacement_and_real_reports_preserve_sourc
 
     def predictor(weights: Path, paths: list[str], **_kwargs: Any) -> pd.DataFrame:
         calls.append(weights.name)
-        assert [Path(path).name for path in paths] == [
-            f"test-{index:04}-猫.png" for index in range(2)
-        ]
+        assert [Path(path).name for path in paths] == [f"test-{index:04}-猫.png" for index in range(2)]
         return _predictions(paths, "mixed", baseline=weights == baseline)
 
     monkeypatch.setattr(workflow_dependencies.tracking, "init_task", lambda *_a, **_kw: None)
@@ -239,12 +233,8 @@ def test_comparison_cache_checkpoint_replacement_and_real_reports_preserve_sourc
         ),
     )
     destination = tmp_path / "comparison"
-    baseline_ref = ModelRef(
-        source="local", weights=baseline, thresholds=dict.fromkeys(_LABELS, 0.5)
-    )
-    candidate_ref = ModelRef(
-        source="local", weights=candidate, thresholds=dict.fromkeys(_LABELS, 0.5)
-    )
+    baseline_ref = ModelRef(source="local", weights=baseline, thresholds=dict.fromkeys(_LABELS, 0.5))
+    candidate_ref = ModelRef(source="local", weights=candidate, thresholds=dict.fromkeys(_LABELS, 0.5))
 
     def run() -> None:
         result = compare(
@@ -263,9 +253,7 @@ def test_comparison_cache_checkpoint_replacement_and_real_reports_preserve_sourc
             assert cast(pd.Series, frame.loc[label, ["tp", "fp", "fn"]]).tolist() == [0, 1, 1]
 
     run()
-    first_manifest = ComparisonManifest.model_validate_json(
-        (destination / MANIFEST_NAME).read_text()
-    )
+    first_manifest = ComparisonManifest.model_validate_json((destination / MANIFEST_NAME).read_text())
     baseline_cache = destination / first_manifest.baseline_predictions
     candidate_cache = destination / first_manifest.candidate_predictions
     preserved = (baseline_cache.read_bytes(), candidate_cache.read_bytes())
@@ -274,9 +262,7 @@ def test_comparison_cache_checkpoint_replacement_and_real_reports_preserve_sourc
     before = candidate.stat()
     candidate.write_bytes(b"candidate-v2")  # Same size and mtime; content must own cache identity.
     os.utime(candidate, ns=(before.st_atime_ns, before.st_mtime_ns))
-    candidate_identity = candidate_identity.model_copy(
-        update={"checkpoint_sha256": checkpoint_sha256(candidate)}
-    )
+    candidate_identity = candidate_identity.model_copy(update={"checkpoint_sha256": checkpoint_sha256(candidate)})
     write_checkpoint_identity(candidate, candidate_identity)
     run()
     assert calls == ["baseline.pt", "candidate.pt", "candidate.pt"]

@@ -23,10 +23,7 @@ def target_bound(configuration: dict[str, Any], objects_per_image: int) -> int:
     """Bound target amplification from the enabled native mosaic/mixup recipe."""
     loader = configuration["train_dataloader"]
     operations = loader["dataset"]["transforms"]["ops"]
-    mosaic = any(
-        operation["type"] == "Mosaic" and operation.get("probability", 1) > 0
-        for operation in operations
-    )
+    mosaic = any(operation["type"] == "Mosaic" and operation.get("probability", 1) > 0 for operation in operations)
     count = objects_per_image * (4 if mosaic else 1)
     collate = loader["collate_fn"]
     mixed = count * (2 if collate.get("mixup_prob", 0) > 0 else 1)
@@ -163,9 +160,7 @@ class _ValidationBatch:
         return 1
 
 
-def _coco_annotations(
-    request: BatchProbeRequest, template: dict[str, "torch.Tensor"]
-) -> dict[str, Any]:
+def _coco_annotations(request: BatchProbeRequest, template: dict[str, "torch.Tensor"]) -> dict[str, Any]:
     height, width = request.profile.nominal_size
     boxes = template["boxes"].cpu().tolist()
     labels = template["labels"].cpu().tolist()
@@ -190,19 +185,13 @@ def _coco_annotations(
             )
     return {
         "info": {},
-        "images": [
-            {"id": image, "width": width, "height": height} for image in range(request.global_batch)
-        ],
-        "categories": [
-            {"id": label, "name": str(label)} for label in range(request.workload.classes)
-        ],
+        "images": [{"id": image, "width": width, "height": height} for image in range(request.global_batch)],
+        "categories": [{"id": label, "name": str(label)} for label in range(request.workload.classes)],
         "annotations": annotations,
     }
 
 
-def validate(
-    solver: Any, module_name: str, request: BatchProbeRequest, per_rank: int, rank: int
-) -> None:
+def validate(solver: Any, module_name: str, request: BatchProbeRequest, per_rank: int, rank: int) -> None:
     """Run the native bounded validation/evaluator while optimizer and EMA stay resident."""
     import torch
 

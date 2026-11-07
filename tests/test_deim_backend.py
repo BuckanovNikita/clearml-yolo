@@ -44,9 +44,7 @@ def test_deim_rows_preserve_lexical_labels_and_filter_foreground_indices() -> No
     ]
 
 
-@pytest.mark.parametrize(
-    ("device", "expected_device", "expected_amp"), [("cpu", "cpu", False), (2, "cuda:2", True)]
-)
+@pytest.mark.parametrize(("device", "expected_device", "expected_amp"), [("cpu", "cpu", False), (2, "cuda:2", True)])
 def test_deim_train_applies_native_recipe_before_solver_construction(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -111,9 +109,7 @@ def test_deim_train_applies_native_recipe_before_solver_construction(
         return SimpleNamespace(fit=lambda: (output / "best_stg1.pth").write_bytes(b"best"))
 
     solver = SimpleNamespace(__package__="private.engine.solver", TASKS={"detection": make_solver})
-    monkeypatch.setattr(
-        backend, "load_source", lambda _path: (SimpleNamespace(YAMLConfig=yaml_config), solver)
-    )
+    monkeypatch.setattr(backend, "load_source", lambda _path: (SimpleNamespace(YAMLConfig=yaml_config), solver))
     monkeypatch.setattr(backend, "native_coco_modules", nullcontext)
     monkeypatch.setattr(backend, "_native_writer", backend._OwnerWriter)
     native_misc = ModuleType("private.engine.misc.dist_utils")
@@ -185,9 +181,7 @@ def test_deim_missing_source_is_actionable(tmp_path: Path) -> None:
         artifacts=[],
     )
     with pytest.raises(ValueError, match="source_dir"):
-        train(
-            ModelConfig(backend="deimv2", preset="s"), prepared, tmp_path / "out", lambda *_: None
-        )
+        train(ModelConfig(backend="deimv2", preset="s"), prepared, tmp_path / "out", lambda *_: None)
 
 
 @pytest.mark.parametrize("batch", [None, 1, 3])
@@ -420,13 +414,9 @@ def test_deim_full_pretrained_checkpoint_requires_compatible_backbone(
     from clearml_yolo.adapters.deim import backend
 
     expected = {} if case == "empty" else {"backbone.patch.weight": SimpleNamespace(shape=(2, 2))}
-    actual = {
-        "backbone.patch.weight": SimpleNamespace(shape=(3, 3) if case == "wrong_shape" else (2, 2))
-    }
+    actual = {"backbone.patch.weight": SimpleNamespace(shape=(3, 3) if case == "wrong_shape" else (2, 2))}
     native_torch = SimpleNamespace(load=lambda *_args, **_kwargs: {"model": expected})
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.deim.backend.importlib.import_module", lambda _: native_torch
-    )
+    monkeypatch.setattr("clearml_yolo.adapters.deim.backend.importlib.import_module", lambda _: native_torch)
     model = SimpleNamespace(state_dict=lambda: actual)
     if case == "compatible":
         backend._validate_tuning(model, tmp_path / "weights.pth")
@@ -479,9 +469,7 @@ def test_deim_private_import_restores_coco_modules_even_after_failure(
         ):
             monkeypatch.setitem(sys.modules, name, ModuleType(name))
     original = {
-        name: module
-        for name, module in sys.modules.items()
-        if name == "pycocotools" or name.startswith("pycocotools.")
+        name: module for name, module in sys.modules.items() if name == "pycocotools" or name.startswith("pycocotools.")
     }
     namespace = "_test_deim_coco_isolation"
     monkeypatch.setitem(sys.modules, namespace, ModuleType(namespace))
@@ -506,9 +494,7 @@ def test_deim_private_import_restores_coco_modules_even_after_failure(
         loaded = _load_package(namespace, engine)
         assert loaded.captured_coco.__name__ == "fast_pycocotools.coco"
     restored = {
-        name: module
-        for name, module in sys.modules.items()
-        if name == "pycocotools" or name.startswith("pycocotools.")
+        name: module for name, module in sys.modules.items() if name == "pycocotools" or name.startswith("pycocotools.")
     }
     assert restored.keys() == original.keys()
     assert all(restored[name] is module for name, module in original.items())
@@ -533,9 +519,7 @@ def test_deim_native_dataset_alias_scope_preserves_original_modules(
         lambda name: native_modules[name],
     )
     original = {
-        name: module
-        for name, module in sys.modules.items()
-        if name == "pycocotools" or name.startswith("pycocotools.")
+        name: module for name, module in sys.modules.items() if name == "pycocotools" or name.startswith("pycocotools.")
     }
     captured: list[ModuleType] = []
 
@@ -549,9 +533,7 @@ def test_deim_native_dataset_alias_scope_preserves_original_modules(
         construct_dataset()
     assert captured[0] is native_modules["faster_coco_eval.core.coco"]
     restored = {
-        name: module
-        for name, module in sys.modules.items()
-        if name == "pycocotools" or name.startswith("pycocotools.")
+        name: module for name, module in sys.modules.items() if name == "pycocotools" or name.startswith("pycocotools.")
     }
     assert restored.keys() == original.keys()
     assert all(restored[name] is module for name, module in original.items())

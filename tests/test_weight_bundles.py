@@ -50,11 +50,7 @@ def fixture_bundle(
         schema_version=1,
         repository="BuckanovNikita/clearml-yolo",
         release_tag="weights-2026-10-29",
-        archives=(
-            BundleArchive(
-                name=path.name, size=path.stat().st_size, sha256=digest(path.read_bytes())
-            ),
-        ),
+        archives=(BundleArchive(name=path.name, size=path.stat().st_size, sha256=digest(path.read_bytes())),),
         assets=(
             BundleAsset(
                 identity=spec.identity,
@@ -144,9 +140,7 @@ def test_checksum_failures_never_publish(
     assert not asset_destination(spec).exists()
 
 
-def test_proxy_failure_recovers_at_original(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_proxy_failure_recovers_at_original(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     spec, manifest, archive = fixture_bundle(tmp_path)
     monkeypatch.setattr(bundles, "cy_home", lambda: tmp_path)
     monkeypatch.setattr(bundles, "write_path", lambda path: path)
@@ -178,9 +172,7 @@ def test_manifest_rejects_duplicates_and_unknown_fields(tmp_path: Path) -> None:
         BundleManifest.model_validate(data)
 
 
-def test_duplicate_archive_members_rejected(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_duplicate_archive_members_rejected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     spec, _, _ = fixture_bundle(tmp_path)
     spec, manifest, archive = fixture_bundle(tmp_path, unsafe=f"assets/{spec.identity}/model.pt")
     monkeypatch.setattr(bundles, "cy_home", lambda: tmp_path)
@@ -194,9 +186,7 @@ def test_duplicate_archive_members_rejected(
     assert not asset_destination(spec).exists()
 
 
-def test_valid_native_cache_does_not_require_a_manifest(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_valid_native_cache_does_not_require_a_manifest(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from clearml_yolo.adapters.assets import preparation
 
     spec, _, _ = fixture_bundle(tmp_path)
@@ -204,12 +194,8 @@ def test_valid_native_cache_does_not_require_a_manifest(
     destination.parent.mkdir(parents=True)
     destination.write_bytes(WEIGHT)
     monkeypatch.setattr(bundles, "load_manifest", lambda: None)
-    monkeypatch.setattr(
-        preparation, "_discover", lambda: ("fixture", (), (("example/small", spec),), ())
-    )
-    monkeypatch.setattr(
-        bundles, "download", lambda *args, **kwargs: pytest.fail("release network requested")
-    )
+    monkeypatch.setattr(preparation, "_discover", lambda: ("fixture", (), (("example/small", spec),), ()))
+    monkeypatch.setattr(bundles, "download", lambda *args, **kwargs: pytest.fail("release network requested"))
     result = preparation.prepare_catalogue(automatic=False)
     assert len(result.assets) == 1
     assert result.assets[0].path == destination
@@ -230,9 +216,7 @@ def test_pinned_manifest_identity_changes_preparation_fingerprint(
     assert first != second
 
 
-def test_extraction_scratch_stays_under_cy_home(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_extraction_scratch_stays_under_cy_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     spec, manifest, archive = fixture_bundle(tmp_path)
     monkeypatch.setattr(bundles, "cy_home", lambda: tmp_path)
     monkeypatch.setattr(bundles, "write_path", lambda path: path)
@@ -340,18 +324,14 @@ def test_resnet_bundle_matches_same_content_across_torchvision_versions() -> Non
     assert not bundles._matches(changed_source, deim)
 
 
-def test_bulk_release_failure_never_contacts_upstream(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_bulk_release_failure_never_contacts_upstream(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     import requests
 
     from clearml_yolo.adapters.assets import preparation, resolver
 
     spec, manifest, _ = fixture_bundle(tmp_path)
     monkeypatch.setattr(bundles, "load_manifest", lambda: manifest)
-    monkeypatch.setattr(
-        preparation, "_discover", lambda: ("release-only", (), (("example/small", spec),), ())
-    )
+    monkeypatch.setattr(preparation, "_discover", lambda: ("release-only", (), (("example/small", spec),), ()))
     monkeypatch.setenv("GHR", "https://user:secret@private.example/artifactory/files?token=hidden")
     attempts: list[str] = []
 
@@ -377,9 +357,7 @@ def test_bulk_release_failure_never_contacts_upstream(
     assert "GHR Files remote: HTTP 401" in message
     assert "GitHub release: HTTP 401" in message
     assert "weights.tar" in message
-    assert all(
-        secret not in message for secret in ("opaque-private-secret", "hidden", "private.example")
-    )
+    assert all(secret not in message for secret in ("opaque-private-secret", "hidden", "private.example"))
     assert not asset_destination(spec).exists()
 
 
@@ -394,9 +372,7 @@ def test_bulk_unavailable_pin_or_incomplete_restore_never_uses_upstream(
     if manifest_state == "no-match":
         spec = spec.model_copy(update={"revision": "changed"})
     monkeypatch.setattr(bundles, "load_manifest", lambda: selected)
-    monkeypatch.setattr(
-        preparation, "_discover", lambda: (manifest_state, (), (("example/small", spec),), ())
-    )
+    monkeypatch.setattr(preparation, "_discover", lambda: (manifest_state, (), (("example/small", spec),), ()))
     if manifest_state == "false-success":
         monkeypatch.setattr(preparation, "seed_bundle_asset", lambda requested: None)
     upstream: list[str] = []
@@ -494,9 +470,7 @@ def test_local_only_hub_resolution_never_repairs_metadata_over_network(
         (repo / "refs").mkdir()
         (repo / "refs" / "main").write_text(commit)
     monkeypatch.setattr(hub, "hf_hub_download", lambda **kw: pytest.fail("Hub download requested"))
-    monkeypatch.setattr(
-        hub, "get_hf_file_metadata", lambda **kw: pytest.fail("Hub metadata requested")
-    )
+    monkeypatch.setattr(hub, "get_hf_file_metadata", lambda **kw: pytest.fail("Hub metadata requested"))
     with pytest.raises(resolver.AssetResolutionError, match="local cache"):
         resolver.resolve_asset(spec, local_only=True)
 
@@ -508,9 +482,7 @@ def test_bulk_success_from_release_does_not_contact_original_host(
 
     spec, manifest, archive = fixture_bundle(tmp_path)
     monkeypatch.setattr(bundles, "load_manifest", lambda: manifest)
-    monkeypatch.setattr(
-        preparation, "_discover", lambda: ("release-success", (), (("example/small", spec),), ())
-    )
+    monkeypatch.setattr(preparation, "_discover", lambda: ("release-success", (), (("example/small", spec),), ()))
     monkeypatch.setattr(
         bundles,
         "download",

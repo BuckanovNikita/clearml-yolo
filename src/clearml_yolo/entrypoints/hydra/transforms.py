@@ -108,9 +108,7 @@ def prepare_transforms(config: DictConfig) -> TransformConfig:
                 else destination.get(key)
             )
             if requested != value:
-                logger.warning(
-                    "Custom transforms override {}.{}: {} -> {}", prefix, key, requested, value
-                )
+                logger.warning("Custom transforms override {}.{}: {} -> {}", prefix, key, requested, value)
             destination[key] = value
         config.transforms = resolved.model_dump(mode="json")
     return resolved

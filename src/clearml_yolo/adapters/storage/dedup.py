@@ -92,10 +92,7 @@ def _scan(directory: Path, result: DedupResult) -> list[_File]:
                         path = Path(entry.path)
                         if stat.S_ISDIR(snapshot.st_mode):
                             pending.append(path)
-                        elif (
-                            stat.S_ISREG(snapshot.st_mode)
-                            and path.suffix.lower() in IMAGE_EXTENSIONS
-                        ):
+                        elif stat.S_ISREG(snapshot.st_mode) and path.suffix.lower() in IMAGE_EXTENSIONS:
                             files.append(_File(path, snapshot))
                             result.scanned += 1
                     except OSError as error:
@@ -198,9 +195,7 @@ def _replace(source: _File, destination: _File) -> None:
     if sys.platform != "linux":
         raise _UnsupportedError(errno.ENOSYS, "reflinks require Linux FICLONE")
     with _open(source) as source_stream, _open(destination) as destination_stream:
-        temporary_fd, temporary_name = tempfile.mkstemp(
-            prefix=".cy-dedup-", dir=destination.path.parent
-        )
+        temporary_fd, temporary_name = tempfile.mkstemp(prefix=".cy-dedup-", dir=destination.path.parent)
         temporary = Path(temporary_name)
         try:
             _clone(source_stream.fileno(), temporary_fd)

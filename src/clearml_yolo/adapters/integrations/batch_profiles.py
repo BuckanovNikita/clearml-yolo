@@ -78,19 +78,14 @@ def training_profile(
     if not devices:
         raise ValueError("Saved batch estimates require explicitly resolved CUDA devices")
     if transforms is not None and transforms.mode != "native":
-        raise ValueError(
-            "Custom augmentation requires an explicit batch; no standard estimate fits"
-        )
+        raise ValueError("Custom augmentation requires an explicit batch; no standard estimate fits")
     nominal = (imgsz, imgsz)
     stride = 64 if model.architecture.endswith("6u.pt") else 32
     rounded = math.ceil(imgsz / stride) * stride
     if model.backend == "ultralytics":
         values = native_defaults() | (yolo or {})
         scale = float(values["multi_scale"])
-        effective = (
-            (int(rounded * (1 + scale) + stride) - 1) // stride * stride
-            if scale > 0 else rounded
-        )
+        effective = (int(rounded * (1 + scale) + stride) - 1) // stride * stride if scale > 0 else rounded
         effective = max(effective, rounded)
         optimizer = str(values["optimizer"])
         optimizers = ("AdamW", "MuSGD") if optimizer == "auto" else (optimizer,)
@@ -153,10 +148,7 @@ def training_profile(
         model=model,
         nominal_size=nominal,
         effective_size=(effective, effective),
-        gpus=tuple(
-            GPUHardware(name=d.name, total_memory_bytes=d.total_memory_bytes, uuid=d.uuid)
-            for d in devices
-        ),
+        gpus=tuple(GPUHardware(name=d.name, total_memory_bytes=d.total_memory_bytes, uuid=d.uuid) for d in devices),
         dependencies=_versions(model.backend),
         precision=precision,
         compilation=compilation,

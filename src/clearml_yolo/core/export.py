@@ -37,19 +37,12 @@ class OptimizationProfile(BaseModel):
         return self
 
     def accepts(self, shape: tuple[int, int, int, int]) -> bool:
-        return all(
-            low <= value <= high
-            for low, value, high in zip(self.minimum, shape, self.maximum, strict=True)
-        )
+        return all(low <= value <= high for low, value, high in zip(self.minimum, shape, self.maximum, strict=True))
 
 
 DEFAULT_PROFILES = (
-    OptimizationProfile(
-        minimum=(1, 3, 608, 960), optimum=(2, 3, 608, 960), maximum=(4, 3, 736, 960)
-    ),
-    OptimizationProfile(
-        minimum=(1, 3, 128, 1536), optimum=(2, 3, 256, 1920), maximum=(4, 3, 256, 1920)
-    ),
+    OptimizationProfile(minimum=(1, 3, 608, 960), optimum=(2, 3, 608, 960), maximum=(4, 3, 736, 960)),
+    OptimizationProfile(minimum=(1, 3, 128, 1536), optimum=(2, 3, 256, 1920), maximum=(4, 3, 256, 1920)),
 )
 
 

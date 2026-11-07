@@ -184,9 +184,7 @@ def fake_clearml(monkeypatch: pytest.MonkeyPatch) -> tuple[type[Any], FakeTask]:
 
     module.OutputModel = OutputModel  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "clearml", module)
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.clearml.session._start_console_publisher", lambda *_args: None
-    )
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.session._start_console_publisher", lambda *_args: None)
     return Task, task
 
 
@@ -466,14 +464,10 @@ def test_failure_status_does_not_capture_arbitrary_credentials(
         raise RuntimeError(detail)
 
     assert task.failed[0]["status_reason"] == "RuntimeError"
-    assert task.failed[0]["status_message"] == (
-        "RuntimeError: invocation failed; see local diagnostics for details"
-    )
+    assert task.failed[0]["status_message"] == ("RuntimeError: invocation failed; see local diagnostics for details")
 
 
-def test_required_path_must_exist_before_upload(
-    fake_clearml: tuple[type[Any], FakeTask], tmp_path: Path
-) -> None:
+def test_required_path_must_exist_before_upload(fake_clearml: tuple[type[Any], FakeTask], tmp_path: Path) -> None:
     _, task = fake_clearml
     missing = tmp_path / "missing.csv"
 
@@ -488,9 +482,7 @@ def test_required_path_must_exist_before_upload(
     assert len(task.failed) == 1
 
 
-def test_required_output_tree_is_a_valid_artifact(
-    fake_clearml: tuple[type[Any], FakeTask], tmp_path: Path
-) -> None:
+def test_required_output_tree_is_a_valid_artifact(fake_clearml: tuple[type[Any], FakeTask], tmp_path: Path) -> None:
     _, task = fake_clearml
     output_tree = tmp_path / "native-output"
     output_tree.mkdir()
@@ -751,9 +743,7 @@ def test_source_json_is_sanitized_without_changing_non_secret_values(
         assert stored == source
         stored_text = task.configurations[-1]["configuration"].read_text(encoding="utf-8")
 
-    assert stored_text == (
-        '{\n  "model": "yolo11n.pt",\n  "api_token": "<redacted>",\n  "epochs": 3\n}\n'
-    )
+    assert stored_text == ('{\n  "model": "yolo11n.pt",\n  "api_token": "<redacted>",\n  "epochs": 3\n}\n')
     assert task.configurations[-1]["configuration"].suffix == ".json"
     assert task.uploads == []
 
@@ -1042,9 +1032,7 @@ def test_model_barrier_failure_fails_task_and_command(
 
     def run() -> None:
         with invocation(ClearMLConfig(), "train") as owner:
-            register_model_barrier(
-                owner, lambda: (_ for _ in ()).throw(ArtifactUploadError("model missing"))
-            )
+            register_model_barrier(owner, lambda: (_ for _ in ()).throw(ArtifactUploadError("model missing")))
 
     with pytest.raises(ArtifactUploadError, match="model missing"):
         run()
@@ -1192,8 +1180,7 @@ def test_remote_configuration_resolution_preserves_private_execution_and_comment
         source.write_text("epochs: 1\n", encoding="utf-8")
     override = tmp_path / "override.yaml"
     override.write_text(
-        "# example: ${unknown}\npassword: remote-private\n"
-        "copy: ${password} # copy comment\nepochs: ${batch}\n",
+        "# example: ${unknown}\npassword: remote-private\ncopy: ${password} # copy comment\nepochs: ${batch}\n",
         encoding="utf-8",
     )
     original = override.read_bytes()
@@ -1350,9 +1337,7 @@ def test_yaml_dataset_integer_label_keys_and_comments_survive_publication(
     _, task = fake_clearml
     source = tmp_path / "dataset.yaml"
     source.write_text("names:\n  0: person # person label\n  1: car # car label\n")
-    with invocation(
-        ClearMLConfig(), "train", config_resolver=_resolve_attachment if use_resolver else None
-    ) as owner:
+    with invocation(ClearMLConfig(), "train", config_resolver=_resolve_attachment if use_resolver else None) as owner:
         assert connect_config_file(owner, "source", source) == source
         stored = task.configurations[-1]["configuration"]
         assert YAML(typ="safe").load(stored) == {"names": {0: "person", 1: "car"}}
@@ -1397,9 +1382,7 @@ def test_configuration_file_redacts_aliases_with_secret_provenance_from_context(
     def resolve_private(document: Any) -> Any:
         from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_file
 
-        context = (
-            {"auth": {"password": "probe-private-value"}} if reference == "${auth.password}" else {}
-        )
+        context = {"auth": {"password": "probe-private-value"}} if reference == "${auth.password}" else {}
         return resolve_config_file(document, context)
 
     with invocation(ClearMLConfig(), "train", config_resolver=resolve_private) as owner:
@@ -1536,9 +1519,7 @@ def test_run_replay_detaches_nested_proxies_before_storage_mutation(
 ) -> None:
     _, task = fake_clearml
     task.local = False
-    nested: UserDict[str, Any] = UserDict(
-        {"sizes": (UserDict({"width": 64}),), "token": "private-token"}
-    )
+    nested: UserDict[str, Any] = UserDict({"sizes": (UserDict({"width": 64}),), "token": "private-token"})
     task.run_configuration_result = UserDict({"model": nested})
     saved: list[dict[str, Any]] = []
 
@@ -1728,9 +1709,7 @@ def test_owner_isolation_preserves_workflow_error_when_failure_barrier_fails(
     _assert_later_owner_is_blocked(isolated_owner_session)
 
 
-@pytest.mark.parametrize(
-    "cleanup_error", [RuntimeError("close failed"), TaskFinalizationError("deadline")]
-)
+@pytest.mark.parametrize("cleanup_error", [RuntimeError("close failed"), TaskFinalizationError("deadline")])
 @pytest.mark.parametrize("workflow_fails", [False, True])
 def test_owner_isolation_blocks_after_unconfirmed_close(
     isolated_owner_session: tuple[type[Any], FakeTask, list[str]],
@@ -2025,9 +2004,7 @@ def test_owner_failure_releases_monitor_before_terminal_failure_status(
             pass
 
 
-@pytest.mark.parametrize(
-    "release_failure", ["missing-field", "missing-method", "rejected", "exception", "interrupt"]
-)
+@pytest.mark.parametrize("release_failure", ["missing-field", "missing-method", "rejected", "exception", "interrupt"])
 def test_owner_failure_monitor_release_failure_preserves_original_and_skips_status(
     isolated_owner_session: tuple[type[Any], FakeTask, list[str]],
     monkeypatch: pytest.MonkeyPatch,
@@ -2143,9 +2120,7 @@ def test_owner_failure_diagnostic_precedes_console_barrier_and_finish(
         events.append("diagnostic")
         logged.append((message, error, kwargs))
 
-    publisher = types.SimpleNamespace(
-        barrier=lambda: events.append("barrier"), finish=lambda: events.append("finish")
-    )
+    publisher = types.SimpleNamespace(barrier=lambda: events.append("barrier"), finish=lambda: events.append("finish"))
     monkeypatch.setattr("clearml_yolo.adapters.observability.diagnostics.log_exception", diagnostic)
     monkeypatch.setattr(session, "_start_console_publisher", lambda *_args: publisher)
     with (
@@ -2155,9 +2130,7 @@ def test_owner_failure_diagnostic_precedes_console_barrier_and_finish(
         raise original
     assert raised.value is original
     assert events == ["diagnostic", "barrier", "finish"]
-    assert logged == [
-        ("Invocation failed", original, {"level": "ERROR", "context": {"task": task.name}})
-    ]
+    assert logged == [("Invocation failed", original, {"level": "ERROR", "context": {"task": task.name}})]
 
 
 @pytest.mark.parametrize("diagnostic_error", [RuntimeError("broken sink"), KeyboardInterrupt()])

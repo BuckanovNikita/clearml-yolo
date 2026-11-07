@@ -84,11 +84,7 @@ def tracked_documents(root: Path) -> list[Path]:
         capture_output=True,
     )
     paths = [Path(item.decode("utf-8")) for item in result.stdout.split(b"\0") if item]
-    return sorted(
-        root / path
-        for path in paths
-        if project_owned(path) and not contains_symlink(root, root / path)
-    )
+    return sorted(root / path for path in paths if project_owned(path) and not contains_symlink(root, root / path))
 
 
 def heading_text(tokens: Iterable[Token]) -> str:
@@ -108,9 +104,7 @@ def heading_anchor(text: str, used: set[str]) -> str:
     base = "".join(
         char
         for char in text.lower()
-        if char in " -"
-        or unicodedata.category(char)[0] in {"L", "M", "N"}
-        or unicodedata.category(char) == "Pc"
+        if char in " -" or unicodedata.category(char)[0] in {"L", "M", "N"} or unicodedata.category(char) == "Pc"
     ).replace(" ", "-")
     anchor = base
     suffix = 0
@@ -185,26 +179,20 @@ def parse_document(path: Path, text: str) -> Document:
     # markdown-it's environment is an opaque mapping with plugin-dependent values.
     environment: dict[str, Any] = {}
     parser = MarkdownIt("commonmark").enable(["table", "strikethrough"]).disable("text_join")
-    parser.block.ruler.at(
-        "fence", checked_fence, {"alt": ["paragraph", "reference", "blockquote", "list"]}
-    )
+    parser.block.ruler.at("fence", checked_fence, {"alt": ["paragraph", "reference", "blockquote", "list"]})
     parser.inline.ruler.after("link", "undefined_reference", undefined_reference)
     tokens = parser.parse(text, environment)
     heading_ids: set[str] = set()
     for index, token in enumerate(tokens):
         line = token.map[0] + 1 if token.map else 1
         if token.type == "heading_open":
-            document.anchors.add(
-                heading_anchor(heading_text(tokens[index + 1].children or []), heading_ids)
-            )
+            document.anchors.add(heading_anchor(heading_text(tokens[index + 1].children or []), heading_ids))
         elif token.type == "inline":
             inspect_inline(document, path, token, line)
         elif token.type == "html_block":
             HtmlDestinations(document, line).feed(token.content)
         elif token.type == "fence" and not token.meta["closed"]:
-            document.issues.append(
-                Issue(path=path, line=line, message="unclosed fenced code block")
-            )
+            document.issues.append(Issue(path=path, line=line, message="unclosed fenced code block"))
     for reference in environment.get("duplicate_refs", []):
         document.issues.append(
             Issue(
@@ -221,9 +209,7 @@ def load_document(path: Path, cache: dict[Path, Document]) -> Document:
         try:
             cache[path] = parse_document(path, path.read_text(encoding="utf-8"))
         except (OSError, UnicodeError) as exc:
-            cache[path] = Document(
-                issues=[Issue(path=path, line=1, message=f"cannot read Markdown: {exc}")]
-            )
+            cache[path] = Document(issues=[Issue(path=path, line=1, message=f"cannot read Markdown: {exc}")])
     return cache[path]
 
 
@@ -235,11 +221,7 @@ def link_issue(root: Path, source: Path, link: Link, cache: dict[Path, Document]
     if url.scheme or url.netloc:
         return None
     decoded = unquote(url.path)
-    target = (
-        (root / decoded.lstrip("/") if decoded.startswith("/") else source.parent / decoded)
-        if decoded
-        else source
-    )
+    target = (root / decoded.lstrip("/") if decoded.startswith("/") else source.parent / decoded) if decoded else source
     try:
         target = target.resolve()
         if not target.is_relative_to(root):
@@ -255,9 +237,7 @@ def link_issue(root: Path, source: Path, link: Link, cache: dict[Path, Document]
     )
 
 
-def anchor_issue(
-    target: Path, fragment: str, destination: str, cache: dict[Path, Document]
-) -> str | None:
+def anchor_issue(target: Path, fragment: str, destination: str, cache: dict[Path, Document]) -> str | None:
     document = load_document(target, cache)
     if any(issue.message.startswith("cannot read") for issue in document.issues):
         return f"cannot check target anchors: {destination}"
@@ -290,9 +270,7 @@ def check_documents(root: Path, paths: Iterable[Path]) -> list[Issue]:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("paths", nargs="*", type=Path, help="Project Markdown paths to check")
-    parser.add_argument(
-        "--all", action="store_true", help="Check all project-owned tracked Markdown"
-    )
+    parser.add_argument("--all", action="store_true", help="Check all project-owned tracked Markdown")
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     args = parser.parse_args(argv)
     if not args.all and not args.paths:

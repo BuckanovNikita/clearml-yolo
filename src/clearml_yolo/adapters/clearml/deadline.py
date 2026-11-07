@@ -45,10 +45,7 @@ def detach_sdk_exit_callback(task: Any) -> None:
 @contextmanager
 def sdk_deadline(seconds: float) -> Iterator[None]:
     """Require a Unix main-thread alarm slot; never override an embedding timer."""
-    if (
-        not hasattr(signal, "setitimer")
-        or threading.current_thread() is not threading.main_thread()
-    ):
+    if not hasattr(signal, "setitimer") or threading.current_thread() is not threading.main_thread():
         raise TaskFinalizationError("Bounded ClearML finalization requires a Unix main thread")
     timer = signal.getitimer(signal.ITIMER_REAL)
     if timer != (0.0, 0.0):

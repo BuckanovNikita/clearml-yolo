@@ -121,9 +121,7 @@ def _rank_training(rank: int, directory: str) -> None:
 
             args[0].register_comm_hook(None, communicate)
             result = original_epoch(*args, **kwargs)
-            captured.append(
-                {key: value.clone() for key, value in args[6].module.state_dict().items()}
-            )
+            captured.append({key: value.clone() for key, value in args[6].module.state_dict().items()})
             return result
 
         # These process-local spies observe the actual shared training loop and
@@ -138,9 +136,7 @@ def _rank_training(rank: int, directory: str) -> None:
         def report(name: str, _value: float, _step: int) -> None:
             emitted.append(name)
 
-        result = training.train_native(
-            config, prepared, root / "run", report, build_model=build_model, label_offset=1
-        )
+        result = training.train_native(config, prepared, root / "run", report, build_model=build_model, label_offset=1)
         torch.save(captured[0], root / f"ema-{rank}.pth")
         (root / f"rank-{rank}.json").write_text(
             json.dumps(
@@ -163,9 +159,7 @@ def test_real_cpu_ranks_share_ema_and_write_one_checkpoint(tmp_path: Path) -> No
         annotation = prepared.data.parent / split / "_annotations.coco.json"
         payload = json.loads(annotation.read_text())
         payload["images"] = [dict(payload["images"][0], id=index) for index in range(1, 8)]
-        payload["annotations"] = [
-            dict(payload["annotations"][0], id=index, image_id=index) for index in range(1, 8)
-        ]
+        payload["annotations"] = [dict(payload["annotations"][0], id=index, image_id=index) for index in range(1, 8)]
         annotation.write_text(json.dumps(payload))
     (tmp_path / "prepared.json").write_text(prepared.model_dump_json())
     multiprocessing = importlib.import_module("torch.multiprocessing")
@@ -298,9 +292,7 @@ def test_probe_classifies_native_failures_separately(
     from clearml_yolo.adapters.torchvision import probe
     from clearml_yolo.adapters.torchvision.distributed import TrainingContext
 
-    monkeypatch.setattr(
-        probe, "training_context", lambda *_: TrainingContext(0, 1, torch.device("cuda", 0), 2)
-    )
+    monkeypatch.setattr(probe, "training_context", lambda *_: TrainingContext(0, 1, torch.device("cuda", 0), 2))
     monkeypatch.setattr(torch.cuda, "reset_peak_memory_stats", lambda *_: None)
 
     def fail(*args: Any, **kwargs: Any) -> Any:

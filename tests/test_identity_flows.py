@@ -180,9 +180,7 @@ def test_local_comparison_preserves_checkpoint_source_over_label(
     )
     write_checkpoint_identity(checkpoint, identity)
     resolved = _resolve_model(
-        ModelRef(
-            source="local", weights=checkpoint, thresholds={"cat": 0.5}, label="ignored label"
-        ),
+        ModelRef(source="local", weights=checkpoint, thresholds={"cat": 0.5}, label="ignored label"),
         "project",
         exclude_task_id=None,
         automatic_absence_is_skip=False,

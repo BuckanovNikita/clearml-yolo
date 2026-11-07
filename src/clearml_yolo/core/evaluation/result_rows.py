@@ -102,9 +102,7 @@ def prepared_source_mapping(prepared: pd.DataFrame, source: pd.DataFrame) -> dic
         mapping[int(index)] = str(source_id)
     unknown = set(mapping.values()) - set(source["source_row_id"])
     if unknown:
-        raise ValueError(
-            f"Prepared source_row_id is absent from the source frame: {sorted(unknown)}"
-        )
+        raise ValueError(f"Prepared source_row_id is absent from the source frame: {sorted(unknown)}")
     return mapping
 
 
@@ -152,13 +150,9 @@ def _row_status(
         return "excluded", f"invalid_geometry:{reason}"
     source_id = str(row["source_row_id"])
     if source_id not in prepared_indices:
-        reason = (
-            "duplicate_ground_truth" if row_type == "ground_truth" else "prediction_preprocessing"
-        )
+        reason = "duplicate_ground_truth" if row_type == "ground_truth" else "prediction_preprocessing"
         return "excluded", reason
-    statuses = {
-        relationship["status"] for relationship in post_relationships.get((row_type, source_id), [])
-    }
+    statuses = {relationship["status"] for relationship in post_relationships.get((row_type, source_id), [])}
     if row_type == "ground_truth":
         return ("TP" if "TP" in statuses else "FN"), None
     if statuses:
@@ -178,9 +172,7 @@ def _enrich_rows(
     prepared_indices = {source_id: index for index, source_id in prepared_mapping.items()}
     # Convert columns once instead of constructing a pandas Series for every source row.
     # records preserves native scalar/null boxing and the previous string-key projection.
-    records = rows.set_axis([str(column) for column in rows.columns], axis="columns").to_dict(
-        orient="records"
-    )
+    records = rows.set_axis([str(column) for column in rows.columns], axis="columns").to_dict(orient="records")
     for position in range(len(records)):
         record = records[position]
         # iterrows infers string dtype for sparse all-text rows (notably empty-image GT),
@@ -205,9 +197,7 @@ def _enrich_rows(
         if row_type == "prediction":
             threshold = thresholds.get(str(record["instance_label"]))
             record["confidence_threshold"] = threshold
-            record["is_below_threshold"] = (
-                None if threshold is None else float(record["confidence"]) < threshold
-            )
+            record["is_below_threshold"] = None if threshold is None else float(record["confidence"]) < threshold
             if threshold is None and status == "filtered":
                 record.update(evaluation_status="excluded", exclusion_reason="class_not_evaluated")
     return pd.DataFrame(records, columns=rows.columns)

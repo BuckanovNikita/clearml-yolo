@@ -109,8 +109,7 @@ def _task_collision(task: Any, name: str) -> bool:
         ),
     )
     return any(
-        row["id"] != str(task.id) and row["name"] == name and row["project"] == str(task.project)
-        for row in rows
+        row["id"] != str(task.id) and row["name"] == name and row["project"] == str(task.project) for row in rows
     )
 
 
@@ -127,8 +126,7 @@ def _model_collision(task: Any, name: str, model_id: str | None) -> bool:
     )
     # Explicit filtering also guards SDK regex end anchors and project selection.
     return any(
-        str(model.id) != model_id and model.name == name and str(model.project) == str(task.project)
-        for model in models
+        str(model.id) != model_id and model.name == name and str(model.project) == str(task.project) for model in models
     )
 
 
@@ -163,9 +161,7 @@ def _resolve(
         if task.name != task_name:
             raise NameResolutionError("ClearML rejected the effective experiment name")
         model_name = (
-            _display_name(state.requested_model_name, suffix)
-            if state.requested_model_name is not None
-            else None
+            _display_name(state.requested_model_name, suffix) if state.requested_model_name is not None else None
         )
         if write_model_name is not None and model_name is not None:
             with trace_operation("clearml.naming.model_write"):
@@ -177,9 +173,7 @@ def _resolve(
         state.effective_task_name = task_name
         state.effective_model_name = model_name
         return
-    raise NameResolutionError(
-        f"Cannot resolve project-local experiment/model names after {MAX_NAME_ATTEMPTS} attempts"
-    )
+    raise NameResolutionError(f"Cannot resolve project-local experiment/model names after {MAX_NAME_ATTEMPTS} attempts")
 
 
 def initialize_naming(task: Any) -> NamingState:

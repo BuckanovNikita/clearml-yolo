@@ -214,18 +214,14 @@ def test_worker_publishes_partial_utf8_and_scalars_without_task_lifecycle(tmp_pa
     assert len(events) == 3
 
 
-def test_progress_is_rate_limited_without_terminal(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_progress_is_rate_limited_without_terminal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from loguru import logger
 
     from clearml_yolo.adapters.observability import progress
 
     messages: list[str] = []
     monkeypatch.setattr(progress, "terminal_isatty", lambda: False)
-    monkeypatch.setattr(
-        logger, "info", lambda message, *args: messages.append(message.format(*args))
-    )
+    monkeypatch.setattr(logger, "info", lambda message, *args: messages.append(message.format(*args)))
     monkeypatch.setattr(progress, "monotonic", lambda: 1.0)
     assert list(progress.track(range(100), "Inference", unit="img")) == list(range(100))
     assert len(messages) == 1

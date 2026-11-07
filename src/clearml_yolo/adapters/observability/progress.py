@@ -23,9 +23,7 @@ MINIMUM_LOG_SECONDS = 2.0
 
 
 @contextmanager
-def image_progress(
-    total: int, description: str = "Inference"
-) -> Generator[Callable[[int], None], None, None]:
+def image_progress(total: int, description: str = "Inference") -> Generator[Callable[[int], None], None, None]:
     """Own one image-count operation while native backends process whole batches."""
     description = human_text(description)
     started = monotonic()
@@ -103,9 +101,7 @@ def track[Item](
         if done % step == 0 and done != total and now - last_report >= MINIMUM_LOG_SECONDS:
             last_report = now
             elapsed = now - started
-            write_progress(
-                progress=f"{description}: {done}/{total if total is not None else '?'} {unit}"
-            )
+            write_progress(progress=f"{description}: {done}/{total if total is not None else '?'} {unit}")
             share = f" ({done / total:.0%})" if total else ""
             logger.info(
                 "{}: {}/{}{} {} in {:.1f}s",

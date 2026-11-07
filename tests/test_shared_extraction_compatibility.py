@@ -144,12 +144,8 @@ def _scientific_observation(strategy: str, method: str, empty: bool) -> dict[str
     return _canonical_scientific(
         _stable_mapping(
             {
-                "metrics": {
-                    name: metric.model_dump() for name, metric in evaluated.metrics.items()
-                },
-                "counts": {
-                    name: count.model_dump() for name, count in evaluated.outcome.counts.items()
-                },
+                "metrics": {name: metric.model_dump() for name, metric in evaluated.metrics.items()},
+                "counts": {name: count.model_dump() for name, count in evaluated.outcome.counts.items()},
                 "gt_status": _frame(evaluated.outcome.gt_status),
                 "pred_status": _frame(evaluated.outcome.pred_status),
                 "curves": [curve.model_dump() for curve in evaluated.pr_curves],
@@ -164,13 +160,8 @@ def _scientific_observation(strategy: str, method: str, empty: bool) -> dict[str
 @pytest.mark.parametrize("strategy", ["greedy", "hungarian", "iou_prior"])
 @pytest.mark.parametrize("method", ["interp", "continuous"])
 @pytest.mark.parametrize("empty", [False, True])
-def test_scientific_outputs_equal_frozen_pre_extraction_values(
-    strategy: str, method: str, empty: bool
-) -> None:
-    assert (
-        _scientific_observation(strategy, method, empty)
-        == _expected("science")[f"{strategy}/{method}/{empty}"]
-    )
+def test_scientific_outputs_equal_frozen_pre_extraction_values(strategy: str, method: str, empty: bool) -> None:
+    assert _scientific_observation(strategy, method, empty) == _expected("science")[f"{strategy}/{method}/{empty}"]
 
 
 def _paired_outcome(candidate: bool) -> SplitOutcome:
@@ -350,9 +341,7 @@ def _reports_observation(directory: Path, custom: bool) -> dict[str, Any]:
 
 
 @pytest.mark.parametrize("custom", [False, True])
-def test_real_report_values_styles_and_layout_equal_frozen_workbooks(
-    tmp_path: Path, custom: bool
-) -> None:
+def test_real_report_values_styles_and_layout_equal_frozen_workbooks(tmp_path: Path, custom: bool) -> None:
     assert _reports_observation(tmp_path, custom) == _expected("reports")[str(custom)]
 
 
@@ -428,9 +417,7 @@ def _public_observation() -> dict[str, Any]:
             [
                 name,
                 parameter.kind.name,
-                "<required>"
-                if parameter.default is inspect.Parameter.empty
-                else repr(parameter.default),
+                "<required>" if parameter.default is inspect.Parameter.empty else repr(parameter.default),
             ]
             for name, parameter in inspect.signature(function).parameters.items()
         ]
@@ -440,9 +427,7 @@ def _public_observation() -> dict[str, Any]:
         result = runner.invoke(cli, [*command, "--help"])
         assert result.exit_code == 0
         help_text["/".join(command) or "root"] = result.output
-    return _stable_mapping(
-        {"signatures": signatures, "config": asdict(Config.load()), "cli_help": help_text}
-    )
+    return _stable_mapping({"signatures": signatures, "config": asdict(Config.load()), "cli_help": help_text})
 
 
 def test_public_signatures_defaults_config_and_cli_help_equal_frozen_contracts() -> None:

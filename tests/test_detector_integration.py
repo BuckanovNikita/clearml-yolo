@@ -18,9 +18,7 @@ def test_prediction_settings_use_selected_recipe_and_explicit_weights() -> None:
     runner = DetectorRunner(model_preset("rfdetr/small"), build_dependencies().model)
     settings = runner.prediction_settings({"device": "cpu", "batch": 2}, "best.pth")
     assert settings["model"] == "best.pth"
-    assert (
-        settings["imgsz"] is None
-    )  # Resolve the recorded training size after downloading weights.
+    assert settings["imgsz"] is None  # Resolve the recorded training size after downloading weights.
     assert settings["batch"] == 2
     assert settings["device"] == "cpu"
 
@@ -77,18 +75,14 @@ def test_checkpoint_selects_backend_and_restores_image_join_keys(
     assert frame.image_name.tolist() == ["0002"]
     assert frame.instance_label.tolist() == ["0001"]
     assert frame.attrs["checkpoint_design"]["backend"] == "rfdetr"
-    assert Path(frame.attrs["effective_args"]["source"]).read_text(
-        encoding="utf-8"
-    ).splitlines() == [source]
+    assert Path(frame.attrs["effective_args"]["source"]).read_text(encoding="utf-8").splitlines() == [source]
 
 
 def test_raw_reference_requires_checkpoint_owned_labels(tmp_path: Path) -> None:
     weights = tmp_path / "raw.pth"
     weights.write_bytes(b"external")
     runner = build_dependencies().model
-    reference = ModelRef(
-        source="local", weights=weights, thresholds={"0001": 0.4}, backend="rfdetr", preset="small"
-    )
+    reference = ModelRef(source="local", weights=weights, thresholds={"0001": 0.4}, backend="rfdetr", preset="small")
     with pytest.raises(ValueError, match=r"class_names.*preprocessing"):
         runner.bind_reference(weights, reference)
     reference = reference.model_copy(
@@ -135,9 +129,7 @@ def test_reference_rejects_conflicting_embedded_descriptor(tmp_path: Path) -> No
         {"backend": None, "preset": None, "class_names": None, "preprocessing": None},
     ],
 )
-def test_same_raw_checkpoint_rejects_conflicting_comparison_metadata(
-    tmp_path: Path, conflict: dict[str, Any]
-) -> None:
+def test_same_raw_checkpoint_rejects_conflicting_comparison_metadata(tmp_path: Path, conflict: dict[str, Any]) -> None:
     weights = tmp_path / "raw.pth"
     weights.write_bytes(b"external")
     runner = build_dependencies().model
@@ -173,15 +165,11 @@ def test_same_raw_checkpoint_accepts_distinct_thresholds_and_display_labels(tmp_
         preprocessing=Preprocessing(resize="stretch", size=512),
     )
     runner.bind_reference(weights, reference)
-    runner.bind_reference(
-        weights, reference.model_copy(update={"thresholds": {"0001": 0.7}, "label": "baseline"})
-    )
+    runner.bind_reference(weights, reference.model_copy(update={"thresholds": {"0001": 0.7}, "label": "baseline"}))
     assert runner.trained_imgsz(weights) == 512
 
 
-def test_new_family_comparison_passes_shared_precision_to_yolo(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_new_family_comparison_passes_shared_precision_to_yolo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from clearml_yolo.entrypoints.composition import _ModelRunner
 
     received: dict[str, Any] = {}
@@ -212,9 +200,7 @@ def test_new_family_comparison_passes_shared_precision_to_yolo(
         ("split", "test"),
     ],
 )
-def test_native_comparison_rejects_unsupported_population_controls(
-    setting: str, value: Any
-) -> None:
+def test_native_comparison_rejects_unsupported_population_controls(setting: str, value: Any) -> None:
     with pytest.raises(ValueError, match=f"Unsupported.*{setting}"):
         DetectorRunner._native_prediction({setting: value})
 
@@ -235,9 +221,7 @@ def test_native_comparison_accepts_unchanged_yolo_population_defaults() -> None:
         ({"model": "another.pth"}, "weights conflicts"),
     ],
 )
-def test_native_programmatic_prediction_rejects_ownership_conflicts(
-    settings: dict[str, Any], match: str
-) -> None:
+def test_native_programmatic_prediction_rejects_ownership_conflicts(settings: dict[str, Any], match: str) -> None:
     runner = build_dependencies(model_preset("rfdetr/small")).model
     with pytest.raises(ValueError, match=match):
         runner.prediction_settings(settings, "best.pth")

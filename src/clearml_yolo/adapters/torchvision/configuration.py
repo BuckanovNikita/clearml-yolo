@@ -34,6 +34,4 @@ def validate_preprocessing(preprocessing: Preprocessing) -> None:
         or preprocessing.std != STD
         or preprocessing.stride != STRIDE
     ):
-        raise ValueError(
-            "Checkpoint preprocessing is incompatible with native Torchvision detectors"
-        )
+        raise ValueError("Checkpoint preprocessing is incompatible with native Torchvision detectors")

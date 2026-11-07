@@ -29,9 +29,7 @@ class RecordingTask:
         self.publications.append(result)
         return result
 
-    def connect(
-        self, values: dict[str, Any], name: str, ignore_remote_overrides: bool
-    ) -> dict[str, Any]:
+    def connect(self, values: dict[str, Any], name: str, ignore_remote_overrides: bool) -> dict[str, Any]:
         assert name == "General"
         assert ignore_remote_overrides
         self.parameters.update({f"General/{key}": value for key, value in values.items()})
@@ -49,11 +47,7 @@ class RecordingTask:
             self.callback_failed = True
             raise RuntimeError("Injected owner callback failure")
         assert math.isfinite(float(value)), (title, series, value)
-        self.scalars.append(
-            self._record(
-                "scalar", title=title, series=series, value=float(value), iteration=iteration
-            )
-        )
+        self.scalars.append(self._record("scalar", title=title, series=series, value=float(value), iteration=iteration))
 
     def report_single_value(self, name: str, value: float) -> None:
         assert math.isfinite(float(value)), (name, value)
@@ -68,9 +62,7 @@ class RecordingTask:
     def update_output_model(self, model_path: str, model_name: str, auto_delete_file: bool) -> None:
         assert not auto_delete_file
         path = Path(model_path)
-        self.output_models.append(
-            self._record("model", path=str(path), name=model_name, bytes=path.stat().st_size)
-        )
+        self.output_models.append(self._record("model", path=str(path), name=model_name, bytes=path.stat().st_size))
 
 
 class CallbackModel:

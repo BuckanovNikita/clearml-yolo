@@ -62,9 +62,7 @@ def test_preparation_retains_clean_truth_and_nonimage_artifacts(
     assert not any(path.suffix in {".png", ".jpg"} for path in result.artifacts)
     with ZipFile(tmp_path / "prepared" / "labels.zip") as archive:
         assert len(archive.namelist()) == 3
-        assert all(
-            name.startswith("labels/") and name.endswith(".txt") for name in archive.namelist()
-        )
+        assert all(name.startswith("labels/") and name.endswith(".txt") for name in archive.namelist())
 
 
 def test_preparation_refuses_reused_directory(tmp_path: Path) -> None:

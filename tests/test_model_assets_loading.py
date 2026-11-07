@@ -53,9 +53,7 @@ def test_malformed_safetensors_use_asset_value_error_boundary(
 
 def test_valid_zero_element_tensor_is_distinct_from_no_tensors(tmp_path: Path) -> None:
     path = tmp_path / "model.safetensors"
-    path.write_bytes(
-        _safetensors_payload({"x": {"dtype": "F32", "shape": [0], "data_offsets": [0, 0]}}, b"")
-    )
+    path.write_bytes(_safetensors_payload({"x": {"dtype": "F32", "shape": [0], "data_offsets": [0, 0]}}, b""))
     validation._safetensors(path)
 
 
@@ -64,9 +62,7 @@ def test_malformed_safetensors_cache_falls_through_to_valid_candidate(
 ) -> None:
     monkeypatch.setenv("CY_HOME", str(tmp_path / "project"))
     cache = tmp_path / "model.safetensors"
-    cache.write_bytes(
-        _safetensors_payload({"x": {"dtype": "F32", "shape": [1], "data_offsets": [0, 4]}})
-    )
+    cache.write_bytes(_safetensors_payload({"x": {"dtype": "F32", "shape": [1], "data_offsets": [0, 4]}}))
     spec = fasterrcnn_assets.pretrained_asset("resnet50_fpn").model_copy(
         update={
             "filename": cache.name,
@@ -77,9 +73,7 @@ def test_malformed_safetensors_cache_falls_through_to_valid_candidate(
     )
     destination = resolver.asset_destination(spec)
     destination.parent.mkdir(parents=True)
-    destination.write_bytes(
-        _safetensors_payload({"x": {"dtype": "invalid", "shape": [1], "data_offsets": [0, 4]}})
-    )
+    destination.write_bytes(_safetensors_payload({"x": {"dtype": "invalid", "shape": [1], "data_offsets": [0, 4]}}))
     monkeypatch.setattr(resolver, "_download", lambda *args: pytest.fail("valid offline cache"))
 
     record = resolver.resolve_asset(spec)
@@ -107,8 +101,7 @@ def test_every_fasterrcnn_asset_is_the_selected_native_backbone(preset: str) -> 
     assert spec.revision
     if preset == "swin_tiny":
         assert spec.canonical_url == (
-            "https://github.com/SwinTransformer/storage/releases/download/"
-            "v1.0.0/swin_tiny_patch4_window7_224.pth"
+            "https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_tiny_patch4_window7_224.pth"
         )
     elif preset == "dinov3_small":
         assert spec.canonical_url.startswith("https://huggingface.co/timm/")
@@ -148,9 +141,7 @@ def test_native_backbones_load_local_files_without_downloading(
     torch.save(native.state_dict(), path)
     del native
     hub = importlib.import_module("torch.hub")
-    monkeypatch.setattr(
-        hub, "download_url_to_file", lambda *args, **kwargs: pytest.fail("native network download")
-    )
+    monkeypatch.setattr(hub, "download_url_to_file", lambda *args, **kwargs: pytest.fail("native network download"))
     if preset.endswith("_fpn"):
         actual = _resnet_backbone(preset, pretrained=True, weights=path).body
     else:

@@ -30,12 +30,7 @@ class _AttentionPath:
 
     def node(self, output: str, operation: str, inputs: int, outputs: int = 1) -> Any:
         node = self.producers.get(output)
-        if (
-            node is None
-            or not _standard(node, operation)
-            or len(node.input) != inputs
-            or len(node.output) != outputs
-        ):
+        if node is None or not _standard(node, operation) or len(node.input) != inputs or len(node.output) != outputs:
             raise ValueError(f"Unsupported attention value path: expected {operation}")
         return node
 

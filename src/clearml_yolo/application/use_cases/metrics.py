@@ -35,9 +35,7 @@ def _publish_split(
 ) -> None:
     with deps.resources.trace_operation("metrics.publish_split", context={"split": split}):
         per_class, summary = deps.evaluation_writer.summarize_metrics(evaluated.metrics)
-        deps.tracking.publish_evaluation(
-            task, evaluated, ground_truth, predictions, output_dir=output_dir
-        )
+        deps.tracking.publish_evaluation(task, evaluated, ground_truth, predictions, output_dir=output_dir)
         deps.tracking.report_table(
             task,
             artifact_names.METRICS_SECTION,
@@ -71,14 +69,11 @@ def _prepare(
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, list[str]]:
     if config.backend is not None:
         raise ValueError(
-            "Frozen thresholds require the native digital-metrics backend; "
-            f"backend={config.backend!r} is unsupported"
+            f"Frozen thresholds require the native digital-metrics backend; backend={config.backend!r} is unsupported"
         )
     validate_prediction_identity(ground_truth, predictions)
     prepared_gt = deps.evaluation.prepare_ground_truth(ground_truth, deduplicate=config.preprocess)
-    raw_predictions = deps.evaluation.filter_invalid_prediction_boxes(
-        predictions.reset_index(drop=True)
-    )
+    raw_predictions = deps.evaluation.filter_invalid_prediction_boxes(predictions.reset_index(drop=True))
     prepared_predictions = deps.evaluation.prepare_predictions(
         raw_predictions,
         preprocess_conf_threshold=config.preprocess_preds_conf_threshold,
@@ -119,13 +114,9 @@ def compute_metrics(
         )
         requested = list(dict.fromkeys(splits or ["train", "val", "test"]))
         if calibration_split != "val":
-            raise ValueError(
-                "calibration_split must be exactly 'val'; test data must never calibrate thresholds"
-            )
+            raise ValueError("calibration_split must be exactly 'val'; test data must never calibrate thresholds")
         if "all" in requested:
-            raise ValueError(
-                "split='all' is unsupported for frozen evaluation; name concrete splits"
-            )
+            raise ValueError("split='all' is unsupported for frozen evaluation; name concrete splits")
         predictions_frame = assign_source_ids(
             deps.storage.read_detection_csv(predictions),
             row_type="prediction",
@@ -141,7 +132,8 @@ def compute_metrics(
             raise ValueError(f"No ground-truth rows for calibration split {calibration_split!r}")
         validate_split_membership(ground_truth_frame)
         validate_prediction_identity(
-            ground_truth_frame, predictions_frame,
+            ground_truth_frame,
+            predictions_frame,
             image_name=deps.tracking.prediction_image_name(Path(predictions)),
         )
         destination = deps.storage.write_path(output_dir)
@@ -185,9 +177,7 @@ def compute_metrics(
                 deps.tracking.associate_calibration_thresholds(
                     task,
                     thresholds,
-                    prediction_checkpoint_sha256=deps.tracking.prediction_checkpoint_hash(
-                        Path(predictions)
-                    ),
+                    prediction_checkpoint_sha256=deps.tracking.prediction_checkpoint_hash(Path(predictions)),
                 )
             deps.tracking.record_run_configuration(
                 task,
@@ -222,17 +212,14 @@ def compute_metrics(
                 model_identity=identity,
                 deps=deps,
             )
-            evaluation_path = (
-                destination / f"evaluation_{artifact_names.split_component(split)}.json"
-            )
+            evaluation_path = destination / f"evaluation_{artifact_names.split_component(split)}.json"
             deps.storage.write_text(
                 evaluation_path,
                 evaluated.evaluation_payload.model_dump_json(indent=2),
                 encoding="utf-8",
             )
             workbook_path = (
-                destination
-                / f"{artifact_names.EVALUATION_PREFIX}_{artifact_names.split_component(split)}.xlsx"
+                destination / f"{artifact_names.EVALUATION_PREFIX}_{artifact_names.split_component(split)}.xlsx"
             )
             _write_evaluation_workbook(
                 workbook_path,
@@ -275,10 +262,7 @@ def compute_metrics(
             predictions=predictions,
             prediction_splits=None,
             evaluations=result.evaluations,
-            metadata={
-                "evaluation": evaluation.model_dump(mode="json")
-                | {"calibration_split": calibration_split}
-            },
+            metadata={"evaluation": evaluation.model_dump(mode="json") | {"calibration_split": calibration_split}},
             deps=deps,
         )
         return result

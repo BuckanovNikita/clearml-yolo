@@ -62,9 +62,7 @@ def test_legacy_override_shapes_remain_permissive(case: dict[str, Any]) -> None:
 
 
 @pytest.mark.parametrize("command", _BASELINE["parser_help"])
-def test_inert_parsers_preserve_exact_existing_help(
-    command: str, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_inert_parsers_preserve_exact_existing_help(command: str, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(sys, "argv", [command])
     assert parser_for(command).format_help() == _BASELINE["parser_help"][command]
 

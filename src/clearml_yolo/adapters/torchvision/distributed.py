@@ -42,9 +42,7 @@ def training_context(value: Device, global_batch: int | None) -> TrainingContext
         raise ValueError("Resolve batch=null against a saved estimate before native training")
     if global_batch < world_size or global_batch % world_size:
         raise ValueError("Training global batch must be positive and divisible by world size")
-    multiple = (isinstance(value, list) and len(value) != 1) or (
-        isinstance(value, str) and "," in value
-    )
+    multiple = (isinstance(value, list) and len(value) != 1) or (isinstance(value, str) and "," in value)
     if multiple and world_size == 1:
         raise ValueError("multi-device training requires a supervised initialized process group")
     if world_size > 1 and value != "cpu":

@@ -34,9 +34,7 @@ def test_finalized_name_and_full_training_identity_are_durable(
         return "detector-calm-otter"
 
     monkeypatch.setattr("clearml_yolo.adapters.clearml.native.resolve_model_name", unique_name)
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.clearml.native.register_model_barrier", lambda *_args: None
-    )
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.native.register_model_barrier", lambda *_args: None)
     model, trainer = _training_objects(checkpoint)
     finalize_native_model(task, model, trainer, "yolo11n.pt")
     owned = owned_native_model(task)
@@ -104,9 +102,7 @@ def test_recovery_preserves_original_training_task_in_foreign_task(
         clearml_models.resolve_weights_with_identity(task.id)
 
 
-def test_legacy_artifact_identity_has_no_invented_model_id(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_legacy_artifact_identity_has_no_invented_model_id(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     checkpoint = tmp_path / "best.pt"
     checkpoint.write_bytes(b"legacy")
     task = SimpleNamespace(
@@ -124,9 +120,7 @@ def test_legacy_artifact_identity_has_no_invented_model_id(
     assert identity.model_id is None
 
 
-def test_model_uri_identity_recovers_without_reporting_task(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_model_uri_identity_recovers_without_reporting_task(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     import sys
     import types
 

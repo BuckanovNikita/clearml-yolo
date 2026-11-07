@@ -70,15 +70,11 @@ def _detection(fo: Any, box: PublicationBox | EvaluationBox, width: int, height:
     )
 
 
-def _evaluated_detection(
-    fo: Any, box: EvaluationBox, matches: list[EvaluationMatch], width: int, height: int
-) -> Any:
+def _evaluated_detection(fo: Any, box: EvaluationBox, matches: list[EvaluationMatch], width: int, height: int) -> Any:
     detection = _detection(fo, box, width, height)
     detection["dm_status"] = box.status
     detection["dm_gt_indices"] = [match.gt_index for match in matches if match.gt_index is not None]
-    detection["dm_pred_indices"] = [
-        match.pred_index for match in matches if match.pred_index is not None
-    ]
+    detection["dm_pred_indices"] = [match.pred_index for match in matches if match.pred_index is not None]
     detection["dm_ious"] = [match.iou for match in matches if match.iou is not None]
     # Retain every association, including a cross-class FP referencing an FN ground truth.
     detection["dm_matches"] = [match.model_dump(mode="json") for match in matches]
@@ -95,9 +91,7 @@ def _new_sample(fo: Any, name: str, record: PublicationImage) -> Any:
         image_name=name,
         split=record.split,
         metadata=fo.ImageMetadata(width=width, height=height),
-        ground_truth=fo.Detections(
-            detections=[_detection(fo, box, width, height) for box in record.boxes]
-        ),
+        ground_truth=fo.Detections(detections=[_detection(fo, box, width, height) for box in record.boxes]),
     )
 
 
@@ -145,9 +139,7 @@ def _dataset(fo: Any, name: str, snapshot: DatasetSnapshot) -> tuple[Any, bool]:
     return dataset, reused
 
 
-def _load_evaluations(
-    request: PublicationRequest, snapshot: DatasetSnapshot
-) -> list[EvaluationPayload]:
+def _load_evaluations(request: PublicationRequest, snapshot: DatasetSnapshot) -> list[EvaluationPayload]:
     payloads: list[EvaluationPayload] = []
     seen: set[str] = set()
     for split, path in request.evaluations.items():
@@ -156,14 +148,9 @@ def _load_evaluations(
             raise ValueError(f"Evaluation payload split {payload.split!r} conflicts with {split!r}")
         for name in payload.image_names:
             if name in seen or name not in snapshot.images or snapshot.images[name].split != split:
-                raise ValueError(
-                    f"Evaluation image {name!r} conflicts with dataset split membership"
-                )
+                raise ValueError(f"Evaluation image {name!r} conflicts with dataset split membership")
             seen.add(name)
-        if any(
-            box.image_name not in payload.image_names
-            for box in [*payload.ground_truth, *payload.predictions]
-        ):
+        if any(box.image_name not in payload.image_names for box in [*payload.ground_truth, *payload.predictions]):
             raise ValueError("Evaluation boxes fall outside their split image membership")
         payloads.append(payload)
     return payloads
@@ -224,14 +211,10 @@ def _write_run(
         gt = overlay.gt.get(name, [])
         pred = overlay.pred.get(name, [])
         sample[fields["matched_ground_truth"]] = fo.Detections(
-            detections=[
-                _evaluated_detection(fo, box, matches, width, height) for box, matches in gt
-            ]
+            detections=[_evaluated_detection(fo, box, matches, width, height) for box, matches in gt]
         )
         sample[fields["matched_predictions"]] = fo.Detections(
-            detections=[
-                _evaluated_detection(fo, box, matches, width, height) for box, matches in pred
-            ]
+            detections=[_evaluated_detection(fo, box, matches, width, height) for box, matches in pred]
         )
         # Native patch views include every unmatched prediction, regardless of its
         # status. Keep filtered evidence in matched_predictions, outside this field.
@@ -314,8 +297,7 @@ class FiftyOnePublisher:
                 fo.list_datasets()
         except ImportError as error:
             raise RuntimeError(
-                "FiftyOne publishing requires the project dependencies; run uv sync, "
-                "or set fiftyone.enabled=false"
+                "FiftyOne publishing requires the project dependencies; run uv sync, or set fiftyone.enabled=false"
             ) from error
 
     def publish(self, request: PublicationRequest) -> PublicationReceipt:
@@ -324,13 +306,9 @@ class FiftyOnePublisher:
             snapshot = read_snapshot(request.ground_truth)
         self._phase("predictions")
         with trace_operation("fiftyone.predictions"):
-            raw = read_predictions(
-                request.predictions, prediction_aliases(snapshot, request.prediction_image_name)
-            )
+            raw = read_predictions(request.predictions, prediction_aliases(snapshot, request.prediction_image_name))
         self._phase("evaluations")
-        with trace_operation(
-            "fiftyone.evaluations.load", context={"count": len(request.evaluations)}
-        ):
+        with trace_operation("fiftyone.evaluations.load", context={"count": len(request.evaluations)}):
             payloads = _load_evaluations(request, snapshot)
         source = request.source_ground_truth
         self._phase("source")
@@ -363,8 +341,7 @@ class FiftyOnePublisher:
                 "source_ground_truth_sha256": source_hash,
                 "metadata": request.metadata,
                 "evaluations": {
-                    item.split: {"thresholds": item.thresholds, "methodology": item.methodology}
-                    for item in payloads
+                    item.split: {"thresholds": item.thresholds, "methodology": item.methodology} for item in payloads
                 },
             }
             info = deepcopy(dataset.info)
@@ -374,9 +351,7 @@ class FiftyOnePublisher:
                 dataset.save()
             with trace_operation("fiftyone.evaluations.remove"):
                 _remove_evaluations(dataset, run_key)
-            with trace_operation(
-                "fiftyone.overlays.write", context={"images": len(snapshot.images)}
-            ):
+            with trace_operation("fiftyone.overlays.write", context={"images": len(snapshot.images)}):
                 _write_run(fo, dataset, fields, request, raw, _Overlay(payloads))
                 dataset.add_dynamic_sample_fields()
             evaluation_keys = _publish_evaluations(fo, dataset, fields, payloads, run_key)
@@ -384,9 +359,7 @@ class FiftyOnePublisher:
             info["cy_runs"][run_key]["evaluation_keys"] = evaluation_keys
             info["cy_runs"][run_key]["complete"] = True
             dataset.info = info
-            with trace_operation(
-                "fiftyone.run.complete.save", context={"task_id": request.task_id}
-            ):
+            with trace_operation("fiftyone.run.complete.save", context={"task_id": request.task_id}):
                 dataset.save()
         return PublicationReceipt(
             dataset_name=name,
@@ -411,7 +384,5 @@ def _payload_paths(request: PublicationRequest) -> dict[str, Path]:
         paths["source_ground_truth"] = request.source_ground_truth.resolve()
     if request.predictions is not None:
         paths["predictions"] = request.predictions.resolve()
-    paths.update(
-        {f"evaluation_{split}": path.resolve() for split, path in request.evaluations.items()}
-    )
+    paths.update({f"evaluation_{split}": path.resolve() for split, path in request.evaluations.items()})
     return paths

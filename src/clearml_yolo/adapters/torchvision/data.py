@@ -99,8 +99,7 @@ class CocoDataset(Dataset[tuple[Tensor, dict[str, Tensor]]]):
             raise ValueError("COCO image dimensions disagree with source pixels")
         annotations = self.annotations[image.id]
         boxes = [
-            [x, y, x + width, y + height]
-            for x, y, width, height in (annotation.bbox for annotation in annotations)
+            [x, y, x + width, y + height] for x, y, width, height in (annotation.bbox for annotation in annotations)
         ]
         target = {
             "boxes": torch.tensor(boxes, dtype=torch.float32).reshape(-1, 4),
@@ -127,10 +126,7 @@ class CocoDataset(Dataset[tuple[Tensor, dict[str, Tensor]]]):
         return DetectionSample(
             image=pixels,
             boxes=np.array(
-                [
-                    [x, y, x + width, y + height]
-                    for x, y, width, height in (item.bbox for item in annotations)
-                ],
+                [[x, y, x + width, y + height] for x, y, width, height in (item.bbox for item in annotations)],
                 dtype=np.float32,
             ).reshape(-1, 4),
             labels=np.array([item.category_id for item in annotations], dtype=np.int64),
@@ -172,9 +168,7 @@ def prepared_datasets(
     contents = yaml.safe_load(prepared.data.read_text())
     names_value = contents["names"]
     names = (
-        tuple(names_value[key] for key in sorted(names_value))
-        if isinstance(names_value, dict)
-        else tuple(names_value)
+        tuple(names_value[key] for key in sorted(names_value)) if isinstance(names_value, dict) else tuple(names_value)
     )
     root = Path(contents.get("path", prepared.data.parent))
     if not root.is_absolute():
@@ -186,9 +180,7 @@ def prepared_datasets(
         seed=seed,
         label_offset=label_offset,
     )
-    validation = CocoDataset(
-        root / contents["val"] / "_annotations.coco.json", names, label_offset=label_offset
-    )
+    validation = CocoDataset(root / contents["val"] / "_annotations.coco.json", names, label_offset=label_offset)
     if not len(train) or not len(validation) or not validation.records.annotations:
         raise ValueError("Training needs images; validation needs labeled boxes to select best mAP")
     return train, validation, names

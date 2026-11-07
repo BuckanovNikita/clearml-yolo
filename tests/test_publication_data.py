@@ -42,9 +42,7 @@ def test_relocated_identical_csv_has_same_hash_but_different_paths(tmp_path: Pat
     assert first.membership != second.membership
 
 
-def test_snapshot_does_not_open_image_media(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_snapshot_does_not_open_image_media(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from clearml_yolo.adapters.storage.publication_data import read_snapshot
 
     truth = write_truth(tmp_path)
@@ -149,8 +147,7 @@ def test_predictions_reject_reversed_or_nonfinite_boxes(tmp_path: Path, coordina
 
     path = tmp_path / "predictions.csv"
     path.write_text(
-        "image_name,instance_label,confidence,bbox_x_tl,bbox_y_tl,bbox_x_br,bbox_y_br\n"
-        f"001.png,01,0.8,{coordinates}\n"
+        f"image_name,instance_label,confidence,bbox_x_tl,bbox_y_tl,bbox_x_br,bbox_y_br\n001.png,01,0.8,{coordinates}\n"
     )
     with pytest.raises(ValueError, match="Invalid publication box"):
         read_predictions(path, {"001.png": "001.png"})
@@ -178,9 +175,7 @@ def test_invalid_prediction_error_identifies_the_offending_record(tmp_path: Path
 
 
 @pytest.mark.parametrize("confidence", ["nan", "inf", "-0.1", "1.1"])
-def test_collapsed_predictions_still_require_valid_confidence(
-    tmp_path: Path, confidence: str
-) -> None:
+def test_collapsed_predictions_still_require_valid_confidence(tmp_path: Path, confidence: str) -> None:
     from clearml_yolo.adapters.storage.publication_data import read_predictions
 
     path = tmp_path / "predictions.csv"

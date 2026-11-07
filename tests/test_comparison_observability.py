@@ -35,9 +35,7 @@ def test_class_observations_preserve_completed_work_progress(
     monkeypatch: pytest.MonkeyPatch,
     messages: list[tuple[str, str]],
 ) -> None:
-    assert hasattr(progress, "progress_callback"), (
-        "Callback progress must preserve the existing tracker"
-    )
+    assert hasattr(progress, "progress_callback"), "Callback progress must preserve the existing tracker"
     monkeypatch.setattr(sys.stderr, "isatty", lambda: False)
     elapsed = [0.0]
     monkeypatch.setattr(progress, "monotonic", lambda: elapsed[0])

@@ -34,9 +34,7 @@ _BEST_CHECKPOINT_NAMES = frozenset(f"best{suffix}" for suffix in _CHECKPOINT_SUF
 
 
 def looks_like_task_id(value: str) -> bool:
-    return len(value) == TASK_ID_LENGTH and all(
-        character in "0123456789abcdef" for character in value.lower()
-    )
+    return len(value) == TASK_ID_LENGTH and all(character in "0123456789abcdef" for character in value.lower())
 
 
 @trace_operation("clearml.task.lookup")
@@ -101,22 +99,16 @@ def latest_completed_task_id(
 def best_output_model(task: Any) -> Any | None:
     """Select one output by role, historical filename, then registration order."""
     outputs: list[Any] = list(task.get_models().get("output") or [])
-    candidates = [
-        model for model in outputs if model.get_metadata("clearml_yolo_checkpoint_role") == "best"
-    ]
+    candidates = [model for model in outputs if model.get_metadata("clearml_yolo_checkpoint_role") == "best"]
     if len(candidates) > 1:
         raise ValueError(f"Ambiguous best output models on ClearML task {_task_label(task)}")
     if candidates:
         return candidates[0]
     candidates = [
-        model
-        for model in outputs
-        if Path(unquote(urlsplit(str(model.url)).path)).name in _BEST_CHECKPOINT_NAMES
+        model for model in outputs if Path(unquote(urlsplit(str(model.url)).path)).name in _BEST_CHECKPOINT_NAMES
     ]
     if len(candidates) > 1:
-        raise ValueError(
-            f"Ambiguous best checkpoint filename output models on ClearML task {_task_label(task)}"
-        )
+        raise ValueError(f"Ambiguous best checkpoint filename output models on ClearML task {_task_label(task)}")
     if candidates:
         return candidates[0]
     if outputs:
@@ -154,9 +146,7 @@ def _select_checkpoint(task: Any) -> tuple[Any, dict[str, str]]:
             raise ValueError("Checkpoint training identity disagrees with its original task")
         source_identity = ModelIdentity(
             model_name=str(
-                model.get_metadata("clearml_yolo_effective_model_name")
-                or getattr(model, "name", None)
-                or task.name
+                model.get_metadata("clearml_yolo_effective_model_name") or getattr(model, "name", None) or task.name
             ),
             training_task_id=str(stored_task or original_task or task.id),
             checkpoint_sha256=model.get_metadata("clearml_yolo_checkpoint_sha256"),
@@ -193,38 +183,28 @@ def source_model_links(task_id: str) -> dict[str, str]:
     return links
 
 
-def _validate_downloaded_checkpoint(
-    path: Path, source: str, raw_metadata: CheckpointMetadata | None = None
-) -> None:
+def _validate_downloaded_checkpoint(path: Path, source: str, raw_metadata: CheckpointMetadata | None = None) -> None:
     from clearml_yolo.adapters.storage.checkpoint import read_checkpoint_descriptor
 
     if not path.is_file():
-        raise FileNotFoundError(
-            human_text(f"Checkpoint {source} returned {path}, but it is not a file")
-        )
+        raise FileNotFoundError(human_text(f"Checkpoint {source} returned {path}, but it is not a file"))
     descriptor = read_checkpoint_descriptor(path)
     if raw_metadata is not None:
         if raw_metadata.backend == "ultralytics":
             raise ValueError("Raw detector metadata must select a native detector family")
         fields = {"backend", "preset", "class_names", "preprocessing"}
-        if descriptor is not None and descriptor.model_dump(
-            include=fields
-        ) != raw_metadata.model_dump(include=fields):
+        if descriptor is not None and descriptor.model_dump(include=fields) != raw_metadata.model_dump(include=fields):
             raise ValueError("Raw model assertions disagree with the checkpoint descriptor")
     if path.suffix.lower() not in _CHECKPOINT_SUFFIXES or (
         path.suffix.lower() != ".pt" and descriptor is None and raw_metadata is None
     ):
         raise ValueError(
-            human_text(
-                f"Checkpoint {source} must be a .pt file or a described .pth/.ckpt detector: {path}"
-            )
+            human_text(f"Checkpoint {source} must be a .pt file or a described .pth/.ckpt detector: {path}")
         )
 
 
 @trace_operation("clearml.checkpoint.resolve")
-def resolve_task_model(
-    task_id: str, *, raw_metadata: CheckpointMetadata | None = None
-) -> tuple[Path, dict[str, str]]:
+def resolve_task_model(task_id: str, *, raw_metadata: CheckpointMetadata | None = None) -> tuple[Path, dict[str, str]]:
     """Download one selected checkpoint and return its matching source provenance."""
     task = _task(task_id)
     selected, links = _select_checkpoint(task)
@@ -242,8 +222,7 @@ def resolve_task_model(
             context={"task": task_name, "checkpoint": identity},
         )
         raise ValueError(
-            redact_text(f"Cannot download checkpoint {identity!r} on task {task_name}: ")
-            + exception_summary(error)
+            redact_text(f"Cannot download checkpoint {identity!r} on task {task_name}: ") + exception_summary(error)
         ) from None
     if not checkpoint:
         raise ValueError(f"Checkpoint {identity!r} on task {task_name} returned no local file")
@@ -304,9 +283,7 @@ def resolve_weights_with_identity(
             raise ValueError("Checkpoint training identity disagrees with its original task")
         identity = ModelIdentity(
             model_name=str(model.get_metadata("clearml_yolo_effective_model_name") or model.name),
-            training_task_id=(
-                str(stored_task or original_task) if stored_task or original_task else None
-            ),
+            training_task_id=(str(stored_task or original_task) if stored_task or original_task else None),
             checkpoint_sha256=actual_hash,
             model_id=str(model.id),
         )
@@ -456,8 +433,7 @@ def fetch_best_confidences(task_id: str) -> dict[str, float]:
             )
             raise ValueError(
                 redact_text(
-                    f"Cannot recover confidence thresholds from artifact {name!r} "
-                    f"on ClearML task {_task_label(task)}: "
+                    f"Cannot recover confidence thresholds from artifact {name!r} on ClearML task {_task_label(task)}: "
                 )
                 + exception_summary(error)
             ) from None

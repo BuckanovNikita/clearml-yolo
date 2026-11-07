@@ -120,12 +120,8 @@ def test_significance_accepts_probability_endpoints(q: float) -> None:
     assert result.rejected == [True, q == 1.0]
 
 
-@pytest.mark.parametrize(
-    "coordinates", ["-0.01 0.5 0.2 0.2", "1.01 0.5 0.2 0.2", "0.5 0.5 1.01 1.01"]
-)
-def test_ground_truth_preserves_native_coordinate_tolerance(
-    tmp_path: Path, coordinates: str
-) -> None:
+@pytest.mark.parametrize("coordinates", ["-0.01 0.5 0.2 0.2", "1.01 0.5 0.2 0.2", "0.5 0.5 1.01 1.01"])
+def test_ground_truth_preserves_native_coordinate_tolerance(tmp_path: Path, coordinates: str) -> None:
     label = tmp_path / "image.txt"
     label.write_text(f"0 {coordinates}\n")
     assert len(_parse_label_file(label, {0: "object"})) == 1

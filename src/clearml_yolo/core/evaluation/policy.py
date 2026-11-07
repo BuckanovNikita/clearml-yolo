@@ -6,9 +6,7 @@ from collections.abc import Mapping
 import pandas as pd
 
 
-def validate_thresholds(
-    thresholds: Mapping[str, float | int], required_classes: list[str]
-) -> dict[str, float]:
+def validate_thresholds(thresholds: Mapping[str, float | int], required_classes: list[str]) -> dict[str, float]:
     """Return exact numeric thresholds after validating every required class."""
     missing = sorted(set(required_classes) - set(thresholds))
     if missing:
@@ -41,11 +39,7 @@ def validate_split_membership(ground_truth: pd.DataFrame) -> None:
     test_images = set(ground_truth.loc[ground_truth["split"] == "test", "image_name"])
     overlap = sorted(str(value) for value in val_images & test_images)
     if overlap:
-        raise ValueError(
-            "A logical image cannot belong to both val and test; overlapping image_name(s): "
-            f"{overlap}"
-        )
-
+        raise ValueError(f"A logical image cannot belong to both val and test; overlapping image_name(s): {overlap}")
 
 
 def validate_evaluation_image_name(image_name: str | None) -> None:

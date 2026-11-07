@@ -32,9 +32,7 @@ def test_native_archive_rejects_external_destination_and_leaf_before_truncation(
     assert list(outside.iterdir()) == [target]
 
 
-@pytest.mark.parametrize(
-    "operation", ["candidate", "reports", "comparison", "metadata", "engine", "onnx"]
-)
+@pytest.mark.parametrize("operation", ["candidate", "reports", "comparison", "metadata", "engine", "onnx"])
 def test_adapter_outputs_reject_external_routes_before_effects(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, operation: str
 ) -> None:
@@ -67,9 +65,7 @@ def test_adapter_outputs_reject_external_routes_before_effects(
     )
     actions: dict[str, Callable[[], object]] = {
         "candidate": lambda: write_candidate_workbook(output, pd.DataFrame(), {}),
-        "reports": lambda: build_reports(
-            tmp_path / "input.xlsx", tmp_path / "baseline.xlsx", output, output, None
-        ),
+        "reports": lambda: build_reports(tmp_path / "input.xlsx", tmp_path / "baseline.xlsx", output, output, None),
         "comparison": lambda: write_comparison_workbook(pd.DataFrame(), pd.DataFrame(), {}, output),
         "metadata": lambda: metadata.write_metadata(model_metadata, output),
         "engine": lambda: build.build_engine(tmp_path / "input.onnx", output),
@@ -99,9 +95,7 @@ def test_prediction_provenance_rejects_external_sibling_symlink(
     assert outside.read_text() == "preserved"
 
 
-def test_result_csv_ignores_preexisting_pending_symlink(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_result_csv_ignores_preexisting_pending_symlink(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from clearml_yolo.adapters.clearml.results import _atomic_csv
 
     workspace = tmp_path / "workspace"

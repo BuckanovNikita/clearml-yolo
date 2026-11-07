@@ -14,9 +14,7 @@ from pydantic import ValidationError
 from clearml_yolo.core.publication import FiftyOneConfig, PublicationRequest
 
 
-@pytest.mark.parametrize(
-    "field", ["preflight_timeout_seconds", "publish_timeout_seconds", "lock_timeout_seconds"]
-)
+@pytest.mark.parametrize("field", ["preflight_timeout_seconds", "publish_timeout_seconds", "lock_timeout_seconds"])
 @pytest.mark.parametrize("value", [0, -1, float("nan"), float("inf")])
 def test_timeout_controls_reject_nonpositive_and_nonfinite(field: str, value: float) -> None:
     with pytest.raises(ValidationError):
@@ -27,9 +25,7 @@ def _publisher(monkeypatch: pytest.MonkeyPatch, script: str, timeout: float = 0.
     from clearml_yolo.adapters.fiftyone import bounded
 
     # A real fresh interpreter exercises the production supervisor and JSON boundary.
-    monkeypatch.setattr(
-        bounded, "_worker_command", lambda *args: [sys.executable, "-c", script, *map(str, args)]
-    )
+    monkeypatch.setattr(bounded, "_worker_command", lambda *args: [sys.executable, "-c", script, *map(str, args)])
     return bounded.BoundedFiftyOnePublisher(
         FiftyOneConfig(preflight_timeout_seconds=timeout, publish_timeout_seconds=timeout)
     )
@@ -45,9 +41,7 @@ def test_worker_import_hang_is_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.parametrize("phase", ["import", "database", "lock", "write", "shutdown"])
 def test_worker_phase_hang_is_bounded(monkeypatch: pytest.MonkeyPatch, phase: str) -> None:
-    script = (
-        f"import sys,time,pathlib; pathlib.Path(sys.argv[3]).write_text('{phase}'); time.sleep(30)"
-    )
+    script = f"import sys,time,pathlib; pathlib.Path(sys.argv[3]).write_text('{phase}'); time.sleep(30)"
     publisher = _publisher(monkeypatch, script)
     started = time.monotonic()
     with pytest.raises(RuntimeError, match=rf"deadline.*{phase}"):
@@ -73,7 +67,8 @@ def test_exit_and_matching_complete_receipt_are_required(
 
 
 def test_successful_preflight_preserves_sdk_temp_and_owns_request_files(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     monkeypatch.setenv("CY_HOME", str(tmp_path / "workspace"))
     for key in ("TMPDIR", "TMP", "TEMP"):
@@ -126,14 +121,9 @@ time.sleep(30)
         _publisher(monkeypatch, script).preflight()
 
 
-def test_cancellation_propagates_and_worker_is_reaped(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_cancellation_propagates_and_worker_is_reaped(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     pid_file = tmp_path / "pid"
-    script = (
-        f"import os,pathlib,time; pathlib.Path({str(pid_file)!r})"
-        ".write_text(str(os.getpid())); time.sleep(30)"
-    )
+    script = f"import os,pathlib,time; pathlib.Path({str(pid_file)!r}).write_text(str(os.getpid())); time.sleep(30)"
     publisher = _publisher(monkeypatch, script, timeout=10)
     original_wait = subprocess.Popen.wait
 
@@ -329,9 +319,7 @@ def test_windows_cleanup_verifies_entire_job_after_direct_worker_exits(
     monkeypatch.setattr(bounded, "_platform", lambda: "nt")
     monkeypatch.setattr(bounded, "_create_windows_job", lambda _process: 73)
     monkeypatch.setattr(bounded, "_windows_job_running", lambda _handle: active[0])
-    monkeypatch.setattr(
-        bounded, "_terminate_windows_job", lambda _handle: active.__setitem__(0, False)
-    )
+    monkeypatch.setattr(bounded, "_terminate_windows_job", lambda _handle: active.__setitem__(0, False))
     monkeypatch.setattr(bounded, "_close_windows_job", closed.append)
     owned = bounded._OwnedProcesses(process)
     owned.attach()

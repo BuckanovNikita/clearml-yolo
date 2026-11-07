@@ -32,9 +32,7 @@ CAUSE = "FloatingPointError: YOLO probe produced nonfinite validation loss"
 
 
 def _pending(*, legacy: bool = False) -> BatchSearch:
-    settings = (
-        SearchSettings(search_strategy="exponential_binary_v1") if legacy else SearchSettings()
-    )
+    settings = SearchSettings(search_strategy="exponential_binary_v1") if legacy else SearchSettings()
     search = BatchSearch.start(_profile(), settings)
     for _ in range(2):
         search = search.observe(_trial(search))
@@ -53,13 +51,16 @@ def limited_case() -> EstimateCase:
 
 
 def test_reported_binary_search_recovers_only_after_fresh_confirmation() -> None:
-    profile = _profile().model_copy(
-        update={"gpus": (GPUHardware(name="NVIDIA A40", total_memory_bytes=47697690624),)}
-    )
+    profile = _profile().model_copy(update={"gpus": (GPUHardware(name="NVIDIA A40", total_memory_bytes=47697690624),)})
     search = BatchSearch.start(profile, SearchSettings(search_strategy="exponential_binary_v1"))
     for batch, peak in (
-        (1, 4756602880), (2, 5726273536), (4, 8884584448), (8, 14624489472),
-        (16, 27496808448), (32, 47381217280), (24, 40339767296),
+        (1, 4756602880),
+        (2, 5726273536),
+        (4, 8884584448),
+        (8, 14624489472),
+        (16, 27496808448),
+        (32, 47381217280),
+        (24, 40339767296),
     ):
         assert search.next_batch == batch
         search = search.observe(_trial(search, peak_memory_bytes=(peak,)))
@@ -90,8 +91,7 @@ def test_first_numerical_failure_still_has_no_recommendation() -> None:
 
 @pytest.mark.parametrize(
     "failure",
-    ["nonfinite", "oom", "memory_limit", "timeout", "crash", "error", "missing_asset",
-     "cancelled", "contaminated"],
+    ["nonfinite", "oom", "memory_limit", "timeout", "crash", "error", "missing_asset", "cancelled", "contaminated"],
 )
 def test_any_failed_recovery_confirmation_invalidates_recommendation(failure: str) -> None:
     search = _pending()
@@ -107,9 +107,13 @@ def test_any_failed_recovery_confirmation_invalidates_recommendation(failure: st
 @pytest.mark.parametrize(
     "updates",
     [
-        {"measured_steps": 9}, {"warmup_steps": 4}, {"validation_steps": 0},
-        {"optimizer_paths": ("AdamW",)}, {"actual_global_batch": 1},
-        {"peak_memory_bytes": (901,)}, {"peak_memory_bytes": ()},
+        {"measured_steps": 9},
+        {"warmup_steps": 4},
+        {"validation_steps": 0},
+        {"optimizer_paths": ("AdamW",)},
+        {"actual_global_batch": 1},
+        {"peak_memory_bytes": (901,)},
+        {"peak_memory_bytes": ()},
     ],
 )
 def test_incomplete_or_overbudget_confirmation_is_unusable(updates: dict[str, Any]) -> None:
@@ -136,8 +140,10 @@ def test_legacy_terminal_numerical_failure_remains_readable_without_promotion() 
         "profile": search.profile.model_dump(mode="json"),
         "workload": SyntheticWorkload().model_dump(mode="json"),
         "settings": search.settings.model_dump(mode="json", exclude={"search_strategy"}),
-        "status": "failed", "trials": [t.model_dump(mode="json") for t in search.trials],
-        "created_at": "2026-10-30T00:00:00Z", "diagnostic": "",
+        "status": "failed",
+        "trials": [t.model_dump(mode="json") for t in search.trials],
+        "created_at": "2026-10-30T00:00:00Z",
+        "diagnostic": "",
     }
     catalogue = EstimateCatalogue.model_validate({"schema_version": 1, "cases": [raw]})
     assert catalogue.cases[0].status == "failed"
@@ -156,9 +162,7 @@ def test_schema_upgrade_is_write_only_and_preserves_peer_cases(tmp_path: Path) -
     assert json.loads(store.path.read_text())["schema_version"] == 3
     assert store.read().cases == (peer, case)
     with pytest.raises(ValidationError, match="schema"):
-        EstimateCatalogue.model_validate(
-            {"schema_version": 1, "cases": [case.model_dump(mode="json")]}
-        )
+        EstimateCatalogue.model_validate({"schema_version": 1, "cases": [case.model_dump(mode="json")]})
 
 
 def test_limited_lookup_extrapolation_cli_and_training_preserve_cause(
@@ -167,9 +171,7 @@ def test_limited_lookup_extrapolation_cli_and_training_preserve_cause(
     case = limited_case()
     exact = select_recommendation((case,), case.profile, case.workload)
     target = case.profile.model_copy(update={"gpus": case.profile.gpus * 2})
-    target = target.model_copy(
-        update={"gpus": tuple(gpu.model_copy(update={"uuid": None}) for gpu in target.gpus)}
-    )
+    target = target.model_copy(update={"gpus": tuple(gpu.model_copy(update={"uuid": None}) for gpu in target.gpus)})
     derived = select_recommendation((case,), target, case.workload)
     assert exact.status == derived.status == "numerically_limited"
     assert derived.origin == "extrapolated"
@@ -194,13 +196,12 @@ def test_application_progress_cache_and_refresh_keep_confirmation_safety(
         result = original(*args)
         return (
             result.model_copy(update={"status": "nonfinite", "diagnostic": CAUSE})
-            if result.global_batch == 32 else result
+            if result.global_batch == 32
+            else result
         )
 
     monkeypatch.setattr(probe, "run", run)
-    kwargs: dict[str, Any] = {
-        "probe": probe, "store": store, "now": lambda: "2026-10-30T00:00:00Z"
-    }
+    kwargs: dict[str, Any] = {"probe": probe, "store": store, "now": lambda: "2026-10-30T00:00:00Z"}
     args = ((sample_profile(),), SyntheticWorkload(), SearchSettings())
     (case,) = estimate_batches(*args, **kwargs)
     assert case.status == "numerically_limited"
@@ -218,9 +219,7 @@ def test_application_progress_cache_and_refresh_keep_confirmation_safety(
 
 def test_mixed_hardware_preserves_numerical_limit_over_ceiling_status() -> None:
     case = limited_case()
-    other_profile = case.profile.model_copy(
-        update={"gpus": (GPUHardware(name="Other GPU", total_memory_bytes=1000),)}
-    )
+    other_profile = case.profile.model_copy(update={"gpus": (GPUHardware(name="Other GPU", total_memory_bytes=1000),)})
     other = _case(_search(24, ceiling=24, profile=other_profile))
     target = case.profile.model_copy(update={"gpus": (*case.profile.gpus, *other.profile.gpus)})
     result = select_recommendation((case, other), target, case.workload)
@@ -246,7 +245,8 @@ def test_null_batch_lookup_accepts_confirmed_limited_source_within_dataset_bound
 
 
 def test_cli_returns_usable_limited_result_and_reuses_it_without_more_trials(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     probe, _ = _install(monkeypatch, capacity=100)
     original = probe.run
@@ -255,7 +255,8 @@ def test_cli_returns_usable_limited_result_and_reuses_it_without_more_trials(
         result = original(*args)
         return (
             result.model_copy(update={"status": "nonfinite", "diagnostic": CAUSE})
-            if result.global_batch == 32 else result
+            if result.global_batch == 32
+            else result
         )
 
     monkeypatch.setattr(probe, "run", run)

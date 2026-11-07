@@ -63,18 +63,12 @@ def test_every_export_composes_with_packaged_application_defaults_disabled(
             if name in NATIVE_COMMANDS:
                 assert exported.model.backend == selection.split("/", maxsplit=1)[0]
             if profile is not None:
-                assert exported.transforms.mode == (
-                    "native" if profile == "default" else "albumentations"
-                )
-            assert OmegaConf.to_container(exported, resolve=False) == OmegaConf.to_container(
-                baseline, resolve=False
-            )
+                assert exported.transforms.mode == ("native" if profile == "default" else "albumentations")
+            assert OmegaConf.to_container(exported, resolve=False) == OmegaConf.to_container(baseline, resolve=False)
 
 
 @pytest.mark.parametrize("selection", ["ultralytics", "rfdetr/small"])
-def test_legacy_generated_tree_uses_packaged_base_without_rewriting(
-    tmp_path: Path, selection: str
-) -> None:
+def test_legacy_generated_tree_uses_packaged_base_without_rewriting(tmp_path: Path, selection: str) -> None:
     dump_config_tree(tmp_path, command="cy-train", model=selection)
     # These files were absent from the preceding exporter. Its wrapper and full
     # group documents are unchanged, so removing only the additions gives its tree.
@@ -105,9 +99,7 @@ def test_legacy_generated_tree_uses_packaged_base_without_rewriting(
 
 
 @pytest.mark.parametrize("bad_value", ["clearml.tags=3", "skip_train=perhaps"])
-def test_export_preserves_explicit_command_schema_validation(
-    tmp_path: Path, bad_value: str
-) -> None:
+def test_export_preserves_explicit_command_schema_validation(tmp_path: Path, bad_value: str) -> None:
     dump_config_tree(tmp_path)
     with initialize_config_dir(config_dir=str(tmp_path), version_base="1.3"):
         config = compose(config_name="cy", overrides=["ground_truth=truth.csv", bad_value])

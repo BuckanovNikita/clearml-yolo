@@ -89,9 +89,7 @@ class DetectorExporter:
             descriptor=descriptor,
             graph_sha256=sha256(graph.path),
             inference=policy,
-            runtime_versions={
-                name: version(name) for name in ("torch", "torchvision", "timm", "onnx")
-            },
+            runtime_versions={name: version(name) for name in ("torch", "torchvision", "timm", "onnx")},
         )
         metadata_path = destination / "model.onnx.json"
         write_metadata(metadata, metadata_path)

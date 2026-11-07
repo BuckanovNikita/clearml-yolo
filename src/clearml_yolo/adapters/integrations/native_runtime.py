@@ -45,14 +45,8 @@ def _is_worker() -> bool:
     if owner_pid and os.environ.get(OWNER_TASK_ENV) and owner_pid != str(os.getpid()):
         return True
     local_rank = os.environ.get("LOCAL_RANK")
-    if (
-        local_rank is not None
-        and local_rank != "-1"
-        and not (owner_pid and os.environ.get(OWNER_TASK_ENV))
-    ):
-        raise ValueError(
-            "Top-level LOCAL_RANK launches are unsupported; invoke the cy command directly"
-        )
+    if local_rank is not None and local_rank != "-1" and not (owner_pid and os.environ.get(OWNER_TASK_ENV)):
+        raise ValueError("Top-level LOCAL_RANK launches are unsupported; invoke the cy command directly")
     return False
 
 
@@ -63,9 +57,7 @@ def validate_owner_environment() -> None:
 
 def _installed_callbacks(integration: Any) -> dict[str, Any]:
     callbacks = {
-        name: callback
-        for name, callback in vars(integration).items()
-        if name.startswith("on_") and callable(callback)
+        name: callback for name, callback in vars(integration).items() if name.startswith("on_") and callable(callback)
     }
     if not callbacks or "on_pretrain_routine_start" not in callbacks:
         raise RuntimeError("Ultralytics ClearML integration has no usable callback set")
@@ -112,9 +104,7 @@ def _checked_pretrain(integration: Any, callback: Any) -> Any:
         if captured.messages:
             raise RuntimeError("Native ClearML pretrain callback reported a registration failure")
         parameters = current.get_parameters()
-        if not isinstance(parameters, dict) or not any(
-            str(name).startswith("General/") for name in parameters
-        ):
+        if not isinstance(parameters, dict) or not any(str(name).startswith("General/") for name in parameters):
             raise RuntimeError("Native ClearML callback did not register General parameters")
 
     return checked
@@ -128,14 +118,10 @@ def _without_training_pr(callback: Callable[[Any], None]) -> Callable[[Any], Non
         validator_plots = trainer.validator.plots
         try:
             trainer.plots = {
-                path: value
-                for path, value in trainer_plots.items()
-                if not Path(path).stem.endswith("PR_curve")
+                path: value for path, value in trainer_plots.items() if not Path(path).stem.endswith("PR_curve")
             }
             trainer.validator.plots = {
-                path: value
-                for path, value in validator_plots.items()
-                if not Path(path).stem.endswith("PR_curve")
+                path: value for path, value in validator_plots.items() if not Path(path).stem.endswith("PR_curve")
             }
             callback(trainer)
         finally:
@@ -145,9 +131,9 @@ def _without_training_pr(callback: Callable[[Any], None]) -> Callable[[Any], Non
     return publish
 
 
-
 def _completed_training_publication(callback: Callable[[Any], None]) -> Callable[[Any], None]:
     """Isolate the installed final upload callback after native training has ended."""
+
     def publish(trainer: Any) -> None:
         from clearml_yolo.adapters.clearml.session import (
             active_task,
@@ -161,7 +147,9 @@ def _completed_training_publication(callback: Callable[[Any], None]) -> Callable
         # Earlier checkpoints alone cannot establish successful training.
         if best.is_file() and best.stat().st_size > 0:
             preserve_training_success(
-                task, best, Path(trainer.save_dir).parent.parent / "pipeline_outcome.json",
+                task,
+                best,
+                Path(trainer.save_dir).parent.parent / "pipeline_outcome.json",
             )
         try:
             callback(trainer)
@@ -196,6 +184,7 @@ def _final_evaluation_publication(callback: Callable[[Any], None]) -> Callable[[
 
     return publish
 
+
 def _enable_owner(integration: Any, settings: Any) -> None:
     import clearml
     from clearml import Task
@@ -204,9 +193,7 @@ def _enable_owner(integration: Any, settings: Any) -> None:
     integration.clearml = clearml
     integration.Task = _CallbackTasks(Task)
     callbacks = _installed_callbacks(integration)
-    callbacks["on_pretrain_routine_start"] = _checked_pretrain(
-        integration, callbacks["on_pretrain_routine_start"]
-    )
+    callbacks["on_pretrain_routine_start"] = _checked_pretrain(integration, callbacks["on_pretrain_routine_start"])
     callbacks["on_train_end"] = _completed_training_publication(
         _without_training_pr(callbacks["on_train_end"]),
     )
@@ -241,11 +228,7 @@ class _CallbackTask:
 
     def get_logger(self) -> Any:
         original = self.original.get_logger()
-        return (
-            _ScalarLogger(original, suppress_scalars=_REPLAYED_SCALARS.get())
-            if _SCALAR_CALLBACK.get()
-            else original
-        )
+        return _ScalarLogger(original, suppress_scalars=_REPLAYED_SCALARS.get()) if _SCALAR_CALLBACK.get() else original
 
     def connect(self, values: Any, *args: Any, **kwargs: Any) -> Any:
         from clearml_yolo.adapters.clearml.session import (

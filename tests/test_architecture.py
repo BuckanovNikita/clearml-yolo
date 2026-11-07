@@ -107,10 +107,7 @@ def test_pure_cache_projection_adapters_have_no_effects(module: str) -> None:
 def test_pure_adapter_effect_contract_rejects_injected_io(module: str, source: str) -> None:
     tree = ast.parse(source)
     assert architecture.pure_adapter_effect_findings(module, tree)
-    assert (
-        architecture.pure_adapter_effect_findings("clearml_yolo.adapters.clearml.session", tree)
-        == []
-    )
+    assert architecture.pure_adapter_effect_findings("clearml_yolo.adapters.clearml.session", tree) == []
 
 
 def test_cache_projection_import_and_call_are_inert_in_fresh_process() -> None:
@@ -454,11 +451,7 @@ def test_transitive_adapter_escape_is_rejected_by_configured_layers(
         importer="clearml_yolo.application.helper",
         imported="clearml_yolo.adapters.yolo.inference",
     )
-    assert (
-        not configured_contract("Clean architecture inward layers")
-        .check(candidate, verbose=False)
-        .kept
-    )
+    assert not configured_contract("Clean architecture inward layers").check(candidate, verbose=False).kept
 
 
 def test_type_only_imports_remain_in_the_configured_graph(
@@ -471,9 +464,7 @@ def test_type_only_imports_remain_in_the_configured_graph(
     )
 
 
-def test_lazy_import_allowances_match_real_dynamic_edges(
-    graph: grimp.ImportGraph, import_options: UserOptions
-) -> None:
+def test_lazy_import_allowances_match_real_dynamic_edges(graph: grimp.ImportGraph, import_options: UserOptions) -> None:
     for contract in import_options.contracts_options:
         if contract.get("unmatched_ignore_imports_alerting") != "none":
             continue
@@ -617,10 +608,7 @@ def test_initializer_keeps_deferred_bodies_and_plain_definitions_inert(source: s
         "import os\nvalues = [os for os in ()]\nos.listdir('.')",
         # Nested class lookup skips enclosing class namespaces.
         "import os\nclass C:\n    os = {}\n    class D:\n        os.listdir('.')",
-        (
-            "from os import listdir as scan\nclass C:\n    scan = None\n"
-            "    class D:\n        scan('.')"
-        ),
+        ("from os import listdir as scan\nclass C:\n    scan = None\n    class D:\n        scan('.')"),
         (
             "def enclosing():\n    import os\n    class C:\n        os = {}\n"
             "        class D:\n            os.listdir('.')"
@@ -654,10 +642,7 @@ def test_scoped_effect_aliases_are_rejected(source: str) -> None:
         "import requests as network\nnetwork = {}\nnetwork.get('key')",
         "from os import environ\ndef pure(environ):\n    return environ['key']",
         "import os\ndef pure():\n    os = {}\n    return os.get('key')",
-        (
-            "class Example:\n    import requests\n"
-            "    def pure(self):\n        return requests.get('key')"
-        ),
+        ("class Example:\n    import requests\n    def pure(self):\n        return requests.get('key')"),
         "import os\ncallback = lambda os: os.getenv('key')",
         "import os\nvalues = [os.getenv('key') for os in ()]",
         "import os\nvalues = {os.getenv('key') for os in ()}",
@@ -719,9 +704,7 @@ def test_effect_aliases_do_not_escape_scope_or_override_shadowing(source: str) -
         (":Worker.missing", False),
     ],
 )
-def test_runtime_target_resolution_respects_scopes_and_reexports(
-    tmp_path: Path, target: str, valid: bool
-) -> None:
+def test_runtime_target_resolution_respects_scopes_and_reexports(tmp_path: Path, target: str, valid: bool) -> None:
     package = tmp_path / "clearml_yolo"
     package.mkdir()
     (package / "__init__.py").write_text("from .probe import Worker\n")
@@ -748,9 +731,7 @@ def test_runtime_target_resolution_respects_scopes_and_reexports(
         "values = [comprehension_local for comprehension_local in ()]\n"
     )
     (package / "other.py").write_text(
-        "from .probe import Worker as Exported\n"
-        "from .probe import Worker\n"
-        "from .probe import cycle\n"
+        "from .probe import Worker as Exported\nfrom .probe import Worker\nfrom .probe import cycle\n"
     )
     candidate = grimp.ImportGraph()
     candidate.add_module("clearml_yolo")
@@ -775,17 +756,12 @@ def test_runtime_target_resolution_respects_scopes_and_reexports(
             True,
         ),
         (
-            (
-                "from importlib import import_module\n"
-                "def pure(import_module):\n    import_module('torch')"
-            ),
+            ("from importlib import import_module\ndef pure(import_module):\n    import_module('torch')"),
             False,
         ),
     ],
 )
-def test_dynamic_import_graph_resolves_scoped_import_aliases(
-    tmp_path: Path, source: str, expected: bool
-) -> None:
+def test_dynamic_import_graph_resolves_scoped_import_aliases(tmp_path: Path, source: str, expected: bool) -> None:
     package = tmp_path / "clearml_yolo/adapters/storage"
     package.mkdir(parents=True)
     (package / "helper.py").write_text(source)
@@ -793,9 +769,7 @@ def test_dynamic_import_graph_resolves_scoped_import_aliases(
     candidate.add_module("clearml_yolo.adapters.storage.helper")
     candidate.add_module("torch")
     architecture.add_dynamic_imports(candidate, tmp_path)
-    assert candidate.direct_import_exists(
-        importer="clearml_yolo.adapters.storage.helper", imported="torch"
-    ) is expected
+    assert candidate.direct_import_exists(importer="clearml_yolo.adapters.storage.helper", imported="torch") is expected
 
 
 @pytest.mark.parametrize(
@@ -820,9 +794,7 @@ def test_configured_sdk_owner_rejects_dynamic_import(
 ) -> None:
     package = tmp_path / "clearml_yolo/adapters/storage"
     package.mkdir(parents=True)
-    (package / "helper.py").write_text(
-        f"from importlib import import_module\nimport_module({sdk!r})"
-    )
+    (package / "helper.py").write_text(f"from importlib import import_module\nimport_module({sdk!r})")
     candidate = deepcopy(graph)
     candidate.add_module("clearml_yolo.adapters.storage.helper")
     architecture.add_dynamic_imports(candidate, tmp_path)

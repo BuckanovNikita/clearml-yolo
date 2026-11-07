@@ -89,9 +89,7 @@ def test_evaluation_keeps_raw_ap_and_prepared_fixed_match_populations_separate(
         strategy="iou_prior",
     )
     assert curve.ap50 == authoritative["42"].ap50 == evaluated.metrics["42"].ap50
-    before = match_boxes(
-        truth, prepared, 0.5, strategy="iou_prior", split_image_names=["a", "b", "empty"]
-    )
+    before = match_boxes(truth, prepared, 0.5, strategy="iou_prior", split_image_names=["a", "b", "empty"])
     after = slice_by_conf(before, ["42"], {"42": 0.7})
     matrix, labels = get_confusion_matrix(after, ["42"])
     assert evaluated.confusion_matrix.counts == matrix.tolist()
@@ -163,9 +161,7 @@ def test_background_only_split_retains_rows_and_unavailable_ap(
 
 
 def test_prepared_mapping_rejects_missing_and_unknown_lineage() -> None:
-    source = assign_source_ids(
-        pd.DataFrame([("a", "42", 0, 0, 10, 10)], columns=COLUMNS), row_type="ground_truth"
-    )
+    source = assign_source_ids(pd.DataFrame([("a", "42", 0, 0, 10, 10)], columns=COLUMNS), row_type="ground_truth")
     with pytest.raises(ValueError, match="explicit"):
         prepared_source_mapping(source.drop(columns="source_row_id"), source)
     with pytest.raises(ValueError, match="absent"):

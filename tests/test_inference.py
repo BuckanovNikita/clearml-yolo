@@ -91,11 +91,7 @@ class FakeYolo:
         self.calls.append({"source": source, "manifest": manifest, **kwargs})
         listed = sorted(manifest)
         return iter(
-            [
-                FakeResult(path, DETECTIONS.get(Path(path).name))
-                for path in listed
-                if Path(path).name not in UNREADABLE
-            ]
+            [FakeResult(path, DETECTIONS.get(Path(path).name)) for path in listed if Path(path).name not in UNREADABLE]
         )
 
 
@@ -144,9 +140,7 @@ def test_inference_requires_configured_resolution(checkpoint_recording: Any) -> 
         resolution_of("best.pt", None)
 
 
-def test_a_named_resolution_wins_but_is_answered_for(
-    checkpoint_recording: Any, logs: list[str]
-) -> None:
+def test_a_named_resolution_wins_but_is_answered_for(checkpoint_recording: Any, logs: list[str]) -> None:
     """Scoring a model at a scale it was never shown is a real thing to want and a common
     thing to do by accident, so it happens but never quietly."""
     checkpoint_recording({"imgsz": 1280})
@@ -209,9 +203,7 @@ def test_each_box_is_attributed_by_path_not_by_position() -> None:
     }
 
 
-@pytest.mark.parametrize(
-    ("mode", "expected"), [("name", "000012.png"), ("stem", "000012"), ("path", "dir/000012.png")]
-)
+@pytest.mark.parametrize(("mode", "expected"), [("name", "000012.png"), ("stem", "000012"), ("path", "dir/000012.png")])
 def test_the_image_name_mode_decides_how_the_join_key_is_spelled(mode: Any, expected: str) -> None:
     """``path`` is the caller's own spelling, not the absolute one the manifest carries."""
     DETECTIONS["000012.png"] = _boxes(([1, 2, 3, 4], 0.9, 0))
@@ -400,9 +392,7 @@ def test_native_normalization_is_separate_from_requested_settings(
 
 
 @pytest.mark.parametrize("task", ["segment", "pose", "classify", "obb"])
-def test_non_detection_checkpoint_fails_before_prediction(
-    monkeypatch: pytest.MonkeyPatch, task: str
-) -> None:
+def test_non_detection_checkpoint_fails_before_prediction(monkeypatch: pytest.MonkeyPatch, task: str) -> None:
     original = FakeYolo.__init__
 
     def initialize(self: FakeYolo, weights: str) -> None:

@@ -55,9 +55,7 @@ def command_document(name: str) -> DictConfig:
 
 
 def _schema(node: Any, *, name: str, group: str = "", package: str = "_global_") -> None:
-    store(
-        node, name=name, group=f"{SCHEMA_GROUP}/{group}" if group else SCHEMA_GROUP, package=package
-    )
+    store(node, name=name, group=f"{SCHEMA_GROUP}/{group}" if group else SCHEMA_GROUP, package=package)
 
 
 def _token() -> str:
@@ -73,9 +71,7 @@ def register_configs() -> None:
         HydraConf(
             job=JobConf(chdir=False),
             run=RunDir(dir=HYDRA_RUN_DIR),
-            sweep=SweepDir(
-                dir="${cy_home:}/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}-${cy_run_token:}"
-            ),
+            sweep=SweepDir(dir="${cy_home:}/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}-${cy_run_token:}"),
         )
     )
     # Hydra composes the default group before expanding multirun model choices.

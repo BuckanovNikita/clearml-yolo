@@ -26,9 +26,7 @@ def _write_dataset(root: Path) -> Path:
         (root / "labels" / split).mkdir(parents=True)
 
     _write_image(root / "images" / "train" / "train_a.jpg", TRAIN_IMAGE_SIZE)
-    (root / "labels" / "train" / "train_a.txt").write_text(
-        "0 0.5 0.5 0.4 0.2\n1 0.25 0.5 0.5 1.0\n"
-    )
+    (root / "labels" / "train" / "train_a.txt").write_text("0 0.5 0.5 0.4 0.2\n1 0.25 0.5 0.5 1.0\n")
     _write_image(root / "images" / "train" / "train_b.jpg", TRAIN_IMAGE_SIZE)
     (root / "labels" / "train" / "train_b.txt").write_text("1 0.5 0.5 1.0 1.0\n")
 
@@ -37,9 +35,7 @@ def _write_dataset(root: Path) -> Path:
         (root / "labels" / "val" / f"val_{index}.txt").write_text(VAL_LABEL)
 
     yaml_path = root / "data.yaml"
-    yaml_path.write_text(
-        f"path: {root}\ntrain: images/train\nval: images/val\nnames:\n  0: cat\n  1: dog\n"
-    )
+    yaml_path.write_text(f"path: {root}\ntrain: images/train\nval: images/val\nnames:\n  0: cat\n  1: dog\n")
     return yaml_path
 
 
@@ -56,9 +52,7 @@ def _build(
     test_fraction: float = 0.5,
     seed: int = 0,
 ) -> pd.DataFrame:
-    output = build_ground_truth(
-        dataset_yaml, tmp_path / name, test_fraction=test_fraction, seed=seed
-    )
+    output = build_ground_truth(dataset_yaml, tmp_path / name, test_fraction=test_fraction, seed=seed)
     return pd.read_csv(output)
 
 
@@ -126,9 +120,7 @@ def test_zero_test_fraction_keeps_val_whole(dataset_yaml: Path, tmp_path: Path) 
     assert frame.loc[frame["split"] == "val", "image_name"].nunique() == VAL_IMAGE_COUNT
 
 
-def test_background_images_keep_membership_placeholder_rows(
-    dataset_yaml: Path, tmp_path: Path
-) -> None:
+def test_background_images_keep_membership_placeholder_rows(dataset_yaml: Path, tmp_path: Path) -> None:
     root = dataset_yaml.parent
     _write_image(root / "images" / "train" / "no_label.jpg", TRAIN_IMAGE_SIZE)
     _write_image(root / "images" / "train" / "empty_label.jpg", TRAIN_IMAGE_SIZE)
@@ -148,9 +140,7 @@ def test_background_images_keep_membership_placeholder_rows(
 def test_manifest_split_entry_is_supported(dataset_yaml: Path, tmp_path: Path) -> None:
     root = dataset_yaml.parent
     manifest = root / "val.txt"
-    manifest.write_text(
-        "./images/val/val_0.jpg\n" + str(root / "images" / "val" / "val_1.jpg") + "\n"
-    )
+    manifest.write_text("./images/val/val_0.jpg\n" + str(root / "images" / "val" / "val_1.jpg") + "\n")
     dataset_yaml.write_text(
         f"path: {root}\ntrain: images/train\nval: val.txt\nnames:\n  0: cat\n  1: dog\n",
         encoding="utf-8",
@@ -236,24 +226,16 @@ def test_tracked_conversion_uses_effective_dataset_configuration(
     calls: list[str] = []
     override = tmp_path / "remote.yaml"
     output = tmp_path / "truth.csv"
-    monkeypatch.setattr(
-        workflow_dependencies.tracking, "init_task", lambda *args, **kwargs: object()
-    )
-    monkeypatch.setattr(
-        workflow_dependencies.tracking, "register_ground_truth", lambda *args, **kwargs: None
-    )
-    monkeypatch.setattr(
-        workflow_dependencies.tracking, "connect_config_file", lambda *args: override
-    )
+    monkeypatch.setattr(workflow_dependencies.tracking, "init_task", lambda *args, **kwargs: object())
+    monkeypatch.setattr(workflow_dependencies.tracking, "register_ground_truth", lambda *args, **kwargs: None)
+    monkeypatch.setattr(workflow_dependencies.tracking, "connect_config_file", lambda *args: override)
 
     def convert(source: str, *_args: object, **_kwargs: object) -> Path:
         calls.append(source)
         return output
 
     monkeypatch.setattr(workflow_dependencies.dataset, "build_ground_truth", convert)
-    stage.ground_truth(
-        "missing-original.yaml", str(output), ClearMLConfig(), deps=workflow_dependencies
-    )
+    stage.ground_truth("missing-original.yaml", str(output), ClearMLConfig(), deps=workflow_dependencies)
     assert calls == [str(override)]
 
 
@@ -275,20 +257,14 @@ def test_tracked_conversion_publishes_the_expanded_output_path(
     )
     monkeypatch.setattr(Path, "home", lambda: selected.parent)
     published: list[Path] = []
-    monkeypatch.setattr(
-        workflow_dependencies.tracking, "init_task", lambda *args, **kwargs: object()
-    )
-    monkeypatch.setattr(
-        workflow_dependencies.tracking, "connect_config_file", lambda *args: dataset_yaml
-    )
+    monkeypatch.setattr(workflow_dependencies.tracking, "init_task", lambda *args, **kwargs: object())
+    monkeypatch.setattr(workflow_dependencies.tracking, "connect_config_file", lambda *args: dataset_yaml)
     monkeypatch.setattr(
         workflow_dependencies.tracking,
         "register_ground_truth",
         lambda _task, path, **kwargs: published.append(path),
     )
-    result = stage.ground_truth(
-        str(dataset_yaml), "~/truth.csv", ClearMLConfig(), deps=workflow_dependencies
-    )
+    result = stage.ground_truth(str(dataset_yaml), "~/truth.csv", ClearMLConfig(), deps=workflow_dependencies)
     assert result == selected
     assert published == [selected]
     assert selected.is_file()

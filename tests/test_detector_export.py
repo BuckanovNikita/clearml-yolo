@@ -49,9 +49,7 @@ def test_padded_nms_preserves_images_classes_and_empty_slots() -> None:
             ],
         ]
     )
-    scores = torch.tensor(
-        [[[0.9, 0.8, 0.6], [0.95, 0.7, -1.0]], [[-1.0, -1.0, -1.0], [-1.0, -1.0, -1.0]]]
-    )
+    scores = torch.tensor([[[0.9, 0.8, 0.6], [0.95, 0.7, -1.0]], [[-1.0, -1.0, -1.0], [-1.0, -1.0, -1.0]]])
     actual_boxes, actual_scores, indices, counts = tensors.padded_nms(boxes, scores, 0.5, 5)
     assert counts.tolist() == [4, 0]
     assert actual_scores[0].tolist() == pytest.approx([0.95, 0.9, 0.7, 0.6, 0.0])
@@ -103,11 +101,7 @@ def _metadata() -> Any:
 
 @pytest.mark.parametrize(
     "shape",
-    [
-        (b, 3, h, w)
-        for b in range(1, 5)
-        for h, w in [(608, 960), (736, 960), (128, 1536), (256, 1920)]
-    ],
+    [(b, 3, h, w) for b in range(1, 5) for h, w in [(608, 960), (736, 960), (128, 1536), (256, 1920)]],
 )
 def test_default_profiles_cover_required_shapes(shape: tuple[int, int, int, int]) -> None:
     profiles = importlib.import_module("clearml_yolo.core.export").DEFAULT_PROFILES
@@ -148,25 +142,19 @@ def test_builder_accepts_python_profile_setter_returning_none() -> None:
         }
 
 
-@pytest.mark.parametrize(
-    "bad", [(0, 3, 608, 960), (5, 3, 608, 960), (1, 4, 608, 960), (1, 3, 607, 960)]
-)
+@pytest.mark.parametrize("bad", [(0, 3, 608, 960), (5, 3, 608, 960), (1, 4, 608, 960), (1, 3, 607, 960)])
 def test_invalid_profiles_rejected(bad: tuple[int, int, int, int]) -> None:
     core = importlib.import_module("clearml_yolo.core.export")
     with pytest.raises(ValueError, match=r"Profile|profiles|channels"):
         core.OptimizationProfile(minimum=bad, optimum=bad, maximum=bad)
 
 
-def test_metadata_roundtrip_and_hash_binding(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_metadata_roundtrip_and_hash_binding(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     helpers = importlib.import_module("clearml_yolo.adapters.export.metadata")
     runtime = importlib.import_module("clearml_yolo.adapters.export.runtime")
     path = tmp_path / "engine.bin"
     path.write_bytes(b"abc")
-    assert (
-        helpers.sha256(path) == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
-    )
+    assert helpers.sha256(path) == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
     metadata = _metadata().model_copy(update={"engine_sha256": helpers.sha256(path)})
     sidecar = tmp_path / "metadata.json"
     helpers.write_metadata(metadata, sidecar)
@@ -181,9 +169,7 @@ def test_metadata_roundtrip_and_hash_binding(
         runtime.TensorRTRunner(path, metadata)
 
 
-def test_runner_rejects_sdk_version_before_cuda(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_runner_rejects_sdk_version_before_cuda(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     helpers = importlib.import_module("clearml_yolo.adapters.export.metadata")
     runtime = importlib.import_module("clearml_yolo.adapters.export.runtime")
     path = tmp_path / "engine.bin"
@@ -202,14 +188,11 @@ def test_numpy_letterbox_normalizes_before_resize_and_restores_boxes() -> None:
     assert actual.dtype == np.float32
     assert np.count_nonzero(actual[:, :, 16:]) == 0
     expected_first = (
-        image[0, 0].astype(np.float32) / np.float32(255)
-        - np.array([0.485, 0.456, 0.406], dtype=np.float32)
+        image[0, 0].astype(np.float32) / np.float32(255) - np.array([0.485, 0.456, 0.406], dtype=np.float32)
     ) / np.array([0.229, 0.224, 0.225], dtype=np.float32)
     np.testing.assert_allclose(actual[0, :, 0, 0], expected_first, atol=1e-6)
     detections = np.array([[[0, 0, 32, 16, 0.9, 2], [0, 0, 0, 0, 0, 0]]], dtype=np.float32)
-    restored = portable.postprocess(
-        detections, np.array([1], dtype=np.int64), [(1, 2)], sizes, class_count=2
-    )
+    restored = portable.postprocess(detections, np.array([1], dtype=np.int64), [(1, 2)], sizes, class_count=2)
     np.testing.assert_allclose(restored[0], [[0, 0, 2, 1, 0.9, 1]])
 
 
@@ -230,9 +213,7 @@ def test_original_box_restoration_preserves_native_float32_rounding() -> None:
     assert restored[0, 3] == np.nextafter(np.float32(480), np.float32(np.inf))
 
 
-@pytest.mark.parametrize(
-    ("field", "value"), [(0, float("nan")), (4, 1.1), (5, 0), (5, 1.5), (5, 3)]
-)
+@pytest.mark.parametrize(("field", "value"), [(0, float("nan")), (4, 1.1), (5, 0), (5, 1.5), (5, 3)])
 def test_invalid_exported_rows_rejected(field: int, value: float) -> None:
     portable = importlib.import_module("clearml_yolo.adapters.export.preprocessing")
     detections = np.array([[[0, 0, 10, 10, 0.9, 1]]], dtype=np.float32)
@@ -275,16 +256,12 @@ def test_runner_failure_releases_all_allocations_and_selects_device() -> None:
             return 0
 
     runner = runtime.TensorRTRunner.__new__(runtime.TensorRTRunner)
-    tiny = core.OptimizationProfile(
-        minimum=(1, 3, 32, 32), optimum=(1, 3, 32, 32), maximum=(1, 3, 32, 32)
-    )
+    tiny = core.OptimizationProfile(minimum=(1, 3, 32, 32), optimum=(1, 3, 32, 32), maximum=(1, 3, 32, 32))
     runner.metadata = _metadata().model_copy(update={"profiles": (tiny,)})
     runner.device = 2
     runner.cuda = FakeCUDA()
     runner.trt = SimpleNamespace(nptype=lambda dtype: dtype)
-    runner.engine = SimpleNamespace(
-        get_tensor_dtype=lambda name: np.int64 if name == "counts" else np.float32
-    )
+    runner.engine = SimpleNamespace(get_tensor_dtype=lambda name: np.int64 if name == "counts" else np.float32)
     runner.context = SimpleNamespace(
         set_optimization_profile_async=lambda *_args: True,
         set_input_shape=lambda *_args: True,
@@ -316,9 +293,7 @@ def test_numpy_bilinear_math_matches_small_native_tensor(shape: tuple[int, int])
         align_corners=False,
         antialias=False,
     )
-    np.testing.assert_allclose(
-        actual[:, :, : sizes[0, 0], : sizes[0, 1]], expected.numpy(), atol=1e-6, rtol=1e-6
-    )
+    np.testing.assert_allclose(actual[:, :, : sizes[0, 0], : sizes[0, 1]], expected.numpy(), atol=1e-6, rtol=1e-6)
 
 
 @pytest.mark.parametrize(

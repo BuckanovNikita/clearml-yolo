@@ -182,9 +182,7 @@ def sdk(
 
     monkeypatch.setattr(native, "invocation_resource", resource)
     barriers: list[Callable[[], None]] = []
-    monkeypatch.setattr(
-        detectors, "register_model_barrier", lambda _task, verify: barriers.append(verify)
-    )
+    monkeypatch.setattr(detectors, "register_model_barrier", lambda _task, verify: barriers.append(verify))
 
     def resolve(_task: Any, name: str, **kwargs: Any) -> str:
         kwargs["write_model_name"](name + "-resolved")
@@ -215,9 +213,7 @@ def test_publisher_verifies_one_model_and_registers_calibration_owner(sdk: tuple
     assert record.name == "detector-resolved"
     assert record.framework == "PyTorch"
     assert "rfdetr" in record.config_text
-    assert (
-        record.metadata["clearml_yolo_checkpoint_sha256"]["value"] == descriptor.checkpoint_sha256
-    )
+    assert record.metadata["clearml_yolo_checkpoint_sha256"]["value"] == descriptor.checkpoint_sha256
     assert record.metadata["clearml_yolo_checkpoint_role"]["value"] == "best"
     owned = owned_native_model(task)
     assert owned is not None
@@ -264,9 +260,7 @@ def test_metric_reporting_uses_only_owner_task_logger() -> None:
 
     task = _Task()
     report_metric(task, "train/loss", 0.25, 3)
-    assert task.events == [
-        {"title": "Native training", "series": "train/loss", "value": 0.25, "iteration": 3}
-    ]
+    assert task.events == [{"title": "Native training", "series": "train/loss", "value": 0.25, "iteration": 3}]
 
 
 def test_published_detector_accepts_verified_calibration_and_barrier_rechecks_it(
@@ -303,9 +297,7 @@ def test_completion_barrier_rechecks_association_and_design(
         barriers[0]()
 
 
-@pytest.mark.parametrize(
-    ("backend", "preset"), [("deimv2", "s"), ("rfdetr", "nano"), ("fasterrcnn", "resnet50_fpn")]
-)
+@pytest.mark.parametrize(("backend", "preset"), [("deimv2", "s"), ("rfdetr", "nano"), ("fasterrcnn", "resnet50_fpn")])
 def test_publisher_preserves_each_native_family_descriptor(
     sdk: tuple[Any, ...],
     backend: str,

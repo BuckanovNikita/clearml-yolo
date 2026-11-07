@@ -18,12 +18,7 @@ from clearml_yolo.entrypoints.hydra.validation import validate_wrapper_keys
 
 @pytest.mark.parametrize(
     "selection",
-    [
-        f"{backend}/{preset}"
-        for backend, presets in PRESETS.items()
-        if backend != "ultralytics"
-        for preset in presets
-    ],
+    [f"{backend}/{preset}" for backend, presets in PRESETS.items() if backend != "ultralytics" for preset in presets],
 )
 def test_model_group_selects_typed_settings_before_training(selection: str) -> None:
     store.add_to_hydra_store(overwrite_ok=True)
@@ -59,9 +54,7 @@ def test_selected_model_export_contains_only_required_groups(tmp_path: Path) -> 
 def test_unknown_native_setting_rejected_before_training() -> None:
     store.add_to_hydra_store(overwrite_ok=True)
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
-        config = compose(
-            config_name="train", overrides=["model=rfdetr/small", "+model.train.epohs=2"]
-        )
+        config = compose(config_name="train", overrides=["model=rfdetr/small", "+model.train.epohs=2"])
     with pytest.raises(ValueError, match="epohs"):
         validate_wrapper_keys(config, train)
 
@@ -84,9 +77,7 @@ def test_native_selection_rejects_changed_inactive_yolo_groups(override: str) ->
 
 
 @pytest.mark.parametrize("device", ["cpu", "cuda:3"])
-def test_initial_mixed_model_multirun_accepts_native_overrides(
-    monkeypatch: pytest.MonkeyPatch, device: str
-) -> None:
+def test_initial_mixed_model_multirun_accepts_native_overrides(monkeypatch: pytest.MonkeyPatch, device: str) -> None:
     selections = ("deimv2/s", "rfdetr/nano", "fasterrcnn/resnet50_fpn")
     resolutions = {"deimv2": 128, "rfdetr": 64, "fasterrcnn": 128}
     for backend, resolution in resolutions.items():

@@ -9,6 +9,4 @@ NATIVE_EXECUTION_KEYS = frozenset({"device", "project", "name", "save_dir", "exi
 
 def project_native_parameters(values: Mapping[str, Any]) -> dict[str, Any]:
     """Detach scientific native settings without removing nested semantic names/paths."""
-    return deepcopy(
-        {key: value for key, value in values.items() if key not in NATIVE_EXECUTION_KEYS}
-    )
+    return deepcopy({key: value for key, value in values.items() if key not in NATIVE_EXECUTION_KEYS})

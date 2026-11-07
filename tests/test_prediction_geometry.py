@@ -54,13 +54,9 @@ def test_geometry_filter_keeps_valid_predictions_and_reports_reasons(
         preprocess_preds_nms_containment_threshold=0.9 if preprocess else None,
         preprocess_preds_nms_iou_threshold=0.9 if preprocess else None,
     )
-    truth = _truth(
-        "zero.jpg", "reverse.jpg", "missing.jpg", "text.jpg", "infinite.jpg", "low.jpg"
-    )
+    truth = _truth("zero.jpg", "reverse.jpg", "missing.jpg", "text.jpg", "infinite.jpg", "low.jpg")
     try:
-        prepared_truth, raw, prepared, classes = _prepare(
-            predictions, truth, config, deps=workflow_dependencies
-        )
+        prepared_truth, raw, prepared, classes = _prepare(predictions, truth, config, deps=workflow_dependencies)
     finally:
         logger.remove(sink)
 
@@ -68,9 +64,7 @@ def test_geometry_filter_keeps_valid_predictions_and_reports_reasons(
     assert prepared_truth.image_name.tolist() == truth.image_name.tolist()
     assert prepared_truth.iloc[1:].instance_label.isna().all()
     assert raw.image_name.tolist() == ["valid.jpg", "low.jpg"]
-    assert prepared.image_name.tolist() == (
-        ["valid.jpg"] if preprocess else ["valid.jpg", "low.jpg"]
-    )
+    assert prepared.image_name.tolist() == (["valid.jpg"] if preprocess else ["valid.jpg", "low.jpg"])
     assert classes == ["cat"]
     assert len(warnings) == 1
     assert "5 of 7" in warnings[0]
@@ -90,9 +84,7 @@ def test_invalid_coordinate_cells_leave_empty_predictions(
         columns=COLUMNS,
     ).astype({column: object})
     predictions[column] = pd.Series([value], dtype=object)
-    gt, raw, prepared, classes = _prepare(
-        predictions, _truth(), EvaluationConfig(), deps=workflow_dependencies
-    )
+    gt, raw, prepared, classes = _prepare(predictions, _truth(), EvaluationConfig(), deps=workflow_dependencies)
     assert raw.empty
     assert prepared.empty
     assert list(raw.columns) == COLUMNS
@@ -112,9 +104,7 @@ def test_nonpositive_extent_is_dropped(
     corners: tuple[int, int, int, int], workflow_dependencies: WorkflowDependencies
 ) -> None:
     predictions = pd.DataFrame([("valid.jpg", "cat", *corners, 0.8)], columns=COLUMNS)
-    _, raw, prepared, _ = _prepare(
-        predictions, _truth(), EvaluationConfig(), deps=workflow_dependencies
-    )
+    _, raw, prepared, _ = _prepare(predictions, _truth(), EvaluationConfig(), deps=workflow_dependencies)
     assert raw.empty
     assert prepared.empty
 
@@ -130,9 +120,7 @@ def test_valid_numeric_strings_keep_scoring_and_unrelated_validation(
     )
     if invalid_sibling:
         predictions = pd.concat([predictions, predictions.assign(bbox_x_tl="bad")])
-    gt, raw, prepared, classes = _prepare(
-        predictions, _truth(), EvaluationConfig(), deps=workflow_dependencies
-    )
+    gt, raw, prepared, classes = _prepare(predictions, _truth(), EvaluationConfig(), deps=workflow_dependencies)
     assert len(raw) == len(prepared) == 1
     assert calibrate_thresholds(
         gt,
@@ -152,8 +140,7 @@ def test_geometry_filter_preserves_indices_extras_and_limits_warning_sample() ->
     from clearml_yolo.adapters.evaluation.scoring import filter_invalid_prediction_boxes
 
     predictions = pd.DataFrame(
-        [(f"bad-{i}.jpg", "cat", 0, 0, 0, 10, 0.8) for i in range(8)]
-        + [("valid.jpg", "cat", 0, 0, 10, 10, 0.8)],
+        [(f"bad-{i}.jpg", "cat", 0, 0, 0, 10, 0.8) for i in range(8)] + [("valid.jpg", "cat", 0, 0, 10, 10, 0.8)],
         columns=COLUMNS,
         index=list(range(100, 109)),
     ).assign(extra="retained")
@@ -173,9 +160,7 @@ def test_geometry_filter_preserves_indices_extras_and_limits_warning_sample() ->
 
 
 @pytest.mark.parametrize("column", ["bbox_x_br", "image_name", "confidence"])
-def test_missing_required_columns_still_fail(
-    column: str, workflow_dependencies: WorkflowDependencies
-) -> None:
+def test_missing_required_columns_still_fail(column: str, workflow_dependencies: WorkflowDependencies) -> None:
     predictions = pd.DataFrame(
         [("valid.jpg", "cat", 0, 0, 10, 10, 0.8)],
         columns=COLUMNS,

@@ -20,10 +20,14 @@ class _PendingBatchStore(FileBatchEstimateStore):
     @override
     def save(self, case: EstimateCase) -> None:
         if case.usable:
-            case = case.model_copy(update={
-                "status": "failed", "global_batch": None, "per_gpu_batch": None,
-                "diagnostic": "Independent confirmation complete; case owner cleanup pending",
-            })
+            case = case.model_copy(
+                update={
+                    "status": "failed",
+                    "global_batch": None,
+                    "per_gpu_batch": None,
+                    "diagnostic": "Independent confirmation complete; case owner cleanup pending",
+                }
+            )
         super().save(case)
 
 

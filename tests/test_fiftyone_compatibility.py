@@ -15,12 +15,9 @@ def test_fiftyone_uses_native_config_and_constants(tmp_path: Path, explicit: boo
     config.parent.mkdir(parents=True, exist_ok=True)
     config.write_text('{"default_dataset_dir": "native-data-selection"}')
     environment = {
-        key: value for key, value in os.environ.items()
-        if not key.startswith(("FIFTYONE_", "ETA_", "CY_ETA_"))
+        key: value for key, value in os.environ.items() if not key.startswith(("FIFTYONE_", "ETA_", "CY_ETA_"))
     }
-    environment.update(
-        HOME=str(home), CY_HOME=str(tmp_path / "project"), FIFTYONE_DISABLE_SERVICES="1"
-    )
+    environment.update(HOME=str(home), CY_HOME=str(tmp_path / "project"), FIFTYONE_DISABLE_SERVICES="1")
     if explicit:
         environment["FIFTYONE_CONFIG_PATH"] = str(config)
     script = """
@@ -39,7 +36,12 @@ assert Path(c.DEFAULT_DB_DIR).is_relative_to(Path.home()/'.fiftyone')
 assert not any(type(f).__name__ == '_ConstantsFinder' for f in sys.meta_path)
 """
     result = subprocess.run(  # noqa: S603 - test-owned HOME, native services disabled
-        [sys.executable, "-c", script], cwd=tmp_path, env=environment,
-        capture_output=True, text=True, timeout=60, check=False,
+        [sys.executable, "-c", script],
+        cwd=tmp_path,
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
     )
     assert result.returncode == 0, result.stderr

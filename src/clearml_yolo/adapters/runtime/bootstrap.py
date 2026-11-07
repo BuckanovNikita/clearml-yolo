@@ -42,9 +42,7 @@ def project_write_path(value: str | Path, *, root: Path | None = None) -> Path:
 
 def _temporary_root(root: Path) -> Path:
     selected = Path(os.environ.get("CY_RUNTIME_TEMP_ROOT") or root / ".tmp").expanduser()
-    return project_write_path(
-        selected if selected.is_absolute() else root / selected, root=root
-    ).resolve()
+    return project_write_path(selected if selected.is_absolute() else root / selected, root=root).resolve()
 
 
 def initialize_runtime_environment() -> Path:

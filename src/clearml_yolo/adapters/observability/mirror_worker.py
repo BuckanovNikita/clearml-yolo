@@ -14,9 +14,7 @@ def mirror(directory: Path, owner: int, descriptors: tuple[int, int], controls: 
     initial = json.loads((controls / "initial.json").read_text())
     offsets = {name: initial[name] for name in ("stdout", "stderr")}
     filters = {name: HumanTextStream() for name in offsets}
-    decoders = {
-        name: codecs.getincrementaldecoder("utf-8")(errors="surrogateescape") for name in offsets
-    }
+    decoders = {name: codecs.getincrementaldecoder("utf-8")(errors="surrogateescape") for name in offsets}
     while True:
         stop = controls / "final.json"
         final = json.loads(stop.read_text()) if stop.is_file() else None
@@ -43,9 +41,7 @@ def mirror(directory: Path, owner: int, descriptors: tuple[int, int], controls: 
 
 
 def main() -> None:
-    mirror(
-        Path(sys.argv[1]), int(sys.argv[2]), (int(sys.argv[3]), int(sys.argv[4])), Path(sys.argv[5])
-    )
+    mirror(Path(sys.argv[1]), int(sys.argv[2]), (int(sys.argv[3]), int(sys.argv[4])), Path(sys.argv[5]))
 
 
 if __name__ == "__main__":

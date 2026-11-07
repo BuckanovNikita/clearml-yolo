@@ -178,9 +178,7 @@ def _create_windows_job(process: subprocess.Popen[bytes]) -> int:
     try:
         limits = _ExtendedLimits()
         limits.basic.limit_flags = 0x00002000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
-        if not kernel32.SetInformationJobObject(
-            handle, 9, ctypes.byref(limits), ctypes.sizeof(limits)
-        ):
+        if not kernel32.SetInformationJobObject(handle, 9, ctypes.byref(limits), ctypes.sizeof(limits)):
             raise _windows_error(  # noqa: TRY301 - cleanup requires the surrounding try
                 "Could not configure the Windows worker job"
             )
@@ -221,9 +219,7 @@ def _windows_job_running(handle: int) -> bool:
     ]
     kernel32.QueryInformationJobObject.restype = wintypes.BOOL
     accounting = Accounting()
-    if not kernel32.QueryInformationJobObject(
-        handle, 1, ctypes.byref(accounting), ctypes.sizeof(accounting), None
-    ):
+    if not kernel32.QueryInformationJobObject(handle, 1, ctypes.byref(accounting), ctypes.sizeof(accounting), None):
         raise _windows_error("Could not verify Windows worker process cleanup")
     return bool(accounting.active_processes)
 
@@ -257,9 +253,7 @@ class _OwnedProcesses:
         if _platform() == "nt":
             return
         table = _process_table()
-        owners = {
-            pid for pid, born in self.identities.items() if pid in table and table[pid][2] == born
-        }
+        owners = {pid for pid, born in self.identities.items() if pid in table and table[pid][2] == born}
         if self.process.poll() is None:
             owners.add(self.process.pid)
         changed = True
@@ -275,11 +269,7 @@ class _OwnedProcesses:
 
     def alive(self) -> list[int]:
         if _platform() == "nt":
-            return (
-                [self.process.pid]
-                if self.job is not None and _windows_job_running(self.job)
-                else []
-            )
+            return [self.process.pid] if self.job is not None and _windows_job_running(self.job) else []
         table = _process_table()
         return [
             pid
@@ -356,8 +346,7 @@ class _OperationScratch:
             (self.path / ".cy-unsafe-cleanup.json").write_text(json.dumps(marker), encoding="utf-8")
         except OSError as marker_error:
             sys.stderr.write(
-                "Cannot record unsafe FiftyOne scratch ownership: "
-                f"{redact_text(str(marker_error))[:512]}\n"
+                f"Cannot record unsafe FiftyOne scratch ownership: {redact_text(str(marker_error))[:512]}\n"
             )
 
 
@@ -366,9 +355,7 @@ def _operation_scratch() -> Iterator[_OperationScratch]:
     scratch = _OperationScratch(Path(mkdtemp(prefix="fiftyone-", dir=temporary_root())))
     try:
         (scratch.path / ".cy-unsafe-cleanup.json").write_text(
-            json.dumps(
-                {"version": 1, "owners": [], "reason": "Publication cleanup not yet proved"}
-            ),
+            json.dumps({"version": 1, "owners": [], "reason": "Publication cleanup not yet proved"}),
             encoding="utf-8",
         )
     except OSError as error:
@@ -389,8 +376,7 @@ def _preserve_cleanup_failure(
 ) -> None:
     scratch.retain(owned, error)
     unsafe = RuntimeError(
-        "FiftyOne worker cleanup unsafe; "
-        f"scratch retained at {scratch.path}; {redact_text(str(error))[:512]}"
+        f"FiftyOne worker cleanup unsafe; scratch retained at {scratch.path}; {redact_text(str(error))[:512]}"
     )
     if not isinstance(error, Exception):
         sys.stderr.write(f"{unsafe}\n")
@@ -414,8 +400,7 @@ def _validated_result(result_path: Path, phase_path: Path, message: WorkerReques
         result = WorkerResult.model_validate_json(result_path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
         raise RuntimeError(
-            f"FiftyOne {message.operation} worker returned an invalid receipt; "
-            f"phase={_phase(phase_path)}"
+            f"FiftyOne {message.operation} worker returned an invalid receipt; phase={_phase(phase_path)}"
         ) from error
     expected_task = None if message.request is None else message.request.task_id
     if (
@@ -463,23 +448,15 @@ class BoundedFiftyOnePublisher:
                     "source_ground_truth": None
                     if request.source_ground_truth is None
                     else request.source_ground_truth.resolve(),
-                    "predictions": None
-                    if request.predictions is None
-                    else request.predictions.resolve(),
-                    "evaluations": {
-                        split: path.resolve() for split, path in request.evaluations.items()
-                    },
+                    "predictions": None if request.predictions is None else request.predictions.resolve(),
+                    "evaluations": {split: path.resolve() for split, path in request.evaluations.items()},
                 }
             )
-        message = WorkerRequest(
-            operation=operation, operation_id=uuid4().hex, config=self.config, request=request
-        )
+        message = WorkerRequest(operation=operation, operation_id=uuid4().hex, config=self.config, request=request)
         # Request/receipt scratch is explicit; the SDK keeps its native temp selection.
         with _operation_scratch() as scratch:
             arena = scratch.path
-            request_path, result_path, phase_path = (
-                arena / name for name in ("request.json", "result.json", "phase")
-            )
+            request_path, result_path, phase_path = (arena / name for name in ("request.json", "result.json", "phase"))
             request_path.write_text(message.model_dump_json(), encoding="utf-8")
             gate = arena / "start"
             environment = _worker_environment()
@@ -501,8 +478,7 @@ class BoundedFiftyOnePublisher:
                     remaining = deadline - time.monotonic()
                     if remaining <= 0:
                         raise RuntimeError(
-                            f"FiftyOne {operation} deadline exceeded; "
-                            f"phase={_phase(phase_path)}; {output.diagnostic()}"
+                            f"FiftyOne {operation} deadline exceeded; phase={_phase(phase_path)}; {output.diagnostic()}"
                         )
                     try:
                         status = process.wait(timeout=min(0.05, remaining))
@@ -515,9 +491,7 @@ class BoundedFiftyOnePublisher:
                         f"phase={_phase(phase_path)}; {output.diagnostic()}"
                     )
                 if time.monotonic() >= deadline:
-                    raise RuntimeError(
-                        f"FiftyOne {operation} deadline exceeded; phase={_phase(phase_path)}"
-                    )
+                    raise RuntimeError(f"FiftyOne {operation} deadline exceeded; phase={_phase(phase_path)}")
                 result = _validated_result(result_path, phase_path, message)
             finally:
                 original_error = sys.exception()

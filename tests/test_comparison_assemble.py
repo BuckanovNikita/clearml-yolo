@@ -105,9 +105,7 @@ def _outcome(detected: dict[str, list[bool]], correct: dict[str, list[bool]]) ->
 
 def _flags(per_class: dict[str, int]) -> dict[str, list[bool]]:
     """``count`` leading True flags per class, over the fixed image list."""
-    return {
-        name: [index < count for index in range(len(IMAGES))] for name, count in per_class.items()
-    }
+    return {name: [index < count for index in range(len(IMAGES))] for name, count in per_class.items()}
 
 
 def _tables(
@@ -294,9 +292,7 @@ def test_each_checkpoint_gets_its_own_prediction_cache(
     second.write_bytes(b"two-different-length")
 
     def cache(weights: Path, inference: SettledInference = settings) -> Path:
-        return _prediction_cache(
-            tmp_path, "baseline", "test", weights, inference, deps=workflow_dependencies
-        )
+        return _prediction_cache(tmp_path, "baseline", "test", weights, inference, deps=workflow_dependencies)
 
     assert cache(first) != cache(second)
     # The same checkpoint must still hit its cache, or nothing is ever reused.
@@ -333,12 +329,8 @@ def test_a_cache_is_not_reused_across_inference_settings(
         baseline.model_copy(update={"batch": 32}),
         baseline.model_copy(update={"ultralytics": {"half": True}}),
     ):
-        assert _prediction_cache(
-            tmp_path, "baseline", "test", checkpoint, changed, deps=workflow_dependencies
-        ) != (
-            _prediction_cache(
-                tmp_path, "baseline", "test", checkpoint, baseline, deps=workflow_dependencies
-            )
+        assert _prediction_cache(tmp_path, "baseline", "test", checkpoint, changed, deps=workflow_dependencies) != (
+            _prediction_cache(tmp_path, "baseline", "test", checkpoint, baseline, deps=workflow_dependencies)
         )
 
 
@@ -384,17 +376,13 @@ def test_checkpoint_touch_preserves_prediction_cache(
     checkpoint = tmp_path / "best.pt"
     checkpoint.write_bytes(b"weights")
     settings = _settled(device="cpu")
-    produced = _prediction_cache(
-        tmp_path, "candidate", "test", checkpoint, settings, deps=workflow_dependencies
-    )
+    produced = _prediction_cache(tmp_path, "candidate", "test", checkpoint, settings, deps=workflow_dependencies)
     produced.write_text("image_name,confidence\na,0.9\n", encoding="utf-8")
     original = checkpoint.stat()
     os.utime(checkpoint, ns=(original.st_atime_ns, original.st_mtime_ns + 1_000_000_000))
     assert checkpoint.stat().st_mtime_ns != original.st_mtime_ns
 
-    recovered = _prediction_cache(
-        tmp_path, "candidate", "test", checkpoint, settings, deps=workflow_dependencies
-    )
+    recovered = _prediction_cache(tmp_path, "candidate", "test", checkpoint, settings, deps=workflow_dependencies)
     assert recovered == produced
     assert recovered.read_text(encoding="utf-8") == "image_name,confidence\na,0.9\n"
 
@@ -407,9 +395,7 @@ def test_checkpoint_content_change_invalidates_cache_with_preserved_metadata(
     checkpoint = tmp_path / "best.pt"
     checkpoint.write_bytes(b"first-model")
     settings = _settled(device="cpu")
-    before = _prediction_cache(
-        tmp_path, "candidate", "test", checkpoint, settings, deps=workflow_dependencies
-    )
+    before = _prediction_cache(tmp_path, "candidate", "test", checkpoint, settings, deps=workflow_dependencies)
     original = checkpoint.stat()
     checkpoint.write_bytes(b"other-model")
     os.utime(checkpoint, ns=(original.st_atime_ns, original.st_mtime_ns))
@@ -417,9 +403,7 @@ def test_checkpoint_content_change_invalidates_cache_with_preserved_metadata(
     assert replaced.st_size == original.st_size
     assert replaced.st_mtime_ns == original.st_mtime_ns
 
-    assert _prediction_cache(
-        tmp_path, "candidate", "test", checkpoint, settings, deps=workflow_dependencies
-    ) != before
+    assert _prediction_cache(tmp_path, "candidate", "test", checkpoint, settings, deps=workflow_dependencies) != before
 
 
 def test_immutable_images_are_not_hashed_for_prediction_cache(
@@ -469,14 +453,10 @@ def test_native_output_archive_excludes_source_derived_images(
         "access_key: yaml-secret\nendpoint: https://user:pass@example.test/x?token=query-secret\n",
         encoding="utf-8",
     )
-    (native / "results.json").write_text(
-        '{"api-key": "json-secret", "score": 0.9}', encoding="utf-8"
-    )
+    (native / "results.json").write_text('{"api-key": "json-secret", "score": 0.9}', encoding="utf-8")
     (native / "image.jpg").write_bytes(b"derived-image")
 
-    archive = _archive_native_outputs(
-        native, tmp_path, role="candidate", split="test", deps=workflow_dependencies
-    )
+    archive = _archive_native_outputs(native, tmp_path, role="candidate", split="test", deps=workflow_dependencies)
 
     with zipfile.ZipFile(archive) as bundle:
         assert bundle.namelist() == [
@@ -510,12 +490,8 @@ def test_comparing_a_model_against_itself_is_refused(
         "clearml_yolo.application.use_cases.compare.init_task",
         lambda *_args, **_kwargs: None,
     )
-    same = ModelRef(
-        source="local", label="fixture detector", weights=checkpoint, thresholds={"car": 0.4}
-    )
-    (tmp_path / "gt.csv").write_text(
-        "image_name,image_path,split\na.png,a.png,test\n", encoding="utf-8"
-    )
+    same = ModelRef(source="local", label="fixture detector", weights=checkpoint, thresholds={"car": 0.4})
+    (tmp_path / "gt.csv").write_text("image_name,image_path,split\na.png,a.png,test\n", encoding="utf-8")
 
     with pytest.raises(ValueError, match="same checkpoint"):
         compare(
@@ -573,9 +549,7 @@ def test_model_reference_rejects_checkpoint_fields_from_the_other_source() -> No
         ("model_ref", {"checkpoint": "best.pt"}, "checkpoint"),
     ],
 )
-def test_input_models_reject_unknown_override_names(
-    model: str, values: dict[str, object], unexpected: str
-) -> None:
+def test_input_models_reject_unknown_override_names(model: str, values: dict[str, object], unexpected: str) -> None:
     from pydantic import ValidationError
 
     from clearml_yolo.application.use_cases.compare import InferenceConfig, ModelRef
@@ -622,9 +596,7 @@ def test_inference_native_mapping_cannot_override_owned_keys(key: str) -> None:
     from clearml_yolo.application.use_cases.compare import InferenceConfig
 
     with pytest.raises(ValidationError, match=key):
-        InferenceConfig(
-            conf=0.001, iou=0.7, imgsz=640, batch=1, device=None, ultralytics={key: "override"}
-        )
+        InferenceConfig(conf=0.001, iou=0.7, imgsz=640, batch=1, device=None, ultralytics={key: "override"})
 
 
 @pytest.mark.parametrize(
@@ -812,9 +784,7 @@ def _recovered_comparison_models(
     from clearml_yolo.application.use_cases.compare import ModelRef
 
     models = {
-        role: ModelRef(
-            source="local", label=f"fixture {role}", weights=weights, thresholds={"cat": 0.5}
-        )
+        role: ModelRef(source="local", label=f"fixture {role}", weights=weights, thresholds={"cat": 0.5})
         for role, weights in [("baseline", baseline_weights), ("candidate", candidate_weights)]
     }
     if legacy_role is not None:
@@ -837,11 +807,7 @@ def _recovered_comparison_models(
                     ),
                 }
                 if legacy_role in (role, "both")
-                else {
-                    "metrics_best_confidences_val": SimpleNamespace(
-                        get_local_copy=lambda: str(threshold_file)
-                    )
-                }
+                else {"metrics_best_confidences_val": SimpleNamespace(get_local_copy=lambda: str(threshold_file))}
             )
             outputs = [] if legacy_role in (role, "both") else [output]
             sources[role] = SimpleNamespace(
@@ -916,20 +882,18 @@ def _assert_dashboards_before_statistics(
     comparison = workflow_dependencies.evaluation.compare_outcomes
     completed: list[str] = []
     monkeypatch.setattr(
-        workflow_dependencies.tracking, "complete_result_producer",
+        workflow_dependencies.tracking,
+        "complete_result_producer",
         lambda _task, producer: completed.append(producer),
     )
 
     def compare_after_dashboards(*args: Any, **kwargs: Any) -> Any:
-        assert [call["role"] for call in evaluations] == [
-            "comparison_baseline", "comparison_candidate"
-        ]
+        assert [call["role"] for call in evaluations] == ["comparison_baseline", "comparison_candidate"]
         assert completed == ["compare"]
         return comparison(*args, **kwargs)
 
-    monkeypatch.setattr(
-        workflow_dependencies.evaluation, "compare_outcomes", compare_after_dashboards
-    )
+    monkeypatch.setattr(workflow_dependencies.evaluation, "compare_outcomes", compare_after_dashboards)
+
 
 @pytest.mark.parametrize("legacy_role", [None, "baseline", "candidate", "both"])
 @pytest.mark.parametrize("split", ["test", "val"])
@@ -986,9 +950,7 @@ def test_compare_dashboards_and_statistics_share_the_same_test_counts(
     def fake_reinfer(
         weights: Path, current: pd.DataFrame, selected_split: str, output: Path, **_kwargs: Any
     ) -> tuple[pd.DataFrame, Any]:
-        membership.append(
-            (selected_split, current.loc[current["split"] == selected_split, "image_name"].tolist())
-        )
+        membership.append((selected_split, current.loc[current["split"] == selected_split, "image_name"].tolist()))
         rows = []
         if Path(weights).name == "candidate.pt":
             assert [call["role"] for call in evaluations] == ["comparison_baseline"]
@@ -1004,9 +966,7 @@ def test_compare_dashboards_and_statistics_share_the_same_test_counts(
         (save_dir / "image.jpg").write_bytes(b"must-not-upload")
         frame.attrs.update(effective_args={"device": f"normalized-{role}"}, save_dir=str(save_dir))
         frame.to_csv(output, index=False)
-        return frame, VocabularyReport(
-            model_classes=["cat"], unknown_to_model=[], unknown_to_ground_truth=[]
-        )
+        return frame, VocabularyReport(model_classes=["cat"], unknown_to_model=[], unknown_to_ground_truth=[])
 
     uploads, configurations, expected, evaluations = _stub_comparison_publication(
         monkeypatch, workflow_dependencies=workflow_dependencies
@@ -1129,9 +1089,7 @@ def test_comparison_scoring_uses_the_full_evaluation_configuration(
         "clearml_yolo.application.use_cases.compare.reinfer_split",
         lambda *_args, **_kwargs: (
             raw_predictions,
-            VocabularyReport(
-                model_classes=["cat"], unknown_to_model=[], unknown_to_ground_truth=[]
-            ),
+            VocabularyReport(model_classes=["cat"], unknown_to_model=[], unknown_to_ground_truth=[]),
         ),
     )
     calls: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
@@ -1322,9 +1280,7 @@ def test_automatic_baseline_absence_still_evaluates_candidate(
 
     result = compare(
         ModelRef(),
-        ModelRef(
-            source="local", label="fixture candidate", weights=candidate, thresholds={"cat": 0.5}
-        ),
+        ModelRef(source="local", label="fixture candidate", weights=candidate, thresholds={"cat": 0.5}),
         truth_path,
         tmp_path / "comparison",
         ClearMLConfig(),

@@ -134,9 +134,7 @@ def patch_workflow(
             return
         for group, methods in _CAPABILITIES.items():
             if selected_name in methods:
-                monkeypatch.setattr(
-                    getattr(dependencies, group), selected_name, selected_value, raising=raising
-                )
+                monkeypatch.setattr(getattr(dependencies, group), selected_name, selected_value, raising=raising)
                 if module_name.endswith(".train") and selected_name == "record_run_configuration":
                     monkeypatch.setattr(
                         "clearml_yolo.adapters.integrations.training.record_run_configuration",
@@ -145,9 +143,7 @@ def patch_workflow(
                 return
         concrete = {
             "native_ddp_relay": "clearml_yolo.adapters.integrations.training.native_ddp_relay",
-            "finalize_native_model": (
-                "clearml_yolo.adapters.integrations.training.finalize_native_model"
-            ),
+            "finalize_native_model": ("clearml_yolo.adapters.integrations.training.finalize_native_model"),
         }
         if selected_name in concrete:
             monkeypatch.setattr(concrete[selected_name], selected_value, raising=raising)

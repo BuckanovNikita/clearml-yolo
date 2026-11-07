@@ -72,23 +72,17 @@ def render_evaluation(
         else {name: metric for name, metric in metrics.items() if name in dashboard_classes}
     )
     if not visible_metrics:
-        raise ValueError(
-            f"Split {computed.split!r} has no classes that can be written to a dashboard"
-        )
+        raise ValueError(f"Split {computed.split!r} has no classes that can be written to a dashboard")
     suffix = split_component(suffix)
     output_dir.mkdir(parents=True, exist_ok=True)
     # These API-owned outputs must come from this evaluation under either producer convention.
     for metric_name in PLOT_METRICS:
         for plot_suffix in ("", f"_{suffix}"):
-            write_path(output_dir / f"{metric_name}_confidence_intervals{plot_suffix}.png").unlink(
-                missing_ok=True
-            )
+            write_path(output_dir / f"{metric_name}_confidence_intervals{plot_suffix}.png").unlink(missing_ok=True)
     dashboard_path = output_dir / f"full_dashboard_{suffix}.xlsx"
     dtrk_path = output_dir / f"метрики_дтрк_{suffix}.xlsx"
     confusion_matrix_path = output_dir / f"matrix_{suffix}.xlsx"
-    plot_paths = {
-        name: output_dir / f"{name}_confidence_intervals_{suffix}.png" for name in PLOT_METRICS
-    }
+    plot_paths = {name: output_dir / f"{name}_confidence_intervals_{suffix}.png" for name in PLOT_METRICS}
     for artifact in (dashboard_path, dtrk_path, confusion_matrix_path, *plot_paths.values()):
         write_path(artifact)
     identity = computed.model_identity

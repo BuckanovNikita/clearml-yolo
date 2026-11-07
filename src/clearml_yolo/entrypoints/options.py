@@ -86,9 +86,7 @@ OPTION_DECLARATIONS: dict[str, tuple[OptionDeclaration, ...]] = {
             {
                 "nargs": "?",
                 "type": Path,
-                "help": (
-                    "cache to scan (default: CY_HOME/.cache or .cache in the current directory)"
-                ),
+                "help": ("cache to scan (default: CY_HOME/.cache or .cache in the current directory)"),
             },
             "Каталог с примерами YAML или кэш изображений; назначение определяется командой.",
             ("configs",),
@@ -135,10 +133,7 @@ OPTION_DECLARATIONS: dict[str, tuple[OptionDeclaration, ...]] = {
         OptionDeclaration(
             ("--models",),
             {"help": "comma-separated model presets or YOLO asset names; default: all"},
-            (
-                "Модели через запятую: зарегистрированные пресеты или имена YOLO; без"
-                " параметра измеряются все."
-            ),
+            ("Модели через запятую: зарегистрированные пресеты или имена YOLO; без параметра измеряются все."),
             ("--models rfdetr/small",),
         ),
         OptionDeclaration(
@@ -151,15 +146,9 @@ OPTION_DECLARATIONS: dict[str, tuple[OptionDeclaration, ...]] = {
             ("--gpu-counts",),
             {
                 "type": integer_list,
-                "help": (
-                    "report recommendations for first N selected GPUs; no extra searches;"
-                    " default: 1..all"
-                ),
+                "help": ("report recommendations for first N selected GPUs; no extra searches; default: 1..all"),
             },
-            (
-                "Положительное количество первых выбранных GPU для экстраполяции; "
-                "отдельные поиски не запускаются."
-            ),
+            ("Положительное количество первых выбранных GPU для экстраполяции; отдельные поиски не запускаются."),
             ("--gpu-counts 1,2",),
         ),
         OptionDeclaration(
@@ -168,17 +157,14 @@ OPTION_DECLARATIONS: dict[str, tuple[OptionDeclaration, ...]] = {
                 "type": int,
                 "help": "maximum concurrent single-GPU searches; default: available selected GPUs",
             },
-            "Положительный предел одновременных поисков; "
-            "по умолчанию используются свободные выбранные GPU.",
+            "Положительный предел одновременных поисков; по умолчанию используются свободные выбранные GPU.",
             ("--jobs 1",),
         ),
         OptionDeclaration(
             ("--force",),
             {
                 "action": "store_true",
-                "help": (
-                    "allow unattributed GPU activity; retain telemetry and foreign-process checks"
-                ),
+                "help": ("allow unattributed GPU activity; retain telemetry and foreign-process checks"),
             },
             "Разрешить неатрибутированную активность GPU с сохранением проверок телеметрии "
             "и посторонних вычислительных процессов.",
@@ -205,15 +191,9 @@ OPTION_DECLARATIONS: dict[str, tuple[OptionDeclaration, ...]] = {
             {
                 "type": int,
                 "default": 1024,
-                "help": (
-                    "per-GPU search ceiling (default: 1024); extrapolated global batches "
-                    "may exceed it"
-                ),
+                "help": ("per-GPU search ceiling (default: 1024); extrapolated global batches may exceed it"),
             },
-            (
-                "Положительный верхний предел поиска пакета на одном GPU; "
-                "экстраполированные пакеты могут быть больше."
-            ),
+            ("Положительный верхний предел поиска пакета на одном GPU; экстраполированные пакеты могут быть больше."),
             ("--search-limit 1024",),
         ),
         OptionDeclaration(
@@ -253,12 +233,8 @@ OPTION_DECLARATIONS: dict[str, tuple[OptionDeclaration, ...]] = {
 COMMAND_DESCRIPTIONS: dict[str, str] = {
     "cy-init-config": "CLI: initialize a directory with editable example configurations.",
     "cy-dedup": "Reflink identical, same-named cache images without starting application services.",
-    "cy-batch-estimate": (
-        "Measure single-GPU training capacity and extrapolate selected allocations."
-    ),
-    "cy-download-weights": (
-        "Prepare supported named model weights in their native discovery caches."
-    ),
+    "cy-batch-estimate": ("Measure single-GPU training capacity and extrapolate selected allocations."),
+    "cy-download-weights": ("Prepare supported named model weights in their native discovery caches."),
     "cy-docs": "Open the local Russian configuration reference and tutorials.",
 }
 
@@ -273,9 +249,7 @@ _PROGRAMS: dict[str, str | None] = {
 
 def parser_for(command: str) -> argparse.ArgumentParser:
     """Build a fresh parser without importing or executing the command implementation."""
-    parser = argparse.ArgumentParser(
-        prog=_PROGRAMS[command], description=COMMAND_DESCRIPTIONS[command], add_help=False
-    )
+    parser = argparse.ArgumentParser(prog=_PROGRAMS[command], description=COMMAND_DESCRIPTIONS[command], add_help=False)
     for option in OPTION_DECLARATIONS[command]:
         parser.add_argument(*option.flags, **option.kwargs)
     return parser

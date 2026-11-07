@@ -30,7 +30,8 @@ def request_for(tmp_path: Path) -> BatchCaseRequest:
 
 
 def test_case_worker_writes_validated_receipt(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     request = request_for(tmp_path)
     request.output.mkdir()

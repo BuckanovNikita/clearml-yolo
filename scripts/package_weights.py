@@ -101,9 +101,7 @@ def _prepare(spec: AssetSpec, resolve: Callable[[AssetSpec], ResolvedAsset]) -> 
     if resolved.content_kind != "file":
         raise ValueError("Packaging requires the original native file")
     filename = resolved.path.name if spec.hub is not None else spec.filename
-    file_spec = spec.model_copy(
-        update={"filename": filename, "checksum": None} if spec.hub is not None else {}
-    )
+    file_spec = spec.model_copy(update={"filename": filename, "checksum": None} if spec.hub is not None else {})
     digest = validate_asset(resolved.path, file_spec)
     if digest != resolved.sha256:
         raise ValueError("Resolved asset changed before packaging")
@@ -127,9 +125,7 @@ def _prepare(spec: AssetSpec, resolve: Callable[[AssetSpec], ResolvedAsset]) -> 
             commit=commit,
             filename=filename,
             etag=etag,
-            config=BundleConfig(
-                member=config.member, size=config.size, sha256=config.sha256, etag=config_etag
-            ),
+            config=BundleConfig(member=config.member, size=config.size, sha256=config.sha256, etag=config_etag),
         )
         files += (config,)
     return _Prepared(
@@ -264,14 +260,9 @@ def package_catalogue(
                 files = (*notice_files, *(file for item in group for file in item.files))
                 path = staging / name
                 _write_tar(path, files)
-                if (
-                    path.stat().st_size != _tar_size(files)
-                    or path.stat().st_size > max_archive_bytes
-                ):
+                if path.stat().st_size != _tar_size(files) or path.stat().st_size > max_archive_bytes:
                     raise ValueError("Actual archive exceeds planned size")
-                archives.append(
-                    BundleArchive(name=name, size=path.stat().st_size, sha256=_hash(path))
-                )
+                archives.append(BundleArchive(name=name, size=path.stat().st_size, sha256=_hash(path)))
                 assets.extend(item.asset.model_copy(update={"archive": name}) for item in group)
         manifest = BundleManifest(
             schema_version=1,
@@ -300,9 +291,7 @@ def main() -> None:
     args = parser.parse_args()
     _, _, requests, failures = _discover()
     if failures:
-        raise RuntimeError(
-            "Incomplete catalogue discovery: " + ", ".join(f.selection for f in failures)
-        )
+        raise RuntimeError("Incomplete catalogue discovery: " + ", ".join(f.selection for f in failures))
     manifest = package_catalogue(
         [spec for _, spec in requests],
         output=args.output,
@@ -310,9 +299,7 @@ def main() -> None:
         max_archive_bytes=args.max_archive_bytes,
         notices=args.notices,
     )
-    sys.stdout.write(
-        json.dumps({"archives": len(manifest.archives), "assets": len(manifest.assets)}) + "\n"
-    )
+    sys.stdout.write(json.dumps({"archives": len(manifest.archives), "assets": len(manifest.assets)}) + "\n")
 
 
 if __name__ == "__main__":

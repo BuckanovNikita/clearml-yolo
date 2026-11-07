@@ -205,9 +205,7 @@ def test_finalize_rejects_ambiguous_native_outputs(
     task, _, checkpoint = native_sdk
     other = _Record("other-id", checkpoint)
     task.records[other.id] = other
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.clearml.native.register_model_barrier", lambda *_args: None
-    )
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.native.register_model_barrier", lambda *_args: None)
     model, trainer = _training_objects(checkpoint)
 
     with pytest.raises(NativeModelError, match="exactly one"):
@@ -220,9 +218,7 @@ def test_finalize_rejects_failed_native_upload_placeholder(
     task, record, checkpoint = native_sdk
     record.url = "failed_uploading"
     record.metadata["clearml_yolo_checkpoint_role"] = {"value": "best", "type": "str"}
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.clearml.native.register_model_barrier", lambda *_args: None
-    )
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.native.register_model_barrier", lambda *_args: None)
     model, trainer = _training_objects(checkpoint)
 
     with pytest.raises(NativeModelError, match="upload"):
@@ -234,9 +230,7 @@ def test_finalize_rejects_a_download_that_does_not_match_best(
 ) -> None:
     task, record, checkpoint = native_sdk
     record.local.write_bytes(b"different")
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.clearml.native.register_model_barrier", lambda *_args: None
-    )
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.native.register_model_barrier", lambda *_args: None)
     model, trainer = _training_objects(checkpoint)
 
     with pytest.raises(NativeModelError, match="does not match"):
@@ -248,9 +242,7 @@ def test_finalize_rejects_metadata_update_failure(
 ) -> None:
     task, _, checkpoint = native_sdk
     _OutputModel.metadata_result = False
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.clearml.native.register_model_barrier", lambda *_args: None
-    )
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.native.register_model_barrier", lambda *_args: None)
     model, trainer = _training_objects(checkpoint)
 
     with pytest.raises(NativeModelError, match="metadata"):
@@ -261,9 +253,7 @@ def test_finalize_rejects_duplicate_label_names(
     native_sdk: tuple[_Task, _Record, Path], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     task, _, checkpoint = native_sdk
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.clearml.native.register_model_barrier", lambda *_args: None
-    )
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.native.register_model_barrier", lambda *_args: None)
     model, trainer = _training_objects(checkpoint)
     model.names = {0: "cat", 1: "cat"}
 
@@ -275,9 +265,7 @@ def test_finalize_sanitizes_design_and_architecture_reference(
     native_sdk: tuple[_Task, _Record, Path], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     task, record, checkpoint = native_sdk
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.clearml.native.register_model_barrier", lambda *_args: None
-    )
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.native.register_model_barrier", lambda *_args: None)
     model, trainer = _training_objects(checkpoint)
     sensitive = "hid" + "den"
     model.model.yaml["token"] = sensitive
@@ -306,9 +294,7 @@ def test_unknown_package_version_is_omitted_from_metadata(
         raise PackageNotFoundError
 
     monkeypatch.setattr("clearml_yolo.adapters.clearml.native.version", unavailable)
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.clearml.native.register_model_barrier", lambda *_args: None
-    )
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.native.register_model_barrier", lambda *_args: None)
     model, trainer = _training_objects(checkpoint)
     finalize_native_model(task, model, trainer, "yolo11n.pt")
     assert not any(key.endswith("_version") for key in record.metadata)
@@ -391,18 +377,12 @@ def test_native_name_write_race_retries_shared_suffix_without_new_model_or_path(
     monkeypatch.setattr(clearml_naming, "invocation_resource", resource)
     monkeypatch.setattr(native_module, "invocation_resource", resource)
     monkeypatch.setattr(clearml_naming, "record_run_configuration", lambda *_args: None)
-    monkeypatch.setattr(
-        clearml_naming, "task_identity", lambda _task: ("project", "training", "task-id")
-    )
+    monkeypatch.setattr(clearml_naming, "task_identity", lambda _task: ("project", "training", "task-id"))
     monkeypatch.setattr(clearml_naming, "_task_collision", lambda *_args: False)
-    monkeypatch.setattr(
-        clearml_naming, "_model_collision", lambda _task, name, _model_id: name in competitors
-    )
+    monkeypatch.setattr(clearml_naming, "_model_collision", lambda _task, name, _model_id: name in competitors)
     monkeypatch.setattr(clearml_naming, "_readable_suffix", lambda: next(suffixes))
     monkeypatch.setattr(native_module, "resolve_model_name", clearml_naming.resolve_model_name)
-    monkeypatch.setattr(
-        native_module, "register_model_barrier", lambda _task, callback: barriers.append(callback)
-    )
+    monkeypatch.setattr(native_module, "register_model_barrier", lambda _task, callback: barriers.append(callback))
     monkeypatch.setattr(task, "set_name", lambda name: setattr(task, "name", name), raising=False)
     constructor = _OutputModel.__init__
     setter = _OutputModel.__setattr__

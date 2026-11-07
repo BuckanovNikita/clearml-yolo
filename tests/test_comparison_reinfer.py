@@ -199,9 +199,7 @@ def test_forwards_the_inference_settings(ground_truth: pd.DataFrame, tmp_path: P
     }
 
 
-def test_native_outputs_are_routed_below_comparison_destination(
-    ground_truth: pd.DataFrame, tmp_path: Path
-) -> None:
+def test_native_outputs_are_routed_below_comparison_destination(ground_truth: pd.DataFrame, tmp_path: Path) -> None:
     output = tmp_path / "comparison" / "preds.csv"
     predictor = RecordingPredictor()
 
@@ -212,9 +210,7 @@ def test_native_outputs_are_routed_below_comparison_destination(
     assert kwargs["name"] == "baseline_test"
 
 
-def test_cached_inference_evidence_uses_shared_credential_sanitizer(
-    ground_truth: pd.DataFrame, tmp_path: Path
-) -> None:
+def test_cached_inference_evidence_uses_shared_credential_sanitizer(ground_truth: pd.DataFrame, tmp_path: Path) -> None:
     output = tmp_path / "comparison" / "preds.csv"
 
     predictions, _ = _reinfer(ground_truth, output, SensitiveEvidencePredictor())
@@ -270,9 +266,7 @@ def test_writes_predictions_csv(ground_truth: pd.DataFrame, tmp_path: Path) -> N
     pd.testing.assert_frame_equal(pd.read_csv(output), predictions)
 
 
-def test_reuses_an_existing_csv_without_inference(
-    ground_truth: pd.DataFrame, tmp_path: Path
-) -> None:
+def test_reuses_an_existing_csv_without_inference(ground_truth: pd.DataFrame, tmp_path: Path) -> None:
     output = tmp_path / "preds.csv"
     first, _ = _reinfer(ground_truth, output, RecordingPredictor())
 
@@ -315,9 +309,7 @@ def test_cached_confidence_preserves_exact_frozen_threshold_without_inference(
     pd.testing.assert_frame_equal(fresh, cached, check_exact=True)
 
 
-def test_cache_without_provenance_sidecar_is_not_reused(
-    ground_truth: pd.DataFrame, tmp_path: Path
-) -> None:
+def test_cache_without_provenance_sidecar_is_not_reused(ground_truth: pd.DataFrame, tmp_path: Path) -> None:
     output = tmp_path / "preds.csv"
     output.write_text(",".join(PREDICTION_COLUMNS) + "\n", encoding="utf-8")
     predictor = RecordingPredictor()
@@ -328,9 +320,7 @@ def test_cache_without_provenance_sidecar_is_not_reused(
     assert output.with_suffix(".metadata.json").is_file()
 
 
-def test_reused_identifiers_keep_their_text_form(
-    ground_truth: pd.DataFrame, tmp_path: Path
-) -> None:
+def test_reused_identifiers_keep_their_text_form(ground_truth: pd.DataFrame, tmp_path: Path) -> None:
     """Numeric-looking stems must not come back from the cache as integers."""
     output = tmp_path / "preds.csv"
     numeric = NumericNamePredictor()
@@ -360,9 +350,7 @@ def test_cache_miss_runs_inference(ground_truth: pd.DataFrame, tmp_path: Path) -
     assert len(predictor.calls) == 1
 
 
-def test_logs_which_branch_was_taken(
-    ground_truth: pd.DataFrame, tmp_path: Path, info_logs: list[str]
-) -> None:
+def test_logs_which_branch_was_taken(ground_truth: pd.DataFrame, tmp_path: Path, info_logs: list[str]) -> None:
     """A silent reuse of a stale cache would be indistinguishable from a fresh run."""
     output = tmp_path / "preds.csv"
     _reinfer(ground_truth, output, RecordingPredictor())
@@ -393,9 +381,7 @@ def test_missing_image_file_raises(ground_truth: pd.DataFrame, tmp_path: Path) -
         _reinfer(ground_truth, tmp_path / "preds.csv", _explode)
 
 
-def test_missing_image_is_checked_even_when_the_cache_is_warm(
-    ground_truth: pd.DataFrame, tmp_path: Path
-) -> None:
+def test_missing_image_is_checked_even_when_the_cache_is_warm(ground_truth: pd.DataFrame, tmp_path: Path) -> None:
     output = tmp_path / "preds.csv"
     _reinfer(ground_truth, output, RecordingPredictor())
     Path(str(ground_truth.loc[0, "image_path"])).unlink()
@@ -404,9 +390,7 @@ def test_missing_image_is_checked_even_when_the_cache_is_warm(
         _reinfer(ground_truth, output, _explode)
 
 
-def test_vocabulary_report_compares_checkpoint_against_the_split(
-    ground_truth: pd.DataFrame, tmp_path: Path
-) -> None:
+def test_vocabulary_report_compares_checkpoint_against_the_split(ground_truth: pd.DataFrame, tmp_path: Path) -> None:
     with_unknown = pd.concat(
         [
             ground_truth,
@@ -422,9 +406,7 @@ def test_vocabulary_report_compares_checkpoint_against_the_split(
     assert vocabulary.unknown_to_ground_truth == []
 
 
-def test_vocabulary_report_ignores_classes_from_other_splits(
-    ground_truth: pd.DataFrame, tmp_path: Path
-) -> None:
+def test_vocabulary_report_ignores_classes_from_other_splits(ground_truth: pd.DataFrame, tmp_path: Path) -> None:
     """'forklift' lives only in train, so it is not part of the test split's family."""
     _, vocabulary = _reinfer(ground_truth, tmp_path / "preds.csv", RecordingPredictor())
 
@@ -432,9 +414,7 @@ def test_vocabulary_report_ignores_classes_from_other_splits(
     assert vocabulary.unknown_to_ground_truth == []
 
 
-def test_vocabulary_report_lists_classes_the_split_never_shows(
-    ground_truth: pd.DataFrame, tmp_path: Path
-) -> None:
+def test_vocabulary_report_lists_classes_the_split_never_shows(ground_truth: pd.DataFrame, tmp_path: Path) -> None:
     without_dogs = ground_truth[ground_truth["instance_label"] != "dog"]
 
     _, vocabulary = _reinfer(without_dogs, tmp_path / "preds.csv", RecordingPredictor())
@@ -442,9 +422,7 @@ def test_vocabulary_report_lists_classes_the_split_never_shows(
     assert vocabulary.unknown_to_ground_truth == ["dog"]
 
 
-def test_different_caches_keep_distinct_replay_manifests(
-    ground_truth: pd.DataFrame, tmp_path: Path
-) -> None:
+def test_different_caches_keep_distinct_replay_manifests(ground_truth: pd.DataFrame, tmp_path: Path) -> None:
     first, _ = _reinfer(ground_truth, tmp_path / "first.csv", RecordingPredictor())
     source = Path(first.attrs["effective_args"]["source"])
     original = source.read_text(encoding="utf-8")
@@ -466,9 +444,7 @@ def test_cache_miss_and_hit_preserve_literal_labels_and_threshold_edges(
     predictor = RecordingPredictor()
 
     def predict_literal(weights: Any, image_paths: list[str], **kwargs: Any) -> pd.DataFrame:
-        return predictor(weights, image_paths, **kwargs).assign(
-            instance_label=label, confidence=threshold
-        )
+        return predictor(weights, image_paths, **kwargs).assign(instance_label=label, confidence=threshold)
 
     output = tmp_path / "preds.csv"
     first, _ = _reinfer(ground_truth, output, predict_literal)

@@ -21,9 +21,7 @@ def test_execution_copy_preserves_null_selectors_and_publishes_separate_provenan
     config = OmegaConf.create({"model": original, "clearml": {}})
     writes: dict[str, Any] = {}
     task = SimpleNamespace(
-        set_configuration_object=lambda **values: writes.update(
-            {values["name"]: values["config_text"]}
-        )
+        set_configuration_object=lambda **values: writes.update({values["name"]: values["config_text"]})
     )
     state = session._InvocationState(task=task, stages=["train"], current_stage="train")
     token = session._ACTIVE_INVOCATION.set(state)
@@ -35,9 +33,7 @@ def test_execution_copy_preserves_null_selectors_and_publishes_separate_provenan
         override="model.train.backbone_weights",
     )
 
-    def prepare(
-        selected: ModelConfig, *, training: bool
-    ) -> tuple[ModelConfig, tuple[ResolvedAsset, ...]]:
+    def prepare(selected: ModelConfig, *, training: bool) -> tuple[ModelConfig, tuple[ResolvedAsset, ...]]:
         assert training
         assert state.run_configuration["model"]["train"]["backbone_weights"] is None
         prepared = selected.model_copy(deep=True)
@@ -66,16 +62,12 @@ def test_nontraining_execution_does_not_request_pretrained_assets(
 ) -> None:
     observed: list[bool] = []
 
-    def prepare(
-        selected: ModelConfig, *, training: bool
-    ) -> tuple[ModelConfig, tuple[ResolvedAsset, ...]]:
+    def prepare(selected: ModelConfig, *, training: bool) -> tuple[ModelConfig, tuple[ResolvedAsset, ...]]:
         observed.append(training)
         return selected, ()
 
     monkeypatch.setattr(common, "prepare_model_assets", prepare)
-    config = OmegaConf.create(
-        {"model": model_preset("deimv2/s").model_dump(mode="json"), "skip_train": True}
-    )
+    config = OmegaConf.create({"model": model_preset("deimv2/s").model_dump(mode="json"), "skip_train": True})
     common._execution_model(command, config)
     assert observed == [False]
 

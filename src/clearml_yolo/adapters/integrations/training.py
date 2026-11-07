@@ -86,7 +86,8 @@ def execute_training(
                 }
                 record_run_configuration(task, {"training_normalization": differences})
                 with trace_operation(
-                    "training.model.finalize", context={"path": str(architecture)},
+                    "training.model.finalize",
+                    context={"path": str(architecture)},
                 ):
                     finalize_native_model(task, model, trainer, architecture)
             except Exception as error:
@@ -107,9 +108,7 @@ def training_population_counts(ground_truth: Path) -> dict[str, int] | None:
     """Count prepared training annotations, preserving exact lexical class identity."""
     frame = read_detection_csv(ground_truth)
     if "split" not in frame or "instance_label" not in frame:
-        logger.warning(
-            "Prepared training population lacks split/class provenance; counts unavailable"
-        )
+        logger.warning("Prepared training population lacks split/class provenance; counts unavailable")
         return None
     training = frame.loc[frame["split"] == "train", "instance_label"].dropna()
     return {str(label): int(count) for label, count in training.value_counts().items()}

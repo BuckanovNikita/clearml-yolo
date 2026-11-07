@@ -28,9 +28,7 @@ def isolate_fake_cli_and_console(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(common, "validate_launch_arguments", lambda name: None)
     monkeypatch.setattr(common, "prepare_catalogue", lambda **kwargs: None)
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.clearml.session._start_console_publisher", lambda *_args: None
-    )
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.session._start_console_publisher", lambda *_args: None)
 
 
 def test_worker_publication_is_disabled_without_reading_task_identity(
@@ -97,13 +95,9 @@ def test_training_policy_normalization_and_receipts_stay_out_of_artifacts(
     from test_clearml_session import FakeTask
 
     task = FakeTask()
-    monkeypatch.setattr(
-        workflow_dependencies.tracking, "publish_training_parameters", lambda *args: None
-    )
+    monkeypatch.setattr(workflow_dependencies.tracking, "publish_training_parameters", lambda *args: None)
     patch_workflow(monkeypatch, workflow_dependencies, clearml.Task, "init", lambda **_kwargs: task)
-    patch_workflow(
-        monkeypatch, workflow_dependencies, clearml.Task, "get_task", lambda **_kwargs: task
-    )
+    patch_workflow(monkeypatch, workflow_dependencies, clearml.Task, "get_task", lambda **_kwargs: task)
     monkeypatch.delenv("LOCAL_RANK", raising=False)
     prepared = publication_dataset
     truth = prepared.ground_truth
@@ -158,9 +152,7 @@ def test_training_policy_normalization_and_receipts_stay_out_of_artifacts(
 
     patch_workflow(monkeypatch, workflow_dependencies, training, "cached_dataset", dataset)
     patch_workflow(monkeypatch, workflow_dependencies, ultralytics.models, "YOLO", Model)
-    patch_workflow(
-        monkeypatch, workflow_dependencies, training, "finalize_native_model", lambda *_args: None
-    )
+    patch_workflow(monkeypatch, workflow_dependencies, training, "finalize_native_model", lambda *_args: None)
     patch_workflow(
         monkeypatch,
         workflow_dependencies,
@@ -198,11 +190,7 @@ def test_training_policy_normalization_and_receipts_stay_out_of_artifacts(
         )
     assert result.weights == best
     assert [item["name"] for item in task.uploads] == [artifact_names.GROUND_TRUTH]
-    run = next(
-        json.loads(item["config_text"])
-        for item in reversed(task.configurations)
-        if item["name"] == "run"
-    )
+    run = next(json.loads(item["config_text"]) for item in reversed(task.configurations) if item["name"] == "run")
     assert run["training_data_overrides"]["fraction"] == {"requested": 0.5, "effective": 1.0}
     assert run["training_data_overrides"]["classes"] == {"requested": [0], "effective": None}
     assert run["training_normalization"]["batch"] == {"requested": -1, "effective": 8}
@@ -323,17 +311,11 @@ def test_remote_clone_replays_canonical_run_and_general(
         "invocation",
         lambda *_args, **_kwargs: _replay_owner(RemoteTask()),
     )
-    patch_workflow(
-        monkeypatch, workflow_dependencies, common, "initialize_naming", lambda _task: None
-    )
+    patch_workflow(monkeypatch, workflow_dependencies, common, "initialize_naming", lambda _task: None)
     patch_workflow(monkeypatch, workflow_dependencies, common, "replay_configuration", replay)
     monkeypatch.setattr(common, "publish_run_configuration", lambda *args: None)
-    monkeypatch.setattr(
-        workflow_dependencies.tracking, "publish_training_parameters", lambda *args: None
-    )
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.clearml.session.record_run_configuration", lambda *args: None
-    )
+    monkeypatch.setattr(workflow_dependencies.tracking, "publish_training_parameters", lambda *args: None)
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.session.record_run_configuration", lambda *args: None)
     common.launch("train", command)
     assert executed == [("remote.csv", 17)]
     assert inputs == [
@@ -369,9 +351,7 @@ def test_remote_clone_does_not_replay_previous_owner_output_route(
     requested = training_settings(device="cpu")
     if explicit_route:
         requested.update(project=str(project), name="train")
-    config = OmegaConf.create(
-        {"clearml": {}, "ultralytics": requested, "ultralytics_predict": {"device": "cpu"}}
-    )
+    config = OmegaConf.create({"clearml": {}, "ultralytics": requested, "ultralytics_predict": {"device": "cpu"}})
     executed: list[dict[str, Any]] = []
 
     class RemoteTask:
@@ -408,15 +388,11 @@ def test_remote_clone_does_not_replay_previous_owner_output_route(
         executed.append(settings)
         return None
 
-    def command(
-        clearml: Any, ultralytics: dict[str, Any], ultralytics_predict: dict[str, Any]
-    ) -> None:
+    def command(clearml: Any, ultralytics: dict[str, Any], ultralytics_predict: dict[str, Any]) -> None:
         if stage == "pipeline":
             executed.append(routed_native(ultralytics, project, "train"))
         else:
-            training.train(
-                ultralytics, ClearMLConfig(), ground_truth="truth.csv", deps=workflow_dependencies
-            )
+            training.train(ultralytics, ClearMLConfig(), ground_truth="truth.csv", deps=workflow_dependencies)
 
     patch_workflow(
         monkeypatch,
@@ -433,9 +409,7 @@ def test_remote_clone_does_not_replay_previous_owner_output_route(
         "invocation",
         lambda *_args, **_kwargs: _replay_owner(task),
     )
-    patch_workflow(
-        monkeypatch, workflow_dependencies, common, "initialize_naming", lambda _task: None
-    )
+    patch_workflow(monkeypatch, workflow_dependencies, common, "initialize_naming", lambda _task: None)
     patch_workflow(
         monkeypatch,
         workflow_dependencies,
@@ -443,9 +417,7 @@ def test_remote_clone_does_not_replay_previous_owner_output_route(
         "replay_configuration",
         lambda _task, values, **kwargs: values,
     )
-    patch_workflow(
-        monkeypatch, workflow_dependencies, training, "init_task", lambda *_args, **_kwargs: task
-    )
+    patch_workflow(monkeypatch, workflow_dependencies, training, "init_task", lambda *_args, **_kwargs: task)
     monkeypatch.setenv("CY_HOME", str(tmp_path))
     patch_workflow(
         monkeypatch,
@@ -454,16 +426,10 @@ def test_remote_clone_does_not_replay_previous_owner_output_route(
         "_prepare_csv_dataset",
         lambda _task, settings, *_args, **_kwargs: nullcontext((object(), settings)),
     )
-    patch_workflow(
-        monkeypatch, workflow_dependencies, training, "_execute_training", execute_training
-    )
+    patch_workflow(monkeypatch, workflow_dependencies, training, "_execute_training", execute_training)
     monkeypatch.setattr(common, "publish_run_configuration", lambda *args: None)
-    monkeypatch.setattr(
-        workflow_dependencies.tracking, "publish_training_parameters", lambda *args: None
-    )
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.clearml.session.record_run_configuration", lambda *args: None
-    )
+    monkeypatch.setattr(workflow_dependencies.tracking, "publish_training_parameters", lambda *args: None)
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.session.record_run_configuration", lambda *args: None)
     common.launch(stage, command)
     assert len(executed) == 1
     actual = executed[0]
@@ -519,9 +485,7 @@ def test_current_save_dir_override_reaches_pipeline_conflict_validation(
                 "General/save_dir": "/old/detect/old",
             }
 
-    def command(
-        clearml: Any, ultralytics: dict[str, Any], ultralytics_predict: dict[str, Any]
-    ) -> None:
+    def command(clearml: Any, ultralytics: dict[str, Any], ultralytics_predict: dict[str, Any]) -> None:
         assert "save_dir" in ultralytics
         assert ultralytics["save_dir"] == save_dir
         routed_native(ultralytics, tmp_path / "detect", "train")
@@ -541,9 +505,7 @@ def test_current_save_dir_override_reaches_pipeline_conflict_validation(
         "invocation",
         lambda *_args, **_kwargs: _replay_owner(Task()),
     )
-    patch_workflow(
-        monkeypatch, workflow_dependencies, common, "initialize_naming", lambda _task: None
-    )
+    patch_workflow(monkeypatch, workflow_dependencies, common, "initialize_naming", lambda _task: None)
     patch_workflow(
         monkeypatch,
         workflow_dependencies,
@@ -552,12 +514,8 @@ def test_current_save_dir_override_reaches_pipeline_conflict_validation(
         lambda _task, values, **kwargs: values,
     )
     monkeypatch.setattr(common, "publish_run_configuration", lambda *args: None)
-    monkeypatch.setattr(
-        workflow_dependencies.tracking, "publish_training_parameters", lambda *args: None
-    )
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.clearml.session.record_run_configuration", lambda *args: None
-    )
+    monkeypatch.setattr(workflow_dependencies.tracking, "publish_training_parameters", lambda *args: None)
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.session.record_run_configuration", lambda *args: None)
     with pytest.raises(ValueError, match="save_dir conflicts with pipeline run_dir"):
         common.launch("pipeline", command)
 
@@ -588,9 +546,7 @@ def test_real_invocation_freezes_routing_before_collision_display_rename(
     task = Task()
     task.name = "requested/report"
     patch_workflow(monkeypatch, workflow_dependencies, clearml.Task, "init", lambda **_kwargs: task)
-    patch_workflow(
-        monkeypatch, workflow_dependencies, clearml.Task, "get_task", lambda **_kwargs: task
-    )
+    patch_workflow(monkeypatch, workflow_dependencies, clearml.Task, "get_task", lambda **_kwargs: task)
     patch_workflow(
         monkeypatch,
         workflow_dependencies,
@@ -618,11 +574,7 @@ def test_real_invocation_freezes_routing_before_collision_display_rename(
     assert task.name.startswith("requested/report-")
     expected = task_run_dir(tmp_path / "runs", "project", "requested/report", task.id) / "report"
     assert outputs == [str(expected)]
-    run = next(
-        json.loads(item["config_text"])
-        for item in reversed(task.configurations)
-        if item["name"] == "run"
-    )
+    run = next(json.loads(item["config_text"]) for item in reversed(task.configurations) if item["name"] == "run")
     assert run["display_names"]["requested_task_name"] == "requested/report"
     assert run["display_names"]["effective_task_name"] == task.name
     assert run["clearml"]["task_name"] == ClearMLConfig().task_name

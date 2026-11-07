@@ -15,9 +15,7 @@ from clearml_yolo.adapters.observability import tracing
 def events(monkeypatch: pytest.MonkeyPatch) -> Iterator[list[str]]:
     monkeypatch.setenv("LOGURU_LEVEL", "TRACE")
     output: list[str] = []
-    sink = logger.add(
-        lambda message: output.append(str(message)), level="TRACE", format="{message}"
-    )
+    sink = logger.add(lambda message: output.append(str(message)), level="TRACE", format="{message}")
     try:
         yield output
     finally:
@@ -56,8 +54,9 @@ def test_disabled_trace_is_inert(monkeypatch: pytest.MonkeyPatch, events: list[s
 def test_opaque_task_and_path_references_are_readable(events: list[str]) -> None:
     task = "abcdef0123456789" * 2
     checksum = "abcdef0123456789" * 4
-    with tracing.trace_task(task), tracing.trace_operation(
-        "download", context={"path": f"/cache/{checksum}/checkpoint.pt", "count": 12}
+    with (
+        tracing.trace_task(task),
+        tracing.trace_operation("download", context={"path": f"/cache/{checksum}/checkpoint.pt", "count": 12}),
     ):
         pass
     result = "".join(events)
@@ -134,10 +133,7 @@ def test_changed_snapshots_emit_once_per_change(
 ) -> None:
     output: list[str] = []
     sampled = threading.Event()
-    snapshots = iter(
-        [((("first:1 in wait",), (101,), False),)] * 2
-        + [((("second:2 in wait",), (101,), False),)] * 2
-    )
+    snapshots = iter([((("first:1 in wait",), (101,), False),)] * 2 + [((("second:2 in wait",), (101,), False),)] * 2)
     count = 0
 
     def sample(*args: object) -> tuple[tuple[tuple[str, ...], tuple[int, ...], bool], ...]:
@@ -180,11 +176,11 @@ def test_sink_failure_cannot_replace_application_failure(events: list[str]) -> N
 
 
 @pytest.mark.parametrize("sink_error", [SystemExit(23), KeyboardInterrupt()])
-@pytest.mark.parametrize(
-    "original", [LookupError("original"), KeyboardInterrupt(), SystemExit(7), SystemExit(0)]
-)
+@pytest.mark.parametrize("original", [LookupError("original"), KeyboardInterrupt(), SystemExit(7), SystemExit(0)])
 def test_sink_base_exception_preserves_application_exception(
-    events: list[str], sink_error: BaseException, original: BaseException,
+    events: list[str],
+    sink_error: BaseException,
+    original: BaseException,
 ) -> None:
     def broken(message: object) -> None:
         if "START" not in str(message):

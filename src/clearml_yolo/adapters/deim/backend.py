@@ -124,9 +124,7 @@ def _prepare_loaders(
     for split, folder_name in (("train", "train"), ("val", "valid")):
         folder = prepared.data.parent / folder_name
         loader = cfg.yaml_cfg[f"{split}_dataloader"]
-        loader["dataset"].update(
-            img_folder=str(folder), ann_file=str(folder / "_annotations.coco.json")
-        )
+        loader["dataset"].update(img_folder=str(folder), ann_file=str(folder / "_annotations.coco.json"))
         loader.update(total_batch_size=config.train.batch, num_workers=config.train.workers)
         loader["drop_last"] = False
         if split == "train" and transforms is not None and transforms.mode == "albumentations":
@@ -142,9 +140,7 @@ def _prepare_loaders(
         # pinned private field. Replacing objects here leaves the upstream registry intact.
         bridge_transforms(loader.dataset._transforms)  # noqa: SLF001
         if loader.collate_fn.scales is not None:
-            loader.collate_fn.scales = [
-                scale for scale in loader.collate_fn.scales if scale >= _MINIMUM_SIZE
-            ]
+            loader.collate_fn.scales = [scale for scale in loader.collate_fn.scales if scale >= _MINIMUM_SIZE]
     if transforms is not None and transforms.mode == "albumentations":
         dataset = cfg.train_dataloader.dataset
         # Replace only this training dataset instance, never the upstream registry.
@@ -164,11 +160,7 @@ def _validate_training(config: ModelConfig) -> None:
     for weights in (config.train.weights, config.train.backbone_weights):
         if weights is not None and not weights.is_file():
             raise FileNotFoundError(weights)
-    if (
-        config.train.pretrained
-        and config.train.weights is None
-        and config.train.backbone_weights is None
-    ):
+    if config.train.pretrained and config.train.weights is None and config.train.backbone_weights is None:
         raise ValueError("DEIMv2 pretrained training requires explicit weights or backbone_weights")
 
 
@@ -180,9 +172,7 @@ def training_world(config: ModelConfig) -> tuple[int, int]:
     world = dist.get_world_size() if dist.is_initialized() else 1
     rank = dist.get_rank() if dist.is_initialized() else 0
     if requested > 1 and requested != world:
-        raise RuntimeError(
-            "DEIMv2 distributed workers require an initialized matching process group"
-        )
+        raise RuntimeError("DEIMv2 distributed workers require an initialized matching process group")
     global_batch_per_rank(config.train.batch, world)
     return rank, world
 
@@ -299,9 +289,7 @@ def _validate_tuning(model: Any, weights: Path) -> None:
     torch = importlib.import_module("torch")
     payload = torch.load(weights, map_location="cpu", weights_only=True)
     expected = payload["ema"]["module"] if "ema" in payload else payload["model"]
-    backbone = {
-        key: value for key, value in model.state_dict().items() if key.startswith("backbone.")
-    }
+    backbone = {key: value for key, value in model.state_dict().items() if key.startswith("backbone.")}
     # Native tuning silently drops incompatible keys. Require the full unchanged
     # backbone while retaining its native class-head adjustment for new vocabularies.
     if not backbone or not all(
@@ -318,9 +306,7 @@ def _fit(solver: Any, output: Path) -> None:
         solver.fit()
 
 
-def training_configuration(
-    config: ModelConfig, names: tuple[str, ...], output: Path
-) -> tuple[Any, Any]:
+def training_configuration(config: ModelConfig, names: tuple[str, ...], output: Path) -> tuple[Any, Any]:
     """Resolve the same native optimizer, precision, EMA and pretrained recipe for probes."""
     _validate_training(config)
     training_world(config)
@@ -328,9 +314,7 @@ def training_configuration(
     device = _device(config.train.device)
     cfg = _config(config, names, size)
     _, solver_module = load_source(config.source_dir)
-    native_misc = importlib.import_module(
-        solver_module.__package__.rsplit(".", 1)[0] + ".misc.dist_utils"
-    )
+    native_misc = importlib.import_module(solver_module.__package__.rsplit(".", 1)[0] + ".misc.dist_utils")
     native_misc.setup_seed(config.train.seed)
     cfg.yaml_cfg.update(
         device=device,
@@ -406,10 +390,7 @@ def train(
         preset=config.preset,
         class_names=names,
         preprocessing=Preprocessing(resize="stretch", size=config.train.imgsz),
-        dependencies={
-            name: importlib.metadata.version(name)
-            for name in ("torch", "torchvision", "faster-coco-eval")
-        },
+        dependencies={name: importlib.metadata.version(name) for name in ("torch", "torchvision", "faster-coco-eval")},
         source_revision=REVISION,
     )
     return BackendTrainResult(
@@ -456,9 +437,7 @@ def _native_predict(
                     tensor = functional.pil_to_tensor(image).float() / 255
                 tensor = functional.resize(tensor, list(size))
                 tensors.append(
-                    functional.normalize(
-                        tensor, descriptor.preprocessing.mean, descriptor.preprocessing.std
-                    )
+                    functional.normalize(tensor, descriptor.preprocessing.mean, descriptor.preprocessing.std)
                 )
             outputs = model(torch.stack(tensors).to(device))  # noqa: PD013 -- Torch, not pandas
             predictions = postprocessor(outputs, torch.tensor(originals, device=device))

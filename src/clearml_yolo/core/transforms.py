@@ -29,10 +29,7 @@ class TransformSnapshot(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     pipeline: dict[str, JsonValue] = Field(
-        description=(
-            "Сгенерированное сериализованное содержимое Albumentations pipeline; "
-            "проверяется по sha256."
-        ),
+        description=("Сгенерированное сериализованное содержимое Albumentations pipeline; проверяется по sha256."),
         examples=[
             {
                 "__version__": "2.0.8",
@@ -47,10 +44,7 @@ class TransformSnapshot(BaseModel):
         },
     )
     sha256: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")] = Field(
-        description=(
-            "Сгенерированный SHA-256 канонического JSON pipeline, ровно 64 "
-            "шестнадцатеричных символа."
-        ),
+        description=("Сгенерированный SHA-256 канонического JSON pipeline, ровно 64 шестнадцатеричных символа."),
         examples=["0000000000000000000000000000000000000000000000000000000000000000"],
         json_schema_extra={
             "shapes": "Annotated[str, Field(pattern='^[0-9a-f]{64}$')]",
@@ -60,9 +54,7 @@ class TransformSnapshot(BaseModel):
         },
     )
     source: Annotated[str, Field(min_length=1)] = Field(
-        description=(
-            "Сохранённое непустое имя источника pipeline; служит происхождением при replay."
-        ),
+        description=("Сохранённое непустое имя источника pipeline; служит происхождением при replay."),
         examples=["augmentations.yaml"],
         json_schema_extra={
             "shapes": "Annotated[str, Field(min_length=1)]",

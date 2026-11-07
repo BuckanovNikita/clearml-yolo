@@ -30,9 +30,7 @@ def validate(
         ground_truth = resolve_ground_truth(ground_truth, task=task, deps=deps)
         selected = list(dict.fromkeys(splits or ["train", "val", "test"]))
         destination = deps.storage.write_path(output_dir)
-        deps.tracking.declare_result_producers(
-            task, ["predict", "metrics"], output_dir=destination
-        )
+        deps.tracking.declare_result_producers(task, ["predict", "metrics"], output_dir=destination)
         predicted = predict(
             weights,
             ground_truth,

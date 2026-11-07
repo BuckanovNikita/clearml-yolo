@@ -56,13 +56,10 @@ def _validate_inactive_model_settings(model: ModelConfig) -> None:
     values = model.model_dump(mode="json")
     defaults = ModelConfig().model_dump(mode="json")
     for group, owner in (("train", "ultralytics"), ("predict", "ultralytics_predict")):
-        changed = sorted(
-            key for key, value in values[group].items() if value != defaults[group][key]
-        )
+        changed = sorted(key for key, value in values[group].items() if value != defaults[group][key])
         if changed:
             raise ValueError(
-                f"Changed model.{group} settings {changed} are inactive for ultralytics; "
-                f"use {owner} instead"
+                f"Changed model.{group} settings {changed} are inactive for ultralytics; use {owner} instead"
             )
 
 
@@ -81,9 +78,7 @@ def _validate_inactive_groups(config: DictConfig, model: ModelConfig | None) -> 
     for group, owner in (("ultralytics", "train"), ("ultralytics_predict", "predict")):
         if group not in config:
             continue
-        changed = sorted(
-            key for key, value in config[group].items() if value != defaults[group].get(key)
-        )
+        changed = sorted(key for key, value in config[group].items() if value != defaults[group].get(key))
         if changed:
             raise ValueError(
                 f"Changed {group} settings {changed} are inactive for "
@@ -152,9 +147,7 @@ def validate_project_destinations(config: DictConfig) -> None:
         if project is not None:
             write_path(project)
         if name is not None:
-            write_path(
-                Path(project) / str(name) if project is not None else cy_home() / "runs" / str(name)
-            )
+            write_path(Path(project) / str(name) if project is not None else cy_home() / "runs" / str(name))
         if native.get("save_dir") is not None:
             write_path(native.save_dir)
 
@@ -201,16 +194,12 @@ def validate_pipeline_configuration(config: DictConfig) -> None:
     values = {str(key): value for key, value in resolved.items()}
     normalize_ground_truth(values["ground_truth"])
     _validate_pipeline_types(values)
-    metrics, report, compare = pipeline_stage_settings(
-        values["metrics"], values["report"], values["compare"]
-    )
+    metrics, report, compare = pipeline_stage_settings(values["metrics"], values["report"], values["compare"])
     _validate_request(metrics["evaluation"], EvaluationConfig)
     if metrics["calibration_split"] != "val":
         raise ValueError("calibration_split must be exactly 'val'")
     _validate_pipeline_comparison(compare)
-    if report["report_config_path"] is not None and not isinstance(
-        report["report_config_path"], str
-    ):
+    if report["report_config_path"] is not None and not isinstance(report["report_config_path"], str):
         raise TypeError("report_config_path must be a path string or null")
     _validate_request(values["clearml"], ClearMLConfig)
     if values.get("fiftyone") is not None:
@@ -270,9 +259,7 @@ def _inspect_saved_configuration(directory: Path, name: str, visited: set[Path])
         elif isinstance(entry, DictConfig):
             for raw_group, selection in entry.items():
                 group = str(raw_group).removeprefix("override ").lstrip("/")
-                if group.split("/")[0] in _LEGACY_CONTROLS or (
-                    group == "hydra/launcher" and selection == "cy_queue"
-                ):
+                if group.split("/")[0] in _LEGACY_CONTROLS or (group == "hydra/launcher" and selection == "cy_queue"):
                     raise ValueError(_MIGRATION)
                 if isinstance(selection, str):
                     _inspect_saved_configuration(directory, f"{group}/{selection}", visited)
@@ -285,11 +272,7 @@ def validate_launch_arguments(name: str) -> str | None:
     from hydra.core.hydra_config import HydraConfig
 
     arguments = get_args_parser().parse_args()
-    local_source = (
-        str(Path(arguments.config_dir).expanduser().resolve())
-        if arguments.config_dir is not None
-        else None
-    )
+    local_source = str(Path(arguments.config_dir).expanduser().resolve()) if arguments.config_dir is not None else None
     for override in arguments.overrides:
         key = override.split("=", 1)[0].lstrip("+~").split(".", 1)[0]
         if key in _LEGACY_CONTROLS or override.lstrip("+~") == "hydra/launcher=cy_queue":
@@ -309,9 +292,7 @@ def validate_launch_arguments(name: str) -> str | None:
     previous = HydraConfig.instance().cfg
     try:
         with context:
-            multirun, jobs = compose_jobs(
-                selected_name, arguments.overrides, multirun=arguments.multirun
-            )
+            multirun, jobs = compose_jobs(selected_name, arguments.overrides, multirun=arguments.multirun)
             for index, job in enumerate(jobs):
                 reject_legacy_controls(job)
                 with open_dict(job):

@@ -17,9 +17,7 @@ REFERENCE = "42a495f8-014d-4a7e-abda-6bcb4897099e"
 
 
 def test_identity_caption_keeps_names_and_exact_private_provenance() -> None:
-    identity = ModelIdentity(
-        model_name="Detection model", training_task_id=TASK, checkpoint_sha256=CHECKSUM
-    )
+    identity = ModelIdentity(model_name="Detection model", training_task_id=TASK, checkpoint_sha256=CHECKSUM)
     assert identity.label == "Detection model"
     assert TASK not in identity.caption
     assert CHECKSUM not in identity.caption
@@ -37,9 +35,7 @@ def test_human_text_prefers_names_and_preserves_ordinary_numbers() -> None:
     assert "loss=0.125 epoch=12" in result
     for opaque in (TASK, CHECKSUM, REFERENCE):
         assert opaque not in result
-    assert human_text("/tmp/checkpoint.pt E111 https://host/help") == (
-        "/tmp/checkpoint.pt E111 https://host/help"
-    )
+    assert human_text("/tmp/checkpoint.pt E111 https://host/help") == ("/tmp/checkpoint.pt E111 https://host/help")
 
 
 @pytest.mark.parametrize("opaque", [TASK, CHECKSUM, REFERENCE])

@@ -27,23 +27,17 @@ from workflow_dependencies import (
 
 
 @contextmanager
-def _metric_owner(
-    monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
-) -> Iterator[FakeTask]:
+def _metric_owner(monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies) -> Iterator[FakeTask]:
     from types import SimpleNamespace
 
     import clearml
 
     from clearml_yolo.application.use_cases import metrics as module
 
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.clearml.session._start_console_publisher", lambda *_args: None
-    )
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.session._start_console_publisher", lambda *_args: None)
     task = FakeTask()
     patch_workflow(monkeypatch, workflow_dependencies, clearml.Task, "init", lambda **_kwargs: task)
-    patch_workflow(
-        monkeypatch, workflow_dependencies, clearml.Task, "get_task", lambda **_kwargs: task
-    )
+    patch_workflow(monkeypatch, workflow_dependencies, clearml.Task, "get_task", lambda **_kwargs: task)
     patch_workflow(
         monkeypatch,
         workflow_dependencies,
@@ -52,12 +46,8 @@ def _metric_owner(
         lambda: SimpleNamespace(report_plotly=lambda **_kwargs: None),
         raising=False,
     )
-    patch_workflow(
-        monkeypatch, workflow_dependencies, module, "report_table", lambda *_args, **_kwargs: None
-    )
-    patch_workflow(
-        monkeypatch, workflow_dependencies, module, "report_scalars", lambda *_args: None
-    )
+    patch_workflow(monkeypatch, workflow_dependencies, module, "report_table", lambda *_args, **_kwargs: None)
+    patch_workflow(monkeypatch, workflow_dependencies, module, "report_scalars", lambda *_args: None)
     with invocation(ClearMLConfig(), "metrics"):
         yield task
 
@@ -206,9 +196,7 @@ def test_match_table_larger_than_an_excel_sheet_is_saved_as_csv(
     rows = 1048577
     evaluated = replace(evaluated, pred_matches=pd.DataFrame({"pred_index": pd.RangeIndex(rows)}))
     workbook = tmp_path / "metrics_evaluation_test.xlsx"
-    tables = _write_evaluation_workbook(
-        workbook, evaluated, methodology={}, deps=workflow_dependencies
-    )
+    tables = _write_evaluation_workbook(workbook, evaluated, methodology={}, deps=workflow_dependencies)
     matches = pd.read_csv(tables["metrics_evaluation_test_prediction_matches"])
     assert len(matches) == rows
     assert matches.iloc[0].to_dict() == {"pred_index": 0}
@@ -299,16 +287,12 @@ def test_one_image_cannot_belong_to_validation_and_test(
 def test_prediction_only_classes_are_preserved_for_false_positive_accounting(
     workflow_dependencies: WorkflowDependencies,
 ) -> None:
-    ground_truth = pd.DataFrame(
-        [("val.jpg", "/images/val.jpg", "cat", 0, 0, 10, 10, "val")], columns=GT_COLUMNS
-    )
+    ground_truth = pd.DataFrame([("val.jpg", "/images/val.jpg", "cat", 0, 0, 10, 10, "val")], columns=GT_COLUMNS)
     predictions = pd.DataFrame(
         [("val.jpg", "cat", 0, 0, 10, 10, 0.8), ("val.jpg", "bird", 20, 20, 30, 30, 0.7)],
         columns=PRED_COLUMNS,
     )
-    _, raw, prepared, classes = _prepare(
-        predictions, ground_truth, EvaluationConfig(), deps=workflow_dependencies
-    )
+    _, raw, prepared, classes = _prepare(predictions, ground_truth, EvaluationConfig(), deps=workflow_dependencies)
     assert classes == ["bird", "cat"]
     assert list(raw["instance_label"]) == ["cat", "bird"]
     assert list(prepared["instance_label"]) == ["cat", "bird"]
@@ -321,9 +305,7 @@ def test_numeric_image_identifiers_remain_text_when_loaded(
     prediction_frame = pd.read_csv(predictions).assign(
         image_name=["000000000009", "000000000009", "000000000025", "000000000031"]
     )
-    truth_frame = pd.read_csv(ground_truth).assign(
-        image_name=["000000000009", "000000000025", "000000000031"]
-    )
+    truth_frame = pd.read_csv(ground_truth).assign(image_name=["000000000009", "000000000025", "000000000031"])
     prediction_frame.to_csv(predictions, index=False)
     truth_frame.to_csv(ground_truth, index=False)
     seen: dict[str, pd.DataFrame] = {}
@@ -503,9 +485,7 @@ def test_metrics_preflights_before_scoring_and_publishes_evaluation_payloads(
     assert request.predictions == predictions
     assert request.prediction_splits is None
     assert request.evaluations == result.evaluations
-    assert request.metadata == {
-        "evaluation": evaluation.model_dump(mode="json") | {"calibration_split": "val"}
-    }
+    assert request.metadata == {"evaluation": evaluation.model_dump(mode="json") | {"calibration_split": "val"}}
     assert (tmp_path / "metrics/fiftyone_publication.json").is_file()
 
 
@@ -518,9 +498,7 @@ def test_metrics_publishes_only_canonical_tables_and_readable_workbooks(
 ) -> None:
     predictions, ground_truth = _write_inputs(tmp_path)
     truth = pd.read_csv(ground_truth)
-    train = truth[truth.split == "val"].assign(
-        split="train", image_name="train.jpg", image_path="/images/train.jpg"
-    )
+    train = truth[truth.split == "val"].assign(split="train", image_name="train.jpg", image_path="/images/train.jpg")
     pd.concat([train, truth], ignore_index=True).to_csv(ground_truth, index=False)
     frame = pd.read_csv(predictions)
     train_predictions = frame[frame.image_name == "val.jpg"].assign(image_name="train.jpg")
@@ -541,20 +519,14 @@ def test_metrics_publishes_only_canonical_tables_and_readable_workbooks(
     _assert_readable_metrics_evidence(result, uploads, zero_predictions)
 
 
-def _assert_readable_metrics_evidence(
-    result: MetricsResult, uploads: dict[str, Any], zero_predictions: bool
-) -> None:
+def _assert_readable_metrics_evidence(result: MetricsResult, uploads: dict[str, Any], zero_predictions: bool) -> None:
     from clearml_yolo.core.evaluation.payload import EvaluationPayload
 
     assert set(uploads) == {
         "gt_csv",
         "predicts_csv",
         "metrics_best_confidences_val",
-        *{
-            f"metrics_dashboard_{kind}_{split}"
-            for split in ("train", "val", "test")
-            for kind in ("full", "dtrk")
-        },
+        *{f"metrics_dashboard_{kind}_{split}" for split in ("train", "val", "test") for kind in ("full", "dtrk")},
     }
     combined = pd.read_csv(uploads["predicts_csv"])
     assert set(combined["split"]) == {"train", "val", "test"}
@@ -584,9 +556,7 @@ def _assert_readable_metrics_evidence(
         assert len(payload.ground_truth) == 1
         if zero_predictions:
             assert payload.predictions == []
-            assert [
-                (match.status, match.gt_index, match.pred_index) for match in payload.matches
-            ] == [("FN", 0, None)]
+            assert [(match.status, match.gt_index, match.pred_index) for match in payload.matches] == [("FN", 0, None)]
         else:
             for match in payload.matches:
                 if match.gt_index is not None:
@@ -600,11 +570,7 @@ def _assert_readable_metrics_evidence(
                     assert match.status == box.status
                 if match.status == "TP":
                     assert match.iou == 1.0
-    assert (
-        result.best_confidences["train"]
-        == result.best_confidences["val"]
-        == result.best_confidences["test"]
-    )
+    assert result.best_confidences["train"] == result.best_confidences["val"] == result.best_confidences["test"]
     assert "fiftyone_publication" not in uploads
 
 
@@ -634,9 +600,7 @@ def test_metrics_publishes_frozen_validation_thresholds_even_without_val_output(
         "metrics_dashboard_full_test",
         "metrics_dashboard_dtrk_test",
     }
-    combined_path = next(
-        item["artifact_object"] for item in task.uploads if item["name"] == "predicts_csv"
-    )
+    combined_path = next(item["artifact_object"] for item in task.uploads if item["name"] == "predicts_csv")
     assert set(pd.read_csv(combined_path)["split"]) == {"val", "test"}
 
 
@@ -784,14 +748,10 @@ def test_dashboard_plot_contract_uses_explicit_suffixed_paths(
         directory = Path(kwargs["path"])
         suffix = kwargs["suffix"]
         for metric in PLOT_METRICS:
-            assert kwargs["artifact_paths"][metric] == (
-                directory / f"{metric}_confidence_intervals_{suffix}.png"
-            )
+            assert kwargs["artifact_paths"][metric] == (directory / f"{metric}_confidence_intervals_{suffix}.png")
         return result
 
-    patch_workflow(
-        monkeypatch, workflow_dependencies, scoring, "render_shared_evaluation", dashboard
-    )
+    patch_workflow(monkeypatch, workflow_dependencies, scoring, "render_shared_evaluation", dashboard)
     patch_workflow(
         monkeypatch,
         workflow_dependencies,
@@ -843,9 +803,7 @@ def test_reused_destination_requires_fresh_confidence_plots(
             Path(kwargs["artifact_paths"]["recall"]).unlink()
         return result
 
-    patch_workflow(
-        monkeypatch, workflow_dependencies, scoring, "render_shared_evaluation", dashboard
-    )
+    patch_workflow(monkeypatch, workflow_dependencies, scoring, "render_shared_evaluation", dashboard)
     patch_workflow(
         monkeypatch,
         workflow_dependencies,
@@ -881,8 +839,10 @@ def test_reused_destination_requires_fresh_confidence_plots(
 
 @pytest.mark.parametrize("mode", ["stem", "path"])
 def test_metrics_rejects_noncanonical_provenance_even_when_names_match(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-    workflow_dependencies: WorkflowDependencies, mode: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    workflow_dependencies: WorkflowDependencies,
+    mode: str,
 ) -> None:
     from typing import cast
 
@@ -892,17 +852,22 @@ def test_metrics_rejects_noncanonical_provenance_even_when_names_match(
     predictions, truth = _write_inputs(tmp_path)
     checkpoint = tmp_path / "model.pt"
     checkpoint.write_bytes(b"model")
-    write_prediction_provenance(
-        predictions, checkpoint, prediction_image_name=cast(ImageNameMode, mode)
-    )
+    write_prediction_provenance(predictions, checkpoint, prediction_image_name=cast(ImageNameMode, mode))
     monkeypatch.setattr(workflow_dependencies.tracking, "init_task", lambda *_a, **_kw: None)
     monkeypatch.setattr(
-        workflow_dependencies.evaluation, "calibrate_thresholds",
+        workflow_dependencies.evaluation,
+        "calibrate_thresholds",
         lambda *_a, **_kw: pytest.fail("must reject before scoring"),
     )
     with pytest.raises(ValueError, match="require image_name='name'"):
         compute_metrics(
-            predictions, truth, tmp_path / "metrics", ClearMLConfig(), EvaluationConfig(),
-            splits=["test"], fiftyone=FiftyOneConfig(enabled=False), model_label="fixture detector",
+            predictions,
+            truth,
+            tmp_path / "metrics",
+            ClearMLConfig(),
+            EvaluationConfig(),
+            splits=["test"],
+            fiftyone=FiftyOneConfig(enabled=False),
+            model_label="fixture detector",
             deps=workflow_dependencies,
         )

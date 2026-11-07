@@ -52,9 +52,7 @@ def naming_sdk(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
         "record_run_configuration",
         lambda _task, values: configuration.update(values),
     )
-    monkeypatch.setattr(
-        clearml_naming, "task_identity", lambda task: ("project.+", task.name, task.id)
-    )
+    monkeypatch.setattr(clearml_naming, "task_identity", lambda task: ("project.+", task.name, task.id))
     monkeypatch.setattr(clearml_naming, "_readable_suffix", lambda: "gentle-otter")
     task = SimpleNamespace(id="own-task", project="project-id", name="run.+")
 
@@ -92,16 +90,11 @@ def test_archived_task_collision_and_model_share_readable_suffix(
 ) -> None:
     task = naming_sdk.task
     naming_sdk.records["tasks"] = [
-        SimpleNamespace(
-            id="archived", name=task.name, project=task.project, system_tags=["archived"]
-        )
+        SimpleNamespace(id="archived", name=task.name, project=task.project, system_tags=["archived"])
     ]
     state = clearml_naming.initialize_naming(task)
     assert task.name == "run.+-gentle-otter"
-    assert (
-        clearml_naming.resolve_model_name(task, "detector", model_id="own-model")
-        == "detector-gentle-otter"
-    )
+    assert clearml_naming.resolve_model_name(task, "detector", model_id="own-model") == "detector-gentle-otter"
     assert state.requested_task_name == "run.+"
 
 
@@ -109,14 +102,9 @@ def test_archived_model_collision_renames_both_displays(naming_sdk: SimpleNamesp
     task = naming_sdk.task
     state = clearml_naming.initialize_naming(task)
     naming_sdk.records["models"] = [
-        SimpleNamespace(
-            id="archived", name="detector", project=task.project, system_tags=["archived"]
-        )
+        SimpleNamespace(id="archived", name="detector", project=task.project, system_tags=["archived"])
     ]
-    assert (
-        clearml_naming.resolve_model_name(task, "detector", model_id="own-model")
-        == "detector-gentle-otter"
-    )
+    assert clearml_naming.resolve_model_name(task, "detector", model_id="own-model") == "detector-gentle-otter"
     assert task.name == "run.+-gentle-otter"
     assert state.effective_model_name == "detector-gentle-otter"
 
@@ -128,25 +116,19 @@ def test_collision_is_rechecked_after_rename_and_retried(
     original = task.set_name
     suffixes = iter(["gentle-otter", "brave-badger"])
     monkeypatch.setattr(clearml_naming, "_readable_suffix", lambda: next(suffixes))
-    naming_sdk.records["tasks"] = [
-        SimpleNamespace(id="occupied", name=task.name, project=task.project)
-    ]
+    naming_sdk.records["tasks"] = [SimpleNamespace(id="occupied", name=task.name, project=task.project)]
 
     def race(name: str) -> None:
         original(name)
         if name.endswith("gentle-otter"):
-            naming_sdk.records["tasks"].append(
-                SimpleNamespace(id="racer", name=name, project=task.project)
-            )
+            naming_sdk.records["tasks"].append(SimpleNamespace(id="racer", name=name, project=task.project))
 
     task.set_name = race
     state = clearml_naming.initialize_naming(task)
     assert state.effective_task_name == "run.+-brave-badger"
 
 
-def test_twenty_suffix_attempts_exhaust_cleanly(
-    naming_sdk: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_twenty_suffix_attempts_exhaust_cleanly(naming_sdk: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
     task = naming_sdk.task
     attempts: list[str] = []
 
@@ -167,9 +149,7 @@ def test_twenty_suffix_attempts_exhaust_cleanly(
 def test_clones_resolve_a_fresh_state(naming_sdk: SimpleNamespace) -> None:
     task = naming_sdk.task
     clearml_naming.initialize_naming(task)
-    naming_sdk.records["tasks"] = [
-        SimpleNamespace(id="source", name=task.name, project=task.project)
-    ]
+    naming_sdk.records["tasks"] = [SimpleNamespace(id="source", name=task.name, project=task.project)]
     task.id = "clone"
     state = clearml_naming.initialize_naming(task)
     assert state.effective_task_name == "run.+-gentle-otter"
@@ -177,9 +157,7 @@ def test_clones_resolve_a_fresh_state(naming_sdk: SimpleNamespace) -> None:
 
 def test_task_collision_in_another_project_is_ignored(naming_sdk: SimpleNamespace) -> None:
     task = naming_sdk.task
-    naming_sdk.records["tasks"] = [
-        SimpleNamespace(id="foreign", name=task.name, project="foreign-project")
-    ]
+    naming_sdk.records["tasks"] = [SimpleNamespace(id="foreign", name=task.name, project="foreign-project")]
     assert clearml_naming.initialize_naming(task).effective_task_name == "run.+"
 
 
@@ -194,10 +172,7 @@ def test_model_suffix_collision_retries_and_preserves_both_requested_names(
         SimpleNamespace(id=str(index), name=name, project=task.project)
         for index, name in enumerate(["detector", "detector-gentle-otter"])
     ]
-    assert (
-        clearml_naming.resolve_model_name(task, "detector", model_id="own-model")
-        == "detector-brave-badger"
-    )
+    assert clearml_naming.resolve_model_name(task, "detector", model_id="own-model") == "detector-brave-badger"
     assert state.requested_task_name == "run.+"
     assert state.requested_model_name == "detector"
     assert task.name == "run.+-brave-badger"
@@ -205,9 +180,7 @@ def test_model_suffix_collision_retries_and_preserves_both_requested_names(
 
 def test_rejected_rename_is_actionable(naming_sdk: SimpleNamespace) -> None:
     task = naming_sdk.task
-    naming_sdk.records["tasks"] = [
-        SimpleNamespace(id="occupied", name=task.name, project=task.project)
-    ]
+    naming_sdk.records["tasks"] = [SimpleNamespace(id="occupied", name=task.name, project=task.project)]
     task.set_name = lambda _name: None
     with pytest.raises(clearml_naming.NameResolutionError, match="rejected"):
         clearml_naming.initialize_naming(task)
@@ -235,9 +208,7 @@ def test_requested_and_effective_names_persist_in_result_only_section(
             "suffix": None,
         }
     }
-    naming_sdk.records["models"] = [
-        SimpleNamespace(id="previous", name="detector", project=task.project)
-    ]
+    naming_sdk.records["models"] = [SimpleNamespace(id="previous", name="detector", project=task.project)]
     clearml_naming.resolve_model_name(task, "detector", model_id="own-model")
     assert naming_sdk.configuration == {
         "display_names": {
@@ -264,14 +235,10 @@ def test_repeated_post_model_write_races_exhaust_twenty_suffix_attempts(
 
     def write(name: str) -> None:
         writes.append(name)
-        naming_sdk.records["models"].append(
-            SimpleNamespace(id=f"racer-{len(writes)}", name=name, project=task.project)
-        )
+        naming_sdk.records["models"].append(SimpleNamespace(id=f"racer-{len(writes)}", name=name, project=task.project))
 
     monkeypatch.setattr(clearml_naming, "_readable_suffix", suffix)
     with pytest.raises(clearml_naming.NameResolutionError, match="20"):
-        clearml_naming.resolve_model_name(
-            task, "detector", model_id="own-model", write_model_name=write
-        )
+        clearml_naming.resolve_model_name(task, "detector", model_id="own-model", write_model_name=write)
     assert len(attempts) == 20
     assert len(writes) == 21

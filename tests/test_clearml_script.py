@@ -46,9 +46,7 @@ def test_source_metadata_ignores_launch_directory_arguments_and_dirty_contents(
     checkout: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     expected_commit = _git(checkout, "rev-parse", "HEAD")
-    (checkout / "src/clearml_yolo/adapters/clearml/script.py").write_text(
-        "password = 'uncommitted-secret'\n"
-    )
+    (checkout / "src/clearml_yolo/adapters/clearml/script.py").write_text("password = 'uncommitted-secret'\n")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(sys, "argv", ["/outside/bin/cy-ground-truth", "token=argument-secret"])
     task = FakeTask()
@@ -112,9 +110,7 @@ def test_inherited_git_environment_cannot_override_source_checkout(
         ),
     ],
 )
-def test_origin_preserves_transport_and_removes_credentials(
-    checkout: Path, origin: str, expected: str
-) -> None:
+def test_origin_preserves_transport_and_removes_credentials(checkout: Path, origin: str, expected: str) -> None:
     _git(checkout, "remote", "set-url", "origin", origin)
     task = FakeTask()
     script.publish_script(task, "train")
@@ -145,9 +141,7 @@ def test_wheel_inside_unrelated_checkout_does_not_claim_its_git_identity(
     }
 
 
-def test_unavailable_git_does_not_prevent_module_publication(
-    checkout: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_unavailable_git_does_not_prevent_module_publication(checkout: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("clearml_yolo.adapters.clearml.script.shutil.which", lambda _name: None)
     task = FakeTask()
     script.publish_script(task, "report")
@@ -169,18 +163,14 @@ def test_remote_replay_does_not_read_local_git(
     assert task.script == {"repository": "remote-repo", "entry_point": "remote.py"}
 
 
-def test_rejected_script_write_is_detected_by_readback(
-    checkout: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_rejected_script_write_is_detected_by_readback(checkout: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     task = FakeTask()
     monkeypatch.setattr(task, "set_script", lambda **_kwargs: None)
     with pytest.raises(RuntimeError, match="did not retain script metadata field"):
         script.publish_script(task, "val")
 
 
-def test_readback_failure_cannot_validate_cached_script(
-    checkout: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_readback_failure_cannot_validate_cached_script(checkout: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     task = FakeTask()
 
     def unavailable(_field: str) -> None:

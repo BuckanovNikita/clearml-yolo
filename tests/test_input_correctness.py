@@ -59,9 +59,7 @@ def test_cache_distinguishes_resolved_relative_images(tmp_path: Path) -> None:
         assert all(str(tmp_path / "right") in path for path in truth.image_path)
 
 
-def test_cache_reuses_same_absolute_references(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_cache_reuses_same_absolute_references(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     import clearml_yolo.adapters.storage.dataset_cache as cache
 
     left = _truth(tmp_path / "left", absolute=True)
@@ -99,9 +97,9 @@ def test_detection_csv_preserves_literals_backgrounds_and_exact_floats(tmp_path:
     labels = ["NA", "NULL", "nan", "None", "0001", "树", ""]
     threshold = math.nextafter(0.37, 1.0)
     path = tmp_path / "rows.csv"
-    pd.DataFrame(
-        {"image_name": labels, "instance_label": labels, "confidence": [threshold] * len(labels)}
-    ).to_csv(path, index=False)
+    pd.DataFrame({"image_name": labels, "instance_label": labels, "confidence": [threshold] * len(labels)}).to_csv(
+        path, index=False
+    )
     rows = read_detection_csv(path)
     assert rows.instance_label.iloc[:-1].tolist() == labels[:-1]
     assert pd.isna(rows.instance_label.iloc[-1])
@@ -156,9 +154,7 @@ def test_evaluation_rejects_unknown_prediction_membership() -> None:
 
 
 @pytest.mark.parametrize("label", ["NA", "NULL", "nan", "None", "0001", "树"])
-def test_literal_class_csv_keeps_perfect_ap_and_threshold_boundary(
-    tmp_path: Path, label: str
-) -> None:
+def test_literal_class_csv_keeps_perfect_ap_and_threshold_boundary(tmp_path: Path, label: str) -> None:
     from clearml_yolo.adapters.evaluation.scoring import compute_evaluation
     from clearml_yolo.adapters.storage.file_io import read_detection_csv
 
@@ -272,9 +268,7 @@ def test_bom_with_first_image_path_column_keeps_cache_resolution_and_publication
     for source in (left, right):
         with cache.cached_dataset(source, tmp_path / "cache") as prepared:
             roots.append(prepared.data.parent)
-        assert read_ground_truth(source).execution.image_path.iloc[0] == str(
-            source.parent / "train.png"
-        )
+        assert read_ground_truth(source).execution.image_path.iloc[0] == str(source.parent / "train.png")
         snapshot = read_snapshot(source)
         assert snapshot.images["train.png"].path == source.parent / "train.png"
         assert snapshot.images["train.png"].boxes[0].label == "NA"

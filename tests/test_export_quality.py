@@ -104,9 +104,7 @@ def test_coco_fixed_max_detections_100_applies_to_crowded_images() -> None:
         for i in range(101)
     ]
     image = _image("crowded.png", boxes)
-    detections = {
-        "crowded.png": _array([[box.x1, box.y1, box.x2, box.y2, 0.9, 0] for box in boxes])
-    }
+    detections = {"crowded.png": _array([[box.x1, box.y1, box.x2, box.y2, 0.9, 0] for box in boxes])}
     quality = evaluate_detections([image], ["square"], detections)
     assert quality.recall == pytest.approx(100 / 101)
     assert quality.per_class_recall["square"] == pytest.approx(100 / 101)
@@ -121,9 +119,7 @@ def test_coco_population_must_match_exact_image_paths(keys: list[str]) -> None:
 
 def test_coco_rejects_unknown_ground_truth_and_prediction_classes() -> None:
     with pytest.raises(ValueError, match="ground-truth class"):
-        evaluate_detections(
-            [_image("positive.png", [_box("unknown")])], ["square"], {"positive.png": _array([])}
-        )
+        evaluate_detections([_image("positive.png", [_box("unknown")])], ["square"], {"positive.png": _array([])})
     with pytest.raises(ValueError, match="prediction class"):
         evaluate_detections(
             [_image("positive.png", [_box()])],
@@ -147,9 +143,7 @@ def test_duplicate_boxes_match_scores_under_permutation() -> None:
 
 
 def test_all_zero_export_quality_cannot_pass_a_weak_positive_baseline() -> None:
-    assert not quality_gate(
-        _metrics(0.0001), _metrics(0), precision="fp32", reference_detection_count=1
-    )
+    assert not quality_gate(_metrics(0.0001), _metrics(0), precision="fp32", reference_detection_count=1)
 
 
 def test_evaluator_identity_binds_real_module_version_and_source_hash() -> None:
@@ -181,9 +175,7 @@ def test_evaluator_alias_contamination_fails_before_quality_evaluation(
     with pytest.raises(ValueError, match="actual pycocotools"):
         evaluator_identity()
     with pytest.raises(ValueError, match="actual pycocotools"):
-        evaluate_detections(
-            [_image("positive.png", [_box()])], ["square"], {"positive.png": _array([])}
-        )
+        evaluate_detections([_image("positive.png", [_box()])], ["square"], {"positive.png": _array([])})
 
 
 @pytest.mark.parametrize(
@@ -215,9 +207,7 @@ def test_evaluator_alias_contamination_fails_before_quality_evaluation(
     ],
 )
 @pytest.mark.parametrize("side", ["native", "exported"])
-def test_detection_validation_reports_the_invalid_boundary(
-    values: NDArray[Any], diagnostic: str, side: str
-) -> None:
+def test_detection_validation_reports_the_invalid_boundary(values: NDArray[Any], diagnostic: str, side: str) -> None:
     native, exported = (values, _rows([])) if side == "native" else (_rows([]), values)
     with pytest.raises(ValueError, match=f"^{re.escape(diagnostic)}$"):
         match_detections(native, exported)
@@ -241,9 +231,7 @@ def test_match_threshold_rejects_values_outside_open_closed_unit_interval(min_io
 
 
 @pytest.mark.parametrize(("native_count", "served_count"), [(0, 0), (0, 1), (1, 0)])
-def test_empty_sides_retain_counts_without_numerical_error(
-    native_count: int, served_count: int
-) -> None:
+def test_empty_sides_retain_counts_without_numerical_error(native_count: int, served_count: int) -> None:
     box = [0.0, 0.0, 1e200, 1e200, 0.5, 0.0]
     with np.errstate(over="raise", invalid="raise"):
         result = match_detections(_rows([box] * native_count), _rows([box] * served_count))
@@ -265,9 +253,7 @@ def test_empty_sides_retain_counts_without_numerical_error(
         ([5, 0, 9, 2, 0.5, 0], 0.1, 0),
     ],
 )
-def test_nonsquare_boxes_match_at_the_geometric_iou_boundary(
-    box: list[float], min_iou: float, matched: int
-) -> None:
+def test_nonsquare_boxes_match_at_the_geometric_iou_boundary(box: list[float], min_iou: float, matched: int) -> None:
     result = match_detections(_rows([[0, 0, 4, 2, 0.5, 0]]), _rows([box]), min_iou=min_iou)
     assert result.matched == matched
     assert result.unmatched_reference == result.unmatched_exported == 1 - matched
@@ -284,9 +270,7 @@ def test_matching_prefers_closer_geometry_among_valid_candidates() -> None:
 
 
 @pytest.mark.parametrize(("offset", "min_iou"), [(3.0, 0.5), (9.0, 0.05), (10 - 1e-9, 1e-12)])
-def test_match_cardinality_precedes_geometry_and_score_for_small_overlaps(
-    offset: float, min_iou: float
-) -> None:
+def test_match_cardinality_precedes_geometry_and_score_for_small_overlaps(offset: float, min_iou: float) -> None:
     native = _rows([[0, 0, 10, 2, 0, 0], [offset, 0, 10 + offset, 2, 1, 0]])
     served = _rows([[0, 0, 10, 2, 0, 0], [-offset, 0, 10 - offset, 2, 1, 0]])
     result = match_detections(native, served, min_iou=min_iou)
@@ -299,13 +283,9 @@ def test_match_cardinality_precedes_geometry_and_score_for_small_overlaps(
 @pytest.mark.parametrize("field", ["mAP", "map50", "recall", "per_class_recall"])
 @pytest.mark.parametrize("value", [-0.1, 1.1, np.inf, np.nan])
 @pytest.mark.parametrize("side", ["native", "exported"])
-def test_quality_gate_revalidates_every_metric_on_each_side(
-    field: str, value: float, side: str
-) -> None:
+def test_quality_gate_revalidates_every_metric_on_each_side(field: str, value: float, side: str) -> None:
     baseline = _metrics()
-    invalid = baseline.model_copy(
-        update={field: {"object": value} if field == "per_class_recall" else value}
-    )
+    invalid = baseline.model_copy(update={field: {"object": value} if field == "per_class_recall" else value})
     native, exported = (invalid, baseline) if side == "native" else (baseline, invalid)
     assert not quality_gate(native, exported, precision="fp32", reference_detection_count=1)
 
@@ -320,9 +300,7 @@ def test_quality_gate_accepts_perfect_metrics_and_zero_recall_for_one_class() ->
 
 @pytest.mark.parametrize("detection_count", [0, -1])
 def test_quality_gate_requires_observed_reference_detections(detection_count: int) -> None:
-    assert not quality_gate(
-        _metrics(), _metrics(), precision="fp32", reference_detection_count=detection_count
-    )
+    assert not quality_gate(_metrics(), _metrics(), precision="fp32", reference_detection_count=detection_count)
 
 
 def test_quality_gate_rejects_unsupported_precision_with_a_diagnostic() -> None:
@@ -343,9 +321,12 @@ def test_quality_gate_rejects_unsupported_precision_with_a_diagnostic() -> None:
 def test_accuracy_loss_boundary_uses_absolute_roundoff_tolerance(
     precision: Literal["fp32", "fp16"], tolerance: float, excess: float, accepted: bool
 ) -> None:
-    assert quality_gate(
-        _metrics(),
-        _metrics(0.5 - tolerance - excess),
-        precision=precision,
-        reference_detection_count=1,
-    ) is accepted
+    assert (
+        quality_gate(
+            _metrics(),
+            _metrics(0.5 - tolerance - excess),
+            precision=precision,
+            reference_detection_count=1,
+        )
+        is accepted
+    )

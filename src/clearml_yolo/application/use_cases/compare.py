@@ -141,9 +141,7 @@ def _resolve_model(
         deps=deps,
     )
     thresholds = (
-        dict(model.thresholds)
-        if model.thresholds is not None
-        else deps.repository.fetch_best_confidences(task_id)
+        dict(model.thresholds) if model.thresholds is not None else deps.repository.fetch_best_confidences(task_id)
     )
     metadata = _raw_metadata(model)
     weights, links = (
@@ -193,17 +191,13 @@ def _prediction_cache(
     return destination / f"{role}_predictions_{artifact_names.split_component(split)}_{digest}.csv"
 
 
-def _split_fingerprint(
-    ground_truth: pd.DataFrame, split: str, *, deps: WorkflowDependencies
-) -> str:
+def _split_fingerprint(ground_truth: pd.DataFrame, split: str, *, deps: WorkflowDependencies) -> str:
     """Identify current membership under the immutable-image contract."""
     required = {"image_name", "image_path", "split"}
     missing = sorted(required - set(ground_truth.columns))
     if missing:
         raise ValueError(f"Ground truth is missing cache identity column(s): {missing}")
-    rows = ground_truth.loc[
-        ground_truth["split"] == split, ["image_name", "image_path"]
-    ].drop_duplicates()
+    rows = ground_truth.loc[ground_truth["split"] == split, ["image_name", "image_path"]].drop_duplicates()
     digest = hashlib.sha256()
     for row in rows.sort_values(["image_name", "image_path"]).itertuples(index=False):
         path = Path(str(row.image_path))
@@ -279,7 +273,8 @@ def _scored(
             reuse_existing=inference.reuse_existing,
         )
         validate_prediction_identity(
-            ground_truth[ground_truth["split"] == split], predictions,
+            ground_truth[ground_truth["split"] == split],
+            predictions,
             image_name=inference.image_name,
         )
         deps.tracking.write_prediction_provenance(
@@ -297,21 +292,17 @@ def _scored(
                 "requested_args": predictions.attrs.get("requested_args", fallback_args),
                 "normalized_imgsz": predictions.attrs.get("normalized_imgsz"),
                 "checkpoint_design": predictions.attrs.get("checkpoint_design", {}),
-                "save_dir": predictions.attrs.get(
-                    "save_dir", str(deps.storage.resolve(native_project) / native_name)
-                ),
+                "save_dir": predictions.attrs.get("save_dir", str(deps.storage.resolve(native_project) / native_name)),
             }
         )
         deps.model.write_native_yaml(
-            destination
-            / f"ultralytics_predict_{role}_{artifact_names.split_component(split)}.yaml",
+            destination / f"ultralytics_predict_{role}_{artifact_names.split_component(split)}.yaml",
             {key: value for key, value in evidence.effective_args.items() if key != "image_name"}
             | {"model": str(weights), "mode": "predict"},
             "predict",
         )
         deps.model.write_native_yaml(
-            destination
-            / f"ultralytics_predict_{role}_{artifact_names.split_component(split)}_requested.yaml",
+            destination / f"ultralytics_predict_{role}_{artifact_names.split_component(split)}_requested.yaml",
             {key: value for key, value in evidence.requested_args.items() if key != "image_name"}
             | {"model": str(weights), "mode": "predict"},
             "predict",
@@ -320,12 +311,8 @@ def _scored(
             Path(evidence.save_dir), destination, role=role, split=split, deps=deps
         )
         predictions = assign_source_ids(predictions, row_type="prediction")
-        prepared_truth = deps.evaluation.prepare_ground_truth(
-            ground_truth, deduplicate=evaluation.preprocess
-        )
-        raw_predictions = deps.evaluation.filter_invalid_prediction_boxes(
-            predictions.reset_index(drop=True)
-        )
+        prepared_truth = deps.evaluation.prepare_ground_truth(ground_truth, deduplicate=evaluation.preprocess)
+        raw_predictions = deps.evaluation.filter_invalid_prediction_boxes(predictions.reset_index(drop=True))
         prepared_predictions = deps.evaluation.prepare_predictions(
             raw_predictions,
             preprocess_conf_threshold=evaluation.preprocess_preds_conf_threshold,
@@ -333,9 +320,7 @@ def _scored(
             preprocess_nms_iou_threshold=evaluation.preprocess_preds_nms_iou_threshold,
         )
         model_classes = set(vocabulary.model_classes)
-        prediction_classes = {
-            str(value) for value in prepared_predictions["instance_label"].dropna().unique()
-        }
+        prediction_classes = {str(value) for value in prepared_predictions["instance_label"].dropna().unique()}
         required = sorted(set(classes) & model_classes | prediction_classes)
         scored_classes = sorted(set(classes) | model_classes)
         evaluated = evaluate_split(
@@ -382,9 +367,7 @@ def _archive_native_outputs(
 
 def _degraded(tables: ComparisonTables) -> list[str]:
     per_class = tables.rows[~tables.rows["is_pooled"].astype(bool)]
-    degraded = per_class["precision_verdict"].eq("degraded") | per_class["recall_verdict"].eq(
-        "degraded"
-    )
+    degraded = per_class["precision_verdict"].eq("degraded") | per_class["recall_verdict"].eq("degraded")
     return [str(name) for name in per_class.loc[degraded, "class_name"]]
 
 
@@ -420,9 +403,7 @@ def _source_configuration(model: ResolvedModel) -> dict[str, Any]:
         sanitize_configuration(
             (model.links or {"source": model.source, "weights": str(model.weights)})
             | {
-                "model_identity": model.identity.model_dump(mode="json")
-                if model.identity
-                else None,
+                "model_identity": model.identity.model_dump(mode="json") if model.identity else None,
                 "backend_assertions": model.backend_assertions,
             }
         ),
@@ -443,8 +424,7 @@ def _publish_comparison_tables(
             truth,
             path,
             output_dir=path.parent,
-            model_id=model.links.get("model_id")
-            or f"checkpoint:{deps.tracking.file_digest(model.weights)}",
+            model_id=model.links.get("model_id") or f"checkpoint:{deps.tracking.file_digest(model.weights)}",
             role=f"comparison_{role}",
         )
 
@@ -494,26 +474,21 @@ def _skip_without_baseline(
             deps=deps,
         )
         _publish_comparison_tables(
-            task, ground_truth_path,
-            {"candidate": (predictions, evaluated, candidate)}, deps=deps,
+            task,
+            ground_truth_path,
+            {"candidate": (predictions, evaluated, candidate)},
+            deps=deps,
         )
         deps.tracking.complete_result_producer(task, "compare")
-        workbook = (
-            destination
-            / f"compare_evaluation_candidate_{artifact_names.split_component(split)}.xlsx"
-        )
+        workbook = destination / f"compare_evaluation_candidate_{artifact_names.split_component(split)}.xlsx"
         per_class, summary = deps.evaluation_writer.summarize_metrics(evaluated.metrics)
         deps.renderer.write_candidate_workbook(workbook, per_class, summary)
         if candidate.identity is not None:
             deps.renderer.annotate_workbook(workbook, {"candidate": candidate.identity})
         tables: dict[str, Path] = {}
         for title, frame in {
-            "thresholds": pd.DataFrame(
-                list(candidate.thresholds.items()), columns=["class_name", "confidence"]
-            ),
-            "methodology": pd.DataFrame(
-                [{"status": "skipped", "reason": reason, **_source_configuration(candidate)}]
-            ),
+            "thresholds": pd.DataFrame(list(candidate.thresholds.items()), columns=["class_name", "confidence"]),
+            "methodology": pd.DataFrame([{"status": "skipped", "reason": reason, **_source_configuration(candidate)}]),
         }.items():
             table_path = workbook.with_name(f"{workbook.stem}_{title}.csv")
             deps.storage.write_csv(frame, table_path, index=False, float_format="%.17g")
@@ -539,23 +514,16 @@ def _native_inference(
     deps: WorkflowDependencies,
 ) -> InferenceConfig:
     """Adapt public native groups to paired comparison's internal settings."""
-    conflicts = {
-        key
-        for key in ("model", "project", "name")
-        if (ultralytics_predict or {}).get(key) is not None
-    }
+    conflicts = {key for key in ("model", "project", "name") if (ultralytics_predict or {}).get(key) is not None}
     if conflicts:
         raise ValueError(
-            f"Prediction {sorted(conflicts)} are owned by comparison; "
-            "use baseline_model/candidate_model and output_dir"
+            f"Prediction {sorted(conflicts)} are owned by comparison; use baseline_model/candidate_model and output_dir"
         )
     unknown = set(inference) - {"reuse_existing", "image_name"}
     if unknown:
         raise ValueError(f"Unsupported inference settings: {sorted(unknown)}")
     settings = deps.model.prediction_settings(ultralytics_predict or {})
-    fields = {
-        key: settings[key] for key in ("conf", "iou", "imgsz", "batch", "device") if key in settings
-    }
+    fields = {key: settings[key] for key in ("conf", "iou", "imgsz", "batch", "device") if key in settings}
     owned = {
         "model",
         "backend",
@@ -574,14 +542,11 @@ def _native_inference(
 
 def _evaluation_config(evaluation: EvaluationConfig | dict[str, Any] | None) -> EvaluationConfig:
     config = (
-        evaluation
-        if isinstance(evaluation, EvaluationConfig)
-        else EvaluationConfig.model_validate(evaluation or {})
+        evaluation if isinstance(evaluation, EvaluationConfig) else EvaluationConfig.model_validate(evaluation or {})
     )
     if config.backend is not None:
         raise ValueError(
-            "Frozen thresholds require the native digital-metrics backend; "
-            f"backend={config.backend!r} is unsupported"
+            f"Frozen thresholds require the native digital-metrics backend; backend={config.backend!r} is unsupported"
         )
     return config
 
@@ -596,9 +561,7 @@ def _publish_comparison_workbook(
     *,
     deps: WorkflowDependencies,
 ) -> dict[str, Path]:
-    csv_tables = deps.renderer.write_comparison_workbook(
-        tables.rows, tables.excluded, tables.methodology, workbook
-    )
+    csv_tables = deps.renderer.write_comparison_workbook(tables.rows, tables.excluded, tables.methodology, workbook)
     identities = {
         role: model.identity
         for role, model in (("baseline", baseline), ("candidate", candidate))
@@ -612,9 +575,7 @@ def _publish_comparison_workbook(
     return csv_tables
 
 
-def _read_comparison_truth(
-    path: Path, image_name: str, *, deps: WorkflowDependencies
-) -> GroundTruthRead:
+def _read_comparison_truth(path: Path, image_name: str, *, deps: WorkflowDependencies) -> GroundTruthRead:
     validate_evaluation_image_name(image_name)
     loaded = deps.storage.read_ground_truth(path)
     source = assign_source_ids(loaded.source, row_type="ground_truth")
@@ -699,8 +660,7 @@ def compare(
         )
         if deps.storage.resolve(baseline.weights) == deps.storage.resolve(candidate.weights):
             raise ValueError(
-                f"Both sides resolved to the same checkpoint ({candidate.weights}), "
-                "so there is nothing to compare"
+                f"Both sides resolved to the same checkpoint ({candidate.weights}), so there is nothing to compare"
             )
         classes = classes_from_ground_truth(truth[truth["split"] == split])
         settled = _settled(inference, candidate.weights, baseline.weights, deps=deps)
@@ -742,8 +702,10 @@ def compare(
             deps=deps,
         )
         _publish_comparison_tables(
-            task, ground_truth_path,
-            {"baseline": (baseline_predictions, baseline_evaluated, baseline)}, deps=deps,
+            task,
+            ground_truth_path,
+            {"baseline": (baseline_predictions, baseline_evaluated, baseline)},
+            deps=deps,
         )
         candidate_evaluated, candidate_vocabulary, candidate_evidence, _candidate_archive = _scored(
             candidate.weights,
@@ -762,8 +724,10 @@ def compare(
             deps=deps,
         )
         _publish_comparison_tables(
-            task, ground_truth_path,
-            {"candidate": (candidate_predictions, candidate_evaluated, candidate)}, deps=deps,
+            task,
+            ground_truth_path,
+            {"candidate": (candidate_predictions, candidate_evaluated, candidate)},
+            deps=deps,
         )
         deps.tracking.complete_result_producer(task, "compare")
         baseline_classes, candidate_classes = (
@@ -818,12 +782,8 @@ def compare(
                 **evaluation_config.model_dump(),
             }
         )
-        workbook = destination / (
-            artifact_names.per_split(artifact_names.COMPARISON_WORKBOOK_PREFIX, split) + ".xlsx"
-        )
-        csv_tables = _publish_comparison_workbook(
-            task, tables, workbook, split, baseline, candidate, deps=deps
-        )
+        workbook = destination / (artifact_names.per_split(artifact_names.COMPARISON_WORKBOOK_PREFIX, split) + ".xlsx")
+        csv_tables = _publish_comparison_workbook(task, tables, workbook, split, baseline, candidate, deps=deps)
         deps.tracking.report_comparison(task, split, tables.rows, tables.methodology)
         manifest = _write_manifest(
             destination,

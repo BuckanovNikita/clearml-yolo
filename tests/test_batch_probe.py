@@ -86,9 +86,7 @@ class _Workers:
         timeout_seconds: float,
         monitor: Callable[[Callable[[], tuple[int, ...]]], None],
     ) -> WorkerOutcome:
-        request = BatchProbeRequest.model_validate_json(
-            Path(commands[0].argv[-1]).read_text(encoding="utf-8")
-        )
+        request = BatchProbeRequest.model_validate_json(Path(commands[0].argv[-1]).read_text(encoding="utf-8"))
         self.requests.append(request)
         self.commands.append(commands)
         monitor(lambda: (101, 102))
@@ -108,9 +106,7 @@ class _Workers:
                 diagnostic="confirmed worker outcome",
             )
             (request.output / f"rank-{rank}.json").write_text(record.model_dump_json())
-        return WorkerOutcome(
-            status=self.status, exit_codes=(0, 0) if self.status == "success" else (1, -15)
-        )
+        return WorkerOutcome(status=self.status, exit_codes=(0, 0) if self.status == "success" else (1, -15))
 
 
 def test_completed_receipts_fence_telemetry_during_cuda_context_teardown(
@@ -121,9 +117,7 @@ def test_completed_receipts_fence_telemetry_during_cuda_context_teardown(
     monkeypatch.setattr(adapter, "_TELEMETRY_INTERVAL_SECONDS", 0)
     observations: list[tuple[int, ...]] = []
 
-    def telemetry(
-        devices: Any, owned_pids: Callable[[], tuple[int, ...]], **_kwargs: Any
-    ) -> tuple[int, ...]:
+    def telemetry(devices: Any, owned_pids: Callable[[], tuple[int, ...]], **_kwargs: Any) -> tuple[int, ...]:
         pids = owned_pids()
         observations.append(pids)
         if not pids:
@@ -149,9 +143,7 @@ def test_completed_receipts_fence_telemetry_during_cuda_context_teardown(
 
 def _install_workers(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, workers: _Workers) -> None:
     monkeypatch.setattr(adapter, "discover_gpus", sample_devices)
-    monkeypatch.setattr(
-        adapter, "require_idle", lambda devices, **_kwargs: tuple(10 for _ in devices)
-    )
+    monkeypatch.setattr(adapter, "require_idle", lambda devices, **_kwargs: tuple(10 for _ in devices))
     monkeypatch.setattr(adapter, "temporary_root", lambda: tmp_path)
     monkeypatch.setattr(adapter, "_port", lambda: "12345")
     monkeypatch.setattr(adapter, "monitor_devices", lambda devices, pids, **_kwargs: (500,))
@@ -159,9 +151,7 @@ def _install_workers(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, workers: _
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "GPU-physical-a,GPU-physical-b")
 
 
-def test_yolo_configures_cache_before_worker_launch(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_yolo_configures_cache_before_worker_launch(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     workers = _Workers()
     _install_workers(monkeypatch, tmp_path, workers)
     events: list[str] = []
@@ -182,18 +172,14 @@ def test_yolo_configures_cache_before_worker_launch(
     assert events == ["configure", "worker", "configure", "worker"]
 
 
-def test_yolo_configuration_failure_stops_worker_launch(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_yolo_configuration_failure_stops_worker_launch(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     from clearml_yolo.adapters.yolo.assets import WeightCacheConfigurationError
 
     workers = _Workers()
     _install_workers(monkeypatch, tmp_path, workers)
 
     def configure() -> Path:
-        raise WeightCacheConfigurationError(
-            "Cannot persist settings.json; rerun cy-download-weights"
-        )
+        raise WeightCacheConfigurationError("Cannot persist settings.json; rerun cy-download-weights")
 
     monkeypatch.setattr(adapter, "configure_weights_directory", configure)
     result = adapter.NativeBatchProbe().run(_profile(), SyntheticWorkload(), SearchSettings(), 4)
@@ -218,9 +204,7 @@ def test_both_yolo_optimizer_paths_use_fresh_workers_and_maximum_whole_gpu_peaks
     for commands in workers.commands:
         assert [command.environment["LOCAL_RANK"] for command in commands] == ["0"]
         assert all(command.environment["WORLD_SIZE"] == "1" for command in commands)
-        assert all(
-            command.environment["CUDA_VISIBLE_DEVICES"] == "GPU-physical-a" for command in commands
-        )
+        assert all(command.environment["CUDA_VISIBLE_DEVICES"] == "GPU-physical-a" for command in commands)
 
 
 @pytest.mark.parametrize(
@@ -330,9 +314,7 @@ def test_changed_or_busy_hardware_stops_before_launch(
             raise RuntimeError("GPU 0 is busy")
 
         monkeypatch.setattr(adapter, "require_idle", busy)
-    result = adapter.NativeBatchProbe().run(
-        _profile(), SyntheticWorkload(), SearchSettings(force=force), 4
-    )
+    result = adapter.NativeBatchProbe().run(_profile(), SyntheticWorkload(), SearchSettings(force=force), 4)
     assert result.status == "contaminated"
     assert not workers.requests
 
@@ -353,9 +335,7 @@ def test_malformed_telemetry_aborts_search_without_becoming_capacity_evidence(
     profile, settings = _profile(), SearchSettings()
     state = BatchSearch.start(profile, settings)
     assert state.next_batch is not None
-    result = adapter.NativeBatchProbe().run(
-        profile, SyntheticWorkload(), settings, state.next_batch
-    )
+    result = adapter.NativeBatchProbe().run(profile, SyntheticWorkload(), settings, state.next_batch)
     assert result.status == "contaminated"
     assert "GPU telemetry unavailable" in result.diagnostic
     assert "memory.used" in result.diagnostic
@@ -433,8 +413,10 @@ def test_worker_classifies_typed_failures_without_matching_error_text(
     expected: TrialStatus,
 ) -> None:
     _check_worker_failure(
-        monkeypatch, tmp_path,
-        error_type("CUDA out of memory appears in arbitrary diagnostic text"), expected,
+        monkeypatch,
+        tmp_path,
+        error_type("CUDA out of memory appears in arbitrary diagnostic text"),
+        expected,
     )
 
 
@@ -484,10 +466,13 @@ def test_worker_does_not_promote_oom_with_cleanup_failure_to_capacity(
 ) -> None:
     import torch
 
-    error = ExceptionGroup("Native execution and cleanup failed", [
-        torch.cuda.OutOfMemoryError("Confirmed native OOM"),
-        RuntimeError("Descendant cleanup incomplete"),
-    ])
+    error = ExceptionGroup(
+        "Native execution and cleanup failed",
+        [
+            torch.cuda.OutOfMemoryError("Confirmed native OOM"),
+            RuntimeError("Descendant cleanup incomplete"),
+        ],
+    )
     _check_worker_failure(monkeypatch, tmp_path, error, "error")
 
 
@@ -534,9 +519,7 @@ def test_yolo_real_cpu_optimizer_updates_and_ema_include_all_accumulated_microba
     from clearml_yolo.adapters.runtime.gpu_memory import GPUMemory
 
     request = _request(tmp_path)
-    request = request.model_copy(
-        update={"profile": request.profile.model_copy(update={"compilation": compiled})}
-    )
+    request = request.model_copy(update={"profile": request.profile.model_copy(update={"compilation": compiled})})
     trainer = _cpu_trainer()
     memory = GPUMemory()
     observations: list[int] = []
@@ -711,9 +694,7 @@ def test_yolo_validation_executes_installed_detection_loss_on_cpu(tmp_path: Path
     _, loss_items = model(yolo._batch(request, 2, torch.device("cpu")))
     assert loss_items
     assert all(torch.isfinite(value).all() for value in loss_items.values())
-    yolo._validate(
-        request, model, 2, torch.device("cpu"), native_defaults(), False, loss_items=loss_items
-    )
+    yolo._validate(request, model, 2, torch.device("cpu"), native_defaults(), False, loss_items=loss_items)
 
 
 @pytest.mark.parametrize("failure_stage", ["update_metrics", "get_stats"])
@@ -739,9 +720,7 @@ def test_yolo_validation_metric_failures_propagate(
         )
 
 
-def test_yolo_validation_nonfinite_metrics_fail(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_yolo_validation_nonfinite_metrics_fail(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     import torch
     from ultralytics.models.yolo.detect import DetectionValidator
 
@@ -860,9 +839,7 @@ def test_yolo_synthetic_density_classes_and_geometry_are_bounded(tmp_path: Path)
 
 
 @pytest.mark.parametrize(("iterations", "expected"), [(1, "AdamW"), (10001, "MuSGD")])
-def test_recorded_yolo_optimizer_paths_match_installed_native_resolution(
-    iterations: int, expected: str
-) -> None:
+def test_recorded_yolo_optimizer_paths_match_installed_native_resolution(iterations: int, expected: str) -> None:
     import torch
     from ultralytics.models.yolo.detect import DetectionTrainer
 
@@ -880,15 +857,14 @@ def test_recorded_yolo_optimizer_paths_match_installed_native_resolution(
 def test_native_estimator_rejects_multi_gpu_before_discovery(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(
-        adapter, "discover_gpus", lambda: pytest.fail("multi-GPU probe discovered GPUs")
-    )
+    monkeypatch.setattr(adapter, "discover_gpus", lambda: pytest.fail("multi-GPU probe discovered GPUs"))
     with pytest.raises(ValueError, match="exactly one GPU"):
         adapter.NativeBatchProbe().run(sample_profile(2), SyntheticWorkload(), SearchSettings(), 4)
 
 
 def test_force_reaches_each_optimizer_boundary_and_retains_memory_budget(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     workers = _Workers(allocator_peak=850)
     _install_workers(monkeypatch, tmp_path, workers)
@@ -929,9 +905,7 @@ def _telemetry_failure() -> subprocess.CalledProcessError:
     )
 
 
-def _install_failure(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, failure: BaseException
-) -> _Workers:
+def _install_failure(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, failure: BaseException) -> _Workers:
     workers = _Workers()
     _install_workers(monkeypatch, tmp_path, workers)
 
@@ -942,9 +916,7 @@ def _install_failure(
         monitor: Callable[[Callable[[], tuple[int, ...]]], None],
     ) -> WorkerOutcome:
         workers.requests.append(
-            BatchProbeRequest.model_validate_json(
-                Path(commands[0].argv[-1]).read_text(encoding="utf-8")
-            )
+            BatchProbeRequest.model_validate_json(Path(commands[0].argv[-1]).read_text(encoding="utf-8"))
         )
         raise failure
 
@@ -997,9 +969,7 @@ def test_telemetry_and_cleanup_failures_are_recorded_as_error_trials(
     profile, settings = _profile(), SearchSettings()
     state = BatchSearch.start(profile, settings)
     assert state.next_batch is not None
-    result = adapter.NativeBatchProbe().run(
-        profile, SyntheticWorkload(), settings, state.next_batch
-    )
+    result = adapter.NativeBatchProbe().run(profile, SyntheticWorkload(), settings, state.next_batch)
     assert result.status == "error"
     for text in expected:
         assert text in result.diagnostic

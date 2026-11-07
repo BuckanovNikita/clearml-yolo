@@ -41,9 +41,7 @@ COMPARISON_DIR = "comparison"
 class _PipelineStages:
     """Own stage boundaries; all persistence and tracking cross explicit ports."""
 
-    def __init__(
-        self, directory: Path, task: TaskHandle | None, deps: WorkflowDependencies
-    ) -> None:
+    def __init__(self, directory: Path, task: TaskHandle | None, deps: WorkflowDependencies) -> None:
         self.directory = directory
         self.task = task
         self.deps = deps
@@ -60,18 +58,14 @@ class _PipelineStages:
             self.deps.storage.atomic_write_text(
                 self.directory / "pipeline_outcome.json", self.outcome.model_dump_json(indent=2)
             )
-            self.deps.storage.atomic_write_text(
-                self.directory / "pipeline_outcome.txt", self.outcome.summary()
-            )
+            self.deps.storage.atomic_write_text(self.directory / "pipeline_outcome.txt", self.outcome.summary())
         except Exception as error:
             if not self.outcome.training_succeeded:
                 raise
             self._persistence_failure("outcome_storage", error)
 
     def _persistence_failure(self, stage: str, error: Exception) -> None:
-        self.outcome.stages[stage] = StageOutcome(
-            status="failed", reason=redact_text(str(error))
-        )
+        self.outcome.stages[stage] = StageOutcome(status="failed", reason=redact_text(str(error)))
         self.deps.resources.log_exception("Pipeline outcome persistence failed", error)
 
     def skip(self, name: str, reason: str) -> None:
@@ -82,19 +76,16 @@ class _PipelineStages:
         try:
             result = operation()
         except Exception as error:  # Stage boundary retains the actual failure.
-            self.outcome.stages[name] = StageOutcome(
-                status="failed", reason=redact_text(str(error))
-            )
+            self.outcome.stages[name] = StageOutcome(status="failed", reason=redact_text(str(error)))
             try:
                 self.persist()
             except Exception as persistence_error:  # noqa: BLE001 - preserve original stage error
-                self.deps.resources.log_exception(
-                    "Could not record failed stage outcome", persistence_error
-                )
+                self.deps.resources.log_exception("Could not record failed stage outcome", persistence_error)
             if not self.outcome.training_succeeded:
                 raise
             self.deps.resources.log_exception(
-                "Pipeline stage failed; successful training retained", error,
+                "Pipeline stage failed; successful training retained",
+                error,
                 context={"stage": name},
             )
             return None
@@ -106,9 +97,7 @@ class _PipelineStages:
             try:
                 self.persist()
             except Exception as persistence_error:  # noqa: BLE001 - retain interruption
-                self.deps.resources.log_exception(
-                    "Could not record interrupted stage outcome", persistence_error
-                )
+                self.deps.resources.log_exception("Could not record interrupted stage outcome", persistence_error)
             raise
         self.outcome.stages[name] = StageOutcome(status="succeeded")
         self.persist()
@@ -130,7 +119,8 @@ class _PipelineStages:
         results["outcome"] = self.outcome.model_dump(mode="json")
         self.deps.resources.log(
             "WARNING" if self.outcome.status == "completed_with_warnings" else "INFO",
-            "{}", self.outcome.summary(),
+            "{}",
+            self.outcome.summary(),
         )
         return results
 
@@ -151,9 +141,7 @@ def routed_native(settings: dict[str, Any], project: Path, name: str) -> dict[st
     expected = {"project": str(project), "name": name}
     for key, value in expected.items():
         if key in chosen and chosen[key] is not None and (str(chosen[key]) != value):
-            raise ValueError(
-                f"{key}={chosen[key]!r} conflicts with pipeline run_dir; expected {value}"
-            )
+            raise ValueError(f"{key}={chosen[key]!r} conflicts with pipeline run_dir; expected {value}")
     if "save_dir" in chosen:
         raise ValueError("save_dir conflicts with pipeline run_dir; use run_dir to route outputs")
     return chosen | expected
@@ -163,9 +151,7 @@ def _stage_values(config: Any, allowed: set[str], stage: str) -> dict[str, Any]:
     values = _as_dict(config)
     unknown = set(values) - allowed
     if unknown:
-        raise ValueError(
-            f"Pipeline {stage} keys {sorted(unknown)} are unsupported; outputs use run_dir"
-        )
+        raise ValueError(f"Pipeline {stage} keys {sorted(unknown)} are unsupported; outputs use run_dir")
     return values
 
 
@@ -181,9 +167,7 @@ def pipeline_stage_settings(
 
 
 def _comparison_settings(settings: dict[str, Any]) -> InferenceConfig:
-    fields = {
-        key: settings[key] for key in ("conf", "iou", "imgsz", "batch", "device") if key in settings
-    }
+    fields = {key: settings[key] for key in ("conf", "iou", "imgsz", "batch", "device") if key in settings}
     ignored = {
         "model",
         "backend",
@@ -232,12 +216,9 @@ def _compare_and_report(
         local_weights = deps.storage.model_weights_path(checkpoint)
         if isinstance(local_weights, str):
             raise ValueError(
-                "Local comparison requires a filesystem checkpoint; "
-                "resolve remote weights before comparison"
+                "Local comparison requires a filesystem checkpoint; resolve remote weights before comparison"
             )
-        candidate = ModelRef(
-            source="local", weights=local_weights, thresholds=thresholds, label=model_label
-        )
+        candidate = ModelRef(source="local", weights=local_weights, thresholds=thresholds, label=model_label)
     else:
         candidate = ModelRef(source="clearml", task_id=candidate_task_id)
     task = deps.tracking.init_task(clearml, stage="compare")
@@ -254,9 +235,7 @@ def _compare_and_report(
             deps=deps,
         )
     except NoBaselineModelError as error:
-        deps.tracking.record_run_configuration(
-            task, {"comparison_status": {"status": "skipped", "reason": str(error)}}
-        )
+        deps.tracking.record_run_configuration(task, {"comparison_status": {"status": "skipped", "reason": str(error)}})
         deps.tracking.complete_result_producer(task, "compare")
         return {"comparison_status": "skipped"}
     if result is None:
@@ -330,11 +309,11 @@ def _publish_pipeline(
     )
 
 
-def _result_producers(
-    skip_predict: bool, skip_metrics: bool, skip_compare: bool
-) -> list[ResultProducer]:
+def _result_producers(skip_predict: bool, skip_metrics: bool, skip_compare: bool) -> list[ResultProducer]:
     stages: tuple[tuple[ResultProducer, bool], ...] = (
-        ("predict", skip_predict), ("metrics", skip_metrics), ("compare", skip_compare)
+        ("predict", skip_predict),
+        ("metrics", skip_metrics),
+        ("compare", skip_compare),
     )
     return [producer for producer, skipped in stages if not skipped]
 
@@ -369,31 +348,21 @@ def run_pipeline(
         resolved_truth = resolve_ground_truth(ground_truth, task=task, deps=deps)
         publisher = prepare_publisher(task, fiftyone, factory=deps.publisher_factory, deps=deps)
         if weights is not None and (not skip_train):
-            raise ValueError(
-                "weights is only valid with skip_train=true; training chooses its model"
-            )
+            raise ValueError("weights is only valid with skip_train=true; training chooses its model")
         splits = list(dict.fromkeys(splits or ["train", "val", "test"]))
         directory = (
-            deps.storage.resolve_run_dir(
-                deps.storage.runs_root(), run_id or "", Path(run_dir) if run_dir else None
-            )
+            deps.storage.resolve_run_dir(deps.storage.runs_root(), run_id or "", Path(run_dir) if run_dir else None)
             if run_dir or run_id
-            else deps.storage.task_run_dir(
-                deps.storage.runs_root(), *deps.tracking.task_identity(task)
-            )
+            else deps.storage.task_run_dir(deps.storage.runs_root(), *deps.tracking.task_identity(task))
         )
-        if deps.dataset.dataset_cache_root(dataset_cache_dir).is_relative_to(
-            deps.storage.resolve(directory)
-        ):
+        if deps.dataset.dataset_cache_root(dataset_cache_dir).is_relative_to(deps.storage.resolve(directory)):
             raise ValueError("dataset_cache_dir must be outside run_dir")
         metrics_cfg, report_cfg, compare_cfg = pipeline_stage_settings(metrics, report, compare)
         train_params = routed_native(ultralytics, directory / "detect", "train")
         prediction_overrides = dict(ultralytics_predict)
         prediction_data_overrides: dict[str, dict[str, Any]] = {}
         if not skip_train:
-            prediction_overrides, explicit_overrides = deps.dataset.apply_dataset_policy(
-                prediction_overrides
-            )
+            prediction_overrides, explicit_overrides = deps.dataset.apply_dataset_policy(prediction_overrides)
             prediction_data_overrides = {"ultralytics_predict": explicit_overrides}
         predict_params = routed_native(
             deps.model.prediction_settings(prediction_overrides), directory / "native", "predict"
@@ -409,9 +378,15 @@ def run_pipeline(
         effective_ground_truth = resolved_truth
         if not skip_train:
             checkpoint, effective_ground_truth = _train_from_ground_truth(
-                train_params, clearml, resolved_truth, dataset_format, dataset_cache_dir,
+                train_params,
+                clearml,
+                resolved_truth,
+                dataset_format,
+                dataset_cache_dir,
                 _required_training_splits(
-                    splits, skip_predict=skip_predict, skip_metrics=skip_metrics,
+                    splits,
+                    skip_predict=skip_predict,
+                    skip_metrics=skip_metrics,
                     skip_compare=skip_compare,
                 ),
                 deps=deps,
@@ -419,12 +394,8 @@ def run_pipeline(
             if not deps.storage.is_file(checkpoint) or deps.storage.stat(checkpoint).st_size == 0:
                 raise ValueError(f"Training did not produce a usable checkpoint: {checkpoint}")
             stages.outcome.training_succeeded = True
-            stages.outcome.stages["training"] = StageOutcome(
-                status="succeeded", artifacts=[str(checkpoint)]
-            )
-            deps.tracking.preserve_training_success(
-                task, checkpoint, directory / "pipeline_outcome.json"
-            )
+            stages.outcome.stages["training"] = StageOutcome(status="succeeded", artifacts=[str(checkpoint)])
+            deps.tracking.preserve_training_success(task, checkpoint, directory / "pipeline_outcome.json")
             stages.persist()
             results["weights"] = checkpoint
             stages.run("training_resources", deps.resources.training_finished)
@@ -437,10 +408,28 @@ def run_pipeline(
         else:
             stages.skip("training", "Disabled by configuration")
         return _run_downstream(
-            stages, results, directory, checkpoint, effective_ground_truth, resolved_truth,
-            clearml, train_params, predict_params, metrics_cfg, compare_cfg, report_cfg,
-            splits, model_label, skip_train, skip_predict, skip_metrics, skip_compare,
-            skip_report, publisher, task, deps,
+            stages,
+            results,
+            directory,
+            checkpoint,
+            effective_ground_truth,
+            resolved_truth,
+            clearml,
+            train_params,
+            predict_params,
+            metrics_cfg,
+            compare_cfg,
+            report_cfg,
+            splits,
+            model_label,
+            skip_train,
+            skip_predict,
+            skip_metrics,
+            skip_compare,
+            skip_report,
+            publisher,
+            task,
+            deps,
         )
 
 
@@ -478,9 +467,16 @@ def _run_downstream(
         predicted = stages.run(
             "prediction",
             lambda: run_prediction(
-                checkpoint, effective_ground_truth, predictions, clearml, train_params,
-                splits=prediction_splits, ultralytics_predict=predict_params,
-                fiftyone=FiftyOneConfig(enabled=False), model_label=model_label, deps=deps,
+                checkpoint,
+                effective_ground_truth,
+                predictions,
+                clearml,
+                train_params,
+                splits=prediction_splits,
+                ultralytics_predict=predict_params,
+                fiftyone=FiftyOneConfig(enabled=False),
+                model_label=model_label,
+                deps=deps,
             ),
         )
         if predicted is not None:
@@ -492,8 +488,20 @@ def _run_downstream(
     if not skip_train and skip_predict:
         predictions_ready = False
     evaluations, thresholds = _pipeline_metrics(
-        stages, results, directory, predictions, predictions_ready, effective_ground_truth,
-        clearml, splits, model_label, metrics_cfg, skip_metrics, skip_train, skip_compare, deps,
+        stages,
+        results,
+        directory,
+        predictions,
+        predictions_ready,
+        effective_ground_truth,
+        clearml,
+        splits,
+        model_label,
+        metrics_cfg,
+        skip_metrics,
+        skip_train,
+        skip_compare,
+        deps,
     )
     comparison_ready = False
     if skip_compare:
@@ -505,11 +513,19 @@ def _run_downstream(
         compared = stages.run(
             "comparison",
             lambda: _compare_and_report(
-                compare_cfg, checkpoint, thresholds, effective_ground_truth, directory,
-                clearml, _comparison_settings(predict_params), metrics_cfg["evaluation"],
-                report_cfg, True,
+                compare_cfg,
+                checkpoint,
+                thresholds,
+                effective_ground_truth,
+                directory,
+                clearml,
+                _comparison_settings(predict_params),
+                metrics_cfg["evaluation"],
+                report_cfg,
+                True,
                 candidate_task_id=str(task.id) if not skip_train and task is not None else None,
-                model_label=model_label, deps=deps,
+                model_label=model_label,
+                deps=deps,
             ),
         )
         if compared is not None:
@@ -517,16 +533,23 @@ def _run_downstream(
             comparison_ready = "comparison" in compared
             if not comparison_ready:
                 stages.skip("comparison", "Automatic baseline unavailable")
-    _pipeline_report(
-        stages, results, directory, clearml, report_cfg, skip_report, comparison_ready, deps
-    )
+    _pipeline_report(stages, results, directory, clearml, report_cfg, skip_report, comparison_ready, deps)
     if predictions_ready:
         stages.run(
             "visualization",
             lambda: _publish_pipeline(
-                publisher, task, directory, effective_ground_truth.path, resolved_truth.path,
-                predictions, prediction_splits, evaluations, checkpoint, metrics_cfg,
-                skip_predict, deps=deps,
+                publisher,
+                task,
+                directory,
+                effective_ground_truth.path,
+                resolved_truth.path,
+                predictions,
+                prediction_splits,
+                evaluations,
+                checkpoint,
+                metrics_cfg,
+                skip_predict,
+                deps=deps,
             ),
         )
     else:
@@ -556,32 +579,32 @@ def _pipeline_metrics(
     if skip_metrics:
         stages.skip("metrics", "Disabled by configuration")
         if skip_train and not skip_compare:
-            thresholds = stages.run(
-                "thresholds", lambda: json.loads(deps.storage.read_text(thresholds_path))
-            )
+            thresholds = stages.run("thresholds", lambda: json.loads(deps.storage.read_text(thresholds_path)))
     elif not predictions_ready:
         stages.skip("metrics", "No successful prediction producer in this training attempt")
     else:
         evaluated = stages.run(
             "metrics",
             lambda: compute_metrics(
-                predictions, effective_ground_truth, directory / METRICS_DIR, clearml,
-                splits=splits, fiftyone=FiftyOneConfig(enabled=False),
-                model_label=model_label, **metrics_cfg, deps=deps,
+                predictions,
+                effective_ground_truth,
+                directory / METRICS_DIR,
+                clearml,
+                splits=splits,
+                fiftyone=FiftyOneConfig(enabled=False),
+                model_label=model_label,
+                **metrics_cfg,
+                deps=deps,
             ),
         )
         if evaluated is not None:
             results["metrics"] = evaluated
             evaluations = evaluated.evaluations
-            thresholds = stages.run(
-                "thresholds", lambda: next(iter(evaluated.best_confidences.values()))
-            )
+            thresholds = stages.run("thresholds", lambda: next(iter(evaluated.best_confidences.values())))
             if thresholds is not None:
                 stages.run(
                     "threshold_publication",
-                    lambda: deps.storage.atomic_write_text(
-                        thresholds_path, json.dumps(thresholds)
-                    ),
+                    lambda: deps.storage.atomic_write_text(thresholds_path, json.dumps(thresholds)),
                 )
     return evaluations, thresholds
 
@@ -605,15 +628,15 @@ def _pipeline_report(
             "report",
             lambda: run_report(
                 comparison_dir=directory / COMPARISON_DIR,
-                output_dir=directory / REPORTS_DIR, clearml=clearml,
-                **report_cfg, deps=deps,
+                output_dir=directory / REPORTS_DIR,
+                clearml=clearml,
+                **report_cfg,
+                deps=deps,
             ),
         )
         if reported is not None:
             results["reports"] = reported
-            artifacts = [str(path) for path in (
-                *reported.dev_reports.values(), *reported.business_reports.values()
-            )]
+            artifacts = [str(path) for path in (*reported.dev_reports.values(), *reported.business_reports.values())]
             stages.outcome.stages["report"].artifacts = artifacts
             if reported.issues:
                 stages.outcome.stages["report"] = StageOutcome(

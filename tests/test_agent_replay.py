@@ -47,9 +47,7 @@ def test_bare_agent_restores_before_required_inputs_and_runtime(
         assert kwargs["remote_replay"] is snapshot
         events.append("owner")
         task = SimpleNamespace(id="agent-task", running_locally=lambda: False)
-        state = session._InvocationState(
-            task=task, stages=[command], current_stage=command, remote_replay=snapshot
-        )
+        state = session._InvocationState(task=task, stages=[command], current_stage=command, remote_replay=snapshot)
         token = session._ACTIVE_INVOCATION.set(state)
         try:
             yield task
@@ -69,9 +67,7 @@ def test_bare_agent_restores_before_required_inputs_and_runtime(
     monkeypatch.setattr(common, "invocation", owner)
     monkeypatch.setattr(common, "native_runtime", lambda: selected_runtime("yolo"))
     monkeypatch.setattr(common, "detector_runtime", lambda: selected_runtime("detector"))
-    config = OmegaConf.create(
-        {"ground_truth": "???", "model": {}, "clearml": {}} if has_canonical else canonical
-    )
+    config = OmegaConf.create({"ground_truth": "???", "model": {}, "clearml": {}} if has_canonical else canonical)
     common.execute_owned(command, config, workflow)
     assert events == [runtime, "owner", "execute"]
     assert snapshot.canonical == (canonical if has_canonical else None)
@@ -108,9 +104,7 @@ def test_remote_snapshot_reads_once_and_detaches(monkeypatch: pytest.MonkeyPatch
 
 
 @pytest.mark.parametrize("canonical", [{}, [], "malformed"])
-def test_invalid_canonical_snapshot_never_uses_launch_defaults(
-    monkeypatch: pytest.MonkeyPatch, canonical: Any
-) -> None:
+def test_invalid_canonical_snapshot_never_uses_launch_defaults(monkeypatch: pytest.MonkeyPatch, canonical: Any) -> None:
     import clearml
     import clearml.config
 
@@ -128,9 +122,7 @@ def test_invalid_canonical_snapshot_never_uses_launch_defaults(
 
 
 @pytest.mark.parametrize("raw", [None, "", "   "])
-def test_absent_and_empty_canonical_remain_distinct(
-    monkeypatch: pytest.MonkeyPatch, raw: str | None
-) -> None:
+def test_absent_and_empty_canonical_remain_distinct(monkeypatch: pytest.MonkeyPatch, raw: str | None) -> None:
     import clearml
     import clearml.config
 
@@ -159,14 +151,10 @@ def test_replay_and_general_use_same_snapshot_without_refetch() -> None:
         "ultralytics": {"device": 0, "epochs": 1},
         "model": {"backend": "ultralytics", "preset": "default", "weights": None},
     }
-    snapshot = session.RemoteReplay(
-        "agent-task", canonical, {"General/epochs": 3, "General/device": 8}
-    )
+    snapshot = session.RemoteReplay("agent-task", canonical, {"General/epochs": 3, "General/device": 8})
     # No SDK read methods: any second read would fail this regression.
     task = SimpleNamespace(id="agent-task", running_locally=lambda: False)
-    state = session._InvocationState(
-        task=task, stages=["train"], current_stage="train", remote_replay=snapshot
-    )
+    state = session._InvocationState(task=task, stages=["train"], current_stage="train", remote_replay=snapshot)
     token = session._ACTIVE_INVOCATION.set(state)
     try:
         replayed = session.replay_configuration(task, {"ground_truth": "???"}, publish=False)

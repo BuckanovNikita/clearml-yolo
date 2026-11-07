@@ -20,9 +20,7 @@ COMMANDS = {
 }
 
 
-def test_installed_command_creates_examples(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_installed_command_creates_examples(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     entrypoints = [
         entry
         for entry in distribution("clearml-yolo").entry_points
@@ -94,9 +92,7 @@ def test_existing_config_prevents_all_writes(tmp_path: Path) -> None:
     assert list(tmp_path.iterdir()) == [existing]
 
 
-def test_force_replaces_examples_and_preserves_unrelated_files(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_force_replaces_examples_and_preserves_unrelated_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from clearml_yolo.entrypoints.config_tree import main
 
     example = tmp_path / "cy.yaml"
@@ -137,9 +133,7 @@ def test_dangling_symlink_is_not_followed(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("destination_kind", ["directory", "symlink", "dangling_symlink"])
-def test_force_rejects_nonregular_destinations_before_writing(
-    tmp_path: Path, destination_kind: str
-) -> None:
+def test_force_rejects_nonregular_destinations_before_writing(tmp_path: Path, destination_kind: str) -> None:
     from clearml_yolo.entrypoints.hydra.config_tree import dump_config_tree
 
     target = tmp_path / "configs"
@@ -188,9 +182,7 @@ def test_group_directory_symlink_is_rejected(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(("command", "config_name"), COMMANDS.items())
-def test_generated_examples_load_in_fresh_cli_process(
-    tmp_path: Path, command: str, config_name: str
-) -> None:
+def test_generated_examples_load_in_fresh_cli_process(tmp_path: Path, command: str, config_name: str) -> None:
     import subprocess
     import sys
 
@@ -273,9 +265,7 @@ def test_example_sections_comment_controlled_keys_only_in_examples(
     resolved = OmegaConf.to_container(config[group], resolve=True)
     assert isinstance(resolved, dict)
     assert controlled <= resolved.keys()
-    runtime = yaml.safe_load(
-        render_native_yaml({str(key): value for key, value in resolved.items()}, stage)
-    )
+    runtime = yaml.safe_load(render_native_yaml({str(key): value for key, value in resolved.items()}, stage))
     assert controlled <= runtime.keys()
 
 

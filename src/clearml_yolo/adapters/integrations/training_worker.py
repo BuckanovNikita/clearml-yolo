@@ -31,9 +31,7 @@ def _execute(
         raise ValueError("YOLO uses its own native distributed trainer")
     config.train.device = rank
     with native_rank(initialize=config.backend != "rfdetr"):
-        return train(
-            config, request.prepared, request.output, report, transforms=request.transforms
-        )
+        return train(config, request.prepared, request.output, report, transforms=request.transforms)
 
 
 def run(request_path: Path, rank: int) -> int:
@@ -51,9 +49,7 @@ def run(request_path: Path, rank: int) -> int:
 
     try:
         result = _execute(request, rank, report)
-        record = TrainingWorkerResult(
-            token=request.token, rank=rank, status="success", result=result
-        )
+        record = TrainingWorkerResult(token=request.token, rank=rank, status="success", result=result)
     except Exception as error:  # noqa: BLE001 - private process boundary records every failure
         import torch
 

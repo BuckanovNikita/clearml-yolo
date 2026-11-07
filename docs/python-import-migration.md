@@ -134,9 +134,7 @@ def run_metrics() -> MetricsResult:
         from clearml_yolo.core.publication import FiftyOneConfig
         from clearml_yolo.entrypoints.composition import build_dependencies
 
-        tracking = ClearMLConfig(
-            project_name="detection", task_name="metrics", tags=["evaluation"]
-        )
+        tracking = ClearMLConfig(project_name="detection", task_name="metrics", tags=["evaluation"])
         deps = build_dependencies()
         with invocation(tracking, "metrics"):
             return compute_metrics(

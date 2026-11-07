@@ -57,9 +57,7 @@ def test_fcos_pyramid_and_foreground_zero_backward(preset: str, native_threads: 
 
 
 @pytest.mark.parametrize("preset", PRESETS)
-def test_fcos_dataset_and_checkpoint_roundtrip(
-    preset: str, tmp_path: Path, native_threads: Any
-) -> None:
+def test_fcos_dataset_and_checkpoint_roundtrip(preset: str, tmp_path: Path, native_threads: Any) -> None:
     from clearml_yolo.adapters.fcos.backend import predict, train
     from clearml_yolo.adapters.torchvision.data import prepared_datasets
 
@@ -116,9 +114,7 @@ def test_fcos_loads_local_pretrained_backbone_without_loading_detector_head(
     torch.save(backbone.state_dict(), weights)
     del backbone
     hub = importlib.import_module("torch.hub")
-    monkeypatch.setattr(
-        hub, "download_url_to_file", lambda *_args, **_kwargs: pytest.fail("unexpected download")
-    )
+    monkeypatch.setattr(hub, "download_url_to_file", lambda *_args, **_kwargs: pytest.fail("unexpected download"))
     model = build_model(preset, 3, pretrained=True, backbone_weights=weights, image_size=128)
     torch.testing.assert_close(next(model.backbone.body.parameters()), expected)
     assert model.head.classification_head.cls_logits.out_channels == 3

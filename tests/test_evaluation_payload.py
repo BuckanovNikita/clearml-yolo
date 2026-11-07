@@ -90,9 +90,7 @@ def test_payload_uses_sliced_matches_and_preserves_backgrounds_and_filtered_boxe
         columns=GT_COLUMNS,
         index=[100, 101, 102, 103, 104],
     )
-    ground_truth["instance_label"] = pd.Series(
-        [7, 7, 7, 7, None], index=ground_truth.index, dtype=object
-    )
+    ground_truth["instance_label"] = pd.Series([7, 7, 7, 7, None], index=ground_truth.index, dtype=object)
     predictions = pd.DataFrame(
         [
             ("tp.jpg", 7, 0.0, 0.0, 10.0, 10.0, 0.9),

@@ -30,7 +30,9 @@ def test_invalid_training_rows_retain_all_actionable_reasons(
 
 def test_threshold_endpoints_are_valid_and_preserve_exact_values() -> None:
     assert policy.validate_thresholds({"a": 0, "b": 1, "c": 0.37123}, ["b", "a"]) == {
-        "a": 0.0, "b": 1.0, "c": 0.37123,
+        "a": 0.0,
+        "b": 1.0,
+        "c": 0.37123,
     }
 
 
@@ -47,21 +49,31 @@ def test_split_membership_requires_both_identity_columns(columns: list[str]) -> 
     with pytest.raises(ValueError, match="membership column") as error:
         policy.validate_split_membership(pd.DataFrame(columns=columns))
     expected = {
-        (): "['image_name', 'split']", ("image_name",): "['split']", ("split",): "['image_name']",
+        (): "['image_name', 'split']",
+        ("image_name",): "['split']",
+        ("split",): "['image_name']",
     }
-    assert str(error.value) == "Ground truth is missing membership column(s): " + expected[
-        tuple(columns)
-    ]
+    assert str(error.value) == "Ground truth is missing membership column(s): " + expected[tuple(columns)]
 
 
 def test_split_membership_allows_duplicates_within_split_and_training_membership() -> None:
-    policy.validate_split_membership(pd.DataFrame({
-        "image_name": ["v", "v", "t", "t"], "split": ["val", "val", "train", "test"],
-    }))
+    policy.validate_split_membership(
+        pd.DataFrame(
+            {
+                "image_name": ["v", "v", "t", "t"],
+                "split": ["val", "val", "train", "test"],
+            }
+        )
+    )
     with pytest.raises(ValueError, match="overlapping image_name") as error:
-        policy.validate_split_membership(pd.DataFrame({
-            "image_name": ["z", 7, "z", 7], "split": ["val", "test", "test", "val"],
-        }))
+        policy.validate_split_membership(
+            pd.DataFrame(
+                {
+                    "image_name": ["z", 7, "z", 7],
+                    "split": ["val", "test", "test", "val"],
+                }
+            )
+        )
     assert str(error.value) == (
         "A logical image cannot belong to both val and test; overlapping image_name(s): ['7', 'z']"
     )
@@ -79,16 +91,13 @@ def test_identity_validation_rejects_export_only_naming_before_matching(mode: st
     with pytest.raises(ValueError, match="raw prediction export") as error:
         policy.validate_prediction_identity(truth, truth, image_name=mode)
     assert str(error.value) == (
-        "Comparison and evaluation require image_name='name'; "
-        f"{mode!r} is supported only for raw prediction export"
+        f"Comparison and evaluation require image_name='name'; {mode!r} is supported only for raw prediction export"
     )
 
 
 @pytest.mark.parametrize(("index", "label"), [(0, "Ground truth"), (1, "Predictions")])
 @pytest.mark.parametrize("invalid", [None, "", "missing-column"])
-def test_prediction_identity_reports_which_input_has_missing_names(
-    index: int, label: str, invalid: str | None
-) -> None:
+def test_prediction_identity_reports_which_input_has_missing_names(index: int, label: str, invalid: str | None) -> None:
     frames = [pd.DataFrame({"image_name": ["a.jpg"]}) for _ in range(2)]
     frames[index] = pd.DataFrame({"image_name": [invalid]})
     if invalid == "missing-column":
@@ -96,8 +105,7 @@ def test_prediction_identity_reports_which_input_has_missing_names(
     with pytest.raises(ValueError, match=label) as error:
         policy.validate_prediction_identity(*frames)
     reason = (
-        "is missing the 'image_name' column" if invalid == "missing-column"
-        else "contains empty canonical image names"
+        "is missing the 'image_name' column" if invalid == "missing-column" else "contains empty canonical image names"
     )
     assert str(error.value) == f"{label} {reason}"
 

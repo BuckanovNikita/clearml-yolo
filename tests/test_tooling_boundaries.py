@@ -34,17 +34,9 @@ def release_import_findings(source: str) -> set[str]:
     findings: set[str] = set()
     for node in ast.walk(ast.parse(source)):
         if isinstance(node, ast.Import):
-            findings.update(
-                alias.name
-                for alias in node.names
-                if alias.name.split(".")[0] not in allowed
-            )
+            findings.update(alias.name for alias in node.names if alias.name.split(".")[0] not in allowed)
         elif isinstance(node, ast.ImportFrom):
-            if (
-                node.level
-                or node.module is None
-                or node.module.split(".")[0] not in allowed
-            ):
+            if node.level or node.module is None or node.module.split(".")[0] not in allowed:
                 findings.add(node.module or "relative import")
             # This helper has no plugin boundary: dynamic loading would evade its allowlist.
             if node.module == "importlib":
@@ -67,9 +59,7 @@ def runtime_analysis_dependencies(requirements: list[str]) -> set[str]:
 
 
 def test_release_helper_uses_only_its_owned_dependencies() -> None:
-    assert not release_import_findings(
-        (ROOT / "scripts/local_release.py").read_text(encoding="utf-8")
-    )
+    assert not release_import_findings((ROOT / "scripts/local_release.py").read_text(encoding="utf-8"))
 
 
 @pytest.mark.parametrize(
@@ -93,8 +83,7 @@ def test_release_import_guard_rejects_injected_violations(source: str) -> None:
 
 def test_release_import_guard_allows_owned_dependencies() -> None:
     assert not release_import_findings(
-        "import subprocess\nfrom pathlib import Path\nfrom loguru import logger\n"
-        "from pydantic import BaseModel"
+        "import subprocess\nfrom pathlib import Path\nfrom loguru import logger\nfrom pydantic import BaseModel"
     )
 
 
@@ -111,9 +100,7 @@ def architecture_import_findings(source: str) -> set[str]:
 
 
 def test_architecture_helper_does_not_import_inspected_runtime_or_new_sdks() -> None:
-    assert not architecture_import_findings(
-        (ROOT / "tests/architecture_helpers.py").read_text(encoding="utf-8")
-    )
+    assert not architecture_import_findings((ROOT / "tests/architecture_helpers.py").read_text(encoding="utf-8"))
 
 
 @pytest.mark.parametrize(
@@ -187,8 +174,7 @@ def _test_dependency_imports(source: str) -> set[str]:
     return {
         name
         for name in imports
-        if name.split(".")[0]
-        in helpers | {"tests", "hypothesis", "pytest_cov", "coverage", "pytest"}
+        if name.split(".")[0] in helpers | {"tests", "hypothesis", "pytest_cov", "coverage", "pytest"}
     }
 
 
@@ -216,9 +202,7 @@ def _imports_repository_scripts(path: Path) -> bool:
         if isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
             if node.module.split(".")[0] == "scripts":
                 return True
-        elif isinstance(node, ast.Import) and any(
-            alias.name.split(".")[0] == "scripts" for alias in node.names
-        ):
+        elif isinstance(node, ast.Import) and any(alias.name.split(".")[0] == "scripts" for alias in node.names):
             return True
     return False
 
@@ -233,18 +217,14 @@ SCRIPT_IMPORTING_TESTS = tuple(
 
 
 def test_script_importing_test_inventory_covers_known_modules() -> None:
-    assert {"tests/test_check_docs.py", "tests/test_package_weights.py"} <= set(
-        SCRIPT_IMPORTING_TESTS
-    )
+    assert {"tests/test_check_docs.py", "tests/test_package_weights.py"} <= set(SCRIPT_IMPORTING_TESTS)
 
 
 @pytest.mark.parametrize("module", SCRIPT_IMPORTING_TESTS)
 def test_script_importing_test_module_collects_in_a_fresh_session(module: str) -> None:
     # The repository-only scripts package is not installed; each module must make it
     # importable itself instead of relying on another module collected earlier.
-    environment = {
-        key: value for key, value in os.environ.items() if key != "PYTEST_ADDOPTS"
-    }
+    environment = {key: value for key, value in os.environ.items() if key != "PYTEST_ADDOPTS"}
     completed = subprocess.run(  # noqa: S603 - current interpreter and fixed pytest arguments
         [
             sys.executable,
@@ -300,8 +280,7 @@ def weight_packager_import_findings(source: str) -> set[str]:
             findings.update(
                 alias.name
                 for alias in node.names
-                if alias.name.split(".")[0] not in sys.stdlib_module_names
-                and alias.name not in WEIGHT_PACKAGER_IMPORTS
+                if alias.name.split(".")[0] not in sys.stdlib_module_names and alias.name not in WEIGHT_PACKAGER_IMPORTS
             )
             if any(alias.name.split(".")[0] == "importlib" for alias in node.names):
                 findings.add("dynamic import facility")
@@ -311,27 +290,20 @@ def weight_packager_import_findings(source: str) -> set[str]:
                 findings.add("relative import")
             elif module.split(".")[0] not in sys.stdlib_module_names:
                 allowed_names = WEIGHT_PACKAGER_IMPORTS.get(module, set())
-                findings.update(
-                    f"{module}.{alias.name}"
-                    for alias in node.names
-                    if alias.name not in allowed_names
-                )
+                findings.update(f"{module}.{alias.name}" for alias in node.names if alias.name not in allowed_names)
             if module.split(".")[0] == "importlib" or any(
                 alias.name in {"__import__", "eval", "exec"} for alias in node.names
             ):
                 findings.add("dynamic import facility")
         elif (isinstance(node, ast.Name) and node.id in {"__import__", "eval", "exec"}) or (
-            isinstance(node, ast.Attribute)
-            and node.attr in {"__import__", "import_module", "eval", "exec"}
+            isinstance(node, ast.Attribute) and node.attr in {"__import__", "import_module", "eval", "exec"}
         ):
             findings.add("dynamic import facility")
     return findings
 
 
 def test_weight_packager_uses_only_standard_library_and_approved_asset_interfaces() -> None:
-    assert not weight_packager_import_findings(
-        (ROOT / "scripts/package_weights.py").read_text(encoding="utf-8")
-    )
+    assert not weight_packager_import_findings((ROOT / "scripts/package_weights.py").read_text(encoding="utf-8"))
 
 
 @pytest.mark.parametrize(

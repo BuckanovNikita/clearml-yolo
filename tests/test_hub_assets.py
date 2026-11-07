@@ -25,9 +25,7 @@ from clearml_yolo.core.assets import AssetSpec, HubAsset
 _COMMIT = "a" * 40
 
 
-def _terminal_streams(
-    monkeypatch: pytest.MonkeyPatch, terminal: bool
-) -> tuple[io.StringIO, io.StringIO]:
+def _terminal_streams(monkeypatch: pytest.MonkeyPatch, terminal: bool) -> tuple[io.StringIO, io.StringIO]:
     stdout, stderr = io.StringIO(), io.StringIO()
     for stream in (stdout, stderr):
         monkeypatch.setattr(stream, "isatty", lambda: terminal)
@@ -62,9 +60,7 @@ def _exercise_native_xet_progress(progress_classes: list[type[Any]]) -> None:
             )
 
 
-def _signed_cdn_response(
-    contents: dict[str, bytes], requested: list[tuple[str, str]], request: Any
-) -> Any:
+def _signed_cdn_response(contents: dict[str, bytes], requested: list[tuple[str, str]], request: Any) -> Any:
     httpx = importlib.import_module("httpx2")
     filename = request.url.path.rsplit("/", 1)[-1]
     requested.append((request.method, str(request.url)))
@@ -95,9 +91,7 @@ def test_real_sdk_transport_diagnostics_are_redacted_before_console_and_capture(
     console = io.StringIO()
     handler = logging.StreamHandler(console)
     sdk_logger = logging.getLogger("huggingface_hub")
-    source_logger = logging.getLogger(
-        downloads.__name__ if download_warning else transport.__name__
-    )
+    source_logger = logging.getLogger(downloads.__name__ if download_warning else transport.__name__)
     original_filters = tuple(source_logger.filters)
     url = "https://user:HF_URL_SECRET@example.test/model?token=HF_QUERY_SECRET"
     error = httpx.ConnectError("HF_DIAGNOSTIC_SECRET")
@@ -151,9 +145,7 @@ def test_real_http_client_request_and_signed_redirect_diagnostics_are_private(
         if request.url.host == "origin.example":
             return httpx.Response(
                 302,
-                headers={
-                    "location": "https://cdn.example/weights?signature=SIGNED_REDIRECT_SECRET"
-                },
+                headers={"location": "https://cdn.example/weights?signature=SIGNED_REDIRECT_SECRET"},
             )
         return httpx.Response(200, content=b"checkpoint")
 
@@ -224,10 +216,7 @@ def test_real_native_transport_header_debug_diagnostics_are_private(
         )
         wire_response = server.data_to_send()
     else:
-        wire_response = (
-            b"HTTP/1.1 200 OK\r\nx-native-secret: RESPONSE_HEADER_SECRET\r\n"
-            b"content-length: 0\r\n\r\n"
-        )
+        wire_response = b"HTTP/1.1 200 OK\r\nx-native-secret: RESPONSE_HEADER_SECRET\r\ncontent-length: 0\r\n\r\n"
     transport = httpx.HTTPTransport(http2=http2)
     transport._pool = httpcore.ConnectionPool(
         http2=http2, network_backend=httpcore.MockBackend([wire_response], http2=http2)
@@ -315,12 +304,8 @@ def test_public_hub_preparation_keeps_real_sdk_metadata_and_download_diagnostics
     assert result.path.read_bytes() == contents["model.safetensors"]
     assert (result.path.parent / "config.json").read_bytes() == contents["config.json"]
     assert any(method == "GET" and "signature=" in url for method, url in requested)
-    assert any(
-        method == "HEAD" and f"/resolve/{_COMMIT}/config.json" in url for method, url in requested
-    )
-    assert len(progress_classes) == 2, (
-        "Both the weight and config need per-call progress protection"
-    )
+    assert any(method == "HEAD" and f"/resolve/{_COMMIT}/config.json" in url for method, url in requested)
+    assert len(progress_classes) == 2, "Both the weight and config need per-call progress protection"
     _exercise_native_xet_progress(progress_classes)
     for secret in (
         "HF_AUTHORIZATION_SECRET",
@@ -491,9 +476,7 @@ def test_native_valid_cache_uses_safe_representation_and_actual_commit(
     result = hub.resolve_hub_asset(_spec(tmp_path))
     assert result.path == safe
     assert result.revision == _COMMIT
-    assert result.canonical_url == (
-        f"https://huggingface.co/timm/example/resolve/{_COMMIT}/model.safetensors"
-    )
+    assert result.canonical_url == (f"https://huggingface.co/timm/example/resolve/{_COMMIT}/model.safetensors")
 
 
 def test_configured_artifactory_precedes_upstream_without_forwarding_credentials(
@@ -769,9 +752,7 @@ def test_legacy_native_cache_metadata_can_be_promoted_completely_offline(
             ),
         ),
     )
-    monkeypatch.setattr(
-        hub, "get_hf_file_metadata", lambda *a, **kw: pytest.fail("offline promotion")
-    )
+    monkeypatch.setattr(hub, "get_hf_file_metadata", lambda *a, **kw: pytest.fail("offline promotion"))
     monkeypatch.setattr(hub, "hf_hub_download", lambda **kw: pytest.fail("offline promotion"))
     result = hub.resolve_hub_asset(spec)
     assert result.path.read_bytes() == old.read_bytes()
@@ -811,9 +792,7 @@ def test_prior_managed_cache_identity_remains_a_promotion_candidate(
         xet_file_data=None,
     )
     monkeypatch.setattr(hub, "get_hf_file_metadata", lambda *a, **kw: metadata)
-    monkeypatch.setattr(
-        hub, "hf_hub_download", lambda **kw: pytest.fail("compatible managed cache")
-    )
+    monkeypatch.setattr(hub, "hf_hub_download", lambda **kw: pytest.fail("compatible managed cache"))
     result = hub.resolve_hub_asset(spec)
     assert result.path.name == "pytorch_model.bin"
     assert result.path.read_bytes() == legacy.read_bytes()
@@ -828,9 +807,7 @@ def test_registry_revision_and_filename_override_follow_native_hf_selection(
     monkeypatch.setattr(
         timm,
         "get_pretrained_cfg",
-        lambda name: PretrainedCfg(
-            hf_hub_id="owner/model@release/v1", hf_hub_filename="weights.safetensors"
-        ),
+        lambda name: PretrainedCfg(hf_hub_id="owner/model@release/v1", hf_hub_filename="weights.safetensors"),
     )
     spec = assets.pretrained_asset("convnext_tiny")
     assert spec.hub is not None

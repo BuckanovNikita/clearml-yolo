@@ -37,13 +37,8 @@ def test_owner_enables_every_installed_callback_and_restores_globals(
         assert set(integration.callbacks) == set(installed)
         assert os.environ.get("YOLO_CONFIG_DIR") == previous
         assert Path(SETTINGS.file).read_bytes() == settings_bytes
-        assert (
-            unwrap(integration.callbacks["on_train_epoch_end"]) is installed["on_train_epoch_end"]
-        )
-        assert (
-            integration.callbacks["on_pretrain_routine_start"]
-            is not installed["on_pretrain_routine_start"]
-        )
+        assert unwrap(integration.callbacks["on_train_epoch_end"]) is installed["on_train_epoch_end"]
+        assert integration.callbacks["on_pretrain_routine_start"] is not installed["on_pretrain_routine_start"]
 
     assert SETTINGS["clearml"] is original_setting
     assert integration.callbacks is original_callbacks
@@ -263,9 +258,7 @@ def test_native_general_redacts_credentials_without_changing_training_args(
         integration,
         "on_pretrain_routine_start",
         # This optional SDK export is populated dynamically by the integration module.
-        lambda trainer: (
-            integration.__dict__["Task"].current_task().connect(vars(trainer.args), name="General")
-        ),
+        lambda trainer: integration.__dict__["Task"].current_task().connect(vars(trainer.args), name="General"),
     )
     monkeypatch.setenv(OWNER_TASK_ENV, owner.id)
     monkeypatch.delenv("LOCAL_RANK", raising=False)

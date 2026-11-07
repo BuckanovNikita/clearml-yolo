@@ -113,9 +113,7 @@ def _source(directory: Path, *, include_test: bool = False) -> Path:
     return source
 
 
-def test_cache_hit_reuses_completed_files_without_preparation(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_cache_hit_reuses_completed_files_without_preparation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     import clearml_yolo.adapters.storage.dataset_cache as cache
 
     source = _source(tmp_path / "input")
@@ -170,9 +168,7 @@ def test_identical_csv_bytes_with_absolute_references_reuse_one_entry(tmp_path: 
 
     source = _source(tmp_path / "input")
     for split in ("train", "val"):
-        source.write_text(source.read_text().replace(
-            f",{split}.PNG,", f",{source.parent / f'{split}.PNG'},"
-        ))
+        source.write_text(source.read_text().replace(f",{split}.PNG,", f",{source.parent / f'{split}.PNG'},"))
     moved = tmp_path / "copy" / "truth.csv"
     moved.parent.mkdir()
     moved.write_bytes(source.read_bytes())
@@ -278,9 +274,7 @@ def test_separate_processes_build_once_and_serialize_consumers(tmp_path: Path) -
 
     assert all("error" not in observation for observation in observations)
     assert len({observation["root"] for observation in observations}) == 1
-    intervals = sorted(
-        (observation["entered"], observation["leaving"]) for observation in observations
-    )
+    intervals = sorted((observation["entered"], observation["leaving"]) for observation in observations)
     assert intervals[1][0] >= intervals[0][1]
     assert copy_log.read_text(encoding="utf-8").splitlines() == ["copy", "copy"]
     assert len([path for path in cache_dir.iterdir() if not path.name.startswith(".")]) == 1
@@ -318,9 +312,7 @@ def test_terminated_builder_leaves_no_consumable_partial_entry(tmp_path: Path) -
     assert len([path for path in cache_dir.iterdir() if not path.name.startswith(".")]) == 1
 
 
-def test_failed_build_is_cleaned_and_retry_can_publish(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_failed_build_is_cleaned_and_retry_can_publish(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     import clearml_yolo.adapters.storage.dataset_cache as cache
 
     source = _source(tmp_path / "input")
@@ -349,9 +341,7 @@ def test_failed_build_is_cleaned_and_retry_can_publish(
     assert attempts == 2
 
 
-def test_corrupt_complete_entry_is_preserved_under_lock(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_corrupt_complete_entry_is_preserved_under_lock(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     import clearml_yolo.adapters.storage.dataset_cache as cache
 
     source = _source(tmp_path / "input")
@@ -359,20 +349,14 @@ def test_corrupt_complete_entry_is_preserved_under_lock(
     with cache.cached_dataset(source, cache_dir) as first:
         first.ground_truth.unlink()
         root = first.data.parent
-    original_files = {
-        path.relative_to(root): path.read_bytes() for path in root.rglob("*") if path.is_file()
-    }
-    monkeypatch.setattr(
-        cache, "prepare_dataset", lambda *args, **kwargs: pytest.fail("must preserve invalid entry")
-    )
+    original_files = {path.relative_to(root): path.read_bytes() for path in root.rglob("*") if path.is_file()}
+    monkeypatch.setattr(cache, "prepare_dataset", lambda *args, **kwargs: pytest.fail("must preserve invalid entry"))
     with (
         pytest.raises(RuntimeError, match=r"invalid.*preserv"),
         cache.cached_dataset(source, cache_dir),
     ):
         pass
-    assert {
-        path.relative_to(root): path.read_bytes() for path in root.rglob("*") if path.is_file()
-    } == original_files
+    assert {path.relative_to(root): path.read_bytes() for path in root.rglob("*") if path.is_file()} == original_files
     assert not (root / "ground_truth.csv").exists()
 
 
@@ -384,7 +368,8 @@ def test_existing_invalid_entry_is_preserved(tmp_path: Path, kind: str) -> None:
     cache_dir = tmp_path / "cache"
     cache_dir.mkdir()
     identity = cache._identity(
-        hashlib.sha256(source.read_bytes()).hexdigest(), "ndjson",
+        hashlib.sha256(source.read_bytes()).hexdigest(),
+        "ndjson",
         resolved_image_references(source, source.read_bytes()),
     )
     entry = cache_dir / identity
@@ -421,15 +406,14 @@ def test_existing_invalid_entry_is_preserved(tmp_path: Path, kind: str) -> None:
             assert not target.exists()
 
 
-def test_failed_build_cleans_only_its_staging_directory(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_failed_build_cleans_only_its_staging_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     import clearml_yolo.adapters.storage.dataset_cache as cache
 
     source = _source(tmp_path / "input")
     cache_dir = tmp_path / "cache"
     identity = cache._identity(
-        hashlib.sha256(source.read_bytes()).hexdigest(), "ndjson",
+        hashlib.sha256(source.read_bytes()).hexdigest(),
+        "ndjson",
         resolved_image_references(source, source.read_bytes()),
     )
     foreign_staging = cache_dir / f".{identity}.staging-foreign"
@@ -458,9 +442,7 @@ def test_failed_build_cleans_only_its_staging_directory(
 
 
 @pytest.mark.skipif(os.name != "posix", reason="fault injection exercises Unix native flock")
-def test_native_lock_unavailable_fails_without_soft_fallback(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_native_lock_unavailable_fails_without_soft_fallback(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     import filelock._unix as unix_lock
 
     from clearml_yolo.adapters.storage.dataset_cache import cached_dataset
@@ -479,9 +461,7 @@ def test_native_lock_unavailable_fails_without_soft_fallback(
     assert len(list((cache_dir / ".locks").glob("*.lock"))) == 1
 
 
-def test_soft_lock_only_platform_fails_before_preparation(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_soft_lock_only_platform_fails_before_preparation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from filelock import SoftFileLock
 
     import clearml_yolo.adapters.storage.dataset_cache as cache
@@ -580,9 +560,7 @@ def test_default_cache_root_uses_workspace_despite_xdg_cache_home(
     monkeypatch.setenv("CY_HOME", str(tmp_path / "workspace"))
 
     with cached_dataset(source) as prepared:
-        assert prepared.data.is_relative_to(
-            tmp_path / "workspace" / ".cache" / "clearml-yolo" / "datasets"
-        )
+        assert prepared.data.is_relative_to(tmp_path / "workspace" / ".cache" / "clearml-yolo" / "datasets")
     assert not xdg.exists()
 
 
@@ -631,9 +609,7 @@ def test_dataset_cache_missing_metadata_is_quiet_but_permission_failure_diagnose
     assert str(source) in output
 
 
-def test_failed_validation_preserves_published_entry(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_failed_validation_preserves_published_entry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     import clearml_yolo.adapters.storage.dataset_cache as cache
     from clearml_yolo.adapters.storage.dataset import prepare_dataset as original_prepare
 
@@ -660,9 +636,7 @@ def test_failed_validation_preserves_published_entry(
     assert not list(cache_dir.glob(".*.staging-*"))
 
 
-def test_staging_name_collision_preserves_existing_directory(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_staging_name_collision_preserves_existing_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from uuid import UUID
 
     import clearml_yolo.adapters.storage.dataset_cache as cache
@@ -670,7 +644,8 @@ def test_staging_name_collision_preserves_existing_directory(
     source = _source(tmp_path / "input")
     cache_dir = tmp_path / "cache"
     identity = cache._identity(
-        hashlib.sha256(source.read_bytes()).hexdigest(), "ndjson",
+        hashlib.sha256(source.read_bytes()).hexdigest(),
+        "ndjson",
         resolved_image_references(source, source.read_bytes()),
     )
     collision = cache_dir / f".{identity}.staging-{UUID(int=0).hex}"

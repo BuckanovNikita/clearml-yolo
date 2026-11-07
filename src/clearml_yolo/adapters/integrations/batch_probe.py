@@ -134,9 +134,7 @@ class NativeBatchProbe:
             trial_id=trial_id,
             status="success",
             actual_global_batch=min(item.actual_global_batch or 0 for item in records),
-            peak_memory_bytes=tuple(
-                max(peaks[r] for peaks in path_peaks) for r in range(profile.world_size)
-            ),
+            peak_memory_bytes=tuple(max(peaks[r] for peaks in path_peaks) for r in range(profile.world_size)),
             warmup_steps=min(item.warmup_steps for item in records),
             measured_steps=min(item.measured_steps for item in records),
             validation_steps=min(item.validation_steps for item in records),
@@ -212,21 +210,15 @@ class NativeBatchProbe:
             # A receipt fences completed GPU work. Its CUDA context may be tearing
             # down while telemetry still reports utilization or a retired PID.
             active = tuple(
-                (rank, device)
-                for rank, device in enumerate(devices)
-                if not (output / f"rank-{rank}.json").is_file()
+                (rank, device) for rank, device in enumerate(devices) if not (output / f"rank-{rank}.json").is_file()
             )
             if not active:
                 return
-            current = monitor_devices(
-                tuple(device for _, device in active), owned_pids, force=settings.force
-            )
+            current = monitor_devices(tuple(device for _, device in active), owned_pids, force=settings.force)
             for (rank, _device), used in zip(active, current, strict=True):
                 peaks[rank] = max(peaks[rank], used)
 
-        outcome = run_workers(
-            commands, timeout_seconds=settings.trial_timeout_seconds, monitor=monitor
-        )
+        outcome = run_workers(commands, timeout_seconds=settings.trial_timeout_seconds, monitor=monitor)
         records = []
         for rank in range(profile.world_size):
             path = output / f"rank-{rank}.json"

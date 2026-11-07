@@ -39,9 +39,7 @@ def test_invalid_references_fail_before_effects(value: dict[str, Any]) -> None:
         normalize_ground_truth(value)
 
 
-@pytest.mark.parametrize(
-    "value", [{"dataset_id": "id"}, {"project_name": "p", "name": "n", "version": "1.2.0"}]
-)
+@pytest.mark.parametrize("value", [{"dataset_id": "id"}, {"project_name": "p", "name": "n", "version": "1.2.0"}])
 def test_reference_mapping_becomes_typed_request(value: dict[str, str]) -> None:
     assert normalize_ground_truth(value) == ClearMLDatasetRef(**value)
 
@@ -83,9 +81,7 @@ def test_legacy_dependency_constructor_keeps_local_input_support(
         "disabled_publisher",
         "exporter",
     )
-    legacy = WorkflowDependencies(
-        *(getattr(workflow_dependencies, name) for name in existing_fields)
-    )
+    legacy = WorkflowDependencies(*(getattr(workflow_dependencies, name) for name in existing_fields))
     assert legacy.ground_truth_repository is None
     assert resolve_ground_truth("local.csv", task=None, deps=legacy).path == Path("local.csv")
     with pytest.raises(ValueError, match="does not provide ClearML ground-truth resolution"):
@@ -116,13 +112,9 @@ def test_remote_source_records_identity_and_preserves_request(
         "record_run_configuration",
         lambda task, values: records.append(values),
     )
-    monkeypatch.setattr(
-        workflow_dependencies.resources, "log", lambda *args: pytest.fail("remote source warning")
-    )
+    monkeypatch.setattr(workflow_dependencies.resources, "log", lambda *args: pytest.fail("remote source warning"))
     requested = {"project_name": "p", "name": "n"}
-    result = resolve_ground_truth(
-        requested, task=SimpleNamespace(id="task"), deps=workflow_dependencies
-    )
+    result = resolve_ground_truth(requested, task=SimpleNamespace(id="task"), deps=workflow_dependencies)
     assert resolve_ground_truth(result, task=None, deps=workflow_dependencies) is result
     assert len(calls) == 1
     assert requested == {"project_name": "p", "name": "n"}
@@ -188,9 +180,7 @@ def test_adapter_downloads_root_csv_unchanged(
     assert csv.read_bytes() == content
     assert result.csv_sha256 == hashlib.sha256(content).hexdigest()
     assert queries == [selector | {"only_completed": True, "auto_create": False}]
-    assert downloads == [
-        {"files": ["dataset.csv"], "raise_on_error": True, "use_soft_links": False}
-    ]
+    assert downloads == [{"files": ["dataset.csv"], "raise_on_error": True, "use_soft_links": False}]
 
 
 @pytest.mark.parametrize(
@@ -214,16 +204,12 @@ def test_invalid_dataset_inventory_or_state_fails_before_download(
         list_files=lambda: files,
         get_local_copy=lambda **_: pytest.fail("invalid dataset downloaded"),
     )
-    monkeypatch.setitem(
-        sys.modules, "clearml", SimpleNamespace(Dataset=SimpleNamespace(get=lambda **_: dataset))
-    )
+    monkeypatch.setitem(sys.modules, "clearml", SimpleNamespace(Dataset=SimpleNamespace(get=lambda **_: dataset)))
     with pytest.raises((ValueError, FileNotFoundError)):
         ClearMLGroundTruthRepository().resolve(ClearMLDatasetRef(dataset_id="id"))
 
 
-@pytest.mark.parametrize(
-    "command", ["train", "predict", "val", "metrics", "compare", "pipeline", "export"]
-)
+@pytest.mark.parametrize("command", ["train", "predict", "val", "metrics", "compare", "pipeline", "export"])
 def test_hydra_accepts_reference_without_sdk_resolution(command: str) -> None:
     # Import the command registrations explicitly so this file also runs standalone.
     import clearml_yolo.entrypoints.hydra.configs  # noqa: F401
@@ -245,9 +231,7 @@ def test_download_failure_preserves_cause(monkeypatch: pytest.MonkeyPatch) -> No
         list_files=lambda: ["dataset.csv"],
         get_local_copy=failed_download,
     )
-    monkeypatch.setitem(
-        sys.modules, "clearml", SimpleNamespace(Dataset=SimpleNamespace(get=lambda **_: dataset))
-    )
+    monkeypatch.setitem(sys.modules, "clearml", SimpleNamespace(Dataset=SimpleNamespace(get=lambda **_: dataset)))
     with pytest.raises(OSError, match="fixture download failed"):
         ClearMLGroundTruthRepository().resolve(ClearMLDatasetRef(dataset_id="id"))
 
@@ -273,6 +257,4 @@ def test_export_missing_weights_precedes_task_and_dataset_effects(
         lambda *args: pytest.fail("Invalid export fetched a dataset"),
     )
     with pytest.raises(ValueError, match="requires weights"):
-        export_model(
-            {}, ClearMLConfig(), tmp_path, ground_truth=ground_truth, deps=workflow_dependencies
-        )
+        export_model({}, ClearMLConfig(), tmp_path, ground_truth=ground_truth, deps=workflow_dependencies)

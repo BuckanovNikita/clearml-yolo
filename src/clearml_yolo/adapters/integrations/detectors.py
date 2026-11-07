@@ -75,9 +75,7 @@ class _ReinferArguments(TypedDict):
 class DetectorRunner:
     """Keep legacy YOLO behavior while resolving described checkpoints independently."""
 
-    def __init__(
-        self, config: ModelConfig, legacy: ModelRunner, *, transforms: TransformConfig | None = None
-    ) -> None:
+    def __init__(self, config: ModelConfig, legacy: ModelRunner, *, transforms: TransformConfig | None = None) -> None:
         self.config = config
         self.legacy = legacy
         self.transforms = transforms
@@ -114,9 +112,7 @@ class DetectorRunner:
                     "raw comparison weights require explicit ModelRef metadata"
                 )
             if (self.config.backend, self.config.preset) != (descriptor.backend, descriptor.preset):
-                raise ValueError(
-                    "Explicit model selection disagrees with the checkpoint descriptor"
-                )
+                raise ValueError("Explicit model selection disagrees with the checkpoint descriptor")
         if reference is None or reference.backend is None:
             return descriptor
         if descriptor is not None:
@@ -125,9 +121,7 @@ class DetectorRunner:
         if reference.backend == "ultralytics":
             return None
         if reference.class_names is None or reference.preprocessing is None:
-            raise ValueError(
-                "Raw detector checkpoints require explicit class_names and preprocessing"
-            )
+            raise ValueError("Raw detector checkpoints require explicit class_names and preprocessing")
         return CheckpointDescriptor.model_validate(
             {
                 "backend": reference.backend,
@@ -144,22 +138,15 @@ class DetectorRunner:
             raise ValueError("Model reference disagrees with the checkpoint descriptor")
         if reference.class_names is not None and reference.class_names != descriptor.class_names:
             raise ValueError("Model reference vocabulary disagrees with checkpoint descriptor")
-        if (
-            reference.preprocessing is not None
-            and reference.preprocessing != descriptor.preprocessing
-        ):
+        if reference.preprocessing is not None and reference.preprocessing != descriptor.preprocessing:
             raise ValueError("Model reference preprocessing disagrees with checkpoint descriptor")
 
-    def _legacy_prediction(
-        self, values: dict[str, Any], *, comparison: bool = False
-    ) -> dict[str, Any]:
+    def _legacy_prediction(self, values: dict[str, Any], *, comparison: bool = False) -> dict[str, Any]:
         from clearml_yolo.adapters.yolo.reinfer import COMPARISON_KEYS
 
         # A native selected group has no YOLO-only controls. Supply their defaults
         # at this boundary while leaving shared comparison inputs with their owner.
-        defaults = (
-            prediction_defaults(inherit=False) if self.config.backend != "ultralytics" else {}
-        )
+        defaults = prediction_defaults(inherit=False) if self.config.backend != "ultralytics" else {}
         if comparison:
             defaults = {key: value for key, value in defaults.items() if key not in COMPARISON_KEYS}
         result = {key: value for key, value in values.items() if key not in {"backend", "preset"}}
@@ -253,9 +240,7 @@ class DetectorRunner:
             # Native training recipes may use 'model' for a registry name or a
             # nested architecture. Only prediction uses it as a checkpoint path.
             described = (
-                stage == "predict"
-                and isinstance(weights, (str, Path))
-                and self._descriptor(weights) is not None
+                stage == "predict" and isinstance(weights, (str, Path)) and self._descriptor(weights) is not None
             )
             if not described:
                 return self.legacy.write_native_yaml(path, settings, stage)
@@ -321,17 +306,13 @@ class DetectorRunner:
         if image_name not in {"name", "stem", "path"}:
             raise ValueError(f"Unsupported image_name mode: {image_name}")
         settings = self._native_prediction(model_kwargs)
-        output = write_path(
-            Path(model_kwargs.get("project", ".")) / str(model_kwargs.get("name", "predict"))
-        )
+        output = write_path(Path(model_kwargs.get("project", ".")) / str(model_kwargs.get("name", "predict")))
         output.mkdir(parents=True, exist_ok=True)
         directory = write_path(manifest_dir or output / "inputs")
         directory.mkdir(parents=True, exist_ok=True)
         manifest = write_path(directory / "images.txt")
         paths = list(dict.fromkeys(str(path) for path in image_paths))
-        manifest.write_text(
-            "\n".join(str(Path(path).absolute()) for path in paths), encoding="utf-8"
-        )
+        manifest.write_text("\n".join(str(Path(path).absolute()) for path in paths), encoding="utf-8")
         frame = self._predict_native(descriptor, Path(weights), paths, settings)
         if set(frame.attrs.get("image_paths", ())) != set(paths):
             raise ValueError("Native detector did not score every requested image")
@@ -392,9 +373,7 @@ class DetectorRunner:
             "reuse_existing": reuse_existing,
         }
         if self._descriptor(weights) is None:
-            arguments["native_kwargs"] = self._legacy_prediction(
-                arguments["native_kwargs"] or {}, comparison=True
-            )
+            arguments["native_kwargs"] = self._legacy_prediction(arguments["native_kwargs"] or {}, comparison=True)
             return self.legacy.reinfer_split(weights, ground_truth, split, output, **arguments)
         from clearml_yolo.adapters.yolo.reinfer import reinfer_split
 
@@ -432,9 +411,7 @@ class DetectorRunner:
         )
 
         native_values = {key: value for key, value in settings.items() if key not in _ROUTING}
-        config = self.config.model_copy(
-            update={"train": TrainSettings.model_validate(native_values)}
-        )
+        config = self.config.model_copy(update={"train": TrainSettings.model_validate(native_values)})
         output = write_path(Path(settings["project"]) / str(settings["name"]))
         output.mkdir(parents=True, exist_ok=True)
         from clearml_yolo.adapters.clearml.session import record_run_configuration
@@ -487,14 +464,10 @@ class DetectorRunner:
             training_publication,
         )
 
-        preserve_training_success(
-            task, result.weights, output.parent.parent / "pipeline_outcome.json"
-        )
+        preserve_training_success(task, result.weights, output.parent.parent / "pipeline_outcome.json")
         effective = settings | result.effective_args
         with training_publication(task):
-            register_training_counts(
-                task, result.weights, training_population_counts(prepared.ground_truth)
-            )
+            register_training_counts(task, result.weights, training_population_counts(prepared.ground_truth))
             self.write_native_yaml(output / "native_train.yaml", effective, "train")
             record_detector_arguments(task, effective)
             descriptor = bind_checkpoint(result.weights, result.metadata)

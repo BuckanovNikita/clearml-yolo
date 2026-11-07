@@ -94,9 +94,7 @@ def test_real_exports_and_payload_retain_identity(
     for plot in evaluated.plot_paths.values():
         with Image.open(plot) as image:
             image.verify()
-            assert image.info["Model identity"] == (
-                identity.caption
-            )
+            assert image.info["Model identity"] == (identity.caption)
     for path in (
         evaluated.dashboard_path,
         evaluated.dtrk_dashboard_path,
@@ -106,9 +104,7 @@ def test_real_exports_and_payload_retain_identity(
         values = [cell for sheet in workbook for row in sheet.iter_rows() for cell in row]
         assert name in "".join(str(cell.value) for cell in values if cell.value is not None)
         assert all(cell.data_type != "f" for cell in values)
-        assert any(
-            ("recorded" if training_id else "unavailable") in str(cell.value) for cell in values
-        )
+        assert any(("recorded" if training_id else "unavailable") in str(cell.value) for cell in values)
         if training_id:
             assert all(training_id not in str(cell.value) for cell in values)
         workbook.close()
@@ -116,9 +112,7 @@ def test_real_exports_and_payload_retain_identity(
 
 def test_plotly_captions_are_escaped_without_internal_ids() -> None:
     identity = ModelIdentity(model_name="=1 <b>猫 & model</b>", training_task_id="full-task-id")
-    context = ResultContext(
-        context_id="candidate", model_id="weights", split="test", model_identity=identity
-    )
+    context = ResultContext(context_id="candidate", model_id="weights", split="test", model_identity=identity)
     old_context = context.model_copy(update={"model_identity": None})
     task, old_task = RecordingTask(), RecordingTask()
     matrix = ConfusionMatrixPayload(labels=["cat", "background"], counts=[[1, 0], [0, 0]])

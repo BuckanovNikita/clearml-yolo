@@ -19,6 +19,4 @@ def predict_native(
     image_paths: Sequence[str],
     settings: PredictSettings,
 ) -> pd.DataFrame:
-    return predict_torchvision(
-        descriptor, weights, image_paths, settings, build_model=build_model, label_offset=1
-    )
+    return predict_torchvision(descriptor, weights, image_paths, settings, build_model=build_model, label_offset=1)

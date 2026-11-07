@@ -80,8 +80,7 @@ def append_scalar(title: str, series: str, value: float, iteration: int) -> bool
         return False
     if not math.isfinite(value):
         raise ValueError(
-            "Native scalar must be finite: "
-            f"title={title!r}, series={series!r}, iteration={iteration}, value={value!r}"
+            f"Native scalar must be finite: title={title!r}, series={series!r}, iteration={iteration}, value={value!r}"
         )
     record = {"title": title, "series": series, "value": value, "iteration": iteration}
     payload = (json.dumps(record, ensure_ascii=False, allow_nan=False) + "\n").encode()
@@ -113,9 +112,7 @@ class OutputCapture:
     def prepare(self) -> None:
         self.directory.mkdir(parents=True, exist_ok=True)
         for path in self.paths.values():
-            descriptor = os.open(
-                project_write_path(path), os.O_CREAT | os.O_WRONLY | os.O_APPEND, 0o600
-            )
+            descriptor = os.open(project_write_path(path), os.O_CREAT | os.O_WRONLY | os.O_APPEND, 0o600)
             os.close(descriptor)
 
     def offsets(self) -> dict[str, int]:
@@ -176,9 +173,7 @@ class OutputCapture:
                         self.mirror.kill()
                         self.mirror.wait(timeout=2)
                     if self.mirror.returncode != 0:
-                        raise RuntimeError(
-                            "Local console mirror failed; captured logs are retained"
-                        )
+                        raise RuntimeError("Local console mirror failed; captured logs are retained")
             finally:
                 for original in self.saved:
                     os.close(original)

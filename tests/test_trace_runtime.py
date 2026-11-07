@@ -269,9 +269,7 @@ def test_ddp_start_terminal_sink_interruption_rolls_back_live_resources(
     model = _Model()
     relay = NativeDDPRelay(None, model, str(tmp_path))
     failure = KeyboardInterrupt("sink interrupted relay startup")
-    sink = logger.add(
-        _interrupting_sink("DONE ddp.relay.start", failure), level="TRACE", catch=False
-    )
+    sink = logger.add(_interrupting_sink("DONE ddp.relay.start", failure), level="TRACE", catch=False)
     try:
         with pytest.raises(KeyboardInterrupt, match="relay startup") as caught:
             relay.__enter__()
@@ -295,9 +293,7 @@ def test_ddp_cleanup_sink_interruption_finishes_join_and_callback_removal(
     model = _Model()
     relay = NativeDDPRelay(None, model, str(tmp_path))
     failure = KeyboardInterrupt("sink interrupted relay cleanup")
-    sink = logger.add(
-        _interrupting_sink(f"{event} {operation}", failure), level="TRACE", catch=False
-    )
+    sink = logger.add(_interrupting_sink(f"{event} {operation}", failure), level="TRACE", catch=False)
     try:
         with pytest.raises(KeyboardInterrupt, match="relay cleanup") as caught, relay:
             pass
@@ -394,9 +390,7 @@ def test_gpu_cleanup_sink_interruption_finishes_all_memory_release_phases(
     monkeypatch.setitem(sys.modules, "torch", SimpleNamespace(cuda=cuda))
     monkeypatch.setattr(gc, "collect", lambda: calls.append("collect"))
     failure = KeyboardInterrupt("sink interrupted memory release")
-    sink = logger.add(
-        _interrupting_sink(f"{event} gpu.memory.collect", failure), level="TRACE", catch=False
-    )
+    sink = logger.add(_interrupting_sink(f"{event} gpu.memory.collect", failure), level="TRACE", catch=False)
     try:
         with pytest.raises(KeyboardInterrupt, match="memory release") as caught:
             runtime_module.release_training_memory()
@@ -417,9 +411,7 @@ def test_ddp_cleanup_sink_interruption_preserves_pending_caller_exception(
     relay = NativeDDPRelay(None, model, str(tmp_path))
     interruption = KeyboardInterrupt("sink interrupted pending cleanup")
     failure = ValueError("caller failed during relay")
-    sink = logger.add(
-        _interrupting_sink(f"START {operation}", interruption), level="TRACE", catch=False
-    )
+    sink = logger.add(_interrupting_sink(f"START {operation}", interruption), level="TRACE", catch=False)
     try:
         with pytest.raises(ValueError, match="caller failed") as caught, relay:
             raise failure

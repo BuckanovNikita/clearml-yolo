@@ -65,9 +65,7 @@ def publish_results(
         request = PublicationRequest(
             task_id=str(task.id),
             ground_truth=Path(ground_truth),
-            source_ground_truth=Path(source_ground_truth)
-            if source_ground_truth is not None
-            else None,
+            source_ground_truth=Path(source_ground_truth) if source_ground_truth is not None else None,
             predictions=Path(predictions) if predictions is not None else None,
             prediction_splits=prediction_splits,
             prediction_image_name=prediction_image_name,

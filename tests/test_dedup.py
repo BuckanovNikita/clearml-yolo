@@ -109,9 +109,7 @@ def test_symlinks_and_hardlink_aliases_are_not_replaced(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("error", [errno.EOPNOTSUPP, errno.ENOTTY, errno.EXDEV])
-def test_unsupported_clone_preserves_original(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, error: int
-) -> None:
+def test_unsupported_clone_preserves_original(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, error: int) -> None:
     _, destination = pair(tmp_path)
     before = destination.stat()
 
@@ -158,9 +156,7 @@ def test_metadata_failure_keeps_original(tmp_path: Path, monkeypatch: pytest.Mon
     assert list(destination.parent.iterdir()) == [destination]
 
 
-def test_intervening_destination_write_is_not_lost(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_intervening_destination_write_is_not_lost(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _, destination = pair(tmp_path)
 
     def racing_clone(source_fd: int, destination_fd: int) -> None:
@@ -174,9 +170,7 @@ def test_intervening_destination_write_is_not_lost(
     assert list(destination.parent.iterdir()) == [destination]
 
 
-def test_interruption_cleans_temporary_file(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_interruption_cleans_temporary_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _, destination = pair(tmp_path)
 
     def interrupted(_source_fd: int, _destination_fd: int) -> None:
@@ -201,9 +195,7 @@ def test_native_reflink_independent_write(tmp_path: Path) -> None:
     assert source.read_bytes() == b"identical image bytes"
 
 
-def test_hash_collision_never_replaces_different_bytes(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_hash_collision_never_replaces_different_bytes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     source, destination = pair(tmp_path)
     destination.write_bytes(b"different image bytes")
     assert source.stat().st_size == destination.stat().st_size
@@ -254,9 +246,7 @@ def test_cross_device_candidate_does_not_prevent_same_device_dedup(
     assert destination.read_bytes() == third.read_bytes()
 
 
-def test_unsupported_platform_does_not_mutate(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_unsupported_platform_does_not_mutate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _, destination = pair(tmp_path)
     before = destination.stat()
     monkeypatch.setattr(sys, "platform", "win32")
@@ -281,9 +271,7 @@ def test_read_permission_error_is_reported(tmp_path: Path, monkeypatch: pytest.M
     assert destination.read_bytes() == b"identical image bytes"
 
 
-def test_intervening_source_write_prevents_replacement(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_intervening_source_write_prevents_replacement(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     source, destination = pair(tmp_path)
     before = destination.stat()
 
@@ -327,9 +315,7 @@ def test_incomplete_clone_never_replaces_original(
     assert list(destination.parent.iterdir()) == [destination]
 
 
-def test_unsupported_platform_skips_before_temporary_creation(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_unsupported_platform_skips_before_temporary_creation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     pair(tmp_path)
     monkeypatch.setattr(sys, "platform", "win32")
 

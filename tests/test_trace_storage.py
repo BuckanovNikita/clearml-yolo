@@ -34,34 +34,23 @@ def test_cache_acquisition_finishes_before_yield_and_lock_lifetime_outlives_cons
     cache_dir = tmp_path / "cache"
     with cached_dataset(source, cache_dir) as prepared:
         assert prepared.data.is_file()
-        assert any(
-            message.startswith("DONE storage.cache.lock.acquire ") for message in trace_messages
-        )
-        assert not any(
-            message.startswith("DONE storage.cache.lock.lifetime ") for message in trace_messages
-        )
+        assert any(message.startswith("DONE storage.cache.lock.acquire ") for message in trace_messages)
+        assert not any(message.startswith("DONE storage.cache.lock.lifetime ") for message in trace_messages)
         lock_path = next((cache_dir / ".locks").glob("*.lock"))
         with pytest.raises(Timeout), FileLock(lock_path, timeout=0):
             pytest.fail("Native-consumer lock must remain held across yield")
-    assert any(
-        message.startswith("DONE storage.cache.lock.lifetime ") for message in trace_messages
-    )
+    assert any(message.startswith("DONE storage.cache.lock.lifetime ") for message in trace_messages)
     with FileLock(lock_path, timeout=0):
         pass
 
 
-def test_cache_hit_avoids_export_and_consumer_error_releases_lock(
-    tmp_path: Path, trace_messages: list[str]
-) -> None:
+def test_cache_hit_avoids_export_and_consumer_error_releases_lock(tmp_path: Path, trace_messages: list[str]) -> None:
     source = _source(tmp_path / "input")
     cache_dir = tmp_path / "cache"
     with cached_dataset(source, cache_dir):
         pass
     assert any(message.startswith("START storage.cache.miss ") for message in trace_messages)
-    assert (
-        sum(message.startswith("START storage.dataset.materialize ") for message in trace_messages)
-        == 1
-    )
+    assert sum(message.startswith("START storage.dataset.materialize ") for message in trace_messages) == 1
     trace_messages.clear()
     original = ValueError("token=private-consumer-token")
     with (
@@ -71,12 +60,8 @@ def test_cache_hit_avoids_export_and_consumer_error_releases_lock(
         raise original
     assert caught.value is original
     assert any(message.startswith("DONE storage.cache.hit ") for message in trace_messages)
-    assert any(
-        message.startswith("FAILED storage.cache.lock.lifetime ") for message in trace_messages
-    )
-    assert not any(
-        message.startswith("START storage.dataset.export ") for message in trace_messages
-    )
+    assert any(message.startswith("FAILED storage.cache.lock.lifetime ") for message in trace_messages)
+    assert not any(message.startswith("START storage.dataset.export ") for message in trace_messages)
     assert all("private-consumer-token" not in message for message in trace_messages)
     with FileLock(next((cache_dir / ".locks").glob("*.lock")), timeout=0):
         pass
@@ -93,16 +78,13 @@ def test_file_io_returns_original_contents_and_logs_only_scalar_shape(
     write_csv(frame, csv)
     pd.testing.assert_frame_equal(read_csv(csv), frame)
     assert any(
-        message.startswith("DONE storage.csv.write ") and "rows=1 columns=2" in message
-        for message in trace_messages
+        message.startswith("DONE storage.csv.write ") and "rows=1 columns=2" in message for message in trace_messages
     )
     assert all("private-text-token" not in message for message in trace_messages)
     assert all("private-row-value" not in message for message in trace_messages)
 
 
-def test_missing_read_and_checkpoint_hash_preserve_failure_contract(
-    tmp_path: Path, trace_messages: list[str]
-) -> None:
+def test_missing_read_and_checkpoint_hash_preserve_failure_contract(tmp_path: Path, trace_messages: list[str]) -> None:
     path = tmp_path / "missing.txt"
     with pytest.raises(FileNotFoundError):
         read_text(path)
@@ -113,9 +95,7 @@ def test_missing_read_and_checkpoint_hash_preserve_failure_contract(
     assert any(message.startswith("DONE storage.checkpoint.hash ") for message in trace_messages)
 
 
-def test_native_archive_has_one_aggregate_span_for_many_files(
-    tmp_path: Path, trace_messages: list[str]
-) -> None:
+def test_native_archive_has_one_aggregate_span_for_many_files(tmp_path: Path, trace_messages: list[str]) -> None:
     source = tmp_path / "native"
     source.mkdir()
     for index in range(12):
@@ -124,9 +104,7 @@ def test_native_archive_has_one_aggregate_span_for_many_files(
     destination.mkdir()
     path = archive_native_outputs(source, destination, role="prediction", split="val")
     assert path.is_file()
-    assert (
-        sum(message.startswith("START storage.native.archive ") for message in trace_messages) == 1
-    )
+    assert sum(message.startswith("START storage.native.archive ") for message in trace_messages) == 1
 
 
 def test_storage_is_silent_without_trace_opt_in(
@@ -156,9 +134,7 @@ def test_lock_acquisition_failure_is_distinct_from_consumer_lifetime(
         def __exit__(self, *args: object) -> None:
             pytest.fail("Failed acquisition must not attempt lock exit")
 
-    def failed_lock(
-        path: Path, *, fallback_to_soft: bool, preserve_lock_file: bool
-    ) -> FailedLock:
+    def failed_lock(path: Path, *, fallback_to_soft: bool, preserve_lock_file: bool) -> FailedLock:
         assert not fallback_to_soft
         assert preserve_lock_file
         return FailedLock()
@@ -170,9 +146,5 @@ def test_lock_acquisition_failure_is_distinct_from_consumer_lifetime(
     ):
         pytest.fail("Cache lock failure must precede consumer entry")
     assert caught.value.__cause__ is original
-    assert any(
-        message.startswith("FAILED storage.cache.lock.acquire ") for message in trace_messages
-    )
-    assert not any(
-        message.startswith("START storage.cache.lock.lifetime ") for message in trace_messages
-    )
+    assert any(message.startswith("FAILED storage.cache.lock.acquire ") for message in trace_messages)
+    assert not any(message.startswith("START storage.cache.lock.lifetime ") for message in trace_messages)

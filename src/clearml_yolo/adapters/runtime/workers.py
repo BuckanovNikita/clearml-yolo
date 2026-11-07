@@ -57,9 +57,7 @@ def _await_workers(
         time.sleep(0.05)
 
 
-def _stop_workers(
-    processes: Sequence[subprocess.Popen[bytes]], trees: Sequence[LinuxProcessTree]
-) -> None:
+def _stop_workers(processes: Sequence[subprocess.Popen[bytes]], trees: Sequence[LinuxProcessTree]) -> None:
     failures: list[Exception] = []
     for tree in trees:
         try:
@@ -120,9 +118,7 @@ def run_workers(
                     start_new_session=True,
                 )
                 processes.append(process)
-                trees.append(ScopedProcessTree(
-                    process.pid, token, subreaper=os.getpid(), owner_env=_WORKER_OWNER
-                ))
+                trees.append(ScopedProcessTree(process.pid, token, subreaper=os.getpid(), owner_env=_WORKER_OWNER))
             status = _await_workers(processes, trees, time.monotonic() + timeout_seconds, monitor)
         finally:
             primary = sys.exception()
@@ -130,10 +126,6 @@ def run_workers(
                 _stop_workers(processes, trees)
             except Exception as cleanup_error:
                 if primary is not None:
-                    raise BaseExceptionGroup(
-                        "Worker execution and cleanup failed", [primary, cleanup_error]
-                    ) from None
+                    raise BaseExceptionGroup("Worker execution and cleanup failed", [primary, cleanup_error]) from None
                 raise
-    return WorkerOutcome(
-        status=status, exit_codes=tuple(process.returncode for process in processes)
-    )
+    return WorkerOutcome(status=status, exit_codes=tuple(process.returncode for process in processes))

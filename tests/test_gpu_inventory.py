@@ -71,9 +71,7 @@ def test_idle_baseline_uses_fresh_telemetry_in_selected_device_order(
 def test_idle_preflight_never_waits_on_or_accepts_foreign_compute(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(
-        gpu, "gpu_states", lambda: {"GPU-test": gpu.GPUState(10, 0, frozenset({42}))}
-    )
+    monkeypatch.setattr(gpu, "gpu_states", lambda: {"GPU-test": gpu.GPUState(10, 0, frozenset({42}))})
     monkeypatch.setattr(time, "sleep", lambda _: pytest.fail("Must reject foreign process"))
     with pytest.raises(RuntimeError, match="busy"):
         gpu.require_idle((_device(),))
@@ -102,9 +100,7 @@ def test_telemetry_cannot_reuse_a_previously_owned_pid_after_its_identity_change
     tree = process_tree.LinuxProcessTree(101, "private-token", identities={202: 2})
     monkeypatch.setattr(tree, "_table", lambda: dict(table))
     monkeypatch.setattr(tree, "_marked", lambda _: False)
-    monkeypatch.setattr(
-        gpu, "gpu_states", lambda: {"GPU-test": gpu.GPUState(50, 75, frozenset({202}))}
-    )
+    monkeypatch.setattr(gpu, "gpu_states", lambda: {"GPU-test": gpu.GPUState(50, 75, frozenset({202}))})
     assert gpu.monitor_devices((_device(),), tree.live_pids) == (50,)
 
     def changed_telemetry() -> dict[str, gpu.GPUState]:
@@ -125,10 +121,12 @@ def test_malformed_numeric_telemetry_is_an_actionable_unavailable_failure(
 ) -> None:
     values = {"memory.used": "50", "utilization.gpu": "75", "pid": "42"}
     values[field] = "[Generic operating system error]"
-    queries = iter([
-        [["GPU-test", values["memory.used"], values["utilization.gpu"]]],
-        [["GPU-test", values["pid"]]],
-    ])
+    queries = iter(
+        [
+            [["GPU-test", values["memory.used"], values["utilization.gpu"]]],
+            [["GPU-test", values["pid"]]],
+        ]
+    )
     monkeypatch.setattr(gpu, "_query", lambda _: next(queries))
     with pytest.raises(RuntimeError, match=f"GPU telemetry unavailable.*{field}"):
         gpu.gpu_states()
@@ -144,7 +142,8 @@ def test_force_allows_unattributed_activity_but_keeps_live_memory(
 
 @pytest.mark.parametrize("missing", [False, True])
 def test_force_still_rejects_foreign_compute_and_missing_telemetry(
-    monkeypatch: pytest.MonkeyPatch, missing: bool,
+    monkeypatch: pytest.MonkeyPatch,
+    missing: bool,
 ) -> None:
     states = {} if missing else {"GPU-test": gpu.GPUState(70, 65, frozenset({42}))}
     monkeypatch.setattr(gpu, "gpu_states", lambda: states)
@@ -161,14 +160,11 @@ def _fake_nvidia_smi(directory: Path, body: str) -> None:
     script.chmod(0o755)
 
 
-def test_failed_query_keeps_its_type_and_attaches_nvml_output(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_failed_query_keeps_its_type_and_attaches_nvml_output(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     # NVML prints its failure on stdout; the exception text alone omits it.
     _fake_nvidia_smi(
         tmp_path / "bin",
-        "echo 'Failed to initialize NVML: Generic operating system error'\n"
-        "echo 'driver unreachable' >&2\nexit 12",
+        "echo 'Failed to initialize NVML: Generic operating system error'\necho 'driver unreachable' >&2\nexit 12",
     )
     monkeypatch.setenv("PATH", str(tmp_path / "bin"))
     with pytest.raises(subprocess.CalledProcessError) as caught:
@@ -181,9 +177,7 @@ def test_failed_query_keeps_its_type_and_attaches_nvml_output(
     assert "driver unreachable" in notes
 
 
-@pytest.mark.parametrize(
-    "output", [b"partial NVML output\n", "partial NVML output\n"], ids=["bytes", "text"]
-)
+@pytest.mark.parametrize("output", [b"partial NVML output\n", "partial NVML output\n"], ids=["bytes", "text"])
 def test_timed_out_query_keeps_its_type_and_attaches_partial_output(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, output: bytes | str
 ) -> None:
@@ -200,9 +194,7 @@ def test_timed_out_query_keeps_its_type_and_attaches_partial_output(
     assert caught.value.__notes__ == ["nvidia-smi stdout: partial NVML output"]
 
 
-def test_failed_query_with_empty_streams_adds_no_notes(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_failed_query_with_empty_streams_adds_no_notes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _fake_nvidia_smi(tmp_path / "bin", "exit 3")
     monkeypatch.setenv("PATH", str(tmp_path / "bin"))
     with pytest.raises(subprocess.CalledProcessError) as caught:

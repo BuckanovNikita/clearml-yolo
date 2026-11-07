@@ -35,9 +35,7 @@ def run(request_path: Path) -> int:
         # Torch's C++ binding attaches this native CUDA code; its stubs and
         # Python-only exception constructors omit the opaque SDK field.
         accelerator_code: object = (
-            getattr(error, "error_code", None)
-            if isinstance(error, torch.AcceleratorError)
-            else None
+            getattr(error, "error_code", None) if isinstance(error, torch.AcceleratorError) else None
         )
         status = "error"
         if isinstance(error, torch.cuda.OutOfMemoryError) or (

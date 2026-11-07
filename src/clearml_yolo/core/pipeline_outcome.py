@@ -31,9 +31,7 @@ class PipelineOutcome(BaseModel):
         failed = any(stage.status == "failed" for stage in self.stages.values())
         if failed and not self.training_succeeded:
             return "failed"
-        if failed or any(
-            stage.status == "completed_with_warnings" for stage in self.stages.values()
-        ):
+        if failed or any(stage.status == "completed_with_warnings" for stage in self.stages.values()):
             return "completed_with_warnings"
         return "succeeded"
 

@@ -160,9 +160,7 @@ def test_duplicate_host_and_large_headers_are_rejected() -> None:
         assert b" 431 " in _raw(server, large).split(b"\r\n", 1)[0]
 
 
-@pytest.mark.parametrize(
-    "path", ["/../pyproject.toml", "/%2e%2e/pyproject.toml", "/tutorials/missing.html"]
-)
+@pytest.mark.parametrize("path", ["/../pyproject.toml", "/%2e%2e/pyproject.toml", "/tutorials/missing.html"])
 def test_unlisted_assets_cannot_be_read(path: str) -> None:
     with _running(lambda request: PreviewResult()) as server:
         assert _request(server, "GET", path)[0] == HTTPStatus.NOT_FOUND
@@ -180,9 +178,7 @@ def test_missing_assets_and_callback_failure_do_not_stop_server(
     monkeypatch.setattr(server_module, "asset_bytes", missing)
     with _running(failing) as server:
         assert _request(server, "GET", "/")[0] == HTTPStatus.INTERNAL_SERVER_ERROR
-        status, body, _ = _request(
-            server, "POST", "/api/preview", "{}", {"Content-Type": "application/json"}
-        )
+        status, body, _ = _request(server, "POST", "/api/preview", "{}", {"Content-Type": "application/json"})
         assert status == HTTPStatus.INTERNAL_SERVER_ERROR
         assert b"private submitted contents" not in body
         assert _request(server, "GET", "/api/catalog")[0] == HTTPStatus.OK
@@ -269,8 +265,7 @@ def _workers(source: str) -> PreviewWorkers:
 
 def test_real_worker_transports_request_and_valid_response() -> None:
     workers = _workers(
-        "import json,sys; request=json.load(sys.stdin); "
-        "print(json.dumps({'command':request['command']}))"
+        "import json,sys; request=json.load(sys.stdin); print(json.dumps({'command':request['command']}))"
     )
     try:
         result = workers(PreviewRequest(command="predict"))
@@ -302,8 +297,7 @@ def test_worker_timeout_reaps_its_process(monkeypatch: pytest.MonkeyPatch, tmp_p
     monkeypatch.setattr(worker_module, "WORKER_TIMEOUT", 0.3)
     marker = tmp_path / "pid"
     workers = _workers(
-        f"import os,time,pathlib; pathlib.Path({str(marker)!r}).write_text(str(os.getpid())); "
-        "time.sleep(60)"
+        f"import os,time,pathlib; pathlib.Path({str(marker)!r}).write_text(str(os.getpid())); time.sleep(60)"
     )
     try:
         started = monotonic()
@@ -317,14 +311,10 @@ def test_worker_timeout_reaps_its_process(monkeypatch: pytest.MonkeyPatch, tmp_p
 
 
 @pytest.mark.parametrize("channel", ["stdout", "stderr"])
-def test_worker_output_limits_apply_while_worker_is_running(
-    channel: str, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_worker_output_limits_apply_while_worker_is_running(channel: str, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(worker_module, "MAX_RESPONSE_BYTES", 512)
     monkeypatch.setattr(worker_module, "MAX_DIAGNOSTIC_BYTES", 512)
-    workers = _workers(
-        f"import sys,time; sys.{channel}.write('x'*1048576); sys.{channel}.flush(); time.sleep(60)"
-    )
+    workers = _workers(f"import sys,time; sys.{channel}.write('x'*1048576); sys.{channel}.flush(); time.sleep(60)")
     try:
         started = monotonic()
         assert "exceeds" in workers(PreviewRequest()).errors[0]
@@ -370,9 +360,7 @@ def test_unavailable_worker_executable_is_a_documentation_error(
 
 def test_successful_worker_reaps_group_children_with_closed_pipes(tmp_path: Path) -> None:
     sentinel = tmp_path / "unowned-effect"
-    child = (
-        f"import time; from pathlib import Path; time.sleep(0.5); Path({str(sentinel)!r}).touch()"
-    )
+    child = f"import time; from pathlib import Path; time.sleep(0.5); Path({str(sentinel)!r}).touch()"
     code = (
         "import subprocess,sys; "
         f"subprocess.Popen([sys.executable,'-c',{child!r}], "
@@ -443,9 +431,7 @@ def test_parent_cleans_worker_temporary_files_after_every_outcome(
         workers.close()
 
 
-def test_close_removes_owned_worker_temporary_directory(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_close_removes_owned_worker_temporary_directory(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     sandbox = tmp_path / "inherited-temporary"
     sandbox.mkdir()
     sentinel = tmp_path / "unrelated" / "keep"

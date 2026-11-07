@@ -94,9 +94,7 @@ def test_export_preview_preserves_present_and_deferred_inputs(overrides: list[st
         ("train", ["ground_truth=''"], "ground_truth"),
     ],
 )
-def test_known_invalid_wrapper_settings_are_reported(
-    command: str, overrides: list[str], message: str
-) -> None:
+def test_known_invalid_wrapper_settings_are_reported(command: str, overrides: list[str], message: str) -> None:
     result = preview(PreviewRequest(command=command, overrides=overrides))
     assert not result.errors
     assert message in "\n".join(result.jobs[0].errors)
@@ -112,9 +110,7 @@ def test_known_invalid_wrapper_settings_are_reported(
         ("export", ["model=rfdetr/small"], "Faster R-CNN"),
     ],
 )
-def test_backend_and_inactive_group_errors_are_reported(
-    command: str, overrides: list[str], message: str
-) -> None:
+def test_backend_and_inactive_group_errors_are_reported(command: str, overrides: list[str], message: str) -> None:
     result = preview(PreviewRequest(command=command, overrides=overrides))
     assert not result.errors
     assert message in "\n".join(result.jobs[0].errors)
@@ -151,9 +147,7 @@ def test_unresolved_leaf_does_not_hide_independent_pydantic_error() -> None:
 
 
 def test_unresolved_native_leaf_does_not_hide_independent_native_error() -> None:
-    result = preview(
-        PreviewRequest(overrides=["ultralytics.device=${oc.env:DEVICE}", "ultralytics.epochs=0"])
-    )
+    result = preview(PreviewRequest(overrides=["ultralytics.device=${oc.env:DEVICE}", "ultralytics.epochs=0"]))
     assert not result.errors
     assert "epochs" in "\n".join(result.jobs[0].errors)
     assert "DEVICE" not in "\n".join(result.jobs[0].errors)

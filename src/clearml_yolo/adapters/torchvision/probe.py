@@ -46,9 +46,7 @@ class SyntheticDataset(Dataset[tuple[Tensor, dict[str, Tensor]]]):
         positions = torch.arange(objects)
         left = (positions % grid).float() * (width / grid)
         top = (positions // grid).float() * (height / grid)
-        boxes = torch.stack(
-            (left, top, left + width / grid * 0.8, top + height / grid * 0.8), dim=1
-        )
+        boxes = torch.stack((left, top, left + width / grid * 0.8, top + height / grid * 0.8), dim=1)
         labels = positions % self.request.workload.classes + self.label_offset
         return image, {
             "boxes": boxes,
@@ -90,9 +88,7 @@ class _ProbeRun:
         self.optimizer = torch.optim.AdamW(
             self.model.parameters(), lr=self.settings.lr, weight_decay=self.settings.weight_decay
         )
-        self.scaler = torch.amp.GradScaler(
-            "cuda", enabled=self.settings.amp and context.device.type == "cuda"
-        )
+        self.scaler = torch.amp.GradScaler("cuda", enabled=self.settings.amp and context.device.type == "cuda")
         self.ema = (
             AveragedModel(
                 unwrap_model(self.model),
@@ -117,9 +113,7 @@ class _ProbeRun:
             remaining = steps - (self.completed_steps - before)
             self._train_attempts(remaining)
             if self.scaler.is_enabled() and self.scaler.get_scale() < 1:
-                raise FloatingPointError(
-                    "Probe gradients remain nonfinite after AMP scale reduction"
-                )
+                raise FloatingPointError("Probe gradients remain nonfinite after AMP scale reduction")
         return self.completed_steps - before
 
     def _train_attempts(self, steps: int) -> None:
@@ -180,9 +174,7 @@ def _config(request: BatchProbeRequest) -> ModelConfig:
     return config
 
 
-def probe(
-    request: BatchProbeRequest, *, build_model: DetectorBuilder, label_offset: Literal[0, 1]
-) -> ProbeRankResult:
+def probe(request: BatchProbeRequest, *, build_model: DetectorBuilder, label_offset: Literal[0, 1]) -> ProbeRankResult:
     config = _config(request)
     context = training_context(config.train.device, request.global_batch)
     if context.device.type != "cuda":

@@ -50,9 +50,7 @@ def test_a_run_dir_is_named_after_the_run_id_beneath_the_root(tmp_path: Path) ->
 
 
 @pytest.mark.parametrize("explicit", [None, Path("runs/handmade")])
-def test_a_resolved_run_dir_is_absolute(
-    explicit: Path | None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_a_resolved_run_dir_is_absolute(explicit: Path | None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Hydra runs with chdir=False while ultralytics resolves its project path against the
     working directory, so a relative path would mean two different places."""
     monkeypatch.chdir(tmp_path)
@@ -174,9 +172,7 @@ def test_a_stage_output_under_latest_survives_the_move_intact(tmp_path: Path) ->
 
     point_latest_at(tmp_path, run_dir)
 
-    assert (tmp_path / DISPLACED_NAME / "reports" / "report.html").read_text(
-        encoding="utf-8"
-    ) == "mine"
+    assert (tmp_path / DISPLACED_NAME / "reports" / "report.html").read_text(encoding="utf-8") == "mine"
 
 
 @pytest.mark.usefixtures("fixed_identity")
@@ -236,16 +232,12 @@ def test_task_identity_adapter_reads_active_values() -> None:
 
     from clearml_yolo.adapters.clearml.session import task_identity
 
-    task = SimpleNamespace(
-        id="active-id", name="actual task", get_project_name=lambda: "actual/project"
-    )
+    task = SimpleNamespace(id="active-id", name="actual task", get_project_name=lambda: "actual/project")
     assert task_identity(task) == ("actual/project", "actual task", "active-id")
 
 
 @pytest.mark.parametrize("existing_latest", [False, True])
-def test_latest_project_does_not_collide_with_convenience_link(
-    tmp_path: Path, existing_latest: bool
-) -> None:
+def test_latest_project_does_not_collide_with_convenience_link(tmp_path: Path, existing_latest: bool) -> None:
     from clearml_yolo.adapters.storage.run_identity import task_run_dir
 
     root = tmp_path / "runs"

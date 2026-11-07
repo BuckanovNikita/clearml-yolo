@@ -32,9 +32,7 @@ def test_preflight_failure_has_trace_without_changing_error(
     assert any("FAILED fiftyone.backend.import" in line for line in messages)
 
 
-def test_publication_records_lock_and_aggregate_writes(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_publication_records_lock_and_aggregate_writes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("LOGURU_LEVEL", "TRACE")
     messages: list[str] = []
     sink = logger.add(lambda record: messages.append(str(record)), level="TRACE")
@@ -43,9 +41,7 @@ def test_publication_records_lock_and_aggregate_writes(
     monkeypatch.setattr(module, "read_snapshot", lambda _: snapshot)
     monkeypatch.setattr(module, "read_predictions", lambda *_: {})
     monkeypatch.setattr(module, "prediction_aliases", lambda *_: {})
-    monkeypatch.setattr(
-        module, "_backend", lambda: SimpleNamespace(config=SimpleNamespace(database_dir=tmp_path))
-    )
+    monkeypatch.setattr(module, "_backend", lambda: SimpleNamespace(config=SimpleNamespace(database_dir=tmp_path)))
     monkeypatch.setattr(module, "_dataset", lambda *_: (dataset, False))
     monkeypatch.setattr(module, "_remove_evaluations", lambda *_: None)
     monkeypatch.setattr(module, "_write_run", lambda *_: None)
@@ -68,16 +64,12 @@ def test_publication_records_lock_and_aggregate_writes(
     ):
         assert any(f"START fiftyone.{operation}" in line for line in messages)
         assert any(f"DONE fiftyone.{operation}" in line for line in messages)
-    acquisition = next(
-        index for index, line in enumerate(messages) if "DONE fiftyone.lock.acquire" in line
-    )
+    acquisition = next(index for index, line in enumerate(messages) if "DONE fiftyone.lock.acquire" in line)
     writing = next(index for index, line in enumerate(messages) if "START fiftyone.dataset" in line)
     assert acquisition < writing
 
 
-def test_failed_dataset_write_releases_publication_lock(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_failed_dataset_write_releases_publication_lock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("LOGURU_LEVEL", "TRACE")
     snapshot = SimpleNamespace(images={}, sha256="truth", membership={})
     monkeypatch.setattr(module, "read_snapshot", lambda _: snapshot)
@@ -105,16 +97,15 @@ def test_failed_dataset_write_releases_publication_lock(
 
 
 def test_interrupted_lock_completion_releases_publication_lock(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     monkeypatch.setenv("LOGURU_LEVEL", "TRACE")
     snapshot = SimpleNamespace(images={}, sha256="truth", membership={})
     monkeypatch.setattr(module, "read_snapshot", lambda _: snapshot)
     monkeypatch.setattr(module, "read_predictions", lambda *_: {})
     monkeypatch.setattr(module, "prediction_aliases", lambda *_: {})
-    monkeypatch.setattr(
-        module, "_backend", lambda: SimpleNamespace(config=SimpleNamespace(database_dir=tmp_path))
-    )
+    monkeypatch.setattr(module, "_backend", lambda: SimpleNamespace(config=SimpleNamespace(database_dir=tmp_path)))
     owned_lock = FileLock(tmp_path / "owned.lock")
     monkeypatch.setattr(module, "FileLock", lambda _: owned_lock)
 

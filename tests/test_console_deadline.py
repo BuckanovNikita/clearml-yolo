@@ -144,9 +144,7 @@ def test_required_final_publication_failure_corrects_completed_task_to_failed(
         def finish(self) -> None:
             raise ConsolePublicationError("required final drain failed")
 
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.clearml.session._start_console_publisher", lambda *_args: Publisher()
-    )
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.session._start_console_publisher", lambda *_args: Publisher())
     with (
         pytest.raises(ConsolePublicationError, match="required final drain"),
         invocation(ClearMLConfig(), "train"),
@@ -172,9 +170,7 @@ def test_unacknowledged_workload_never_closes_or_completes_sdk_task(
         def finish(self) -> None:
             pass
 
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.clearml.session._start_console_publisher", lambda *_args: Publisher()
-    )
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.session._start_console_publisher", lambda *_args: Publisher())
     with (
         pytest.raises(ConsolePublicationError, match="barrier"),
         invocation(ClearMLConfig(), "train"),
@@ -200,9 +196,7 @@ def test_failed_failure_path_barrier_preserves_original_error_without_sdk_close(
         def finish(self) -> None:
             pass
 
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.clearml.session._start_console_publisher", lambda *_args: Publisher()
-    )
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.session._start_console_publisher", lambda *_args: Publisher())
     original = ValueError("original native failure")
     with (
         pytest.raises(ValueError, match="original native failure") as caught,

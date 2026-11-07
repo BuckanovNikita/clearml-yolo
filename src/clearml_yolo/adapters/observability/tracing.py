@@ -182,17 +182,13 @@ def _stack_snapshot(
     groups: dict[tuple[tuple[str, ...], bool], list[int]] = {}
     frames = sys._current_frames()  # noqa: SLF001 - Python's location-only sampling API
     # Active threads are considered first, even when SDK helper threads outnumber them.
-    diagnostic_ids = {
-        thread.ident for thread in threading.enumerate() if thread.name.startswith("cy-trace-")
-    }
+    diagnostic_ids = {thread.ident for thread in threading.enumerate() if thread.name.startswith("cy-trace-")}
     for thread_id in sorted(frames, key=lambda key: (key not in active, key)):
         if thread_id == monitor_id or thread_id in diagnostic_ids:
             continue
         locations = _frames(frames[thread_id])
         groups.setdefault(locations, []).append(thread_id)
-    return tuple(
-        (locations, tuple(ids), truncated) for (locations, truncated), ids in groups.items()
-    )
+    return tuple((locations, tuple(ids), truncated) for (locations, truncated), ids in groups.items())
 
 
 def _render_snapshot(snapshot: tuple[tuple[tuple[str, ...], tuple[int, ...], bool], ...]) -> str:
@@ -275,11 +271,7 @@ def _begin(name: str, context: Mapping[str, object] | None) -> tuple[_State, _Op
             f"{state.sequence:x}",
             parents[-1].identity if parents else "-",
             next(
-                (
-                    parent.name
-                    for parent in reversed(parents)
-                    if parent.name.startswith("workflow.")
-                ),
+                (parent.name for parent in reversed(parents) if parent.name.startswith("workflow.")),
                 parents[-1].name if parents else _text(name),
             ),
             monotonic(),
@@ -297,9 +289,7 @@ def _end(state: _State, operation: _Operation) -> None:
     if state.pid != os.getpid():
         return
     with state.lock:
-        remaining = tuple(
-            item for item in state.active.get(operation.thread, ()) if item != operation
-        )
+        remaining = tuple(item for item in state.active.get(operation.thread, ()) if item != operation)
         if remaining:
             state.active[operation.thread] = remaining
         else:

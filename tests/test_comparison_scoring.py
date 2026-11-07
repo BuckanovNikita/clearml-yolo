@@ -83,9 +83,7 @@ def _two_cats_one_weak() -> tuple[pd.DataFrame, pd.DataFrame]:
 def test_prediction_below_its_class_threshold_becomes_a_miss() -> None:
     gt, preds = _two_cats_one_weak()
 
-    outcome = score_split(
-        gt, preds, ["cat"], {"cat": 0.5}, iou_threshold=0.5, matching_strategy="iou_prior"
-    )
+    outcome = score_split(gt, preds, ["cat"], {"cat": 0.5}, iou_threshold=0.5, matching_strategy="iou_prior")
 
     assert outcome.counts == {"cat": ClassCounts(tp=1, fp=0, fn=1)}
     assert outcome.gt_status["detected"].tolist() == [True, False]
@@ -132,9 +130,7 @@ def test_prediction_class_absent_from_ground_truth_is_counted_as_false_positive(
         ({"cat": 1.01}, r"\[0, 1\]"),
     ],
 )
-def test_required_thresholds_are_exact_and_valid(
-    thresholds: dict[str, float], message: str
-) -> None:
+def test_required_thresholds_are_exact_and_valid(thresholds: dict[str, float], message: str) -> None:
     with pytest.raises(ValueError, match=message):
         validate_thresholds(thresholds, ["cat"])
 
@@ -256,9 +252,7 @@ def test_labels_outside_the_scored_classes_are_excluded_without_crashing() -> No
         index=[0, 1, 2],
     )
 
-    outcome = score_split(
-        gt, _pred_frame([], []), ["cat"], {}, iou_threshold=0.5, matching_strategy="iou_prior"
-    )
+    outcome = score_split(gt, _pred_frame([], []), ["cat"], {}, iou_threshold=0.5, matching_strategy="iou_prior")
 
     assert outcome.counts == {"cat": ClassCounts(tp=0, fp=0, fn=1)}
     assert outcome.gt_status["gt_index"].tolist() == [0]

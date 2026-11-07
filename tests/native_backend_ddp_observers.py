@@ -23,9 +23,7 @@ def record_process(root: Path) -> None:
 def install_owner() -> None:
     """The public command remains the invocation owner; only rank argv is wrapped."""
     # Opaque test seams preserve the production call while observing private SDK hooks.
-    distributed_training: Any = importlib.import_module(
-        "clearml_yolo.adapters.integrations.distributed_training"
-    )
+    distributed_training: Any = importlib.import_module("clearml_yolo.adapters.integrations.distributed_training")
     from native_backend_ddp_harness import instrument_command
 
     root = Path(os.environ["CY_DDP_TRACE"])
@@ -110,9 +108,7 @@ class RankObserver:
         self.state[f"{phase}_ids"].extend(int(target["image_id"]) for target in targets)
         if phase == "train":
             self.state["train_batches"].append(len(targets))
-            self.state["train_labels"].extend(
-                int(label) for target in targets for label in target["labels"]
-            )
+            self.state["train_labels"].extend(int(label) for target in targets for label in target["labels"])
 
     def _stepped(self, _optimizer: Any, _args: Any, _kwargs: Any) -> None:
         self.state["optimizer_steps"] += 1
@@ -123,9 +119,7 @@ class RankObserver:
 
         assert distributed.is_initialized(), "Native rank did not initialize distribution"
         assert distributed.get_backend() == "nccl", "Native acceptance requires NCCL"
-        self.model = (
-            model.module if isinstance(model, torch.nn.parallel.DistributedDataParallel) else model
-        )
+        self.model = model.module if isinstance(model, torch.nn.parallel.DistributedDataParallel) else model
         self.optimizer, self.ema = optimizer, ema
         local_rank = int(os.environ["LOCAL_RANK"])
         assert torch.cuda.current_device() == local_rank
@@ -190,11 +184,7 @@ class RankObserver:
 
         def save(value: Any, destination: Any, *args: Any, **kwargs: Any) -> Any:
             result = original(value, destination, *args, **kwargs)
-            candidate = (
-                destination
-                if isinstance(destination, (str, Path))
-                else getattr(destination, "name", None)
-            )
+            candidate = destination if isinstance(destination, (str, Path)) else getattr(destination, "name", None)
             if isinstance(candidate, (str, Path)):
                 path = Path(candidate).resolve()
                 if path.is_relative_to(self.request.output.resolve()) and path.suffix in {
@@ -288,9 +278,7 @@ def install_rfdetr(observer: RankObserver) -> None:
 
     class Lifecycle:
         def on_train_start(self, trainer: Any, module: Any) -> None:
-            ema = next(
-                item for item in trainer.callbacks if isinstance(item, callbacks.RFDETREMACallback)
-            )
+            ema = next(item for item in trainer.callbacks if isinstance(item, callbacks.RFDETREMACallback))
             observer.start(
                 module.model,
                 trainer.optimizers[0],
@@ -313,9 +301,7 @@ def install_rfdetr(observer: RankObserver) -> None:
 
     def trainer(*args: Any, **kwargs: Any) -> Any:
         result = build(*args, **kwargs)
-        result.callbacks.append(
-            type("NativeAcceptanceObserver", (Lifecycle, lightning.Callback), {})()
-        )
+        result.callbacks.append(type("NativeAcceptanceObserver", (Lifecycle, lightning.Callback), {})())
         return result
 
     native.RFDETRModelModule.training_step = train

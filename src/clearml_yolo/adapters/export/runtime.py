@@ -87,19 +87,13 @@ class TensorRTRunner:
         if type(device) is not int or device < 0:
             raise ValueError("CUDA device must be a nonnegative integer index")
         engine_bytes = engine_path.read_bytes()
-        if (
-            metadata.engine_sha256 is None
-            or hashlib.sha256(engine_bytes).hexdigest() != metadata.engine_sha256
-        ):
+        if metadata.engine_sha256 is None or hashlib.sha256(engine_bytes).hexdigest() != metadata.engine_sha256:
             raise ValueError("Engine SHA256 does not match export metadata")
         self.metadata = metadata
         self.device = device
         self.trt: Any = importlib.import_module("tensorrt")
         expected_version = metadata.runtime_versions.get("tensorrt")
-        if (
-            not self.trt.__version__.startswith("10.13.0.")
-            or expected_version != self.trt.__version__
-        ):
+        if not self.trt.__version__.startswith("10.13.0.") or expected_version != self.trt.__version__:
             raise RuntimeError("TensorRT version does not match the metadata's 10.13.0 runtime")
         self.logger = self.trt.Logger(self.trt.Logger.WARNING)
         if not self.trt.init_libnvinfer_plugins(self.logger, ""):
@@ -139,9 +133,7 @@ class TensorRTRunner:
             if self.trt.nptype(self.engine.get_tensor_dtype(name)) != dtype:
                 raise ValueError(f"Unexpected engine dtype for {name}")
             expected_mode = (
-                self.trt.TensorIOMode.INPUT
-                if name in self.metadata.input_names
-                else self.trt.TensorIOMode.OUTPUT
+                self.trt.TensorIOMode.INPUT if name in self.metadata.input_names else self.trt.TensorIOMode.OUTPUT
             )
             if self.engine.get_tensor_mode(name) != expected_mode:
                 raise ValueError(f"Unexpected engine I/O direction for {name}")
@@ -153,18 +145,12 @@ class TensorRTRunner:
             if actual != shapes:
                 raise ValueError("Engine image profile does not match metadata")
             sizes = tuple((s[0], 2) for s in shapes)
-            actual_sizes = tuple(
-                tuple(s) for s in self.engine.get_tensor_profile_shape("image_sizes", index)
-            )
+            actual_sizes = tuple(tuple(s) for s in self.engine.get_tensor_profile_shape("image_sizes", index))
             if actual_sizes != sizes:
                 raise ValueError("Engine image_sizes profile does not match metadata")
 
     def _select_profile(self, images: NDArray[np.float32], image_sizes: NDArray[np.int64]) -> int:
-        if (
-            images.dtype != np.float32
-            or images.ndim != _NCHW_RANK
-            or images.shape[1] != _RGB_CHANNELS
-        ):
+        if images.dtype != np.float32 or images.ndim != _NCHW_RANK or images.shape[1] != _RGB_CHANNELS:
             raise ValueError("images must be float32 RGB NCHW")
         if not np.isfinite(images).all() or any(d % _STRIDE for d in images.shape[2:]):
             raise ValueError("images must be finite with a stride32 canvas")
@@ -177,9 +163,7 @@ class TensorRTRunner:
                 return index
         raise ValueError(f"Input shape {images.shape} is outside the engine profiles")
 
-    def _host_buffers(
-        self, images: NDArray[np.float32], image_sizes: NDArray[np.int64]
-    ) -> dict[str, Any]:
+    def _host_buffers(self, images: NDArray[np.float32], image_sizes: NDArray[np.int64]) -> dict[str, Any]:
         for name, value in (("images", images), ("image_sizes", image_sizes)):
             if not self.context.set_input_shape(name, value.shape):
                 raise RuntimeError(f"TensorRT rejected {name} shape")
@@ -197,9 +181,7 @@ class TensorRTRunner:
             host[name] = np.empty(shape, dtype=self.trt.nptype(self.engine.get_tensor_dtype(name)))
         return host
 
-    def _allocate(
-        self, host: dict[str, Any], allocated: list[ctypes.c_void_p]
-    ) -> dict[str, ctypes.c_void_p]:
+    def _allocate(self, host: dict[str, Any], allocated: list[ctypes.c_void_p]) -> dict[str, ctypes.c_void_p]:
         addresses: dict[str, ctypes.c_void_p] = {}
         for name, value in host.items():
             pointer = ctypes.c_void_p()

@@ -122,8 +122,7 @@ def _declaration_fields() -> dict[str, FieldDoc]:
             path = f"{prefix}.{item.name}" if prefix else item.name
             metadata = item.metadata
             if not all(
-                metadata.get(key)
-                for key in ("description", "shapes", "constraints", "applicability", "examples")
+                metadata.get(key) for key in ("description", "shapes", "constraints", "applicability", "examples")
             ):
                 raise ValueError(f"Incomplete command documentation: {command}.{path}")
             detail = FieldDetails(
@@ -178,11 +177,7 @@ def _option_fields() -> list[FieldDoc]:
                     examples=list(option.examples),
                     source="clearml_yolo.entrypoints.options.OPTION_DECLARATIONS",
                     commands=[command],
-                    required=bool(
-                        kwargs.get(
-                            "required", not key.startswith("-") and kwargs.get("nargs") != "?"
-                        )
-                    ),
+                    required=bool(kwargs.get("required", not key.startswith("-") and kwargs.get("nargs") != "?")),
                 )
             )
     return result
@@ -199,14 +194,10 @@ def _configurations() -> list[ConfigurationDoc]:
             profiles = ["default", "albumentations"] if command in TRAINING_COMMANDS else [""]
             for model in models:
                 for profile in profiles:
-                    overrides = ([f"model={model}"] if model else []) + (
-                        [f"transforms={profile}"] if profile else []
-                    )
+                    overrides = ([f"model={model}"] if model else []) + ([f"transforms={profile}"] if profile else [])
                     config = compose(config_name=command, overrides=overrides)
                     values = flatten(
-                        TypeAdapter(JsonValue).validate_python(
-                            OmegaConf.to_container(config, resolve=False)
-                        )
+                        TypeAdapter(JsonValue).validate_python(OmegaConf.to_container(config, resolve=False))
                     )
                     result.append(
                         ConfigurationDoc(
@@ -216,9 +207,7 @@ def _configurations() -> list[ConfigurationDoc]:
                             yaml=OmegaConf.to_yaml(config, resolve=False),
                             values=selected_values(values),
                             expressions={
-                                key: value
-                                for key, value in values.items()
-                                if isinstance(value, str) and "${" in value
+                                key: value for key, value in values.items() if isinstance(value, str) and "${" in value
                             },
                         )
                     )
@@ -228,22 +217,13 @@ def _configurations() -> list[ConfigurationDoc]:
 def build_catalog() -> Catalog:
     declarations = _declaration_fields()
     for prefix, model in PUBLIC_MODELS.items():
-        commands = [
-            command
-            for command in COMMAND_OF_CONFIG
-            if prefix.split(".")[0] in command_schema(command)
-        ]
+        commands = [command for command in COMMAND_OF_CONFIG if prefix.split(".")[0] in command_schema(command)]
         declarations.update((item.path, item) for item in _model_fields(prefix, model, commands))
     for model in (DeimAugmentationOverrides, RFDETRAugmentationOverrides):
         declarations.update(
-            (item.path, item)
-            for item in _model_fields("model.train.augmentation", model, list(TRAINING_COMMANDS))
+            (item.path, item) for item in _model_fields("model.train.augmentation", model, list(TRAINING_COMMANDS))
         )
-    for item in (
-        native_fields(sorted(NATIVE_COMMANDS))
-        + _option_fields()
-        + hydra_controls(list(COMMAND_OF_CONFIG))
-    ):
+    for item in native_fields(sorted(NATIVE_COMMANDS)) + _option_fields() + hydra_controls(list(COMMAND_OF_CONFIG)):
         declarations[item.path] = item
     configurations = _configurations()
     for config in configurations:
@@ -279,28 +259,20 @@ def build_catalog() -> Catalog:
 
 
 def check_coverage(catalog: Catalog) -> None:
-    installed = {
-        entry.name
-        for entry in distribution("clearml-yolo").entry_points
-        if entry.group == "console_scripts"
-    }
+    installed = {entry.name for entry in distribution("clearml-yolo").entry_points if entry.group == "console_scripts"}
     if installed != set(catalog.commands.values()):
         raise ValueError(
-            f"Command documentation coverage mismatch: "
-            f"{sorted(installed ^ set(catalog.commands.values()))}"
+            f"Command documentation coverage mismatch: {sorted(installed ^ set(catalog.commands.values()))}"
         )
     registered = {entry["name"] for entry in store if entry["group"] == "_cy_schemas"}
     if registered != set(COMMAND_DECLARATIONS):
-        raise ValueError(
-            f"Undocumented registered commands: {registered ^ set(COMMAND_DECLARATIONS)}"
-        )
+        raise ValueError(f"Undocumented registered commands: {registered ^ set(COMMAND_DECLARATIONS)}")
     documented = {item.path: item for item in catalog.fields}
     for config in catalog.configurations:
         for path in config.values:
             if path not in documented:
                 raise ValueError(
-                    f"Undocumented composed field: "
-                    f"{config.command}/{config.model}/{config.profile}: {path}"
+                    f"Undocumented composed field: {config.command}/{config.model}/{config.profile}: {path}"
                 )
     for item in catalog.fields:
         if not all(

@@ -16,9 +16,7 @@ class _NoExternalPlugins(MetaPathFinder):
         target: ModuleType | None = None,
     ) -> ModuleSpec | None:
         if fullname == "hydra_plugins" or fullname.startswith("hydra_plugins."):
-            raise ModuleNotFoundError(
-                "External Hydra plugins are disabled in documentation preview"
-            )
+            raise ModuleNotFoundError("External Hydra plugins are disabled in documentation preview")
         return None
 
 

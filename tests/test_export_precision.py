@@ -16,10 +16,7 @@ def _model(nodes: list[Any], initializers: list[Any], inputs: list[str], output:
         helper.make_graph(
             nodes,
             "mixed",
-            [
-                helper.make_tensor_value_info(name, onnx.TensorProto.FLOAT, [None, 2])
-                for name in inputs
-            ],
+            [helper.make_tensor_value_info(name, onnx.TensorProto.FLOAT, [None, 2]) for name in inputs],
             [helper.make_tensor_value_info(output, onnx.TensorProto.FLOAT, [None, 2])],
             initializers,
         ),
@@ -125,9 +122,7 @@ def test_pointwise_lowering_preserves_bias_and_existing_tensor_names() -> None:
 
 
 def test_dynamic_weighted_convolution_rejects_unsupported_lowering() -> None:
-    model = _model(
-        [onnx.helper.make_node("Conv", ["x", "weight"], ["output"])], [], ["x", "weight"], "output"
-    )
+    model = _model([onnx.helper.make_node("Conv", ["x", "weight"], ["output"])], [], ["x", "weight"], "output")
     with pytest.raises(ValueError, match="FP32 initializer weights"):
         fp16_weighted_graph(model, onnx)
 
@@ -179,9 +174,7 @@ def test_fpn_and_detection_heads_preserve_float_arithmetic_after_half_backbone(
     value = np.array([1.0002, 2.0002], dtype=np.float32).reshape(image_shape)
     evaluated = ReferenceEvaluator(model).run(None, {"x": value})
     assert isinstance(evaluated, list)
-    np.testing.assert_array_equal(
-        evaluated[0], value.astype(np.float16).astype(np.float32) * factor
-    )
+    np.testing.assert_array_equal(evaluated[0], value.astype(np.float16).astype(np.float32) * factor)
     assert [value.SerializeToString() for value in model.graph.initializer] == original_weights
 
 
@@ -270,19 +263,14 @@ def test_convolutions_without_pointwise_accumulation_support_remain_float(
             ],
             [helper.make_tensor_value_info("features", onnx.TensorProto.FLOAT, [1, 2, None, None])],
             [
-                onnx.numpy_helper.from_array(
-                    np.ones((2, channels, *kernel), np.float32), "conv_weight"
-                ),
+                onnx.numpy_helper.from_array(np.ones((2, channels, *kernel), np.float32), "conv_weight"),
                 onnx.numpy_helper.from_array(np.eye(2, dtype=np.float32), "linear_weight"),
             ],
         ),
         opset_imports=[helper.make_opsetid("", 17)],
     )
     assert fp16_weighted_graph(model, onnx) == 1
-    assert (
-        next(n for n in model.graph.node if n.op_type == "Conv").SerializeToString()
-        == original_conv
-    )
+    assert next(n for n in model.graph.node if n.op_type == "Conv").SerializeToString() == original_conv
     onnx.checker.check_model(model, full_check=True)
 
 
@@ -325,9 +313,7 @@ def test_gemm_preserves_transposes_float_coefficients_and_bias_broadcasting(
     onnx.checker.check_model(model, full_check=True)
     _assert_private_float_product(model, next(n for n in model.graph.node if n.op_type == "MatMul"))
     product = a.astype(np.float16).astype(np.float32) @ b.astype(np.float16).astype(np.float32)
-    expected = product.astype(np.float16).astype(np.float32) * np.float32(0.5) + bias * np.float32(
-        2
-    )
+    expected = product.astype(np.float16).astype(np.float32) * np.float32(0.5) + bias * np.float32(2)
     evaluated = ReferenceEvaluator(model).run(None, {"x": stored_a})
     assert isinstance(evaluated, list)
     np.testing.assert_array_equal(evaluated[0], expected)

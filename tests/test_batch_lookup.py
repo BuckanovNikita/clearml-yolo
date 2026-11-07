@@ -63,9 +63,7 @@ def test_real_workload_exceeding_saved_bounds_stops_with_instructions(
 ) -> None:
     case, store = sample_case(), MemoryStore()
     store.save(case)
-    with pytest.raises(
-        ValueError, match=r"cy-batch-estimate --imgsz 960 --models ultralytics/yolo11n"
-    ):
+    with pytest.raises(ValueError, match=r"cy-batch-estimate --imgsz 960 --models ultralytics/yolo11n"):
         resolve_batch_estimate(case.profile, _dataset(tmp_path, **updates), store)
 
 
@@ -91,9 +89,7 @@ def test_missing_and_incompatible_cache_never_fall_back(tmp_path: Path) -> None:
         {"images": [{"split": "test", "boxes": 1}]},
     ],
 )
-def test_invalid_manifests_cannot_shrink_workload_bounds(
-    tmp_path: Path, updates: dict[str, Any]
-) -> None:
+def test_invalid_manifests_cannot_shrink_workload_bounds(tmp_path: Path, updates: dict[str, Any]) -> None:
     with pytest.raises(ValueError, match=r"class_names|images|boxes|no training|identifiers"):
         dataset_workload(_dataset(tmp_path, **updates))
 

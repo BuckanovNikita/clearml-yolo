@@ -27,9 +27,7 @@ def import_options() -> "UserOptions":
     from importlinter.configuration import configure
 
     configure()  # type: ignore[no-untyped-call]
-    options = IniFileUserOptionReader().read_options(
-        str(Path(__file__).resolve().parents[1] / ".importlinter")
-    )
+    options = IniFileUserOptionReader().read_options(str(Path(__file__).resolve().parents[1] / ".importlinter"))
     assert options is not None
     assert options.contracts_options
     return options
@@ -49,9 +47,7 @@ def configured_contract(import_options: "UserOptions") -> "Callable[[str], Contr
     }
 
     def create(name: str) -> Contract:
-        selected = next(
-            contract for contract in import_options.contracts_options if contract["name"] == name
-        )
+        selected = next(contract for contract in import_options.contracts_options if contract["name"] == name)
         return classes[selected["type"]](
             name=name,
             session_options=import_options.session_options,
@@ -134,10 +130,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         action="append",
         default=[],
         metavar="MODEL=PATH",
-        help=(
-            "Local pretrained backbone for a DEIMv2/Faster R-CNN/FCOS selection; "
-            "repeat for each model"
-        ),
+        help=("Local pretrained backbone for a DEIMv2/Faster R-CNN/FCOS selection; repeat for each model"),
     )
 
 
@@ -170,18 +163,14 @@ def ddp_gpu_options(request: pytest.FixtureRequest) -> GPUOptions:
         cleanup_timeout=config.getoption("--ddp-cleanup-timeout"),
     )
     missing = [
-        name
-        for name in ("--ddp-devices", "--ddp-clearml-project", "--ddp-artifacts")
-        if not config.getoption(name)
+        name for name in ("--ddp-devices", "--ddp-clearml-project", "--ddp-artifacts") if not config.getoption(name)
     ]
     if not config.getoption("--run-ddp-gpu"):
         missing.insert(0, "--run-ddp-gpu")
     if missing:
         evidence = Evidence(options, "selection-error")
         with evidence.retained():
-            raise ValueError(
-                f"Physical DDP selection requires {' '.join(missing)}; evidence: {evidence.root}"
-            )
+            raise ValueError(f"Physical DDP selection requires {' '.join(missing)}; evidence: {evidence.root}")
     return options
 
 

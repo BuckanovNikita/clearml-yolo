@@ -37,9 +37,15 @@ class RecordingCasePool:
         assert all(visibility != item.gpu for item in self.pending)
         self.started.append((key, visibility))
         code = batch_estimate_worker.run(path)
-        self.pending.append(SimpleNamespace(
-            key=key, gpu=visibility, exit_code=code, cleanup_complete=True, diagnostic="",
-        ))
+        self.pending.append(
+            SimpleNamespace(
+                key=key,
+                gpu=visibility,
+                exit_code=code,
+                cleanup_complete=True,
+                diagnostic="",
+            )
+        )
         self.maximum_active = max(self.maximum_active, len(self.pending))
 
     def poll(self) -> tuple[Any, ...]:
@@ -62,15 +68,12 @@ def _available_devices() -> tuple[GPUDevice, ...]:
     )
 
 
-def _install(
-    monkeypatch: pytest.MonkeyPatch, *, capacity: int = 8
-) -> tuple[RecordingProbe, list[tuple[int, ...]]]:
+def _install(monkeypatch: pytest.MonkeyPatch, *, capacity: int = 8) -> tuple[RecordingProbe, list[tuple[int, ...]]]:
     devices = _available_devices()
     idle_checks: list[tuple[int, ...]] = []
     monkeypatch.setattr(cli, "discover_gpus", lambda: devices)
     monkeypatch.setattr(
-        cli, "require_idle",
-        lambda selected, **_kwargs: idle_checks.append(tuple(g.index for g in selected))
+        cli, "require_idle", lambda selected, **_kwargs: idle_checks.append(tuple(g.index for g in selected))
     )
     probe = RecordingProbe(capacity=capacity)
     monkeypatch.setattr(cli, "_make_probe", lambda: probe)
@@ -110,9 +113,7 @@ def test_filters_defaults_resume_and_refresh(
     cases = FileBatchEstimateStore().read().cases
     assert len(cases) == 2
     assert {case.profile.world_size for case in cases} == {1}
-    assert all(
-        case.workload.classes == 150 and case.workload.objects_per_image == 300 for case in cases
-    )
+    assert all(case.workload.classes == 150 and case.workload.objects_per_image == 300 for case in cases)
     assert all(case.settings.memory_fraction == 0.9 for case in cases)
     calls = probe.calls
     cli.main(arguments)
@@ -172,9 +173,7 @@ def test_count_and_workload_controls_are_forwarded(monkeypatch: pytest.MonkeyPat
         ["--jobs", "-1"],
     ],
 )
-def test_invalid_options_fail_without_trials(
-    monkeypatch: pytest.MonkeyPatch, option: list[str]
-) -> None:
+def test_invalid_options_fail_without_trials(monkeypatch: pytest.MonkeyPatch, option: list[str]) -> None:
     probe, _ = _install(monkeypatch)
     with pytest.raises(SystemExit) as stopped:
         cli.main(["--imgsz", "960", *option])
@@ -234,9 +233,7 @@ def test_first_idle_identical_device_is_used_and_cached_run_ignores_busy_devices
     cli.main(args)
     assert checks == [(0,), (1,)]
     assert {profile.gpus[0].uuid for profile in probe.probed_profiles} == {"GPU-1"}
-    monkeypatch.setattr(
-        cli, "require_idle", lambda _, **_kwargs: pytest.fail("cached run checked idle")
-    )
+    monkeypatch.setattr(cli, "require_idle", lambda _, **_kwargs: pytest.fail("cached run checked idle"))
     cli.main(args)
 
 
@@ -276,15 +273,23 @@ def test_mixed_hardware_measures_each_group_once(
 
 @pytest.mark.parametrize(("jobs", "expected"), [(None, 3), (1, 1), (2, 2)])
 def test_jobs_bound_independent_cases_and_preserve_model_order(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
-    jobs: int | None, expected: int,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    jobs: int | None,
+    expected: int,
 ) -> None:
     _install(monkeypatch)
     pool = RecordingCasePool()
     monkeypatch.setattr(cli, "_make_pool", lambda: pool)
     arguments = [
-        "--imgsz", "640", "--models", "yolo11n,yolo11s,yolo11m,yolo11l",
-        "--gpu-counts", "1", "--search-limit", "8",
+        "--imgsz",
+        "640",
+        "--models",
+        "yolo11n,yolo11s,yolo11m,yolo11l",
+        "--gpu-counts",
+        "1",
+        "--search-limit",
+        "8",
     ]
     if jobs is not None:
         arguments += ["--jobs", str(jobs)]
@@ -330,8 +335,14 @@ def test_next_launch_reuses_verified_models_and_retries_only_failed_cases(
 
     monkeypatch.setattr(probe, "run", run)
     args = [
-        "--imgsz", "640", "--models", "yolo11n,yolo11s", "--devices", "0,1",
-        "--search-limit", "8",
+        "--imgsz",
+        "640",
+        "--models",
+        "yolo11n,yolo11s",
+        "--devices",
+        "0,1",
+        "--search-limit",
+        "8",
     ]
     with pytest.raises(SystemExit) as stopped:
         cli.main(args)
@@ -342,10 +353,14 @@ def test_next_launch_reuses_verified_models_and_retries_only_failed_cases(
     failing = False
     cli.main([*args, "--jobs", "1"])
     assert set(measured) == {"ultralytics/yolo11s"}
-    assert next(
-        case for case in FileBatchEstimateStore().read().cases
-        if case.profile.model.selection == "ultralytics/yolo11n"
-    ).model_dump_json() == previous
+    assert (
+        next(
+            case
+            for case in FileBatchEstimateStore().read().cases
+            if case.profile.model.selection == "ultralytics/yolo11n"
+        ).model_dump_json()
+        == previous
+    )
 
 
 def test_cache_survives_device_order_report_count_and_jobs_changes(
@@ -355,9 +370,7 @@ def test_cache_survives_device_order_report_count_and_jobs_changes(
     args = ["--imgsz", "640", "--models", "yolo11n,yolo11s", "--search-limit", "8"]
     cli.main([*args, "--devices", "0,1", "--jobs", "1", "--gpu-counts", "1"])
     calls = probe.calls
-    monkeypatch.setattr(
-        cli, "require_idle", lambda _, **_kwargs: pytest.fail("cache hit checked idle GPU")
-    )
+    monkeypatch.setattr(cli, "require_idle", lambda _, **_kwargs: pytest.fail("cache hit checked idle GPU"))
     monkeypatch.setattr(cli, "_make_pool", lambda: pytest.fail("cache hit created worker pool"))
     cli.main([*args, "--devices", "1,0", "--jobs", "2", "--gpu-counts", "2"])
     assert probe.calls == calls
@@ -365,7 +378,8 @@ def test_cache_survives_device_order_report_count_and_jobs_changes(
 
 @pytest.mark.parametrize("damage", ["missing", "token", "gpu", "exit", "cleanup"])
 def test_unaccepted_case_receipts_cannot_publish_success_or_fail_peers(
-    monkeypatch: pytest.MonkeyPatch, damage: str,
+    monkeypatch: pytest.MonkeyPatch,
+    damage: str,
 ) -> None:
     _install(monkeypatch)
     pool = RecordingCasePool()
@@ -373,9 +387,7 @@ def test_unaccepted_case_receipts_cannot_publish_success_or_fail_peers(
 
     def start(key: str, command: Any) -> None:
         original_start(key, command)
-        request = BatchCaseRequest.model_validate_json(
-            Path(command.argv[-1]).read_text(encoding="utf-8")
-        )
+        request = BatchCaseRequest.model_validate_json(Path(command.argv[-1]).read_text(encoding="utf-8"))
         if request.profile.model.selection != "ultralytics/yolo11n":
             return
         receipt = request.output / "result.json"
@@ -398,10 +410,18 @@ def test_unaccepted_case_receipts_cannot_publish_success_or_fail_peers(
     monkeypatch.setattr(pool, "start", start)
     monkeypatch.setattr(cli, "_make_pool", lambda: pool)
     with pytest.raises(SystemExit) as stopped:
-        cli.main([
-            "--imgsz", "640", "--models", "yolo11n,yolo11s,yolo11m", "--devices", "0,1",
-            "--search-limit", "8",
-        ])
+        cli.main(
+            [
+                "--imgsz",
+                "640",
+                "--models",
+                "yolo11n,yolo11s,yolo11m",
+                "--devices",
+                "0,1",
+                "--search-limit",
+                "8",
+            ]
+        )
     assert stopped.value.code == 1
     cases = {case.profile.model.selection: case for case in FileBatchEstimateStore().read().cases}
     assert not cases["ultralytics/yolo11n"].usable
@@ -412,7 +432,8 @@ def test_unaccepted_case_receipts_cannot_publish_success_or_fail_peers(
 
 
 def test_force_reaches_case_worker_and_reports_cached_and_extrapolated_sources(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     probe, _ = _install(monkeypatch)
     observed: list[bool] = []

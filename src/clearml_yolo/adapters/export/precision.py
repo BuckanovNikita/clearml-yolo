@@ -42,9 +42,7 @@ def _pointwise_strides(node: Any, weight: Any, onnx: Any) -> tuple[int, int] | N
 def _weighted_nodes(graph: Any, onnx: Any) -> list[Any]:
     float_attention = float_attention_outputs(graph, onnx)
     initializers = {value.name: value for value in graph.initializer}
-    float_weights = {
-        name for name, value in initializers.items() if value.data_type == onnx.TensorProto.FLOAT
-    }
+    float_weights = {name for name, value in initializers.items() if value.data_type == onnx.TensorProto.FLOAT}
     selected = []
     for node in graph.node:
         if node.domain not in ("", "ai.onnx"):
@@ -63,10 +61,7 @@ def _weighted_nodes(graph: Any, onnx: Any) -> list[Any]:
             or node.output[0] in float_attention
         ):
             continue
-        if (
-            node.op_type == "Conv"
-            and _pointwise_strides(node, initializers[node.input[_WEIGHT_INPUT]], onnx) is None
-        ):
+        if node.op_type == "Conv" and _pointwise_strides(node, initializers[node.input[_WEIGHT_INPUT]], onnx) is None:
             continue
         selected.append(node)
     if not selected:
@@ -81,13 +76,9 @@ class _GraphBuilder:
         self.onnx = onnx
         self.nodes: list[Any] = []
         self.counter = 0
-        self.occupied = {
-            name for node in graph.node for name in (*node.input, *node.output, node.name)
-        }
+        self.occupied = {name for node in graph.node for name in (*node.input, *node.output, node.name)}
         self.occupied.update(value.name for value in graph.initializer)
-        self.occupied.update(
-            value.name for value in (*graph.input, *graph.output, *graph.value_info)
-        )
+        self.occupied.update(value.name for value in (*graph.input, *graph.output, *graph.value_info))
         self.occupied.update(value.values.name for value in graph.sparse_initializer)
         self.occupied.update(value.indices.name for value in graph.sparse_initializer)
 
@@ -108,22 +99,16 @@ class _GraphBuilder:
     ) -> str:
         target = output if output is not None else self.fresh()
         self.nodes.append(
-            self.onnx.helper.make_node(
-                operation, inputs, [target], name=name or self.fresh(), **attributes
-            )
+            self.onnx.helper.make_node(operation, inputs, [target], name=name or self.fresh(), **attributes)
         )
         return target
 
     def vector(self, values: tuple[int, ...]) -> str:
-        value = self.onnx.helper.make_tensor(
-            self.fresh(), self.onnx.TensorProto.INT64, [len(values)], values
-        )
+        value = self.onnx.helper.make_tensor(self.fresh(), self.onnx.TensorProto.INT64, [len(values)], values)
         return self.emit("Constant", [], value=value)
 
     def scalar(self, value: float) -> str:
-        tensor = self.onnx.helper.make_tensor(
-            self.fresh(), self.onnx.TensorProto.FLOAT, [], [value]
-        )
+        tensor = self.onnx.helper.make_tensor(self.fresh(), self.onnx.TensorProto.FLOAT, [], [value])
         return self.emit("Constant", [], value=tensor)
 
     def quantized_float(self, source: str) -> str:
@@ -194,15 +179,11 @@ def _lower_pointwise(node: Any, weight: Any, builder: _GraphBuilder) -> None:
     source = _sample_pointwise_input(node.input[0], strides, builder)
     shape = builder.emit("Shape", [source])
     flattened = builder.emit("Reshape", [source, builder.vector((0, input_channels, -1))])
-    kernel = builder.emit(
-        "Reshape", [node.input[1], builder.vector((1, output_channels, input_channels))]
-    )
+    kernel = builder.emit("Reshape", [node.input[1], builder.vector((1, output_channels, input_channels))])
     product = builder.product(kernel, flattened, node.name)
     output_shape = _pointwise_output_shape(shape, output_channels, builder)
     bias = node.input[_BIAS_INPUT] if len(node.input) > _BIAS_INPUT else ""
-    output = builder.emit(
-        "Reshape", [product, output_shape], output=None if bias else node.output[0]
-    )
+    output = builder.emit("Reshape", [product, output_shape], output=None if bias else node.output[0])
     if bias:
         broadcast = builder.emit("Reshape", [bias, builder.vector((1, output_channels, 1, 1))])
         builder.emit("Add", [output, broadcast], output=node.output[0])

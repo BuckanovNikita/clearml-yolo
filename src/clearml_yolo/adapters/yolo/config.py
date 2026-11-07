@@ -13,9 +13,7 @@ import yaml
 from clearml_yolo.adapters.storage.filesystem import write_path
 
 Stage = Literal["train", "predict"]
-_REQUESTED_DEVICES: ContextVar[dict[str, Any] | None] = ContextVar(
-    "requested_devices", default=None
-)
+_REQUESTED_DEVICES: ContextVar[dict[str, Any] | None] = ContextVar("requested_devices", default=None)
 
 
 @contextmanager
@@ -28,9 +26,7 @@ def requested_devices(values: dict[str, Any]) -> Iterator[None]:
         _REQUESTED_DEVICES.reset(token)
 
 
-def requested_settings(
-    settings: dict[str, Any], stage: Stage, *, group: str | None = None
-) -> dict[str, Any]:
+def requested_settings(settings: dict[str, Any], stage: Stage, *, group: str | None = None) -> dict[str, Any]:
     values = _REQUESTED_DEVICES.get() or {}
     group = group or ("ultralytics" if stage == "train" else "ultralytics_predict")
     return settings | {"device": values[group]} if group in values else dict(settings)
@@ -173,9 +169,7 @@ _KEY_LINE = re.compile(r"^([a-zA-Z_][\w]*):")
 
 # Keep validation independent of the model SDK. These are the native parser's
 # typed keys that this adapter forwards; untyped selectors retain native handling.
-_NUMERIC_KEYS = frozenset(
-    ["warmup_epochs", "box", "cls", "dfl", "dis", "degrees", "shear", "time", "batch"]
-)
+_NUMERIC_KEYS = frozenset(["warmup_epochs", "box", "cls", "dfl", "dis", "degrees", "shear", "time", "batch"])
 _FRACTION_KEYS = frozenset(
     [
         "lr0",
@@ -265,8 +259,7 @@ def _validate_fraction(key: str, value: Any, qualified: str) -> None:
                 len(value) not in (2, 3)
                 or not all(value[:2])
                 or not all(
-                    (type(item) is int and item >= 0) or (type(item) is float and 0 <= item <= 1)
-                    for item in value
+                    (type(item) is int and item >= 0) or (type(item) is float and 0 <= item <= 1) for item in value
                 )
             ):
                 raise ValueError(f"{qualified} must contain train/val[/test] counts or ratios")
@@ -293,9 +286,7 @@ def _validate_native_type(key: str, value: Any, qualified: str) -> None:
 
 def _validate_scale(value: Any, qualified: str) -> None:
     if isinstance(value, (list, tuple)):
-        if len(value) != _SCALE_DIMENSIONS or not all(
-            isinstance(item, (int, float)) for item in value
-        ):
+        if len(value) != _SCALE_DIMENSIONS or not all(isinstance(item, (int, float)) for item in value):
             raise ValueError(f"{qualified} must contain exactly two numeric values")
     elif not isinstance(value, (int, float)) or not 0 <= value <= 1:
         raise ValueError(f"{qualified} must be in [0, 1] or contain two numeric values")
@@ -304,11 +295,7 @@ def _validate_scale(value: Any, qualified: str) -> None:
 def _validate_native_choice(key: str, value: Any, qualified: str) -> None:
     if key == "compile" and not isinstance(value, (bool, str)):
         raise ValueError(f"{qualified} must be a boolean or a compiler mode string")
-    if (
-        key == "amp"
-        and not isinstance(value, bool)
-        and str(value).lower() not in {"fp16", "bf16", "fp32"}
-    ):
+    if key == "amp" and not isinstance(value, bool) and str(value).lower() not in {"fp16", "bf16", "fp32"}:
         raise ValueError(f"{qualified} must be a boolean or fp16, bf16, fp32")
     if key == "quantize" and str(value).lower() not in _QUANTIZATION_VALUES:
         raise ValueError(f"{qualified} must name a supported 8/16/32-bit quantization scheme")
@@ -371,9 +358,7 @@ def execution_settings(settings: dict[str, Any], stage: Stage) -> dict[str, Any]
     allowed = TRAIN_KEYS if stage == "train" else PREDICT_KEYS
     missing = (native_defaults().keys() & allowed) - values.keys()
     if missing:
-        raise ValueError(
-            f"Missing {group} parameters {sorted(missing)}; compose a complete {group} group"
-        )
+        raise ValueError(f"Missing {group} parameters {sorted(missing)}; compose a complete {group} group")
     if values["task"] != "detect":
         raise ValueError(f"{group}.task must be detect")
     if values["mode"] != stage:
@@ -422,9 +407,7 @@ def prediction_defaults(*, inherit: bool = True) -> dict[str, Any]:
 def _value_yaml(key: str, value: Any) -> str:
     # Flow style keeps nested lists/maps on a single logical parameter line and safely
     # quotes strings containing YAML syntax. A large width avoids folded scalars.
-    dumped = yaml.safe_dump(
-        {key: value}, default_flow_style=False, width=100000, allow_unicode=True, sort_keys=False
-    )
+    dumped = yaml.safe_dump({key: value}, default_flow_style=False, width=100000, allow_unicode=True, sort_keys=False)
     if "\n" in dumped.rstrip("\n"):
         scalar = (
             yaml.safe_dump(value, default_flow_style=True, width=100000, allow_unicode=True)
@@ -485,10 +468,7 @@ def _example_sections(lines: list[str], stage: Stage) -> str:
         "Stage-inapplicable settings",
     )
     return (
-        "\n\n".join(
-            f"# {heading}\n" + "\n".join(section)
-            for heading, section in zip(headings, sections, strict=True)
-        )
+        "\n\n".join(f"# {heading}\n" + "\n".join(section) for heading, section in zip(headings, sections, strict=True))
         + "\n"
     )
 

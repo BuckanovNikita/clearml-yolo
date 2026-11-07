@@ -94,9 +94,7 @@ def test_finalizer_failure_traces_failed_terminal_path_without_exception_text(
         owned = _attach_configuration(task, configuration_source)
         register_finalizer(task, fail)
     assert caught.value is original
-    assert any(
-        message.startswith("FAILED clearml.publication.finalizer ") for message in trace_messages
-    )
+    assert any(message.startswith("FAILED clearml.publication.finalizer ") for message in trace_messages)
     assert any(message.startswith("DONE clearml.task.mark_failed ") for message in trace_messages)
     assert owned.read_text() == "name: original\n"
     assert configuration_source.read_text(encoding="utf-8") == "name: original\n"
@@ -184,10 +182,7 @@ def test_task_creation_failure_is_visible_before_owner_identity_exists(
     ):
         pytest.fail("Task creation must fail before invocation body")
     assert caught.value is original
-    assert any(
-        message.startswith("FAILED clearml.task.create ") and "task=- " in message
-        for message in trace_messages
-    )
+    assert any(message.startswith("FAILED clearml.task.create ") and "task=- " in message for message in trace_messages)
     assert task.events == []
 
 

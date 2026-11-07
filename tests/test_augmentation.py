@@ -13,9 +13,7 @@ def _snapshot(transform: Any) -> Any:
     from clearml_yolo.core.transforms import TransformSnapshot, pipeline_digest
 
     document = albumentations.to_dict(transform)
-    return TransformSnapshot(
-        pipeline=document, sha256=pipeline_digest(document), source="test.json"
-    )
+    return TransformSnapshot(pipeline=document, sha256=pipeline_digest(document), source="test.json")
 
 
 def _sample(index: int = 0, *, empty: bool = False) -> Any:
@@ -77,12 +75,8 @@ def test_pipeline_supplies_missing_bbox_processor_and_preserves_rgb() -> None:
     assert (result.image[:, :, 1:] == 0).all()
 
 
-@pytest.mark.parametrize(
-    ("empty_primary", "empty_donors"), [(False, False), (True, False), (True, True)]
-)
-def test_mosaic_tracks_donor_classes_crowd_and_unique_instances(
-    empty_primary: bool, empty_donors: bool
-) -> None:
+@pytest.mark.parametrize(("empty_primary", "empty_donors"), [(False, False), (True, False), (True, True)])
+def test_mosaic_tracks_donor_classes_crowd_and_unique_instances(empty_primary: bool, empty_donors: bool) -> None:
     loaded: list[int] = []
 
     def load(index: int) -> Any:
@@ -137,18 +131,14 @@ def test_mosaic_nondefault_grid_samples_full_donor_population() -> None:
 
 
 @pytest.mark.parametrize(("size", "expected"), [(1, {0}), (2, {1})])
-def test_small_mosaic_populations_use_only_available_training_donors(
-    size: int, expected: set[int]
-) -> None:
+def test_small_mosaic_populations_use_only_available_training_donors(size: int, expected: set[int]) -> None:
     loaded: list[int] = []
 
     def load(index: int) -> Any:
         loaded.append(index)
         return _sample(index)
 
-    transform = albumentations.Compose(
-        [albumentations.Mosaic(target_size=(64, 64), cell_shape=(32, 32), p=1)]
-    )
+    transform = albumentations.Compose([albumentations.Mosaic(target_size=(64, 64), cell_shape=(32, 32), p=1)])
     result = _apply(transform, _sample(), size=size, loader=load)
     assert len(loaded) == 3
     assert set(loaded) == expected
@@ -156,9 +146,7 @@ def test_small_mosaic_populations_use_only_available_training_donors(
 
 
 def test_disabled_mosaic_never_loads_donors() -> None:
-    transform = albumentations.Compose(
-        [albumentations.Mosaic(target_size=(64, 64), cell_shape=(32, 32), p=0)]
-    )
+    transform = albumentations.Compose([albumentations.Mosaic(target_size=(64, 64), cell_shape=(32, 32), p=0)])
     result = _apply(transform, _sample(), size=4, loader=lambda _: pytest.fail("donor read"))
     assert result.image.shape == (32, 32, 3)
 
@@ -171,11 +159,7 @@ def test_worker_seed_changes_are_reproducible_without_reseeding_every_image() ->
     def values(seed: int) -> list[int]:
         pipeline = TrainingPipeline(snapshot, seed=0)
         return [
-            int(
-                pipeline.apply(_sample(2), index=0, size=1, load_sample=_sample, seed=seed).image[
-                    0, 0, 0
-                ]
-            )
+            int(pipeline.apply(_sample(2), index=0, size=1, load_sample=_sample, seed=seed).image[0, 0, 0])
             for _ in range(5)
         ]
 
@@ -194,9 +178,7 @@ def test_worker_seed_changes_are_reproducible_without_reseeding_every_image() ->
             "Mosaic",
         ),
         (
-            lambda: albumentations.Compose(
-                [albumentations.HorizontalFlip(), albumentations.Mosaic()]
-            ),
+            lambda: albumentations.Compose([albumentations.HorizontalFlip(), albumentations.Mosaic()]),
             "Mosaic",
         ),
         (
@@ -228,9 +210,7 @@ def test_snapshot_file_errors_do_not_construct_fallback_pipeline(tmp_path: Path)
     from clearml_yolo.core.transforms import TransformConfig
 
     with pytest.raises(ValueError, match=r"missing\.json"):
-        resolve_transform_config(
-            TransformConfig(mode="albumentations", pipeline_file=tmp_path / "missing.json")
-        )
+        resolve_transform_config(TransformConfig(mode="albumentations", pipeline_file=tmp_path / "missing.json"))
 
 
 @pytest.mark.parametrize(
@@ -247,9 +227,7 @@ def test_snapshot_file_errors_do_not_construct_fallback_pipeline(tmp_path: Path)
         ("bbox_params", {"label_fields": ""}, "label_fields"),
     ],
 )
-def test_malformed_compose_and_bbox_parameters_fail_early(
-    field: str, value: Any, match: str
-) -> None:
+def test_malformed_compose_and_bbox_parameters_fail_early(field: str, value: Any, match: str) -> None:
     from clearml_yolo.adapters.augmentation.configuration import validate_pipeline
 
     document = albumentations.to_dict(albumentations.Compose([]))
@@ -262,9 +240,7 @@ def test_malformed_compose_and_bbox_parameters_fail_early(
 def test_mosaic_metadata_key_must_not_overwrite_detection_fields(metadata_key: str) -> None:
     from clearml_yolo.adapters.augmentation.configuration import validate_pipeline
 
-    document = albumentations.to_dict(
-        albumentations.Compose([albumentations.Mosaic(metadata_key=metadata_key)])
-    )
+    document = albumentations.to_dict(albumentations.Compose([albumentations.Mosaic(metadata_key=metadata_key)]))
     with pytest.raises(ValueError, match="metadata_key"):
         validate_pipeline(document)
 
@@ -321,9 +297,7 @@ def test_disabled_root_compose_never_loads_mosaic_donors() -> None:
         (lambda: albumentations.Mosaic(metadata_key="mask"), "metadata_key"),
     ],
 )
-def test_unsupported_targets_fail_at_configuration_boundary(
-    transform_factory: Callable[[], Any], match: str
-) -> None:
+def test_unsupported_targets_fail_at_configuration_boundary(transform_factory: Callable[[], Any], match: str) -> None:
     from clearml_yolo.adapters.augmentation.configuration import validate_pipeline
 
     document = albumentations.to_dict(albumentations.Compose([transform_factory()]))

@@ -58,22 +58,14 @@ def _records(tmp_path: Path) -> Path:
 
 
 @pytest.mark.parametrize("empty", [False, True])
-def test_fasterrcnn_custom_geometry_preserves_rgb_labels_and_empty_targets(
-    tmp_path: Path, empty: bool
-) -> None:
+def test_fasterrcnn_custom_geometry_preserves_rgb_labels_and_empty_targets(tmp_path: Path, empty: bool) -> None:
     from clearml_yolo.adapters.fasterrcnn.data import CocoDataset
 
     augmentation = importlib.import_module("albumentations")
-    operation = (
-        augmentation.Crop(x_min=16, y_min=0, x_max=32, y_max=16)
-        if empty
-        else augmentation.HorizontalFlip(p=1)
-    )
+    operation = augmentation.Crop(x_min=16, y_min=0, x_max=32, y_max=16) if empty else augmentation.HorizontalFlip(p=1)
     records = _records(tmp_path)
     native = CocoDataset(records, tuple(map(str, range(4))))
-    custom = CocoDataset(
-        records, tuple(map(str, range(4))), transforms=_config(tmp_path, [operation])
-    )
+    custom = CocoDataset(records, tuple(map(str, range(4))), transforms=_config(tmp_path, [operation]))
     image, target = custom[0]
     assert image.dtype.is_floating_point
     assert image[0].min() == 1
@@ -243,9 +235,7 @@ def _deim_finalization(
 
 
 @pytest.mark.parametrize("epoch", [0, 130])
-def test_deim_custom_pipeline_survives_native_epoch_schedule_and_recomputes_area(
-    tmp_path: Path, epoch: int
-) -> None:
+def test_deim_custom_pipeline_survives_native_epoch_schedule_and_recomputes_area(tmp_path: Path, epoch: int) -> None:
     from clearml_yolo.adapters.deim.transforms import TrainingTransform
 
     augmentation = importlib.import_module("albumentations")
@@ -280,9 +270,7 @@ def test_deim_custom_pipeline_preserves_subpixel_boxes(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("backend", ["deimv2", "rfdetr"])
 @pytest.mark.parametrize("mosaic", [False, True])
-def test_native_bridges_accept_empty_crops_and_raw_mosaic_donors(
-    tmp_path: Path, backend: str, mosaic: bool
-) -> None:
+def test_native_bridges_accept_empty_crops_and_raw_mosaic_donors(tmp_path: Path, backend: str, mosaic: bool) -> None:
     augmentation = importlib.import_module("albumentations")
     operation = (
         augmentation.Mosaic(
@@ -310,9 +298,7 @@ def test_native_bridges_accept_empty_crops_and_raw_mosaic_donors(
         from clearml_yolo.adapters.rfdetr.transforms import install_training_transforms
 
         coco = importlib.import_module("rfdetr.datasets.coco")
-        native = coco.make_coco_transforms_square_div_64(
-            "train", 32, aug_config={}, scale_jitter=False
-        )
+        native = coco.make_coco_transforms_square_div_64("train", 32, aug_config={}, scale_jitter=False)
         dataset = coco.CocoDetection(tmp_path, records, native, draft_size=8)
         module = SimpleNamespace(_dataset_train=dataset)
         install_training_transforms(module, config, seed=0)
@@ -351,9 +337,7 @@ def test_fasterrcnn_dataloader_workers_are_reproducible(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("variant", ["Nano", "Small", "Medium", "Large"])
-def test_rfdetr_repeated_native_setup_keeps_custom_training_only(
-    tmp_path: Path, variant: str
-) -> None:
+def test_rfdetr_repeated_native_setup_keeps_custom_training_only(tmp_path: Path, variant: str) -> None:
     from clearml_yolo.adapters.rfdetr.transforms import install_training_transforms
 
     config_sdk = importlib.import_module("rfdetr.config")
@@ -363,9 +347,7 @@ def test_rfdetr_repeated_native_setup_keeps_custom_training_only(
         folder = tmp_path / split
         folder.mkdir()
         _records(folder)
-    model = getattr(config_sdk, f"RFDETR{variant}Config")(
-        num_classes=4, pretrain_weights=None, device="cpu"
-    )
+    model = getattr(config_sdk, f"RFDETR{variant}Config")(num_classes=4, pretrain_weights=None, device="cpu")
     train = config_sdk.TrainConfig(
         dataset_dir=str(tmp_path),
         dataset_file="roboflow",

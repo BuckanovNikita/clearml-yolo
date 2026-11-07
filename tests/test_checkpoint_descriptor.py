@@ -43,9 +43,7 @@ def test_copy_of_checkpoint_retains_vocabulary_without_sidecar(
     assert observed.class_names == ("0001", "施工")
 
 
-def test_modified_checkpoint_does_not_reuse_old_descriptor(
-    checkpoint: Path, metadata: CheckpointMetadata
-) -> None:
+def test_modified_checkpoint_does_not_reuse_old_descriptor(checkpoint: Path, metadata: CheckpointMetadata) -> None:
     bind_checkpoint(checkpoint, metadata)
     with ZipFile(checkpoint, "a") as archive:
         archive.writestr("best/data/0", b"changed-weights")
@@ -53,9 +51,7 @@ def test_modified_checkpoint_does_not_reuse_old_descriptor(
         read_checkpoint_descriptor(checkpoint)
 
 
-def test_sidecar_cannot_replace_checkpoint_classes(
-    checkpoint: Path, metadata: CheckpointMetadata
-) -> None:
+def test_sidecar_cannot_replace_checkpoint_classes(checkpoint: Path, metadata: CheckpointMetadata) -> None:
     bind_checkpoint(checkpoint, metadata)
     sidecar = checkpoint.with_name(checkpoint.name + ".model.json")
     value = json.loads(sidecar.read_text())
@@ -65,9 +61,7 @@ def test_sidecar_cannot_replace_checkpoint_classes(
         read_checkpoint_descriptor(checkpoint)
 
 
-def test_explicit_selection_cannot_override_described_backend(
-    checkpoint: Path, metadata: CheckpointMetadata
-) -> None:
+def test_explicit_selection_cannot_override_described_backend(checkpoint: Path, metadata: CheckpointMetadata) -> None:
     bind_checkpoint(checkpoint, metadata)
     with pytest.raises(ValueError, match="selection"):
         read_checkpoint_descriptor(checkpoint, expected=model_preset("rfdetr/small"))
@@ -77,9 +71,7 @@ def test_legacy_checkpoint_has_no_invented_backend(checkpoint: Path) -> None:
     assert read_checkpoint_descriptor(checkpoint) is None
 
 
-def test_binding_metadata_preserves_torch_loading(
-    tmp_path: Path, metadata: CheckpointMetadata
-) -> None:
+def test_binding_metadata_preserves_torch_loading(tmp_path: Path, metadata: CheckpointMetadata) -> None:
     import torch
 
     path = tmp_path / "native.pth"

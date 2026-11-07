@@ -50,9 +50,7 @@ class FiftyOneConfig(BaseModel):
         default=30.0,
         gt=0,
         allow_inf_nan=False,
-        description=(
-            "Положительный конечный таймаут ожидания блокировки набора FiftyOne в секундах."
-        ),
+        description=("Положительный конечный таймаут ожидания блокировки набора FiftyOne в секундах."),
         examples=[30.0],
         json_schema_extra={
             "shapes": "float",
@@ -65,8 +63,7 @@ class FiftyOneConfig(BaseModel):
         default="clearml-yolo",
         pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
         description=(
-            "Префикс имени набора: латинские буквы, цифры, дефис и подчёркивание;"
-            " первый символ — буква или цифра."
+            "Префикс имени набора: латинские буквы, цифры, дефис и подчёркивание; первый символ — буква или цифра."
         ),
         examples=["clearml-yolo"],
         json_schema_extra={

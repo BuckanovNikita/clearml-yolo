@@ -25,12 +25,8 @@ def main(argv: Sequence[str] | None = None) -> None:
         for asset in result.assets:
             sys.stdout.write(f"Prepared: {redact_text(str(asset.path))}\n")
         for failure in result.failures:
-            sys.stdout.write(
-                f"Failed: {redact_text(failure.selection)}: {redact_text(failure.message)}\n"
-            )
-        sys.stdout.write(
-            f"Prepared {len(result.assets)} assets; {len(result.failures)} failures.\n"
-        )
+            sys.stdout.write(f"Failed: {redact_text(failure.selection)}: {redact_text(failure.message)}\n")
+        sys.stdout.write(f"Prepared {len(result.assets)} assets; {len(result.failures)} failures.\n")
         if result.failures:
             sys.stdout.write(
                 "If Artifactory is required, configure its repository roots and retry:\n"

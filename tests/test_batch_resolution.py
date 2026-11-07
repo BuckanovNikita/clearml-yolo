@@ -15,9 +15,7 @@ from test_batch_estimate_workflow import MemoryStore, sample_case
 from test_batch_lookup import _dataset
 
 
-def test_explicit_batches_do_not_discover_gpus(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_explicit_batches_do_not_discover_gpus(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     def forbidden() -> Any:
         pytest.fail("Numeric batches must retain direct native device behavior")
 

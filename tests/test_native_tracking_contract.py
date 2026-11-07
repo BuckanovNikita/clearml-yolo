@@ -101,9 +101,7 @@ def test_installed_callbacks_report_native_epochs_and_one_best_model(
         best=best,
         validator=SimpleNamespace(
             save_dir=tmp_path,
-            plots={confusion_matrix: {}, validation: {}, validator_pr: {}, confidence_curve: {}}
-            if plots
-            else {},
+            plots={confusion_matrix: {}, validation: {}, validator_pr: {}, confidence_curve: {}} if plots else {},
             metrics=SimpleNamespace(results_dict={"metrics/mAP50(B)": 0.95}),
         ),
     )
@@ -134,17 +132,13 @@ def test_installed_callbacks_report_native_epochs_and_one_best_model(
     ]
     assert logger.scalars == [(*value, epoch) for epoch in (1, 2) for value in expected_epoch]
     assert logger.single_values == {"metrics/mAP50(B)": 0.95}
-    assert models == [
-        {"model_path": str(best), "model_name": "native-detector", "auto_delete_file": False}
-    ]
+    assert models == [{"model_path": str(best), "model_name": "native-detector", "auto_delete_file": False}]
     assert best.read_bytes() == b"native best checkpoint"
     assert artifacts == []
     assert [entry["title"] for entry in logger.figures] == (
         ["results", "confusion_matrix", "BoxF1_curve"] if plots else []
     )
-    assert [entry["title"] for entry in logger.images] == (
-        ["Mosaic", "Validation"] if plots else []
-    )
+    assert [entry["title"] for entry in logger.images] == (["Mosaic", "Validation"] if plots else [])
     assert integration.callbacks is original_callbacks
     assert SETTINGS["clearml"] is original_setting
 

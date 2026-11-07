@@ -33,8 +33,7 @@ def _profile(count: int = 1) -> TrainingProfile:
         nominal_size=(960, 960),
         effective_size=(960, 960),
         gpus=tuple(
-            GPUHardware(name="Test GPU", total_memory_bytes=1000, uuid=f"GPU-{index}")
-            for index in range(count)
+            GPUHardware(name="Test GPU", total_memory_bytes=1000, uuid=f"GPU-{index}") for index in range(count)
         ),
         dependencies={"torch": "2.13", "ultralytics": "8.4.184"},
         precision="fp16",
@@ -114,10 +113,7 @@ def test_catalogue_has_standard_yolo_and_every_native_preset() -> None:
         "yolo26x.pt",
     }
     assert {variant.selection for variant in variants if variant.backend != "ultralytics"} == {
-        f"{backend}/{preset}"
-        for backend, presets in PRESETS.items()
-        if backend != "ultralytics"
-        for preset in presets
+        f"{backend}/{preset}" for backend, presets in PRESETS.items() if backend != "ultralytics" for preset in presets
     }
     assert select_models(("yolo11n",)) == select_models(("ultralytics/yolo11n",))
     assert select_models(None) == variants
@@ -131,9 +127,7 @@ def test_invalid_or_repeated_selections_fail(selection: tuple[str, ...]) -> None
 
 @pytest.mark.parametrize("count", [1, 2, 3, 4])
 @pytest.mark.parametrize("capacity", [0, 1, 3, 5, 11, 16, 31, 32, 99])
-def test_search_finds_divisible_capacity_and_independently_confirms(
-    count: int, capacity: int
-) -> None:
+def test_search_finds_divisible_capacity_and_independently_confirms(count: int, capacity: int) -> None:
     search = _search(capacity, count=count)
     expected = min(capacity, 32) // count * count
     assert all(trial.global_batch % count == 0 for trial in search.trials)
@@ -143,12 +137,9 @@ def test_search_finds_divisible_capacity_and_independently_confirms(
     else:
         assert search.global_batch == expected
         assert search.per_gpu_batch == expected // count
-        assert search.status == (
-            "ceiling_limited" if expected == 32 // count * count else "validated"
-        )
+        assert search.status == ("ceiling_limited" if expected == 32 // count * count else "validated")
         assert search.trials[-1].global_batch == search.trials[-2].global_batch or any(
-            trial.status == "success" and trial.global_batch == expected
-            for trial in search.trials[:-1]
+            trial.status == "success" and trial.global_batch == expected for trial in search.trials[:-1]
         )
         assert search.trials[-1].trial_id not in {trial.trial_id for trial in search.trials[:-1]}
         assert _case(search).usable
@@ -223,9 +214,7 @@ def test_heterogeneous_memory_and_order_are_checked_per_rank() -> None:
             )
         }
     )
-    search = BatchSearch.start(
-        profile, SearchSettings(search_strategy="exponential_binary_v1", max_global_batch=2)
-    )
+    search = BatchSearch.start(profile, SearchSettings(search_strategy="exponential_binary_v1", max_global_batch=2))
     search = search.observe(_trial(search, peak_memory_bytes=(1800, 900)))
     search = search.observe(_trial(search, peak_memory_bytes=(1800, 900)))
     case = _case(search)
@@ -270,23 +259,17 @@ def test_profile_changes_are_incompatible(changes: dict[str, Any]) -> None:
 def test_hardware_compatibility_uses_ordered_capabilities_not_uuid() -> None:
     case = _case(_search(8))
     same = case.profile.model_copy(
-        update={
-            "gpus": (GPUHardware(name="Test GPU", total_memory_bytes=1000, uuid="replacement"),)
-        }
+        update={"gpus": (GPUHardware(name="Test GPU", total_memory_bytes=1000, uuid="replacement"),)}
     )
     assert not compatibility_issues(case, same, SyntheticWorkload())
-    different = same.model_copy(
-        update={"gpus": (GPUHardware(name="Test GPU", total_memory_bytes=2000),)}
-    )
+    different = same.model_copy(update={"gpus": (GPUHardware(name="Test GPU", total_memory_bytes=2000),)})
     assert compatibility_issues(case, different, SyntheticWorkload())
     assert compatibility_issues(case, _profile(2), SyntheticWorkload())
 
 
 def test_density_and_class_bounds_are_upper_limits() -> None:
     case = _case(_search(8))
-    assert not compatibility_issues(
-        case, case.profile, SyntheticWorkload(classes=1, objects_per_image=1)
-    )
+    assert not compatibility_issues(case, case.profile, SyntheticWorkload(classes=1, objects_per_image=1))
     assert compatibility_issues(case, case.profile, SyntheticWorkload(classes=151))
     assert compatibility_issues(case, case.profile, SyntheticWorkload(objects_per_image=301))
     assert select_estimate((case,), case.profile, SyntheticWorkload()) == case
@@ -327,9 +310,7 @@ def test_workload_rejects_invalid_bounds(values: dict[str, Any]) -> None:
 
 def test_ceiling_below_world_size_is_invalid() -> None:
     with pytest.raises(ValueError, match="world size"):
-        BatchSearch.start(
-            _profile(4), SearchSettings(search_strategy="exponential_binary_v1", max_global_batch=3)
-        )
+        BatchSearch.start(_profile(4), SearchSettings(search_strategy="exponential_binary_v1", max_global_batch=3))
 
 
 def test_recommendation_retains_target_and_actual_source_provenance() -> None:
@@ -341,9 +322,7 @@ def test_recommendation_retains_target_and_actual_source_provenance() -> None:
     assert recommendation.origin == "measured"
     assert recommendation.profile == target
     assert recommendation.global_batch == recommendation.per_gpu_batch == 16
-    assert recommendation.source_estimate_keys == (
-        estimate_key(case.profile, case.workload, case.settings),
-    )
+    assert recommendation.source_estimate_keys == (estimate_key(case.profile, case.workload, case.settings),)
     assert recommendation.source_statuses == ("validated",)
     assert recommendation.sources == (case,)
 
@@ -412,9 +391,7 @@ def test_invalid_sources_never_support_extrapolation(invalid: str) -> None:
 
 def test_legacy_exact_allocation_measurement_precedes_extrapolation() -> None:
     single, exact = _case(_search(16)), _case(_search(16, count=2))
-    restored = EstimateCatalogue.model_validate_json(
-        EstimateCatalogue(cases=(single, exact)).model_dump_json()
-    )
+    restored = EstimateCatalogue.model_validate_json(EstimateCatalogue(cases=(single, exact)).model_dump_json())
     recommendation = select_recommendation(restored.cases, _profile(2), SyntheticWorkload())
     assert recommendation.origin == "measured"
     assert recommendation.global_batch == 16
@@ -494,9 +471,7 @@ def test_saved_coverage_accepts_numerically_limited_evidence() -> None:
             16,
             observe=lambda search: _trial(
                 search,
-                "success"
-                if search.next_batch is not None and search.next_batch <= 8
-                else "nonfinite",
+                "success" if search.next_batch is not None and search.next_batch <= 8 else "nonfinite",
             ),
         )
     )
@@ -509,12 +484,10 @@ def test_saved_diagnostic_prefers_case_then_failed_trial_then_status() -> None:
     from clearml_yolo.core import batch_estimation as policy
 
     failed = _case(_search(16, observe=lambda search: _trial(search, "timeout")))
-    assert policy.estimate_diagnostic(
-        failed.model_copy(update={"diagnostic": "owner timed out"})
-    ) == ("owner timed out")
-    assert (
-        policy.estimate_diagnostic(failed.model_copy(update={"diagnostic": ""})) == "observed trial"
+    assert policy.estimate_diagnostic(failed.model_copy(update={"diagnostic": "owner timed out"})) == (
+        "owner timed out"
     )
+    assert policy.estimate_diagnostic(failed.model_copy(update={"diagnostic": ""})) == "observed trial"
     snapshot = failed.model_copy(update={"diagnostic": "", "trials": ()})
     assert policy.estimate_diagnostic(snapshot) == "failed"
 

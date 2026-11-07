@@ -51,9 +51,7 @@ def plot_calls(
     ) -> None:
         calls.append(("pr", context, display_label))
 
-    patch_workflow(
-        monkeypatch, workflow_dependencies, results, "report_confusion_matrices", confusion
-    )
+    patch_workflow(monkeypatch, workflow_dependencies, results, "report_confusion_matrices", confusion)
     patch_workflow(monkeypatch, workflow_dependencies, results, "report_pr_curves", pr)
     return calls
 
@@ -133,9 +131,7 @@ def test_prediction_bundle_is_deferred_and_contexts_are_distinct(
     assert frame["is_below_threshold"].isna().all()
 
 
-def test_gt_only_does_not_invent_prediction_artifact(
-    owner: tuple[type[Any], FakeTask], tmp_path: Path
-) -> None:
+def test_gt_only_does_not_invent_prediction_artifact(owner: tuple[type[Any], FakeTask], tmp_path: Path) -> None:
     _, task = owner
     truth, _ = _inputs(tmp_path)
     with invocation(ClearMLConfig(), "train"):
@@ -146,9 +142,7 @@ def test_gt_only_does_not_invent_prediction_artifact(
 
 
 def test_worker_does_not_read_inputs_or_create_shards(tmp_path: Path) -> None:
-    results.register_predictions(
-        None, tmp_path / "missing_gt", tmp_path / "missing_pred", output_dir=tmp_path
-    )
+    results.register_predictions(None, tmp_path / "missing_gt", tmp_path / "missing_pred", output_dir=tmp_path)
     assert list(tmp_path.iterdir()) == []
 
 
@@ -252,9 +246,7 @@ def test_baseline_keeps_artifacts_and_provenance_without_plots(
     )
     with invocation(ClearMLConfig(), "compare"):
         results.declare_result_producers(task, ["predict"], output_dir=tmp_path)
-        results.publish_evaluation(
-            task, evaluated, truth, predictions, output_dir=tmp_path, role="comparison_baseline"
-        )
+        results.publish_evaluation(task, evaluated, truth, predictions, output_dir=tmp_path, role="comparison_baseline")
         results.complete_result_producer(task, "predict")
     assert plot_calls == []
     assert [upload["name"] for upload in task.uploads] == [
@@ -278,17 +270,11 @@ def test_checkpoint_slots_repeat_and_collisions_have_readable_suffixes(
 ) -> None:
     # Repeated dashboard names are independently rejected by the artifact owner;
     # isolate that transport rule while exercising the chart publication boundary.
-    patch_workflow(
-        monkeypatch, workflow_dependencies, results, "expect_artifacts", lambda *_args: None
-    )
-    patch_workflow(
-        monkeypatch, workflow_dependencies, results, "upload_artifact", lambda *_args: None
-    )
+    patch_workflow(monkeypatch, workflow_dependencies, results, "expect_artifacts", lambda *_args: None)
+    patch_workflow(monkeypatch, workflow_dependencies, results, "upload_artifact", lambda *_args: None)
     _, task = owner
     truth, predictions = _inputs(tmp_path)
-    evaluated = _evaluation(
-        truth, predictions, tmp_path, workflow_dependencies=workflow_dependencies
-    )
+    evaluated = _evaluation(truth, predictions, tmp_path, workflow_dependencies=workflow_dependencies)
     cases = [
         ("a", "prediction", "test"),
         ("a", "comparison_candidate", "test"),
@@ -322,17 +308,11 @@ def test_unknown_contexts_do_not_overwrite_and_provenance_reuses_slots(
     monkeypatch: pytest.MonkeyPatch,
     workflow_dependencies: WorkflowDependencies,
 ) -> None:
-    patch_workflow(
-        monkeypatch, workflow_dependencies, results, "expect_artifacts", lambda *_args: None
-    )
-    patch_workflow(
-        monkeypatch, workflow_dependencies, results, "upload_artifact", lambda *_args: None
-    )
+    patch_workflow(monkeypatch, workflow_dependencies, results, "expect_artifacts", lambda *_args: None)
+    patch_workflow(monkeypatch, workflow_dependencies, results, "upload_artifact", lambda *_args: None)
     _, task = owner
     truth, predictions = _inputs(tmp_path)
-    evaluated = _evaluation(
-        truth, predictions, tmp_path, workflow_dependencies=workflow_dependencies
-    )
+    evaluated = _evaluation(truth, predictions, tmp_path, workflow_dependencies=workflow_dependencies)
     checkpoint = tmp_path / "best.pt"
     checkpoint.write_bytes(b"same checkpoint")
     with invocation(ClearMLConfig(), "pipeline"):
@@ -354,9 +334,7 @@ def test_unknown_contexts_do_not_overwrite_and_provenance_reuses_slots(
                 if index == 7
                 else evaluated
             )
-            results.publish_evaluation(
-                task, value, truth, source, output_dir=tmp_path, model_id=model_id
-            )
+            results.publish_evaluation(task, value, truth, source, output_dir=tmp_path, model_id=model_id)
         results.complete_result_producer(task, "predict")
     assert [label for kind, _, label in plot_calls if kind == "confusion"] == [
         "Current model · test",
@@ -381,21 +359,22 @@ def test_raw_publication_preserves_literal_names_and_labels_and_assigns_media_sp
 
     _, task = owner
     truth, predictions = _inputs(tmp_path)
-    truth_frame = read_detection_csv(truth).assign(
-        image_path=["val.jpg", "test.jpg"], instance_label=["NA", "NULL"]
-    )
+    truth_frame = read_detection_csv(truth).assign(image_path=["val.jpg", "test.jpg"], instance_label=["NA", "NULL"])
     truth_frame.to_csv(truth, index=False)
     names = [
         name if mode == "name" else Path(name).stem if mode == "stem" else str(tmp_path / name)
         for name in ["val.jpg", "test.jpg"]
     ]
-    read_detection_csv(predictions).assign(
-        image_name=names, instance_label=["NA", "NULL"]
-    ).to_csv(predictions, index=False)
+    read_detection_csv(predictions).assign(image_name=names, instance_label=["NA", "NULL"]).to_csv(
+        predictions, index=False
+    )
     with invocation(ClearMLConfig(), "predict"):
         results.declare_result_producers(task, ["predict"], output_dir=tmp_path)
         results.register_predictions(
-            task, truth, predictions, output_dir=tmp_path,
+            task,
+            truth,
+            predictions,
+            output_dir=tmp_path,
             prediction_image_name=cast(ImageNameMode, mode),
         )
         results.complete_result_producer(task, "predict")

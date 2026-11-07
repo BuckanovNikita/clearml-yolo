@@ -56,18 +56,14 @@ def test_file_roots_replace_context_wholesale_and_only_file_roots_are_returned(
     }
     if as_omegaconf:
         context = OmegaConf.create(context)
-    original = (
-        OmegaConf.to_container(context, resolve=False) if as_omegaconf else deepcopy(context)
-    )
+    original = OmegaConf.to_container(context, resolve=False) if as_omegaconf else deepcopy(context)
 
     assert resolve_config_document(document, context) == {
         "settings": {"size": 960},
         "size": 960,
         "path": "/effective/output",
     }
-    assert (
-        OmegaConf.to_container(context, resolve=False) if as_omegaconf else context
-    ) == original
+    assert (OmegaConf.to_container(context, resolve=False) if as_omegaconf else context) == original
 
 
 def test_context_containers_referenced_by_file_values_keep_their_contained_fields() -> None:
@@ -201,9 +197,7 @@ def test_transformed_literal_resolver_output_fails_safely() -> None:
     OmegaConf.register_new_resolver("config_upload_upper", str.upper)
     try:
         with pytest.raises(ValueError, match="could not be resolved"):
-            resolve_config_document(
-                {"literal": r"\${missing}", "upper": "${config_upload_upper:${literal}}"}
-            )
+            resolve_config_document({"literal": r"\${missing}", "upper": "${config_upload_upper:${literal}}"})
     finally:
         OmegaConf.clear_resolver("config_upload_upper")
 
@@ -225,9 +219,7 @@ def test_concrete_tuple_resolver_output_is_a_primitive_list() -> None:
 
     OmegaConf.register_new_resolver("config_upload_tuple", lambda: (3, False, None))
     try:
-        assert resolve_config_document({"values": "${config_upload_tuple:}"}) == {
-            "values": [3, False, None]
-        }
+        assert resolve_config_document({"values": "${config_upload_tuple:}"}) == {"values": [3, False, None]}
     finally:
         OmegaConf.clear_resolver("config_upload_tuple")
 
@@ -235,9 +227,7 @@ def test_concrete_tuple_resolver_output_is_a_primitive_list() -> None:
 def test_file_metadata_tracks_context_credentials_without_uploading_context() -> None:
     from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_file
 
-    result = resolve_config_file(
-        {"copy": "${auth.password}"}, {"auth": {"password": "context-private-value"}}
-    )
+    result = resolve_config_file({"copy": "${auth.password}"}, {"auth": {"password": "context-private-value"}})
 
     assert result.values == {"copy": "context-private-value"}
     secret_inventory_is_correct = "context-private-value" in result.secrets
@@ -248,9 +238,7 @@ def test_file_metadata_tracks_context_credentials_without_uploading_context() ->
     "expression",
     ["${oc.env:APP_SECRET_KEY}", '${oc.env:"APP_SECRET_KEY"}', "${oc.env:${env_name}}"],
 )
-def test_file_metadata_tracks_sensitive_environment_aliases(
-    monkeypatch: pytest.MonkeyPatch, expression: str
-) -> None:
+def test_file_metadata_tracks_sensitive_environment_aliases(monkeypatch: pytest.MonkeyPatch, expression: str) -> None:
     from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_file
 
     monkeypatch.setenv("APP_SECRET_KEY", "environment-private-value")
@@ -349,9 +337,7 @@ def test_unsupported_resolver_results_cannot_escape_plain_tree_validation(
         ),
     ],
 )
-def test_mixed_literal_text_and_embedded_reference_provenance(
-    document: Any, expected: Any
-) -> None:
+def test_mixed_literal_text_and_embedded_reference_provenance(document: Any, expected: Any) -> None:
     from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_document
 
     assert resolve_config_document(document) == expected
@@ -390,9 +376,7 @@ def test_unused_context_resolver_is_not_executed_for_secret_inventory() -> None:
 
     OmegaConf.register_new_resolver("config_upload_unused_secret", unused)
     try:
-        result = resolve_config_file(
-            {"plain": 7}, {"auth": {"password": "${config_upload_unused_secret:}"}}
-        )
+        result = resolve_config_file({"plain": 7}, {"auth": {"password": "${config_upload_unused_secret:}"}})
     finally:
         OmegaConf.clear_resolver("config_upload_unused_secret")
 

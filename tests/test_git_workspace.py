@@ -26,18 +26,12 @@ _COMMANDS = (
 
 
 def _environment(root: Path) -> dict[str, str]:
-    environment = {
-        key: value
-        for key, value in os.environ.items()
-        if not key.startswith(("GIT_", "CY_"))
-    }
+    environment = {key: value for key, value in os.environ.items() if not key.startswith(("GIT_", "CY_"))}
     environment["CY_HOME"] = str(root)
     return environment
 
 
-def _run(
-    arguments: list[str], cwd: Path, *, root: Path | None = None
-) -> subprocess.CompletedProcess[str]:
+def _run(arguments: list[str], cwd: Path, *, root: Path | None = None) -> subprocess.CompletedProcess[str]:
     return subprocess.run(  # noqa: S603 - fixed commands and test-owned paths, no shell
         arguments,
         cwd=cwd,
@@ -98,9 +92,7 @@ def test_experiment_inspection_warns_once_without_changing_stdout_or_status(
 
 
 @pytest.mark.parametrize("kind", ["unborn", "nested", "worktree", "submodule"])
-def test_valid_working_trees_are_quiet(
-    tmp_path: Path, kind: str, messages: list[str]
-) -> None:
+def test_valid_working_trees_are_quiet(tmp_path: Path, kind: str, messages: list[str]) -> None:
     from clearml_yolo.adapters.runtime.git_workspace import warn_if_unversioned_launch
 
     repository = tmp_path / "repository"
@@ -133,9 +125,7 @@ def test_valid_working_trees_are_quiet(
 
 
 @pytest.mark.parametrize("bare", [False, True])
-def test_non_working_tree_warns_without_writing_git(
-    tmp_path: Path, bare: bool, messages: list[str]
-) -> None:
+def test_non_working_tree_warns_without_writing_git(tmp_path: Path, bare: bool, messages: list[str]) -> None:
     from clearml_yolo.adapters.runtime.git_workspace import warn_if_unversioned_launch
 
     if bare:
@@ -186,9 +176,7 @@ def test_git_failures_remain_advisory(
 ) -> None:
     from clearml_yolo.adapters.runtime import git_workspace
 
-    with patch.object(shutil, "which", return_value="/git"), patch.object(
-        subprocess, "run"
-    ) as probe:
+    with patch.object(shutil, "which", return_value="/git"), patch.object(subprocess, "run") as probe:
         if isinstance(failure, subprocess.CompletedProcess):
             probe.return_value = failure
         else:
@@ -204,9 +192,7 @@ def test_git_failures_remain_advisory(
 def test_missing_git_warns_without_spawning(tmp_path: Path, messages: list[str]) -> None:
     from clearml_yolo.adapters.runtime import git_workspace
 
-    with patch.object(shutil, "which", return_value=None), patch.object(
-        subprocess, "run"
-    ) as probe:
+    with patch.object(shutil, "which", return_value=None), patch.object(subprocess, "run") as probe:
         git_workspace.warn_if_unversioned_launch(tmp_path)
     probe.assert_not_called()
     assert len(messages) == 1

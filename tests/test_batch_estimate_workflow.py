@@ -124,9 +124,7 @@ def sample_case(count: int = 1) -> EstimateCase:
 def test_completed_case_is_reused_and_refresh_repeats_trials() -> None:
     store, probe = MemoryStore(), RecordingProbe()
     profiles, workload, settings = (sample_profile(),), SyntheticWorkload(), SearchSettings()
-    first = estimate_batches(
-        profiles, workload, settings, probe=probe, store=store, now=lambda: "2026-10-26T12:00:00Z"
-    )
+    first = estimate_batches(profiles, workload, settings, probe=probe, store=store, now=lambda: "2026-10-26T12:00:00Z")
     calls, writes = probe.calls, len(store.writes)
     assert first[0].global_batch == 8
     assert all(not case.usable for case in store.writes[:-1])
@@ -236,9 +234,7 @@ def test_probe_error_is_visible_and_next_profile_still_runs() -> None:
 def test_duplicate_hardware_profiles_measure_once_even_during_refresh() -> None:
     store, probe = MemoryStore(), RecordingProbe()
     profile = sample_profile()
-    other = profile.model_copy(
-        update={"gpus": (profile.gpus[0].model_copy(update={"uuid": "GPU-other"}),)}
-    )
+    other = profile.model_copy(update={"gpus": (profile.gpus[0].model_copy(update={"uuid": "GPU-other"}),)})
     results = estimate_batches(
         (profile, other),
         SyntheticWorkload(),
@@ -394,6 +390,4 @@ def test_error_diagnostic_appends_notes_of_groups_and_leaves() -> None:
     leaf.add_note("second")
     group = ExceptionGroup("outer", [leaf])
     group.add_note("group note")
-    assert core.error_diagnostic(group) == (
-        "ExceptionGroup: outer (group note) [ValueError: leaf (first; second)]"
-    )
+    assert core.error_diagnostic(group) == ("ExceptionGroup: outer (group note) [ValueError: leaf (first; second)]")

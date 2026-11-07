@@ -16,9 +16,7 @@ from omegaconf import OmegaConf
 pytestmark = pytest.mark.skipif(sys.platform != "linux", reason="Linux supervisor channel")
 
 
-def test_supervised_success_does_not_enter_native_cleanup(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_supervised_success_does_not_enter_native_cleanup(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     from clearml_yolo.entrypoints.hydra import common
 
     outcomes: list[str] = []
@@ -111,9 +109,7 @@ def test_training_cleanup_precedes_acknowledged_handoff(monkeypatch: pytest.Monk
 
 
 @pytest.mark.parametrize("reply", [b"", b"invalid"])
-def test_failed_handoff_cannot_start_inference(
-    monkeypatch: pytest.MonkeyPatch, reply: bytes
-) -> None:
+def test_failed_handoff_cannot_start_inference(monkeypatch: pytest.MonkeyPatch, reply: bytes) -> None:
     from clearml_yolo.adapters.runtime import execution_lifecycle as lifecycle
 
     parent, child = socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET)

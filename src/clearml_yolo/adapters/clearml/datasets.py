@@ -33,9 +33,7 @@ class ClearMLGroundTruthRepository:
                 )
             # Soft links can move the CSV's effective parent to an SDK archive cache,
             # changing existing source-relative image-path interpretation.
-            directory = dataset.get_local_copy(
-                files=["dataset.csv"], raise_on_error=True, use_soft_links=False
-            )
+            directory = dataset.get_local_copy(files=["dataset.csv"], raise_on_error=True, use_soft_links=False)
             path = Path(directory) / "dataset.csv"
             if not path.is_file():
                 raise FileNotFoundError(f"Downloaded ClearML dataset has no dataset.csv: {path}")

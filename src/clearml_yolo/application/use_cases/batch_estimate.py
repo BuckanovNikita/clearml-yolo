@@ -34,7 +34,8 @@ def _snapshot(
         diagnostic=diagnostic
         or (
             "Independent confirmation pending; search may still be running or was interrupted"
-            if pending else search.diagnostic
+            if pending
+            else search.diagnostic
         ),
     )
 

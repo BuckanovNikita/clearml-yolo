@@ -23,9 +23,7 @@ def test_external_application_write_is_rejected_without_creating_destination(
     assert not outside.parent.exists()
 
 
-def test_project_write_rejects_symlink_escape(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_project_write_rejects_symlink_escape(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     root = tmp_path / "workspace"
     root.mkdir()
     outside = tmp_path / "outside"
@@ -37,9 +35,7 @@ def test_project_write_rejects_symlink_escape(
     assert list(outside.iterdir()) == []
 
 
-def test_external_temp_is_rejected_before_workspace_creation(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_external_temp_is_rejected_before_workspace_creation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from clearml_yolo.adapters.runtime.bootstrap import initialize_runtime_environment
 
     root = tmp_path / "workspace"
@@ -84,9 +80,7 @@ def test_dataset_default_uses_cy_home(tmp_path: Path, monkeypatch: pytest.Monkey
     assert dataset_cache_root(None) == tmp_path / ".cache" / "clearml-yolo" / "datasets"
 
 
-def test_dataset_default_ignores_general_xdg_cache(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_dataset_default_ignores_general_xdg_cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CY_HOME", str(tmp_path / "workspace"))
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "home" / ".cache"))
     expected = tmp_path / "workspace" / ".cache" / "clearml-yolo" / "datasets"
@@ -182,9 +176,7 @@ def test_contained_home_destination_is_accepted_without_relocation(
     assert not selected.exists()
 
 
-def test_symlinks_within_workspace_remain_valid_destinations(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_symlinks_within_workspace_remain_valid_destinations(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     target = tmp_path / "real"
     target.mkdir()
     link = tmp_path / "alias"

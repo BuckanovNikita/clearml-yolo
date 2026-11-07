@@ -67,6 +67,7 @@ def test_restore_real_snapshot_and_config_offline(
 ) -> None:
     spec, asset, weight, config = _fixture(tmp_path)
     if copy_fallback:
+
         def unavailable_symlink(_self: Path, _target: str) -> None:
             raise OSError("Symlinks unavailable on test filesystem")
 
@@ -75,15 +76,11 @@ def test_restore_real_snapshot_and_config_offline(
     monkeypatch.setattr(hub, "get_hf_file_metadata", lambda **kw: pytest.fail("metadata requested"))
     result = hub.restore_bundle_asset(spec, asset, weight, config)
     assert result.revision == COMMIT
-    assert result.canonical_url == (
-        f"https://huggingface.co/timm/example/resolve/{COMMIT}/pytorch_model.bin"
-    )
+    assert result.canonical_url == (f"https://huggingface.co/timm/example/resolve/{COMMIT}/pytorch_model.bin")
     assert hub.bundle_asset_ready(spec)
     assert hub.resolve_hub_asset(spec) == result
     assert spec.hub is not None
-    cached_config = try_to_load_from_cache(
-        "timm/example", "config.json", cache_dir=spec.hub.cache_dir, revision="main"
-    )
+    cached_config = try_to_load_from_cache("timm/example", "config.json", cache_dir=spec.hub.cache_dir, revision="main")
     assert isinstance(cached_config, str)
     assert Path(cached_config).read_bytes() == config.read_bytes()
     assert result.path.read_bytes() == WEIGHT

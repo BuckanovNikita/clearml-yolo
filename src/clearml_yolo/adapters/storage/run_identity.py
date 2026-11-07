@@ -38,9 +38,7 @@ def safe_path_component(value: str) -> str:
 def task_run_dir(root: Path, project_name: str, task_name: str, task_id: str) -> Path:
     """Resolve an implicit root from plain identity values, independent of tracking SDKs."""
     return (
-        root
-        / safe_path_component(project_name)
-        / f"{safe_path_component(task_name)}-{safe_path_component(task_id)}"
+        root / safe_path_component(project_name) / f"{safe_path_component(task_name)}-{safe_path_component(task_id)}"
     ).resolve()
 
 
@@ -106,8 +104,7 @@ def point_latest_at(root: Path, run_dir: Path) -> None:
         if latest.exists() and not latest.is_symlink():
             latest.rename(displaced)
             logger.warning(
-                "Moved {} to {} because it was not a symlink, and kept everything it held;"
-                " {} now points at {}",
+                "Moved {} to {} because it was not a symlink, and kept everything it held; {} now points at {}",
                 latest,
                 displaced,
                 latest,
@@ -117,8 +114,6 @@ def point_latest_at(root: Path, run_dir: Path) -> None:
         pending.symlink_to(run_dir)
         pending.replace(latest)
     except OSError as error:
-        log_exception(
-            "Could not update latest run link", error, context={"link": latest, "target": run_dir}
-        )
+        log_exception("Could not update latest run link", error, context={"link": latest, "target": run_dir})
         with suppress(OSError):
             pending.unlink(missing_ok=True)

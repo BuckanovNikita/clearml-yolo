@@ -125,9 +125,7 @@ class DigitalMetricsDetectionResults(DetectionResults):  # type: ignore[misc,no-
     ) -> None:
         payload = EvaluationPayload.model_validate(source_payload)
         if classes is None:
-            classes = (
-                payload.report.classes if payload.report is not None else list(payload.thresholds)
-            )
+            classes = payload.report.classes if payload.report is not None else list(payload.thresholds)
         super().__init__(
             samples,
             config,
@@ -311,10 +309,7 @@ class DigitalMetricsDetectionResults(DetectionResults):  # type: ignore[misc,no-
             }
             denominator = sum(weights.values())
             result[average] = {
-                metric: sum(
-                    float(result[name][metric]) * weight for name, weight in weights.items()
-                )
-                / denominator
+                metric: sum(float(result[name][metric]) * weight for name, weight in weights.items()) / denominator
                 if denominator
                 else 0.0
                 for metric in ("precision", "recall", "f1-score")
@@ -349,11 +344,7 @@ class DigitalMetricsDetectionResults(DetectionResults):  # type: ignore[misc,no-
             total = sum(weights)
             for metric in ("precision", "recall", "f1-score"):
                 values[metric] = (
-                    sum(
-                        float(row[metric]) * weight
-                        for row, weight in zip(rows, weights, strict=True)
-                    )
-                    / total
+                    sum(float(row[metric]) * weight for row, weight in zip(rows, weights, strict=True)) / total
                     if total
                     else 0.0
                 )
@@ -371,11 +362,7 @@ class DigitalMetricsDetectionResults(DetectionResults):  # type: ignore[misc,no-
         if self.is_subset or report is None:
             return None
         selected = classes if classes is not None else report.classes
-        values = [
-            report.average_precisions[name].ap50_95
-            for name in selected
-            if name in report.average_precisions
-        ]
+        values = [report.average_precisions[name].ap50_95 for name in selected if name in report.average_precisions]
         available = [value for value in values if value is not None]
         return sum(available) / len(available) if available else None
 
@@ -391,9 +378,7 @@ class DigitalMetricsDetectionResults(DetectionResults):  # type: ignore[misc,no-
             raise ValueError("AP50 PR curves are unavailable for this evaluation scope")
         if iou_thresh is not None and iou_thresh != _AP50_IOU:
             raise ValueError("Only authoritative IoU 0.50 PR curves are available")
-        curves = [
-            curve for curve in report.pr_curves if classes is None or curve.class_name in classes
-        ]
+        curves = [curve for curve in report.pr_curves if classes is None or curve.class_name in classes]
         # Source curves have distinct recall grids; resampling would lose evidence.
         if backend == "plotly":
             import plotly.graph_objects as go  # type: ignore[import-untyped]
@@ -442,9 +427,7 @@ class DigitalMetricsDetectionResults(DetectionResults):  # type: ignore[misc,no-
             inds = (self.ypred == x) & (self.ytrue == y)
             return (
                 list(dict.fromkeys(value for value in self.ytrue_ids[inds] if value in visible_gt)),
-                list(
-                    dict.fromkeys(value for value in self.ypred_ids[inds] if value in visible_pred)
-                ),
+                list(dict.fromkeys(value for value in self.ypred_ids[inds] if value in visible_pred)),
             )
         payload = self.source_payload
         return (
@@ -506,15 +489,9 @@ def _write_native_fields(
                 detection[f"{key}_id"] = association or ""
                 detection[f"{key}_iou"] = iou
         name = sample.image_name
-        sample[f"{key}_tp"] = sum(
-            box.status == "TP" and box.image_name == name for box in payload.predictions
-        )
-        sample[f"{key}_fp"] = sum(
-            box.status == "FP" and box.image_name == name for box in payload.predictions
-        )
-        sample[f"{key}_fn"] = sum(
-            box.status == "FN" and box.image_name == name for box in payload.ground_truth
-        )
+        sample[f"{key}_tp"] = sum(box.status == "TP" and box.image_name == name for box in payload.predictions)
+        sample[f"{key}_fp"] = sum(box.status == "FP" and box.image_name == name for box in payload.predictions)
+        sample[f"{key}_fn"] = sum(box.status == "FN" and box.image_name == name for box in payload.ground_truth)
         sample.save()
 
 

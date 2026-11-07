@@ -77,9 +77,7 @@ class _Model:
     def __init__(self) -> None:
         from ultralytics.utils.callbacks import base
 
-        self.callbacks = {
-            event: callbacks.copy() for event, callbacks in base.default_callbacks.items()
-        }
+        self.callbacks = {event: callbacks.copy() for event, callbacks in base.default_callbacks.items()}
         self.trainer: Any = None
 
     def add_callback(self, event: str, callback: Any) -> None:
@@ -95,9 +93,7 @@ def _capture_events(
 ) -> Path:
     output.mkdir(parents=True)
     trainer = SimpleNamespace(
-        args=SimpleNamespace(
-            project="runs", name="ddp-run", profile=False, secret=output.name, imgsz=98
-        ),
+        args=SimpleNamespace(project="runs", name="ddp-run", profile=False, secret=output.name, imgsz=98),
         save_dir=output,
         epoch=0,
         tloss=object(),
@@ -124,9 +120,7 @@ def _capture_events(
     best.write_bytes(b"checkpoint")
     trainer.best = best
     trainer.plots = {}
-    trainer.validator = SimpleNamespace(
-        plots={}, metrics=SimpleNamespace(results_dict={"metrics/mAP50(B)": 0.8})
-    )
+    trainer.validator = SimpleNamespace(plots={}, metrics=SimpleNamespace(results_dict={"metrics/mAP50(B)": 0.8}))
     if plots:
         figure = plt.figure()
         for owner, name in (
@@ -273,9 +267,7 @@ def test_ddp_journals_epoch_before_replay_with_invocation_context(
     monkeypatch.setenv("CY_SCALAR_JOURNAL", str(scalars))
     monkeypatch.setattr(clearml, "Task", _Task)
     monkeypatch.setattr("clearml_yolo.adapters.clearml.session.active_task", owner.get)
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.integrations.native_ddp._worker_rank_zero", lambda: True
-    )
+    monkeypatch.setattr("clearml_yolo.adapters.integrations.native_ddp._worker_rank_zero", lambda: True)
     monkeypatch.setattr(torch_utils, "model_info_for_loggers", lambda _trainer: {})
     monkeypatch.setenv(OWNER_PID_ENV, str(os.getpid()))
     monkeypatch.setenv(OWNER_TASK_ENV, task.id)
@@ -307,9 +299,7 @@ def test_ddp_journals_epoch_before_replay_with_invocation_context(
         owner.reset(token)
 
 
-def test_ddp_final_replay_cannot_publish_best_twice(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_ddp_final_replay_cannot_publish_best_twice(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     import clearml
     from ultralytics.utils import torch_utils
 
@@ -317,9 +307,7 @@ def test_ddp_final_replay_cannot_publish_best_twice(
     _Task.current = task
     monkeypatch.setattr(clearml, "Task", _Task)
     monkeypatch.setattr("clearml_yolo.adapters.clearml.session.active_task", lambda: task)
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.integrations.native_ddp._worker_rank_zero", lambda: True
-    )
+    monkeypatch.setattr("clearml_yolo.adapters.integrations.native_ddp._worker_rank_zero", lambda: True)
     monkeypatch.setattr(torch_utils, "model_info_for_loggers", lambda _trainer: {})
     monkeypatch.setenv(OWNER_PID_ENV, str(os.getpid()))
     monkeypatch.setenv(OWNER_TASK_ENV, task.id)
@@ -385,9 +373,7 @@ def test_ddp_partial_record_waits_for_newline_and_interruption_stops_consumer(
     assert directory.is_dir()
     assert [json.loads(line) for line in journal.read_text().splitlines()] == [pretrain, epoch]
     assert model.callbacks == original_callbacks
-    assert not any(
-        thread.name == "cy-native-ddp-relay" for thread in set(enumerate_threads()) - before
-    )
+    assert not any(thread.name == "cy-native-ddp-relay" for thread in set(enumerate_threads()) - before)
 
 
 def test_ddp_owner_callback_failure_reaches_caller_and_stops_publication(
@@ -412,9 +398,7 @@ def test_ddp_owner_callback_failure_reaches_caller_and_stops_publication(
     monkeypatch.setattr(task.logger, "report_scalar", fail_scalar)
     monkeypatch.setattr(clearml, "Task", _Task)
     monkeypatch.setattr("clearml_yolo.adapters.clearml.session.active_task", lambda: task)
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.integrations.native_ddp._worker_rank_zero", lambda: True
-    )
+    monkeypatch.setattr("clearml_yolo.adapters.integrations.native_ddp._worker_rank_zero", lambda: True)
     monkeypatch.setattr(torch_utils, "model_info_for_loggers", lambda _trainer: {})
     monkeypatch.setenv(OWNER_PID_ENV, str(os.getpid()))
     monkeypatch.setenv(OWNER_TASK_ENV, task.id)
@@ -437,15 +421,11 @@ def test_ddp_owner_callback_failure_reaches_caller_and_stops_publication(
     assert model.callbacks == original_callbacks
     assert task.output_models == []
     assert failed.is_set()
-    assert not any(
-        thread.name == "cy-native-ddp-relay" for thread in set(enumerate_threads()) - before
-    )
+    assert not any(thread.name == "cy-native-ddp-relay" for thread in set(enumerate_threads()) - before)
 
 
 @pytest.mark.parametrize("tail", [b'{"event":broken}\n', b'{"event":"on_train_end"}'])
-def test_ddp_corrupt_or_unterminated_journal_never_publishes_best(
-    monkeypatch: pytest.MonkeyPatch, tail: bytes
-) -> None:
+def test_ddp_corrupt_or_unterminated_journal_never_publishes_best(monkeypatch: pytest.MonkeyPatch, tail: bytes) -> None:
     import clearml
 
     task = _Task()
@@ -462,16 +442,12 @@ def test_ddp_corrupt_or_unterminated_journal_never_publishes_best(
         native_ddp_relay(task, model) as relay,
     ):
         journal = relay._directory / "events.jsonl"
-        journal.write_bytes(
-            b'{"event":"on_pretrain_routine_start","args":{"name":"bad","epochs":1}}\n' + tail
-        )
+        journal.write_bytes(b'{"event":"on_pretrain_routine_start","args":{"name":"bad","epochs":1}}\n' + tail)
         relay.replay(model.trainer)
     assert task.output_models == []
 
 
-@pytest.mark.parametrize(
-    "missing", ["args", "save_dir", "trainer_plots", "validator_plots", "results"]
-)
+@pytest.mark.parametrize("missing", ["args", "save_dir", "trainer_plots", "validator_plots", "results"])
 def test_ddp_incomplete_final_state_fails_before_best_upload(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, missing: str
 ) -> None:
@@ -484,9 +460,7 @@ def test_ddp_incomplete_final_state_fails_before_best_upload(
     _Task.current = task
     monkeypatch.setattr(clearml, "Task", _Task)
     monkeypatch.setattr("clearml_yolo.adapters.clearml.session.active_task", lambda: task)
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.integrations.native_ddp._worker_rank_zero", lambda: True
-    )
+    monkeypatch.setattr("clearml_yolo.adapters.integrations.native_ddp._worker_rank_zero", lambda: True)
     monkeypatch.setattr(torch_utils, "model_info_for_loggers", lambda _trainer: {})
     monkeypatch.setenv(OWNER_PID_ENV, str(os.getpid()))
     monkeypatch.setenv(OWNER_TASK_ENV, task.id)
@@ -531,9 +505,7 @@ def test_ddp_malformed_epoch_state_fails_before_best_upload(
     _Task.current = task
     monkeypatch.setattr(clearml, "Task", _Task)
     monkeypatch.setattr("clearml_yolo.adapters.clearml.session.active_task", lambda: task)
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.integrations.native_ddp._worker_rank_zero", lambda: True
-    )
+    monkeypatch.setattr("clearml_yolo.adapters.integrations.native_ddp._worker_rank_zero", lambda: True)
     monkeypatch.setattr(torch_utils, "model_info_for_loggers", lambda _trainer: {})
     monkeypatch.setenv(OWNER_PID_ENV, str(os.getpid()))
     monkeypatch.setenv(OWNER_TASK_ENV, task.id)

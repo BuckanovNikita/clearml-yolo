@@ -107,9 +107,7 @@ def install_sdk(monkeypatch: pytest.MonkeyPatch) -> Callable[[RecoveryTask], Non
     return install
 
 
-def standalone_checkpoint(
-    directory: Path, backend: str, preset: str, suffix: str
-) -> tuple[Path, CheckpointDescriptor]:
+def standalone_checkpoint(directory: Path, backend: str, preset: str, suffix: str) -> tuple[Path, CheckpointDescriptor]:
     source = directory / ("native-best" + suffix)
     with ZipFile(source, "w") as archive:
         archive.writestr("weights/data.pkl", b"tiny-native-checkpoint-fixture")
@@ -142,9 +140,7 @@ def test_native_download_recovers_embedded_descriptor_and_original_identity(
     downloaded, descriptor = standalone_checkpoint(tmp_path, backend, preset, suffix)
     model = DownloadedModel(downloaded)
     install_sdk(RecoveryTask([model]))
-    path, identity = resolve_weights_with_identity(
-        TASK_ID if route == "task" else f"clearml://{model.id}"
-    )
+    path, identity = resolve_weights_with_identity(TASK_ID if route == "task" else f"clearml://{model.id}")
     assert path == downloaded
     assert isinstance(path, Path)
     assert read_checkpoint_descriptor(path) == descriptor
@@ -272,9 +268,7 @@ def test_legacy_pt_remains_recoverable_without_invented_detector_metadata(
     checkpoint.write_bytes(b"historical-nonzip-checkpoint")
     model = DownloadedModel(checkpoint, role=None)
     install_sdk(RecoveryTask([model]))
-    path, identity = resolve_weights_with_identity(
-        TASK_ID if route == "task" else f"clearml://{model.id}"
-    )
+    path, identity = resolve_weights_with_identity(TASK_ID if route == "task" else f"clearml://{model.id}")
     assert path == checkpoint
     assert read_checkpoint_descriptor(checkpoint) is None
     assert identity is not None

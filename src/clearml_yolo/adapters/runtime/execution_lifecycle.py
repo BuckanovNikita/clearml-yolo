@@ -11,9 +11,7 @@ OWNER_PID_ENV = "CY_EXECUTION_OWNER_PID"
 TRAINING_FINISHED = b"training-finished-v1"
 ACKNOWLEDGED = b"ok-v1"
 _HANDOFF_TIMEOUT_SECONDS = 30.0
-_CHANNEL: ContextVar[tuple[int, socket.socket] | None] = ContextVar(
-    "execution_lifecycle_channel", default=None
-)
+_CHANNEL: ContextVar[tuple[int, socket.socket] | None] = ContextVar("execution_lifecycle_channel", default=None)
 
 
 @contextmanager

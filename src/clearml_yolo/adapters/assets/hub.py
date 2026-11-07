@@ -127,8 +127,7 @@ def _safe_sdk_diagnostics() -> Iterator[None]:
         registered = logging.Logger.manager.loggerDict.copy()
         for name, logger in registered.items():
             if not isinstance(logger, logging.Logger) or not any(
-                name == namespace or name.startswith(namespace + ".")
-                for namespace in _SDK_DIAGNOSTIC_NAMESPACES
+                name == namespace or name.startswith(namespace + ".") for namespace in _SDK_DIAGNOSTIC_NAMESPACES
             ):
                 continue
             if logger not in state.loggers:
@@ -186,9 +185,7 @@ def _contained(root: Path, path: Path) -> Path:
 
 def _repo_root(hub: HubAsset) -> Path:
     validate_repo_id(hub.repository)
-    return _contained(
-        hub.cache_dir, hub.cache_dir / ("models--" + hub.repository.replace("/", "--"))
-    )
+    return _contained(hub.cache_dir, hub.cache_dir / ("models--" + hub.repository.replace("/", "--")))
 
 
 def _filenames(hub: HubAsset) -> tuple[str, ...]:
@@ -234,9 +231,7 @@ def _native_identity(path: Path, hub: HubAsset) -> tuple[str, str | None]:
 def _file_spec(spec: AssetSpec, filename: str) -> AssetSpec:
     # Original URL checksums describe another serialization. Native Hub ETags
     # validate the selected representation independently.
-    return spec.model_copy(
-        update={"filename": filename, "checksum": None, "checksum_algorithm": "sha256"}
-    )
+    return spec.model_copy(update={"filename": filename, "checksum": None, "checksum_algorithm": "sha256"})
 
 
 def _record(path: Path, spec: AssetSpec, filename: str) -> ResolvedAsset:
@@ -246,9 +241,7 @@ def _record(path: Path, spec: AssetSpec, filename: str) -> ResolvedAsset:
     if etag is not None and not _etag_matches(path, etag, digest):
         raise ValueError("Native Hub blob checksum mismatch")
     return ResolvedAsset(
-        canonical_url=hf_hub_url(
-            hub.repository, filename, revision=commit, endpoint=_PUBLIC_ENDPOINT
-        ),
+        canonical_url=hf_hub_url(hub.repository, filename, revision=commit, endpoint=_PUBLIC_ENDPOINT),
         path=path.absolute(),
         sha256=digest,
         override=spec.override,
@@ -260,9 +253,7 @@ def _cached(spec: AssetSpec) -> tuple[ResolvedAsset | None, set[str]]:
     hub = _request(spec)
     corrupt: set[str] = set()
     for filename in _filenames(hub):
-        cached = try_to_load_from_cache(
-            hub.repository, filename, cache_dir=hub.cache_dir, revision=hub.revision
-        )
+        cached = try_to_load_from_cache(hub.repository, filename, cache_dir=hub.cache_dir, revision=hub.revision)
         if not isinstance(cached, str):
             continue
         try:
@@ -288,21 +279,12 @@ def _endpoints() -> tuple[tuple[str, bool | None], ...]:
 
 def _legacy_candidates(spec: AssetSpec) -> tuple[Path, ...]:
     legacy = (
-        cy_home()
-        / ".cache"
-        / "clearml-yolo"
-        / "models"
-        / spec.backend
-        / spec.preset
-        / spec.identity
-        / spec.filename
+        cy_home() / ".cache" / "clearml-yolo" / "models" / spec.backend / spec.preset / spec.identity / spec.filename
     )
     return (*spec.cache_candidates, *(cached.path for cached in spec.equivalent_caches), legacy)
 
 
-def _publish_snapshot(
-    blob: Path, snapshot: Path, *, validator: Callable[[Path], str]
-) -> None:
+def _publish_snapshot(blob: Path, snapshot: Path, *, validator: Callable[[Path], str]) -> None:
     """Publish a native blob link, retaining validated atomic copy fallback."""
     snapshot.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(dir=snapshot.parent, delete=False) as temporary:
@@ -371,9 +353,7 @@ def _legacy_metadata(candidate: Path, hub: HubAsset, filename: str) -> HfFileMet
             continue
         repo = Path(*parts[:index])
         reference = repo / "refs" / _relative(hub.revision)
-        if hub.revision != commit and (
-            not reference.is_file() or reference.read_text().strip() != commit
-        ):
+        if hub.revision != commit and (not reference.is_file() or reference.read_text().strip() != commit):
             continue
         blob = candidate.resolve()
         if blob.parent != repo / "blobs" or not _ETAG.fullmatch(blob.name):
@@ -382,9 +362,7 @@ def _legacy_metadata(candidate: Path, hub: HubAsset, filename: str) -> HfFileMet
             commit_hash=commit,
             etag=blob.name,
             size=candidate.stat().st_size,
-            location=hf_hub_url(
-                hub.repository, filename, revision=commit, endpoint=_PUBLIC_ENDPOINT
-            ),
+            location=hf_hub_url(hub.repository, filename, revision=commit, endpoint=_PUBLIC_ENDPOINT),
             xet_file_data=None,
         )
     return None
@@ -436,9 +414,7 @@ def _promote(spec: AssetSpec) -> ResolvedAsset | None:
                     metadata = _sdk_call(
                         partial(
                             get_hf_file_metadata,
-                            hf_hub_url(
-                                hub.repository, filename, revision=hub.revision, endpoint=endpoint
-                            ),
+                            hf_hub_url(hub.repository, filename, revision=hub.revision, endpoint=endpoint),
                             token=token,
                             endpoint=endpoint,
                         )
@@ -451,9 +427,7 @@ def _promote(spec: AssetSpec) -> ResolvedAsset | None:
 
 def _config(spec: AssetSpec, commit: str, endpoint: str, token: bool | None) -> None:
     hub = _request(spec)
-    existing = try_to_load_from_cache(
-        hub.repository, "config.json", cache_dir=hub.cache_dir, revision=commit
-    )
+    existing = try_to_load_from_cache(hub.repository, "config.json", cache_dir=hub.cache_dir, revision=commit)
     force = False
     if isinstance(existing, str):
         try:
@@ -496,9 +470,7 @@ def _validate_config_data(path: Path, etag: str | None) -> str:
 def _needs_config_repair(spec: AssetSpec, result: ResolvedAsset) -> bool:
     hub = _request(spec)
     commit, _ = _native_identity(result.path, hub)
-    config = try_to_load_from_cache(
-        hub.repository, "config.json", cache_dir=hub.cache_dir, revision=commit
-    )
+    config = try_to_load_from_cache(hub.repository, "config.json", cache_dir=hub.cache_dir, revision=commit)
     if not isinstance(config, str):
         # We cannot distinguish a historical weight-only cache from a previous
         # preparation attempt whose config download failed. Both need repair
@@ -539,9 +511,7 @@ def _ready(spec: AssetSpec) -> ResolvedAsset:
     return ready
 
 
-def _retrieve_one(
-    spec: AssetSpec, filename: str, endpoint: str, token: bool | None, force: bool
-) -> ResolvedAsset:
+def _retrieve_one(spec: AssetSpec, filename: str, endpoint: str, token: bool | None, force: bool) -> ResolvedAsset:
     hub = _request(spec)
     path = _sdk_call(
         partial(
@@ -620,9 +590,7 @@ def bundle_asset_ready(spec: AssetSpec) -> bool:
     return existing is not None and not _needs_config_repair(spec, existing)
 
 
-def restore_bundle_asset(
-    spec: AssetSpec, asset: BundleAsset, weight_path: Path, config_path: Path
-) -> ResolvedAsset:
+def restore_bundle_asset(spec: AssetSpec, asset: BundleAsset, weight_path: Path, config_path: Path) -> ResolvedAsset:
     """Restore a real pinned snapshot without a metadata or config network request."""
     hub = _request(spec)
     metadata = asset.hub
@@ -639,10 +607,7 @@ def restore_bundle_asset(
     if not _etag_matches(weight_path, metadata.etag, digest):
         raise ValueError("Bundle weight ETag mismatch")
     config_digest = _validate_config_data(config_path, metadata.config.etag)
-    if (
-        config_digest != metadata.config.sha256
-        or config_path.stat().st_size != metadata.config.size
-    ):
+    if config_digest != metadata.config.sha256 or config_path.stat().st_size != metadata.config.size:
         raise ValueError("Bundle config checksum mismatch")
     key = hashlib.sha256(f"{hub.repository}@{hub.revision}".encode()).hexdigest()
     lock = _contained(hub.cache_dir, hub.cache_dir / ".locks" / "clearml-yolo" / f"{key}.lock")

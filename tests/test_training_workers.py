@@ -47,10 +47,7 @@ def test_failure_kills_peer_and_next_trial_succeeds(tmp_path: Path, failure: str
     pid = int(pid_file.read_text())
     with pytest.raises(ProcessLookupError):
         os.kill(pid, 0)
-    assert (
-        run_workers([_command("pass", tmp_path / "next.log")], timeout_seconds=10).status
-        == "success"
-    )
+    assert run_workers([_command("pass", tmp_path / "next.log")], timeout_seconds=10).status == "success"
 
 
 def test_invalid_timeout_never_starts_worker(tmp_path: Path) -> None:
@@ -93,18 +90,13 @@ def test_successful_leader_cannot_leave_detached_child(tmp_path: Path) -> None:
 def test_monitor_recognizes_live_detached_descendant(tmp_path: Path) -> None:
     pid_file = tmp_path / "compiler.pid"
     child = f"import os,time;open({str(pid_file)!r},'w').write(str(os.getpid()));time.sleep(1)"
-    parent = (
-        f"import subprocess,sys;subprocess.Popen([sys.executable,'-c',{child!r}],"
-        "start_new_session=True).wait()"
-    )
+    parent = f"import subprocess,sys;subprocess.Popen([sys.executable,'-c',{child!r}],start_new_session=True).wait()"
     seen: set[int] = set()
 
     def observe(owned_pids: Callable[[], tuple[int, ...]]) -> None:
         seen.update(owned_pids())
 
-    result = run_workers(
-        [_command(parent, tmp_path / "parent.log")], timeout_seconds=10, monitor=observe
-    )
+    result = run_workers([_command(parent, tmp_path / "parent.log")], timeout_seconds=10, monitor=observe)
     assert result.status == "success"
     assert int(pid_file.read_text()) in seen
     assert os.getpid() not in seen
@@ -150,8 +142,12 @@ def test_gpu_telemetry_accepts_owned_child_spawned_during_its_query(
         f"subprocess.Popen([sys.executable,'-c',{child!r}],start_new_session=True).wait()\n"
     )
     device = gpu.GPUDevice(
-        index=0, uuid="GPU-test", name="test", total_memory_bytes=100,
-        used_memory_bytes=10, utilization=0,
+        index=0,
+        uuid="GPU-test",
+        name="test",
+        total_memory_bytes=100,
+        used_memory_bytes=10,
+        utilization=0,
     )
     observed: list[int] = []
 
@@ -163,7 +159,7 @@ def test_gpu_telemetry_accepts_owned_child_spawned_during_its_query(
         while not pid_file.is_file() or not pid_file.read_text():
             if time.monotonic() >= deadline:
                 pytest.fail("Worker did not spawn its child during telemetry")
-            time.sleep(.01)
+            time.sleep(0.01)
         pid = int(pid_file.read_text())
         assert b"CY_TRAINING_WORKER_OWNER=" in Path(f"/proc/{pid}/environ").read_bytes()
         observed.append(pid)
@@ -175,9 +171,7 @@ def test_gpu_telemetry_accepts_owned_child_spawned_during_its_query(
             finished.touch()
 
     monkeypatch.setattr(gpu, "gpu_states", telemetry)
-    outcome = run_workers(
-        [_command(worker, tmp_path / "worker.log")], timeout_seconds=10, monitor=monitor
-    )
+    outcome = run_workers([_command(worker, tmp_path / "worker.log")], timeout_seconds=10, monitor=monitor)
     assert outcome.status == "success"
     assert len(observed) == 1
     with pytest.raises(ProcessLookupError):
@@ -185,7 +179,8 @@ def test_gpu_telemetry_accepts_owned_child_spawned_during_its_query(
 
 
 def test_training_cleanup_never_scans_unrelated_processes(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     original = Path.iterdir
 

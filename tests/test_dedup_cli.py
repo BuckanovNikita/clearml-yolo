@@ -10,7 +10,9 @@ import pytest
 
 
 def _run(
-    directory: Path, *arguments: str, cy_home: str | None = None,
+    directory: Path,
+    *arguments: str,
+    cy_home: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     environment = dict(os.environ)
     environment.pop("CY_HOME", None)
@@ -18,7 +20,11 @@ def _run(
         environment["CY_HOME"] = cy_home
     return subprocess.run(  # noqa: S603 -- fixed interpreter/module and test-owned arguments
         [sys.executable, "-m", "clearml_yolo.entrypoints.dedup", *arguments],
-        cwd=directory, env=environment, capture_output=True, text=True, check=False,
+        cwd=directory,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
     )
 
 
@@ -78,7 +84,8 @@ def test_explicit_external_directory_is_rejected_without_writes(tmp_path: Path) 
 
 def test_installed_command_has_lightweight_entrypoint() -> None:
     entrypoints = [
-        item for item in distribution("clearml-yolo").entry_points
+        item
+        for item in distribution("clearml-yolo").entry_points
         if item.group == "console_scripts" and item.name == "cy-dedup"
     ]
     assert len(entrypoints) == 1
@@ -86,7 +93,9 @@ def test_installed_command_has_lightweight_entrypoint() -> None:
 
 
 def test_operational_failure_reports_nonzero_and_preserves_images(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     from clearml_yolo.adapters.storage import dedup
     from clearml_yolo.entrypoints.dedup import main
@@ -123,7 +132,10 @@ def test_command_does_not_import_execution_dependencies(tmp_path: Path) -> None:
     )
     result = subprocess.run(  # noqa: S603 -- fixed script and test-owned directory
         [sys.executable, "-c", script, str(tmp_path), "--dry-run"],
-        cwd=tmp_path, capture_output=True, text=True, check=False,
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     assert result.returncode == 0, result.stderr
     assert list(tmp_path.iterdir()) == []

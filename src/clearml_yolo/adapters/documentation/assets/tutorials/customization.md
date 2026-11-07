@@ -136,9 +136,7 @@ def run_metrics(engine: EvaluationEngine | None = None) -> MetricsResult:
         from clearml_yolo.core.publication import FiftyOneConfig
         from clearml_yolo.entrypoints.composition import build_dependencies
 
-        tracking = ClearMLConfig(
-            project_name="cy-tutorial", task_name="python-metrics", tags=["tutorial", "python"]
-        )
+        tracking = ClearMLConfig(project_name="cy-tutorial", task_name="python-metrics", tags=["tutorial", "python"])
         evaluation = EvaluationConfig()
         publication = FiftyOneConfig(enabled=False)
         deps = build_dependencies()

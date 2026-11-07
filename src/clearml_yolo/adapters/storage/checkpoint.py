@@ -15,9 +15,7 @@ _MAX_METADATA_BYTES = 256 * 1024
 
 
 def _member(archive: ZipFile) -> str:
-    roots = [
-        name.removesuffix("data.pkl") for name in archive.namelist() if name.endswith("/data.pkl")
-    ]
+    roots = [name.removesuffix("data.pkl") for name in archive.namelist() if name.endswith("/data.pkl")]
     if len(roots) != 1:
         raise ValueError("Checkpoint must contain one native Torch archive root")
     return roots[0] + _METADATA_NAME
@@ -59,9 +57,7 @@ def _write_descriptor(path: Path, descriptor: CheckpointDescriptor) -> None:
             temporary.unlink(missing_ok=True)
 
 
-def read_checkpoint_descriptor(
-    path: Path, *, expected: ModelConfig | None = None
-) -> CheckpointDescriptor | None:
+def read_checkpoint_descriptor(path: Path, *, expected: ModelConfig | None = None) -> CheckpointDescriptor | None:
     """Read checkpoint-owned classes and validate optional hash/selection assertions."""
     metadata = _embedded(path)
     sidecar = _sidecar(path)
@@ -110,8 +106,6 @@ def bind_checkpoint(path: Path, metadata: CheckpointMetadata) -> CheckpointDescr
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
-    descriptor = CheckpointDescriptor(
-        **metadata.model_dump(), checkpoint_sha256=checkpoint_sha256(path)
-    )
+    descriptor = CheckpointDescriptor(**metadata.model_dump(), checkpoint_sha256=checkpoint_sha256(path))
     _write_descriptor(path, descriptor)
     return descriptor

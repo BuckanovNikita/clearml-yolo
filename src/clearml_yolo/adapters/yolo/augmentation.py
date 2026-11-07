@@ -33,9 +33,7 @@ class AugmentedYOLODataset(YOLODataset):
         # PIL decoding also guarantees the RGB contract for grayscale/alpha sources.
         with Image.open(self.im_files[i]) as source:
             # Native decoding and cached label dimensions already honor EXIF orientation.
-            rgb = np.array(
-                ImageOps.exif_transpose(source).convert("RGB"), dtype=np.uint8, copy=True
-            )
+            rgb = np.array(ImageOps.exif_transpose(source).convert("RGB"), dtype=np.uint8, copy=True)
         height, width = rgb.shape[:2]
         return np.ascontiguousarray(rgb[:, :, ::-1]), (height, width), (height, width)
 

@@ -26,17 +26,13 @@ def isolate_fake_cli_and_console(monkeypatch: pytest.MonkeyPatch) -> None:
     from clearml_yolo.entrypoints.hydra import common
 
     monkeypatch.setattr(common, "validate_launch_arguments", lambda name: None)
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.clearml.session._start_console_publisher", lambda *_args: None
-    )
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.session._start_console_publisher", lambda *_args: None)
 
 
 def test_file_resolver_sees_remote_inputs_and_derived_output(
     monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
 ) -> None:
-    config = OmegaConf.create(
-        {"clearml": {"task_name": "source"}, "weights": "local.pt", "output_dir": None}
-    )
+    config = OmegaConf.create({"clearml": {"task_name": "source"}, "weights": "local.pt", "output_dir": None})
     attached: list[Any] = []
     resolver: Any = None
 
@@ -85,17 +81,13 @@ def test_file_resolver_sees_remote_inputs_and_derived_output(
     )
     patch_workflow(monkeypatch, workflow_dependencies, common, "native_runtime", nullcontext)
     patch_workflow(monkeypatch, workflow_dependencies, common, "invocation", owner)
-    patch_workflow(
-        monkeypatch, workflow_dependencies, common, "initialize_naming", lambda _task: None
-    )
+    patch_workflow(monkeypatch, workflow_dependencies, common, "initialize_naming", lambda _task: None)
     patch_workflow(monkeypatch, workflow_dependencies, common, "replay_configuration", replay)
     monkeypatch.setattr(common, "publish_run_configuration", lambda *_args: None)
     common.launch("report", command)
     assert attached == [
         {
-            "artifact_dir": str(
-                task_run_dir(runs_root(), "clone-project", "clone/report", "clone-id") / "report"
-            ),
+            "artifact_dir": str(task_run_dir(runs_root(), "clone-project", "clone/report", "clone-id") / "report"),
             "model": "remote.pt",
             "owner": "remote",
         }
@@ -121,12 +113,8 @@ def test_numbered_configuration_copies_and_overrides_replay_without_artifacts(
     remote = FakeTask()
     remote.local = False
     selected = local
-    patch_workflow(
-        monkeypatch, workflow_dependencies, clearml.Task, "init", lambda **_kwargs: selected
-    )
-    patch_workflow(
-        monkeypatch, workflow_dependencies, clearml.Task, "get_task", lambda **_kwargs: selected
-    )
+    patch_workflow(monkeypatch, workflow_dependencies, clearml.Task, "init", lambda **_kwargs: selected)
+    patch_workflow(monkeypatch, workflow_dependencies, clearml.Task, "get_task", lambda **_kwargs: selected)
     monkeypatch.delenv("LOCAL_RANK", raising=False)
     copies: list[tuple[str, Path, str]] = []
 
@@ -181,12 +169,8 @@ def test_missing_remote_named_configuration_fails_without_artifact_fallback(
 
     remote = FakeTask()
     remote.local = False
-    patch_workflow(
-        monkeypatch, workflow_dependencies, clearml.Task, "init", lambda **_kwargs: remote
-    )
-    patch_workflow(
-        monkeypatch, workflow_dependencies, clearml.Task, "get_task", lambda **_kwargs: remote
-    )
+    patch_workflow(monkeypatch, workflow_dependencies, clearml.Task, "init", lambda **_kwargs: remote)
+    patch_workflow(monkeypatch, workflow_dependencies, clearml.Task, "get_task", lambda **_kwargs: remote)
     monkeypatch.delenv("LOCAL_RANK", raising=False)
     with (
         pytest.raises(FileNotFoundError, match="Remote task has no attached configuration"),

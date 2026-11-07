@@ -32,9 +32,7 @@ def payload() -> EvaluationPayload:
             "status": status,
         }
 
-    def match(
-        gt: int | None, pred: int | None, true: str, predicted: str, status: str
-    ) -> dict[str, Any]:
+    def match(gt: int | None, pred: int | None, true: str, predicted: str, status: str) -> dict[str, Any]:
         return {
             "gt_index": gt,
             "pred_index": pred,
@@ -179,9 +177,7 @@ def test_wrong_class_pair_claims_gt_and_retains_source_fn(
     assert results.label_ids("matrix", x="dog", y="background") == ([], ["pred1"])
     assert results.tp_fp_fn() == (1, 2, 2)
     assert results.report()["cat"]["recall"] == pytest.approx(0.5)
-    assert results.confusion_matrix(include_missing=True).tolist() == (
-        payload.report.confusion_matrix.counts
-    )
+    assert results.confusion_matrix(include_missing=True).tolist() == (payload.report.confusion_matrix.counts)
 
 
 def test_f1_matches_source_epsilon(native: Any) -> None:
@@ -396,9 +392,7 @@ def test_empty_native_evaluation_subset_report_and_restoration(
     with results.use_subset(dataset.view()):
         assert results.has_subset
         assert not results.is_subset
-        assert all(
-            getattr(results, name) is None or len(getattr(results, name)) == 0 for name in fields
-        )
+        assert all(getattr(results, name) is None or len(getattr(results, name)) == 0 for name in fields)
         assert results.tp_fp_fn() == (0, 0, 0)
         assert results.report()["cat"]["support"] == 0
         assert results.metrics()["precision"] == 0

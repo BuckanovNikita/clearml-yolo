@@ -104,8 +104,7 @@ def _worker_result(process: subprocess.Popen[bytes], payload: bytes, lock: Lock)
         output, diagnostic = _communicate_bounded(process, payload, lock)
         if process.returncode:
             message = (
-                f"Preview worker failed ({process.returncode}): "
-                f"{diagnostic.decode('utf-8', errors='replace')[-2000:]}"
+                f"Preview worker failed ({process.returncode}): {diagnostic.decode('utf-8', errors='replace')[-2000:]}"
             )
             return PreviewResult(errors=[message])
         return PreviewResult.model_validate_json(output)
@@ -125,9 +124,7 @@ def _stop(process: subprocess.Popen[bytes], lock: Lock) -> None:
             process.wait(timeout=WORKER_TIMEOUT)
 
 
-def _communicate_bounded(
-    process: subprocess.Popen[bytes], payload: bytes, lock: Lock
-) -> tuple[bytes, bytes]:
+def _communicate_bounded(process: subprocess.Popen[bytes], payload: bytes, lock: Lock) -> tuple[bytes, bytes]:
     if process.stdin is None or process.stdout is None or process.stderr is None:
         raise RuntimeError("Preview worker streams are unavailable")
     deadline = monotonic() + WORKER_TIMEOUT

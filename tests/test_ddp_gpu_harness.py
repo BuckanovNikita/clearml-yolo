@@ -35,9 +35,7 @@ def test_selection_resolves_physical_index_before_cuda_mapping(
     assert resolve_devices(physical_indexes("1,0"), inventory) == ("GPU-b", "GPU-a")
 
 
-@pytest.mark.parametrize(
-    "inventory", [[], [{"index": 0, "uuid": "MIG-abc"}, {"index": 1, "uuid": "GPU-b"}]]
-)
+@pytest.mark.parametrize("inventory", [[], [{"index": 0, "uuid": "MIG-abc"}, {"index": 1, "uuid": "GPU-b"}]])
 def test_missing_or_mig_devices_fail_instead_of_skipping(inventory: list[dict[str, Any]]) -> None:
     with pytest.raises(RuntimeError):
         resolve_devices((0, 1), inventory)
@@ -48,17 +46,13 @@ def test_preflight_failure_retains_summary_and_junit_without_launch(
 ) -> None:
     calls = []
 
-    def fail(
-        evidence: Evidence, operation: str, environment: dict[str, str], **kwargs: Any
-    ) -> None:
+    def fail(evidence: Evidence, operation: str, environment: dict[str, str], **kwargs: Any) -> None:
         calls.append(operation)
         raise RuntimeError("NCCL unavailable")
 
     monkeypatch.setattr(Evidence, "helper", fail)
     with pytest.raises(RuntimeError, match="NCCL unavailable"):
-        run_scenario(
-            GPUOptions("0,1", "owned-tests", tmp_path), "direct-eager", queued=False, compiled=False
-        )
+        run_scenario(GPUOptions("0,1", "owned-tests", tmp_path), "direct-eager", queued=False, compiled=False)
     root = next(tmp_path.iterdir())
     summary = json.loads((root / "summary.json").read_text())
     assert summary["status"] == "failed"
@@ -70,9 +64,7 @@ def test_preflight_failure_retains_summary_and_junit_without_launch(
 
 def test_invalid_device_request_still_retains_failure(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="unique nonnegative physical indexes"):
-        run_scenario(
-            GPUOptions("0", "owned-tests", tmp_path), "bad-selection", queued=False, compiled=False
-        )
+        run_scenario(GPUOptions("0", "owned-tests", tmp_path), "bad-selection", queued=False, compiled=False)
     assert json.loads(next(tmp_path.glob("*/summary.json")).read_text())["status"] == "failed"
 
 
@@ -81,9 +73,7 @@ def test_evidence_redacts_credentials_and_retains_files_on_interruption(tmp_path
 
     def interrupted() -> None:
         with evidence.retained():
-            (evidence.root / "owner.log").write_text(
-                "https://user:secret@example.com/model\napi_key=hidden\n"
-            )
+            (evidence.root / "owner.log").write_text("https://user:secret@example.com/model\napi_key=hidden\n")
             (evidence.root / "best.pt").write_bytes(b"checkpoint")
             raise KeyboardInterrupt("cancelled")
 
@@ -99,9 +89,7 @@ def test_evidence_redacts_credentials_and_retains_files_on_interruption(tmp_path
 def test_evidence_command_failure_is_not_an_implicit_retry(tmp_path: Path) -> None:
     evidence = Evidence(GPUOptions("0,1", "owned-tests", tmp_path), "command-error")
     with pytest.raises(RuntimeError, match="Command exited 3"), evidence.retained():
-        evidence.command(
-            [sys.executable, "-c", "print('diagnostic'); raise SystemExit(3)"], dict(os.environ)
-        )
+        evidence.command([sys.executable, "-c", "print('diagnostic'); raise SystemExit(3)"], dict(os.environ))
     assert len(evidence.data["commands"]) == 1
     assert "diagnostic" in (evidence.root / "command-1.log").read_text()
 
@@ -127,9 +115,7 @@ def test_ordinary_collection_deselects_gpu_without_environment_effects() -> None
 def test_explicit_mark_selection_retains_gpu_missing_authorization() -> None:
     from conftest import pytest_collection_modifyitems
 
-    config = SimpleNamespace(
-        args=[], getoption=lambda name: False, option=SimpleNamespace(markexpr="ddp_gpu")
-    )
+    config = SimpleNamespace(args=[], getoption=lambda name: False, option=SimpleNamespace(markexpr="ddp_gpu"))
     gpu = SimpleNamespace(get_closest_marker=lambda name: object() if name == "ddp_gpu" else None)
     items = [gpu]
     pytest_collection_modifyitems(config, items)  # type: ignore[arg-type]
@@ -240,9 +226,7 @@ def test_explicit_cuda_capability_failure_never_skips(
     from ddp_gpu_worker import _cuda
 
     distributed = SimpleNamespace(is_available=lambda: True, is_nccl_available=lambda: nccl)
-    torch = SimpleNamespace(
-        cuda=SimpleNamespace(is_available=lambda: available), distributed=distributed
-    )
+    torch = SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: available), distributed=distributed)
     monkeypatch.setitem(sys.modules, "torch", torch)
     monkeypatch.setitem(sys.modules, "torch.distributed", distributed)
     with pytest.raises(AssertionError, match=r"Torch CUDA|Torch NCCL"):
@@ -279,9 +263,7 @@ def test_generated_inputs_and_native_config_compose_offline(tmp_path: Path) -> N
         "context.__enter__(); config=compose(config_name='ddp'); "
         "assert 'pretrained' in config.ultralytics; context.__exit__(None,None,None)"
     )
-    evidence.command(
-        [sys.executable, "-c", code], dict(base, PYTHONPATH=f"{source}:{base['PYTHONPATH']}")
-    )
+    evidence.command([sys.executable, "-c", code], dict(base, PYTHONPATH=f"{source}:{base['PYTHONPATH']}"))
     # Startup for a worker/probe/control command keeps Torch and ClearML unloaded.
     base["CY_DDP_TRACE"] = str(evidence.root)
     base["PYTHONPATH"] = f"{evidence.root / 'instrumentation'}:{base['PYTHONPATH']}"
@@ -332,16 +314,12 @@ def test_explicit_gpu_file_selection_requires_authorization() -> None:
     assert items == [gpu]
 
 
-def test_inaccessible_known_owned_process_blocks_cleanup(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_inaccessible_known_owned_process_blocks_cleanup(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     from ddp_gpu_instrumentation import process_birth
     from ddp_gpu_worker import _owned_processes
 
     pid = os.getpid()
-    (tmp_path / f"process-{pid}.json").write_text(
-        json.dumps({"pid": pid, "born": process_birth(pid)})
-    )
+    (tmp_path / f"process-{pid}.json").write_text(json.dumps({"pid": pid, "born": process_birth(pid)}))
     original = Path.read_bytes
 
     def restricted(path: Path) -> bytes:

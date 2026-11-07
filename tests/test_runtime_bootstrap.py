@@ -81,9 +81,7 @@ def _environment(root: Path, extra: dict[str, str] | None = None) -> dict[str, s
     return environment
 
 
-def _run(
-    script: str, root: Path, extra: dict[str, str] | None = None
-) -> subprocess.CompletedProcess[str]:
+def _run(script: str, root: Path, extra: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
     return subprocess.run(  # noqa: S603 - fixed test scripts and fixture-owned paths
         [sys.executable, "-B", "-c", script],
         cwd=root,
@@ -120,9 +118,7 @@ assert os.environ['XDG_STATE_HOME'] == str(root / 'user-state')
 def test_initialization_preserves_every_external_selector(tmp_path: Path, explicit: bool) -> None:
     environment = {"SELECTORS": json.dumps(_EXTERNAL_SELECTORS)}
     if explicit:
-        environment.update(
-            {name: str(tmp_path.parent / "outside" / name) for name in _EXTERNAL_SELECTORS}
-        )
+        environment.update({name: str(tmp_path.parent / "outside" / name) for name in _EXTERNAL_SELECTORS})
         environment["ETA_MODELS_DIRS"] = '["relative:model", "user-selected"]'
         environment["AWS_EC2_METADATA_DISABLED"] = "false"
     result = _run(
@@ -158,9 +154,7 @@ assert sys.pycache_prefix == bytecode
 
 
 @pytest.mark.parametrize("outcome", ["success", "failure", "interrupt", "terminate"])
-def test_invocation_retains_explicit_scratch_for_every_outcome(
-    tmp_path: Path, outcome: str
-) -> None:
+def test_invocation_retains_explicit_scratch_for_every_outcome(tmp_path: Path, outcome: str) -> None:
     result = _run(
         """
 import os, signal
@@ -227,11 +221,7 @@ assert (current / 'own.tmp').read_text() == 'keep too'
 
 @pytest.mark.parametrize("selected", ["relative-temp", "outside"])
 def test_explicit_project_temp_root_requires_containment(tmp_path: Path, selected: str) -> None:
-    expected = (
-        tmp_path / selected
-        if selected == "relative-temp"
-        else tmp_path.parent / (tmp_path.name + "-outside")
-    )
+    expected = tmp_path / selected if selected == "relative-temp" else tmp_path.parent / (tmp_path.name + "-outside")
     result = _run(
         """
 import os
@@ -281,9 +271,7 @@ assert os.environ['CY_GPU_QUEUE_ROOT'] == 'caller-selected/queue'
 
 
 @pytest.mark.parametrize("outcome", ["success", "failure", "interrupt", "terminate"])
-def test_overlapping_subprocesses_keep_distinct_scratch_and_late_children(
-    tmp_path: Path, outcome: str
-) -> None:
+def test_overlapping_subprocesses_keep_distinct_scratch_and_late_children(tmp_path: Path, outcome: str) -> None:
     result = _run(
         """
 import os, signal, subprocess, sys

@@ -66,13 +66,9 @@ def conversion(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) 
         source[f"layer.0.layer_scale{index}.lambda1"] = torch.full((2,), float(index))
         state[f"blocks.0.ls{index}.gamma"] = torch.zeros(2)
     for projection in ("q", "k", "v", "o"):
-        source[f"layer.0.attention.{projection}_proj.weight"] = torch.full(
-            (2, 2), float(ord(projection))
-        )
+        source[f"layer.0.attention.{projection}_proj.weight"] = torch.full((2, 2), float(ord(projection)))
         if projection != "k":
-            source[f"layer.0.attention.{projection}_proj.bias"] = torch.full(
-                (2,), float(ord(projection))
-            )
+            source[f"layer.0.attention.{projection}_proj.bias"] = torch.full((2,), float(ord(projection)))
     state.update(
         {
             "blocks.0.attn.proj.weight": torch.zeros(2, 2),
@@ -109,20 +105,14 @@ def test_mapping_preserves_attention_order_mlp_and_nonlearned_buffers(
             result["blocks.0.attn.qkv.weight"].chunk(3)[index],
             source[f"layer.0.attention.{projection}_proj.weight"],
         )
-    assert torch.equal(
-        result["blocks.0.attn.qkv.bias"], torch.tensor([113.0, 113.0, 0.0, 0.0, 118.0, 118.0])
-    )
-    assert torch.equal(
-        result["blocks.0.attn.qkv.bias_mask"], torch.tensor([1.0, 1.0, 0.0, 0.0, 1.0, 1.0])
-    )
+    assert torch.equal(result["blocks.0.attn.qkv.bias"], torch.tensor([113.0, 113.0, 0.0, 0.0, 118.0, 118.0]))
+    assert torch.equal(result["blocks.0.attn.qkv.bias_mask"], torch.tensor([1.0, 1.0, 0.0, 0.0, 1.0, 1.0]))
     assert torch.equal(result["rope_embed.periods"], expected["rope_embed.periods"])
     assert all(torch.equal(value, model.state_dict()[key]) for key, value in result.items())
 
 
 @pytest.mark.parametrize("failure", ["missing", "extra", "nan", "shape", "dtype"])
-def test_conversion_rejects_incomplete_or_incompatible_source(
-    conversion: Conversion, failure: str
-) -> None:
+def test_conversion_rejects_incomplete_or_incompatible_source(conversion: Conversion, failure: str) -> None:
     preset, source, expected = conversion
     key = "embeddings.cls_token"
     if failure == "missing":
@@ -140,9 +130,7 @@ def test_conversion_rejects_incomplete_or_incompatible_source(
 
 
 @pytest.fixture
-def source_record(
-    conversion: Conversion, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> SourceRecord:
+def source_record(conversion: Conversion, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SourceRecord:
     preset, source, _ = conversion
     path = tmp_path / "model.safetensors"
     save_file(source, path)
@@ -198,9 +186,7 @@ def test_fallback_preserves_source_and_derived_provenance_and_reuses_cache(
     assert result.path.stat().st_mtime_ns == before
 
 
-def test_unauthorized_hf_failure_is_not_hidden(
-    source_record: SourceRecord, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_unauthorized_hf_failure_is_not_hidden(source_record: SourceRecord, monkeypatch: pytest.MonkeyPatch) -> None:
     preset, _ = source_record
 
     def resolve(spec: AssetSpec, *, local_only: bool = False) -> ResolvedAsset:
@@ -216,17 +202,13 @@ def test_corrupt_source_fails_before_native_construction(
 ) -> None:
     preset, source = source_record
     source.path.write_bytes(b"corrupt")
-    monkeypatch.setattr(
-        hf_weights, "_native_model", lambda *_: pytest.fail("invalid source consumed")
-    )
+    monkeypatch.setattr(hf_weights, "_native_model", lambda *_: pytest.fail("invalid source consumed"))
     with pytest.raises(ValueError, match="checksum"):
         hf_weights._publish(source, preset, Path("source"))
 
 
 @pytest.mark.parametrize("failure", ["checkpoint", "receipt", "tensor-and-hash", "metadata"])
-def test_corrupt_derived_cache_is_rebuilt_from_verified_source(
-    source_record: SourceRecord, failure: str
-) -> None:
+def test_corrupt_derived_cache_is_rebuilt_from_verified_source(source_record: SourceRecord, failure: str) -> None:
     preset, source = source_record
     result = hf_weights._publish(source, preset, Path("source"))
     receipt = result.path.with_suffix(".json")
@@ -241,9 +223,7 @@ def test_corrupt_derived_cache_is_rebuilt_from_verified_source(
         state["cls_token"].add_(1)
         torch.save(state, result.path)
         receipt.write_text(
-            result.model_copy(
-                update={"sha256": hashlib.sha256(result.path.read_bytes()).hexdigest()}
-            ).model_dump_json()
+            result.model_copy(update={"sha256": hashlib.sha256(result.path.read_bytes()).hexdigest()}).model_dump_json()
         )
     repaired = hf_weights._publish(source, preset, Path("source"))
     assert repaired == result
@@ -278,9 +258,7 @@ def test_unreadable_derived_checkpoint_with_matching_receipt_is_rebuilt(
 def test_concurrent_conversion_publishes_one_valid_checkpoint(source_record: SourceRecord) -> None:
     preset, source = source_record
     with ThreadPoolExecutor(max_workers=2) as executor:
-        results = list(
-            executor.map(lambda _: hf_weights._publish(source, preset, Path("source")), range(2))
-        )
+        results = list(executor.map(lambda _: hf_weights._publish(source, preset, Path("source")), range(2)))
     assert results[0] == results[1]
     assert not list(results[0].path.parent.glob(".conversion-*"))
 
@@ -326,9 +304,7 @@ def test_explicit_or_unrequested_initialization_never_uses_fallback(
         config.train.backbone_weights = checkpoint
     monkeypatch.setattr(execution, "validate_checkout", lambda _: None)
     monkeypatch.setattr(execution, "resolve_assets", lambda specs: ())
-    monkeypatch.setattr(
-        execution, "resolve_backbone", lambda *_: pytest.fail("unrequested HF fallback")
-    )
+    monkeypatch.setattr(execution, "resolve_backbone", lambda *_: pytest.fail("unrequested HF fallback"))
     _, records = execution.prepare_model_assets(config, training=mode != "inference")
     assert records == ()
 
@@ -336,9 +312,7 @@ def test_explicit_or_unrequested_initialization_never_uses_fallback(
 def test_source_revision_mismatch_is_rejected(source_record: SourceRecord) -> None:
     preset, source = source_record
     with pytest.raises(ValueError, match="provenance"):
-        hf_weights._publish(
-            source.model_copy(update={"revision": "another"}), preset, Path("source")
-        )
+        hf_weights._publish(source.model_copy(update={"revision": "another"}), preset, Path("source"))
 
 
 def test_native_construction_preserves_cpu_rng_without_seeding_cuda(
@@ -346,9 +320,7 @@ def test_native_construction_preserves_cpu_rng_without_seeding_cuda(
 ) -> None:
     core = ModuleType("test_deim.core")
     backbone = ModuleType("test_deim.backbone.dinov3")
-    monkeypatch.setattr(
-        backbone, "DinoVisionTransformer", lambda **_: torch.nn.Linear(2, 2), raising=False
-    )
+    monkeypatch.setattr(backbone, "DinoVisionTransformer", lambda **_: torch.nn.Linear(2, 2), raising=False)
     monkeypatch.setattr(hf_weights, "load_source", lambda _: (core, core))
     original = importlib.import_module
     monkeypatch.setattr(

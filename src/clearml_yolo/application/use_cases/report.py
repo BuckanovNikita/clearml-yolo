@@ -10,15 +10,11 @@ from clearml_yolo.core import artifact_names
 from clearml_yolo.core.identity import ModelIdentity, require_model_identity
 
 
-def _manifest(
-    comparison_dir: str | Path, *, deps: WorkflowDependencies
-) -> tuple[Path, Path, ComparisonManifest]:
+def _manifest(comparison_dir: str | Path, *, deps: WorkflowDependencies) -> tuple[Path, Path, ComparisonManifest]:
     directory = Path(comparison_dir)
     path = directory / MANIFEST_NAME
     if not deps.storage.is_file(path):
-        raise FileNotFoundError(
-            f"Comparison directory {directory} has no {MANIFEST_NAME}; run cy-compare first"
-        )
+        raise FileNotFoundError(f"Comparison directory {directory} has no {MANIFEST_NAME}; run cy-compare first")
     return (
         directory,
         path,
@@ -26,9 +22,7 @@ def _manifest(
     )
 
 
-def _required_path(
-    directory: Path, relative: str, description: str, *, deps: WorkflowDependencies
-) -> Path:
+def _required_path(directory: Path, relative: str, description: str, *, deps: WorkflowDependencies) -> Path:
     path = directory / relative
     if not deps.storage.is_file(path):
         raise FileNotFoundError(f"Comparison {description} does not exist: {path}")
@@ -47,12 +41,8 @@ def report(
 ) -> ReportResult:
     """Load the paired evaluated dashboards recorded by ``compare``."""
     directory, manifest_path, manifest = _manifest(comparison_dir, deps=deps)
-    candidate = _required_path(
-        directory, manifest.candidate_dashboard, "candidate dashboard", deps=deps
-    )
-    baseline = _required_path(
-        directory, manifest.baseline_dashboard, "baseline dashboard", deps=deps
-    )
+    candidate = _required_path(directory, manifest.candidate_dashboard, "candidate dashboard", deps=deps)
+    baseline = _required_path(directory, manifest.baseline_dashboard, "baseline dashboard", deps=deps)
     return build_reports(
         candidate,
         baseline,
@@ -108,27 +98,14 @@ def build_reports(
             deps.tracking.expect_artifacts(task, expected)
         effective_config_path: str | Path | None = report_config_path
         if report_config_path is not None and task is not None:
-            effective_config_path = deps.tracking.connect_config_file(
-                task, "report", Path(report_config_path)
-            )
+            effective_config_path = deps.tracking.connect_config_file(task, "report", Path(report_config_path))
         identities = {
-            "baseline": _report_identity(
-                baseline_path, "baseline", baseline_identity, baseline_label, deps=deps
-            ),
-            "candidate": _report_identity(
-                candidate_path, "candidate", candidate_identity, candidate_label, deps=deps
-            ),
+            "baseline": _report_identity(baseline_path, "baseline", baseline_identity, baseline_label, deps=deps),
+            "candidate": _report_identity(candidate_path, "candidate", candidate_identity, candidate_label, deps=deps),
         }
-        dev_path = (
-            destination
-            / f"{artifact_names.REPORT_DEV_PREFIX}_{artifact_names.split_component(split)}.xlsx"
-        )
-        business_path = (
-            destination
-            / (
-                f"{artifact_names.REPORT_BUSINESS_PREFIX}_"
-                f"{artifact_names.split_component(split)}.xlsx"
-            )
+        dev_path = destination / f"{artifact_names.REPORT_DEV_PREFIX}_{artifact_names.split_component(split)}.xlsx"
+        business_path = destination / (
+            f"{artifact_names.REPORT_BUSINESS_PREFIX}_{artifact_names.split_component(split)}.xlsx"
         )
         issues = deps.renderer.build_reports(
             candidate_path, baseline_path, dev_path, business_path, effective_config_path
@@ -138,12 +115,11 @@ def build_reports(
             if task is not None:
                 deps.tracking.upload_artifact(task, name, path)
         result = ReportResult(
-            dev_reports={split: dev_path}, business_reports={split: business_path},
+            dev_reports={split: dev_path},
+            business_reports={split: business_path},
             issues=issues or (),
         )
-        deps.resources.log(
-            "INFO", "Split {!r}: {} and {}", split, dev_path.name, business_path.name
-        )
+        deps.resources.log("INFO", "Split {!r}: {} and {}", split, dev_path.name, business_path.name)
         return result
 
 

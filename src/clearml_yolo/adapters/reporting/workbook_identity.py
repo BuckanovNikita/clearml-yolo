@@ -56,11 +56,7 @@ def _model_metadata(root: ET.Element) -> dict[str, ModelIdentity]:
 
 
 def _validate_models(raw: Any) -> dict[str, ModelIdentity]:
-    if (
-        not isinstance(raw, dict)
-        or not raw
-        or any(not isinstance(role, str) or not role.strip() for role in raw)
-    ):
+    if not isinstance(raw, dict) or not raw or any(not isinstance(role, str) or not role.strip() for role in raw):
         raise ValueError("Workbook identities must be a nonempty role mapping")
     return {role: ModelIdentity.model_validate(value) for role, value in raw.items()}
 
@@ -143,10 +139,7 @@ def _visible_parts(entries: Mapping[str, bytes]) -> dict[str, ET.Element]:
         name: _parse_display_xml(content)
         for name, content in entries.items()
         if name.endswith(".xml")
-        and (
-            name == "xl/sharedStrings.xml"
-            or name.startswith(("xl/worksheets/", "xl/charts/", "xl/drawings/"))
-        )
+        and (name == "xl/sharedStrings.xml" or name.startswith(("xl/worksheets/", "xl/charts/", "xl/drawings/")))
     }
 
 

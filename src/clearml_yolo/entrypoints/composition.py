@@ -62,9 +62,7 @@ class _DatasetStore:
     ) -> AbstractContextManager[PreparedDataset]:
         if dataset_format == "coco":
             raise ValueError("Ultralytics training requires ndjson or flat dataset_format")
-        return dataset_cache.cached_dataset(
-            ground_truth, cache_dir, dataset_format, required_splits=required_splits
-        )
+        return dataset_cache.cached_dataset(ground_truth, cache_dir, dataset_format, required_splits=required_splits)
 
 
 class _DetectorDatasetStore(_DatasetStore):
@@ -79,9 +77,7 @@ class _DetectorDatasetStore(_DatasetStore):
         # Native adapters own their COCO representation, including callers that
         # use the shared programmatic train API's legacy default argument.
         del dataset_format
-        return dataset_cache.cached_dataset(
-            ground_truth, cache_dir, "coco", required_splits=required_splits
-        )
+        return dataset_cache.cached_dataset(ground_truth, cache_dir, "coco", required_splits=required_splits)
 
 
 class _ModelRunner:
@@ -111,9 +107,7 @@ class _ModelRunner:
         settings: dict[str, Any],
         prepared: PreparedDataset,
     ) -> TrainResult:
-        return training.execute_training(
-            task, architecture, settings, prepared, transforms=self.transforms
-        )
+        return training.execute_training(task, architecture, settings, prepared, transforms=self.transforms)
 
 
 class _ModelRepository:

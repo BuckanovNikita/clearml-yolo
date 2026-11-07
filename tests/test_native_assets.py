@@ -39,9 +39,7 @@ def test_legacy_asset_is_promoted_to_native_cache_without_network(
         write_path(native / "project-output.csv")
 
 
-def test_native_destination_rejects_escaping_leaf_symlink(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_native_destination_rejects_escaping_leaf_symlink(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CY_HOME", str(tmp_path / "project"))
     native = tmp_path / "cache"
     native.mkdir()

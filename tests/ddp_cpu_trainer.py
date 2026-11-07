@@ -62,9 +62,7 @@ class _CpuDetectionValidator(DetectionValidator):
 class CpuDetectionTrainer(DetectionTrainer):
     """Exercise the inherited trainer, sampler, loss, optimizer, EMA and final eval."""
 
-    def __init__(
-        self, *, root: Path, scenario: str, evidence: dict[str, Any], callbacks: dict[str, Any]
-    ) -> None:
+    def __init__(self, *, root: Path, scenario: str, evidence: dict[str, Any], callbacks: dict[str, Any]) -> None:
         self.root = root
         self.scenario = scenario
         self.evidence = evidence
@@ -77,9 +75,7 @@ class CpuDetectionTrainer(DetectionTrainer):
         self.world_size = dist.get_world_size()
         self.ddp = False  # Already launched by torchrun; do not spawn another launcher.
         torch.set_num_threads(1)
-        self.evidence.update(
-            world_size=self.world_size, backend=dist.get_backend(), device=str(self.device)
-        )
+        self.evidence.update(world_size=self.world_size, backend=dist.get_backend(), device=str(self.device))
 
     def _overrides(self) -> dict[str, Any]:
         return {
@@ -136,9 +132,7 @@ class CpuDetectionTrainer(DetectionTrainer):
 
     @override
     def _setup_train(self) -> None:
-        with patch.object(
-            torch.nn.parallel, "DistributedDataParallel", _CpuDistributedDataParallel
-        ):
+        with patch.object(torch.nn.parallel, "DistributedDataParallel", _CpuDistributedDataParallel):
             super()._setup_train()  # type: ignore[no-untyped-call]
 
     @override
@@ -199,22 +193,17 @@ class CpuDetectionTrainer(DetectionTrainer):
                     train_dataset=type(self.train_loader.dataset).__name__,
                     validation_dataset=type(self.test_loader.dataset).__name__,
                     train_final_transforms=[
-                        type(transform).__name__
-                        for transform in self.train_loader.dataset.transforms.transforms
+                        type(transform).__name__ for transform in self.train_loader.dataset.transforms.transforms
                     ],
                     batches=[],
                 )
             self.evidence["ddp"] = isinstance(self.model, DistributedDataParallel)
-            self.evidence["distributed_sampler"] = isinstance(
-                self.train_loader.sampler, DistributedSampler
-            )
+            self.evidence["distributed_sampler"] = isinstance(self.train_loader.sampler, DistributedSampler)
             self.initial_parameters = self._parameters_sha256()
             self.evidence["initial_parameters_sha256"] = self.initial_parameters
             self.previous_parameters = self.initial_parameters
             model: Any = self.model
-            self.evidence["parameter_count"] = sum(
-                parameter.numel() for parameter in model.parameters()
-            )
+            self.evidence["parameter_count"] = sum(parameter.numel() for parameter in model.parameters())
         elif event == "on_train_epoch_start":
             self.epoch_samples = []
             self.epoch_optimizer_steps = 0

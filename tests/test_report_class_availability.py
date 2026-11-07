@@ -85,11 +85,7 @@ def test_report_preserves_one_sided_metrics_with_real_builders(
         annotated.close()
         with deannotated_workbook(path) as original:
             workbook = load_workbook(original)
-        metric = (
-            config.business.column_translations.get("f1_score", "f1_score")
-            if business
-            else "f1_score"
-        )
+        metric = config.business.column_translations.get("f1_score", "f1_score") if business else "f1_score"
         for sheet_name, available, absent, expected, mean in (
             (config.sheet_names.model1, "new", "deleted", 0.0, 0.4 if shared else 0.0),
             (config.sheet_names.model2, "deleted", "new", 0.4, 0.5 if shared else 0.4),
@@ -99,9 +95,7 @@ def test_report_preserves_one_sided_metrics_with_real_builders(
             assert not any(str(header).endswith(" coverage") for header in headers)
             column = headers.index(metric) + 1
             rows = {sheet.cell(row, 1).value: row for row in range(3, sheet.max_row + 1)}
-            assert sheet.cell(rows["AP50-valid-class-count"], 2).value == (
-                "2/2" if shared else "1/1"
-            )
+            assert sheet.cell(rows["AP50-valid-class-count"], 2).value == ("2/2" if shared else "1/1")
             assert {"new", "deleted"} <= rows.keys()
             assert sheet.cell(rows[available], column).value == pytest.approx(expected)
             assert sheet.cell(rows[absent], column).value == "NA"
@@ -193,18 +187,14 @@ def test_report_count_summary_preserves_values_and_custom_headers(
             column = headers.index(metric) + 1
             rows = {sheet.cell(row, 1).value: row for row in range(3, sheet.max_row + 1)}
             assert sheet.cell(rows["AP50-valid-class-count"], 2).value == expected
-            assert sheet.cell(rows["f1_score-valid-class-count"], 2).value == (
-                "0/0" if expected == "0/0" else "2/2"
-            )
+            assert sheet.cell(rows["f1_score-valid-class-count"], 2).value == ("0/0" if expected == "0/0" else "2/2")
             if custom_present:
                 assert sheet.cell(rows["Availability custom-valid-class-count"], 2).value == (
                     "0/0" if expected == "0/0" else "2/2"
                 )
             assert rows["AP50-valid-class-count"] > rows["Среднее"]
             assert sheet.freeze_panes == "B3"
-            assert all(
-                column_index_from_string(key) <= len(headers) for key in sheet.column_dimensions
-            )
+            assert all(column_index_from_string(key) <= len(headers) for key in sheet.column_dimensions)
             if expected != "0/0":
                 assert sheet.cell(rows["A"], column).value == ("NA" if ap50[0] is None else ap50[0])
                 if ap50[0] is not None:

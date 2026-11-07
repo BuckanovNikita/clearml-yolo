@@ -44,10 +44,7 @@ class ClearMLDatasetRef(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
     dataset_id: str | None = Field(
         default=None,
-        description=(
-            "Идентификатор неизменяемой версии ClearML Dataset. Не совмещается с "
-            "именованным селектором."
-        ),
+        description=("Идентификатор неизменяемой версии ClearML Dataset. Не совмещается с именованным селектором."),
         examples=["dataset-id"],
         json_schema_extra={
             "shapes": "str | None",
@@ -58,9 +55,7 @@ class ClearMLDatasetRef(BaseModel):
     )
     project_name: str | None = Field(
         default=None,
-        description=(
-            "Имя проекта ClearML Dataset; обязательно вместе с name, когда dataset_id не задан."
-        ),
+        description=("Имя проекта ClearML Dataset; обязательно вместе с name, когда dataset_id не задан."),
         examples=["datasets"],
         json_schema_extra={
             "shapes": "str | None",
@@ -71,9 +66,7 @@ class ClearMLDatasetRef(BaseModel):
     )
     name: str | None = Field(
         default=None,
-        description=(
-            "Имя набора ClearML Dataset; обязательно вместе с project_name при поиске по имени."
-        ),
+        description=("Имя набора ClearML Dataset; обязательно вместе с project_name при поиске по имени."),
         examples=["inspection"],
         json_schema_extra={
             "shapes": "str | None",
@@ -84,9 +77,7 @@ class ClearMLDatasetRef(BaseModel):
     )
     version: str | None = Field(
         default=None,
-        description=(
-            "Версия именованного ClearML Dataset; null оставляет выбор версии механизму ClearML."
-        ),
+        description=("Версия именованного ClearML Dataset; null оставляет выбор версии механизму ClearML."),
         examples=["1.0.0"],
         json_schema_extra={
             "shapes": "str | None",
@@ -134,10 +125,7 @@ class ClearMLConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     project_name: str = Field(
         default=DEFAULT_PROJECT_NAME,
-        description=(
-            "Проект ClearML для текущего эксперимента. Задавайте явно, чтобы "
-            "разделять рабочие запуски."
-        ),
+        description=("Проект ClearML для текущего эксперимента. Задавайте явно, чтобы разделять рабочие запуски."),
         examples=["experiments"],
         json_schema_extra={
             "shapes": "str",
@@ -148,10 +136,7 @@ class ClearMLConfig(BaseModel):
     )
     task_name: str = Field(
         default="yolo-run",
-        description=(
-            "Читаемое имя задачи ClearML; влияет также на безопасное имя неявного"
-            " каталога результатов."
-        ),
+        description=("Читаемое имя задачи ClearML; влияет также на безопасное имя неявного каталога результатов."),
         examples=["first-training"],
         json_schema_extra={
             "shapes": "str",
@@ -173,9 +158,7 @@ class ClearMLConfig(BaseModel):
     )
     tags: list[str] = Field(
         default_factory=list,
-        description=(
-            "Теги задачи ClearML; задавайте список строк для поиска и группировки экспериментов."
-        ),
+        description=("Теги задачи ClearML; задавайте список строк для поиска и группировки экспериментов."),
         examples=[["tutorial"]],
         json_schema_extra={
             "shapes": "list[str]",
@@ -314,9 +297,7 @@ class ModelRef(BaseModel):
     model_config = ConfigDict(extra="forbid")
     source: ModelSource = Field(
         default="clearml",
-        description=(
-            "Источник checkpoint: clearml для поиска опубликованной модели либо local для файла."
-        ),
+        description=("Источник checkpoint: clearml для поиска опубликованной модели либо local для файла."),
         examples=["clearml"],
         json_schema_extra={
             "shapes": "ModelSource",
@@ -371,9 +352,7 @@ class ModelRef(BaseModel):
     )
     weights: Path | None = Field(
         default=None,
-        description=(
-            "Локальный checkpoint; обязателен для source=local и запрещён для source=clearml."
-        ),
+        description=("Локальный checkpoint; обязателен для source=local и запрещён для source=clearml."),
         examples=["best.pth"],
         json_schema_extra={
             "shapes": "Path | None",
@@ -398,9 +377,7 @@ class ModelRef(BaseModel):
     )
     label: str | None = Field(
         default=None,
-        description=(
-            "Читаемая подпись модели в сравнении; null использует разрешённую идентичность."
-        ),
+        description=("Читаемая подпись модели в сравнении; null использует разрешённую идентичность."),
         examples=["baseline"],
         json_schema_extra={
             "shapes": "str | None",
@@ -411,10 +388,7 @@ class ModelRef(BaseModel):
     )
     backend: BackendName | None = Field(
         default=None,
-        description=(
-            "Семейство нативного checkpoint; задаётся вместе с preset для "
-            "проверки или описания сырых весов."
-        ),
+        description=("Семейство нативного checkpoint; задаётся вместе с preset для проверки или описания сырых весов."),
         examples=["fasterrcnn"],
         json_schema_extra={
             "shapes": "BackendName | None",
@@ -425,10 +399,7 @@ class ModelRef(BaseModel):
     )
     preset: str | None = Field(
         default=None,
-        description=(
-            "Архитектура checkpoint из реестра выбранного backend; backend и "
-            "preset задаются вместе."
-        ),
+        description=("Архитектура checkpoint из реестра выбранного backend; backend и preset задаются вместе."),
         examples=["resnet50_fpn"],
         json_schema_extra={
             "shapes": "str | None",
@@ -440,8 +411,7 @@ class ModelRef(BaseModel):
     source_dir: Path | None = Field(
         default=None,
         description=(
-            "Путь к исходникам DEIMv2 для сырых checkpoint; требует backend и "
-            "preset, для остальных семейств запрещён."
+            "Путь к исходникам DEIMv2 для сырых checkpoint; требует backend и preset, для остальных семейств запрещён."
         ),
         examples=["vendor/DEIMv2"],
         json_schema_extra={
@@ -453,10 +423,7 @@ class ModelRef(BaseModel):
     )
     class_names: tuple[str, ...] | None = Field(
         default=None,
-        description=(
-            "Имена foreground-классов сырых весов в порядке выходов модели. "
-            "Требуют backend и preset."
-        ),
+        description=("Имена foreground-классов сырых весов в порядке выходов модели. Требуют backend и preset."),
         examples=[["defect"]],
         json_schema_extra={
             "shapes": "tuple[str, ...] | None",
@@ -485,12 +452,8 @@ class ModelRef(BaseModel):
         if (self.backend is None) != (self.preset is None):
             raise ValueError("Checkpoint backend and preset must be specified together")
         if self.backend is not None:
-            ModelConfig.model_validate(
-                {"backend": self.backend, "preset": self.preset, "source_dir": self.source_dir}
-            )
-        elif any(
-            value is not None for value in (self.source_dir, self.class_names, self.preprocessing)
-        ):
+            ModelConfig.model_validate({"backend": self.backend, "preset": self.preset, "source_dir": self.source_dir})
+        elif any(value is not None for value in (self.source_dir, self.class_names, self.preprocessing)):
             raise ValueError("Raw checkpoint metadata requires backend and preset")
         if self.source == "local":
             if self.weights is None:

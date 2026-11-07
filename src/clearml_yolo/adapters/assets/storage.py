@@ -18,14 +18,10 @@ def native_asset_path(root: Path, filename: str) -> Path:
     return destination
 
 
-def promote_asset(
-    source: Path, destination: Path, *, validator: Callable[[Path], str] | None = None
-) -> None:
+def promote_asset(source: Path, destination: Path, *, validator: Callable[[Path], str] | None = None) -> None:
     """Copy validated legacy bytes atomically without consuming the original file."""
     destination.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile(
-        prefix=".asset-", dir=destination.parent, delete=False
-    ) as temporary:
+    with tempfile.NamedTemporaryFile(prefix=".asset-", dir=destination.parent, delete=False) as temporary:
         staging = Path(temporary.name)
     try:
         with source.open("rb") as incoming, staging.open("wb") as outgoing:

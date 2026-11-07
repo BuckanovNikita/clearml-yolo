@@ -30,17 +30,11 @@ CONTROLS = {
         "--multirun ultralytics.epochs=1,2",
     ),
     "shell_completion": (
-        (
-            "Показать команды установки/удаления shell completion Hydra; выполняйте их "
-            "осознанно в терминале."
-        ),
+        ("Показать команды установки/удаления shell completion Hydra; выполняйте их осознанно в терминале."),
         "--shell-completion install=bash",
     ),
     "config_path": (
-        (
-            "Заменить основной путь конфигураций Hydra; относительный путь отсчитывается от "
-            "Python entrypoint."
-        ),
+        ("Заменить основной путь конфигураций Hydra; относительный путь отсчитывается от Python entrypoint."),
         "--config-path /path/to/configs",
     ),
     "config_name": (
@@ -55,10 +49,7 @@ CONTROLS = {
         "--config-dir ./configs --config-name cy-train",
     ),
     "experimental_rerun": (
-        (
-            "Экспериментальный повтор Hydra из pickle. Загружайте только доверенные файлы; "
-            "это не ClearML Agent replay."
-        ),
+        ("Экспериментальный повтор Hydra из pickle. Загружайте только доверенные файлы; это не ClearML Agent replay."),
         "--experimental-rerun /trusted/job.pickle",
     ),
     "info": (
@@ -90,9 +81,7 @@ def hydra_controls(commands: list[str]) -> list[FieldDoc]:
                     f"aliases={action.option_strings}; choices={action.choices}; "
                     f"nargs={action.nargs}; default={action.default}"
                 ),
-                applicability=(
-                    "CLI Hydra; параметры запуска передаются в терминале, не как поля YAML."
-                ),
+                applicability=("CLI Hydra; параметры запуска передаются в терминале, не как поля YAML."),
                 examples=[example],
                 source="hydra._internal.utils.get_args_parser",
                 commands=commands,

@@ -57,8 +57,7 @@ def _main() -> None:
             context={"destination": arguments.directory},
         )
         argument_parser.error(
-            f"Cannot initialize configuration directory {redact_text(arguments.directory)}: "
-            + exception_summary(error)
+            f"Cannot initialize configuration directory {redact_text(arguments.directory)}: " + exception_summary(error)
         )
 
 

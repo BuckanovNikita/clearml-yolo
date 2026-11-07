@@ -44,9 +44,7 @@ def _sdk() -> Any:
     try:
         actual = importlib.metadata.version("rfdetr")
     except importlib.metadata.PackageNotFoundError as exc:
-        raise ImportError(
-            'RF-DETR requires the default "rfdetr[train]==1.11.2" dependency'
-        ) from exc
+        raise ImportError('RF-DETR requires the default "rfdetr[train]==1.11.2" dependency') from exc
     if actual != VERSION:
         raise RuntimeError(f"RF-DETR requires version {VERSION}; installed version is {actual}")
     return importlib.import_module("rfdetr")
@@ -83,11 +81,7 @@ def _verify_pretrained(model: Any, weights: Path) -> None:
     expected = payload["model"]
     actual = model.model.model.state_dict()
     projection = next(
-        (
-            key
-            for key in expected
-            if key.startswith("backbone.") and key.endswith("patch_embeddings.projection.weight")
-        ),
+        (key for key in expected if key.startswith("backbone.") and key.endswith("patch_embeddings.projection.weight")),
         None,
     )
     # Patch projection is neither the intentionally replaced class head nor the
@@ -163,20 +157,14 @@ class _UniqueValidation:
             raise RuntimeError("RF-DETR validation requires its sequential distributed sampler")
         length = len(cast(Sized, sampler.dataset))
         samples, targets = batch
-        count = unique_validation_count(
-            length, sampler.num_replicas, sampler.rank, batch_idx, loader.batch_size
-        )
+        count = unique_validation_count(length, sampler.num_replicas, sampler.rank, batch_idx, loader.batch_size)
         targets = targets[:count]
         samples.tensors = samples.tensors[:count]
         if samples.mask is not None:
             samples.mask = samples.mask[:count]
         # Empty padded slots do no forward work, but still participate in native
         # box normalization and the epoch's metric collectives alongside peers.
-        outputs = (
-            self._resolve_eval_model()(samples)
-            if count
-            else {"pred_logits": torch.empty(0, device=self.device)}
-        )
+        outputs = self._resolve_eval_model()(samples) if count else {"pred_logits": torch.empty(0, device=self.device)}
         normalizer = self.criterion.num_boxes_for_targets(outputs, targets)
         global_count = torch.tensor(count, device=self.device)
         distributed.all_reduce(global_count)
@@ -187,11 +175,7 @@ class _UniqueValidation:
             losses.update({key: value for key, value in computed.items() if key in losses})
         loss = sum(losses[key] * weight for key, weight in self.criterion.weight_dict.items())
         self._log_val_loss_metrics(loss, losses, batch_size=int(global_count))
-        results = (
-            self.postprocess(outputs, torch.stack([target["orig_size"] for target in targets]))
-            if count
-            else []
-        )
+        results = self.postprocess(outputs, torch.stack([target["orig_size"] for target in targets])) if count else []
         return {"results": results, "targets": targets}
 
 
@@ -338,17 +322,13 @@ def train(
     )
 
 
-def _prediction_frame(
-    predictions: Sequence[tuple[str, Any]], names: tuple[str, ...], max_det: int
-) -> pd.DataFrame:
+def _prediction_frame(predictions: Sequence[tuple[str, Any]], names: tuple[str, ...], max_det: int) -> pd.DataFrame:
     rows: list[dict[str, Any]] = []
     for path, detection in predictions:
         if detection.class_id is None or detection.confidence is None:
             continue
         count = 0
-        for box, score, class_id in zip(
-            detection.xyxy, detection.confidence, detection.class_id, strict=True
-        ):
+        for box, score, class_id in zip(detection.xyxy, detection.confidence, detection.class_id, strict=True):
             label = int(class_id)
             if not 0 <= label < len(names):
                 continue
@@ -410,9 +390,7 @@ def predict(
         with image_progress(len(image_paths)) as advance:
             for offset in range(0, len(image_paths), settings.batch):
                 paths = list(image_paths[offset : offset + settings.batch])
-                outputs = model.predict(
-                    paths, threshold=settings.conf, shape=(size, size), include_source_image=False
-                )
+                outputs = model.predict(paths, threshold=settings.conf, shape=(size, size), include_source_image=False)
                 predictions.extend(zip(paths, outputs, strict=True))
                 advance(len(paths))
     frame = _prediction_frame(predictions, descriptor.class_names, settings.max_det)

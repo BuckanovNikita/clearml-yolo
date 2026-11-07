@@ -24,20 +24,14 @@ def _torch_cache(filename: str) -> Path:
 
 def _hf_cache(hub: HubAsset, filename: str) -> tuple[Path, ...]:
     sdk = importlib.import_module("huggingface_hub")
-    path = sdk.try_to_load_from_cache(
-        hub.repository, filename, cache_dir=hub.cache_dir, revision=hub.revision
-    )
+    path = sdk.try_to_load_from_cache(hub.repository, filename, cache_dir=hub.cache_dir, revision=hub.revision)
     return (Path(path),) if isinstance(path, str) else ()
 
 
 def _description(preset: str) -> tuple[str, str, tuple[AssetCache, ...], HubAsset | None]:
     if preset in {"resnet50_fpn", "resnet101_fpn"}:
         models = importlib.import_module("torchvision.models")
-        weights = (
-            models.ResNet50_Weights.DEFAULT
-            if preset == "resnet50_fpn"
-            else models.ResNet101_Weights.DEFAULT
-        )
+        weights = models.ResNet50_Weights.DEFAULT if preset == "resnet50_fpn" else models.ResNet101_Weights.DEFAULT
         return str(weights.url), importlib.metadata.version("torchvision"), (), None
     timm = importlib.import_module("timm")
     native = timm.get_pretrained_cfg(TIMM_MODELS[preset])
@@ -53,9 +47,7 @@ def _description(preset: str) -> tuple[str, str, tuple[AssetCache, ...], HubAsse
     if source != "hf-hub":
         raise ValueError(f"Unsupported native pretrained source for {preset}: {source}")
     native_hub = importlib.import_module("timm.models._hub")
-    repository, revision = native_hub.hf_split(
-        location[0] if isinstance(location, tuple) else location
-    )
+    repository, revision = native_hub.hf_split(location[0] if isinstance(location, tuple) else location)
     filename = location[1] if isinstance(location, tuple) else "pytorch_model.bin"
     constants = importlib.import_module("huggingface_hub.constants")
     hub = HubAsset(
@@ -72,10 +64,7 @@ def _description(preset: str) -> tuple[str, str, tuple[AssetCache, ...], HubAsse
                 caches.append(
                     AssetCache(
                         path=path,
-                        canonical_url=(
-                            f"https://huggingface.co/{repository}/resolve/"
-                            f"{hub.revision}/{cached_filename}"
-                        ),
+                        canonical_url=(f"https://huggingface.co/{repository}/resolve/{hub.revision}/{cached_filename}"),
                         checksum=blob if re.fullmatch(r"[0-9a-f]{64}", blob) else None,
                     )
                 )
@@ -87,9 +76,7 @@ def _description(preset: str) -> tuple[str, str, tuple[AssetCache, ...], HubAsse
     return url, version, tuple(caches), hub
 
 
-def pretrained_asset(
-    preset: str, *, backend: Literal["fasterrcnn", "fcos"] = "fasterrcnn"
-) -> AssetSpec:
+def pretrained_asset(preset: str, *, backend: Literal["fasterrcnn", "fcos"] = "fasterrcnn") -> AssetSpec:
     url, revision, caches, hub = _description(preset)
     filename = Path(urlsplit(url).path).name
     match = re.search(r"-([0-9a-f]{8,64})\.", filename)

@@ -143,9 +143,7 @@ class _Harness:
         settings: PredictSettings,
     ) -> pd.DataFrame:
         self.scored.append((config.backend, weights, list(image_paths), settings))
-        result = pd.DataFrame(
-            [[path, "thing", 0.8, 1, 1, 9, 9] for path in image_paths], columns=PREDICTION_COLUMNS
-        )
+        result = pd.DataFrame([[path, "thing", 0.8, 1, 1, 9, 9] for path in image_paths], columns=PREDICTION_COLUMNS)
         result.attrs.update(
             image_paths=list(image_paths),
             normalized_imgsz=[64, 64],
@@ -169,9 +167,7 @@ def detector_harness(
     def create(selection: str = "rfdetr/small") -> _Harness:
         config = model_preset(selection).model_copy(
             update={
-                "train": model_preset(selection).train.model_copy(
-                    update={"imgsz": 64, "device": "cpu"}
-                ),
+                "train": model_preset(selection).train.model_copy(update={"imgsz": 64, "device": "cpu"}),
                 "predict": PredictSettings(device="cpu", imgsz=64),
             }
         )
@@ -218,9 +214,7 @@ def detector_harness(
                 prepare_native_parameters(values), name="General", ignore_remote_overrides=True
             ),
         )
-        monkeypatch.setattr(
-            deps.tracking, "task_identity", lambda owner: ("project", "native", "native-owner")
-        )
+        monkeypatch.setattr(deps.tracking, "task_identity", lambda owner: ("project", "native", "native-owner"))
         monkeypatch.setattr(
             deps.tracking,
             "record_run_configuration",
@@ -243,9 +237,7 @@ def detector_harness(
         return harness
 
     yield create
-    assert not {"torch", "torchvision", "ultralytics", "timm", "rfdetr"} & (
-        set(sys.modules) - loaded
-    )
+    assert not {"torch", "torchvision", "ultralytics", "timm", "rfdetr"} & (set(sys.modules) - loaded)
 
 
 def test_recovered_deim_prepares_source_with_another_selected_family(
@@ -264,9 +256,7 @@ def test_recovered_deim_prepares_source_with_another_selected_family(
     published: list[tuple[ResolvedAsset, ...]] = []
     prepared: list[ModelConfig] = []
 
-    def prepare(
-        config: ModelConfig, *, training: bool
-    ) -> tuple[ModelConfig, tuple[ResolvedAsset, ...]]:
+    def prepare(config: ModelConfig, *, training: bool) -> tuple[ModelConfig, tuple[ResolvedAsset, ...]]:
         assert not training
         assert (config.backend, config.preset, config.source_dir) == ("deimv2", "s", None)
         resolved = config.model_copy(update={"source_dir": source}, deep=True)
@@ -284,18 +274,14 @@ def test_recovered_deim_prepares_source_with_another_selected_family(
         assert config.source_dir == source
         return harness.native_predict(config, descriptor, weights, paths, settings)
 
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.integrations.detectors.prepare_model_assets", prepare
-    )
+    monkeypatch.setattr("clearml_yolo.adapters.integrations.detectors.prepare_model_assets", prepare)
     monkeypatch.setattr(
         "clearml_yolo.adapters.integrations.detectors.publish_model_assets",
         lambda task, assets: published.append(assets),
     )
     monkeypatch.setattr("clearml_yolo.adapters.deim.backend.predict", predict)
     assert isinstance(harness.deps.model, DetectorRunner)
-    harness.deps.model.bind_reference(
-        weights, ModelRef(source="local", weights=weights, thresholds={"thing": 0.5})
-    )
+    harness.deps.model.bind_reference(weights, ModelRef(source="local", weights=weights, thresholds={"thing": 0.5}))
     result = harness.deps.model.predict_on_images(
         weights, [str(harness.root / "test.png")], project=str(harness.root), name="recovered"
     )
@@ -347,9 +333,7 @@ def test_pipeline_uses_selected_best_and_backend_owned_settings(
     assert identity is not None
     assert identity.model_id == "published-best"
     assert identity.checkpoint_sha256 == checkpoint_sha256(best)
-    requested = yaml.safe_load(
-        (harness.root / "run/ultralytics_predict_requested.yaml").read_text()
-    )
+    requested = yaml.safe_load((harness.root / "run/ultralytics_predict_requested.yaml").read_text())
     effective = yaml.safe_load((harness.root / "run/ultralytics_predict.yaml").read_text())
     assert requested["device"] == [-1]
     assert effective["device"] == "cpu"
@@ -413,9 +397,7 @@ def test_calibration_association_uses_published_best_prediction_identity(
     class CalibrationReachedError(Exception):
         pass
 
-    def associate(
-        owner: TaskHandle, thresholds: dict[str, float], *, prediction_checkpoint_sha256: str
-    ) -> None:
+    def associate(owner: TaskHandle, thresholds: dict[str, float], *, prediction_checkpoint_sha256: str) -> None:
         associations.append((thresholds, prediction_checkpoint_sha256))
         # Stop after real calibration and identity binding, before unrelated rendering.
         raise CalibrationReachedError
@@ -477,16 +459,12 @@ def _paired_comparison(
     with pytest.raises(BothEvaluatedError):
         compare(
             ModelRef(source="local", weights=baseline, thresholds={"thing": 0.7}, label="baseline"),
-            ModelRef(
-                source="local", weights=candidate, thresholds={"thing": 0.6}, label="candidate"
-            ),
+            ModelRef(source="local", weights=candidate, thresholds={"thing": 0.6}, label="candidate"),
             harness.truth,
             harness.root / "comparison",
             ClearMLConfig(),
             {"reuse_existing": False},
-            ultralytics=training_settings()
-            if legacy
-            else harness.config.train.model_dump(mode="json"),
+            ultralytics=training_settings() if legacy else harness.config.train.model_dump(mode="json"),
             ultralytics_predict=prediction,
             deps=harness.deps,
         )
@@ -500,13 +478,9 @@ def test_compare_resolves_each_checkpoint_and_shares_current_images_and_device(
     selection: str,
 ) -> None:
     harness = detector_harness(selection)
-    baseline = _archive(
-        harness.root / "baseline.pth", _metadata(model_preset("fasterrcnn/resnet50_fpn"))
-    )
+    baseline = _archive(harness.root / "baseline.pth", _metadata(model_preset("fasterrcnn/resnet50_fpn")))
     if selection == "ultralytics":
-        candidate = _archive(
-            harness.root / "candidate.pth", _metadata(model_preset("rfdetr/small"))
-        )
+        candidate = _archive(harness.root / "candidate.pth", _metadata(model_preset("rfdetr/small")))
     else:
         candidate = _pipeline(harness)["weights"]
         harness.scored.clear()
@@ -517,9 +491,7 @@ def test_compare_resolves_each_checkpoint_and_shares_current_images_and_device(
         ("rfdetr", candidate),
     ]
     assert all(paths == [str(harness.root / "test.png")] for _, _, paths, _ in harness.scored)
-    assert all(
-        settings.device == "cpu" and settings.imgsz == 64 for _, _, _, settings in harness.scored
-    )
+    assert all(settings.device == "cpu" and settings.imgsz == 64 for _, _, _, settings in harness.scored)
     assert [item.image_names for item in evaluated] == [["test.png"], ["test.png"]]
     assert [item.thresholds for item in evaluated] == [{"thing": 0.7}, {"thing": 0.6}]
     identities = [item.model_identity for item in evaluated]
@@ -554,9 +526,7 @@ def test_compare_keeps_legacy_baseline_usable_with_native_candidate(
         **settings: Any,
     ) -> pd.DataFrame:
         # Exercise the exact complete-group validation that runs before YOLO SDK loading.
-        values = execution_settings(
-            settings | {"model": str(weights), "source": "images.txt"}, "predict"
-        )
+        values = execution_settings(settings | {"model": str(weights), "source": "images.txt"}, "predict")
         legacy_calls.append((Path(weights), list(paths), values))
         return pd.DataFrame(
             [[Path(path).name, "thing", 0.8, 1, 1, 9, 9] for path in paths],
@@ -564,9 +534,7 @@ def test_compare_keeps_legacy_baseline_usable_with_native_candidate(
         )
 
     def legacy_reinfer(*args: Any, **kwargs: Any) -> Any:
-        return reinfer_split(
-            *args, **kwargs, predictor=legacy_predict, class_names=lambda _: {0: "thing"}
-        )
+        return reinfer_split(*args, **kwargs, predictor=legacy_predict, class_names=lambda _: {0: "thing"})
 
     monkeypatch.setattr(harness.deps.model.legacy, "reinfer_split", legacy_reinfer)
     monkeypatch.setattr(harness.deps.model.legacy, "trained_imgsz", lambda weights: 640)
@@ -575,6 +543,4 @@ def test_compare_keeps_legacy_baseline_usable_with_native_candidate(
     assert len(legacy_calls) == 1
     assert legacy_calls[0][0:2] == (baseline, [str(harness.root / "test.png")])
     assert legacy_calls[0][2]["device"] == "cpu"
-    assert [(backend, weights) for backend, weights, _, _ in harness.scored] == [
-        ("rfdetr", candidate)
-    ]
+    assert [(backend, weights) for backend, weights, _, _ in harness.scored] == [("rfdetr", candidate)]

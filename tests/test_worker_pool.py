@@ -16,9 +16,7 @@ from clearml_yolo.adapters.runtime.workers import WorkerCommand
 
 
 def _command(source: str, output: Path, **environment: str) -> WorkerCommand:
-    return WorkerCommand(
-        argv=(sys.executable, "-c", source), environment=environment, log_path=output
-    )
+    return WorkerCommand(argv=(sys.executable, "-c", source), environment=environment, log_path=output)
 
 
 def _until(predicate: Callable[[], bool], *, seconds: float = 10) -> None:
@@ -101,9 +99,7 @@ def test_failed_case_does_not_terminate_running_peer(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("exit_code", [0, 7])
-def test_completion_cleans_detached_grandchild_with_changed_trial_marker(
-    tmp_path: Path, exit_code: int
-) -> None:
+def test_completion_cleans_detached_grandchild_with_changed_trial_marker(tmp_path: Path, exit_code: int) -> None:
     pid_file = tmp_path / "grandchild.pid"
     grandchild = (
         "import os,time\nfrom pathlib import Path\n"
@@ -140,9 +136,7 @@ def test_completion_cleans_detached_grandchild_with_changed_trial_marker(
 
 def test_startup_failure_keeps_existing_case_running(tmp_path: Path) -> None:
     pid_file = tmp_path / "peer.pid"
-    source = (
-        f"import os,time;open({str(pid_file)!r},'w').write(str(os.getpid()));time.sleep(60)"
-    )
+    source = f"import os,time;open({str(pid_file)!r},'w').write(str(os.getpid()));time.sleep(60)"
     with IndependentWorkerPool() as pool:
         pool.start("peer", _command(source, tmp_path / "peer.log"))
         _until(lambda: pid_file.is_file() and bool(pid_file.read_text()))
@@ -213,9 +207,7 @@ def test_exception_cleans_all_cases_and_preserves_original_error(tmp_path: Path)
     def cancel() -> None:
         with IndependentWorkerPool() as pool:
             for index, path in enumerate(pids):
-                source = (
-                    f"import os,time;open({str(path)!r},'w').write(str(os.getpid()));time.sleep(60)"
-                )
+                source = f"import os,time;open({str(path)!r},'w').write(str(os.getpid()));time.sleep(60)"
                 pool.start(str(index), _command(source, tmp_path / f"{index}.log"))
             _until(lambda: all(path.is_file() and path.read_text() for path in pids))
             raise KeyboardInterrupt
@@ -304,7 +296,8 @@ def test_real_repeated_signals_finish_owned_cleanup(tmp_path: Path, signum: sign
 
 
 def test_pool_cleanup_never_scans_unrelated_processes(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     original = Path.iterdir
 

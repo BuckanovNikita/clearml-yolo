@@ -16,9 +16,7 @@ from hydra_zen import store
 from omegaconf import OmegaConf
 
 
-@pytest.mark.parametrize(
-    "cleanup_error", [RuntimeError("cleanup failed"), KeyboardInterrupt(), SystemExit(143)]
-)
+@pytest.mark.parametrize("cleanup_error", [RuntimeError("cleanup failed"), KeyboardInterrupt(), SystemExit(143)])
 @pytest.mark.parametrize("broken_sink", [False, True])
 def test_gpu_cleanup_retains_original_error(
     monkeypatch: pytest.MonkeyPatch, cleanup_error: BaseException, broken_sink: bool
@@ -53,9 +51,7 @@ def test_gpu_cleanup_retains_original_error(
     assert diagnostics
 
 
-@pytest.mark.parametrize(
-    "cleanup_error", [RuntimeError("cleanup failed"), KeyboardInterrupt(), SystemExit(143)]
-)
+@pytest.mark.parametrize("cleanup_error", [RuntimeError("cleanup failed"), KeyboardInterrupt(), SystemExit(143)])
 def test_gpu_cleanup_without_primary_propagates_failure(
     monkeypatch: pytest.MonkeyPatch, cleanup_error: BaseException
 ) -> None:
@@ -99,10 +95,7 @@ def test_direct_schemas_have_no_scheduler_and_use_basic_launcher() -> None:
             config = compose(config_name=name, return_hydra_config=True)
             assert "queue" not in config
             assert "autogpu" not in config
-            assert (
-                config.hydra.launcher._target_
-                == "hydra._internal.core_plugins.basic_launcher.BasicLauncher"
-            )
+            assert config.hydra.launcher._target_ == "hydra._internal.core_plugins.basic_launcher.BasicLauncher"
 
 
 @pytest.mark.parametrize("device", [-1, "cuda", "2,0", [2, 0], "cpu", None])
@@ -186,9 +179,7 @@ def test_saved_legacy_configuration_reports_migration(tmp_path: Path) -> None:
         "ultralytics.project",
     ],
 )
-def test_external_project_routes_are_rejected_before_any_external_creation(
-    tmp_path: Path, setting: str
-) -> None:
+def test_external_project_routes_are_rejected_before_any_external_creation(tmp_path: Path, setting: str) -> None:
     outside = tmp_path / "outside" / "never-created"
     arguments = [f"{setting}={outside}"]
     if setting == "hydra.sweep.dir":
@@ -200,9 +191,7 @@ def test_external_project_routes_are_rejected_before_any_external_creation(
 
 
 def test_external_input_remains_allowed_for_config_inspection(tmp_path: Path) -> None:
-    result = _cli(
-        tmp_path / "workspace", "--cfg", "job", f"ground_truth={tmp_path / 'external.csv'}"
-    )
+    result = _cli(tmp_path / "workspace", "--cfg", "job", f"ground_truth={tmp_path / 'external.csv'}")
     assert result.returncode == 0, result.stderr
     assert "external.csv" in result.stdout
 
@@ -251,9 +240,7 @@ common.execute_owned = execute
 common.launch('pipeline', lambda: None)
 """
     arguments = (
-        ["-m", "ultralytics.epochs=1,2", f"hydra.sweep.dir={selected}"]
-        if multirun
-        else [f"hydra.run.dir={selected}"]
+        ["-m", "ultralytics.epochs=1,2", f"hydra.sweep.dir={selected}"] if multirun else [f"hydra.run.dir={selected}"]
     )
     if leaf == "escaped.log":
         arguments.append(

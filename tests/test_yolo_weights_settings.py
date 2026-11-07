@@ -79,9 +79,7 @@ def test_already_absolute_directory_repairs_live_state_without_rewriting(
     assert directory == native_settings.WEIGHTS_DIR
 
 
-def test_tilde_is_a_literal_directory_component(
-    native_settings: SimpleNamespace, tmp_path: Path
-) -> None:
+def test_tilde_is_a_literal_directory_component(native_settings: SimpleNamespace, tmp_path: Path) -> None:
     path = native_settings.SETTINGS.file_path
     values = dict(native_settings.SETTINGS) | {"weights_dir": "~/weights"}
     path.write_text(json.dumps(values), encoding="utf-8")

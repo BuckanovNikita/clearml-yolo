@@ -90,15 +90,12 @@ def _existing_image_paths(split_rows: pd.DataFrame, split: str) -> list[str]:
         shown = missing[:_MAX_REPORTED_PATHS]
         suffix = "" if len(missing) <= _MAX_REPORTED_PATHS else f" (+{len(missing) - len(shown)})"
         raise ValueError(
-            f"{len(missing)} of {len(paths)} images of split {split!r} do not exist on disk: "
-            f"{shown}{suffix}"
+            f"{len(missing)} of {len(paths)} images of split {split!r} do not exist on disk: {shown}{suffix}"
         )
     return paths
 
 
-def _vocabulary_report(
-    model_names: dict[int, str], split_labels: "pd.Series[str]"
-) -> VocabularyReport:
+def _vocabulary_report(model_names: dict[int, str], split_labels: "pd.Series[str]") -> VocabularyReport:
     model_classes = [model_names[index] for index in sorted(model_names)]
     ground_truth_classes = {str(label) for label in split_labels.dropna().unique()}
     return VocabularyReport(
@@ -116,28 +113,21 @@ def _evidence(predictions: pd.DataFrame, fallback: dict[str, object]) -> Inferen
     effective = predictions.attrs.get("effective_args", fallback)
     if not isinstance(effective, dict):
         effective = fallback
-    save_dir = predictions.attrs.get(
-        "save_dir", str(Path(str(fallback["project"])) / str(fallback["name"]))
-    )
+    save_dir = predictions.attrs.get("save_dir", str(Path(str(fallback["project"])) / str(fallback["name"])))
     evidence = InferenceEvidence.model_validate(
         {
             "effective_args": sanitize_configuration(effective),
             "save_dir": str(save_dir),
-            "requested_args": sanitize_configuration(
-                predictions.attrs.get("requested_args", fallback)
-            ),
+            "requested_args": sanitize_configuration(predictions.attrs.get("requested_args", fallback)),
             "normalized_imgsz": predictions.attrs.get("normalized_imgsz"),
-            "checkpoint_design": sanitize_configuration(
-                predictions.attrs.get("checkpoint_design", {})
-            ),
+            "checkpoint_design": sanitize_configuration(predictions.attrs.get("checkpoint_design", {})),
         }
     )
     native_root = Path(str(fallback["project"])).resolve()
     actual_output = Path(evidence.save_dir).resolve()
     if not actual_output.is_relative_to(native_root):
         raise ValueError(
-            f"Native inference wrote outside the comparison directory: {actual_output} "
-            f"is not below {native_root}"
+            f"Native inference wrote outside the comparison directory: {actual_output} is not below {native_root}"
         )
     predictions.attrs.update(evidence.model_dump())
     return evidence
@@ -225,9 +215,7 @@ def reinfer_split(
     reuse_existing: bool = True,
     predictor: Predictor = predict_on_images,
     class_names: ClassNameLoader = _model_class_names,
-    write_settings: Callable[
-        [Path, dict[str, Any], Literal["train", "predict"]], Path
-    ] = write_native_yaml,
+    write_settings: Callable[[Path, dict[str, Any], Literal["train", "predict"]], Path] = write_native_yaml,
 ) -> tuple[pd.DataFrame, VocabularyReport]:
     """Score ``weights`` on the images of ``split`` in ``ground_truth``.
 
@@ -247,10 +235,7 @@ def reinfer_split(
     validate_evaluation_image_name(image_name)
     duplicate_native_keys = sorted(COMPARISON_KEYS & set(native_kwargs or {}))
     if duplicate_native_keys:
-        raise ValueError(
-            "native_kwargs cannot override comparison-owned inference key(s): "
-            f"{duplicate_native_keys}"
-        )
+        raise ValueError(f"native_kwargs cannot override comparison-owned inference key(s): {duplicate_native_keys}")
     split_rows = _select_split(ground_truth, split)
     image_paths = _existing_image_paths(split_rows, split)
 
@@ -283,18 +268,14 @@ def reinfer_split(
         manifest_dir = write_path(output.parent / "prediction_inputs" / native_name / output.stem)
         manifest_dir.mkdir(parents=True, exist_ok=True)
         manifest = write_path(manifest_dir / "images.txt")
-        manifest.write_text(
-            "\n".join(str(Path(path).absolute()) for path in image_paths), encoding="utf-8"
-        )
+        manifest.write_text("\n".join(str(Path(path).absolute()) for path in image_paths), encoding="utf-8")
         write_settings(
             output.parent / f"ultralytics_predict_{native_name}.yaml",
             {key: value for key, value in settings.items() if key != "image_name"}
             | {"source": str(manifest.resolve()), "model": str(weights), "mode": "predict"},
             "predict",
         )
-        with trace_operation(
-            "yolo.cache.miss.inference", context={"split": split, "images": len(image_paths)}
-        ):
+        with trace_operation("yolo.cache.miss.inference", context={"split": split, "images": len(image_paths)}):
             predictions = predictor(
                 weights,
                 image_paths,
@@ -305,9 +286,7 @@ def reinfer_split(
         effective.update(source=str(manifest.resolve()), model=str(weights), mode="predict")
         predictions.attrs["effective_args"] = effective
         evidence = _evidence(predictions, settings)
-        with trace_operation(
-            "yolo.cache.write", context={"path": str(output), "rows": len(predictions)}
-        ):
+        with trace_operation("yolo.cache.write", context={"path": str(output), "rows": len(predictions)}):
             _write_cache(predictions, output, evidence)
         logger.info(
             "Re-inferred {} baseline predictions over {} images of split {!r} into {}",

@@ -45,9 +45,7 @@ def _detections(
                 ):
                     category = int(label) - dataset.label_offset
                     if not 0 <= category < dataset.num_classes:
-                        raise ValueError(
-                            "Torchvision validation emitted an unknown foreground label"
-                        )
+                        raise ValueError("Torchvision validation emitted an unknown foreground label")
                     records.append(
                         {
                             "image_id": image_id,

@@ -26,13 +26,9 @@ def build_model(
     if backbone_weights is not None and not backbone_weights.is_file():
         raise FileNotFoundError(backbone_weights)
     if preset in {"resnet50_fpn", "resnet101_fpn"}:
-        backbone = _resnet_backbone(
-            preset, pretrained=pretrained, weights=backbone_weights, first_level=3
-        )
+        backbone = _resnet_backbone(preset, pretrained=pretrained, weights=backbone_weights, first_level=3)
     elif preset in TIMM_MODELS:
-        backbone = FeaturePyramid(
-            preset, pretrained=pretrained, weights=backbone_weights, first_level=3
-        )
+        backbone = FeaturePyramid(preset, pretrained=pretrained, weights=backbone_weights, first_level=3)
     else:
         raise ValueError(f"Unsupported FCOS preset: {preset}")
     detection = importlib.import_module("torchvision.models.detection")

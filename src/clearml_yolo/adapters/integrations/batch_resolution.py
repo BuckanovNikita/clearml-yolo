@@ -46,9 +46,7 @@ def batch_provenance(recommendation: ResolvedRecommendation) -> dict[str, Any]:
                 "profile": source.profile.model_dump(mode="json"),
                 "settings": source.settings.model_dump(mode="json"),
             }
-            for key, source in zip(
-                recommendation.source_estimate_keys, recommendation.sources, strict=True
-            )
+            for key, source in zip(recommendation.source_estimate_keys, recommendation.sources, strict=True)
         ],
     }
     if recommendation.origin == "measured":

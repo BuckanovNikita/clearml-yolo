@@ -41,11 +41,7 @@ def _source(root: Path, count: int = 60, *, legacy: bool = False) -> Path:
     images = root / "train_images"
     images.mkdir(parents=True)
     with (root / "train.csv").open("w", newline="", encoding="utf-8") as stream:
-        fields = (
-            ["ImageId_ClassId", "EncodedPixels"]
-            if legacy
-            else ["ImageId", "ClassId", "EncodedPixels"]
-        )
+        fields = ["ImageId_ClassId", "EncodedPixels"] if legacy else ["ImageId", "ClassId", "EncodedPixels"]
         writer = csv.DictWriter(stream, fields)
         writer.writeheader()
         for index in range(count):
@@ -69,9 +65,7 @@ def test_rle_is_one_based_column_major_and_keeps_boundary_pixels() -> None:
     assert not severstal.decode_rle("", height=3, width=4).any()
 
 
-@pytest.mark.parametrize(
-    "encoded", ["1", "0 1", "1 0", "-1 2", "1 3 2 1", "5 1 1 1", "12 2", "x 1"]
-)
+@pytest.mark.parametrize("encoded", ["1", "0 1", "1 0", "-1 2", "1 3 2 1", "5 1 1 1", "12 2", "x 1"])
 def test_rle_rejects_malformed_or_overlapping_runs(encoded: str) -> None:
     with pytest.raises(ValueError, match="RLE"):
         severstal.decode_rle(encoded, height=3, width=4)
@@ -90,9 +84,7 @@ def test_components_use_eight_connectivity_and_half_open_boxes() -> None:
 
 
 @pytest.mark.parametrize("legacy", [False, True])
-def test_source_conversion_preserves_backgrounds_classes_and_source_bytes(
-    tmp_path: Path, legacy: bool
-) -> None:
+def test_source_conversion_preserves_backgrounds_classes_and_source_bytes(tmp_path: Path, legacy: bool) -> None:
     source = _source(tmp_path / "source", count=10, legacy=legacy)
     original = (source / "train.csv").read_bytes()
     records = severstal.read_source(source)
@@ -112,9 +104,7 @@ def test_source_conversion_preserves_backgrounds_classes_and_source_bytes(
     ]
     assert (
         first_positive.source_sha256
-        == hashlib.sha256(
-            (source / "train_images" / first_positive.image_name).read_bytes()
-        ).hexdigest()
+        == hashlib.sha256((source / "train_images" / first_positive.image_name).read_bytes()).hexdigest()
     )
     assert (source / "train.csv").read_bytes() == original
 
@@ -129,9 +119,7 @@ def test_duplicate_image_class_annotation_is_rejected(tmp_path: Path) -> None:
 
 def test_unknown_or_unsafe_image_reference_is_rejected(tmp_path: Path) -> None:
     source = _source(tmp_path / "source", count=2)
-    (source / "train.csv").write_text(
-        "ImageId,ClassId,EncodedPixels\n../secret.png,1,1 1\n", encoding="utf-8"
-    )
+    (source / "train.csv").write_text("ImageId,ClassId,EncodedPixels\n../secret.png,1,1 1\n", encoding="utf-8")
     with pytest.raises(ValueError, match="image"):
         severstal.read_source(source)
 
@@ -233,10 +221,7 @@ def test_native_matrix_uses_every_registered_preset(tmp_path: Path) -> None:
     from clearml_yolo.core.models import PRESETS
 
     expected = {"ultralytics"} | {
-        f"{backend}/{preset}"
-        for backend, presets in PRESETS.items()
-        if backend != "ultralytics"
-        for preset in presets
+        f"{backend}/{preset}" for backend, presets in PRESETS.items() if backend != "ultralytics" for preset in presets
     }
     assert set(MODEL_SELECTIONS) == expected
     assert len(MODEL_SELECTIONS) == len(expected), "Native matrix must not duplicate presets"
@@ -251,9 +236,7 @@ def test_native_matrix_uses_every_registered_preset(tmp_path: Path) -> None:
             assert f"{prefix}.seed=0" in overrides
             assert ("transforms=albumentations" in overrides) == (variant != "default")
             for key in ("run_dir", "dataset_cache_dir"):
-                value = next(
-                    value.partition("=")[2] for value in overrides if value.startswith(f"{key}=")
-                )
+                value = next(value.partition("=")[2] for value in overrides if value.startswith(f"{key}="))
                 assert Path(json.loads(value)).is_relative_to(home)
 
 
@@ -327,9 +310,7 @@ def test_backbone_mapping_is_validated_and_frozen_between_variants(tmp_path: Pat
     first.write_bytes(b"first checkpoint")
     second.write_bytes(b"second checkpoint")
     configured = {"deimv2/l": first}
-    options = SeverstalOptions(
-        tmp_path, tmp_path, "acceptance", ("owned",), backbone_weights=configured
-    )
+    options = SeverstalOptions(tmp_path, tmp_path, "acceptance", ("owned",), backbone_weights=configured)
     configured["deimv2/l"] = second
     assert options.backbone_weights["deimv2/l"] == first.resolve()
     with pytest.raises(ValueError, match="supports only"):
@@ -351,9 +332,7 @@ def test_backbone_mapping_is_validated_and_frozen_between_variants(tmp_path: Pat
     ],
 )
 @pytest.mark.parametrize("variant", ["default", "json", "json_mosaic"])
-def test_backbone_override_composes_only_for_matching_selection(
-    tmp_path: Path, selection: str, variant: str
-) -> None:
+def test_backbone_override_composes_only_for_matching_selection(tmp_path: Path, selection: str, variant: str) -> None:
     from hydra import compose, initialize_config_module
     from hydra_zen import store
 
@@ -561,9 +540,7 @@ def test_publication_lookup_accepts_owned_collision_suffix_only(
 
     monkeypatch.setattr(Task, "get_tasks", get_tasks)
     with pytest.raises(AssertionError, match="exactly one"):
-        _verify_publication(
-            tmp_path, {"project": "owned", "task_name": "run.42", "tags": ["owned-tag"]}, {}
-        )
+        _verify_publication(tmp_path, {"project": "owned", "task_name": "run.42", "tags": ["owned-tag"]}, {})
     pattern = str(captured["task_name"])
     assert re.fullmatch(pattern, "run.42")
     assert re.fullmatch(pattern, "run.42-wise-meadow")

@@ -67,18 +67,12 @@ def _prepared(tmp_path: Path) -> PreparedDataset:
         }
         (folder / "_annotations.coco.json").write_text(json.dumps(payload))
     data = root / "data.yaml"
-    data.write_text(
-        yaml.safe_dump(
-            {"path": str(root), "train": "train", "val": "valid", "names": {0: "класс-01"}}
-        )
-    )
+    data.write_text(yaml.safe_dump({"path": str(root), "train": "train", "val": "valid", "names": {0: "класс-01"}}))
     truth = root / "truth.csv"
     truth.write_text("image_name,instance_label\n")
     manifest = root / "manifest.json"
     manifest.write_text("{}\n")
-    return PreparedDataset(
-        data=data, ground_truth=truth, manifest=manifest, dataset_format="coco", artifacts=[]
-    )
+    return PreparedDataset(data=data, ground_truth=truth, manifest=manifest, dataset_format="coco", artifacts=[])
 
 
 def test_backend_import_is_lazy(tmp_path: Path) -> None:
@@ -113,9 +107,7 @@ def test_coco_unicode_records_load_under_ascii_locale(tmp_path: Path) -> None:
             {
                 "images": [{"id": 1, "file_name": image_name, "height": 7, "width": 9}],
                 "categories": [{"id": 0, "name": class_name}],
-                "annotations": [
-                    {"image_id": 1, "category_id": 0, "bbox": [1, 2, 3, 4], "area": 12}
-                ],
+                "annotations": [{"image_id": 1, "category_id": 0, "bbox": [1, 2, 3, 4], "area": 12}],
             },
             ensure_ascii=False,
         ),
@@ -147,9 +139,7 @@ def test_coco_unicode_records_load_under_ascii_locale(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("preset", PRESETS)
-def test_every_backbone_has_exportable_stride_pyramid(
-    preset: str, single_thread_torch: Any
-) -> None:
+def test_every_backbone_has_exportable_stride_pyramid(preset: str, single_thread_torch: Any) -> None:
     from clearml_yolo.adapters.fasterrcnn.model import build_model
 
     torch = single_thread_torch
@@ -178,9 +168,7 @@ def test_letterbox_roundtrip_preserves_original_geometry(single_thread_torch: An
     transform = LetterboxTransform((64, 96))
     transform.eval()
     original = torch.tensor([[5.0, 10.0, 25.0, 40.0]])
-    images, targets = transform(
-        [torch.ones(3, 100, 50)], [{"boxes": original.clone(), "labels": torch.tensor([1])}]
-    )
+    images, targets = transform([torch.ones(3, 100, 50)], [{"boxes": original.clone(), "labels": torch.tensor([1])}])
     assert images.image_sizes == [(64, 32)]
     assert tuple(images.tensors.shape) == (1, 3, 64, 96)
     assert torch.count_nonzero(images.tensors[:, :, :, 32:]) == 0
@@ -200,9 +188,7 @@ def test_roi_pool_uses_canvas_strides_for_short_valid_images(single_thread_torch
         for index, (height, width) in enumerate(((16, 24), (8, 12), (4, 6), (2, 3)))
     }
     boxes = [torch.tensor([[4.0, 2.0, 24.0, 12.0]])]
-    expected = ops.roi_align(
-        features["0"], boxes, output_size=7, spatial_scale=0.25, sampling_ratio=2
-    )
+    expected = ops.roi_align(features["0"], boxes, output_size=7, spatial_scale=0.25, sampling_ratio=2)
     actual = model.roi_heads.box_roi_pool(features, boxes, [(16, 96)])
     torch.testing.assert_close(actual, expected)
 
@@ -251,9 +237,7 @@ def test_native_training_updates_weights_and_reloads_all_presets(
     assert checkpoint["selection_metric"] == result.metrics["val/map50_95"]
     assert 0 <= result.metrics["val/map50_95"] <= 1
     assert any(name == "train/loss" for name, _, _ in emitted)
-    paths = [
-        str(prepared.data.parent / "valid" / filename) for filename in ("object.png", "empty.png")
-    ]
+    paths = [str(prepared.data.parent / "valid" / filename) for filename in ("object.png", "empty.png")]
     frame = predict(
         config,
         result.metadata,
@@ -297,9 +281,7 @@ def test_prediction_rejects_unknown_preprocessing_instead_of_ignoring_it(tmp_pat
         predict(config, descriptor, tmp_path / "absent.pth", [], PredictSettings(device="cpu"))
 
 
-def test_training_ema_accumulation_and_callback_failures_are_explicit(
-    tmp_path: Path, single_thread_torch: Any
-) -> None:
+def test_training_ema_accumulation_and_callback_failures_are_explicit(tmp_path: Path, single_thread_torch: Any) -> None:
     from clearml_yolo.adapters.fasterrcnn.backend import train
 
     config = ModelConfig.model_validate(

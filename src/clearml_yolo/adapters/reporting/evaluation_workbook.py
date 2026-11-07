@@ -18,9 +18,7 @@ from clearml_yolo.core.evaluation.models import EvaluatedSplit
 
 
 @trace_operation("report.candidate.workbook")
-def write_candidate_workbook(
-    path: Path, per_class: pd.DataFrame, summary: dict[str, float]
-) -> None:
+def write_candidate_workbook(path: Path, per_class: pd.DataFrame, summary: dict[str, float]) -> None:
     """Retain candidate diagnostics when no automatic baseline is available."""
     path = write_path(path)
     with pd.ExcelWriter(path, engine="openpyxl") as writer:
@@ -30,9 +28,7 @@ def write_candidate_workbook(
 
 
 @trace_operation("report.evaluation.workbook")
-def write_evaluation_workbook(
-    path: Path, evaluated: EvaluatedSplit, *, methodology: dict[str, Any]
-) -> dict[str, Path]:
+def write_evaluation_workbook(path: Path, evaluated: EvaluatedSplit, *, methodology: dict[str, Any]) -> dict[str, Path]:
     """Write metric tables to Excel and row-level evidence/metadata to CSV."""
     path = write_path(path)
     for title in ("ground_truth_matches", "prediction_matches", "thresholds", "methodology"):
@@ -54,9 +50,7 @@ def write_evaluation_workbook(
         )
     per_class, summary = summarize_metrics(evaluated.metrics)
     confusion = read_dashboard(evaluated.confusion_matrix_path, index_col=0)
-    thresholds = pd.DataFrame(
-        sorted(evaluated.thresholds.items()), columns=["class_name", "confidence"]
-    )
+    thresholds = pd.DataFrame(sorted(evaluated.thresholds.items()), columns=["class_name", "confidence"])
     summary_frame = pd.DataFrame([summary])
     per_class_frame = per_class.rename_axis("class_name").reset_index()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -85,8 +79,6 @@ def _methodology_frame(values: dict[str, Any]) -> pd.DataFrame:
     return pd.DataFrame(
         {
             "parameter": list(values),
-            "value": [
-                json.dumps(value, ensure_ascii=False, sort_keys=True) for value in values.values()
-            ],
+            "value": [json.dumps(value, ensure_ascii=False, sort_keys=True) for value in values.values()],
         }
     )

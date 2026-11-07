@@ -66,9 +66,7 @@ def tag_multirun_job(config: DictConfig, tag: str) -> None:
             config.clearml.tags = [*tags, tag]
 
 
-def compose_jobs(
-    name: str, overrides: list[str], *, multirun: bool
-) -> tuple[bool, tuple[DictConfig, ...]]:
+def compose_jobs(name: str, overrides: list[str], *, multirun: bool) -> tuple[bool, tuple[DictConfig, ...]]:
     """Compose complete jobs in an initialized Hydra context, without launching.
 
     Like Hydra, probe mode with sweep syntax permitted; an explicit -m takes
@@ -104,18 +102,13 @@ def compose_jobs(
         )
         if configuration.hydra[plugin]._target_ != expected:
             raise ValueError(
-                "cy supports sequential BasicSweeper/BasicLauncher sweeps; "
-                "use cy-queue for concurrent execution"
+                "cy supports sequential BasicSweeper/BasicLauncher sweeps; use cy-queue for concurrent execution"
             )
     parameters = configuration.hydra.sweeper.get("params") or {}
     arguments = [f"{key}={value}" for key, value in parameters.items()]
     arguments.extend(task_overrides(configuration))
     batches = BasicSweeper.split_arguments(parser.parse_overrides(arguments), None)
-    jobs = tuple(
-        hydra.config_loader.load_sweep_config(configuration, values)
-        for batch in batches
-        for values in batch
-    )
+    jobs = tuple(hydra.config_loader.load_sweep_config(configuration, values) for batch in batches for values in batch)
     if not jobs:
         raise ValueError("Hydra sweep must produce at least one job")
     return True, jobs

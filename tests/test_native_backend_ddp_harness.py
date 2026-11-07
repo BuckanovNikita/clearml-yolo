@@ -26,9 +26,7 @@ from native_backend_ddp_harness import (
 )
 
 
-def _evidence(
-    tmp_path: Path, selection: str = "fcos/resnet50_fpn"
-) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+def _evidence(tmp_path: Path, selection: str = "fcos/resnet50_fpn") -> tuple[dict[str, Any], list[dict[str, Any]]]:
     request = request_document(GPUOptions("0,1", "native-tests", tmp_path), selection, "none")
     request["uuids"] = ["GPU-a", "GPU-b"]
     ranks = [
@@ -64,9 +62,7 @@ def _evidence(
 
 
 @pytest.mark.parametrize("selection", SELECTIONS)
-def test_public_pipeline_commands_select_actual_native_global_batch(
-    tmp_path: Path, selection: str
-) -> None:
+def test_public_pipeline_commands_select_actual_native_global_batch(tmp_path: Path, selection: str) -> None:
     request = request_document(GPUOptions("3,1", "owned", tmp_path), selection, "none")
     argv = pipeline_arguments(tmp_path, request)
     assert argv[1:3] == ["-m", "clearml_yolo.entrypoints.pipeline"]
@@ -98,9 +94,7 @@ def test_rank_wrapper_preserves_production_requests_and_supervision(tmp_path: Pa
     assert wrapped.environment == command.environment
     assert wrapped.log_path == command.log_path
     with pytest.raises(ValueError, match="unexpected"):
-        instrument_command(
-            WorkerCommand(argv=("wrong",), environment={}, log_path=command.log_path)
-        )
+        instrument_command(WorkerCommand(argv=("wrong",), environment={}, log_path=command.log_path))
 
 
 @pytest.mark.parametrize("selection", SELECTIONS)
@@ -133,9 +127,7 @@ def test_consistent_native_rank_evidence_passes(tmp_path: Path, selection: str) 
         ("train_labels", [1], "class zero"),
     ],
 )
-def test_bad_rank_evidence_is_rejected(
-    tmp_path: Path, field: str, value: Any, message: str
-) -> None:
+def test_bad_rank_evidence_is_rejected(tmp_path: Path, field: str, value: Any, message: str) -> None:
     request, ranks = _evidence(tmp_path)
     ranks[1][field] = value
     with pytest.raises(AssertionError, match=message):
@@ -182,9 +174,7 @@ def test_real_owner_and_checkpoint_readback_contract(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("fault", ["crash", "oom", "cancel"])
-def test_fault_requires_matching_native_observation_and_failed_exit(
-    tmp_path: Path, fault: Any
-) -> None:
+def test_fault_requires_matching_native_observation_and_failed_exit(tmp_path: Path, fault: Any) -> None:
     request = request_document(GPUOptions("0,1", "owned", tmp_path), SELECTIONS[0], fault)
     event = {
         "kind": f"fault-{fault}",
@@ -215,9 +205,7 @@ def test_native_public_command_composes_without_execution(tmp_path: Path, select
     request = request_document(GPUOptions("0,1", "owned", tmp_path), selection, "none")
     store.add_to_hydra_store(overwrite_ok=True)
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
-        config = compose(
-            config_name="pipeline", overrides=pipeline_arguments(tmp_path, request)[3:]
-        )
+        config = compose(config_name="pipeline", overrides=pipeline_arguments(tmp_path, request)[3:])
     assert f"{config.model.backend}/{config.model.preset}" == selection
     assert config.model.train.batch == 4
     assert config.model.train.device == [0, 1]
@@ -275,10 +263,7 @@ def test_owner_wrapper_forwards_live_ownership_monitor_unchanged(
         environment={"RANK": "1"},
         log_path=tmp_path / "rank.log",
     )
-    assert (
-        module.run_workers([command], monitor=monitor, timeout_seconds=17)
-        == "real-supervisor-result"
-    )
+    assert module.run_workers([command], monitor=monitor, timeout_seconds=17) == "real-supervisor-result"
     assert observed["monitor"] is monitor
     assert observed["monitor"](lambda: (123, 456)) == (123, 456)
     assert observed["timeout_seconds"] == 17
@@ -335,9 +320,7 @@ def test_cpu_observer_tracks_real_updates_hashes_and_original_samples(
     monkeypatch.setattr(torch.distributed, "get_backend", lambda: "nccl")
     monkeypatch.setattr(torch.distributed, "get_world_size", lambda: 2)
     monkeypatch.setattr(torch.cuda, "current_device", lambda: 1)
-    monkeypatch.setattr(
-        torch.cuda, "get_device_properties", lambda _rank: SimpleNamespace(uuid="b")
-    )
+    monkeypatch.setattr(torch.cuda, "get_device_properties", lambda _rank: SimpleNamespace(uuid="b"))
     observer.start(model, optimizer, lambda: (ema.module, int(ema.n_averaged)))
     model(torch.ones(1, 2)).sum().backward()
     optimizer.step()
@@ -387,9 +370,7 @@ def test_cpu_fault_gate_waits_for_release_and_records_specific_failure(
             observer._fault_gate()
         assert caught.value.code == 73
     else:
-        monkeypatch.setattr(
-            torch.cuda, "get_device_properties", lambda _rank: SimpleNamespace(total_memory=100)
-        )
+        monkeypatch.setattr(torch.cuda, "get_device_properties", lambda _rank: SimpleNamespace(total_memory=100))
 
         def allocation(size: int, **kwargs: Any) -> None:
             assert size == 200
@@ -403,9 +384,7 @@ def test_cpu_fault_gate_waits_for_release_and_records_specific_failure(
 
 
 @pytest.mark.parametrize("world", [2, 3, 4])
-def test_rfdetr_fixture_meets_native_minimum_without_repeated_samples(
-    tmp_path: Path, world: int
-) -> None:
+def test_rfdetr_fixture_meets_native_minimum_without_repeated_samples(tmp_path: Path, world: int) -> None:
     import torch
 
     native: Any = importlib.import_module("rfdetr.training.module_data")

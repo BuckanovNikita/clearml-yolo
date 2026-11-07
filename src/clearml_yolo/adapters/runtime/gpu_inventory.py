@@ -111,9 +111,7 @@ def discover_gpus() -> tuple[GPUDevice, ...]:
         if state is None:
             raise RuntimeError("Visible CUDA device lacks whole-GPU telemetry (MIG unsupported)")
         devices.append(
-            GPUDevice.model_validate(
-                record | {"used_memory_bytes": state.used, "utilization": state.utilization}
-            )
+            GPUDevice.model_validate(record | {"used_memory_bytes": state.used, "utilization": state.utilization})
         )
     if not devices:
         raise RuntimeError("No visible CUDA GPUs; batch estimation requires idle GPUs")
@@ -141,8 +139,10 @@ def require_idle(devices: tuple[GPUDevice, ...], *, force: bool = False) -> tupl
 
 
 def monitor_devices(
-    devices: tuple[GPUDevice, ...], owned_pids: Callable[[], tuple[int, ...]],
-    *, force: bool = False,
+    devices: tuple[GPUDevice, ...],
+    owned_pids: Callable[[], tuple[int, ...]],
+    *,
+    force: bool = False,
 ) -> tuple[int, ...]:
     """Reject foreign compute; force permits activity with no attributable PID."""
     states = gpu_states()
@@ -156,12 +156,8 @@ def monitor_devices(
             raise RuntimeError(f"GPU {device.index} telemetry disappeared during the trial")
         foreign = state.pids - owners
         if foreign:
-            raise RuntimeError(
-                f"GPU {device.index} measurement contaminated by foreign PIDs {sorted(foreign)}"
-            )
+            raise RuntimeError(f"GPU {device.index} measurement contaminated by foreign PIDs {sorted(foreign)}")
         if state.utilization and not state.pids and not force:
-            raise RuntimeError(
-                f"GPU {device.index} measurement contaminated: active compute has no PID telemetry"
-            )
+            raise RuntimeError(f"GPU {device.index} measurement contaminated: active compute has no PID telemetry")
         peaks.append(state.used)
     return tuple(peaks)

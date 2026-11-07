@@ -32,14 +32,11 @@ MEANINGS = {
         "нужен положительный integer."
     ),
     "imgsz": (
-        "Размер входного изображения; CY по умолчанию использует 960. Предсказание "
-        "допускает пару высота/ширина."
+        "Размер входного изображения; CY по умолчанию использует 960. Предсказание допускает пару высота/ширина."
     ),
     "save": "Сохранять нативные результаты; публикацией CY управляет владелец запуска.",
     "save_period": "Интервал сохранения промежуточных весов в эпохах; -1 отключает.",
-    "cache": (
-        "Кэш изображений Ultralytics: false, true, ram или disk; не путать с dataset_cache_dir CY."
-    ),
+    "cache": ("Кэш изображений Ultralytics: false, true, ram или disk; не путать с dataset_cache_dir CY."),
     "device": (
         "Устройство: cpu, индекс CUDA, список индексов или null. Обучение и "
         "предсказание выбирают устройства независимо; -1 использует нативный "
@@ -48,10 +45,7 @@ MEANINGS = {
     "workers": "Число процессов загрузки данных.",
     "project": "Нативный корень результатов; маршрутизацией каталога владеет CY.",
     "name": "Нативное имя запуска; итоговый каталог назначает CY.",
-    "exist_ok": (
-        "Разрешить Ultralytics существующий каталог результата; изоляция запуска "
-        "остаётся обязанностью CY."
-    ),
+    "exist_ok": ("Разрешить Ultralytics существующий каталог результата; изоляция запуска остаётся обязанностью CY."),
     "pretrained": "Использовать предобученную инициализацию: boolean или путь к весам.",
     "optimizer": "Оптимизатор Ultralytics, например auto, SGD или AdamW.",
     "verbose": "Подробный нативный вывод.",
@@ -61,22 +55,13 @@ MEANINGS = {
     "rect": "Использовать прямоугольные пакеты вместо квадратного дополнения.",
     "cos_lr": "Косинусное расписание learning rate.",
     "close_mosaic": "Отключить Mosaic за указанное число эпох до завершения.",
-    "resume": (
-        "Продолжение нативного запуска; CSV-обучение CY не поддерживает resume, "
-        "используйте fine-tuning весов."
-    ),
+    "resume": ("Продолжение нативного запуска; CSV-обучение CY не поддерживает resume, используйте fine-tuning весов."),
     "amp": "Смешанная точность: boolean или fp16/bf16/fp32, согласно нативному backend.",
-    "fraction": (
-        "Доля или количество изображений; допускается список train/val[/test]. "
-        "CSV-членством управляет CY."
-    ),
+    "fraction": ("Доля или количество изображений; допускается список train/val[/test]. CSV-членством управляет CY."),
     "profile": "Включить нативное профилирование.",
     "freeze": "Заморозить первые N слоёв или список индексов; null не замораживает.",
     "multi_scale": "Диапазон изменения масштаба изображения во время обучения.",
-    "compile": (
-        "Компиляция PyTorch: boolean или строка режима. CY задаёт true; при проблемах "
-        "начните с false."
-    ),
+    "compile": ("Компиляция PyTorch: boolean или строка режима. CY задаёт true; при проблемах начните с false."),
     "channels_last": "Использовать формат памяти channels-last в нативном backend.",
     "cls_remap": "Разрешить нативное переназначение классов предобученной головы.",
     "val": "Выполнять внутреннюю нативную валидацию во время обучения.",
@@ -88,16 +73,10 @@ MEANINGS = {
     ),
     "iou": "Порог IoU для нативного подавления пересекающихся рамок (NMS).",
     "max_det": "Максимальное число детекций на изображение.",
-    "quantize": (
-        "Нативный режим квантования, например fp32, fp16 или int8; поддержка зависит от "
-        "модели/runtime."
-    ),
+    "quantize": ("Нативный режим квантования, например fp32, fp16 или int8; поддержка зависит от модели/runtime."),
     "nms": "Включить нативное NMS; CY по умолчанию true.",
     "plots": "Создавать нативные графики обучения и валидации.",
-    "source": (
-        "Нативный источник изображений; в CY членство задаётся ground_truth, значение "
-        "должно оставаться null."
-    ),
+    "source": ("Нативный источник изображений; в CY членство задаётся ground_truth, значение должно оставаться null."),
     "dnn": "Использовать OpenCV DNN при поддерживаемом формате модели.",
     "show": "Показывать изображения в нативном графическом окне.",
     "save_txt": "Сохранять нативные детекции в текстовом формате.",
@@ -137,14 +116,12 @@ MEANINGS = {
     "fliplr": "Вероятность горизонтального отражения.",
     "bgr": "Вероятность перестановки цветовых каналов RGB/BGR.",
     "mosaic": (
-        "Вероятность нативного Mosaic; пользовательский Albumentations заменяет "
-        "случайные нативные аугментации."
+        "Вероятность нативного Mosaic; пользовательский Albumentations заменяет случайные нативные аугментации."
     ),
     "mixup": "Вероятность смешивания изображений MixUp.",
     "cutmix": "Вероятность смешивания областей CutMix.",
     "augmentations": (
-        "Дополнительный нативный список аугментаций; общим Albumentations-конвейером "
-        "управляет transforms."
+        "Дополнительный нативный список аугментаций; общим Albumentations-конвейером управляет transforms."
     ),
     "overlap_mask": "Объединение пересекающихся масок сегментации.",
     "mask_ratio": "Масштаб уменьшения масок сегментации.",
@@ -165,9 +142,7 @@ MEANINGS = {
     "embed": "Индексы слоёв embeddings; ненулевое значение не поддерживается detection records CY.",
     "save_frames": "Сохранение кадров видео; не применяется к CSV-предсказаниям.",
     "retina_masks": "Маски сегментации повышенного разрешения.",
-    "format": (
-        "Нативный формат экспорта Ultralytics; отдельный cy-export имеет собственный контракт."
-    ),
+    "format": ("Нативный формат экспорта Ultralytics; отдельный cy-export имеет собственный контракт."),
     "optimize": "Нативная мобильная оптимизация экспорта.",
     "dynamic": "Динамические размеры нативного экспорта.",
     "simplify": "Упрощение графа при нативном экспорте.",
@@ -247,9 +222,7 @@ def _upstream_annotations() -> dict[str, tuple[str, str]]:
 
 def native_fields(commands: list[str]) -> list[FieldDoc]:
     if set(MEANINGS) != KNOWN_KEYS:
-        raise ValueError(
-            f"Native documentation coverage mismatch: {sorted(set(MEANINGS) ^ KNOWN_KEYS)}"
-        )
+        raise ValueError(f"Native documentation coverage mismatch: {sorted(set(MEANINGS) ^ KNOWN_KEYS)}")
     defaults: dict[str, Any] = native_defaults() | {"augmentations": []}
     annotations = _upstream_annotations()
     result = []
@@ -263,12 +236,7 @@ def native_fields(commands: list[str]) -> list[FieldDoc]:
             applicability = (
                 "Не применяется в этом этапе; сохраняется для совместимости нативного YAML."
                 if inactive
-                else "YOLO: "
-                + (
-                    "обучение и внутренняя валидация."
-                    if group == "ultralytics"
-                    else "предсказание."
-                )
+                else "YOLO: " + ("обучение и внутренняя валидация." if group == "ultralytics" else "предсказание.")
             )
             if key in INACTIVE_KEYS:
                 applicability += " Не относится к detection-сценарию CY."
@@ -288,10 +256,7 @@ def native_fields(commands: list[str]) -> list[FieldDoc]:
                     ),
                     applicability=applicability,
                     examples=[value],
-                    source=(
-                        f"clearml_yolo.adapters.yolo.config:{key}; "
-                        "installed ultralytics/cfg/default.yaml"
-                    ),
+                    source=(f"clearml_yolo.adapters.yolo.config:{key}; installed ultralytics/cfg/default.yaml"),
                     commands=commands,
                 )
             )

@@ -97,9 +97,7 @@ def test_custom_profile_overrides_competing_native_settings(tmp_path: Path) -> N
 
 
 @pytest.mark.parametrize("selection", ["ultralytics", "rfdetr/nano"])
-def test_exported_profiles_can_switch_without_wrapper_shadowing(
-    selection: str, tmp_path: Path
-) -> None:
+def test_exported_profiles_can_switch_without_wrapper_shadowing(selection: str, tmp_path: Path) -> None:
     pipeline = tmp_path / "pipeline.json"
     _pipeline(pipeline)
     folder = tmp_path / "config"
@@ -116,9 +114,7 @@ def test_exported_profiles_can_switch_without_wrapper_shadowing(
         assert config.model.train.augmentation.scale_jitter is False
 
 
-@pytest.mark.parametrize(
-    "selection", ["ultralytics", "deimv2/s", "rfdetr/nano", "fasterrcnn/resnet50_fpn"]
-)
+@pytest.mark.parametrize("selection", ["ultralytics", "deimv2/s", "rfdetr/nano", "fasterrcnn/resnet50_fpn"])
 def test_canonical_agent_replay_preserves_pipeline_without_local_file(
     selection: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

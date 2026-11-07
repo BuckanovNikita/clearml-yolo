@@ -39,9 +39,7 @@ class _Worker:
 
 def _tree(worker: _Worker) -> LinuxProcessTree:
     if worker.tree is None:
-        worker.tree = ScopedProcessTree(
-            worker.process.pid, worker.token, subreaper=os.getpid(), owner_env=_CASE_OWNER
-        )
+        worker.tree = ScopedProcessTree(worker.process.pid, worker.token, subreaper=os.getpid(), owner_env=_CASE_OWNER)
     return worker.tree
 
 
@@ -126,9 +124,7 @@ class IndependentWorkerPool:
             except Exception as error:
                 failures = _cleanup(worker)
                 if failures:
-                    raise ExceptionGroup(
-                        "Worker startup and cleanup failed", [error, *failures]
-                    ) from None
+                    raise ExceptionGroup("Worker startup and cleanup failed", [error, *failures]) from None
                 del self._workers[key]
                 raise
 

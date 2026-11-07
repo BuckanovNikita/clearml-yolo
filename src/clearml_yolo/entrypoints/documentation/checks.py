@@ -38,9 +38,7 @@ def _tutorial_errors(tutorial: TutorialDoc, paths: set[str], pages: set[str]) ->
         "Проверка",
     )
     errors.extend(
-        f"Missing tutorial section {heading}: {tutorial.file}"
-        for heading in headings
-        if heading not in content
+        f"Missing tutorial section {heading}: {tutorial.file}" for heading in headings if heading not in content
     )
     links = _Links()
     links.feed(page)
@@ -67,11 +65,7 @@ def _tutorial_errors(tutorial: TutorialDoc, paths: set[str], pages: set[str]) ->
 
 def check_catalog(catalog: Catalog) -> list[str]:
     check_coverage(catalog)
-    errors = [
-        f"Empty asset: {asset}"
-        for asset in ("index.html", "app.js", "style.css")
-        if not asset_bytes(asset)
-    ]
+    errors = [f"Empty asset: {asset}" for asset in ("index.html", "app.js", "style.css") if not asset_bytes(asset)]
     paths = {item.path for item in catalog.fields}
     pages = {item.file.removesuffix(".md") + ".html" for item in catalog.tutorials}
     for tutorial in catalog.tutorials:

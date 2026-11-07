@@ -47,16 +47,10 @@ def export_onnx(
     tensor_adapter = importlib.import_module("clearml_yolo.adapters.export.tensors")
     source = copy.deepcopy(model).cpu().float().eval()
     native_models = importlib.import_module("clearml_yolo.adapters.fasterrcnn.model")
-    if (
-        isinstance(source.backbone, native_models.FeaturePyramid)
-        and source.backbone.preset == "dinov2_small"
-    ):
+    if isinstance(source.backbone, native_models.FeaturePyramid) and source.backbone.preset == "dinov2_small":
         positions = importlib.import_module("clearml_yolo.adapters.export.positions")
         source.backbone.body = positions.ExportViTIntermediates(source.backbone.body)
-    elif (
-        isinstance(source.backbone, native_models.FeaturePyramid)
-        and source.backbone.preset == "dinov3_small"
-    ):
+    elif isinstance(source.backbone, native_models.FeaturePyramid) and source.backbone.preset == "dinov3_small":
         positions = importlib.import_module("clearml_yolo.adapters.export.positions")
         if tuple(source.backbone.body.patch_embed.patch_size) != (16, 16):
             raise ValueError("DINOv3 export requires its native patch16 embedding")
@@ -65,10 +59,7 @@ def export_onnx(
         # intermediate-grid reshape while preserving all permitted-input numerics.
         source.backbone.body.patch_embed.dynamic_img_pad = False
         source.backbone.body.rope = positions.ExportDinoRotary(source.backbone.body.rope)
-    elif (
-        isinstance(source.backbone, native_models.FeaturePyramid)
-        and source.backbone.preset == "swin_tiny"
-    ):
+    elif isinstance(source.backbone, native_models.FeaturePyramid) and source.backbone.preset == "swin_tiny":
         swin = importlib.import_module("clearml_yolo.adapters.export.swin")
         swin.adapt_swin_blocks(source.backbone.body)
     adapter = tensor_adapter.TensorizedDetector(source).eval()

@@ -202,12 +202,8 @@ def _row(
         "tp_candidate": candidate_counts.tp if candidate_counts is not None else math.nan,
         "fp_candidate": candidate_counts.fp if candidate_counts is not None else math.nan,
         "fn_candidate": candidate_counts.fn if candidate_counts is not None else math.nan,
-        "precision_baseline": _precision(baseline_counts)
-        if baseline_counts is not None
-        else math.nan,
-        "precision_candidate": _precision(candidate_counts)
-        if candidate_counts is not None
-        else math.nan,
+        "precision_baseline": _precision(baseline_counts) if baseline_counts is not None else math.nan,
+        "precision_candidate": _precision(candidate_counts) if candidate_counts is not None else math.nan,
         "precision_delta": precision.delta,
         "precision_ci_lower": precision.ci_lower,
         "precision_ci_upper": precision.ci_upper,
@@ -318,13 +314,9 @@ def build_comparison_rows_with_statistics(
     compared: list[str] = []
     excluded_rows: list[dict[str, str]] = []
     known_to_baseline = baseline_classes if baseline_classes is not None else set(baseline.counts)
-    known_to_candidate = (
-        candidate_classes if candidate_classes is not None else set(candidate.counts)
-    )
+    known_to_candidate = candidate_classes if candidate_classes is not None else set(candidate.counts)
 
-    display_classes = sorted(
-        set(baseline.counts) | set(candidate.counts) | known_to_baseline | known_to_candidate
-    )
+    display_classes = sorted(set(baseline.counts) | set(candidate.counts) | known_to_baseline | known_to_candidate)
     for class_name in display_classes:
         reason = _exclusion_reason(
             class_name,
@@ -357,12 +349,8 @@ def build_comparison_rows_with_statistics(
         rows.append(
             _row(
                 class_name,
-                baseline.counts.get(class_name, ClassCounts())
-                if class_name in known_to_baseline
-                else None,
-                candidate.counts.get(class_name, ClassCounts())
-                if class_name in known_to_candidate
-                else None,
+                baseline.counts.get(class_name, ClassCounts()) if class_name in known_to_baseline else None,
+                candidate.counts.get(class_name, ClassCounts()) if class_name in known_to_candidate else None,
                 thresholds_baseline,
                 thresholds_candidate,
                 precision,
@@ -433,9 +421,7 @@ def build_comparison_rows_with_statistics(
     )
 
 
-def _adjust_family(
-    frame: pd.DataFrame, q: float, statistics: ComparisonStatistics | None = None
-) -> int:
+def _adjust_family(frame: pd.DataFrame, q: float, statistics: ComparisonStatistics | None = None) -> int:
     """Correct every hypothesis of the split at once and write the verdicts back.
 
     Both metrics of every class enter one family: correcting precision and recall
@@ -454,8 +440,6 @@ def _adjust_family(
     for metric in ("precision", "recall"):
         frame[f"{metric}_verdict"] = [
             _verdict(delta, adjusted_p, q)
-            for delta, adjusted_p in zip(
-                frame[f"{metric}_delta"], frame[f"{metric}_p_bh"], strict=True
-            )
+            for delta, adjusted_p in zip(frame[f"{metric}_delta"], frame[f"{metric}_p_bh"], strict=True)
         ]
     return int(sum(1 for value in adjusted if not math.isnan(value)))

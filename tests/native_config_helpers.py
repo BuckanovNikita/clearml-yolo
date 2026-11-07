@@ -12,9 +12,7 @@ def training_settings(**overrides: Any) -> dict[str, Any]:
 
 
 def prediction_config(**overrides: Any) -> dict[str, Any]:
-    config = OmegaConf.create(
-        {"ultralytics": native_defaults(), "ultralytics_predict": prediction_defaults()}
-    )
+    config = OmegaConf.create({"ultralytics": native_defaults(), "ultralytics_predict": prediction_defaults()})
     values = OmegaConf.to_container(config.ultralytics_predict, resolve=True)
     assert isinstance(values, dict)
     return {str(key): value for key, value in values.items()} | overrides

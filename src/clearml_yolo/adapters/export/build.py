@@ -51,9 +51,7 @@ def _add_profiles(builder: Any, config: Any, profiles: tuple[OptimizationProfile
         # The Python setter returns None on success and raises ValueError for
         # invalid bounds; unlike its C++ counterpart, it does not return a bool.
         native.set_shape("images", profile.minimum, profile.optimum, profile.maximum)
-        sizes = tuple(
-            (shape[0], 2) for shape in (profile.minimum, profile.optimum, profile.maximum)
-        )
+        sizes = tuple((shape[0], 2) for shape in (profile.minimum, profile.optimum, profile.maximum))
         native.set_shape("image_sizes", *sizes)
         if config.add_optimization_profile(native) < 0:
             raise RuntimeError("TensorRT rejected optimization profile")

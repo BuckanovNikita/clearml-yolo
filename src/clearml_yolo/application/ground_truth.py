@@ -36,8 +36,7 @@ def resolve_ground_truth(
     if isinstance(normalized, Path):
         deps.resources.log(
             "WARNING",
-            "Using local ground-truth CSV {}; prefer a ClearML dataset reference "
-            "for versioned annotations.",
+            "Using local ground-truth CSV {}; prefer a ClearML dataset reference for versioned annotations.",
             normalized,
         )
         return ResolvedGroundTruth(path=normalized)

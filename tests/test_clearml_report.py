@@ -26,9 +26,7 @@ class _FakeLogger:
         self.scalars: list[dict[str, Any]] = []
         self.single_values: dict[str, float] = {}
 
-    def report_table(
-        self, title: str, series: str, iteration: int, table_plot: pd.DataFrame
-    ) -> None:
+    def report_table(self, title: str, series: str, iteration: int, table_plot: pd.DataFrame) -> None:
         self.tables.append({"title": title, "series": series, "frame": table_plot})
 
     def report_scalar(self, title: str, series: str, value: float, iteration: int) -> None:
@@ -192,9 +190,7 @@ def test_scalar_aliases_survive_subsets_reordering_and_later_literal_collisions(
     assert records[0]["series"] != records[1]["series"]
     assert records[1]["series"] == records[2]["series"] == records[3]["series"]
     assert records[0]["series"] == records[4]["series"]
-    assert (
-        len({record["series"] for record in (records[0], records[1], records[5], records[6])}) == 4
-    )
+    assert len({record["series"] for record in (records[0], records[1], records[5], records[6])}) == 4
     assert len({records[index]["title"] for index in (0, 7, 8)}) == 3
     assert [record["value"] for record in records] == [0.125, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3]
     assert all(name not in str(records) for name in names[:2])

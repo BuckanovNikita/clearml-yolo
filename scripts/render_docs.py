@@ -9,10 +9,7 @@ from markdown_it import MarkdownIt
 
 
 def main() -> None:
-    root = (
-        Path(__file__).resolve().parents[1]
-        / "src/clearml_yolo/adapters/documentation/assets/tutorials"
-    )
+    root = Path(__file__).resolve().parents[1] / "src/clearml_yolo/adapters/documentation/assets/tutorials"
     inventory = json.loads((root / "inventory.json").read_text(encoding="utf-8"))
     renderer = MarkdownIt("commonmark", {"html": False}).enable("table")
     for tutorial in inventory:

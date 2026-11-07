@@ -41,9 +41,7 @@ def preview_directory(documents: Mapping[str, str]) -> Iterator[Path]:
     if len(documents) > MAX_DOCUMENTS:
         raise ValueError("At most 32 preview documents are allowed")
     names = [document_name(name) for name in documents]
-    if sum(len(name.encode()) + len(value.encode()) for name, value in documents.items()) > (
-        MAX_REQUEST_BYTES
-    ):
+    if sum(len(name.encode()) + len(value.encode()) for name, value in documents.items()) > (MAX_REQUEST_BYTES):
         raise ValueError("Preview documents exceed 1 MiB")
     for name in names:
         if any(parent.as_posix() in documents for parent in PurePosixPath(name).parents):

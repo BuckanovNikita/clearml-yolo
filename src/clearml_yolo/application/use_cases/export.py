@@ -14,9 +14,7 @@ def _validate_inputs(
     weights: str | Path | None,
     ground_truth: GroundTruthInput | None,
 ) -> GroundTruthInput | None:
-    settings.validate_input_presence(
-        has_weights=weights is not None, has_ground_truth=ground_truth is not None
-    )
+    settings.validate_input_presence(has_weights=weights is not None, has_ground_truth=ground_truth is not None)
     return normalize_ground_truth(ground_truth) if ground_truth is not None else None
 
 
@@ -29,17 +27,12 @@ def export_model(
     *,
     deps: WorkflowDependencies,
 ) -> ExportResult:
-    settings = (
-        export if isinstance(export, ExportSettings) else ExportSettings.model_validate(export)
-    )
+    settings = export if isinstance(export, ExportSettings) else ExportSettings.model_validate(export)
     ground_truth = _validate_inputs(settings, weights, ground_truth)
     if deps.exporter is None:
         raise ValueError("This dependency bundle does not provide detector export")
     task = deps.tracking.init_task(clearml, stage="export")
-    resolved_truth = (
-        resolve_ground_truth(ground_truth, task=task, deps=deps)
-        if ground_truth is not None else None
-    )
+    resolved_truth = resolve_ground_truth(ground_truth, task=task, deps=deps) if ground_truth is not None else None
     request = ExportRequest(
         **settings.model_dump(),
         weights=Path(weights) if weights is not None else None,

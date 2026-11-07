@@ -18,9 +18,7 @@ def _resize(values: NDArray[np.float32], size: tuple[int, int]) -> NDArray[np.fl
     axes = []
     for source, target in zip(values.shape[-2:], size, strict=True):
         scale = np.float32(source / target)
-        coordinate = (np.arange(target, dtype=np.float32) + np.float32(0.5)) * scale - np.float32(
-            0.5
-        )
+        coordinate = (np.arange(target, dtype=np.float32) + np.float32(0.5)) * scale - np.float32(0.5)
         coordinate = np.maximum(coordinate, np.float32(0))
         lower = coordinate.astype(np.int64)
         upper = np.minimum(lower + 1, source - 1)
@@ -29,10 +27,7 @@ def _resize(values: NDArray[np.float32], size: tuple[int, int]) -> NDArray[np.fl
     low, high, weight = axes[1]
     horizontal = values[:, :, low] * (1 - weight) + values[:, :, high] * weight
     low, high, weight = axes[0]
-    result = (
-        horizontal[:, low, :] * (1 - weight[None, :, None])
-        + horizontal[:, high, :] * weight[None, :, None]
-    )
+    result = horizontal[:, low, :] * (1 - weight[None, :, None]) + horizontal[:, high, :] * weight[None, :, None]
     return cast(NDArray[np.float32], result)
 
 
@@ -51,11 +46,7 @@ def preprocess(
         raise ValueError("Preprocessing requires batch 1-4 and a positive stride32 canvas")
     mean_array = np.array(mean, dtype=np.float32)[:, None, None]
     std_array = np.array(std, dtype=np.float32)[:, None, None]
-    if (
-        not np.isfinite(mean_array).all()
-        or not np.isfinite(std_array).all()
-        or np.any(std_array <= 0)
-    ):
+    if not np.isfinite(mean_array).all() or not np.isfinite(std_array).all() or np.any(std_array <= 0):
         raise ValueError("Normalization requires finite means and positive finite deviations")
     result = np.zeros((len(images), _RGB_CHANNELS, *canvas), dtype=np.float32)
     valid: list[tuple[int, int]] = []
@@ -69,12 +60,8 @@ def preprocess(
             raise ValueError("Source images must be nonempty RGB uint8 HWC arrays")
         original = image.shape[:2]
         scale = min(canvas[0] / original[0], canvas[1] / original[1])
-        size = tuple(
-            max(1, min(limit, round(d * scale))) for d, limit in zip(original, canvas, strict=True)
-        )
-        normalized = (
-            image.transpose(2, 0, 1).astype(np.float32) / np.float32(255) - mean_array
-        ) / std_array
+        size = tuple(max(1, min(limit, round(d * scale))) for d, limit in zip(original, canvas, strict=True))
+        normalized = (image.transpose(2, 0, 1).astype(np.float32) / np.float32(255) - mean_array) / std_array
         result[index, :, : size[0], : size[1]] = _resize(normalized, size)
         valid.append(size)
     return result, np.array(valid, dtype=np.int64)
@@ -88,26 +75,16 @@ def validate_detections(
     image_sizes: NDArray[np.int64] | None = None,
 ) -> None:
     """Validate fixed outputs, foreground labels, padding and optional canvas bounds."""
-    if (
-        detections.dtype != np.float32
-        or detections.ndim != _TENSOR_RANK
-        or detections.shape[2] != _ROW_WIDTH
-    ):
+    if detections.dtype != np.float32 or detections.ndim != _TENSOR_RANK or detections.shape[2] != _ROW_WIDTH:
         raise ValueError("detections must be float32 [batch,max_det,6]")
     if counts.dtype != np.int64 or counts.shape != (detections.shape[0],):
         raise ValueError("counts must be int64 [batch]")
-    if (
-        not np.isfinite(detections).all()
-        or np.any(counts < 0)
-        or np.any(counts > detections.shape[1])
-    ):
+    if not np.isfinite(detections).all() or np.any(counts < 0) or np.any(counts > detections.shape[1]):
         raise ValueError("Detection outputs must be finite with counts inside the padded output")
     if class_count is not None and class_count < 1:
         raise ValueError("Foreground class count must be positive")
     if image_sizes is not None and (
-        image_sizes.dtype != np.int64
-        or image_sizes.shape != (detections.shape[0], 2)
-        or np.any(image_sizes <= 0)
+        image_sizes.dtype != np.int64 or image_sizes.shape != (detections.shape[0], 2) or np.any(image_sizes <= 0)
     ):
         raise ValueError("Valid image size metadata does not match the detection batch")
     _validate_rows(detections, counts, class_count, image_sizes)

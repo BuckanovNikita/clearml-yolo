@@ -36,9 +36,7 @@ def _port() -> str:
 
 
 class _WorkerEvents:
-    def __init__(
-        self, directory: Path, report: Callable[[str, float, int], None], world_size: int
-    ) -> None:
+    def __init__(self, directory: Path, report: Callable[[str, float, int], None], world_size: int) -> None:
         self.directory = directory
         self.report = report
         self.offsets: dict[Path, int] = {}
@@ -137,8 +135,7 @@ def train_distributed(
         details = "; ".join(item.diagnostic for item in receipts if item.status != "success")
         raise RuntimeError(f"Native distributed training {outcome.status}: {details or directory}")
     if len(receipts) != len(devices) or any(
-        item.token != token or item.rank != rank or item.status != "success"
-        for rank, item in enumerate(receipts)
+        item.token != token or item.rank != rank or item.status != "success" for rank, item in enumerate(receipts)
     ):
         raise RuntimeError("Native workers exited without matching successful receipts")
     result = receipts[0].result

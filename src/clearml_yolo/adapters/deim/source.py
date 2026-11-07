@@ -53,9 +53,7 @@ def native_coco_modules() -> Iterator[None]:
             "pycocotools.cocoeval": "faster_coco_eval.core.faster_eval_api",
             "pycocotools.mask": "faster_coco_eval.core.mask",
         }
-        sys.modules.update(
-            {name: importlib.import_module(source) for name, source in modules.items()}
-        )
+        sys.modules.update({name: importlib.import_module(source) for name, source in modules.items()})
         yield
 
 
@@ -127,9 +125,7 @@ def load_source(source: Path | None) -> tuple[Any, Any]:
     namespace = "_clearml_yolo_deimv2_" + hashlib.sha256(str(source).encode()).hexdigest()[:16]
     if namespace not in sys.modules:
         _load_package(namespace, source / "engine", verified=source == managed)
-    return importlib.import_module(f"{namespace}.core"), importlib.import_module(
-        f"{namespace}.solver"
-    )
+    return importlib.import_module(f"{namespace}.core"), importlib.import_module(f"{namespace}.solver")
 
 
 class _VerifiedSourceLoader(importlib.machinery.SourceFileLoader):
@@ -170,9 +166,7 @@ class _VerifiedSourceFinder(importlib.abc.MetaPathFinder):
         if spec is None:
             return None
         if not spec.origin or not isinstance(spec.loader, importlib.machinery.SourceFileLoader):
-            raise ImportError(
-                f"DEIM managed modules require manifest-verified Python source: {fullname}"
-            )
+            raise ImportError(f"DEIM managed modules require manifest-verified Python source: {fullname}")
         spec.loader = _VerifiedSourceLoader(fullname, spec.origin, self.root, self.manifest)
         return spec
 
@@ -180,9 +174,7 @@ class _VerifiedSourceFinder(importlib.abc.MetaPathFinder):
 def _load_package(namespace: str, engine: Path, *, verified: bool = False) -> ModuleType:
     finder = _VerifiedSourceFinder(namespace, engine.parent) if verified else None
     loader = (
-        _VerifiedSourceLoader(
-            namespace, str(engine / "__init__.py"), engine.parent, finder.manifest
-        )
+        _VerifiedSourceLoader(namespace, str(engine / "__init__.py"), engine.parent, finder.manifest)
         if finder
         else None
     )

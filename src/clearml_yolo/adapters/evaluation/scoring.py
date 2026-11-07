@@ -310,16 +310,12 @@ def calibrate_thresholds(
     confidence_optimization: str,
 ) -> dict[str, float]:
     """Calibrate once on one split, preserving empty images in the match scope."""
-    EvaluationConfig.model_validate(
-        {"iou_threshold": iou_threshold, "matching_strategy": matching_strategy}
-    )
+    EvaluationConfig.model_validate({"iou_threshold": iou_threshold, "matching_strategy": matching_strategy})
     validate_prediction_identity(ground_truth, predictions)
     try:
         calibration_gt = _split_ground_truth(ground_truth, calibration_split)
     except ValueError as error:
-        raise ValueError(
-            f"No ground-truth rows for calibration split {calibration_split!r}"
-        ) from error
+        raise ValueError(f"No ground-truth rows for calibration split {calibration_split!r}") from error
     validate_dataframes(predictions, calibration_gt)
     image_names = [str(value) for value in calibration_gt["image_name"].unique()]
     with trace_operation(
@@ -341,8 +337,7 @@ def calibrate_thresholds(
             calibrated = find_best_confidences(matches, classes)
         else:
             raise ValueError(
-                "confidence_optimization must be 'per_class' or 'global', got "
-                f"{confidence_optimization!r}"
+                f"confidence_optimization must be 'per_class' or 'global', got {confidence_optimization!r}"
             )
     return validate_thresholds(calibrated, classes)
 
@@ -670,15 +665,11 @@ def score_split(
     false positive also carries a ``gt_index``, but that box's real status is
     recorded by its own TP or FN record.
     """
-    EvaluationConfig.model_validate(
-        {"iou_threshold": iou_threshold, "matching_strategy": matching_strategy}
-    )
+    EvaluationConfig.model_validate({"iou_threshold": iou_threshold, "matching_strategy": matching_strategy})
     validate_prediction_identity(gt_df, preds_df)
     for frame_name, frame in (("Ground-truth", gt_df), ("Prediction", preds_df)):
         if not frame.index.is_unique:
-            raise ValueError(
-                f"{frame_name} index has duplicate labels, so match records cannot join back."
-            )
+            raise ValueError(f"{frame_name} index has duplicate labels, so match records cannot join back.")
         if (frame.index < 0).any():
             raise ValueError(
                 f"{frame_name} index has negative labels, which collide with the -1 that match "

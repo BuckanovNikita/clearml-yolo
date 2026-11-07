@@ -44,9 +44,7 @@ class EvaluationConfig(BaseModel):
     )
     ap_method: Literal["interp", "continuous"] = Field(
         default="interp",
-        description=(
-            "Метод расчёта AP: интерполированная кривая interp либо непрерывный continuous."
-        ),
+        description=("Метод расчёта AP: интерполированная кривая interp либо непрерывный continuous."),
         examples=["interp"],
         json_schema_extra={
             "shapes": "Literal['interp', 'continuous']",
@@ -57,16 +55,12 @@ class EvaluationConfig(BaseModel):
     )
     confidence_optimization: str = Field(
         default="per_class",
-        description=(
-            "Подбор порогов на val: per_class отдельно для каждого класса либо global для всех."
-        ),
+        description=("Подбор порогов на val: per_class отдельно для каждого класса либо global для всех."),
         examples=["per_class"],
         json_schema_extra={
             "shapes": "str",
             "applicability": "EvaluationConfig",
-            "source": (
-                "clearml_yolo.core.evaluation.models.EvaluationConfig.confidence_optimization"
-            ),
+            "source": ("clearml_yolo.core.evaluation.models.EvaluationConfig.confidence_optimization"),
             "classification": "input",
         },
     )
@@ -102,44 +96,33 @@ class EvaluationConfig(BaseModel):
         json_schema_extra={
             "shapes": "float | None",
             "applicability": "EvaluationConfig",
-            "source": (
-                "clearml_yolo.core.evaluation.models.EvaluationConfig."
-                "preprocess_preds_conf_threshold"
-            ),
+            "source": ("clearml_yolo.core.evaluation.models.EvaluationConfig.preprocess_preds_conf_threshold"),
             "classification": "input",
         },
     )
     preprocess_preds_nms_containment_threshold: float | None = Field(
         default=None,
         description=(
-            "Порог вложенности для предварительного NMS; null оставляет выбор "
-            "движку. Действует при preprocess=true."
+            "Порог вложенности для предварительного NMS; null оставляет выбор движку. Действует при preprocess=true."
         ),
         examples=[0.9],
         json_schema_extra={
             "shapes": "float | None",
             "applicability": "EvaluationConfig",
             "source": (
-                "clearml_yolo.core.evaluation.models.EvaluationConfig."
-                "preprocess_preds_nms_containment_threshold"
+                "clearml_yolo.core.evaluation.models.EvaluationConfig.preprocess_preds_nms_containment_threshold"
             ),
             "classification": "input",
         },
     )
     preprocess_preds_nms_iou_threshold: float | None = Field(
         default=None,
-        description=(
-            "Порог IoU для предварительного NMS; null оставляет выбор движку. "
-            "Действует при preprocess=true."
-        ),
+        description=("Порог IoU для предварительного NMS; null оставляет выбор движку. Действует при preprocess=true."),
         examples=[0.7],
         json_schema_extra={
             "shapes": "float | None",
             "applicability": "EvaluationConfig",
-            "source": (
-                "clearml_yolo.core.evaluation.models.EvaluationConfig."
-                "preprocess_preds_nms_iou_threshold"
-            ),
+            "source": ("clearml_yolo.core.evaluation.models.EvaluationConfig.preprocess_preds_nms_iou_threshold"),
             "classification": "input",
         },
     )

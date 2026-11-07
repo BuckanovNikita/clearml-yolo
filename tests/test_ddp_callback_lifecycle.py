@@ -31,9 +31,7 @@ def test_stalled_reader_resume_after_timeout_never_dispatches_sdk_callbacks(
     monkeypatch.setattr("clearml_yolo.adapters.clearml.session.active_task", lambda: task)
     monkeypatch.setenv(OWNER_PID_ENV, str(os.getpid()))
     monkeypatch.setenv(OWNER_TASK_ENV, task.id)
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.integrations.native_ddp._JOIN_SECONDS", 0.03, raising=False
-    )
+    monkeypatch.setattr("clearml_yolo.adapters.integrations.native_ddp._JOIN_SECONDS", 0.03, raising=False)
     model = _Model()
     model.trainer = SimpleNamespace(ddp=True)
     relay = NativeDDPRelay(task, model, str(tmp_path))
@@ -155,10 +153,7 @@ def test_cpu_observer_reads_live_journal_and_preserves_publication_failure(
     (tmp_path / "first-epoch-ready").touch()
     scalar_journal = tmp_path / "scalars.jsonl"
     scalar_journal.write_text(
-        json.dumps(
-            {"title": "metrics", "series": "metrics/mAP50(B)", "value": 0.75, "iteration": 0}
-        )
-        + "\n"
+        json.dumps({"title": "metrics", "series": "metrics/mAP50(B)", "value": 0.75, "iteration": 0}) + "\n"
     )
     process = Mock(spec=subprocess.Popen)
     process.poll.side_effect = [None, 0]

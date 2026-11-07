@@ -147,9 +147,7 @@ def _validate_saved_prediction(model: Any, settings: dict[str, Any]) -> None:
         validate_output_tree(model.predictor.save_dir)
 
 
-def _prediction_configuration(
-    weights: str | Path, model_kwargs: dict[str, Any]
-) -> dict[str, Any]:
+def _prediction_configuration(weights: str | Path, model_kwargs: dict[str, Any]) -> dict[str, Any]:
     settings = execution_settings(model_kwargs | {"model": str(weights), "source": None}, "predict")
     settings.pop("model")
     settings.pop("source")

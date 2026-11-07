@@ -10,15 +10,11 @@ from torch.nn import functional
 
 def _partition(values: Tensor, window: tuple[int, int]) -> Tensor:
     batch, height, width, channels = values.shape
-    values = values.reshape(
-        batch, height // window[0], window[0], width // window[1], window[1], channels
-    )
+    values = values.reshape(batch, height // window[0], window[0], width // window[1], window[1], channels)
     return values.permute(0, 1, 3, 2, 4, 5).contiguous().reshape(-1, window[0], window[1], channels)
 
 
-def shifted_window_mask(
-    padded: Tensor, window: tuple[int, int], shift: tuple[int, int]
-) -> Tensor | None:
+def shifted_window_mask(padded: Tensor, window: tuple[int, int], shift: tuple[int, int]) -> Tensor | None:
     """Native nine-region mask on an already padded NHWC grid, without math.ceil."""
     if not any(shift):
         return None
@@ -27,8 +23,7 @@ def shifted_window_mask(
         coordinates = torch.arange(size, device=padded.device)
         if displacement:
             regions.append(
-                (coordinates >= size - length).to(torch.int64)
-                + (coordinates >= size - displacement).to(torch.int64)
+                (coordinates >= size - length).to(torch.int64) + (coordinates >= size - displacement).to(torch.int64)
             )
         else:
             # Native's final slice (0,None) overwrites that entire zero-shift axis.

@@ -73,9 +73,7 @@ def _solver() -> Any:
 
     class Criterion(torch.nn.Module):
         @override
-        def forward(
-            self, outputs: torch.Tensor, *args: Any, **kwargs: Any
-        ) -> dict[str, torch.Tensor]:
+        def forward(self, outputs: torch.Tensor, *args: Any, **kwargs: Any) -> dict[str, torch.Tensor]:
             return {"loss": (outputs - 1).square()}
 
     model = Model()
@@ -198,9 +196,7 @@ def _distributed_cpu_worker(rank: int, rendezvous: str, result: Any) -> None:
     from clearml_yolo.adapters.deim.backend import _DistributedSolver
 
     torch.set_num_threads(1)
-    dist.init_process_group(
-        "gloo", init_method=rendezvous, rank=rank, world_size=2, timeout=timedelta(seconds=15)
-    )
+    dist.init_process_group("gloo", init_method=rendezvous, rank=rank, world_size=2, timeout=timedelta(seconds=15))
     try:
 
         class Native:
@@ -239,10 +235,7 @@ def test_real_cpu_ranks_finish_unequal_validation_and_synchronize_buffers(tmp_pa
     context = multiprocessing.get_context("spawn")
     result = context.Queue()
     rendezvous = (tmp_path / "gloo-store").as_uri()
-    processes = [
-        context.Process(target=_distributed_cpu_worker, args=(rank, rendezvous, result))
-        for rank in range(2)
-    ]
+    processes = [context.Process(target=_distributed_cpu_worker, args=(rank, rendezvous, result)) for rank in range(2)]
     try:
         for process in processes:
             process.start()

@@ -48,9 +48,7 @@ def asset_destination(spec: AssetSpec) -> Path:
     if spec.hub is not None:
         # Hub publication owns repository snapshots and refs. This is a reportable
         # repository root, not a synthetic flat checkpoint destination.
-        return spec.hub.cache_dir.expanduser().resolve() / (
-            "models--" + spec.hub.repository.replace("/", "--")
-        )
+        return spec.hub.cache_dir.expanduser().resolve() / ("models--" + spec.hub.repository.replace("/", "--"))
     if spec.native_cache is not None:
         return native_asset_path(spec.native_cache, spec.filename)
     return managed_asset_destination(spec)
@@ -63,9 +61,7 @@ def release_proxy_url(url: str, root: str | None) -> str | None:
     if "/releases/download/" not in source.path:
         return None
     proxy = urlsplit(root.strip())
-    return urlunsplit(
-        (proxy.scheme, proxy.netloc, proxy.path.rstrip("/") + source.path, proxy.query, "")
-    )
+    return urlunsplit((proxy.scheme, proxy.netloc, proxy.path.rstrip("/") + source.path, proxy.query, ""))
 
 
 def source_proxy_url(url: str, revision: str, root: str | None) -> str | None:
@@ -88,11 +84,7 @@ def source_urls(spec: AssetSpec) -> tuple[str, ...]:
         if spec.kind == "deim-source"
         else release_proxy_url(spec.canonical_url, os.environ.get("GHR"))
     )
-    return (
-        (proxy, spec.canonical_url)
-        if proxy and proxy != spec.canonical_url
-        else (spec.canonical_url,)
-    )
+    return (proxy, spec.canonical_url) if proxy and proxy != spec.canonical_url else (spec.canonical_url,)
 
 
 def _record(spec: AssetSpec, path: Path, digest: str) -> ResolvedAsset:
@@ -131,9 +123,7 @@ def _existing(spec: AssetSpec, destination: Path) -> ResolvedAsset | None:
 
 def _retrieve(spec: AssetSpec, destination: Path) -> ResolvedAsset:
     errors: list[str] = []
-    with tempfile.NamedTemporaryFile(
-        prefix=".asset-", dir=destination.parent, delete=False
-    ) as temporary:
+    with tempfile.NamedTemporaryFile(prefix=".asset-", dir=destination.parent, delete=False) as temporary:
         staging = Path(temporary.name)
     try:
         try:
@@ -166,12 +156,8 @@ def _retrieve(spec: AssetSpec, destination: Path) -> ResolvedAsset:
 def _failure(spec: AssetSpec, destination: Path, reason: str) -> str:
     access = f"\n  Access: {spec.access_requirement}" if spec.access_requirement else ""
     if spec.kind == "deim-source":
-        access += (
-            "\n  Offline archive: leave model.source_dir=null to verify and extract it on rerun."
-        )
-    override_path = (
-        destination.with_suffix("").with_suffix("") if spec.kind == "deim-source" else destination
-    )
+        access += "\n  Offline archive: leave model.source_dir=null to verify and extract it on rerun."
+    override_path = destination.with_suffix("").with_suffix("") if spec.kind == "deim-source" else destination
     return (
         f"Missing {spec.backend}/{spec.preset} asset {spec.filename}:\n"
         f"  Original URL: {asset_source_url(spec.canonical_url)}\n"

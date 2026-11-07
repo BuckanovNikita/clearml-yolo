@@ -45,9 +45,7 @@ def test_missing_capability_rejects_before_native_work(
 
 
 @pytest.mark.parametrize("number", [errno.ENOSYS, errno.EINVAL, errno.EPERM])
-def test_unavailable_kernel_pidfd_fails_before_native_work(
-    monkeypatch: pytest.MonkeyPatch, number: int
-) -> None:
+def test_unavailable_kernel_pidfd_fails_before_native_work(monkeypatch: pytest.MonkeyPatch, number: int) -> None:
     def unavailable(_pid: int) -> int:
         raise OSError(number, "capability probe rejected")
 

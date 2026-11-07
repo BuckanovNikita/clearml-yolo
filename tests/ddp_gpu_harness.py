@@ -37,9 +37,7 @@ def _redact_url(match: re.Match[str]) -> str:
     query = [
         (
             key,
-            "<redacted>"
-            if re.search(r"(?i)(sig|token|key|secret|credential|auth|password)", key)
-            else value,
+            "<redacted>" if re.search(r"(?i)(sig|token|key|secret|credential|auth|password)", key) else value,
         )
         for key, value in parse_qsl(url.query, keep_blank_values=True)
     ]
@@ -52,9 +50,7 @@ def physical_indexes(value: str) -> tuple[int, ...]:
     try:
         indexes = tuple(int(part.strip()) for part in value.split(","))
     except ValueError as error:
-        raise ValueError(
-            "--ddp-devices requires comma-separated physical integer indexes"
-        ) from error
+        raise ValueError("--ddp-devices requires comma-separated physical integer indexes") from error
     if len(indexes) < 2 or len(set(indexes)) != len(indexes) or min(indexes) < 0:
         raise ValueError("--ddp-devices requires at least two unique nonnegative physical indexes")
     return indexes
@@ -66,9 +62,7 @@ def resolve_devices(indexes: tuple[int, ...], inventory: list[dict[str, Any]]) -
         raise RuntimeError("Selected physical GPU index does not exist in NVML inventory")
     uuids = tuple(cards[index] for index in indexes)
     if any(not value.startswith("GPU-") for value in uuids) or len(set(uuids)) != len(uuids):
-        raise RuntimeError(
-            "Physical selection requires distinct whole-GPU UUIDs; MIG is unsupported"
-        )
+        raise RuntimeError("Physical selection requires distinct whole-GPU UUIDs; MIG is unsupported")
     return uuids
 
 
@@ -91,8 +85,7 @@ def redact_data(value: Any) -> Any:
     """Redact structured evidence without damaging JSON strings or delimiters."""
     if isinstance(value, dict):
         return {
-            key: "<redacted>" if _SECRET_KEY.fullmatch(str(key)) else redact_data(item)
-            for key, item in value.items()
+            key: "<redacted>" if _SECRET_KEY.fullmatch(str(key)) else redact_data(item) for key, item in value.items()
         }
     if isinstance(value, list):
         return [redact_data(item) for item in value]
@@ -159,17 +152,11 @@ class Evidence:
                 _redact_file(path)
         self.data = redact_data(self.data)
         (self.root / "summary.json").write_text(json.dumps(self.data, indent=2), encoding="utf-8")
-        suite = Element(
-            "testsuite", name="physical_ddp", tests="1", failures=str(int(error is not None))
-        )
-        case = SubElement(
-            suite, "testcase", name=self.data["scenario"], time=str(self.data["elapsed_seconds"])
-        )
+        suite = Element("testsuite", name="physical_ddp", tests="1", failures=str(int(error is not None)))
+        case = SubElement(suite, "testcase", name=self.data["scenario"], time=str(self.data["elapsed_seconds"]))
         if error:
             SubElement(case, "failure", message=redact(str(error))).text = self.data["error"]
-        (self.root / "junit.xml").write_bytes(
-            tostring(suite, encoding="utf-8", xml_declaration=True)
-        )
+        (self.root / "junit.xml").write_bytes(tostring(suite, encoding="utf-8", xml_declaration=True))
 
     @contextmanager
     def retained(self) -> Iterator["Evidence"]:
@@ -202,29 +189,17 @@ class Evidence:
                 check=False,
             )
         except subprocess.TimeoutExpired as error:
-            captured = [
-                output.decode(errors="replace") for output in (error.stdout, error.stderr) if output
-            ]
-            (self.root / f"command-{index}.log").write_text(
-                redact("\n".join(captured)), encoding="utf-8"
-            )
-            self.data.setdefault("command_timeouts", []).append(
-                {"command": index, "timeout": timeout}
-            )
+            captured = [output.decode(errors="replace") for output in (error.stdout, error.stderr) if output]
+            (self.root / f"command-{index}.log").write_text(redact("\n".join(captured)), encoding="utf-8")
+            self.data.setdefault("command_timeouts", []).append({"command": index, "timeout": timeout})
             raise
-        (self.root / f"command-{index}.log").write_text(
-            redact(result.stdout + result.stderr), encoding="utf-8"
-        )
+        (self.root / f"command-{index}.log").write_text(redact(result.stdout + result.stderr), encoding="utf-8")
         if check and result.returncode:
-            raise RuntimeError(
-                f"Command exited {result.returncode}: {argv}; see command-{index}.log"
-            )
+            raise RuntimeError(f"Command exited {result.returncode}: {argv}; see command-{index}.log")
         return result
 
     def helper(self, operation: str, environment: dict[str, str], *, timeout: float = 60) -> None:
-        self.command(
-            [sys.executable, str(_HELPER), operation, str(self.root)], environment, timeout=timeout
-        )
+        self.command([sys.executable, str(_HELPER), operation, str(self.root)], environment, timeout=timeout)
 
 
 def environment_for(evidence: Evidence, *, instrument: bool = False) -> dict[str, str]:
@@ -277,9 +252,7 @@ def _prepare_scenario(evidence: Evidence, *, compiled: bool) -> dict[str, str]:
         or not math.isfinite(options.cleanup_timeout)
         or options.cleanup_timeout < 120
     ):
-        raise ValueError(
-            "Execution timeout must be positive; cleanup timeout must be at least 120s"
-        )
+        raise ValueError("Execution timeout must be positive; cleanup timeout must be at least 120s")
     base = environment_for(evidence)
     (evidence.root / "request.json").write_text(
         json.dumps(
@@ -305,9 +278,7 @@ def _prepare_scenario(evidence: Evidence, *, compiled: bool) -> dict[str, str]:
     return base
 
 
-def _launch_arguments(
-    evidence: Evidence, base: dict[str, str], *, queued: bool
-) -> tuple[list[str], str | None]:
+def _launch_arguments(evidence: Evidence, base: dict[str, str], *, queued: bool) -> tuple[list[str], str | None]:
     overrides = ["--config-dir", str(evidence.root / "config"), "--config-name", "ddp"]
     devices = ",".join(str(i) for i in range(len(evidence.data["uuids"])))
     if not queued:
@@ -371,13 +342,9 @@ def run_scenario(options: GPUOptions, scenario: str, *, queued: bool, compiled: 
                 )
                 owner.wait(timeout=max(0.1, deadline - time.monotonic()))
                 if owner.returncode != 0:
-                    raise AssertionError(
-                        f"Direct native pipeline exited {owner.returncode}; see owner.log"
-                    )
+                    raise AssertionError(f"Direct native pipeline exited {owner.returncode}; see owner.log")
             evidence.helper("verify", base, timeout=max(0.1, min(180, deadline - time.monotonic())))
-            evidence.data["verification"] = json.loads(
-                (evidence.root / "verification.json").read_text()
-            )
+            evidence.data["verification"] = json.loads((evidence.root / "verification.json").read_text())
         finally:
             _cleanup_scenario(evidence, base, owner, identifier)
     return evidence.root

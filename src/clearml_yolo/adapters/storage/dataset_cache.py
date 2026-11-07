@@ -43,9 +43,7 @@ def dataset_cache_root(cache_dir: str | Path | None) -> Path:
     return write_path(cy_home() / ".cache" / "clearml-yolo" / "datasets").resolve()
 
 
-def _identity(
-    csv_sha256: str, dataset_format: DatasetFormat, image_references: list[str]
-) -> str:
+def _identity(csv_sha256: str, dataset_format: DatasetFormat, image_references: list[str]) -> str:
     payload = json.dumps(
         {
             "csv_sha256": csv_sha256,
@@ -91,9 +89,7 @@ def _read_completion(
     dataset_format: DatasetFormat,
 ) -> _Completion | None:
     try:
-        completion = _Completion.model_validate_json(
-            (entry / _COMPLETION_FILE).read_text(encoding="utf-8")
-        )
+        completion = _Completion.model_validate_json((entry / _COMPLETION_FILE).read_text(encoding="utf-8"))
     except FileNotFoundError:
         return None
     except (OSError, UnicodeDecodeError, ValidationError, ValueError) as error:
@@ -181,9 +177,7 @@ def _validated_splits(
     return split_counts if dict(observed) == split_counts else None
 
 
-def _valid_data_yaml(
-    entry: Path, splits: dict[str, int] | None, dataset_format: DatasetFormat
-) -> bool:
+def _valid_data_yaml(entry: Path, splits: dict[str, int] | None, dataset_format: DatasetFormat) -> bool:
     try:
         data = yaml.safe_load((entry / "data.yaml").read_text(encoding="utf-8"))
     except FileNotFoundError:
@@ -208,11 +202,7 @@ def _valid_data_yaml(
         and {str(key): value for key, value in names.items()} == manifest.get("class_names")
         and all(
             data.get(split)
-            == (
-                ("valid" if split == "val" else split)
-                if dataset_format == "coco"
-                else f"images/{split}"
-            )
+            == (("valid" if split == "val" else split) if dataset_format == "coco" else f"images/{split}")
             for split in splits
         )
     )
@@ -270,13 +260,9 @@ def _load_completed(
     if splits != completion.split_counts or not _valid_data_yaml(entry, splits, dataset_format):
         return None
 
-    missing_splits = sorted(
-        split for split in required_splits if completion.split_counts.get(split, 0) < 1
-    )
+    missing_splits = sorted(split for split in required_splits if completion.split_counts.get(split, 0) < 1)
     if missing_splits:
-        raise ValueError(
-            "Cached dataset required split(s) contain no images: " + ", ".join(missing_splits)
-        )
+        raise ValueError("Cached dataset required split(s) contain no images: " + ", ".join(missing_splits))
 
     artifact_paths = _artifact_paths(entry, completion.artifacts, required_paths)
     if artifact_paths is None:
@@ -305,9 +291,7 @@ def _rewrite_final_paths(staging: Path, entry: Path) -> None:
     if not isinstance(data, dict):
         raise TypeError(f"Prepared dataset configuration is not a mapping: {data_path}")
     data["path"] = str(entry.resolve())
-    data_path.write_text(
-        yaml.safe_dump(data, sort_keys=False, allow_unicode=True), encoding="utf-8"
-    )
+    data_path.write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True), encoding="utf-8")
 
     manifest_path = staging / "preparation.json"
     manifest = _read_json_object(manifest_path)
@@ -318,24 +302,16 @@ def _rewrite_final_paths(staging: Path, entry: Path) -> None:
         raise TypeError(f"Prepared dataset manifest has no image inventory: {manifest_path}")
     for item in images:
         if not isinstance(item, dict):
-            raise TypeError(
-                f"Prepared dataset manifest has an invalid image entry: {manifest_path}"
-            )
+            raise TypeError(f"Prepared dataset manifest has an invalid image entry: {manifest_path}")
         generated = item.get("generated_path")
         if not isinstance(generated, str):
-            raise TypeError(
-                f"Prepared dataset manifest has an invalid generated path: {manifest_path}"
-            )
+            raise TypeError(f"Prepared dataset manifest has an invalid generated path: {manifest_path}")
         try:
             relative = Path(generated).relative_to(staging)
         except ValueError as error:
-            raise ValueError(
-                f"Prepared generated path is outside the staging directory: {generated}"
-            ) from error
+            raise ValueError(f"Prepared generated path is outside the staging directory: {generated}") from error
         item["generated_path"] = str(entry / relative)
-    manifest_path.write_text(
-        json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-    )
+    manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
 @trace_operation("storage.cache.publish")
@@ -363,9 +339,7 @@ def _publish_entry(
         raise ValueError("Prepared dataset manifest has no split counts")
     split_counts = {str(name): int(count) for name, count in manifest["splits"].items()}
     artifact_names = [path.relative_to(staging).as_posix() for path in prepared.artifacts]
-    required_files = sorted(
-        path.relative_to(staging).as_posix() for path in staging.rglob("*") if path.is_file()
-    )
+    required_files = sorted(path.relative_to(staging).as_posix() for path in staging.rglob("*") if path.is_file())
     required_files.append(_COMPLETION_FILE)
     completion = _Completion(
         preparation_version=PREPARATION_VERSION,
@@ -376,9 +350,7 @@ def _publish_entry(
         required_files=required_files,
         artifacts=artifact_names,
     )
-    (staging / _COMPLETION_FILE).write_text(
-        completion.model_dump_json(indent=2) + "\n", encoding="utf-8"
-    )
+    (staging / _COMPLETION_FILE).write_text(completion.model_dump_json(indent=2) + "\n", encoding="utf-8")
     staging.rename(entry)
 
 
@@ -395,18 +367,14 @@ def cached_dataset(
     unsupported_splits = sorted(set(required_splits) - _SUPPORTED_SPLITS)
     if unsupported_splits:
         raise ValueError(
-            "Unsupported required split(s): "
-            + ", ".join(unsupported_splits)
-            + "; expected train, val, or test"
+            "Unsupported required split(s): " + ", ".join(unsupported_splits) + "; expected train, val, or test"
         )
     source_path = Path(source).expanduser().resolve()
     with trace_operation("storage.cache.source.read", context={"path": str(source_path)}):
         source_bytes = source_path.read_bytes()
     with trace_operation("storage.cache.source.hash", context={"bytes": len(source_bytes)}):
         input_sha256 = hashlib.sha256(source_bytes).hexdigest()
-    identity = _identity(
-        input_sha256, dataset_format, resolved_image_references(source_path, source_bytes)
-    )
+    identity = _identity(input_sha256, dataset_format, resolved_image_references(source_path, source_bytes))
     root = dataset_cache_root(cache_dir)
     root.mkdir(parents=True, exist_ok=True)
     lock_root = write_path(root / ".locks")
@@ -425,9 +393,7 @@ def cached_dataset(
             try:
                 stack.enter_context(lock)
             except (OSError, NotImplementedError) as error:
-                raise RuntimeError(
-                    f"Cannot acquire required native dataset cache lock: {lock.lock_file}"
-                ) from error
+                raise RuntimeError(f"Cannot acquire required native dataset cache lock: {lock.lock_file}") from error
         with trace_operation("storage.cache.lock.lifetime", context={"path": str(entry)}):
             prepared = _load_completed(
                 entry,
@@ -469,8 +435,7 @@ def cached_dataset(
                     )
                     if prepared is None:
                         raise RuntimeError(
-                            "Prepared dataset cache entry failed validation "
-                            f"and has been preserved: {entry}"
+                            f"Prepared dataset cache entry failed validation and has been preserved: {entry}"
                         )
             else:
                 with trace_operation("storage.cache.hit", context={"format": dataset_format}):

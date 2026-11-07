@@ -64,11 +64,7 @@ def _confusion_trace(
                 "column": column_totals[column_index],
                 "global": total,
             }[normalization]
-            value_row.append(
-                count
-                if normalization == "raw"
-                else (100 * count / denominator if denominator else 0)
-            )
+            value_row.append(count if normalization == "raw" else (100 * count / denominator if denominator else 0))
             hover_row.append([count, denominator, "observed" if denominator else "no observations"])
         values.append(value_row)
         hover.append(hover_row)
@@ -79,10 +75,7 @@ def _confusion_trace(
         "z": values,
         "customdata": hover,
         "text": [
-            [
-                f"True: {escape(labels[true])}<br>Predicted: {escape(labels[predicted])}"
-                for predicted in matrix.labels
-            ]
+            [f"True: {escape(labels[true])}<br>Predicted: {escape(labels[predicted])}" for predicted in matrix.labels]
             for true in matrix.labels
         ],
         "colorscale": "Blues",
@@ -253,18 +246,11 @@ COMPARED_METRICS = (
 
 
 def _readable_frame(frame: pd.DataFrame) -> pd.DataFrame:
-    strings = [
-        value
-        for row in frame.itertuples(index=False, name=None)
-        for value in row
-        if isinstance(value, str)
-    ]
+    strings = [value for row in frame.itertuples(index=False, name=None) for value in row if isinstance(value, str)]
     for axis in (frame.index, frame.columns):
         strings.extend(name for name in axis.names if isinstance(name, str))
         for level in range(axis.nlevels):
-            strings.extend(
-                value for value in axis.get_level_values(level) if isinstance(value, str)
-            )
+            strings.extend(value for value in axis.get_level_values(level) if isinstance(value, str))
     labels = human_labels(strings)
 
     def display(value: Any) -> Any:
@@ -314,9 +300,7 @@ def report_table(
         table_plot=display_frame,
         **options,
     )
-    logger.debug(
-        "Reported table {}/{} ({} rows)", human_text(title), human_text(series), len(frame)
-    )
+    logger.debug("Reported table {}/{} ({} rows)", human_text(title), human_text(series), len(frame))
 
 
 @trace_operation("clearml.report_scalars")
@@ -372,9 +356,7 @@ def _verdicts(per_class: pd.DataFrame) -> dict[str, "pd.Series[Any]"]:
     return found
 
 
-def _degraded_classes(
-    per_class: pd.DataFrame, verdicts: Mapping[str, "pd.Series[Any]"]
-) -> pd.DataFrame:
+def _degraded_classes(per_class: pd.DataFrame, verdicts: Mapping[str, "pd.Series[Any]"]) -> pd.DataFrame:
     """The per-class rows that got significantly worse on at least one metric."""
     if not verdicts:
         return per_class.iloc[:0]
@@ -473,8 +455,7 @@ def report_comparison(
         and float(declared_family_size) != hypotheses
     ):
         logger.warning(
-            "Methodology declares a BH family size of {} but the comparison rows carry "
-            "{:.0f} adjusted p-value(s)",
+            "Methodology declares a BH family size of {} but the comparison rows carry {:.0f} adjusted p-value(s)",
             declared_family_size,
             hypotheses,
         )

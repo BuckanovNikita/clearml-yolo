@@ -28,9 +28,7 @@ def report_generator(
     pairs: list[tuple[Path, Path]] = []
 
     class FakeBuilder:
-        def __init__(
-            self, candidate: Any, baseline: Any, *_: object, **_options: object
-        ) -> None:
+        def __init__(self, candidate: Any, baseline: Any, *_: object, **_options: object) -> None:
             self.candidate = candidate
             self.baseline = baseline
 
@@ -67,12 +65,8 @@ def _comparison_dir(tmp_path: Path) -> tuple[Path, Path, Path]:
     directory.mkdir()
     baseline = directory / "full_dashboard_baseline_test.xlsx"
     candidate = directory / "full_dashboard_candidate_test.xlsx"
-    pd.DataFrame(
-        {"tp": [1], "ap50": [0.5], "Количество примеров train": [30]}, index=["cat"]
-    ).to_excel(baseline)
-    pd.DataFrame(
-        {"tp": [2], "ap50": [0.6], "Количество примеров train": [30]}, index=["cat"]
-    ).to_excel(candidate)
+    pd.DataFrame({"tp": [1], "ap50": [0.5], "Количество примеров train": [30]}, index=["cat"]).to_excel(baseline)
+    pd.DataFrame({"tp": [2], "ap50": [0.6], "Количество примеров train": [30]}, index=["cat"]).to_excel(candidate)
     (directory / MANIFEST_NAME).write_text(
         ComparisonManifest(
             split="test",
@@ -176,9 +170,7 @@ def test_standalone_report_publishes_only_final_workbooks_and_report_configurati
             assert "report_dev_test" in uploads
         annotate(path, identities)
 
-    monkeypatch.setattr(
-        workflow_dependencies.renderer, "annotate_workbook", annotate_after_previous_upload
-    )
+    monkeypatch.setattr(workflow_dependencies.renderer, "annotate_workbook", annotate_after_previous_upload)
 
     class FakeTask:
         pass

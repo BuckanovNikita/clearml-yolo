@@ -49,14 +49,10 @@ def log_exception(
         operation = f"{operation} ({human_text(_context_summary(context))})"
     if level != "DEBUG":
         logger.opt(exception=False).log(level, "{}: {}", operation, details)
-    logger.opt(exception=False).debug(
-        "{}: {}\n{}", operation, details, human_text(_traceback_locations(error))
-    )
+    logger.opt(exception=False).debug("{}: {}\n{}", operation, details, human_text(_traceback_locations(error)))
 
 
-def log_exception_safely(
-    message: str, error: BaseException, *, context: Mapping[str, object] | None = None
-) -> None:
+def log_exception_safely(message: str, error: BaseException, *, context: Mapping[str, object] | None = None) -> None:
     """Report a lifecycle failure without interrupting remaining error cleanup."""
     try:
         log_exception(message, error, level="ERROR", context=context)

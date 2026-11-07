@@ -78,9 +78,7 @@ def prediction_checkpoint_hash(predictions: Path) -> str | None:
     if not path.is_file():
         return None
     payload = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict) or payload.get("predictions_sha256") != file_digest(
-        predictions
-    ):
+    if not isinstance(payload, dict) or payload.get("predictions_sha256") != file_digest(predictions):
         raise ValueError("Prediction provenance does not match prediction CSV bytes")
     digest = payload.get("checkpoint_sha256")
     if digest is not None and (
@@ -133,8 +131,13 @@ def _atomic_csv(frame: pd.DataFrame, path: Path) -> None:
     pending: Path | None = None
     try:
         with NamedTemporaryFile(
-            mode="w", encoding="utf-8", newline="", dir=path.parent,
-            prefix=f".{path.name}-", suffix=".pending", delete=False,
+            mode="w",
+            encoding="utf-8",
+            newline="",
+            dir=path.parent,
+            prefix=f".{path.name}-",
+            suffix=".pending",
+            delete=False,
         ) as stream:
             pending = Path(stream.name)
             frame.to_csv(stream, index=False, float_format="%.17g")
@@ -255,10 +258,7 @@ class _ResultBundle:
         manifest = write_path(self.directory / "contexts.json")
         manifest.write_text(
             json.dumps(
-                [
-                    context.model_dump() | {"path": str(path)}
-                    for _, (context, path) in sorted(self.contexts.items())
-                ],
+                [context.model_dump() | {"path": str(path)} for _, (context, path) in sorted(self.contexts.items())],
                 ensure_ascii=False,
                 indent=2,
             )
@@ -285,9 +285,7 @@ def _bundle(task: Any, output_dir: Path | None = None) -> _ResultBundle:
     return invocation_resource(task, "clearml_results", create)
 
 
-def declare_result_producers(
-    task: Any, producers: Sequence[ResultProducer], *, output_dir: Path
-) -> None:
+def declare_result_producers(task: Any, producers: Sequence[ResultProducer], *, output_dir: Path) -> None:
     """Freeze the complete contributor set; nested stages may declare active subsets."""
     if task is not None:
         _bundle(task, output_dir).declare(producers)
@@ -367,9 +365,7 @@ def register_predictions(
             key = path.stem if prediction_image_name == "stem" else str(path)
             canonical = str(row.image_name)
             if key in identities and identities[key] != canonical:
-                raise ValueError(
-                    f"Ambiguous raw prediction {prediction_image_name} identity: {key}"
-                )
+                raise ValueError(f"Ambiguous raw prediction {prediction_image_name} identity: {key}")
             identities[key] = canonical
         membership = source["image_name"].map(identities)
     selected = splits if splits is not None else list(truth["split"].dropna().unique())
@@ -432,12 +428,8 @@ def publish_evaluation(
     bundle.put(context, evaluated.result_rows)
     stem = "metrics" if role == "prediction" else role
     names = {
-        artifact_names.per_split(
-            f"{stem}_dashboard_full", evaluated.split
-        ): evaluated.dashboard_path,
-        artifact_names.per_split(
-            f"{stem}_dashboard_dtrk", evaluated.split
-        ): evaluated.dtrk_dashboard_path,
+        artifact_names.per_split(f"{stem}_dashboard_full", evaluated.split): evaluated.dashboard_path,
+        artifact_names.per_split(f"{stem}_dashboard_dtrk", evaluated.split): evaluated.dtrk_dashboard_path,
     }
     expect_artifacts(task, list(names))
     for name, path in names.items():

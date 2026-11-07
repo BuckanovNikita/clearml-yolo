@@ -107,9 +107,7 @@ def _per_image_counts(
     totals = grouped.size().reindex(split_images, fill_value=0).to_numpy(dtype=float)
     dropped = len(status) - int(totals.sum())
     if dropped and diagnostic is not None:
-        diagnostic(
-            f"{dropped} {description} rows reference images outside the split and were dropped"
-        )
+        diagnostic(f"{dropped} {description} rows reference images outside the split and were dropped")
     return successes, totals
 
 
@@ -152,10 +150,7 @@ def _bootstrap_rate_delta(
     n_candidate = int(candidate_totals.sum())
     if n_baseline == 0 or n_candidate == 0:
         if diagnostic is not None:
-            diagnostic(
-                f"The {metric} bootstrap needs rows from both models, "
-                f"got {n_baseline} and {n_candidate}"
-            )
+            diagnostic(f"The {metric} bootstrap needs rows from both models, got {n_baseline} and {n_candidate}")
         return TestResult(
             delta=float("nan"),
             p_value=float("nan"),
@@ -176,8 +171,7 @@ def _bootstrap_rate_delta(
             resampled[iteration] = np.nan
             continue
         resampled[iteration] = (
-            candidate_hits[sampled].sum() / candidate_rows
-            - baseline_hits[sampled].sum() / baseline_rows
+            candidate_hits[sampled].sum() / candidate_rows - baseline_hits[sampled].sum() / baseline_rows
         )
 
     usable = resampled[np.isfinite(resampled)]

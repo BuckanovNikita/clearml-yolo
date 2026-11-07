@@ -35,9 +35,7 @@ def _native_model(preset: str, source_dir: Path) -> "nn.Module":
         return cast("nn.Module", backbone.DinoVisionTransformer(name=_MODEL_NAMES[preset]).eval())
 
 
-def native_state(
-    source: Mapping[str, "Tensor"], preset: str, native: "nn.Module"
-) -> dict[str, "Tensor"]:
+def native_state(source: Mapping[str, "Tensor"], preset: str, native: "nn.Module") -> dict[str, "Tensor"]:
     """Map every source tensor once; restore only architecture-defined nonlearned state."""
     torch = importlib.import_module("torch")
     remaining = dict(source)
@@ -76,20 +74,14 @@ def native_state(
             ("layer_scale2.lambda1", "ls2.gamma"),
             ("attention.o_proj.weight", "attn.proj.weight"),
             ("attention.o_proj.bias", "attn.proj.bias"),
-            *(
-                (f"mlp.{hf}.{kind}", f"mlp.{deim}.{kind}")
-                for hf, deim in mlp
-                for kind in ("weight", "bias")
-            ),
+            *((f"mlp.{hf}.{kind}", f"mlp.{deim}.{kind}") for hf, deim in mlp for kind in ("weight", "bias")),
         ]
         for hf, deim in pairs:
             result[target + deim] = take(origin + hf)
         result[target + "attn.qkv.weight"] = torch.cat(
             [take(origin + f"attention.{projection}_proj.weight") for projection in ("q", "k", "v")]
         )
-        query, value = [
-            take(origin + f"attention.{projection}_proj.bias") for projection in ("q", "v")
-        ]
+        query, value = [take(origin + f"attention.{projection}_proj.bias") for projection in ("q", "v")]
         result[target + "attn.qkv.bias"] = torch.cat((query, torch.zeros_like(query), value))
         result[target + "attn.qkv.bias_mask"] = torch.cat(
             (torch.ones_like(query), torch.zeros_like(query), torch.ones_like(query))
@@ -188,9 +180,7 @@ def _publish(
         native_revision=DEIM_REVISION,
     )
     identity = hashlib.sha256(derivation.model_dump_json().encode()).hexdigest()[:24]
-    directory = write_path(
-        cy_home() / ".cache" / "clearml-yolo" / "models" / "deimv2" / preset / identity
-    )
+    directory = write_path(cy_home() / ".cache" / "clearml-yolo" / "models" / "deimv2" / preset / identity)
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / f"{_CONVERTER}.pth"
     receipt = path.with_suffix(".json")

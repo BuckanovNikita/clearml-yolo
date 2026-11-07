@@ -75,9 +75,7 @@ def test_verification_evidence_uploads_before_failed_completion(
         "expect_artifacts",
         lambda owner, names: calls.append(("expect", names)),
     )
-    monkeypatch.setattr(
-        dependencies.repository, "resolve_weights_with_identity", lambda weights: (checkpoint, None)
-    )
+    monkeypatch.setattr(dependencies.repository, "resolve_weights_with_identity", lambda weights: (checkpoint, None))
     arguments: dict[str, Any] = {
         "export": {"operation": "verify", "device": 0, "engine": tmp_path / "model.engine"},
         "clearml": ClearMLConfig(project_name="export-tests"),
@@ -102,9 +100,7 @@ def test_verification_evidence_uploads_before_failed_completion(
     ]
 
 
-def test_missing_inputs_fail_before_task_creation(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_missing_inputs_fail_before_task_creation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     dependencies = build_dependencies(model_preset("fasterrcnn/resnet50_fpn"))
     monkeypatch.setattr(
         dependencies.tracking,
@@ -178,6 +174,4 @@ def test_verification_covers_contract_endpoints_and_profile_switches() -> None:
         for batch in (1, 2, 3, 4)
         for height, width in ((608, 960), (736, 960), (128, 1536), (256, 1920))
     }
-    assert cases[16:] == tuple(
-        case for batch in (1, 2, 4) for case in ((batch, 672, 960), (batch, 192, 1728))
-    )
+    assert cases[16:] == tuple(case for batch in (1, 2, 4) for case in ((batch, 672, 960), (batch, 192, 1728)))

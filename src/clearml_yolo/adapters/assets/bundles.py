@@ -38,9 +38,7 @@ def _download_budget() -> float:
     try:
         seconds = float(os.environ.get("CY_WEIGHTS_DOWNLOAD_TIMEOUT", "1800"))
     except ValueError:
-        raise BundlePreparationError(
-            "CY_WEIGHTS_DOWNLOAD_TIMEOUT must be positive finite seconds"
-        ) from None
+        raise BundlePreparationError("CY_WEIGHTS_DOWNLOAD_TIMEOUT must be positive finite seconds") from None
     if seconds <= 0 or not math.isfinite(seconds * 4 + 60):
         raise BundlePreparationError("CY_WEIGHTS_DOWNLOAD_TIMEOUT must be positive finite seconds")
     return seconds
@@ -89,10 +87,7 @@ def _archive_path(manifest: BundleManifest, archive: BundleArchive) -> Path:
             pass
         else:
             return destination
-        original = (
-            f"https://github.com/{manifest.repository}/releases/download/"
-            f"{manifest.release_tag}/{archive.name}"
-        )
+        original = f"https://github.com/{manifest.repository}/releases/download/{manifest.release_tag}/{archive.name}"
         try:
             proxy = release_proxy_url(original, os.environ.get("GHR"))
         except ValueError:
@@ -166,11 +161,7 @@ def _matches(spec: AssetSpec, asset: BundleAsset) -> bool:
         and spec.checksum is not None
         and spec.checksum_algorithm == "sha256"
     )
-    identity = (
-        spec.model_copy(update={"revision": asset.source_revision}).identity
-        if resnet
-        else spec.identity
-    )
+    identity = spec.model_copy(update={"revision": asset.source_revision}).identity if resnet else spec.identity
     return (
         asset.identity == identity
         and asset.backend == spec.backend
@@ -223,9 +214,7 @@ def _seed(spec: AssetSpec, manifest: BundleManifest) -> None:
             _copy_member(archive, members, asset.member, weight, asset.size, asset.sha256)
             if asset.hub is not None:
                 metadata = asset.hub.config
-                _copy_member(
-                    archive, members, metadata.member, config, metadata.size, metadata.sha256
-                )
+                _copy_member(archive, members, metadata.member, config, metadata.size, metadata.sha256)
         if spec.hub is not None:
             restore_bundle_asset(spec, asset, weight, config)
         else:
@@ -248,8 +237,7 @@ def seed_bundle_asset(spec: AssetSpec, manifest: BundleManifest | None = None) -
         selected = manifest if manifest is not None else load_manifest()
         if selected is None:
             raise BundlePreparationError(
-                "Packaged weights manifest is missing; "
-                "reinstall a release with weights-manifest.json"
+                "Packaged weights manifest is missing; reinstall a release with weights-manifest.json"
             )
         _seed(spec, selected)
     except (

@@ -163,9 +163,7 @@ def test_ndjson_native_conversion_reads_local_images_without_network(
         "get",
         lambda *args, **kwargs: pytest.fail("local NDJSON must not fetch an HTTP image"),
     )
-    data = asyncio.run(
-        convert_ndjson_to_yolo(directory / "dataset.ndjson", output_path=directory / "native")
-    )
+    data = asyncio.run(convert_ndjson_to_yolo(directory / "dataset.ndjson", output_path=directory / "native"))
     checked = check_det_dataset(str(data))
     assert checked["names"] == {0: "alpha", 1: "zeta"}
     for split in ("train", "val"):

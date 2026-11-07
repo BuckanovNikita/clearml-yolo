@@ -23,12 +23,8 @@ from workflow_dependencies import (
 
 
 @pytest.fixture(autouse=True)
-def native_publication_boundary(
-    monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
-) -> None:
-    monkeypatch.setattr(
-        workflow_dependencies.tracking, "publish_training_parameters", lambda *a: None
-    )
+def native_publication_boundary(monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies) -> None:
+    monkeypatch.setattr(workflow_dependencies.tracking, "publish_training_parameters", lambda *a: None)
     # Load the real trainer boundary before individual tests substitute YOLO construction.
     from clearml_yolo.adapters.integrations import native_trainer  # noqa: F401
 
@@ -170,9 +166,7 @@ def test_csv_training_uses_prepared_data_and_returns_cleaned_ground_truth(
     class Model:
         def __init__(self, _model: str) -> None:
             self.task = "detect"
-            self.trainer = types.SimpleNamespace(
-                save_dir=native_dir, args=types.SimpleNamespace(), data={}
-            )
+            self.trainer = types.SimpleNamespace(save_dir=native_dir, args=types.SimpleNamespace(), data={})
 
         def train(self, **kwargs: Any) -> None:
             from clearml_yolo.adapters.integrations.native_trainer import OwnedDetectionTrainer
@@ -214,14 +208,10 @@ def test_csv_training_uses_prepared_data_and_returns_cleaned_ground_truth(
     assert calls["uploads"] == [(cleaned, tmp_path / "training")]
     assert calls["locked"] is False
     prepared_records = [
-        values["prepared_dataset"]
-        for values in calls["configurations"]
-        if "prepared_dataset" in values
+        values["prepared_dataset"] for values in calls["configurations"] if "prepared_dataset" in values
     ]
     assert prepared_records == (
-        [{"cache_identity": cache_identity, "root": str(prepared_dir)}]
-        if cache_identity is not None
-        else []
+        [{"cache_identity": cache_identity, "root": str(prepared_dir)}] if cache_identity is not None else []
     )
     assert result.weights == native_dir / "weights/best.pt"
     assert result.cleaned_ground_truth == cleaned
@@ -323,9 +313,7 @@ def test_implicit_training_name_uses_active_task(
         raising=False,
     )
 
-    def capture(
-        _task: object, settings: dict[str, Any], *args: Any, deps: WorkflowDependencies
-    ) -> Any:
+    def capture(_task: object, settings: dict[str, Any], *args: Any, deps: WorkflowDependencies) -> Any:
         assert deps is workflow_dependencies
         assert settings["name"] == "renamed%2Ftask"
         assert settings["project"] == str(tmp_path / "runs/project/renamed%2Ftask-id/detect")
@@ -424,17 +412,14 @@ def test_native_ddp_events_replay_before_model_finalization(
     _execute_training(
         types.SimpleNamespace(id="task"),
         "model.pt",
-        training_settings()
-        | {"project": str(tmp_path), "name": "train", "data": str(prepared.data)},
+        training_settings() | {"project": str(tmp_path), "name": "train", "data": str(prepared.data)},
         prepared,
         deps=workflow_dependencies,
     )
     assert events == ["train", "replay", "finalize", "relay_closed"]
 
 
-@pytest.mark.parametrize(
-    "selection", ["ultralytics", "rfdetr/small", "deimv2/s", "fasterrcnn/resnet50_fpn"]
-)
+@pytest.mark.parametrize("selection", ["ultralytics", "rfdetr/small", "deimv2/s", "fasterrcnn/resnet50_fpn"])
 def test_validated_general_is_published_before_any_dataset_preparation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, selection: str
 ) -> None:

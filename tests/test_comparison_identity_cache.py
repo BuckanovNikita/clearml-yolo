@@ -130,10 +130,20 @@ def test_comparison_resolves_execution_and_fingerprint_without_rewriting_lineage
     image = source / "image.jpg"
     image.write_bytes(b"source image")
     truth_path = source / "truth.csv"
-    pd.DataFrame([{
-        "image_name": "image.jpg", "image_path": "image.jpg", "instance_label": "person",
-        "bbox_x_tl": 1., "bbox_y_tl": 2., "bbox_x_br": 3., "bbox_y_br": 4., "split": "test",
-    }]).to_csv(truth_path, index=False)
+    pd.DataFrame(
+        [
+            {
+                "image_name": "image.jpg",
+                "image_path": "image.jpg",
+                "instance_label": "person",
+                "bbox_x_tl": 1.0,
+                "bbox_y_tl": 2.0,
+                "bbox_x_br": 3.0,
+                "bbox_y_br": 4.0,
+                "split": "test",
+            }
+        ]
+    ).to_csv(truth_path, index=False)
     working = tmp_path / "hydra-output"
     working.mkdir()
     (working / "image.jpg").write_bytes(b"wrong image")
@@ -147,7 +157,8 @@ def test_comparison_resolves_execution_and_fingerprint_without_rewriting_lineage
     monkeypatch.chdir(working)
     predictor = RecordingPredictor()
     monkeypatch.setattr(
-        workflow_dependencies.model, "reinfer_split",
+        workflow_dependencies.model,
+        "reinfer_split",
         partial(reinfer_split, predictor=predictor, class_names=lambda _: {0: "person"}),
     )
     weights = tmp_path / "best.pt"
@@ -159,13 +170,23 @@ def test_comparison_resolves_execution_and_fingerprint_without_rewriting_lineage
         return SimpleNamespace()
 
     patch_workflow(
-        monkeypatch, workflow_dependencies,
-        "clearml_yolo.application.use_cases.compare.evaluate_split", observe,
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.compare.evaluate_split",
+        observe,
     )
     _scored(
-        weights, loaded.source, "test", tmp_path / "predictions.csv", tmp_path,
-        "candidate", _settled(), {"person": 0.0}, ["person"],
-        evaluation=EvaluationConfig(), execution_truth=loaded.execution,
+        weights,
+        loaded.source,
+        "test",
+        tmp_path / "predictions.csv",
+        tmp_path,
+        "candidate",
+        _settled(),
+        {"person": 0.0},
+        ["person"],
+        evaluation=EvaluationConfig(),
+        execution_truth=loaded.execution,
         deps=workflow_dependencies,
     )
     assert predictor.calls[0][1] == [str(image)]

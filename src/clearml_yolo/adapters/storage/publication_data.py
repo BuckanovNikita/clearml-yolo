@@ -46,12 +46,8 @@ def file_hash(path: Path) -> str:
 
 
 @trace_operation("storage.publication.csv.read")
-def _read_csv(
-    path: Path, required: set[str], *, content: bytes | None = None
-) -> list[dict[str, str]]:
-    with StringIO(
-        (path.read_bytes() if content is None else content).decode("utf-8-sig"), newline=""
-    ) as stream:
+def _read_csv(path: Path, required: set[str], *, content: bytes | None = None) -> list[dict[str, str]]:
+    with StringIO((path.read_bytes() if content is None else content).decode("utf-8-sig"), newline="") as stream:
         reader = csv.DictReader(stream)
         names = reader.fieldnames or []
         if len(set(names)) != len(names) or not required.issubset(names):
@@ -73,15 +69,12 @@ def _box(row: dict[str, str], index: int, *, allow_collapsed: bool = False) -> P
         raise ValueError(
             f"Invalid publication box at CSV data row {index} (zero-based): "
             f"image_name={row['image_name']!r}, box={(x1, y1, x2, y2)!r}; "
-            "coordinates must be finite and ordered"
-            + ("" if allow_collapsed else " with positive width and height")
+            "coordinates must be finite and ordered" + ("" if allow_collapsed else " with positive width and height")
         )
     confidence = float(row["confidence"]) if "confidence" in row else None
     if confidence is not None and (not math.isfinite(confidence) or not 0 <= confidence <= 1):
         raise ValueError(f"Invalid prediction confidence at CSV data row {index}")
-    return PublicationBox(
-        label=row["instance_label"], box=(x1, y1, x2, y2), confidence=confidence, index=index
-    )
+    return PublicationBox(label=row["instance_label"], box=(x1, y1, x2, y2), confidence=confidence, index=index)
 
 
 @trace_operation("storage.publication.snapshot")
@@ -126,9 +119,7 @@ def prediction_aliases(snapshot: DatasetSnapshot, mode: str) -> dict[str, str]:
             keys = {name}
         for alias in keys:
             if alias in aliases and aliases[alias] != name:
-                raise ValueError(
-                    f"Ambiguous prediction image identity {alias!r}; use image_name=name"
-                )
+                raise ValueError(f"Ambiguous prediction image identity {alias!r}; use image_name=name")
             aliases[alias] = name
     return aliases
 
@@ -143,9 +134,7 @@ def read_predictions(path: Path | None, aliases: dict[str, str]) -> dict[str, li
     for index, row in enumerate(rows):
         name = aliases.get(row["image_name"])
         if name is None:
-            raise ValueError(
-                f"Prediction image {row['image_name']!r} has no matching ground-truth sample"
-            )
+            raise ValueError(f"Prediction image {row['image_name']!r} has no matching ground-truth sample")
         # Native boundary clipping can collapse boxes; retain raw detections and CSV indices.
         grouped.setdefault(name, []).append(_box(row, index, allow_collapsed=True))
     validate_dataframe(

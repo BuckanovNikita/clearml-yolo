@@ -27,9 +27,7 @@ def test_owned_trainer_round_trips_frozen_pipeline_without_source_file(tmp_path:
         ),
         encoding="utf-8",
     )
-    transforms = resolve_transform_config(
-        TransformConfig(mode="albumentations", pipeline_file=path)
-    )
+    transforms = resolve_transform_config(TransformConfig(mode="albumentations", pipeline_file=path))
     trainer = native_trainer.trainer_with_transforms(transforms)
     serialized = cloudpickle.dumps(trainer)
     path.unlink()
@@ -77,9 +75,7 @@ def test_yolo_custom_crop_keeps_empty_result_and_raw_source_geometry(tmp_path: P
             }
         )
     )
-    transforms = resolve_transform_config(
-        TransformConfig(mode="albumentations", pipeline_file=path)
-    )
+    transforms = resolve_transform_config(TransformConfig(mode="albumentations", pipeline_file=path))
     settings = IterableSimpleNamespace(**vars(get_cfg()))
     dataset = AugmentedYOLODataset(
         img_path=str(images),
@@ -129,9 +125,7 @@ def test_yolo_raw_reader_matches_native_exif_geometry(tmp_path: Path, orientatio
         json.dumps({"transform": {"__class_fullname__": "Compose", "transforms": []}}),
         encoding="utf-8",
     )
-    transforms = resolve_transform_config(
-        TransformConfig(mode="albumentations", pipeline_file=pipeline)
-    )
+    transforms = resolve_transform_config(TransformConfig(mode="albumentations", pipeline_file=pipeline))
     dataset = AugmentedYOLODataset(
         img_path=str(images),
         imgsz=32,

@@ -53,9 +53,7 @@ def exported_image_filename(image: ImageRecord, index: int, dataset_format: Data
     if dataset_format in {"flat", "coco"}:
         return f"{index:08d}{suffix}"
     if dataset_format != "ndjson":
-        raise ValueError(
-            f"Unsupported dataset format {dataset_format!r}; expected 'ndjson' or 'flat'"
-        )
+        raise ValueError(f"Unsupported dataset format {dataset_format!r}; expected 'ndjson' or 'flat'")
     if image.name in {"", ".", ".."} or Path(image.name).name != image.name:
         raise ValueError(f"NDJSON image name must be a safe basename: {image.name!r}")
     if "/" in image.name or "\\" in image.name:
@@ -86,9 +84,7 @@ def _export_coco(records: ValidatedDataset, directory: Path) -> Path:
                 continue
             filename = exported_image_filename(image, index, "coco")
             shutil.copyfile(image.path, write_path(destination / filename))
-            images.append(
-                {"id": index, "file_name": filename, "width": image.width, "height": image.height}
-            )
+            images.append({"id": index, "file_name": filename, "width": image.width, "height": image.height})
             for box in image.boxes:
                 annotation_id += 1
                 width, height = box.x2 - box.x1, box.y2 - box.y1
@@ -109,9 +105,7 @@ def _export_coco(records: ValidatedDataset, directory: Path) -> Path:
         if images:
             data[split] = folder
     path = directory / "data.yaml"
-    write_path(path).write_text(
-        yaml.safe_dump(data, sort_keys=False, allow_unicode=True), encoding="utf-8"
-    )
+    write_path(path).write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True), encoding="utf-8")
     return path
 
 
@@ -144,13 +138,10 @@ def _export_image(
 
 
 @trace_operation("storage.dataset.convert")
-def _export_images(
-    records: ValidatedDataset, dataset_format: DatasetFormat
-) -> tuple[_ExportImage, ...]:
+def _export_images(records: ValidatedDataset, dataset_format: DatasetFormat) -> tuple[_ExportImage, ...]:
     class_ids = {name: class_id for class_id, name in records.names.items()}
     images = tuple(
-        _export_image(image, index, class_ids, dataset_format)
-        for index, image in enumerate(records.images, start=1)
+        _export_image(image, index, class_ids, dataset_format) for index, image in enumerate(records.images, start=1)
     )
     if dataset_format == "ndjson":
         label_owners: dict[tuple[str, str], str] = {}
@@ -256,16 +247,12 @@ def _write_yaml(directory: Path, names: dict[int, str], images: tuple[_ExportIma
     for split in _SPLITS:
         if split in present_splits:
             data[split] = f"images/{split}"
-    write_path(data_path).write_text(
-        yaml.safe_dump(data, sort_keys=False, allow_unicode=True), encoding="utf-8"
-    )
+    write_path(data_path).write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True), encoding="utf-8")
     return data_path
 
 
 @trace_operation("storage.dataset.export")
-def export_dataset(
-    records: ValidatedDataset, directory: Path, dataset_format: DatasetFormat
-) -> Path:
+def export_dataset(records: ValidatedDataset, directory: Path, dataset_format: DatasetFormat) -> Path:
     """Export canonical records and return the native YAML consumed by Ultralytics."""
     directory = write_path(directory)
     directory.mkdir(parents=True, exist_ok=True)
@@ -276,8 +263,6 @@ def export_dataset(
         manifest = directory / "dataset.ndjson"
         _write_ndjson(manifest, records.names, images)
     elif dataset_format != "flat":
-        raise ValueError(
-            f"Unsupported dataset format {dataset_format!r}; expected 'ndjson' or 'flat'"
-        )
+        raise ValueError(f"Unsupported dataset format {dataset_format!r}; expected 'ndjson' or 'flat'")
     _materialize(directory, images)
     return _write_yaml(directory, records.names, images)

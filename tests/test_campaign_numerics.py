@@ -44,9 +44,7 @@ def test_nonfinite_training_loss_identifies_batch_images_and_components() -> Non
             self.weight = nn.Parameter(torch.tensor(1.0))
 
         @override
-        def forward(
-            self, images: list[Tensor], targets: list[dict[str, Tensor]]
-        ) -> dict[str, Tensor]:
+        def forward(self, images: list[Tensor], targets: list[dict[str, Tensor]]) -> dict[str, Tensor]:
             return {
                 "classification": self.weight * 2,
                 "bbox_regression": self.weight * math.inf,
@@ -69,12 +67,8 @@ def test_nonfinite_training_loss_identifies_batch_images_and_components() -> Non
     )
     optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
     scaler = torch.amp.GradScaler("cuda", enabled=False)
-    with pytest.raises(
-        FloatingPointError, match="Torchvision training produced a nonfinite loss"
-    ) as caught:
-        _training_epoch(
-            model, loader, optimizer, scaler, TrainSettings(), torch.device("cpu"), None
-        )
+    with pytest.raises(FloatingPointError, match="Torchvision training produced a nonfinite loss") as caught:
+        _training_epoch(model, loader, optimizer, scaler, TrainSettings(), torch.device("cpu"), None)
 
     message = str(caught.value)
     assert "batch=0" in message

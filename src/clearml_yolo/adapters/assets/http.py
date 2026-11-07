@@ -29,9 +29,7 @@ def asset_source_url(url: str) -> str:
         and parts.path == "/download"
         and all(key in {"id", "export", "confirm"} for key, _ in parse_qsl(parts.query))
     ):
-        return urlunsplit(
-            (parts.scheme, parts.netloc.rsplit("@", 1)[-1], parts.path, parts.query, "")
-        )
+        return urlunsplit((parts.scheme, parts.netloc.rsplit("@", 1)[-1], parts.path, parts.query, ""))
     return redacted_url(url)
 
 
@@ -80,9 +78,5 @@ def download(url: str, destination: Path, *, max_seconds: float = _DOWNLOAD_SECO
                 target.write(chunk)
             target.flush()
             os.fsync(target.fileno())
-        if (
-            expected is not None
-            and not response.headers.get("Content-Encoding")
-            and total != int(expected)
-        ):
+        if expected is not None and not response.headers.get("Content-Encoding") and total != int(expected):
             raise ValueError("Asset download ended before the declared content length")

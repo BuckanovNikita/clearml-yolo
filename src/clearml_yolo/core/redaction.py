@@ -158,8 +158,7 @@ def traceback_locations(error: BaseException) -> str:
         while traceback is not None:
             code = traceback.tb_frame.f_code
             lines.append(
-                f"  File {redact_text(code.co_filename)}, line {traceback.tb_lineno}, "
-                f"in {redact_text(code.co_name)}"
+                f"  File {redact_text(code.co_filename)}, line {traceback.tb_lineno}, in {redact_text(code.co_name)}"
             )
             traceback = traceback.tb_next
     return "\n".join(lines)
@@ -229,8 +228,7 @@ def sanitize_configuration(value: object) -> JsonValue:
         value = dataclasses.asdict(value)
     if isinstance(value, Mapping):
         return {
-            str(key): _REDACTED if sensitive_key(key) else sanitize_configuration(item)
-            for key, item in value.items()
+            str(key): _REDACTED if sensitive_key(key) else sanitize_configuration(item) for key, item in value.items()
         }
     if isinstance(value, (list, tuple, set, frozenset)):
         return [sanitize_configuration(item) for item in value]

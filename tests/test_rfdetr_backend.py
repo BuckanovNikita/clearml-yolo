@@ -123,9 +123,7 @@ def test_rfdetr_reload_preserves_trained_position_grid(
 def test_rfdetr_explicit_missing_weights_fail_before_native_construction(tmp_path: Path) -> None:
     from clearml_yolo.adapters.rfdetr.backend import train
 
-    config = ModelConfig(
-        backend="rfdetr", preset="nano", train=TrainSettings(weights=tmp_path / "missing.pth")
-    )
+    config = ModelConfig(backend="rfdetr", preset="nano", train=TrainSettings(weights=tmp_path / "missing.pth"))
     prepared = PreparedDataset(
         data=tmp_path / "data.yaml",
         ground_truth=tmp_path / "gt.csv",
@@ -209,9 +207,7 @@ def test_rfdetr_missing_native_best_never_falls_back_to_last_checkpoint(
         "pytorch_lightning",
         SimpleNamespace(seed_everything=lambda *_, **__: None, Callback=type("Callback", (), {})),
     )
-    config = ModelConfig(
-        backend="rfdetr", preset="nano", train=TrainSettings(device="cpu", pretrained=False)
-    )
+    config = ModelConfig(backend="rfdetr", preset="nano", train=TrainSettings(device="cpu", pretrained=False))
     with pytest.raises(RuntimeError, match=r"did not produce checkpoint_best_total\.pth"):
         backend.train(config, prepared, output, lambda *_: None)
     assert (output / "checkpoint_last.pth").read_bytes() == b"unselected native checkpoint"
@@ -258,12 +254,8 @@ def test_rfdetr_pretrained_backbone_was_actually_loaded(
         assert name in {"torch", "rfdetr.utilities.io"}
         return native_torch if name == "torch" else native_io
 
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.rfdetr.backend.importlib.import_module", native_module
-    )
-    model = SimpleNamespace(
-        model=SimpleNamespace(model=SimpleNamespace(state_dict=lambda: {key: actual}))
-    )
+    monkeypatch.setattr("clearml_yolo.adapters.rfdetr.backend.importlib.import_module", native_module)
+    model = SimpleNamespace(model=SimpleNamespace(model=SimpleNamespace(state_dict=lambda: {key: actual})))
     if matches:
         backend._verify_pretrained(model, checkpoint)
     else:
@@ -271,9 +263,7 @@ def test_rfdetr_pretrained_backbone_was_actually_loaded(
             backend._verify_pretrained(model, checkpoint)
 
 
-@pytest.mark.parametrize(
-    "changes", [{"resize": "letterbox"}, {"stride": 16}, {"size": [64, 64]}, {"size": 65}]
-)
+@pytest.mark.parametrize("changes", [{"resize": "letterbox"}, {"stride": 16}, {"size": [64, 64]}, {"size": 65}])
 def test_rfdetr_rejects_unsupported_checkpoint_preprocessing(changes: dict[str, Any]) -> None:
     from clearml_yolo.adapters.rfdetr.backend import predict
 
@@ -356,9 +346,7 @@ def test_rfdetr_distributed_validation_removes_padding_before_forward(length: in
 
 
 @pytest.mark.parametrize("length", [1, 5, 7])
-def test_rfdetr_validation_forward_visits_only_unique_images(
-    length: int, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_rfdetr_validation_forward_visits_only_unique_images(length: int, monkeypatch: pytest.MonkeyPatch) -> None:
     import torch
     from torch import distributed
 

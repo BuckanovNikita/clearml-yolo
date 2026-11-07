@@ -30,9 +30,7 @@ class ConsolePublisher:
         self.capture = capture
         self.directory = capture.directory / f"publisher-{uuid4().hex}"
         self.directory.mkdir(mode=0o700)
-        initial = (
-            capture.offsets() if capture.publication_started else dict.fromkeys(capture.paths, 0)
-        )
+        initial = capture.offsets() if capture.publication_started else dict.fromkeys(capture.paths, 0)
         capture.publication_started = True
         write_offsets(self.directory / "publisher-initial.json", initial)
         self.timeout = timeout
@@ -84,9 +82,7 @@ class ConsolePublisher:
         deadline = monotonic() + self.timeout
         while monotonic() < deadline:
             if self.process is None or self.process.poll() is not None:
-                raise ConsolePublicationError(
-                    "Console publisher stopped before publication barrier"
-                )
+                raise ConsolePublicationError("Console publisher stopped before publication barrier")
             if self._acknowledges(target):
                 return
             sleep(0.025)
@@ -115,16 +111,12 @@ class ConsolePublisher:
             self.process.wait(timeout=self.timeout)
         except subprocess.TimeoutExpired as error:
             self._stop_owned_process()
-            raise ConsolePublicationError(
-                "Console publication deadline expired; local logs retained"
-            ) from error
+            raise ConsolePublicationError("Console publication deadline expired; local logs retained") from error
         except BaseException:
             self._stop_owned_process()
             raise
         receipt = self.directory / "publisher-receipt.json"
         if self.process.returncode != 0 or not receipt.is_file():
-            raise ConsolePublicationError(
-                "Console publisher failed; delivery is uncertain and logs retained"
-            )
+            raise ConsolePublicationError("Console publisher failed; delivery is uncertain and logs retained")
         if json.loads(receipt.read_text()) != final:
             raise ConsolePublicationError("Console publication did not acknowledge final offsets")

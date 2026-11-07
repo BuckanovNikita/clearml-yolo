@@ -31,9 +31,7 @@ def _inputs(tmp_path: Path) -> tuple[pd.DataFrame, Path]:
         image = tmp_path / f"{split}.jpg"
         image.write_bytes(b"native inference is replaced in these tests")
         rows.append((image.name, str(image), "cat", 0, 0, 10, 10, split))
-    truth = pd.DataFrame(
-        rows, columns=["image_name", "image_path", "instance_label", *BOX_COLUMNS, "split"]
-    )
+    truth = pd.DataFrame(rows, columns=["image_name", "image_path", "instance_label", *BOX_COLUMNS, "split"])
     path = tmp_path / "ground_truth.csv"
     truth.to_csv(path, index=False)
     return truth, path
@@ -60,9 +58,7 @@ def _assert_payload(payload: EvaluationPayload, all_invalid: bool) -> None:
     assert len(payload.ground_truth) == 1
     assert payload.ground_truth[0].status == ("FN" if all_invalid else "TP")
     assert len(payload.predictions) == (0 if all_invalid else 2)
-    assert sorted(match.status for match in payload.matches) == (
-        ["FN"] if all_invalid else ["FP", "TP"]
-    )
+    assert sorted(match.status for match in payload.matches) == (["FN"] if all_invalid else ["FP", "TP"])
     for match in payload.matches:
         if match.pred_index is not None:
             box = next(box for box in payload.predictions if box.index == match.pred_index)

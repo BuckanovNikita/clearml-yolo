@@ -59,10 +59,7 @@ class DocumentationServer(ThreadingHTTPServer):
             raise TypeError("Documentation server requires TCP sockets")
         if not self._connections.acquire(blocking=False):
             try:
-                request.sendall(
-                    b"HTTP/1.0 503 Service Unavailable\r\n"
-                    b"Content-Length: 0\r\nConnection: close\r\n\r\n"
-                )
+                request.sendall(b"HTTP/1.0 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
             finally:
                 self.shutdown_request(request)
             return
@@ -132,9 +129,7 @@ class _Handler(BaseHTTPRequestHandler):
         origins = self.headers.get_all("Origin", [])
         return hosts == [address] and origins in ([], [f"http://{address}"])
 
-    def _send(
-        self, status: HTTPStatus, data: bytes, content_type: str = "text/plain; charset=utf-8"
-    ) -> None:
+    def _send(self, status: HTTPStatus, data: bytes, content_type: str = "text/plain; charset=utf-8") -> None:
         try:
             self.send_response(status)
             self.send_header("Content-Type", content_type)
@@ -169,9 +164,7 @@ class _Handler(BaseHTTPRequestHandler):
             self._error(HTTPStatus.BAD_REQUEST, "Invalid request target")
             return
         if path == "/api/catalog":
-            self._send(
-                HTTPStatus.OK, self.docs_server.catalog_bytes, "application/json; charset=utf-8"
-            )
+            self._send(HTTPStatus.OK, self.docs_server.catalog_bytes, "application/json; charset=utf-8")
             return
         name = "index.html" if path == "/" else path.lstrip("/")
         if name not in self.docs_server.allowed:

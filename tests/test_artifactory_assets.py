@@ -36,13 +36,9 @@ def artifactory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Loc
     state = LocalArtifactory(root="")
     original_send = requests.Session.send
 
-    def local_send(
-        session: requests.Session, request: requests.PreparedRequest, **kwargs: Any
-    ) -> requests.Response:
+    def local_send(session: requests.Session, request: requests.PreparedRequest, **kwargs: Any) -> requests.Response:
         assert request.url is not None
-        assert urlsplit(request.url).hostname in {"127.0.0.1", "localhost"}, (
-            "These checks permit loopback HTTP only"
-        )
+        assert urlsplit(request.url).hostname in {"127.0.0.1", "localhost"}, "These checks permit loopback HTTP only"
         return original_send(session, request, **kwargs)
 
     monkeypatch.setattr(requests.Session, "send", local_send)
@@ -104,11 +100,7 @@ def _bundle() -> tuple[AssetSpec, BundleManifest, bytes]:
         schema_version=1,
         repository="BuckanovNikita/clearml-yolo",
         release_tag="weights-2026-10-29",
-        archives=(
-            BundleArchive(
-                name="weights.tar", size=len(payload), sha256=hashlib.sha256(payload).hexdigest()
-            ),
-        ),
+        archives=(BundleArchive(name="weights.tar", size=len(payload), sha256=hashlib.sha256(payload).hexdigest()),),
         assets=(
             BundleAsset(
                 identity=spec.identity,
@@ -159,15 +151,9 @@ def test_own_bundle_proxy_failure_recovers_at_original_release(
     spec, manifest, payload = _bundle()
     path = "/artifactory/github-releases" + _own_path()
     status = 401 if failure == "unauthorized" else 503
-    artifactory.routes[path] = (
-        (200, b"corrupt archive", {}) if failure == "corrupt" else (status, b"denied", {})
-    )
+    artifactory.routes[path] = (200, b"corrupt archive", {}) if failure == "corrupt" else (status, b"denied", {})
     artifactory.routes["/original-release"] = (200, payload, {})
-    root = (
-        "http://[malformed"
-        if failure == "malformed"
-        else (artifactory.root + "/artifactory/github-releases")
-    )
+    root = "http://[malformed" if failure == "malformed" else (artifactory.root + "/artifactory/github-releases")
     monkeypatch.setenv("GHR", root)
     original = "https://github.com" + _own_path()
     attempts: list[str] = []
@@ -217,10 +203,7 @@ def test_gh_vcs_downloadcommit_route_retains_original_source(
         override="model.source_dir",
     )
     monkeypatch.setenv("GH", artifactory.root + "/artifactory/github-vcs/")
-    expected = (
-        "/artifactory/api/vcs/downloadCommit/github-vcs/Intellindust-AI-Lab/DEIMv2/"
-        f"{revision}?ext=tar.gz"
-    )
+    expected = f"/artifactory/api/vcs/downloadCommit/github-vcs/Intellindust-AI-Lab/DEIMv2/{revision}?ext=tar.gz"
     artifactory.routes[expected] = (200, b"source transport fixture", {})
     proxy, original = resolver.source_urls(spec)
     assert proxy == artifactory.root + expected
@@ -233,9 +216,7 @@ def test_gh_vcs_downloadcommit_route_retains_original_source(
     assert spec.revision == revision
 
 
-def test_native_upstream_release_still_uses_ghr(
-    artifactory: LocalArtifactory, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_native_upstream_release_still_uses_ghr(artifactory: LocalArtifactory, monkeypatch: pytest.MonkeyPatch) -> None:
     spec, _, _ = _bundle()
     monkeypatch.setenv("GHR", artifactory.root + "/artifactory/github-releases")
     path = "/artifactory/github-releases/upstream/models/releases/download/v1/model.pt"
@@ -246,9 +227,7 @@ def test_native_upstream_release_still_uses_ghr(
     assert artifactory.requests[0][0] == path
 
 
-def test_netrc_auth_is_not_forwarded_to_redirect_host(
-    artifactory: LocalArtifactory, tmp_path: Path
-) -> None:
+def test_netrc_auth_is_not_forwarded_to_redirect_host(artifactory: LocalArtifactory, tmp_path: Path) -> None:
     redirected = artifactory.root.replace("127.0.0.1", "localhost") + "/public"
     artifactory.routes["/private"] = (302, b"", {"Location": redirected})
     artifactory.routes["/public"] = (200, WEIGHT, {})
@@ -294,9 +273,7 @@ def test_manual_failure_prints_static_setup_and_retry_only_when_needed(
 ) -> None:
     result = PreparationResult(
         fingerprint="fixture",
-        failures=(PreparationFailure(selection="example", message="unavailable"),)
-        if failed
-        else (),
+        failures=(PreparationFailure(selection="example", message="unavailable"),) if failed else (),
     )
     monkeypatch.setattr(download_weights, "runtime_environment", nullcontext)
     monkeypatch.setattr(download_weights, "prepare_catalogue", lambda *, automatic: result)

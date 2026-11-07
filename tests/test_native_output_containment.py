@@ -35,21 +35,20 @@ def test_detector_output_tree_rejected_before_native_work(
     monkeypatch.setattr(shared_training, "training_context", native_effect)
     monkeypatch.setattr(rfdetr, "_names", native_effect)
     monkeypatch.setattr(deim, "_validate_training", native_effect)
-    functions = {
-        "fasterrcnn": fasterrcnn.train_native, "rfdetr": rfdetr.train, "deimv2": deim.train
-    }
+    functions = {"fasterrcnn": fasterrcnn.train_native, "rfdetr": rfdetr.train, "deimv2": deim.train}
     prepared = PreparedDataset(
-        data=tmp_path / "input.yaml", ground_truth=tmp_path / "input.csv",
-        manifest=tmp_path / "preparation.json", dataset_format="coco", artifacts=[],
+        data=tmp_path / "input.yaml",
+        ground_truth=tmp_path / "input.csv",
+        manifest=tmp_path / "preparation.json",
+        dataset_format="coco",
+        artifacts=[],
     )
     with pytest.raises(ValueError, match="CY_HOME"):
         functions[backend](ModelConfig(), prepared, output, lambda *_args: None)
     assert outside.read_bytes() == b"preserve external output"
 
 
-def test_checkpoint_leaf_revalidated_before_torch_save(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_checkpoint_leaf_revalidated_before_torch_save(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from clearml_yolo.adapters.torchvision import training
 
     monkeypatch.setenv("CY_HOME", str(tmp_path))
@@ -59,8 +58,11 @@ def test_checkpoint_leaf_revalidated_before_torch_save(
         outside.write_bytes(b"preserve external checkpoint")
         output.symlink_to(outside)
         metadata = CheckpointMetadata(
-            backend="fasterrcnn", preset="resnet50_fpn", class_names=("object",),
-            preprocessing=Preprocessing(resize="letterbox", size=(608, 960)), dependencies={},
+            backend="fasterrcnn",
+            preset="resnet50_fpn",
+            class_names=("object",),
+            preprocessing=Preprocessing(resize="letterbox", size=(608, 960)),
+            dependencies={},
         )
         with pytest.raises(ValueError, match="CY_HOME"):
             training._checkpoint(SimpleNamespace(state_dict=dict), output, 0, 0.5, metadata)
@@ -81,10 +83,15 @@ def test_yolo_constructor_validates_output_before_native_initialization(
     outside.write_text("preserve external args")
     (output / "args.yaml").symlink_to(outside)
     with pytest.raises(ValueError, match="CY_HOME"):
-        OwnedDetectionTrainer(overrides={
-            "project": str(output.parent), "name": output.name, "exist_ok": True,
-            "device": "cpu", "model": "missing.yaml",
-        })
+        OwnedDetectionTrainer(
+            overrides={
+                "project": str(output.parent),
+                "name": output.name,
+                "exist_ok": True,
+                "device": "cpu",
+                "model": "missing.yaml",
+            }
+        )
     assert outside.read_text() == "preserve external args"
     assert not (output / "weights").exists()
 
@@ -139,6 +146,7 @@ def test_yolo_prediction_checks_actual_native_route_before_stream_writes(
             def stream() -> Iterator[Any]:
                 outside.write_bytes(b"native overwritten image")
                 yield SimpleNamespace(path=str(tmp_path / "input.jpg"), boxes=None)
+
             return stream()
 
     monkeypatch.setattr(ultralytics.models, "YOLO", Model)

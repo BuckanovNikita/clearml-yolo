@@ -44,9 +44,7 @@ def _run(root: str = "/cache/one", device: Any = None) -> dict[str, Any]:
         },
         "display_names": {"requested": root, "effective": root},
         "fiftyone_result": {"dataset_name": root, "run_key": root, "sample_count": 2},
-        "prediction_result": {
-            "native_normalization": {"imgsz": {"requested": 63, "effective": 64}}
-        },
+        "prediction_result": {"native_normalization": {"imgsz": {"requested": 63, "effective": 64}}},
     }
 
 
@@ -113,9 +111,7 @@ def test_cuda_selector_spellings_share_identity(device: Any, sdk_hash: Callable[
 
 
 @pytest.mark.parametrize("device", [[0], "cpu", "mps", "cuda", -1, "-1,-1", "", [0, 0], True])
-def test_device_types_counts_and_unresolved_selectors_differ(
-    device: Any, sdk_hash: Callable[..., str]
-) -> None:
+def test_device_types_counts_and_unresolved_selectors_differ(device: Any, sdk_hash: Callable[..., str]) -> None:
     assert sdk_hash(_representation(device=device)) != sdk_hash(_representation())
 
 
@@ -149,9 +145,7 @@ def test_semantic_and_unknown_run_settings_remain_sensitive(
 
 
 @pytest.mark.parametrize("section", ["script", "docker", "hyper_params", "configs"])
-def test_code_container_and_unknown_fields_remain_sensitive(
-    section: str, sdk_hash: Callable[..., str]
-) -> None:
+def test_code_container_and_unknown_fields_remain_sensitive(section: str, sdk_hash: Callable[..., str]) -> None:
     first = _representation()
     second = deepcopy(first)
     second[section]["unknown"] = "changed"
@@ -238,16 +232,12 @@ def test_dataset_class_key_types_and_split_semantics_remain_sensitive(
         {"path": "/cache/one", "train": "images/train", "names": {"0": "cat"}}
     )
     assert sdk_hash(first) != sdk_hash(second)
-    second["configs"]["dataset"] = yaml.safe_dump(
-        {"path": "/cache/one", "train": "images/val", "names": {0: "cat"}}
-    )
+    second["configs"]["dataset"] = yaml.safe_dump({"path": "/cache/one", "train": "images/val", "names": {0: "cat"}})
     assert sdk_hash(first) != sdk_hash(second)
 
 
 @pytest.mark.parametrize("identity", [None, "", "not-a-digest"])
-def test_unproven_generated_paths_remain_sensitive(
-    identity: Any, sdk_hash: Callable[..., str]
-) -> None:
+def test_unproven_generated_paths_remain_sensitive(identity: Any, sdk_hash: Callable[..., str]) -> None:
     values = []
     for root in ("/cache/one", "/cache/two"):
         representation = _representation(root)
@@ -293,9 +283,7 @@ def test_safe_yaml_aliases_are_detached_and_deterministic() -> None:
         ("comparison", "inference"),
     ],
 )
-def test_devices_in_known_model_and_inference_groups(
-    path: tuple[str, ...], sdk_hash: Callable[..., str]
-) -> None:
+def test_devices_in_known_model_and_inference_groups(path: tuple[str, ...], sdk_hash: Callable[..., str]) -> None:
     values = []
     for device in ("0", [2], "cpu"):
         representation = _representation()
@@ -318,9 +306,7 @@ def test_devices_in_known_model_and_inference_groups(
     assert target["unknown"] == {"name": "science", "path": "/input"}
 
 
-@pytest.mark.parametrize(
-    "path", [("training_normalization",), ("prediction_result", "native_normalization")]
-)
+@pytest.mark.parametrize("path", [("training_normalization",), ("prediction_result", "native_normalization")])
 def test_recorded_native_normalization_preserves_science_and_normalizes_routing(
     path: tuple[str, ...], sdk_hash: Callable[..., str]
 ) -> None:
@@ -489,21 +475,15 @@ def test_sdk_incompatible_json_key_escape_preserves_entire_representation(
 
     literal = _representation()
     escaped = deepcopy(literal)
-    escaped["configs"]["run"] = literal["configs"]["run"].replace(
-        '"ground_truth"', r'"\u0067round_truth"'
-    )
+    escaped["configs"]["run"] = literal["configs"]["run"].replace('"ground_truth"', r'"\u0067round_truth"')
     assert json.loads(literal["configs"]["run"]) == json.loads(escaped["configs"]["run"])
-    assert text_to_config_dict(literal["configs"]["run"]) != text_to_config_dict(
-        escaped["configs"]["run"]
-    )
+    assert text_to_config_dict(literal["configs"]["run"]) != text_to_config_dict(escaped["configs"]["run"])
     assert sdk_hash(literal) != sdk_hash(escaped)
     assert normalize_task_hash(escaped) == escaped
 
 
 @pytest.mark.parametrize("value", [r"\u0061", r"\/", r"\b", r"\f", 'quoted " text ' + r"\u0061"])
-def test_literal_backslash_sequences_remain_normalizable(
-    value: str, sdk_hash: Callable[..., str]
-) -> None:
+def test_literal_backslash_sequences_remain_normalizable(value: str, sdk_hash: Callable[..., str]) -> None:
     from clearml.utilities.config import text_to_config_dict
 
     representations = []
@@ -567,9 +547,9 @@ def test_tracking_project_remains_scientific_for_fallback_model_lookup(
         for key in ("baseline_model", "candidate_model"):
             values[key] = ModelRef.model_validate(values[key]).model_dump(mode="json")
     elif "baseline_model" in values.get("compare", {}):
-        values["compare"]["baseline_model"] = ModelRef.model_validate(
-            values["compare"]["baseline_model"]
-        ).model_dump(mode="json")
+        values["compare"]["baseline_model"] = ModelRef.model_validate(values["compare"]["baseline_model"]).model_dump(
+            mode="json"
+        )
     representations = [
         _workflow_representation(
             command,
@@ -637,9 +617,7 @@ def test_tracking_project_is_routing_only_when_model_lookup_is_independent(
     assert sdk_hash(representations[0]) == sdk_hash(representations[1])
 
 
-@pytest.mark.parametrize(
-    "skip", ["skip_train", "skip_predict", "skip_metrics", "skip_compare", "skip_report"]
-)
+@pytest.mark.parametrize("skip", ["skip_train", "skip_predict", "skip_metrics", "skip_compare", "skip_report"])
 @pytest.mark.parametrize("destination", ["run_dir", "run_id"])
 def test_pipeline_reuse_destinations_identify_consumed_inputs(
     skip: str, destination: str, sdk_hash: Callable[..., str]
@@ -724,17 +702,12 @@ def test_rejected_detector_selectors_cannot_hit_valid_cached_tasks(
     assert str(consumer(settings.model_validate({"device": valid}).device)) in {"cpu", "cuda:0"}
     with pytest.raises((ValueError, RuntimeError)):
         consumer(settings.model_validate({"device": invalid}).device)
-    representations = [
-        _selector_representation(("model", stage), value, backend=backend)
-        for value in (valid, invalid)
-    ]
+    representations = [_selector_representation(("model", stage), value, backend=backend) for value in (valid, invalid)]
     assert sdk_hash(representations[0]) != sdk_hash(representations[1])
 
 
 @pytest.mark.parametrize("invalid", ["00", "01", "cuda:00"])
-def test_fasterrcnn_leading_zero_selectors_remain_distinct(
-    invalid: str, sdk_hash: Callable[..., str]
-) -> None:
+def test_fasterrcnn_leading_zero_selectors_remain_distinct(invalid: str, sdk_hash: Callable[..., str]) -> None:
     from clearml_yolo.adapters.fasterrcnn.inference import execution_device
 
     with pytest.raises(RuntimeError):
@@ -771,9 +744,7 @@ def test_rejected_export_selectors_cannot_hit_valid_cached_tasks(
     assert sdk_hash(values[0]) != sdk_hash(values[1])
 
 
-@pytest.mark.parametrize(
-    "path", [("inference",), ("compare", "inference"), ("inference", "ultralytics")]
-)
+@pytest.mark.parametrize("path", [("inference",), ("compare", "inference"), ("inference", "ultralytics")])
 @pytest.mark.parametrize("invalid", ["[0]", "CUDA:0", "0 ", ["0"], "00", "0,1"])
 def test_unknown_comparison_backend_uses_conservative_selectors(
     path: tuple[str, ...], invalid: Any, sdk_hash: Callable[..., str]
@@ -829,10 +800,7 @@ def test_typed_model_groups_preserve_invalid_string_lists(
     schema = TrainSettings if stage == "train" else PredictSettings
     with pytest.raises(ValueError, match="valid integer"):
         schema.model_validate({"device": ["0"]})
-    values = [
-        _selector_representation(("model", stage), device, backend=backend)
-        for device in ([0], ["0"])
-    ]
+    values = [_selector_representation(("model", stage), device, backend=backend) for device in ([0], ["0"])]
     assert sdk_hash(values[0]) != sdk_hash(values[1])
 
 
@@ -841,18 +809,13 @@ def test_typed_model_groups_preserve_invalid_string_lists(
 def test_strict_consumers_still_ignore_valid_gpu_index_changes(
     backend: str, device: Any, sdk_hash: Callable[..., str]
 ) -> None:
-    values = [
-        _selector_representation(("model", "train"), value, backend=backend)
-        for value in (0, device)
-    ]
+    values = [_selector_representation(("model", "train"), value, backend=backend) for value in (0, device)]
     assert sdk_hash(values[0]) == sdk_hash(values[1])
 
 
 @pytest.mark.parametrize("operation", ["onnx", "build", "verify", [], {}])
 def test_export_projection_handles_operation_shapes_conservatively(operation: Any) -> None:
-    representation = _workflow_representation(
-        "export", {"export": {"operation": operation, "device": "CPU"}}
-    )
+    representation = _workflow_representation("export", {"export": {"operation": operation, "device": "CPU"}})
     normalized = normalize_task_hash(representation)
     assert json.loads(normalized["configs"]["run"])["export"] == {
         "operation": operation,

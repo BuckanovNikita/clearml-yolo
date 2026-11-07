@@ -22,9 +22,7 @@ def resolve_transform_config(config: TransformConfig) -> TransformConfig:
         except (OSError, UnicodeError, json.JSONDecodeError) as error:
             raise ValueError(f"Cannot read augmentation JSON {path}: {error}") from error
         pipeline = TypeAdapter(dict[str, JsonValue]).validate_python(content)
-        snapshot = TransformSnapshot(
-            pipeline=pipeline, sha256=pipeline_digest(pipeline), source=str(path)
-        )
+        snapshot = TransformSnapshot(pipeline=pipeline, sha256=pipeline_digest(pipeline), source=str(path))
     validate_pipeline(snapshot.pipeline)
     return TransformConfig(mode=config.mode, pipeline_file=config.pipeline_file, snapshot=snapshot)
 

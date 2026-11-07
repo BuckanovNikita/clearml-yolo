@@ -28,9 +28,7 @@ def _context_data(command_config: DictConfig | Mapping[str, Any] | None) -> dict
     return deepcopy(dict(command_config or {}))
 
 
-def _reference_target(
-    root: Mapping[str, Any], key: str, path: tuple[str, ...]
-) -> tuple[Any, tuple[str, ...]]:
+def _reference_target(root: Mapping[str, Any], key: str, path: tuple[str, ...]) -> tuple[Any, tuple[str, ...]]:
     relative = len(key) - len(key.lstrip("."))
     prefix = path[:-relative] if relative else ()
     parts = tuple(part for part in re.split(r"[.\[\]]+", key.lstrip(".")) if part)
@@ -44,9 +42,7 @@ def _reference_target(
     return value, target_path
 
 
-def _follow_reference(
-    source: Any, path: tuple[str, ...], root: Mapping[str, Any]
-) -> tuple[Any, tuple[str, ...], bool]:
+def _follow_reference(source: Any, path: tuple[str, ...], root: Mapping[str, Any]) -> tuple[Any, tuple[str, ...], bool]:
     visited: set[tuple[str, ...]] = set()
     sensitive = False
     while path not in visited:
@@ -156,9 +152,7 @@ def _validate_result(
             )
             for index, item in enumerate(value)
         ]
-    if isinstance(value, str) and (
-        value == "???" or ("${" in value and not _literal_output(value, literals))
-    ):
+    if isinstance(value, str) and (value == "???" or ("${" in value and not _literal_output(value, literals))):
         raise ValueError("Configuration values could not be resolved")
     if not isinstance(value, (str, bool, int, float, type(None))):
         raise TypeError("Configuration values could not be resolved")
@@ -209,9 +203,7 @@ def _context_secrets(
         return {
             secret
             for index, value in enumerate(source)
-            for secret in _context_secrets(
-                value, root, captured, (*path, str(index)), sensitive=sensitive
-            )
+            for secret in _context_secrets(value, root, captured, (*path, str(index)), sensitive=sensitive)
         }
     if not sensitive or source == "???":
         return configuration_secrets(source)
@@ -249,9 +241,7 @@ def _resolve_file(
     secrets: set[str] = set()
     captured: dict[tuple[str, ...], tuple[Any, Any]] = {}
     resolved = {
-        key: _validate_result(
-            _resolved_value(root, key), source, (key,), sources, secrets, captured
-        )
+        key: _validate_result(_resolved_value(root, key), source, (key,), sources, secrets, captured)
         for key, source in fields.items()
     }
     if provenance:
@@ -267,9 +257,7 @@ def _resolve_file(
     return ResolvedConfigFile(values=values, secrets=frozenset(secrets))
 
 
-def resolve_config_document(
-    document: Any, command_config: DictConfig | Mapping[str, Any] | None = None
-) -> Any:
+def resolve_config_document(document: Any, command_config: DictConfig | Mapping[str, Any] | None = None) -> Any:
     """Resolve original file fields once, preserving native resolver arguments."""
     try:
         return _resolve_file(document, command_config, provenance=False).values
@@ -301,7 +289,5 @@ def _resolution_failure(error: BaseException) -> NoReturn:
     )
     field = f" (field {redact_text(str(context['field']))})" if context else ""
     raise ValueError(
-        "Configuration values could not be resolved: "
-        + exception_summary(error, include_message=False)
-        + field
+        "Configuration values could not be resolved: " + exception_summary(error, include_message=False) + field
     ) from None

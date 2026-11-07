@@ -94,9 +94,7 @@ def _output_models(task: Any) -> dict[str, Any]:
 def _best_output(task: Any) -> tuple[Any, set[str]]:
     outputs = _output_models(task)
     if len(outputs) != 1:
-        raise NativeModelError(
-            f"Native training must register exactly one unique output model; found {len(outputs)}"
-        )
+        raise NativeModelError(f"Native training must register exactly one unique output model; found {len(outputs)}")
     candidates = []
     for model in outputs.values():
         basename = Path(unquote(urlsplit(str(model.url)).path)).name
@@ -187,9 +185,7 @@ def _metadata(
     imgsz = getattr(trainer.args, "imgsz", None)
     if imgsz is not None:
         values["clearml_yolo_input_imgsz"] = (
-            json.dumps(imgsz, separators=(",", ":"))
-            if isinstance(imgsz, (list, tuple, dict))
-            else str(imgsz)
+            json.dumps(imgsz, separators=(",", ":")) if isinstance(imgsz, (list, tuple, dict)) else str(imgsz)
         )
     if channels is not None:
         values["clearml_yolo_input_channels"] = str(channels)
@@ -198,9 +194,7 @@ def _metadata(
     input_ids = _deduplicated([str(value) for value in input_values])
     if len(input_ids) == 1:
         values["clearml_yolo_input_model_id"] = input_ids[0]
-    return {
-        key: {"value": value, "type": "str"} for key, value in values.items() if value is not None
-    }
+    return {key: {"value": value, "type": "str"} for key, value in values.items() if value is not None}
 
 
 @trace_operation("clearml.model.verify")
@@ -242,9 +236,7 @@ def _verify_model(
     }
     mismatched = [field for field, (actual, expected) in fields.items() if actual != expected]
     if mismatched:
-        raise NativeModelError(
-            "Native output model metadata fields failed verification: " + ", ".join(mismatched)
-        )
+        raise NativeModelError("Native output model metadata fields failed verification: " + ", ".join(mismatched))
     _verify_custom_metadata(fresh, metadata)
 
 
@@ -331,9 +323,7 @@ def finalize_native_model(task: Any, model: Any, trainer: Any, architecture: Any
     model_id = str(native.id)
     tags = _deduplicated([*[str(tag) for tag in task.get_tags()], "best"])
     comment = f"Best checkpoint {checkpoint.name} produced by task {task.id}."
-    writable, name = _name_native_model(
-        task, model_id, requested_name, design, labels, tags, comment
-    )
+    writable, name = _name_native_model(task, model_id, requested_name, design, labels, tags, comment)
     metadata = _metadata(task, checkpoint, checkpoint_hash, architecture, trainer, channels)
     metadata.update(
         clearml_yolo_requested_model_name={"value": requested_name, "type": "str"},
@@ -387,9 +377,7 @@ def finalize_native_model(task: Any, model: Any, trainer: Any, architecture: Any
     return model_id
 
 
-def _calibration_metadata(
-    thresholds: Mapping[str, float], checkpoint_sha256: str
-) -> dict[str, dict[str, str]]:
+def _calibration_metadata(thresholds: Mapping[str, float], checkpoint_sha256: str) -> dict[str, dict[str, str]]:
     if not thresholds:
         raise NativeModelError("Calibration requires nonempty confidence thresholds")
     values: dict[str, float] = {}
@@ -441,9 +429,7 @@ def associate_calibration_thresholds(
     if not prediction_checkpoint_sha256:
         raise NativeModelError("Calibration prediction checkpoint provenance is missing")
     if prediction_checkpoint_sha256 != owned.checkpoint_sha256:
-        raise NativeModelError(
-            "Calibration prediction checkpoint does not match the owned best model"
-        )
+        raise NativeModelError("Calibration prediction checkpoint does not match the owned best model")
     metadata = _calibration_metadata(thresholds, prediction_checkpoint_sha256)
     owned.verify()
     with trace_operation("clearml.model.metadata.write"):

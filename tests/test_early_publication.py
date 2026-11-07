@@ -44,9 +44,7 @@ def test_last_declared_producer_publishes_the_enriched_aggregate_once(
     _, task = owner
     truth, predictions = _inputs(tmp_path)
     with session.invocation(session.ClearMLConfig(), "pipeline"):
-        results.declare_result_producers(
-            task, ["predict", "metrics", "compare"], output_dir=tmp_path
-        )
+        results.declare_result_producers(task, ["predict", "metrics", "compare"], output_dir=tmp_path)
         results.declare_result_producers(task, ["predict"], output_dir=tmp_path)
         results.register_predictions(task, truth, predictions, output_dir=tmp_path)
         results.complete_result_producer(task, "predict")
@@ -71,8 +69,9 @@ def test_incomplete_contributors_fail_the_barrier_without_uploading_partial_rows
 ) -> None:
     _, task = owner
     truth, predictions = _inputs(tmp_path)
-    with pytest.raises(RuntimeError, match="Incomplete result producers"), session.invocation(  # noqa: PT012 - verification occurs on context exit
-        session.ClearMLConfig(), "pipeline"
+    with (  # noqa: PT012 - verification occurs on context exit
+        pytest.raises(RuntimeError, match="Incomplete result producers"),
+        session.invocation(session.ClearMLConfig(), "pipeline"),
     ):
         results.declare_result_producers(task, ["predict", "metrics"], output_dir=tmp_path)
         results.register_predictions(task, truth, predictions, output_dir=tmp_path)
@@ -147,8 +146,9 @@ def test_upload_rejection_fails_at_the_first_complete_artifact(
 ) -> None:
     _, task = owner
     truth, predictions = _inputs(tmp_path)
-    with pytest.raises(session.ArtifactUploadError), session.invocation(  # noqa: PT012 - rejection must cross the owner boundary
-        session.ClearMLConfig(), "predict"
+    with (  # noqa: PT012 - rejection must cross the owner boundary
+        pytest.raises(session.ArtifactUploadError),
+        session.invocation(session.ClearMLConfig(), "predict"),
     ):
         results.declare_result_producers(task, ["predict"], output_dir=tmp_path)
         task.upload_result = rejected != "gt_csv"
@@ -212,7 +212,9 @@ def test_pipeline_declares_enabled_producers_and_finishes_before_reports(
     (directory / "metrics").mkdir(parents=True)
     (directory / "metrics/frozen_thresholds.json").write_text(json.dumps({"01": 0.5}))
     stages: tuple[tuple[ResultProducer, bool], ...] = (
-        ("predict", skip_predict), ("metrics", skip_metrics), ("compare", skip_compare)
+        ("predict", skip_predict),
+        ("metrics", skip_metrics),
+        ("compare", skip_compare),
     )
     expected = {name for name, skipped in stages if not skipped}
     visited: list[str] = []
@@ -228,9 +230,7 @@ def test_pipeline_declares_enabled_producers_and_finishes_before_reports(
             assert "predicts_csv" in _names(task)
         else:
             assert "predicts_csv" not in _names(task)
-        return SimpleNamespace(
-            predictions=predictions, best_confidences={"val": {"01": 0.5}}, evaluations={}
-        )
+        return SimpleNamespace(predictions=predictions, best_confidences={"val": {"01": 0.5}}, evaluations={})
 
     def skipped_comparison(*_args: Any, **_kwargs: Any) -> None:
         assert results._bundle(task).producers == frozenset(expected)
@@ -250,11 +250,21 @@ def test_pipeline_declares_enabled_producers_and_finishes_before_reports(
     monkeypatch.setattr(pipeline, "_publish_pipeline", report_after_results)
     with session.invocation(session.ClearMLConfig(), "pipeline"):
         pipeline.run_pipeline(
-            ultralytics={}, ultralytics_predict=prediction_config(),
+            ultralytics={},
+            ultralytics_predict=prediction_config(),
             metrics={"evaluation": EvaluationConfig(), "calibration_split": "val"},
-            report={}, compare={}, clearml=session.ClearMLConfig(), ground_truth=str(truth),
-            run_dir=directory, weights=tmp_path / "best.pt", skip_train=True,
-            skip_predict=skip_predict, skip_metrics=skip_metrics, skip_compare=skip_compare,
-            fiftyone=FiftyOneConfig(enabled=False), model_label="fixture", deps=deps,
+            report={},
+            compare={},
+            clearml=session.ClearMLConfig(),
+            ground_truth=str(truth),
+            run_dir=directory,
+            weights=tmp_path / "best.pt",
+            skip_train=True,
+            skip_predict=skip_predict,
+            skip_metrics=skip_metrics,
+            skip_compare=skip_compare,
+            fiftyone=FiftyOneConfig(enabled=False),
+            model_label="fixture",
+            deps=deps,
         )
     assert task.completed

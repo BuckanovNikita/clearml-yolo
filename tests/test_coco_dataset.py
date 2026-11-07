@@ -49,9 +49,7 @@ def test_coco_cache_preserves_source_bytes_geometry_and_empty_images(tmp_path: P
         assert (root / "valid/_annotations.coco.json").is_file()
         assert (root / "test/_annotations.coco.json").is_file()
         for record in json.loads(prepared.manifest.read_text())["images"]:
-            assert (
-                Path(record["generated_path"]).read_bytes() == original[Path(record["image_path"])]
-            )
+            assert Path(record["generated_path"]).read_bytes() == original[Path(record["image_path"])]
         initial_timestamp = prepared.manifest.stat().st_mtime_ns
     with cached_dataset(source, tmp_path / "cache", "coco") as hit:
         assert hit.data.parent == root

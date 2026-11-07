@@ -25,9 +25,7 @@ def test_removed_overrides_fail(override: str) -> None:
 
 def test_native_mapping_starts_full_and_accepts_explicit_values() -> None:
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
-        config = compose(
-            config_name="train", overrides=["ultralytics.epochs=100", "ultralytics.amp=false"]
-        )
+        config = compose(config_name="train", overrides=["ultralytics.epochs=100", "ultralytics.amp=false"])
     assert config.ultralytics.epochs == 100
     assert config.ultralytics.amp is False
     assert "optimizer" in config.ultralytics
@@ -86,9 +84,7 @@ def test_resolved_prediction_does_not_inherit_batch_or_save_implicitly() -> None
 
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
         config = compose(config_name="pipeline", overrides=["ultralytics.batch=32"])
-    settings = prediction_settings(
-        dict(config.ultralytics_predict)
-    )
+    settings = prediction_settings(dict(config.ultralytics_predict))
     assert settings["model"] is None
     assert settings["imgsz"] == 960
     assert settings["compile"] is True
@@ -109,9 +105,7 @@ def test_evaluation_defaults_to_all_three_splits(command: str) -> None:
 @pytest.mark.parametrize("training_device", ["null", "cpu", "[0,1]"])
 def test_prediction_device_is_independent(training_device: str) -> None:
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
-        config = compose(
-            config_name="pipeline", overrides=[f"ultralytics.device={training_device}"]
-        )
+        config = compose(config_name="pipeline", overrides=[f"ultralytics.device={training_device}"])
         overridden = compose(config_name="pipeline", overrides=["ultralytics_predict.device=null"])
     assert list(config.ultralytics_predict.device) == [-1]
     assert overridden.ultralytics_predict.device is None

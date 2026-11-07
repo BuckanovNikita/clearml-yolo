@@ -68,9 +68,7 @@ def test_rendered_metrics_preserve_every_backend_value(tmp_path: Path) -> None:
         ap_method="interp",
         skip_cohen_kappa=True,
     )
-    upstream_matches = match_boxes(
-        gt, predictions, 0.5, strategy="iou_prior", split_image_names=["a"]
-    )
+    upstream_matches = match_boxes(gt, predictions, 0.5, strategy="iou_prior", split_image_names=["a"])
     upstream_metrics = compute_metrics_from_matches(
         slice_by_conf(upstream_matches, ["cat"], {"cat": threshold}),
         ["cat"],
@@ -193,13 +191,7 @@ def test_opaque_evaluation_classes_are_readable_without_changing_machine_values(
     write_candidate_workbook(candidate, artifacts.dashboard, {"mean_precision": 1.0})
     assert read_dashboard(candidate, index_col=0).index.tolist() == names
     workbook = load_workbook(candidate)
-    assert all(
-        name not in str(cell.value)
-        for sheet in workbook
-        for row in sheet
-        for cell in row
-        for name in names
-    )
+    assert all(name not in str(cell.value) for sheet in workbook for row in sheet for cell in row for name in names)
     workbook.close()
 
 

@@ -25,16 +25,19 @@ def pipeline_case(
     checkpoint.write_bytes(b"verified checkpoint fixture")
     monkeypatch.setattr(workflow_dependencies.tracking, "init_task", lambda *_a, **_k: None)
     for method in (
-        "declare_result_producers", "complete_result_producer", "record_run_configuration",
-        "preserve_training_success", "record_pipeline_outcome",
+        "declare_result_producers",
+        "complete_result_producer",
+        "record_run_configuration",
+        "preserve_training_success",
+        "record_pipeline_outcome",
     ):
         monkeypatch.setattr(workflow_dependencies.tracking, method, lambda *_a, **_k: None)
     monkeypatch.setattr(workflow_dependencies.storage, "point_latest_at", lambda *_a: None)
     monkeypatch.setattr(workflow_dependencies.resources, "training_finished", lambda: None)
     monkeypatch.setattr(
-        pipeline, "run_training", lambda *_a, **_k: SimpleNamespace(
-            weights=checkpoint, cleaned_ground_truth=tmp_path / "truth.csv"
-        ),
+        pipeline,
+        "run_training",
+        lambda *_a, **_k: SimpleNamespace(weights=checkpoint, cleaned_ground_truth=tmp_path / "truth.csv"),
     )
 
     def predict(*args: Any, **_kwargs: Any) -> SimpleNamespace:
@@ -44,22 +47,27 @@ def pipeline_case(
 
     monkeypatch.setattr(pipeline, "run_prediction", predict)
     monkeypatch.setattr(
-        pipeline, "compute_metrics", lambda *_a, **_k: SimpleNamespace(
-            best_confidences={"val": {"cat": 0.5}}, evaluations={}
-        ),
+        pipeline,
+        "compute_metrics",
+        lambda *_a, **_k: SimpleNamespace(best_confidences={"val": {"cat": 0.5}}, evaluations={}),
     )
     monkeypatch.setattr(pipeline, "_compare_and_report", lambda *_a, **_k: {"comparison": object()})
     monkeypatch.setattr(
-        pipeline, "run_report", lambda *_a, **_k: SimpleNamespace(
-            issues=(), dev_reports={}, business_reports={}
-        ),
+        pipeline,
+        "run_report",
+        lambda *_a, **_k: SimpleNamespace(issues=(), dev_reports={}, business_reports={}),
     )
     return {
-        "ultralytics": training_settings(), "ultralytics_predict": prediction_config(),
+        "ultralytics": training_settings(),
+        "ultralytics_predict": prediction_config(),
         "metrics": {"evaluation": object(), "calibration_split": "val"},
-        "report": {}, "compare": {}, "clearml": ClearMLConfig(),
-        "ground_truth": str(tmp_path / "truth.csv"), "run_dir": tmp_path / "run",
-        "fiftyone": FiftyOneConfig(enabled=False), "deps": workflow_dependencies,
+        "report": {},
+        "compare": {},
+        "clearml": ClearMLConfig(),
+        "ground_truth": str(tmp_path / "truth.csv"),
+        "run_dir": tmp_path / "run",
+        "fiftyone": FiftyOneConfig(enabled=False),
+        "deps": workflow_dependencies,
     }
 
 
@@ -73,8 +81,11 @@ def pipeline_case(
     ],
 )
 def test_failed_downstream_stage_preserves_training_without_reusing_stale_outputs(
-    pipeline_case: dict[str, Any], monkeypatch: pytest.MonkeyPatch,
-    operation: str, stage: str, skipped: list[str],
+    pipeline_case: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+    operation: str,
+    stage: str,
+    skipped: list[str],
 ) -> None:
     directory = pipeline_case["run_dir"]
     directory.mkdir()
@@ -115,9 +126,7 @@ def test_interruption_is_not_converted_to_success(
     assert (pipeline_case["run_dir"].parent / "actual.pt").is_file()
 
 
-def test_skip_training_keeps_failure_exit(
-    pipeline_case: dict[str, Any], monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_skip_training_keeps_failure_exit(pipeline_case: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:
     def fail(*_args: Any, **_kwargs: Any) -> None:
         raise ValueError("prediction failed")
 
@@ -135,9 +144,7 @@ def test_outcome_status_never_claims_failed_stage_succeeded() -> None:
     assert outcome.stages["metrics"].status == "failed"
 
 
-def test_training_failure_is_not_downgraded(
-    pipeline_case: dict[str, Any], monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_training_failure_is_not_downgraded(pipeline_case: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:
     def fail(*_args: Any, **_kwargs: Any) -> None:
         raise RuntimeError("native training failed")
 
@@ -152,11 +159,11 @@ def test_empty_training_checkpoint_is_not_success(pipeline_case: dict[str, Any])
         pipeline.run_pipeline(**pipeline_case)
 
 
-def test_report_issues_are_visible_in_outcome(
-    pipeline_case: dict[str, Any], monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_report_issues_are_visible_in_outcome(pipeline_case: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        pipeline, "run_report", lambda *_a, **_k: SimpleNamespace(
+        pipeline,
+        "run_report",
+        lambda *_a, **_k: SimpleNamespace(
             issues=(object(),), dev_reports={"test": Path("dev.xlsx")}, business_reports={}
         ),
     )
@@ -191,7 +198,10 @@ def test_resource_transition_failure_prevents_all_downstream_compute(
 
     monkeypatch.setattr(pipeline_case["deps"].resources, "training_finished", fail_transition)
     for name in (
-        "run_prediction", "compute_metrics", "_compare_and_report", "run_report",
+        "run_prediction",
+        "compute_metrics",
+        "_compare_and_report",
+        "run_report",
         "_publish_pipeline",
     ):
         monkeypatch.setattr(pipeline, name, forbidden)
@@ -206,12 +216,13 @@ def test_resource_transition_failure_prevents_all_downstream_compute(
         assert "resource transition failed" in outcome["stages"][name]["reason"]
 
 
-def test_successful_report_records_artifacts(
-    pipeline_case: dict[str, Any], monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_successful_report_records_artifacts(pipeline_case: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        pipeline, "run_report", lambda *_a, **_k: SimpleNamespace(
-            issues=(), dev_reports={"test": Path("dev.xlsx")},
+        pipeline,
+        "run_report",
+        lambda *_a, **_k: SimpleNamespace(
+            issues=(),
+            dev_reports={"test": Path("dev.xlsx")},
             business_reports={"test": Path("business.xlsx")},
         ),
     )

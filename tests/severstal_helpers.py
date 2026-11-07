@@ -136,6 +136,4 @@ def loss_values(scalars: Mapping[str, Any]) -> list[float]:
 
 
 def write_json(path: Path, value: Any) -> None:
-    path.write_text(
-        json.dumps(value, indent=2, default=str, allow_nan=False) + "\n", encoding="utf-8"
-    )
+    path.write_text(json.dumps(value, indent=2, default=str, allow_nan=False) + "\n", encoding="utf-8")

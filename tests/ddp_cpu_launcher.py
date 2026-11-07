@@ -37,9 +37,7 @@ def _environment(root: Path) -> dict[str, str]:
             "WORLD_SIZE",
             "MASTER_ADDR",
             "MASTER_PORT",
-        } or key.startswith(
-            ("CLEARML_", "TRAINS_", "CY_CLEARML_OWNER_", "TORCHELASTIC_", "FIFTYONE_")
-        ):
+        } or key.startswith(("CLEARML_", "TRAINS_", "CY_CLEARML_OWNER_", "TORCHELASTIC_", "FIFTYONE_")):
             env.pop(key)
     env.update(
         CUDA_VISIBLE_DEVICES="",
@@ -77,9 +75,7 @@ def _stop_tree(process: subprocess.Popen[str], root: Path) -> None:
         descendants = psutil.Process(process.pid).children(recursive=True)
     except psutil.NoSuchProcess:
         descendants = []
-    descendants = list(
-        {child.pid: child for child in [*descendants, *_registered_processes(root)]}.values()
-    )
+    descendants = list({child.pid: child for child in [*descendants, *_registered_processes(root)]}.values())
     for child in reversed(descendants):
         try:
             child.terminate()
@@ -125,8 +121,6 @@ def run_scenario(root: Path, ranks: int, scenario: str) -> dict[str, Any]:
     result: dict[str, Any] = json.loads((root / "result.json").read_text())
     result["workers"] = [json.loads(path.read_text()) for path in sorted(root.glob("rank-*.json"))]
     result["remaining_pids"] = remaining_pids
-    result["retained_runtime_directories"] = [
-        str(path) for path in (root / "workspace" / ".tmp").glob("cy-runtime-*")
-    ]
+    result["retained_runtime_directories"] = [str(path) for path in (root / "workspace" / ".tmp").glob("cy-runtime-*")]
     # Process closure is independent of retained invocation scratch on every outcome.
     return result

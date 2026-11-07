@@ -12,9 +12,7 @@ from clearml_yolo.adapters.yolo.config import native_defaults
 from clearml_yolo.application.training_workers import BatchProbeRequest, ProbeRankResult
 
 
-def _batch(
-    request: BatchProbeRequest, count: int, device: Any, *, validation: bool = False
-) -> dict[str, Any]:
+def _batch(request: BatchProbeRequest, count: int, device: Any, *, validation: bool = False) -> dict[str, Any]:
     import torch
 
     stride = 64 if request.profile.model.architecture.endswith("6u.pt") else 32
@@ -35,9 +33,7 @@ def _batch(
             else torch.rand((count, 3, height, width), device=device)
         ),
         "batch_idx": torch.arange(count, device=device).repeat_interleave(objects),
-        "cls": (torch.arange(count * objects, device=device) % request.workload.classes)
-        .float()
-        .unsqueeze(1),
+        "cls": (torch.arange(count * objects, device=device) % request.workload.classes).float().unsqueeze(1),
         "bboxes": torch.cat((xy, wh), dim=1),
     }
     if validation:
@@ -45,9 +41,7 @@ def _batch(
         result.update(
             ori_shape=[(height, width)] * count,
             ratio_pad=[((1.0, 1.0), (0.0, 0.0))] * count,
-            im_file=[
-                str(request.output / f"rank-{rank}-image-{index}.png") for index in range(count)
-            ],
+            im_file=[str(request.output / f"rank-{rank}-image-{index}.png") for index in range(count)],
         )
     return result
 
@@ -116,9 +110,7 @@ def probe(request: BatchProbeRequest) -> ProbeRankResult:
         )
     accumulation = max(round(int(values["nbs"]) / request.global_batch), 1)
     # Use the installed native optimizer resolver, including both auto paths.
-    trainer: Any = SimpleNamespace(
-        args=SimpleNamespace(**values), data={"nc": request.workload.classes}
-    )
+    trainer: Any = SimpleNamespace(args=SimpleNamespace(**values), data={"nc": request.workload.classes})
     optimizer = DetectionTrainer.build_optimizer(  # type: ignore[no-untyped-call]
         trainer,
         model,
@@ -253,9 +245,7 @@ def _validate(
 
     # Use the native training-validator entrypoint so assignment loss, matching,
     # aggregate metrics, and distributed metric/loss gathers are all measured.
-    loader = _ValidationLoader(
-        _batch(request, batch * 2, device, validation=True), request.global_batch * 2
-    )
+    loader = _ValidationLoader(_batch(request, batch * 2, device, validation=True), request.global_batch * 2)
     validator_type: Any = type("CYBoundedValidator", (_BoundedValidation, DetectionValidator), {})
 
     def observe_validation(validator: Any) -> None:
@@ -286,9 +276,7 @@ def _validate(
         epoch=0,
         epochs=1,
         world_size=request.profile.world_size,
-        label_loss_items=lambda values, prefix: {
-            f"{prefix}/{key}": value for key, value in values.items()
-        },
+        label_loss_items=lambda values, prefix: {f"{prefix}/{key}": value for key, value in values.items()},
     )
     results = validator(trainer=trainer)
     if results is not None and any(not math.isfinite(value) for value in results.values()):

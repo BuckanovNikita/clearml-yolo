@@ -71,9 +71,7 @@ def _wait_workers(
                 failure = error
         first_epoch = root / "first-epoch-ready"
         release = root / "release-first-epoch"
-        observed = any(
-            item["title"] == "metrics" and item["iteration"] == 0 for item in task.scalars
-        )
+        observed = any(item["title"] == "metrics" and item["iteration"] == 0 for item in task.scalars)
         if first_epoch.exists() and not release.exists() and (observed or task.callback_failed):
             live = observed
             release.write_text("Owner consumed telemetry while workers were still running.\n")
@@ -110,9 +108,7 @@ def _serialize_custom_trainer(root: Path, result: dict[str, Any]) -> dict[str, s
         ),
         pipeline_file,
     )
-    config = resolve_transform_config(
-        TransformConfig(mode="albumentations", pipeline_file=pipeline_file)
-    )
+    config = resolve_transform_config(TransformConfig(mode="albumentations", pipeline_file=pipeline_file))
     assert config.snapshot is not None
     trainer_file = root / "trainer.pkl"
     # Use the production factory, serialized by value as in Ultralytics' DDP launch.
@@ -179,9 +175,7 @@ def _training(root: Path, ranks: int, scenario: str, result: dict[str, Any]) -> 
                 result["launcher_returncode"] = process.returncode
             journal = relay._directory / "events.jsonl"
             if journal.exists():
-                result["captured_events"] = [
-                    json.loads(line)["event"] for line in journal.read_text().splitlines()
-                ]
+                result["captured_events"] = [json.loads(line)["event"] for line in journal.read_text().splitlines()]
             _check_returncode(process.returncode)
             if publication_failure is not None:
                 raise publication_failure
@@ -194,9 +188,7 @@ def _training(root: Path, ranks: int, scenario: str, result: dict[str, Any]) -> 
         result["callbacks_restored"] = model.callbacks == original_callbacks
         result["environment_restored"] = dict(os.environ) == original_env
         result["changed_environment_keys"] = [
-            key
-            for key in original_env.keys() | os.environ.keys()
-            if original_env.get(key) != os.environ.get(key)
+            key for key in original_env.keys() | os.environ.keys() if original_env.get(key) != os.environ.get(key)
         ]
         result["relay_threads"] = [
             thread.name for thread in threading.enumerate() if thread.name == "cy-native-ddp-relay"

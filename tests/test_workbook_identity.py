@@ -50,9 +50,7 @@ def test_banner_all_sheets_preserves_references_and_print_structure(
     path = workspace / "workbook.xlsx"
     _complex_workbook(path)
     original = path.read_bytes()
-    identity = ModelIdentity(
-        model_name="=Unicode 模型 " + "long name " * 40, training_task_id="full-training-task-id"
-    )
+    identity = ModelIdentity(model_name="=Unicode 模型 " + "long name " * 40, training_task_id="full-training-task-id")
     annotate_workbook(path, {"Candidate": identity})
     annotated = load_workbook(path)
     for sheet in annotated:
@@ -68,10 +66,7 @@ def test_banner_all_sheets_preserves_references_and_print_structure(
         assert sheet.sheet_properties.pageSetUpPr.fitToPage is True
         assert sheet.page_setup.fitToWidth == 1
         assert all(sheet.row_dimensions[row].height <= 48 for row in range(1, banner_end + 1))
-    shift = (
-        next(cell.row for row in annotated["Main sheet"] for cell in row if cell.value == "Class")
-        - 1
-    )
+    shift = next(cell.row for row in annotated["Main sheet"] for cell in row if cell.value == "Class") - 1
     main = annotated["Main sheet"]
     assert main.cell(3 + shift, 2).value == f"=SUM($B${2 + shift}:B{2 + shift})"
     assert annotated["Other"].cell(1 + shift, 1).value == f"='Main sheet'!$B${2 + shift}+1"
@@ -108,9 +103,7 @@ def test_real_dependency_dashboards_are_readable_annotated_and_historical(tmp_pa
         before = pd.read_excel(path, index_col=0)
         assert workbook_identities(path) == {}
         pd.testing.assert_frame_equal(read_dashboard(path, index_col=0), before)
-        annotate_workbook(
-            path, {"Model": ModelIdentity(model_name="+safe", training_task_id="task")}
-        )
+        annotate_workbook(path, {"Model": ModelIdentity(model_name="+safe", training_task_id="task")})
         pd.testing.assert_frame_equal(read_dashboard(path, index_col=0), before)
         with ZipFile(path) as archive:
             assert b"+safe" in archive.read("xl/worksheets/sheet1.xml")
@@ -144,13 +137,7 @@ def test_readable_workbook_classes_keep_exact_original_and_distinct_aliases(
     labels = [row[0].value for row in visible.active if row[1].value in (0.125, 0.25)]
     assert len(set(labels)) == 2
     assert "[task]" not in labels
-    assert all(
-        name not in str(cell.value)
-        for sheet in visible
-        for row in sheet
-        for cell in row
-        for name in names
-    )
+    assert all(name not in str(cell.value) for sheet in visible for row in sheet for cell in row for name in names)
     visible.close()
     with deannotated_workbook(path) as source:
         assert source.read_bytes() == original
@@ -324,9 +311,7 @@ def test_valid_metadata_edits_are_rejected(tmp_path: Path, changed_part: str) ->
         parts = {name: archive.read(name) for name in archive.namelist()}
     metadata = "customXml/clearml-yolo-identity.xml"
     if changed_part == "identity":
-        parts[metadata] = parts[metadata].replace(
-            b'"training_task_id": "task"', b'"training_task_id": "other"'
-        )
+        parts[metadata] = parts[metadata].replace(b'"training_task_id": "task"', b'"training_task_id": "other"')
     else:
         edited = io.BytesIO()
         with ZipFile(io.BytesIO(original)) as source, ZipFile(edited, "w") as destination:
@@ -336,9 +321,7 @@ def test_valid_metadata_edits_are_rejected(tmp_path: Path, changed_part: str) ->
                     assert b">0.37<" in content
                     content = content.replace(b">0.37<", b">0.91<")
                 destination.writestr(name, content)
-        parts[metadata] = parts[metadata].replace(
-            base64.b64encode(original), base64.b64encode(edited.getvalue())
-        )
+        parts[metadata] = parts[metadata].replace(base64.b64encode(original), base64.b64encode(edited.getvalue()))
     with ZipFile(path, "w") as archive:
         for name, part in parts.items():
             archive.writestr(name, part)

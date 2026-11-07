@@ -54,16 +54,12 @@ def _training_epoch(
     total = 0.0
     for index, (images, targets) in enumerate(loader):
         device_images = [image.to(device) for image in images]
-        device_targets = [
-            {key: value.to(device) for key, value in target.items()} for target in targets
-        ]
+        device_targets = [{key: value.to(device) for key, value in target.items()} for target in targets]
         start = (index // settings.grad_accum_steps) * settings.grad_accum_steps
         window = min(settings.grad_accum_steps, len(loader) - start)
         update = (index + 1) % settings.grad_accum_steps == 0 or index + 1 == len(loader)
         synchronization = (
-            model.no_sync()
-            if isinstance(model, DistributedDataParallel) and not update
-            else nullcontext()
+            model.no_sync() if isinstance(model, DistributedDataParallel) and not update else nullcontext()
         )
         # DDP requires no_sync around forward as well as backward. Every rank's
         # training sampler yields the same number of microbatches/windows.
@@ -74,10 +70,7 @@ def _training_epoch(
             value = float(loss.detach())
             if not math.isfinite(value):
                 components = {name: float(component.detach()) for name, component in losses.items()}
-                image_ids = [
-                    target["image_id"].item() if "image_id" in target else None
-                    for target in targets
-                ]
+                image_ids = [target["image_id"].item() if "image_id" in target else None for target in targets]
                 raise FloatingPointError(
                     "Torchvision training produced a nonfinite loss: "
                     f"batch={index}, image_ids={image_ids}, losses={components!r}"
@@ -101,9 +94,7 @@ def _training_epoch(
     return float(population[0] / population[1])
 
 
-def _checkpoint(
-    model: Any, path: Path, epoch: int, score: float, metadata: CheckpointMetadata
-) -> None:
+def _checkpoint(model: Any, path: Path, epoch: int, score: float, metadata: CheckpointMetadata) -> None:
     path = write_path(path)
     torch.save(
         {
@@ -149,9 +140,7 @@ class _TrainingRun:
         self.optimizer = torch.optim.AdamW(
             self.model.parameters(), lr=self.settings.lr, weight_decay=self.settings.weight_decay
         )
-        self.scaler = torch.amp.GradScaler(
-            "cuda", enabled=self.settings.amp and self.context.device.type == "cuda"
-        )
+        self.scaler = torch.amp.GradScaler("cuda", enabled=self.settings.amp and self.context.device.type == "cuda")
         self.ema = (
             AveragedModel(
                 unwrap_model(self.model),
@@ -168,16 +157,13 @@ class _TrainingRun:
             class_names=names,
             preprocessing=Preprocessing(resize="letterbox", size=canvas_size(self.settings.imgsz)),
             dependencies={
-                name: importlib.metadata.version(name)
-                for name in ("torch", "torchvision", "timm", "pycocotools")
+                name: importlib.metadata.version(name) for name in ("torch", "torchvision", "timm", "pycocotools")
             },
         )
 
     def _loaders(
         self,
-    ) -> tuple[
-        DataLoader[tuple[Tensor, dict[str, Tensor]]], DataLoader[tuple[Tensor, dict[str, Tensor]]]
-    ]:
+    ) -> tuple[DataLoader[tuple[Tensor, dict[str, Tensor]]], DataLoader[tuple[Tensor, dict[str, Tensor]]]]:
         context = self.context
         sampler: DistributedSampler[tuple[Tensor, dict[str, Tensor]]] | None = (
             DistributedSampler(
@@ -201,9 +187,7 @@ class _TrainingRun:
         validation = DataLoader(
             self.validation_data,
             batch_size=context.per_rank_batch,
-            sampler=DistributedEvaluationSampler(
-                len(self.validation_data), context.rank, context.world_size
-            ),
+            sampler=DistributedEvaluationSampler(len(self.validation_data), context.rank, context.world_size),
             num_workers=self.settings.workers,
             collate_fn=collate_detection,
         )
@@ -225,9 +209,7 @@ class _TrainingRun:
         synchronize_buffers(evaluated)
         metrics = {
             "train/loss": loss,
-            **evaluate_coco(
-                evaluated, self.validation_data, iter(self.val_loader), self.context.device
-            ),
+            **evaluate_coco(evaluated, self.validation_data, iter(self.val_loader), self.context.device),
         }
         return evaluated, metrics
 
@@ -242,9 +224,7 @@ def _fit(
     best_metrics: dict[str, float] = {}
     with ExitStack() as stack:
         stream = (
-            stack.enter_context(metrics_path.open("w", newline="", encoding="utf-8"))
-            if run.context.rank == 0
-            else None
+            stack.enter_context(metrics_path.open("w", newline="", encoding="utf-8")) if run.context.rank == 0 else None
         )
         writer = (
             csv.DictWriter(
@@ -286,9 +266,7 @@ def train_native(
     transforms: TransformConfig | None = None,
 ) -> BackendTrainResult:
     output = validate_output_tree(output)
-    run = _TrainingRun(
-        config, prepared, build_model=build_model, label_offset=label_offset, transforms=transforms
-    )
+    run = _TrainingRun(config, prepared, build_model=build_model, label_offset=label_offset, transforms=transforms)
     weights, metrics_path, metrics = _fit(run, output, report)
     settings = run.settings
     global_batch = run.context.per_rank_batch * run.context.world_size

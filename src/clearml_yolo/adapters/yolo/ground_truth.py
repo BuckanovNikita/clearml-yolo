@@ -68,11 +68,7 @@ def _collect_images(entry: str | list[str], split: str) -> list[Path]:
                 f"Split {split!r} points at {source!r}, which is neither an existing image "
                 "directory nor a .txt image list"
             )
-    return [
-        Path(image)
-        for image in sorted(set(found))
-        if image.rpartition(".")[-1].lower() in IMG_FORMATS
-    ]
+    return [Path(image) for image in sorted(set(found)) if image.rpartition(".")[-1].lower() in IMG_FORMATS]
 
 
 def _parse_label_file(label_path: Path, names: dict[int, str]) -> list[YoloBox]:
@@ -98,13 +94,8 @@ def _parse_label_file(label_path: Path, names: dict[int, str]) -> list[YoloBox]:
                 f"{box_height}); such a box has no top-left/bottom-right corner"
             )
         coordinates = (center_x, center_y, box_width, box_height)
-        if any(
-            not math.isfinite(value) or not NORMALIZED_MIN <= value <= NORMALIZED_MAX
-            for value in coordinates
-        ):
-            raise ValueError(
-                f"{label_path}:{number} has nonfinite or out-of-bounds normalized coordinates"
-            )
+        if any(not math.isfinite(value) or not NORMALIZED_MIN <= value <= NORMALIZED_MAX for value in coordinates):
+            raise ValueError(f"{label_path}:{number} has nonfinite or out-of-bounds normalized coordinates")
         if class_index not in names:
             raise ValueError(
                 f"{label_path}:{number} references class {class_index}, but the dataset "
@@ -123,16 +114,12 @@ def _image_size(image: Path) -> tuple[int, int]:
     return int(width), int(height)
 
 
-def _split_rows(
-    images: list[Path], split: str, names: dict[int, str]
-) -> tuple[list[GroundTruthRow], int]:
+def _split_rows(images: list[Path], split: str, names: dict[int, str]) -> tuple[list[GroundTruthRow], int]:
     """Build the CSV rows of one split, counting images that carry no annotation."""
     rows: list[GroundTruthRow] = []
     background_images = 0
     labels = img2label_paths([str(image) for image in images])
-    for image, label in track(
-        list(zip(images, labels, strict=True)), f"Reading split {split!r}", unit="img"
-    ):
+    for image, label in track(list(zip(images, labels, strict=True)), f"Reading split {split!r}", unit="img"):
         label_path = Path(label)
         boxes = _parse_label_file(label_path, names) if label_path.is_file() else []
         if not boxes:
@@ -167,9 +154,7 @@ def _split_rows(
     return rows, background_images
 
 
-def _carve_test_split(
-    val_images: list[Path], test_fraction: float, seed: int
-) -> tuple[list[Path], list[Path]]:
+def _carve_test_split(val_images: list[Path], test_fraction: float, seed: int) -> tuple[list[Path], list[Path]]:
     """Move a deterministic fraction of the val images into a test split.
 
     The draw is over image names rather than paths, so two annotations of one image can

@@ -71,9 +71,7 @@ def test_deterministic_complete_deduplicated_and_noncommercial(tmp_path: Path) -
     assert first == second
     assert len(first.assets) == 3
     assert len(first.archives) == 2
-    assert next(a for a in first.assets if a.backend == "deimv2").archive.startswith(
-        "deim-noncommercial"
-    )
+    assert next(a for a in first.assets if a.backend == "deimv2").archive.startswith("deim-noncommercial")
     for path in output.iterdir():
         assert path.read_bytes() == (second_output / path.name).read_bytes()
     for bundle in first.archives:
@@ -127,9 +125,7 @@ def test_one_download_failure_prevents_success_output(tmp_path: Path) -> None:
         return _record(spec, path)
 
     with pytest.raises(RuntimeError, match="download unavailable"):
-        package_weights.package_catalogue(
-            [first, second], output=tmp_path / "out", tag="weights-test", resolve=resolve
-        )
+        package_weights.package_catalogue([first, second], output=tmp_path / "out", tag="weights-test", resolve=resolve)
     assert not list((tmp_path / "out").iterdir())
 
 
@@ -149,9 +145,7 @@ def test_revalidation_rejects_corruption_and_resolved_tree(tmp_path: Path) -> No
             [spec.model_copy(update={"kind": "deim-source"})],
             output=tmp_path / "tree",
             tag="weights-test",
-            resolve=lambda request: _record(request, path).model_copy(
-                update={"content_kind": "source-tree"}
-            ),
+            resolve=lambda request: _record(request, path).model_copy(update={"content_kind": "source-tree"}),
         )
 
 
@@ -169,9 +163,7 @@ def test_hub_keeps_real_commit_etags_and_same_snapshot_config(tmp_path: Path) ->
     source.rename(blobs / weight_etag)
     (snapshot / "pytorch_model.bin").symlink_to(blobs / weight_etag)
     config_data = json.dumps({"architecture": "test"}).encode()
-    config_etag = hashlib.sha1(
-        f"blob {len(config_data)}\0".encode() + config_data, usedforsecurity=False
-    ).hexdigest()
+    config_etag = hashlib.sha1(f"blob {len(config_data)}\0".encode() + config_data, usedforsecurity=False).hexdigest()
     (blobs / config_etag).write_bytes(config_data)
     (snapshot / "config.json").symlink_to(blobs / config_etag)
     spec = _spec("hub").model_copy(
@@ -203,9 +195,7 @@ def test_hub_keeps_real_commit_etags_and_same_snapshot_config(tmp_path: Path) ->
             [spec],
             output=tmp_path / "missing-metadata",
             tag="weights-test",
-            resolve=lambda request: _record(
-                request, snapshot / "pytorch_model.bin", revision=commit
-            ),
+            resolve=lambda request: _record(request, snapshot / "pytorch_model.bin", revision=commit),
         )
 
 
@@ -226,9 +216,7 @@ def test_notice_links_rejected(tmp_path: Path) -> None:
         )
 
 
-def test_deim_packages_verified_pinned_tar_bytes(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_deim_packages_verified_pinned_tar_bytes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     import io
 
     from clearml_yolo.adapters.assets import archive as source_archive
@@ -269,9 +257,7 @@ def test_discovery_failure_stops_cli_before_packaging(monkeypatch: pytest.Monkey
 
     from clearml_yolo.core.assets import PreparationFailure
 
-    monkeypatch.setattr(
-        sys, "argv", ["package_weights", "--output", "unused", "--tag", "weights-x"]
-    )
+    monkeypatch.setattr(sys, "argv", ["package_weights", "--output", "unused", "--tag", "weights-x"])
     monkeypatch.setattr(
         package_weights,
         "_discover",
@@ -286,9 +272,7 @@ def test_discovery_failure_stops_cli_before_packaging(monkeypatch: pytest.Monkey
         package_weights.main()
 
 
-def test_concurrent_input_change_prevents_manifest(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_concurrent_input_change_prevents_manifest(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     spec = _spec("a")
     path = tmp_path / spec.filename
     _checkpoint(path)

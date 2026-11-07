@@ -33,9 +33,7 @@ def verification_cases() -> tuple[tuple[int, int, int], ...]:
         for height, width in ((608, 960), (736, 960), (128, 1536), (256, 1920))
         for batch in (1, 2, 3, 4)
     )
-    interiors = tuple(
-        (batch, height, width) for batch in (1, 2, 4) for height, width in ((672, 960), (192, 1728))
-    )
+    interiors = tuple((batch, height, width) for batch in (1, 2, 4) for height, width in ((672, 960), (192, 1728)))
     return endpoints + interiors
 
 
@@ -43,13 +41,9 @@ def _corpus(request: ExportRequest, destination: Path) -> tuple[list[ImageRecord
     destination = write_path(destination)
     if request.ground_truth is None:
         raise ValueError("Verification requires labeled ground truth")
-    records = validate_ground_truth(
-        request.ground_truth, required_splits=(request.split,), require_training=False
-    )
+    records = validate_ground_truth(request.ground_truth, required_splits=(request.split,), require_training=False)
     if records.errors:
-        raise ValueError(
-            "Export quality corpus contains invalid boxes; correct them before verification"
-        )
+        raise ValueError("Export quality corpus contains invalid boxes; correct them before verification")
     images = [image for image in records.images if image.split == request.split]
     if not images or not any(image.boxes for image in images):
         raise ValueError("Export quality corpus requires images with labeled foreground objects")
@@ -59,10 +53,7 @@ def _corpus(request: ExportRequest, destination: Path) -> tuple[list[ImageRecord
             {
                 "ground_truth_sha256": records.input_sha256,
                 "split": request.split,
-                "images": [
-                    image.model_dump(mode="json") | {"sha256": sha256(image.path)}
-                    for image in images
-                ],
+                "images": [image.model_dump(mode="json") | {"sha256": sha256(image.path)} for image in images],
             },
             indent=2,
             ensure_ascii=False,
@@ -84,10 +75,7 @@ def _read_image(image: ImageRecord) -> NDArray[np.uint8]:
 def _verify_corpus(request: ExportRequest, manifest: Path) -> None:
     """Fail if any source bytes changed while the fixed-corpus run was in progress."""
     recorded = json.loads(manifest.read_text(encoding="utf-8"))
-    if (
-        request.ground_truth is None
-        or sha256(request.ground_truth) != recorded["ground_truth_sha256"]
-    ):
+    if request.ground_truth is None or sha256(request.ground_truth) != recorded["ground_truth_sha256"]:
         raise ValueError("Quality ground truth changed during verification")
     for image in recorded["images"]:
         if sha256(Path(image["path"])) != image["sha256"]:
@@ -146,17 +134,12 @@ def _case(
                 mean=metadata.descriptor.preprocessing.mean,
                 std=metadata.descriptor.preprocessing.std,
             )
-            tensors = [
-                torch.from_numpy(value.copy()).permute(2, 0, 1).float().div(255).to(device)
-                for value in pixels
-            ]
+            tensors = [torch.from_numpy(value.copy()).permute(2, 0, 1).float().div(255).to(device) for value in pixels]
             transformed, _ = detector.transform(tensors)
             actual_input = transformed.tensors.cpu().numpy()
             if transformed.image_sizes != [tuple(size) for size in sizes.tolist()]:
                 raise ValueError("Native and standalone valid resized dimensions disagree")
-            preprocessing_maximum = max(
-                preprocessing_maximum, float(np.abs(actual_input - normalized).max())
-            )
+            preprocessing_maximum = max(preprocessing_maximum, float(np.abs(actual_input - normalized).max()))
             preprocessing_passed &= bool(
                 np.allclose(
                     actual_input,
@@ -191,9 +174,7 @@ def _case(
             ):
                 key = str(image.path)
                 native[key], exported[key] = expected, observed
-                agreements.append(
-                    match_detections(expected, observed, min_iou=_MATCH_IOU).model_dump()
-                )
+                agreements.append(match_detections(expected, observed, min_iou=_MATCH_IOU).model_dump())
     native_metrics = evaluate_detections(images, metadata.descriptor.class_names, native)
     exported_metrics = evaluate_detections(images, metadata.descriptor.class_names, exported)
     native_count = sum(len(values) for values in native.values())
@@ -223,8 +204,7 @@ def _case(
         "native_torch_peak_allocated_bytes": torch.cuda.max_memory_allocated(device),
         "engine_context_bytes": runner.engine_context_bytes,
         "engine_max_io_buffer_bytes": peak_buffers,
-        "memory_scope": "Torch allocator peak and TensorRT context/I-O allocations; "
-        "not total process GPU peak",
+        "memory_scope": "Torch allocator peak and TensorRT context/I-O allocations; not total process GPU peak",
     }
 
 

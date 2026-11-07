@@ -128,9 +128,7 @@ def quality_gate(
         return False
     if native.mAP <= 0:
         return False
-    if not any(
-        (exported.mAP, exported.map50, exported.recall, *exported.per_class_recall.values())
-    ):
+    if not any((exported.mAP, exported.map50, exported.recall, *exported.per_class_recall.values())):
         return False
     tolerance = 0.001 if precision == "fp32" else 0.005
     loss = native.mAP - exported.mAP

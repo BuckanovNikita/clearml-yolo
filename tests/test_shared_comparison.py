@@ -72,12 +72,8 @@ def _outcome(candidate: bool, scenario: str) -> SplitOutcome:
 
 
 @pytest.mark.parametrize("seed", [0, 19, 93])
-@pytest.mark.parametrize(
-    "scenario", ["eligible", "one_sided", "empty", "no_predictions", "outside", "unpaired"]
-)
-def test_shared_statistics_equal_legacy_tables_and_callback_sequences(
-    seed: int, scenario: str
-) -> None:
+@pytest.mark.parametrize("scenario", ["eligible", "one_sided", "empty", "no_predictions", "outside", "unpaired"])
+def test_shared_statistics_equal_legacy_tables_and_callback_sequences(seed: int, scenario: str) -> None:
     baseline, candidate = _outcome(False, scenario), _outcome(True, scenario)
     expected_events: list[tuple[str, str | None]] = []
     actual_events: list[tuple[str, str | None]] = []
@@ -182,19 +178,13 @@ def test_workflow_uses_optional_capability_and_keeps_legacy_injection_fallback(
     (tmp_path / "candidate.pt").write_bytes(b"resolved candidate fixture")
     models = iter(
         [
-            ResolvedModel(
-                source="local", weights=tmp_path / "baseline.pt", thresholds={"0001": 0.5}
-            ),
-            ResolvedModel(
-                source="local", weights=tmp_path / "candidate.pt", thresholds={"0001": 0.5}
-            ),
+            ResolvedModel(source="local", weights=tmp_path / "baseline.pt", thresholds={"0001": 0.5}),
+            ResolvedModel(source="local", weights=tmp_path / "candidate.pt", thresholds={"0001": 0.5}),
         ]
     )
     monkeypatch.setattr(workflow, "_resolve_model", lambda *_a, **_kw: next(models))
     inference = InferenceConfig(conf=0.001, iou=0.7, imgsz=640, batch=1, device=None)
-    monkeypatch.setattr(
-        workflow, "_settled", lambda *_a, **_kw: SettledInference(**inference.model_dump())
-    )
+    monkeypatch.setattr(workflow, "_settled", lambda *_a, **_kw: SettledInference(**inference.model_dump()))
     monkeypatch.setattr(workflow, "_prediction_cache", lambda *_a, **_kw: tmp_path / "pred.csv")
     outcome = _outcome(False, "eligible")
     monkeypatch.setattr(

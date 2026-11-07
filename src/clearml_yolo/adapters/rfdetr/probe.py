@@ -70,9 +70,7 @@ class _MaximumShape:
 class _ProbeProgress:
     """Count native optimizer updates without counting scaler-skipped attempts."""
 
-    def __init__(
-        self, per_rank_batch: int, shape: tuple[int, int], *, memory: GPUMemory | None = None
-    ) -> None:
+    def __init__(self, per_rank_batch: int, shape: tuple[int, int], *, memory: GPUMemory | None = None) -> None:
         self.per_rank_batch = per_rank_batch
         self.shape = shape
         self.optimizer_steps = 0
@@ -95,14 +93,10 @@ class _ProbeProgress:
         self._hooks.append(trainer.optimizers[0].register_step_post_hook(self._stepped))
         self._observe_memory()
 
-    def on_train_batch_start(
-        self, _trainer: Any, _module: Any, batch: Any, _batch_idx: int
-    ) -> None:
+    def on_train_batch_start(self, _trainer: Any, _module: Any, batch: Any, _batch_idx: int) -> None:
         samples, targets = batch
         if len(targets) != self.per_rank_batch or tuple(samples.tensors.shape[-2:]) != self.shape:
-            raise ValueError(
-                "Native probe batch disagrees with its recorded batch or effective shape"
-            )
+            raise ValueError("Native probe batch disagrees with its recorded batch or effective shape")
 
     def on_before_optimizer_step(self, trainer: Any, _module: Any, optimizer: Any) -> None:
         # Lightning unscales before this hook, then lets GradScaler skip overflow
@@ -114,17 +108,13 @@ class _ProbeProgress:
                 if parameter.grad is not None and not torch.isfinite(parameter.grad).all():
                     raise FloatingPointError("RF-DETR probe produced nonfinite gradients")
 
-    def on_train_batch_end(
-        self, trainer: Any, _module: Any, outputs: Any, _batch: Any, _batch_idx: int
-    ) -> None:
+    def on_train_batch_end(self, trainer: Any, _module: Any, outputs: Any, _batch: Any, _batch_idx: int) -> None:
         loss = outputs["loss"] if isinstance(outputs, dict) else outputs
         if not isinstance(loss, Tensor) or not torch.isfinite(loss).all():
             raise FloatingPointError("RF-DETR probe produced a nonfinite loss")
         scaler = trainer.scaler
         if scaler is not None and scaler.is_enabled() and scaler.get_scale() < 1:
-            raise FloatingPointError(
-                "RF-DETR probe gradients remain nonfinite after AMP scale reduction"
-            )
+            raise FloatingPointError("RF-DETR probe gradients remain nonfinite after AMP scale reduction")
         if self.target_steps is not None and self.optimizer_steps >= self.target_steps:
             # The pinned Lightning loop checks should_stop after this hook and
             # runs validation before leaving fit. Enable it only now, preserving
@@ -202,9 +192,7 @@ def _attempt_steps(steps: int, scaler: Any) -> int:
     # successful interval. The callback stops earlier at the actual-update target;
     # one further backoff produces the explicit persistent-nonfinite failure.
     growths = (steps - 1) // int(scaler.get_growth_interval())
-    log_scale = math.log(float(scaler.get_scale())) + growths * math.log(
-        float(scaler.get_growth_factor())
-    )
+    log_scale = math.log(float(scaler.get_scale())) + growths * math.log(float(scaler.get_growth_factor()))
     skipped = max(0, math.ceil(log_scale / -math.log(float(scaler.get_backoff_factor())))) + 1
     return steps + skipped
 
@@ -218,11 +206,7 @@ def _fit(request: BatchProbeRequest, config: ModelConfig, progress: _ProbeProgre
     device = f"cuda:{config.train.device}"
     names = tuple(str(index) for index in range(request.workload.classes))
     mc, tc = training_configuration(config, names, device, request.output, request.output)
-    maximum = max(
-        scales.compute_multi_scale_scales(
-            mc.resolution, tc.expanded_scales, mc.patch_size, mc.num_windows
-        )
-    )
+    maximum = max(scales.compute_multi_scale_scales(mc.resolution, tc.expanded_scales, mc.patch_size, mc.num_windows))
     if request.profile.effective_size != (maximum, maximum):
         raise ValueError("RF-DETR probe profile disagrees with the native maximum training scale")
     if mc.compile or bool(tc.use_ema) != request.profile.ema:

@@ -155,9 +155,7 @@ def validate_ranks(request: dict[str, Any], ranks: list[dict[str, Any]]) -> None
         assert sorted(observed) == sorted(expected), f"Missing or duplicate {phase} samples"
 
 
-def validate_publication(
-    request: dict[str, Any], events: list[dict[str, Any]], publication: dict[str, Any]
-) -> None:
+def validate_publication(request: dict[str, Any], events: list[dict[str, Any]], publication: dict[str, Any]) -> None:
     creations = [event for event in events if event["kind"] == "task-init"]
     assert len(creations) == 1, "Expected one ClearML invocation owner"
     owner = creations[0]
@@ -168,9 +166,7 @@ def validate_publication(
     assert publication["task_ids"] == [owner["task_id"]], "Unexpected ClearML tasks"
     assert publication["status"] == "completed", "Native owner task did not complete"
     assert publication["output_models"] == 1, "Expected one selected Output Model"
-    assert publication["download_sha256"] == publication["native_sha256"], (
-        "Checkpoint hash mismatch"
-    )
+    assert publication["download_sha256"] == publication["native_sha256"], "Checkpoint hash mismatch"
     assert publication["download_sha256"], "Missing checkpoint hash"
     assert publication["selection"] == request["selection"], "Wrong downloaded checkpoint family"
     assert publication["reload_images"] == request["test_count"], "Checkpoint reload lost images"
@@ -195,9 +191,7 @@ def validate_failure(request: dict[str, Any], events: list[dict[str, Any]], exit
 
 
 def _helper(evidence: Evidence, action: str, environment: dict[str, str], timeout: float) -> None:
-    evidence.command(
-        [sys.executable, str(_WORKER), action, str(evidence.root)], environment, timeout=timeout
-    )
+    evidence.command([sys.executable, str(_WORKER), action, str(evidence.root)], environment, timeout=timeout)
 
 
 def _wait_ready(evidence: Evidence, owner: subprocess.Popen[Any], deadline: float) -> None:
@@ -252,15 +246,11 @@ def _run(options: GPUOptions, selection: str, fault: Fault) -> Path:
                 owner.wait(timeout=max(0.1, deadline - time.monotonic()))
                 (evidence.root / "exit-code.json").write_text(json.dumps(owner.returncode))
                 if fault == "none" and owner.returncode != 0:
-                    raise AssertionError(
-                        f"Native pipeline failed with {owner.returncode}; see owner.log"
-                    )
+                    raise AssertionError(f"Native pipeline failed with {owner.returncode}; see owner.log")
         finally:
             _cleanup_scenario(evidence, base, owner, None)
         _helper(evidence, "verify", base, max(1, min(180, deadline - time.monotonic())))
-        evidence.data["verification"] = json.loads(
-            (evidence.root / "verification.json").read_text()
-        )
+        evidence.data["verification"] = json.loads((evidence.root / "verification.json").read_text())
     return evidence.root
 
 

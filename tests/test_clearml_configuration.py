@@ -16,8 +16,7 @@ def test_clearml_discovers_home_or_explicit_configuration(tmp_path: Path, explic
     cache = tmp_path / "selected-cache"
     config.write_text(f'sdk.storage.cache.default_base_dir: "{cache}"\n')
     environment = {
-        key: value for key, value in os.environ.items()
-        if not key.startswith(("CLEARML_", "TRAINS_", "AWS_", "XDG_"))
+        key: value for key, value in os.environ.items() if not key.startswith(("CLEARML_", "TRAINS_", "AWS_", "XDG_"))
     }
     environment.update(HOME=str(home), CY_HOME=str(tmp_path / "project"))
     if explicit:
@@ -40,8 +39,12 @@ assert str(Path.home()/'.aws/models') in loader.search_paths
 assert loader.load_service_model('s3', 'service-2')['metadata']['serviceId'] == 'S3'
 """
     result = subprocess.run(  # noqa: S603 - isolated SDK discovery, no credentials/network
-        [sys.executable, "-c", script], cwd=tmp_path,
-        env=environment | {"EXPECTED_CACHE": str(cache)}, capture_output=True,
-        text=True, timeout=45, check=False,
+        [sys.executable, "-c", script],
+        cwd=tmp_path,
+        env=environment | {"EXPECTED_CACHE": str(cache)},
+        capture_output=True,
+        text=True,
+        timeout=45,
+        check=False,
     )
     assert result.returncode == 0, result.stderr

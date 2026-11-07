@@ -95,17 +95,13 @@ def _parse_row(signature: tuple[str, ...], number: int, source: Path) -> _CsvRow
     if image_path_value == "":
         raise ValueError(f"{source}: row {number} has an empty image_path")
     if split_value not in SPLITS:
-        raise ValueError(
-            f"{source}: row {number} has invalid split {split_value!r}; "
-            "expected train, val, or test"
-        )
+        raise ValueError(f"{source}: row {number} has invalid split {split_value!r}; expected train, val, or test")
 
     split = cast(Split, split_value)
     image_path = resolved_image_path(image_path_value, source.parent)
     if image_name != image_path.name:
         raise ValueError(
-            f"{source}: row {number} image_name {image_name!r} must match "
-            f"resolved path basename {image_path.name!r}"
+            f"{source}: row {number} image_name {image_name!r} must match resolved path basename {image_path.name!r}"
         )
     return _CsvRow(
         number=number,
@@ -205,10 +201,7 @@ def _group_rows(rows: list[_CsvRow], source: Path) -> dict[str, list[_CsvRow]]:
         has_background = any(row.is_background for row in image_rows)
         has_annotation = any(not row.is_background for row in image_rows)
         if has_background and has_annotation:
-            raise ValueError(
-                f"{source}: image {image_name!r} mixes an explicit background row "
-                "with an annotation row"
-            )
+            raise ValueError(f"{source}: image {image_name!r} mixes an explicit background row with an annotation row")
     return grouped
 
 
@@ -241,14 +234,10 @@ def _read_image_size(row: _CsvRow, source: Path) -> tuple[int, int]:
                         },
                     )
     except (OSError, SyntaxError) as error:
-        raise ValueError(
-            f"{source}: image {row.image_name!r} at {row.image_path} cannot be read"
-        ) from error
+        raise ValueError(f"{source}: image {row.image_name!r} at {row.image_path} cannot be read") from error
     # Pillow reports the decoded JP2 format as JPEG2000, matching native validation.
     if image_format not in NATIVE_IMAGE_EXTENSIONS | {"jpeg2000"}:
-        raise ValueError(
-            f"{source}: image {row.image_name!r} decodes as unsupported format {image_format!r}"
-        )
+        raise ValueError(f"{source}: image {row.image_name!r} decodes as unsupported format {image_format!r}")
     if width < MINIMUM_IMAGE_DIMENSION or height < MINIMUM_IMAGE_DIMENSION:
         raise ValueError(
             f"{source}: image {row.image_name!r} is {width} x {height} pixels; "
@@ -260,9 +249,7 @@ def _read_image_size(row: _CsvRow, source: Path) -> tuple[int, int]:
 def _validate_requested_splits(required_splits: tuple[str, ...]) -> set[str]:
     unsupported = sorted(set(required_splits) - set(SPLITS))
     if unsupported:
-        raise ValueError(
-            f"Unsupported required split(s): {', '.join(unsupported)}; expected train, val, or test"
-        )
+        raise ValueError(f"Unsupported required split(s): {', '.join(unsupported)}; expected train, val, or test")
     return set(required_splits)
 
 
@@ -277,9 +264,7 @@ def _validate_prepared_images(images: list[ImageRecord]) -> None:
             "height": image.height,
         }
         if not image.boxes:
-            prepared_rows.append(
-                {**common, "instance_label": None, **dict.fromkeys(REQUIRED_COLUMNS[3:7])}
-            )
+            prepared_rows.append({**common, "instance_label": None, **dict.fromkeys(REQUIRED_COLUMNS[3:7])})
         prepared_rows.extend(
             {
                 **common,
@@ -295,9 +280,7 @@ def _validate_prepared_images(images: list[ImageRecord]) -> None:
 
 
 def _require_training_labels(images: list[ImageRecord], labels: list[str], source: Path) -> None:
-    training_labels = {
-        box.label for image in images if image.split == "train" for box in image.boxes
-    }
+    training_labels = {box.label for image in images if image.split == "train" for box in image.boxes}
     if not training_labels:
         raise ValueError(f"{source}: at least one valid training box is required")
     for label in sorted(set(labels) - training_labels):
@@ -366,9 +349,7 @@ def validate_ground_truth(
     available_splits = {image.split for image in images}
     missing_splits = sorted(required - available_splits)
     if missing_splits:
-        raise ValueError(
-            f"{source_path}: required split(s) contain no images: {', '.join(missing_splits)}"
-        )
+        raise ValueError(f"{source_path}: required split(s) contain no images: {', '.join(missing_splits)}")
 
     if require_training:
         _require_training_labels(images, labels, source_path)

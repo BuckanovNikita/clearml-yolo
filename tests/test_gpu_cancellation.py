@@ -50,9 +50,7 @@ def test_cleanup_defers_first_interrupt_and_restores_handlers() -> None:
 def test_inaccessible_owned_process_prevents_verified_release(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    process = subprocess.Popen(
-        [sys.executable, "-c", "import time; time.sleep(60)"], start_new_session=True
-    )
+    process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"], start_new_session=True)
     try:
         tree = process_tree.LinuxProcessTree(process.pid)
         original = process_tree._read_process
@@ -103,9 +101,7 @@ def test_native_torchrun_ranks_do_not_escape_cancellation(tmp_path: Path) -> Non
         rank_pids: list[int] = []
         try:
             tree = LinuxProcessTree(worker.pid, token)
-            rank_pids.extend(
-                int(_wait(tmp_path / f"rank-{rank}.pid", timeout=10)) for rank in range(2)
-            )
+            rank_pids.extend(int(_wait(tmp_path / f"rank-{rank}.pid", timeout=10)) for rank in range(2))
             assert all(os.getpgid(pid) != worker.pid for pid in rank_pids)
 
             tree.terminate()
@@ -166,9 +162,7 @@ def test_unreadable_new_process_blocks_verification_without_being_killed(tmp_pat
 
 
 @pytest.mark.parametrize("after_denial", ["gone", "zombie", "live", "reused", "inaccessible"])
-def test_environment_denial_rechecks_process_liveness(
-    monkeypatch: pytest.MonkeyPatch, after_denial: str
-) -> None:
+def test_environment_denial_rechecks_process_liveness(monkeypatch: pytest.MonkeyPatch, after_denial: str) -> None:
     # A process can exit after the table snapshot but before its environment is read.
     candidate = process_tree._Process(4242, 1, 4242, 123, "S")
     tree = process_tree.LinuxProcessTree(2**31 - 1, uuid4().hex)
@@ -211,14 +205,18 @@ def test_pid_reuse_after_snapshot_does_not_adopt_unmarked_processes(
     root = process_tree._Process(101, 1, 101, 10, "S")
     replacement = process_tree._Process(root.pid, 1, root.session, 20, "S")
     child = process_tree._Process(
-        202, root.pid if association == "parent" else 1,
-        root.session if association == "session" else 202, 21, "S",
+        202,
+        root.pid if association == "parent" else 1,
+        root.session if association == "session" else 202,
+        21,
+        "S",
     )
     monkeypatch.setattr(process_tree, "_read_process", lambda _pid: root)
     tree = process_tree.LinuxProcessTree(root.pid, uuid4().hex)
     monkeypatch.setattr(tree, "_table", lambda: {root.pid: root, child.pid: child})
     monkeypatch.setattr(
-        process_tree, "_read_process",
+        process_tree,
+        "_read_process",
         lambda pid: replacement if pid == root.pid else child,
     )
     monkeypatch.setattr(Path, "read_bytes", lambda _path: b"")
@@ -226,7 +224,9 @@ def test_pid_reuse_after_snapshot_does_not_adopt_unmarked_processes(
     monkeypatch.setattr(os, "pidfd_open", lambda pid: pid)
     monkeypatch.setattr(os, "close", lambda _descriptor: None)
     monkeypatch.setattr(
-        signal, "pidfd_send_signal", lambda descriptor, _signum: signalled.append(descriptor),
+        signal,
+        "pidfd_send_signal",
+        lambda descriptor, _signum: signalled.append(descriptor),
     )
 
     tree.signal(signal.SIGKILL)
@@ -249,7 +249,8 @@ def test_empty_scan_does_not_release_a_late_forked_child(
     snapshots = iter(({parent.pid: parent}, {child.pid: child}, {child.pid: child}))
     monkeypatch.setattr(tree, "_table", lambda: next(snapshots))
     monkeypatch.setattr(
-        process_tree, "_read_process",
+        process_tree,
+        "_read_process",
         lambda pid: child if pid == child.pid and not child_exits_during_next_scan else None,
     )
     monkeypatch.setattr(Path, "read_bytes", lambda _path: f"{OWNER_ENV}={token}\0".encode())

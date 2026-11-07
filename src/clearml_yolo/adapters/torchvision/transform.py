@@ -76,16 +76,10 @@ class LetterboxTransform(nn.Module):
                 align_corners=False,
                 antialias=False,
             )[0]
-            resized.append(
-                functional.pad(
-                    pixels, (0, self.canvas_size[1] - size[1], 0, self.canvas_size[0] - size[0])
-                )
-            )
+            resized.append(functional.pad(pixels, (0, self.canvas_size[1] - size[1], 0, self.canvas_size[0] - size[0])))
             sizes.append(size)
             if transformed is not None:
-                transformed[index]["boxes"] = scale_boxes(
-                    transformed[index]["boxes"], original, size
-                )
+                transformed[index]["boxes"] = scale_boxes(transformed[index]["boxes"], original, size)
         image_list = importlib.import_module("torchvision.models.detection.image_list")
         return image_list.ImageList(torch.stack(resized), sizes), transformed
 
@@ -97,8 +91,6 @@ class LetterboxTransform(nn.Module):
     ) -> list[dict[str, Tensor]]:
         if self.training:
             return results
-        for result, source, destination in zip(
-            results, image_shapes, original_image_sizes, strict=True
-        ):
+        for result, source, destination in zip(results, image_shapes, original_image_sizes, strict=True):
             result["boxes"] = scale_boxes(result["boxes"], source, destination)
         return results

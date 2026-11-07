@@ -38,9 +38,7 @@ def detection_sample(image: Image.Image, target: dict[str, Any]) -> "DetectionSa
         boxes=boxes,
         labels=np.asarray(target["labels"], dtype=np.int64).copy(),
         instance_ids=np.arange(len(boxes), dtype=np.int64),
-        iscrowd=np.asarray(
-            target.get("iscrowd", np.zeros(len(boxes), dtype=np.int64)), dtype=np.int64
-        ).copy(),
+        iscrowd=np.asarray(target.get("iscrowd", np.zeros(len(boxes), dtype=np.int64)), dtype=np.int64).copy(),
     )
 
 
@@ -57,9 +55,7 @@ def tensor_target(
         "boxes": boxes,
         "labels": torch.from_numpy(sample.labels.copy()),
         "iscrowd": torch.from_numpy(sample.iscrowd.copy()),
-        "area": torch.from_numpy(
-            (sample.boxes[:, 2] - sample.boxes[:, 0]) * (sample.boxes[:, 3] - sample.boxes[:, 1])
-        ),
+        "area": torch.from_numpy((sample.boxes[:, 2] - sample.boxes[:, 0]) * (sample.boxes[:, 3] - sample.boxes[:, 1])),
     }
     if "size" in target:
         target["size"] = torch.tensor(sample.image.shape[:2], dtype=torch.int64)

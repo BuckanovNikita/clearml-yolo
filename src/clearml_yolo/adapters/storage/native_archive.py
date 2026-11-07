@@ -16,9 +16,7 @@ from clearml_yolo.core.redaction import sanitize_configuration
 def archive_native_outputs(save_dir: Path, destination: Path, *, role: str, split: str) -> Path:
     """Archive native tabular/text outputs without copying source-derived images."""
     destination = write_path(destination)
-    archive = write_path(
-        destination / f"native_outputs_{role}_{artifact_names.split_component(split)}.zip"
-    )
+    archive = write_path(destination / f"native_outputs_{role}_{artifact_names.split_component(split)}.zip")
     allowed = {".csv", ".json", ".txt", ".yaml", ".yml"}
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
         if save_dir.is_dir():
@@ -30,18 +28,13 @@ def archive_native_outputs(save_dir: Path, destination: Path, *, role: str, spli
                         content = json.loads(path.read_text(encoding="utf-8"))
                         bundle.writestr(
                             relative.as_posix(),
-                            json.dumps(
-                                sanitize_configuration(content), indent=2, ensure_ascii=False
-                            )
-                            + "\n",
+                            json.dumps(sanitize_configuration(content), indent=2, ensure_ascii=False) + "\n",
                         )
                     elif suffix in {".yaml", ".yml"}:
                         content = yaml.safe_load(path.read_text(encoding="utf-8"))
                         bundle.writestr(
                             relative.as_posix(),
-                            yaml.safe_dump(
-                                sanitize_configuration(content), sort_keys=False, allow_unicode=True
-                            ),
+                            yaml.safe_dump(sanitize_configuration(content), sort_keys=False, allow_unicode=True),
                         )
                     else:
                         bundle.write(path, relative)

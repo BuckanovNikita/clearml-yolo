@@ -9,7 +9,5 @@ pytestmark = pytest.mark.severstal_gpu
 
 @pytest.mark.parametrize("selection", MODEL_SELECTIONS)
 @pytest.mark.parametrize("variant", VARIANTS)
-def test_native_severstal_smoke(
-    severstal_options: SeverstalOptions, selection: str, variant: str
-) -> None:
+def test_native_severstal_smoke(severstal_options: SeverstalOptions, selection: str, variant: str) -> None:
     run_scenario(severstal_options, selection, variant)

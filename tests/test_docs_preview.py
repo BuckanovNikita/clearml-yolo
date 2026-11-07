@@ -35,18 +35,14 @@ def test_preview_named_documents_and_ordered_overrides() -> None:
 
 
 def test_preview_sweep_is_bounded_before_cartesian_expansion() -> None:
-    result = preview(
-        PreviewRequest(overrides=["ultralytics.epochs=range(1,1000000000)"], sweep=True)
-    )
+    result = preview(PreviewRequest(overrides=["ultralytics.epochs=range(1,1000000000)"], sweep=True))
     assert result.errors
     assert "100" in result.errors[0]
 
 
 def test_preview_rejects_search_path_before_composition() -> None:
     result = preview(
-        PreviewRequest(
-            documents={"example.yaml": "defaults:\n- train\nhydra:\n  searchpath: [file:///etc]\n"}
-        )
+        PreviewRequest(documents={"example.yaml": "defaults:\n- train\nhydra:\n  searchpath: [file:///etc]\n"})
     )
     assert result.errors
     assert "searchpath" in result.errors[0]
@@ -54,9 +50,7 @@ def test_preview_rejects_search_path_before_composition() -> None:
 
 def test_preview_never_loads_an_augmentation_file() -> None:
     result = preview(
-        PreviewRequest(
-            overrides=["transforms=albumentations", "transforms.pipeline_file=/does/not/exist.json"]
-        )
+        PreviewRequest(overrides=["transforms=albumentations", "transforms.pipeline_file=/does/not/exist.json"])
     )
     assert not result.errors
     assert not result.jobs[0].errors
@@ -90,9 +84,7 @@ def test_custom_resolver_is_never_called() -> None:
 
 
 def test_sweep_materialization_helpers_are_rejected_before_parsing() -> None:
-    result = preview(
-        PreviewRequest(sweep=True, overrides=["ultralytics.epochs=shuffle(range(1,1000000000))"])
-    )
+    result = preview(PreviewRequest(sweep=True, overrides=["ultralytics.epochs=shuffle(range(1,1000000000))"]))
     assert result.errors
 
 
@@ -112,9 +104,7 @@ def test_packaged_group_override_cannot_evaluate_a_resolver() -> None:
         OmegaConf.clear_resolver("docs_group_probe")
 
 
-@pytest.mark.parametrize(
-    "package", ["hydra.launcher", "_global_.hydra.launcher", "_global_._cy_schemas"]
-)
+@pytest.mark.parametrize("package", ["hydra.launcher", "_global_.hydra.launcher", "_global_._cy_schemas"])
 def test_package_directives_cannot_replace_hydra_or_schema(package: str) -> None:
     request = PreviewRequest(
         documents={
@@ -138,8 +128,7 @@ def test_nested_defaults_resolver_is_rejected_before_composition() -> None:
             command="predict",
             documents={
                 "entry.yaml": (
-                    "defaults:\n- predict\n- selector: docs_nested_probe\n"
-                    "- override model: ${${selector}:}\n"
+                    "defaults:\n- predict\n- selector: docs_nested_probe\n- override model: ${${selector}:}\n"
                 ),
                 "selector/docs_nested_probe.yaml": "# @package _global_\n{}\n",
             },
@@ -176,9 +165,7 @@ def test_ordered_override_delete_add_and_replace_are_preserved() -> None:
     ],
 )
 def test_group_values_cannot_traverse_outside_preview_inputs(selection: str) -> None:
-    result = preview(
-        PreviewRequest(command="predict", overrides=[f"model={selection}"], sweep=True)
-    )
+    result = preview(PreviewRequest(command="predict", overrides=[f"model={selection}"], sweep=True))
     assert result.errors
     assert "external group" in result.errors[0]
 
@@ -193,11 +180,7 @@ def test_interpolated_hydra_container_cannot_execute_a_resolver() -> None:
     OmegaConf.register_new_resolver("docs_hydra_probe", forbidden)
     try:
         result = preview(
-            PreviewRequest(
-                documents={
-                    "entry.yaml": "defaults:\n- train\n- _self_\nhydra: ${docs_hydra_probe:}\n"
-                }
-            )
+            PreviewRequest(documents={"entry.yaml": "defaults:\n- train\n- _self_\nhydra: ${docs_hydra_probe:}\n"})
         )
         assert result.errors
         assert called == []
@@ -205,9 +188,7 @@ def test_interpolated_hydra_container_cannot_execute_a_resolver() -> None:
         OmegaConf.clear_resolver("docs_hydra_probe")
 
 
-def test_hydra_alias_cannot_read_an_external_configuration(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_hydra_alias_cannot_read_an_external_configuration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     outside = tmp_path / "outside.yaml"
     outside.write_text("external_marker: 123\n")
     opened: list[str] = []
@@ -271,13 +252,9 @@ def test_sweep_override_order_matches_native_basic_sweeper() -> None:
         "model_label=last",
         "ultralytics_predict.batch=1,2",
     ]
-    batches = BasicSweeper.split_arguments(
-        OverridesParser.create().parse_overrides(overrides), max_batch_size=None
-    )
+    batches = BasicSweeper.split_arguments(OverridesParser.create().parse_overrides(overrides), max_batch_size=None)
     expected = [
-        preview(PreviewRequest(command="predict", overrides=job)).jobs[0].yaml
-        for batch in batches
-        for job in batch
+        preview(PreviewRequest(command="predict", overrides=job)).jobs[0].yaml for batch in batches for job in batch
     ]
     result = preview(PreviewRequest(command="predict", overrides=overrides, sweep=True))
     assert not result.errors

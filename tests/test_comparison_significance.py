@@ -15,9 +15,7 @@ from clearml_yolo.core.comparison.significance import (
 )
 
 
-def detection_series(
-    baseline_only: int, candidate_only: int, both: int, neither: int
-) -> tuple[pd.Series, pd.Series]:
+def detection_series(baseline_only: int, candidate_only: int, both: int, neither: int) -> tuple[pd.Series, pd.Series]:
     """Two paired detected/missed vectors with an exactly known discordance."""
     shared = [True] * both + [False] * neither
     baseline = [True] * baseline_only + [False] * candidate_only + shared
@@ -120,12 +118,8 @@ def test_mcnemar_without_shared_boxes_is_undefined() -> None:
 
 def planted_difference_frames() -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
     images = [f"img{index}" for index in range(60)]
-    baseline = prediction_frame(
-        {image: [index % 3 == 0, index % 5 == 0, False] for index, image in enumerate(images)}
-    )
-    candidate = prediction_frame(
-        {image: [True, True, index % 7 != 0] for index, image in enumerate(images)}
-    )
+    baseline = prediction_frame({image: [index % 3 == 0, index % 5 == 0, False] for index, image in enumerate(images)})
+    candidate = prediction_frame({image: [True, True, index % 7 != 0] for index, image in enumerate(images)})
     return baseline, candidate, images
 
 
@@ -253,9 +247,7 @@ def test_recall_bootstrap_brackets_a_planted_gain_and_withholds_a_p_value() -> N
 
     result = bootstrap_recall_delta(baseline, candidate, images, iterations=500, seed=1)
 
-    expected = candidate["detected"].sum() / len(candidate) - baseline["detected"].sum() / len(
-        baseline
-    )
+    expected = candidate["detected"].sum() / len(candidate) - baseline["detected"].sum() / len(baseline)
     assert result.delta == pytest.approx(expected)
     assert result.delta > 0
     assert result.ci_lower is not None

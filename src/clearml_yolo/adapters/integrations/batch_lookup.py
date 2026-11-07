@@ -26,9 +26,7 @@ class _PreparedManifest(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    class_names: Annotated[
-        dict[int, Annotated[str, Field(strict=True, min_length=1)]], Field(min_length=1)
-    ]
+    class_names: Annotated[dict[int, Annotated[str, Field(strict=True, min_length=1)]], Field(min_length=1)]
     images: Annotated[tuple[_ImageDensity, ...], Field(min_length=1)]
 
     @model_validator(mode="after")

@@ -74,9 +74,7 @@ def _attention_model(
     parameters = {"weight": _QKV_WEIGHT, "out_weight": _OUTPUT_WEIGHT, "mlp_weight": _MLP_WEIGHT}
     if bias != "none":
         parameters["bias"] = np.arange(1, 7, dtype=np.float32) * np.float32(0.0001)
-    initializers.extend(
-        onnx.numpy_helper.from_array(value, names[key]) for key, value in parameters.items()
-    )
+    initializers.extend(onnx.numpy_helper.from_array(value, names[key]) for key, value in parameters.items())
     for role, values in (("shape", [1, 2, 3, 1, 2]), ("split_sizes", [1, 1, 1]), ("axes", [0])):
         tensor = onnx.numpy_helper.from_array(np.array(values, dtype=np.int64), names[role])
         if constants:
@@ -115,10 +113,7 @@ def _attention_model(
             nodes,
             "anonymous_attention",
             [helper.make_tensor_value_info(names["x"], onnx.TensorProto.FLOAT, [1, 2, 2])],
-            [
-                helper.make_tensor_value_info(names[role], onnx.TensorProto.FLOAT, shape)
-                for role, shape in outputs
-            ],
+            [helper.make_tensor_value_info(names[role], onnx.TensorProto.FLOAT, shape) for role, shape in outputs],
             initializers,
         ),
         opset_imports=[helper.make_opsetid("", 17)],
@@ -140,9 +135,7 @@ def _evaluate(model: Any, inputs: dict[str, NDArray[np.float32]]) -> list[Any]:
 
 
 def _rounded_product(left: NDArray[np.float32], right: NDArray[np.float32]) -> NDArray[np.float32]:
-    product = left.astype(np.float16).astype(np.float32) @ right.astype(np.float16).astype(
-        np.float32
-    )
+    product = left.astype(np.float16).astype(np.float32) @ right.astype(np.float16).astype(np.float32)
     return product.astype(np.float16).astype(np.float32)
 
 
@@ -176,13 +169,9 @@ def test_qkv_is_float_by_value_branch_while_output_projection_and_mlp_round(
     np.testing.assert_array_equal(actual[2], expected_output)
     np.testing.assert_array_equal(actual[3], expected_mlp)
     assert selected == 2
-    assert all(
-        node in [value.SerializeToString() for value in model.graph.node] for node in protected
-    )
+    assert all(node in [value.SerializeToString() for value in model.graph.node] for node in protected)
     assert [value.SerializeToString() for value in model.graph.initializer] == initializers
-    assert [
-        value.SerializeToString() for value in (*model.graph.input, *model.graph.output)
-    ] == external_io
+    assert [value.SerializeToString() for value in (*model.graph.input, *model.graph.output)] == external_io
 
 
 def _replace_initializer(model: Any, name: str, array: NDArray[Any]) -> None:

@@ -32,10 +32,7 @@ class ModelIdentity(BaseModel):
 
     @property
     def caption(self) -> str:
-        return (
-            f"Model: {self.label}\n"
-            f"Training source: {'recorded' if self.training_task_id else 'unavailable'}"
-        )
+        return f"Model: {self.label}\nTraining source: {'recorded' if self.training_task_id else 'unavailable'}"
 
     @classmethod
     def from_provenance(cls, provenance: Mapping[str, str]) -> Self:
@@ -46,12 +43,6 @@ class ModelIdentity(BaseModel):
             checkpoint_sha256=provenance.get("checkpoint_sha256"),
             model_id=provenance.get("model_id"),
         )
-
-
-
-
-
-
 
 
 def require_model_identity(
@@ -65,7 +56,6 @@ def require_model_identity(
         return identity
     if label is None or not label.strip():
         raise ValueError(
-            "Model provenance is unavailable; supply a custom model_label "
-            "(comparison model references use label)"
+            "Model provenance is unavailable; supply a custom model_label (comparison model references use label)"
         )
     return ModelIdentity(model_name=label, checkpoint_sha256=checkpoint_hash)

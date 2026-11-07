@@ -72,9 +72,7 @@ def _parameters(command: str) -> dict[str, inspect.Parameter]:
     return dict(inspect.signature(_FUNCTIONS[command]).parameters)
 
 
-def _scalar_errors(
-    values: dict[str, JsonValue], command: str, defaults: dict[str, JsonValue]
-) -> list[str]:
+def _scalar_errors(values: dict[str, JsonValue], command: str, defaults: dict[str, JsonValue]) -> list[str]:
     errors = []
     for name, parameter in _parameters(command).items():
         if name not in values or name in _STRUCTURED or name == "ground_truth":
@@ -91,9 +89,7 @@ def _scalar_errors(
 
 def _nested_model(annotation: Any) -> type[BaseModel] | None:
     candidates = [
-        item
-        for item in (annotation, *get_args(annotation))
-        if isinstance(item, type) and issubclass(item, BaseModel)
+        item for item in (annotation, *get_args(annotation)) if isinstance(item, type) and issubclass(item, BaseModel)
     ]
     return candidates[0] if len(candidates) == 1 else None
 
@@ -147,9 +143,7 @@ def _target_errors(values: JsonValue, defaults: JsonValue) -> list[str]:
         if path.split(".")[-1] != "_target_" or unresolved(value):
             continue
         if path not in expected or value != expected[path]:
-            errors.append(
-                f"Unsupported configuration target {path}; preserve its public definition"
-            )
+            errors.append(f"Unsupported configuration target {path}; preserve its public definition")
     return errors
 
 
@@ -177,9 +171,7 @@ def _inference_errors(value: JsonValue) -> list[str]:
     image_name = value.get("image_name", "name")
     if not unresolved(image_name):
         try:
-            validate_evaluation_image_name(
-                TypeAdapter(str).validate_python(image_name, strict=True)
-            )
+            validate_evaluation_image_name(TypeAdapter(str).validate_python(image_name, strict=True))
         except (ValueError, TypeError) as error:
             errors.append(f"inference.image_name: {error}")
     reuse = value.get("reuse_existing", True)
@@ -204,9 +196,7 @@ def _wrapper_errors(value: dict[str, JsonValue], command: str) -> list[str]:
     errors.extend(_inference_errors(value.get("inference")))
     metrics = value.get("metrics")
     calibration = (
-        metrics.get("calibration_split", "val")
-        if isinstance(metrics, dict)
-        else value.get("calibration_split", "val")
+        metrics.get("calibration_split", "val") if isinstance(metrics, dict) else value.get("calibration_split", "val")
     )
     if not unresolved(calibration) and calibration != "val":
         errors.append("calibration_split must be val; test thresholds are frozen")
@@ -229,9 +219,7 @@ def _inactive_errors(value: dict[str, JsonValue], defaults: dict[str, JsonValue]
     backend = model.get("backend", "ultralytics")
     errors = []
     if backend == "ultralytics":
-        baseline: JsonValue = TypeAdapter(JsonValue).validate_python(
-            ModelConfig().model_dump(mode="json")
-        )
+        baseline: JsonValue = TypeAdapter(JsonValue).validate_python(ModelConfig().model_dump(mode="json"))
         if not isinstance(baseline, dict):
             raise TypeError("Model defaults must be a mapping")
         for group, owner in (("train", "ultralytics"), ("predict", "ultralytics_predict")):
@@ -291,9 +279,9 @@ def _export_input_errors(value: dict[str, JsonValue]) -> list[str]:
     if unresolved(selected):
         return []
     try:
-        operation: Literal["onnx", "build", "verify"] = TypeAdapter(
-            Literal["onnx", "build", "verify"]
-        ).validate_python(selected)
+        operation: Literal["onnx", "build", "verify"] = TypeAdapter(Literal["onnx", "build", "verify"]).validate_python(
+            selected
+        )
     except ValidationError:
         # The ordinary settings validator already reports an invalid operation.
         return []

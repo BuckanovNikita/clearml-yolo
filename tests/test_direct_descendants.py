@@ -34,9 +34,7 @@ def _alive(pid: int) -> bool:
 
 @pytest.mark.parametrize("orphan", [False, True])
 @pytest.mark.parametrize("native_fork", [False, True])
-def test_fork_without_exec_is_owned_and_reaped(
-    tmp_path: Path, orphan: bool, native_fork: bool
-) -> None:
+def test_fork_without_exec_is_owned_and_reaped(tmp_path: Path, orphan: bool, native_fork: bool) -> None:
     script = """
 import ctypes,os,signal,sys,time
 from pathlib import Path
@@ -123,9 +121,7 @@ with native_descendant_scope():
         )
     pids: list[int] = []
     try:
-        pids.extend(
-            int(_wait(tmp_path / f"{name}.pid")) for name in ("helper", "helper-child", "native")
-        )
+        pids.extend(int(_wait(tmp_path / f"{name}.pid")) for name in ("helper", "helper-child", "native"))
         supervisor.wait(timeout=15)
         assert supervisor.returncode == 0, (tmp_path / "errors").read_text(encoding="utf-8")
         assert _alive(pids[0])
@@ -300,9 +296,7 @@ def test_native_scope_checks_second_empty_scan_for_late_fork(
         snapshots = iter(({101: current}, {101: current, 202: child}))
         monkeypatch.setattr(tree, "_table", lambda: next(snapshots))
         monkeypatch.setattr(Path, "read_bytes", lambda _path: b"")
-        monkeypatch.setattr(
-            process_tree, "_read_process", lambda pid: current if pid == current.pid else child
-        )
+        monkeypatch.setattr(process_tree, "_read_process", lambda pid: current if pid == current.pid else child)
 
         assert tree.running(), "Native scope released before checking a late fork"
         assert tree._identities == {101: 10, 202: 11}

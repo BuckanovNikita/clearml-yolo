@@ -62,9 +62,7 @@ class SourceImage:
 
     @property
     def features(self) -> frozenset[str]:
-        return frozenset(component.class_id for component in self.components) or frozenset(
-            {"background"}
-        )
+        return frozenset(component.class_id for component in self.components) or frozenset({"background"})
 
 
 def decode_rle(encoded: str, *, height: int, width: int) -> NDArray[np.bool_]:
@@ -84,9 +82,7 @@ def decode_rle(encoded: str, *, height: int, width: int) -> NDArray[np.bool_]:
         offset = start - 1
         end = offset + length
         if offset < previous_end or length <= 0 or end > flat.size:
-            raise ValueError(
-                "RLE runs must be positive, sorted, nonoverlapping and within the image"
-            )
+            raise ValueError("RLE runs must be positive, sorted, nonoverlapping and within the image")
         flat[offset:end] = True
         previous_end = end
     return flat.reshape((height, width), order="F")
@@ -103,11 +99,7 @@ def component_boxes(mask: NDArray[np.bool_], class_id: str) -> tuple[Component, 
         if slices is None:
             raise ValueError("Connected-component labeling produced a missing component")
         y, x = slices
-        result.append(
-            Component(
-                class_id, component_id, (x.start, y.start, x.stop, y.stop), int(areas[component_id])
-            )
-        )
+        result.append(Component(class_id, component_id, (x.start, y.start, x.stop, y.stop), int(areas[component_id])))
     return tuple(result)
 
 
@@ -131,11 +123,7 @@ def _annotations(path: Path, image_names: set[str]) -> dict[str, dict[str, str]]
         reader = csv.DictReader(stream)
         fields = set(reader.fieldnames or ())
         legacy = "ImageId_ClassId" in fields
-        expected = (
-            {"ImageId_ClassId", "EncodedPixels"}
-            if legacy
-            else {"ImageId", "ClassId", "EncodedPixels"}
-        )
+        expected = {"ImageId_ClassId", "EncodedPixels"} if legacy else {"ImageId", "ClassId", "EncodedPixels"}
         if not expected.issubset(fields) or (legacy and {"ImageId", "ClassId"} & fields):
             raise ValueError("Unsupported or ambiguous Severstal train.csv columns")
         for row in reader:
@@ -177,9 +165,7 @@ def read_source(source: Path) -> tuple[SourceImage, ...]:
     image_root = source / "train_images"
     if not image_root.is_dir() or not (source / "train.csv").is_file():
         raise FileNotFoundError("Official Severstal source requires train.csv and train_images")
-    paths = sorted(
-        path for path in image_root.iterdir() if path.suffix.lower() in {".jpg", ".jpeg", ".png"}
-    )
+    paths = sorted(path for path in image_root.iterdir() if path.suffix.lower() in {".jpg", ".jpeg", ".png"})
     if not paths:
         raise ValueError("Severstal train_images contains no supported images")
     if any(not path.is_file() or not path.resolve().is_relative_to(image_root) for path in paths):
@@ -196,29 +182,20 @@ def _group_features(group: Sequence[SourceImage]) -> frozenset[str]:
     return frozenset(feature for record in group for feature in record.features)
 
 
-def _cover_features(
-    available: dict[str, tuple[SourceImage, ...]], capacity: int, *, seed: int
-) -> list[str]:
+def _cover_features(available: dict[str, tuple[SourceImage, ...]], capacity: int, *, seed: int) -> list[str]:
     selected: list[str] = []
     missing = set(FEATURES)
     counts = Counter(feature for group in available.values() for feature in _group_features(group))
     while missing:
         candidates = [
-            key
-            for key, group in available.items()
-            if len(group) <= capacity and missing & _group_features(group)
+            key for key, group in available.items() if len(group) <= capacity and missing & _group_features(group)
         ]
         if not candidates:
-            raise ValueError(
-                "Cannot cover all four classes and backgrounds with independent content groups"
-            )
+            raise ValueError("Cannot cover all four classes and backgrounds with independent content groups")
         key = min(
             candidates,
             key=lambda item: (
-                -sum(
-                    1 / counts[feature]
-                    for feature in sorted(missing & _group_features(available[item]))
-                ),
+                -sum(1 / counts[feature] for feature in sorted(missing & _group_features(available[item]))),
                 len(available[item]),
                 _order_key(item, seed),
             ),
@@ -245,12 +222,7 @@ def assign_splits(records: Sequence[SourceImage], *, seed: int = 0) -> dict[str,
     totals = Counter(feature for record in records for feature in record.features)
     counts = {split: sum(len(groups[item]) for item in chosen[split]) for split in SPLITS}
     feature_counts = {
-        split: Counter(
-            feature
-            for item in chosen[split]
-            for record in groups[item]
-            for feature in record.features
-        )
+        split: Counter(feature for item in chosen[split] for record in groups[item] for feature in record.features)
         for split in SPLITS
     }
     for key in sorted(
@@ -263,15 +235,8 @@ def assign_splits(records: Sequence[SourceImage], *, seed: int = 0) -> dict[str,
         split = _choose_split(groups[key], counts, feature_counts, targets, totals)
         chosen[split].append(key)
         counts[split] += len(groups[key])
-        feature_counts[split].update(
-            feature for record in groups[key] for feature in record.features
-        )
-    return {
-        record.image_name: split
-        for split, keys in chosen.items()
-        for key in keys
-        for record in groups[key]
-    }
+        feature_counts[split].update(feature for record in groups[key] for feature in record.features)
+    return {record.image_name: split for split, keys in chosen.items() for key in keys for record in groups[key]}
 
 
 def _choose_split(
@@ -316,9 +281,7 @@ def select_smoke(
             record.image_name: (record,) for record in records if splits[record.image_name] == split
         }
         if len(members) < size:
-            raise ValueError(
-                f"Requested smoke {split} size {size} exceeds available {len(members)}"
-            )
+            raise ValueError(f"Requested smoke {split} size {size} exceeds available {len(members)}")
         covered = _cover_features(members, size, seed=seed)
         selected.update(covered)
         remaining = sorted(members, key=lambda key: _order_key(key, seed))
@@ -340,9 +303,7 @@ def _csv_contents(records: Iterable[SourceImage], splits: Mapping[str, Split]) -
             writer.writerow(common | {"instance_label": ""})
         for component in record.components:
             writer.writerow(
-                common
-                | {"instance_label": component.class_id}
-                | dict(zip(CSV_FIELDS[3:7], component.box, strict=True))
+                common | {"instance_label": component.class_id} | dict(zip(CSV_FIELDS[3:7], component.box, strict=True))
             )
     return stream.getvalue()
 
@@ -362,17 +323,13 @@ def prepare(
         raise ValueError("Preparation output and original dataset must be separate directory trees")
     destinations = [output / name for name in ("full.csv", "smoke.csv", "manifest.json")]
     if any(path.exists() for path in destinations):
-        raise FileExistsError(
-            "Prepared dataset already exists; verify it or choose a new output directory"
-        )
+        raise FileExistsError("Prepared dataset already exists; verify it or choose a new output directory")
     records = read_source(source)
     splits = assign_splits(records, seed=seed)
     smoke = select_smoke(records, splits, smoke_sizes, seed=seed)
     documents = {
         "full.csv": _csv_contents(records, splits),
-        "smoke.csv": _csv_contents(
-            (record for record in records if record.image_name in smoke), splits
-        ),
+        "smoke.csv": _csv_contents((record for record in records if record.image_name in smoke), splits),
     }
     manifest: dict[str, Any] = {
         "schema_version": 1,
@@ -390,10 +347,7 @@ def prepare(
         "requested_split_ratios": RATIOS,
         "split_counts": dict(Counter(splits.values())),
         "smoke_counts": dict(Counter(splits[name] for name in smoke)),
-        "csv_sha256": {
-            name: hashlib.sha256(contents.encode()).hexdigest()
-            for name, contents in documents.items()
-        },
+        "csv_sha256": {name: hashlib.sha256(contents.encode()).hexdigest() for name, contents in documents.items()},
         "images": [
             asdict(record)
             | {
@@ -438,8 +392,7 @@ def verify_prepared(output: Path, *, verify_images: bool = True) -> dict[str, An
         for record in manifest["images"]:
             if (
                 record["smoke"]
-                and hashlib.sha256(Path(record["image_path"]).read_bytes()).hexdigest()
-                != record["source_sha256"]
+                and hashlib.sha256(Path(record["image_path"]).read_bytes()).hexdigest() != record["source_sha256"]
             ):
                 raise ValueError(f"Prepared Severstal image {record['image_name']} hash mismatch")
     return cast(dict[str, Any], manifest)

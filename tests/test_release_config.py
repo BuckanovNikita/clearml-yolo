@@ -105,9 +105,7 @@ def test_comparison_rejects_owned_prediction_overrides(
     from clearml_yolo.adapters.clearml.session import ClearMLConfig
     from clearml_yolo.application.use_cases import compare as module
 
-    monkeypatch.setattr(
-        workflow_dependencies.tracking, "init_task", lambda *a, **k: pytest.fail("created task")
-    )
+    monkeypatch.setattr(workflow_dependencies.tracking, "init_task", lambda *a, **k: pytest.fail("created task"))
     with pytest.raises(ValueError, match="owned by comparison"):
         module.compare(
             module.ModelRef(),

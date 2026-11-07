@@ -64,10 +64,7 @@ def _guard(request: PreviewRequest) -> None:
             raise TypeError("YAML documents must be mappings")
         _guard_mapping(OmegaConf.to_container(parsed, resolve=False))
     groups = {
-        str(parent)
-        for name in request.documents
-        for parent in PurePosixPath(name).parents
-        if str(parent) != "."
+        str(parent) for name in request.documents for parent in PurePosixPath(name).parents if str(parent) != "."
     } | {"model", "transforms", "transform_overrides", "ultralytics", "ultralytics_predict"}
     _guard_overrides(request.overrides, groups)
 
@@ -85,11 +82,7 @@ def _guard_overrides(overrides: list[str], groups: set[str]) -> None:
             raise ValueError("Preview forbids external group paths")
         if group == "hydra" or group.startswith(("hydra.", "hydra/")):
             raise ValueError(f"Preview forbids {key}; apply Hydra runtime controls in the terminal")
-        if (
-            group.startswith("_cy_schemas")
-            or key == "defaults"
-            or ("_target_" in key and key.startswith("hydra"))
-        ):
+        if group.startswith("_cy_schemas") or key == "defaults" or ("_target_" in key and key.startswith("hydra")):
             raise ValueError(f"Preview forbids {key}")
         if separator or group in groups or group.split("/")[0] in groups:
             _guard_selection(item.partition("=")[2])
@@ -100,9 +93,7 @@ def _guard_selection(value: str) -> None:
     # Check every textual choice before sweep parsing/materialization as well.
     if "${" in value:
         raise ValueError("Preview group selectors must be literal")
-    if any(token in value for token in ("..", "\\", "://")) or re.search(
-        r"""(?:^|[,\[\s"'])/""", value
-    ):
+    if any(token in value for token in ("..", "\\", "://")) or re.search(r"""(?:^|[,\[\s"'])/""", value):
         raise ValueError("Preview forbids external group selection paths")
 
 
@@ -135,9 +126,7 @@ def _expanded(request: PreviewRequest) -> list[list[str]]:
 
 
 def _job(configuration: DictConfig, command: str) -> PreviewJob:
-    value: JsonValue = TypeAdapter(JsonValue).validate_python(
-        OmegaConf.to_container(configuration, resolve=False)
-    )
+    value: JsonValue = TypeAdapter(JsonValue).validate_python(OmegaConf.to_container(configuration, resolve=False))
     flattened = flatten(value)
     selected = selected_values(flattened)
     return PreviewJob(
@@ -160,16 +149,9 @@ def preview(request: PreviewRequest) -> PreviewResult:
                 if request.documents
                 else initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3")
             )
-            name = (
-                next(iter(request.documents)).rsplit(".", 1)[0]
-                if request.documents
-                else request.command
-            )
+            name = next(iter(request.documents)).rsplit(".", 1)[0] if request.documents else request.command
             with context:
-                jobs = [
-                    _job(compose(config_name=name, overrides=overrides), request.command)
-                    for overrides in expanded
-                ]
+                jobs = [_job(compose(config_name=name, overrides=overrides), request.command) for overrides in expanded]
         command = [COMMAND_OF_CONFIG[request.command]]
         if request.documents:
             command.extend(["--config-dir", "./configs", "--config-name", name])

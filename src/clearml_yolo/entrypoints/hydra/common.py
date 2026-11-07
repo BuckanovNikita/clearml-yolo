@@ -81,11 +81,7 @@ def _validate_replay_runtime(uses_detector: bool, replay: dict[str, Any]) -> Non
         return
     selected = ModelConfig.model_validate(replay["model"])
     if (selected.backend != "ultralytics") != uses_detector:
-        model = (
-            "ultralytics"
-            if selected.backend == "ultralytics"
-            else f"{selected.backend}/{selected.preset}"
-        )
+        model = "ultralytics" if selected.backend == "ultralytics" else f"{selected.backend}/{selected.preset}"
         # Runtime setup precedes ClearML package discovery; replacing it mid-owner
         # would lose callback and path isolation established for this invocation.
         raise ValueError(
@@ -145,9 +141,7 @@ def _builtin_defaults(name: str, config: DictConfig) -> dict[str, Any]:
     return _publication_inputs(defaults)
 
 
-def _executable_replay(
-    config: DictConfig, function: Callable[..., Any], replay: dict[str, Any]
-) -> dict[str, Any]:
+def _executable_replay(config: DictConfig, function: Callable[..., Any], replay: dict[str, Any]) -> dict[str, Any]:
     reject_legacy_controls(replay)
     # Run also contains result provenance; only command inputs are executable.
     accepted = set(inspect.signature(function).parameters) - {"deps"}
@@ -164,9 +158,7 @@ def _restore_agent_inputs(
     # Agent scripts record a bare entrypoint. Restore inputs before validating
     # required fields or selecting the native runtime; no task is initialized yet.
     snapshot = fetch_remote_replay()
-    native = (
-        OmegaConf.to_container(config.ultralytics, resolve=False) if "ultralytics" in config else {}
-    )
+    native = OmegaConf.to_container(config.ultralytics, resolve=False) if "ultralytics" in config else {}
     if not isinstance(native, dict):
         raise TypeError("Native command configuration must be a mapping")
     requested = {str(key): value for key, value in native.items()}
@@ -195,10 +187,7 @@ def execute_owned(name: str, config: DictConfig, function: Callable[..., Any]) -
     # Initialize native imports before ClearML starts background package detection;
     # concurrent torch submodule discovery can observe a partially loaded package.
     model_values = inputs.get("model", {})
-    uses_detector = (
-        isinstance(model_values, dict)
-        and model_values.get("backend", "ultralytics") != "ultralytics"
-    )
+    uses_detector = isinstance(model_values, dict) and model_values.get("backend", "ultralytics") != "ultralytics"
     with (
         execution_lifecycle() as supervised,
         detector_runtime() if uses_detector else native_runtime(),
@@ -210,9 +199,7 @@ def execute_owned(name: str, config: DictConfig, function: Callable[..., Any]) -
         ) as task,
         _gpu_cleanup(True),
     ):
-        remote_native = (
-            name in {"pipeline", "train"} and not uses_detector and not task.running_locally()
-        )
+        remote_native = name in {"pipeline", "train"} and not uses_detector and not task.running_locally()
         replay = (
             replay_configuration(task, inputs, legacy_native_general=True, publish=False)
             if remote_native
@@ -235,9 +222,7 @@ def execute_owned(name: str, config: DictConfig, function: Callable[..., Any]) -
                 config.ultralytics = native
         validate_wrapper_keys(config, function)
         validate_project_destinations(config)
-        publish_run_configuration(
-            task, _publication_inputs(config), _builtin_defaults(name, config)
-        )
+        publish_run_configuration(task, _publication_inputs(config), _builtin_defaults(name, config))
         initialize_naming(task)
         # Derive paths only after the owner exists; remote task names may differ.
         with open_dict(config):
@@ -272,9 +257,7 @@ def _execute_direct(name: str, config: DictConfig, function: Callable[..., Any])
     for group in ("ultralytics", "ultralytics_predict"):
         if group in config:
             value = config[group].get("device")
-            requests[group] = (
-                OmegaConf.to_container(value, resolve=True) if OmegaConf.is_config(value) else value
-            )
+            requests[group] = OmegaConf.to_container(value, resolve=True) if OmegaConf.is_config(value) else value
     with requested_devices(requests):
         if "deps" in inspect.signature(function).parameters:
             with trace_operation("configuration.dependencies"):
@@ -284,9 +267,7 @@ def _execute_direct(name: str, config: DictConfig, function: Callable[..., Any])
                 transforms = prepare_transforms(effective)
                 if transforms.mode == "native":
                     dependencies = (
-                        build_dependencies()
-                        if selected.backend == "ultralytics"
-                        else build_dependencies(selected)
+                        build_dependencies() if selected.backend == "ultralytics" else build_dependencies(selected)
                     )
                 else:
                     dependencies = build_dependencies(selected, transforms=transforms)
@@ -304,13 +285,9 @@ def _execute_direct(name: str, config: DictConfig, function: Callable[..., Any])
 
             # Supply concrete capabilities outside the public Hydra configuration.
             if name == "train" or (name == "pipeline" and not effective.skip_train):
-                parameters = dependencies.model.execution_settings(
-                    dict(effective.ultralytics), "train"
-                )
+                parameters = dependencies.model.execution_settings(dict(effective.ultralytics), "train")
                 if not parameters.get("model"):
-                    raise ValueError(
-                        "Set ultralytics.model explicitly; no training model fallback is provided"
-                    )
+                    raise ValueError("Set ultralytics.model explicitly; no training model fallback is provided")
                 dependencies.tracking.publish_training_parameters(
                     dependencies.tracking.init_task(instantiate(effective.clearml), stage=name),
                     parameters | {"mode": "train"},

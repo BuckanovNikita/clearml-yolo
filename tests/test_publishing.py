@@ -183,9 +183,7 @@ def test_visualization_publication_failure_warns_without_success_receipt(
     assert any(type(failure).__name__ in warning for warning in warnings_log)
     assert any(str(failure) in warning for warning in warnings_log)
     assert any("operation=publish" in warning for warning in warnings_log)
-    assert any(
-        "task_id=task" in warning and "ground_truth=gt.csv" in warning for warning in warnings_log
-    )
+    assert any("task_id=task" in warning and "ground_truth=gt.csv" in warning for warning in warnings_log)
 
 
 @pytest.mark.parametrize("stage", ["factory", "preflight", "publication"])
@@ -213,14 +211,9 @@ def test_visualization_warnings_do_not_expose_backend_credentials(
         return FailingPublisher()
 
     task = SimpleNamespace(id="task")
-    publisher = prepare_publisher(
-        task, FiftyOneConfig(), factory=factory, deps=workflow_dependencies
-    )
+    publisher = prepare_publisher(task, FiftyOneConfig(), factory=factory, deps=workflow_dependencies)
     assert (
-        publish_results(
-            publisher, task, output_dir=tmp_path, ground_truth="gt.csv", deps=workflow_dependencies
-        )
-        is None
+        publish_results(publisher, task, output_dir=tmp_path, ground_truth="gt.csv", deps=workflow_dependencies) is None
     )
     assert any("RuntimeError" in warning for warning in warnings_log)
     assert all("private-password" not in warning for warning in warnings_log)
@@ -267,9 +260,7 @@ def test_visualization_receipt_failure_does_not_fail_computation(
     def fail_record(*_args: Any) -> None:
         raise RuntimeError("visualization link unavailable")
 
-    patch_workflow(
-        monkeypatch, workflow_dependencies, publication, "record_run_configuration", fail_record
-    )
+    patch_workflow(monkeypatch, workflow_dependencies, publication, "record_run_configuration", fail_record)
     destination = tmp_path / "output"
     if failure_stage == "receipt":
         destination.write_text("existing file")
@@ -304,14 +295,10 @@ def test_visualization_failure_allows_clearml_task_completion(
     from clearml_yolo.core.publication import FiftyOneConfig
     from test_clearml_session import FakeTask
 
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.clearml.session._start_console_publisher", lambda *_args: None
-    )
+    monkeypatch.setattr("clearml_yolo.adapters.clearml.session._start_console_publisher", lambda *_args: None)
     task = FakeTask()
     patch_workflow(monkeypatch, workflow_dependencies, clearml.Task, "init", lambda **_kwargs: task)
-    patch_workflow(
-        monkeypatch, workflow_dependencies, clearml.Task, "get_task", lambda **_kwargs: task
-    )
+    patch_workflow(monkeypatch, workflow_dependencies, clearml.Task, "get_task", lambda **_kwargs: task)
     monkeypatch.delenv("LOCAL_RANK", raising=False)
     predictions = tmp_path / "predictions.csv"
     predictions.write_text("image_name\nexample.jpg\n")
@@ -376,8 +363,6 @@ def test_publication_request_failure_identifies_input_without_calling_backend(
         is None
     )
     assert any(
-        "operation=prepare_request" in entry
-        and "ground_truth=gt.csv" in entry
-        and ("ValidationError" in entry)
+        "operation=prepare_request" in entry and "ground_truth=gt.csv" in entry and ("ValidationError" in entry)
         for entry in warnings_log
     )

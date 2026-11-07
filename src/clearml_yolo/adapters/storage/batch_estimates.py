@@ -54,9 +54,7 @@ class FileBatchEstimateStore:
             self._replace(catalogue.model_dump_json(indent=2) + "\n")
 
     def _replace(self, payload: str) -> None:
-        descriptor, name = tempfile.mkstemp(
-            prefix=".batch-estimates-", suffix=".tmp", dir=self.path.parent
-        )
+        descriptor, name = tempfile.mkstemp(prefix=".batch-estimates-", suffix=".tmp", dir=self.path.parent)
         temporary = Path(name)
         try:
             with os.fdopen(descriptor, "w", encoding="utf-8") as stream:

@@ -19,6 +19,7 @@ from clearml_yolo.entrypoints.composition import build_dependencies
 
 ArtifactReady = Callable[[str, Path], None]
 
+
 def _metadata() -> ExportMetadata:
     return ExportMetadata(
         descriptor=CheckpointDescriptor(
@@ -68,13 +69,13 @@ def test_complete_export_survives_later_producer_failure(
             metadata = destination / "model.engine.json"
             metadata.write_bytes(b"complete metadata")
             artifact_ready("export_metadata", metadata)
-            return ExportResult(
-                artifacts={"export_engine": engine, "export_metadata": metadata}, evidence={}
-            )
+            return ExportResult(artifacts={"export_engine": engine, "export_metadata": metadata}, evidence={})
 
     dependencies = replace(dependencies, exporter=Exporter())
     arguments = {
-        "operation": "build", "device": 0, "onnx": tmp_path / "source.onnx",
+        "operation": "build",
+        "device": 0,
+        "onnx": tmp_path / "source.onnx",
     }
     if later_failure:
         with pytest.raises(RuntimeError, match="metadata producer failed"):
@@ -83,7 +84,8 @@ def test_complete_export_survives_later_producer_failure(
     else:
         export_model(arguments, ClearMLConfig(), tmp_path / "output", deps=dependencies)
         assert uploads == [
-            ("export_engine", b"complete engine"), ("export_metadata", b"complete metadata"),
+            ("export_engine", b"complete engine"),
+            ("export_metadata", b"complete metadata"),
         ]
 
 
@@ -103,7 +105,10 @@ def test_engine_ready_callback_precedes_metadata_and_rejection_stops_producer(
         destination.write_bytes(b"final engine")
         events.append("engine complete")
         return SimpleNamespace(
-            path=destination, sha256="c" * 64, runtime_versions={}, plugins=(),
+            path=destination,
+            sha256="c" * 64,
+            runtime_versions={},
+            plugins=(),
         )
 
     def write_metadata(value: ExportMetadata, destination: Path) -> None:
@@ -118,9 +123,7 @@ def test_engine_ready_callback_precedes_metadata_and_rejection_stops_producer(
     monkeypatch.setattr(build, "build_engine", build_engine)
     monkeypatch.setattr(export_operations, "write_metadata", write_metadata)
     request = ExportRequest(operation="build", device=0, onnx=graph)
-    result = export_operations.DetectorExporter._build(
-        request, tmp_path, metadata, artifact_ready=ready
-    )
+    result = export_operations.DetectorExporter._build(request, tmp_path, metadata, artifact_ready=ready)
     assert set(result.artifacts) == {"export_engine", "export_metadata"}
     assert events == ["engine complete", "export_engine", "metadata write", "export_metadata"]
     events.clear()
@@ -131,9 +134,7 @@ def test_engine_ready_callback_precedes_metadata_and_rejection_stops_producer(
         raise RuntimeError("upload rejected")
 
     with pytest.raises(RuntimeError, match="upload rejected"):
-        export_operations.DetectorExporter._build(
-            request, tmp_path, metadata, artifact_ready=reject
-        )
+        export_operations.DetectorExporter._build(request, tmp_path, metadata, artifact_ready=reject)
     assert events == ["engine complete"]
 
 
@@ -187,8 +188,11 @@ def test_verification_announces_corpus_then_only_complete_report(
     monkeypatch.setattr(model, "build_model", lambda *args, **kwargs: Detector())
     monkeypatch.setattr(model, "checkpoint_state", lambda *args: {})
     request = ExportRequest(
-        operation="verify", device=0, weights=tmp_path / "best.pth",
-        engine=tmp_path / "model.engine", ground_truth=tmp_path / "truth.csv",
+        operation="verify",
+        device=0,
+        weights=tmp_path / "best.pth",
+        engine=tmp_path / "model.engine",
+        ground_truth=tmp_path / "truth.csv",
     )
     if fail_case:
         with pytest.raises(RuntimeError, match="case execution failed"):

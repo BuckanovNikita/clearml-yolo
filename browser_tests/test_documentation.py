@@ -23,9 +23,7 @@ def open_editor(page: Page) -> None:
 def test_search_stable_links_and_keyboard_navigation(page: Page) -> None:
     open_editor(page)
     page.get_by_label("Найти параметр").fill("ultralytics.batch")
-    link = page.get_by_role("list", name="Параметры").get_by_role(
-        "link", name=re.compile(r"^ultralytics\.batch")
-    )
+    link = page.get_by_role("list", name="Параметры").get_by_role("link", name=re.compile(r"^ultralytics\.batch"))
     expect(link).to_have_count(1)
     link.focus()
     page.keyboard.press("Enter")
@@ -63,22 +61,16 @@ def test_edit_preview_differences_clipboard_and_download(page: Page, tmp_path: P
     with page.expect_download() as documents:
         page.get_by_role("button", name="Скачать документы JSON", exact=True).click()
     documents.value.save_as(tmp_path / "documents.json")
-    assert json.loads((tmp_path / "documents.json").read_text())["example.yaml"].endswith(
-        "ground_truth: ./tiny.csv\n"
-    )
+    assert json.loads((tmp_path / "documents.json").read_text())["example.yaml"].endswith("ground_truth: ./tiny.csv\n")
 
 
 def test_named_documents_and_ordered_overrides(page: Page) -> None:
     open_editor(page)
-    page.get_by_label("Содержимое YAML", exact=True).fill(
-        "defaults:\n  - train\n  - custom\n  - _self_\n"
-    )
+    page.get_by_label("Содержимое YAML", exact=True).fill("defaults:\n  - train\n  - custom\n  - _self_\n")
     page.get_by_role("button", name="+ Документ", exact=True).click()
     page.get_by_label("Имя документа", exact=True).nth(1).fill("custom.yaml")
     page.get_by_label("Содержимое YAML", exact=True).nth(1).fill("ultralytics:\n  epochs: 3\n")
-    page.get_by_label("Переопределения по порядку").fill(
-        "ultralytics.epochs=4\nultralytics.epochs=5"
-    )
+    page.get_by_label("Переопределения по порядку").fill("ultralytics.epochs=4\nultralytics.epochs=5")
     page.get_by_label("Переопределения по порядку").press("Control+Enter")
     expect(page.get_by_label("Собранный YAML")).to_contain_text("epochs: 5")
     page.get_by_role("button", name="Удалить документ 2", exact=True).click()
@@ -88,9 +80,7 @@ def test_named_documents_and_ordered_overrides(page: Page) -> None:
 def test_reference_examples_are_valid_overrides(page: Page) -> None:
     open_editor(page)
     page.get_by_label("Найти параметр").fill("ground_truth")
-    page.get_by_role("list", name="Параметры").get_by_role(
-        "link", name=re.compile(r"^ground_truth ")
-    ).click()
+    page.get_by_role("list", name="Параметры").get_by_role("link", name=re.compile(r"^ground_truth ")).click()
     detail = page.get_by_role("article", name="Описание параметра")
     detail.get_by_role("button", name="ground_truth=truth.csv", exact=True).click()
     expect(page.get_by_label("Переопределения по порядку")).to_have_value("ground_truth=truth.csv")
@@ -108,9 +98,7 @@ def test_reference_examples_are_valid_overrides(page: Page) -> None:
 def test_required_marker_follows_selected_command(page: Page) -> None:
     open_editor(page)
     page.get_by_label("Найти параметр").fill("ground_truth")
-    page.get_by_role("list", name="Параметры").get_by_role(
-        "link", name=re.compile(r"^ground_truth ")
-    ).click()
+    page.get_by_role("list", name="Параметры").get_by_role("link", name=re.compile(r"^ground_truth ")).click()
     detail = page.get_by_role("article", name="Описание параметра")
     expect(detail.get_by_text("Обязательное значение", exact=True)).to_be_visible()
     page.get_by_label("Команда", exact=True).select_option("export")
@@ -131,9 +119,7 @@ def test_mapping_and_relative_nested_examples_compose(page: Page) -> None:
         page.get_by_role("list", name="Параметры").get_by_role(
             "link", name=re.compile(rf"^{re.escape(field)} ")
         ).click()
-        page.get_by_role("article", name="Описание параметра").get_by_role(
-            "button", name=expected, exact=True
-        ).click()
+        page.get_by_role("article", name="Описание параметра").get_by_role("button", name=expected, exact=True).click()
     page.get_by_role("button", name="Предпросмотр").click()
     yaml = page.get_by_label("Собранный YAML")
     expect(yaml).to_contain_text("project_name: examples")
@@ -171,9 +157,7 @@ def test_worker_errors_preserve_inputs_and_allow_retry(page: Page) -> None:
         route.fulfill(
             status=200,
             content_type="application/json",
-            body=json.dumps(
-                {"jobs": [], "errors": ["Preview worker timed out"], "deferred": [], "command": ""}
-            ),
+            body=json.dumps({"jobs": [], "errors": ["Preview worker timed out"], "deferred": [], "command": ""}),
         )
 
     page.route("**/api/preview", fail_worker)

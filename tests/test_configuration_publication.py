@@ -21,9 +21,7 @@ def _owner() -> Iterator[tuple[Any, dict[str, Any]]]:
     documents: dict[str, Any] = {}
     task = SimpleNamespace(
         name="configuration-test",
-        set_configuration_object=lambda **values: documents.update(
-            {values["name"]: json.loads(values["config_text"])}
-        ),
+        set_configuration_object=lambda **values: documents.update({values["name"]: json.loads(values["config_text"])}),
     )
     state = session._InvocationState(task=task, stages=["train"], current_stage="train")
     token = session._ACTIVE_INVOCATION.set(state)
@@ -114,9 +112,7 @@ def test_difference_json_is_deterministic_and_empty_override_is_published() -> N
         assert json.loads(serialized[-1]) == {}
 
 
-@pytest.mark.parametrize(
-    "selection", ["ultralytics", "rfdetr/small", "deimv2/s", "fasterrcnn/resnet50_fpn"]
-)
+@pytest.mark.parametrize("selection", ["ultralytics", "rfdetr/small", "deimv2/s", "fasterrcnn/resnet50_fpn"])
 def test_defaults_use_same_selected_preset_and_only_active_backend(selection: str) -> None:
     store.add_to_hydra_store(overwrite_ok=True)
     model = model_preset(selection).model_dump(mode="json")
@@ -153,9 +149,7 @@ def test_training_parameters_are_detached_sanitized_and_owner_only(
     }
     with _owner() as (task, _):
         connected: list[dict[str, Any]] = []
-        task.connect = lambda values, **kwargs: connected.append(
-            {"values": deepcopy(values), **kwargs}
-        )
+        task.connect = lambda values, **kwargs: connected.append({"values": deepcopy(values), **kwargs})
         session.publish_training_parameters(task, values)
         session.publish_training_parameters(task, values | {"project": "later-route"})
         assert connected == [
@@ -174,9 +168,7 @@ def test_training_parameters_are_detached_sanitized_and_owner_only(
 
 def test_ordered_lists_keep_nested_boolean_and_zero_differences() -> None:
     with _owner() as (task, documents):
-        session.publish_run_configuration(
-            task, {"values": [False, {"flag": False}]}, {"values": [0, {"flag": 0}]}
-        )
+        session.publish_run_configuration(task, {"values": [False, {"flag": False}]}, {"values": [0, {"flag": 0}]})
         assert documents["run_overrides"] == {"values": [False, {"flag": False}]}
 
 
@@ -196,9 +188,7 @@ def test_remote_general_read_does_not_publish_or_redact_executable_credentials()
         assert "private" in resolved["model"]
 
 
-@pytest.mark.parametrize(
-    "selection", ["ultralytics", "rfdetr/small", "deimv2/s", "fasterrcnn/resnet50_fpn"]
-)
+@pytest.mark.parametrize("selection", ["ultralytics", "rfdetr/small", "deimv2/s", "fasterrcnn/resnet50_fpn"])
 @pytest.mark.parametrize("skip_train", [False, True])
 def test_general_precedes_workflow_and_optional_publisher_and_skipped_training_has_none(
     monkeypatch: pytest.MonkeyPatch, selection: str, skip_train: bool
@@ -242,9 +232,7 @@ def test_general_precedes_workflow_and_optional_publisher_and_skipped_training_h
 
         monkeypatch.setattr(common, "zen", lambda *args, **kwargs: enter_workflow)
         common.execute_owned("pipeline", config, run_pipeline)
-        assert events == (
-            ["workflow and publisher"] if skip_train else ["General", "workflow and publisher"]
-        )
+        assert events == (["workflow and publisher"] if skip_train else ["General", "workflow and publisher"])
         if selection == "ultralytics":
             expected = 0.0005 if skip_train else 0.03
             assert documents["run"]["ultralytics"]["weight_decay"] == expected

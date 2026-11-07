@@ -51,9 +51,7 @@ class FeaturePyramid(nn.Module):
             options["pretrained_cfg_overlay"] = {"file": str(weights.absolute())}
         # A native file override retains checkpoint filtering, key remapping and
         # positional interpolation before timm wraps the feature extractor.
-        self.body = timm.create_model(
-            TIMM_MODELS[preset], pretrained=weights is not None, **options
-        )
+        self.body = timm.create_model(TIMM_MODELS[preset], pretrained=weights is not None, **options)
         channels = (
             [int(self.body.num_features)] * len(self.strides)
             if self.patch_features
@@ -119,10 +117,6 @@ def _resnet_backbone(
         **options,
     )
     if weights is not None:
-        state = {
-            key: tensor
-            for key, tensor in checkpoint_state(weights).items()
-            if not key.startswith("fc.")
-        }
+        state = {key: tensor for key, tensor in checkpoint_state(weights).items() if not key.startswith("fc.")}
         backbone.body.load_state_dict(state, strict=True)
     return backbone

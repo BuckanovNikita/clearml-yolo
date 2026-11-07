@@ -145,17 +145,11 @@ def _construct(node: dict[str, JsonValue], path: str, sdk: Any, registry: dict[s
 
 def _check_tree(node: dict[str, JsonValue], path: str, *, root: bool = False) -> None:
     name = node.get(_CLASS_KEY)
-    if (
-        isinstance(name, str)
-        and name.rsplit(".", maxsplit=1)[-1] == "Mosaic"
-        and path != "transform.transforms[0]"
-    ):
+    if isinstance(name, str) and name.rsplit(".", maxsplit=1)[-1] == "Mosaic" and path != "transform.transforms[0]":
         raise ValueError(f"{path}: Mosaic is supported only as the first top-level transform")
     for field in ("additional_targets", "keypoint_params"):
         if node.get(field):
-            raise ValueError(
-                f"{path}.{field}: only detection images and bounding boxes are supported"
-            )
+            raise ValueError(f"{path}.{field}: only detection images and bounding boxes are supported")
     if not root and node.get("bbox_params"):
         raise ValueError(f"{path}.bbox_params: configure bounding boxes only on the root Compose")
     children = node.get("transforms")
@@ -167,9 +161,7 @@ def _check_tree(node: dict[str, JsonValue], path: str, *, root: bool = False) ->
 
 def _box_configuration(root: dict[str, JsonValue], sdk: Any) -> tuple[Any, str, str]:
     original = root.get("bbox_params")
-    values: dict[str, Any] = (
-        dict(_mapping(original, "transform.bbox_params")) if original is not None else {}
-    )
+    values: dict[str, Any] = dict(_mapping(original, "transform.bbox_params")) if original is not None else {}
     values.setdefault("format", "pascal_voc")
     fields = values.get("label_fields")
     if fields is None or fields == []:

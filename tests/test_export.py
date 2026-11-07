@@ -19,9 +19,7 @@ def test_gpu_operations_require_one_explicit_device(device: object) -> None:
 @pytest.mark.parametrize("operation", ["onnx", "build", "verify"])
 def test_each_operation_requires_its_inputs(operation: str) -> None:
     with pytest.raises(ValueError, match="requires"):
-        ExportRequest.model_validate(
-            {"operation": operation, "device": "cpu" if operation == "onnx" else 0}
-        )
+        ExportRequest.model_validate({"operation": operation, "device": "cpu" if operation == "onnx" else 0})
 
 
 @pytest.mark.parametrize("settings", [{"device": 0}, {"precision": "fp16"}])

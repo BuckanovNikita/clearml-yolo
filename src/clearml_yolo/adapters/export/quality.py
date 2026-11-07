@@ -27,9 +27,7 @@ COCO_MAX_DETECTIONS = 100
 def _actual_evaluator() -> ModuleType:
     evaluation = importlib.import_module("pycocotools.cocoeval")
     if evaluation.COCOeval.__module__ != "pycocotools.cocoeval":
-        raise ValueError(
-            "Export quality requires actual pycocotools COCOeval, not an aliased evaluator"
-        )
+        raise ValueError("Export quality requires actual pycocotools COCOeval, not an aliased evaluator")
     return evaluation
 
 
@@ -54,11 +52,7 @@ def _population(
     paths = [str(image.path) for image in images]
     if len(set(paths)) != len(paths) or set(detections) != set(paths):
         raise ValueError("Detection population must match unique image paths exactly")
-    if (
-        not class_names
-        or len(set(class_names)) != len(class_names)
-        or any(not name for name in class_names)
-    ):
+    if not class_names or len(set(class_names)) != len(class_names) or any(not name for name in class_names):
         raise ValueError("COCO class names must be unique and nonempty")
     return {name: index for index, name in enumerate(class_names)}
 
@@ -169,9 +163,7 @@ def evaluate_detections(
         evaluator.accumulate()
         evaluator.summarize()
     class_recall = {
-        name: _available_mean(
-            np.asarray(evaluator.eval["recall"][:, index, 0, -1], dtype=np.float64)
-        )
+        name: _available_mean(np.asarray(evaluator.eval["recall"][:, index, 0, -1], dtype=np.float64))
         for name, index in labels.items()
     }
     return QualityMetrics(

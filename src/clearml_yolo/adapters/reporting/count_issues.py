@@ -19,13 +19,10 @@ ISSUES_SHEET = "Report issues"
 _IMPACT = "Excluded from training-count-filtered aggregates and comparison deltas."
 
 
-def apply_training_counts(
-    frame: pd.DataFrame, path: Path, counts: Mapping[str, int] | None
-) -> None:
+def apply_training_counts(frame: pd.DataFrame, path: Path, counts: Mapping[str, int] | None) -> None:
     """Replace evaluation-population counts with checkpoint-owned training evidence."""
     frame[TRAIN_COLUMN] = [
-        training_count(counts.get(str(label), 0)) if counts is not None else None
-        for label in frame.index
+        training_count(counts.get(str(label), 0)) if counts is not None else None for label in frame.index
     ]
     workbook = load_workbook(path)
     try:
@@ -60,11 +57,7 @@ class CountPartition:
 def partition_counts(table: Any, model: str) -> CountPartition:
     """Keep only count-valid rows for the strict dependency; never invent counts."""
     frame = table.frame.copy(deep=True)
-    columns = [
-        column
-        for column in frame.columns
-        if "train" in str(column).lower() and "пример" in str(column).lower()
-    ]
+    columns = [column for column in frame.columns if "train" in str(column).lower() and "пример" in str(column).lower()]
     if len(columns) > 1:
         raise ValueError(f"Multiple training count columns in {table.source_name}: {columns}")
     column = columns[0] if columns else TRAIN_COLUMN
@@ -80,17 +73,13 @@ def partition_counts(table: Any, model: str) -> CountPartition:
             model=model,
             class_name=str(label),
             field=str(column),
-            reason=(
-                "Missing training count" if not columns else "Unavailable or invalid training count"
-            ),
+            reason=("Missing training count" if not columns else "Unavailable or invalid training count"),
         )
         for label in unknown["Класс"]
     )
     eligible = frame.loc[valid].copy()
     eligible[column] = [value for value in counts if value is not None]
-    return CountPartition(
-        MetricsTable(eligible, table.source_name, table.source_path), unknown, issues
-    )
+    return CountPartition(MetricsTable(eligible, table.source_name, table.source_path), unknown, issues)
 
 
 def _cell_value(value: Any) -> Any:

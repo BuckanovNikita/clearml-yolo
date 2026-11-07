@@ -18,19 +18,28 @@ from test_clearml_session import FakeTask
 
 def _state(tmp_path: Path) -> session._InvocationState:
     return session._InvocationState(
-        task=FakeTask(), stages=["pipeline"], current_stage="pipeline",
+        task=FakeTask(),
+        stages=["pipeline"],
+        current_stage="pipeline",
         pipeline_outcome=PipelineOutcome(training_succeeded=True),
         outcome_path=tmp_path / "pipeline_outcome.json",
     )
 
 
 def test_missing_upload_preserves_training_and_records_truth(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     state = _state(tmp_path)
-    state.artifacts.append(session._ArtifactRecord(
-        name="report", required=True, uploaded=False, stage="report", local_path=None,
-    ))
+    state.artifacts.append(
+        session._ArtifactRecord(
+            name="report",
+            required=True,
+            uploaded=False,
+            stage="report",
+            local_path=None,
+        )
+    )
     monkeypatch.setattr(session, "_release_failure_monitor", lambda _state: None)
     monkeypatch.setattr(session, "_close_for_failure", lambda _state, _error: state.task)
     session._finalize_preserving_training(state)
@@ -62,7 +71,8 @@ def test_interruption_remains_strict(tmp_path: Path, monkeypatch: pytest.MonkeyP
 
 
 def test_unreachable_status_retains_local_warning(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     state = _state(tmp_path)
     state.task.flush_result = False
@@ -116,7 +126,8 @@ def test_pipeline_record_preserves_earlier_model_publication_failure(tmp_path: P
 
 
 def test_atomic_snapshot_keeps_previous_on_replace_failure(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     destination = tmp_path / "outcome.json"
     destination.write_text("old")
@@ -146,11 +157,13 @@ def test_late_console_failure_preserves_training(tmp_path: Path) -> None:
 
 
 def test_publication_warning_does_not_soften_interrupted_console(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     state = _state(tmp_path)
     monkeypatch.setitem(
-        sys.modules, "clearml",
+        sys.modules,
+        "clearml",
         SimpleNamespace(Task=SimpleNamespace(get_task=lambda **_kwargs: state.task)),
     )
 

@@ -34,9 +34,7 @@ type TrialStatus = Literal[
 ]
 type UsableStatus = Literal["validated", "ceiling_limited", "numerically_limited"]
 type SearchStatus = Literal["searching", "no_capacity", "failed"] | UsableStatus
-type SearchStrategy = Literal[
-    "exponential_binary_v1", "memory_guided_v1", "memory_guided_aligned_v1"
-]
+type SearchStrategy = Literal["exponential_binary_v1", "memory_guided_v1", "memory_guided_aligned_v1"]
 
 _STRATEGY_SCHEMA_VERSION = 3
 
@@ -148,10 +146,7 @@ class TrainingProfile(_Record):
         identities = [gpu.uuid for gpu in self.gpus if gpu.uuid is not None]
         if len(set(identities)) != len(identities):
             raise ValueError("GPU identities must be unique")
-        if any(
-            effective < nominal
-            for nominal, effective in zip(self.nominal_size, self.effective_size, strict=True)
-        ):
+        if any(effective < nominal for nominal, effective in zip(self.nominal_size, self.effective_size, strict=True)):
             raise ValueError("Effective shape must cover nominal shape")
         return self
 
@@ -161,9 +156,7 @@ class TrainingProfile(_Record):
 
     def compatibility_data(self) -> dict[str, object]:
         values: dict[str, object] = self.model_dump(mode="json", exclude={"gpus"})
-        values["gpus"] = [
-            {"name": gpu.name, "total_memory_bytes": gpu.total_memory_bytes} for gpu in self.gpus
-        ]
+        values["gpus"] = [{"name": gpu.name, "total_memory_bytes": gpu.total_memory_bytes} for gpu in self.gpus]
         return values
 
 
@@ -278,9 +271,7 @@ class BatchSearch(_Record):
     def start(cls, profile: TrainingProfile, settings: SearchSettings) -> Self:
         step = 8 if settings.search_strategy == "memory_guided_aligned_v1" else 1
         if settings.max_global_batch < step * profile.world_size:
-            raise ValueError(
-                f"Search ceiling must cover at least {step} images per rank/world size"
-            )
+            raise ValueError(f"Search ceiling must cover at least {step} images per rank/world size")
         return cls(profile=profile, settings=settings, next_batch=step * profile.world_size)
 
     @property
@@ -311,9 +302,7 @@ class BatchSearch(_Record):
                 update={
                     "confirming": True,
                     "next_batch": self.lower * self.profile.world_size,
-                    "numerical_failure": (
-                        f"Numerical failure at global batch {trial.global_batch}: {diagnostic}"
-                    ),
+                    "numerical_failure": (f"Numerical failure at global batch {trial.global_batch}: {diagnostic}"),
                 }
             )
         if status not in {"success", "oom", "memory_limit"}:
@@ -338,18 +327,13 @@ class BatchSearch(_Record):
                 "numerically_limited",
                 batch=batch,
                 diagnostic=(
-                    f"{cause}independently confirmed global batch {batch}; "
-                    "maximum capacity was not determined"
+                    f"{cause}independently confirmed global batch {batch}; maximum capacity was not determined"
                 ),
             )
         ceiling = self._ceiling
-        return BatchSearch._finish(
-            self, "ceiling_limited" if self.lower == ceiling else "validated", batch=batch
-        )
+        return BatchSearch._finish(self, "ceiling_limited" if self.lower == ceiling else "validated", batch=batch)
 
-    def _finish(
-        self, status: SearchStatus, *, batch: int | None = None, diagnostic: str | None = None
-    ) -> Self:
+    def _finish(self, status: SearchStatus, *, batch: int | None = None, diagnostic: str | None = None) -> Self:
         return self.model_copy(
             update={
                 "status": status,
@@ -362,25 +346,17 @@ class BatchSearch(_Record):
 
     def _advance(self) -> Self:
         ceiling = self._ceiling
-        if self.lower == ceiling or (
-            self.upper is not None and self.upper - self.lower == self._batch_step
-        ):
+        if self.lower == ceiling or (self.upper is not None and self.upper - self.lower == self._batch_step):
             return self.model_copy(
                 update={
                     "confirming": True,
                     "next_batch": self.lower * self.profile.world_size,
                 }
             )
-        candidate = (
-            self._growth_candidate(ceiling)
-            if self.upper is None
-            else (self.lower + self.upper) // 2
-        )
+        candidate = self._growth_candidate(ceiling) if self.upper is None else (self.lower + self.upper) // 2
         # Round predictions and binary midpoints down without revisiting the lower
         # bound; aligned bounds guarantee this stays below an observed upper bound.
-        candidate = max(
-            self.lower + self._batch_step, candidate // self._batch_step * self._batch_step
-        )
+        candidate = max(self.lower + self._batch_step, candidate // self._batch_step * self._batch_step)
         return self.model_copy(update={"next_batch": candidate * self.profile.world_size})
 
     def _growth_candidate(self, ceiling: int) -> int:
@@ -470,16 +446,12 @@ class EstimateCatalogue(_Record):
                     if isinstance(case, dict):
                         settings = case.get("settings")
                         if isinstance(settings, dict) and "search_strategy" not in settings:
-                            raise ValueError(
-                                "Catalogue schema 3 requires an explicit search strategy"
-                            )
+                            raise ValueError("Catalogue schema 3 requires an explicit search strategy")
         return value
 
     @model_validator(mode="after")
     def legacy_statuses(self) -> Self:
-        if self.schema_version == 1 and any(
-            case.status == "numerically_limited" for case in self.cases
-        ):
+        if self.schema_version == 1 and any(case.status == "numerically_limited" for case in self.cases):
             raise ValueError("Numerically limited estimates require catalogue schema 2")
         if self.schema_version < _STRATEGY_SCHEMA_VERSION and any(
             case.settings.search_strategy != "exponential_binary_v1" for case in self.cases
@@ -499,17 +471,13 @@ class ModelCoverage(_Record):
         return any(case.usable for case in self.attempts)
 
 
-def model_coverage(
-    models: tuple[ModelVariant, ...], cases: tuple[EstimateCase, ...]
-) -> tuple[ModelCoverage, ...]:
+def model_coverage(models: tuple[ModelVariant, ...], cases: tuple[EstimateCase, ...]) -> tuple[ModelCoverage, ...]:
     """Report selected models in catalogue order without testing current compatibility."""
     selected = {model.selection for model in models}
     return tuple(
         ModelCoverage(
             model=model,
-            attempts=tuple(
-                case for case in cases if case.profile.model.selection == model.selection
-            ),
+            attempts=tuple(case for case in cases if case.profile.model.selection == model.selection),
         )
         for model in model_catalogue()
         if model.selection in selected
@@ -526,9 +494,7 @@ def estimate_diagnostic(case: EstimateCase) -> str:
     return case.status
 
 
-def estimate_key(
-    profile: TrainingProfile, workload: SyntheticWorkload, settings: SearchSettings
-) -> str:
+def estimate_key(profile: TrainingProfile, workload: SyntheticWorkload, settings: SearchSettings) -> str:
     """Stable storage key; actual device UUIDs and observation times are provenance."""
     # Ordinary settings serialize without ``force``, retaining historical
     # source/cache identities; forced settings include it and get distinct keys.
@@ -542,14 +508,10 @@ def estimate_key(
         "workload": workload.model_dump(mode="json"),
         "settings": settings_data,
     }
-    return hashlib.sha256(
-        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
-    ).hexdigest()
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
-def compatibility_issues(
-    case: EstimateCase, profile: TrainingProfile, workload: SyntheticWorkload
-) -> tuple[str, ...]:
+def compatibility_issues(case: EstimateCase, profile: TrainingProfile, workload: SyntheticWorkload) -> tuple[str, ...]:
     issues = []
     if not case.usable:
         issues.append(f"estimate status is {case.status}")
@@ -598,8 +560,7 @@ class ResolvedRecommendation(_Record):
         if self.global_batch != self.per_gpu_batch * self.profile.world_size:
             raise ValueError("Recommended global batch must divide equally across target GPUs")
         if self.source_estimate_keys != tuple(
-            estimate_key(source.profile, source.workload, source.settings)
-            for source in self.sources
+            estimate_key(source.profile, source.workload, source.settings) for source in self.sources
         ) or self.source_statuses != tuple(source.status for source in self.sources):
             raise ValueError("Recommendation keys and statuses must match measured sources")
         if self.origin == "measured":
@@ -613,8 +574,7 @@ class ResolvedRecommendation(_Record):
         else:
             target_hardware = {(gpu.name, gpu.total_memory_bytes): gpu for gpu in self.profile.gpus}
             source_hardware = {
-                (source.profile.gpus[0].name, source.profile.gpus[0].total_memory_bytes)
-                for source in self.sources
+                (source.profile.gpus[0].name, source.profile.gpus[0].total_memory_bytes) for source in self.sources
             }
             if (
                 self.profile.world_size == 1
@@ -624,9 +584,7 @@ class ResolvedRecommendation(_Record):
                 raise ValueError("Extrapolation requires one source per target hardware group")
             for source in self.sources:
                 gpu = source.profile.gpus[0]
-                target = self.profile.model_copy(
-                    update={"gpus": (target_hardware[gpu.name, gpu.total_memory_bytes],)}
-                )
+                target = self.profile.model_copy(update={"gpus": (target_hardware[gpu.name, gpu.total_memory_bytes],)})
                 if compatibility_issues(source, target, source.workload):
                     raise ValueError("Extrapolation requires compatible single-GPU sources")
             if self.per_gpu_batch != min(source.per_gpu_batch or 0 for source in self.sources):
@@ -648,10 +606,7 @@ def _recommendation(
     statuses: list[UsableStatus] = []
     capacities = []
     for source in sources:
-        if (
-            source.status not in ("validated", "ceiling_limited", "numerically_limited")
-            or source.per_gpu_batch is None
-        ):
+        if source.status not in ("validated", "ceiling_limited", "numerically_limited") or source.per_gpu_batch is None:
             raise ValueError("A recommendation requires usable measured sources")
         statuses.append(source.status)
         capacities.append(source.per_gpu_batch)

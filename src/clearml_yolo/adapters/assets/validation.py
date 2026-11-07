@@ -28,9 +28,7 @@ def validate_asset(path: Path, spec: AssetSpec) -> str:
         actual = digest
         if spec.checksum_algorithm == "md5":
             with path.open("rb") as stream:
-                actual = hashlib.file_digest(
-                    stream, lambda: hashlib.md5(usedforsecurity=False)
-                ).hexdigest()
+                actual = hashlib.file_digest(stream, lambda: hashlib.md5(usedforsecurity=False)).hexdigest()
         if not actual.startswith(spec.checksum.lower()):
             raise ValueError(f"Asset {spec.checksum_algorithm} checksum mismatch")
     if spec.kind == "deim-source":
@@ -39,9 +37,7 @@ def validate_asset(path: Path, spec: AssetSpec) -> str:
         _safetensors(path)
     elif zipfile.is_zipfile(path):
         with zipfile.ZipFile(path) as archive:
-            if archive.testzip() is not None or not any(
-                name.endswith("/data.pkl") for name in archive.namelist()
-            ):
+            if archive.testzip() is not None or not any(name.endswith("/data.pkl") for name in archive.namelist()):
                 raise ValueError("Invalid native Torch checkpoint archive")
     else:
         with path.open("rb") as stream:

@@ -125,9 +125,7 @@ def _preparation_record(
                 "width": image.width,
                 "height": image.height,
                 "boxes": len(image.boxes),
-                "generated_path": str(
-                    directory / exported_image_path(image, index, dataset_format)
-                ),
+                "generated_path": str(directory / exported_image_path(image, index, dataset_format)),
             }
             for index, image in enumerate(records.images, start=1)
         ],
@@ -155,9 +153,7 @@ def prepare_dataset(
     _write_cleaned_truth(records, ground_truth)
     manifest = directory / "preparation.json"
     metadata = _preparation_record(records, directory, dataset_format)
-    write_path(manifest).write_text(
-        json.dumps(metadata, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-    )
+    write_path(manifest).write_text(json.dumps(metadata, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     data = export_dataset(records, directory, dataset_format)
     labels = directory / "labels.zip"
     with (
@@ -194,9 +190,7 @@ def apply_dataset_policy(
     owned: dict[str, Any] = {"task": "detect", "classes": None}
     if data is not None:
         if settings.get("resume"):
-            raise ValueError(
-                "resume is unsupported with ground_truth; use model weights to fine-tune"
-            )
+            raise ValueError("resume is unsupported with ground_truth; use model weights to fine-tune")
         owned.update(
             data=str(data),
             single_cls=False,

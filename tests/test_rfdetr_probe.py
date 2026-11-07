@@ -32,9 +32,7 @@ def _request(tmp_path: Path) -> BatchProbeRequest:
     return BatchProbeRequest(
         token=uuid.uuid4().hex,
         profile=TrainingProfile(
-            model=ModelVariant(
-                selection="rfdetr/nano", backend="rfdetr", preset="nano", architecture="rfdetr/nano"
-            ),
+            model=ModelVariant(selection="rfdetr/nano", backend="rfdetr", preset="nano", architecture="rfdetr/nano"),
             nominal_size=(64, 64),
             effective_size=(224, 224),
             gpus=(GPUHardware(name="fixture", total_memory_bytes=1024),),
@@ -86,11 +84,7 @@ def test_probe_config_is_detached_and_rejects_incompatible_recipe(tmp_path: Path
     with pytest.raises(ValueError, match="uncompiled AdamW"):
         _config(request.model_copy(update={"optimizer": "SGD"}))
     with pytest.raises(ValueError, match="nominal resolution"):
-        _config(
-            request.model_copy(
-                update={"profile": request.profile.model_copy(update={"nominal_size": (96, 96)})}
-            )
-        )
+        _config(request.model_copy(update={"profile": request.profile.model_copy(update={"nominal_size": (96, 96)})}))
 
 
 def test_optimizer_counter_counts_calls_and_rejects_nonfinite_gradients() -> None:
@@ -223,9 +217,7 @@ def test_nonfinite_loss_and_partial_validation_are_not_completed_steps() -> None
         progress.on_validation_batch_end(None, None, {"targets": [{}], "results": []}, None, 0)
     assert progress.validation_steps == 0
     with pytest.raises(FloatingPointError, match="validation loss"):
-        progress.on_validation_end(
-            SimpleNamespace(callback_metrics={"val/loss": torch.tensor(float("nan"))}), None
-        )
+        progress.on_validation_end(SimpleNamespace(callback_metrics={"val/loss": torch.tensor(float("nan"))}), None)
 
 
 @pytest.mark.parametrize(("amp", "persistent"), [(True, False), (True, True), (False, False)])
@@ -240,9 +232,7 @@ def test_fit_counts_real_amp_updates_before_stopping_and_validating(
     request = _request(tmp_path).model_copy(update={"settings": SearchSettings()})
     config = _config(request)
     config.train.use_ema = False
-    request = request.model_copy(
-        update={"profile": request.profile.model_copy(update={"ema": False})}
-    )
+    request = request.model_copy(update={"profile": request.profile.model_copy(update={"ema": False})})
     mc = configuration.RFDETRNanoConfig(resolution=64, pretrain_weights=None, num_classes=150)
     tc = configuration.TrainConfig(
         dataset_dir=str(tmp_path),
@@ -307,9 +297,7 @@ def test_fit_counts_real_amp_updates_before_stopping_and_validating(
 
     monkeypatch.setattr(native, "RFDETRModelModule", module_type)
     monkeypatch.setattr(native, "build_trainer", build_cpu_trainer)
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.rfdetr.probe.training_configuration", lambda *_: (mc, tc)
-    )
+    monkeypatch.setattr("clearml_yolo.adapters.rfdetr.probe.training_configuration", lambda *_: (mc, tc))
     monkeypatch.setattr(
         "clearml_yolo.adapters.rfdetr.probe.trainer_devices",
         lambda *_: {"accelerator": "cpu", "devices": 1},

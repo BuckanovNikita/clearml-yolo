@@ -58,11 +58,7 @@ def parser() -> argparse.ArgumentParser:
 
 
 def _options(arguments: argparse.Namespace) -> _Options:
-    selections = (
-        tuple(value.strip() for value in arguments.models.split(","))
-        if arguments.models is not None
-        else None
-    )
+    selections = tuple(value.strip() for value in arguments.models.split(",")) if arguments.models is not None else None
     return _Options(
         imgsz=arguments.imgsz,
         models=select_models(selections),
@@ -70,9 +66,7 @@ def _options(arguments: argparse.Namespace) -> _Options:
         gpu_counts=arguments.gpu_counts,
         refresh=arguments.refresh,
         jobs=arguments.jobs,
-        workload=SyntheticWorkload(
-            classes=arguments.classes, objects_per_image=arguments.objects_per_image
-        ),
+        workload=SyntheticWorkload(classes=arguments.classes, objects_per_image=arguments.objects_per_image),
         settings=SearchSettings(
             force=arguments.force,
             memory_fraction=arguments.memory_budget,
@@ -84,11 +78,7 @@ def _options(arguments: argparse.Namespace) -> _Options:
 
 def _devices(options: _Options) -> tuple[tuple[GPUDevice, ...], tuple[int, ...]]:
     visible = discover_gpus()
-    indexes = (
-        options.devices
-        if options.devices is not None
-        else tuple(device.index for device in visible)
-    )
+    indexes = options.devices if options.devices is not None else tuple(device.index for device in visible)
     by_index = {device.index: device for device in visible}
     if not indexes or any(index not in by_index for index in indexes):
         raise ValueError("--devices must select GPUs inside the inherited CUDA visibility")
@@ -127,18 +117,14 @@ def _report(case: ResolvedRecommendation, cached: bool) -> None:
         message += "\tcached"
     if any(source.settings.force for source in case.sources):
         message += "\tforced/background-sensitive"
-    limitations = dict.fromkeys(
-        source.diagnostic for source in case.sources if source.status == "numerically_limited"
-    )
+    limitations = dict.fromkeys(source.diagnostic for source in case.sources if source.status == "numerically_limited")
     if limitations:
         message += "\tdiagnostic=" + "; ".join(limitations)
     sys.stdout.write(message + "\n")
     sys.stdout.flush()
 
 
-def _idle_profile(
-    profile: TrainingProfile, devices: tuple[GPUDevice, ...], *, force: bool = False
-) -> TrainingProfile:
+def _idle_profile(profile: TrainingProfile, devices: tuple[GPUDevice, ...], *, force: bool = False) -> TrainingProfile:
     hardware = profile.gpus[0]
     failures = []
     for device in devices:
@@ -181,10 +167,7 @@ def _case_command(request: BatchCaseRequest) -> WorkerCommand:
 
 def _completed_case(request: BatchCaseRequest, outcome: "WorkerCompletion") -> EstimateCase:
     if outcome.exit_code != 0 or not outcome.cleanup_complete:
-        raise ValueError(
-            f"Case process exited {outcome.exit_code}; {outcome.diagnostic}; "
-            f"inspect {request.output}"
-        )
+        raise ValueError(f"Case process exited {outcome.exit_code}; {outcome.diagnostic}; inspect {request.output}")
     path = request.output / "result.json"
     result = BatchCaseResult.model_validate_json(path.read_text(encoding="utf-8"))
     if (result.token, result.estimate_key) != (request.token, request.estimate_key):
@@ -210,7 +193,8 @@ class _CaseScheduler:
     def run(self) -> None:
         saved = {
             estimate_key(case.profile, case.workload, case.settings): case
-            for case in self.store.read().cases if case.usable
+            for case in self.store.read().cases
+            if case.usable
         }
         if not self.options.refresh:
             for key in tuple(self.pending):
@@ -236,19 +220,16 @@ class _CaseScheduler:
                 break
             occupied = {request.profile.gpus[0].uuid for request in self.active.values()}
             candidates = tuple(
-                device for device in self.devices
-                if device.uuid not in occupied | self.unavailable
-                and _hardware_matches(profile, device)
+                device
+                for device in self.devices
+                if device.uuid not in occupied | self.unavailable and _hardware_matches(profile, device)
             )
             try:
                 selected = _idle_profile(profile, candidates, force=self.options.settings.force)
             except RuntimeError as error:
                 # Another owned case can release a compatible GPU. Foreign busy
                 # devices alone never make this command wait indefinitely.
-                if any(
-                    device.uuid in occupied and _hardware_matches(profile, device)
-                    for device in self.devices
-                ):
+                if any(device.uuid in occupied and _hardware_matches(profile, device) for device in self.devices):
                     continue
                 self._failed(key, profile, str(error))
                 del self.pending[key]
@@ -259,16 +240,24 @@ class _CaseScheduler:
     def _launch(self, pool: "IndependentWorkerPool", key: str, profile: TrainingProfile) -> None:
         token = uuid4().hex
         request = BatchCaseRequest(
-            token=token, estimate_key=key, profile=profile,
-            workload=self.options.workload, settings=self.options.settings,
+            token=token,
+            estimate_key=key,
+            profile=profile,
+            workload=self.options.workload,
+            settings=self.options.settings,
             catalogue_path=self.store.path,
             output=temporary_root() / "batch-cases" / token,
         )
-        self.store.save(EstimateCase(
-            profile=profile, workload=request.workload, settings=request.settings,
-            status="failed", created_at=_timestamp(),
-            diagnostic="Independent confirmation pending; case process has not completed",
-        ))
+        self.store.save(
+            EstimateCase(
+                profile=profile,
+                workload=request.workload,
+                settings=request.settings,
+                status="failed",
+                created_at=_timestamp(),
+                diagnostic="Independent confirmation pending; case process has not completed",
+            )
+        )
         try:
             pool.start(key, _case_command(request))
         except (OSError, RuntimeError) as error:
@@ -292,14 +281,22 @@ class _CaseScheduler:
         self.results[outcome.key] = case
 
     def _failed(self, key: str, profile: TrainingProfile, diagnostic: str) -> None:
-        prior = next((
-            case for case in self.store.read().cases
-            if estimate_key(case.profile, case.workload, case.settings) == key
-        ), None)
+        prior = next(
+            (
+                case
+                for case in self.store.read().cases
+                if estimate_key(case.profile, case.workload, case.settings) == key
+            ),
+            None,
+        )
         case = EstimateCase(
-            profile=profile, workload=self.options.workload, settings=self.options.settings,
-            status="failed", trials=prior.trials if prior is not None else (),
-            created_at=_timestamp(), diagnostic=diagnostic,
+            profile=profile,
+            workload=self.options.workload,
+            settings=self.options.settings,
+            status="failed",
+            trials=prior.trials if prior is not None else (),
+            created_at=_timestamp(),
+            diagnostic=diagnostic,
         )
         self.store.save(case)
         self.results[key] = case
@@ -309,8 +306,7 @@ def _execute(options: _Options) -> bool:
     devices, counts = _devices(options)
     probe, store = _make_probe(), FileBatchEstimateStore()
     allocations = tuple(
-        probe.profile(model, options.imgsz, tuple(device.index for device in devices))
-        for model in options.models
+        probe.profile(model, options.imgsz, tuple(device.index for device in devices)) for model in options.models
     )
     profiles = dict[str, TrainingProfile]()
     model_keys: list[tuple[str, ...]] = []
@@ -330,9 +326,7 @@ def _execute(options: _Options) -> bool:
         for key in case_keys:
             case = scheduler.results[key]
             if not case.usable:
-                sys.stdout.write(
-                    f"{case.profile.model.selection}\tgpus=1\t{case.status}\t{case.diagnostic}\n"
-                )
+                sys.stdout.write(f"{case.profile.model.selection}\tgpus=1\t{case.status}\t{case.diagnostic}\n")
         for count in counts:
             target = allocation.model_copy(update={"gpus": allocation.gpus[:count]})
             try:
@@ -349,9 +343,7 @@ def _execute(options: _Options) -> bool:
     return successful
 
 
-def _list_arguments(
-    argument_parser: argparse.ArgumentParser, tokens: Sequence[str]
-) -> None:
+def _list_arguments(argument_parser: argparse.ArgumentParser, tokens: Sequence[str]) -> None:
     # parse_args already resolved abbreviations and rejected ambiguous/unknown flags.
     # Inspect explicit tokens so even measurement values equal to defaults are rejected.
     measurement_flags = tuple(
@@ -362,11 +354,7 @@ def _list_arguments(
     )
     for token in tokens:
         name = token.partition("=")[0]
-        if (
-            name.startswith("--")
-            and name != "--"
-            and any(flag.startswith(name) for flag in measurement_flags)
-        ):
+        if name.startswith("--") and name != "--" and any(flag.startswith(name) for flag in measurement_flags):
             argument_parser.error(f"{name} cannot be used with --list")
 
 
@@ -377,9 +365,7 @@ def _cell(value: str) -> str:
 
 
 def _list_saved(selections: str | None) -> None:
-    models = select_models(
-        tuple(value.strip() for value in selections.split(",")) if selections is not None else None
-    )
+    models = select_models(tuple(value.strip() for value in selections.split(",")) if selections is not None else None)
     store = FileBatchEstimateStore()
     coverage = model_coverage(models, store.read().cases)
     missing = tuple(item for item in coverage if not item.covered)
@@ -392,9 +378,7 @@ def _list_saved(selections: str | None) -> None:
             sys.stdout.write(f"{item.model.selection}\tnot_attempted\tNo saved attempt\t-\n")
         for case in item.attempts:
             profile = case.profile
-            hardware = ", ".join(
-                f"{gpu.name} ({gpu.total_memory_bytes} bytes)" for gpu in profile.gpus
-            )
+            hardware = ", ".join(f"{gpu.name} ({gpu.total_memory_bytes} bytes)" for gpu in profile.gpus)
             context = (
                 f"imgsz={profile.nominal_size[0]}x{profile.nominal_size[1]}; "
                 f"gpus={profile.world_size}: {hardware}; "
@@ -402,8 +386,7 @@ def _list_saved(selections: str | None) -> None:
                 f"objects_per_image={case.workload.objects_per_image}"
             )
             sys.stdout.write(
-                f"{item.model.selection}\t{case.status}\t{_cell(estimate_diagnostic(case))}"
-                f"\t{_cell(context)}\n"
+                f"{item.model.selection}\t{case.status}\t{_cell(estimate_diagnostic(case))}\t{_cell(context)}\n"
             )
     if not missing:
         sys.stdout.write("All selected models have a usable saved estimate.\n")

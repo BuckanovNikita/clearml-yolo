@@ -73,10 +73,7 @@ def require_process_supervision() -> None:
         signal: ("pidfd_send_signal",),
     }
     missing = [
-        f"{module.__name__}.{name}"
-        for module, names in required.items()
-        for name in names
-        if not hasattr(module, name)
+        f"{module.__name__}.{name}" for module, names in required.items() for name in names if not hasattr(module, name)
     ]
     if missing:
         raise RuntimeError(
@@ -279,11 +276,7 @@ class LinuxProcessTree:
             self._extend_unmarked_owners(owners, table)
         for pid in owners:
             self._identities[pid] = table[pid].born
-        return [
-            table[pid]
-            for pid in owners
-            if table[pid].state != "Z" and self._excluded.get(pid) != table[pid].born
-        ]
+        return [table[pid] for pid in owners if table[pid].state != "Z" and self._excluded.get(pid) != table[pid].born]
 
     def signal(self, signum: signal.Signals) -> None:
         """Signal confirmed identities, descendants before their direct worker."""
@@ -344,12 +337,7 @@ class LinuxProcessTree:
         """Reap recorded adopted zombies after direct Popen statuses are consumed."""
         for pid, born in tuple(self._identities.items()):
             current = _read_process(pid)
-            if (
-                current is not None
-                and current.born == born
-                and current.parent == os.getpid()
-                and current.state == "Z"
-            ):
+            if current is not None and current.born == born and current.parent == os.getpid() and current.state == "Z":
                 self._reap(current)
 
     @staticmethod
@@ -377,7 +365,12 @@ class ScopedProcessTree(LinuxProcessTree):
     """
 
     def __init__(
-        self, root: int, token: str, *, subreaper: int, born: int | None = None,
+        self,
+        root: int,
+        token: str,
+        *,
+        subreaper: int,
+        born: int | None = None,
         owner_env: str = OWNER_ENV,
     ) -> None:
         super().__init__(root, token, born=born, owner_env=owner_env)
@@ -426,18 +419,16 @@ class ScopedProcessTree(LinuxProcessTree):
 
     def _matches_parent(self, process: _Process, parent: _Process) -> bool:
         current = self._identity(parent.pid)
-        if (
-            current is None
-            or current.born != parent.born
-            or process.parent != parent.pid
-            or process.born < parent.born
-        ):
+        if current is None or current.born != parent.born or process.parent != parent.pid or process.born < parent.born:
             self._scan_changed = True
             return False
         return True
 
     def _candidate(
-        self, pid: int, born: int | None, parent: _Process | None,
+        self,
+        pid: int,
+        born: int | None,
+        parent: _Process | None,
     ) -> _Process | None:
         process = self._identity(pid)
         if process is None or (born is not None and process.born != born):
@@ -605,9 +596,7 @@ class _NativeProcessTree(ScopedProcessTree):
 
     def _protected(self, table: Mapping[int, _Process]) -> set[int]:
         protected = {
-            pid
-            for pid, born in self._excluded.items()
-            if pid != self.root and pid in table and table[pid].born == born
+            pid for pid, born in self._excluded.items() if pid != self.root and pid in table and table[pid].born == born
         }
         # Never propagate from the caller: only its preexisting helper branches.
         changed = True
@@ -626,11 +615,10 @@ class _NativeProcessTree(ScopedProcessTree):
         table = self._begin_scan()
         self._fork_identities()
         protected = self._protected(table)
-        owners = {
-            pid for pid in self._known_owners(table) if pid != self.root and pid not in protected
-        }
+        owners = {pid for pid in self._known_owners(table) if pid != self.root and pid not in protected}
         owners.update(
-            pid for pid in self._threaded_zombies
+            pid
+            for pid in self._threaded_zombies
             if self._identities.get(pid) == table[pid].born and pid not in protected
         )
         owners.update(process.pid for process in table.values() if self._marked(process))
@@ -640,9 +628,7 @@ class _NativeProcessTree(ScopedProcessTree):
             for process in table.values():
                 if process.pid in owners or process.pid in protected or process.pid == self.root:
                     continue
-                if process.parent in owners or (
-                    process.parent == self.root and not self._has_helpers
-                ):
+                if process.parent in owners or (process.parent == self.root and not self._has_helpers):
                     owners.add(process.pid)
                     changed = True
         for process in table.values():
@@ -657,10 +643,7 @@ class _NativeProcessTree(ScopedProcessTree):
         for pid in owners:
             self._identities[pid] = table[pid].born
         self._reap_owned(table, protected)
-        return [
-            table[pid] for pid in owners
-            if table[pid].state != "Z" or pid in self._threaded_zombies
-        ]
+        return [table[pid] for pid in owners if table[pid].state != "Z" or pid in self._threaded_zombies]
 
     def _reap_owned(self, table: Mapping[int, _Process], protected: set[int]) -> None:
         """Keep dead recorded children available for reaping after live revalidation."""
@@ -762,15 +745,9 @@ def native_descendant_scope() -> Iterator[None]:
             if owner:
                 with _collect_scope_failure(failures):
                     tree.terminate()
-            failures.extend(
-                _restore_native_scope(
-                    reader, writer, previous, previous_subreaper if owner else None
-                )
-            )
+            failures.extend(_restore_native_scope(reader, writer, previous, previous_subreaper if owner else None))
             if failures:
                 errors = [primary, *failures] if primary is not None else failures
                 if len(errors) == 1:
                     raise errors[0]
-                raise BaseExceptionGroup(
-                    "Native execution, descendant cleanup or restoration failed", errors
-                ) from None
+                raise BaseExceptionGroup("Native execution, descendant cleanup or restoration failed", errors) from None

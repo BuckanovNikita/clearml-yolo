@@ -322,9 +322,7 @@ def test_missing_canonical_column_is_rejected(
     tmp_path: Path, rows: pd.DataFrame, excluded: pd.DataFrame, methodology: dict[str, object]
 ) -> None:
     with pytest.raises(ValueError, match="recall_p_bh"):
-        write_comparison_workbook(
-            rows.drop(columns=["recall_p_bh"]), excluded, methodology, tmp_path / "broken.xlsx"
-        )
+        write_comparison_workbook(rows.drop(columns=["recall_p_bh"]), excluded, methodology, tmp_path / "broken.xlsx")
 
 
 def test_unavailable_values_and_verdicts_render_na_without_fill(tmp_path: Path) -> None:

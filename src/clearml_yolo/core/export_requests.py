@@ -47,10 +47,7 @@ class ExportSettings(BaseModel):
 
     operation: Literal["onnx", "build", "verify"] = Field(
         default="onnx",
-        description=(
-            "Операция: onnx экспортирует граф, build собирает TensorRT, verify "
-            "проверяет качество движка."
-        ),
+        description=("Операция: onnx экспортирует граф, build собирает TensorRT, verify проверяет качество движка."),
         examples=["onnx"],
         json_schema_extra={
             "shapes": "Literal['onnx', 'build', 'verify']",
@@ -73,8 +70,7 @@ class ExportSettings(BaseModel):
     precision: Literal["fp32", "fp16"] = Field(
         default="fp32",
         description=(
-            "Точность fp32 или fp16. ONNX экспортируется на CPU только в fp32; "
-            "fp16 выбирается при сборке движка."
+            "Точность fp32 или fp16. ONNX экспортируется на CPU только в fp32; fp16 выбирается при сборке движка."
         ),
         examples=["fp32"],
         json_schema_extra={
@@ -145,10 +141,7 @@ class ExportSettings(BaseModel):
         device = self.device
         if self.operation == "onnx":
             if device != "cpu" or self.precision != "fp32":
-                raise ValueError(
-                    "ONNX export requires device=cpu precision=fp32; "
-                    "select GPU/FP16 during engine build"
-                )
+                raise ValueError("ONNX export requires device=cpu precision=fp32; select GPU/FP16 during engine build")
             return self
         gpu_device_index(device)
         return self

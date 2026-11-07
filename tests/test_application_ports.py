@@ -52,9 +52,7 @@ def test_conversion_uses_supplied_dataset_and_tracking_ports(
     assert result == destination
     tracking.init_task.assert_called_once_with(ClearMLConfig(), stage="ground_truth")
     tracking.connect_config_file.assert_called_once_with(task, "dataset", Path("original.yaml"))
-    dataset.build_ground_truth.assert_called_once_with(
-        str(resolved), "requested.csv", test_fraction=0.2, seed=17
-    )
+    dataset.build_ground_truth.assert_called_once_with(str(resolved), "requested.csv", test_fraction=0.2, seed=17)
     tracking.register_ground_truth.assert_called_once_with(task, destination, output_dir=tmp_path)
     assert not destination.exists()
 

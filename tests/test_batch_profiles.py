@@ -71,9 +71,7 @@ def test_default_profiles_are_metadata_only_and_cover_native_maximum_shapes(
     assert profile.nominal_size == (size, size)
     assert profile.effective_size == (effective, effective)
     assert [gpu.uuid for gpu in profile.gpus] == ["GPU-0", "GPU-1"]
-    assert profile.optimizers == (
-        ("AdamW", "MuSGD") if selection.startswith("yolo") else ("AdamW",)
-    )
+    assert profile.optimizers == (("AdamW", "MuSGD") if selection.startswith("yolo") else ("AdamW",))
 
 
 @pytest.mark.parametrize(
@@ -120,9 +118,7 @@ def test_resolved_default_assets_and_execution_controls_preserve_compatibility(
     assert actual.compatibility_data() == expected.compatibility_data()
 
 
-@pytest.mark.parametrize(
-    "setting", ["weights", "backbone_weights", "amp", "use_ema", "grad_accum_steps", "lr"]
-)
+@pytest.mark.parametrize("setting", ["weights", "backbone_weights", "amp", "use_ema", "grad_accum_steps", "lr"])
 def test_custom_native_training_profiles_cannot_reuse_standard_estimates(
     monkeypatch: pytest.MonkeyPatch, setting: str
 ) -> None:
@@ -233,13 +229,9 @@ def test_null_lookup_uses_actual_ordered_devices_and_preserves_requested_configu
 
         monkeypatch.setattr(native_torch, "parse_device", lambda _: "1,0")
         settings = {"batch": None, "imgsz": 960, "device": "-1,-1"}
-        effective, _ = apply_dataset_policy(
-            execution_settings(native_defaults() | settings, "train"), prepared.data
-        )
+        effective, _ = apply_dataset_policy(execution_settings(native_defaults() | settings, "train"), prepared.data)
         assert effective["cls_remap"] is False
-        resolved_settings, provenance = resolution.resolve_yolo_batch(
-            "yolo11n.pt", effective, prepared, None
-        )
+        resolved_settings, provenance = resolution.resolve_yolo_batch("yolo11n.pt", effective, prepared, None)
         assert settings == {"batch": None, "imgsz": 960, "device": "-1,-1"}
         assert resolved_settings["batch"] == 2 * (case.global_batch or 0)
         assert resolved_settings["device"] == [1, 0]

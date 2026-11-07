@@ -33,9 +33,7 @@ LEGACY_KEYS = {
 
 
 def _start(*, budget: int = 900, ceiling: int = 1024, strategy: str = GUIDED) -> BatchSearch:
-    profile = _profile().model_copy(
-        update={"gpus": (GPUHardware(name="Test GPU", total_memory_bytes=budget),)}
-    )
+    profile = _profile().model_copy(update={"gpus": (GPUHardware(name="Test GPU", total_memory_bytes=budget),)})
     settings = SearchSettings.model_validate(
         {"memory_fraction": 1, "max_global_batch": ceiling, "search_strategy": strategy}
     )
@@ -76,8 +74,7 @@ def test_affine_memory_uses_fewer_full_trials_with_same_confirmed_capacity(capac
     assert any(trial.global_batch == capacity for trial in guided.trials[:-1])
     assert len({trial.trial_id for trial in guided.trials}) == len(guided.trials)
     assert all(trial.warmup_steps == 5 and trial.measured_steps == 10 for trial in guided.trials)
-    assert all(trial.validation_steps and trial.optimizer_paths == guided.profile.optimizers
-               for trial in guided.trials)
+    assert all(trial.validation_steps and trial.optimizer_paths == guided.profile.optimizers for trial in guided.trials)
     assert EstimateCase.model_validate_json(_case(guided).model_dump_json()) == _case(guided)
 
 
@@ -90,9 +87,7 @@ def test_affine_memory_uses_fewer_full_trials_with_same_confirmed_capacity(capac
     ],
     ids=["quadratic", "rounded", "allocation-step"],
 )
-def test_nonlinear_memory_still_finds_the_observed_boundary(
-    memory: Callable[[int], int], budget: int
-) -> None:
+def test_nonlinear_memory_still_finds_the_observed_boundary(memory: Callable[[int], int], budget: int) -> None:
     expected = max(batch for batch in range(1, 129) if memory(batch) <= budget)
     result = _run_curve(memory, budget=budget, ceiling=128)
     assert result.global_batch == expected
@@ -188,9 +183,7 @@ def test_guided_confirmation_failure_never_returns_a_recommendation(failure: str
 
 
 @pytest.mark.parametrize("version", [1, 2])
-def test_frozen_legacy_catalogues_preserve_keys_and_read_only_bytes(
-    tmp_path: Path, version: int
-) -> None:
+def test_frozen_legacy_catalogues_preserve_keys_and_read_only_bytes(tmp_path: Path, version: int) -> None:
     payload = (FIXTURES / f"legacy-v{version}.json").read_bytes()
     path = tmp_path / "estimates.json"
     path.write_bytes(payload)
@@ -198,8 +191,10 @@ def test_frozen_legacy_catalogues_preserve_keys_and_read_only_bytes(
     assert path.read_bytes() == payload
     assert catalogue.schema_version == version
     assert all(case.settings.search_strategy == LEGACY for case in catalogue.cases)
-    assert tuple(estimate_key(case.profile, case.workload, case.settings)
-                 for case in catalogue.cases) == LEGACY_KEYS[version]
+    assert (
+        tuple(estimate_key(case.profile, case.workload, case.settings) for case in catalogue.cases)
+        == LEGACY_KEYS[version]
+    )
     if version == 1:
         assert catalogue.cases[1].profile.world_size == 2
         assert catalogue.cases[1].global_batch == 4
@@ -219,10 +214,13 @@ def test_mixed_schema_three_preserves_histories_and_explicit_strategies(tmp_path
     assert saved.cases == (*old, new)
     raw = json.loads(path.read_text())
     assert [case["settings"]["search_strategy"] for case in raw["cases"]] == [
-        LEGACY, LEGACY, GUIDED,
+        LEGACY,
+        LEGACY,
+        GUIDED,
     ]
-    assert tuple(estimate_key(case.profile, case.workload, case.settings)
-                 for case in saved.cases[:-1]) == LEGACY_KEYS[1]
+    assert (
+        tuple(estimate_key(case.profile, case.workload, case.settings) for case in saved.cases[:-1]) == LEGACY_KEYS[1]
+    )
 
 
 def test_legacy_inference_does_not_mutate_supplied_payload() -> None:
@@ -231,9 +229,7 @@ def test_legacy_inference_does_not_mutate_supplied_payload() -> None:
     parsed = EstimateCase.model_validate(raw)
     assert parsed.settings.search_strategy == LEGACY
     assert raw == before
-    assert (
-        SearchSettings.model_validate(raw["settings"]).search_strategy == "memory_guided_aligned_v1"
-    )
+    assert SearchSettings.model_validate(raw["settings"]).search_strategy == "memory_guided_aligned_v1"
 
 
 @pytest.mark.parametrize("version", [1, 2])

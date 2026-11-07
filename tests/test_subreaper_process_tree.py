@@ -27,11 +27,14 @@ class ProcessTopology:
         self.denied_identity: set[int] = set()
         self.denied_topology: set[int] = set()
         self.denied_children: set[int] = set()
+
         def directories(path: Path) -> Iterator[Path]:
             return self.directories(path)
 
         def read_text(
-            path: Path, encoding: str | None = None, errors: str | None = None,
+            path: Path,
+            encoding: str | None = None,
+            errors: str | None = None,
         ) -> str:
             return self.read_text(path, encoding, errors)
 
@@ -85,7 +88,8 @@ def test_live_scope_ignores_unrelated_process_permissions_and_churn(
 
 @pytest.mark.parametrize("denial", ["identity", "topology", "children"])
 def test_live_scope_inaccessible_descendant_blocks_release(
-    monkeypatch: pytest.MonkeyPatch, denial: str,
+    monkeypatch: pytest.MonkeyPatch,
+    denial: str,
 ) -> None:
     topology = ProcessTopology(monkeypatch)
     tree = topology.tree()
@@ -133,7 +137,9 @@ def test_live_scope_parent_replaced_during_topology_read_does_not_adopt_children
     original = topology.read_text
 
     def replace_parent(
-        path: Path, encoding: str | None = None, errors: str | None = None,
+        path: Path,
+        encoding: str | None = None,
+        errors: str | None = None,
     ) -> str:
         children = original(path, encoding, errors)
         if path == Path("/proc/202/task/202/children"):
@@ -201,7 +207,8 @@ def test_live_scope_second_scan_finds_late_adoption(monkeypatch: pytest.MonkeyPa
 
 @pytest.mark.parametrize("launch", ["fork", "orphan", "thread"])
 def test_live_scope_cleans_fork_session_adoption_and_thread_children(
-    tmp_path: Path, launch: str,
+    tmp_path: Path,
+    launch: str,
 ) -> None:
     script = r'''
 import ctypes,os,signal,subprocess,sys,time
@@ -323,7 +330,8 @@ def test_native_scope_ignores_unrelated_churn_and_permissions(
 
 @pytest.mark.parametrize("denial", ["identity", "topology", "children"])
 def test_native_scope_inaccessible_descendant_blocks_cleanup(
-    native_topology: tuple[ProcessTopology, process_tree._NativeProcessTree], denial: str,
+    native_topology: tuple[ProcessTopology, process_tree._NativeProcessTree],
+    denial: str,
 ) -> None:
     topology, tree = native_topology
     topology.children[101][101] = [202]

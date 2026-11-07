@@ -15,9 +15,7 @@ _MAX_MEMBERS = 5000
 
 
 def source_manifest() -> dict[str, str]:
-    raw: object = json.loads(
-        files("clearml_yolo.adapters.assets").joinpath("deim-manifest.json").read_text()
-    )
+    raw: object = json.loads(files("clearml_yolo.adapters.assets").joinpath("deim-manifest.json").read_text())
     if not isinstance(raw, dict) or not all(
         isinstance(key, str) and isinstance(value, str) for key, value in raw.items()
     ):

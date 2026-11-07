@@ -38,26 +38,22 @@ def checkpoint_recording(monkeypatch: pytest.MonkeyPatch) -> Any:
 
 
 @pytest.fixture
-def published(
-    monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
-) -> dict[str, pd.DataFrame]:
+def published(monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies) -> dict[str, pd.DataFrame]:
     """Everything the stage would have published to ClearML, keyed by section/series."""
     tables: dict[str, pd.DataFrame] = {}
     for method in (
-        "declare_result_producers", "complete_result_producer", "register_ground_truth",
+        "declare_result_producers",
+        "complete_result_producer",
+        "register_ground_truth",
         "record_pipeline_outcome",
     ):
         monkeypatch.setattr(workflow_dependencies.tracking, method, lambda *_a, **_k: None)
 
-    def report_table(
-        _: object, title: str, series: str, frame: pd.DataFrame, **_kwargs: Any
-    ) -> None:
+    def report_table(_: object, title: str, series: str, frame: pd.DataFrame, **_kwargs: Any) -> None:
         tables[f"{title}/{series}"] = frame
 
     patch_workflow(monkeypatch, workflow_dependencies, predict_module, "report_table", report_table)
-    patch_workflow(
-        monkeypatch, workflow_dependencies, predict_module, "init_task", lambda *_a, **_k: object()
-    )
+    patch_workflow(monkeypatch, workflow_dependencies, predict_module, "init_task", lambda *_a, **_k: object())
     patch_workflow(
         monkeypatch,
         workflow_dependencies,
@@ -180,9 +176,7 @@ def test_splits_are_inferred_separately_for_reproducible_test_batches(
         model_label="fixture detector",
         deps=workflow_dependencies,
     )
-    assert calls == [
-        [str(tmp_path / "z.png")], [str(tmp_path / "a.png"), str(tmp_path / "b.png")]
-    ]
+    assert calls == [[str(tmp_path / "z.png")], [str(tmp_path / "a.png"), str(tmp_path / "b.png")]]
 
 
 def test_prediction_preflights_before_compute_and_publishes_exact_outputs(
@@ -221,9 +215,7 @@ def test_prediction_preflights_before_compute_and_publishes_exact_outputs(
                 fields={"predictions": "predictions_predict-task"},
             )
 
-    patch_workflow(
-        monkeypatch, workflow_dependencies, predict_module, "init_task", lambda *_a, **_k: task
-    )
+    patch_workflow(monkeypatch, workflow_dependencies, predict_module, "init_task", lambda *_a, **_k: task)
     patch_workflow(
         monkeypatch,
         workflow_dependencies,
@@ -341,12 +333,12 @@ def test_invocation_uploads_canonical_prediction_and_gt_csvs_before_completion(
 
     checkpoint_recording({"imgsz": 64})
     _, task = fake_clearml
-    patch_workflow(
-        monkeypatch, workflow_dependencies, predict_module, "init_task", lambda *_a, **_k: task
-    )
+    patch_workflow(monkeypatch, workflow_dependencies, predict_module, "init_task", lambda *_a, **_k: task)
     for method in (
-        "register_predictions", "register_ground_truth",
-        "declare_result_producers", "complete_result_producer",
+        "register_predictions",
+        "register_ground_truth",
+        "declare_result_producers",
+        "complete_result_producer",
     ):
         monkeypatch.setattr(workflow_dependencies.tracking, method, getattr(results, method))
     with invocation(ClearMLConfig(), "predict"):
@@ -392,9 +384,7 @@ def test_prediction_autobatch_requires_override() -> None:
 
 
 @pytest.mark.parametrize(("weights", "expected"), [("best.pt", "best.pt"), (None, None)])
-def test_prediction_model_uses_explicit_weights_or_resolved_null(
-    weights: str | None, expected: str | None
-) -> None:
+def test_prediction_model_uses_explicit_weights_or_resolved_null(weights: str | None, expected: str | None) -> None:
     from clearml_yolo.adapters.yolo.config import prediction_settings
 
     assert prediction_settings(prediction_config(model=None), weights)["model"] == expected
@@ -502,17 +492,34 @@ def test_prediction_and_skip_train_resolve_csv_paths_from_other_directory(
     monkeypatch.chdir(working)
     if pipeline:
         run_pipeline(
-            {}, prediction_config(imgsz=64), {}, {}, {}, ClearMLConfig(), str(truth),
-            splits=["val"], run_dir=tmp_path / "run", weights="best.pt",
-            skip_train=True, skip_metrics=True, skip_compare=True, skip_report=True,
-            fiftyone=FiftyOneConfig(enabled=False), model_label="fixture detector",
+            {},
+            prediction_config(imgsz=64),
+            {},
+            {},
+            {},
+            ClearMLConfig(),
+            str(truth),
+            splits=["val"],
+            run_dir=tmp_path / "run",
+            weights="best.pt",
+            skip_train=True,
+            skip_metrics=True,
+            skip_compare=True,
+            skip_report=True,
+            fiftyone=FiftyOneConfig(enabled=False),
+            model_label="fixture detector",
             deps=workflow_dependencies,
         )
     else:
         predict(
-            "best.pt", truth, tmp_path / "predictions.csv", ClearMLConfig(), {},
+            "best.pt",
+            truth,
+            tmp_path / "predictions.csv",
+            ClearMLConfig(),
+            {},
             ultralytics_predict=prediction_config(imgsz=64),
-            fiftyone=FiftyOneConfig(enabled=False), model_label="fixture detector",
+            fiftyone=FiftyOneConfig(enabled=False),
+            model_label="fixture detector",
             deps=workflow_dependencies,
         )
     assert calls == [[str(source / "a.png")]]

@@ -18,10 +18,7 @@ def write(root: Path, name: str, value: Any) -> None:
 
 def _event(root: Path, kind: str, **values: Any) -> None:
     with (root / f"events-{os.getpid()}.jsonl").open("a", encoding="utf-8") as stream:
-        stream.write(
-            json.dumps({"kind": kind, "pid": os.getpid(), "at": time.time(), **values}, default=str)
-            + "\n"
-        )
+        stream.write(json.dumps({"kind": kind, "pid": os.getpid(), "at": time.time(), **values}, default=str) + "\n")
         stream.flush()
         os.fsync(stream.fileno())
 
@@ -98,9 +95,7 @@ def _install_native(root: Path, request: dict[str, Any], rank: int) -> None:
             assert torch.cuda.current_device() == int(os.environ["LOCAL_RANK"])
             native = trainer.model.module
             compiled = hasattr(native, "_orig_mod")
-            assert compiled == request["compiled"], (
-                "Requested torch.compile did not wrap the native model"
-            )
+            assert compiled == request["compiled"], "Requested torch.compile did not wrap the native model"
             record = {
                 "pid": os.getpid(),
                 "rank": rank,
@@ -115,9 +110,7 @@ def _install_native(root: Path, request: dict[str, Any], rank: int) -> None:
             }
             write(root, f"rank-{rank}-started.json", record)
             _event(root, "rank-started", **record)
-            descriptor = os.open(
-                root / f"rank-{rank}.log", os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600
-            )
+            descriptor = os.open(root / f"rank-{rank}.log", os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
             os.dup2(descriptor, 1)
             os.dup2(descriptor, 2)
             os.close(descriptor)
@@ -173,9 +166,7 @@ def _install_predict(root: Path, scenario: str, rank: int) -> None:
                 checkpoint=str(model.ckpt_path),
             )
             if not (root / "pipeline-predict-started.json").exists():
-                write(
-                    root, "pipeline-predict-started.json", {"pid": os.getpid(), "at": time.time()}
-                )
+                write(root, "pipeline-predict-started.json", {"pid": os.getpid(), "at": time.time()})
                 if scenario.startswith("queued"):
                     _gate(root, "release-predict")
         result = original_predict(model, *args, **kwargs)
@@ -195,9 +186,7 @@ def _install_sdk(root: Path, rank: int) -> None:
     for name in ("init", "create"):
         original = getattr(task_type, name)
 
-        def task_factory(
-            *args: Any, _original: Any = original, _name: str = name, **kwargs: Any
-        ) -> Any:
+        def task_factory(*args: Any, _original: Any = original, _name: str = name, **kwargs: Any) -> Any:
             _event(root, f"task-{_name}-attempt", rank=rank)
             assert rank == -1, "A native DDP child attempted to create a real ClearML task"
             task = _original(*args, **kwargs)

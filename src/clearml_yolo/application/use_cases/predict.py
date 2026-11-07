@@ -59,19 +59,11 @@ def predict(
         settings = deps.model.prediction_settings(ultralytics_predict or {}, weights)
         selected = settings.pop("model", None)
         if selected is None:
-            raise ValueError(
-                "Prediction requires weights=<checkpoint> or ultralytics_predict.model"
-            )
+            raise ValueError("Prediction requires weights=<checkpoint> or ultralytics_predict.model")
         checkpoint, source_identity = deps.repository.resolve_weights_with_identity(selected)
         checkpoint_path = Path(checkpoint)
-        checkpoint_hash = (
-            deps.tracking.file_digest(checkpoint_path)
-            if deps.storage.is_file(checkpoint_path)
-            else None
-        )
-        identity = require_model_identity(
-            source_identity, model_label, checkpoint_hash=checkpoint_hash
-        )
+        checkpoint_hash = deps.tracking.file_digest(checkpoint_path) if deps.storage.is_file(checkpoint_path) else None
+        identity = require_model_identity(source_identity, model_label, checkpoint_hash=checkpoint_hash)
         resolution = deps.model.resolution_of(checkpoint, settings.get("imgsz"))
         settings["imgsz"] = resolution.scored_at
         deps.tracking.report_table(
@@ -82,15 +74,11 @@ def predict(
             identities={"model": identity},
         )
         if output is None:
-            directory = deps.storage.task_run_dir(
-                deps.storage.runs_root(), *deps.tracking.task_identity(task)
-            )
+            directory = deps.storage.task_run_dir(deps.storage.runs_root(), *deps.tracking.task_identity(task))
             output = directory / "predictions.csv"
         output_path = deps.storage.write_path(output)
         deps.storage.mkdir(output_path.parent, parents=True, exist_ok=True)
-        settings["project"] = settings.get("project") or str(
-            deps.storage.resolve(output_path.parent) / "native"
-        )
+        settings["project"] = settings.get("project") or str(deps.storage.resolve(output_path.parent) / "native")
         settings["name"] = settings.get("name") or "predict"
         deps.storage.write_path(Path(settings["project"]) / str(settings["name"]))
         settings["mode"] = "predict"
@@ -98,11 +86,7 @@ def predict(
         deps.tracking.declare_result_producers(task, ["predict"], output_dir=output_path.parent)
         truth = deps.storage.read_ground_truth(ground_truth).execution
         paths = images_to_score(truth, splits)
-        groups = (
-            [images_to_score(truth, [split]) for split in dict.fromkeys(splits)]
-            if splits
-            else [paths]
-        )
+        groups = [images_to_score(truth, [split]) for split in dict.fromkeys(splits)] if splits else [paths]
         deps.tracking.register_ground_truth(task, Path(ground_truth), output_dir=output_path.parent)
         frames = [
             _predict_group(checkpoint, group, image_name, settings, output_path, index, deps=deps)
@@ -145,9 +129,7 @@ def predict(
             ground_truth=ground_truth,
             predictions=output_path,
             prediction_splits=(
-                splits
-                if splits is not None
-                else sorted(str(value) for value in truth["split"].unique())
+                splits if splits is not None else sorted(str(value) for value in truth["split"].unique())
             )
             if publisher.enabled
             else None,
@@ -169,9 +151,7 @@ def _native_changes(settings: dict[str, Any], frame: pd.DataFrame) -> dict[str, 
     changes = {
         key: {"requested": value, "effective": effective[key]}
         for key, value in settings.items()
-        if key not in {"project", "name", "source", "model", "mode"}
-        and key in effective
-        and (value != effective[key])
+        if key not in {"project", "name", "source", "model", "mode"} and key in effective and (value != effective[key])
     }
     normalized = frame.attrs.get("normalized_imgsz")
     requested = settings["imgsz"]
@@ -211,9 +191,7 @@ def _predict_group(
             "mode": "predict",
         }
         requested_path = config_path.with_stem(config_path.stem + "_requested")
-        deps.model.write_native_yaml(
-            requested_path, deps.model.requested_settings(provisional, "predict"), "predict"
-        )
+        deps.model.write_native_yaml(requested_path, deps.model.requested_settings(provisional, "predict"), "predict")
         deps.model.write_native_yaml(config_path, provisional, "predict")
         frame = deps.model.predict_on_images(
             checkpoint, group, image_name=image_name, manifest_dir=manifest_dir, **settings

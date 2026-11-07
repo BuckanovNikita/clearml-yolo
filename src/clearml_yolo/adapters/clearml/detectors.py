@@ -82,9 +82,7 @@ def _metadata(
         "clearml_version": _package_version("clearml"),
         "torch_version": descriptor.dependencies.get("torch"),
     }
-    return {
-        key: {"value": value, "type": "str"} for key, value in values.items() if value is not None
-    }
+    return {key: {"value": value, "type": "str"} for key, value in values.items() if value is not None}
 
 
 def _validate_publication(
