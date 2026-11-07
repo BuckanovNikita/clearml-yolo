@@ -99,6 +99,7 @@ The scratch worktree was then removed. In this worktree, the same five files gav
   81 deselected`, exit 0 (19 min 6 s).
 
 The paired CY/queue release check is not part of this step; the branch is not pushed.
+It is recorded in [Release and paired check](#release-and-paired-check--2026-11-07).
 
 ## Limits
 
@@ -107,3 +108,29 @@ no ClearML stand. The nvidia-smi failure is simulated by an executable that
 reproduces the observed exit status and NVML message; the WSL driver outage itself
 is not reproduced. Selected-L remains blocked on the environmental decision in the
 [source assessment](../selected-l-telemetry-loss/assessment.md#impact-on-wp1).
+
+## Release and paired check — 2026-11-07
+
+The fix (`bf5c5f6`) and its evidence commits `f390fe0` and `04cc4b2` were released as
+CY 0.46.2: release commit `77e916ffd0e8b0464fdfa7cc2c97e4eb866f6fda`, annotated tag
+`v0.46.2`, created by the post-commit release hook. `04cc4b2` and the release commit
+change only documentation, `CHANGELOG.md`, the version and `uv.lock`, so the full
+suite run 2 above (on `f390fe0`, same `src` and `tests`) covers the released source.
+
+Paired CY/queue check, run from the cy-queue checkout with the CY `.venv` (no queue
+worker was running):
+
+| Item | Value |
+| --- | --- |
+| CY source | `77e916ffd0e8b0464fdfa7cc2c97e4eb866f6fda`, version 0.46.2 |
+| cy-queue source | `0c486b5257da8950932aded99dc2a2f1b3680286` (`origin/main`, fetched 2026-11-07), version 0.1.9, requirement `clearml-yolo>=0.38,<0.47` |
+| `uv pip install -e ../clearml-yolo -e .` | normal resolution, installed `clearml-yolo==0.46.2`, `cy-queue==0.1.9` |
+| `uv pip check` | all 281 installed packages compatible |
+| Installed metadata | `clearml-yolo` 0.46.2, `cy-queue` 0.1.9, both imported from these source checkouts |
+| Queue `CUDA_VISIBLE_DEVICES= pytest -q` | 584 passed, 7 deselected (physical `ddp_gpu` opt-ins, waived), 127 s |
+| `cy-queue --help` | exit 0 |
+| Queue `ruff check .`, `ruff format --check .` | passed; 111 files already formatted |
+| Queue `mypy .`, `lint-imports` | no issues in 70 source files; 2 contracts kept |
+
+Limits: CPU only, `CUDA_VISIBLE_DEVICES` empty; no GPU, native conversion or live
+stand run.
