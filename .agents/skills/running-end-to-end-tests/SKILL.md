@@ -123,7 +123,7 @@ the verification tool inventory. Follow the native Spec Kit workflow for documen
   counts keep their metrics in the `Unknown training count` worksheet, are excluded from
   eligibility-dependent aggregates and are explained in the issues worksheet; this is a
   report warning, not invented zeros. Use the
-  [report contract](../../../specs/000-baseline/spec.md#reports-and-readable-visualization).
+  [report contract](../../../docs/experiment-records.md#reports-and-readable-visualization).
 - Exercise `cy-val`, `cy-compare` and `cy-report` independently, including nondefault
   evaluation options.
 
@@ -132,7 +132,7 @@ the verification tool inventory. Follow the native Spec Kit workflow for documen
 *Evaluation artifacts*
 
 - Force-download every required artifact and verify the explicit publication inventory.
-  Use the [evaluation publication contract](../../../specs/000-baseline/spec.md#required-publication-and-task-lifecycle)
+  Use the [evaluation publication contract](../../../docs/experiment-records.md#required-publication-and-task-lifecycle)
   for canonical names.
 - Download `gt_csv` and `predicts_csv`; confirm one upload per invocation, every original
   source row/ID, exclusions, strict threshold flags and JSON pre/post-threshold
@@ -167,7 +167,7 @@ the verification tool inventory. Follow the native Spec Kit workflow for documen
 - Verify zero baseline chart events, zero comparison/degraded-class/methodology table
   events and zero non-test PR events, while baseline CSV contexts, dashboards, paired
   reports and headline single values remain available. Use the
-  [readable plot contract](../../../specs/000-baseline/spec.md#reports-and-readable-visualization).
+  [readable plot contract](../../../docs/experiment-records.md#reports-and-readable-visualization).
 
 *Models and native ClearML outputs*
 
@@ -223,7 +223,7 @@ the verification tool inventory. Follow the native Spec Kit workflow for documen
 - Check exact wrong-class/duplicate counts and confusion cells, persisted label
   click-through, native rename/delete, interrupted same-task retry and concurrent-task
   isolation against the
-  [native evaluation contract](../../../specs/000-baseline/spec.md#optional-fiftyone-publication).
+  [native evaluation contract](../../../docs/runtime-isolation.md#fiftyone-evaluation-publication).
 - Explicitly install `@clearml-yolo/evaluation` in the server/backend Python environment
   using `install_evaluation_plugin()` and restart App; publication must not install it.
 - Inspect `native_evaluation` and `evaluation_reports` for original PR50 and
@@ -252,7 +252,7 @@ the verification tool inventory. Follow the native Spec Kit workflow for documen
 - Check artifact/model upload rejection, callback-registration failure, flush failure and
   interruption with isolated test invocations, retaining local diagnostics until
   intentional cleanup. Follow the
-  [task lifecycle contract](../../../specs/000-baseline/spec.md#required-publication-and-task-lifecycle):
+  [task lifecycle contract](../../../docs/experiment-records.md#required-publication-and-task-lifecycle):
   - Standalone commands and pipelines with `skip_train=true`: each failure must fail the
     command and task.
   - Interruptions and training failures must fail the command in every mode.

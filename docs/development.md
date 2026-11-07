@@ -345,8 +345,22 @@ launcher, preserves foreign post-commit hooks and refuses foreign pre-commit hoo
 Legacy `--post-commit` calls are harmless no-ops. Contributor commits do not generate
 changelogs, version commits or tags.
 
-After final verification, explicitly invoke the existing release workflow when release
-is authorized:
+Explicit releases run on master only and evaluate all unreleased reachable
+Conventional Commits: `fix` and `perf` produce a patch, `feat` a minor, and breaking
+changes a minor below 1.0. Nonrelease types alone do not bump the version.
+A release creates a checked version commit and annotated `vX.Y.Z` tag.
+Concurrent execution, a dirty tracked worktree or index, inconsistent version/tag
+metadata, or changed prepared recovery content must fail or defer explicitly.
+Recovery validates recorded source and release identities and content hashes;
+it never rewrites existing refs. Legacy recovery records without a changelog
+checksum cannot create a tag automatically. The helper does not automatically
+fetch, push or build. Changelog refresh rejects shallow history without fetching
+and skips detached HEAD. Recovery runs `untracked-sources`, so stage or remove
+task-owned untracked files under `src/`, `tests/` and `scripts/` before retrying.
+
+Exit 0 means a completed release or an explained skip; exit 1 means a reported
+failure or deferral. An explicit release failure retains the contributor commit.
+After final verification, explicitly invoke the release workflow when authorized:
 
 ```bash
 uv run --locked --no-sync python scripts/local_release.py
@@ -367,10 +381,7 @@ and any newly created version tag explicitly, then verify the remote refs. A no-
 evaluation is a valid outcome for documentation-only history; do not force a version bump.
 Publish Git tags only for code: no code GitHub Releases, project distribution assets
 or registry packages. The separate [model-weight procedure](#model-weight-releases)
-is the only model-assets exception. The
-[release contract](../specs/000-baseline/spec.md) describes
-version policy, dirty-tree deferral, concurrency and recovery. The
-[validation guide](../specs/000-baseline/spec.md) covers checks and changelog refresh.
+is the only model-assets exception.
 
 ## Model-weight releases
 

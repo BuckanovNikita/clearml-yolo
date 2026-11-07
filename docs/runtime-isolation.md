@@ -39,7 +39,9 @@ selection for Python callers.
 
 ## Optional FiftyOne operations
 
-FiftyOne remains enabled by default where publication is supported. Factory,
+The typed publisher exposes enabled, preflight and publication operations without
+SDK objects in its requests or results. FiftyOne remains enabled by default where
+publication is supported. Factory,
 preflight, request preparation, publication, local receipt and run-link failures
 warn and preserve otherwise successful computation and the ClearML task.
 `fiftyone.enabled=false` selects a dependency-free no-op publisher. Cancellation
@@ -66,6 +68,34 @@ cy --config-dir cy-config --config-name cy fiftyone.preflight_timeout_seconds=30
 
 This containment does not establish the root cause of the original remote hang.
 Fault injection verifies bounded failure behavior independently of that incident.
+
+## FiftyOne evaluation publication
+
+Publish one sample per image, keeping raw predictions separate from evaluated fields,
+using task-hash namespaces and exact source lineage. Finite, ordered zero-area
+predictions produced by clipping remain raw evidence. Reject reversed or nonfinite
+boxes and confidence outside `[0,1]`; labelled ground truth requires positive geometry.
+Effective ground-truth identity hashes the bytes actually parsed.
+
+The local receipt records completion markers, payload paths, semantic field mapping,
+per-split evaluation keys and an aware UTC publication time. The canonical run stores
+its meaningful link, not a second receipt artifact.
+
+Persist one detection evaluation per task and split using `digital_metrics`, exact
+source matches and the existing claimed-ground-truth confusion rules, without
+rematching. Native evaluated predictions exclude `filtered` boxes; the complete audit
+overlay retains them without native evaluated status. Persisted IDs support loading,
+reporting, confusion, patches, rename and delete. Same-task retry preserves other tasks.
+Optional schema-v1 reports retain original confusion, PR50, AP50, AP75 and AP50_95;
+absent reports remain unavailable. mAP is mean AP50_95 over classes with ground truth.
+mAR and restricted-subset AP/PR are unavailable. Restore subset fixed-threshold arrays
+on exit.
+
+Install the `@clearml-yolo/evaluation` App extension explicitly in the matching
+server/backend environment. Publication does not migrate old runs; native evaluations
+appear for old data only through new publication or reruns. Preserve normal SDK
+settings discovery. Invalid optional SDK configuration uses the warning/no-op boundary
+above rather than blocking help or substituting project defaults.
 
 ## Runtime boundary
 

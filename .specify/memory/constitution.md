@@ -79,7 +79,7 @@ consumers MUST validate required existing inputs. Convenience links MUST preserv
 Model execution MUST delegate native training and inference to the selected backend;
 YOLO device, batch, AMP, compilation and distributed behavior belongs to Ultralytics.
 Approved detector families and export operations follow the
-[backend](../../specs/000-baseline/spec.md#detector-backends-and-deployment-export) and
+[backend](../../docs/multi-model-backends.md) and
 [export](../../docs/tensorrt-deployment.md) contracts. Export
 MUST NOT register another trained model; numerical parity and labeled-corpus accuracy
 acceptance remain separate, with target-runtime evidence required for deployment claims.
@@ -191,7 +191,7 @@ tear down shared infrastructure.
 
 Model class names MUST come from the checkpoint rather than ClearML model metadata.
 Task recovery MUST follow the ordered checkpoint and threshold selection in the
-[recovery contract](../../specs/000-baseline/spec.md#evaluation-comparison-and-historical-model-recovery).
+[recovery contract](../../docs/experiment-records.md#evaluation-comparison-and-historical-model-recovery).
 Current best Output Models and exact validation thresholds remain preferred; approved
 historical checkpoint artifacts, named threshold payloads and dashboard recovery are valid
 fallbacks. Explicit threshold maps take precedence. Dashboard recovery MUST warn about

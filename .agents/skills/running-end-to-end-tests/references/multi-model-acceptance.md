@@ -1,7 +1,7 @@
 # Multi-model and deployment acceptance
 
 When detector integration changes, follow the
-[multi-model acceptance guide](../../../../specs/000-baseline/spec.md#detector-backends-and-deployment-export)
+[multi-model acceptance guide](../../../../docs/multi-model-backends.md)
 and its backend/export contracts in addition to the shared workflow checks in the
 [verification checklist](../SKILL.md#verification-checklist).
 
