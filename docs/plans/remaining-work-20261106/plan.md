@@ -183,10 +183,18 @@ check, the force `native` check and assessment `:49`.
 
 Tasks:
 
-- [ ] T1.1 **Blocker.** Diagnose the selected-L telemetry failure: the helper hits
+- [x] T1.1 **Blocker.** Diagnose the selected-L telemetry failure: the helper hits
   ENOMEM, exits 255, and the 15 s `nvidia-smi` query times out (accelerator-oom
   test.md:41-51, :70-77; DINOv3 test.md:307-325). Do not relax deadlines or shrink
   the workload. A code defect follows the bug workflow with a regression.
+  *(2026-11-07: diagnosed as environmental and reproduced 3 of 3 in
+  [selected-l-telemetry-loss](../../bugs/selected-l-telemetry-loss/assessment.md).
+  The batch-8 L trial oversubscribes device memory into Windows shared memory
+  (about 92 GB). The WSL GPU driver path then becomes unavailable for about 12 s.
+  This is not a CY defect, and no fix or release was made. **WP1 (T1.2–T1.4) and
+  WP4 stay blocked** until the user chooses one of the record's three options:
+  a sysmem-fallback driver setting, an allocator budget cap as a contract change,
+  or an accepted gap.)*
 - [ ] T1.2 Run a fresh forced estimate of the selected DEIMv2 L/X models
   (`cy-batch-estimate --force`) with raw optimizer receipts. Each model must end in
   either a freshly confirmed winner or a raw-proven minimum-eight `no_capacity`

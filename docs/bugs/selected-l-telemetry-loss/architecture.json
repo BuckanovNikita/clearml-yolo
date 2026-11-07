@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "task": "Diagnose the selected-L GPU telemetry failure (remaining-work WP1 T1.1)",
+  "scope": [
+    "docs/bugs/selected-l-telemetry-loss",
+    "docs/plans/remaining-work-20261106/plan.md"
+  ],
+  "impact": "none",
+  "rationale": "Inspected gpu_inventory._query, workers.run_workers, batch_probe.NativeBatchProbe.run and the estimate_batches diagnostic path against three native reproductions. The root cause is environmental (WSL2 device-memory oversubscription into Windows shared memory making the paravirtualized GPU driver path unavailable), so this task changes no module, interface, dependency, effect owner or import contract; it records dated evidence and a remaining decision only. The secondary diagnosability defects are recorded as a proposed follow-up and are not implemented here."
+}
