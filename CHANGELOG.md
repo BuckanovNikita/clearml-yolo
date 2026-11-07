@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Documentation
+
+- **bugs**: Record the CY 0.46.2 release and paired queue check
+  ([`f547e11`](https://github.com/BuckanovNikita/clearml-yolo/commit/f547e114549d97e5cad07de4ec23405be5b6d4dc))
+
+
 ## v0.46.2 (2026-11-07)
 
 ### Bug Fixes

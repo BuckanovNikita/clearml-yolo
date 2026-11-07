@@ -189,3 +189,56 @@ The raw files are kept outside the repository in the task-owned
 - watchdog `summary.json` and `samples.tsv`;
 - launcher `ownership.json` and `run.log`;
 - the probe, sampler and watchdog scripts.
+
+## Post-restart sysmem fallback probe — 2026-11-07
+
+Result: **not verified.** The probe was not run after the restart, so it is still
+unknown whether WSL2 CUDA honours "Prefer No Sysmem Fallback" once the WSL VM has
+restarted. The latest measured result is still the
+[pre-restart check](#sysmem-fallback-policy-check--2026-11-07): not honoured.
+
+### Why the probe did not run
+
+- The current WSL VM booted at 2026-11-07 15:08:47 MSK (`uptime -s`).
+- At 15:16 pcboard reported that the user had been watching video (`chrome.exe`)
+  since 15:00. VRAM was 3.4 of 31.8 GiB, and only small GPU jobs were allowed,
+  with about 27 GiB of safe headroom.
+- The probe fills 31–33 GiB of device memory, so it is not a small GPU job. Under the
+  pcboard GPU safety rule it was not started.
+- `pc_status(wait=free)` was registered at 15:16:03 under the parent session key.
+  It had not fired when the step returned, so no wait duration is recorded.
+- No launch root was created, no probe ran, and driver versions were not captured.
+
+### Independent check
+
+- The receipt directory holds only `wait-start.txt`, `pcboard-blocked.log` and
+  `SHA256SUMS`. `sha256sum -c`, run inside the directory, reports both files OK.
+- There is no `summary.json` or `samples.tsv`. With no exception type and no
+  Shared/Committed trace from a post-restart run, "honoured" cannot be claimed.
+- The block is justified: the probe needs more device memory than the safe headroom
+  pcboard reported.
+
+### Rerun procedure
+
+Rerun once `pc_status(wait=free)` fires, with the same procedure as the pre-restart
+probe:
+
+- `watchdog.py` wraps the owned launcher `run_owned_gpu.py`, which runs
+  `uv run --frozen --no-sync python …/scripts/probe.py` in the primary checkout with
+  `--seconds 300`.
+- Keep the same abort thresholds: Shared Usage 4 GB above the baseline, adapter Total
+  Committed 110 GB, samples stale for 5 s.
+- Write the receipts into `step1-probe-postreboot2/` under a new launch root.
+  Capture the Windows and WSL driver versions next to the probe, and update
+  `SHA256SUMS`.
+
+### Impact
+
+WP1 stays blocked. Option 2 (an allocator-enforced budget) or option 3 (recorded
+gaps) remains the way forward. Option 1 would only become viable again if a measured
+post-restart probe showed a native OOM with no Shared Usage growth.
+
+### Post-restart receipts
+
+The files are in the `nofallback-20261107/step1-probe-postreboot2/` evidence
+directory, outside the repository.

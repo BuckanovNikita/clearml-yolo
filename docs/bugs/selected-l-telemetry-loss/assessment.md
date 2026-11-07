@@ -23,6 +23,12 @@
 
   WP1 stays blocked. Option 2 is now needed to unblock it; option 3, an accepted
   gap, remains the alternative.
+- Status (2026-11-07, post-restart): **not verified.** The WSL VM restarted (boot
+  15:08:47 MSK), but the probe was not rerun, because the user was watching video
+  and the probe needs more VRAM than pcboard's safe headroom
+  ([test.md](test.md#post-restart-sysmem-fallback-probe--2026-11-07)). Whether a
+  restart makes the setting take effect is still unknown. Option 2 (an
+  allocator-enforced budget) or option 3 (recorded gaps) remains.
 
 ## Observation
 
@@ -151,7 +157,10 @@ Unblocking needs a user decision. None of these options was applied here:
    this scenario. *(2026-11-07: chosen and applied globally by the user. Without a
    VM restart or driver reload, WSL2 CUDA does not honour it: a 1 GiB allocation
    probe exceeded device memory with no OOM. The replay was not run. See
-   [test.md](test.md#sysmem-fallback-policy-check--2026-11-07).)*
+   [test.md](test.md#sysmem-fallback-policy-check--2026-11-07). After the WSL VM
+   restart the probe has not been rerun yet, so the post-restart result is not
+   verified; see
+   [test.md](test.md#post-restart-sysmem-fallback-probe--2026-11-07).)*
 2. **Source change (new contract decision).** Enforce the existing memory budget in
    the probe worker allocator, for example
    `torch.cuda.set_per_process_memory_fraction(memory_fraction)`. An over-budget
