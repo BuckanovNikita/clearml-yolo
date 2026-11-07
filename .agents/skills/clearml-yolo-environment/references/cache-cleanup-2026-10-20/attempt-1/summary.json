@@ -1,0 +1,42 @@
+{
+  "tag": "clearml-yolo-codex-20261020-cache-cleanup-s96y",
+  "project": "clearml-yolo-codex-20261020-cache-cleanup-s96y clearml-yolo",
+  "runs": [
+    {
+      "name": "native-cpu-template",
+      "device": "cpu",
+      "command": [
+        "/mnt/wsl/data/nkt/clearml-yolo/.venv/bin/python3",
+        "-m",
+        "clearml_yolo.entrypoints.train",
+        "ground_truth=/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-s96y/inputs/ground_truth.csv",
+        "clearml.project_name=clearml-yolo-codex-20261020-cache-cleanup-s96y clearml-yolo",
+        "clearml.tags=[clearml-yolo-codex-20261020-cache-cleanup-s96y]",
+        "clearml.task_name=native-cpu-template",
+        "ultralytics.model=yolo11n.yaml",
+        "ultralytics.pretrained=false",
+        "ultralytics.epochs=1",
+        "ultralytics.batch=2",
+        "ultralytics.imgsz=64",
+        "ultralytics.workers=0",
+        "ultralytics.device=cpu",
+        "ultralytics_predict.device=cpu",
+        "ultralytics.compile=false",
+        "ultralytics.amp=false",
+        "ultralytics.plots=true",
+        "ultralytics.optimizer=SGD",
+        "ultralytics.mosaic=0",
+        "ultralytics.lr0=0.01",
+        "ultralytics.project=/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-s96y/native-cpu-template",
+        "ultralytics.name=train",
+        "dataset_cache_dir=/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-s96y/dataset-cache",
+        "hydra.run.dir=/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-s96y/hydra/native-cpu-template"
+      ],
+      "task_id": null,
+      "exit_code": 0,
+      "seconds": 78.95
+    }
+  ],
+  "cache": [],
+  "error": "AssertionError: Expected exactly one 'native-cpu-template' task; got 0"
+}

@@ -1,0 +1,24 @@
+{
+  "native-cpu-template": {
+    "task_id": "3e0cdf99da4b43fc889c5ffe59b917f0",
+    "gt_rows": 8,
+    "empty_backgrounds": 2,
+    "source_names_preserved": true,
+    "model_forced_download_sha256": "ccc28add57d431b25eb84821c9d53c7b9daed1f629f76dff431476af26eb72de",
+    "artifact_names": [
+      "gt_csv"
+    ],
+    "project_and_tag_verified": true
+  },
+  "controller-first": {
+    "task_id": "7b0f51d864744d3489647dff4a88ab6b",
+    "gt_rows": 8,
+    "empty_backgrounds": 2,
+    "source_names_preserved": true,
+    "model_forced_download_sha256": "de3d54ccdc1dc8200a5347f742bf7b2d2ae8477cb05373ad3a4ce94b81bf9958",
+    "artifact_names": [
+      "gt_csv"
+    ],
+    "project_and_tag_verified": true
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "diagnostic": {
+    "t008": "passed",
+    "task_ids": [
+      "51edbfb34d124d3c8ac90416cfb99ea7",
+      "8009a6d2fc4743d8a4f7b1202393fbdb",
+      "97af69d2bd1a4cdb810e210454c1a083"
+    ],
+    "dataset_identity_reused": true,
+    "scientific_override_applied": true
+  },
+  "plain-repeat": {
+    "t008": "passed",
+    "task_ids": [
+      "3e0cdf99da4b43fc889c5ffe59b917f0",
+      "7b0f51d864744d3489647dff4a88ab6b",
+      "3b27e57594de4abe9359ed3cddb1966a"
+    ],
+    "dataset_identity_reused": true,
+    "scientific_override_applied": true
+  },
+  "single_gpu": {
+    "status": "passed",
+    "task_id": "1446398496124c718a35368615af6402"
+  },
+  "all_owned_runs_cleaned": true,
+  "observed_runtime_sources_unchanged": true,
+  "owned_processes_remaining": []
+}

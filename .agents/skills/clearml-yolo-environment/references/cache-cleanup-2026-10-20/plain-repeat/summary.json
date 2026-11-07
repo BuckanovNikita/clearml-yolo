@@ -1,0 +1,1489 @@
+{
+  "tag": "clearml-yolo-codex-20261020-cache-cleanup-n1op",
+  "project": "clearml-yolo-codex-20261020-cache-cleanup-n1op clearml-yolo",
+  "runs": [
+    {
+      "name": "native-cpu-template",
+      "device": "cpu",
+      "command": [
+        "/mnt/wsl/data/nkt/clearml-yolo/.venv/bin/python3",
+        "-m",
+        "clearml_yolo.entrypoints.train",
+        "ground_truth=/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-n1op/inputs/ground_truth.csv",
+        "clearml.project_name=clearml-yolo-codex-20261020-cache-cleanup-n1op clearml-yolo",
+        "clearml.tags=[clearml-yolo-codex-20261020-cache-cleanup-n1op]",
+        "clearml.task_name=native-cpu-template",
+        "ultralytics.model=yolo11n.yaml",
+        "ultralytics.pretrained=false",
+        "ultralytics.epochs=1",
+        "ultralytics.batch=2",
+        "ultralytics.imgsz=64",
+        "ultralytics.workers=0",
+        "ultralytics.device=cpu",
+        "ultralytics_predict.device=cpu",
+        "ultralytics.compile=false",
+        "ultralytics.amp=false",
+        "ultralytics.plots=true",
+        "ultralytics.optimizer=SGD",
+        "ultralytics.mosaic=0",
+        "ultralytics.lr0=0.01",
+        "ultralytics.project=/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-n1op/native-cpu-template",
+        "ultralytics.name=train",
+        "dataset_cache_dir=/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-n1op/dataset-cache",
+        "hydra.run.dir=/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-n1op/hydra/native-cpu-template"
+      ],
+      "task_id": "3e0cdf99da4b43fc889c5ffe59b917f0",
+      "exit_code": 0,
+      "seconds": 80.49,
+      "status": "completed",
+      "general": {
+        "dataset/_ignore_remote_overrides_config_": "True",
+        "General/_ignore_remote_overrides_": "True",
+        "General/task": "detect",
+        "General/mode": "train",
+        "General/model": "yolo11n.yaml",
+        "General/epochs": "1",
+        "General/time": "",
+        "General/patience": "100",
+        "General/batch": "2",
+        "General/imgsz": "64",
+        "General/save": "True",
+        "General/save_period": "-1",
+        "General/cache": "False",
+        "General/workers": "0",
+        "General/pretrained": "False",
+        "General/cls_remap": "False",
+        "General/optimizer": "SGD",
+        "General/verbose": "True",
+        "General/seed": "0",
+        "General/deterministic": "True",
+        "General/single_cls": "False",
+        "General/rect": "False",
+        "General/cos_lr": "False",
+        "General/close_mosaic": "10",
+        "General/resume": "False",
+        "General/amp": "False",
+        "General/fraction": "1.0",
+        "General/profile": "False",
+        "General/freeze": "",
+        "General/multi_scale": "0.0",
+        "General/compile": "False",
+        "General/channels_last": "",
+        "General/overlap_mask": "True",
+        "General/mask_ratio": "4",
+        "General/dropout": "0.0",
+        "General/val": "True",
+        "General/split": "val",
+        "General/save_json": "False",
+        "General/conf": "",
+        "General/iou": "0.7",
+        "General/max_det": "300",
+        "General/quantize": "",
+        "General/dnn": "False",
+        "General/plots": "True",
+        "General/nms": "True",
+        "General/source": "",
+        "General/vid_stride": "1",
+        "General/stream_buffer": "False",
+        "General/visualize": "False",
+        "General/augment": "False",
+        "General/agnostic_nms": "False",
+        "General/classes": "",
+        "General/retina_masks": "False",
+        "General/embed": "",
+        "General/show": "False",
+        "General/save_frames": "False",
+        "General/save_txt": "False",
+        "General/save_conf": "False",
+        "General/save_crop": "False",
+        "General/show_labels": "True",
+        "General/show_conf": "True",
+        "General/show_boxes": "True",
+        "General/line_width": "",
+        "General/format": "torchscript",
+        "General/optimize": "False",
+        "General/dynamic": "False",
+        "General/simplify": "True",
+        "General/opset": "",
+        "General/workspace": "",
+        "General/lr0": "0.01",
+        "General/lrf": "0.01",
+        "General/momentum": "0.937",
+        "General/weight_decay": "0.0005",
+        "General/warmup_epochs": "3.0",
+        "General/warmup_momentum": "0.8",
+        "General/warmup_bias_lr": "0.1",
+        "General/distill_model": "",
+        "General/dis": "6.0",
+        "General/box": "7.5",
+        "General/cls": "0.5",
+        "General/cls_pw": "0.0",
+        "General/dfl": "1.5",
+        "General/pose": "12.0",
+        "General/kobj": "1.0",
+        "General/rle": "1.0",
+        "General/angle": "1.0",
+        "General/dlog": "1.0",
+        "General/dgrad": "0.5",
+        "General/dlam": "1.0",
+        "General/nbs": "64",
+        "General/hsv_h": "0.015",
+        "General/hsv_s": "0.7",
+        "General/hsv_v": "0.4",
+        "General/degrees": "0.0",
+        "General/translate": "0.1",
+        "General/scale": "0.5",
+        "General/shear": "0.0",
+        "General/perspective": "0.0",
+        "General/flipud": "0.0",
+        "General/fliplr": "0.5",
+        "General/bgr": "0.0",
+        "General/mosaic": "0",
+        "General/mixup": "0.0",
+        "General/cutmix": "0.0",
+        "General/copy_paste": "0.0",
+        "General/copy_paste_mode": "flip",
+        "General/auto_augment": "randaugment",
+        "General/erasing": "0.4",
+        "General/cfg": "",
+        "General/tracker": "tracktrack.yaml"
+      },
+      "canonical_run": {
+        "model": {
+          "backend": "ultralytics",
+          "preset": "default",
+          "source_dir": null,
+          "train": {
+            "device": null,
+            "epochs": 100,
+            "batch": 4,
+            "imgsz": 640,
+            "workers": 4,
+            "lr": 0.0001,
+            "weight_decay": 0.0001,
+            "seed": 0,
+            "pretrained": true,
+            "weights": null,
+            "backbone_weights": null,
+            "amp": true,
+            "grad_accum_steps": 1,
+            "use_ema": true
+          },
+          "predict": {
+            "device": null,
+            "batch": 1,
+            "imgsz": null,
+            "conf": 0.001,
+            "iou": 0.7,
+            "max_det": 300,
+            "half": false
+          }
+        },
+        "ultralytics": {
+          "task": "detect",
+          "mode": "train",
+          "model": "yolo11n.yaml",
+          "data": null,
+          "epochs": 1,
+          "time": null,
+          "patience": 100,
+          "batch": 2,
+          "imgsz": 64,
+          "save": true,
+          "save_period": -1,
+          "cache": false,
+          "device": "cpu",
+          "workers": 0,
+          "project": "/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-n1op/native-cpu-template",
+          "name": "train",
+          "exist_ok": false,
+          "pretrained": false,
+          "cls_remap": true,
+          "optimizer": "SGD",
+          "verbose": true,
+          "seed": 0,
+          "deterministic": true,
+          "single_cls": false,
+          "rect": false,
+          "cos_lr": false,
+          "close_mosaic": 10,
+          "resume": false,
+          "amp": false,
+          "fraction": 1.0,
+          "profile": false,
+          "freeze": null,
+          "multi_scale": 0.0,
+          "compile": false,
+          "channels_last": null,
+          "val": true,
+          "split": "val",
+          "save_json": false,
+          "conf": null,
+          "iou": 0.7,
+          "max_det": 300,
+          "quantize": null,
+          "plots": true,
+          "nms": true,
+          "visualize": false,
+          "augment": false,
+          "agnostic_nms": false,
+          "classes": null,
+          "save_txt": false,
+          "save_conf": false,
+          "show_labels": true,
+          "show_conf": true,
+          "lr0": 0.01,
+          "lrf": 0.01,
+          "momentum": 0.937,
+          "weight_decay": 0.0005,
+          "warmup_epochs": 3.0,
+          "warmup_momentum": 0.8,
+          "warmup_bias_lr": 0.1,
+          "distill_model": null,
+          "dis": 6.0,
+          "box": 7.5,
+          "cls": 0.5,
+          "cls_pw": 0.0,
+          "dfl": 1.5,
+          "nbs": 64,
+          "hsv_h": 0.015,
+          "hsv_s": 0.7,
+          "hsv_v": 0.4,
+          "degrees": 0.0,
+          "translate": 0.1,
+          "scale": 0.5,
+          "shear": 0.0,
+          "perspective": 0.0,
+          "flipud": 0.0,
+          "fliplr": 0.5,
+          "bgr": 0.0,
+          "mosaic": 0,
+          "mixup": 0.0,
+          "cutmix": 0.0
+        },
+        "ultralytics_predict": {
+          "task": "detect",
+          "mode": "predict",
+          "model": null,
+          "data": null,
+          "batch": 1,
+          "imgsz": 64,
+          "save": false,
+          "device": "cpu",
+          "project": null,
+          "name": null,
+          "exist_ok": false,
+          "verbose": false,
+          "rect": true,
+          "compile": false,
+          "channels_last": null,
+          "conf": 0.001,
+          "iou": 0.7,
+          "max_det": 300,
+          "quantize": null,
+          "dnn": false,
+          "nms": true,
+          "source": null,
+          "visualize": false,
+          "augment": false,
+          "agnostic_nms": false,
+          "classes": null,
+          "show": false,
+          "save_txt": false,
+          "save_conf": false,
+          "save_crop": false,
+          "show_labels": true,
+          "show_conf": true,
+          "show_boxes": true,
+          "line_width": null
+        },
+        "clearml": {
+          "_target_": "clearml_yolo.application.contracts.ClearMLConfig",
+          "project_name": "clearml-yolo-codex-20261020-cache-cleanup-n1op clearml-yolo",
+          "task_name": "native-cpu-template",
+          "task_type": "training",
+          "tags": [
+            "clearml-yolo-codex-20261020-cache-cleanup-n1op"
+          ],
+          "output_uri": true
+        },
+        "ground_truth": "/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-n1op/inputs/ground_truth.csv",
+        "dataset_format": "ndjson",
+        "dataset_cache_dir": "/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-n1op/dataset-cache",
+        "required_splits": null,
+        "display_names": {
+          "requested_task_name": "native-cpu-template/train",
+          "effective_task_name": "native-cpu-template/train",
+          "requested_model_name": "train",
+          "effective_model_name": "train",
+          "suffix": null
+        },
+        "training_data_overrides": {
+          "data": {
+            "requested": null,
+            "effective": "/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-n1op/dataset-cache/37223356fb6a812c9559f12a849aee3e44863e4090ededcb5d012dd97c58dc4a/data.yaml"
+          },
+          "cls_remap": {
+            "requested": true,
+            "effective": false
+          }
+        },
+        "prepared_dataset": {
+          "cache_identity": "37223356fb6a812c9559f12a849aee3e44863e4090ededcb5d012dd97c58dc4a",
+          "root": "/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-n1op/dataset-cache/37223356fb6a812c9559f12a849aee3e44863e4090ededcb5d012dd97c58dc4a"
+        },
+        "training_normalization": {
+          "overlap_mask": {
+            "requested": null,
+            "effective": true
+          },
+          "mask_ratio": {
+            "requested": null,
+            "effective": 4
+          },
+          "dropout": {
+            "requested": null,
+            "effective": 0.0
+          },
+          "dnn": {
+            "requested": null,
+            "effective": false
+          },
+          "vid_stride": {
+            "requested": null,
+            "effective": 1
+          },
+          "stream_buffer": {
+            "requested": null,
+            "effective": false
+          },
+          "retina_masks": {
+            "requested": null,
+            "effective": false
+          },
+          "show": {
+            "requested": null,
+            "effective": false
+          },
+          "save_frames": {
+            "requested": null,
+            "effective": false
+          },
+          "save_crop": {
+            "requested": null,
+            "effective": false
+          },
+          "show_boxes": {
+            "requested": null,
+            "effective": true
+          },
+          "format": {
+            "requested": null,
+            "effective": "torchscript"
+          },
+          "optimize": {
+            "requested": null,
+            "effective": false
+          },
+          "dynamic": {
+            "requested": null,
+            "effective": false
+          },
+          "simplify": {
+            "requested": null,
+            "effective": true
+          },
+          "pose": {
+            "requested": null,
+            "effective": 12.0
+          },
+          "kobj": {
+            "requested": null,
+            "effective": 1.0
+          },
+          "rle": {
+            "requested": null,
+            "effective": 1.0
+          },
+          "angle": {
+            "requested": null,
+            "effective": 1.0
+          },
+          "dlog": {
+            "requested": null,
+            "effective": 1.0
+          },
+          "dgrad": {
+            "requested": null,
+            "effective": 0.5
+          },
+          "dlam": {
+            "requested": null,
+            "effective": 1.0
+          },
+          "copy_paste": {
+            "requested": null,
+            "effective": 0.0
+          },
+          "copy_paste_mode": {
+            "requested": null,
+            "effective": "flip"
+          },
+          "auto_augment": {
+            "requested": null,
+            "effective": "randaugment"
+          },
+          "erasing": {
+            "requested": null,
+            "effective": 0.4
+          },
+          "tracker": {
+            "requested": null,
+            "effective": "tracktrack.yaml"
+          },
+          "save_dir": {
+            "requested": null,
+            "effective": "/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-n1op/native-cpu-template/train"
+          }
+        }
+      },
+      "artifacts": {
+        "gt_csv": {
+          "bytes": 1149,
+          "sha256": "d02302f4b37571fb8bfd7339b2eda242e8d49fba28299c368316748dac189b10"
+        }
+      },
+      "model": {
+        "id": "0260dfd0672047cb8c5b5d72ecbdc965",
+        "sha256": "ccc28add57d431b25eb84821c9d53c7b9daed1f629f76dff431476af26eb72de",
+        "bytes": 5411162,
+        "names": {
+          "0": "object"
+        }
+      },
+      "scalar_titles": [
+        ":monitor:gpu",
+        ":monitor:machine",
+        "Epoch Time",
+        "lr",
+        "metrics",
+        "train",
+        "val"
+      ]
+    },
+    {
+      "name": "controller-first",
+      "device": "cpu",
+      "command": [
+        "/mnt/wsl/data/nkt/clearml-yolo/.venv/bin/python3",
+        "-m",
+        "clearml_yolo.entrypoints.train",
+        "ground_truth=/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-n1op/inputs/ground_truth.csv",
+        "clearml.project_name=clearml-yolo-codex-20261020-cache-cleanup-n1op clearml-yolo",
+        "clearml.tags=[clearml-yolo-codex-20261020-cache-cleanup-n1op]",
+        "clearml.task_name=controller-first",
+        "ultralytics.model=yolo11n.yaml",
+        "ultralytics.pretrained=false",
+        "ultralytics.epochs=1",
+        "ultralytics.batch=2",
+        "ultralytics.imgsz=64",
+        "ultralytics.workers=0",
+        "ultralytics.device=cpu",
+        "ultralytics_predict.device=cpu",
+        "ultralytics.compile=false",
+        "ultralytics.amp=false",
+        "ultralytics.plots=true",
+        "ultralytics.optimizer=SGD",
+        "ultralytics.mosaic=0",
+        "ultralytics.lr0=0.01",
+        "ultralytics.project=/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-n1op/controller-first",
+        "ultralytics.name=train",
+        "dataset_cache_dir=/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-n1op/dataset-cache",
+        "hydra.run.dir=/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-n1op/hydra/controller-first"
+      ],
+      "task_id": "7b0f51d864744d3489647dff4a88ab6b",
+      "before": {
+        "id": "7b0f51d864744d3489647dff4a88ab6b",
+        "name": "controller-first",
+        "status": "in_progress",
+        "output_uri": "http://files.clearml.k8s.localhost",
+        "output_models": []
+      },
+      "remote_environment": {
+        "CLEARML_TASK_ID": "7b0f51d864744d3489647dff4a88ab6b",
+        "TRAINS_TASK_ID": "7b0f51d864744d3489647dff4a88ab6b",
+        "CLEARML_LOG_TASK_TO_BACKEND": "1",
+        "CLEARML_SIMULATE_REMOTE_TASK": "1"
+      },
+      "exit_code": 0,
+      "seconds": 58.48,
+      "after": {
+        "id": "7b0f51d864744d3489647dff4a88ab6b",
+        "name": "controller-first-young-owl",
+        "status": "completed",
+        "output_uri": "http://files.clearml.k8s.localhost",
+        "output_models": [
+          {
+            "id": "e3e4a7ddd54c468082492962370e6044",
+            "name": "train-young-owl",
+            "url": "http://files.clearml.k8s.localhost/clearml-yolo-codex-20261020-cache-cleanup-n1op%20clearml-yolo/controller-first.7b0f51d864744d3489647dff4a88ab6b/models/best.pt",
+            "task": "7b0f51d864744d3489647dff4a88ab6b",
+            "published": false
+          }
+        ]
+      },
+      "status": "completed",
+      "general": {
+        "dataset/_ignore_remote_overrides_config_": "True",
+        "General/_ignore_remote_overrides_": "True",
+        "General/task": "detect",
+        "General/mode": "train",
+        "General/model": "yolo11n.yaml",
+        "General/epochs": "1",
+        "General/time": "",
+        "General/patience": "100",
+        "General/batch": "2",
+        "General/imgsz": "64",
+        "General/save": "True",
+        "General/save_period": "-1",
+        "General/cache": "False",
+        "General/workers": "0",
+        "General/pretrained": "False",
+        "General/cls_remap": "False",
+        "General/optimizer": "SGD",
+        "General/verbose": "True",
+        "General/seed": "0",
+        "General/deterministic": "True",
+        "General/single_cls": "False",
+        "General/rect": "False",
+        "General/cos_lr": "False",
+        "General/close_mosaic": "10",
+        "General/resume": "False",
+        "General/amp": "False",
+        "General/fraction": "1.0",
+        "General/profile": "False",
+        "General/freeze": "",
+        "General/multi_scale": "0.0",
+        "General/compile": "False",
+        "General/channels_last": "",
+        "General/overlap_mask": "True",
+        "General/mask_ratio": "4",
+        "General/dropout": "0.0",
+        "General/val": "True",
+        "General/split": "val",
+        "General/save_json": "False",
+        "General/conf": "",
+        "General/iou": "0.7",
+        "General/max_det": "300",
+        "General/quantize": "",
+        "General/dnn": "False",
+        "General/plots": "True",
+        "General/nms": "True",
+        "General/source": "",
+        "General/vid_stride": "1",
+        "General/stream_buffer": "False",
+        "General/visualize": "False",
+        "General/augment": "False",
+        "General/agnostic_nms": "False",
+        "General/classes": "",
+        "General/retina_masks": "False",
+        "General/embed": "",
+        "General/show": "False",
+        "General/save_frames": "False",
+        "General/save_txt": "False",
+        "General/save_conf": "False",
+        "General/save_crop": "False",
+        "General/show_labels": "True",
+        "General/show_conf": "True",
+        "General/show_boxes": "True",
+        "General/line_width": "",
+        "General/format": "torchscript",
+        "General/optimize": "False",
+        "General/dynamic": "False",
+        "General/simplify": "True",
+        "General/opset": "",
+        "General/workspace": "",
+        "General/lr0": "0.01",
+        "General/lrf": "0.01",
+        "General/momentum": "0.937",
+        "General/weight_decay": "0.0005",
+        "General/warmup_epochs": "3.0",
+        "General/warmup_momentum": "0.8",
+        "General/warmup_bias_lr": "0.1",
+        "General/distill_model": "",
+        "General/dis": "6.0",
+        "General/box": "7.5",
+        "General/cls": "0.5",
+        "General/cls_pw": "0.0",
+        "General/dfl": "1.5",
+        "General/pose": "12.0",
+        "General/kobj": "1.0",
+        "General/rle": "1.0",
+        "General/angle": "1.0",
+        "General/dlog": "1.0",
+        "General/dgrad": "0.5",
+        "General/dlam": "1.0",
+        "General/nbs": "64",
+        "General/hsv_h": "0.015",
+        "General/hsv_s": "0.7",
+        "General/hsv_v": "0.4",
+        "General/degrees": "0.0",
+        "General/translate": "0.1",
+        "General/scale": "0.5",
+        "General/shear": "0.0",
+        "General/perspective": "0.0",
+        "General/flipud": "0.0",
+        "General/fliplr": "0.5",
+        "General/bgr": "0.0",
+        "General/mosaic": "0",
+        "General/mixup": "0.0",
+        "General/cutmix": "0.0",
+        "General/copy_paste": "0.0",
+        "General/copy_paste_mode": "flip",
+        "General/auto_augment": "randaugment",
+        "General/erasing": "0.4",
+        "General/cfg": "",
+        "General/tracker": "tracktrack.yaml"
+      },
+      "canonical_run": {
+        "model": {
+          "backend": "ultralytics",
+          "preset": "default",
+          "source_dir": null,
+          "train": {
+            "device": null,
+            "epochs": 100,
+            "batch": 4,
+            "imgsz": 640,
+            "workers": 4,
+            "lr": 0.0001,
+            "weight_decay": 0.0001,
+            "seed": 0,
+            "pretrained": true,
+            "weights": null,
+            "backbone_weights": null,
+            "amp": true,
+            "grad_accum_steps": 1,
+            "use_ema": true
+          },
+          "predict": {
+            "device": null,
+            "batch": 1,
+            "imgsz": null,
+            "conf": 0.001,
+            "iou": 0.7,
+            "max_det": 300,
+            "half": false
+          }
+        },
+        "ultralytics": {
+          "task": "detect",
+          "mode": "train",
+          "model": "yolo11n.yaml",
+          "data": null,
+          "epochs": 1,
+          "time": null,
+          "patience": 100,
+          "batch": 2,
+          "imgsz": 64,
+          "save": true,
+          "save_period": -1,
+          "cache": false,
+          "device": "cpu",
+          "workers": 0,
+          "project": "/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-n1op/controller-first",
+          "name": "train",
+          "exist_ok": false,
+          "pretrained": false,
+          "cls_remap": true,
+          "optimizer": "SGD",
+          "verbose": true,
+          "seed": 0,
+          "deterministic": true,
+          "single_cls": false,
+          "rect": false,
+          "cos_lr": false,
+          "close_mosaic": 10,
+          "resume": false,
+          "amp": false,
+          "fraction": 1.0,
+          "profile": false,
+          "freeze": null,
+          "multi_scale": 0.0,
+          "compile": false,
+          "channels_last": null,
+          "val": true,
+          "split": "val",
+          "save_json": false,
+          "conf": null,
+          "iou": 0.7,
+          "max_det": 300,
+          "quantize": null,
+          "plots": true,
+          "nms": true,
+          "visualize": false,
+          "augment": false,
+          "agnostic_nms": false,
+          "classes": null,
+          "save_txt": false,
+          "save_conf": false,
+          "show_labels": true,
+          "show_conf": true,
+          "lr0": 0.01,
+          "lrf": 0.01,
+          "momentum": 0.937,
+          "weight_decay": 0.0005,
+          "warmup_epochs": 3.0,
+          "warmup_momentum": 0.8,
+          "warmup_bias_lr": 0.1,
+          "distill_model": null,
+          "dis": 6.0,
+          "box": 7.5,
+          "cls": 0.5,
+          "cls_pw": 0.0,
+          "dfl": 1.5,
+          "nbs": 64,
+          "hsv_h": 0.015,
+          "hsv_s": 0.7,
+          "hsv_v": 0.4,
+          "degrees": 0.0,
+          "translate": 0.1,
+          "scale": 0.5,
+          "shear": 0.0,
+          "perspective": 0.0,
+          "flipud": 0.0,
+          "fliplr": 0.5,
+          "bgr": 0.0,
+          "mosaic": 0,
+          "mixup": 0.0,
+          "cutmix": 0.0
+        },
+        "ultralytics_predict": {
+          "task": "detect",
+          "mode": "predict",
+          "model": null,
+          "data": null,
+          "batch": 1,
+          "imgsz": 64,
+          "save": false,
+          "device": "cpu",
+          "project": null,
+          "name": null,
+          "exist_ok": false,
+          "verbose": false,
+          "rect": true,
+          "compile": false,
+          "channels_last": null,
+          "conf": 0.001,
+          "iou": 0.7,
+          "max_det": 300,
+          "quantize": null,
+          "dnn": false,
+          "nms": true,
+          "source": null,
+          "visualize": false,
+          "augment": false,
+          "agnostic_nms": false,
+          "classes": null,
+          "show": false,
+          "save_txt": false,
+          "save_conf": false,
+          "save_crop": false,
+          "show_labels": true,
+          "show_conf": true,
+          "show_boxes": true,
+          "line_width": null
+        },
+        "clearml": {
+          "_target_": "clearml_yolo.application.contracts.ClearMLConfig",
+          "project_name": "clearml-yolo-codex-20261020-cache-cleanup-n1op clearml-yolo",
+          "task_name": "controller-first",
+          "task_type": "training",
+          "tags": [
+            "clearml-yolo-codex-20261020-cache-cleanup-n1op"
+          ],
+          "output_uri": true
+        },
+        "ground_truth": "/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-n1op/inputs/ground_truth.csv",
+        "dataset_format": "ndjson",
+        "dataset_cache_dir": "/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-n1op/dataset-cache",
+        "required_splits": null,
+        "display_names": {
+          "requested_task_name": "controller-first",
+          "effective_task_name": "controller-first-young-owl",
+          "requested_model_name": "train",
+          "effective_model_name": "train-young-owl",
+          "suffix": "young-owl"
+        },
+        "training_data_overrides": {
+          "data": {
+            "requested": null,
+            "effective": "/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-n1op/dataset-cache/37223356fb6a812c9559f12a849aee3e44863e4090ededcb5d012dd97c58dc4a/data.yaml"
+          },
+          "cls_remap": {
+            "requested": true,
+            "effective": false
+          }
+        },
+        "prepared_dataset": {
+          "cache_identity": "37223356fb6a812c9559f12a849aee3e44863e4090ededcb5d012dd97c58dc4a",
+          "root": "/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-n1op/dataset-cache/37223356fb6a812c9559f12a849aee3e44863e4090ededcb5d012dd97c58dc4a"
+        },
+        "training_normalization": {
+          "overlap_mask": {
+            "requested": null,
+            "effective": true
+          },
+          "mask_ratio": {
+            "requested": null,
+            "effective": 4
+          },
+          "dropout": {
+            "requested": null,
+            "effective": 0.0
+          },
+          "dnn": {
+            "requested": null,
+            "effective": false
+          },
+          "vid_stride": {
+            "requested": null,
+            "effective": 1
+          },
+          "stream_buffer": {
+            "requested": null,
+            "effective": false
+          },
+          "retina_masks": {
+            "requested": null,
+            "effective": false
+          },
+          "show": {
+            "requested": null,
+            "effective": false
+          },
+          "save_frames": {
+            "requested": null,
+            "effective": false
+          },
+          "save_crop": {
+            "requested": null,
+            "effective": false
+          },
+          "show_boxes": {
+            "requested": null,
+            "effective": true
+          },
+          "format": {
+            "requested": null,
+            "effective": "torchscript"
+          },
+          "optimize": {
+            "requested": null,
+            "effective": false
+          },
+          "dynamic": {
+            "requested": null,
+            "effective": false
+          },
+          "simplify": {
+            "requested": null,
+            "effective": true
+          },
+          "pose": {
+            "requested": null,
+            "effective": 12.0
+          },
+          "kobj": {
+            "requested": null,
+            "effective": 1.0
+          },
+          "rle": {
+            "requested": null,
+            "effective": 1.0
+          },
+          "angle": {
+            "requested": null,
+            "effective": 1.0
+          },
+          "dlog": {
+            "requested": null,
+            "effective": 1.0
+          },
+          "dgrad": {
+            "requested": null,
+            "effective": 0.5
+          },
+          "dlam": {
+            "requested": null,
+            "effective": 1.0
+          },
+          "copy_paste": {
+            "requested": null,
+            "effective": 0.0
+          },
+          "copy_paste_mode": {
+            "requested": null,
+            "effective": "flip"
+          },
+          "auto_augment": {
+            "requested": null,
+            "effective": "randaugment"
+          },
+          "erasing": {
+            "requested": null,
+            "effective": 0.4
+          },
+          "tracker": {
+            "requested": null,
+            "effective": "tracktrack.yaml"
+          },
+          "save_dir": {
+            "requested": null,
+            "effective": "/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-n1op/controller-first/train"
+          }
+        }
+      },
+      "artifacts": {
+        "gt_csv": {
+          "bytes": 1149,
+          "sha256": "d02302f4b37571fb8bfd7339b2eda242e8d49fba28299c368316748dac189b10"
+        }
+      },
+      "model": {
+        "id": "e3e4a7ddd54c468082492962370e6044",
+        "sha256": "de3d54ccdc1dc8200a5347f742bf7b2d2ae8477cb05373ad3a4ce94b81bf9958",
+        "bytes": 5411162,
+        "names": {
+          "0": "object"
+        }
+      },
+      "scalar_titles": [
+        ":monitor:gpu",
+        ":monitor:machine",
+        "Epoch Time",
+        "lr",
+        "metrics",
+        "train",
+        "val"
+      ]
+    },
+    {
+      "name": "controller-scientific-miss",
+      "device": "cpu",
+      "command": [
+        "/mnt/wsl/data/nkt/clearml-yolo/.venv/bin/python3",
+        "-m",
+        "clearml_yolo.entrypoints.train",
+        "ground_truth=/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-n1op/inputs/ground_truth.csv",
+        "clearml.project_name=clearml-yolo-codex-20261020-cache-cleanup-n1op clearml-yolo",
+        "clearml.tags=[clearml-yolo-codex-20261020-cache-cleanup-n1op]",
+        "clearml.task_name=controller-scientific-miss",
+        "ultralytics.model=yolo11n.yaml",
+        "ultralytics.pretrained=false",
+        "ultralytics.epochs=1",
+        "ultralytics.batch=2",
+        "ultralytics.imgsz=64",
+        "ultralytics.workers=0",
+        "ultralytics.device=cpu",
+        "ultralytics_predict.device=cpu",
+        "ultralytics.compile=false",
+        "ultralytics.amp=false",
+        "ultralytics.plots=true",
+        "ultralytics.optimizer=SGD",
+        "ultralytics.mosaic=0",
+        "ultralytics.lr0=0.02",
+        "ultralytics.project=/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-n1op/controller-scientific-miss",
+        "ultralytics.name=train",
+        "dataset_cache_dir=/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-n1op/dataset-cache",
+        "hydra.run.dir=/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-n1op/hydra/controller-scientific-miss"
+      ],
+      "task_id": "3b27e57594de4abe9359ed3cddb1966a",
+      "before": {
+        "id": "3b27e57594de4abe9359ed3cddb1966a",
+        "name": "controller-scientific-miss",
+        "status": "in_progress",
+        "output_uri": "http://files.clearml.k8s.localhost",
+        "output_models": []
+      },
+      "remote_environment": {
+        "CLEARML_TASK_ID": "3b27e57594de4abe9359ed3cddb1966a",
+        "TRAINS_TASK_ID": "3b27e57594de4abe9359ed3cddb1966a",
+        "CLEARML_LOG_TASK_TO_BACKEND": "1",
+        "CLEARML_SIMULATE_REMOTE_TASK": "1"
+      },
+      "exit_code": 0,
+      "seconds": 54.49,
+      "after": {
+        "id": "3b27e57594de4abe9359ed3cddb1966a",
+        "name": "controller-scientific-miss-calm-pine",
+        "status": "completed",
+        "output_uri": "http://files.clearml.k8s.localhost",
+        "output_models": [
+          {
+            "id": "d40ac6cc651e4425a6199f934700a7e8",
+            "name": "train-calm-pine",
+            "url": "http://files.clearml.k8s.localhost/clearml-yolo-codex-20261020-cache-cleanup-n1op%20clearml-yolo/controller-scientific-miss.3b27e57594de4abe9359ed3cddb1966a/models/best.pt",
+            "task": "3b27e57594de4abe9359ed3cddb1966a",
+            "published": false
+          }
+        ]
+      },
+      "status": "completed",
+      "general": {
+        "dataset/_ignore_remote_overrides_config_": "True",
+        "General/_ignore_remote_overrides_": "True",
+        "General/task": "detect",
+        "General/mode": "train",
+        "General/model": "yolo11n.yaml",
+        "General/epochs": "1",
+        "General/time": "",
+        "General/patience": "100",
+        "General/batch": "2",
+        "General/imgsz": "64",
+        "General/save": "True",
+        "General/save_period": "-1",
+        "General/cache": "False",
+        "General/workers": "0",
+        "General/pretrained": "False",
+        "General/cls_remap": "False",
+        "General/optimizer": "SGD",
+        "General/verbose": "True",
+        "General/seed": "0",
+        "General/deterministic": "True",
+        "General/single_cls": "False",
+        "General/rect": "False",
+        "General/cos_lr": "False",
+        "General/close_mosaic": "10",
+        "General/resume": "False",
+        "General/amp": "False",
+        "General/fraction": "1.0",
+        "General/profile": "False",
+        "General/freeze": "",
+        "General/multi_scale": "0.0",
+        "General/compile": "False",
+        "General/channels_last": "",
+        "General/overlap_mask": "True",
+        "General/mask_ratio": "4",
+        "General/dropout": "0.0",
+        "General/val": "True",
+        "General/split": "val",
+        "General/save_json": "False",
+        "General/conf": "",
+        "General/iou": "0.7",
+        "General/max_det": "300",
+        "General/quantize": "",
+        "General/dnn": "False",
+        "General/plots": "True",
+        "General/nms": "True",
+        "General/source": "",
+        "General/vid_stride": "1",
+        "General/stream_buffer": "False",
+        "General/visualize": "False",
+        "General/augment": "False",
+        "General/agnostic_nms": "False",
+        "General/classes": "",
+        "General/retina_masks": "False",
+        "General/embed": "",
+        "General/show": "False",
+        "General/save_frames": "False",
+        "General/save_txt": "False",
+        "General/save_conf": "False",
+        "General/save_crop": "False",
+        "General/show_labels": "True",
+        "General/show_conf": "True",
+        "General/show_boxes": "True",
+        "General/line_width": "",
+        "General/format": "torchscript",
+        "General/optimize": "False",
+        "General/dynamic": "False",
+        "General/simplify": "True",
+        "General/opset": "",
+        "General/workspace": "",
+        "General/lr0": "0.02",
+        "General/lrf": "0.01",
+        "General/momentum": "0.937",
+        "General/weight_decay": "0.0005",
+        "General/warmup_epochs": "3.0",
+        "General/warmup_momentum": "0.8",
+        "General/warmup_bias_lr": "0.1",
+        "General/distill_model": "",
+        "General/dis": "6.0",
+        "General/box": "7.5",
+        "General/cls": "0.5",
+        "General/cls_pw": "0.0",
+        "General/dfl": "1.5",
+        "General/pose": "12.0",
+        "General/kobj": "1.0",
+        "General/rle": "1.0",
+        "General/angle": "1.0",
+        "General/dlog": "1.0",
+        "General/dgrad": "0.5",
+        "General/dlam": "1.0",
+        "General/nbs": "64",
+        "General/hsv_h": "0.015",
+        "General/hsv_s": "0.7",
+        "General/hsv_v": "0.4",
+        "General/degrees": "0.0",
+        "General/translate": "0.1",
+        "General/scale": "0.5",
+        "General/shear": "0.0",
+        "General/perspective": "0.0",
+        "General/flipud": "0.0",
+        "General/fliplr": "0.5",
+        "General/bgr": "0.0",
+        "General/mosaic": "0",
+        "General/mixup": "0.0",
+        "General/cutmix": "0.0",
+        "General/copy_paste": "0.0",
+        "General/copy_paste_mode": "flip",
+        "General/auto_augment": "randaugment",
+        "General/erasing": "0.4",
+        "General/cfg": "",
+        "General/tracker": "tracktrack.yaml"
+      },
+      "canonical_run": {
+        "model": {
+          "backend": "ultralytics",
+          "preset": "default",
+          "source_dir": null,
+          "train": {
+            "device": null,
+            "epochs": 100,
+            "batch": 4,
+            "imgsz": 640,
+            "workers": 4,
+            "lr": 0.0001,
+            "weight_decay": 0.0001,
+            "seed": 0,
+            "pretrained": true,
+            "weights": null,
+            "backbone_weights": null,
+            "amp": true,
+            "grad_accum_steps": 1,
+            "use_ema": true
+          },
+          "predict": {
+            "device": null,
+            "batch": 1,
+            "imgsz": null,
+            "conf": 0.001,
+            "iou": 0.7,
+            "max_det": 300,
+            "half": false
+          }
+        },
+        "ultralytics": {
+          "task": "detect",
+          "mode": "train",
+          "model": "yolo11n.yaml",
+          "data": null,
+          "epochs": 1,
+          "time": null,
+          "patience": 100,
+          "batch": 2,
+          "imgsz": 64,
+          "save": true,
+          "save_period": -1,
+          "cache": false,
+          "device": "cpu",
+          "workers": 0,
+          "project": "/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-n1op/controller-scientific-miss",
+          "name": "train",
+          "exist_ok": false,
+          "pretrained": false,
+          "cls_remap": true,
+          "optimizer": "SGD",
+          "verbose": true,
+          "seed": 0,
+          "deterministic": true,
+          "single_cls": false,
+          "rect": false,
+          "cos_lr": false,
+          "close_mosaic": 10,
+          "resume": false,
+          "amp": false,
+          "fraction": 1.0,
+          "profile": false,
+          "freeze": null,
+          "multi_scale": 0.0,
+          "compile": false,
+          "channels_last": null,
+          "val": true,
+          "split": "val",
+          "save_json": false,
+          "conf": null,
+          "iou": 0.7,
+          "max_det": 300,
+          "quantize": null,
+          "plots": true,
+          "nms": true,
+          "visualize": false,
+          "augment": false,
+          "agnostic_nms": false,
+          "classes": null,
+          "save_txt": false,
+          "save_conf": false,
+          "show_labels": true,
+          "show_conf": true,
+          "lr0": 0.02,
+          "lrf": 0.01,
+          "momentum": 0.937,
+          "weight_decay": 0.0005,
+          "warmup_epochs": 3.0,
+          "warmup_momentum": 0.8,
+          "warmup_bias_lr": 0.1,
+          "distill_model": null,
+          "dis": 6.0,
+          "box": 7.5,
+          "cls": 0.5,
+          "cls_pw": 0.0,
+          "dfl": 1.5,
+          "nbs": 64,
+          "hsv_h": 0.015,
+          "hsv_s": 0.7,
+          "hsv_v": 0.4,
+          "degrees": 0.0,
+          "translate": 0.1,
+          "scale": 0.5,
+          "shear": 0.0,
+          "perspective": 0.0,
+          "flipud": 0.0,
+          "fliplr": 0.5,
+          "bgr": 0.0,
+          "mosaic": 0,
+          "mixup": 0.0,
+          "cutmix": 0.0
+        },
+        "ultralytics_predict": {
+          "task": "detect",
+          "mode": "predict",
+          "model": null,
+          "data": null,
+          "batch": 1,
+          "imgsz": 64,
+          "save": false,
+          "device": "cpu",
+          "project": null,
+          "name": null,
+          "exist_ok": false,
+          "verbose": false,
+          "rect": true,
+          "compile": false,
+          "channels_last": null,
+          "conf": 0.001,
+          "iou": 0.7,
+          "max_det": 300,
+          "quantize": null,
+          "dnn": false,
+          "nms": true,
+          "source": null,
+          "visualize": false,
+          "augment": false,
+          "agnostic_nms": false,
+          "classes": null,
+          "show": false,
+          "save_txt": false,
+          "save_conf": false,
+          "save_crop": false,
+          "show_labels": true,
+          "show_conf": true,
+          "show_boxes": true,
+          "line_width": null
+        },
+        "clearml": {
+          "_target_": "clearml_yolo.application.contracts.ClearMLConfig",
+          "project_name": "clearml-yolo-codex-20261020-cache-cleanup-n1op clearml-yolo",
+          "task_name": "controller-scientific-miss",
+          "task_type": "training",
+          "tags": [
+            "clearml-yolo-codex-20261020-cache-cleanup-n1op"
+          ],
+          "output_uri": true
+        },
+        "ground_truth": "/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-n1op/inputs/ground_truth.csv",
+        "dataset_format": "ndjson",
+        "dataset_cache_dir": "/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-n1op/dataset-cache",
+        "required_splits": null,
+        "display_names": {
+          "requested_task_name": "controller-scientific-miss",
+          "effective_task_name": "controller-scientific-miss-calm-pine",
+          "requested_model_name": "train",
+          "effective_model_name": "train-calm-pine",
+          "suffix": "calm-pine"
+        },
+        "training_data_overrides": {
+          "data": {
+            "requested": null,
+            "effective": "/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-n1op/dataset-cache/37223356fb6a812c9559f12a849aee3e44863e4090ededcb5d012dd97c58dc4a/data.yaml"
+          },
+          "cls_remap": {
+            "requested": true,
+            "effective": false
+          }
+        },
+        "prepared_dataset": {
+          "cache_identity": "37223356fb6a812c9559f12a849aee3e44863e4090ededcb5d012dd97c58dc4a",
+          "root": "/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-n1op/dataset-cache/37223356fb6a812c9559f12a849aee3e44863e4090ededcb5d012dd97c58dc4a"
+        },
+        "training_normalization": {
+          "overlap_mask": {
+            "requested": null,
+            "effective": true
+          },
+          "mask_ratio": {
+            "requested": null,
+            "effective": 4
+          },
+          "dropout": {
+            "requested": null,
+            "effective": 0.0
+          },
+          "dnn": {
+            "requested": null,
+            "effective": false
+          },
+          "vid_stride": {
+            "requested": null,
+            "effective": 1
+          },
+          "stream_buffer": {
+            "requested": null,
+            "effective": false
+          },
+          "retina_masks": {
+            "requested": null,
+            "effective": false
+          },
+          "show": {
+            "requested": null,
+            "effective": false
+          },
+          "save_frames": {
+            "requested": null,
+            "effective": false
+          },
+          "save_crop": {
+            "requested": null,
+            "effective": false
+          },
+          "show_boxes": {
+            "requested": null,
+            "effective": true
+          },
+          "format": {
+            "requested": null,
+            "effective": "torchscript"
+          },
+          "optimize": {
+            "requested": null,
+            "effective": false
+          },
+          "dynamic": {
+            "requested": null,
+            "effective": false
+          },
+          "simplify": {
+            "requested": null,
+            "effective": true
+          },
+          "pose": {
+            "requested": null,
+            "effective": 12.0
+          },
+          "kobj": {
+            "requested": null,
+            "effective": 1.0
+          },
+          "rle": {
+            "requested": null,
+            "effective": 1.0
+          },
+          "angle": {
+            "requested": null,
+            "effective": 1.0
+          },
+          "dlog": {
+            "requested": null,
+            "effective": 1.0
+          },
+          "dgrad": {
+            "requested": null,
+            "effective": 0.5
+          },
+          "dlam": {
+            "requested": null,
+            "effective": 1.0
+          },
+          "copy_paste": {
+            "requested": null,
+            "effective": 0.0
+          },
+          "copy_paste_mode": {
+            "requested": null,
+            "effective": "flip"
+          },
+          "auto_augment": {
+            "requested": null,
+            "effective": "randaugment"
+          },
+          "erasing": {
+            "requested": null,
+            "effective": 0.4
+          },
+          "tracker": {
+            "requested": null,
+            "effective": "tracktrack.yaml"
+          },
+          "save_dir": {
+            "requested": null,
+            "effective": "/tmp/clearml-yolo-runs/clearml-yolo-codex-20261020-cache-cleanup-n1op/controller-scientific-miss/train"
+          }
+        }
+      },
+      "artifacts": {
+        "gt_csv": {
+          "bytes": 1149,
+          "sha256": "d02302f4b37571fb8bfd7339b2eda242e8d49fba28299c368316748dac189b10"
+        }
+      },
+      "model": {
+        "id": "d40ac6cc651e4425a6199f934700a7e8",
+        "sha256": "208f5bc89737b259548c7c638e9b6c8850730258fb2266b3d112ab4dde40d0b4",
+        "bytes": 5411162,
+        "names": {
+          "0": "object"
+        }
+      },
+      "scalar_titles": [
+        ":monitor:gpu",
+        ":monitor:machine",
+        "Epoch Time",
+        "lr",
+        "metrics",
+        "train",
+        "val"
+      ]
+    }
+  ],
+  "cache": [
+    {
+      "case": "initial_miss",
+      "task_id": "7b0f51d864744d3489647dff4a88ab6b",
+      "cached": false
+    },
+    {
+      "case": "routing_hit",
+      "task_id": "7b0f51d864744d3489647dff4a88ab6b",
+      "cached": true,
+      "no_new_output_directory": true
+    },
+    {
+      "case": "scientific_miss",
+      "task_id": "3b27e57594de4abe9359ed3cddb1966a",
+      "cached": false,
+      "lr0": 0.02
+    }
+  ],
+  "t008": "passed"
+}

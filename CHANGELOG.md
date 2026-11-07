@@ -8,6 +8,9 @@
 - **bugs**: Record the CY 0.46.2 release and paired queue check
   ([`f547e11`](https://github.com/BuckanovNikita/clearml-yolo/commit/f547e114549d97e5cad07de4ec23405be5b6d4dc))
 
+- **bugs**: Record the unverified post-restart sysmem fallback probe
+  ([`303a0ae`](https://github.com/BuckanovNikita/clearml-yolo/commit/303a0ae277b9a3a09b0746abe197b7ecd187e7a9))
+
 
 ## v0.46.2 (2026-11-07)
 

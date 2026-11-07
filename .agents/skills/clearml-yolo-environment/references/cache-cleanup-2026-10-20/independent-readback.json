@@ -1,0 +1,13 @@
+{
+  "native-cpu-template": {
+    "task_id": "ebae5b5bd46f4719aae80b8adb5c6a25",
+    "gt_rows": 8,
+    "empty_backgrounds": 2,
+    "source_names_preserved": true,
+    "model_forced_download_sha256": "a45a597c0543b498411105fb00cdf647330379392ac42fdc359443cf3ee7d91b",
+    "artifact_names": [
+      "gt_csv"
+    ],
+    "project_and_tag_verified": true
+  }
+}

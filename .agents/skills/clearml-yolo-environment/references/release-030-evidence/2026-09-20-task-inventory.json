@@ -1,0 +1,116 @@
+[
+  {
+    "task_id": "68f1bf30cbd84d469b6ee9069f62f92e",
+    "name": "ingestion/ground_truth",
+    "status": "failed",
+    "artifacts": 3,
+    "output_models": 0
+  },
+  {
+    "task_id": "b1959384a1684cde95b85291e8f0100d",
+    "name": "ingestion-fixed/ground_truth",
+    "status": "completed",
+    "artifacts": 6,
+    "output_models": 0
+  },
+  {
+    "task_id": "b6e7859b4fb04dd184e5e15172bf15ba",
+    "name": "cpu-first",
+    "status": "failed",
+    "artifacts": 71,
+    "output_models": 0
+  },
+  {
+    "task_id": "6d3076614805492db102fc3e0abee049",
+    "name": "cpu-verified",
+    "status": "failed",
+    "artifacts": 5,
+    "output_models": 0
+  },
+  {
+    "task_id": "7f493e5143694fba8e4c180df17ca1b3",
+    "name": "cpu-final",
+    "status": "completed",
+    "artifacts": 74,
+    "output_models": 0
+  },
+  {
+    "task_id": "cec86aa927a7488a8798116551a30a54",
+    "name": "failure-upload/verification",
+    "status": "failed",
+    "artifacts": 0,
+    "output_models": 0
+  },
+  {
+    "task_id": "2f41a990160c477ea19bc38e0b2a3540",
+    "name": "failure-interrupted/verification",
+    "status": "failed",
+    "artifacts": 0,
+    "output_models": 0
+  },
+  {
+    "task_id": "8295703e3c914e249380eef28cfab65b",
+    "name": "gpu-candidate",
+    "status": "failed",
+    "artifacts": 31,
+    "output_models": 0
+  },
+  {
+    "task_id": "887edb5c8bbd492bb716e8d0da3ecea1",
+    "name": "gpu-verified",
+    "status": "completed",
+    "artifacts": 101,
+    "output_models": 0
+  },
+  {
+    "task_id": "db7643a25a2a4da2bb1bab42974d57f3",
+    "name": "standalone/val",
+    "status": "completed",
+    "artifacts": 38,
+    "output_models": 0
+  },
+  {
+    "task_id": "263fd1b3217e468a88271bb14292d278",
+    "name": "val-verified/val",
+    "status": "completed",
+    "artifacts": 38,
+    "output_models": 0
+  },
+  {
+    "task_id": "f3a9ab7fc0d045219f4d8211c17b56af",
+    "name": "compare-verified/compare",
+    "status": "completed",
+    "artifacts": 43,
+    "output_models": 0
+  },
+  {
+    "task_id": "2558572621e04d9c8e5ed513f781f017",
+    "name": "report-verified/report",
+    "status": "completed",
+    "artifacts": 8,
+    "output_models": 0
+  },
+  {
+    "task_id": "816c008bc1f044189331df3990a0b55a",
+    "name": "review-verified",
+    "status": "failed",
+    "artifacts": 38,
+    "output_models": 0,
+    "failure_status_excludes_exception_text": true
+  },
+  {
+    "task_id": "42cf020d5b294425aa7ba83550f9ae90",
+    "name": "evaluation-verified",
+    "status": "completed",
+    "artifacts": 84,
+    "output_models": 0
+  },
+  {
+    "task_id": "be13f9af1ca34b2aa39760e4bac39f20",
+    "name": "compare-options-verified/compare",
+    "status": "completed",
+    "artifacts": 43,
+    "output_models": 0,
+    "nondefault_evaluation_verified": true
+  }
+]

@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "task": "Preserve completed feature 036 live evidence",
+  "scope": [
+    "skills/clearml-yolo-environment/references/cache-cleanup-2026-10-20"
+  ],
+  "impact": "none",
+  "rationale": "Inspected all 37 received evidence files, the reproduction helpers, acceptance records and current skill entrypoint/scripts/tests. This change archives dated observations and the helpers used to obtain them, plus an archive note, this record and checksums. Raw logs are stored as lossless gzip files with original/compressed path and hash mappings; decompression must reproduce their original bytes. No active skill instruction, import contract, checker, dependency, runtime module, or composition target references the archived helpers. Helpers are retained as historical reproduction evidence, not adopted as maintained executable tooling; syntax checks do not execute them. Existing live runs and failures remain unchanged. No infrastructure, workload or installed package is changed by this archive."
+}

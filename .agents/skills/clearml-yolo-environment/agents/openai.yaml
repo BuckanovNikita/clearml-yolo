@@ -1,0 +1,3 @@
+interface:
+  display_name: "ClearML YOLO Environment"
+  short_description: "Run, diagnose, and clean up local ClearML YOLO jobs"

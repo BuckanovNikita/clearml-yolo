@@ -25,8 +25,8 @@ description: Defines real-run acceptance for clearml-yolo - native CPU/GPU train
 Read [prerequisites](references/pipeline-prerequisites.md) for inputs and configuration,
 and use the repository's [current contract index](../../../docs/current-contracts.md)
 to select each acceptance claim's maintained contract.
-Use the environment's applicable global skill for credentials, capacity and cleanup;
-`clearml-yolo-environment` supplies this project's local environment when installed.
+Use the project-local [clearml-yolo-environment](../clearml-yolo-environment/SKILL.md)
+for this machine's credentials, capacity and cleanup.
 This skill defines product acceptance, not deployment or machine setup.
 
 Terms: CY is clearml-yolo; the queue is the separate `cy-queue` package.
