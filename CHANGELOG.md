@@ -1,7 +1,7 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.46.2 (2026-11-07)
 
 ### Bug Fixes
 
@@ -24,6 +24,9 @@
 
 - **bugs**: Record the CY 0.46.1 release and paired queue check
   ([`255c69c`](https://github.com/BuckanovNikita/clearml-yolo/commit/255c69c7aa4dc115b0f3f4b335e628d081c48098))
+
+- **bugs**: Record the W6 review and fix its evidence-record findings
+  ([`04cc4b2`](https://github.com/BuckanovNikita/clearml-yolo/commit/04cc4b219181d393b97306a3a0f0d994d2326367))
 
 - **plans**: Record landing fixups, retired corp-skills checkouts and T6.2
   ([`ce7e48e`](https://github.com/BuckanovNikita/clearml-yolo/commit/ce7e48ef087966be2a4861c86dfc1c0b85f2cc5b))
