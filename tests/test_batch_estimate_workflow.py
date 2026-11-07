@@ -1,10 +1,12 @@
 """The estimator coordinates explicit ports and preserves resumable evidence."""
 
+import subprocess
 from typing import Any, override
 
 import pytest
 
 from clearml_yolo.application.use_cases.batch_estimate import estimate_batches
+from clearml_yolo.core import batch_estimation as core
 from clearml_yolo.core.batch_estimation import (
     BatchSearch,
     EstimateCase,
@@ -304,3 +306,94 @@ def test_refresh_invalidates_saved_success_when_idle_preparation_fails() -> None
     assert "GPU busy" in result.diagnostic
     assert not any(saved.usable for saved in store.read().cases)
     assert probe.calls == 0
+
+
+def _grouped_telemetry_failure() -> BaseExceptionGroup[Exception]:
+    query = subprocess.CalledProcessError(12, ["nvidia-smi", "--query-compute-apps=gpu_uuid,pid"])
+    query.add_note("nvidia-smi stdout: Failed to initialize NVML: Generic operating system error")
+    return BaseExceptionGroup(
+        "Worker execution and cleanup failed",
+        [
+            query,
+            ExceptionGroup(
+                "Training worker cleanup failed",
+                [
+                    subprocess.TimeoutExpired(["probe_worker"], 2),
+                    RuntimeError("Owned descendants survived cleanup"),
+                ],
+            ),
+        ],
+    )
+
+
+def test_case_diagnostic_keeps_every_grouped_failure_and_its_notes() -> None:
+    store = MemoryStore()
+
+    class GroupedFailureProbe(RecordingProbe):
+        @override
+        def run(self, *args: Any, **kwargs: Any) -> TrialResult:
+            raise _grouped_telemetry_failure()
+
+    (case,) = estimate_batches(
+        (sample_profile(),),
+        SyntheticWorkload(),
+        SearchSettings(),
+        probe=GroupedFailureProbe(),
+        store=store,
+        now=lambda: "now",
+    )
+    assert case.status == "failed"
+    assert case.diagnostic == (
+        "ExceptionGroup: Worker execution and cleanup failed ["
+        "CalledProcessError: Command '['nvidia-smi', '--query-compute-apps=gpu_uuid,pid']' "
+        "returned non-zero exit status 12. "
+        "(nvidia-smi stdout: Failed to initialize NVML: Generic operating system error); "
+        "ExceptionGroup: Training worker cleanup failed ["
+        "TimeoutExpired: Command '['probe_worker']' timed out after 2 seconds; "
+        "RuntimeError: Owned descendants survived cleanup]]"
+    )
+
+
+def test_failed_preparation_diagnostic_keeps_grouped_failures() -> None:
+    def prepare(_profile: TrainingProfile) -> TrainingProfile:
+        raise _grouped_telemetry_failure()
+
+    (case,) = estimate_batches(
+        (sample_profile(),),
+        SyntheticWorkload(),
+        SearchSettings(),
+        probe=RecordingProbe(),
+        store=MemoryStore(),
+        now=lambda: "now",
+        prepare_profile=prepare,
+    )
+    assert "Failed to initialize NVML" in case.diagnostic
+    assert "RuntimeError: Owned descendants survived cleanup" in case.diagnostic
+
+
+@pytest.mark.parametrize(
+    ("error", "expected"),
+    [
+        (ValueError("bad value"), "ValueError: bad value"),
+        (RuntimeError(), "RuntimeError: "),
+        (
+            ExceptionGroup("outer", [ValueError("a"), ExceptionGroup("inner", [KeyError("b")])]),
+            "ExceptionGroup: outer [ValueError: a; ExceptionGroup: inner [KeyError: 'b']]",
+        ),
+    ],
+)
+def test_error_diagnostic_formats_plain_errors_unchanged_and_groups_recursively(
+    error: BaseException, expected: str
+) -> None:
+    assert core.error_diagnostic(error) == expected
+
+
+def test_error_diagnostic_appends_notes_of_groups_and_leaves() -> None:
+    leaf = ValueError("leaf")
+    leaf.add_note("first")
+    leaf.add_note("second")
+    group = ExceptionGroup("outer", [leaf])
+    group.add_note("group note")
+    assert core.error_diagnostic(group) == (
+        "ExceptionGroup: outer (group note) [ValueError: leaf (first; second)]"
+    )

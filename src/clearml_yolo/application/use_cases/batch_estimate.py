@@ -9,6 +9,7 @@ from clearml_yolo.core.batch_estimation import (
     SearchSettings,
     SyntheticWorkload,
     TrainingProfile,
+    error_diagnostic,
     estimate_key,
 )
 
@@ -57,7 +58,7 @@ def _measure(
     try:
         prepared = prepare_profile(profile) if prepare_profile is not None else profile
     except Exception as error:  # noqa: BLE001 - record failed preparation and continue other hardware groups.
-        case = _snapshot(search, workload, timestamp, diagnostic=f"{type(error).__name__}: {error}")
+        case = _snapshot(search, workload, timestamp, diagnostic=error_diagnostic(error))
         store.save(case)
         return case
     if estimate_key(prepared, workload, settings) != estimate_key(profile, workload, settings):
@@ -72,7 +73,7 @@ def _measure(
                 search,
                 workload,
                 timestamp,
-                diagnostic=f"{type(error).__name__}: {error}",
+                diagnostic=error_diagnostic(error),
             )
             store.save(case)
             return case

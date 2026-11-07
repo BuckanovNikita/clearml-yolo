@@ -1,5 +1,6 @@
 """Fresh-process GPU trials with real native execution and conservative telemetry."""
 
+import subprocess
 import sys
 import time
 from collections.abc import Callable
@@ -24,6 +25,7 @@ from clearml_yolo.core.batch_estimation import (
     SyntheticWorkload,
     TrainingProfile,
     TrialResult,
+    error_diagnostic,
 )
 from clearml_yolo.core.models import model_preset
 
@@ -114,6 +116,18 @@ class NativeBatchProbe:
                     "diagnostic": str(error),
                     "duration_seconds": time.monotonic() - start,
                 }
+            )
+        except (ExceptionGroup, subprocess.SubprocessError) as error:
+            # Telemetry query and worker-cleanup failures are recorded trials, never
+            # capacity evidence. The "GPU" text rule above applies only to direct
+            # RuntimeErrors; leaf or nvidia-smi output text must not reclassify these.
+            # A BaseExceptionGroup carrying cancellation is not an ExceptionGroup.
+            return TrialResult(
+                global_batch=global_batch,
+                trial_id=trial_id,
+                status="error",
+                diagnostic=error_diagnostic(error),
+                duration_seconds=time.monotonic() - start,
             )
         return TrialResult(
             global_batch=global_batch,

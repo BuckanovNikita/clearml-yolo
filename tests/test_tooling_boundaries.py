@@ -1,6 +1,8 @@
 """Keep release tooling independent and analysis dependencies out of runtime installs."""
 
 import ast
+import os
+import subprocess
 import sys
 import tomllib
 from pathlib import Path
@@ -207,6 +209,67 @@ def test_production_has_no_test_tool_or_helper_imports() -> None:
 )
 def test_helper_import_guard_rejects_injected_dependencies(source: str) -> None:
     assert _test_dependency_imports(source)
+
+
+def _imports_repository_scripts(path: Path) -> bool:
+    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        if isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+            if node.module.split(".")[0] == "scripts":
+                return True
+        elif isinstance(node, ast.Import) and any(
+            alias.name.split(".")[0] == "scripts" for alias in node.names
+        ):
+            return True
+    return False
+
+
+SCRIPT_IMPORTING_TESTS = tuple(
+    sorted(
+        path.relative_to(ROOT).as_posix()
+        for path in (ROOT / "tests").glob("test_*.py")
+        if _imports_repository_scripts(path)
+    )
+)
+
+
+def test_script_importing_test_inventory_covers_known_modules() -> None:
+    assert {"tests/test_check_docs.py", "tests/test_package_weights.py"} <= set(
+        SCRIPT_IMPORTING_TESTS
+    )
+
+
+@pytest.mark.parametrize("module", SCRIPT_IMPORTING_TESTS)
+def test_script_importing_test_module_collects_in_a_fresh_session(module: str) -> None:
+    # The repository-only scripts package is not installed; each module must make it
+    # importable itself instead of relying on another module collected earlier.
+    environment = {
+        key: value for key, value in os.environ.items() if key != "PYTEST_ADDOPTS"
+    }
+    completed = subprocess.run(  # noqa: S603 - current interpreter and fixed pytest arguments
+        [
+            sys.executable,
+            # -P: like the pytest console script, do not prepend the working directory.
+            "-P",
+            "-m",
+            "pytest",
+            "--collect-only",
+            "-q",
+            "-p",
+            "no:randomly",
+            "-p",
+            "no:testmon",
+            "-p",
+            "no:cacheprovider",
+            module,
+        ],
+        cwd=ROOT,
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stdout[-2000:] + completed.stderr[-2000:]
 
 
 WEIGHT_PACKAGER_IMPORTS = {

@@ -31,17 +31,31 @@ class GPUState:
     pids: frozenset[int]
 
 
+def _attach_output(error: subprocess.CalledProcessError | subprocess.TimeoutExpired) -> None:
+    for name, stream in (("stdout", error.stdout), ("stderr", error.stderr)):
+        # TimeoutExpired can carry partial bytes even when text mode was requested.
+        text = stream.decode(errors="replace") if isinstance(stream, bytes) else stream
+        if text and text.strip():
+            error.add_note(f"nvidia-smi {name}: {text.strip()}")
+
+
 def _query(selector: str) -> list[list[str]]:
     executable = shutil.which("nvidia-smi")
     if executable is None:
         raise RuntimeError("Batch estimation requires nvidia-smi GPU telemetry")
-    result = subprocess.run(  # noqa: S603 - resolved executable and fixed query arguments
-        [executable, selector, "--format=csv,noheader,nounits"],
-        check=True,
-        capture_output=True,
-        text=True,
-        timeout=15,
-    )
+    try:
+        result = subprocess.run(  # noqa: S603 - resolved executable and fixed query arguments
+            [executable, selector, "--format=csv,noheader,nounits"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+        # NVML reports its failure on stdout, which the exception text omits. Notes keep
+        # the exception type and text, so status classification cannot change.
+        _attach_output(error)
+        raise
     return [[value.strip() for value in row] for row in csv.reader(io.StringIO(result.stdout))]
 
 

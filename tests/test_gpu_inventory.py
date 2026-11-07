@@ -1,6 +1,8 @@
 """Foreign GPU workloads remain protected even when a trial has native children."""
 
+import subprocess
 import time
+from pathlib import Path
 
 import pytest
 
@@ -150,3 +152,59 @@ def test_force_still_rejects_foreign_compute_and_missing_telemetry(
         gpu.require_idle((_device(),), force=True)
     with pytest.raises(RuntimeError, match=r"foreign PIDs|telemetry disappeared"):
         gpu.monitor_devices((_device(),), lambda: (10,), force=True)
+
+
+def _fake_nvidia_smi(directory: Path, body: str) -> None:
+    directory.mkdir()
+    script = directory / "nvidia-smi"
+    script.write_text(f"#!/bin/sh\n{body}\n", encoding="utf-8")
+    script.chmod(0o755)
+
+
+def test_failed_query_keeps_its_type_and_attaches_nvml_output(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # NVML prints its failure on stdout; the exception text alone omits it.
+    _fake_nvidia_smi(
+        tmp_path / "bin",
+        "echo 'Failed to initialize NVML: Generic operating system error'\n"
+        "echo 'driver unreachable' >&2\nexit 12",
+    )
+    monkeypatch.setenv("PATH", str(tmp_path / "bin"))
+    with pytest.raises(subprocess.CalledProcessError) as caught:
+        gpu.gpu_states()
+    assert type(caught.value) is subprocess.CalledProcessError
+    assert caught.value.returncode == 12
+    assert "NVML" not in str(caught.value)
+    notes = "\n".join(caught.value.__notes__)
+    assert "Failed to initialize NVML: Generic operating system error" in notes
+    assert "driver unreachable" in notes
+
+
+@pytest.mark.parametrize(
+    "output", [b"partial NVML output\n", "partial NVML output\n"], ids=["bytes", "text"]
+)
+def test_timed_out_query_keeps_its_type_and_attaches_partial_output(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, output: bytes | str
+) -> None:
+    _fake_nvidia_smi(tmp_path / "bin", "exit 0")
+    monkeypatch.setenv("PATH", str(tmp_path / "bin"))
+
+    def timeout(command: list[str], **_kwargs: object) -> None:
+        raise subprocess.TimeoutExpired(command, 15, output=output, stderr=None)
+
+    monkeypatch.setattr(subprocess, "run", timeout)
+    with pytest.raises(subprocess.TimeoutExpired) as caught:
+        gpu.gpu_states()
+    assert type(caught.value) is subprocess.TimeoutExpired
+    assert caught.value.__notes__ == ["nvidia-smi stdout: partial NVML output"]
+
+
+def test_failed_query_with_empty_streams_adds_no_notes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _fake_nvidia_smi(tmp_path / "bin", "exit 3")
+    monkeypatch.setenv("PATH", str(tmp_path / "bin"))
+    with pytest.raises(subprocess.CalledProcessError) as caught:
+        gpu.gpu_states()
+    assert not hasattr(caught.value, "__notes__")

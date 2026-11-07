@@ -1,5 +1,6 @@
 """Supervised probe receipts preserve failures and exercise native YOLO optimizer semantics."""
 
+import subprocess
 from collections.abc import Callable, Sequence
 from contextlib import nullcontext
 from pathlib import Path
@@ -914,3 +915,147 @@ def test_force_reaches_each_optimizer_boundary_and_retains_memory_budget(
     assert all(request.settings.force for request in workers.requests)
     assert result.peak_memory_bytes == (950,)
     assert BatchSearch.start(_profile(), settings).observe(result).status == "no_capacity"
+
+
+def _noted[E: BaseException](error: E, note: str) -> E:
+    error.add_note(note)
+    return error
+
+
+def _telemetry_failure() -> subprocess.CalledProcessError:
+    return _noted(
+        subprocess.CalledProcessError(12, ["nvidia-smi", "--query-compute-apps=gpu_uuid,pid"]),
+        "nvidia-smi stdout: GPU access blocked; Failed to initialize NVML",
+    )
+
+
+def _install_failure(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, failure: BaseException
+) -> _Workers:
+    workers = _Workers()
+    _install_workers(monkeypatch, tmp_path, workers)
+
+    def run(
+        commands: Sequence[WorkerCommand],
+        *,
+        timeout_seconds: float,
+        monitor: Callable[[Callable[[], tuple[int, ...]]], None],
+    ) -> WorkerOutcome:
+        workers.requests.append(
+            BatchProbeRequest.model_validate_json(
+                Path(commands[0].argv[-1]).read_text(encoding="utf-8")
+            )
+        )
+        raise failure
+
+    monkeypatch.setattr(adapter, "run_workers", run)
+    return workers
+
+
+@pytest.mark.parametrize(
+    ("failure", "expected"),
+    [
+        (
+            BaseExceptionGroup(
+                "Worker execution and cleanup failed",
+                [
+                    _telemetry_failure(),
+                    ExceptionGroup(
+                        "Training worker cleanup failed",
+                        [
+                            subprocess.TimeoutExpired(["probe_worker"], 2),
+                            RuntimeError("GPU 0 owned descendants survived"),
+                        ],
+                    ),
+                ],
+            ),
+            (
+                "ExceptionGroup: Worker execution and cleanup failed",
+                "CalledProcessError: Command",
+                "returned non-zero exit status 12",
+                "Failed to initialize NVML",
+                "TimeoutExpired: Command '['probe_worker']' timed out after 2 seconds",
+                "RuntimeError: GPU 0 owned descendants survived",
+            ),
+        ),
+        (_telemetry_failure(), ("exit status 12", "Failed to initialize NVML")),
+        (
+            subprocess.TimeoutExpired(["nvidia-smi", "--id=GPU-a"], 15),
+            ("TimeoutExpired: Command '['nvidia-smi', '--id=GPU-a']'", "after 15 seconds"),
+        ),
+    ],
+    ids=["cleanup-group", "lone-query-failure", "lone-query-timeout"],
+)
+def test_telemetry_and_cleanup_failures_are_recorded_as_error_trials(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    failure: Exception,
+    expected: tuple[str, ...],
+) -> None:
+    # Leaf and note text mention "GPU"; only a direct RuntimeError uses that rule.
+    workers = _install_failure(monkeypatch, tmp_path, failure)
+    profile, settings = _profile(), SearchSettings()
+    state = BatchSearch.start(profile, settings)
+    assert state.next_batch is not None
+    result = adapter.NativeBatchProbe().run(
+        profile, SyntheticWorkload(), settings, state.next_batch
+    )
+    assert result.status == "error"
+    for text in expected:
+        assert text in result.diagnostic
+    assert "sub-exceptions" not in result.diagnostic
+    observed = state.observe(result)
+    assert observed.status == "failed"
+    assert observed.trials == (result,)
+    assert len(workers.requests) == 1
+
+
+@pytest.mark.parametrize(
+    ("message", "status"),
+    [
+        ("GPU telemetry unavailable: nvidia-smi exited", "contaminated"),
+        ("Batch estimation requires nvidia-smi GPU telemetry", "contaminated"),
+        ("Probe receipt identity does not match its worker", "error"),
+    ],
+)
+def test_runtime_error_text_classification_is_unchanged(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, message: str, status: str
+) -> None:
+    _install_failure(monkeypatch, tmp_path, RuntimeError(message))
+    result = adapter.NativeBatchProbe().run(_profile(), SyntheticWorkload(), SearchSettings(), 8)
+    assert result.status == status
+    assert result.diagnostic == message
+
+
+def test_interrupted_trial_with_cleanup_failure_still_propagates(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    interrupted = BaseExceptionGroup(
+        "Worker execution and cleanup failed",
+        [KeyboardInterrupt(), subprocess.TimeoutExpired(["probe_worker"], 2)],
+    )
+    _install_failure(monkeypatch, tmp_path, interrupted)
+    with pytest.raises(BaseExceptionGroup) as caught:
+        adapter.NativeBatchProbe().run(_profile(), SyntheticWorkload(), SearchSettings(), 8)
+    assert caught.value is interrupted
+
+
+def test_failing_nvidia_smi_output_reaches_the_trial_diagnostic(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    workers = _Workers()
+    _install_workers(monkeypatch, tmp_path, workers)
+    executable = tmp_path / "bin" / "nvidia-smi"
+    executable.parent.mkdir()
+    executable.write_text(
+        "#!/bin/sh\necho 'Failed to initialize NVML: Generic operating system error'\nexit 12\n",
+        encoding="utf-8",
+    )
+    executable.chmod(0o755)
+    monkeypatch.setenv("PATH", str(executable.parent))
+    monkeypatch.setattr(adapter, "monitor_devices", gpu_inventory.monitor_devices)
+    result = adapter.NativeBatchProbe().run(_profile(), SyntheticWorkload(), SearchSettings(), 8)
+    assert result.status == "error"
+    assert "returned non-zero exit status 12" in result.diagnostic
+    assert "Failed to initialize NVML: Generic operating system error" in result.diagnostic
+    assert len(workers.requests) == 1

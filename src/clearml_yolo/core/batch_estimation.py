@@ -207,6 +207,26 @@ class TrialResult(_Record):
     duration_seconds: Annotated[float, Field(ge=0, allow_inf_nan=False)] = 0
 
 
+def error_diagnostic(error: BaseException) -> str:
+    """Render a failure as ``Type: message`` with its notes and every grouped leaf.
+
+    A plain exception without notes keeps the historical ``Type: message`` text. A
+    group uses its message rather than its counted ``str()`` and lists each nested
+    failure, so no leaf such as a telemetry query or cleanup timeout is dropped.
+    """
+    if isinstance(error, BaseExceptionGroup):
+        text = f"{type(error).__name__}: {error.message}"
+    else:
+        text = f"{type(error).__name__}: {error}"
+    # __notes__ exists only after add_note; it is a standard but undeclared attribute.
+    notes = getattr(error, "__notes__", ())
+    if notes:
+        text += f" ({'; '.join(str(note) for note in notes)})"
+    if isinstance(error, BaseExceptionGroup):
+        text += f" [{'; '.join(error_diagnostic(leaf) for leaf in error.exceptions)}]"
+    return text
+
+
 def _trial_observation(
     trial: TrialResult, profile: TrainingProfile, settings: SearchSettings
 ) -> tuple[TrialStatus, str]:

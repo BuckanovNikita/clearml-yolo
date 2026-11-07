@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "task": "scripts-import-isolation",
+  "scope": [
+    "tests/test_package_weights.py",
+    "tests/test_tooling_boundaries.py",
+    "tests/test_check_docs.py",
+    "tests/test_severstal.py",
+    "tests/test_local_release.py",
+    "docs/bugs/scripts-import-isolation"
+  ],
+  "impact": "none",
+  "rationale": "Inspected the scripts imports of every test module. The change only scopes the test module's import of the repository-only scripts package with the existing MonkeyPatch.context syspath_prepend pattern and adds a per-module fresh-collection regression test. No src module, scripts module, import-linter contract, architecture test helper, composition target or dependency configuration changes."
+}

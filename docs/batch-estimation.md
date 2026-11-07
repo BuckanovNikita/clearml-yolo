@@ -190,6 +190,12 @@ image-by-image maximum. `ceiling_limited` records a confirmed batch at the round
 an unconstrained maximum. `numerically_limited` records the independently repeated
 last good batch after discovery stopped numerically, with no capacity maximum claim.
 `no_capacity` and `failed` results retain diagnostics.
+A failed `nvidia-smi` query, a query timeout or a worker-cleanup failure during a
+trial is saved as an `error` trial; it is never capacity evidence and fails the case.
+Failure diagnostics list every grouped failure (for example the telemetry query,
+the cleanup timeout and surviving descendants) and the `nvidia-smi` stdout/stderr,
+where NVML reports its error. A direct telemetry, idle or ownership rejection whose
+message names a GPU remains `contaminated`.
 Even a validated batch is a recommendation for the recorded synthetic workload
 and recipe, not a guarantee for arbitrary datasets or concurrent GPU use.
 

@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+  "task": "estimate-error-diagnostics",
+  "scope": [
+    "src/clearml_yolo/core/batch_estimation.py",
+    "src/clearml_yolo/application/use_cases/batch_estimate.py",
+    "src/clearml_yolo/adapters/integrations/batch_probe.py",
+    "src/clearml_yolo/adapters/runtime/gpu_inventory.py",
+    "tests/test_batch_probe.py",
+    "tests/test_batch_estimate_workflow.py",
+    "tests/test_gpu_inventory.py",
+    "tests/test_batch_estimation.py",
+    "docs/batch-estimation.md",
+    "docs/bugs/estimate-error-diagnostics",
+    "tests/test_tooling_boundaries.py",
+    "tests/test_package_weights.py"
+  ],
+  "impact": "modules",
+  "rules": "Inward layers entrypoints -> adapters -> application -> core (.importlinter clean-architecture-inward-layers); adapters must not import application use cases; process effects belong to runtime adapters (tests/test_architecture.py effect ownership with negative cases).",
+  "modules": [
+    {
+      "id": "batch_estimation_core",
+      "path": "src/clearml_yolo/core/batch_estimation.py",
+      "change": "modify",
+      "responsibility": "Pure batch-search records and policy; adds a pure diagnostic formatter for failures",
+      "interface": "error_diagnostic(error: BaseException) -> str: 'Type: message' unchanged for a plain exception without notes; appends __notes__; recursively lists ExceptionGroup leaves using the group message",
+      "layer": "core",
+      "allowed_dependencies": [
+        "Python standard library",
+        "pydantic"
+      ],
+      "forbidden_dependencies": [
+        "clearml_yolo.application",
+        "clearml_yolo.adapters",
+        "clearml_yolo.entrypoints",
+        "subprocess or other effects"
+      ],
+      "effects": "None; pure string formatting",
+      "contracts": [
+        "layers"
+      ]
+    },
+    {
+      "id": "batch_estimate_use_case",
+      "path": "src/clearml_yolo/application/use_cases/batch_estimate.py",
+      "change": "modify",
+      "responsibility": "Run capacity cases through injected probe and store ports",
+      "interface": "estimate_batches unchanged; failed-case diagnostic now uses core error_diagnostic",
+      "layer": "application/use_cases",
+      "allowed_dependencies": [
+        "clearml_yolo.core",
+        "clearml_yolo.application ports"
+      ],
+      "forbidden_dependencies": [
+        "clearml_yolo.adapters",
+        "clearml_yolo.entrypoints"
+      ],
+      "effects": "None; clock, probe and persistence are injected",
+      "contracts": [
+        "layers"
+      ]
+    },
+    {
+      "id": "batch_probe_adapter",
+      "path": "src/clearml_yolo/adapters/integrations/batch_probe.py",
+      "change": "modify",
+      "responsibility": "Fresh-process GPU trials with conservative telemetry",
+      "interface": "NativeBatchProbe.run returns an 'error' TrialResult for ExceptionGroup and subprocess.SubprocessError failures with a leaf/notes diagnostic; RuntimeError and FileNotFoundError mappings unchanged; BaseExceptionGroup with KeyboardInterrupt still propagates",
+      "layer": "adapters/integrations",
+      "allowed_dependencies": [
+        "clearml_yolo.core",
+        "clearml_yolo.application contracts",
+        "runtime adapters"
+      ],
+      "forbidden_dependencies": [
+        "clearml_yolo.application.use_cases",
+        "clearml_yolo.entrypoints"
+      ],
+      "effects": "Unchanged; process launch via runtime run_workers",
+      "contracts": [
+        "layers"
+      ]
+    },
+    {
+      "id": "gpu_inventory_adapter",
+      "path": "src/clearml_yolo/adapters/runtime/gpu_inventory.py",
+      "change": "modify",
+      "responsibility": "Read nvidia-smi GPU telemetry",
+      "interface": "_query raises the same CalledProcessError/TimeoutExpired with nvidia-smi stdout/stderr attached as notes; str(error) unchanged",
+      "layer": "adapters/runtime",
+      "allowed_dependencies": [
+        "Python standard library",
+        "pydantic"
+      ],
+      "forbidden_dependencies": [
+        "clearml_yolo.application.use_cases",
+        "clearml_yolo.entrypoints"
+      ],
+      "effects": "Owns the nvidia-smi subprocess; unchanged",
+      "contracts": [
+        "layers"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "layers",
+      "path": ".importlinter",
+      "status": "existing",
+      "rules": "Inward layers and adapter use-case prohibition; tests/test_architecture.py exercises negative cases and effect ownership in the full suite",
+      "check": "imports"
+    }
+  ],
+  "checks": [
+    {
+      "id": "imports",
+      "kind": "imports",
+      "command": "uv run --frozen --no-sync lint-imports",
+      "expectation": "All contracts kept; no new import edges",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/estimate-error-diagnostics/test.md"
+      }
+    },
+    {
+      "id": "full-suite",
+      "kind": "behavior",
+      "command": "env -u PYTEST_ADDOPTS CUDA_VISIBLE_DEVICES= nice -n19 uv run --frozen --no-sync pytest --testmon-noselect -q -p no:randomly",
+      "expectation": "Complete suite passes, including new regressions (failing before the fix), architecture negative cases and CPU-DDP",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/estimate-error-diagnostics/test.md"
+      }
+    },
+    {
+      "id": "static",
+      "kind": "behavior",
+      "command": "uv run --frozen --no-sync prek run --all-files",
+      "expectation": "Ruff, mypy, Vulture, import-linter, cached pytest and docs hooks pass",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/estimate-error-diagnostics/test.md"
+      }
+    },
+    {
+      "id": "docs",
+      "kind": "documentation",
+      "command": "uv run --frozen --no-sync python scripts/check_docs.py --all",
+      "expectation": "Markdown and local links pass",
+      "result": {
+        "status": "passed",
+        "exit_code": 0,
+        "evidence": "docs/bugs/estimate-error-diagnostics/test.md"
+      }
+    }
+  ],
+  "documentation": "Update docs/batch-estimation.md failure evidence; inspect corp-skills clearml-yolo usage source and record internal-only no-change reason.",
+  "review": {
+    "status": "accepted",
+    "reviewer": "Fresh feature-dev:code-reviewer subagent, no inherited conversation, no write ownership, no further delegation",
+    "evidence": "docs/bugs/estimate-error-diagnostics/review.md",
+    "reconciliation": "Task-owned diff: four src modules (core error_diagnostic; use-case diagnostics; probe ExceptionGroup/SubprocessError branch; gpu_inventory output notes), tests in test_batch_estimate_workflow/test_batch_probe/test_gpu_inventory, docs/batch-estimation.md and bug records. The companion scripts-import-isolation bug owns tests/test_package_weights.py and tests/test_tooling_boundaries.py under its no-impact record. No module added, no new import edge beyond existing inward adapters/application -> core, no dependency, configuration or import-rule change. Deviation (lone SubprocessError also recorded as an error trial) is recorded in fix.md. Pre-existing untracked primary worktrees and the other agent's telemetry-9p-enomem worktree are excluded."
+  }
+}

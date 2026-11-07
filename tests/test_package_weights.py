@@ -7,9 +7,13 @@ import zipfile
 from pathlib import Path
 
 import pytest
-from scripts import package_weights
 
 from clearml_yolo.core.assets import AssetSpec, HubAsset, ResolvedAsset
+
+ROOT = Path(__file__).resolve().parents[1]
+with pytest.MonkeyPatch.context() as import_path:
+    import_path.syspath_prepend(str(ROOT))
+    from scripts import package_weights
 
 
 def _spec(name: str, *, backend: str = "ultralytics") -> AssetSpec:
