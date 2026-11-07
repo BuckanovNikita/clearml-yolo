@@ -137,8 +137,8 @@
     {
       "id": "static",
       "kind": "behavior",
-      "command": "uv run --frozen --no-sync prek run --all-files",
-      "expectation": "Ruff, mypy, Vulture, import-linter, cached pytest and docs hooks pass",
+      "command": "uv run --frozen --no-sync ruff check . && uv run --frozen --no-sync mypy . && uv run --frozen --no-sync vulture",
+      "expectation": "Ruff, strict mypy and Vulture pass on the whole tree (test.md Checks table); the commit hooks on the staged files (Ruff, mypy, Vulture, import contracts, affected pytest, Markdown/links, changelog) also passed at commit. prek run --all-files was not run.",
       "result": {
         "status": "passed",
         "exit_code": 0,
@@ -160,8 +160,8 @@
   "documentation": "Update docs/batch-estimation.md failure evidence; inspect corp-skills clearml-yolo usage source and record internal-only no-change reason.",
   "review": {
     "status": "accepted",
-    "reviewer": "Fresh feature-dev:code-reviewer subagent, no inherited conversation, no write ownership, no further delegation",
+    "reviewer": "Fresh feature-dev:code-reviewer subagent, no inherited conversation, no write ownership, no further delegation; W6 orchestration review of the committed branch (f390fe0, 2026-11-07): verdict ship after fixing three low evidence-record findings (F1-F3)",
     "evidence": "docs/bugs/estimate-error-diagnostics/review.md",
-    "reconciliation": "Task-owned diff: four src modules (core error_diagnostic; use-case diagnostics; probe ExceptionGroup/SubprocessError branch; gpu_inventory output notes), tests in test_batch_estimate_workflow/test_batch_probe/test_gpu_inventory, docs/batch-estimation.md and bug records. The companion scripts-import-isolation bug owns tests/test_package_weights.py and tests/test_tooling_boundaries.py under its no-impact record. No module added, no new import edge beyond existing inward adapters/application -> core, no dependency, configuration or import-rule change. Deviation (lone SubprocessError also recorded as an error trial) is recorded in fix.md. Pre-existing untracked primary worktrees and the other agent's telemetry-9p-enomem worktree are excluded."
+    "reconciliation": "Task-owned diff: four src modules (core error_diagnostic; use-case diagnostics; probe ExceptionGroup/SubprocessError branch; gpu_inventory output notes), tests in test_batch_estimate_workflow/test_batch_probe/test_gpu_inventory, docs/batch-estimation.md and bug records. The companion scripts-import-isolation bug owns tests/test_package_weights.py and tests/test_tooling_boundaries.py under its no-impact record. No module added, no new import edge beyond existing inward adapters/application -> core, no dependency, configuration or import-rule change. Deviation (lone SubprocessError also recorded as an error trial) is recorded in fix.md. Pre-existing untracked primary worktrees and the other agent's telemetry-9p-enomem worktree are excluded. W6 findings F1 (static check command now matches the commands actually run), F2 (fail-first itemization sums to 13) and F3 (post-rebase link anchor) are fixed in documentation only, as review.md records; no source or test change."
   }
 }

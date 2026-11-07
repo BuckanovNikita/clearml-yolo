@@ -16,6 +16,9 @@
 - **bugs**: Diagnose the selected-L telemetry loss as WSL GPU oversubscription
   ([`a6505ad`](https://github.com/BuckanovNikita/clearml-yolo/commit/a6505ad1b4319201f39ac57102d939c272dae57e))
 
+- **bugs**: Record fail-first and post-rebase evidence for the estimate diagnostics fix
+  ([`f390fe0`](https://github.com/BuckanovNikita/clearml-yolo/commit/f390fe03e6af8abac8e7769dbfe343e08bc7a665))
+
 - **bugs**: Record that WSL2 CUDA ignores the no-sysmem-fallback policy
   ([`fe7332b`](https://github.com/BuckanovNikita/clearml-yolo/commit/fe7332b0d95c60fc5e9ec5f20938356539e6b931))
 

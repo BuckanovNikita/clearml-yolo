@@ -40,5 +40,7 @@ kept master's `tests/test_package_weights.py` and copied only the new
 - `pytest ... tests/test_package_weights.py`:
   `ModuleNotFoundError: No module named 'scripts'`, 1 error.
 
-The pre-commit full suite passed (4840 passed). Post-rebase full-suite results are in the
-[shared verification](../estimate-error-diagnostics/test.md#checks).
+The pre-commit full suite passed (4840 passed). Pre-commit results are in the
+[shared checks](../estimate-error-diagnostics/test.md#checks); post-rebase full-suite
+results are in the
+[shared commit and post-rebase verification](../estimate-error-diagnostics/test.md#commit-and-post-rebase-verification-2026-11-07).

@@ -52,8 +52,9 @@ env -u PYTEST_ADDOPTS CUDA_VISIBLE_DEVICES= nice -n19 uv run --frozen --no-sync 
 
 Result on unfixed source: `13 failed, 169 passed`. The failures:
 
-- the four `error_diagnostic` and case/preparation diagnostic tests in
-  `test_batch_estimate_workflow.py`;
+- the six `error_diagnostic` and case/preparation diagnostic test cases in
+  `test_batch_estimate_workflow.py` (four functions, the formatter test parametrized
+  three times);
 - the three `error_trials` cases (`cleanup-group`, `lone-query-failure`,
   `lone-query-timeout`) and `test_failing_nvidia_smi_output_reaches_the_trial_diagnostic`
   in `test_batch_probe.py`;
