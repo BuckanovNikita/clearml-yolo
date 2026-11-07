@@ -27,5 +27,18 @@ is parametrized over `test_check_docs.py`, `test_local_release.py`,
   `test_package_weights.py` case failed (`No module named 'scripts'`, 1 failed,
   4 passed); after the fix all passed.
 
-The full suite passed (4840 passed); see the
+### Fail-first against origin/master (2026-11-07)
+
+In a scratch worktree at `origin/master` `fe7332b`, the fixed `test_package_weights.py`
+passes on its own, because the fix is inside that test file. So the fail-first check
+kept master's `tests/test_package_weights.py` and copied only the new
+`tests/test_tooling_boundaries.py`:
+
+- `pytest ... tests/test_tooling_boundaries.py -k "fresh_session or inventory_covers"`:
+  `1 failed, 4 passed`; the failure was `[tests/test_package_weights.py]`, where the
+  `-P` collection subprocess exited 2 with `1 error during collection`.
+- `pytest ... tests/test_package_weights.py`:
+  `ModuleNotFoundError: No module named 'scripts'`, 1 error.
+
+The pre-commit full suite passed (4840 passed). Post-rebase full-suite results are in the
 [shared verification](../estimate-error-diagnostics/test.md#checks).

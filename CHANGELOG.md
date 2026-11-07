@@ -3,6 +3,11 @@
 
 ## Unreleased
 
+### Bug Fixes
+
+- **estimate**: Keep grouped and nvidia-smi failure evidence in batch trials
+  ([`bf5c5f6`](https://github.com/BuckanovNikita/clearml-yolo/commit/bf5c5f686be7289297d02c728a6e622a38e209cd))
+
 ### Documentation
 
 - **bugs**: Correct selected-L sampling timings and plan prerequisites
@@ -10,6 +15,9 @@
 
 - **bugs**: Diagnose the selected-L telemetry loss as WSL GPU oversubscription
   ([`a6505ad`](https://github.com/BuckanovNikita/clearml-yolo/commit/a6505ad1b4319201f39ac57102d939c272dae57e))
+
+- **bugs**: Record that WSL2 CUDA ignores the no-sysmem-fallback policy
+  ([`fe7332b`](https://github.com/BuckanovNikita/clearml-yolo/commit/fe7332b0d95c60fc5e9ec5f20938356539e6b931))
 
 - **bugs**: Record the CY 0.46.1 release and paired queue check
   ([`255c69c`](https://github.com/BuckanovNikita/clearml-yolo/commit/255c69c7aa4dc115b0f3f4b335e628d081c48098))

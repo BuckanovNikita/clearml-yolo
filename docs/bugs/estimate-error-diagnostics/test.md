@@ -38,6 +38,31 @@ The 10 that passed were pinning tests for existing behavior:
 
 After the fix: `23 passed` (same selection, including the corrected isolation tests).
 
+### Fail-first against origin/master (2026-11-07)
+
+A scratch detached worktree at `origin/master` `fe7332b` (external dependencies
+copied, `uv sync --frozen`) received only the five changed test files
+(`tests/test_batch_estimate_workflow.py`, `tests/test_batch_probe.py`,
+`tests/test_gpu_inventory.py`, `tests/test_package_weights.py`,
+`tests/test_tooling_boundaries.py`) and ran them whole:
+
+```bash
+env -u PYTEST_ADDOPTS CUDA_VISIBLE_DEVICES= nice -n19 uv run --frozen --no-sync pytest -q -p no:randomly -p no:testmon <the five files>
+```
+
+Result on unfixed source: `13 failed, 169 passed`. The failures:
+
+- the four `error_diagnostic` and case/preparation diagnostic tests in
+  `test_batch_estimate_workflow.py`;
+- the three `error_trials` cases (`cleanup-group`, `lone-query-failure`,
+  `lone-query-timeout`) and `test_failing_nvidia_smi_output_reaches_the_trial_diagnostic`
+  in `test_batch_probe.py`;
+- the three notes tests in `test_gpu_inventory.py`
+  (`'CalledProcessError'`/`'TimeoutExpired' object has no attribute '__notes__'`).
+
+The scratch worktree was then removed. In this worktree, the same five files gave
+`182 passed` before the commit.
+
 ## Checks
 
 | Check | Command | Result |
@@ -50,8 +75,29 @@ After the fix: `23 passed` (same selection, including the corrected isolation te
 | Documentation | `uv run --frozen --no-sync python scripts/check_docs.py --all` | pass, 0 issues |
 | Mutation | `[tool.mutmut] only_mutate` excludes all changed modules | not applicable |
 
-Commit hooks and the paired CY/queue release check are recorded in the release
-section below once run.
+## Commit and post-rebase verification (2026-11-07)
+
+- Commit hooks: the first attempt, with CUDA visible, failed in the affected-pytest
+  hook. Exit 134 came from `Fatal Python error: Aborted` in `torch.cuda._lazy_init`
+  (`tests/test_torchvision_distributed.py`). At that time `nvidia-smi -L` itself
+  crashed with `*** stack smashing detected ***`, the host GPU driver fault this bug
+  family concerns. The commit was retried with `CUDA_VISIBLE_DEVICES=` and no hook
+  skipped. All hooks passed (Ruff, mypy, Vulture, import contracts, affected pytest,
+  Markdown/links, changelog, local semantic version: no tag on a branch).
+- Rebased onto `origin/master` `fe7332b` without conflicts. The generated
+  `CHANGELOG.md` hunk became empty because upstream already has that entry.
+- Full suite after rebase
+  (`env -u PYTEST_ADDOPTS CUDA_VISIBLE_DEVICES= nice -n19 uv run --frozen --no-sync pytest --testmon-noselect -q -p no:randomly`),
+  run 1: `1 failed, 4839 passed, 30 skipped, 81 deselected` (20 min 50 s). The failure
+  was `tests/test_clearml_session.py::test_console_streams_reach_offline_sdk_without_duplicates`,
+  where the offline ClearML subprocess printed `*** stack smashing detected ***` and
+  hung until the 60 s timeout. The test passed when run alone (`1 passed`). No changed
+  module is imported by `adapters/clearml` or `adapters/observability`. Classified as
+  the concurrent host driver fault, not this change.
+- Full suite run 2, same command and tree: pass, `4840 passed, 30 skipped,
+  81 deselected`, exit 0 (19 min 6 s).
+
+The paired CY/queue release check is not part of this step; the branch is not pushed.
 
 ## Limits
 
