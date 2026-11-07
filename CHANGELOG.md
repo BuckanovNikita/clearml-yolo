@@ -5,6 +5,9 @@
 
 ### Documentation
 
+- **bugs**: Correct selected-L sampling timings and plan prerequisites
+  ([`49b2125`](https://github.com/BuckanovNikita/clearml-yolo/commit/49b21251a6677448a4d869ea71831d7729e86819))
+
 - **bugs**: Diagnose the selected-L telemetry loss as WSL GPU oversubscription
   ([`a6505ad`](https://github.com/BuckanovNikita/clearml-yolo/commit/a6505ad1b4319201f39ac57102d939c272dae57e))
 

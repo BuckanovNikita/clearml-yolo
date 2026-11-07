@@ -194,7 +194,10 @@ Tasks:
   This is not a CY defect, and no fix or release was made. **WP1 (T1.2–T1.4) and
   WP4 stay blocked** until the user chooses one of the record's three options:
   a sysmem-fallback driver setting, an allocator budget cap as a contract change,
-  or an accepted gap.)*
+  or an accepted gap. 2026-11-07: the user applied the driver setting (option 1).
+  A guarded probe showed that WSL2 CUDA does not honour it in the current VM and
+  driver session, so WP1 and WP4 stay blocked.
+  The remaining choice is option 2 or option 3.)*
 - [ ] T1.2 Run a fresh forced estimate of the selected DEIMv2 L/X models
   (`cy-batch-estimate --force`) with raw optimizer receipts. Each model must end in
   either a freshly confirmed winner or a raw-proven minimum-eight `no_capacity`

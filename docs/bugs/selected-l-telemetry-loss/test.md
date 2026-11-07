@@ -104,3 +104,88 @@ compaction or allocation-failure events.
 - No production telemetry fallback, retry, timeout relaxation, workload reduction or
   machine setting change was made.
 - Raw observer, launcher and run logs are retained in the task-owned run directory.
+
+## Sysmem fallback policy check — 2026-11-07
+
+Result: **not honoured.** CUDA in WSL2 still oversubscribes into Windows shared
+memory with the driver setting applied. Step 2 (the selected-L replay) was not run.
+
+### Decision and setting
+
+- The user chose option 1 from the [assessment](assessment.md#impact-on-wp1). In
+  NVIDIA Control Panel → Manage 3D settings → Global, they set "CUDA - Sysmem
+  Fallback Policy" to "Prefer No Sysmem Fallback" on the Windows host.
+- No WSL VM restart, driver reload or reboot followed the change. Other agents were
+  running, so none was forced.
+
+### Safety guard
+
+- A task-owned watchdog wrapped the probe:
+  - a persistent `powershell.exe` `Get-Counter -Continuous -SampleInterval 1`
+    sampler, at about 1.0 s spacing;
+  - an abort on NVIDIA adapter Shared Usage more than 4 GB above the pre-launch
+    baseline;
+  - an abort on adapter Total Committed above 110 GB;
+  - an abort on samples stale for 5 s.
+- Deviation from the requested guard: the 110 GB limit applies to the adapter
+  `GPU Adapter Memory(luid_…120b6_phys_0)\Total Committed` counter. The 133.6 GB
+  figure in run 3 came from that counter. System `\Memory\Committed Bytes` is
+  about 140 GB at idle on this host, because it is backed by the page file, so a
+  110 GB limit on it would trip at once. It was recorded only.
+- Abort action:
+  - SIGKILL the owned launcher's transient unit through `cgroup.kill`, then
+    `systemctl --user kill`;
+  - let the launcher verify exit and release its lease, then SIGKILL the guarded
+    process group if it survives;
+  - verify through `/proc`, the unit cgroup and a bounded `nvidia-smi` query.
+- Kill-path tests passed before any GPU step:
+  - a direct `sleep` tree: three PIDs killed, none left;
+  - the owned launcher running `sleep 300` in a `MemoryMax=48G` unit: unit killed
+    after 15 s, `process_exit_verified` and `ownership_released` true.
+
+### Probe
+
+- Path: the same owned launcher, cy-queue lease and 12 GiB admission rule as T1.1.
+  pcboard was `normal`; background usage was about 2.0 GiB.
+- Command: `uv run --frozen --no-sync python probe.py` in the primary checkout.
+  CY master `49b2125`, torch 2.14.1+cu130.
+- Method: allocate and fill 1 GiB `torch.uint8` CUDA blocks with a synchronize after
+  each. Pace at 1 s per block from 24 GiB. Self-stop at 33 GiB, because exceeding the
+  31.8 GiB device without an error already decides the result.
+- Outcome: 33 GiB allocated, **no exception** (`hard_stop_no_exception`).
+  - `torch.cuda.mem_get_info` reported 0 GiB free from 29 GiB onwards.
+  - Allocations kept succeeding, slowing from about 1.0 to 2.3–3.2 s per GiB.
+
+Windows NVIDIA adapter counters (GB, 1 s; MSK):
+
+| Time | Dedicated | Shared | Adapter Total Committed | System Committed |
+| --- | --- | --- | --- | --- |
+| 11:29:23 | 2.0 | 0.1 | 3.7 | 139.9 |
+| 11:29:29 | 31.0 | 0.2 | 33.4 | 169.6 |
+| 11:29:33 | 31.1 | 1.8 | 35.4 | 171.8 |
+| 11:29:37–38 | 31.1 | 3.8 | 37.5 (peak) | 173.7 (peak) |
+| 11:29:41 | 0.8 | 0.4 | 3.8 | 140.3 |
+
+- The Shared Usage peak was baseline + 3.6 GB. That is just under the 4 GB abort
+  limit, so the watchdog did not trip.
+- Exit was clean, with `ownership_released` true, no owned PIDs and an empty unit
+  cgroup. Device memory then read 770 MiB.
+
+### Verdict and impact
+
+- Verdict: not honoured. The "native OOM" criterion failed. Shared Usage grew
+  +3.6 GB against the +1 GB criterion, which also failed.
+- The selected-L replay would again drive Windows into the run-3 exhaustion path,
+  so it was not run.
+- Option 2 is required: an allocator-enforced budget, a source and contract change.
+- Untested caveat: the setting might take effect only after a full WSL VM restart
+  or a driver reload.
+
+### Receipts
+
+The raw files are kept outside the repository in the task-owned
+`nofallback-20261107` evidence directory:
+
+- watchdog `summary.json` and `samples.tsv`;
+- launcher `ownership.json` and `run.log`;
+- the probe, sampler and watchdog scripts.

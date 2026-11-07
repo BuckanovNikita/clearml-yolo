@@ -15,6 +15,14 @@
   unavailable for about 11–12 seconds, and NVML, `nvidia-smi` and its executable
   lookup failed or blocked. It is not a CY telemetry defect. Three secondary CY
   diagnosability defects are confirmed (below); they did not cause the failure.
+- Status (2026-11-07): the user chose option 1, the driver setting. A guarded probe
+  showed that WSL2 CUDA does not honour it in the current WSL VM and driver session
+  ([test.md](test.md#sysmem-fallback-policy-check--2026-11-07)):
+  - 33 GiB was allocated on the 31.8 GiB device with no OOM;
+  - Shared Usage grew by 3.6 GB.
+
+  WP1 stays blocked. Option 2 is now needed to unblock it; option 3, an accepted
+  gap, remains the alternative.
 
 ## Observation
 
@@ -140,7 +148,10 @@ Unblocking needs a user decision. None of these options was applied here:
 
 1. **Host driver setting.** Set the NVIDIA "CUDA - Sysmem Fallback Policy" to
    "Prefer No Sysmem Fallback" (globally or for the WSL host process), then replay
-   this scenario. Whether WSL2 CUDA honours it is unverified.
+   this scenario. *(2026-11-07: chosen and applied globally by the user. Without a
+   VM restart or driver reload, WSL2 CUDA does not honour it: a 1 GiB allocation
+   probe exceeded device memory with no OOM. The replay was not run. See
+   [test.md](test.md#sysmem-fallback-policy-check--2026-11-07).)*
 2. **Source change (new contract decision).** Enforce the existing memory budget in
    the probe worker allocator, for example
    `torch.cuda.set_per_process_memory_fraction(memory_fraction)`. An over-budget
