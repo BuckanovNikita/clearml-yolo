@@ -29,7 +29,7 @@ classified environmental. No source change; no release.
 | 1 | `cy-batch-estimate --imgsz 960 --classes 150 --objects-per-image 300 --models deimv2/l --devices 0 --memory-budget 0.9 --search-limit 1024 --trial-timeout 300 --force` | Exit 1 after 169 s. Case `failed`: `ExceptionGroup: Worker execution and cleanup failed (2 sub-exceptions)`, `trials: []`. Unit peak 3.9 GiB. Exit verified, lease released. |
 | 2 | Same `estimate_batches` path through a diagnostic driver that subclasses `NativeBatchProbe.run` only to print the full exception tree | Batch-8 trial 06:06:45–06:10:12 raised the same group. Leaves: `CalledProcessError` (`nvidia-smi --query-compute-apps=gpu_uuid,pid` exit **12**); nested cleanup `TimeoutExpired` (worker `wait(timeout=2)`); `RuntimeError: Owned descendants survived bounded cleanup`. Unit peak 2.9 GiB. Exit verified, lease released. |
 
-| 3 | Run-2 driver, plus 0.7 s-cadence Windows `GPU Adapter/Process Memory` counters (read-only `Get-Counter`) and 2 Hz worker thread state/`wchan` | Batch-8 trial 06:15:12–06:19:08 raised the same group. Leaves: `RuntimeError: Batch estimation requires nvidia-smi GPU telemetry` (`shutil.which` found no `nvidia-smi`), cleanup `TimeoutExpired`, surviving-descendant `RuntimeError`. Unit peak 2.9 GiB. Exit verified, lease released. |
+| 3 | Run-2 driver, plus Windows `GPU Adapter/Process Memory` counters (read-only `Get-Counter`, about 1.6–1.8 s spacing) and 2 Hz worker thread state/`wchan` | Batch-8 trial 06:15:12–06:19:08 raised the same group. Leaves: `RuntimeError: Batch estimation requires nvidia-smi GPU telemetry` (`shutil.which` found no `nvidia-smi`), cleanup `TimeoutExpired`, surviving-descendant `RuntimeError`. Unit peak 2.9 GiB. Exit verified, lease released. |
 
 ## Timeline evidence (MSK)
 
@@ -63,7 +63,7 @@ Run 3 Windows adapter memory (GB, `GPU Adapter Memory` counters):
 | Time | Dedicated | Shared | Note |
 | --- | --- | --- | --- |
 | 06:15:27 | 0.3 | 0.2 | Before the CUDA context. |
-| 06:15:39 | 32.0 | 5.0 | Dedicated saturated about 12 s after the trial start. |
+| 06:15:39 | 32.0 | 5.0 | Dedicated first rose at 06:15:29 and saturated about 10 s after the CUDA context appeared. |
 | 06:15:44 | 32.1 | 31.3 | |
 | 06:17:28 | 32.2 | 59.9 | |
 | 06:18:19 | 32.2 | 82.5 | |

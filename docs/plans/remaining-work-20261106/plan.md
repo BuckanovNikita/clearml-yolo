@@ -39,7 +39,7 @@ new bug workflow (`speckit-bug-*`), with its own regression, release and paired 
 | 2 | WP6 Instruction-refactor review | offline | none |
 | 3 | WP1 Native forced-estimator acceptance | single GPU | WP2a findings resolved |
 | 4 | WP2b Architecture acceptance for force, DINOv3 and OOM | offline | WP1, WP2a, WP3 |
-| 5 | WP4 Original campaign recovery | single GPU, long | WP1 telemetry fix (T1.1) |
+| 5 | WP4 Original campaign recovery | single GPU, long | WP1 telemetry blocker decision (T1.1) |
 
 The WP0, WP2a, WP3 and WP6 tasks touch disjoint files and can run in parallel with
 exclusive write ownership. The GPU packages run one at a time: there is one GPU
@@ -247,7 +247,7 @@ a host reboot. SIGILL (exit 132) is unresolved (test.md:488-541). The number of
 cases never attempted on current source is about 8; it is inferred, so confirm it
 first.
 
-**Prerequisites:** the WP1 telemetry fix (T1.1), the ClearML stand, the private
+**Prerequisites:** a user decision resolving the WP1 telemetry blocker diagnosed in T1.1, the ClearML stand, the private
 campaign tooling and the `resume-20261105-postboot` evidence (personal-automations
 "CY campaign" profile and the manual CY repair), and GPU windows. The SIGILL
 repetitions need CPU time; follow pcboard throttling.

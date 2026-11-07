@@ -41,7 +41,7 @@ fresh runs on CY 0.46.1, 2.5–4 minutes into the first batch-8 trial
 
 The third, sampled run identified the mechanism.
 
-- Within about 10 seconds of the trial start, Windows adapter Dedicated Usage
+- Within about 10 seconds of the CUDA context appearing, Windows adapter Dedicated Usage
   saturated at about 32.1 GB.
 - Shared Usage then rose in steps: about 31 GB by 06:15:44, 60 GB by 06:17:28,
   82 GB by 06:18:19 and 91.8 GB at 06:18:57.

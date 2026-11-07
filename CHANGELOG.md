@@ -5,6 +5,9 @@
 
 ### Documentation
 
+- **bugs**: Diagnose the selected-L telemetry loss as WSL GPU oversubscription
+  ([`a6505ad`](https://github.com/BuckanovNikita/clearml-yolo/commit/a6505ad1b4319201f39ac57102d939c272dae57e))
+
 - **bugs**: Record the CY 0.46.1 release and paired queue check
   ([`255c69c`](https://github.com/BuckanovNikita/clearml-yolo/commit/255c69c7aa4dc115b0f3f4b335e628d081c48098))
 
