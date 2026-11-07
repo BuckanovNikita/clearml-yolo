@@ -1,42 +1,50 @@
-# Stage zero: current clearml-yolo specification
+# clearml-yolo: problem and desired behavior
 
-Baseline epoch: **2026-10-20**. This document consolidates the pre-reset feature, bug, assessment and dated
-maintenance history. It specifies the supported product and preserves evidence limits; it is not an active
-implementation ledger. The archival checkpoint and final cutover checks are recorded under [Historical
-provenance](#historical-provenance).
+## Problem
 
-## Authority and starting new work
+Experiment operators need to train and compare detector families without losing input
+identity, native model semantics, reproducibility or trustworthy scientific results.
+Disconnected caches, configuration drift, ambiguous publication and unsafe process
+cleanup can make a successful computation impossible to reproduce or use.
 
-`clearml-yolo` provides native detector training, prediction, validation, evaluation, paired comparison and
-reporting through Hydra/hydra-zen applications. Users retain reproducible inputs, exact scientific results,
-source identity and verified required ClearML publications. Optional visualization must not determine
-computation success.
+## Desired outcome and scope
 
-This baseline replaces retired task-local contracts as current navigation. The [contract
-index](../../docs/current-contracts.md) selects the maintained topic guides; those guides remain
-authoritative for their detailed operational procedures. [Project
-contracts](../../docs/project-contracts.md) summarize cross-cutting behavior. Current code and executed
-checks establish implementation evidence; historical plans, task checkboxes and release tags alone do not
-establish a physical outcome. An unexplained requirement/code mismatch must be investigated explicitly.
+Provide native training, prediction, validation, evaluation, comparison and reporting
+through explicit Hydra configuration. Preserve exact source identity, reproducible
+inputs and required ClearML publications. Optional visualization must not determine
+computation success. Standalone commands work independently of the separate cy-queue.
 
-New Spec Kit work starts at **001** in this new epoch, references this specification, and creates its own
-specification, plan and task ledger. `000-baseline` must not become the active feature
-or inherit old unfinished checkboxes. Identify a retired feature using its full historical path and
-checkpoint, not its number alone: the old epoch includes two different `003-*` features and both
-`037-early-accurate-publication` and `037-cleanup-baseline`. Their artifacts retain separate identities and
-are preserved together at H. Existing Git commits, branches and tags retain their meaning. No history is
-rewritten.
+This specification defines desired behavior and acceptance obligations, without claiming
+implementation or test completion. The [contract index](../../docs/current-contracts.md)
+selects authoritative detailed operational contracts; [project contracts](../../docs/project-contracts.md)
+define cross-cutting behavior. The topic specifications below describe the complete
+required capability set. Where a topic describes a narrower case, its explicit rule
+applies; current operational contracts resolve superseded design alternatives.
 
-The [constitution](../../.specify/memory/constitution.md), [agent workflow](../../docs/agent-workflow.md),
-installed Spec Kit tooling and current topic guides remain in place. Future tasks follow the native
-workflow for new capabilities or documented behavior changes; routine fixes, documentation and
-small refactors proceed directly. This reset does not authorize changes to installed workflow tooling.
+## Capability specifications
 
-The released [feature 006](../006-batch-training/spec.md) extends this baseline with
-local capacity estimation, explicit null-batch lookup, native distributed training,
-FCOS and self-contained configuration exports. Its [ledger](../006-batch-training/tasks.md)
-and dated evidence record acceptance gaps; earlier single-device restrictions remain
-historical baseline statements, not evidence that the new distributed paths were validated.
+- [clearml ground truth](../001-clearml-ground-truth/spec.md).
+- [git workspace warning](../002-git-workspace-warning/spec.md).
+- [portable training](../003-portable-training/spec.md).
+- [custom augmentation](../004-custom-augmentation/spec.md).
+- [reduce verification](../005-reduce-verification/spec.md).
+- [batch training](../006-batch-training/spec.md).
+- [download weights](../007-download-weights/spec.md).
+- [local docs](../008-local-docs/spec.md).
+- [release weights](../009-release-weights/spec.md).
+- [cleanup](../010-cleanup/spec.md).
+- [simplify hooks](../011-simplify-hooks/spec.md).
+
+## Acceptance
+
+For each capability, verify the positive scenario and its stated failure/ownership
+boundaries. Numerical results, public schemas, source identity and artifact bytes must
+remain consistent across direct, replayed and queued execution where supported.
+Native GPU, distributed, Agent scheduling, remote publication and multi-host filesystem
+outcomes require explicitly owned live checks on the intended target; mock or CPU
+checks alone do not establish those outcomes. No historical release or waiver is a
+passing acceptance result. Development and release procedures remain in
+[workflow policy](../../docs/agent-workflow.md) and [development guidance](../../docs/development.md).
 
 ## Compatibility and module interfaces
 
@@ -763,181 +771,3 @@ contributor commit retained. Authorized delivery explicitly pushes and verifies 
 Git commits and annotated tags only. Project `.whl` wheels and `.tar.gz` source archives are debugging
 tools, never release deliverables or routine release checks. GitHub Release objects, assets, registries
 and deployment require separate scope.
-
-## Historical evidence and limits
-
-The pre-reset release at integration start is v0.34.1. During cleanup integration, origin advanced to
-v0.35.0; its source/evidence commits were merged normally and preserved below before archival
-cutover. Upstream delivery does not certify the cleanup's newly merged source or erase task-specific
-verification gaps. New cutover delivery is recorded below only after actual checks. Older status text such
-as “approved” or unchecked tasks may predate later review/release evidence; use the complete dated chain at
-checkpoint H.
-
-| Historical area | Preserved outcome and limit |
-| --- | --- |
-| Native detector/export feature 025 | v0.24.0 records all advertised presets and FP32/FP16 local matrices. Relative export quality uses a frozen small single-class corpus, not general accuracy. Current QKV policy combines fresh transformer runs with exact lowered-graph equivalence for accepted CNN engines. CUDA 11.8 target execution/binary portability remain unverified. |
-| Shared extraction 028 | Frozen offline science/workbook/API compatibility and independent review passed. No new accuracy, native GPU or server-upload claim follows. |
-| Shared queue 029 and supervision 031 | Software and scoped CPU/single-GPU evidence exist; five-physical-GPU, associated multi-GPU/NCCL/cancellation and actual two-user/two-host NFS obligations were closed by explicit user waiver on 2026-10-16. Their physical outcomes remain unverified. |
-| Historical native failures | Original cuBLAS, intermittent CPU-DDP SIGILL and ClearML missing-model-ID evidence remains unresolved; later passing scoped runs and the waiver do not establish their causes or fixes. |
-| Readability/archive 034 | v0.33.0 includes actual separate-user ownership/workers and CPU/single-GPU publication/download. GPU facts in the multiuser tests were synthetic; physical multi-GPU, two-host NFS and browser interaction were not exercised. |
-| User configuration/NFS eligibility 035 | v0.34.0 verifies discovery, mountinfo validation, software and isolated package behavior. Actual NFS locking, reconnect, server restart/outage and multi-host execution were not run. |
-| Queue refresh isolation | v0.34.1 verifies reproduced missing/malformed snapshot isolation and headless rendering. Exact original historical ValueError, physical GPU, NFS outage and live ClearML behavior are not established by those checks. |
-| Static configuration split 026 amendment | Local checks, semantic import-contract equivalence and fresh review passed before reset; delivery had been deferred by existing mixed working changes. Final integration/delivery must be recorded below. |
-| Stable parameter/cache 036 | Upstream v0.35.0 records accepted source, hooks, review, architecture and real CPU PipelineController/ClearmlJob miss/routing-only hit/weight-decay miss, with active-task reads and downloaded GT/best-checkpoint hashes. Its workload ran locally under SDK simulated-remote settings; this proves server-backed lookup, not ClearML-agent scheduling. Separately, local checks, installed-package probes and CPU/Gloo recording-boundary tests passed; on 2026-10-20 real CPU/single-GPU publication/download/reload and diagnostic/plain controller miss-hit-miss repeats passed. One earlier local remote model-enrichment failure remains unexplained; neither upstream acceptance nor later local success establishes its cause, a source fix or a reliability guarantee. Final cleanup integration/delivery is recorded below. |
-| Accurate startup/early publication 037 | Implemented, source-reviewed and delivered in v0.35.0. Persistent resumed CPU cache and paired pipelines verified active run/General/run_overrides, early GT/calibration/dashboards, aggregate timing, once-only uploads, exact downloads/checkpoints and readable reports. Actual scheduled execution remains not-run: T013 and the acceptance portion of T016 remain open, and its architecture acceptance fails only that native gate. Renewed explicit user authorization permitted Git-only delivery with the disclosed gap; delivery is not full acceptance. Physical multi-GPU, other native presets and real ONNX/TensorRT execution were not established by these scoped runs. |
-
-Upstream early-publication 037's earlier direct single-GPU, CPU/Gloo DDP and queue snapshot/worker-loader
-observations remain dated historical evidence; their earlier temporary raw archives were unavailable during
-resumed release. Fresh persistent resumed evidence covers CPU controller lookup and paired pipelines. Actual
-queue submission/loader testing did not establish scheduler admission; normal attempts stayed pending under
-memory policy without bypass. Synthetic data does not establish model accuracy. Exact-tag wheel/source
-installs reused prepared dependencies on Python 3.12.13 and do not prove fresh dependency resolution or
-Python 3.13 execution. Corresponding portable guidance was delivered separately as v0.2.10 at
-`351fde30139095668d40c7ee917b6276704bdc5e` in custom-opencode-skills; the former corp-skills alias
-redirects, and that delivery did not replace installed skill copies.
-
-The historical 029/031 waiver is an acceptance disposition, not a passing test or runtime relaxation. It
-does not cover CUDA 11.8, future target certification or early-publication 037's pending scheduler gate.
-Feature 036's live gate passed upstream and was independently checked locally on 2026-10-20. New 037's
-successful source review and explicitly authorized delivery do not complete its missing native acceptance. A
-future request to certify a waived target starts new scoped acceptance and review; no old external-input
-request is silently reopened.
-
-## Historical provenance
-
-**Archival checkpoint H:**
-[`d74945c83dc24094c599388bbcfd5e987daeb9bf`](https://github.com/BuckanovNikita/clearml-yolo/commit/d74945c83dc24094c599388bbcfd5e987daeb9bf).
-All 548 retired files, including formerly uncommitted records, exist byte-for-byte in this ordinary reachable
-commit. Their combined size is 3,563,396 bytes. The snapshot preserves documents and is distinct from commits
-that originally implemented behavior. Its
-[history map](https://github.com/BuckanovNikita/clearml-yolo/blob/d74945c83dc24094c599388bbcfd5e987daeb9bf/specs/037-cleanup-baseline/history-map.json)
-inventories exact paths, SHA-256 values, sizes, destinations, topics and dispositions; the map excludes its
-own recursive fingerprint. The map's SHA-256 is
-`9568e0755bee0b056657e86f66bf1dee645aced6b86f7ada39c411a3add8b4d6`.
-Coverage includes old feature directories, `.specify/bugs`, `.specify/assessments`, `docs/evidence` and the
-three selected standalone dated reports. Existing commits, branches and tags were not rewritten or deleted.
-
-Retrieve any original document with `git show H:path/to/document`, list it with `git ls-tree -r --name-only
-H -- specs .specify/bugs .specify/assessments docs/evidence`, and inspect historical changes with `git log
---follow H -- path/to/document`. Here H means the full checkpoint SHA recorded above, not a branch name.
-Original source commits below are immutable anchors, not blanket current acceptance.
-
-| Content or decision | Original commit | Historical source at H |
-| --- | --- | --- |
-| Initial composed/native workflow | `93ef462faac0a5929e4b48d64730c3bf53d110be` | `specs/001-release-030/` |
-| Native configuration groups | `23f864510abe0dc5a8d90546954f7e1dc670577d` | `specs/003-ultralytics-config-groups/` |
-| CSV dataset/native model publication | `589dc4a563e8a767a3cf9b675df66820b0a3c83b` | `specs/008-dataset-clearml-tracking/` |
-| Historical task recovery amendment | `db33015eb1b5d88050ce6e592002e3abc0b14bd7` | `specs/012-remove-legacy-compatibility/contracts/task-recovery.md` |
-| Full evaluation evidence | `0946121fd91edecaf873df1a074f8146e46d0480` | `specs/014-evaluation-publication/` |
-| Clean Python boundaries | `493f0399fc10c2f99ac072335115f754176baa14` | `specs/021-clean-architecture/` |
-| Detector families and export | `43f9e7dc85672bbb25f29e6abcb27344201ac443` | `specs/025-multi-model-backends/verification.md` |
-| Shared scientific/workbook extraction | `55dcabd87f002502f59fe55b8910f161be01da62` | `specs/028-shared-extraction/` |
-| Direct execution/shared queue | `31a5bd5edc2fe122791005526ae747e7fe5b0401` | `specs/029-shared-cy-queue/` |
-| Generation-fenced physical GPU freeing | `dcbbc4903cec07c67ce50cd9b116ea3f6dab8216` | `specs/031-test-quality-gpu-controls/gpu-control-simplification/` |
-| Input correctness/document checks | `bdf21a63be95151759c58d2d701735b548c4baaa` | `docs/evidence/2026-10-15-correctness-cleanup/` |
-| Explicit external acceptance waiver | `c168e62e71536246f2ad9a09af307850d8af3708` | `docs/evidence/2026-10-16-acceptance-closure/decision.md` |
-| Readable shared queue/archive | `c3e3f15c7e907ab86d0bf8ccad703654828b0968` | `specs/034-readable-shared-queue/` |
-| User config and NFS eligibility | `f64e973aaed25b2467615947387c5d115e39d585` | `specs/035-queue-user-config-nfs/` |
-| Private refresh failure isolation | `ac65f80ec74926edca3a1409d3847dec9902124d` | `.specify/bugs/queue-view-refresh-isolation/` |
-| Stable parameters/controller cache | `2e4b5f2fa3c3e9dc90920af75fe3edb8e346bcd0` | `specs/036-stable-clearml-cache/` |
-| Accurate startup and early complete publication | `fd395d34bff7f3128047e5d0c302f2c3f0720b78` | `specs/037-early-accurate-publication/` |
-| Integrated publication review/native evidence | `b4a8164feb486a3864af2e2cfec96501963c2df0` | `specs/037-early-accurate-publication/review.md` |
-| Application v0.35.0 | `accdfb664b2c9f605b026b26d713cae4213e05e2` | `specs/037-early-accurate-publication/verification.md` |
-| Sequential release verification and retained acceptance limit | `41a4036666b2225a4e3029e1695499cf914a5f59` | `specs/037-early-accurate-publication/verification.md` |
-
-### Preserved executable fixtures
-
-The scientific pre-extraction fixture moves from `specs/028-shared-extraction/baseline.json` to
-`tests/fixtures/shared-extraction-baseline.json`, preserving SHA-256
-`ba41b1cc32671847b29190457508fb696c3f1049460f945d81b1a30979b33117`. The module migration map moves from
-`specs/021-clean-architecture/migration-map.json` to `tests/fixtures/legacy-module-map.json`, preserving
-SHA-256 `7522e4bd8e521bfddfbedf48ec77faf03bed2b1cd3091c44c222523d6a81d715`. The original paths remain
-recoverable at H. Tests consume the maintained copies; relocation never regenerates expectations or
-reinterprets the baseline.
-
-### Superseded designs
-
-Historical GPU features 013/022/024 describe prior FIFO, waiting and four-control-mode designs; today's
-direct/queue split and physical controls supersede them. Old project-local SDK redirection gives way to
-normal SDK discovery and explicit retained project scratch. Current-only recovery restrictions were
-deliberately amended by ordered historical threshold/checkpoint recovery. Old artifact copies, duplicate
-summaries, per-class/per-normalization plot inventories and visible full-ID banners do not describe new
-publication. Old submodule setup and published-package/assets delivery recipes are not current setup or
-release authorization.
-
-### Cutover acceptance
-
-On 2026-10-20, ordinary merge `9fc0b50db12437ec669daa4ae543c3e7ca1c761f` reconciled the local cleanup
-checkpoint and published v0.35.0 history. Its normal hooks passed Ruff, mypy, all 43 import contracts,
-Vulture and the full pytest suite. A separate integrated architecture run passed 246 tests. Both final
-wheel and sdist passed installed checks against all 184 package-file hashes, 12 console commands, nine
-default/81 selected configurations, nine shipped callables, overwrite/mode checks and two queue snapshots.
-Source-manifest SHA-256 is `b26afdab1d9620f627d583be6af7980ea3df9158f815689a919838da616d831f`.
-These Python 3.12.13 checks reused dependencies; they add no Python 3.13 or hardware certification.
-The [dated verification](https://github.com/BuckanovNikita/clearml-yolo/blob/d74945c83dc24094c599388bbcfd5e987daeb9bf/specs/037-cleanup-baseline/verification.md)
-and [fresh independent review](https://github.com/BuckanovNikita/clearml-yolo/blob/d74945c83dc24094c599388bbcfd5e987daeb9bf/specs/037-cleanup-baseline/review.md)
-retain initial, interrupted and successful outcomes separately. Final review returned ship after correcting
-a duplicate-link replacement bug in the cutover helper.
-
-The real dry-run and applied cutover both verified all 548 archived files before removal. Post-cutover
-checks confirmed one file under `specs/`, both fixture hashes unchanged, all 52 snapshotted workflow-tool
-paths unchanged, 20 historical commit/source references resolvable, and all 38 retained historical links
-redirected to H. Source, tests, dependency configuration and executable contracts are unchanged since H.
-The ignored active-feature pointer is absent. The installed creation script's read-only dry-run selected
-`001-next-work` without creating a feature or pointer. All 34 retained Markdown files passed structure and local-link validation through the cutover
-commit procedure; final Git delivery is recorded below.
-
-The final documentation-only architecture record passed planning before removal and acceptance afterward:
-
-```json
-{
-  "schema_version": 1,
-  "task": "Verified history cutover to stage-zero baseline",
-  "scope": [
-    "specs",
-    ".specify/bugs",
-    ".specify/assessments",
-    ".specify/feature.json",
-    "docs",
-    ".agents/skills/running-end-to-end-tests",
-    "AGENTS.md",
-    "README.md",
-    "TECH_DETAILS.md",
-    ".specify/memory/constitution.md"
-  ],
-  "impact": "none",
-  "rationale": "After the separately verified source/fixture integration checkpoint, cutover removes only byte-preserved historical records, redirects documentation links, records the single baseline and clears the ignored active-feature pointer. Runtime modules, supported interfaces, dependencies, executable architecture checks and installed workflow tooling are unchanged. Both live test fixtures were already relocated and verified before this boundary; removing their unused historical copies adds no runtime or import effect."
-}
-```
-
-The `cleanup-code` personal skill was released and installed from private `agent-skills` commit
-`7f635ce123332d5444f294909c6a753dea7d268e`, annotated tag `v0.7.2`. All six installed files match the
-released source; fresh independent review and 102 offline checks passed. Only this skill was installed;
-shared agent links and unrelated lock metadata were preserved. Automatic host loading was not tested.
-Actual native CPU/single-GPU/cache observations remain in the private
-[dated evidence archive](https://github.com/BuckanovNikita/agent-skills/blob/1ab7da0b6448971a0abb44b5ec8380304714cfbc/skills/clearml-yolo-environment/references/cache-cleanup-2026-10-20/acceptance.md).
-Neither this cutover nor successful repeats resolve the unexplained enrichment failure or complete the
-inherited early-publication scheduler gate.
-
-### Delivery record (2026-10-20)
-
-The cutover is published on application `master` at
-[`228be7f4e8184667f39cb1ad797c4b00e6958022`](https://github.com/BuckanovNikita/clearml-yolo/commit/228be7f4e8184667f39cb1ad797c4b00e6958022).
-The remote branch was verified against that commit. The native release helper reported no unreleased
-semantic changes; version v0.35.0 and its existing tag at
-`accdfb664b2c9f605b026b26d713cae4213e05e2` remain unchanged. This dated evidence update follows the
-cutover and does not change runtime behavior. The exact local dependency-source section was preserved,
-excluded from commits and restored unstaged after every attempt.
-
-Portable usage links were published in `custom-opencode-skills` v0.2.11 at
-[`e0ff164696d86eaca42e218623f6c9f03798f0ad`](https://github.com/BuckanovNikita/custom-opencode-skills/commit/e0ff164696d86eaca42e218623f6c9f03798f0ad),
-with remote branch and annotated-tag targets verified. Package validation, four explicit Markdown checks,
-45-file Markdown lint, discovery of all four skills, architecture validation and fresh link review passed.
-Only three contract links and release evidence changed; examples and installed usage copies were preserved.
-The original checkout's concurrent unrelated edits were untouched. Personal `cleanup-code` v0.7.2 source,
-annotated tag and six installed files were also independently reverified against Git objects.
-
-Task-owned native runs and remote data were cleaned as recorded in their private evidence. Both disposable
-package environments and all six generated probe workspaces were removed after acceptance; verification
-manifests and logs remain available. The current work starts from this specification and feature `001`;
-retired pending checkboxes remain historical records, and the explicit limitations above remain in force.

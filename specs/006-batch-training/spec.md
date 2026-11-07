@@ -1,12 +1,4 @@
-# Feature Specification: Batch estimation and native distributed training
-
-**Created**: 2026-10-26
-
-**Status**: Implementation released; physical/native acceptance limitations and scoped
-delivery exceptions remain in [tasks.md](tasks.md).
-
-**Input**: Implement the supplied batch estimation, multi-GPU training, FCOS and
-self-contained configuration export plan. Baseline: [stage zero](../000-baseline/spec.md).
+# Capability: Batch estimation and native distributed training
 
 ## User Scenarios & Testing
 
@@ -167,15 +159,9 @@ acceptance. Existing numeric defaults and approved dependency revisions remain f
 No deployment, package publication or unrelated workload intervention is authorized.
 Saved values are recommendations for the recorded workload, not arbitrary-dataset guarantees.
 
-## Single-GPU amendment
+## Search speedup and independent concurrency requirements
 
-The 2026-10-27 simplification supersedes the original estimator count-matrix search
-and acceptance requirement. Separate real multi-GPU training correctness gates remain
-in SC-003. Earlier dated verification records retain their historical meaning.
-
-## Search speedup and independent concurrency amendment (2026-10-30)
-
-This amendment retains the single-GPU measurement and linear extrapolation contract.
+The estimator retains the single-GPU measurement and linear extrapolation contract.
 It adds faster candidate selection and parallel independent model/hardware cases.
 
 - **FR-013**: New searches use two successful memory observations to guide bounded
@@ -200,15 +186,9 @@ It adds faster candidate selection and parallel independent model/hardware cases
   with identical confirmed capacities. Native one-GPU comparisons report actual
   elapsed time, trial count and outcomes with matching workload/assets.
 - **SC-007**: Real CPU subprocess tests prove overlap, exclusive slots, independent
-  failures, cancellation and cleanup. The user explicitly permits release without
-  physical multi-GPU execution, which must remain documented as unverified.
+  failures, cancellation and cleanup. Physical multi-GPU outcomes require separate live acceptance.
 
-The approved delivery includes ordinary/architecture/documentation verification,
-fresh independent review, current/proposed paired CY/queue checks and a new Git-only
-code release. Existing historical acceptance limitations remain visible.
-
-
-## Aligned automatic search amendment (2026-11-02)
+## Aligned automatic search requirements
 
 New automatic searches use an eight-image per-GPU grid for discovery, memory-guided
 predictions, binary refinement and fresh confirmation. Ceilings round down; a ceiling
@@ -216,12 +196,9 @@ below eight per GPU is invalid. Failure at eight yields no aligned capacity, wit
 an unaligned fallback. Automatic exact lookup and extrapolation exclude unaligned
 historical per-GPU results, while evidence replay and old keys remain unchanged.
 Explicit training batches keep their existing semantics. See the
-[task assessment](../../docs/bugs/batch-align-eight/assessment.md) and
-[batch contract](../../docs/batch-estimation.md). This policy makes no measured
-throughput improvement claim and does not reopen historical acceptance exceptions.
+[batch contract](../../docs/batch-estimation.md). This policy makes no measured throughput improvement claim.
 
-
-## Saved coverage listing amendment (2026-11-03)
+## Saved coverage listing requirements
 
 `cy-batch-estimate --list` reports registered models without any usable saved
 estimate, without requiring `--imgsz`, CUDA, runtime initialization or writes.
@@ -235,8 +212,7 @@ selected/covered/missing totals and catalogue path; all-covered is explicit.
 Explicit measurement-only flags are rejected with `--list`. Measurement still
 requires positive `--imgsz`. Report success exits 0 even when estimates are missing;
 invalid arguments or unreadable/corrupt catalogues exit 2. Persisted schemas and
-measurement/search/lookup behavior remain unchanged. See [design](list/design.md).
-
+measurement/search/lookup behavior remain unchanged. See design.
 
 ## Explicit forced-admission follow-up (2026-11-03)
 

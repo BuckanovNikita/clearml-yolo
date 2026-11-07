@@ -1,7 +1,5 @@
-# Feature Specification: Custom augmentation and universal mosaic
+# Capability: Custom augmentation and universal mosaic
 
-**Created**: 2026-10-23
-**Status**: Approved; implementation in progress
 **Baseline**: [Current contracts](../000-baseline/spec.md)
 
 ## User scenarios and acceptance
@@ -71,11 +69,8 @@ variants on the same frozen Severstal subset. This establishes execution, not ac
 No inline alternative to the JSON file. Reject Normalize, tensor conversion, custom
 executable transforms, unsupported target requirements and nested/repeated Mosaic.
 User geometry is followed by required backend finalization. No minimum smoke mAP.
-Official unlabeled test images are excluded from scored evaluation. Full training
-waits for a later explicit approval. Dataset download/authentication is a prerequisite,
+Official unlabeled test images are excluded from scored evaluation. Dataset download/authentication is a prerequisite,
 not permission to replace the requested dataset with synthetic data.
 
-The user's explicit approved feature supersedes the old capability statement that
-augmentation JSON is unsupported in constitution section III. This is a capability
-extension, not a relaxation of architecture or verification principles. Per project
-instructions, installed workflow and .specify files remain unchanged.
+Augmentation JSON is supported subject to the constraints above. Architecture
+and verification principles apply to every backend.

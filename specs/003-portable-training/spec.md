@@ -1,8 +1,4 @@
-# Feature Specification: Extract queue and portable training
-
-**Created**: 2026-10-23
-**Status**: Approved user intent; implementation pending
-**Input**: Extract cy-queue and support portable training execution.
+# Capability: Extract queue and portable training
 
 ## User Scenarios & Testing
 

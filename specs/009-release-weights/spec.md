@@ -1,8 +1,5 @@
-# Feature Specification: Independently versioned model-weight releases
+# Capability: Independently versioned model-weight releases
 
-**Created**: 2026-10-29
-**Status**: Released as CY 0.44.0 with weights-2026-10-29
-**Input**: Download the supported catalogue, publish multiple tar archives in this repository, and make weight preparation use those releases without republishing weights for every code release.
 **Baseline**: [stage zero](../000-baseline/spec.md); extends the existing [native preparation](../007-download-weights/spec.md).
 
 ## User Scenarios & Testing
@@ -13,7 +10,7 @@ Users run the existing weight-preparation command and receive verified weights i
 
 **Independent test**: Start with empty native caches, allow only the project's weight-release downloads, prepare the catalogue, then load native models offline.
 
-**Acceptance**: Existing valid files are reused. Missing files come from the pinned weights release. Original source identities and native Hub configuration/revision discovery survive restoration. Corrupt or unsafe archives never publish files. Uncovered future asset identities and unavailable mirrors retain explicit upstream fallback and existing failure reporting.
+**Acceptance**: Existing valid files are reused. Missing files come from the pinned weights release. Original source identities and native Hub configuration/revision discovery survive restoration. Corrupt or unsafe archives never publish files. Uncovered asset identities and unavailable mirrors fail explicitly during bulk preparation.
 
 ### User Story 2 — Publish a reusable catalogue snapshot (P1)
 
@@ -44,18 +41,15 @@ Maintainers publish model assets once and reuse the same snapshot across code re
 
 The user explicitly authorized model-weight GitHub Release assets on 2026-10-29, overriding the general no-GitHub-Releases rule for this purpose only. No project distributions or registry publication are authorized. The latest clarification selects the existing supported catalogue, including its prior exclusions. Unrelated local documentation work is preserved. Upstream licence conditions remain attached to redistributed files.
 
-## Artifactory verification amendment — 2026-10-29
-
-The user additionally requires preserving GH/GHR Artifactory routing and clean environment setup instructions after failed downloads. They explicitly limited verification to logic/fixtures, with no live Artifactory check. `CH` in the request is treated as the existing `GH` variable; no new alias is introduced.
+## Artifactory verification requirements
 
 - **FR-009**: Preserve exact GHR repository-relative release paths and GH downloadCommit VCS requests, including proxy failures, authentication boundaries and credential-safe diagnostics. Verify with local fixtures, not a live Artifactory deployment.
 - **FR-010**: Failed manual preparation prints concise conditional Artifactory setup and retry instructions. Documentation explains repository roots, GH/GHR roles, optional HF API endpoint/authentication, TLS/permissions failures and native-cache recovery without exposing credentials.
 
-## DINOv3 publication amendment — 2026-10-31
+## DINOv3 publication requirements
 
-The user explicitly selected public, licence-compliant publication of the supported
-DINOv3 small weights alongside the other maintained weights. This supersedes only
-the DINOv3 bulk exclusion inherited from feature 007; DEIMv2 large/xlarge stay excluded.
+The bulk catalogue includes licence-compliant DINOv3 small weights. DEIMv2
+large/xlarge remain excluded from bulk preparation.
 
 - **FR-011**: Include the shared `dinov3_small` timm checkpoint and native Hub config
   in the bulk catalogue and a new immutable complete weight snapshot. Preserve the
@@ -69,13 +63,12 @@ Acceptance requires local archive/member verification, native offline DINOv3 loa
 actual hosted-byte checks, applicable canonical/docs/architecture and current paired
 CY/queue checks, fresh independent review and normal authorized Git-only code delivery.
 
-**DINOv3 amendment outcome**: released as CY 0.44.5 with public
-`weights-2026-10-31`; see [dated acceptance](dinov3/verification.md).
 
-## Current bulk-resolution authority — 2026-11-01
 
-Earlier upstream-fallback promises above are superseded by the accepted
-[release-only correction](../../docs/bugs/weight-files-remote/assessment.md).
-The [current asset contract](../../docs/model-assets.md#pinned-project-archives)
-owns bulk resolution and its distinction from standalone selected-model execution.
-Original dated intent and completed release evidence remain historical.
+
+## Bulk resolution boundary
+
+The [model asset contract](../../docs/model-assets.md#pinned-project-archives)
+owns bulk resolution: preparation uses pinned project archives and fails explicitly
+for unavailable or uncovered assets. Upstream fallback applies only to standalone
+selected-model execution where that contract allows it, never to bulk preparation.

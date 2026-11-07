@@ -2,7 +2,7 @@
 
 `cy-train` and the training stage of `cy` accept one standard Albumentations JSON
 pipeline for every registered YOLO, DEIMv2, RF-DETR, Faster R-CNN and FCOS selection. FCOS support shipped with feature 006; its native GPU acceptance limitations remain
-recorded in the [feature ledger](../specs/006-batch-training/tasks.md).
+recorded in the feature ledger.
 The default `transforms=default` keeps each backend's native augmentation recipe.
 Select `transforms=albumentations` to replace optional native augmentation with your
 JSON. Prediction, validation and export keep their normal preprocessing.
@@ -173,6 +173,6 @@ duplicate images together in the seeded 80/10/10 split. See the
 These are required scenarios, not a claim that the matrix has passed. Execution
 results belong in dated verification evidence.
 
-Full-dataset training is a [separate follow-up](../specs/004-custom-augmentation/full-training-task.md)
+Full-dataset training is a separate follow-up
 requiring additional approval after feature release. Running the smoke suite does
 not start that follow-up.

@@ -382,7 +382,7 @@ from application versions; ordinary release hooks neither package nor upload wei
 Reuse the current snapshot across code releases until its catalogue needs an update.
 
 Inspect the current [eligible catalogue](model-assets.md#catalogue-and-automatic-execution),
-native caches and [licence inventory](../specs/009-release-weights/licenses.md), then
+native caches and licence inventory, then
 assemble a complete snapshot with the explicit maintainer command:
 
 ```bash

@@ -26,15 +26,13 @@ specifications under `specs/` remain project documentation.
 
 ### Automatic workflow routing
 
-The [stage-zero specification](../specs/000-baseline/spec.md) starts the current
-numbering epoch. New feature artifacts begin at `001` and reference that baseline.
-Retrieve retired evidence by its full checkpoint SHA and path; old feature numbers
-can recur in the new epoch. Preserve the baseline as a specification, not an active
-feature ledger, and retain the installed Spec Kit workflow.
+The [product specification](../specs/000-baseline/spec.md) and linked capability
+contracts define desired behavior and acceptance. New feature work uses its own
+native Spec Kit artifacts; keep implementation status out of product requirements.
 
 Use Spec Kit for new capabilities and changes to documented behavior. Routine fixes,
 documentation edits and small refactors proceed directly; update the existing native
-task artifacts when applicable. Preserve completed history. Planning-only and read-only
+task artifacts when applicable. Keep historical execution records in Git history. Planning-only and read-only
 requests remain read-only. Verify the original failure path for bugs.
 
 Record the task outcome, compatibility boundaries, affected documentation, concrete

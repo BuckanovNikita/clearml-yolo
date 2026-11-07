@@ -1,28 +1,11 @@
-# Feature Specification: Plain prek hooks with cached pytest
+# Capability: Plain prek hooks with cached pytest
 
-**Created**: 2026-11-06
-**Status**: Implemented and independently reviewed; see [verification](verification.md).
-**Baseline**: [Stage zero](../000-baseline/spec.md); supersedes the receipt-reuse
-verifier introduced by [005](../005-reduce-verification/spec.md).
+## Problem and desired behavior
 
-## Intent and boundaries
-
-`scripts/verify.py` wraps five ordinary checks: Ruff, mypy, Vulture, import-linter and
-the full pytest suite. `--docs` runs the documentation checker. Most of its code fingerprints
-inputs and stores Git-private receipts. That cache exists only so the roughly
-16.5-minute suite does not run again on the automatic `chore(release)` commit or
-during tag recovery. The cache has proven fragile: on 2026-11-06 it refused to record a pass
-because file stat identity drifted, and the commit needed an approved hook skip
-([evidence](../../docs/plans/unfinished-work-cleanup-20261106/verification.md)).
-
-The user chose to:
-
-- remove `verify.py` and run plain hooks through **prek**;
-- keep pytest in the pre-commit stage, reusing caches where possible;
-- keep the `changelog` hook;
-- stop heavy hooks from running again on the generated release commit.
-
-There is no change to application behaviour, CLI, configuration or runtime packages.
+Contributors need ordinary, inspectable checks with useful incremental caching and
+without duplicate heavy checks for generated release metadata. Use direct prek hooks
+and pytest-testmon, retaining the changelog hook and byte-exact release validation.
+Application CLI, configuration and runtime behavior are independent of these tools.
 
 ## User scenarios and acceptance
 
@@ -69,4 +52,4 @@ Acceptance:
   commit and during tag recovery.
 - FR-005: Move `version_bytes` into `scripts/local_release.py` unchanged in behaviour,
   and keep its tests.
-- FR-006: Update current guidance. Completed feature and bug evidence remains unchanged.
+- FR-006: Current guidance names the authoritative direct commands and their limitations.

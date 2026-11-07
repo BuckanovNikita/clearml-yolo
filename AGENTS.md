@@ -42,9 +42,9 @@ for every task. Read guidance instead of copying shared skills into the reposito
   affected module boundaries, run the project verification gates and follow authorized
   release procedures. The native Spec Kit workflow owns stage order, task artifacts and review
   sequence.
-- Start new work from the [stage-zero specification](specs/000-baseline/spec.md). It
-  identifies the current contracts and immutable pre-reset history. New features use the
-  new numbering epoch beginning at `001`; do not reactivate retired task ledgers.
+- Start from the [product specification](specs/000-baseline/spec.md) and its
+  capability contracts. New behavior changes use the native Spec Kit workflow;
+  product specifications describe requirements without implementation status.
 - Reconcile the actual task-owned diff with the ledger, checks and review before
   acceptance; then evaluate the native release workflow within authorization.
   Documentation-only changes may produce no new version. Missing or failed required

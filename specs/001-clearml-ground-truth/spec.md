@@ -1,16 +1,5 @@
 # ClearML ground truth and complete default installation
 
-**Status**: Approved for implementation on 2026-10-20.
-
-## Baseline and feature identity
-
-This feature amends the [stage-zero specification](../000-baseline/spec.md) for
-ground-truth source selection and default runtime dependencies. Its original
-`036-clearml-ground-truth` records moved to `001-clearml-ground-truth` in the new
-numbering epoch after concurrent baseline integration. Requirements and completed
-history are preserved; the [task ledger](tasks.md#concurrent-baseline-integration--2026-10-20)
-tracks the renewed integration and delivery gates.
-
 ## User scenarios and testing
 
 ### US1 — Consume versioned annotations (P1)

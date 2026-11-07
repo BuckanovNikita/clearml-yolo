@@ -1,11 +1,4 @@
-# Feature Specification: Git workspace startup warning
-
-**Feature Branch**: `002-git-workspace-warning`
-**Created**: 2026-10-20
-**Status**: Approved for implementation
-**Input**: Warn users starting cy outside a Git-controlled directory; land on master and release.
-The user selected all experiment commands and every launch, including help/config inspection.
-This feature extends the [baseline](../000-baseline/spec.md#commands-and-configuration).
+# Capability: Git workspace startup warning
 
 ## User Scenarios & Testing
 

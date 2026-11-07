@@ -1,8 +1,5 @@
-# Feature Specification: Local Russian configuration reference
+# Capability: Local Russian configuration reference
 
-**Feature**: 008-local-docs
-**Created**: 2026-10-29
-**Status**: Released as CY 0.43.0
 **Baseline**: [Stage zero](../000-baseline/spec.md)
 
 ## User Scenarios & Testing

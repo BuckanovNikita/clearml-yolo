@@ -1,9 +1,9 @@
 # Training batch estimation
 
 Batch estimation is available from version 0.41.0. See the
-[release evidence](../specs/006-batch-training/evidence/release.md) for native verification limits.
+release evidence for native verification limits.
 Single-GPU estimator acceptance and the separate real multi-GPU training checks
-are recorded in the [feature ledger](../specs/006-batch-training/tasks.md).
+are recorded in the feature ledger.
 Configuration examples and CPU tests do not establish native GPU outcomes.
 
 `cy-batch-estimate` measures training capacity locally without creating a ClearML

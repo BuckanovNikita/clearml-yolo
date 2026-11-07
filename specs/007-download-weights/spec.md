@@ -1,13 +1,4 @@
-# Feature Specification: Download weights into native discovery locations
-
-**Feature Branch**: `master` (native release workflow)
-
-**Created**: 2026-10-29
-
-**Status**: Released as v0.42.0
-
-**Input**: Implement the supplied download-weights plan, retaining the current
-[baseline](../000-baseline/spec.md) and existing configuration semantics.
+# Capability: Download weights into native discovery locations
 
 ## User Scenarios & Testing
 
@@ -102,16 +93,9 @@ must retain explicit failure/retry behavior and atomic published files.
 - **SC-004**: Application, documentation, architecture, applicable mutation and paired
   CY/queue gates pass; fresh independent review accepts the integrated change.
 
-## Assumptions
+## Cache-directory ownership
 
-The supplied plan is the approved design. No dependency-source changes, SDK settings
-rewrites, deployment, package publication or GitHub Release objects are authorized.
-Completion includes native verification, portable skill updates and Git-only release.
-
-## Superseding cache-directory correction (2026-10-30)
-
-The original no-SDK-settings-rewrite intent above is superseded only for
-Ultralytics `weights_dir`. Explicit preparation and YOLO estimator setup persist
+For Ultralytics `weights_dir`, explicit preparation and YOLO estimator setup persist
 an absolute destination before catalogue reuse or trial worker launch. Relative
 values resolve against invocation cwd; existing absolute destinations, unrelated
 settings and cache files are retained. CY coordinates with an adjacent lock,
@@ -124,10 +108,10 @@ older relative caches. Errors identify the settings file and JSON/permissions/re
 recovery. Public command/report schemas and other path semantics are unchanged.
 See the [current cache contract](../../docs/model-assets.md#cache-locations) for authoritative guidance.
 
-## Current bulk-resolution authority — 2026-11-01
 
-Earlier upstream-fallback promises above are superseded by the accepted
-[release-only correction](../../docs/bugs/weight-files-remote/assessment.md).
-The [current asset contract](../../docs/model-assets.md#pinned-project-archives)
-owns bulk resolution and its distinction from standalone selected-model execution.
-Original dated intent and completed release evidence remain historical.
+## Bulk resolution boundary
+
+The [model asset contract](../../docs/model-assets.md#pinned-project-archives)
+owns bulk resolution: preparation uses pinned project archives and fails explicitly
+for unavailable or uncovered assets. Upstream fallback applies only to standalone
+selected-model execution where that contract allows it, never to bulk preparation.
