@@ -105,3 +105,11 @@ Behavior, interface, dependency, security and operational-policy changes require
 independent review after integration and verification; wording edits may be self-reviewed.
 Documentation checks are limited to native Spec Kit or OpenSpec checks. Local commits
 may be autonomous; pushes require separate authorization, including existing session authorization.
+
+## Specification rewrites
+
+Compare the original behavior, conditions and exceptions with their new authoritative
+homes, including requirements embedded in scenarios. Separate approved policy changes
+from wording changes; resolve overloaded terms before editing. Retain compatibility
+obligations, remove historical status claims, and have the reviewer compare meaning
+against the original source rather than judge length or wording alone.

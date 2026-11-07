@@ -1,10 +1,9 @@
 # Training batch estimation
 
-Batch estimation is available from version 0.41.0. See the
-release evidence for native verification limits.
-Single-GPU estimator acceptance and the separate real multi-GPU training checks
-are recorded in the feature ledger.
-Configuration examples and CPU tests do not establish native GPU outcomes.
+Single-GPU capacity measurements and real multi-GPU training are distinct outcomes.
+Configuration examples and CPU tests establish neither. Use the
+[physical DDP procedure](ddp-testing.md) for multi-GPU acceptance and record native
+estimator results with their hardware and workload.
 
 `cy-batch-estimate` measures training capacity locally without creating a ClearML
 task. It tests registered pretrained YOLO variants and all registered DEIMv2,

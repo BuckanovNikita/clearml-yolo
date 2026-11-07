@@ -560,12 +560,10 @@ omission retains the 2.0 GiB default. Remove `--reason`, `--claim-token` and `--
 to the project. Only explicit shared queue metadata and small host-partitioned coordination files are
 exceptions. SDK configuration, cache/download/temp policies and outside inputs remain intact.
 [Diagnostics](diagnostics.md#live-console-and-shutdown) explains FD capture, live publication,
-quiet prediction and bounded finalization. The [feature ledger](https://github.com/BuckanovNikita/clearml-yolo/blob/d74945c83dc24094c599388bbcfd5e987daeb9bf/specs/029-shared-cy-queue/tasks.md)
-and dated evidence distinguish implemented behavior from physical GPU, live ClearML and
-actual multi-user/multi-host NFS acceptance. CPU/mocked tests do not establish those
-physical outcomes. The listed unavailable external checks are
-[closed by user waiver](https://github.com/BuckanovNikita/clearml-yolo/blob/d74945c83dc24094c599388bbcfd5e987daeb9bf/docs/evidence/2026-10-16-acceptance-closure/decision.md) as
-completion/release obligations; physical GPU/NFS outcomes remain unverified.
+quiet prediction and bounded finalization. Physical GPU execution, live ClearML
+publication and actual multi-user/multi-host NFS operation each require evidence from
+the relevant environment. CPU/mocked tests do not establish those outcomes. Follow
+[acceptance boundaries](implementation-status.md) when reporting verification.
 
 ## Cross-contract integration
 

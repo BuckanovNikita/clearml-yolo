@@ -1,9 +1,8 @@
 # Physical multi-GPU DDP acceptance
 
-The external-result obligation for the delivered implementation is
-[closed by user waiver](https://github.com/BuckanovNikita/clearml-yolo/blob/d74945c83dc24094c599388bbcfd5e987daeb9bf/docs/evidence/2026-10-16-acceptance-closure/decision.md).
-Physical multi-GPU outcomes remain unverified. This procedure is retained for a
-future explicitly requested target certification; no result bundle is awaited.
+Use this procedure when physical multi-GPU acceptance is required. CPU/Gloo tests
+and simulated device checks do not establish CUDA/NCCL or queued multi-GPU outcomes;
+record those outcomes against the tested environment and workload.
 
 CY's `ddp_gpu` tests run the production direct YOLO pipeline. The separate cy-queue
 repository owns the full direct/queued comparison and queue failure matrix. Both use
