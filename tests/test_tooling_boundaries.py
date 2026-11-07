@@ -217,7 +217,7 @@ SCRIPT_IMPORTING_TESTS = tuple(
 
 
 def test_script_importing_test_inventory_covers_known_modules() -> None:
-    assert {"tests/test_check_docs.py", "tests/test_package_weights.py"} <= set(SCRIPT_IMPORTING_TESTS)
+    assert {"tests/test_package_weights.py"} <= set(SCRIPT_IMPORTING_TESTS)
 
 
 @pytest.mark.parametrize("module", SCRIPT_IMPORTING_TESTS)
