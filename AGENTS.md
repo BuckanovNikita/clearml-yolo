@@ -43,7 +43,7 @@ for every task. Read guidance instead of copying shared skills into the reposito
   release procedures. The native Spec Kit workflow owns stage order, task artifacts and review
   sequence.
 - Start from the [product specification](specs/000-baseline/spec.md) and its
-  capability contracts. New behavior changes use the native Spec Kit workflow;
+  technical contracts. New behavior changes use the native Spec Kit workflow;
   product specifications describe requirements without implementation status.
 - Reconcile the actual task-owned diff with the ledger, checks and review before
   acceptance; then evaluate the native release workflow within authorization.

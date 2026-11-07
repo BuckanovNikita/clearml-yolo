@@ -153,7 +153,7 @@ test.jpg,images/test.jpg,helmet,10,20,100,120,test
 и `test`**. Разбиение задаёте вы: команды обучения его не создают. Классы и состав
 набора берутся из CSV, данные YOLO или COCO готовятся автоматически. Некорректные
 рамки отбрасываются с сообщением; отсутствие допустимых обучающих рамок — ошибка.
-Подробности — [контракт входных данных](specs/000-baseline/spec.md#detection-inputs-dataset-cache-and-output-routing).
+Подробности — [контракт входных данных](specs/000-baseline/spec.md).
 
 ### Модель и параметры
 
@@ -994,7 +994,7 @@ cy-ground-truth data_yaml=./dataset/data.yaml output=./converted/ground_truth.cs
 Результат — CSV с рамками в пикселях и назначенными выборками. Если в источнике нет
 `test`, часть исходной `val` выделяется в `test` по `test_fraction` и `seed`;
 проверьте получившееся разбиение до обучения. Подробнее —
-[контракт конвертации](specs/000-baseline/spec.md#commands-and-configuration).
+[контракт конвертации](specs/000-baseline/spec.md).
 
 ### FiftyOne
 

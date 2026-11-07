@@ -103,7 +103,7 @@ Object. Embedded application callers must supply their complete resolved inputs 
 within that invocation. Direct use-case calls do not reconstruct that full snapshot.
 Native `General` excludes execution-only device/routing/generated-data fields, so it
 cannot substitute for full input recording. See the
-[stable parameter contract](../specs/000-baseline/spec.md#stable-experiment-parameters-and-controller-caching).
+[stable parameter contract](experiment-records.md#stable-experiment-parameters-and-controller-caching).
 
 SDKs use normal imports, environment selectors, user settings, cwd discovery and caches.
 There is no project import-directory context, SDK constant substitution or process binding

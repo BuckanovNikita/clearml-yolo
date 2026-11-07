@@ -177,7 +177,7 @@ queue submission perform no asset resolution. See [model assets](model-assets.md
 
 ### Git workspace warning
 
-The nine experiment commands listed in the [command contract](../specs/000-baseline/spec.md#commands-and-configuration)
+The nine experiment commands listed in the [command contract](../specs/000-baseline/spec.md)
 inspect the original launch cwd once inside console capture and before Hydra can
 change directories. This includes help/config inspection and emits at most one
 workspace warning per invocation, including multiruns. The warning uses stderr
@@ -245,7 +245,7 @@ cleanup uncertainty: the queue reports `recovery_required` and retains recovery 
 Current allocations stay exclusive unless explicitly freed; stale unlocked records alone
 do not veto capacity.
 Required computation/upload failures follow the
-[pipeline outcome policy](../specs/000-baseline/spec.md#required-publication-and-task-lifecycle). Old cancellation work
+[pipeline outcome policy](experiment-records.md#required-publication-and-task-lifecycle). Old cancellation work
 is retained in generic process supervision and guardian regression tests; forced
 termination is covered separately.
 Normal queue cancellation gives the verified pipeline owner up to 90 seconds to

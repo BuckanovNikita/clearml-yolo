@@ -169,7 +169,7 @@ The preparation tool requires the official `train.csv` and `train_images`, conve
 one-based column-major masks into one box per 8-connected component, and retains
 background images and the four literal classes. Source-content identities keep
 duplicate images together in the seeded 80/10/10 split. See the
-[feature requirements](../specs/004-custom-augmentation/spec.md) for acceptance scope.
+[feature requirements](../specs/000-baseline/spec.md) for acceptance scope.
 These are required scenarios, not a claim that the matrix has passed. Execution
 results belong in dated verification evidence.
 

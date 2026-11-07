@@ -14,10 +14,9 @@ Normal loaders discover native files without rewriting Hydra model/pretrained/re
 values, native settings or environment selectors. Explicit non-null ultralytics.cfg
 remains rejected. Only SDK-owned asset destinations may be outside CY_HOME.
 
-## Superseding cache-directory correction (2026-10-30)
+## Native cache destination
 
-The original no-SDK-settings-rewrite intent above is superseded only for
-Ultralytics `weights_dir`. Explicit preparation and YOLO estimator setup persist
+Ultralytics `weights_dir` is the explicit SDK-settings exception. Explicit preparation and YOLO estimator setup persist
 an absolute destination before catalogue reuse or trial worker launch. Relative
 values resolve against invocation cwd; existing absolute destinations, unrelated
 settings and cache files are retained. CY coordinates with an adjacent lock,

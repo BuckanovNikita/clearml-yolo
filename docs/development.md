@@ -135,7 +135,7 @@ Test-only trainer adaptations retain installed native loops and do not add a
 production CPU distributed launcher. Local task recordings establish callback
 behavior and model association. Accelerator launch, NCCL, AMP and actual ClearML
 uploads/downloads require separate acceptance. See the
-[CPU validation guide](../specs/000-baseline/spec.md#required-publication-and-task-lifecycle)
+[CPU validation guide](experiment-records.md#required-publication-and-task-lifecycle)
 for scope and evidence requirements; keep observed results in dated evidence.
 
 ### Generated and composed regressions
@@ -368,9 +368,9 @@ evaluation is a valid outcome for documentation-only history; do not force a ver
 Publish Git tags only for code: no code GitHub Releases, project distribution assets
 or registry packages. The separate [model-weight procedure](#model-weight-releases)
 is the only model-assets exception. The
-[release contract](../specs/000-baseline/spec.md#local-release-interface) describes
+[release contract](../specs/000-baseline/spec.md) describes
 version policy, dirty-tree deferral, concurrency and recovery. The
-[validation guide](../specs/000-baseline/spec.md#local-release-interface) covers checks and changelog refresh.
+[validation guide](../specs/000-baseline/spec.md) covers checks and changelog refresh.
 
 ## Model-weight releases
 

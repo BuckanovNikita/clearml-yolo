@@ -130,5 +130,5 @@ The queue repository has its own same-named harness tests covering the full matr
 run those from that checkout with the shared prepared environment.
 
 The maintained [queue contract](queue.md) and
-[publication inventory](../specs/000-baseline/spec.md#required-publication-and-task-lifecycle)
+[publication inventory](experiment-records.md#required-publication-and-task-lifecycle)
 define the production behavior checked here.

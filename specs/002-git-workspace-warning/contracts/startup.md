@@ -1,6 +1,6 @@
 # Startup warning contract
 
-The nine experiment commands listed in [the specification](../spec.md) call the
+The nine experiment commands listed in [the specification](../../000-baseline/spec.md) call the
 shared launch boundary, including help/config inspection. A read-only
 `git -C DIRECTORY rev-parse --is-inside-work-tree` probe receives no inherited
 `GIT_*` overrides and has a five-second timeout. Only a successful `true` response

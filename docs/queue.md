@@ -240,7 +240,7 @@ alongside each job's user-supplied `clearml.tags`. This includes one-job sweeps 
 saved MULTIRUN mode. Direct launches generate a fresh group per launch; queued
 submissions freeze it in every snapshot before workers execute. Repeated submissions
 get different tags. Ordinary RUN leaves tags unchanged. See the
-[task-grouping contract](../specs/000-baseline/spec.md#direct-execution-shared-queue-and-diagnostics).
+[task-grouping contract](../specs/000-baseline/spec.md).
 
 Remove native GPU selectors from queued configurations: allocation supplies all training
 devices and the first device for inference/comparison, while explicit CPU phases remain CPU.
@@ -569,7 +569,7 @@ completion/release obligations; physical GPU/NFS outcomes remain unverified.
 
 ## Cross-contract integration
 
-The [multirun grouping contract](../specs/000-baseline/spec.md#direct-execution-shared-queue-and-diagnostics) adds a
+The [multirun grouping contract](../specs/000-baseline/spec.md) adds a
 shared random ClearML tag per direct launch or queued submission. Keep the shared
 Hydra tag helper, direct callback lifetime and frozen queue tags consistent. Explicit
 user tags survive; ordinary RUN adds no tag.

@@ -11,8 +11,8 @@ available from version 0.41.0. Native confirmation and physical DDP verification
 limits are recorded in the release evidence.
 Configuration examples are not execution evidence.
 Use the [verification ledger](https://github.com/BuckanovNikita/clearml-yolo/blob/d74945c83dc24094c599388bbcfd5e987daeb9bf/specs/025-multi-model-backends/verification.md) for
-observed results and the [acceptance guide](../specs/000-baseline/spec.md#detector-backends-and-deployment-export)
-for the required checks. The [backend contract](../specs/000-baseline/spec.md#detector-backends-and-deployment-export)
+observed results and the [acceptance guide](../specs/000-baseline/spec.md)
+for the required checks. The [backend contract](../specs/000-baseline/spec.md)
 defines the shared behavior.
 
 ## Installation and model selection
@@ -260,7 +260,7 @@ native logical devices without queue configuration or reservations. See
 
 ## Data, checkpoints and comparison
 
-Keep the existing [ground-truth CSV contract](../specs/000-baseline/spec.md#detection-inputs-dataset-cache-and-output-routing).
+Keep the existing [ground-truth CSV contract](../specs/000-baseline/spec.md).
 The new backends prepare cached COCO datasets automatically, including when the historical
 Python API default says `dataset_format="ndjson"`. The cache retains empty images, exact
 class names, split membership and original geometry. It does not convert existing YOLO
@@ -388,4 +388,4 @@ evaluation policy. Embedded checkpoint metadata survives standalone copies/downl
 hash/selection conflicts fail before execution. Mixed comparisons resolve each checkpoint
 independently and preserve current image membership, frozen thresholds and the shared
 inference device. Explicit raw references add required vocabulary/preprocessing assertions.
-See the [multi-model contract](../specs/000-baseline/spec.md#detector-backends-and-deployment-export).
+See the [multi-model contract](../specs/000-baseline/spec.md).

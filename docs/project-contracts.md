@@ -27,7 +27,7 @@ See [selected export and runtime isolation](runtime-isolation.md).
 `cy-dedup [DIRECTORY] [--dry-run]` is local cache maintenance without application startup
 or tracking. It reflinks identical same-named images, preserving paths and content;
 unsupported reflinks are reported skips. See the
-[deduplication contract](../specs/000-baseline/spec.md#explicit-cache-deduplication).
+[deduplication contract](../specs/000-baseline/spec.md).
 
 `cy-docs [--port PORT] [--no-browser] [--check]` opens the packaged Russian reference
 and tutorials on loopback. Its catalog derives fields and effective defaults from
@@ -67,7 +67,7 @@ replay settings without artifact copies, while native General contains scientifi
 parameters. YOLO replay applies scientific General overrides over full `run.ultralytics`
 settings; devices and other known execution-only values remain in the full configuration.
 External controllers can explicitly normalize cache identity before job creation through
-the [stable parameter contract](../specs/000-baseline/spec.md#stable-experiment-parameters-and-controller-caching).
+the [stable parameter contract](experiment-records.md#stable-experiment-parameters-and-controller-caching).
 Pass device, batch, AMP and compilation through the native groups. Native augmentation
 options retain their behavior with `transforms=default`. For `cy` and `cy-train`,
 `transforms=albumentations transforms.pipeline_file=FILE` selects standard `A.save`
@@ -116,7 +116,7 @@ Each direct or queued multirun adds one shared readable `multirun-<UTC date/time
 tag to all its jobs, preserving explicit tags. The group is fresh per launch/submission
 and persists in queued snapshots. Effective MULTIRUN mode includes one-job sweeps;
 ordinary RUN adds no tag. See the
-[grouping contract](../specs/000-baseline/spec.md#direct-execution-shared-queue-and-diagnostics).
+[grouping contract](../specs/000-baseline/spec.md).
 
 The `model=deimv2/<preset>`, `model=rfdetr/<preset>`, `model=fasterrcnn/<preset>` and
 `model=fcos/<preset>` groups
@@ -127,7 +127,7 @@ Their composition derives immutable COCO datasets from the same validated CSV re
 public labels retain exact strings and exclude detector background slots. A descriptor
 embedded in each owned checkpoint binds backend, preset, foreground vocabulary,
 preprocessing and source/dependency identity; its external record adds the checkpoint hash.
-See the [backend contract](../specs/000-baseline/spec.md#detector-backends-and-deployment-export) and
+See the [backend contract](../specs/000-baseline/spec.md) and
 [model guide](multi-model-backends.md) for presets, pretrained sources and limitations.
 Native multi-GPU training uses one supervised rank per GPU, with global microbatches
 divisible by world size and one invocation-owned ClearML task. FCOS uses zero-based
@@ -177,7 +177,7 @@ comparison uses test; standalone `cy-compare` defaults to test and accepts a spl
 Both models use identical current images from that split and matching inference settings.
 Reports consume their paired results and manifest split from `comparison_dir`. Historical
 dashboards provide only stored thresholds under the maintained
-[task recovery contract](../specs/000-baseline/spec.md#evaluation-comparison-and-historical-model-recovery),
+[task recovery contract](experiment-records.md#evaluation-comparison-and-historical-model-recovery),
 with a warning about rounding and unavailable calibration provenance; their predictions/metrics
 are not comparison inputs. Explicit threshold maps take precedence. Ordered task recovery
 accepts named threshold payloads, then dashboards; present malformed sources fail strictly.
@@ -190,7 +190,7 @@ The automatic baseline is the latest completed prod-tagged task excluding the cu
 missing automatic baseline skips comparison, while invalid explicit references fail.
 
 Evaluation publication follows the
-[current result contract](../specs/000-baseline/spec.md#required-publication-and-task-lifecycle):
+[current result contract](experiment-records.md#required-publication-and-task-lifecycle):
 one invocation-owned `gt_csv` and combined `predicts_csv` retain original source rows,
 stable IDs, exclusions, thresholds and JSON pre/post-threshold relationships. Canonical
 Ground truth uploads when validated and written; the combined prediction CSV assembles
@@ -213,7 +213,7 @@ slots repeat; model/context fallback and readable stage/ordinal suffixes prevent
 Baseline charts and comparison tables are excluded from Plots; baseline rows/dashboards,
 paired workbooks and headline single values remain published. Native callback validation
 PR images are excluded while other native output and DDP owner replay are preserved.
-See the [readable plot contract](../specs/000-baseline/spec.md#reports-and-readable-visualization).
+See the [readable plot contract](experiment-records.md#reports-and-readable-visualization).
 
 Project-local exact task/model name collisions, including archived records, receive a
 shared readable suffix after rechecking; unused requested names and output paths remain
@@ -317,7 +317,7 @@ console publication and reports. Exact IDs/hashes remain in machine provenance,
 explicit JSON, raw captures and link targets; see [readable output](readable-output.md).
 
 Startup `run`/`run_overrides` views and early training General follow the
-[configuration contract](../specs/000-baseline/spec.md#configuration-resolution-and-replay).
+[configuration contract](experiment-records.md#configuration-resolution-and-replay).
 Selected executable inputs remain distinct from observed normalization and result provenance.
 
 ### Training counts and report warnings
