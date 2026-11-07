@@ -1,5 +1,12 @@
 # Remaining work after CY 0.46.0: completion plan, 2026-11-06
 
+> **Note 2026-11-07:** WP1 (native forced-estimator acceptance), WP2b (architecture
+> acceptance for force, DINOv3 and OOM) and WP4 (original campaign recovery) are
+> superseded by the [verification-from-zero plan](../verification-from-zero-20261107.md).
+> Their partial verification evidence artifacts were dropped; do not cite them as
+> acceptance. The ticked WP0, WP2a, WP3 and WP6 boxes below are history, re-verified
+> by that plan.
+
 ## Purpose and baseline
 
 This plan lists every unfinished item across CY and cy-queue, so that existing work

@@ -11,6 +11,9 @@
 - **bugs**: Record the unverified post-restart sysmem fallback probe
   ([`303a0ae`](https://github.com/BuckanovNikita/clearml-yolo/commit/303a0ae277b9a3a09b0746abe197b7ecd187e7a9))
 
+- **skills**: Move ClearML environment guidance into the project
+  ([`1abc844`](https://github.com/BuckanovNikita/clearml-yolo/commit/1abc844fde541c74288b983e6c757be9d1e15586))
+
 
 ## v0.46.2 (2026-11-07)
 
