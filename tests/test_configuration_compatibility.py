@@ -30,7 +30,7 @@ from clearml_yolo.entrypoints.hydra.declarations import COMMAND_DECLARATIONS, NE
 from clearml_yolo.entrypoints.options import OPTION_DECLARATIONS, parser_for
 
 _BASELINE: dict[str, Any] = json.loads(
-    Path(__file__).with_name("fixtures").joinpath("docs-compatibility.json").read_text()
+    Path(__file__).with_name("fixtures").joinpath("configuration-compatibility.json").read_text()
 )
 
 

@@ -71,3 +71,20 @@ v0.6.2 are published with verified remote refs. Fresh integrated review, stable
 canonical receipt, actual committed-version pairing and source installation passed.
 See the [completed delivery record](evidence/delivery.md#completed-git-only-delivery).
 Earlier pending states above remain historical checkpoints.
+
+## Withdrawal — 2026-11-08
+
+User requested removal of cy-docs and related functionality for now. Remove the
+command, catalog, previews, server, packaged assets, exclusive tests and browser
+dependency. Retain shared configuration/parser declarations and compatibility tests,
+field descriptions, and historical specifications/evidence. Current application
+commands and configuration semantics must remain unchanged.
+
+- [x] W001 Remove feature implementation and active contract/navigation entries.
+- [ ] W002 Full verification waived by user for local branch delivery; full suite interrupted.
+- [x] W003 Fresh independent review found no blocking issues in the integrated removal.
+
+Local delivery: user requested `docs/...` branch and no further checks. Prior
+checks passed: 193 shared configuration compatibility cases, Ruff, mypy, Vulture,
+and 51 import contracts. Full suite, final prek pipeline and paired release
+verification are not established. No release or push is requested.

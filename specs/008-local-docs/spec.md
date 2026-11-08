@@ -2,7 +2,7 @@
 
 **Feature**: 008-local-docs
 **Created**: 2026-10-29
-**Status**: Released as CY 0.43.0
+**Status**: Withdrawn from current source on 2026-11-08 at user request; previously released as CY 0.43.0
 **Baseline**: [Stage zero](../000-baseline/spec.md)
 
 ## User Scenarios & Testing
