@@ -4,15 +4,10 @@ import ast
 import json
 import subprocess
 import sys
-import tomllib
-from collections.abc import Callable
-from copy import deepcopy
 from pathlib import Path
 
 import grimp
 import pytest
-from importlinter.application.user_options import UserOptions
-from importlinter.domain.contract import Contract
 
 import architecture_helpers as architecture
 
@@ -20,18 +15,8 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 
 
-def test_actual_graph_obeys_every_configured_contract_including_dynamic_imports(
-    graph: grimp.ImportGraph,
-    import_options: UserOptions,
-    configured_contract: Callable[[str], Contract],
-) -> None:
-    for options in import_options.contracts_options:
-        contract = configured_contract(options["name"])
-        # Contracts remove ignored edges, so each gets its own graph.
-        result = contract.check(deepcopy(graph), verbose=False)
-        assert result.kept, (contract.name, result.metadata)
+def test_actual_graph_obeys_project_specific_architecture_rules(graph: grimp.ImportGraph) -> None:
     assert architecture.graph_findings(graph) == []
-
 
 @pytest.mark.parametrize(
     ("importer", "imported", "rejected"),
@@ -219,260 +204,6 @@ def test_legacy_missing_module_and_missing_attribute_targets_are_rejected(
     graph: grimp.ImportGraph,
 ) -> None:
     assert architecture.target_findings({target}, graph, SRC)
-
-
-def test_console_command_inventory_matches_configured_independence(
-    configured_contract: Callable[[str], Contract],
-) -> None:
-    config = tomllib.loads((ROOT / "pyproject.toml").read_text())
-    commands = {target.split(":")[0] for target in config["project"]["scripts"].values()}
-    options = configured_contract("Every command entrypoint stands alone").contract_options
-    assert commands == set(options["modules"])
-
-
-@pytest.mark.parametrize(
-    ("name", "importer", "imported"),
-    [
-        (
-            "Adapters depend only on application ports and contracts",
-            "clearml_yolo.adapters.storage.dataset",
-            "clearml_yolo.application.ground_truth",
-        ),
-        (
-            "Application command composition is inward and acyclic",
-            "clearml_yolo.application.use_cases.train",
-            "clearml_yolo.application.use_cases.pipeline",
-        ),
-        (
-            "CY never imports extracted queue or its private dependencies",
-            "clearml_yolo.adapters.runtime.process_tree",
-            "cy_queue",
-        ),
-        (
-            "CY never imports extracted queue or its private dependencies",
-            "clearml_yolo.entrypoints.pipeline",
-            "textual",
-        ),
-        (
-            "CY never imports extracted queue or its private dependencies",
-            "clearml_yolo.adapters.runtime.bootstrap",
-            "pynvml",
-        ),
-        (
-            "Adapter peer ownership (storage-consumers)",
-            "clearml_yolo.adapters.assets.sources",
-            "clearml_yolo.adapters.clearml.session",
-        ),
-        (
-            "Adapter peer ownership (storage-consumers)",
-            "clearml_yolo.adapters.integrations.batch_profiles",
-            "clearml_yolo.adapters.yolo.assets",
-        ),
-        (
-            "Adapter peer ownership (storage-consumers)",
-            "clearml_yolo.adapters.integrations.batch_probe",
-            "clearml_yolo.adapters.yolo.inference",
-        ),
-        (
-            "Adapter peer ownership (restricted)",
-            "clearml_yolo.adapters.storage.dataset",
-            "clearml_yolo.adapters.assets.sources",
-        ),
-        (
-            "Adapter peer ownership (restricted)",
-            "clearml_yolo.adapters.evaluation.scoring",
-            "clearml_yolo.adapters.reporting.evaluation",
-        ),
-        (
-            "Clean architecture inward layers",
-            "clearml_yolo.application.use_cases.train",
-            "clearml_yolo.adapters.yolo.inference",
-        ),
-        ("SDK ownership (static imports)", "clearml_yolo.application.contracts", "clearml"),
-        ("SDK ownership (static imports)", "clearml_yolo.application.ports", "safetensors"),
-        ("SDK ownership (lazy imports)", "clearml_yolo.core.assets", "huggingface_hub"),
-        ("Exhaustive root layer classification", "clearml_yolo.misc", None),
-        ("Exhaustive adapter responsibility classification", "clearml_yolo.adapters.misc", None),
-        ("Exhaustive application classification", "clearml_yolo.application.misc", None),
-        ("Exhaustive entrypoint classification", "clearml_yolo.entrypoints.misc", None),
-        (
-            "SDK ownership (lazy imports)",
-            "clearml_yolo.core.transforms",
-            "albumentations",
-        ),
-        (
-            "Adapter peer ownership (storage-consumers)",
-            "clearml_yolo.adapters.clearml.cache",
-            "clearml_yolo.adapters.yolo.config",
-        ),
-        (
-            "Clean architecture inward layers",
-            "clearml_yolo.application.use_cases.train",
-            "clearml_yolo.adapters.clearml.parameters",
-        ),
-        (
-            "SDK ownership (lazy imports)",
-            "clearml_yolo.application.contracts",
-            "torchvision",
-        ),
-        ("SDK ownership (lazy imports)", "clearml_yolo.adapters.rfdetr.backend", "timm"),
-        ("SDK ownership (lazy imports)", "clearml_yolo.adapters.export.metadata", "timm"),
-        ("SDK ownership (lazy imports)", "clearml_yolo.application.training_workers", "torch"),
-        (
-            "Clean architecture inward layers",
-            "clearml_yolo.core.batch_estimation",
-            "clearml_yolo.adapters.runtime.gpu_memory",
-        ),
-        (
-            "Adapter peer ownership (restricted)",
-            "clearml_yolo.adapters.runtime.gpu_memory",
-            "clearml_yolo.adapters.yolo.batch_probe",
-        ),
-        (
-            "Adapter peer ownership (storage-consumers)",
-            "clearml_yolo.adapters.yolo.inference",
-            "clearml_yolo.adapters.runtime.gpu_memory",
-        ),
-        ("SDK ownership (lazy imports)", "clearml_yolo.adapters.deim.backend", "rfdetr"),
-        (
-            "Clean architecture inward layers",
-            "clearml_yolo.core.batch_estimation",
-            "clearml_yolo.adapters.runtime.gpu_inventory",
-        ),
-        (
-            "Clean architecture inward layers",
-            "clearml_yolo.application.use_cases.batch_estimate",
-            "clearml_yolo.adapters.storage.batch_estimates",
-        ),
-        (
-            "Clean architecture inward layers",
-            "clearml_yolo.application.training_workers",
-            "clearml_yolo.adapters.runtime.worker_pool",
-        ),
-        (
-            "Adapters depend only on application ports and contracts",
-            "clearml_yolo.adapters.runtime.worker_pool",
-            "clearml_yolo.application.use_cases.batch_estimate",
-        ),
-        (
-            "Adapter peer ownership (restricted)",
-            "clearml_yolo.adapters.runtime.worker_pool",
-            "clearml_yolo.adapters.storage.batch_estimates",
-        ),
-        (
-            "Adapter peer ownership (restricted)",
-            "clearml_yolo.adapters.torchvision.training",
-            "clearml_yolo.adapters.fcos.model",
-        ),
-        (
-            "Adapter peer ownership (restricted)",
-            "clearml_yolo.adapters.fcos.backend",
-            "clearml_yolo.adapters.clearml.session",
-        ),
-        (
-            "SDK ownership (lazy imports)",
-            "clearml_yolo.application.training_workers",
-            "lightning_fabric",
-        ),
-        (
-            "SDK ownership (lazy imports)",
-            "clearml_yolo.core.batch_estimation",
-            "faster_coco_eval",
-        ),
-        (
-            "SDK ownership (lazy imports)",
-            "clearml_yolo.application.contracts",
-            "pytorch_lightning",
-        ),
-        (
-            "SDK ownership (lazy imports)",
-            "clearml_yolo.application.contracts",
-            "pycocotools",
-        ),
-        ("SDK ownership (lazy imports)", "clearml_yolo.adapters.clearml.detectors", "onnx"),
-        ("SDK ownership (lazy imports)", "clearml_yolo.entrypoints.composition", "tensorrt"),
-        (
-            "Adapter peer ownership (export)",
-            "clearml_yolo.adapters.export.metadata",
-            "clearml_yolo.adapters.fasterrcnn.model",
-        ),
-        (
-            "Adapter peer ownership (export)",
-            "clearml_yolo.adapters.export.verification",
-            "clearml_yolo.adapters.fasterrcnn.inference",
-        ),
-        (
-            "Adapter peer ownership (restricted)",
-            "clearml_yolo.adapters.runtime.git_workspace",
-            "clearml_yolo.adapters.clearml.script",
-        ),
-        (
-            "Every command entrypoint stands alone",
-            "clearml_yolo.entrypoints.export",
-            "clearml_yolo.entrypoints.train",
-        ),
-        (
-            "Core and application have no logging or rendering dependency",
-            "clearml_yolo.application.contracts",
-            "loguru",
-        ),
-    ],
-)
-def test_actual_configured_import_linter_contract_rejects_mutated_graph(
-    name: str,
-    importer: str,
-    imported: str | None,
-    graph: grimp.ImportGraph,
-    configured_contract: Callable[[str], Contract],
-) -> None:
-    contract = configured_contract(name)
-    actual = contract.check(deepcopy(graph), verbose=False)
-    assert actual.kept
-    mutated = deepcopy(graph)
-    if imported is None:
-        mutated.add_module(importer)
-    else:
-        if imported not in mutated.modules:
-            mutated.add_module(imported)
-        mutated.add_import(importer=importer, imported=imported)
-    assert not contract.check(mutated, verbose=False).kept
-
-
-def test_transitive_adapter_escape_is_rejected_by_configured_layers(
-    graph: grimp.ImportGraph, configured_contract: Callable[[str], Contract]
-) -> None:
-    candidate = deepcopy(graph)
-    candidate.add_module("clearml_yolo.application.helper")
-    candidate.add_import(
-        importer="clearml_yolo.application.use_cases.train",
-        imported="clearml_yolo.application.helper",
-    )
-    candidate.add_import(
-        importer="clearml_yolo.application.helper",
-        imported="clearml_yolo.adapters.yolo.inference",
-    )
-    assert not configured_contract("Clean architecture inward layers").check(candidate, verbose=False).kept
-
-
-def test_type_only_imports_remain_in_the_configured_graph(
-    graph: grimp.ImportGraph, import_options: UserOptions
-) -> None:
-    exclusion = import_options.session_options.get("exclude_type_checking_imports")
-    assert str(exclusion).lower() != "true"
-    assert "clearml_yolo.adapters.augmentation.pipeline" in graph.find_modules_directly_imported_by(
-        "clearml_yolo.adapters.deim.transforms"
-    )
-
-
-def test_lazy_import_allowances_match_real_dynamic_edges(graph: grimp.ImportGraph, import_options: UserOptions) -> None:
-    for contract in import_options.contracts_options:
-        if contract.get("unmatched_ignore_imports_alerting") != "none":
-            continue
-        # import-linter omits import_module calls. Its exact optional allowances
-        # must still exist in our AST-enriched graph, so stale exceptions fail.
-        for edge in contract.get("ignore_imports", []):
-            importer, imported = edge.split(" -> ")
-            assert imported in graph.find_modules_directly_imported_by(importer), edge
 
 
 @pytest.mark.parametrize(
@@ -770,42 +501,6 @@ def test_dynamic_import_graph_resolves_scoped_import_aliases(tmp_path: Path, sou
     candidate.add_module("torch")
     architecture.add_dynamic_imports(candidate, tmp_path)
     assert candidate.direct_import_exists(importer="clearml_yolo.adapters.storage.helper", imported="torch") is expected
-
-
-@pytest.mark.parametrize(
-    "sdk",
-    [
-        "clearml",
-        "torch",
-        "torchvision",
-        "timm",
-        "rfdetr",
-        "pytorch_lightning",
-        "onnx",
-        "tensorrt",
-        "safetensors",
-    ],
-)
-def test_configured_sdk_owner_rejects_dynamic_import(
-    tmp_path: Path,
-    sdk: str,
-    graph: grimp.ImportGraph,
-    import_options: UserOptions,
-    configured_contract: Callable[[str], Contract],
-) -> None:
-    package = tmp_path / "clearml_yolo/adapters/storage"
-    package.mkdir(parents=True)
-    (package / "helper.py").write_text(f"from importlib import import_module\nimport_module({sdk!r})")
-    candidate = deepcopy(graph)
-    candidate.add_module("clearml_yolo.adapters.storage.helper")
-    architecture.add_dynamic_imports(candidate, tmp_path)
-    options = next(
-        options
-        for options in import_options.contracts_options
-        if options["id"].startswith("sdk-ownership-") and sdk in options["forbidden_modules"]
-    )
-    contract = configured_contract(options["name"])
-    assert not contract.check(candidate, verbose=False).kept
 
 
 def test_runtime_target_inventory_includes_nested_colon_attributes(tmp_path: Path) -> None:

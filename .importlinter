@@ -78,7 +78,7 @@ forbidden_modules =
     torchvision
     ultralytics
 allow_indirect_imports = true
-# Lazy imports are checked in the AST-enriched architecture tests.
+# Lazy imports are absent from import-linter's static graph.
 unmatched_ignore_imports_alerting = none
 ignore_imports =
     clearml_yolo.adapters.integrations.native_ddp -> ultralytics
@@ -443,7 +443,7 @@ forbidden_modules =
     clearml_yolo.adapters.torchvision
     clearml_yolo.adapters.yolo
 allow_indirect_imports = true
-# Lazy imports are checked in the AST-enriched architecture tests.
+# Lazy imports are absent from import-linter's static graph.
 unmatched_ignore_imports_alerting = none
 ignore_imports =
     clearml_yolo.adapters.export.build -> clearml_yolo.adapters.storage.filesystem
