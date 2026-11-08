@@ -1,18 +1,6 @@
-# prek (https://prek.j178.dev) runs these hooks; the format stays pre-commit compatible.
-# Every check runs the project's own tools through `uv run`, so a hook and the command
-# you type by hand are the same command against the same locked versions. Nothing here
-# pins a second copy of ruff or mypy that could drift from the `dev` dependency group.
-# Install both hooks with scripts/local_release.py --install-hooks. The custom
-# post-commit launcher uses --all-files so the runner cannot hide dirty files.
-#
-# Hooks run serially in this order. Whole-repository checks always run, because staged
-# file lists omit deletions; their own caches keep unchanged runs cheap. They analyze
-# the complete tree (pass_filenames: false), which includes untracked files, so the
-# untracked-sources hook rejects untracked files under src, tests and scripts.
-# pytest-testmon reruns only tests affected by changed Python; pytest-full reruns the
-# complete suite for non-Python inputs and refreshes the testmon database first, so the
-# incremental hook then selects nothing. Generated release commits skip the heavy hook
-# ids (scripts/local_release.py HEAVY_HOOKS); keep those names in sync.
+# Relevant staged paths select checks; full acceptance runs after the final commit.
+# Whole-project hooks include deleted paths in selection without passing them as arguments.
+minimum_prek_version: "0.5.10"
 default_install_hook_types: [pre-commit]
 default_stages: [pre-commit]
 fail_fast: false
@@ -31,31 +19,31 @@ repos:
 
   - repo: local
     hooks:
-      - id: changelog
-        name: Generate changelog from committed history
-        entry: uv run --locked --no-sync python scripts/local_release.py --changelog
-        language: system
-        always_run: true
-        pass_filenames: false
-        require_serial: true
-        # A regenerated changelog rejects the commit anyway; stop before analysis and
-        # tests run, so only the retry (with the changelog staged) pays for them.
-        fail_fast: true
-
       - id: untracked-sources
         name: No untracked files under src, tests or scripts
         entry: >-
           sh -c 'files=$(git ls-files --others --exclude-standard -- src tests scripts);
           test -z "$files" || { printf "Stage or remove:\n%s\n" "$files"; exit 1; }'
         language: system
-        always_run: true
+        files: '^((src|tests|scripts)/|\.pre-commit-config\.yaml$)'
+        include_deleted: true
         pass_filenames: false
 
       - id: ruff
-        name: Ruff
+        name: Ruff (changed Python files)
+        entry: uv run --frozen --no-sync ruff check --force-exclude
+        language: system
+        types_or: [python, pyi]
+        exclude: '^(external|outputs|runs|multirun|build|dist|mutants|\.agents|\.claude)/'
+        pass_filenames: true
+        require_serial: true
+
+      - id: ruff-config
+        name: Ruff (configuration changes)
         entry: uv run --frozen --no-sync ruff check .
         language: system
-        always_run: true
+        files: '^(pyproject\.toml|ruff\.toml|\.ruff\.toml|uv\.lock|\.pre-commit-config\.yaml)$'
+        include_deleted: true
         pass_filenames: false
         require_serial: true
 
@@ -63,7 +51,9 @@ repos:
         name: mypy (strict)
         entry: uv run --frozen --no-sync mypy .
         language: system
-        always_run: true
+        files: '(^.*\.pyi?$|^(pyproject\.toml|mypy\.ini|\.mypy\.ini|uv\.lock|\.pre-commit-config\.yaml)$)'
+        exclude: '^(external|outputs|runs|multirun|build|dist|mutants|\.agents|\.claude)/'
+        include_deleted: true
         pass_filenames: false
         require_serial: true
 
@@ -71,7 +61,8 @@ repos:
         name: Vulture
         entry: uv run --frozen --no-sync vulture
         language: system
-        always_run: true
+        files: '^((src|tests|scripts)/.*\.py$|pyproject\.toml$|uv\.lock$|\.pre-commit-config\.yaml$)'
+        include_deleted: true
         pass_filenames: false
         require_serial: true
 
@@ -79,7 +70,8 @@ repos:
         name: Import contracts
         entry: uv run --frozen --no-sync lint-imports
         language: system
-        always_run: true
+        files: '^(src/.*\.py$|pyproject\.toml$|uv\.lock$|\.importlinter$|\.pre-commit-config\.yaml$)'
+        include_deleted: true
         pass_filenames: false
         require_serial: true
 
@@ -87,8 +79,9 @@ repos:
         name: Full pytest for non-Python inputs
         entry: env -u PYTEST_ADDOPTS uv run --frozen --no-sync pytest --testmon-noselect -q
         language: system
-        files: ^((src|tests|scripts)/|pyproject\.toml$|uv\.lock$|ruff\.toml$|\.importlinter$|\.pre-commit-config\.yaml$)
+        files: ^((src|tests|scripts)/|pytest\.ini$|setup\.cfg$|tox\.ini$|pyproject\.toml$|uv\.lock$|ruff\.toml$|\.importlinter$|\.pre-commit-config\.yaml$)
         exclude_types: [python]
+        include_deleted: true
         pass_filenames: false
         require_serial: true
 
@@ -96,17 +89,7 @@ repos:
         name: Affected pytest (testmon)
         entry: env -u PYTEST_ADDOPTS uv run --frozen --no-sync pytest --testmon -q
         language: system
-        always_run: true
-        pass_filenames: false
-        require_serial: true
-
-
-      - id: local-release
-        name: Create local semantic version commit and tag
-        entry: uv run --locked --no-sync python scripts/local_release.py
-        args: [--post-commit]
-        language: system
-        stages: [post-commit]
-        always_run: true
+        files: '^((src|tests|scripts)/.*\.py$|pyproject\.toml$|uv\.lock$|\.pre-commit-config\.yaml$)'
+        include_deleted: true
         pass_filenames: false
         require_serial: true

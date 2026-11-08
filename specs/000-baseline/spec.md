@@ -741,19 +741,22 @@ appropriate isolated installs, with reused dependencies stated.
 ### Local release interface
 
 The [commit/release procedure](../../docs/development.md#commit-procedure) owns hooks and exact preservation
-of local `[tool.uv.sources]` around every commit attempt. Stage only authorized changes, preserve other work
-and inspect generated changelog changes; do not bypass hooks, reset or stash to obtain acceptance.
+of local `[tool.uv.sources]`. Intermediate split commits may target expensive hook IDs with `SKIP`;
+full verification runs after the final task commit with skips unset, including deletion coverage.
+Validate committed metadata in an isolated prepared worktree without altering local overrides.
+Stage only authorized changes and keep mechanical formatting commits separate.
 `scripts/local_release.py --changelog` regenerates English history from committed Conventional Commits
 without staging; changed output requires review/retry. Shallow history is rejected without automatic fetch;
 detached refresh is skipped.
 
-`scripts/local_release.py --install-hooks` installs owned prek pre/post-commit hooks and refuses to replace
-unrelated custom hooks. Normal/manual release runs on master only: fix/perf patch, feat minor, breaking
+`scripts/local_release.py --install-hooks` installs prek pre-commit checks and removes only the unchanged
+project-owned legacy post-commit launcher. It preserves foreign post-commit hooks and refuses foreign
+pre-commit hooks. Legacy `--post-commit` calls are no-ops. Explicit release runs on master only: fix/perf patch, feat minor, breaking
 minor below 1.0, nonrelease types alone no version. It includes unreleased reachable history, creates a
 checked version commit and annotated `vX.Y.Z`, and edits only root version tokens/changelog plus private Git
 recovery metadata; no dependency resolution or automatic push/fetch/build occurs. Concurrency, dirty
 source/index, inconsistent metadata/tag or changed prepared recovery content fail/defer explicitly;
-post-commit failure does not undo the contributor commit. Recovery validates recorded identities/hashes and
+explicit release failure does not undo the contributor commit. Recovery validates recorded identities/hashes and
 never rewrites existing refs. Legacy recovery records without a changelog checksum cannot tag automatically.
 Exit 0 means release complete or an explained skip; exit 1 means a reported failure/defer, with the original
 contributor commit retained. Authorized delivery explicitly pushes and verifies branch/tag refs. Publish

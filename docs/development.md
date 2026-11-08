@@ -72,25 +72,20 @@ serially, in file order. Install the hooks with the
 untracked files stay visible to the checks. The `untracked-sources` hook therefore
 rejects untracked files under `src/`, `tests/` and `scripts/`; stage or remove them.
 
-Every commit runs the hygiene, `changelog`, `untracked-sources`, Ruff, mypy, Vulture,
-import-linter, `pytest --testmon` hooks. They always run because
-staged file lists omit deleted files; their caches keep unchanged runs short. A
-commit that only deletes non-Python test or package data does not trigger the full
-suite, which is one more reason to run full acceptance. The
-full `pytest --testmon-noselect` hook runs only for staged non-Python files under
-`src/`, `tests/` or `scripts/`, or for `pyproject.toml`, `uv.lock`, `ruff.toml`,
-`.importlinter` or `.pre-commit-config.yaml`.
+Commit hooks select tools from the staged paths and each tool's configuration.
+Ruff checks selected Python files and uses whole-project analysis for configuration changes;
+mypy retains whole-project analysis when selected; Vulture and import-linter
+retain their configured cross-file scope. Python changes select affected testmon tests;
+non-Python fixtures and dependency/configuration changes select the complete suite first,
+refreshing testmon so the incremental pass does not repeat it. Documentation-only commits
+select hygiene checks. Changelog generation and releases are explicit commands.
 
-[pytest-testmon](https://testmon.org) records which source each test executes, in the
-ignored `.testmondata` file. `--testmon` reruns only the tests affected by changed
-Python, plus tests that previously failed. `--testmon-noselect` runs every test and
-refreshes the database. After a full acceptance run, a commit of unchanged code
-therefore selects no tests. Run the full command as the acceptance step before a
-commit or release. testmon does not see code that runs only in child processes (such as
-CPU-DDP or supervision) or environment changes that leave files unchanged, so the
-incremental hook is a fast gate, not acceptance. Mypy, Ruff and import-linter keep
-their own incremental caches. Generated release commits skip the heavy hooks; see
-[local releases](#local-releases).
+Whole-project hooks include deleted paths in selection. After the final task commit, unset `SKIP`
+and `PYTEST_ADDOPTS` and run `uv run --frozen --no-sync prek run --all-files`.
+This includes the complete ordinary suite and covers deleted inputs. Do not repeat a
+successful check merely for another workflow stage when its inputs remain unchanged.
+Testmon cannot establish child-process or environment-change coverage, so its affected
+selection alone is not acceptance.
 
 See the [static analysis policy](static-analysis.md) for Ruff selections and exclusions,
 mypy boundary exceptions and Vulture's confidence threshold. Install the locked dev
@@ -282,29 +277,22 @@ explicit paths or hunks belonging to the task; preserve unrelated staged and uns
 changes. Do not stash, reset, revert or bypass hooks to make a check pass. Use Conventional
 Commits and inspect hook-generated changes before retrying.
 
-Before every commit, temporarily remove the entire `[tool.uv.sources]` section
-from `pyproject.toml`, including its comments and the local editable overrides:
+Split work into coherent task-owned commits. Intermediate commits may use targeted
+`SKIP=<hook IDs>` for expensive checks, with final verification still outstanding.
+Keep mechanical formatting fixes in a separate commit. Preserve unrelated staged and
+unstaged changes; inspect auto-fixes and restage only owned hunks. Do not use
+`--no-verify` or blanket skips to hide failures. Run the full configured pipeline after
+the final task commit; relevant subsequent changes invalidate affected evidence.
 
-```toml
-[tool.uv.sources]
-# Local development uses ordinary dependency copies.
-digital-metrics = { path = "external/digital-metrics", editable = true }
-report-generator = { path = "external/report-generator", editable = true }
-```
-
-Preserve the exact local section before removing it. Perform final verification
-after removal and keep the section absent through independent review and automatic
-release, so the checked inputs are the committed ones. Stage only the section removal
-and other authorized changes; verify that the staged `pyproject.toml` has no
-`[tool.uv.sources]` section. Preserve unrelated staged and unstaged edits. Run the
-applicable commit checks without bypassing hooks. This temporary removal does not
-authorize dependency resolution, changes to `uv.lock`, or dependency source updates.
-
-After the commit command and its hooks finish, restore the saved section locally
-without staging it. Keep the section absent throughout any automatic release commit.
-Restore it on failed or interrupted commit attempts as well; remove it again before
-retrying. Verify that the working copy has the local overrides and that a successful
-commit contains no `[tool.uv.sources]` section.
+Keep local `[tool.uv.sources]` overrides intact during intermediate commits, and never
+stage them. Before final acceptance, inspect `git show HEAD:pyproject.toml` to confirm
+that the committed project contains no local source overrides. Verify committed inputs
+in an isolated worktree at that final commit, using the prepared environment with
+`uv run --frozen --no-sync` and explicit `UV_PROJECT_ENVIRONMENT` pointing to it.
+Provision required external dependency checkouts there before checking; do not resolve
+or update dependencies during verification. This keeps the working checkout's exact
+local overrides intact. Run explicit releases from a clean prepared checkout after
+acceptance; do not strip and restore overrides around each contributor commit.
 
 ## Paired CY and queue release check
 
@@ -345,41 +333,34 @@ for a concrete debugging purpose; they are not routine release acceptance gates.
 Run release verification from the source checkout. Generic packaging guidance in
 shared skills does not override this project rule.
 
-After installing dependencies, install both repository hooks:
+After installing dependencies, install the repository checks:
 
 ```bash
 uv run --locked --no-sync python scripts/local_release.py --install-hooks
 ```
 
-The installer runs `prek install --force` for the pre-commit hook. It replaces a hook
-generated by pre-commit or prek instead of chaining it as `pre-commit.legacy`, which
-would run every check twice. It refuses to replace any other existing pre-commit or
-post-commit hook. The `changelog` hook regenerates CHANGELOG.md from committed history.
-It runs before analysis and tests and has `fail_fast: true`, so a changelog rewrite stops
-the hook run before the expensive checks. If that
-changes the file, inspect and stage the generated change, then retry the commit.
-Do not edit the generated changelog by hand.
+The installer replaces only a pre-commit/prek-generated pre-commit hook, avoiding
+legacy chaining and duplicate checks. It removes the project's marked post-commit
+launcher, preserves foreign post-commit hooks and refuses foreign pre-commit hooks.
+Legacy `--post-commit` calls are harmless no-ops. Contributor commits do not generate
+changelogs, version commits or tags.
 
-On master, the post-commit hook evaluates unreleased Conventional Commits. Release
-changes produce a checked version commit and an annotated version tag. Documentation
-commits alone do not bump the version. Release preparation updates only the root
-package version in `uv.lock`; it does not resolve dependencies. The committed dependency
-sources, versions and metadata remain unchanged while local source overrides are absent.
-The helper validates the exact expected source parent, the three release paths,
-root-version-only metadata changes and the prepared changelog hash. Because of that,
-the generated version commit and the tag-recovery hook run set `SKIP` to the heavy hook
-IDs (`HEAVY_HOOKS` in [the helper](../scripts/local_release.py)): Ruff, mypy, Vulture,
-import-linter and both pytest hooks. The hygiene, changelog and documentation hooks
-still run. Tag recovery retains metadata, ownership, concurrency and conflicting-tag
-checks. A commit message alone never authorizes skipping. Recovery runs
-`untracked-sources`, so stage or remove untracked files under `src/`, `tests/` and
-`scripts/` before retrying.
-A failed post-commit hook does not undo the
-original commit; inspect its output. To retry or check the release workflow manually:
+After final verification, explicitly invoke the existing release workflow when release
+is authorized:
 
 ```bash
 uv run --locked --no-sync python scripts/local_release.py
+# Optional standalone changelog refresh; returns 1 when the file changes.
+uv run --locked --no-sync python scripts/local_release.py --changelog
 ```
+
+On master, the helper evaluates Conventional Commits and prepares only root version
+metadata and the generated changelog. Documentation commits alone do not bump the
+version. Lock versions and dependency sources remain unchanged. Existing release
+ownership, parent/path validation, changelog hash, concurrency and conflicting-tag
+checks remain enforced. Generated metadata-only commits and tag recovery skip the
+heavy IDs in `HEAVY_HOOKS`; hygiene checks remain enabled. Failed explicit release
+attempts retain their state for inspection and retry with the same command.
 
 After checking the result, complete authorized delivery by pushing the intended branch
 and any newly created version tag explicitly, then verify the remote refs. A no-release

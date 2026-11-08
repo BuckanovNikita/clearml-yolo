@@ -73,10 +73,10 @@ for every task. Read guidance instead of copying shared skills into the reposito
 - Use Conventional Commits and complete the native release workflow when user or standing
   authorization covers delivery; explicit no-commit/no-release limits and the active host
   mode take precedence. Preserve unrelated changes and stage only task-owned hunks;
-  do not stash, reset, revert or bypass hooks to make a check pass.
-- Before each commit, follow the [commit procedure](docs/development.md#commit-procedure):
-  temporarily remove the entire local `[tool.uv.sources]` section, preserve it exactly,
-  and restore it unstaged after commit/hooks finish, including failed attempts.
+  do not stash, reset or revert unrelated work, or bypass hooks to hide failures.
+- Follow the [commit procedure](docs/development.md#commit-procedure) for coherent split
+  commits, targeted intermediate skips and final verification of committed inputs.
+  Preserve local source overrides; validate them only at final acceptance.
 
 ## Documentation
 
