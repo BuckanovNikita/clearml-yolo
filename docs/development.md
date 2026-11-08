@@ -191,8 +191,7 @@ in dated feature evidence, not this evergreen guide.
 The release helper imports the standard library, Loguru, Pydantic and the verifier's
 shared byte-exact version validation. The verification entrypoint uses only the standard library and never imports application runtime modules. Keep lint
 and stub distributions in the development group when adding runtime dependencies.
-`tests/test_tooling_boundaries.py` enforces these constraints with
-injected forbidden imports and dependency declarations. Ruff preview checks require
+Review these tooling boundaries when changing the development scripts. Ruff preview checks require
 explicit code selection; review the [policy report](static-analysis.md) and refresh
 the rule inventory when changing the locked Ruff version.
 
