@@ -80,7 +80,6 @@ In both isolated environments, the following native Ultralytics check passed:
 
 ```python
 from ultralytics.data.augment import Albumentations
-
 assert Albumentations().transform is not None
 ```
 

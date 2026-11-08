@@ -1,7 +1,7 @@
 extend = "../../../ruff.toml"
 
 # Checksum-protected reproduction records are historical evidence, not maintained code.
-extend-exclude = ["references/cache-cleanup-2026-10-20"]
+extend-exclude = ["references/cache-cleanup-2026-10-20", "references/release-030-evidence"]
 
 [lint.extend-per-file-ignores]
 # Apply the root test policy to this package's nested regression tests.

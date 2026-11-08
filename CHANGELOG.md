@@ -3,13 +3,47 @@
 
 ## Unreleased
 
+### Chores
+
+- Drop release fixtures and the portable skill stage
+  ([`e215f18`](https://github.com/BuckanovNikita/clearml-yolo/commit/e215f1875d257763a0436b962ecaa2adbd24ca20))
+
+- Remove documentation-specific tests and checks
+  ([`19ff1b7`](https://github.com/BuckanovNikita/clearml-yolo/commit/19ff1b78084fa4d963e01757b1f5ecd0bacd5319))
+
+- **tooling**: Consolidate agent and verification policies
+  ([`3014e7f`](https://github.com/BuckanovNikita/clearml-yolo/commit/3014e7fa217de1af66c46d75f1b01fb8e96bb898))
+
+### Code Style
+
+- Apply Ruff formatting
+  ([`91756fa`](https://github.com/BuckanovNikita/clearml-yolo/commit/91756fa4661c79854dacd7c827832854dc63e787))
+
 ### Documentation
+
+- Clarify domain boundaries and preserve specification meaning
+  ([`ca8d887`](https://github.com/BuckanovNikita/clearml-yolo/commit/ca8d887f4eee833b97db1e86eecf5e1d011708aa))
+
+- Consolidate specifications into functional descriptions
+  ([`54a6827`](https://github.com/BuckanovNikita/clearml-yolo/commit/54a682729428b4402983aa2ddd3e0295db6caab1))
+
+- Define self-contained functional behavior
+  ([`a019f19`](https://github.com/BuckanovNikita/clearml-yolo/commit/a019f1917c1a8b50ed8c630f913a7270006fb78a))
+
+- Replace progress records with fresh product specifications
+  ([`b25fae9`](https://github.com/BuckanovNikita/clearml-yolo/commit/b25fae94b649c12c8bbddc811662ead6d0a1b218))
+
+- Restore missing specification guarantees
+  ([`099a088`](https://github.com/BuckanovNikita/clearml-yolo/commit/099a088bbe8b2b7008ba69978ffbbad13fb0bdea))
 
 - **bugs**: Record the CY 0.46.2 release and paired queue check
   ([`f547e11`](https://github.com/BuckanovNikita/clearml-yolo/commit/f547e114549d97e5cad07de4ec23405be5b6d4dc))
 
 - **bugs**: Record the unverified post-restart sysmem fallback probe
   ([`303a0ae`](https://github.com/BuckanovNikita/clearml-yolo/commit/303a0ae277b9a3a09b0746abe197b7ecd187e7a9))
+
+- **plans**: Add the verification-from-zero plan and supersede WP1, WP2b and WP4
+  ([`1c25bd5`](https://github.com/BuckanovNikita/clearml-yolo/commit/1c25bd59849c5033c6af8aed065b8594ac4c7483))
 
 - **skills**: Move ClearML environment guidance into the project
   ([`1abc844`](https://github.com/BuckanovNikita/clearml-yolo/commit/1abc844fde541c74288b983e6c757be9d1e15586))
