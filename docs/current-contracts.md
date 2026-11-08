@@ -43,7 +43,7 @@ configuration, output, tracking and evaluation rules formerly listed in `AGENTS.
 | FiftyOne publication | [Publisher and native evaluations](../specs/000-baseline/spec.md), [current inventory](experiment-records.md#publication-inventory) | [Owner publication](../src/clearml_yolo/application/use_cases/publication.py), [replaceable adapter](../src/clearml_yolo/adapters/fiftyone/publisher.py) | [Publisher checks](../tests/test_fiftyone_publisher.py), [native evaluation projection](../tests/test_fiftyone_evaluation_results.py); [dated native evidence](https://github.com/BuckanovNikita/clearml-yolo/blob/d74945c83dc24094c599388bbcfd5e987daeb9bf/specs/015-fiftyone-native-evaluations/verification-2026-10-06.md) |
 | Operation diagnostics and stalled-run capture | [Diagnostics](diagnostics.md) | [Tracing](../src/clearml_yolo/adapters/observability/tracing.py), [FD capture](../src/clearml_yolo/adapters/observability/capture.py), [publisher](../src/clearml_yolo/adapters/clearml/console.py), cy_queue guardian, [native cleanup](../src/clearml_yolo/adapters/integrations/native_runtime.py) | [Diagnostics](../tests/test_diagnostics.py), [console capture](../tests/test_console_capture.py), queue repository logging tests |
 | Local dependency sources | [Development setup and local copies](development.md#external-dependencies) | [Ignore rules](../.gitignore), [package configuration](../pyproject.toml), [editable lock](../uv.lock) | [Metadata/tooling boundaries](../tests/test_tooling_boundaries.py), [installed dependency evidence](https://github.com/BuckanovNikita/clearml-yolo/blob/d74945c83dc24094c599388bbcfd5e987daeb9bf/docs/evidence/2026-10-15-correctness-cleanup/packaging-verification.md) |
-| Local versioning, changelog and release hooks | [Local release](../specs/000-baseline/spec.md) | [Release helper](../scripts/local_release.py), [hook configuration](../.pre-commit-config.yaml), [generated changelog](../CHANGELOG.md) | [Release fixtures](../tests/test_local_release.py); actual delivery requires commit/tag ref verification |
+| Local versioning, changelog and release hooks | [Local release](../specs/000-baseline/spec.md) | [Release helper](../scripts/local_release.py), [hook configuration](../.pre-commit-config.yaml), [generated changelog](../CHANGELOG.md) | No automated fixture; actual delivery requires commit/tag ref verification |
 
 ## Authority and verification
 
@@ -64,11 +64,8 @@ and reason in the workflow artifacts. Missing required updates or failed validat
 blocks completion.
 
 For a contract change, inspect this index, affected contracts, active specifications,
-quickstarts, README, project-owned integration skills, the portable
-[clearml-yolo usage skill](https://github.com/BuckanovNikita/corp-skills/tree/main/skills/clearml-yolo)
-and any applicable environment skill. The
-[skill maintenance stage](agent-workflow.md#portable-usage-skill-maintenance)
-owns cross-repository updates and acceptance evidence.
+quickstarts, README, project-owned integration skills and any applicable
+environment skill.
 Update current normative text together. Preserve completed task history and dated
 analysis/verification; annotate superseded intent and link to current guidance.
 Do not turn historical observations into a claim about a new implementation.

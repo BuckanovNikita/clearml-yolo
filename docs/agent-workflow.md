@@ -71,18 +71,6 @@ task-owned diff with contract coverage and record actual results in dated eviden
 Update affected user guidance with behavior changes. Use only documentation checks
 native to Spec Kit or OpenSpec; no separate documentation stage or custom gate applies.
 
-### Portable usage skill maintenance
-
-The canonical portable `clearml-yolo` usage skill lives in
-[corp-skills/skills/clearml-yolo](https://github.com/BuckanovNikita/corp-skills/tree/main/skills/clearml-yolo).
-This repository owns application contracts; corp-skills owns the distributable
-usage package. Edit its source, not installed skill copies. Machine-specific stand,
-GPU and credential setup stays in global environment skills.
-
-When CLI/API, configuration, inputs/outputs or recovery behavior changes, update
-affected portable usage guidance at its canonical source. Preserve unrelated edits
-and historical evidence. Skill installation is a separate action.
-
 ### Workflow safeguards
 
 - In host Plan Mode, return read-only findings or a proposed plan before executing

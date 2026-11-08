@@ -27,7 +27,7 @@ for every task. Read guidance instead of copying shared skills into the reposito
 | Plan, implement, fix, resume or accept repository changes | [Workflow policy](docs/agent-workflow.md), including its [module boundaries](docs/agent-workflow.md#module-boundaries) |
 | Run any Spec Kit stage, including planning or bug-source capture | [Agent workflow policy](docs/agent-workflow.md), then the applicable installed skills |
 | Verify native execution, training, GPU use or ClearML publication | [running-end-to-end-tests](.agents/skills/running-end-to-end-tests/SKILL.md); load the project-local [clearml-yolo-environment](.agents/skills/clearml-yolo-environment/SKILL.md) for this machine |
-| Change contracts or their documentation | [Current contract index](docs/current-contracts.md#maintaining-consistency) and the [documentation guidance](docs/agent-workflow.md#documentation), including the portable `clearml-yolo` usage skill ([maintenance](docs/agent-workflow.md#portable-usage-skill-maintenance)) |
+| Change contracts or their documentation | [Current contract index](docs/current-contracts.md#maintaining-consistency) and the [documentation guidance](docs/agent-workflow.md#documentation) |
 
 ## Workflow and completion
 
