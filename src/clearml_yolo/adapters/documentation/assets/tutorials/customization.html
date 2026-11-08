@@ -115,9 +115,7 @@ def run_metrics(engine: EvaluationEngine | None = None) -&gt; MetricsResult:
         from clearml_yolo.core.publication import FiftyOneConfig
         from clearml_yolo.entrypoints.composition import build_dependencies
 
-        tracking = ClearMLConfig(
-            project_name=&quot;cy-tutorial&quot;, task_name=&quot;python-metrics&quot;, tags=[&quot;tutorial&quot;, &quot;python&quot;]
-        )
+        tracking = ClearMLConfig(project_name=&quot;cy-tutorial&quot;, task_name=&quot;python-metrics&quot;, tags=[&quot;tutorial&quot;, &quot;python&quot;])
         evaluation = EvaluationConfig()
         publication = FiftyOneConfig(enabled=False)
         deps = build_dependencies()
@@ -185,4 +183,4 @@ CLI выше. Произвольные pipeline stages нельзя замени
 обязательные uploads и содержимое <code>Configuration / run</code>. Тестирование preview
 не проверяет JSON операторов, произвольную реализацию port или native обучение.</p>
 </main></body></html>
-<!-- source-sha256: 601beae6361148a0e2c6baaaeff9b1fdd94c337c95e2530d26c995520a8217c1 -->
+<!-- source-sha256: 0d4ddf3c884e409a03cde302db889509f55a7ad116d7125ad738194da2ec380e -->
