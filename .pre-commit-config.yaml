@@ -42,7 +42,7 @@ repos:
         name: Ruff (configuration changes)
         entry: uv run --frozen --no-sync ruff check .
         language: system
-        files: '^(pyproject\.toml|ruff\.toml|\.ruff\.toml|uv\.lock|\.pre-commit-config\.yaml)$'
+        files: '(?:^(pyproject\.toml|ruff\.toml|\.ruff\.toml|uv\.lock|\.pre-commit-config\.yaml)$)|^\.python-version$'
         include_deleted: true
         pass_filenames: false
         require_serial: true
@@ -51,7 +51,7 @@ repos:
         name: mypy (strict)
         entry: uv run --frozen --no-sync mypy .
         language: system
-        files: '(^.*\.pyi?$|^(pyproject\.toml|mypy\.ini|\.mypy\.ini|uv\.lock|\.pre-commit-config\.yaml)$)'
+        files: '(?:(^.*\.pyi?$|^(pyproject\.toml|mypy\.ini|\.mypy\.ini|uv\.lock|\.pre-commit-config\.yaml)$))|^\.python-version$'
         exclude: '^(external|outputs|runs|multirun|build|dist|mutants|\.agents|\.claude)/'
         include_deleted: true
         pass_filenames: false
@@ -61,7 +61,7 @@ repos:
         name: Vulture
         entry: uv run --frozen --no-sync vulture
         language: system
-        files: '^((src|tests|scripts)/.*\.py$|pyproject\.toml$|uv\.lock$|\.pre-commit-config\.yaml$)'
+        files: '(?:^((src|tests|scripts)/.*\.py$|pyproject\.toml$|uv\.lock$|\.pre-commit-config\.yaml$))|^\.python-version$'
         include_deleted: true
         pass_filenames: false
         require_serial: true
@@ -70,7 +70,7 @@ repos:
         name: Import contracts
         entry: uv run --frozen --no-sync lint-imports
         language: system
-        files: '^(src/.*\.py$|pyproject\.toml$|uv\.lock$|\.importlinter$|\.pre-commit-config\.yaml$)'
+        files: '(?:^(src/.*\.py$|pyproject\.toml$|uv\.lock$|\.importlinter$|\.pre-commit-config\.yaml$))|^\.python-version$'
         include_deleted: true
         pass_filenames: false
         require_serial: true
@@ -84,7 +84,7 @@ repos:
           done;
           exec env -u PYTEST_ADDOPTS uv run --frozen --no-sync pytest --testmon -q' --
         language: system
-        files: '^((src|tests|scripts)/|pytest\.ini$|setup\.cfg$|tox\.ini$|pyproject\.toml$|uv\.lock$|\.?ruff\.toml$|\.importlinter$|\.pre-commit-config\.yaml$)'
+        files: '(?:^((src|tests|scripts)/|pytest\.ini$|setup\.cfg$|tox\.ini$|pyproject\.toml$|uv\.lock$|\.?ruff\.toml$|\.importlinter$|\.pre-commit-config\.yaml$))|^\.python-version$'
         include_deleted: true
         pass_filenames: true
         require_serial: true
