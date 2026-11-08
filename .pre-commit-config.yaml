@@ -1,5 +1,5 @@
 # Relevant staged paths select checks; full acceptance runs after the final commit.
-# Whole-project hooks include deleted paths in selection without passing them as arguments.
+# Whole-project checks select deleted paths; pytest consumes filenames only to choose its mode.
 minimum_prek_version: "0.5.10"
 default_install_hook_types: [pre-commit]
 default_stages: [pre-commit]
@@ -75,21 +75,16 @@ repos:
         pass_filenames: false
         require_serial: true
 
-      - id: pytest-full
-        name: Full pytest for non-Python inputs
-        entry: env -u PYTEST_ADDOPTS uv run --frozen --no-sync pytest --testmon-noselect -q
-        language: system
-        files: ^((src|tests|scripts)/|pytest\.ini$|setup\.cfg$|tox\.ini$|pyproject\.toml$|uv\.lock$|ruff\.toml$|\.importlinter$|\.pre-commit-config\.yaml$)
-        exclude_types: [python]
-        include_deleted: true
-        pass_filenames: false
-        require_serial: true
-
       - id: pytest
-        name: Affected pytest (testmon)
-        entry: env -u PYTEST_ADDOPTS uv run --frozen --no-sync pytest --testmon -q
+        name: Pytest (affected Python or full changed-input suite)
+        entry: >-
+          bash -c 'for file do
+          case "$file" in *.py) test -e "$file" && continue;; esac;
+          exec env -u PYTEST_ADDOPTS uv run --frozen --no-sync pytest --testmon-noselect -q;
+          done;
+          exec env -u PYTEST_ADDOPTS uv run --frozen --no-sync pytest --testmon -q' --
         language: system
-        files: '^((src|tests|scripts)/.*\.py$|pyproject\.toml$|uv\.lock$|\.pre-commit-config\.yaml$)'
+        files: '^((src|tests|scripts)/|pytest\.ini$|setup\.cfg$|tox\.ini$|pyproject\.toml$|uv\.lock$|\.?ruff\.toml$|\.importlinter$|\.pre-commit-config\.yaml$)'
         include_deleted: true
-        pass_filenames: false
+        pass_filenames: true
         require_serial: true

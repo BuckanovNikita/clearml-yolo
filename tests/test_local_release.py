@@ -762,3 +762,51 @@ def test_installer_preserves_modified_owned_launcher(release_repo: Path, kind: s
     command(repo, sys.executable, str(HELPER), "--install-hooks")
     assert hook.read_text() == content
     assert hook.is_symlink() == (kind == "symlink")
+
+
+@pytest.mark.parametrize("scenario", ["python", "config", "fixture", "deleted", "all", "docs"])
+def test_pytest_hook_dispatches_one_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, scenario: str) -> None:
+    """Exercise real prek selection and the shell dispatcher without importing the runtime."""
+    repo = tmp_path / "dispatch"
+    repo.mkdir()
+    config = yaml.safe_load((ROOT / ".pre-commit-config.yaml").read_text())
+    hook = next(hook for item in config["repos"] for hook in item["hooks"] if hook["id"] == "pytest")
+    config["repos"] = [{"repo": "local", "hooks": [hook]}]
+    (repo / ".pre-commit-config.yaml").write_text(yaml.safe_dump(config))
+    for filename in ("src/with spaces.py", "tests/data.json", "ruff.toml", "README.md"):
+        path = repo / filename
+        path.parent.mkdir(exist_ok=True)
+        path.write_text("fixture\n")
+    git(repo, "init", "-b", "dispatch")
+    git(repo, "config", "user.name", "Hook Test")
+    git(repo, "config", "user.email", "hook@example.invalid")
+    git(repo, "add", ".")
+    git(repo, "commit", "-m", "chore: dispatch fixture")
+    binary = tmp_path / "bin"
+    binary.mkdir()
+    stub = binary / "uv"
+    stub.write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> "$HOOK_CALLS"\n')
+    stub.chmod(0o755)
+    calls = tmp_path / "calls"
+    monkeypatch.setenv("PATH", str(binary) + os.pathsep + os.environ["PATH"])
+    monkeypatch.setenv("HOOK_CALLS", str(calls))
+    if scenario == "deleted":
+        (repo / "src/with spaces.py").unlink()
+        git(repo, "add", "-u")
+        options: tuple[str, ...] = ()
+    elif scenario == "all":
+        options = ("--all-files",)
+    else:
+        paths = {
+            "python": "src/with spaces.py",
+            "config": "ruff.toml",
+            "fixture": "tests/data.json",
+            "docs": "README.md",
+        }
+        options = ("--files", paths[scenario])
+    command(repo, "prek", "run", *options)
+    if scenario == "docs":
+        assert not calls.exists()
+    else:
+        flag = "--testmon" if scenario == "python" else "--testmon-noselect"
+        assert calls.read_text().splitlines() == [f"run --frozen --no-sync pytest {flag} -q"]

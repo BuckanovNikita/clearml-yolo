@@ -76,9 +76,9 @@ Commit hooks select tools from the staged paths and each tool's configuration.
 Ruff checks selected Python files and uses whole-project analysis for configuration changes;
 mypy retains whole-project analysis when selected; Vulture and import-linter
 retain their configured cross-file scope. Python changes select affected testmon tests;
-non-Python fixtures and dependency/configuration changes select the complete suite first,
-refreshing testmon so the incremental pass does not repeat it. Documentation-only commits
-select hygiene checks. Changelog generation and releases are explicit commands.
+non-Python fixtures, dependency/configuration changes and deleted inputs select the
+complete suite. A single hook dispatches exactly one pytest invocation, refreshing
+testmon on a full run. Documentation-only commits select hygiene checks. Changelog generation and releases are explicit commands.
 
 Whole-project hooks include deleted paths in selection. After the final task commit, unset `SKIP`
 and `PYTEST_ADDOPTS` and run `uv run --frozen --no-sync prek run --all-files`.
