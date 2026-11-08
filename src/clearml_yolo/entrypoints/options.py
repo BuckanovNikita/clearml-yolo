@@ -204,30 +204,6 @@ OPTION_DECLARATIONS: dict[str, tuple[OptionDeclaration, ...]] = {
         ),
     ),
     "cy-download-weights": (_HELP,),
-    "cy-docs": (
-        _HELP,
-        OptionDeclaration(
-            ("--port",),
-            {"type": int, "default": 0, "help": "local port (default: choose an available port)"},
-            "Порт локального сервера от 0 до 65535; 0 выбирает свободный порт.",
-            ("--port 8765",),
-        ),
-        OptionDeclaration(
-            ("--no-browser",),
-            {"action": "store_true", "help": "print the URL without opening a browser"},
-            "Напечатать адрес локального сайта без открытия браузера.",
-            ("--no-browser",),
-        ),
-        OptionDeclaration(
-            ("--check",),
-            {
-                "action": "store_true",
-                "help": "check packaged documentation without starting a server",
-            },
-            "Проверить полноту справочника, материалы и примеры без запуска сервера.",
-            ("--check",),
-        ),
-    ),
 }
 
 COMMAND_DESCRIPTIONS: dict[str, str] = {
@@ -235,7 +211,6 @@ COMMAND_DESCRIPTIONS: dict[str, str] = {
     "cy-dedup": "Reflink identical, same-named cache images without starting application services.",
     "cy-batch-estimate": ("Measure single-GPU training capacity and extrapolate selected allocations."),
     "cy-download-weights": ("Prepare supported named model weights in their native discovery caches."),
-    "cy-docs": "Open the local Russian configuration reference and tutorials.",
 }
 
 _PROGRAMS: dict[str, str | None] = {
@@ -243,7 +218,6 @@ _PROGRAMS: dict[str, str | None] = {
     "cy-dedup": None,
     "cy-batch-estimate": "cy-batch-estimate",
     "cy-download-weights": "cy-download-weights",
-    "cy-docs": "cy-docs",
 }
 
 

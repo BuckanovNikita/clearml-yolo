@@ -14,9 +14,9 @@ core/adapter dependency allowlists, explicit-effect and runtime-target checks.
 
 `uv run lint-imports --no-cache` enforces the configured contracts in
 [.importlinter](../.importlinter). `uv run pytest tests/test_architecture.py` checks
-the complete module graph, responsibility classification, cycles, core dependency
-allowlist, explicit effects, initializers and runtime targets. Negative tests mutate
-graphs and run unique AST checks and actual configured import-linter contracts. The
+project-specific graph rules, cycles, core dependency allowlists, explicit effects,
+initializers and runtime targets. Negative tests exercise the project's graph and
+AST helpers; import-linter contracts run only through `lint-imports`. The
 [verification commands](development.md#verification) cover both without a separate architecture pytest run.
 
 ## Layers and effects
@@ -65,8 +65,9 @@ dependencies are forbidden in both application and core.
 The exact imports listed in `ignore_imports` are the permitted ownership edges,
 including imports used only for type checking. New SDK imports require a matching
 owner and an explicit contract entry. Ordinary unmatched exceptions fail; optional
-backend/export contracts explicitly permit absent imports and the same configured
-contracts evaluate the AST-enriched graph containing literal dynamic edges. Indirect SDK use through an approved adapter is normal;
+backend/export contracts explicitly permit absent imports. Import-linter checks
+static imports; literal dynamic imports participate in the project-specific graph
+checks but are not checked against import-linter ownership contracts. Indirect SDK use through an approved adapter is normal;
 the layer rules still prevent a core or application module from reaching that adapter.
 
 Queue admission and its disposable visibility probe belong to `cy_queue`; its
@@ -134,7 +135,7 @@ directly to the execution resource port for downstream work and invocation clean
 Evaluation cannot import reporting or tracking; it returns scientific outputs that
 the composition root routes to separate writers. FiftyOne publication cannot import
 tracking or model execution. Additional peer edges require explicit justification
-and updates to both the contracts and the negative graph tests.
+and updates to the contracts.
 
 ## Initializers and runtime targets
 

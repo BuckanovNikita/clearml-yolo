@@ -219,14 +219,7 @@ Dry-run mutates nothing and does not probe reflink support. Writable selections 
 CY_HOME; external selections are dry-run only. Counts describe files, not measured saved
 bytes. See [selection and exit formats](../../docs/experiment-records.md#explicit-cache-deduplication).
 
-## Local documentation and compatibility
-
-cy-docs serves an offline Russian reference with searchable stable field links,
-effective defaults and authored tutorials. Users edit YAML/overrides, inspect differences
-and download configurations. Previews are isolated, bounded to 100 jobs and 15 seconds,
-reject external search paths/plugins, retain unresolved expressions and cannot train,
-load datasets or instantiate targets. Shutdown reaps owned workers. Assets ship without
-requiring Node. [Local documentation](../../docs/local-documentation.md) owns the UI contract.
+## Compatibility
 
 Public CLI/API, serialized formats and scientific values are compatibility boundaries.
 Supported interpreter and dependency requirements are defined by [development](../../docs/development.md) and package metadata.

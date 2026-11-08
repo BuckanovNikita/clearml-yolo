@@ -26,7 +26,7 @@ IMPORT_CONTRACTS.read(Path(__file__).resolve().parents[1] / ".importlinter")
 SDK_ROOTS = {
     root
     for section in IMPORT_CONTRACTS.sections()
-    if section.endswith("-sdk-has-explicit-owners")
+    if section.startswith("importlinter:contract:sdk-ownership-")
     for root in IMPORT_CONTRACTS[section]["forbidden_modules"].split()
 }
 QUEUE_ROOTS = set(

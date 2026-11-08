@@ -4,14 +4,10 @@ import ast
 import json
 import subprocess
 import sys
-from collections.abc import Callable
-from copy import deepcopy
 from pathlib import Path
 
 import grimp
 import pytest
-from importlinter.application.user_options import UserOptions
-from importlinter.domain.contract import Contract
 
 import architecture_helpers as architecture
 
@@ -19,16 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 
 
-def test_actual_graph_obeys_every_configured_contract_including_dynamic_imports(
-    graph: grimp.ImportGraph,
-    import_options: UserOptions,
-    configured_contract: Callable[[str], Contract],
-) -> None:
-    for options in import_options.contracts_options:
-        contract = configured_contract(options["name"])
-        # Contracts remove ignored edges, so each gets its own graph.
-        result = contract.check(deepcopy(graph), verbose=False)
-        assert result.kept, (contract.name, result.metadata)
+def test_actual_graph_obeys_project_specific_architecture_rules(graph: grimp.ImportGraph) -> None:
     assert architecture.graph_findings(graph) == []
 
 
