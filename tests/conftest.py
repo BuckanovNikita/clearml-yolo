@@ -3,7 +3,7 @@
 import os
 import sys
 import tempfile
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from copy import deepcopy
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -15,8 +15,46 @@ from ddp_gpu_harness import GPUOptions
 
 if TYPE_CHECKING:
     import grimp
+    from importlinter.application.user_options import UserOptions
+    from importlinter.domain.contract import Contract
 
     from severstal_harness import SeverstalOptions
+
+
+@pytest.fixture(scope="session")
+def import_options() -> "UserOptions":
+    from importlinter.adapters.user_options import IniFileUserOptionReader
+    from importlinter.configuration import configure
+
+    configure()  # type: ignore[no-untyped-call]
+    options = IniFileUserOptionReader().read_options(str(Path(__file__).resolve().parents[1] / ".importlinter"))
+    assert options is not None
+    assert options.contracts_options
+    return options
+
+
+@pytest.fixture(scope="session")
+def configured_contract(import_options: "UserOptions") -> "Callable[[str], Contract]":
+    from importlinter.contracts.forbidden import ForbiddenContract
+    from importlinter.contracts.independence import IndependenceContract
+    from importlinter.contracts.layers import LayersContract
+    from importlinter.domain.contract import Contract
+
+    classes: dict[str, type[Contract]] = {
+        "layers": LayersContract,
+        "forbidden": ForbiddenContract,
+        "independence": IndependenceContract,
+    }
+
+    def create(name: str) -> Contract:
+        selected = next(contract for contract in import_options.contracts_options if contract["name"] == name)
+        return classes[selected["type"]](
+            name=name,
+            session_options=import_options.session_options,
+            contract_options=selected,
+        )
+
+    return create
 
 
 @pytest.fixture(scope="session")

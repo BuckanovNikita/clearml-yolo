@@ -15,8 +15,9 @@ core/adapter dependency allowlists, explicit-effect and runtime-target checks.
 `uv run lint-imports --no-cache` enforces the configured contracts in
 [.importlinter](../.importlinter). `uv run pytest tests/test_architecture.py` checks
 project-specific graph rules, cycles, core dependency allowlists, explicit effects,
-initializers and runtime targets. Negative tests exercise the project's graph and
-AST helpers; import-linter contracts run only through `lint-imports`. The
+initializers and runtime targets. It also applies the configured import contracts
+to the actual product graph augmented with literal dynamic imports; `lint-imports`
+checks the static graph. The
 [verification commands](development.md#verification) cover both without a separate architecture pytest run.
 
 ## Layers and effects
