@@ -10,7 +10,8 @@ Explicit training `batch=null` checks hardware compatibility for saved
 
 The [job/reservation lifecycle diagram](queue-lifecycles.md) separates job outcomes,
 process-cleanup evidence and current-generation GPU availability. The
-[status map](implementation-status.md) links implementation, releases and external gaps.
+[acceptance boundaries](implementation-status.md) state which outcomes need native or
+remote evidence.
 
 ## Installation
 
@@ -259,8 +260,8 @@ compatible idle hardware or use an explicit value. Global training batches must 
 divisible by the allocated GPU count. OOM keeps normal training failure behavior;
 there is no automatic retry or hidden batch reduction.
 These batch-estimation/native multi-GPU interfaces shipped with feature 006.
-Real multi-GPU acceptance limitations remain in its
-ledger; release does not establish that evidence.
+Real multi-GPU acceptance requires physical-topology evidence; see the
+[acceptance boundaries](implementation-status.md). Release does not establish it.
 
 Training holds the full allocation. After native training
 returns and releases unused model memory, the job notifies its external guardian and

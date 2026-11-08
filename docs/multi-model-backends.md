@@ -8,7 +8,8 @@ The default remains `model=ultralytics`, with its existing `ultralytics` and
 
 FCOS, native multi-GPU training and [batch estimation](batch-estimation.md) are
 available from version 0.41.0. Native confirmation and physical DDP verification
-limits are recorded in the release evidence.
+limits are recorded in the dated
+[release evidence](https://github.com/BuckanovNikita/clearml-yolo/blob/91756fa4661c79854dacd7c827832854dc63e787/specs/006-batch-training/evidence/release.md).
 Configuration examples are not execution evidence.
 Use the [verification ledger](https://github.com/BuckanovNikita/clearml-yolo/blob/d74945c83dc24094c599388bbcfd5e987daeb9bf/specs/025-multi-model-backends/verification.md) for
 observed results and the [acceptance guide](../specs/000-baseline/spec.md)

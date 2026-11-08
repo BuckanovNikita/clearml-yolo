@@ -22,7 +22,7 @@ Use Python and dependency bounds from `pyproject.toml` and selected versions fro
 `uv.lock`. Detector and ONNX export dependencies install with CY; the queue TUI
 and NVML belong to the separate `cy-queue` source package. Install CY first, then
 a compatible queue version into the same environment when queue testing is required.
-Neither package is assumed available on PyPI; project extras are removed. Keep development tools in the separate `dev` group. Configure ClearML
+Neither package is assumed available on PyPI. Keep development tools in the separate `dev` group. Configure ClearML
 through normal SDK environment/user configuration; external selectors are valid.
 Infrastructure access and resource capacity come from the environment, not this repository.
 
@@ -73,7 +73,6 @@ uv run --frozen --no-sync cy-ground-truth data_yaml=data.yaml output=ground_trut
 Prediction overrides live in `configs/ultralytics_predict/default.yaml`. Invoke generated
 examples with `--config-dir configs --config-name cy`; override shared values with
 `ultralytics.key=value` and prediction values with `ultralytics_predict.key=value`.
-Raw `cfg` loading and nested `train.ultralytics`/`predict.ultralytics` are removed.
 
 ClearML is required for execution commands. Pass `clearml.project_name` and
 `clearml.tags` explicitly when isolating runs. `run_dir` routes pipeline output;
@@ -93,9 +92,8 @@ verified source checkout when explicit, otherwise an approved manifest-verified
 archive. Non-YOLO pretrained assets resolve only at execution; explicit local
 weights remain authoritative. Follow [asset recovery](../../../../docs/model-assets.md)
 for cache, proxies and offline placement. Follow the
-[model guide](../../../../docs/multi-model-backends.md) for presets and restrictions and
-the [multi-model acceptance guide](../../../../docs/multi-model-backends.md)
-for the native/download/comparison matrices. Use `uv run --frozen --no-sync` after preparing
+[model guide](../../../../docs/multi-model-backends.md) for presets, restrictions and
+the native/download/comparison matrices. Use `uv run --frozen --no-sync` after preparing
 a backend environment so verification does not remove additional external runtime packages.
 
 ## Devices and queue execution
@@ -127,7 +125,7 @@ to its descendants; recovery keeps conservative global ownership proof.
 A persistent same-user worker executes private immutable snapshots in fresh processes;
 closing a submission terminal or TUI does not stop it. No ClearML task exists while waiting.
 Automatic availability uses only NVML used VRAM strictly below
-`queue.max_used_memory_gib` (default 2.0 GiB, or 2048 MiB), independently of
+`queue.max_used_memory_gib` (default in the [queue contract](../../../../docs/queue.md#submit-and-run)), independently of
 model/compiler memory fit. The worker freezes this positive finite TOML setting
 in each guardian payload and checks it again immediately before launch; equality
 is busy. Restart the owned worker to adopt a changed setting. Existing guardians
@@ -161,9 +159,10 @@ errors as acceptance gaps. See the [queue contract](../../../../docs/queue.md).
 
 ## FiftyOne isolation
 
-Optional FiftyOne workers use finite preflight/publication/lock deadlines of 60/900/30
-seconds and no GPU/queue/ClearML ownership. Fault injection must prove bounded import,
-work and shutdown plus at most ten seconds cleanup; publication success requires zero
+Optional FiftyOne workers use the finite preflight/publication/lock deadlines of the
+[project contract](../../../../docs/project-contracts.md) and no GPU/queue/ClearML
+ownership. Fault injection must prove bounded import, work and shutdown plus at most
+ten seconds cleanup; publication success requires zero
 exit and a matching complete receipt. Errors warn and preserve computation; cancellation
 remains cancellation. Normal SDK configuration discovery, unchanged selectors/global temp
 settings and retained project scratch are required acceptance evidence; process cleanup and

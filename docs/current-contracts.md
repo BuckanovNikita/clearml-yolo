@@ -51,13 +51,13 @@ Normative behavior belongs in the topic contracts above. Each rule needs a linke
 executable check or an explicit verification limitation. The
 [module](module-architecture.md), [queue](queue-lifecycles.md) and
 [input provenance](input-provenance.md) diagrams explain ownership and invariants.
-The [status map](implementation-status.md) separates implementation, verification,
-release, acceptance disposition and unverified limits without rewriting completed task history.
+The [acceptance boundaries](implementation-status.md) separate local checks from native
+and remote outcomes.
 
 ## Maintaining consistency
 
 Spec Kit implementation and bug-fix workflows require a **Documentation update**
-stage before completion. Follow the [project workflow policy](agent-workflow.md#mandatory-documentation-stage)
+stage before completion. Follow the [project workflow policy](agent-workflow.md#documentation)
 to plan explicit documentation tasks, reconcile them with the actual changes and
 validate the result. If no documentation changes are needed, record the reviewed scope
 and reason in the workflow artifacts. Missing required updates or failed validation

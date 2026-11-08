@@ -56,8 +56,8 @@ not treated as equivalent.
 
 Weight snapshots have a separate release cadence from application versions. Ordinary
 code releases reuse the existing pin and do not build or upload weights. See the
-[maintainer procedure](development.md#model-weight-releases) and
-licence inventory. Each file retains its
+[maintainer procedure](development.md#model-weight-releases) and the
+[2026-10-29 licence inventory](https://github.com/BuckanovNikita/clearml-yolo/blob/91756fa4661c79854dacd7c827832854dc63e787/specs/009-release-weights/licenses.md) (historical, for the initial snapshot). Each file retains its
 own terms: YOLO uses AGPL-3.0; DEIMv2 materials permit non-commercial use and
 redistribution only. DINOv3 retains its separate Meta agreement and use restrictions;
 archives include the exact model licence, linked Meta agreement and model card.

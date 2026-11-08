@@ -431,7 +431,7 @@ link. `q` exits without stopping the worker.
 ## FiftyOne and process ownership
 
 FiftyOne is optional visualization; its
-[publication contract](docs/experiment-records.md#required-publication-and-task-lifecycle)
+[publication contract](docs/runtime-isolation.md#fiftyone-evaluation-publication)
 defines dataset and evaluation behavior.
 Its isolated worker owns no GPU or ClearML task. Setup/publication errors warn and do
 not fail otherwise successful computation. Available controls are

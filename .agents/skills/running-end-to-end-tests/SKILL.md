@@ -1,6 +1,6 @@
 ---
 name: running-end-to-end-tests
-description: Defines real-run acceptance for clearml-yolo - native CPU/GPU training, prediction and validation, direct and cy-queue execution, ClearML artifact download and readback, reports and charts, baseline/candidate comparison, FiftyOne publication, and detector ONNX/TensorRT export. Use for release or integration verification and whenever a claim about native execution, GPU use or ClearML publication needs evidence; mocked unit tests do not establish these outcomes.
+description: Real-run acceptance for clearml-yolo. Use for release or integration verification, and for any claim about native CPU/GPU execution, cy-queue execution, ClearML publication, FiftyOne or ONNX/TensorRT export that needs real-run evidence.
 ---
 
 # Verify the detection workflow
@@ -9,7 +9,7 @@ description: Defines real-run acceptance for clearml-yolo - native CPU/GPU train
 
 - Authority and modes
 - Verification checklist
-  - 1\. Static checks
+  - 1\. Default verification (prek)
   - 2\. Isolated run setup
   - 3\. Direct execution and queue acceptance
   - 4\. Baseline and candidate
@@ -41,10 +41,22 @@ user request for those actions.
 
 ## Verification checklist
 
-### 1. Static checks
+### 1. Default verification (prek)
 
 Run `uv run --frozen --no-sync prek run --all-files`; the hook configuration owns
-the verification tool inventory. Follow the native Spec Kit workflow for documentation.
+the verification tool inventory. It covers lint, types and the ordinary pytest suite
+(its `pytest` hook is incremental testmon; the complete-suite command is in
+[verification](../../../docs/development.md#verification)). It does not establish
+GPU, queue or publication outcomes.
+
+Native suites use the pytest markers declared in `pyproject.toml`. `ddp_cpu`
+([CPU distributed regressions](../../../docs/development.md#native-cpu-distributed-regression-tests))
+runs in the ordinary suite. `ddp_gpu` ([physical DDP procedure](../../../docs/ddp-testing.md))
+and `severstal_gpu`
+([Severstal execution checks](../../../docs/augmentation.md#severstal-execution-checks))
+are opt-in: `ddp_gpu` needs `--run-ddp-gpu` (invocation in that procedure) and
+`severstal_gpu` needs `--run-severstal-gpu` plus the required options that
+`uv run --frozen --no-sync pytest --help` lists under "native Severstal acceptance".
 
 ### 2. Isolated run setup
 
@@ -91,8 +103,10 @@ the verification tool inventory. Follow the native Spec Kit workflow for documen
 *Admission and operator controls*
 
 - Verify active allocations stay exclusive, stale unlocked records do not veto capacity,
-  and automatic admission uses only used VRAM strictly below the configured threshold
-  (default 2.0 GiB), with the same frozen value in the fresh guardian launch check.
+  and automatic admission uses only used VRAM strictly below the configured
+  `queue.max_used_memory_gib` threshold (default in the
+  [queue contract](../../../docs/queue.md#submit-and-run)), with the same frozen value in
+  the fresh guardian launch check.
 - Verify physical-index `gpu free`/`release` clears only the selected device's
   reservations and holds without tokens, reasons, force flags, confirmation,
   memory/process checks, signals or original queue access.
@@ -103,7 +117,9 @@ the verification tool inventory. Follow the native Spec Kit workflow for documen
 *Target evidence*
 
 - Real two-user, two-host NFS and physical one/five-GPU eager/compiled acceptance require
-  target evidence; record unavailable targets and unresolved native failures as gaps.
+  target evidence (multi-GPU: the `ddp_gpu` suite in the
+  [physical DDP procedure](../../../docs/ddp-testing.md)); record unavailable targets
+  and unresolved native failures as gaps.
 - Compare matching direct and queued settings without treating scheduling as a compiler fix.
 
 ### 4. Baseline and candidate
@@ -234,8 +250,9 @@ the verification tool inventory. Follow the native Spec Kit workflow for documen
 - Exercise disabled publication and warn-and-continue behavior.
 - Inject real worker hangs/crashes during import, database access, locking, writes and
   shutdown.
-- Require finite preflight/publication/lock deadlines (defaults 60/900/30 seconds),
-  operation timeout plus at most ten seconds cleanup, no GPU/task/queue ownership in
+- Require finite preflight/publication/lock deadlines (defaults in the
+  [project contract](../../../docs/project-contracts.md)), operation timeout plus at most
+  ten seconds cleanup, no GPU/task/queue ownership in
   publication children, and no success without zero exit plus a matching complete receipt.
 - Preserve cancellation semantics. Containment does not confirm the original hang cause.
 

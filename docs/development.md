@@ -8,8 +8,8 @@ any commit. The [agent instructions](../AGENTS.md) define authorization and task
 Read [pyproject.toml](../pyproject.toml) for package/dependency/release settings,
 [ruff.toml](../ruff.toml) for lint policy and [.importlinter](../.importlinter) for import
 contracts. Ruff and import-linter discover their dedicated files automatically.
-The shared `python-project-workflow` skill supplies lifecycle requirements within the
-[native workflow](agent-workflow.md); this document owns the project's commands and
+The shared `python-code-standards` and `python-import-contracts` skills supply Python
+requirements within the [native workflow](agent-workflow.md); this document owns the project's commands and
 dependency/commit/release procedures.
 
 ## Python compatibility
@@ -134,9 +134,9 @@ graceful shutdown before terminating only the owned process tree.
 Test-only trainer adaptations retain installed native loops and do not add a
 production CPU distributed launcher. Local task recordings establish callback
 behavior and model association. Accelerator launch, NCCL, AMP and actual ClearML
-uploads/downloads require separate acceptance. See the
-[CPU validation guide](experiment-records.md#required-publication-and-task-lifecycle)
-for scope and evidence requirements; keep observed results in dated evidence.
+uploads/downloads require separate acceptance; physical multi-GPU acceptance follows the
+[DDP procedure](ddp-testing.md). Record observed results with their environment and
+limitations.
 
 ### Generated and composed regressions
 
@@ -393,7 +393,8 @@ from application versions; ordinary release hooks neither package nor upload wei
 Reuse the current snapshot across code releases until its catalogue needs an update.
 
 Inspect the current [eligible catalogue](model-assets.md#catalogue-and-automatic-execution),
-native caches and licence inventory, then
+native caches and upstream licence terms (the
+[2026-10-29 licence inventory](https://github.com/BuckanovNikita/clearml-yolo/blob/91756fa4661c79854dacd7c827832854dc63e787/specs/009-release-weights/licenses.md) records those of the initial snapshot), then
 assemble a complete snapshot with the explicit maintainer command:
 
 ```bash

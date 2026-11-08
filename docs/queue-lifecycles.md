@@ -45,4 +45,4 @@ stateDiagram-v2
 An explicit hold is independent of job state. Free clears existing holds; a subsequent
 disable or allocation applies normally. Every new job still needs fresh memory admission.
 See [operator controls](queue.md#physical-gpu-operator-controls) and the
-[verification/status map](implementation-status.md) for executed versus external checks.
+[acceptance boundaries](implementation-status.md) for local versus native checks.

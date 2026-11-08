@@ -3,6 +3,11 @@
 
 ## Unreleased
 
+### Bug Fixes
+
+- **skills**: Restore archived release-030 evidence bytes
+  ([`b642871`](https://github.com/BuckanovNikita/clearml-yolo/commit/b64287178bef0b246d1d6cbd82db3ef55d1a2740))
+
 ### Chores
 
 - Drop release fixtures and the portable skill stage

@@ -19,14 +19,14 @@ or documentation-only work.
 2. Run the application from its checkout root (including a Git worktree) and keep
    the run output outside it. This project owns the skill in `.agents/skills/`;
    `.claude/skills` exposes the same source to Claude.
-3. Use this block. The helpers live beside this file:
+3. Use this block. The helpers live beside this file. The k8s-infra tag helper
+   defaults the harness to `claude`; Codex, CI and humans export
+   `INFRA_HARNESS=codex|ci|human` first.
 
    ```bash
    project_root="$(git rev-parse --show-toplevel)"
    skill_dir="$project_root/.agents/skills/clearml-yolo-environment"
    export CY_PROJECT_ROOT="$project_root"
-   # Claude Code: export INFRA_HARNESS=claude before this block (k8s-infra default is claude).
-   export INFRA_HARNESS="${INFRA_HARNESS:-codex}"
    source "$skill_dir/scripts/agent_env.sh" smoke
    uv run cy run_dir=$CY_RUN_DIR/smoke \
      clearml.project_name="$CY_RUN_TAG clearml-yolo" \
@@ -34,6 +34,7 @@ or documentation-only work.
      ground_truth=ground_truth.csv \
      ultralytics.device=0 \
      ultralytics_predict.device=0
+   # Read the outcome and copy anything to keep out of $CY_RUN_DIR first.
    "$skill_dir/scripts/agent_cleanup.sh"
    ```
 
@@ -46,9 +47,11 @@ or documentation-only work.
    the tag. The application no longer rewrites tags from the environment.
 6. Keep `ultralytics.device=0` and `ultralytics_predict.device=0` only when the
    run needs the host GPU (see Run shape and GPU in the machine workflow).
-7. Run `agent_cleanup.sh` after successful and failed live runs. The helper
-   proves the tag-scoped listing before it removes a directory named for that
-   tag.
+7. Run `agent_cleanup.sh` after successful and failed live runs, once you have
+   read the outcome, diagnosed any failure and copied the logs or results you need:
+   it deletes the tagged ClearML tasks and the run directory. The helper prints the
+   remaining tag-scoped listing before it removes a directory named for that tag;
+   confirm that listing is empty before reporting the stand clean.
 
 ## Configuration contract
 
