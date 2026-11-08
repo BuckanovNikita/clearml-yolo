@@ -79,17 +79,6 @@ and stop if the k8s-infra helper reports an unavailable stand or Secret.
 | `scripts/agent_cleanup.sh [--tag <tag>] [--run-dir <dir>] [--dry-run]` | run in the shell that sourced `agent_env.sh`, or pass the tag explicitly | `clearml.py --project clearml-yolo cleanup --prefix <tag>` then `ls --prefix <tag>`; removes the run directory only when its basename equals the tag; `--dry-run` deletes nothing | 0 = success, including stand-only cleanup when `CY_RUN_DIR` is unset; 2 = no tag or unknown argument (before any stand call); 1 = run directory not named after the tag, or k8s-infra skill not found; any other nonzero = a k8s-infra helper failure passed through (`set -euo pipefail`; it can also be 1 or 2, and `--tag`/`--run-dir` without a value fails on an unbound `$2`), so treat stand cleanup as unproven and read the output |
 | `scripts/check_env.sh [--json]` | run from the application checkout | read-only: checks uv, an authenticated ClearML `auth.login`, the host-stand warning, GPU and docker compose; never prints credential values; missing `uv` and ClearML configuration, reachability and credential problems are `FAIL` lines; GPU and docker problems and the ClearML host-stand endpoint are `WARN` lines; `--json` emits a single `{"report": "<text>"}` object wrapping the same text, with no structured fields to parse | always 0 (reports, never blocks) |
 
-## Tests
-
-The bundled tests replace `k8s-infra` and `curl` with fakes; they never access
-the stand or GPU.
-
-Run from the active checkout root, using its prepared environment:
-
-```bash
-uv run --frozen --no-sync pytest -q -p no:cacheprovider .agents/skills/clearml-yolo-environment/tests/test_agent_scripts.py
-```
-
 ## References
 
 - [references/machine-workflow.md](references/machine-workflow.md): before any live run, host-GPU use, or ClearML auth or TLS failure.

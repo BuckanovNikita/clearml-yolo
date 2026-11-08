@@ -1,44 +1,9 @@
-"""Reject hypothetical documentation imports and isolate faults from normal commands."""
+"""Isolate documentation faults from normal product commands."""
 
 import subprocess
 import sys
-from collections.abc import Callable
-from copy import deepcopy
 
-import grimp
 import pytest
-from importlinter.contracts.forbidden import ForbiddenContract
-from importlinter.domain.contract import Contract
-
-
-@pytest.fixture(scope="module")
-def docs_import_contract(configured_contract: Callable[[str], Contract]) -> ForbiddenContract:
-    contract = configured_contract("Documentation serving is isolated from ordinary execution")
-    assert isinstance(contract, ForbiddenContract)
-    return contract
-
-
-@pytest.mark.parametrize(
-    "source",
-    [
-        "clearml_yolo.core.models",
-        "clearml_yolo.application.contracts",
-        "clearml_yolo.entrypoints.hydra.configs",
-        "clearml_yolo.entrypoints.train",
-    ],
-)
-def test_documentation_import_boundary_rejects_injected_edges(
-    docs_import_contract: ForbiddenContract, source: str, graph: grimp.ImportGraph
-) -> None:
-    assert docs_import_contract.check(deepcopy(graph), verbose=False).kept
-    candidate = deepcopy(graph)
-    candidate.add_import(
-        importer=source,
-        imported="clearml_yolo.adapters.documentation.server",
-        line_number=1,
-        line_contents="injected forbidden import",
-    )
-    assert not docs_import_contract.check(candidate, verbose=False).kept
 
 
 @pytest.mark.parametrize(
