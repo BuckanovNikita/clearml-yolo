@@ -259,27 +259,27 @@ def test_console_command_inventory_matches_configured_independence(
             "pynvml",
         ),
         (
-            "assets adapter peer ownership",
+            "Adapter peer ownership (storage-consumers)",
             "clearml_yolo.adapters.assets.sources",
             "clearml_yolo.adapters.clearml.session",
         ),
         (
-            "integrations adapter peer ownership",
+            "Adapter peer ownership (storage-consumers)",
             "clearml_yolo.adapters.integrations.batch_profiles",
             "clearml_yolo.adapters.yolo.assets",
         ),
         (
-            "integrations adapter peer ownership",
+            "Adapter peer ownership (storage-consumers)",
             "clearml_yolo.adapters.integrations.batch_probe",
             "clearml_yolo.adapters.yolo.inference",
         ),
         (
-            "storage adapter peer ownership",
+            "Adapter peer ownership (restricted)",
             "clearml_yolo.adapters.storage.dataset",
             "clearml_yolo.adapters.assets.sources",
         ),
         (
-            "evaluation adapter peer ownership",
+            "Adapter peer ownership (restricted)",
             "clearml_yolo.adapters.evaluation.scoring",
             "clearml_yolo.adapters.reporting.evaluation",
         ),
@@ -288,20 +288,20 @@ def test_console_command_inventory_matches_configured_independence(
             "clearml_yolo.application.use_cases.train",
             "clearml_yolo.adapters.yolo.inference",
         ),
-        ("clearml SDK has explicit owners", "clearml_yolo.application.contracts", "clearml"),
-        ("safetensors SDK has explicit owners", "clearml_yolo.application.ports", "safetensors"),
-        ("huggingface_hub SDK has explicit owners", "clearml_yolo.core.assets", "huggingface_hub"),
+        ("SDK ownership (static imports)", "clearml_yolo.application.contracts", "clearml"),
+        ("SDK ownership (static imports)", "clearml_yolo.application.ports", "safetensors"),
+        ("SDK ownership (lazy imports)", "clearml_yolo.core.assets", "huggingface_hub"),
         ("Exhaustive root layer classification", "clearml_yolo.misc", None),
         ("Exhaustive adapter responsibility classification", "clearml_yolo.adapters.misc", None),
         ("Exhaustive application classification", "clearml_yolo.application.misc", None),
         ("Exhaustive entrypoint classification", "clearml_yolo.entrypoints.misc", None),
         (
-            "albumentations SDK has explicit owners",
+            "SDK ownership (lazy imports)",
             "clearml_yolo.core.transforms",
             "albumentations",
         ),
         (
-            "clearml adapter peer ownership",
+            "Adapter peer ownership (storage-consumers)",
             "clearml_yolo.adapters.clearml.cache",
             "clearml_yolo.adapters.yolo.config",
         ),
@@ -311,29 +311,29 @@ def test_console_command_inventory_matches_configured_independence(
             "clearml_yolo.adapters.clearml.parameters",
         ),
         (
-            "torchvision SDK has explicit owners",
+            "SDK ownership (lazy imports)",
             "clearml_yolo.application.contracts",
             "torchvision",
         ),
-        ("timm SDK has explicit owners", "clearml_yolo.adapters.rfdetr.backend", "timm"),
-        ("timm SDK has explicit owners", "clearml_yolo.adapters.export.metadata", "timm"),
-        ("torch SDK has explicit owners", "clearml_yolo.application.training_workers", "torch"),
+        ("SDK ownership (lazy imports)", "clearml_yolo.adapters.rfdetr.backend", "timm"),
+        ("SDK ownership (lazy imports)", "clearml_yolo.adapters.export.metadata", "timm"),
+        ("SDK ownership (lazy imports)", "clearml_yolo.application.training_workers", "torch"),
         (
             "Clean architecture inward layers",
             "clearml_yolo.core.batch_estimation",
             "clearml_yolo.adapters.runtime.gpu_memory",
         ),
         (
-            "runtime adapter peer ownership",
+            "Adapter peer ownership (restricted)",
             "clearml_yolo.adapters.runtime.gpu_memory",
             "clearml_yolo.adapters.yolo.batch_probe",
         ),
         (
-            "yolo adapter peer ownership",
+            "Adapter peer ownership (storage-consumers)",
             "clearml_yolo.adapters.yolo.inference",
             "clearml_yolo.adapters.runtime.gpu_memory",
         ),
-        ("rfdetr SDK has explicit owners", "clearml_yolo.adapters.deim.backend", "rfdetr"),
+        ("SDK ownership (lazy imports)", "clearml_yolo.adapters.deim.backend", "rfdetr"),
         (
             "Clean architecture inward layers",
             "clearml_yolo.core.batch_estimation",
@@ -355,54 +355,54 @@ def test_console_command_inventory_matches_configured_independence(
             "clearml_yolo.application.use_cases.batch_estimate",
         ),
         (
-            "runtime adapter peer ownership",
+            "Adapter peer ownership (restricted)",
             "clearml_yolo.adapters.runtime.worker_pool",
             "clearml_yolo.adapters.storage.batch_estimates",
         ),
         (
-            "torchvision adapter peer ownership",
+            "Adapter peer ownership (restricted)",
             "clearml_yolo.adapters.torchvision.training",
             "clearml_yolo.adapters.fcos.model",
         ),
         (
-            "fcos adapter peer ownership",
+            "Adapter peer ownership (restricted)",
             "clearml_yolo.adapters.fcos.backend",
             "clearml_yolo.adapters.clearml.session",
         ),
         (
-            "lightning_fabric SDK has explicit owners",
+            "SDK ownership (lazy imports)",
             "clearml_yolo.application.training_workers",
             "lightning_fabric",
         ),
         (
-            "faster_coco_eval SDK has explicit owners",
+            "SDK ownership (lazy imports)",
             "clearml_yolo.core.batch_estimation",
             "faster_coco_eval",
         ),
         (
-            "pytorch_lightning SDK has explicit owners",
+            "SDK ownership (lazy imports)",
             "clearml_yolo.application.contracts",
             "pytorch_lightning",
         ),
         (
-            "pycocotools SDK has explicit owners",
+            "SDK ownership (lazy imports)",
             "clearml_yolo.application.contracts",
             "pycocotools",
         ),
-        ("onnx SDK has explicit owners", "clearml_yolo.adapters.clearml.detectors", "onnx"),
-        ("tensorrt SDK has explicit owners", "clearml_yolo.entrypoints.composition", "tensorrt"),
+        ("SDK ownership (lazy imports)", "clearml_yolo.adapters.clearml.detectors", "onnx"),
+        ("SDK ownership (lazy imports)", "clearml_yolo.entrypoints.composition", "tensorrt"),
         (
-            "export adapter peer ownership",
+            "Adapter peer ownership (export)",
             "clearml_yolo.adapters.export.metadata",
             "clearml_yolo.adapters.fasterrcnn.model",
         ),
         (
-            "export adapter peer ownership",
+            "Adapter peer ownership (export)",
             "clearml_yolo.adapters.export.verification",
             "clearml_yolo.adapters.fasterrcnn.inference",
         ),
         (
-            "runtime adapter peer ownership",
+            "Adapter peer ownership (restricted)",
             "clearml_yolo.adapters.runtime.git_workspace",
             "clearml_yolo.adapters.clearml.script",
         ),
@@ -790,6 +790,7 @@ def test_configured_sdk_owner_rejects_dynamic_import(
     tmp_path: Path,
     sdk: str,
     graph: grimp.ImportGraph,
+    import_options: UserOptions,
     configured_contract: Callable[[str], Contract],
 ) -> None:
     package = tmp_path / "clearml_yolo/adapters/storage"
@@ -798,7 +799,12 @@ def test_configured_sdk_owner_rejects_dynamic_import(
     candidate = deepcopy(graph)
     candidate.add_module("clearml_yolo.adapters.storage.helper")
     architecture.add_dynamic_imports(candidate, tmp_path)
-    contract = configured_contract(f"{sdk} SDK has explicit owners")
+    options = next(
+        options
+        for options in import_options.contracts_options
+        if options["id"].startswith("sdk-ownership-") and sdk in options["forbidden_modules"]
+    )
+    contract = configured_contract(options["name"])
     assert not contract.check(candidate, verbose=False).kept
 
 
