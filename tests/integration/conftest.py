@@ -26,9 +26,11 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 def live_run() -> Iterator[lifecycle.Run]:
     """Prepare this session's run, export its stand variables, then stop it.
 
-    Stand unavailability blocks setup rather than failing a test: under Task verification
-    (``CY_TASK_VERIFICATION=1``, run without xdist workers by ``task integration``) the session
-    exits with status 3 (deferred); an interactive run skips the stand tests. Every other
+    Stand unavailability blocks the run rather than failing a test: under Task verification
+    (``CY_TASK_VERIFICATION=1``, set without xdist workers by ``task integration`` and by the
+    release-acceptance GPU commands) the session exits with status 3 (deferred); an
+    interactive run skips the stand tests. GPU suites reach the stand on demand through
+    ``stand_project``, so the exit or skip happens when they join the run. Every other
     refusal fails setup. The environment is restored when the session ends.
     """
     saved = dict(os.environ)

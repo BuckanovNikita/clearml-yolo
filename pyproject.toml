@@ -206,8 +206,9 @@ pytest_add_cli_args = [
     "--ignore=tests/test_tooling_boundaries.py",
     "--ignore=tests/test_mutation_driver.py",
 ]
-# Fallback for a direct `mutmut run`; scripts/mutation.py replaces it in its copy with
-# the test files that depend on the changed files (.testmondata plus importers).
+# Fallback for a direct `mutmut run`; scripts/mutation.py replaces it in its copy with the
+# test node ids .testmondata records for the changed files (still defined in the staged tree),
+# plus whole test modules that import them and have no selected node id.
 pytest_add_cli_args_test_selection = ["tests/"]
 # Presentation is not behaviour: a test that kills a mutated log message or progress
 # bar only pins its wording. Matching is `re.search` per line, and a matched line skips

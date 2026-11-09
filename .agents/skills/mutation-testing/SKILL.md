@@ -21,7 +21,8 @@ policy.
   with the functions "Not reached by tests".
 - **Excluded tests**: `tests/integration` is never selected; every run deselects
   `-m "not ddp_cpu and not process_capabilities and not gpu_controls"` (`gpu_controls`
-  is reserved for GPU-holding tests).
+  is reserved for GPU-holding tests), and the tooling suites ignored by `pytest_add_cli_args`
+  in `[tool.mutmut]` never run.
 - **Budget**: 8 changed functions and 300 seconds by default. Functions beyond the
   budget are skipped; mutants left unjudged count as "not run" and functions no selected
   test reaches as "not reached by tests", never as survivors.
