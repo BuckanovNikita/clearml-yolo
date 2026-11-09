@@ -332,8 +332,8 @@ validated receipts, rather than inferred success. See [runtime isolation](runtim
 Update maintained code links and migration guidance; preserve completed feature history as dated intent.
 For detector/export changes, include the runtime prerequisites and acceptance matrices in
 the [model guide](multi-model-backends.md) and [deployment guide](tensorrt-deployment.md).
-Use `uv run --frozen --no-sync` for verification in a deliberately prepared backend
-environment so a default sync does not remove additional external runtime packages.
+Use `uv run --frozen --no-sync` for ad hoc commands in a deliberately prepared backend
+environment so they never sync it; Task stages always use `uv run --locked task`.
 
 ## External dependencies
 

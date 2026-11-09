@@ -62,8 +62,7 @@ unit test that reaches it, or report why only live or hardware tests can.
   per run by the script, never checked in.
 - Tests run without xdist (`-n 0`): mutmut forks per mutant, and xdist would start a pool
   each time.
-- The excluded tests above and the architecture tests (import structure, not behaviour)
-  never run against mutants.
+- The excluded tests above never run against mutants.
 - Generated `mutants/` stays ignored by Git, Ruff, mypy and Vulture.
 
 ## Completion

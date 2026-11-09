@@ -119,8 +119,9 @@ transitions/allocation readbacks, downloaded artifacts, checkpoint hashes, and c
 receipts. Preflight failures retain the files available at the failure point rather
 than inventing absent rank/publication evidence. Diagnostic configuration and logs
 are redacted, and environment evidence uses a small explicit safe list; credentials
-are never copied from SDK configuration. Remote tasks/models and local evidence
-are retained for review under the unique test tag; cleanup does not delete them.
+are never copied from SDK configuration. The harness's own cleanup retains remote
+tasks/models and local evidence under the run tag; the run's exact-tag `L stop` removes
+the remote objects, so archive and review the evidence before stopping the run.
 
 Archive the directory after pytest returns, including failed scenarios:
 
