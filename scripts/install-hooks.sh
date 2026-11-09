@@ -22,14 +22,21 @@ hook_type=$(basename "$0")
 root=$(git rev-parse --show-toplevel)
 cd "$root"
 export UV_PROJECT_ENVIRONMENT="$root/.venv"
-# A deleted working-tree file must not masquerade as a legacy checkout.
-if [ -f Taskfile.yml ] || git cat-file -e HEAD:Taskfile.yml 2>/dev/null ||
-    git cat-file -e :Taskfile.yml 2>/dev/null; then
+tracked() {
+    [ -f "$1" ] || git cat-file -e "HEAD:$1" 2>/dev/null || git cat-file -e ":$1" 2>/dev/null
+}
+# A deleted working-tree file must not masquerade as a legacy checkout. Commits that
+# predate scripts/git-hook.sh (it is absent from the tree, HEAD and the index) use prek.
+if tracked scripts/git-hook.sh; then
     if [ ! -f Taskfile.yml ] || [ ! -f scripts/git-hook.sh ]; then
         echo 'Task workflow files are missing; restore them before committing.' >&2
         exit 1
     fi
     exec bash scripts/git-hook.sh "$hook_type" "$hook_dir" "$@"
+fi
+if tracked Taskfile.yml && [ ! -f Taskfile.yml ]; then
+    echo 'Taskfile.yml is missing; restore it before committing.' >&2
+    exit 1
 fi
 # Older worktrees keep their own prek configuration and environment.
 exec uv run --frozen --no-sync prek hook-impl --hook-dir "$hook_dir" --script-version 4 --hook-type "$hook_type" -- "$@"

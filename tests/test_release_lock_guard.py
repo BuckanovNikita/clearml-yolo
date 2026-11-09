@@ -1,5 +1,6 @@
 """The release commit guard accepts only a root-version change of the staged files."""
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -25,7 +26,8 @@ dependencies = [{{ name = "digital-metrics" }}]
 METRICS_ENTRY = """[[package]]
 name = "digital-metrics"
 version = "0.1.0"
-source = {{ editable = "external/digital-metrics" }}
+source = {{ registry = "external/wheelhouse" }}
+sdist = {{ path = "digital_metrics-0.1.0.tar.gz" }}
 """
 EXTRA_ENTRY = """[[package]]
 name = "extra"
@@ -43,7 +45,12 @@ def _lock(version: str, *, metrics: str = METRICS_ENTRY, extra: bool = False) ->
 
 def _git(root: Path, *args: str) -> None:
     subprocess.run(  # noqa: S603 - fixed Git arguments in a test-owned repository
-        ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", *args],  # noqa: S607
+        [  # noqa: S607
+            "git",
+            *("-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"),
+            *("-c", f"core.hooksPath={os.devnull}"),
+            *args,
+        ],
         cwd=root,
         check=True,
         capture_output=True,
@@ -91,7 +98,7 @@ def test_external_revision_change_fails(repo: Path) -> None:
 
 
 def test_changed_package_source_fails(repo: Path) -> None:
-    moved = METRICS_ENTRY.replace("external/digital-metrics", "../digital-metrics")
+    moved = METRICS_ENTRY.replace('registry = "external/wheelhouse"', 'editable = "external/digital-metrics"')
     _stage(repo, pyproject=PYPROJECT.format(version="0.5.0"), lock=_lock("0.5.0", metrics=moved, extra=True))
 
     assert release_lock_guard.check(repo) == ["uv.lock package changed: digital-metrics 0.1.0"]
@@ -132,7 +139,7 @@ def test_lock_version_must_match_project(repo: Path) -> None:
 
 
 def test_staged_source_override_fails(repo: Path) -> None:
-    override = '\n[tool.uv.sources]\ndigital-metrics = { path = "external/digital-metrics" }\n'
+    override = '\n[tool.uv.sources]\ndigital-metrics = { path = "external/digital-metrics", editable = true }\n'
     _stage(repo, pyproject=PYPROJECT.format(version="0.5.0") + override, lock=_lock("0.5.0", extra=True))
 
     assert release_lock_guard.check(repo) == [
