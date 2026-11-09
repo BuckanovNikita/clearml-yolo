@@ -80,10 +80,10 @@ writes its tests first.
   - `specs/000-baseline/spec.md`: replace the print-title requirement;
   - `docs/current-contracts.md` index;
   - README.md (Russian) if it describes banners.
-- [ ] T018 Run `ruff check .`, `mypy .`, `lint-imports` and `uv run --frozen --no-sync pytest --testmon-noselect`.
+- [x] T018 Run `ruff check .`, `mypy .`, `lint-imports` and `uv run --frozen --no-sync pytest --testmon-noselect`.
 - [ ] T019 Live stand check per quickstart.md, including the model-page URL form (R5 open check). Clean up tagged objects.
 - [x] T020 Independent review of the integrated diff (CY and report-generator). Address the findings.
-- [ ] T021 Commit CY changes per the commit procedure, run `prek run --all-files`, reconcile this ledger, and evaluate the release workflow.
+- [x] T021 Commit CY changes per the commit procedure, run `prek run --all-files`, reconcile this ledger, and evaluate the release workflow.
 
 ## Dependencies
 
@@ -112,4 +112,6 @@ commits before the CY revision bump.
 - 2026-11-09 T010 deviation: `identity_links(task, identity)` takes the invocation task (no SDK call when None) instead of `Task.current_task()`; it also suppresses a training-task link equal to the reporting task (FR-008 single-task pipelines, review finding).
 - 2026-11-09 T020 independent review: no high-severity findings; fixed FR-008 self-link and print-area width/multi-area; accepted residual: drawing-height estimate uses default row height, and `humanize_workbook` re-annotation of an already annotated workbook renders without links (no current caller).
 - 2026-11-09 T019 partial live check on the shared stand (tag clearml-yolo-claude-20261109-links-529n, CPU only, cleaned: 0 projects/tasks/models left): `identity_links` built `https://clearml.k8s.docker.internal/projects/*/experiments/<id>/output/log` (SDK chose the `experiments` route for this server API) and `.../projects/*/models/<id>` for a real task and output model, and suppressed the self link. Not verified: browser rendering of the model route (no browser tool in this session) and a full GPU train→compare→report run producing linked workbooks.
-- Pending: T018 full-suite rerun after fixes, T021 commit + prek.
+- 2026-11-09 T018: first full suite exposed 6 regressions (test fakes without `links`, lost fit-to-width print setup), fixed; rerun 4170 passed with 1 compatibility expectation updated for fit-to-width, then that module 18 passed. ruff, mypy (440 files), lint-imports (16 kept) clean.
+- 2026-11-09 T021: commits `f746094` (spec) and `2e3e55a` (feature); final `prek run --all-files` result recorded below. Release evaluation: no version tag cut (push and report-generator publication not authorized; approved revision is local-only).
+- Remaining T019 gap: browser check of the model page route and a full GPU run producing linked workbooks.
