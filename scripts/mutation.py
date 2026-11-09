@@ -16,15 +16,18 @@ not reach by then count as "not run", not as survivors. Zero lifts either limit.
 
 The budget covers mutmut's whole run, including its stats pass, which executes every
 selected test once before any mutant. With the whole unit suite selected, that pass
-alone outlasts any useful budget, so each run selects test files per change
-(``select_tests``): the test files ``.testmondata`` records as depending on each
-changed file, plus the test files whose text imports the changed module. Live suites
-(``tests/integration``) and files ``[tool.mutmut]`` ignores are never selected, and
-the committed ``pytest_add_cli_args`` deselect the host-wide markers. The selection
-keeps the stats pass small enough for the budget to reach mutants; a widely imported
-module still selects many files, so widen ``--budget-seconds`` for a thorough run.
-When no test file is selected, mutmut is not run and the functions are reported as
-not reached by tests.
+alone outlasts any useful budget, so each run selects tests per change
+(``select_tests``): the test node ids ``.testmondata`` records as depending on each
+changed file, where the test function is still defined in the staged test module
+(parameters dropped; a module that cannot be parsed is selected whole), plus whole
+test modules whose text imports the changed module and that hold no selected node id.
+Only pytest test modules (``test_*.py``, ``*_test.py``) are selected; live suites
+(``tests/integration``) and files ``[tool.mutmut]`` ignores never are, and the
+committed ``pytest_add_cli_args`` deselect the host-wide markers. The selection keeps
+the stats pass small enough for the budget to reach mutants; a widely imported module
+still selects many tests, so widen ``--budget-seconds`` for a thorough run. When no
+test is selected, mutmut is not run and the functions are reported as not reached by
+tests.
 
 The verdict is advisory: surviving mutants are printed (the first few with diffs) and
 the run passes, unless ``--strict`` is given. Mutants no unit test reaches are counted
@@ -36,8 +39,8 @@ Nothing is shared between runs. Each run exports the *staged* tree with
 ``git checkout-index`` into a fresh temporary directory, links the repository's
 ``external/`` dependency copies into it, narrows that copy's ``[tool.mutmut]`` to the
 changed files and selected tests and runs the repository venv's ``mutmut`` there in
-its own session. When the budget expires, that process group and every descendant
-that started a session of its own are stopped. No mutmut cache or
+its own session. When the budget expires, or the driver itself is interrupted, that
+process group and every descendant that started a session of its own are stopped. No mutmut cache or
 pytest temp root outlives the run, so concurrent runs from other worktrees or agents
 cannot corrupt each other, and a stale verdict cannot be reused.
 
@@ -66,7 +69,7 @@ import tomllib
 from collections import deque
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SOURCE_ROOT = "src"
@@ -269,9 +272,20 @@ def _ignored_paths(workspace: Path) -> tuple[str, ...]:
     return tuple(arg.removeprefix("--ignore=").rstrip("/") for arg in args if str(arg).startswith("--ignore="))
 
 
+def _is_test_module(path: str) -> bool:
+    """Tell whether *path* names a pytest test module (``test_*.py`` or ``*_test.py``)."""
+    name = PurePosixPath(path).name
+    return name.endswith(".py") and (name.startswith("test_") or name.endswith("_test.py"))
+
+
 def _eligible_test_file(workspace: Path, path: str, ignored: Sequence[str]) -> bool:
-    """Tell whether *path* is a unit test file present in the staged *workspace*."""
-    if not path.startswith(f"{TESTS_DIR}/") or not path.endswith(".py"):
+    """Tell whether *path* is a unit test module present in the staged *workspace*.
+
+    conftest, harness, worker and helper modules are not test modules: pytest collects
+    no tests from them, so selecting one would only load it as a plugin or collect it
+    as an empty module.
+    """
+    if not path.startswith(f"{TESTS_DIR}/") or not _is_test_module(path):
         return False
     if any(path == skip or path.startswith(f"{skip}/") for skip in (LIVE_TESTS_DIR, *ignored)):
         return False
@@ -279,11 +293,11 @@ def _eligible_test_file(workspace: Path, path: str, ignored: Sequence[str]) -> b
 
 
 def testmon_dependents(database: Path, sources: Sequence[str]) -> dict[str, set[str]]:
-    """Return, per source file, the test files *database* records as depending on it.
+    """Return, per source file, the test node ids *database* records as depending on it.
 
     The database is pytest-testmon's ``.testmondata``, opened read-only; a missing or
-    unreadable database yields no dependents. Node ids are cut to their test files:
-    stale ids (renamed tests, parameters) would make pytest refuse the selection.
+    unreadable database yields no dependents. The ids are returned as recorded and may
+    be stale (renamed tests or parameters); ``select_tests`` validates them.
     """
     if not database.is_file() or not sources:
         return {}
@@ -299,7 +313,7 @@ def testmon_dependents(database: Path, sources: Sequence[str]) -> dict[str, set[
         try:
             for source in sources:
                 node_ids = connection.execute(query, (source,)).fetchall()
-                dependents[source] = {str(node_id).partition("::")[0] for (node_id,) in node_ids}
+                dependents[source] = {str(node_id) for (node_id,) in node_ids}
         finally:
             connection.close()
     except sqlite3.Error as exc:
@@ -331,21 +345,69 @@ def importing_tests(workspace: Path, source: str, ignored: Sequence[str]) -> set
     return found
 
 
-def select_tests(workspace: Path, sources: Sequence[str], database: Path) -> list[str]:
-    """Return the unit test files that can kill mutants of *sources*.
+def _defined_functions(source: str) -> set[str]:
+    """Return the names of every function and method defined in test module *source*."""
+    return {
+        node.name for node in ast.walk(ast.parse(source)) if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+    }
 
-    Per source file, testmon's recorded dependents that still exist in the staged tree
-    are joined by the test files that import its module. The import scan covers what
-    testmon has not recorded yet: a new source file, no database, or a test staged to
-    kill a survivor since testmon last ran.
+
+class NodeValidator:
+    """Check recorded testmon node ids against the staged test modules."""
+
+    def __init__(self, workspace: Path, ignored: Sequence[str]) -> None:
+        """Bind the staged *workspace* and the ``--ignore`` paths."""
+        self.workspace, self.ignored = workspace, ignored
+        self._functions: dict[str, set[str] | None] = {}
+
+    def _names(self, path: str) -> set[str] | None:
+        """Return the functions defined in *path*; None when the module cannot be parsed."""
+        if path not in self._functions:
+            try:
+                self._functions[path] = _defined_functions((self.workspace / path).read_text(encoding="utf-8"))
+            except (OSError, SyntaxError, ValueError):
+                self._functions[path] = None
+        return self._functions[path]
+
+    def __call__(self, node_id: str) -> str | None:
+        """Return the selectable form of *node_id*: itself without parameters, its file, or None.
+
+        A node whose file is not an eligible staged test module, or whose function is no
+        longer defined there, is stale and dropped. Parameters are dropped because a
+        renamed parameter would make pytest refuse the whole selection. A node that
+        cannot be validated (no ``::`` part, an unparsable module) selects its file.
+        """
+        path, _, rest = node_id.partition("::")
+        if not _eligible_test_file(self.workspace, path, self.ignored):
+            return None
+        bare = rest.partition("[")[0]
+        names = self._names(path)
+        if not bare or names is None:
+            return path
+        return f"{path}::{bare}" if bare.rpartition("::")[2] in names else None
+
+
+def select_tests(workspace: Path, sources: Sequence[str], database: Path) -> list[str]:
+    """Return the unit test node ids and test modules that can kill mutants of *sources*.
+
+    Per source file, testmon's recorded node ids that are still defined in the staged
+    tree are selected (``NodeValidator``). A test module that imports a source module
+    is selected whole only when none of its node ids is selected: the import scan
+    covers what testmon has not recorded yet (a new source file, no database) while
+    keeping the selection narrow. A test staged since testmon last ran, in a module
+    with recorded ids, is therefore selected only once testmon records it.
     """
     ignored = _ignored_paths(workspace)
     recorded = testmon_dependents(database, sources)
+    validate = NodeValidator(workspace, ignored)
     selected: set[str] = set()
     for source in sources:
-        selected |= {path for path in recorded.get(source, set()) if _eligible_test_file(workspace, path, ignored)}
-        selected |= importing_tests(workspace, source, ignored)
-    return sorted(selected)
+        selected |= {node for node_id in recorded.get(source, set()) if (node := validate(node_id)) is not None}
+    covered = {entry.partition("::")[0] for entry in selected}
+    for source in sources:
+        selected |= importing_tests(workspace, source, ignored) - covered
+    whole = {entry for entry in selected if "::" not in entry}
+    return sorted(entry for entry in selected if entry in whole or entry.partition("::")[0] not in whole)
 
 
 def _toml_array(values: Sequence[str]) -> str:
@@ -410,8 +472,8 @@ def _proc_stat(proc: Path, pid: int) -> tuple[int, str] | None:
     return int(fields[1]), fields[19]
 
 
-def descendants(pid: int, proc: Path = PROC_ROOT) -> dict[int, str]:
-    """Return every live descendant of *pid* by parent-pid chain, with its start time.
+def proc_descendants(pid: int, proc: Path = PROC_ROOT) -> dict[int, str]:
+    """Return every live descendant of *pid* by a ``/proc`` parent-pid scan, with its start time.
 
     This includes descendants that started a session (or group) of their own, which a
     signal to the process group misses. A process orphaned before the scan is not seen.
@@ -430,11 +492,48 @@ def descendants(pid: int, proc: Path = PROC_ROOT) -> dict[int, str]:
     return found
 
 
+def psutil_descendants(pid: int) -> dict[int, str]:
+    """Return every live descendant of *pid* from psutil, with its start-time identity."""
+    import psutil  # type: ignore[import-untyped]
+
+    found: dict[int, str] = {}
+    for child in psutil.Process(pid).children(recursive=True):
+        with contextlib.suppress(psutil.Error):
+            found[child.pid] = f"psutil:{child.create_time()!r}"
+    return found
+
+
+def descendants(pid: int, proc: Path = PROC_ROOT) -> dict[int, str]:
+    """Return every live descendant of *pid* with a start-time identity; {} when none can be found.
+
+    psutil is asked first and the ``/proc`` scan is the fallback; a failure of both
+    yields no descendants rather than an error, so the group signals still follow.
+    Each identity names its source, so ``_kill_known`` re-reads it the same way.
+    """
+    with contextlib.suppress(Exception):
+        return psutil_descendants(pid)
+    with contextlib.suppress(Exception):
+        return {child: f"proc:{started}" for child, started in proc_descendants(pid, proc).items()}
+    return {}
+
+
+def _start_identity(pid: int, source: str, proc: Path) -> str | None:
+    """Re-read *pid*'s start-time identity from *source*; None when it cannot be read."""
+    try:
+        if source == "psutil":
+            import psutil
+
+            return f"psutil:{psutil.Process(pid).create_time()!r}"
+        stat = _proc_stat(proc, pid)
+    except Exception:  # noqa: BLE001 - a process that cannot be read is not killed
+        return None
+    return None if stat is None else f"proc:{stat[1]}"
+
+
 def _kill_known(processes: dict[int, str], proc: Path = PROC_ROOT) -> None:
     """SIGKILL each recorded process that still runs with the same start time."""
-    for pid, started in processes.items():
-        stat = _proc_stat(proc, pid)
-        if stat is None or stat[1] != started:  # gone, or the pid was reused
+    for pid, identity in processes.items():
+        if _start_identity(pid, identity.partition(":")[0], proc) != identity:  # gone, or the pid was reused
             continue
         try:
             os.kill(pid, signal.SIGKILL)
@@ -449,16 +548,17 @@ def _stop_group(process: subprocess.Popen[bytes], spent: threading.Event) -> Non
     group gets SIGINT first; after the grace period the group and every descendant
     recorded before the interrupt (including ones in sessions of their own, which may
     hold the output pipe) get SIGKILL. Descendants are recorded first because they
-    lose their parent chain once mutmut exits.
+    lose their parent chain once mutmut exits. Descendant discovery never prevents the
+    group signals.
     """
     spent.set()
     tree = descendants(process.pid)
-    with contextlib.suppress(subprocess.TimeoutExpired, ProcessLookupError):
+    with contextlib.suppress(subprocess.TimeoutExpired, ProcessLookupError, PermissionError):
         os.killpg(process.pid, signal.SIGINT)
         process.wait(timeout=BUDGET_GRACE_SECONDS)
     if process.poll() is None:  # a reaped pid may already belong to another process
         tree |= descendants(process.pid)
-    with contextlib.suppress(ProcessLookupError):
+    with contextlib.suppress(ProcessLookupError, PermissionError):
         os.killpg(process.pid, signal.SIGKILL)
     _kill_known(tree)
 
@@ -475,7 +575,8 @@ def run_mutmut(
     Only what a terminal would have left on each line is printed, so captured output
     does not hold every spinner redraw. mutmut runs in its own session; with a budget,
     a timer interrupts that process group once the budget is spent, and the mutants
-    judged so far keep their results.
+    judged so far keep their results. Any exception while streaming, KeyboardInterrupt
+    included, stops that group too before it propagates.
     """
     tail: deque[str] = deque(maxlen=40)
     spent = threading.Event()
@@ -487,19 +588,26 @@ def run_mutmut(
         stderr=subprocess.STDOUT,
         start_new_session=True,
     ) as process:
+        stdout = process.stdout
+        if stdout is None:
+            _stop_group(process, spent)
+            msg = "mutmut output pipe is unavailable."
+            raise MutationError(msg)
         timer = threading.Timer(budget_seconds, _stop_group, (process, spent)) if budget_seconds > 0 else None
         if timer is not None:
             timer.start()
         try:
-            stdout = process.stdout
-            if stdout is None:
-                msg = "mutmut output pipe is unavailable."
-                raise MutationError(msg)
             for raw in stdout:
                 line = raw.decode("utf-8", errors="replace").rsplit("\r", 1)[-1]
                 tail.append(line)
                 sys.stdout.write(line)
                 sys.stdout.flush()
+        except BaseException:
+            # mutmut runs in its own session, so a terminal Ctrl-C never reaches it.
+            if timer is not None:
+                timer.cancel()
+            _stop_group(process, spent)
+            raise
         finally:
             if timer is not None:
                 timer.cancel()
@@ -630,10 +738,11 @@ def mutate(workspace: Path, targets: Sequence[Target], options: Options) -> int:
         print(f"    {target.path}: {target.qualname}")
     tests = select_tests(workspace, files, REPO_ROOT / TESTMON_DATABASE)
     if not tests:
-        print("Not reached by tests: no unit test file depends on or imports the changed modules; mutmut not run.")
+        print("Not reached by tests: no unit test depends on or imports the changed modules; mutmut not run.")
         print("Advisory: add tests that call them.")
         return _advisory(options.strict)
-    print(f"Selected {len(tests)} test file(s): {' '.join(tests)}")
+    modules = len({test.partition("::")[0] for test in tests})
+    print(f"Selected {len(tests)} test(s) in {modules} file(s): {' '.join(tests)}")
     link_external(workspace)
     narrow_scope(workspace / "pyproject.toml", files, tests)
     binary = mutmut_binary()
