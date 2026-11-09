@@ -19,8 +19,8 @@ defines the shared behavior.
 ## Installation and model selection
 
 Use Python `>=3.12.13,<3.14` and the approved external dependency copies described in
-[development setup](development.md#external-dependencies). Keep those revisions and local
-source overrides intact. From the project checkout, install the complete runtime:
+[development setup](development.md#external-dependencies). Keep those revisions and the
+local wheelhouse intact. From the project checkout, install the complete runtime:
 
 ```bash
 uv sync --frozen
