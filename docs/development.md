@@ -319,8 +319,8 @@ normal resolution must succeed without `--no-deps`. Record both source SHAs, ver
 and actual integration results in dated task evidence. If hooks change a version,
 refresh the installation and recheck the final pair before pushing. Incompatibility,
 stale metadata, missing current sources or unavailable/failed checks block delivery.
-Update the queue's bounded requirement only after verifying the new CY interfaces;
-do not assume an untested future minor is compatible. CY remains independent of the
+The queue declares only a minimum compatible CY version, never an upper bound; raise
+that minimum when the queue starts using a newer CY interface. CY remains independent of the
 queue at runtime. This is a mandatory release acceptance step alongside the hooks.
 
 ## Local releases
