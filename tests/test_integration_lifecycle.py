@@ -116,6 +116,22 @@ def test_check_reports_available_without_minting_or_cleaning(stand: FakeStand) -
         ("curl", {"code": 7}),
         ("curl", {"out": "503"}),
         ("kubectl", {"code": 1, "err": "dial tcp: connection refused"}),
+        (
+            "kubectl",
+            {
+                "code": 1,
+                "err": "The connection to the server 127.0.0.1:6443 was refused - "
+                "did you specify the right host or port?",
+            },
+        ),
+        (
+            "kubectl",
+            {
+                "code": 1,
+                "err": "Unable to connect to the server: dial tcp 127.0.0.1:6443: connectex: "
+                "No connection could be made because the target machine actively refused it.",
+            },
+        ),
         ("clearml-whoami", {"code": 1, "err": "Remote end closed connection"}),
     ],
 )
@@ -181,14 +197,31 @@ def test_up_does_not_mint_when_the_stand_is_unavailable(stand: FakeStand) -> Non
     assert not stand.tag_file.exists()
 
 
-def test_exported_tag_is_adopted_and_its_leftovers_cleaned(stand: FakeStand, monkeypatch: pytest.MonkeyPatch) -> None:
-    stand.tag_file.write_text("clearml-yolo-claude-20261108-integration-zz99\n", encoding="utf-8")
+@pytest.mark.parametrize("recorded", [None, TAG])
+def test_exported_tag_is_adopted_and_its_leftovers_cleaned(
+    stand: FakeStand, monkeypatch: pytest.MonkeyPatch, recorded: str | None
+) -> None:
+    if recorded is not None:
+        stand.tag_file.write_text(f"{recorded}\n", encoding="utf-8")
     monkeypatch.setenv("INFRA_RUN_TAG", TAG)
     assert stand.main("up") == lifecycle.EXIT_AVAILABLE
     calls = stand.calls()
     assert not any("newtag" in call for call in calls)
     assert f"clearml --project clearml-yolo cleanup --prefix {TAG}" in calls
     assert f"clearml --project clearml-yolo ls --prefix {TAG}" in calls
+
+
+def test_exported_tag_does_not_bypass_another_active_run(
+    stand: FakeStand, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    active = "clearml-yolo-claude-20261108-integration-zz99"
+    stand.tag_file.write_text(f"{active}\n", encoding="utf-8")
+    monkeypatch.setenv("INFRA_RUN_TAG", TAG)
+    assert stand.main("up") == lifecycle.EXIT_ERROR
+    assert f"INFRA_RUN_TAG={active}" in capsys.readouterr().err
+    assert stand.tag_file.read_text(encoding="utf-8") == f"{active}\n"
+    calls = stand.calls()
+    assert not any("newtag" in call or "cleanup" in call for call in calls)
 
 
 def test_env_prefers_the_exported_tag_over_the_tag_file(

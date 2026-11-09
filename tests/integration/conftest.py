@@ -3,7 +3,7 @@
 ``tests/conftest.py`` marks every test under ``tests/integration`` ``integration`` and puts it
 in the ``live`` xdist group, so one worker runs them serially. Tests that use the ClearML stand
 request the session fixture ``live_run``; it is not autouse, so the GPU and FiftyOne suites
-in this directory never touch the stand. ``live_run`` performs the bounded preflight, claims
+in this directory reach it only through ``stand_project``. ``live_run`` performs the bounded preflight, claims
 one run tag through ``lifecycle.py`` before the first stand test, and after the last one removes
 exactly that tag's objects, failing the session when cleanup is incomplete.
 
@@ -12,7 +12,7 @@ root, and one module identity keeps its exception classes shared with the unit t
 """
 
 import os
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
@@ -58,3 +58,25 @@ def live_run() -> Iterator[lifecycle.Run]:
         finally:
             os.environ.clear()
             os.environ.update(saved)
+
+
+@pytest.fixture
+def stand_project(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> Callable[[str], str]:
+    """Join the live run on demand and return the tagged form of an explicit project name.
+
+    The GPU suites validate their explicit options first and only then call the returned
+    function, so a rejected selection never claims a run tag. Environment isolation hides
+    ``~/clearml.conf``; the call exports the run's stand credentials and CA trust for this
+    test, and prefixes the project with the run tag so exact-tag cleanup removes what the
+    suite publishes.
+    """
+
+    def join(project: str) -> str:
+        run: lifecycle.Run = request.getfixturevalue("live_run")
+        for key, value in run.exported.items():
+            monkeypatch.setenv(key, value)
+        if project.split()[:1] == [run.tag]:
+            return project
+        return lifecycle.tagged_project_name(run.tag, project)
+
+    return join
