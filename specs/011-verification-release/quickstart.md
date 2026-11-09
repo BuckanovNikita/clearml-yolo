@@ -1,6 +1,6 @@
 # Quickstart: validate the workflow
 
-Prerequisites: `external/` populated, `uv sync --locked --dev`, `bash scripts/install-hooks.sh`.
+Prerequisites: `external/` populated, `uvx --from go-task-bin task local-deps` (wheelhouse and `uv.toml`), `uv sync --locked --dev`, `bash scripts/install-hooks.sh`.
 
 1. Staging guard: edit two tracked files, stage one, `git commit` → refused, tree unchanged.
 2. Message check: stage a change, `git commit -m "update stuff"` → refused.

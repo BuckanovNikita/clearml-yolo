@@ -25,6 +25,8 @@ text; only the integrator writes those files after Phase 2.
 - [ ] T002 Add `.testmondata*`, `.hypothesis/`, `.coverage`, `tests/integration/.run-tag` to .gitignore (keep existing entries)
 - [x] T003 `ruff format --check .` reported all 558 files formatted (2026-11-09); no style commit needed
 
+- [ ] T003a Add task `local-deps` (sdists of external packages into external/wheelhouse, create uv.toml with find-links when absent) and ignore /uv.toml, /external per research R15
+
 ## Phase 2: Foundational (blocks all stories)
 
 - [ ] T004 Create Taskfile.yml from cveta2's with `RUN` prefix, `TEST_WORKERS` from `CY_TEST_WORKERS` (default 2), tasks `fix`, `_ruff`, `check` (uv lock --check, _ruff, lint-imports, mypy ., vulture, deptry .), `_unit` with TESTMON_ENV hash over `src/clearml_yolo/`, `tests/`, `scripts/` and config files incl. ruff.toml and .importlinter, `test`, `test-full`, `verify` (check → test, no build), `properties`, `infra-check`, `integration`, `_clean-tip`, `acceptance`, `release-acceptance`, `mutation`, placeholders for `paired-check` and `release-commit-check` (bodies from stream B) in Taskfile.yml
@@ -39,7 +41,7 @@ text; only the integrator writes those files after Phase 2.
 **Independent test**: quickstart steps 1–3.
 
 - [ ] T008 [P] [US1] Port scripts/install-hooks.sh (backup existing hooks, dispatcher for pre-commit and commit-msg, `UV_PROJECT_ENVIRONMENT=$root/.venv`, fallback to `prek hook-impl` for worktrees without Taskfile.yml) in scripts/install-hooks.sh
-- [ ] T009 [P] [US1] Port scripts/git-hook.sh staging guard (refuse unstaged tracked changes and nonignored untracked files before prek; never stage, stash or delete) with the research R13 source-override exemption implemented in scripts/source_override.py (+ tests in tests/test_source_override.py) in scripts/git-hook.sh
+- [ ] T009 [P] [US1] Port scripts/git-hook.sh staging guard (refuse unstaged tracked changes and nonignored untracked files before prek; never stage, stash or delete) without exemptions (research R15 removed the need for uncommitted source overrides) in scripts/git-hook.sh
 - [ ] T010 [US1] Rewrite .pre-commit-config.yaml: install types `[pre-commit, commit-msg]`, `fail_fast: true`, keep hygiene hooks and `untracked-sources`, single local serial always-run `verify` hook (`uv run --locked task --exit-code verify`), manual hooks `integration-tests`, `acceptance-tests`, `property-exploration`, `mutmut`, remote `conventional-pre-commit` v4.5.0 commit-msg with types build, chore, ci, docs, feat, fix, perf, refactor, style, test
 - [ ] T011 [US1] Install hooks in this worktree with `bash scripts/install-hooks.sh` and run quickstart steps 1–3; record outcomes in the evidence section of this file
 
@@ -59,9 +61,9 @@ text; only the integrator writes those files after Phase 2.
 
 **Independent test**: quickstart step 7.
 
-- [ ] T019 [P] [US3] Create scripts/release_lock_guard.py: compare `uv.lock` at HEAD with the index, require identical `package` entries except `clearml-yolo` whose only difference is `version`; exit 0/1 with a precise message
+- [ ] T019 [P] [US3] Create scripts/release_lock_guard.py: compare `uv.lock` at HEAD with the index, require identical `package` entries except `clearml-yolo` whose only difference is `version`; staged pyproject.toml may differ from HEAD only in `project.version` and must have no `[tool.uv.sources]`; exit 0/1 with a precise message
 - [ ] T020 [P] [US3] Unit tests for the guard (root-only version change passes; digital-metrics revision change, added package, removed package fail) in tests/test_release_lock_guard.py
-- [ ] T021 [US3] Define `release-commit-check` task body (no unstaged changes, no untracked files, staged paths ⊆ pyproject.toml/uv.lock/CHANGELOG.md, `python scripts/release_lock_guard.py`, `uv lock --check`, `_ruff`, `deptry .`) and `[tool.semantic_release]` `build_command_env=["CY_RELEASE_CHECK"]` + `build_command` (patch text to integrator)
+- [ ] T021 [US3] Define `release-commit-check` task body (no unstaged changes, no untracked files, staged paths ⊆ pyproject.toml/uv.lock/CHANGELOG.md, `python scripts/release_lock_guard.py`, `uv lock --check`, `_ruff`, `deptry .`) and `[tool.semantic_release]` `build_command_env=["CY_RELEASE_CHECK"]` + `build_command` running `uv lock --upgrade-package "$PACKAGE_NAME"` (research R15)
 - [ ] T022 [US3] Delete scripts/local_release.py and remove references from pyproject.toml/vulture config
 
 ## Phase 6: User Story 4 – Release acceptance and paired release check (P2) — Streams A/B
@@ -98,7 +100,7 @@ text; only the integrator writes those files after Phase 2.
 - [ ] T039 Fresh independent review of the integrated diff; fix findings; rerun affected checks; `prek run --all-files` with SKIP cleared
 - [ ] T040 Record dated evidence (checks, outcomes, deferrals, waivers) below
 
-Design constraints from research R13–R14 (overrides, worktree isolation, real env, FiftyOne placement, coverage/docs-only) apply to all tasks.
+Design constraints from research R14–R15 (local wheelhouse, worktree isolation, real env, FiftyOne placement, coverage/docs-only) apply to all tasks.
 
 ## Dependencies
 

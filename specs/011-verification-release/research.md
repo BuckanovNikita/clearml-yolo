@@ -40,7 +40,8 @@ Source of truth for adapted files: `/mnt/wsl/data/nkt/cveta2` at `0fa3310`.
   --prefix <tag>` then `ls --prefix <tag>`. The environment skill scripts remain for manual runs.
 - **GPU/FiftyOne gating**: GPU-marked tests stay deselected unless their `--run-*` flags are
   given (by `release-acceptance`); `release-acceptance` checks GPU idleness via pcboard status
-  where available and reports deferral rather than starting.
+  where available and reports deferral rather than starting. (Revised: the GPU-busy check is an
+  agent/operator pcboard step documented in the skills; Task cannot query pcboard.)
 
 ## R6. CPU stand smoke test (user decision 2026-11-09)
 - **Decision**: `tests/integration/test_cpu_stand_smoke.py`: synthesize a tiny YOLO dataset in
@@ -52,7 +53,7 @@ Source of truth for adapted files: `/mnt/wsl/data/nkt/cveta2` at `0fa3310`.
   and evaluation artifacts. Cleanup by exact tag in the session fixture.
 - **Alternatives**: FiftyOne only; no live part (both rejected by user).
 
-## R7. Release mechanism
+## R7. Release mechanism (lock handling superseded by R15: plain `uv lock --upgrade-package` works with the local wheelhouse)
 - **Decision**: `[tool.semantic_release]` keeps current settings (`master`, `v{version}`,
   `major_on_zero=false`, changelog exclusions) and adds `build_command_env=["CY_RELEASE_CHECK"]`
   and `build_command`: `uv lock --upgrade-package clearml-yolo`, `git add uv.lock`, and when
@@ -94,7 +95,7 @@ Source of truth for adapted files: `/mnt/wsl/data/nkt/cveta2` at `0fa3310`.
 - **Decision**: port `scripts/session_status.sh` (branch vs `master`, release lock
   `clearml-yolo-release.lock`, `.run-tag`); register in `.claude/settings.json` SessionStart.
 
-## R13. Local source overrides (user decision 2026-11-09: narrow exemption)
+## R13. Local source overrides (user decision 2026-11-09: narrow exemption) — SUPERSEDED by R15
 - **Decision**: Keep the documented uncommitted `[tool.uv.sources]` override convention.
   - `scripts/git-hook.sh` tolerates unstaged changes only when every unstaged tracked path is
     `pyproject.toml` whose working copy differs from the index solely inside
