@@ -15,14 +15,14 @@ are listed; mutmut stops after ``--budget-seconds`` (default 300), and mutants i
 not reach by then count as "not run", not as survivors. Zero lifts either limit.
 
 The budget covers mutmut's whole run, including its stats pass, which executes every
-selected test once before any mutant. Running the whole unit suite there takes about
-1000 s, so each run selects test files per change instead (``select_tests``): the
-test files ``.testmondata`` records as depending on each changed file, or, for a file
-it knows nothing about, the test files whose text imports the changed module. Live
-suites (``tests/integration``) and files ``[tool.mutmut]`` ignores are never selected,
-and the committed ``pytest_add_cli_args`` deselect the host-wide markers. With that
-selection the stats pass takes seconds to a few minutes, so 300 s leaves room for
-mutants of the default 8 functions; widen ``--budget-seconds`` for a thorough run.
+selected test once before any mutant. With the whole unit suite selected, that pass
+alone outlasts any useful budget, so each run selects test files per change
+(``select_tests``): the test files ``.testmondata`` records as depending on each
+changed file, plus the test files whose text imports the changed module. Live suites
+(``tests/integration``) and files ``[tool.mutmut]`` ignores are never selected, and
+the committed ``pytest_add_cli_args`` deselect the host-wide markers. The selection
+keeps the stats pass small enough for the budget to reach mutants; a widely imported
+module still selects many files, so widen ``--budget-seconds`` for a thorough run.
 When no test file is selected, mutmut is not run and the functions are reported as
 not reached by tests.
 
@@ -335,15 +335,16 @@ def select_tests(workspace: Path, sources: Sequence[str], database: Path) -> lis
     """Return the unit test files that can kill mutants of *sources*.
 
     Per source file, testmon's recorded dependents that still exist in the staged tree
-    are used; a source file testmon does not know (new, renamed, or no database) falls
-    back to the test files that import its module.
+    are joined by the test files that import its module. The import scan covers what
+    testmon has not recorded yet: a new source file, no database, or a test staged to
+    kill a survivor since testmon last ran.
     """
     ignored = _ignored_paths(workspace)
     recorded = testmon_dependents(database, sources)
     selected: set[str] = set()
     for source in sources:
-        known = {path for path in recorded.get(source, set()) if _eligible_test_file(workspace, path, ignored)}
-        selected |= known or importing_tests(workspace, source, ignored)
+        selected |= {path for path in recorded.get(source, set()) if _eligible_test_file(workspace, path, ignored)}
+        selected |= importing_tests(workspace, source, ignored)
     return sorted(selected)
 
 

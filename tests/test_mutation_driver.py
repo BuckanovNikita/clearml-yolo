@@ -356,8 +356,8 @@ def test_testmon_dependents_are_cut_to_existing_unit_test_files(repo: Path, monk
     _stage(repo, "tests/integration/test_live.py", "def test_stand() -> None:\n    pass\n")
     _stage(repo, MODULE, ORIGINAL.replace("value * 2", "value * 3"))
     assert mutation.main([]) == 0
-    # testmon knows the changed file, so the importing tests/test_sample.py is not added.
-    assert _selection(fake.pyproject) == ["tests/test_indirect.py"]
+    # Recorded dependents join the importing tests, which testmon may not know yet.
+    assert _selection(fake.pyproject) == ["tests/test_indirect.py", SAMPLE_TEST]
 
 
 def test_unreadable_testmon_data_falls_back_to_imports(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
