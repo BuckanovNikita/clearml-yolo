@@ -4,6 +4,7 @@ __all__ = ["ReportResult"]
 from pathlib import Path
 
 from clearml_yolo.application.contracts import ClearMLConfig, ComparisonManifest, ReportResult
+from clearml_yolo.application.evaluation import identity_links
 from clearml_yolo.application.ports import WorkflowDependencies
 from clearml_yolo.application.use_cases.compare import MANIFEST_NAME
 from clearml_yolo.core import artifact_names
@@ -110,8 +111,9 @@ def build_reports(
         issues = deps.renderer.build_reports(
             candidate_path, baseline_path, dev_path, business_path, effective_config_path
         )
+        links = identity_links(task, identities, deps=deps)
         for name, path in zip(expected, (dev_path, business_path), strict=True):
-            deps.renderer.annotate_workbook(path, identities)
+            deps.renderer.annotate_workbook(path, identities, links=links)
             if task is not None:
                 deps.tracking.upload_artifact(task, name, path)
         result = ReportResult(

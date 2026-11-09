@@ -41,7 +41,7 @@ from clearml_yolo.core.evaluation.models import (
     EvaluationArtifacts,
     EvaluationConfig,
 )
-from clearml_yolo.core.identity import ModelIdentity
+from clearml_yolo.core.identity import IdentityLinks, ModelIdentity
 from clearml_yolo.core.models import (
     BackendTrainResult,
     CheckpointDescriptor,
@@ -435,6 +435,7 @@ def _paired_comparison(
         output_dir: Path,
         suffix: str,
         dashboard_classes: set[str] | None = None,
+        links: IdentityLinks | None = None,
     ) -> EvaluationArtifacts:
         evaluated.append(computed)
         # Keep actual matching and provenance; unrelated report rendering is outside this test.

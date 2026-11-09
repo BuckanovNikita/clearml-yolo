@@ -81,7 +81,7 @@ def test_report_preserves_one_sided_metrics_with_real_builders(
         annotated = load_workbook(path)
         for sheet in annotated:
             assert sheet.page_setup.fitToWidth == 1
-            assert sheet.print_title_rows.startswith("$1:")
+            assert sheet.oddFooter.left.text.startswith("baseline: fixture baseline · Training source:")
         annotated.close()
         with deannotated_workbook(path) as original:
             workbook = load_workbook(original)

@@ -19,7 +19,7 @@ from clearml_yolo.application.use_cases import predict as predict_module
 from clearml_yolo.application.use_cases.compare import ModelRef, _resolve_model
 from clearml_yolo.application.use_cases.metrics import EvaluationConfig, compute_metrics
 from clearml_yolo.application.use_cases.report import report
-from clearml_yolo.core.identity import ModelIdentity, require_model_identity
+from clearml_yolo.core.identity import IdentityLinks, ModelIdentity, require_model_identity
 from clearml_yolo.core.publication import FiftyOneConfig
 from test_metrics import _write_inputs
 from test_predict import _predict
@@ -143,6 +143,41 @@ def test_report_retains_distinct_source_tasks_and_visible_names(
         workbook.close()
 
 
+def test_report_footer_links_each_source_role_to_its_training_task(
+    tmp_path: Path,
+    report_generator: list[tuple[Path, Path]],
+    workflow_dependencies: WorkflowDependencies,
+) -> None:
+    comparison, candidate, baseline = _comparison_dir(tmp_path)
+    identities = {
+        "baseline": ModelIdentity(model_name="baseline-trained", training_task_id="a" * 32),
+        "candidate": ModelIdentity(model_name="candidate-trained", training_task_id="b" * 32),
+    }
+    annotate_workbook(candidate, {"model": identities["candidate"]})
+    annotate_workbook(baseline, {"model": identities["baseline"]})
+    requested: list[ModelIdentity] = []
+
+    def links(task: object, identity: ModelIdentity) -> IdentityLinks:
+        requested.append(identity)
+        return IdentityLinks(task_url=f"https://app.example/projects/*/tasks/{identity.training_task_id}/output/log")
+
+    workflow_dependencies.tracking.identity_links = links  # type: ignore[method-assign]
+    result = report(comparison, tmp_path / "reports", ClearMLConfig(), deps=workflow_dependencies)
+    # Only source identities are linked, never the task that produced the report.
+    assert sorted(identity.model_name for identity in requested) == ["baseline-trained", "candidate-trained"]
+    for path in [*result.dev_reports.values(), *result.business_reports.values()]:
+        workbook = load_workbook(path)
+        for sheet in workbook.worksheets:
+            targets = {cell.hyperlink.target for row in sheet.iter_rows() for cell in row if cell.hyperlink}
+            assert targets == {
+                f"https://app.example/projects/*/tasks/{'a' * 32}/output/log",
+                f"https://app.example/projects/*/tasks/{'b' * 32}/output/log",
+            }
+            linked = [cell.value for row in sheet.iter_rows() for cell in row if cell.hyperlink]
+            assert linked == ["Training task: open in ClearML"] * 2
+        workbook.close()
+
+
 def test_legacy_report_workbooks_require_explicit_labels(
     tmp_path: Path,
     report_generator: list[tuple[Path, Path]],
@@ -219,3 +254,53 @@ def test_metrics_retains_prediction_source_identity_in_dashboard(
         deps=workflow_dependencies,
     )
     assert workbook_identities(result.dashboards["test"]) == {"model": identity}
+
+
+def test_metrics_footers_link_the_source_in_every_workbook(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
+) -> None:
+    predictions, truth = _write_inputs(tmp_path)
+    checkpoint = tmp_path / "best.pt"
+    checkpoint.write_bytes(b"training checkpoint")
+    identity = ModelIdentity(
+        model_name="trained-source",
+        training_task_id="a" * 32,
+        model_id="m" * 32,
+        checkpoint_sha256=checkpoint_sha256(checkpoint),
+    )
+    write_prediction_provenance(predictions, checkpoint, identity)
+    patch_workflow(
+        monkeypatch,
+        workflow_dependencies,
+        "clearml_yolo.application.use_cases.metrics.init_task",
+        lambda *_args, **_kwargs: None,
+    )
+    sources = IdentityLinks(
+        model_url=f"https://app.example/projects/*/models/{'m' * 32}",
+        task_url=f"https://app.example/projects/*/tasks/{'a' * 32}/output/log",
+    )
+    workflow_dependencies.tracking.identity_links = lambda task, identity: sources  # type: ignore[method-assign]
+    result = compute_metrics(
+        predictions,
+        truth,
+        tmp_path / "metrics",
+        ClearMLConfig(),
+        EvaluationConfig(),
+        splits=["test"],
+        fiftyone=FiftyOneConfig(enabled=False),
+        deps=workflow_dependencies,
+    )
+    workbooks = sorted((tmp_path / "metrics").rglob("*.xlsx"))
+    assert result.dashboards["test"] in workbooks
+    assert len(workbooks) >= 4
+    for path in workbooks:
+        workbook = load_workbook(path)
+        for sheet in workbook.worksheets:
+            header = sheet.cell(1, 1).value
+            assert header is None or not str(header).startswith(("model:", "Training"))
+            linked = {cell.value: cell.hyperlink.target for row in sheet.iter_rows() for cell in row if cell.hyperlink}
+            assert linked == {
+                "model: trained-source": sources.model_url,
+                "Training task: open in ClearML": sources.task_url,
+            }, path.name
+        workbook.close()

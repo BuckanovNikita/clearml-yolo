@@ -169,6 +169,7 @@ forbidden_modules =
 allow_indirect_imports = true
 ignore_imports =
     clearml_yolo.adapters.clearml.datasets -> clearml
+    clearml_yolo.adapters.clearml.links -> clearml
     clearml_yolo.adapters.clearml.detectors -> clearml
     clearml_yolo.adapters.clearml.console_worker -> clearml
     clearml_yolo.adapters.clearml.models -> clearml

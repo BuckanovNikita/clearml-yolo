@@ -14,7 +14,7 @@ from clearml_yolo.adapters.clearml.session import ClearMLConfig
 from clearml_yolo.application.ports import WorkflowDependencies
 from clearml_yolo.application.use_cases.compare import MANIFEST_NAME, ComparisonManifest
 from clearml_yolo.application.use_cases.report import build_reports, report
-from clearml_yolo.core.identity import ModelIdentity
+from clearml_yolo.core.identity import IdentityLinks, ModelIdentity
 from workflow_dependencies import patch_workflow
 from workflow_dependencies import (
     workflow_dependencies as workflow_dependencies,  # noqa: PLC0414 - fixture export
@@ -165,10 +165,12 @@ def test_standalone_report_publishes_only_final_workbooks_and_report_configurati
     connected: list[tuple[str, Path]] = []
     annotate = workflow_dependencies.renderer.annotate_workbook
 
-    def annotate_after_previous_upload(path: Path, identities: Mapping[str, ModelIdentity]) -> None:
+    def annotate_after_previous_upload(
+        path: Path, identities: Mapping[str, ModelIdentity], *, links: Mapping[str, IdentityLinks] | None = None
+    ) -> None:
         if path.stem == "report_business_test":
             assert "report_dev_test" in uploads
-        annotate(path, identities)
+        annotate(path, identities, links=links)
 
     monkeypatch.setattr(workflow_dependencies.renderer, "annotate_workbook", annotate_after_previous_upload)
 

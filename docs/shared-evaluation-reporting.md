@@ -50,9 +50,10 @@ names and relationship ID. Original-content recovery remains byte-exact. Fingerp
 validation rejects edits to annotated workbooks before historical metrics are read.
 Existing readers and annotation methods retain their signatures and failure behavior.
 
-Visible workbook banners and plot captions use model names, comparison roles and
-split context. Banners indicate whether training-source provenance is recorded;
-they do not print task identifiers or checkpoint digests. Exact values remain in
+Visible workbook identity footers and plot captions use model names, comparison roles
+and split context. Footers follow each sheet's content through report-generator's
+opt-in bottom placement, indicate whether training-source provenance is recorded and
+may link to ClearML pages; they do not print task identifiers or checkpoint digests. Exact values remain in
 embedded workbook identity metadata and machine provenance, with the same original
 metric recovery and fingerprint validation. See [readable output](readable-output.md).
 An optional separate presentation envelope retains exact original workbook bytes and

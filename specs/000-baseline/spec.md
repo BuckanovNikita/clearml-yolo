@@ -88,7 +88,8 @@ paired differences/statistics use the shared eligible population and defined mul
 correction. Unknown training counts remain unavailable and visible as report issues;
 evaluation counts cannot replace them. Empty shared populations retain available metrics
 with unavailable comparisons. Workbooks preserve original numeric values, literal class
-names, layout and readable model/source identity. Tampered decorated workbooks fail ingestion;
+names, layout (headers stay in place) and a readable model/source identity footer that
+links to source ClearML pages when available. Tampered decorated workbooks fail ingestion;
 undecorated historical workbooks remain readable.
 
 Publish current-model confusion counts and percentage views from identical counts, and

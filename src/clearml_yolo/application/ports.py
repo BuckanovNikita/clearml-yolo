@@ -32,7 +32,7 @@ from clearml_yolo.core.evaluation.models import (
     SplitOutcome,
 )
 from clearml_yolo.core.export_requests import ExportRequest, ExportResult
-from clearml_yolo.core.identity import ModelIdentity
+from clearml_yolo.core.identity import IdentityLinks, ModelIdentity
 from clearml_yolo.core.models import CheckpointMetadata
 from clearml_yolo.core.pipeline_outcome import PipelineOutcome
 from clearml_yolo.core.publication import FiftyOneConfig, PublicationReceipt, PublicationRequest
@@ -241,6 +241,7 @@ class EvaluationWriter(Protocol):
         output_dir: Path,
         suffix: str,
         dashboard_classes: set[str] | None = None,
+        links: IdentityLinks | None = None,
     ) -> EvaluationArtifacts: ...
 
     def summarize_metrics(self, metrics: dict[str, DetectionMetrics]) -> tuple[pd.DataFrame, dict[str, float]]: ...
@@ -249,7 +250,13 @@ class EvaluationWriter(Protocol):
 class ReportRenderer(Protocol):
     def write_candidate_workbook(self, path: Path, per_class: pd.DataFrame, summary: dict[str, float]) -> None: ...
 
-    def annotate_workbook(self, path: str | Path, identities: Mapping[str, ModelIdentity]) -> None: ...
+    def annotate_workbook(
+        self,
+        path: str | Path,
+        identities: Mapping[str, ModelIdentity],
+        *,
+        links: Mapping[str, IdentityLinks] | None = None,
+    ) -> None: ...
 
     def read_dashboard(self, path: str | Path, **kwargs: Any) -> pd.DataFrame: ...
 
@@ -269,7 +276,12 @@ class ReportRenderer(Protocol):
     ) -> tuple[TrainingCountIssue, ...]: ...
 
     def write_evaluation_workbook(
-        self, path: Path, evaluated: EvaluatedSplit, *, methodology: dict[str, Any]
+        self,
+        path: Path,
+        evaluated: EvaluatedSplit,
+        *,
+        methodology: dict[str, Any],
+        links: IdentityLinks | None = None,
     ) -> dict[str, Path]: ...
 
 
@@ -452,6 +464,10 @@ class TrackingSession(Protocol):  # noqa: PLR0904
     ) -> None: ...
 
     def task_identity(self, task: TaskHandle | None) -> tuple[str, str, str]: ...
+
+    def identity_links(self, task: TaskHandle | None, identity: ModelIdentity) -> IdentityLinks:
+        """Build exact web links for a source identity; empty without a live task, never raising."""
+        ...
 
     def upload_artifact(self, task: TaskHandle | None, name: str, artifact_object: Path) -> None: ...
 

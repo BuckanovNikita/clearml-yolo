@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, override
 
 from clearml_yolo.adapters.clearml import datasets as clearml_datasets
+from clearml_yolo.adapters.clearml import links as clearml_links
 from clearml_yolo.adapters.clearml import models as clearml_models
 from clearml_yolo.adapters.clearml import native as clearml_native
 from clearml_yolo.adapters.clearml import report as clearml_report
@@ -203,6 +204,7 @@ class _TrackingSession:
     report_scalars = staticmethod(clearml_report.report_scalars)
     report_table = staticmethod(clearml_report.report_table)
     task_identity = staticmethod(clearml_session.task_identity)
+    identity_links = staticmethod(clearml_links.identity_links)
     upload_artifact = staticmethod(clearml_session.upload_artifact)
     write_prediction_provenance = staticmethod(clearml_results.write_prediction_provenance)
     has_owned_native_model = staticmethod(_has_owned_native_model)

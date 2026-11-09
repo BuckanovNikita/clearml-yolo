@@ -2,7 +2,6 @@
 
 import io
 import json
-import textwrap
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
@@ -22,10 +21,11 @@ from report_generator.v2 import annotate_workbook as annotate_package
 
 from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.storage.filesystem import temporary_root, write_path
-from clearml_yolo.core.identity import ModelIdentity
+from clearml_yolo.core.identity import IdentityLinks, ModelIdentity
 from clearml_yolo.core.presentation import human_labels, human_text
 
 _META = "customXml/clearml-yolo-identity.xml"
+_ALIAS_NOTICE = "Class labels use readable aliases; original values are retained."
 _IDENTITY_NS = "https://clearml-yolo/model-identity/v1"
 _FORMAT = MetadataFormat(_META, _IDENTITY_NS, "identity", "1", "clearmlYoloIdentity")
 _DISPLAY_NS = "https://clearml-yolo/readable-workbook/v1"
@@ -153,6 +153,16 @@ def humanize_workbook(path: str | Path) -> None:
         return
     if read_metadata(content, _DISPLAY_FORMAT, _presentation_labels) is not None:
         return
+    _humanize_labels(path, visible_notice=True)
+
+
+def _humanize_labels(path: Path, *, visible_notice: bool) -> bool:
+    """Apply readable class aliases; return whether any visible label changed.
+
+    The identity footer owns visible lines when identities exist, so its caller asks
+    for a metadata-only envelope and appends the alias notice to one footer block.
+    """
+    content = path.read_bytes()
     with ZipFile(io.BytesIO(content)) as archive:
         entries = {name: archive.read(name) for name in archive.namelist()}
     labels = human_labels(
@@ -161,15 +171,16 @@ def humanize_workbook(path: str | Path) -> None:
         for group in _literal_groups(root)
     )
     if all(original == display for original, display in labels.items()):
-        return
-    # Generic annotation owns relationships, shifted formulas and the original bytes.
+        return False
+    # Generic annotation owns relationships, footer placement and the original bytes.
     # The second envelope is separate from the established model-identity schema.
     annotate_package(
         path,
-        banner_lines=["Class labels use readable aliases; original values are retained."],
+        banner_lines=[_ALIAS_NOTICE] if visible_notice else [],
         metadata_texts={"labels": json.dumps(labels, ensure_ascii=False)},
         format=_DISPLAY_FORMAT,
         validate=_presentation_labels,
+        placement="bottom",
     )
     with ZipFile(path) as archive:
         entries = {name: archive.read(name) for name in archive.namelist()}
@@ -191,41 +202,66 @@ def humanize_workbook(path: str | Path) -> None:
     with ZipFile(path, "w", compression=ZIP_DEFLATED) as archive:
         for name, payload in entries.items():
             archive.writestr(name, payload)
+    return True
 
 
-def _banner_lines(identities: Mapping[str, ModelIdentity]) -> list[str]:
+def _source_status(identity: ModelIdentity) -> str:
+    return f"Training source: {'recorded' if identity.training_task_id else 'unavailable'}"
+
+
+def _footer_lines(
+    identities: Mapping[str, ModelIdentity], links: Mapping[str, IdentityLinks]
+) -> tuple[list[str], list[str | None]]:
+    """Readable identity lines and their exact link targets; identifiers stay hidden.
+
+    Lines are literal inline strings, so formula-like names are never evaluated.
+    """
     lines: list[str] = []
+    targets: list[str | None] = []
     for role, identity in identities.items():
-        # Fixed-width chunks preserve every character, including whitespace and
-        # formula-like prefixes. Inline strings never become Excel formulas.
-        for label in (
-            f"{human_text(role)}: {identity.label}",
-            f"Training source: {'recorded' if identity.training_task_id else 'unavailable'}",
-        ):
-            lines.extend(
-                textwrap.wrap(
-                    label,
-                    width=90,
-                    expand_tabs=False,
-                    replace_whitespace=False,
-                    drop_whitespace=False,
-                )
-                or [""]
-            )
-    return lines
+        link = links.get(role, IdentityLinks())
+        lines.append(f"{human_text(role)}: {identity.label}")
+        targets.append(link.model_url if identity.model_id else None)
+        if identity.training_task_id and link.task_url:
+            lines.append("Training task: open in ClearML")
+            targets.append(link.task_url)
+        else:
+            lines.append(_source_status(identity))
+            targets.append(None)
+    return lines, targets
+
+
+def _page_footer(identities: Mapping[str, ModelIdentity]) -> str:
+    return " | ".join(
+        f"{human_text(role)}: {identity.label} · {_source_status(identity)}" for role, identity in identities.items()
+    )
 
 
 @trace_operation("report.workbook.annotate")
-def annotate_workbook(path: str | Path, identities: Mapping[str, ModelIdentity]) -> None:
-    """Prepend literal identities, preserving metadata v1 and byte-exact recovery."""
+def annotate_workbook(
+    path: str | Path,
+    identities: Mapping[str, ModelIdentity],
+    *,
+    links: Mapping[str, IdentityLinks] | None = None,
+) -> None:
+    """Append the identity footer, preserving metadata v1 and byte-exact recovery.
+
+    Original table coordinates never move. Roles without links render plain text.
+    """
     path = write_path(path)
     if not identities:
         raise ValueError("Workbook annotation requires at least one model identity")
     path.write_bytes(_original(path.read_bytes()))
-    humanize_workbook(path)
+    lines, targets = _footer_lines(identities, links or {})
+    if _humanize_labels(path, visible_notice=False):
+        lines.append(_ALIAS_NOTICE)
+        targets.append(None)
     annotate_package(
         path,
-        banner_lines=_banner_lines(identities),
+        banner_lines=lines,
+        banner_links=targets,
+        page_footer=_page_footer(identities),
+        placement="bottom",
         metadata_texts={
             "models": json.dumps(
                 {role: identity.model_dump() for role, identity in identities.items()},

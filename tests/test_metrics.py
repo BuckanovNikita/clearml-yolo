@@ -196,7 +196,7 @@ def test_match_table_larger_than_an_excel_sheet_is_saved_as_csv(
     rows = 1048577
     evaluated = replace(evaluated, pred_matches=pd.DataFrame({"pred_index": pd.RangeIndex(rows)}))
     workbook = tmp_path / "metrics_evaluation_test.xlsx"
-    tables = _write_evaluation_workbook(workbook, evaluated, methodology={}, deps=workflow_dependencies)
+    tables = _write_evaluation_workbook(workbook, evaluated, methodology={}, task=None, deps=workflow_dependencies)
     matches = pd.read_csv(tables["metrics_evaluation_test_prediction_matches"])
     assert len(matches) == rows
     assert matches.iloc[0].to_dict() == {"pred_index": 0}

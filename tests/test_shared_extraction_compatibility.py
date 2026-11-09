@@ -378,13 +378,30 @@ def _identity_observation(directory: Path) -> dict[str, Any]:
 
 def test_formula_chart_print_and_identity_recovery_equal_frozen_values(tmp_path: Path) -> None:
     expected = _expected("identity")
-    # Feature 034 deliberately changes only visible source banners; retain the
-    # immutable extraction baseline and compare every other cell/identity exactly.
-    cells = expected["annotated"]["sheets"][0]["cells"]
-    assert cells[1] == ["A2", "Training task: candidate-task", "s", 0]
-    assert cells[3] == ["A4", "Training task: baseline-task", "s", 0]
-    cells[1][1] = cells[3][1] = "Training source: recorded"
-    assert _identity_observation(tmp_path) == expected
+    observed = _identity_observation(tmp_path)
+    # The immutable extraction baseline still fixes the original package and identities.
+    assert observed["original"] == expected["original"]
+    assert observed["identities"] == expected["identities"]
+    # Feature 010 moves visible identities from prepended rows to a footer: every
+    # original cell, chart and print name keeps its frozen original coordinates.
+    original_sheet = expected["original"]["sheets"][0]
+    annotated_sheet = observed["annotated"]["sheets"][0]
+    count = len(original_sheet["cells"])
+    assert annotated_sheet["cells"][:count] == original_sheet["cells"]
+    assert [cell[1] for cell in annotated_sheet["cells"][count:]] == [
+        "candidate: Candidate",
+        "Training source: recorded",
+        "baseline: Baseline",
+        "Training source: recorded",
+    ]
+    # Page setup changes only to fit the printed footer width to one page.
+    for key in set(original_sheet) - {"cells", "merged", "print_area", "rows", "page_setup", "sheet_properties"}:
+        assert annotated_sheet[key] == original_sheet[key], key
+    assert 'fitToWidth="1"' in annotated_sheet["page_setup"]
+    assert 'fitToPage="1"' in annotated_sheet["sheet_properties"]
+    assert set(original_sheet["merged"]) <= set(annotated_sheet["merged"])
+    assert all(annotated_sheet["rows"][row] == value for row, value in original_sheet["rows"].items())
+    assert observed["annotated"]["drawings"] == expected["original"]["drawings"]
 
 
 def _public_observation() -> dict[str, Any]:

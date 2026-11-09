@@ -28,7 +28,7 @@ from clearml_yolo.application.contracts import (
     SettledInference,
     VocabularyReport,
 )
-from clearml_yolo.application.evaluation import evaluate_split
+from clearml_yolo.application.evaluation import evaluate_split, identity_links
 from clearml_yolo.application.ground_truth import resolve_ground_truth
 from clearml_yolo.application.ports import (
     PairedComparisonEngine,
@@ -250,7 +250,6 @@ def _scored(
     deps: WorkflowDependencies,
 ) -> tuple[EvaluatedSplit, VocabularyReport, InferenceEvidence, Path]:
     with deps.resources.trace_operation("comparison.score", context={"split": split}):
-        del task
         validate_evaluation_image_name(inference.image_name)
         if inference.reuse_existing and deps.storage.is_file(output):
             _validate_cached_identity(output, weights, model_identity, deps=deps)
@@ -341,6 +340,7 @@ def _scored(
             source_ground_truth=ground_truth,
             source_predictions=predictions,
             model_identity=model_identity,
+            task=task,
             deps=deps,
         )
         return (evaluated, vocabulary, evidence, native_archive)
@@ -484,7 +484,8 @@ def _skip_without_baseline(
         per_class, summary = deps.evaluation_writer.summarize_metrics(evaluated.metrics)
         deps.renderer.write_candidate_workbook(workbook, per_class, summary)
         if candidate.identity is not None:
-            deps.renderer.annotate_workbook(workbook, {"candidate": candidate.identity})
+            identities = {"candidate": candidate.identity}
+            deps.renderer.annotate_workbook(workbook, identities, links=identity_links(task, identities, deps=deps))
         tables: dict[str, Path] = {}
         for title, frame in {
             "thresholds": pd.DataFrame(list(candidate.thresholds.items()), columns=["class_name", "confidence"]),
@@ -567,7 +568,7 @@ def _publish_comparison_workbook(
         for role, model in (("baseline", baseline), ("candidate", candidate))
         if model.identity is not None
     }
-    deps.renderer.annotate_workbook(workbook, identities)
+    deps.renderer.annotate_workbook(workbook, identities, links=identity_links(task, identities, deps=deps))
     if task is not None:
         name = artifact_names.per_split(artifact_names.COMPARISON_WORKBOOK_PREFIX, split)
         deps.tracking.expect_artifacts(task, [name])

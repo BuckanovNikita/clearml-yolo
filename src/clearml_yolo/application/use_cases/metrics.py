@@ -55,9 +55,12 @@ def _write_evaluation_workbook(
     evaluated: EvaluatedSplit,
     *,
     methodology: dict[str, Any],
+    task: TaskHandle | None,
     deps: WorkflowDependencies,
 ) -> dict[str, Path]:
-    return deps.renderer.write_evaluation_workbook(path, evaluated, methodology=methodology)
+    identity = evaluated.model_identity
+    links = None if identity is None else deps.tracking.identity_links(task, identity)
+    return deps.renderer.write_evaluation_workbook(path, evaluated, methodology=methodology, links=links)
 
 
 def _prepare(
@@ -210,6 +213,7 @@ def compute_metrics(
                 source_ground_truth=ground_truth_frame,
                 source_predictions=predictions_frame,
                 model_identity=identity,
+                task=task,
                 deps=deps,
             )
             evaluation_path = destination / f"evaluation_{artifact_names.split_component(split)}.json"
@@ -230,6 +234,7 @@ def compute_metrics(
                     "evaluated_splits": requested,
                     "test_calibration": False,
                 },
+                task=task,
                 deps=deps,
             )
             _publish_split(

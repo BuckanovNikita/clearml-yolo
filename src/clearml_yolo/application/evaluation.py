@@ -7,9 +7,9 @@ from pathlib import Path
 import pandas as pd
 from pydantic import JsonValue
 
-from clearml_yolo.application.ports import WorkflowDependencies
+from clearml_yolo.application.ports import TaskHandle, WorkflowDependencies
 from clearml_yolo.core.evaluation.models import EvaluatedSplit
-from clearml_yolo.core.identity import ModelIdentity
+from clearml_yolo.core.identity import IdentityLinks, ModelIdentity
 
 
 def evaluate_split(
@@ -32,6 +32,7 @@ def evaluate_split(
     output_dir: Path,
     suffix: str,
     dashboard_classes: set[str] | None = None,
+    task: TaskHandle | None = None,
     deps: WorkflowDependencies,
 ) -> EvaluatedSplit:
     with deps.resources.trace_operation("evaluation.split", context={"split": split}):
@@ -57,6 +58,17 @@ def evaluate_split(
             training_counts=deps.tracking.training_counts(model_identity),
         )
         artifacts = deps.evaluation_writer.render_evaluation(
-            computed, output_dir=output_dir, suffix=suffix, dashboard_classes=dashboard_classes
+            computed,
+            output_dir=output_dir,
+            suffix=suffix,
+            dashboard_classes=dashboard_classes,
+            links=None if model_identity is None else deps.tracking.identity_links(task, model_identity),
         )
         return EvaluatedSplit.from_parts(computed, artifacts)
+
+
+def identity_links(
+    task: TaskHandle | None, identities: Mapping[str, ModelIdentity], *, deps: WorkflowDependencies
+) -> dict[str, IdentityLinks]:
+    """Resolve footer links for source identities from the invocation's own task session."""
+    return {role: deps.tracking.identity_links(task, identity) for role, identity in identities.items()}

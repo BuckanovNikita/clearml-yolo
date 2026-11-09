@@ -1,6 +1,10 @@
-"""Workbook identities preserve source data while repeating in print titles."""
+"""Workbook identity footers preserve source data and identify every printed page."""
 
+import io
+import json
+import math
 from pathlib import Path
+from typing import Any
 from zipfile import ZipFile
 
 import pandas as pd
@@ -16,7 +20,7 @@ from clearml_yolo.adapters.reporting.workbook_identity import (
     read_dashboard,
     workbook_identities,
 )
-from clearml_yolo.core.identity import ModelIdentity
+from clearml_yolo.core.identity import IdentityLinks, ModelIdentity
 
 
 def _complex_workbook(path: Path) -> None:
@@ -40,7 +44,14 @@ def _complex_workbook(path: Path) -> None:
     workbook.save(path)
 
 
-def test_banner_all_sheets_preserves_references_and_print_structure(
+def _footer(sheet: Any) -> list[str]:
+    """Visible lines after the one empty row that ends original content."""
+    values = [sheet.cell(row, 1).value for row in range(1, sheet.max_row + 1)]
+    start = max(index for index, value in enumerate(values) if value is None) + 1
+    return [str(value) for value in values[start:]]
+
+
+def test_identity_footer_keeps_every_original_coordinate_on_all_sheets(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -53,39 +64,122 @@ def test_banner_all_sheets_preserves_references_and_print_structure(
     identity = ModelIdentity(model_name="=Unicode 模型 " + "long name " * 40, training_task_id="full-training-task-id")
     annotate_workbook(path, {"Candidate": identity})
     annotated = load_workbook(path)
-    for sheet in annotated:
-        banner_end = int(sheet.print_title_rows.split(":")[-1].replace("$", "")) - (
-            1 if sheet.title == "Main sheet" else 2
-        )
-        banner = "".join(str(sheet.cell(row, 1).value or "") for row in range(1, banner_end + 1))
-        assert identity.model_name in banner
-        assert identity.training_task_id is not None
-        assert identity.training_task_id not in banner
-        assert all(sheet.cell(row, 1).data_type == "s" for row in range(1, banner_end + 1))
-        assert sheet.print_title_rows.startswith("$1:")
-        assert sheet.sheet_properties.pageSetUpPr.fitToPage is True
-        assert sheet.page_setup.fitToWidth == 1
-        assert all(sheet.row_dimensions[row].height <= 48 for row in range(1, banner_end + 1))
-    shift = next(cell.row for row in annotated["Main sheet"] for cell in row if cell.value == "Class") - 1
-    main = annotated["Main sheet"]
-    assert main.cell(3 + shift, 2).value == f"=SUM($B${2 + shift}:B{2 + shift})"
-    assert annotated["Other"].cell(1 + shift, 1).value == f"='Main sheet'!$B${2 + shift}+1"
-    assert main.cell(1 + shift, 1).font.color.rgb == "00FF0000"
-    assert f"D{2 + shift}:E{2 + shift}" in main.merged_cells
-    assert main.tables["Results"].ref == f"A{1 + shift}:B{2 + shift}"
-    assert main.freeze_panes == f"B{2 + shift}"
-    assert main.row_breaks.brk[0].id == 2 + shift
+    main, other = annotated["Main sheet"], annotated["Other"]
+    # Headers stay in row 1 and references, styles and print setup keep their cells.
+    assert main["A1"].value == "Class"
+    assert main["A1"].font.color.rgb == "00FF0000"
+    assert main["B3"].value == "=SUM($B$2:B2)"
+    assert other["A1"].value == "='Main sheet'!$B$2+1"
+    assert "D2:E2" in main.merged_cells
+    assert main.tables["Results"].ref == "A1:B2"
+    assert main.freeze_panes == "B2"
+    assert main.row_breaks.brk[0].id == 2
+    assert main.print_title_rows == "$1:$1"
     assert main.print_title_cols == "$A:$A"
+    assert other.print_title_rows == "$1:$2"
+    expected = [f"Candidate: {identity.model_name}", "Training source: recorded"]
+    for sheet, last_original_row in ((main, 3), (other, 1)):
+        assert sheet.cell(last_original_row + 1, 1).value is None
+        assert [sheet.cell(last_original_row + 2 + offset, 1).value for offset in range(2)] == expected
+        assert sheet.cell(last_original_row + 2, 1).data_type == "s"
+        assert sheet.cell(last_original_row + 2, 1).hyperlink is None
+        footer = sheet.oddFooter.left.text
+        assert footer.startswith("Candidate: =Unicode 模型")
+        assert len(footer) <= 253
+        assert "full-training-task-id" not in footer
+        visible = [str(cell.value) for row in sheet for cell in row if cell.value is not None]
+        assert all("full-training-task-id" not in value for value in visible)
+    assert main.print_area == "'Main sheet'!$A$1:$H$6"  # widened for the merged A:H footer
     assert workbook_identities(path) == {"Candidate": identity}
     with deannotated_workbook(path) as restored:
         assert restored.is_relative_to(tmp_path / "workspace/.tmp")
         assert restored.read_bytes() == original
     assert not restored.exists()
     assert path.read_bytes() != original
+    first = path.read_bytes()
     annotate_workbook(path, {"Candidate": identity})
     assert workbook_identities(path) == {"Candidate": identity}
     with deannotated_workbook(path) as restored:
         assert restored.read_bytes() == original
+    with ZipFile(path) as current, ZipFile(io.BytesIO(first)) as previous:
+        assert current.read("xl/worksheets/sheet1.xml") == previous.read("xl/worksheets/sheet1.xml")
+
+
+def test_identity_footer_links_sources_by_role_without_visible_identifiers(tmp_path: Path) -> None:
+    path = tmp_path / "comparison.xlsx"
+    _complex_workbook(path)
+    identities = {
+        "baseline": ModelIdentity(model_name="old-detector", training_task_id="b" * 32, model_id="m" * 32),
+        "candidate": ModelIdentity(model_name="train-brave-willow", training_task_id="c" * 32),
+    }
+    links = {
+        "baseline": IdentityLinks(
+            model_url=f"https://app.example/projects/*/models/{'m' * 32}",
+            task_url=f"https://app.example/projects/*/tasks/{'b' * 32}/output/log",
+        ),
+        "candidate": IdentityLinks(),
+    }
+    annotate_workbook(path, identities, links=links)
+    workbook = load_workbook(path)
+    main = workbook["Main sheet"]
+    assert _footer(main) == [
+        "baseline: old-detector",
+        "Training task: open in ClearML",
+        "candidate: train-brave-willow",
+        "Training source: recorded",
+    ]
+    targets = {cell.value: cell.hyperlink.target if cell.hyperlink else None for cell in main["A"][4:8]}
+    assert targets == {
+        "baseline: old-detector": links["baseline"].model_url,
+        "Training task: open in ClearML": links["baseline"].task_url,
+        "candidate: train-brave-willow": None,
+        "Training source: recorded": None,
+    }
+    assert main.oddFooter.left.text == (
+        "baseline: old-detector · Training source: recorded | candidate: train-brave-willow · Training source: recorded"
+    )
+    visible = [str(cell.value) for sheet in workbook for row in sheet for cell in row if cell.value is not None]
+    assert not any(token * 32 in value for value in visible for token in "bcm")
+    workbook.close()
+    assert workbook_identities(path) == identities
+
+
+def test_model_link_requires_recorded_model_identifier(tmp_path: Path) -> None:
+    path = tmp_path / "book.xlsx"
+    _complex_workbook(path)
+    identity = ModelIdentity(model_name="custom")
+    annotate_workbook(
+        path, {"model": identity}, links={"model": IdentityLinks(model_url="https://app.example/projects/*/models/x")}
+    )
+    main = load_workbook(path)["Main sheet"]
+    assert _footer(main) == ["model: custom", "Training source: unavailable"]
+    assert all(cell.hyperlink is None for cell in main["A"])
+
+
+def test_historical_top_banner_workbook_recovers_and_moves_to_footer(tmp_path: Path) -> None:
+    from report_generator.v2 import annotate_workbook as annotate_package
+
+    from clearml_yolo.adapters.reporting import workbook_identity
+
+    path = tmp_path / "historical.xlsx"
+    _complex_workbook(path)
+    original = path.read_bytes()
+    identity = ModelIdentity(model_name="legacy", training_task_id="task")
+    annotate_package(
+        path,
+        banner_lines=["Model: legacy", "Training task: task"],
+        metadata_texts={"models": json.dumps({"model": identity.model_dump()})},
+        format=workbook_identity._FORMAT,
+        validate=workbook_identity._model_metadata,
+    )
+    assert load_workbook(path)["Main sheet"]["A3"].value == "Class"
+    assert workbook_identities(path) == {"model": identity}
+    with deannotated_workbook(path) as restored:
+        assert restored.read_bytes() == original
+    annotate_workbook(path, workbook_identities(path))
+    main = load_workbook(path)["Main sheet"]
+    assert main["A1"].value == "Class"
+    assert _footer(main) == ["model: legacy", "Training source: recorded"]
 
 
 def test_real_dependency_dashboards_are_readable_annotated_and_historical(tmp_path: Path) -> None:
@@ -199,13 +293,14 @@ def test_real_report_workbooks_keep_every_original_sheet_and_cell(tmp_path: Path
         after = load_workbook(path)
         assert before.sheetnames == after.sheetnames
         for old, new in zip(before, after, strict=True):
-            assert new["A1"].value == "Baseline: Old model"
-            assert new["A3"].value == "Candidate: 新模型"
             for row in old:
                 for cell in row:
-                    if cell.data_type != "f":
-                        assert new.cell(cell.row + 4, cell.column).value == cell.value
-            assert new.print_title_rows.startswith("$1:$4")
+                    assert new.cell(cell.row, cell.column).value == cell.value
+            footer = _footer(new)
+            assert footer[0] == "Baseline: Old model"
+            assert footer[2] == "Candidate: 新模型"
+            assert new.oddFooter.left.text.startswith("Baseline: Old model · Training source: recorded")
+            assert new.print_title_rows == old.print_title_rows
 
 
 def test_chart_validation_and_filter_ranges_follow_original_body(tmp_path: Path) -> None:
@@ -230,18 +325,22 @@ def test_chart_validation_and_filter_ranges_follow_original_body(tmp_path: Path)
     path = tmp_path / "chart.xlsx"
     workbook.save(path)
     annotate_workbook(path, {"Model": ModelIdentity(model_name="model", training_task_id="task")})
-    after = load_workbook(path)["Values, original"]
-    assert after.auto_filter.ref == "A3:B4"
-    assert after.data_validations.dataValidation[0].sqref == "B4"
-    assert after.data_validations.dataValidation[0].formula1 == "B4"
-    assert after.print_title_rows == "$1:$3"
-    assert after.print_title_cols == "$A:$A"
-    assert after.page_setup.fitToHeight == 2
     with ZipFile(path) as archive:
         drawing = archive.read("xl/drawings/drawing1.xml")
-        assert b">3</" in drawing  # chart's zero-based D2 anchor now follows D4
         chart_xml = archive.read("xl/charts/chart1.xml")
-        assert b"'Values, original'!$B$4" in chart_xml
+    after = load_workbook(path)["Values, original"]
+    assert after.auto_filter.ref == "A1:B2"
+    assert after.data_validations.dataValidation[0].sqref == "B2"
+    assert after.data_validations.dataValidation[0].formula1 == "B2"
+    assert after.print_title_rows == "$1:$1"
+    assert after.print_title_cols == "$A:$A"
+    assert after.page_setup.fitToHeight == 2
+    assert b"'Values, original'!$B$2" in chart_xml
+    # openpyxl anchors the default 7.5 cm chart at D2 (zero-based row 1); the footer starts below it.
+    chart_rows = 1 + math.ceil(7.5 / 2.54 * 72 * 12700 / (15 * 12700))
+    footer_start = next(row for row in range(3, after.max_row + 1) if after.cell(row, 1).value)
+    assert footer_start == chart_rows + 2
+    assert b"<xdr:row>1</xdr:row>" in drawing or b">1</" in drawing
 
 
 def test_edited_annotated_parts_are_rejected_before_reading_original(tmp_path: Path) -> None:

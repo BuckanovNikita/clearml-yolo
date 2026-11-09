@@ -20,6 +20,7 @@ from clearml_yolo.core.evaluation.models import (
     DetectionMetrics,
     EvaluationArtifacts,
 )
+from clearml_yolo.core.identity import IdentityLinks
 from clearml_yolo.core.presentation import human_labels
 
 
@@ -49,6 +50,7 @@ def render_evaluation(
     output_dir: Path,
     suffix: str,
     dashboard_classes: set[str] | None = None,
+    links: IdentityLinks | None = None,
 ) -> EvaluationArtifacts:
     """Write the original dashboards and plots without repeating matching/scoring."""
     output_dir = write_path(output_dir)
@@ -119,7 +121,7 @@ def render_evaluation(
             raise FileNotFoundError(f"Required confidence interval plot is missing: {path}")
     for workbook in (dashboard_path, dtrk_path, confusion_matrix_path):
         if identity is not None:
-            annotate_workbook(workbook, {"model": identity})
+            annotate_workbook(workbook, {"model": identity}, links=None if links is None else {"model": links})
         else:
             humanize_workbook(workbook)
     return EvaluationArtifacts(

@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 
 from clearml_yolo.application.ports import Publisher, WorkflowDependencies
+from clearml_yolo.core.identity import IdentityLinks, ModelIdentity
 from clearml_yolo.core.publication import FiftyOneConfig
 from clearml_yolo.entrypoints.composition import build_dependencies
 
@@ -22,9 +23,17 @@ class PublisherFactory:
         return self.create(config)
 
 
+def _no_web_host(task: object, identity: ModelIdentity) -> IdentityLinks:
+    """Links depend on the machine's ClearML configuration; default to an unknown host."""
+    del task, identity
+    return IdentityLinks()
+
+
 @pytest.fixture
 def workflow_dependencies() -> WorkflowDependencies:
     dependencies = build_dependencies()
+    # Instance attribute shadows the composed static method for this bundle only.
+    dependencies.tracking.identity_links = _no_web_host  # type: ignore[method-assign]
     return replace(dependencies, publisher_factory=PublisherFactory(dependencies.publisher_factory))
 
 
@@ -98,6 +107,7 @@ _CAPABILITIES = {
         "upload_artifact",
         "publish_table",
         "task_identity",
+        "identity_links",
         "associate_calibration_thresholds",
     },
 }

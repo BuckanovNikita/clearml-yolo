@@ -35,8 +35,11 @@ GPU fields retain the existing public display aliases even in JSON.
 Readable presentation does not alter checkpoint identities, cache keys, manifests,
 source rows, hashes, thresholds or calculated metrics.
 
-Workbooks show model names/roles and whether training-source provenance is recorded.
-Their embedded identity metadata retains exact task identifiers and checkpoint hashes;
+Workbooks show model names/roles and whether training-source provenance is recorded
+in an identity footer below each sheet's content; table headers stay in place. Footer
+lines link to ClearML model and training-task pages with readable text when the web
+host is known. Naive readers that skip identity metadata see footer rows as trailing
+rows. Their embedded identity metadata retains exact task identifiers and checkpoint hashes;
 the original metric layout remains recoverable. Plot captions use names and split
 context. Original source identifiers are retained in machine provenance, not visible
 captions or banner cells. See [shared reporting](shared-evaluation-reporting.md).

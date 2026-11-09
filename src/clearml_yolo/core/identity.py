@@ -2,6 +2,7 @@
 
 from collections.abc import Mapping
 from typing import Self
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
@@ -43,6 +44,29 @@ class ModelIdentity(BaseModel):
             checkpoint_sha256=provenance.get("checkpoint_sha256"),
             model_id=provenance.get("model_id"),
         )
+
+
+class IdentityLinks(BaseModel):
+    """Exact web addresses of a model's tracked sources, derived when a report renders.
+
+    Links are presentation data: they are never stored as identity, so an unknown
+    host only removes the link while the identity remains complete.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    model_url: str | None = None
+    task_url: str | None = None
+
+    @field_validator("model_url", "task_url")
+    @classmethod
+    def absolute_web_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        parts = urlsplit(value)
+        if parts.scheme not in {"http", "https"} or not parts.netloc:
+            raise ValueError("Identity links must be absolute http or https URLs")
+        return value
 
 
 def require_model_identity(

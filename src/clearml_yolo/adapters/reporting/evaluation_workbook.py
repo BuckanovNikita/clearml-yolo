@@ -15,6 +15,7 @@ from clearml_yolo.adapters.reporting.workbook_identity import (
 )
 from clearml_yolo.adapters.storage.filesystem import write_path
 from clearml_yolo.core.evaluation.models import EvaluatedSplit
+from clearml_yolo.core.identity import IdentityLinks
 
 
 @trace_operation("report.candidate.workbook")
@@ -28,7 +29,13 @@ def write_candidate_workbook(path: Path, per_class: pd.DataFrame, summary: dict[
 
 
 @trace_operation("report.evaluation.workbook")
-def write_evaluation_workbook(path: Path, evaluated: EvaluatedSplit, *, methodology: dict[str, Any]) -> dict[str, Path]:
+def write_evaluation_workbook(
+    path: Path,
+    evaluated: EvaluatedSplit,
+    *,
+    methodology: dict[str, Any],
+    links: IdentityLinks | None = None,
+) -> dict[str, Path]:
     """Write metric tables to Excel and row-level evidence/metadata to CSV."""
     path = write_path(path)
     for title in ("ground_truth_matches", "prediction_matches", "thresholds", "methodology"):
@@ -59,7 +66,7 @@ def write_evaluation_workbook(path: Path, evaluated: EvaluatedSplit, *, methodol
         per_class_frame.to_excel(writer, sheet_name="per_class", index=False)
         confusion.to_excel(writer, sheet_name="confusion_matrix")
     if evaluated.model_identity is not None:
-        annotate_workbook(path, {"model": evaluated.model_identity})
+        annotate_workbook(path, {"model": evaluated.model_identity}, links=None if links is None else {"model": links})
     else:
         humanize_workbook(path)
     tables: dict[str, Path] = {}
