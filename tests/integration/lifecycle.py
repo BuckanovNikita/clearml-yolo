@@ -93,8 +93,16 @@ TLS_REMEDY = (
     "clearml.py env exports SSL_CERT_FILE.",
 )
 PERMANENT_TERMS = ("unauthorized", "forbidden", "certificate", "x509", "invalid credential", "401", "403")
+# Refusals are matched by their specific texts: kubectl prefixes every failure, permanent
+# configuration errors included (a missing exec credential plugin), with "Unable to connect to
+# the server", so that prefix alone proves nothing. "was refused" covers kubectl's stopped API
+# server ("The connection to the server <host:port> was refused"); "actively refused" and "no
+# connection could be made" cover the Windows socket error.
 TEMPORARY_TERMS = (
     "connection refused",
+    "was refused",
+    "actively refused",
+    "no connection could be made",
     "connection reset",
     "remote end closed",
     "timed out",
@@ -106,14 +114,10 @@ TEMPORARY_TERMS = (
     "eof",
     "serviceunavailable",
     "unable to handle the request",
-    "unable to connect to the server",
     "502",
     "503",
     "504",
 )
-# kubectl reports a stopped API server as "The connection to the server <host:port> was
-# refused - did you specify the right host or port?", which no plain term above matches.
-TEMPORARY_PATTERNS = (re.compile(r"the connection to the server \S+ was refused"),)
 
 
 class LifecycleError(Exception):
@@ -277,9 +281,7 @@ def is_temporary(detail: str) -> bool:
     """Whether lower-cased error text reports lost connectivity and no permanent problem."""
     if any(term in detail for term in PERMANENT_TERMS):
         return False
-    return any(term in detail for term in TEMPORARY_TERMS) or any(
-        pattern.search(detail) for pattern in TEMPORARY_PATTERNS
-    )
+    return any(term in detail for term in TEMPORARY_TERMS)
 
 
 def classify_failure(result: subprocess.CompletedProcess[str], description: str) -> NoReturn:
@@ -351,7 +353,10 @@ class Run:
     # -- run tag ----------------------------------------------------------
 
     def _read_tag_file(self) -> str:
-        lines = self.tag_file.read_text(encoding="utf-8").splitlines()
+        try:
+            lines = self.tag_file.read_text(encoding="utf-8").splitlines()
+        except (OSError, UnicodeDecodeError):
+            lines = []
         tag = lines[0].strip() if lines else ""
         if not valid_tag(tag):
             fail(f"{self.tag_file} does not hold a run tag;", "remove it if the run it named is gone.")
@@ -396,8 +401,11 @@ class Run:
             return
         try:
             active = self._read_tag_file()
-        except LifecycleError:
-            active = "?"
+        except LifecycleError as error:
+            raise LifecycleError(
+                f"{self.tag_file} is in this worktree but does not hold a readable run tag;",
+                "remove it if the run it named is gone, then start again.",
+            ) from error
         if self.adopted() and active == self.tag:
             return
         fail(

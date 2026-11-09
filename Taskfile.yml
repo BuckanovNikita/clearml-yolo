@@ -50,12 +50,16 @@ tasks:
         PY
         fi
         mkdir -p external/wheelhouse
-        # Drop stale archives of these two packages so only the current checkouts resolve.
+        # Build both archives aside first: a failed build keeps the previous wheelhouse intact.
+        staging="$(mktemp -d external/wheelhouse.tmp.XXXXXX)"
+        trap 'rm -rf -- "$staging"' EXIT
+        for name in digital-metrics report-generator; do
+          uv build --sdist "external/$name" -o "$staging"
+        done
+        # Only now drop stale archives of these two packages so only the current checkouts resolve.
         rm -f external/wheelhouse/digital_metrics-* external/wheelhouse/digital-metrics-* \
           external/wheelhouse/report_generator-* external/wheelhouse/report-generator-*
-        for name in digital-metrics report-generator; do
-          uv build --sdist "external/$name" -o external/wheelhouse
-        done
+        mv "$staging"/*.tar.gz external/wheelhouse/
         if [ ! -e uv.toml ]; then
           printf 'find-links = ["external/wheelhouse"]\n' > uv.toml
           echo 'local-deps: created uv.toml with find-links = ["external/wheelhouse"]'
@@ -68,7 +72,7 @@ tasks:
       - "{{.RUN}} {{.UV}} ruff format ."
 
   check:
-    desc: Read-only lock, lint, boundary, type, dead-code and dependency checks
+    desc: Lock, lint, boundary, type, dead-code and dependency checks (no source edits; syncs the worktree .venv to the lock)
     cmds:
       - task: _lock
       - task: _ruff
@@ -333,14 +337,14 @@ tasks:
         fi
       - task: acceptance
       # The arguments are split into pytest options on purpose (unquoted).
-      - "{{.RUN}} {{.UV}} pytest tests/integration -m severstal_gpu -p no:randomly -n 0 $CY_SEVERSTAL_ARGS"
+      - "CY_TASK_VERIFICATION=1 {{.RUN}} {{.UV}} pytest tests/integration -m severstal_gpu -p no:randomly -n 0 $CY_SEVERSTAL_ARGS"
       # Multi-GPU DDP is waived on single-GPU hosts (FR-015): reported, never blocking.
       - |
         if [ -z "${CY_DDP_ARGS:-}" ]; then
           echo "multi-GPU DDP: waived (CY_DDP_ARGS unset)"
           exit 0
         fi
-        {{.RUN}} {{.UV}} pytest tests/integration -m ddp_gpu -p no:randomly -n 0 $CY_DDP_ARGS
+        CY_TASK_VERIFICATION=1 {{.RUN}} {{.UV}} pytest tests/integration -m ddp_gpu -p no:randomly -n 0 $CY_DDP_ARGS
       - |
         set -eu
         mkdir -p {{.ROOT_DIR | shellQuote}}/.tmp
