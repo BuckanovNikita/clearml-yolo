@@ -57,4 +57,5 @@ required.
 Use `properties`, `integration`, `mutation` or `paired-check` separately when the change
 needs them. None is cached. Live acceptance is reusable only within the same release
 attempt on the unchanged clean tip. Documentation-only changes use native Spec Kit
-checks; `acceptance` skips its live part for them and says so.
+checks; `acceptance` skips both its preflight and its live part for them, says so,
+and they are reported as not verified.

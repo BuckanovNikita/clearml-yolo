@@ -32,9 +32,12 @@ uv run --frozen --no-sync cy-queue --help
 ```
 
 The queue's package metadata declares its compatible CY range. Do not bypass that
-constraint. Subsequent CY verification commands use `uv run --frozen --no-sync` in
-this combined environment so synchronization does not remove the separately installed
-queue. Queue-only Textual and NVML dependencies belong to `cy-queue`; shared process
+constraint. Ad hoc CY commands use `uv run --frozen --no-sync` in this combined
+environment so they never synchronize it. Task stages run `uv run --locked`, which syncs
+the worktree `.venv` to `uv.lock`; the sync is inexact, so the separately installed
+`cy-queue` stays installed while locked packages are restored to their locked versions.
+The paired release check uses its own temporary virtual environment. Queue-only
+Textual and NVML dependencies belong to `cy-queue`; shared process
 supervision and lifecycle communication remain in CY. Direct commands and externally
 managed ClearML Agents require neither queue installation nor queue configuration.
 

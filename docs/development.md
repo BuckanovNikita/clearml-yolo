@@ -65,7 +65,7 @@ Task freshness, timestamps and interrupted runs never establish completion. The
 
 | Stage | Runs | Live |
 | --- | --- | --- |
-| `local-deps` | Build the [local wheelhouse](#external-dependencies) and write `uv.toml` | no |
+| `local-deps` | Build the [local wheelhouse](#external-dependencies) and create `uv.toml` when absent | no |
 | `fix` | Safe Ruff fixes and `ruff format`; never stages files | no |
 | `check` | Lock freshness (`uv lock --check`), Ruff check and format check, import-linter, mypy, Vulture, deptry | no |
 | `test` | Affected unit tests (testmon), excluding `tests/integration` | no |
@@ -83,8 +83,9 @@ Task freshness, timestamps and interrupted runs never establish completion. The
 Unit stages run in parallel with `CY_TEST_WORKERS` workers (default 2) and
 `--dist loadgroup`. Before heavy stages, inspect the host's reported load (for example
 pcboard, where available) and lower the worker count or postpone the stage while the
-user's workload needs the machine. No stage builds distributions. Development
-verification never contacts live services.
+user's workload needs the machine. No verification or release stage builds
+distributions; `local-deps` builds development-only sdists of the external packages,
+never release deliverables. Development verification never contacts live services.
 
 `test` uses testmon affected selection under a history namespace derived from the
 interpreter, the lockfile, verification configuration, test fixtures, package data and
@@ -141,9 +142,12 @@ not run pre-commit hooks; verify combined content explicitly.
 4. The complete unit suite with coverage held at or above
    `[tool.coverage.report] fail_under` in [pyproject.toml](../pyproject.toml).
 5. The live part: `integration`, including the CPU smoke run against the shared ClearML
-   stand. When every path changed since `master` is Markdown or lies under `docs/` or
-   `specs/`, the live part is skipped and the stage says so.
+   stand.
 6. Clean tip again with `HEAD` unchanged.
+
+When every path changed since `master` is Markdown or lies under `docs/` or `specs/`,
+both the preflight (step 3) and the live part (step 5) are skipped; the stage says so,
+and they are reported as not verified.
 
 Code changes also need a mutation report against `master` (`task mutation -- --base
 master`) and fresh independent review.
@@ -155,6 +159,10 @@ It runs `acceptance`, then:
   from `CY_SEVERSTAL_ARGS`.
 - Physical multi-GPU DDP only when `CY_DDP_ARGS` is set (its `--run-ddp-gpu` options);
   otherwise the stage reports it as waived.
+- Both GPU suites run with `CY_TASK_VERIFICATION=1`, so an unavailable stand ends the
+  suite with exit 3: deferred verification. Their options are split on spaces, so
+  project names must be space-free; the suites claim the session run tag themselves and
+  prefix the published project name with it.
 - The FiftyOne native-database tests in `tests/integration/fiftyone` with
   `CY_TEST_FIFTYONE=1` and a temporary `FIFTYONE_DATABASE_DIR`, removed afterwards.
 - `paired-check`.
@@ -267,13 +275,17 @@ top-level functions and methods changed in the staged diff (or against a named b
 fresh workspace exported from the index, and reports killed, surviving, not-reached and
 not-run mutants.
 
-- **Test selection per change**: the tests that testmon data records as executing the
-  changed functions; without usable testmon data, the test files that import the changed
-  modules.
-- **Excluded tests**: `tests/integration` and the `ddp_cpu`, `process_capabilities` and
-  `gpu_controls` tests, which need live services, real processes or hardware.
+- **Test selection per change**: the union of the test node ids that `.testmondata`
+  records for the changed files and that still exist in the staged tree, and, for a
+  changed module without such validated testmon nodes, the test modules (`test_*.py`)
+  that import it. When `.testmondata` is missing or unreadable, the import scan alone
+  selects. When nothing is selected, mutmut does not run and the functions are reported
+  as "Not reached by tests".
+- **Excluded tests**: `tests/integration` is never selected, and every run deselects
+  `-m "not ddp_cpu and not process_capabilities and not gpu_controls"`, tests that need
+  real processes or hardware (`gpu_controls` is reserved for GPU-holding tests).
 - **Budget**: 8 changed functions and 300 seconds by default; functions beyond the
-  budget are reported as skipped.
+  budget are reported as skipped, and mutants left unjudged count as not run.
 
 `[tool.mutmut]` in [pyproject.toml](../pyproject.toml) holds the settings; generated
 `mutants/` content is ignored by Git, Ruff and mypy and is outside Vulture's maintained
@@ -333,7 +345,11 @@ Update maintained code links and migration guidance; preserve completed feature 
 For detector/export changes, include the runtime prerequisites and acceptance matrices in
 the [model guide](multi-model-backends.md) and [deployment guide](tensorrt-deployment.md).
 Use `uv run --frozen --no-sync` for ad hoc commands in a deliberately prepared backend
-environment so they never sync it; Task stages always use `uv run --locked task`.
+environment so they never sync it. Task stages always run `uv run --locked`, which syncs
+the worktree `.venv` to `uv.lock`. The sync is inexact: extra packages such as
+`cy-queue` stay installed, while locked packages are restored to their locked versions.
+The [paired release check](#paired-cy-and-queue-release-check) uses its own temporary
+virtual environment.
 
 ## External dependencies
 
@@ -361,17 +377,22 @@ after copying the sources:
 ```bash
 uv build --sdist external/digital-metrics -o external/wheelhouse
 uv build --sdist external/report-generator -o external/wheelhouse
-printf 'find-links = ["external/wheelhouse"]\n' > uv.toml
+[ -e uv.toml ] || printf 'find-links = ["external/wheelhouse"]\n' > uv.toml
 uv sync --locked --dev
 bash scripts/install-hooks.sh
 ```
 
-The Task stage `local-deps` automates the first three commands once Task is installed in
-the environment. `uv.toml`, `external/` and its wheelhouse are gitignored; every worktree
-needs its own `external/` (a copy or symlink) and `uv.toml`. The committed `uv.lock`
-records both packages as `source = { registry = "external/wheelhouse" }` and does not
-store their source contents or enforce their Git revisions. Rebuild the wheelhouse after
-an authorized change of an approved copy. Then check the installation with
+The third command creates `uv.toml` only when it is absent; if `uv.toml` already exists,
+add `find-links = ["external/wheelhouse"]` to it by hand. The Task stage `local-deps`
+automates the first three commands and never overwrites an existing `uv.toml`. In a
+fresh checkout, before the environment exists, run it as
+`uvx --from go-task-bin task local-deps`. In an existing environment, rebuild the
+wheelhouse after an authorized change of an approved external revision with
+`uv run --locked task --exit-code local-deps`. `uv.toml`, `external/` and its wheelhouse
+are gitignored; every worktree needs its own `external/` (a copy or symlink) and
+`uv.toml`. The committed `uv.lock` records both packages as
+`source = { registry = "external/wheelhouse" }` and does not store their source contents
+or enforce their Git revisions. Then check the installation with
 `uv run --locked cy --help`.
 
 Why this layout:
