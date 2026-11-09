@@ -28,7 +28,7 @@ if [ -n "$worktrees" ]; then
     echo "$worktrees" | head -3 | sed 's/^/    /'
 fi
 
-unmerged=$(git branch --no-merged master --format='%(refname:short)' 2>/dev/null | grep -vx "$branch" | head -4 | paste -sd ' ' -)
+unmerged=$(git branch --no-merged master --format='%(refname:short)' 2>/dev/null | grep -Fvx -e "$branch" | head -4 | paste -sd ' ' -)
 if [ -n "$unmerged" ]; then
     echo "  unmerged branches: $unmerged"
 fi

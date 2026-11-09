@@ -1,8 +1,12 @@
 """Changed-function mapping and exit statuses of scripts/mutation.py, without running mutmut."""
 
+import sqlite3
 import subprocess
+import sys
 import tempfile
 import textwrap
+import time
+import tomllib
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -38,6 +42,20 @@ ORIGINAL = textwrap.dedent(
     """
 )
 PYPROJECT = '[project]\nname = "sample"\n\n[tool.mutmut]\nsource_paths = ["src/clearml_yolo"]\n'
+SAMPLE_TEST = "tests/test_sample.py"
+SAMPLE_TEST_TEXT = "from clearml_yolo.core import (\n    other,\n    sample,\n)\n"
+# The three pytest-testmon tables the driver joins, as testmon 2 creates them.
+TESTMON_SCHEMA = (
+    (
+        "CREATE TABLE test_execution (id INTEGER PRIMARY KEY, environment_id INTEGER, test_name TEXT,"
+        " duration FLOAT, failed BIT, forced BIT)"
+    ),
+    "CREATE TABLE file_fp (id INTEGER PRIMARY KEY, filename TEXT, method_checksums BLOB, mtime FLOAT, fsha TEXT)",
+    (
+        "CREATE TABLE test_execution_file_fp (test_execution_id INTEGER, fingerprint_id INTEGER,"
+        " PRIMARY KEY (test_execution_id, fingerprint_id)) WITHOUT ROWID"
+    ),
+)
 
 
 GIT_IDENTITY = (
@@ -71,6 +89,7 @@ def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     _write(root, "pyproject.toml", PYPROJECT)
     _write(root, MODULE, ORIGINAL)
     _write(root, "src/clearml_yolo/__init__.py", "def version() -> str:\n    return '0'\n")
+    _write(root, SAMPLE_TEST, SAMPLE_TEST_TEXT)
     _git(root, "add", "-A")
     _git(root, "commit", "-q", "-m", "initial")
     (root / "external").mkdir()
@@ -290,3 +309,163 @@ def test_workspace_is_removed_unless_kept(
     assert mutation.main(["--keep"]) == 0
     (kept,) = scratch.iterdir()
     assert f"Workspace kept: {kept}" in capsys.readouterr().out
+
+
+def _testmon(repo: Path, dependencies: Sequence[tuple[str, str]]) -> None:
+    """Write a .testmondata recording (source file, test node id) dependencies."""
+    connection = sqlite3.connect(repo / mutation.TESTMON_DATABASE)
+    with connection:
+        for statement in TESTMON_SCHEMA:
+            connection.execute(statement)
+        for number, (source, node_id) in enumerate(dependencies, start=1):
+            connection.execute(
+                "INSERT INTO test_execution (id, environment_id, test_name) VALUES (?, 1, ?)", (number, node_id)
+            )
+            connection.execute("INSERT INTO file_fp (id, filename) VALUES (?, ?)", (number, source))
+            connection.execute("INSERT INTO test_execution_file_fp VALUES (?, ?)", (number, number))
+    connection.close()
+
+
+def _selection(pyproject: str) -> list[str]:
+    selection: list[str] = tomllib.loads(pyproject)["tool"]["mutmut"]["pytest_add_cli_args_test_selection"]
+    return selection
+
+
+def test_importing_test_files_are_selected_without_testmon_data(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = FakeMutmut()
+    fake.install(monkeypatch)
+    _stage(repo, "tests/test_unrelated.py", "from clearml_yolo.core import sample_extra\n")
+    _stage(repo, "tests/test_dotted.py", "import clearml_yolo.core.sample as s\n")
+    _stage(repo, "tests/integration/test_live.py", "from clearml_yolo.core import sample\n")
+    _stage(repo, MODULE, ORIGINAL.replace("value * 2", "value * 3"))
+    assert mutation.main([]) == 0
+    assert _selection(fake.pyproject) == ["tests/test_dotted.py", SAMPLE_TEST]
+
+
+def test_testmon_dependents_are_cut_to_existing_unit_test_files(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = FakeMutmut()
+    fake.install(monkeypatch)
+    _testmon(repo, [
+        (MODULE, "tests/test_indirect.py::test_case[a b-c]"),
+        (MODULE, "tests/test_indirect.py::test_other"),
+        (MODULE, "tests/test_moved_away.py::test_gone"),
+        (MODULE, "tests/integration/test_live.py::test_stand"),
+        ("src/clearml_yolo/__init__.py", "tests/test_init.py::test_version"),
+    ])  # fmt: skip
+    _stage(repo, "tests/test_indirect.py", "def test_other() -> None:\n    pass\n")
+    _stage(repo, "tests/integration/test_live.py", "def test_stand() -> None:\n    pass\n")
+    _stage(repo, MODULE, ORIGINAL.replace("value * 2", "value * 3"))
+    assert mutation.main([]) == 0
+    # Recorded dependents join the importing tests, which testmon may not know yet.
+    assert _selection(fake.pyproject) == ["tests/test_indirect.py", SAMPLE_TEST]
+
+
+def test_unreadable_testmon_data_falls_back_to_imports(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = FakeMutmut()
+    fake.install(monkeypatch)
+    (repo / mutation.TESTMON_DATABASE).write_text("not a database", encoding="utf-8")
+    _stage(repo, MODULE, ORIGINAL.replace("value * 2", "value * 3"))
+    assert mutation.main([]) == 0
+    assert _selection(fake.pyproject) == [SAMPLE_TEST]
+
+
+def test_committed_selection_is_replaced_not_duplicated(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = FakeMutmut()
+    fake.install(monkeypatch)
+    _stage(repo, "pyproject.toml", PYPROJECT + 'pytest_add_cli_args_test_selection = [\n    "tests/",\n]\nkeep = 1\n')
+    _stage(repo, MODULE, ORIGINAL.replace("value * 2", "value * 3"))
+    assert mutation.main([]) == 0
+    table = tomllib.loads(fake.pyproject)["tool"]["mutmut"]
+    assert table["pytest_add_cli_args_test_selection"] == [SAMPLE_TEST]
+    assert table["keep"] == 1
+
+
+@pytest.mark.parametrize(("strict", "expected"), [(False, 0), (True, 1)])
+def test_change_no_test_selects_is_not_reached_without_running_mutmut(
+    repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], strict: bool, expected: int
+) -> None:
+    fake = FakeMutmut()
+    fake.install(monkeypatch)
+    ignoring = PYPROJECT + f'pytest_add_cli_args = ["-n", "0", "--ignore={SAMPLE_TEST}"]\n'
+    _stage(repo, "pyproject.toml", ignoring)
+    _stage(repo, MODULE, ORIGINAL.replace("value * 2", "value * 3"))
+    assert mutation.main(["--strict"] if strict else []) == expected
+    assert "Not reached by tests" in capsys.readouterr().out
+    assert fake.run_args == []
+
+
+def test_unexpected_failure_is_a_tool_error(
+    repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    FakeMutmut().install(monkeypatch)
+
+    def broken(*_: object) -> str:
+        msg = "database is gone"
+        raise RuntimeError(msg)
+
+    monkeypatch.setattr(mutation, "mutmut_results", broken)
+    _stage(repo, MODULE, ORIGINAL.replace("value * 2", "value * 3"))
+    assert mutation.main([]) == 2
+    assert "ERROR: unexpected RuntimeError: database is gone" in capsys.readouterr().err
+
+
+def _fake_proc(root: Path, processes: dict[int, tuple[str, int, str]]) -> Path:
+    """Write ``<root>/<pid>/stat`` files: pid -> (command name, parent pid, start time)."""
+    for pid, (name, parent, started) in processes.items():
+        (root / str(pid)).mkdir(parents=True)
+        fields = " ".join(["0"] * 17)  # pgrp .. itrealvalue
+        (root / str(pid) / "stat").write_text(f"{pid} ({name}) S {parent} {fields} {started} 0\n", encoding="utf-8")
+    (root / "self").mkdir()
+    return root
+
+
+def test_descendants_follow_the_parent_chain_across_sessions(tmp_path: Path) -> None:
+    proc = _fake_proc(tmp_path, {
+        10: ("mutmut", 1, "100"),
+        11: ("python) S 1 (x", 10, "101"),  # a command name that mimics stat fields
+        12: ("setsid child", 11, "102"),
+        13: ("unrelated", 1, "103"),
+        14: ("grandchild", 12, "104"),
+    })  # fmt: skip
+    assert mutation.descendants(10, proc) == {11: "101", 12: "102", 14: "104"}
+    assert mutation.descendants(14, proc) == {}
+
+
+FAKE_MUTMUT = """\
+#!{python}
+import pathlib, subprocess, sys, time
+# A descendant in a session of its own: the group signal misses it, and it holds stdout.
+child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"], start_new_session=True)
+pathlib.Path(sys.argv[-1]).write_text(str(child.pid))
+print("mutating", flush=True)
+time.sleep(30)
+"""
+
+
+def _gone(pid: int) -> bool:
+    try:
+        stat = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
+    except OSError:
+        return True
+    return stat.rpartition(")")[2].split()[0] == "Z"
+
+
+@pytest.mark.skipif(not Path("/proc/self/stat").is_file(), reason="needs Linux /proc")
+def test_spent_budget_stops_mutmut_and_descendants_in_other_sessions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    binary = tmp_path / "mutmut"
+    binary.write_text(FAKE_MUTMUT.format(python=sys.executable), encoding="utf-8")
+    binary.chmod(0o755)
+    pid_file = tmp_path / "child.pid"
+    monkeypatch.setattr(mutation, "BUDGET_GRACE_SECONDS", 1)
+    started = time.monotonic()
+    status, tail = mutation.run_mutmut(binary, tmp_path, {"PATH": "/usr/bin:/bin"}, [str(pid_file)], 3.0)
+    assert status is None
+    assert "mutating" in tail
+    assert time.monotonic() - started < 15
+    child = int(pid_file.read_text(encoding="utf-8"))
+    deadline = time.monotonic() + 5
+    while not _gone(child) and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert _gone(child)

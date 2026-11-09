@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'f=\"$(git rev-parse --show-toplevel 2>/dev/null)/scripts/session_status.sh\"; [ -f \"$f\" ] && bash \"$f\" || true'"
+          }
+        ]
+      }
+    ]
+  }
+}

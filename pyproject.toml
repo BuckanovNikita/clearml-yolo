@@ -187,22 +187,26 @@ DEP002 = [
 DEP003 = ["plotly", "matplotlib"]
 
 [tool.mutmut]
-# scripts/mutation.py derives only_mutate from each change and runs mutmut in a fresh
-# workspace, so nothing here describes a scope or a cache.
+# scripts/mutation.py derives only_mutate and the test selection from each change and
+# runs mutmut in a fresh workspace, so nothing here describes a scope or a cache.
 source_paths = ["src/clearml_yolo"]
 # Tests import scripts/ and read .importlinter relative to the copied repository root.
 also_copy = ["scripts/", ".importlinter"]
 # `-n 0` keeps xdist out of each forked mutant; these args are appended last, so they win.
 # The --ignore list drops live suites and suites that check tooling or source text and
-# never execute package functions: they cannot kill a mutant, but each mutation run
-# would pay for them twice (stats pass and clean run).
+# never execute package functions: they cannot kill a mutant, and the driver never
+# selects them. The -m expression deselects tests that hold host-wide resources (real
+# multi-rank training, process supervision, GPU holds) inside a selected file.
 pytest_add_cli_args = [
     "-n", "0", "-p", "no:cacheprovider", "-p", "no:randomly", "--no-cov",
+    "-m", "not ddp_cpu and not process_capabilities and not gpu_controls",
     "--ignore=tests/integration",
     "--ignore=tests/test_architecture.py",
     "--ignore=tests/test_tooling_boundaries.py",
     "--ignore=tests/test_mutation_driver.py",
 ]
+# Fallback for a direct `mutmut run`; scripts/mutation.py replaces it in its copy with
+# the test files that depend on the changed files (.testmondata plus importers).
 pytest_add_cli_args_test_selection = ["tests/"]
 # Presentation is not behaviour: a test that kills a mutated log message or progress
 # bar only pins its wording. Matching is `re.search` per line, and a matched line skips
