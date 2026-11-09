@@ -10,9 +10,10 @@ configuration must not depend on an agent harness or machine.
 Authoritative details and prerequisites: [development procedures](docs/development.md#verification).
 
 ```bash
-uv sync --frozen --dev                                     # after populating external/ (docs/development.md#external-dependencies)
-uv run --frozen --no-sync python scripts/local_release.py --install-hooks  # prek hooks
-uv run --frozen --no-sync pytest --testmon-noselect           # complete suite: acceptance, refreshes testmon
+uv sync --frozen --dev                                 # after populating external/ (docs/development.md#external-dependencies)
+bash scripts/install-hooks.sh                          # once per worktree: staging guard, verify, commit-msg
+uv run --frozen --no-sync task --exit-code verify      # development verification (also the pre-commit hook)
+uv run --frozen --no-sync task --exit-code acceptance  # change acceptance on a clean committed tip
 ```
 
 ## Read when relevant
@@ -26,6 +27,10 @@ for every task. Read guidance instead of copying shared skills into the reposito
 | Set up dependencies, verify code or commit | Relevant sections of [development procedures](docs/development.md); read the commit procedure before every commit |
 | Plan, implement, fix, resume or accept repository changes | [Workflow policy](docs/agent-workflow.md), including its [module boundaries](docs/agent-workflow.md#module-boundaries) |
 | Run any Spec Kit stage, including planning or bug-source capture | [Agent workflow policy](docs/agent-workflow.md), then the applicable installed skills |
+| Verify changes, commit, or report completion | [verification-workflow](.agents/skills/verification-workflow/SKILL.md) |
+| Run live tests, acceptance, or clean up a run tag | [running-integration-tests](.agents/skills/running-integration-tests/SKILL.md) |
+| Triage mutants or change mutmut settings | [mutation-testing](.agents/skills/mutation-testing/SKILL.md) |
+| Release, or recover a failed release | [release](.agents/skills/release/SKILL.md) |
 | Verify native execution, training, GPU use or ClearML publication | [running-end-to-end-tests](.agents/skills/running-end-to-end-tests/SKILL.md); load the project-local [clearml-yolo-environment](.agents/skills/clearml-yolo-environment/SKILL.md) for this machine |
 | Change contracts or their documentation | [Current contract index](docs/current-contracts.md#maintaining-consistency) and the [documentation guidance](docs/agent-workflow.md#documentation) |
 
@@ -50,6 +55,8 @@ for every task. Read guidance instead of copying shared skills into the reposito
   Documentation-only changes may produce no new version. Missing or failed required
   checks remain acceptance gaps.
 - Mocked tests do not establish native/GPU/upload outcomes.
+- Report each required check as passed, failed, deferred, waived or error. Deferred
+  verification blocks acceptance, integration and release; waived checks never block.
 
 ## Dependencies, commits and releases
 
@@ -57,7 +64,7 @@ for every task. Read guidance instead of copying shared skills into the reposito
   versioned `weights-*` GitHub Releases may contain the project's verified model asset
   tar archives, manifests, checksums and upstream notices under the explicit
   model-assets exception; follow [weight releases](docs/development.md#model-weight-releases).
-  Code-release hooks do not publish these assets.
+  Code releases do not publish these assets.
 - Build project `.whl` wheels and `.tar.gz` source archives only for a concrete
   debugging task; never build or present them as release deliverables or routine release
   checks. This project rule overrides generic distribution-build guidance in shared skills.

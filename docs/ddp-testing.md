@@ -6,9 +6,17 @@ record those outcomes against the tested environment and workload.
 
 CY's `ddp_gpu` tests run the production direct YOLO pipeline. The separate cy-queue
 repository owns the full direct/queued comparison and queue failure matrix. Both use
-real CUDA/NCCL ranks and ClearML publication. Existing CPU/Gloo DDP tests
-remain part of ordinary pytest. Ordinary pytest deselects the physical suite and
+real CUDA/NCCL ranks and ClearML publication. Existing CPU/Gloo DDP tests remain
+part of the unit suite, where they run in the `serial` xdist group, one test at a time
+on one worker. The physical suite lives in `tests/integration`, outside development
+verification and affected-test runs; without `--run-ddp-gpu` it is deselected and
 does not probe GPUs or contact ClearML through this harness.
+
+[Release acceptance](development.md#acceptance-tiers) runs the GPU-marked suites with
+the options given in `CY_DDP_ARGS` (this procedure's `--run-ddp-gpu` options) and
+`CY_SEVERSTAL_ARGS`. On a single-GPU host, physical multi-GPU DDP is waived by standing
+user decision: report it as waived, not as passed or deferred; it never blocks. A GPU
+busy with the user's workload is deferred verification and blocks delivery.
 
 Prepare the repository's [development environment](development.md), including its
 approved external dependency revisions and CUDA-enabled detector dependencies.
@@ -16,7 +24,8 @@ Use Linux/WSL with working NVML, NCCL, at least two whole physical GPUs, support
 pidfd/subreaper supervision and Git. Configure ClearML using its usual SDK
 configuration or environment. Required artifacts need an accessible storage
 backend. Supply a dedicated test project, not a production project. Select idle
-GPUs and run one harness invocation at a time; do not use pytest-xdist.
+GPUs and run one harness invocation at a time; the live tests share the `live` xdist
+group, so parallel workers never run two of them concurrently.
 
 Physical indexes mean the indexes shown by `nvidia-smi`, not inherited CUDA logical
 indexes. The harness resolves indexes through NVML identity enumeration, then sets
@@ -27,7 +36,7 @@ the production queue's selector semantics. MIG selections are unsupported.
 Run the direct physical tests from the CY checkout:
 
 ```bash
-uv run --frozen --no-sync pytest -m ddp_gpu \
+uv run --frozen --no-sync pytest tests/integration -m ddp_gpu \
   --run-ddp-gpu \
   --ddp-devices=0,1 \
   --ddp-clearml-project=clearml-yolo-ddp-tests \
