@@ -13,25 +13,27 @@ GitHub Releases, wheels or source archives for code. Model-weight releases follo
 
 ## 1. Accept the clean branch tip
 
-Work from a clean prepared checkout of `BRANCH` with its own `.venv`, populated
-`external/` and no `[tool.uv.sources]` override. Inspect host load, choose
+Work from a clean prepared checkout of `BRANCH` with its own `.venv`, `external/`
+copies, built wheelhouse and `uv.toml`
+([setup](../../../docs/development.md#external-dependencies)). Inspect host load, choose
 `CY_TEST_WORKERS` and, with `SKIP` cleared:
 
 ```bash
 git fetch origin
 git rebase origin/master                                  # only when needed
-uv run --frozen --no-sync task --exit-code acceptance
-uv run --frozen --no-sync task --exit-code mutation -- --base master   # code changes
-uv run --frozen --no-sync task --exit-code release-acceptance          # before delivery
+uv run --locked task --exit-code acceptance
+uv run --locked task --exit-code mutation -- --base master   # code changes
+uv run --locked task --exit-code release-acceptance          # before delivery
 ```
 
 Code changes also need fresh independent review after integration and verification.
 `release-acceptance` includes the paired release check (`CY_QUEUE_DIR`, default
-`../cy-queue`); also run the real-run gate of `running-end-to-end-tests` on CPU and a
-single GPU. Use `running-integration-tests` for the live part: UNAVAILABLE/3 or a GPU
-busy with the user's workload is deferred verification, ERROR/1 needs diagnosis.
-Multi-GPU DDP on a single-GPU host is waived and does not block. Every other required
-check must pass. Record the accepted tip and outcomes; a changed tip needs fresh
+`../cy-queue`, run in a temporary environment); also run the real-run gate of
+`running-end-to-end-tests` on CPU and a single GPU. Use `running-integration-tests` for
+the live part: UNAVAILABLE/3 or a GPU busy with the user's workload (check pcboard
+`pc_status` first) is deferred verification, ERROR/1 needs diagnosis. Multi-GPU DDP is
+waived unless `CY_DDP_ARGS` is set and does not block; the Severstal single-GPU suite
+(`CY_SEVERSTAL_ARGS`) is required. Every other required check must pass. Record the accepted tip and outcomes; a changed tip needs fresh
 acceptance.
 
 ## 2. Merge, release and push under the lock
@@ -50,8 +52,8 @@ flock -n "$(git rev-parse --git-common-dir)/clearml-yolo-release.lock" bash -c '
   git merge --ff-only origin/master
   git merge --ff-only "$1"
   test "$(git rev-parse HEAD)" = "$2"
-  uv run --frozen --no-sync semantic-release version --print
-  CY_RELEASE_CHECK=1 SKIP=verify uv run --frozen --no-sync semantic-release version --no-push --no-vcs-release
+  uv run --locked semantic-release version --print
+  CY_RELEASE_CHECK=1 SKIP=verify uv run --locked semantic-release version --no-push --no-vcs-release
   git push origin master --follow-tags
 ' _ "$BRANCH" "$ACCEPTED_TIP"
 git ls-remote origin refs/heads/master 'refs/tags/v*'
@@ -62,17 +64,20 @@ around them:
 
 - `flock` fails: another release holds the lock; never wait on or break it.
 - `git switch master` fails because `master` is checked out in another worktree, or the
-  clean-tree test fails because that checkout carries a source override.
+  clean-tree test fails.
 - A fast-forward fails or the tip moved: return to step 1; never tag a different tip.
 
 No releasable commits means no version: a successful outcome that pushes only `master`
 when authorized.
 
-`CY_RELEASE_CHECK=1` makes semantic-release's build command run `release-commit-check`
-after `scripts/release_version.py` patches the root `clearml-yolo` version in `uv.lock`
-(no dependency resolution) and before committing. The check permits only
-`pyproject.toml`, `uv.lock` and `CHANGELOG.md`, rejects any other `uv.lock` difference
-(`scripts/release_lock_guard.py`) and reruns lock freshness, read-only Ruff and deptry.
+semantic-release's build command runs `uv lock --upgrade-package clearml-yolo` to refresh
+the root version entry in `uv.lock`; with `CY_RELEASE_CHECK=1` it then runs
+`release-commit-check` before committing. The check permits only staged
+`pyproject.toml`, `uv.lock` and `CHANGELOG.md` with no unstaged or untracked inputs,
+requires the staged project to differ from `HEAD` only in its version and to declare no
+`[tool.uv.sources]`, requires every lock package except the `clearml-yolo` version to
+equal `HEAD` (`scripts/release_lock_guard.py`), and reruns lock freshness, read-only Ruff
+and deptry. Any other lock change lands first as an ordinary reviewed commit.
 `SKIP=verify` is the documented exception for this version commit only; message
 validation and the staging guard stay active.
 

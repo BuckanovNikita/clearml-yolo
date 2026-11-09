@@ -11,25 +11,31 @@ k8s-infra project helpers, never from a file. `clearml-yolo-environment` explain
 machine's endpoints, 401 and TLS failures; this skill never deploys, restarts or stops
 the stand.
 
-Live tests are ordinary pytest tests under `tests/integration`. Development verification
-and affected-test runs exclude that directory. `tests/conftest.py` marks them
-`integration` and puts them in the `live` xdist group, so one worker runs them serially
-while unit tests stay parallel; keep `--dist loadgroup`. Stand tests request the session
-fixture `live_run` (`tests/integration/conftest.py`) explicitly: it prepares the run tag
-through `tests/integration/lifecycle.py`, exports the stand environment, and stops the
-run after the last test, failing the session when cleanup is incomplete. The FiftyOne
+Live tests are ordinary pytest tests under `tests/integration`. They run only when the
+pytest invocation names `tests/integration` or files in it (or selects the `integration`
+marker); a plain `pytest`, development verification and affected-test runs never
+contact the stand. `tests/conftest.py` marks them `integration` and puts them in the
+`live` xdist group, so one worker runs them serially while unit tests stay parallel;
+keep `--dist loadgroup`. Stand tests request the session fixture `live_run`
+(`tests/integration/conftest.py`) explicitly: it prepares the run tag through
+`tests/integration/lifecycle.py`, exports the stand environment, and stops the run after
+the last test, failing the session when cleanup is incomplete. The FiftyOne
 native-database tests in `tests/integration/fiftyone` run outside that fixture.
-HOME-dependent locations (k8s-infra skill, weights cache, fonts) come from the real
-environment saved in `CY_REAL_ENV`, because tests run under an isolated HOME.
+
+Tests run under an isolated HOME that hides `~/clearml.conf`. Every live suite, the CPU
+stand smoke run and the GPU suites alike, takes its ClearML endpoint and credentials from
+the lifecycle stand environment of the tagged run, never from the user's SDK
+configuration. HOME-dependent locations (k8s-infra skill, weights cache, fonts) come from
+the real environment saved in `CY_REAL_ENV`.
 
 ```bash
-uv run --frozen --no-sync task --exit-code infra-check         # read-only preflight
-uv run --frozen --no-sync task --exit-code integration         # non-GPU live tests, CPU smoke
-uv run --frozen --no-sync task --exit-code acceptance          # change acceptance
-uv run --frozen --no-sync task --exit-code release-acceptance  # + GPU, FiftyOne, paired check
+uv run --locked task --exit-code infra-check         # read-only preflight
+uv run --locked task --exit-code integration         # non-GPU live tests, CPU smoke
+uv run --locked task --exit-code acceptance          # change acceptance
+uv run --locked task --exit-code release-acceptance  # + GPU, FiftyOne, paired check
 ```
 
-`L` abbreviates `uv run --frozen --no-sync python -m tests.integration.lifecycle` for
+`L` abbreviates `uv run --locked python -m tests.integration.lifecycle` for
 manual operations:
 
 ```bash
@@ -60,9 +66,10 @@ setup; assertion failures after setup are test failures. For errors, keep TLS
 verification and HTTPS as they are and diagnose with `clearml-yolo-environment`.
 
 When unavailable, report the reason and the deferred checks, continue independent work
-and retry at a meaningful milestone or after restored availability, without polling. A
-GPU busy with the user's workload (reported by pcboard where available) defers the GPU
-suites the same way. Multi-GPU DDP on a single-GPU host is waived and never blocks.
+and retry at a meaningful milestone or after restored availability, without polling.
+Before GPU work, check pcboard `pc_status` where available; a GPU busy with the user's
+workload defers the GPU suites the same way. Multi-GPU DDP is waived unless
+`CY_DDP_ARGS` is set and never blocks.
 Deferred verification blocks acceptance, integration and release; when only blocked
 checks remain, stop and ask for the user's decision.
 
@@ -83,10 +90,13 @@ For a focused selector, run `infra-check` first, then pytest on the selected
   broaden the selector, and run `cleanup --stale` only with `--dry-run`.
 - **Concurrency.** Different tags never share objects. Respect the stand capacity that
   `room` reports; serialize runs from several worktrees beyond it.
-- GPU suites take their `--run-*` options from `CY_DDP_ARGS` and `CY_SEVERSTAL_ARGS`;
-  `release-acceptance` passes them through and runs the FiftyOne tests with
-  `CY_TEST_FIFTYONE=1`. Supply the GPU options from [the DDP procedure](../../../docs/ddp-testing.md)
-  and `pytest --help` ("native Severstal acceptance").
+- GPU suites take their `--run-*` options from the environment: the Severstal
+  single-GPU suite is required and reads `CY_SEVERSTAL_ARGS`; multi-GPU DDP runs only
+  when `CY_DDP_ARGS` is set and is otherwise reported as waived. `release-acceptance`
+  passes them through and runs the FiftyOne tests with `CY_TEST_FIFTYONE=1` in a
+  temporary `FIFTYONE_DATABASE_DIR` that it removes afterwards. Supply the GPU options
+  from [the DDP procedure](../../../docs/ddp-testing.md) and `pytest --help` ("native
+  Severstal acceptance").
 - The real-run gate (CPU and a single GPU) belongs to `running-end-to-end-tests`; these
   tests do not replace it.
 

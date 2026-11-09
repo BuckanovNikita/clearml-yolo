@@ -1,6 +1,6 @@
 ---
 name: mutation-testing
-description: Runs and triages clearml-yolo's changed-function mutation report (scripts/mutation.py, [tool.mutmut] in pyproject.toml). Use for surviving mutants from the mutation Task stage, hardening tests of a changed function, deciding whether a survivor is equivalent, a run that produces no mutants, a mutation tool error, or edits to the mutmut settings.
+description: Runs and triages clearml-yolo's changed-function mutation report (scripts/mutation.py, [tool.mutmut] in pyproject.toml). Use for surviving mutants from the mutation Task stage, hardening tests of a changed function, deciding whether a survivor is equivalent, a run that produces no mutants, functions no test reaches, a mutation tool or configuration error, or edits to the mutmut settings.
 ---
 
 # Changed-function mutation testing
@@ -9,20 +9,33 @@ description: Runs and triages clearml-yolo's changed-function mutation report (s
 touch, exports the index into a fresh temporary workspace with `git checkout-index`, and
 runs mutmut there on those functions only. The child environment drops `CLEARML_*`,
 `INFRA_*`, `CY_RUN_*` and `GIT_*` variables, so mutants inherit neither stand credentials
-nor this repository's version-control state. Default budget: 8 changed functions and
-120 s of mutmut; mutants left unjudged count as "not run" and mutants no unit test
-reaches as "not reached by tests", never as survivors. Read the script's docstring for the mechanics.
+nor this repository's version-control state. Read the script's docstring for the
+mechanics; [development procedures](../../../docs/development.md#mutation-report) own the
+policy.
+
+- **Test selection per change**: the tests that this worktree's testmon data records as
+  executing the changed functions; without usable testmon data, the test files that
+  import the changed modules.
+- **Excluded tests**: `tests/integration`, `ddp_cpu`, `process_capabilities` and
+  `gpu_controls`.
+- **Budget**: 8 changed functions and 300 seconds by default. Functions beyond the
+  budget are skipped; mutants left unjudged count as "not run" and functions no selected
+  test reaches as "not reached by tests", never as survivors.
 
 ```bash
-uv run --frozen --no-sync task --exit-code mutation                          # staged vs HEAD
-uv run --frozen --no-sync task --exit-code mutation -- --base master         # whole branch
-uv run --frozen --no-sync task --exit-code mutation -- --strict              # survivors fail
+uv run --locked task --exit-code mutation                          # staged vs HEAD
+uv run --locked task --exit-code mutation -- --base master         # whole branch
+uv run --locked task --exit-code mutation -- --strict              # survivors fail
 ```
 
-Exit 0: report produced (survivors are advisory). Exit 1: survivors under `--strict`.
-Exit 2: tool error, including a failing clean test run in the workspace. Nothing is
-cached between runs; the staged comparison and the `--base` branch comparison are
-different reports. Before acceptance of a code change, run the branch comparison.
+| Exit | Meaning |
+| --- | --- |
+| 0 | Report produced; survivors and unreached functions are advisory. |
+| 1 | Under `--strict`: surviving mutants, or changed functions no selected test reaches. |
+| 2 | Tool or configuration error, or the clean test run failed in the workspace. |
+
+Nothing is cached between runs; the staged comparison and the `--base` branch comparison
+are different reports. Before acceptance of a code change, run the branch comparison.
 
 ## Triage a survivor
 
@@ -35,25 +48,28 @@ and other presentation details alone.
    leave it and say so in the report. There is no allowlist.
 3. Keep correct production code as it is; reshaping it only to stop a mutant is not a fix.
 
-## Why a change produces no mutants
+## No mutants, or functions not reached
 
 mutmut mutates code inside undecorated top-level functions and methods, never module
-constants, f-strings or docstrings. "No mutants" is a pass. "No unit test exercises the
-changed functions" (code only `tests/integration` reaches) also passes, but prompts a
-unit test.
+constants, f-strings or docstrings. "No mutants" is a pass. A changed function that no
+selected unit test reaches (for example code only `tests/integration` or an excluded
+marker exercises) is advisory by default but fails under `--strict`; add a behavioural
+unit test that reaches it, or report why only live or hardware tests can.
 
 ## Settings invariants
 
-- `source_paths = ["src/clearml_yolo"]`; `only_mutate` is derived per run by the script,
-  never checked in.
-- `pytest_add_cli_args` keeps `-n 0` (mutmut forks per mutant; xdist would start a
-  pool each time) and ignores `tests/integration` (live services) and the architecture
-  tests (import structure, not behaviour).
+- `source_paths = ["src/clearml_yolo"]`; `only_mutate` and the selected tests are derived
+  per run by the script, never checked in.
+- Tests run without xdist (`-n 0`): mutmut forks per mutant, and xdist would start a pool
+  each time.
+- The excluded tests above and the architecture tests (import structure, not behaviour)
+  never run against mutants.
 - Generated `mutants/` stays ignored by Git, Ruff, mypy and Vulture.
 
 ## Completion
 
-Report the functions mutated (and any skipped by the budget), the
-killed/survived/not-reached/not-run counts, each survivor's classification (test added,
-equivalent, presentation) and the rerun result. Tool errors remain unresolved; keep
-dispositions in dated feature evidence.
+Report the functions mutated (and any skipped by the budget), the selected tests and
+whether testmon or the import fallback chose them, the killed/survived/not-reached/not-run
+counts, each survivor's classification (test added, equivalent, presentation) and the
+rerun result. Tool and configuration errors remain unresolved; keep dispositions in dated
+feature evidence.

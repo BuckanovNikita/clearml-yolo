@@ -66,8 +66,9 @@ examples.
 
 For an explicit diagnosis, run `"$skill_dir/scripts/check_env.sh"` from the
 application checkout. It reports the endpoint and credential source without
-printing credential values. No SessionStart hook is installed: diagnostics are
-on demand. For a 401, follow
+printing credential values. Environment diagnostics are on demand: the repository's
+session-start hook (`scripts/session_status.sh`) reports only Git, release-lock and
+run-tag status, never the ClearML environment. For a 401, follow
 [Diagnose ClearML 401](references/machine-workflow.md#diagnose-clearml-401-and-missing-tasks)
 and stop if the k8s-infra helper reports an unavailable stand or Secret.
 
