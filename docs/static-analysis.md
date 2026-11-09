@@ -102,7 +102,7 @@ are maintained in `pyproject.toml` and should be reviewed with their runtime ver
 exceptions still mask missing submodules within those packages; they are a real typing
 coverage limit. Local external copies and generated output/build directories are excluded
 from recursive discovery because they are not first-party source. Generated `mutants/`
-is also excluded; [mutation acceptance](development.md#scoped-mutation-acceptance) runs separately.
+is also excluded; the [mutation report](development.md#mutation-report) runs separately.
 
 The inline suppression audit found these categories, kept at their call sites:
 

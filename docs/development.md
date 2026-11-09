@@ -47,59 +47,133 @@ checkouts and files remain authoritative. Dependency installation is always exte
 
 ## Verification
 
-Run the locked tools directly; the hooks run the same commands:
+[Taskfile.yml](../Taskfile.yml) owns verification commands and their order; prek owns
+Git hooks and commit-message validation. Invoke every stage as:
 
 ```bash
-uv run --frozen --no-sync ruff check .
-uv run --frozen --no-sync mypy .
-uv run --frozen --no-sync vulture
-uv run --frozen --no-sync lint-imports
-uv run --frozen --no-sync pytest --testmon-noselect      # complete ordinary suite
+uv run --frozen --no-sync task --exit-code <stage>
 ```
 
-These are Ruff, strict mypy, Vulture, import-linter, one complete ordinary pytest
-suite. The pytest run includes architecture negative
-cases and native CPU-DDP, so no separate architecture or full-suite run is needed for
-those gates. Focused commands are still useful while developing. Unset
-`PYTEST_ADDOPTS` for acceptance so that selection flags cannot turn the run into a
-partial or collection-only one.
+`--frozen --no-sync` runs Task in this worktree's prepared environment without
+resolving or syncing, so uncommitted [source overrides](#external-dependencies) and
+additional external runtime packages stay intact. `--exit-code` keeps each child
+command's exit status. Clear an inherited `UV_PROJECT_ENVIRONMENT` before the outer
+`uv run`; Task then pins the environment, testmon history, coverage data and Ruff/mypy
+caches of its child commands to this worktree. Do not share these between worktrees.
+Task freshness, timestamps and interrupted runs never establish completion. The
+`verification-workflow` skill selects stages for a change and its completion report.
 
-### Hooks and cached tests
+| Stage | Runs | Live |
+| --- | --- | --- |
+| `fix` | Safe Ruff fixes and `ruff format`; never stages files | no |
+| `check` | Staged lock freshness, Ruff check and format check, import-linter, mypy, Vulture, deptry | no |
+| `test` | Affected unit tests (testmon), excluding `tests/integration` | no |
+| `test-full` | Every unit test; refreshes testmon history | no |
+| `verify` | `check`, then `test`: development verification | no |
+| `properties` | Unit suite under the Hypothesis `explore` profile, fixed order | no |
+| `mutation` | Changed-function [mutation report](#mutation-report) | no |
+| `infra-check` | Read-only, bounded stand preflight | read-only |
+| `integration` | `infra-check`, then the non-GPU live tests, including the CPU stand smoke run | yes |
+| `acceptance` | [Change acceptance](#acceptance-tiers) on a clean committed tip | yes |
+| `release-acceptance` | [Release acceptance](#acceptance-tiers) | yes |
+| `paired-check` | [Paired CY and queue release check](#paired-cy-and-queue-release-check) | no |
+| `release-commit-check` | Checks of the version commit, run only by the [release tool](#local-releases) | no |
 
-[prek](https://prek.j178.dev) runs [.pre-commit-config.yaml](../.pre-commit-config.yaml)
-serially, in file order. Install the hooks with the
-[release helper](#local-releases). prek stashes unstaged changes to tracked files, but
-untracked files stay visible to the checks. The `untracked-sources` hook therefore
-rejects untracked files under `src/`, `tests/` and `scripts/`; stage or remove them.
+Unit stages run in parallel with `CY_TEST_WORKERS` workers (default 2) and
+`--dist loadgroup`. Before heavy stages, inspect the host's reported load (for example
+pcboard, where available) and lower the worker count or postpone the stage while the
+user's workload needs the machine. No stage builds distributions. Development
+verification never contacts live services.
 
-Commit hooks select tools from the staged paths and each tool's configuration.
-Ruff checks selected Python files and uses whole-project analysis for configuration changes;
-mypy retains whole-project analysis when selected; Vulture and import-linter
-retain their configured cross-file scope. Python changes select affected testmon tests;
-non-Python fixtures, dependency/configuration changes and deleted inputs select the
-complete suite. A single hook dispatches exactly one pytest invocation, refreshing
-testmon on a full run. Documentation-only commits select hygiene checks. Changelog generation and releases are explicit commands.
+`test` uses testmon affected selection under a history namespace derived from the
+interpreter, the lockfile, verification configuration, test fixtures, package data and
+tracked file membership; an unseen namespace starts a full baseline. Use `test-full`
+when affected selection cannot represent a changed input. A deselected test is not a
+fresh execution; report the actual selection.
 
-Whole-project hooks include deleted paths in selection. After the final task commit, unset `SKIP`
-and `PYTEST_ADDOPTS` and run `uv run --frozen --no-sync prek run --all-files`.
-This includes the complete ordinary suite and covers deleted inputs. Do not repeat a
-successful check merely for another workflow stage when its inputs remain unchanged.
-Testmon cannot establish child-process or environment-change coverage, so its affected
-selection alone is not acceptance.
+### Lock freshness
 
-See the [static analysis policy](static-analysis.md) for Ruff selections and exclusions,
-mypy boundary exceptions and Vulture's confidence threshold. Install the locked dev
-dependencies before verification; in a deliberately prepared environment, an inexact
-sync preserves additional external runtime packages.
+The committed `pyproject.toml` declares `digital-metrics` and `report-generator` by
+version only, while the committed `uv.lock` records them as editable copies under
+`external/`. The committed project alone therefore cannot lock: without the source
+override, uv would look the packages up on the index. [scripts/lock_check.py](../scripts/lock_check.py)
+copies the **staged** `pyproject.toml`, `uv.lock` and `README.md` into a temporary
+directory, appends the canonical [source override](#external-dependencies) when the
+staged project declares no sources, links `external/` and runs `uv lock --check` there.
+An uncommitted override in the working copy therefore never masks lock drift. The
+check needs populated `external/` copies and never resolves into the worktree.
+
+### Hooks and staging guard
+
+Install the hooks once per worktree; the installer keeps the previous hooks for rollback:
+
+```bash
+bash scripts/install-hooks.sh
+```
+
+The pre-commit entry first runs the staging guard, `scripts/git-hook.sh`. It refuses the
+commit when tracked changes are unstaged or nonignored untracked files exist, before prek
+could stash anything; it never stages, stashes or deletes files. Its only exemption is
+the documented local source override: an unstaged `pyproject.toml` whose working copy
+differs from the index solely inside `[tool.uv.sources]`, optionally together with an
+unstaged `uv.lock`. Every other unstaged or untracked input is refused.
+
+prek then runs [.pre-commit-config.yaml](../.pre-commit-config.yaml): cheap hygiene hooks
+(large files, merge conflicts, TOML/YAML syntax, end of file, whitespace,
+`untracked-sources`) followed by one serial, always-run `verify` hook. The commit-msg
+hook runs `conventional-pre-commit` with the allowed types `build`, `chore`, `ci`,
+`docs`, `feat`, `fix`, `perf`, `refactor`, `style` and `test`. Heavy stages (live
+integration, acceptance, property exploration, mutation) never run on commit.
+
+Run `fix` explicitly before staging and inspect its changes. Intermediate commits may
+defer development verification with `SKIP=verify`; the final committed content needs
+`verify` with `SKIP` cleared. Reuse a passing commit-hook run while its inputs remain
+unchanged. `uv run --frozen --no-sync prek run --all-files` remains the full hook check;
+it runs the hygiene hooks over all files and `verify`. Rebase, cherry-pick and merge do
+not run pre-commit hooks; verify combined content explicitly.
+
+### Acceptance tiers
+
+**Change acceptance** (`acceptance`) runs on a clean committed branch tip and refuses
+uncommitted or untracked files before and after running. It runs `check`, `properties`,
+the complete unit suite with coverage held at or above `[tool.coverage.report] fail_under`
+in [pyproject.toml](../pyproject.toml), and the live part: `infra-check` followed by
+`integration`, which includes the CPU smoke run against the shared ClearML stand. When
+every path changed since `master` is Markdown or lies under `docs/` or `specs/`, the live
+part is skipped and the stage says so. Code changes also need a mutation report against
+`master` (`task mutation -- --base master`) and fresh independent review.
+
+**Release acceptance** (`release-acceptance`) is required before a version is delivered.
+It runs `acceptance`, then the GPU-marked tests with their `--run-*` options taken from
+`CY_DDP_ARGS` and `CY_SEVERSTAL_ARGS`, the FiftyOne native-database tests in
+`tests/integration/fiftyone` with `CY_TEST_FIFTYONE=1`, and `paired-check`. The real-run
+gate on CPU and a single GPU remains a step of the
+[end-to-end skill](../.agents/skills/running-end-to-end-tests/SKILL.md).
+
+Report each required check as passed, failed, deferred, waived or error:
+
+- **Deferred**: a temporarily unavailable resource, such as `infra-check` exit 3
+  (unreachable stand, timeout or capacity wait) or a GPU busy with the user's workload.
+  Deferred verification blocks acceptance, integration and release; continue independent
+  local work and retry at a meaningful milestone.
+- **Waived**: a check the user excused for this environment. Multi-GPU DDP on a
+  single-GPU host is waived by standing decision; it never blocks.
+- **Error**: `infra-check` exit 1, such as missing credentials, TLS trust or
+  configuration. Diagnose it; do not wait or weaken security settings.
+
+`infra-check` is bounded by `CY_INFRA_CHECK_TIMEOUT` (60 seconds by default) and creates
+no run tag or resources. The `running-integration-tests` skill owns the live-run
+lifecycle, run tags and exact-tag cleanup.
 
 Finish environment provisioning before verification, including native SDK
 optional decoders exercised by the selected tests. The installed Ultralytics image
 fallback can request `pi-heif` for an unidentified image; provision that verification
 prerequisite deliberately rather than relying on a mid-suite installation. Do not
-install or update packages during a check.
+install or update packages during a check. See the [static analysis policy](static-analysis.md)
+for Ruff selections and exclusions, mypy boundary exceptions and Vulture's confidence
+threshold.
 
-Documentation-only work uses only native Spec Kit or OpenSpec documentation checks. Inspect [.pre-commit-config.yaml](../.pre-commit-config.yaml) before
-running hooks: it includes changelog generation and a post-commit release hook.
+Documentation-only work uses only native Spec Kit or OpenSpec documentation checks.
 The mocked suite cannot prove native training, a GPU or ClearML uploads; those require
 dated real-run evidence and the
 [end-to-end skill](../.agents/skills/running-end-to-end-tests/SKILL.md).
@@ -107,12 +181,14 @@ dated real-run evidence and the
 ### Native CPU distributed regression tests
 
 The `ddp_cpu` suite runs real native YOLO training, validation and checkpoint creation
-in two-rank and four-rank CPU/Gloo process groups. It is included in `uv run pytest`
-and in full acceptance runs. To select it directly:
+in two-rank and four-rank CPU/Gloo process groups. It belongs to the unit suite, so
+`test-full` and both acceptance tiers run it; it shares the `serial` xdist group with the
+process-supervision tests, so one worker runs those tests one at a time while other tests
+stay parallel. To select it directly:
 
 ```bash
-uv run pytest -m ddp_cpu
-uv run pytest tests/test_native_ddp_cpu.py
+uv run --frozen --no-sync pytest -m ddp_cpu
+uv run --frozen --no-sync pytest tests/test_native_ddp_cpu.py
 ```
 
 Use the existing repository environment on Linux or WSL with Torch distributed/Gloo
@@ -143,8 +219,9 @@ limitations.
 Hypothesis and pytest-cov are development dependencies. The routine suite stays offline;
 generated CY cases exercise lexical CSV identity, prediction-cache provenance and
 frozen validation thresholds. Queue state-transition cases live in cy-queue. Composed workflow tests join saved Hydra
-configuration, real storage, evaluation and report boundaries. To run these tests with
-branch coverage:
+configuration, real storage, evaluation and report boundaries. `HYPOTHESIS_PROFILE`
+selects the deterministic default profile `clearml-yolo` or the larger `explore`
+profile that the `properties` stage uses. To run these tests with branch coverage:
 
 ```bash
 uv run --frozen --no-sync pytest tests/test_quality_properties.py tests/test_workflow_quality.py --cov=clearml_yolo --cov-branch --cov-report=term-missing --cov-report=html:.tmp/coverage/html
@@ -153,47 +230,43 @@ uv run --frozen --no-sync pytest -m process_capabilities
 
 Coverage identifies unexercised paths; it does not establish assertion quality. Preserve
 Hypothesis's reported falsifying example and reproduce a failure before changing its
-seed or adding retries. The local `.hypothesis/` example database is ignored by Git.
-Keep mutation/fault observations and run counts in dated feature evidence.
+seed or adding retries. pytest-randomly prints its seed; reproduce an order-dependent
+failure with `--randomly-seed=<seed>`, or disable shuffling with `-p no:randomly`. The
+local `.hypothesis/` example database is ignored by Git. Keep mutation/fault
+observations and run counts in dated feature evidence.
 
-Physical multi-GPU/NCCL and remote ClearML checks are opt-in under `ddp_gpu`, separate
-from the routine suite and existing `ddp_cpu` tests. Follow the [GPU DDP guide](ddp-testing.md)
-for exact selection, prerequisites, deadlines and the evidence archive to return.
+Physical multi-GPU/NCCL and remote ClearML checks are opt-in under `ddp_gpu`; they and the
+other GPU and FiftyOne live suites live in `tests/integration`, outside development
+verification. Follow the [GPU DDP guide](ddp-testing.md) for exact selection,
+prerequisites, deadlines and the evidence archive to return.
 
-### Scoped mutation acceptance
+### Mutation report
 
-The locked mutmut 3.8.x development dependency assesses training-box validation,
-evaluation policy and core export quality. `[tool.mutmut]` defines the exact source,
-offline test selection and copied fixtures. Native training, GPU, remote publication
-and release machinery are excluded. Generated `mutants/` content is ignored by Git,
-Ruff and mypy and is outside Vulture's maintained paths.
+`task mutation` mutates only the top-level functions and methods changed in the staged
+diff (or against a named base) in a fresh workspace exported from the index, within a
+budget of changed functions and seconds, and reports killed, surviving, unreached and
+unrun mutants. `[tool.mutmut]` in [pyproject.toml](../pyproject.toml) holds the settings;
+generated `mutants/` content is ignored by Git, Ruff and mypy and is outside Vulture's
+maintained paths.
 
 ```bash
-uv run --frozen --no-sync mutmut run 'clearml_yolo.core.*'
-uv run --frozen --no-sync mutmut results
-uv run --frozen --no-sync mutmut run 'clearml_yolo.core.evaluation.policy*'
-uv run --frozen --no-sync mutmut show MUTANT_NAME
+uv run --frozen --no-sync task --exit-code mutation                     # staged change
+uv run --frozen --no-sync task --exit-code mutation -- --base master    # whole branch
 ```
 
-At acceptance, rerun affected selected modules when their code, selected tests, fixtures
-or dependencies change. Use explicit module/function selection for incremental work;
-an explicit selection reruns cached verdicts, while bare `mutmut run` may reuse them.
-Clear only task-owned stale mutant output when source/test/dependency changes require
-fresh execution. Broader audits are explicit. Mutation never runs inside contributor
-or version-commit hooks. Report its outcomes separately from ordinary pytest success.
-Every survivor needs stronger assertions or a reviewed equivalence explanation bound
-to the tested inputs. Untested mutants, timeouts and runner errors remain acceptance
-gaps regardless of command exit status. Keep the baseline and individual dispositions
-in dated feature evidence, not this evergreen guide.
+Exit 0 is a report (survivors are advisory), 1 means survivors under `--strict`, and 2
+is a tool error such as a failing clean test run; tool errors remain unresolved. Run it
+explicitly for code changes before acceptance; it never runs in a commit hook and is
+never cached. The `mutation-testing` skill owns survivor triage and settings invariants.
+Keep dispositions in dated feature evidence.
 
 ### Static-analysis boundaries
 
-The release helper imports the standard library, Loguru, Pydantic and the verifier's
-shared byte-exact version validation. The verification entrypoint uses only the standard library and never imports application runtime modules. Keep lint
-and stub distributions in the development group when adding runtime dependencies.
-Review these tooling boundaries when changing the development scripts. Ruff preview checks require
-explicit code selection; review the [policy report](static-analysis.md) and refresh
-the rule inventory when changing the locked Ruff version.
+Keep lint and stub distributions in the development group when adding runtime
+dependencies. Review the tooling boundaries of `scripts/` when changing development
+scripts. Ruff preview checks require explicit code selection; review the
+[policy report](static-analysis.md) and refresh the rule inventory when changing the
+locked Ruff version.
 
 ## Python integration and architecture
 
@@ -254,8 +327,18 @@ uv sync --frozen --dev
 uv run --frozen cy --help
 ```
 
-For local dependency resolution, use the uncommitted `[tool.uv.sources]` overrides
-below. Restore them after each commit using the [commit procedure](#commit-procedure).
+For local dependency resolution (for example `uv lock` or `uv sync` without `--frozen`),
+add this uncommitted override to the working copy's `pyproject.toml`:
+
+```toml
+[tool.uv.sources]
+digital-metrics = { path = "external/digital-metrics", editable = true }
+report-generator = { path = "external/report-generator", editable = true }
+```
+
+Keep it unstaged and uncommitted; the [staging guard](#hooks-and-staging-guard) tolerates
+exactly this difference and the [lock check](#lock-freshness) adds the same block to the
+staged project. Follow the [commit procedure](#commit-procedure) for final acceptance.
 Do not update upstream source revisions during ordinary setup. Existing submodule
 users should preserve their populated source trees before switching to this revision;
 remove only their obsolete `.git` pointer files and local `submodule.*` configuration.
@@ -276,52 +359,50 @@ explicit paths or hunks belonging to the task; preserve unrelated staged and uns
 changes. Do not stash, reset, revert or bypass hooks to make a check pass. Use Conventional
 Commits and inspect hook-generated changes before retrying.
 
-Split work into coherent task-owned commits. Intermediate commits may use targeted
-`SKIP=<hook IDs>` for expensive checks, with final verification still outstanding.
-Keep mechanical formatting fixes in a separate commit. Preserve unrelated staged and
-unstaged changes; inspect auto-fixes and restage only owned hunks. Do not use
-`--no-verify` or blanket skips to hide failures. Run the full configured pipeline after
-the final task commit; relevant subsequent changes invalidate affected evidence.
+Split work into coherent task-owned commits. Intermediate commits may use `SKIP=verify`
+with final verification still outstanding; message validation and the staging guard stay
+active. Keep mechanical formatting fixes in a separate commit. Do not use `--no-verify`
+or blanket skips to hide failures. Run `verify` with `SKIP` cleared on the final content
+(see [hooks](#hooks-and-staging-guard)); relevant subsequent changes invalidate affected
+evidence.
 
 Keep local `[tool.uv.sources]` overrides intact during intermediate commits, and never
-stage them. Before final acceptance, inspect `git show HEAD:pyproject.toml` to confirm
-that the committed project contains no local source overrides. Verify committed inputs
-in an isolated worktree at that final commit, using the prepared environment with
-`uv run --frozen --no-sync` and explicit `UV_PROJECT_ENVIRONMENT` pointing to it.
-Provision required external dependency checkouts there before checking; do not resolve
-or update dependencies during verification. This keeps the working checkout's exact
-local overrides intact. Run explicit releases from a clean prepared checkout after
-acceptance; do not strip and restore overrides around each contributor commit.
+stage them. Change acceptance needs a clean committed tip, which a checkout carrying an
+override is not. Run it in a separate worktree at the final commit after confirming with
+`git show HEAD:pyproject.toml` that the committed project has no source overrides.
+Provision that worktree with its own `external/` copies and its own environment
+(`uv sync --frozen --dev`): Task pins each stage to the worktree's `.venv`, and a shared
+editable environment would import another checkout's sources. Do not resolve or update
+dependencies during verification. Releases likewise run from a clean prepared checkout
+without overrides; do not strip and restore overrides around each contributor commit.
 
 ## Paired CY and queue release check
 
 Before every release or delivery of either repository, verify the latest CY and
 [cy-queue](https://github.com/BuckanovNikita/cy-queue) together. Fetch both remotes
 and inspect their latest default branches/tags, preserving unrelated local changes.
-Use the intended release versions, including any version the local release hook will
+Use the intended release versions, including the version the release tool will
 produce. A stale sibling checkout or editable installation is not current evidence.
 
 With approved external dependencies prepared and active workers drained according to
 [queue upgrade](queue.md#coordinated-package-upgrade), or in an isolated environment:
 
 ```bash
-uv pip install --python .venv/bin/python -e . -e ../cy-queue
-uv pip check --python .venv/bin/python
-# Run from the queue repository so its own configuration is selected:
-cd ../cy-queue
-uv run --frozen --no-sync --project ../clearml-yolo pytest -q
-uv run --frozen --no-sync --project ../clearml-yolo cy-queue --help
+CY_QUEUE_DIR=../cy-queue uv run --frozen --no-sync task --exit-code paired-check
 ```
 
-Run the queue's configured static/import checks and CY's applicable verification too.
-Queue installation tests verify source/installed versions and dependency constraints;
-normal resolution must succeed without `--no-deps`. Record both source SHAs, versions
-and actual integration results in dated task evidence. If hooks change a version,
-refresh the installation and recheck the final pair before pushing. Incompatibility,
-stale metadata, missing current sources or unavailable/failed checks block delivery.
-The queue declares only a minimum compatible CY version, never an upper bound; raise
-that minimum when the queue starts using a newer CY interface. CY remains independent of the
-queue at runtime. This is a mandatory release acceptance step alongside the hooks.
+`CY_QUEUE_DIR` defaults to the sibling `../cy-queue` checkout. The stage fails when the
+checkout is missing, installs both packages editable into this worktree's environment,
+runs `uv pip check`, compares both source versions with the installed metadata, runs the
+queue suite and `cy-queue --help`, and prints both commit SHAs and versions. Normal
+resolution must succeed without `--no-deps`. Run the queue's configured static/import
+checks too. Record both source SHAs, versions and actual results in dated task evidence.
+If the release changes a version, refresh the installation and recheck the final pair
+before pushing. Incompatibility, stale metadata, missing current sources or
+unavailable/failed checks block delivery. The queue declares only a minimum compatible
+CY version, never an upper bound; raise that minimum when the queue starts using a newer
+CY interface. CY remains independent of the queue at runtime. `release-acceptance` runs
+this stage; it is mandatory before delivering either package.
 
 ## Local releases
 
@@ -330,57 +411,40 @@ upload or offer project `.whl` wheels or `.tar.gz` source archives as release
 deliverables. Distribution builds and isolated archive installs are allowed only
 for a concrete debugging purpose; they are not routine release acceptance gates.
 Run release verification from the source checkout. Generic packaging guidance in
-shared skills does not override this project rule.
+shared skills does not override this project rule. There is no CI.
 
-After installing dependencies, install the repository checks:
+python-semantic-release alone determines versions, changelog entries and annotated
+`v{version}` tags from Conventional Commits: `fix` and `perf` produce a patch, `feat` a
+minor, and breaking changes a minor below 1.0. Other types alone produce no version,
+which is a successful outcome. Configuration lives in `[tool.semantic_release]` in
+[pyproject.toml](../pyproject.toml). The [release skill](../.agents/skills/release/SKILL.md)
+owns the procedure:
 
-```bash
-uv run --locked --no-sync python scripts/local_release.py --install-hooks
-```
+1. Accept the clean branch tip: `acceptance`, a mutation report against `master` for
+   code changes, fresh independent review, and `release-acceptance` before delivery.
+   Without push authorization, stop after reporting acceptance.
+2. Under `flock -n "$(git rev-parse --git-common-dir)/clearml-yolo-release.lock"`:
+   confirm the accepted tip and a clean tree, `git fetch origin`, switch to `master`,
+   fast-forward to `origin/master` and then to the accepted tip, print the next version,
+   run semantic-release with `CY_RELEASE_CHECK=1 SKIP=verify` and `--no-push
+   --no-vcs-release`, and push `master` with `--follow-tags`. Confirm the refs with
+   `git ls-remote`. A held lock is a reported blocker, never waited on or broken.
 
-The installer replaces only a pre-commit/prek-generated pre-commit hook, avoiding
-legacy chaining and duplicate checks. It removes the project's marked post-commit
-launcher, preserves foreign post-commit hooks and refuses foreign pre-commit hooks.
-Legacy `--post-commit` calls are harmless no-ops. Contributor commits do not generate
-changelogs, version commits or tags.
+The version commit may change only `pyproject.toml`, `uv.lock` and `CHANGELOG.md`.
+semantic-release's build command updates only the root `clearml-yolo` version in
+`uv.lock` through `scripts/release_version.py`, without dependency resolution. With
+`CY_RELEASE_CHECK=1` it then runs `release-commit-check`: staged paths limited to those
+three files, no unstaged or untracked inputs, a `uv.lock` difference from `HEAD` limited
+to the root package version (`scripts/release_lock_guard.py`), lock freshness, read-only
+Ruff and deptry. `SKIP=verify` applies only to this version commit; message validation
+and the staging guard remain active.
 
-Explicit releases run on master only and evaluate all unreleased reachable
-Conventional Commits: `fix` and `perf` produce a patch, `feat` a minor, and breaking
-changes a minor below 1.0. Nonrelease types alone do not bump the version.
-A release creates a checked version commit and annotated `vX.Y.Z` tag.
-Concurrent execution, a dirty tracked worktree or index, inconsistent version/tag
-metadata, or changed prepared recovery content must fail or defer explicitly.
-Recovery validates recorded source and release identities and content hashes;
-it never rewrites existing refs. Legacy recovery records without a changelog
-checksum cannot create a tag automatically. The helper does not automatically
-fetch, push or build. Changelog refresh rejects shallow history without fetching
-and skips detached HEAD. Recovery runs `untracked-sources`, so stage or remove
-task-owned untracked files under `src/`, `tests/` and `scripts/` before retrying.
-
-Exit 0 means a completed release or an explained skip; exit 1 means a reported
-failure or deferral. An explicit release failure retains the contributor commit.
-After final verification, explicitly invoke the release workflow when authorized:
-
-```bash
-uv run --locked --no-sync python scripts/local_release.py
-# Optional standalone changelog refresh; returns 1 when the file changes.
-uv run --locked --no-sync python scripts/local_release.py --changelog
-```
-
-On master, the helper evaluates Conventional Commits and prepares only root version
-metadata and the generated changelog. Documentation commits alone do not bump the
-version. Lock versions and dependency sources remain unchanged. Existing release
-ownership, parent/path validation, changelog hash, concurrency and conflicting-tag
-checks remain enforced. Generated metadata-only commits and tag recovery skip the
-heavy IDs in `HEAVY_HOOKS`; hygiene checks remain enabled. Failed explicit release
-attempts retain their state for inspection and retry with the same command.
-
-After checking the result, complete authorized delivery by pushing the intended branch
-and any newly created version tag explicitly, then verify the remote refs. A no-release
-evaluation is a valid outcome for documentation-only history; do not force a version bump.
-Publish Git tags only for code: no code GitHub Releases, project distribution assets
-or registry packages. The separate [model-weight procedure](#model-weight-releases)
-is the only model-assets exception.
+A failed attempt may leave this attempt's version, changelog and lockfile changes staged
+without a commit or tag. Restore only those changes, fix the cause on the branch and
+accept the new tip again. Never hand-edit versions or tags, and never tag a tip other
+than the accepted one. Publish Git tags only for code: no code GitHub Releases, project
+distribution assets or registry packages. The separate
+[model-weight procedure](#model-weight-releases) is the only model-assets exception.
 
 ## Model-weight releases
 
@@ -388,7 +452,7 @@ The user-authorized model-assets exception permits `weights-*` GitHub Releases i
 `BuckanovNikita/clearml-yolo` containing verified model-weight/source tar archives,
 manifest, checksums and upstream notices. It does not authorize project wheels,
 source distributions or registry packages. Weight tags have an independent cadence
-from application versions; ordinary release hooks neither package nor upload weights.
+from application versions; code releases neither package nor upload weights.
 Reuse the current snapshot across code releases until its catalogue needs an update.
 
 Inspect the current [eligible catalogue](model-assets.md#catalogue-and-automatic-execution),

@@ -40,8 +40,9 @@ acceptance checks and authorized stopping point in the native ledger. Reconcile 
 with the final diff and actual check evidence before completion. Existing user or standing
 authorization covers its stated commit/release scope without another stage prompt;
 explicit no-commit/no-release limits and the active host mode take precedence. Evaluate
-the [native release workflow](development.md#local-releases) after acceptance. A docs-only
-change may correctly produce no version tag. Deployment and package publishing remain
+the [native release workflow](development.md#local-releases) after
+[change acceptance](development.md#acceptance-tiers); the `release` skill owns the
+procedure. A docs-only change may correctly produce no version tag. Deployment and package publishing remain
 separate actions requiring explicit authorization.
 
 Project wheels (`.whl`) and source archives (`.tar.gz`) are debugging tools only.
@@ -61,9 +62,10 @@ When boundary coverage is missing, add scoped executable checks, including a neg
 case demonstrating that a prohibited dependency fails. Keep existing rules intact and
 avoid unrelated repository refactors.
 
-Run the applicable [verification commands](development.md#verification). The complete
-`pytest --testmon-noselect` suite already includes architecture negative cases and
-CPU-DDP; avoid repeating those checks merely to claim another gate. Reconcile the final
+Run the applicable [verification stages](development.md#verification); the
+`verification-workflow` skill selects them. The unit suite already includes architecture
+negative cases and CPU-DDP; avoid repeating those checks merely to claim another gate.
+Report deferred and waived checks as such, never as passed. Reconcile the final
 task-owned diff with contract coverage and record actual results in dated evidence.
 
 ### Documentation

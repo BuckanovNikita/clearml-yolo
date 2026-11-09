@@ -1019,5 +1019,28 @@ cy-dedup
 на отдельном листе отчёта и исключены из сводных показателей, требующих известного числа
 примеров. Лист предупреждений объясняет ограничения результата.
 
+## Разработка
+
+Перед установкой скопируйте внешние зависимости в `external/` (см.
+[разработку](docs/development.md#external-dependencies)). Затем один раз в каждом рабочем
+дереве установите окружение и Git-хуки:
+
+```bash
+uv sync --frozen --dev
+bash scripts/install-hooks.sh
+```
+
+Все проверки запускаются через Task:
+
+```bash
+uv run --frozen --no-sync task --exit-code fix         # безопасные исправления Ruff и форматирование
+uv run --frozen --no-sync task --exit-code verify      # статические проверки и затронутые тесты
+uv run --frozen --no-sync task --exit-code acceptance  # приёмка чистого коммита, включая стенд ClearML
+```
+
+Хук pre-commit отклоняет коммит с неиндексированными изменениями или неотслеживаемыми
+файлами и запускает `verify`; хук commit-msg требует Conventional Commits. Этапы,
+уровни приёмки и выпуск версий описаны в [разработке и релизах](docs/development.md#verification).
+
 Далее: [технический справочник](TECH_DETAILS.md), [каталог контрактов](docs/current-contracts.md),
 [диагностика](docs/diagnostics.md), [разработка и релизы](docs/development.md).
