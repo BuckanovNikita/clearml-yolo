@@ -108,3 +108,10 @@ tasks:
     desc: Randomized unit property exploration
     cmds:
       - "HYPOTHESIS_PROFILE=explore {{.RUN}} {{.UV}} pytest --ignore=tests/integration -p no:randomly -n {{.TEST_WORKERS}} --dist loadgroup"
+
+  # --- stream C begin ---
+  mutation:
+    desc: Advisory mutation report for changed functions (exit 0 ok, 1 strict survivors, 2 tool error)
+    cmds:
+      - "{{.RUN}} {{.UV}} python scripts/mutation.py {{.CLI_ARGS}}"
+  # --- stream C end ---
