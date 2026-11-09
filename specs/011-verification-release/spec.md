@@ -197,6 +197,9 @@ mutants run); start a session with a held lock (status reports it).
 - **FR-013**: Change acceptance MUST require a clean committed tip before and after running and
   MUST run checks, property exploration, preflight and the complete suite with coverage at or
   above the recorded floor; documentation-only changes MAY omit the live part.
+- **FR-013a**: The live suite MUST include a CPU smoke run against the shared ClearML stand that
+  trains and evaluates a minimal model on a synthesized dataset under the run tag and confirms
+  the published task, model and evaluation results exist before exact-tag cleanup.
 - **FR-014**: Release acceptance MUST add GPU-marked tests, FiftyOne checks, the documented
   real-run gate on CPU and a single GPU, and the paired release check.
 - **FR-015**: Unavailable stands, capacity wait and a GPU busy with the user's workload MUST be
