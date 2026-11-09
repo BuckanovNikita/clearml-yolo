@@ -13,3 +13,23 @@ Terms separate what executes from what was observed or produced.
 **Invocation owner**: The execution responsible for one experiment's task, publications and owned descendant cleanup.
 
 **Identity footer**: The readable model identity and source links placed after a report's data, leaving table headers in place; exact identifiers stay in provenance.
+
+# Verification and release
+
+Terms separate what a check establishes from when it is required.
+
+## Language
+
+**Development verification**: Static checks and the tests affected by a change, run on the current working copy. It establishes nothing about native GPU execution, ClearML publication or the queue.
+
+**Change acceptance**: Verification of a clean committed tip, including the complete suite and the live checks run against the shared ClearML stand on CPU. Documentation-only changes need no live part.
+
+**Release acceptance**: Change acceptance plus GPU checks, the real-run gate and the paired release check, required before a version is delivered.
+
+**Deferred verification**: A required check that could not run because a resource was temporarily unavailable, such as an unavailable stand or a busy GPU. It blocks acceptance, integration and release until it runs.
+
+**Waived verification**: A check the user explicitly excused for this environment. It never blocks and is reported as waived, not as passed or deferred.
+
+**Release-commit check**: The reduced checks applied only to the version commit that carries the new version, changelog and lock entry.
+
+**Paired release check**: Verification that the CY and cy-queue versions proposed for delivery install and pass the queue suite together. It is distinct from the release-commit check; the bare phrase "release check" is not used.
