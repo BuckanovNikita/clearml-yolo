@@ -765,6 +765,11 @@ uv run --frozen --no-sync cy-queue --help
 
 Установка обоих исходников одной командой проверяет совместимость версий и обновляет
 метаданные editable-установок. Диапазон поддерживаемых версий CY задаёт пакет очереди.
+Этапы Task запускаются через `uv run --locked`, который синхронизирует `.venv` рабочего
+дерева с `uv.lock`. Синхронизация неточная (inexact): дополнительные пакеты, например
+`cy-queue`, остаются установленными, а пакеты из lock-файла возвращаются к
+зафиксированным версиям. Парная проверка перед выпуском использует собственное
+временное виртуальное окружение.
 
 Перед синхронным обновлением всех участников остановите отправку и workers,
 дождитесь завершения активных заданий и выполните необходимое восстановление.
@@ -1030,10 +1035,17 @@ cy-dedup
 ```bash
 uv build --sdist external/digital-metrics -o external/wheelhouse
 uv build --sdist external/report-generator -o external/wheelhouse
-printf 'find-links = ["external/wheelhouse"]\n' > uv.toml
+[ -e uv.toml ] || printf 'find-links = ["external/wheelhouse"]\n' > uv.toml
 uv sync --locked --dev
 bash scripts/install-hooks.sh
 ```
+
+Третья команда создаёт `uv.toml`, только если его нет; в существующий `uv.toml` добавьте
+строку `find-links = ["external/wheelhouse"]` вручную. Первые три команды выполняет и
+этап Task `local-deps`: в новом checkout, до создания окружения, запустите
+`uvx --from go-task-bin task local-deps`, а в готовом окружении после разрешённой смены
+ревизии внешних исходников пересоберите wheelhouse командой
+`uv run --locked task --exit-code local-deps`.
 
 `pyproject.toml` не содержит `[tool.uv.sources]`: локальные пути ломают установку по
 git-ссылке, поэтому пакеты берутся из `external/wheelhouse`. Каждому рабочему дереву

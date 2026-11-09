@@ -13,11 +13,15 @@ nor this repository's version-control state. Read the script's docstring for the
 mechanics; [development procedures](../../../docs/development.md#mutation-report) own the
 policy.
 
-- **Test selection per change**: the tests that this worktree's testmon data records as
-  executing the changed functions; without usable testmon data, the test files that
-  import the changed modules.
-- **Excluded tests**: `tests/integration`, `ddp_cpu`, `process_capabilities` and
-  `gpu_controls`.
+- **Test selection per change**: the union of the test node ids that this worktree's
+  `.testmondata` records for the changed files and that still exist in the staged tree,
+  and, for a changed module without such validated testmon nodes, the test modules
+  (`test_*.py`) that import it. A missing or unreadable `.testmondata` leaves the import
+  scan alone. When nothing is selected, mutmut does not run and the report ends early
+  with the functions "Not reached by tests".
+- **Excluded tests**: `tests/integration` is never selected; every run deselects
+  `-m "not ddp_cpu and not process_capabilities and not gpu_controls"` (`gpu_controls`
+  is reserved for GPU-holding tests).
 - **Budget**: 8 changed functions and 300 seconds by default. Functions beyond the
   budget are skipped; mutants left unjudged count as "not run" and functions no selected
   test reaches as "not reached by tests", never as survivors.

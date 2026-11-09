@@ -19,8 +19,12 @@ contact the stand. `tests/conftest.py` marks them `integration` and puts them in
 keep `--dist loadgroup`. Stand tests request the session fixture `live_run`
 (`tests/integration/conftest.py`) explicitly: it prepares the run tag through
 `tests/integration/lifecycle.py`, exports the stand environment, and stops the run after
-the last test, failing the session when cleanup is incomplete. The FiftyOne
-native-database tests in `tests/integration/fiftyone` run outside that fixture.
+the last test, failing the session when cleanup is incomplete. The GPU suites claim the
+session run tag themselves: after validating their options they call the
+`stand_project` fixture, which joins `live_run` and prefixes the published project name
+with the run tag, so the session's exact-tag cleanup removes it. They need no manual
+`L up` or `eval "$(L env)"`. The FiftyOne native-database tests in
+`tests/integration/fiftyone` run outside that fixture.
 
 Tests run under an isolated HOME that hides `~/clearml.conf`. Every live suite, the CPU
 stand smoke run and the GPU suites alike, takes its ClearML endpoint and credentials from
@@ -41,9 +45,12 @@ manual operations:
 ```bash
 L check           # bounded availability check; creates no tag or resources
 L up              # mint or adopt the run tag and record it in tests/integration/.run-tag
-eval "$(L env)"   # export the run's stand variables for manual tools
+eval "$(L env)"   # export the run's stand variables for manual tools, not for pytest
 L stop            # exact-tag cleanup, then release the tag (also the crash cleanup)
 ```
+
+Crash recovery is `L stop` for the recorded tag (`tests/integration/.run-tag`, or
+`INFRA_RUN_TAG=<tag>`).
 
 The k8s-infra helpers are not on `PATH`. The lifecycle resolves them from
 `K8S_INFRA_SKILL_DIR`, else the installed k8s-infra skill under `~/.agents/skills` or
@@ -92,9 +99,12 @@ For a focused selector, run `infra-check` first, then pytest on the selected
   `room` reports; serialize runs from several worktrees beyond it.
 - GPU suites take their `--run-*` options from the environment: the Severstal
   single-GPU suite is required and reads `CY_SEVERSTAL_ARGS`; multi-GPU DDP runs only
-  when `CY_DDP_ARGS` is set and is otherwise reported as waived. `release-acceptance`
-  passes them through and runs the FiftyOne tests with `CY_TEST_FIFTYONE=1` in a
-  temporary `FIFTYONE_DATABASE_DIR` that it removes afterwards. Supply the GPU options
+  when `CY_DDP_ARGS` is set and is otherwise reported as waived. The options are split
+  on spaces, so use space-free project names (for example
+  `--ddp-clearml-project=clearml-yolo-ddp`); the published name gets the run-tag prefix.
+  `release-acceptance` runs them with `CY_TASK_VERIFICATION=1`, so an unavailable stand
+  ends the suite with exit 3, deferred. It runs the FiftyOne tests with
+  `CY_TEST_FIFTYONE=1` in a temporary `FIFTYONE_DATABASE_DIR` that it removes afterwards. Supply the GPU options
   from [the DDP procedure](../../../docs/ddp-testing.md) and `pytest --help` ("native
   Severstal acceptance").
 - The real-run gate (CPU and a single GPU) belongs to `running-end-to-end-tests`; these

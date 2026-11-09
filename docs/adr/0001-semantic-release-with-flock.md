@@ -47,7 +47,7 @@ the staging guard needed an exemption for the override.
 - Verification has two acceptance tiers. Change acceptance (`acceptance`) gates
   integration: a clean tip, static checks, property exploration, a stand preflight, the
   complete unit suite with a coverage floor and a CPU smoke run on the shared ClearML
-  stand; documentation-only changes skip the live part. Release acceptance
+  stand; documentation-only changes skip the preflight and the live part. Release acceptance
   (`release-acceptance`) gates delivery: change acceptance plus the Severstal single-GPU
   suite, multi-GPU DDP when configured (otherwise waived), FiftyOne tests in a temporary
   database, the paired CY and cy-queue check in a temporary environment and, as a skill
