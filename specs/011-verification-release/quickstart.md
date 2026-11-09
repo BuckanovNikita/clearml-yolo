@@ -10,7 +10,7 @@ Prerequisites: `external/` populated, `uv sync --locked --dev`, `bash scripts/in
 5. Change acceptance on a clean tip: `uv run --locked task --exit-code acceptance`; afterwards
    `clearml.py --project clearml-yolo ls --prefix <tag>` is empty.
 6. Mutation: `uv run --locked task --exit-code mutation -- --base master`.
-7. Release rehearsal in a throwaway worktree (no tag, no push): run
+7. Release rehearsal in a scratchpad `git clone --local` on `master` with a throwaway `fix:` commit: run
    `semantic-release version --print`, then the build command with `CY_RELEASE_CHECK=1`;
    `git diff --cached --name-only` ⊆ {pyproject.toml, uv.lock, CHANGELOG.md}; remove worktree.
 8. Paired check: `uv run --locked task --exit-code paired-check` → prints both SHAs/versions.

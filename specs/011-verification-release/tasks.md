@@ -23,7 +23,7 @@ text; only the integrator writes those files after Phase 2.
 
 - [ ] T001 Add dev dependencies `go-task-bin`, `pytest-xdist`, `pytest-randomly`, `deptry` to `[dependency-groups].dev` in pyproject.toml and refresh uv.lock with `uv lock` (verify only these packages were added; `digital-metrics` entry unchanged)
 - [ ] T002 Add `.testmondata*`, `.hypothesis/`, `.coverage`, `tests/integration/.run-tag` to .gitignore (keep existing entries)
-- [ ] T003 If `ruff format --check .` reports changes, run `ruff format .` and commit separately as `style: apply ruff format` before other work
+- [x] T003 `ruff format --check .` reported all 558 files formatted (2026-11-09); no style commit needed
 
 ## Phase 2: Foundational (blocks all stories)
 
@@ -39,7 +39,7 @@ text; only the integrator writes those files after Phase 2.
 **Independent test**: quickstart steps 1–3.
 
 - [ ] T008 [P] [US1] Port scripts/install-hooks.sh (backup existing hooks, dispatcher for pre-commit and commit-msg, `UV_PROJECT_ENVIRONMENT=$root/.venv`, fallback to `prek hook-impl` for worktrees without Taskfile.yml) in scripts/install-hooks.sh
-- [ ] T009 [P] [US1] Port scripts/git-hook.sh staging guard (refuse unstaged tracked changes and nonignored untracked files before prek; never stage, stash or delete) in scripts/git-hook.sh
+- [ ] T009 [P] [US1] Port scripts/git-hook.sh staging guard (refuse unstaged tracked changes and nonignored untracked files before prek; never stage, stash or delete) with the research R13 source-override exemption implemented in scripts/source_override.py (+ tests in tests/test_source_override.py) in scripts/git-hook.sh
 - [ ] T010 [US1] Rewrite .pre-commit-config.yaml: install types `[pre-commit, commit-msg]`, `fail_fast: true`, keep hygiene hooks and `untracked-sources`, single local serial always-run `verify` hook (`uv run --locked task --exit-code verify`), manual hooks `integration-tests`, `acceptance-tests`, `property-exploration`, `mutmut`, remote `conventional-pre-commit` v4.5.0 commit-msg with types build, chore, ci, docs, feat, fix, perf, refactor, style, test
 - [ ] T011 [US1] Install hooks in this worktree with `bash scripts/install-hooks.sh` and run quickstart steps 1–3; record outcomes in the evidence section of this file
 
@@ -94,9 +94,11 @@ text; only the integrator writes those files after Phase 2.
 - [ ] T035 Integrator applies stream patch texts to pyproject.toml, Taskfile.yml, .gitignore; `uv lock --check`
 - [ ] T036 `task verify`; then commit per stream with Conventional Commits
 - [ ] T037 `task mutation -- --base master`; `task acceptance` on the clean tip (report deferral if infra-check exits 3)
-- [ ] T038 Release rehearsal in a throwaway worktree (quickstart step 7); `task paired-check`; remove worktree
+- [ ] T038 Release rehearsal in a scratchpad `git clone --local` on branch `master` with a throwaway `fix:` commit (research R14); inspect commit/tag; delete clone; `task paired-check`
 - [ ] T039 Fresh independent review of the integrated diff; fix findings; rerun affected checks; `prek run --all-files` with SKIP cleared
 - [ ] T040 Record dated evidence (checks, outcomes, deferrals, waivers) below
+
+Design constraints from research R13–R14 (overrides, worktree isolation, real env, FiftyOne placement, coverage/docs-only) apply to all tasks.
 
 ## Dependencies
 

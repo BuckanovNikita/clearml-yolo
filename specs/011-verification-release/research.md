@@ -93,3 +93,36 @@ Source of truth for adapted files: `/mnt/wsl/data/nkt/cveta2` at `0fa3310`.
 ## R12. Session status
 - **Decision**: port `scripts/session_status.sh` (branch vs `master`, release lock
   `clearml-yolo-release.lock`, `.run-tag`); register in `.claude/settings.json` SessionStart.
+
+## R13. Local source overrides (user decision 2026-11-09: narrow exemption)
+- **Decision**: Keep the documented uncommitted `[tool.uv.sources]` override convention.
+  - `scripts/git-hook.sh` tolerates unstaged changes only when every unstaged tracked path is
+    `pyproject.toml` whose working copy differs from the index solely inside
+    `[tool.uv.sources]`, optionally with `uv.lock`; checked by `scripts/source_override.py`.
+    All other unstaged or untracked inputs are refused as before.
+  - Task stages run tools with `uv run --frozen --no-sync` against the prepared worktree
+    environment (CY convention) instead of `--locked`.
+  - `check`'s lock freshness runs `uv lock --check` on the **index** content: a temporary
+    `git checkout-index` copy with `external/` symlinked, so overrides never mask drift.
+  - Final acceptance keeps verifying committed content; `release-commit-check` refuses any
+    override in staged content.
+- **Alternatives**: drop the convention; `--frozen` only without guard exemption.
+
+## R14. Execution safety (advisor review 2026-11-09)
+- Streams run in separate git worktrees; only the integrator commits on the feature branch,
+  installs hooks and runs heavy checks (full xdist suite, CPU smoke, acceptance), each after
+  checking pcboard availability.
+- Release rehearsal runs in a `git clone --local` under the scratchpad on a branch named
+  `master` with a throwaway `fix:` commit so semantic-release actually versions, commits and
+  tags inside the clone; the clone is deleted afterwards. No tag reaches this repository.
+- `tests/env_isolation.py` saves the real environment in `CY_REAL_ENV`; `lifecycle.py` and the
+  CPU smoke test read HOME-dependent locations (k8s-infra skill dir, weights cache, fonts)
+  from it. The smoke test passes an explicit weights path and disables plots if fonts would
+  be downloaded.
+- FiftyOne native-database tests move to `tests/integration/fiftyone/`, outside the stand
+  fixture scope (the stand `live_run` fixture is requested explicitly by stand tests, not
+  autouse across FiftyOne). Only env-gated tests move; ungated tests stay in `tests/`.
+- Coverage `fail_under` is measured and enforced on the non-live full unit suite, which both
+  acceptance paths run. `acceptance` skips its live part when every path changed since
+  `master` is documentation (`*.md`, `docs/`, `specs/`), and reports that it did so.
+- `ruff format --check .` reports 558 files already formatted: T003 is a no-op.
