@@ -23,7 +23,9 @@ The run tag, in order of precedence:
    ``stop`` deletes once cleanup is proven;
 3. nothing: ``up`` mints one; ``stop`` refuses.
 
-``up`` refuses to mint while ``.run-tag`` names another run: stop it or adopt it first.
+``up`` refuses to start while ``.run-tag`` names another run: stop it or adopt it first. An
+exported ``INFRA_RUN_TAG`` adopts only the run ``.run-tag`` names; a different exported tag is
+refused too, so one worktree never has two active runs.
 
 ``check`` is a read-only preflight bounded by ``CY_INFRA_CHECK_TIMEOUT`` seconds (60 by
 default). It creates no tag and no stand object. Exit statuses: 0 available, 3 unavailable
@@ -104,10 +106,14 @@ TEMPORARY_TERMS = (
     "eof",
     "serviceunavailable",
     "unable to handle the request",
+    "unable to connect to the server",
     "502",
     "503",
     "504",
 )
+# kubectl reports a stopped API server as "The connection to the server <host:port> was
+# refused - did you specify the right host or port?", which no plain term above matches.
+TEMPORARY_PATTERNS = (re.compile(r"the connection to the server \S+ was refused"),)
 
 
 class LifecycleError(Exception):
@@ -267,10 +273,19 @@ def call(command: Sequence[str], *, capture: bool = False) -> subprocess.Complet
     return subprocess.CompletedProcess(list(command), child.returncode, stdout)
 
 
+def is_temporary(detail: str) -> bool:
+    """Whether lower-cased error text reports lost connectivity and no permanent problem."""
+    if any(term in detail for term in PERMANENT_TERMS):
+        return False
+    return any(term in detail for term in TEMPORARY_TERMS) or any(
+        pattern.search(detail) for pattern in TEMPORARY_PATTERNS
+    )
+
+
 def classify_failure(result: subprocess.CompletedProcess[str], description: str) -> NoReturn:
     """Separate temporary connectivity loss from permanent errors without echoing secrets."""
     detail = (result.stderr or "").lower()
-    if not any(term in detail for term in PERMANENT_TERMS) and any(term in detail for term in TEMPORARY_TERMS):
+    if is_temporary(detail):
         raise StandUnavailableError(f"{description}: service connectivity was lost")
     fail(f"{description} failed (exit {result.returncode}); check prerequisites, credentials, TLS and access.")
 
@@ -314,6 +329,11 @@ class Run:
         return self._run([sys.executable, self.script("clearml.py"), "--project", PROJECT, *args], capture=capture)
 
     def _stand_env(self) -> None:
+        """Export the ClearML credentials and CA trust of project clearml-yolo.
+
+        ``mongodb.py env`` is deliberately not exported: the FiftyOne suites never use the
+        shared MongoDB stand, they require an explicit isolated ``FIFTYONE_DATABASE_DIR``.
+        """
         completed = self.clearml("env", capture=True)
         if completed.returncode != 0:
             if self.deadline is not None:
@@ -367,23 +387,29 @@ class Run:
             )
 
     def refuse_active_run(self) -> None:
-        """Refuse to mint while the tag file names an active run."""
-        if self.adopted() or not self.tag_file.is_file():
+        """Refuse to start while the tag file names a run other than an adopted one.
+
+        Only an exported tag equal to the recorded one adopts that run; a minted or a different
+        exported tag would start a second run in this worktree.
+        """
+        if not self.tag_file.is_file():
             return
         try:
             active = self._read_tag_file()
         except LifecycleError:
             active = "?"
+        if self.adopted() and active == self.tag:
+            return
         fail(
             f"run '{active}' is active in this worktree ({self.tag_file});",
-            f"stop it with {MODULE} stop, or export INFRA_RUN_TAG={active} to adopt it.",
+            f"stop it with INFRA_RUN_TAG={active} {MODULE} stop, or export INFRA_RUN_TAG={active} to adopt it.",
         )
 
     def claim_run_tag(self) -> None:
         """Mint when needed; assign, then record, so a refusal leaves nothing behind."""
+        self.refuse_active_run()
         if self.adopted():
             return
-        self.refuse_active_run()
         minted = call(
             [sys.executable, self.script("infra.py"), "newtag", "--project", PROJECT, "--slug", TAG_SLUG],
             capture=True,
@@ -409,7 +435,8 @@ class Run:
 
     def remove_tagged_objects(self) -> bool:
         """Delete this tag's ClearML objects, then prove that none remain."""
-        log(f"Removing ClearML objects of run tag '{self.tag}' at {os.environ.get('CLEARML_API_HOST', '?')}")
+        host = self.exported.get("CLEARML_API_HOST", "?")
+        log(f"Removing ClearML objects of run tag '{self.tag}' at {host}")
         removed = self.clearml("cleanup", "--prefix", self.tag).returncode == 0
         listing = self.clearml("ls", "--prefix", self.tag, capture=True)
         rows = [line for line in (listing.stdout or "").splitlines() if line.split()[:1] in (["project"], ["task"])]
@@ -480,7 +507,7 @@ def _cluster_available(deadline: float) -> str | None:
     detail = (result.stderr or "").lower()
     if any(term in detail for term in PERMANENT_TERMS):
         fail("Kubernetes access, context, credentials or TLS configuration failed; check kubectl access.")
-    if any(term in detail for term in TEMPORARY_TERMS):
+    if is_temporary(detail):
         return "the docker-desktop cluster does not answer"
     fail(f"Kubernetes readiness probe failed unexpectedly (exit {result.returncode}); check kubectl access.")
 
