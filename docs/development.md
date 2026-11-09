@@ -243,7 +243,7 @@ these paths also work; do not add their contents or Git metadata to this reposit
 | Dependency | Upstream | Approved source revision |
 | --- | --- | --- |
 | digital-metrics | [repository](https://github.com/Wasilkas/digital-metrics) | `6e801be1564dce458294eb23592cc1aa0939c4d9` |
-| report-generator | [repository](https://github.com/Wasilkas/report-generator) | `f3dff3844e7277ecf360d406cea04bb77deba65a` |
+| report-generator | [repository](https://github.com/Wasilkas/report-generator) | `7339ef864b4ff1b1db499a08d647193128088e80` |
 
 The committed lockfile installs both paths editable; it does not store their source
 contents or enforce their Git revisions. Keep the approved copies available for all

@@ -91,7 +91,7 @@
 
 ## R8. Revision bump provenance
 
-- The new report-generator commit is local. Bumping the approved revision in
-  `docs/development.md` points at a commit that fresh clones cannot obtain until
-  report-generator is pushed, which needs separate authorization. Record this in the
-  ledger and raise it at delivery.
+- The footer API ships in the report-generator 0.2.0 release (tag `v0.2.0`). CY requires
+  `report-generator>=0.2.0`, and `docs/development.md` approves the release commit, so a
+  checkout older than the release fails dependency checks instead of rendering without
+  bottom placement.

@@ -74,7 +74,7 @@ writes its tests first.
 
 ## Phase 6: Polish & Cross-Cutting
 
-- [x] T016 Bump the approved report-generator revision in `docs/development.md`. Record that it is local-only and unpushed.
+- [x] T016 Bump the approved report-generator revision in `docs/development.md`. Pin the release as the minimum version.
 - [x] T017 [P] Update the contracts:
   - `docs/readable-output.md` and `docs/shared-evaluation-reporting.md`: footer, links, page footer, naive-reader note;
   - `specs/000-baseline/spec.md`: replace the print-title requirement;
@@ -115,3 +115,5 @@ commits before the CY revision bump.
 - 2026-11-09 T018: first full suite exposed 6 regressions (test fakes without `links`, lost fit-to-width print setup), fixed; rerun 4170 passed with 1 compatibility expectation updated for fit-to-width, then that module 18 passed. ruff, mypy (440 files), lint-imports (16 kept) clean.
 - 2026-11-09 T021: commits `f746094` (spec) and `2e3e55a` (feature); final `prek run --all-files` result recorded below. Release evaluation: no version tag cut (push and report-generator publication not authorized; approved revision is local-only).
 - Remaining T019 gap: browser check of the model page route and a full GPU run producing linked workbooks.
+- 2026-11-09 T021 final gate before delivery: `prek run --all-files` at `99d5c3c` exited 0 (13 hooks).
+- 2026-11-09 delivery (user-authorized push and report-generator release): report-generator `chore(release): 0.2.0` `7339ef8` fast-forwarded `main` from `d10aa39` with annotated tag `v0.2.0` and GitHub release; upstream suite 184 passed, ruff clean. This supersedes the local-only notes above. CY pins `report-generator>=0.2.0`, the lock records 0.2.0 and the approved revision is `7339ef8`. Paired check: CY 0.46.2 (master, this commit series) with cy-queue 0.1.9 `cd85a0c` (origin/main, fetched): editable install of report-generator, CY and queue, `uv pip check` compatible, installed report-generator 0.2.0, queue suite 528 passed (7 deselected), `cy-queue --help`, queue lint-imports (2 kept), ruff and mypy clean. No CY version tag: the `feat` would release 0.47.0, outside cy-queue's `clearml-yolo>=0.38,<0.47`.
