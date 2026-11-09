@@ -6,6 +6,8 @@ __pycache__/
 .testmondata*
 .pytest_cache/
 .hypothesis/
+# Active live-run tag (tests/integration/lifecycle.py)
+tests/integration/.run-tag
 mutants/
 .cache/
 .config/

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+from hypothesis import HealthCheck, settings
 
 from clearml_yolo.adapters.runtime import bootstrap
 from ddp_gpu_harness import GPUOptions
@@ -19,6 +20,41 @@ if TYPE_CHECKING:
     from importlinter.domain.contract import Contract
 
     from severstal_harness import SeverstalOptions
+
+# Default runs are deterministic; `HYPOTHESIS_PROFILE=explore` (the `properties` Task stage)
+# searches randomly and wider. Tests that pin their own `@settings` keep those values.
+# A failure found while exploring is stored in .hypothesis/ and replayed by later runs.
+settings.register_profile(
+    "clearml-yolo",
+    deadline=None,
+    derandomize=True,
+    max_examples=50,
+    suppress_health_check=[HealthCheck.too_slow],
+)
+settings.register_profile(
+    "explore",
+    deadline=None,
+    derandomize=False,
+    max_examples=1000,
+    suppress_health_check=[HealthCheck.too_slow],
+)
+settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "clearml-yolo"))
+
+INTEGRATION_DIR = Path(__file__).resolve().parent / "integration"
+# Linux process-supervision modules: they own process groups, subreapers, signals and
+# timing-sensitive children, so one xdist worker runs them one after another.
+SERIAL_MODULES = frozenset(
+    {
+        "test_bounded_fiftyone.py",
+        "test_direct_descendants.py",
+        "test_execution_lifecycle.py",
+        "test_gpu_cancellation.py",
+        "test_subreaper_process_tree.py",
+        "test_training_workers.py",
+        "test_worker_pool.py",
+    }
+)
+SERIAL_MARKERS = ("ddp_cpu", "process_capabilities")
 
 
 @pytest.fixture(scope="session")
@@ -134,8 +170,45 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
 
 
+def pytest_itemcollected(item: pytest.Item) -> None:
+    """Assign xdist groups during collection, before xdist distributes the items.
+
+    Everything under ``tests/integration`` is marked ``integration`` and joins the ``live``
+    group, so one worker runs the live tests serially and the session run is prepared once.
+    CPU DDP and process-supervision tests share the ``serial`` group; with
+    ``--dist loadgroup`` every other test stays parallel.
+    """
+    if item.path.resolve().is_relative_to(INTEGRATION_DIR):
+        item.add_marker(pytest.mark.integration)
+        item.add_marker(pytest.mark.xdist_group("live"))
+    elif item.path.name in SERIAL_MODULES or any(item.get_closest_marker(name) for name in SERIAL_MARKERS):
+        item.add_marker(pytest.mark.xdist_group("serial"))
+
+
+def _selects_integration(config: pytest.Config) -> bool:
+    """Whether the invocation names tests/integration (or a path inside it) or the marker."""
+    if "integration" in config.option.markexpr:
+        return True
+    base = config.invocation_params.dir
+    for argument in config.args:
+        path = (base / argument.split("::", 1)[0]).resolve()
+        if path.is_relative_to(INTEGRATION_DIR):
+            return True
+    return False
+
+
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Keep ordinary pytest offline, while an explicit GPU selection fails missing opt-in."""
+    """Keep ordinary pytest offline, while an explicit live or GPU selection runs.
+
+    Live tests run only when the invocation names ``tests/integration`` (or a path inside
+    it) or selects the ``integration`` marker; a plain ``pytest`` never contacts the stand.
+    An explicit GPU selection without its opt-in fails in the option fixtures below.
+    """
+    if not _selects_integration(config):
+        removed = [item for item in items if item.get_closest_marker("integration") is not None]
+        items[:] = [item for item in items if item.get_closest_marker("integration") is None]
+        if removed:
+            config.hook.pytest_deselected(items=removed)
     for marker, flag, filename in (
         ("ddp_gpu", "--run-ddp-gpu", "test_native_ddp_gpu.py"),
         ("severstal_gpu", "--run-severstal-gpu", "test_severstal_gpu.py"),
