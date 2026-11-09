@@ -11,18 +11,33 @@ Changed lines of staged ``src/clearml_yolo/**/*.py`` files, compared with the me
 base of ``--base`` (default ``HEAD``), are mapped to the top-level functions and
 methods that contain them, and mutmut runs only their mutants. The run is budgeted:
 at most ``--max-functions`` (default 8) changed functions are mutated and the rest
-are listed; mutmut stops after ``--budget-seconds`` (default 120), and mutants it did
+are listed; mutmut stops after ``--budget-seconds`` (default 300), and mutants it did
 not reach by then count as "not run", not as survivors. Zero lifts either limit.
+
+The budget covers mutmut's whole run, including its stats pass, which executes every
+selected test once before any mutant. Running the whole unit suite there takes about
+1000 s, so each run selects test files per change instead (``select_tests``): the
+test files ``.testmondata`` records as depending on each changed file, or, for a file
+it knows nothing about, the test files whose text imports the changed module. Live
+suites (``tests/integration``) and files ``[tool.mutmut]`` ignores are never selected,
+and the committed ``pytest_add_cli_args`` deselect the host-wide markers. With that
+selection the stats pass takes seconds to a few minutes, so 300 s leaves room for
+mutants of the default 8 functions; widen ``--budget-seconds`` for a thorough run.
+When no test file is selected, mutmut is not run and the functions are reported as
+not reached by tests.
 
 The verdict is advisory: surviving mutants are printed (the first few with diffs) and
 the run passes, unless ``--strict`` is given. Mutants no unit test reaches are counted
 separately. Exit statuses: 0 success (survivors are advisory), 1 survivors or
-unreached functions under ``--strict``, 2 a tool, configuration or clean-test failure.
+unreached functions under ``--strict``, 2 a tool, configuration or clean-test failure,
+including any unexpected error of the driver itself.
 
 Nothing is shared between runs. Each run exports the *staged* tree with
 ``git checkout-index`` into a fresh temporary directory, links the repository's
 ``external/`` dependency copies into it, narrows that copy's ``[tool.mutmut]`` to the
-changed files and runs the repository venv's ``mutmut`` there. No mutmut cache or
+changed files and selected tests and runs the repository venv's ``mutmut`` there in
+its own session. When the budget expires, that process group and every descendant
+that started a session of its own are stopped. No mutmut cache or
 pytest temp root outlives the run, so concurrent runs from other worktrees or agents
 cannot corrupt each other, and a stale verdict cannot be reused.
 
@@ -36,15 +51,18 @@ from __future__ import annotations
 
 import argparse
 import ast
+import contextlib
 import json
 import os
 import re
 import shutil
 import signal
+import sqlite3
 import subprocess
 import sys
 import tempfile
 import threading
+import tomllib
 from collections import deque
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
@@ -71,8 +89,13 @@ CLASS_SEPARATOR = "ǁ"
 HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
 MAX_DIFFS = 5
 DEFAULT_MAX_FUNCTIONS = 8
-DEFAULT_BUDGET_SECONDS = 120.0
+DEFAULT_BUDGET_SECONDS = 300.0
 BUDGET_GRACE_SECONDS = 15
+# pytest-testmon's dependency database in the repository (the worktree) root.
+TESTMON_DATABASE = ".testmondata"
+TESTS_DIR = "tests"
+LIVE_TESTS_DIR = "tests/integration"
+PROC_ROOT = Path("/proc")
 
 
 class MutationError(Exception):
@@ -224,20 +247,133 @@ def link_external(workspace: Path) -> None:
     (workspace / "external").symlink_to(external, target_is_directory=True)
 
 
-def narrow_scope(pyproject: Path, files: Sequence[str]) -> None:
-    """Point the workspace's ``[tool.mutmut]`` at *files* and nothing else."""
+def _mutmut_table(pyproject: Path) -> dict[str, object]:
+    """Return the parsed ``[tool.mutmut]`` table of *pyproject*; invalid TOML is a tool error."""
+    try:
+        document = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+    except tomllib.TOMLDecodeError as exc:
+        msg = f"{pyproject.name} is not valid TOML: {exc}"
+        raise MutationError(msg) from exc
+    table = document.get("tool", {}).get("mutmut")
+    if not isinstance(table, dict):
+        msg = "pyproject.toml has no [tool.mutmut] table."
+        raise MutationError(msg)
+    return table
+
+
+def _ignored_paths(workspace: Path) -> tuple[str, ...]:
+    """Return the paths ``[tool.mutmut].pytest_add_cli_args`` passes to ``--ignore=``."""
+    args = _mutmut_table(workspace / "pyproject.toml").get("pytest_add_cli_args", [])
+    if not isinstance(args, list):
+        return ()
+    return tuple(arg.removeprefix("--ignore=").rstrip("/") for arg in args if str(arg).startswith("--ignore="))
+
+
+def _eligible_test_file(workspace: Path, path: str, ignored: Sequence[str]) -> bool:
+    """Tell whether *path* is a unit test file present in the staged *workspace*."""
+    if not path.startswith(f"{TESTS_DIR}/") or not path.endswith(".py"):
+        return False
+    if any(path == skip or path.startswith(f"{skip}/") for skip in (LIVE_TESTS_DIR, *ignored)):
+        return False
+    return (workspace / path).is_file()
+
+
+def testmon_dependents(database: Path, sources: Sequence[str]) -> dict[str, set[str]]:
+    """Return, per source file, the test files *database* records as depending on it.
+
+    The database is pytest-testmon's ``.testmondata``, opened read-only; a missing or
+    unreadable database yields no dependents. Node ids are cut to their test files:
+    stale ids (renamed tests, parameters) would make pytest refuse the selection.
+    """
+    if not database.is_file() or not sources:
+        return {}
+    query = (
+        "SELECT DISTINCT t.test_name FROM test_execution t "
+        "JOIN test_execution_file_fp tf ON tf.test_execution_id = t.id "
+        "JOIN file_fp f ON f.id = tf.fingerprint_id "
+        "WHERE f.filename = ?"
+    )
+    dependents: dict[str, set[str]] = {}
+    try:
+        connection = sqlite3.connect(f"{database.resolve().as_uri()}?mode=ro", uri=True, timeout=5)
+        try:
+            for source in sources:
+                node_ids = connection.execute(query, (source,)).fetchall()
+                dependents[source] = {str(node_id).partition("::")[0] for (node_id,) in node_ids}
+        finally:
+            connection.close()
+    except sqlite3.Error as exc:
+        print(f"Test selection: {database} is unreadable ({exc}); falling back to imports.")
+        return {}
+    return dependents
+
+
+def _import_pattern(module: str) -> re.Pattern[str]:
+    """Match ``pkg.mod`` anywhere or ``from pkg import (..., mod, ...)`` in test source."""
+    parent, _, leaf = module.rpartition(".")
+    dotted = rf"\b{re.escape(module)}\b"
+    if not parent:
+        return re.compile(dotted)
+    from_import = rf"\bfrom\s+{re.escape(parent)}\s+import\s+(?:\([^)]*|[^\n]*)\b{re.escape(leaf)}\b"
+    return re.compile(f"{dotted}|{from_import}")
+
+
+def importing_tests(workspace: Path, source: str, ignored: Sequence[str]) -> set[str]:
+    """Return the unit test files of *workspace* whose text imports *source*'s module."""
+    pattern = _import_pattern(module_name(source))
+    found: set[str] = set()
+    for test_file in sorted((workspace / TESTS_DIR).rglob("*.py")):
+        relative = test_file.relative_to(workspace).as_posix()
+        if _eligible_test_file(workspace, relative, ignored) and pattern.search(
+            test_file.read_text(encoding="utf-8", errors="replace")
+        ):
+            found.add(relative)
+    return found
+
+
+def select_tests(workspace: Path, sources: Sequence[str], database: Path) -> list[str]:
+    """Return the unit test files that can kill mutants of *sources*.
+
+    Per source file, testmon's recorded dependents that still exist in the staged tree
+    are used; a source file testmon does not know (new, renamed, or no database) falls
+    back to the test files that import its module.
+    """
+    ignored = _ignored_paths(workspace)
+    recorded = testmon_dependents(database, sources)
+    selected: set[str] = set()
+    for source in sources:
+        known = {path for path in recorded.get(source, set()) if _eligible_test_file(workspace, path, ignored)}
+        selected |= known or importing_tests(workspace, source, ignored)
+    return sorted(selected)
+
+
+def _toml_array(values: Sequence[str]) -> str:
+    return "[" + ", ".join(json.dumps(value) for value in values) + "]"
+
+
+def narrow_scope(pyproject: Path, files: Sequence[str], tests: Sequence[str]) -> None:
+    """Point the workspace's ``[tool.mutmut]`` at *files* and the selected *tests*."""
+    if "only_mutate" in _mutmut_table(pyproject):
+        msg = "pyproject.toml sets [tool.mutmut].only_mutate; the scope is derived from the change, remove the setting."
+        raise MutationError(msg)
     text = pyproject.read_text(encoding="utf-8")
     header = re.search(r"^\[tool\.mutmut\]\s*$", text, flags=re.MULTILINE)
     if header is None:
-        msg = "pyproject.toml has no [tool.mutmut] table."
+        msg = "pyproject.toml has no plain [tool.mutmut] header line."
         raise MutationError(msg)
-    if re.search(r"^only_mutate\s*=", text, flags=re.MULTILINE):
-        msg = "pyproject.toml sets [tool.mutmut].only_mutate; the scope is derived from the change, remove the setting."
-        raise MutationError(msg)
-    scope = ", ".join(json.dumps(name) for name in files)
+    head, body = text[: header.end()], text[header.end() :]
+    # The committed selection is replaced: a second assignment is a TOML error.
+    body = re.sub(r"^pytest_add_cli_args_test_selection\s*=\s*\[[^\]]*\][^\n]*\n?", "", body, flags=re.MULTILINE)
     # Git change detection would compare against a repository this copy is not.
-    addition = f"\nonly_mutate = [{scope}]\nuse_git_change_detection = false\n"
-    pyproject.write_text(text[: header.end()] + addition + text[header.end() :], encoding="utf-8")
+    addition = (
+        f"\nonly_mutate = {_toml_array(files)}\nuse_git_change_detection = false\n"
+        f"pytest_add_cli_args_test_selection = {_toml_array(tests)}\n"
+    )
+    pyproject.write_text(head + addition + body, encoding="utf-8")
+    table = _mutmut_table(pyproject)
+    if table.get("only_mutate") != list(files) or table.get("pytest_add_cli_args_test_selection") != list(tests):
+        msg = "could not narrow [tool.mutmut] in the workspace copy of pyproject.toml."
+        raise MutationError(msg)
 
 
 def child_env(workspace: Path) -> dict[str, str]:
@@ -260,25 +396,70 @@ def mutmut_binary() -> Path:
     return binary
 
 
+def _proc_stat(proc: Path, pid: int) -> tuple[int, str] | None:
+    """Return (parent pid, start time) of *pid* from ``<proc>/<pid>/stat``; None when gone."""
+    try:
+        stat = (proc / str(pid) / "stat").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    # The command name is parenthesized and may itself contain spaces and parentheses.
+    fields = stat.rpartition(")")[2].split()
+    if len(fields) < 20:  # noqa: PLR2004 - field 22 (starttime) is index 19 after the name
+        return None
+    return int(fields[1]), fields[19]
+
+
+def descendants(pid: int, proc: Path = PROC_ROOT) -> dict[int, str]:
+    """Return every live descendant of *pid* by parent-pid chain, with its start time.
+
+    This includes descendants that started a session (or group) of their own, which a
+    signal to the process group misses. A process orphaned before the scan is not seen.
+    """
+    children: dict[int, list[tuple[int, str]]] = {}
+    for entry in proc.iterdir():
+        if entry.name.isdigit() and (stat := _proc_stat(proc, int(entry.name))) is not None:
+            children.setdefault(stat[0], []).append((int(entry.name), stat[1]))
+    found: dict[int, str] = {}
+    pending = [pid]
+    while pending:
+        for child, started in children.get(pending.pop(), []):
+            if child not in found:
+                found[child] = started
+                pending.append(child)
+    return found
+
+
+def _kill_known(processes: dict[int, str], proc: Path = PROC_ROOT) -> None:
+    """SIGKILL each recorded process that still runs with the same start time."""
+    for pid, started in processes.items():
+        stat = _proc_stat(proc, pid)
+        if stat is None or stat[1] != started:  # gone, or the pid was reused
+            continue
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            continue
+
+
 def _stop_group(process: subprocess.Popen[bytes], spent: threading.Event) -> None:
     """Interrupt mutmut's whole process group, then kill what is left.
 
     mutmut forks one child per mutant and stops them only on KeyboardInterrupt, so the
-    group gets SIGINT first; children still alive after the grace period (they hold
-    the output pipe) get SIGKILL.
+    group gets SIGINT first; after the grace period the group and every descendant
+    recorded before the interrupt (including ones in sessions of their own, which may
+    hold the output pipe) get SIGKILL. Descendants are recorded first because they
+    lose their parent chain once mutmut exits.
     """
     spent.set()
-    try:
+    tree = descendants(process.pid)
+    with contextlib.suppress(subprocess.TimeoutExpired, ProcessLookupError):
         os.killpg(process.pid, signal.SIGINT)
         process.wait(timeout=BUDGET_GRACE_SECONDS)
-    except subprocess.TimeoutExpired:
-        pass
-    except ProcessLookupError:
-        return
-    try:
+    if process.poll() is None:  # a reaped pid may already belong to another process
+        tree |= descendants(process.pid)
+    with contextlib.suppress(ProcessLookupError):
         os.killpg(process.pid, signal.SIGKILL)
-    except ProcessLookupError:
-        return
+    _kill_known(tree)
 
 
 def run_mutmut(
@@ -446,7 +627,14 @@ def mutate(workspace: Path, targets: Sequence[Target], options: Options) -> int:
     print(f"Mutating {len(targets)} function(s) in {len(files)} file(s):")
     for target in targets:
         print(f"    {target.path}: {target.qualname}")
-    narrow_scope(workspace / "pyproject.toml", files)
+    tests = select_tests(workspace, files, REPO_ROOT / TESTMON_DATABASE)
+    if not tests:
+        print("Not reached by tests: no unit test file depends on or imports the changed modules; mutmut not run.")
+        print("Advisory: add tests that call them.")
+        return _advisory(options.strict)
+    print(f"Selected {len(tests)} test file(s): {' '.join(tests)}")
+    link_external(workspace)
+    narrow_scope(workspace / "pyproject.toml", files, tests)
     binary = mutmut_binary()
     env = child_env(workspace)
     children = ["--max-children", str(options.max_children)] if options.max_children else []
@@ -485,7 +673,6 @@ def run(options: Options) -> int:
         if not targets:
             print(f"No changed {PACKAGE} function can be mutated; nothing to do.")
             return 0
-        link_external(workspace)
         return mutate(workspace, limit_targets(targets, options.max_functions), options)
     finally:
         if options.keep:
@@ -548,12 +735,15 @@ def parse_options(argv: Sequence[str] | None) -> Options:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run the driver; argparse usage errors also exit 2."""
+    """Run the driver; argparse usage errors and unexpected failures also exit 2."""
     options = parse_options(argv)
     try:
         return run(options)
     except (MutationError, SyntaxError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
+    except Exception as exc:  # noqa: BLE001 - any driver failure is a tool error (2), not a verdict (1)
+        print(f"ERROR: unexpected {type(exc).__name__}: {exc}", file=sys.stderr)
         return 2
 
 
