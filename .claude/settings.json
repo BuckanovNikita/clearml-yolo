@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/session_status.sh\""
+            "command": "bash -c 'f=\"$CLAUDE_PROJECT_DIR/scripts/session_status.sh\"; [ -f \"$f\" ] && bash \"$f\" || true'"
           }
         ]
       }
