@@ -146,6 +146,9 @@ min_confidence = 80
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# The repository root makes the `tests` namespace importable for `-p tests.env_isolation`;
+# test modules keep their prepend-mode imports (helpers, `integration.lifecycle`).
+pythonpath = ["."]
 addopts = ["--strict-markers", "--strict-config", "-p", "tests.env_isolation"]
 markers = [
     "integration: live test under tests/integration; excluded from development verification by directory",
@@ -154,6 +157,8 @@ markers = [
     "ddp_gpu: opt-in real multi-GPU direct/queued native pipeline acceptance",
     "process_capabilities: Linux supervision preflight regression tests",
     "gpu_controls: host-wide GPU holds and manual reservation recovery",
+    # Registered here too so --strict-markers holds when the xdist plugin is disabled.
+    "xdist_group(name): pytest-xdist loadgroup scheduling group; assigned by tests/conftest.py",
 ]
 
 [tool.coverage.run]
@@ -163,6 +168,7 @@ data_file = ".tmp/coverage/.coverage"
 
 [tool.coverage.report]
 show_missing = true
+# fail_under set by integrator from measured floor
 
 [tool.deptry]
 known_first_party = ["clearml_yolo", "tests", "scripts"]

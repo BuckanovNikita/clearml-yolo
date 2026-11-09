@@ -108,3 +108,61 @@ tasks:
     desc: Randomized unit property exploration
     cmds:
       - "HYPOTHESIS_PROFILE=explore {{.RUN}} {{.UV}} pytest --ignore=tests/integration -p no:randomly -n {{.TEST_WORKERS}} --dist loadgroup"
+
+  # --- stream A begin ---
+  infra-check:
+    desc: Read-only bounded stand preflight (0 available, 3 unavailable, 1 error); creates nothing
+    cmds:
+      - "{{.RUN}} {{.UV}} python -m tests.integration.lifecycle check"
+
+  integration:
+    desc: Preflight, then the non-GPU live tests (stand smoke and FiftyOne) in the serial live group
+    cmds:
+      - task: infra-check
+      # One process: every live test shares the serial `live` group anyway, and only
+      # without xdist workers does a setup-time outage end the session with status 3.
+      - "CY_TASK_VERIFICATION=1 {{.RUN}} {{.UV}} pytest tests/integration -m 'not ddp_gpu and not severstal_gpu' -n 0"
+
+  _clean-tip:
+    internal: true
+    cmds:
+      - |
+        test -z "$(git status --porcelain --untracked-files=all)" || {
+          echo 'Acceptance requires a clean committed tip.' >&2
+          git status --short --untracked-files=all >&2
+          exit 1
+        }
+
+  acceptance:
+    desc: Clean-tip checks, property exploration, unit suite with coverage, then the live part
+    cmds:
+      - task: _clean-tip
+      - task: check
+      - task: properties
+      - "mkdir -p {{.ROOT_DIR | shellQuote}}/.tmp/coverage"
+      # Coverage and its floor apply to the unit suite only; the live part is not measured.
+      - "{{.RUN}} {{.UV}} pytest --cov --ignore=tests/integration -n {{.TEST_WORKERS}} --dist loadgroup"
+      - |
+        bash -eu -o pipefail -c '
+          base=$(git merge-base master HEAD)
+          changed=$(git diff --name-only "$base"..HEAD)
+          if [ -z "$changed" ]; then
+            echo "NOTICE: no commits since master; running the live part." >&2
+          else
+            docs_only=1
+            while IFS= read -r path; do
+              case "$path" in
+                *.md|docs/*|specs/*) ;;
+                *) docs_only=0 ;;
+              esac
+            done <<< "$changed"
+            if [ "$docs_only" = 1 ]; then
+              echo "NOTICE: every path changed since master is documentation (*.md, docs/, specs/);" >&2
+              echo "NOTICE: the live part (infra-check, integration) is SKIPPED and not verified." >&2
+              exit 0
+            fi
+          fi
+          "{{.TASK_EXE}}" --exit-code integration
+        '
+      - task: _clean-tip
+  # --- stream A end ---
