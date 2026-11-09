@@ -27,7 +27,7 @@ Use Linux/WSL with working NVML, NCCL, at least two whole physical GPUs, support
 pidfd/subreaper supervision and Git. The test environment isolation hides
 `~/clearml.conf`; the suite takes its ClearML endpoint and credentials from the lifecycle
 stand environment of the session's tagged run, never from the user's SDK configuration.
-No manual run preparation is needed: after validating its options, the suite claims the
+The CY suite needs no manual run preparation: after validating its options, it claims the
 session run tag itself through the `stand_project` fixture, which joins the `live_run`
 session fixture of the
 [integration-test skill](../.agents/skills/running-integration-tests/SKILL.md). The
@@ -45,10 +45,13 @@ the production queue's selector semantics. MIG selections are unsupported.
 
 Run the direct physical tests from the CY checkout. Pass a space-free project name:
 release acceptance splits `CY_DDP_ARGS` into separate options. The suite publishes
-under `<run tag> clearml-yolo-ddp`:
+under `<run tag> clearml-yolo-ddp`. `CY_TASK_VERIFICATION=1` and `-n 0` match release
+acceptance: an unavailable stand ends the session with exit 3 (deferred) instead of
+skipping the tests:
 
 ```bash
-uv run --frozen --no-sync pytest tests/integration -m ddp_gpu \
+CY_TASK_VERIFICATION=1 uv run --frozen --no-sync pytest tests/integration -m ddp_gpu \
+  -p no:randomly -n 0 \
   --run-ddp-gpu \
   --ddp-devices=0,1 \
   --ddp-clearml-project=clearml-yolo-ddp \
@@ -57,13 +60,17 @@ uv run --frozen --no-sync pytest tests/integration -m ddp_gpu \
 ```
 
 Run the complete comparison and queue-failure matrix from the sibling cy-queue
-checkout, using the same prepared environment:
+checkout, using the same prepared environment. That repository's harness does not
+claim a run tag itself: prepare the run from the CY checkout with the lifecycle `up`
+and export its stand environment (`eval "$(L env)"`, as in the integration-test skill),
+then pass a project name that starts with the recorded run tag so exact-tag cleanup
+reaches it, and run the lifecycle `stop` afterwards:
 
 ```bash
 uv run --frozen --no-sync --project ../clearml-yolo pytest -m ddp_gpu \
   --run-ddp-gpu \
   --ddp-devices=0,1 \
-  --ddp-clearml-project=clearml-yolo-ddp \
+  --ddp-clearml-project="$(cat ../clearml-yolo/tests/integration/.run-tag) clearml-yolo-ddp" \
   --ddp-artifacts=.tmp/ddp-results \
   -ra -vv
 ```
@@ -73,7 +80,10 @@ The harness retains its host coordination root and overrides only scenario-owned
 durable metadata. Installing CY alone provides the direct cases without queue imports.
 
 Missing opt-in, required options, devices, capabilities, credentials or services
-fail an explicitly selected test; they never become a skip or successful result.
+fail an explicitly selected test; they never become a successful result. A ClearML stand
+that is unavailable when the CY suite claims its run tag is deferred verification: with
+`CY_TASK_VERIFICATION=1` the session ends with exit 3, and without it the stand tests
+are skipped with an UNAVAILABLE message, which is not acceptance.
 A missing artifacts option retains selection-failure evidence in
 `.tmp/ddp-results`. Each scenario otherwise creates a unique directory beneath the
 requested artifacts directory before parsing selection or running preflight.

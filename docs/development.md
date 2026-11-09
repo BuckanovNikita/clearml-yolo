@@ -65,7 +65,7 @@ Task freshness, timestamps and interrupted runs never establish completion. The
 
 | Stage | Runs | Live |
 | --- | --- | --- |
-| `local-deps` | Build the [local wheelhouse](#external-dependencies) and write `uv.toml` | no |
+| `local-deps` | Build the [local wheelhouse](#external-dependencies) and create `uv.toml` when absent | no |
 | `fix` | Safe Ruff fixes and `ruff format`; never stages files | no |
 | `check` | Lock freshness (`uv lock --check`), Ruff check and format check, import-linter, mypy, Vulture, deptry | no |
 | `test` | Affected unit tests (testmon), excluding `tests/integration` | no |
