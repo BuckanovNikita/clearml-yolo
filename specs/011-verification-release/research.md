@@ -126,3 +126,22 @@ Source of truth for adapted files: `/mnt/wsl/data/nkt/cveta2` at `0fa3310`.
   acceptance paths run. `acceptance` skips its live part when every path changed since
   `master` is documentation (`*.md`, `docs/`, `specs/`), and reports that it did so.
 - `ruff format --check .` reports 558 files already formatted: T003 is a no-op.
+
+## R15. Local external packages without pyproject overrides (user direction 2026-11-09; supersedes R13)
+- **Problem**: committed `[tool.uv.sources]` path entries break git-link installs (uv lowers
+  them to `git+…#subdirectory=external/…`, absent in the repository; reproduced with uv
+  0.11.32). End users cannot reach GitHub, so pinned git sources are not an option.
+  `uv.toml` rejects `sources` and ignores `override-dependencies` for project locking.
+- **Decision**: the committed project declares only version requirements and no sources.
+  A gitignored repository-root `uv.toml` sets `find-links = ["external/wheelhouse"]`; a task
+  builds source distributions of the approved `external/digital-metrics` and
+  `external/report-generator` checkouts into that ignored directory. The committed lock records
+  them as `source = { registry = "external/wheelhouse" }`. End users installing from a git link
+  ignore this lock and resolve both packages from their own index.
+- **Consequences**: no uncommitted `pyproject.toml` edits, so the staging guard needs no
+  exemption, Task uses `--locked`, `uv lock --check` runs directly and semantic-release can use
+  `uv lock --upgrade-package clearml-yolo`. External packages are no longer editable, which the
+  digital-metrics pin rule already requires. Each worktree needs `external/` and `uv.toml`
+  (documented setup). Changing the locked source of both packages is the user's explicit intent.
+- **Verified**: scratch project with `find-links` in an uncommitted `uv.toml` locks offline from
+  an sdist wheelhouse, records a relative registry path, and `uv lock --check` passes.

@@ -34,3 +34,8 @@ build/
 # Local editable dependency copies
 /external/digital-metrics/
 /external/report-generator/
+
+# Local package configuration (find-links to external/wheelhouse) and agent worktrees
+/uv.toml
+/external
+/.claude/worktrees/
