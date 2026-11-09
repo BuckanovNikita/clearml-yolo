@@ -1,20 +1,34 @@
 # CHANGELOG
 
 
-## Unreleased
+## v0.47.0 (2026-11-09)
 
 ### Bug Fixes
 
+- **hooks**: Dispatch pytest once per selected change
+  ([`f55b927`](https://github.com/BuckanovNikita/clearml-yolo/commit/f55b92798e144edde6d8876fc34824b946412c54))
+
+- **hooks**: Verify interpreter selection changes
+  ([`fae45b7`](https://github.com/BuckanovNikita/clearml-yolo/commit/fae45b71c495246a681ffd134f71dbeb0d6abe15))
+
 - **skills**: Restore archived release-030 evidence bytes
-  ([`b642871`](https://github.com/BuckanovNikita/clearml-yolo/commit/b64287178bef0b246d1d6cbd82db3ef55d1a2740))
+  ([`3be0e9c`](https://github.com/BuckanovNikita/clearml-yolo/commit/3be0e9cce42224fce7c874469cf633ee15edf38f))
+
+### Build System
+
+- **deps**: Require report-generator 0.2.0
+  ([`7a93bfc`](https://github.com/BuckanovNikita/clearml-yolo/commit/7a93bfc6e2de8bc6f4716937630710c511e5ff78))
 
 ### Chores
 
 - Drop release fixtures and the portable skill stage
-  ([`e215f18`](https://github.com/BuckanovNikita/clearml-yolo/commit/e215f1875d257763a0436b962ecaa2adbd24ca20))
+  ([`8256676`](https://github.com/BuckanovNikita/clearml-yolo/commit/825667696d7b66b544c4a1bfc064d0fea43b1051))
 
 - Remove documentation-specific tests and checks
-  ([`19ff1b7`](https://github.com/BuckanovNikita/clearml-yolo/commit/19ff1b78084fa4d963e01757b1f5ecd0bacd5319))
+  ([`ddb069a`](https://github.com/BuckanovNikita/clearml-yolo/commit/ddb069a312587ee2a353275cdd5f8e34b44b1ff6))
+
+- **hooks**: Scope checks and make releases explicit
+  ([`de75c71`](https://github.com/BuckanovNikita/clearml-yolo/commit/de75c711aca8f0e41e5fbb489d726a34b600a5b4))
 
 - **tooling**: Consolidate agent and verification policies
   ([`3014e7f`](https://github.com/BuckanovNikita/clearml-yolo/commit/3014e7fa217de1af66c46d75f1b01fb8e96bb898))
@@ -27,19 +41,37 @@
 ### Documentation
 
 - Clarify domain boundaries and preserve specification meaning
-  ([`ca8d887`](https://github.com/BuckanovNikita/clearml-yolo/commit/ca8d887f4eee833b97db1e86eecf5e1d011708aa))
+  ([`433a0fe`](https://github.com/BuckanovNikita/clearml-yolo/commit/433a0fe1088ca76a180cb2eb7d3d5e87dc37d599))
+
+- Clarify import contract verification scope
+  ([`b761d67`](https://github.com/BuckanovNikita/clearml-yolo/commit/b761d671586abf2f5ac6c41f7e5bd42a7d021e46))
 
 - Consolidate specifications into functional descriptions
-  ([`54a6827`](https://github.com/BuckanovNikita/clearml-yolo/commit/54a682729428b4402983aa2ddd3e0295db6caab1))
+  ([`cf1175d`](https://github.com/BuckanovNikita/clearml-yolo/commit/cf1175de9db42bd896e89fadc9350ae543d8df06))
 
 - Define self-contained functional behavior
-  ([`a019f19`](https://github.com/BuckanovNikita/clearml-yolo/commit/a019f1917c1a8b50ed8c630f913a7270006fb78a))
+  ([`d7a44c2`](https://github.com/BuckanovNikita/clearml-yolo/commit/d7a44c21dd381daf1fe30413a36294808dc6c5fe))
+
+- Fix dangling references after spec reset
+  ([`74d1037`](https://github.com/BuckanovNikita/clearml-yolo/commit/74d10370027c07da494089fdaa473ce8ed9f0c3c))
+
+- Reconcile contracts after branch consolidation
+  ([`ad7b273`](https://github.com/BuckanovNikita/clearml-yolo/commit/ad7b273535eafc59c56ce64f6b9d09a51274eb5c))
+
+- Regenerate customization tutorial HTML
+  ([`44e24f2`](https://github.com/BuckanovNikita/clearml-yolo/commit/44e24f2933f490ba26e351ba58c908f75fd3b5fb))
+
+- Remove withdrawn cy-docs status entry
+  ([`008ef4d`](https://github.com/BuckanovNikita/clearml-yolo/commit/008ef4d1d817c0f03f4d9c09c72efcb8416aec6a))
 
 - Replace progress records with fresh product specifications
-  ([`b25fae9`](https://github.com/BuckanovNikita/clearml-yolo/commit/b25fae94b649c12c8bbddc811662ead6d0a1b218))
+  ([`2938d06`](https://github.com/BuckanovNikita/clearml-yolo/commit/2938d0666d70d0cbdc4d240f26e950cb0b9abda2))
 
 - Restore missing specification guarantees
-  ([`099a088`](https://github.com/BuckanovNikita/clearml-yolo/commit/099a088bbe8b2b7008ba69978ffbbad13fb0bdea))
+  ([`7fc8929`](https://github.com/BuckanovNikita/clearml-yolo/commit/7fc8929e9fef994f1d64fa6fd9ffb6987cc14128))
+
+- Restore retained release fixture reference
+  ([`d104532`](https://github.com/BuckanovNikita/clearml-yolo/commit/d1045322567be82bdc89003030f9d14de22f038e))
 
 - **bugs**: Record the CY 0.46.2 release and paired queue check
   ([`f547e11`](https://github.com/BuckanovNikita/clearml-yolo/commit/f547e114549d97e5cad07de4ec23405be5b6d4dc))
@@ -52,6 +84,39 @@
 
 - **skills**: Move ClearML environment guidance into the project
   ([`1abc844`](https://github.com/BuckanovNikita/clearml-yolo/commit/1abc844fde541c74288b983e6c757be9d1e15586))
+
+- **spec**: Record identity footer verification ledger
+  ([`99d5c3c`](https://github.com/BuckanovNikita/clearml-yolo/commit/99d5c3c6938afdb1d15c180b49eaa7f9ea06b6b6))
+
+- **spec**: Specify identity footer for Excel reports
+  ([`f746094`](https://github.com/BuckanovNikita/clearml-yolo/commit/f746094e77abf9edc6c0a115f709c5bd702f1190))
+
+### Features
+
+- Remove cy-docs local documentation feature
+  ([`9bdaa0a`](https://github.com/BuckanovNikita/clearml-yolo/commit/9bdaa0a2f09c8272080f1992e1f42049b9304ba0))
+
+- **reporting**: Move workbook identity to a linked footer
+  ([`2e3e55a`](https://github.com/BuckanovNikita/clearml-yolo/commit/2e3e55a5bf2110e0fc8ce7904efedaa2bc993ff7))
+
+### Refactoring
+
+- Consolidate equivalent import contracts
+  ([`daba5ff`](https://github.com/BuckanovNikita/clearml-yolo/commit/daba5ff642814e0a5f77f34d5c7cf09525a6a7f4))
+
+### Testing
+
+- Remove development tooling self-tests
+  ([`57a1d1d`](https://github.com/BuckanovNikita/clearml-yolo/commit/57a1d1d0bad0cb871f5a740bd84852708186e75c))
+
+- Remove development tooling self-tests
+  ([`2f8a12f`](https://github.com/BuckanovNikita/clearml-yolo/commit/2f8a12f9bc39c6e2b65cacc4c23c85ebd3977817))
+
+- Remove import-linter contract tests
+  ([`d680192`](https://github.com/BuckanovNikita/clearml-yolo/commit/d680192b82546cdfb59f9111bd912a318537751f))
+
+- Retain contracts for actual dynamic product imports
+  ([`28e3ecd`](https://github.com/BuckanovNikita/clearml-yolo/commit/28e3ecdbaaa5ae41717aee66006eed89c1f1d539))
 
 
 ## v0.46.2 (2026-11-07)
