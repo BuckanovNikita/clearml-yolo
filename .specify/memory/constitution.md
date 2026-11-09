@@ -127,14 +127,12 @@ Every change MUST be verified against its affected behavior using documented rep
 and current check configuration. Documentation checks MUST be limited to native Spec Kit or OpenSpec checks.
 
 Code changes MUST run the relevant verification stages defined in
-[Taskfile.yml](../../Taskfile.yml) through `uv run --frozen --no-sync task --exit-code <stage>`;
-development verification (`verify`) covers lock freshness, Ruff, import contracts, mypy,
-Vulture, deptry and affected tests. Verification MUST broaden when impact crosses
-boundaries, up to change acceptance and, before delivery, release acceptance. Commit work
-MUST satisfy the applicable checks in [.pre-commit-config.yaml](../../.pre-commit-config.yaml);
-hooks MUST NOT be bypassed to hide failures. `uv run --frozen --no-sync prek run --all-files`
-is the repository's full hook check and runs `verify`. Deferred verification MUST block
-acceptance, integration and release; user-waived checks MUST be reported as waived.
+[Taskfile.yml](../../Taskfile.yml) through `uv run --frozen --no-sync task --exit-code <stage>`,
+as described in the [development procedures](../../docs/development.md#verification).
+Verification MUST broaden when impact crosses boundaries. Commit work MUST satisfy the
+applicable checks in [.pre-commit-config.yaml](../../.pre-commit-config.yaml); hooks MUST NOT
+be bypassed to hide failures. `uv run --frozen --no-sync prek run --all-files` is the
+repository's full hook check and runs `verify`.
 
 Tests MUST assert observable behavior and contracts. They MUST use isolated temporary paths,
 controlled clocks or identities, and explicit external-dependency substitutes where needed
@@ -149,7 +147,7 @@ Work needing real pipeline evidence MUST follow the `running-end-to-end-tests` s
 agent-run contract in [AGENTS.md](../../AGENTS.md).
 
 Completion reports MUST identify checks actually performed, failures, and limitations.
-Skipped or unavailable checks MUST NOT be reported as passing.
+Skipped, unavailable (deferred) or waived checks MUST NOT be reported as passing.
 
 ### V. Clear Communication and Safe Collaboration
 
@@ -220,8 +218,8 @@ import historical predictions or silently recalibrate on test data.
 
 Amendment 9.0.2 (2026-11-09) clarifies Principle IV for feature 011: verification
 commands are Task stages, the full hook check runs `verify`, and deferred and waived
-outcomes are named. The required gates, hook discipline and evidence rules are unchanged
-in substance; this is a PATCH wording clarification with no migration beyond using the
+checks are named among those never reported as passing. Required gates, hook discipline
+and evidence rules are unchanged in substance; this is a PATCH wording clarification with no migration beyond using the
 documented stage invocations.
 
 Amendment 9.0.0 (2026-10-15) reconciles Principles II–III and operational constraints

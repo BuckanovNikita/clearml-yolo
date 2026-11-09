@@ -8,10 +8,10 @@ description: Runs and triages clearml-yolo's changed-function mutation report (s
 `scripts/mutation.py` maps changed lines to the top-level functions and methods they
 touch, exports the index into a fresh temporary workspace with `git checkout-index`, and
 runs mutmut there on those functions only. The child environment drops `CLEARML_*`,
-`INFRA_*`, `CY_RUN_*` and `GIT_*` variables, so no mutant reaches a live service or this
-repository. Default budget: 8 changed functions and 120 s of mutmut; mutants left
-unjudged count as "not run" and mutants no unit test reaches as "not reached by tests",
-never as survivors. Read the script's docstring for the mechanics.
+`INFRA_*`, `CY_RUN_*` and `GIT_*` variables, so mutants inherit neither stand credentials
+nor this repository's version-control state. Default budget: 8 changed functions and
+120 s of mutmut; mutants left unjudged count as "not run" and mutants no unit test
+reaches as "not reached by tests", never as survivors. Read the script's docstring for the mechanics.
 
 ```bash
 uv run --frozen --no-sync task --exit-code mutation                          # staged vs HEAD
