@@ -147,6 +147,17 @@ def test_temporary_outages_are_unavailable(stand: FakeStand, key: str, answer: d
         ("curl", {"code": 60}),
         ("curl", {"out": "404"}),
         ("kubectl", {"code": 1, "err": "x509: certificate signed by unknown authority"}),
+        (
+            "kubectl",
+            {
+                "code": 1,
+                "err": "Unable to connect to the server: getting credentials: exec: executable kubelogin not found",
+            },
+        ),
+        (
+            "kubectl",
+            {"code": 1, "err": "Unable to connect to the server: x509: certificate signed by unknown authority"},
+        ),
         ("clearml-env", {"code": 1, "err": "secret not found"}),
         ("clearml-env", {"out": "export CLEARML_API_HOST=https://api.clearml.example\n"}),
         ("clearml-whoami", {"code": 1, "err": "HTTP 401 Unauthorized"}),
@@ -222,6 +233,21 @@ def test_exported_tag_does_not_bypass_another_active_run(
     assert stand.tag_file.read_text(encoding="utf-8") == f"{active}\n"
     calls = stand.calls()
     assert not any("newtag" in call or "cleanup" in call for call in calls)
+
+
+@pytest.mark.parametrize("content", [b"not a tag!\n", b"", b"\xff\xfe\n"])
+def test_corrupt_tag_file_with_an_exported_tag_is_refused(
+    stand: FakeStand, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], content: bytes
+) -> None:
+    stand.tag_file.write_bytes(content)
+    monkeypatch.setenv("INFRA_RUN_TAG", TAG)
+    assert stand.main("up") == lifecycle.EXIT_ERROR
+    err = capsys.readouterr().err
+    assert str(stand.tag_file) in err
+    assert "remove it" in err
+    assert "INFRA_RUN_TAG=?" not in err
+    assert stand.tag_file.read_bytes() == content
+    assert not any("newtag" in call or "cleanup" in call for call in stand.calls())
 
 
 def test_env_prefers_the_exported_tag_over_the_tag_file(

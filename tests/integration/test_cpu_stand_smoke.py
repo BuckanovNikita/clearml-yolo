@@ -116,12 +116,18 @@ def _run(arguments: list[str], cwd: Path, environment: dict[str, str], log: Path
         pytest.fail(f"{Path(arguments[0]).name} exited {completed.returncode}; log {log}:\n{tail}", pytrace=False)
 
 
-def test_cpu_pipeline_publishes_a_completed_tagged_task(live_run: lifecycle.Run, tmp_path: Path) -> None:
+def test_cpu_pipeline_publishes_a_completed_tagged_task(
+    live_run: lifecycle.Run, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from clearml import Task
 
     project = lifecycle.tagged_project_name(live_run.tag)
     tags = f"clearml.tags=[{live_run.tag}]"
-    environment = dict(os.environ)
+    # The run's stand variables are applied explicitly, for the children and for the
+    # in-process ClearML query below, rather than assumed from an earlier export.
+    for key, value in live_run.exported.items():
+        monkeypatch.setenv(key, value)
+    environment = {**os.environ, **live_run.exported}
     # The invocation workspace owns the dataset, ground truth and run directory.
     environment["CY_HOME"] = str(tmp_path)
     data = _write_dataset(tmp_path / "dataset")

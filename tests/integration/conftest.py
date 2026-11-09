@@ -2,10 +2,10 @@
 
 ``tests/conftest.py`` marks every test under ``tests/integration`` ``integration`` and puts it
 in the ``live`` xdist group, so one worker runs them serially. Tests that use the ClearML stand
-request the session fixture ``live_run``; it is not autouse, so the GPU and FiftyOne suites
-in this directory reach it only through ``stand_project``. ``live_run`` performs the bounded preflight, claims
-one run tag through ``lifecycle.py`` before the first stand test, and after the last one removes
-exactly that tag's objects, failing the session when cleanup is incomplete.
+request the session fixture ``live_run``; it is not autouse: the FiftyOne suites never touch the
+stand; the GPU suites reach it only through ``stand_project``. ``live_run`` performs the bounded
+preflight, claims one run tag through ``lifecycle.py`` before the first stand test, and after
+the last one removes exactly that tag's objects, failing the session when cleanup is incomplete.
 
 The module is imported as ``integration.lifecycle``: ``tests`` is a mypy and pytest import
 root, and one module identity keeps its exception classes shared with the unit tests.
