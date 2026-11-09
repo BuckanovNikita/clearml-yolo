@@ -166,3 +166,98 @@ tasks:
         '
       - task: _clean-tip
   # --- stream A end ---
+  # --- stream B begin ---
+  release-commit-check:
+    desc: Release exception checks; runs only inside the semantic-release build_command
+    cmds:
+      - |
+        bash -eu -c '
+          if ! git diff --quiet --ignore-submodules=none; then
+            echo "Release check requires no unstaged tracked changes." >&2
+            exit 1
+          fi
+          if IFS= read -r -d "" path < <(git ls-files --others --exclude-standard -z); then
+            echo "Release check requires no untracked files: $path" >&2
+            exit 1
+          fi
+          while IFS= read -r -d "" path; do
+            case "$path" in
+              pyproject.toml|uv.lock|CHANGELOG.md) ;;
+              *) echo "Outside release exception: $path" >&2; exit 1 ;;
+            esac
+          done < <(git diff --cached --name-only -z)
+        '
+      - "{{.RUN}} {{.UV}} python scripts/release_lock_guard.py"
+      - task: _lock
+      - task: _ruff
+      - "{{.RUN}} {{.UV}} deptry ."
+
+  paired-check:
+    desc: Paired CY and cy-queue release check (CY_QUEUE_DIR, default ../cy-queue)
+    dir: '{{.ROOT_DIR}}'
+    cmds:
+      - |
+        set -eu
+        export UV_PROJECT_ENVIRONMENT={{.ROOT_DIR | shellQuote}}/.venv
+        root={{.ROOT_DIR | shellQuote}}
+        queue="${CY_QUEUE_DIR:-$root/../cy-queue}"
+        if [ ! -f "$queue/pyproject.toml" ]; then
+          echo "paired-check: no cy-queue checkout at $queue; set CY_QUEUE_DIR." >&2
+          exit 1
+        fi
+        queue="$(cd "$queue" && pwd -P)"
+        python="$UV_PROJECT_ENVIRONMENT/bin/python"
+        uv pip install --python "$python" -e "$root" -e "$queue"
+        uv pip check --python "$python"
+        for project in "$root" "$queue"; do
+          "$python" - "$project" <<'PY'
+        import importlib.metadata
+        import sys
+        import tomllib
+        from pathlib import Path
+
+        project = tomllib.loads((Path(sys.argv[1]) / "pyproject.toml").read_text())["project"]
+        installed = importlib.metadata.version(project["name"])
+        if installed != project["version"]:
+            sys.exit(f"paired-check: {project['name']} source {project['version']} != installed {installed}")
+        PY
+        done
+        (cd "$queue" && uv run --frozen --no-sync --project "$root" pytest -q)
+        (cd "$queue" && uv run --frozen --no-sync --project "$root" cy-queue --help >/dev/null)
+        for project in "$root" "$queue"; do
+          "$python" - "$project" "$(git -C "$project" rev-parse HEAD)" <<'PY'
+        import sys
+        import tomllib
+        from pathlib import Path
+
+        project = tomllib.loads((Path(sys.argv[1]) / "pyproject.toml").read_text())["project"]
+        print(f"paired-check: {project['name']} {project['version']} {sys.argv[2]} {sys.argv[1]}")
+        PY
+        done
+
+  release-acceptance:
+    desc: Release acceptance (acceptance, GPU-marked tests, FiftyOne, paired-check)
+    # The real-run gate of the running-end-to-end-tests skill remains a separate step.
+    cmds:
+      - |
+        if [ -z "${CY_DDP_ARGS:-}" ] || [ -z "${CY_SEVERSTAL_ARGS:-}" ]; then
+          echo "release-acceptance: GPU checks are not configured; set CY_DDP_ARGS and CY_SEVERSTAL_ARGS to their pytest options (--run-ddp-gpu ..., --run-severstal-gpu ...)." >&2
+          exit 1
+        fi
+      - task: acceptance
+      - "{{.RUN}} {{.UV}} pytest tests/integration -m 'ddp_gpu or severstal_gpu' -p no:randomly -n 0 $CY_DDP_ARGS $CY_SEVERSTAL_ARGS"
+      - |
+        set -eu
+        database="${FIFTYONE_DATABASE_DIR:-}"
+        owned=""
+        if [ -z "$database" ]; then
+          mkdir -p {{.ROOT_DIR | shellQuote}}/.tmp
+          database="$(mktemp -d {{.ROOT_DIR | shellQuote}}/.tmp/fiftyone-db.XXXXXX)"
+          owned="$database"
+        fi
+        status=0
+        CY_TEST_FIFTYONE=1 FIFTYONE_DATABASE_DIR="$database" {{.RUN}} {{.UV}} pytest tests/integration/fiftyone -p no:randomly -n 0 || status=$?
+        if [ -n "$owned" ]; then rm -rf "$owned"; fi
+        exit "$status"
+      - task: paired-check
+  # --- stream B end ---

@@ -1,9 +1,10 @@
-# Relevant staged paths select checks; full acceptance runs after the final commit.
-# Whole-project checks select deleted paths; pytest consumes filenames only to choose its mode.
+# Task owns every verification command; prek only selects stages. Install the
+# worktree-aware dispatchers with scripts/install-hooks.sh. Cheap hygiene hooks run
+# before the serial Task development verification.
 minimum_prek_version: "0.5.10"
-default_install_hook_types: [pre-commit]
+default_install_hook_types: [pre-commit, commit-msg]
 default_stages: [pre-commit]
-fail_fast: false
+fail_fast: true
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -29,62 +30,50 @@ repos:
         include_deleted: true
         pass_filenames: false
 
-      - id: ruff
-        name: Ruff (changed Python files)
-        entry: uv run --frozen --no-sync ruff check --force-exclude
+      - id: verify
+        name: Task development verification
+        entry: uv run --frozen --no-sync task --exit-code verify
         language: system
-        types_or: [python, pyi]
-        exclude: '^(external|outputs|runs|multirun|build|dist|mutants|\.agents|\.claude)/'
-        pass_filenames: true
-        require_serial: true
-
-      - id: ruff-config
-        name: Ruff (configuration changes)
-        entry: uv run --frozen --no-sync ruff check .
-        language: system
-        files: '(?:^(pyproject\.toml|ruff\.toml|\.ruff\.toml|uv\.lock|\.pre-commit-config\.yaml)$)|^\.python-version$'
-        include_deleted: true
         pass_filenames: false
+        always_run: true
         require_serial: true
 
-      - id: mypy
-        name: mypy (strict)
-        entry: uv run --frozen --no-sync mypy .
+      - id: integration-tests
+        name: Task live integration
+        entry: uv run --frozen --no-sync task --exit-code integration
         language: system
-        files: '(?:(^.*\.pyi?$|^(pyproject\.toml|mypy\.ini|\.mypy\.ini|uv\.lock|\.pre-commit-config\.yaml)$))|^\.python-version$'
-        exclude: '^(external|outputs|runs|multirun|build|dist|mutants|\.agents|\.claude)/'
-        include_deleted: true
         pass_filenames: false
-        require_serial: true
+        always_run: true
+        stages: [manual]
 
-      - id: vulture
-        name: Vulture
-        entry: uv run --frozen --no-sync vulture
+      - id: acceptance-tests
+        name: Task clean-tip acceptance
+        entry: uv run --frozen --no-sync task --exit-code acceptance
         language: system
-        files: '(?:^((src|tests|scripts)/.*\.py$|pyproject\.toml$|uv\.lock$|\.pre-commit-config\.yaml$))|^\.python-version$'
-        include_deleted: true
         pass_filenames: false
-        require_serial: true
+        always_run: true
+        stages: [manual]
 
-      - id: import-linter
-        name: Import contracts
-        entry: uv run --frozen --no-sync lint-imports
+      - id: property-exploration
+        name: Task property exploration
+        entry: uv run --frozen --no-sync task --exit-code properties
         language: system
-        files: '(?:^(src/.*\.py$|pyproject\.toml$|uv\.lock$|\.importlinter$|\.pre-commit-config\.yaml$))|^\.python-version$'
-        include_deleted: true
         pass_filenames: false
-        require_serial: true
+        always_run: true
+        stages: [manual]
 
-      - id: pytest
-        name: Pytest (affected Python or full changed-input suite)
-        entry: >-
-          bash -c 'for file do
-          case "$file" in *.py) test -e "$file" && continue;; esac;
-          exec env -u PYTEST_ADDOPTS uv run --frozen --no-sync pytest --testmon-noselect -q;
-          done;
-          exec env -u PYTEST_ADDOPTS uv run --frozen --no-sync pytest --testmon -q' --
+      - id: mutmut
+        name: Task changed-function mutation (advisory)
+        entry: uv run --frozen --no-sync task --exit-code mutation
         language: system
-        files: '(?:^((src|tests|scripts)/|pytest\.ini$|setup\.cfg$|tox\.ini$|pyproject\.toml$|uv\.lock$|\.?ruff\.toml$|\.importlinter$|\.pre-commit-config\.yaml$))|^\.python-version$'
-        include_deleted: true
-        pass_filenames: true
-        require_serial: true
+        pass_filenames: false
+        always_run: true
+        stages: [manual]
+        verbose: true
+
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.5.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args: [build, chore, ci, docs, feat, fix, perf, refactor, style, test]
