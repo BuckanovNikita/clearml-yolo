@@ -207,6 +207,23 @@ allow_zero_version = true
 major_on_zero = false
 commit_message = "chore(release): {version}"
 no_git_verify = false
+# semantic-release runs the build command with a restricted environment; forward the
+# explicit release-check selector so the required check cannot silently disappear.
+build_command_env = ["CY_RELEASE_CHECK"]
+# A release builds no artifact. The command keeps uv.lock's root version equal to the
+# rewritten project.version and stages it into the release commit. It never runs
+# `uv lock`: the committed project cannot resolve without the uncommitted
+# [tool.uv.sources] override for external/ (scripts/lock_check.py), so
+# scripts/release_version.py patches only that one version token.
+build_command = """
+set -e
+uv run --frozen --no-sync python scripts/release_version.py
+git add uv.lock
+if [ "${CY_RELEASE_CHECK:-}" = 1 ]; then
+    git add pyproject.toml CHANGELOG.md
+    uv run --frozen --no-sync task --exit-code release-commit-check
+fi
+"""
 
 [tool.semantic_release.branches.master]
 match = "^master$"
