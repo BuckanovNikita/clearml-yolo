@@ -200,26 +200,31 @@ def _selects_integration(config: pytest.Config) -> bool:
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     """Keep ordinary pytest offline, while an explicit live or GPU selection runs.
 
-    Live tests run only when the invocation names ``tests/integration`` (or a path inside
-    it) or selects the ``integration`` marker; a plain ``pytest`` never contacts the stand.
-    An explicit GPU selection without its opt-in fails in the option fixtures below.
+    A GPU suite runs when its opt-in flag, its marker expression or its file is named; an
+    explicit GPU selection without the opt-in fails in the option fixtures below. Other live
+    tests run only when the invocation names ``tests/integration`` (or a path inside it) or
+    selects the ``integration`` marker, so a plain ``pytest`` never contacts the stand.
     """
-    if not _selects_integration(config):
-        removed = [item for item in items if item.get_closest_marker("integration") is not None]
-        items[:] = [item for item in items if item.get_closest_marker("integration") is None]
-        if removed:
-            config.hook.pytest_deselected(items=removed)
-    for marker, flag, filename in (
-        ("ddp_gpu", "--run-ddp-gpu", "test_native_ddp_gpu.py"),
-        ("severstal_gpu", "--run-severstal-gpu", "test_severstal_gpu.py"),
-    ):
-        explicit_file = any(filename in value for value in config.args)
-        if config.getoption(flag) or marker in config.option.markexpr or explicit_file:
-            continue
-        removed = [item for item in items if item.get_closest_marker(marker) is not None]
-        items[:] = [item for item in items if item.get_closest_marker(marker) is None]
-        if removed:
-            config.hook.pytest_deselected(items=removed)
+    selected_gpu = {
+        marker
+        for marker, flag, filename in (
+            ("ddp_gpu", "--run-ddp-gpu", "test_native_ddp_gpu.py"),
+            ("severstal_gpu", "--run-severstal-gpu", "test_severstal_gpu.py"),
+        )
+        if config.getoption(flag) or marker in config.option.markexpr or any(filename in value for value in config.args)
+    }
+    live = _selects_integration(config)
+
+    def keep(item: pytest.Item) -> bool:
+        gpu = [marker for marker in ("ddp_gpu", "severstal_gpu") if item.get_closest_marker(marker) is not None]
+        if gpu:
+            return any(marker in selected_gpu for marker in gpu)
+        return live or item.get_closest_marker("integration") is None
+
+    removed = [item for item in items if not keep(item)]
+    if removed:
+        items[:] = [item for item in items if keep(item)]
+        config.hook.pytest_deselected(items=removed)
 
 
 @pytest.fixture

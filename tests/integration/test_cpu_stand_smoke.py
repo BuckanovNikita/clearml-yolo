@@ -152,6 +152,8 @@ def test_cpu_pipeline_publishes_a_completed_tagged_task(live_run: lifecycle.Run,
             "ultralytics.batch=2",
             "ultralytics.workers=0",
             "ultralytics.plots=false",
+            # The packaged default compiles; eager CPU keeps the smoke run short.
+            "ultralytics.compile=false",
             "ultralytics_predict.device=cpu",
             "fiftyone.enabled=false",
             f"run_dir={tmp_path / 'run'}",

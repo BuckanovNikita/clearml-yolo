@@ -119,7 +119,9 @@ tasks:
     desc: Preflight, then the non-GPU live tests (stand smoke and FiftyOne) in the serial live group
     cmds:
       - task: infra-check
-      - "CY_TASK_VERIFICATION=1 {{.RUN}} {{.UV}} pytest tests/integration -m 'not ddp_gpu and not severstal_gpu' -n {{.TEST_WORKERS}} --dist loadgroup"
+      # One process: every live test shares the serial `live` group anyway, and only
+      # without xdist workers does a setup-time outage end the session with status 3.
+      - "CY_TASK_VERIFICATION=1 {{.RUN}} {{.UV}} pytest tests/integration -m 'not ddp_gpu and not severstal_gpu' -n 0"
 
   _clean-tip:
     internal: true

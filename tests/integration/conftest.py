@@ -27,9 +27,9 @@ def live_run() -> Iterator[lifecycle.Run]:
     """Prepare this session's run, export its stand variables, then stop it.
 
     Stand unavailability blocks setup rather than failing a test: under Task verification
-    (``CY_TASK_VERIFICATION=1``) the session exits with status 3 (deferred); an interactive
-    run skips the stand tests. Every other refusal fails setup. The environment is restored
-    when the session ends.
+    (``CY_TASK_VERIFICATION=1``, run without xdist workers by ``task integration``) the session
+    exits with status 3 (deferred); an interactive run skips the stand tests. Every other
+    refusal fails setup. The environment is restored when the session ends.
     """
     saved = dict(os.environ)
     try:
