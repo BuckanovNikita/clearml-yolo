@@ -10,11 +10,15 @@ configuration must not depend on an agent harness or machine.
 Authoritative details and prerequisites: [development procedures](docs/development.md#verification).
 
 ```bash
-uv sync --frozen --dev                                 # after populating external/ (docs/development.md#external-dependencies)
-bash scripts/install-hooks.sh                          # once per worktree: staging guard, verify, commit-msg
-uv run --frozen --no-sync task --exit-code verify      # development verification (also the pre-commit hook)
-uv run --frozen --no-sync task --exit-code acceptance  # change acceptance on a clean committed tip
+uv sync --locked --dev                         # after external/, wheelhouse and uv.toml (docs/development.md#external-dependencies)
+bash scripts/install-hooks.sh                  # once per worktree: staging guard, verify, commit-msg
+uv run --locked task --exit-code verify        # development verification (also the pre-commit hook)
+uv run --locked task --exit-code acceptance    # change acceptance on a clean committed tip
 ```
+
+`scripts/session_status.sh` runs at Claude and Codex session start and reports the
+branch, uncommitted paths, other worktrees, a held release lock and an active run tag;
+treat changes it lists as possibly another session's.
 
 ## Read when relevant
 
@@ -83,7 +87,7 @@ for every task. Read guidance instead of copying shared skills into the reposito
   do not stash, reset or revert unrelated work, or bypass hooks to hide failures.
 - Follow the [commit procedure](docs/development.md#commit-procedure) for coherent split
   commits, targeted intermediate skips and final verification of committed inputs.
-  Preserve local source overrides; validate them only at final acceptance.
+  Never commit `[tool.uv.sources]`; local packages come from the ignored wheelhouse.
 
 ## Documentation
 

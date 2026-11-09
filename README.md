@@ -1021,21 +1021,30 @@ cy-dedup
 
 ## Разработка
 
-Перед установкой скопируйте внешние зависимости в `external/` (см.
+Перед установкой скопируйте утверждённые исходники внешних зависимостей в
+`external/digital-metrics` и `external/report-generator` (см.
 [разработку](docs/development.md#external-dependencies)). Затем один раз в каждом рабочем
-дереве установите окружение и Git-хуки:
+дереве соберите из них локальный wheelhouse, создайте игнорируемый Git файл `uv.toml`,
+установите окружение и Git-хуки:
 
 ```bash
-uv sync --frozen --dev
+uv build --sdist external/digital-metrics -o external/wheelhouse
+uv build --sdist external/report-generator -o external/wheelhouse
+printf 'find-links = ["external/wheelhouse"]\n' > uv.toml
+uv sync --locked --dev
 bash scripts/install-hooks.sh
 ```
+
+`pyproject.toml` не содержит `[tool.uv.sources]`: локальные пути ломают установку по
+git-ссылке, поэтому пакеты берутся из `external/wheelhouse`. Каждому рабочему дереву
+нужны свои `external/` и `uv.toml`.
 
 Все проверки запускаются через Task:
 
 ```bash
-uv run --frozen --no-sync task --exit-code fix         # безопасные исправления Ruff и форматирование
-uv run --frozen --no-sync task --exit-code verify      # статические проверки и затронутые тесты
-uv run --frozen --no-sync task --exit-code acceptance  # приёмка чистого коммита, включая стенд ClearML
+uv run --locked task --exit-code fix         # безопасные исправления Ruff и форматирование
+uv run --locked task --exit-code verify      # статические проверки и затронутые тесты
+uv run --locked task --exit-code acceptance  # приёмка чистого коммита, включая стенд ClearML
 ```
 
 Хук pre-commit отклоняет коммит с неиндексированными изменениями или неотслеживаемыми

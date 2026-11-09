@@ -9,7 +9,7 @@ release evidence within these routes, following the project contracts and develo
 procedures linked from [AGENTS.md](../AGENTS.md). Spec Kit retains its
 stage order, artifacts, execution roles and status ledger. Shared skills do not establish
 a second plan or review process. Inspect current code, configuration, hooks and changes
-before relying on historical task claims; preserve unrelated work and local overrides.
+before relying on historical task claims; preserve unrelated work and ignored local configuration.
 
 ## Spec Kit integration
 

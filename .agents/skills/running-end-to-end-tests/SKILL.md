@@ -44,7 +44,7 @@ user request for those actions.
 ### 1. Default verification (Task stages)
 
 Run the acceptance tier the claim needs through
-`uv run --frozen --no-sync task --exit-code <stage>`, as selected by the
+`uv run --locked task --exit-code <stage>`, as selected by the
 `verification-workflow` skill and defined in
 [acceptance tiers](../../../docs/development.md#acceptance-tiers): `acceptance` for
 change acceptance (checks, properties, the complete unit suite with the coverage floor
@@ -59,10 +59,13 @@ and `severstal_gpu`
 live in `tests/integration` and are opt-in: `ddp_gpu` needs `--run-ddp-gpu` (invocation
 in that procedure) and `severstal_gpu` needs `--run-severstal-gpu` plus the required
 options that `uv run --frozen --no-sync pytest --help` lists under "native Severstal
-acceptance". `release-acceptance` passes these options from `CY_DDP_ARGS` and
-`CY_SEVERSTAL_ARGS`. Multi-GPU DDP on a single-GPU host is waived; a GPU busy with the
-user's workload is deferred. The `running-integration-tests` skill owns run tags and
-exact-tag cleanup for those Task-driven live tests.
+acceptance". `release-acceptance` requires the Severstal options in
+`CY_SEVERSTAL_ARGS` and runs multi-GPU DDP only when `CY_DDP_ARGS` is set, otherwise
+reporting it as waived. Check pcboard `pc_status` before GPU work; a GPU busy with the
+user's workload is deferred. These suites take ClearML credentials from the lifecycle
+stand environment of the tagged run, not from `~/clearml.conf`. The
+`running-integration-tests` skill owns run tags and exact-tag cleanup for those
+Task-driven live tests.
 
 ### 2. Isolated run setup
 

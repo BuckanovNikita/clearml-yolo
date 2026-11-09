@@ -127,11 +127,11 @@ Every change MUST be verified against its affected behavior using documented rep
 and current check configuration. Documentation checks MUST be limited to native Spec Kit or OpenSpec checks.
 
 Code changes MUST run the relevant verification stages defined in
-[Taskfile.yml](../../Taskfile.yml) through `uv run --frozen --no-sync task --exit-code <stage>`,
+[Taskfile.yml](../../Taskfile.yml) through `uv run --locked task --exit-code <stage>`,
 as described in the [development procedures](../../docs/development.md#verification).
 Verification MUST broaden when impact crosses boundaries. Commit work MUST satisfy the
 applicable checks in [.pre-commit-config.yaml](../../.pre-commit-config.yaml); hooks MUST NOT
-be bypassed to hide failures. `uv run --frozen --no-sync prek run --all-files` is the
+be bypassed to hide failures. `uv run --locked prek run --all-files` is the
 repository's full hook check and runs `verify`.
 
 Tests MUST assert observable behavior and contracts. They MUST use isolated temporary paths,

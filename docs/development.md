@@ -51,12 +51,12 @@ checkouts and files remain authoritative. Dependency installation is always exte
 Git hooks and commit-message validation. Invoke every stage as:
 
 ```bash
-uv run --frozen --no-sync task --exit-code <stage>
+uv run --locked task --exit-code <stage>
 ```
 
-`--frozen --no-sync` runs Task in this worktree's prepared environment without
-resolving or syncing, so uncommitted [source overrides](#external-dependencies) and
-additional external runtime packages stay intact. `--exit-code` keeps each child
+`--locked` fails when `uv.lock` no longer matches `pyproject.toml` instead of
+re-resolving it, then runs Task in this worktree's environment; the worktree needs its
+[local external packages](#external-dependencies) prepared. `--exit-code` keeps each child
 command's exit status. Clear an inherited `UV_PROJECT_ENVIRONMENT` before the outer
 `uv run`; Task then pins the environment, testmon history, coverage data and Ruff/mypy
 caches of its child commands to this worktree. Do not share these between worktrees.
@@ -65,8 +65,9 @@ Task freshness, timestamps and interrupted runs never establish completion. The
 
 | Stage | Runs | Live |
 | --- | --- | --- |
+| `local-deps` | Build the [local wheelhouse](#external-dependencies) and write `uv.toml` | no |
 | `fix` | Safe Ruff fixes and `ruff format`; never stages files | no |
-| `check` | Staged lock freshness, Ruff check and format check, import-linter, mypy, Vulture, deptry | no |
+| `check` | Lock freshness (`uv lock --check`), Ruff check and format check, import-linter, mypy, Vulture, deptry | no |
 | `test` | Affected unit tests (testmon), excluding `tests/integration` | no |
 | `test-full` | Every unit test; refreshes testmon history | no |
 | `verify` | `check`, then `test`: development verification | no |
@@ -93,15 +94,13 @@ fresh execution; report the actual selection.
 
 ### Lock freshness
 
-The committed `pyproject.toml` declares `digital-metrics` and `report-generator` by
-version only, while the committed `uv.lock` records them as editable copies under
-`external/`. The committed project alone therefore cannot lock: without the source
-override, uv would look the packages up on the index. [scripts/lock_check.py](../scripts/lock_check.py)
-copies the **staged** `pyproject.toml`, `uv.lock` and `README.md` into a temporary
-directory, appends the canonical [source override](#external-dependencies) when the
-staged project declares no sources, links `external/` and runs `uv lock --check` there.
-An uncommitted override in the working copy therefore never masks lock drift. The
-check needs populated `external/` copies and never resolves into the worktree.
+`check` runs `uv lock --check` directly in the worktree. The committed `pyproject.toml`
+declares `digital-metrics` and `report-generator` by version only and has no
+`[tool.uv.sources]`; the committed `uv.lock` records both as
+`source = { registry = "external/wheelhouse" }`. Locking therefore needs the worktree's
+gitignored `uv.toml` and the source distributions in `external/wheelhouse`
+([setup](#external-dependencies)); without them uv would look the packages up on the
+index. The check never rewrites `uv.lock`.
 
 ### Hooks and staging guard
 
@@ -113,10 +112,9 @@ bash scripts/install-hooks.sh
 
 The pre-commit entry first runs the staging guard, `scripts/git-hook.sh`. It refuses the
 commit when tracked changes are unstaged or nonignored untracked files exist, before prek
-could stash anything; it never stages, stashes or deletes files. Its only exemption is
-the documented local source override: an unstaged `pyproject.toml` whose working copy
-differs from the index solely inside `[tool.uv.sources]`, optionally together with an
-unstaged `uv.lock`. Every other unstaged or untracked input is refused.
+could stash anything; it never stages, stashes or deletes files. It has no exemptions:
+every unstaged tracked change and every nonignored untracked file is refused. The local
+package configuration (`uv.toml`, `external/`) is ignored and never committed.
 
 prek then runs [.pre-commit-config.yaml](../.pre-commit-config.yaml): cheap hygiene hooks
 (large files, merge conflicts, TOML/YAML syntax, end of file, whitespace,
@@ -128,26 +126,42 @@ integration, acceptance, property exploration, mutation) never run on commit.
 Run `fix` explicitly before staging and inspect its changes. Intermediate commits may
 defer development verification with `SKIP=verify`; the final committed content needs
 `verify` with `SKIP` cleared. Reuse a passing commit-hook run while its inputs remain
-unchanged. `uv run --frozen --no-sync prek run --all-files` remains the full hook check;
+unchanged. `uv run --locked prek run --all-files` remains the full hook check;
 it runs the hygiene hooks over all files and `verify`. Rebase, cherry-pick and merge do
 not run pre-commit hooks; verify combined content explicitly.
 
 ### Acceptance tiers
 
-**Change acceptance** (`acceptance`) runs on a clean committed branch tip and refuses
-uncommitted or untracked files before and after running. It runs `check`, `properties`,
-the complete unit suite with coverage held at or above `[tool.coverage.report] fail_under`
-in [pyproject.toml](../pyproject.toml), and the live part: `infra-check` followed by
-`integration`, which includes the CPU smoke run against the shared ClearML stand. When
-every path changed since `master` is Markdown or lies under `docs/` or `specs/`, the live
-part is skipped and the stage says so. Code changes also need a mutation report against
-`master` (`task mutation -- --base master`) and fresh independent review.
+**Change acceptance** (`acceptance`) runs on a clean committed branch tip, in this order:
+
+1. Clean tip: refuse unstaged, staged or untracked files and record `HEAD`.
+2. `check`, then `properties`.
+3. Preflight: `infra-check`. Exit 3 (stand unavailable) is deferred verification and
+   stops acceptance; it blocks integration and release until the check runs.
+4. The complete unit suite with coverage held at or above
+   `[tool.coverage.report] fail_under` in [pyproject.toml](../pyproject.toml).
+5. The live part: `integration`, including the CPU smoke run against the shared ClearML
+   stand. When every path changed since `master` is Markdown or lies under `docs/` or
+   `specs/`, the live part is skipped and the stage says so.
+6. Clean tip again with `HEAD` unchanged.
+
+Code changes also need a mutation report against `master` (`task mutation -- --base
+master`) and fresh independent review.
 
 **Release acceptance** (`release-acceptance`) is required before a version is delivered.
-It runs `acceptance`, then the GPU-marked tests with their `--run-*` options taken from
-`CY_DDP_ARGS` and `CY_SEVERSTAL_ARGS`, the FiftyOne native-database tests in
-`tests/integration/fiftyone` with `CY_TEST_FIFTYONE=1`, and `paired-check`. The real-run
-gate on CPU and a single GPU remains a step of the
+It runs `acceptance`, then:
+
+- The Severstal single-GPU suite, required, with its `--run-severstal-gpu` options taken
+  from `CY_SEVERSTAL_ARGS`.
+- Physical multi-GPU DDP only when `CY_DDP_ARGS` is set (its `--run-ddp-gpu` options);
+  otherwise the stage reports it as waived.
+- The FiftyOne native-database tests in `tests/integration/fiftyone` with
+  `CY_TEST_FIFTYONE=1` and a temporary `FIFTYONE_DATABASE_DIR`, removed afterwards.
+- `paired-check`.
+
+Before any GPU work, agents check the GPU through pcboard `pc_status` where available; a
+GPU busy with the user's workload makes the GPU checks deferred. The real-run gate on CPU
+and a single GPU remains a step of the
 [end-to-end skill](../.agents/skills/running-end-to-end-tests/SKILL.md).
 
 Report each required check as passed, failed, deferred, waived or error:
@@ -156,14 +170,20 @@ Report each required check as passed, failed, deferred, waived or error:
   (unreachable stand, timeout or capacity wait) or a GPU busy with the user's workload.
   Deferred verification blocks acceptance, integration and release; continue independent
   local work and retry at a meaningful milestone.
-- **Waived**: a check the user excused for this environment. Multi-GPU DDP on a
-  single-GPU host is waived by standing decision; it never blocks.
+- **Waived**: a check the user excused for this environment. Multi-GPU DDP is waived
+  by standing decision on this single-GPU host unless `CY_DDP_ARGS` is set; it never
+  blocks.
 - **Error**: `infra-check` exit 1, such as missing credentials, TLS trust or
   configuration. Diagnose it; do not wait or weaken security settings.
 
 `infra-check` is bounded by `CY_INFRA_CHECK_TIMEOUT` (60 seconds by default) and creates
 no run tag or resources. The `running-integration-tests` skill owns the live-run
-lifecycle, run tags and exact-tag cleanup.
+lifecycle, run tags and exact-tag cleanup. Live tests run only when `tests/integration`
+or files in it are named on the pytest command line, or the `integration` marker is
+selected, as the live stages do; a plain `pytest` never contacts the stand. The test environment isolation hides
+`~/clearml.conf`, so every live suite, including the GPU suites, takes its ClearML
+credentials from the lifecycle stand environment of the tagged run, never from the user's
+SDK configuration.
 
 Finish environment provisioning before verification, including native SDK
 optional decoders exercised by the selected tests. The installed Ultralytics image
@@ -242,23 +262,38 @@ prerequisites, deadlines and the evidence archive to return.
 
 ### Mutation report
 
-`task mutation` mutates only the top-level functions and methods changed in the staged
-diff (or against a named base) in a fresh workspace exported from the index, within a
-budget of changed functions and seconds, and reports killed, surviving, unreached and
-unrun mutants. `[tool.mutmut]` in [pyproject.toml](../pyproject.toml) holds the settings;
-generated `mutants/` content is ignored by Git, Ruff and mypy and is outside Vulture's
-maintained paths.
+`task mutation` is the scoped mutation acceptance of a change. It mutates only the
+top-level functions and methods changed in the staged diff (or against a named base) in a
+fresh workspace exported from the index, and reports killed, surviving, not-reached and
+not-run mutants.
+
+- **Test selection per change**: the tests that testmon data records as executing the
+  changed functions; without usable testmon data, the test files that import the changed
+  modules.
+- **Excluded tests**: `tests/integration` and the `ddp_cpu`, `process_capabilities` and
+  `gpu_controls` tests, which need live services, real processes or hardware.
+- **Budget**: 8 changed functions and 300 seconds by default; functions beyond the
+  budget are reported as skipped.
+
+`[tool.mutmut]` in [pyproject.toml](../pyproject.toml) holds the settings; generated
+`mutants/` content is ignored by Git, Ruff and mypy and is outside Vulture's maintained
+paths.
 
 ```bash
-uv run --frozen --no-sync task --exit-code mutation                     # staged change
-uv run --frozen --no-sync task --exit-code mutation -- --base master    # whole branch
+uv run --locked task --exit-code mutation                     # staged change
+uv run --locked task --exit-code mutation -- --base master    # whole branch
+uv run --locked task --exit-code mutation -- --strict         # survivors fail
 ```
 
-Exit 0 is a report (survivors are advisory), 1 means survivors under `--strict`, and 2
-is a tool error such as a failing clean test run; tool errors remain unresolved. Run it
-explicitly for code changes before acceptance; it never runs in a commit hook and is
-never cached. The `mutation-testing` skill owns survivor triage and settings invariants.
-Keep dispositions in dated feature evidence.
+| Exit | Meaning |
+| --- | --- |
+| 0 | Report produced; survivors and unreached functions are advisory. |
+| 1 | Under `--strict`: surviving mutants, or changed functions no selected test reaches. |
+| 2 | Tool or configuration error, or the clean test run failed; unresolved, never a pass. |
+
+Run it explicitly for code changes before acceptance; it never runs in a commit hook and
+is never cached. The `mutation-testing` skill owns survivor triage and settings
+invariants. Keep dispositions in dated feature evidence.
 
 ### Static-analysis boundaries
 
@@ -297,8 +332,8 @@ validated receipts, rather than inferred success. See [runtime isolation](runtim
 Update maintained code links and migration guidance; preserve completed feature history as dated intent.
 For detector/export changes, include the runtime prerequisites and acceptance matrices in
 the [model guide](multi-model-backends.md) and [deployment guide](tensorrt-deployment.md).
-Use `uv run --frozen --no-sync` for verification in a deliberately prepared backend
-environment so a default sync does not remove additional external runtime packages.
+Use `uv run --frozen --no-sync` for ad hoc commands in a deliberately prepared backend
+environment so they never sync it; Task stages always use `uv run --locked task`.
 
 ## External dependencies
 
@@ -318,27 +353,38 @@ these paths also work; do not add their contents or Git metadata to this reposit
 | digital-metrics | [repository](https://github.com/Wasilkas/digital-metrics) | `6e801be1564dce458294eb23592cc1aa0939c4d9` |
 | report-generator | [repository](https://github.com/Wasilkas/report-generator) | `7339ef864b4ff1b1db499a08d647193128088e80` |
 
-The committed lockfile installs both paths editable; it does not store their source
-contents or enforce their Git revisions. Keep the approved copies available for all
-syncs and runs. A fresh checkout does not download them automatically. Once populated:
+The committed project declares both packages by version only and never contains
+`[tool.uv.sources]`. Development resolves them from a local wheelhouse of source
+distributions built from the approved copies. Set up each worktree once, from its root,
+after copying the sources:
 
 ```bash
-uv sync --frozen --dev
-uv run --frozen cy --help
+uv build --sdist external/digital-metrics -o external/wheelhouse
+uv build --sdist external/report-generator -o external/wheelhouse
+printf 'find-links = ["external/wheelhouse"]\n' > uv.toml
+uv sync --locked --dev
+bash scripts/install-hooks.sh
 ```
 
-For local dependency resolution (for example `uv lock` or `uv sync` without `--frozen`),
-add this uncommitted override to the working copy's `pyproject.toml`:
+The Task stage `local-deps` automates the first three commands once Task is installed in
+the environment. `uv.toml`, `external/` and its wheelhouse are gitignored; every worktree
+needs its own `external/` (a copy or symlink) and `uv.toml`. The committed `uv.lock`
+records both packages as `source = { registry = "external/wheelhouse" }` and does not
+store their source contents or enforce their Git revisions. Rebuild the wheelhouse after
+an authorized change of an approved copy. Then check the installation with
+`uv run --locked cy --help`.
 
-```toml
-[tool.uv.sources]
-digital-metrics = { path = "external/digital-metrics", editable = true }
-report-generator = { path = "external/report-generator", editable = true }
-```
+Why this layout:
 
-Keep it unstaged and uncommitted; the [staging guard](#hooks-and-staging-guard) tolerates
-exactly this difference and the [lock check](#lock-freshness) adds the same block to the
-staged project. Follow the [commit procedure](#commit-procedure) for final acceptance.
+- A committed path source in `[tool.uv.sources]` breaks installation from a git link:
+  uv rewrites it to a `git+…#subdirectory=external/…` requirement that does not exist in
+  the repository.
+- A repository-root `uv.toml` cannot declare `sources`, but it can add `find-links`,
+  which keeps all local configuration out of tracked files.
+- End users install CY from a git link, ignore this lockfile and resolve both packages
+  from their own package index; they have no GitHub access, so git sources are not an
+  option.
+
 Do not update upstream source revisions during ordinary setup. Existing submodule
 users should preserve their populated source trees before switching to this revision;
 remove only their obsolete `.git` pointer files and local `submodule.*` configuration.
@@ -366,15 +412,11 @@ or blanket skips to hide failures. Run `verify` with `SKIP` cleared on the final
 (see [hooks](#hooks-and-staging-guard)); relevant subsequent changes invalidate affected
 evidence.
 
-Keep local `[tool.uv.sources]` overrides intact during intermediate commits, and never
-stage them. Change acceptance needs a clean committed tip, which a checkout carrying an
-override is not. Run it in a separate worktree at the final commit after confirming with
-`git show HEAD:pyproject.toml` that the committed project has no source overrides.
-Provision that worktree with its own `external/` copies and its own environment
-(`uv sync --frozen --dev`): Task pins each stage to the worktree's `.venv`, and a shared
-editable environment would import another checkout's sources. Do not resolve or update
-dependencies during verification. Releases likewise run from a clean prepared checkout
-without overrides; do not strip and restore overrides around each contributor commit.
+Change acceptance needs a clean committed tip. Each worktree uses its own prepared
+environment ([setup](#external-dependencies)): Task pins each stage to the worktree's
+`.venv`, so worktrees never share an environment. Do not resolve or update dependencies
+during verification; dependency changes land as ordinary reviewed commits that update
+`pyproject.toml` and `uv.lock` together. Releases run from a clean prepared checkout.
 
 ## Paired CY and queue release check
 
@@ -384,21 +426,20 @@ and inspect their latest default branches/tags, preserving unrelated local chang
 Use the intended release versions, including the version the release tool will
 produce. A stale sibling checkout or editable installation is not current evidence.
 
-With approved external dependencies prepared and active workers drained according to
-[queue upgrade](queue.md#coordinated-package-upgrade), or in an isolated environment:
+With the approved external packages prepared ([setup](#external-dependencies)):
 
 ```bash
-CY_QUEUE_DIR=../cy-queue uv run --frozen --no-sync task --exit-code paired-check
+CY_QUEUE_DIR=../cy-queue uv run --locked task --exit-code paired-check
 ```
 
 `CY_QUEUE_DIR` defaults to the sibling `../cy-queue` checkout. The stage fails when the
-checkout is missing, installs both packages editable into this worktree's environment,
-runs `uv pip check`, compares both source versions with the installed metadata, runs the
-queue suite and `cy-queue --help`, and prints both commit SHAs and versions. Normal
+checkout is missing. It installs both packages into a temporary virtual environment,
+leaving the worktree's `.venv` untouched, runs `uv pip check`, compares both source
+versions with the installed metadata, runs the queue suite and `cy-queue --help`, prints
+both commit SHAs and versions and removes the temporary environment. Normal
 resolution must succeed without `--no-deps`. Run the queue's configured static/import
 checks too. Record both source SHAs, versions and actual results in dated task evidence.
-If the release changes a version, refresh the installation and recheck the final pair
-before pushing. Incompatibility, stale metadata, missing current sources or
+If the release changes a version, rerun `paired-check` on the final pair before pushing. Incompatibility, stale metadata, missing current sources or
 unavailable/failed checks block delivery. The queue declares only a minimum compatible
 CY version, never an upper bound; raise that minimum when the queue starts using a newer
 CY interface. CY remains independent of the queue at runtime. `release-acceptance` runs
@@ -431,13 +472,21 @@ owns the procedure:
    `git ls-remote`. A held lock is a reported blocker, never waited on or broken.
 
 The version commit may change only `pyproject.toml`, `uv.lock` and `CHANGELOG.md`.
-semantic-release's build command updates only the root `clearml-yolo` version in
-`uv.lock` through `scripts/release_version.py`, without dependency resolution. With
-`CY_RELEASE_CHECK=1` it then runs `release-commit-check`: staged paths limited to those
-three files, no unstaged or untracked inputs, a `uv.lock` difference from `HEAD` limited
-to the root package version (`scripts/release_lock_guard.py`), lock freshness, read-only
-Ruff and deptry. `SKIP=verify` applies only to this version commit; message validation
-and the staging guard remain active.
+semantic-release's build command runs `uv lock --upgrade-package clearml-yolo`, which
+refreshes the root `clearml-yolo` version entry in `uv.lock`; the release checkout needs
+the [local external packages](#external-dependencies). With `CY_RELEASE_CHECK=1` it then
+runs `release-commit-check`, which enforces:
+
+- staged paths limited to `pyproject.toml`, `uv.lock` and `CHANGELOG.md`, with no
+  unstaged or untracked inputs;
+- a staged `pyproject.toml` that differs from `HEAD` only in the project version and
+  declares no `[tool.uv.sources]`;
+- a staged `uv.lock` whose packages are identical to `HEAD` except the `clearml-yolo`
+  version ([scripts/release_lock_guard.py](../scripts/release_lock_guard.py));
+- lock freshness, read-only Ruff and deptry.
+
+`SKIP=verify` applies only to this version commit; message validation and the staging
+guard remain active.
 
 A failed attempt may leave this attempt's version, changelog and lockfile changes staged
 without a commit or tag. Restore only those changes, fix the cause on the branch and
