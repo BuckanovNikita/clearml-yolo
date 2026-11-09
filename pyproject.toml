@@ -96,6 +96,10 @@ dev = [
     "pytest-cov>=7.1.0",
     "pytest-testmon>=2.1",
     "mutmut>=3.8,<3.9",
+    "go-task-bin>=3.54.0",
+    "pytest-xdist>=3.8.0",
+    "pytest-randomly>=5.0.0",
+    "deptry>=0.23",
 ]
 
 [tool.mypy]
@@ -142,8 +146,9 @@ min_confidence = 80
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = ["--strict-markers", "--strict-config"]
+addopts = ["--strict-markers", "--strict-config", "-p", "tests.env_isolation"]
 markers = [
+    "integration: live test under tests/integration; excluded from development verification by directory",
     "severstal_gpu: opt-in native all-model Severstal training and ClearML acceptance",
     "ddp_cpu: real multi-rank CPU YOLO training and native relay integration",
     "ddp_gpu: opt-in real multi-GPU direct/queued native pipeline acceptance",
@@ -158,6 +163,22 @@ data_file = ".tmp/coverage/.coverage"
 
 [tool.coverage.report]
 show_missing = true
+
+[tool.deptry]
+known_first_party = ["clearml_yolo", "tests", "scripts"]
+extend_exclude = ["external", "outputs", "runs", "multirun", "mutants", "weights", "examples"]
+
+[tool.deptry.per_rule_ignores]
+# Runtime packages loaded by model families, exporters and third-party trainers rather
+# than imported by clearml_yolo itself; removing them breaks native execution.
+DEP002 = [
+    "aiohttp", "albumentations", "calflops", "cloudpickle", "faster-coco-eval",
+    "graphql-core", "onnx", "onnxruntime", "pycocotools", "pytorch-lightning",
+    "rfdetr", "tensorboard", "timm", "torchvision",
+]
+# FiftyOne's plotting backends, imported only on FiftyOne's plotting path and provided
+# by the declared fiftyone dependency.
+DEP003 = ["plotly", "matplotlib"]
 
 [tool.mutmut]
 source_paths = ["src/"]

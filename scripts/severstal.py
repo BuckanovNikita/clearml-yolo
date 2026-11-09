@@ -414,7 +414,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         result = prepare(args.source, args.output, seed=args.seed, smoke_sizes=sizes)
     else:
         result = verify_prepared(args.output)
-    print(  # noqa: T201 - maintenance CLI result
+    print(
         json.dumps(
             {
                 "sha256": result["sha256"],
