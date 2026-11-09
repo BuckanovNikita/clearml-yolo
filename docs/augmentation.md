@@ -159,7 +159,7 @@ profiles. Custom Albumentations mode requires an explicit numeric training batch
 
 ## Severstal execution checks
 
-The opt-in [Severstal suite](../tests/test_severstal_gpu.py) covers every registered model:
+The opt-in [Severstal suite](../tests/integration/test_severstal_gpu.py) covers every registered model:
 YOLO26n, four DEIMv2, four RF-DETR, six Faster R-CNN and six FCOS presets, each with native,
 JSON and JSON+Mosaic variants. Each smoke scenario uses one epoch, batch one and FP32
 on a frozen 160/40/40 training/validation/test subset of the official Kaggle data.
