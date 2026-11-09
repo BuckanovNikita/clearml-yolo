@@ -9,7 +9,7 @@ description: Real-run acceptance for clearml-yolo. Use for release or integratio
 
 - Authority and modes
 - Verification checklist
-  - 1\. Default verification (prek)
+  - 1\. Default verification (Task stages)
   - 2\. Isolated run setup
   - 3\. Direct execution and queue acceptance
   - 4\. Baseline and candidate
@@ -41,22 +41,28 @@ user request for those actions.
 
 ## Verification checklist
 
-### 1. Default verification (prek)
+### 1. Default verification (Task stages)
 
-Run `uv run --frozen --no-sync prek run --all-files`; the hook configuration owns
-the verification tool inventory. It covers lint, types and the ordinary pytest suite
-(its `pytest` hook is incremental testmon; the complete-suite command is in
-[verification](../../../docs/development.md#verification)). It does not establish
-GPU, queue or publication outcomes.
+Run the acceptance tier the claim needs through
+`uv run --frozen --no-sync task --exit-code <stage>`, as selected by the
+`verification-workflow` skill and defined in
+[acceptance tiers](../../../docs/development.md#acceptance-tiers): `acceptance` for
+change acceptance (checks, properties, the complete unit suite with the coverage floor
+and the CPU smoke run on the shared ClearML stand), `release-acceptance` before delivery.
+Neither establishes the GPU, queue or publication outcomes this checklist covers.
 
 Native suites use the pytest markers declared in `pyproject.toml`. `ddp_cpu`
 ([CPU distributed regressions](../../../docs/development.md#native-cpu-distributed-regression-tests))
-runs in the ordinary suite. `ddp_gpu` ([physical DDP procedure](../../../docs/ddp-testing.md))
+runs in the unit suite. `ddp_gpu` ([physical DDP procedure](../../../docs/ddp-testing.md))
 and `severstal_gpu`
 ([Severstal execution checks](../../../docs/augmentation.md#severstal-execution-checks))
-are opt-in: `ddp_gpu` needs `--run-ddp-gpu` (invocation in that procedure) and
-`severstal_gpu` needs `--run-severstal-gpu` plus the required options that
-`uv run --frozen --no-sync pytest --help` lists under "native Severstal acceptance".
+live in `tests/integration` and are opt-in: `ddp_gpu` needs `--run-ddp-gpu` (invocation
+in that procedure) and `severstal_gpu` needs `--run-severstal-gpu` plus the required
+options that `uv run --frozen --no-sync pytest --help` lists under "native Severstal
+acceptance". `release-acceptance` passes these options from `CY_DDP_ARGS` and
+`CY_SEVERSTAL_ARGS`. Multi-GPU DDP on a single-GPU host is waived; a GPU busy with the
+user's workload is deferred. The `running-integration-tests` skill owns run tags and
+exact-tag cleanup for those Task-driven live tests.
 
 ### 2. Isolated run setup
 
