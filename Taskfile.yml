@@ -2,8 +2,9 @@ version: '3'
 
 # Deliberately no sources, generates, status, or completion cache: Task freshness never
 # establishes completion. Commands run sequentially; only the individual tools reuse
-# incremental data. Tools run with --frozen --no-sync against this worktree's prepared
-# environment so uncommitted [tool.uv.sources] overrides stay intact (docs/development.md).
+# incremental data. Tools run with `uv run --locked` in this worktree's environment: the
+# committed lock resolves the external packages from the ignored external/wheelhouse through
+# the ignored repository-root uv.toml (task local-deps prepares both).
 vars:
   TEST_WORKERS: '{{default "2" .CY_TEST_WORKERS}}'
   # Command-local environment assignments defeat inherited shared-cache overrides.
@@ -13,9 +14,53 @@ vars:
     COVERAGE_FILE={{.ROOT_DIR | shellQuote}}/.tmp/coverage/.coverage
     RUFF_CACHE_DIR={{.ROOT_DIR | shellQuote}}/.ruff_cache
     MYPY_CACHE_DIR={{.ROOT_DIR | shellQuote}}/.mypy_cache
-  UV: uv run --frozen --no-sync
+  UV: uv run --locked
 
 tasks:
+  local-deps:
+    desc: >-
+      Build the approved external/ checkouts into external/wheelhouse and create uv.toml
+      (bootstrap, before any uv run --locked: uvx --from go-task-bin task local-deps)
+    dir: '{{.ROOT_DIR}}'
+    cmds:
+      - |
+        set -eu
+        missing=""
+        for name in digital-metrics report-generator; do
+          [ -d "external/$name" ] || missing="$missing external/$name"
+        done
+        if [ -n "$missing" ]; then
+          echo "local-deps: missing approved checkouts:$missing" >&2
+          echo "local-deps: check out the approved digital-metrics and report-generator revisions there (docs/development.md, External dependencies)." >&2
+          exit 1
+        fi
+        # Never overwrite an existing uv.toml: it may hold other local settings.
+        if [ -e uv.toml ]; then
+          uv run --no-project --no-config python - <<'PY'
+        import sys
+        import tomllib
+        from pathlib import Path
+
+        try:
+            links = tomllib.loads(Path("uv.toml").read_text()).get("find-links", [])
+        except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
+            sys.exit(f"local-deps: cannot read uv.toml: {exc}")
+        if "external/wheelhouse" not in links:
+            sys.exit('local-deps: uv.toml exists without find-links = ["external/wheelhouse"]; add that entry by hand.')
+        PY
+        fi
+        mkdir -p external/wheelhouse
+        # Drop stale archives of these two packages so only the current checkouts resolve.
+        rm -f external/wheelhouse/digital_metrics-* external/wheelhouse/digital-metrics-* \
+          external/wheelhouse/report_generator-* external/wheelhouse/report-generator-*
+        for name in digital-metrics report-generator; do
+          uv build --sdist "external/$name" -o external/wheelhouse
+        done
+        if [ ! -e uv.toml ]; then
+          printf 'find-links = ["external/wheelhouse"]\n' > uv.toml
+          echo 'local-deps: created uv.toml with find-links = ["external/wheelhouse"]'
+        fi
+
   fix:
     desc: Apply safe Ruff fixes and formatting before staging (never stages)
     cmds:
@@ -35,7 +80,7 @@ tasks:
   _lock:
     internal: true
     cmds:
-      - "{{.RUN}} {{.UV}} python scripts/lock_check.py"
+      - "{{.RUN}} uv lock --check"
 
   _ruff:
     internal: true
@@ -134,37 +179,62 @@ tasks:
         }
 
   acceptance:
-    desc: Clean-tip checks, property exploration, unit suite with coverage, then the live part
+    desc: Clean tip, checks, properties, early live preflight, unit suite with coverage, live part, clean unchanged tip
+    vars:
+      # Recorded before any stage runs; the final command compares a fresh rev-parse.
+      START_HEAD:
+        sh: git rev-parse HEAD
+      # 1 when every path changed since master is documentation; no commits since
+      # master runs the live part.
+      DOCS_ONLY:
+        sh: |
+          bash -eu -o pipefail -c '
+            base=$(git merge-base master HEAD)
+            changed=$(git diff --name-only "$base"..HEAD)
+            if [ -z "$changed" ]; then echo 0; exit 0; fi
+            while IFS= read -r path; do
+              case "$path" in
+                *.md|docs/*|specs/*) ;;
+                *) echo 0; exit 0 ;;
+              esac
+            done <<< "$changed"
+            echo 1
+          '
     cmds:
       - task: _clean-tip
       - task: check
       - task: properties
+      # Live preflight early, so an unavailable stand defers before the long unit suite.
+      - |
+        if [ "{{.DOCS_ONLY}}" = 1 ]; then
+          echo "NOTICE: every path changed since master is documentation (*.md, docs/, specs/);" >&2
+          echo "NOTICE: the live part (infra-check, integration) is SKIPPED and not verified." >&2
+          exit 0
+        fi
+        status=0
+        "{{.TASK_EXE}}" --exit-code infra-check || status=$?
+        if [ "$status" = 3 ]; then
+          echo "DEFERRED: the shared stand is unavailable (infra-check exit 3); acceptance is blocked until the live part runs." >&2
+        fi
+        exit "$status"
       - "mkdir -p {{.ROOT_DIR | shellQuote}}/.tmp/coverage"
       # Coverage and its floor apply to the unit suite only; the live part is not measured.
       - "{{.RUN}} {{.UV}} pytest --cov --ignore=tests/integration -n {{.TEST_WORKERS}} --dist loadgroup"
       - |
-        bash -eu -o pipefail -c '
-          base=$(git merge-base master HEAD)
-          changed=$(git diff --name-only "$base"..HEAD)
-          if [ -z "$changed" ]; then
-            echo "NOTICE: no commits since master; running the live part." >&2
-          else
-            docs_only=1
-            while IFS= read -r path; do
-              case "$path" in
-                *.md|docs/*|specs/*) ;;
-                *) docs_only=0 ;;
-              esac
-            done <<< "$changed"
-            if [ "$docs_only" = 1 ]; then
-              echo "NOTICE: every path changed since master is documentation (*.md, docs/, specs/);" >&2
-              echo "NOTICE: the live part (infra-check, integration) is SKIPPED and not verified." >&2
-              exit 0
-            fi
-          fi
-          "{{.TASK_EXE}}" --exit-code integration
-        '
+        if [ "{{.DOCS_ONLY}}" = 1 ]; then exit 0; fi
+        status=0
+        "{{.TASK_EXE}}" --exit-code integration || status=$?
+        if [ "$status" = 3 ]; then
+          echo "DEFERRED: the shared stand became unavailable (exit 3); acceptance is blocked until the live part runs." >&2
+        fi
+        exit "$status"
       - task: _clean-tip
+      - |
+        if [ "$(git rev-parse HEAD)" != "{{.START_HEAD}}" ]; then
+          echo "Acceptance requires an unchanged tip: HEAD moved from {{.START_HEAD}} to $(git rev-parse HEAD)." >&2
+          exit 1
+        fi
+        echo "Accepted tip: {{.START_HEAD}}"
   # --- stream A end ---
   # --- stream B begin ---
   release-commit-check:
@@ -173,11 +243,11 @@ tasks:
       - |
         bash -eu -c '
           if ! git diff --quiet --ignore-submodules=none; then
-            echo "Release check requires no unstaged tracked changes." >&2
+            echo "Release-commit check requires no unstaged tracked changes." >&2
             exit 1
           fi
           if IFS= read -r -d "" path < <(git ls-files --others --exclude-standard -z); then
-            echo "Release check requires no untracked files: $path" >&2
+            echo "Release-commit check requires no untracked files: $path" >&2
             exit 1
           fi
           while IFS= read -r -d "" path; do
@@ -193,12 +263,11 @@ tasks:
       - "{{.RUN}} {{.UV}} deptry ."
 
   paired-check:
-    desc: Paired CY and cy-queue release check (CY_QUEUE_DIR, default ../cy-queue)
+    desc: Paired CY and cy-queue release check in a temporary environment (CY_QUEUE_DIR, default ../cy-queue)
     dir: '{{.ROOT_DIR}}'
     cmds:
       - |
         set -eu
-        export UV_PROJECT_ENVIRONMENT={{.ROOT_DIR | shellQuote}}/.venv
         root={{.ROOT_DIR | shellQuote}}
         queue="${CY_QUEUE_DIR:-$root/../cy-queue}"
         if [ ! -f "$queue/pyproject.toml" ]; then
@@ -206,24 +275,40 @@ tasks:
           exit 1
         fi
         queue="$(cd "$queue" && pwd -P)"
-        python="$UV_PROJECT_ENVIRONMENT/bin/python"
-        uv pip install --python "$python" -e "$root" -e "$queue"
+        # The worktree .venv stays untouched: the pair is installed into a temporary
+        # environment on the same filesystem (ignored .tmp/), removed on exit.
+        mkdir -p "$root/.tmp"
+        scratch="$(mktemp -d "$root/.tmp/paired-check.XXXXXX")"
+        trap 'rm -rf -- "$scratch"' EXIT
+        venv="$scratch/venv"
+        python="$venv/bin/python"
+        UV_PROJECT_ENVIRONMENT="$venv" uv sync --locked --dev
+        uv pip install --python "$python" -e "$queue"
         uv pip check --python "$python"
-        for project in "$root" "$queue"; do
-          "$python" - "$project" <<'PY'
+        # Both distributions must match their source versions and be the editable
+        # installs of these checkouts (cy-queue's minimum-only CY bound must not have
+        # replaced the locked CY with an index build).
+        "$python" - "$root" "$queue" <<'PY'
         import importlib.metadata
+        import json
         import sys
         import tomllib
         from pathlib import Path
+        from urllib.parse import unquote, urlparse
 
-        project = tomllib.loads((Path(sys.argv[1]) / "pyproject.toml").read_text())["project"]
-        installed = importlib.metadata.version(project["name"])
-        if installed != project["version"]:
-            sys.exit(f"paired-check: {project['name']} source {project['version']} != installed {installed}")
+        for directory in map(Path, sys.argv[1:]):
+            project = tomllib.loads((directory / "pyproject.toml").read_text())["project"]
+            distribution = importlib.metadata.distribution(project["name"])
+            if distribution.version != project["version"]:
+                sys.exit(f"paired-check: {project['name']} source {project['version']} != installed {distribution.version}")
+            direct = json.loads(distribution.read_text("direct_url.json") or "{}")
+            location = Path(unquote(urlparse(direct.get("url", "")).path))
+            editable = direct.get("dir_info", {}).get("editable", False)
+            if not editable or location.resolve() != directory.resolve():
+                sys.exit(f"paired-check: {project['name']} is not the editable install of {directory}: {direct}")
         PY
-        done
-        (cd "$queue" && uv run --frozen --no-sync --project "$root" pytest -q)
-        (cd "$queue" && uv run --frozen --no-sync --project "$root" cy-queue --help >/dev/null)
+        (cd "$queue" && "$python" -m pytest -q)
+        "$venv/bin/cy-queue" --help >/dev/null
         for project in "$root" "$queue"; do
           "$python" - "$project" "$(git -C "$project" rev-parse HEAD)" <<'PY'
         import sys
@@ -236,29 +321,32 @@ tasks:
         done
 
   release-acceptance:
-    desc: Release acceptance (acceptance, GPU-marked tests, FiftyOne, paired-check)
-    # The real-run gate of the running-end-to-end-tests skill remains a separate step.
+    desc: Release acceptance (acceptance, single-GPU severstal, multi-GPU DDP unless waived, FiftyOne, paired-check)
+    # The real-run gate of the running-end-to-end-tests skill remains a separate step. A GPU
+    # busy with the user's workload is deferred verification, checked by the agent or
+    # operator before starting (verification-workflow skill); it is not automated here.
     cmds:
       - |
-        if [ -z "${CY_DDP_ARGS:-}" ] || [ -z "${CY_SEVERSTAL_ARGS:-}" ]; then
-          echo "release-acceptance: GPU checks are not configured; set CY_DDP_ARGS and CY_SEVERSTAL_ARGS to their pytest options (--run-ddp-gpu ..., --run-severstal-gpu ...)." >&2
+        if [ -z "${CY_SEVERSTAL_ARGS:-}" ]; then
+          echo "release-acceptance: the single-GPU severstal suite is required; set CY_SEVERSTAL_ARGS to its pytest options (--run-severstal-gpu ...)." >&2
           exit 1
         fi
       - task: acceptance
-      - "{{.RUN}} {{.UV}} pytest tests/integration -m 'ddp_gpu or severstal_gpu' -p no:randomly -n 0 $CY_DDP_ARGS $CY_SEVERSTAL_ARGS"
+      # The arguments are split into pytest options on purpose (unquoted).
+      - "{{.RUN}} {{.UV}} pytest tests/integration -m severstal_gpu -p no:randomly -n 0 $CY_SEVERSTAL_ARGS"
+      # Multi-GPU DDP is waived on single-GPU hosts (FR-015): reported, never blocking.
+      - |
+        if [ -z "${CY_DDP_ARGS:-}" ]; then
+          echo "multi-GPU DDP: waived (CY_DDP_ARGS unset)"
+          exit 0
+        fi
+        {{.RUN}} {{.UV}} pytest tests/integration -m ddp_gpu -p no:randomly -n 0 $CY_DDP_ARGS
       - |
         set -eu
-        database="${FIFTYONE_DATABASE_DIR:-}"
-        owned=""
-        if [ -z "$database" ]; then
-          mkdir -p {{.ROOT_DIR | shellQuote}}/.tmp
-          database="$(mktemp -d {{.ROOT_DIR | shellQuote}}/.tmp/fiftyone-db.XXXXXX)"
-          owned="$database"
-        fi
-        status=0
-        CY_TEST_FIFTYONE=1 FIFTYONE_DATABASE_DIR="$database" {{.RUN}} {{.UV}} pytest tests/integration/fiftyone -p no:randomly -n 0 || status=$?
-        if [ -n "$owned" ]; then rm -rf "$owned"; fi
-        exit "$status"
+        mkdir -p {{.ROOT_DIR | shellQuote}}/.tmp
+        database="$(mktemp -d {{.ROOT_DIR | shellQuote}}/.tmp/fiftyone-db.XXXXXX)"
+        trap 'rm -rf -- "$database"' EXIT
+        CY_TEST_FIFTYONE=1 FIFTYONE_DATABASE_DIR="$database" {{.RUN}} {{.UV}} pytest tests/integration/fiftyone -p no:randomly -n 0
       - task: paired-check
   # --- stream B end ---
   # --- stream C begin ---
