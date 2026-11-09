@@ -357,6 +357,8 @@ def test_testmon_node_ids_still_defined_in_staged_test_modules_are_selected(
         (MODULE, "tests/test_indirect.py::test_other"),
         (MODULE, "tests/test_indirect.py::test_case[a::b-c]"),
         (MODULE, "tests/test_indirect.py::TestGroup::test_method[1]"),
+        (MODULE, "tests/test_indirect.py::TestRenamed::test_method"),
+        (MODULE, "tests/test_indirect.py::test_method"),
         (MODULE, "tests/test_moved_away.py::test_gone"),
         (MODULE, "tests/integration/test_live.py::test_stand"),
         (MODULE, "tests/conftest.py::fixture_ghost"),
@@ -593,6 +595,28 @@ def test_failed_descendant_discovery_still_signals_the_group(monkeypatch: pytest
     assert signals == [(process.pid, signal.SIGINT), (process.pid, signal.SIGKILL)]
     assert process.waited
     assert spent.is_set()
+
+
+def test_interrupted_grace_wait_still_kills_the_group(monkeypatch: pytest.MonkeyPatch) -> None:
+    class ImpatientProcess:
+        pid = 454545
+
+        def wait(self, timeout: float) -> int:
+            raise KeyboardInterrupt(timeout)  # a second Ctrl-C during the grace period
+
+        def poll(self) -> int | None:
+            return None
+
+    monkeypatch.setattr(mutation, "descendants", lambda _pid: {77: "proc:1"})
+    signals: list[tuple[int, int]] = []
+    killed: list[set[int]] = []
+    monkeypatch.setattr(os, "killpg", lambda pid, sig: signals.append((pid, sig)))
+    monkeypatch.setattr(mutation, "_kill_known", lambda tree: killed.append(set(tree)))
+    process = ImpatientProcess()
+    with pytest.raises(KeyboardInterrupt):
+        mutation._stop_group(process, threading.Event())  # type: ignore[arg-type]
+    assert signals == [(process.pid, signal.SIGINT), (process.pid, signal.SIGKILL)]
+    assert killed == [{77}]
 
 
 class InterruptedPopen:

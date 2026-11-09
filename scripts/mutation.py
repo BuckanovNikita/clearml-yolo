@@ -346,10 +346,21 @@ def importing_tests(workspace: Path, source: str, ignored: Sequence[str]) -> set
 
 
 def _defined_functions(source: str) -> set[str]:
-    """Return the names of every function and method defined in test module *source*."""
-    return {
-        node.name for node in ast.walk(ast.parse(source)) if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
-    }
+    """Return the ``::`` paths of the module functions and class methods of test module *source*.
+
+    A method of ``class TestA`` nested in ``class TestOuter`` is ``TestOuter::TestA::test_m``,
+    as pytest names it, so a test moved into or out of a class no longer matches.
+    """
+    found: set[str] = set()
+    scopes: list[tuple[str, list[ast.stmt]]] = [("", ast.parse(source).body)]
+    while scopes:
+        prefix, body = scopes.pop()
+        for node in body:
+            if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+                found.add(f"{prefix}{node.name}")
+            elif isinstance(node, ast.ClassDef):
+                scopes.append((f"{prefix}{node.name}::", node.body))
+    return found
 
 
 class NodeValidator:
@@ -373,7 +384,7 @@ class NodeValidator:
         """Return the selectable form of *node_id*: itself without parameters, its file, or None.
 
         A node whose file is not an eligible staged test module, or whose function is no
-        longer defined there, is stale and dropped. Parameters are dropped because a
+        longer defined there under the same classes, is stale and dropped. Parameters are dropped because a
         renamed parameter would make pytest refuse the whole selection. A node that
         cannot be validated (no ``::`` part, an unparsable module) selects its file.
         """
@@ -384,7 +395,7 @@ class NodeValidator:
         names = self._names(path)
         if not bare or names is None:
             return path
-        return f"{path}::{bare}" if bare.rpartition("::")[2] in names else None
+        return f"{path}::{bare}" if bare in names else None
 
 
 def select_tests(workspace: Path, sources: Sequence[str], database: Path) -> list[str]:
@@ -553,14 +564,16 @@ def _stop_group(process: subprocess.Popen[bytes], spent: threading.Event) -> Non
     """
     spent.set()
     tree = descendants(process.pid)
-    with contextlib.suppress(subprocess.TimeoutExpired, ProcessLookupError, PermissionError):
-        os.killpg(process.pid, signal.SIGINT)
-        process.wait(timeout=BUDGET_GRACE_SECONDS)
-    if process.poll() is None:  # a reaped pid may already belong to another process
-        tree |= descendants(process.pid)
-    with contextlib.suppress(ProcessLookupError, PermissionError):
-        os.killpg(process.pid, signal.SIGKILL)
-    _kill_known(tree)
+    try:
+        with contextlib.suppress(subprocess.TimeoutExpired, ProcessLookupError, PermissionError):
+            os.killpg(process.pid, signal.SIGINT)
+            process.wait(timeout=BUDGET_GRACE_SECONDS)
+    finally:  # a second Ctrl-C during the grace wait must not skip the kill
+        if process.poll() is None:  # a reaped pid may already belong to another process
+            tree |= descendants(process.pid)
+        with contextlib.suppress(ProcessLookupError, PermissionError):
+            os.killpg(process.pid, signal.SIGKILL)
+        _kill_known(tree)
 
 
 def run_mutmut(
