@@ -11,3 +11,5 @@ Terms separate what executes from what was observed or produced.
 **Scientific result**: A prediction, metric, comparison or report tied to its source objects, model and evaluation context; publication and visualization are separate outcomes.
 
 **Invocation owner**: The execution responsible for one experiment's task, publications and owned descendant cleanup.
+
+**Identity footer**: The readable model identity and source links placed after a report's data, leaving table headers in place; exact identifiers stay in provenance.
