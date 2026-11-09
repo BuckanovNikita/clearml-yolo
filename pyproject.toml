@@ -100,6 +100,7 @@ dev = [
     "pytest-xdist>=3.8.0",
     "pytest-randomly>=5.0.0",
     "deptry>=0.23",
+    "psutil>=7.2",
 ]
 
 [tool.mypy]
@@ -185,6 +186,8 @@ DEP002 = [
 # FiftyOne's plotting backends, imported only on FiftyOne's plotting path and provided
 # by the declared fiftyone dependency.
 DEP003 = ["plotly", "matplotlib"]
+# Development tooling under scripts/ (the mutation driver) uses dev-group packages.
+DEP004 = ["psutil"]
 
 [tool.mutmut]
 # scripts/mutation.py derives only_mutate and the test selection from each change and
