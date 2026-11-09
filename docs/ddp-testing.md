@@ -12,20 +12,24 @@ on one worker. The physical suite lives in `tests/integration`, outside developm
 verification and affected-test runs; without `--run-ddp-gpu` it is deselected and
 does not probe GPUs or contact ClearML through this harness.
 
-[Release acceptance](development.md#acceptance-tiers) runs the GPU-marked suites with
-the options given in `CY_DDP_ARGS` (this procedure's `--run-ddp-gpu` options) and
-`CY_SEVERSTAL_ARGS`. On a single-GPU host, physical multi-GPU DDP is waived by standing
-user decision: report it as waived, not as passed or deferred; it never blocks. A GPU
-busy with the user's workload is deferred verification and blocks delivery.
+[Release acceptance](development.md#acceptance-tiers) runs this suite only when
+`CY_DDP_ARGS` holds this procedure's `--run-ddp-gpu` options. Without it, physical
+multi-GPU DDP is waived by standing user decision on this single-GPU host: the stage
+reports it as waived, not as passed or deferred, and it never blocks. Check the GPU
+through pcboard `pc_status` where available before starting; a GPU busy with the user's
+workload is deferred verification and blocks delivery.
 
-Prepare the repository's [development environment](development.md), including its
-approved external dependency revisions and CUDA-enabled detector dependencies.
+Prepare the repository's [development environment](development.md#external-dependencies),
+including its approved external packages and CUDA-enabled detector dependencies.
 Use Linux/WSL with working NVML, NCCL, at least two whole physical GPUs, supported
-pidfd/subreaper supervision and Git. Configure ClearML using its usual SDK
-configuration or environment. Required artifacts need an accessible storage
-backend. Supply a dedicated test project, not a production project. Select idle
-GPUs and run one harness invocation at a time; the live tests share the `live` xdist
-group, so parallel workers never run two of them concurrently.
+pidfd/subreaper supervision and Git. The test environment isolation hides
+`~/clearml.conf`; the suite takes its ClearML endpoint and credentials from the lifecycle
+stand environment of a tagged run, never from the user's SDK configuration. Prepare that
+run as the [integration-test skill](../.agents/skills/running-integration-tests/SKILL.md)
+describes; its tag scopes the ClearML project, which must not be a production project.
+Required artifacts need an accessible storage backend. Select idle GPUs and run one
+harness invocation at a time; the live tests share the `live` xdist group, so parallel
+workers never run two of them concurrently.
 
 Physical indexes mean the indexes shown by `nvidia-smi`, not inherited CUDA logical
 indexes. The harness resolves indexes through NVML identity enumeration, then sets
@@ -33,13 +37,15 @@ indexes. The harness resolves indexes through NVML identity enumeration, then se
 Queued submission uses logical indexes within that new UUID visibility, preserving
 the production queue's selector semantics. MIG selections are unsupported.
 
-Run the direct physical tests from the CY checkout:
+Run the direct physical tests from the CY checkout, in a shell that exported the run's
+stand environment (`eval "$(L env)"` after `L up`, as in the integration-test skill). The
+project name starts with the run tag so that exact-tag cleanup reaches it:
 
 ```bash
 uv run --frozen --no-sync pytest tests/integration -m ddp_gpu \
   --run-ddp-gpu \
   --ddp-devices=0,1 \
-  --ddp-clearml-project=clearml-yolo-ddp-tests \
+  --ddp-clearml-project="$INTEGRATION_RUN_TAG clearml-yolo-ddp" \
   --ddp-artifacts=.tmp/ddp-results \
   -ra -vv
 ```
@@ -51,7 +57,7 @@ checkout, using the same prepared environment:
 uv run --frozen --no-sync --project ../clearml-yolo pytest -m ddp_gpu \
   --run-ddp-gpu \
   --ddp-devices=0,1 \
-  --ddp-clearml-project=clearml-yolo-ddp-tests \
+  --ddp-clearml-project="$INTEGRATION_RUN_TAG clearml-yolo-ddp" \
   --ddp-artifacts=.tmp/ddp-results \
   -ra -vv
 ```
