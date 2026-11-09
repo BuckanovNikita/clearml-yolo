@@ -1,14 +1,19 @@
 """Changed-function mapping and exit statuses of scripts/mutation.py, without running mutmut."""
 
+import os
+import signal
 import sqlite3
 import subprocess
 import sys
 import tempfile
 import textwrap
+import threading
 import time
 import tomllib
-from collections.abc import Sequence
+import types
+from collections.abc import Iterator, Sequence
 from pathlib import Path
+from typing import ClassVar, Self
 
 import pytest
 
@@ -342,22 +347,90 @@ def test_importing_test_files_are_selected_without_testmon_data(repo: Path, monk
     assert _selection(fake.pyproject) == ["tests/test_dotted.py", SAMPLE_TEST]
 
 
-def test_testmon_dependents_are_cut_to_existing_unit_test_files(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_testmon_node_ids_still_defined_in_staged_test_modules_are_selected(
+    repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     fake = FakeMutmut()
     fake.install(monkeypatch)
     _testmon(repo, [
-        (MODULE, "tests/test_indirect.py::test_case[a b-c]"),
+        (MODULE, "tests/test_indirect.py::test_renamed[a b-c]"),
         (MODULE, "tests/test_indirect.py::test_other"),
+        (MODULE, "tests/test_indirect.py::test_case[a::b-c]"),
+        (MODULE, "tests/test_indirect.py::TestGroup::test_method[1]"),
+        (MODULE, "tests/test_indirect.py::TestRenamed::test_method"),
+        (MODULE, "tests/test_indirect.py::test_method"),
         (MODULE, "tests/test_moved_away.py::test_gone"),
         (MODULE, "tests/integration/test_live.py::test_stand"),
+        (MODULE, "tests/conftest.py::fixture_ghost"),
         ("src/clearml_yolo/__init__.py", "tests/test_init.py::test_version"),
     ])  # fmt: skip
-    _stage(repo, "tests/test_indirect.py", "def test_other() -> None:\n    pass\n")
+    indirect = textwrap.dedent(
+        """\
+        import pytest
+        def test_other() -> None:
+            pass
+        @pytest.mark.parametrize("value", ["a::b-c"])
+        def test_case(value: str) -> None:
+            pass
+        class TestGroup:
+            def test_method(self) -> None:
+                pass
+        """
+    )
+    _stage(repo, "tests/test_indirect.py", indirect)
     _stage(repo, "tests/integration/test_live.py", "def test_stand() -> None:\n    pass\n")
+    _stage(repo, "tests/conftest.py", "def fixture_ghost() -> None:\n    pass\n")
     _stage(repo, MODULE, ORIGINAL.replace("value * 2", "value * 3"))
     assert mutation.main([]) == 0
-    # Recorded dependents join the importing tests, which testmon may not know yet.
-    assert _selection(fake.pyproject) == ["tests/test_indirect.py", SAMPLE_TEST]
+    # Stale, live and non-test ids are dropped and parameters cut; the importing test
+    # module, which testmon has not recorded, is added whole.
+    assert _selection(fake.pyproject) == [
+        "tests/test_indirect.py::TestGroup::test_method",
+        "tests/test_indirect.py::test_case",
+        "tests/test_indirect.py::test_other",
+        SAMPLE_TEST,
+    ]
+    assert "Selected 4 test(s) in 2 file(s)" in capsys.readouterr().out
+
+
+def test_importing_module_with_selected_node_ids_is_not_added_whole(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake = FakeMutmut()
+    fake.install(monkeypatch)
+    _testmon(repo, [(MODULE, f"{SAMPLE_TEST}::test_first")])
+    _stage(
+        repo,
+        SAMPLE_TEST,
+        SAMPLE_TEST_TEXT + "def test_first() -> None:\n    pass\ndef test_slow() -> None:\n    pass\n",
+    )
+    _stage(repo, MODULE, ORIGINAL.replace("value * 2", "value * 3"))
+    assert mutation.main([]) == 0
+    assert _selection(fake.pyproject) == [f"{SAMPLE_TEST}::test_first"]
+
+
+def test_node_ids_of_an_unparsable_test_module_select_the_whole_module(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake = FakeMutmut()
+    fake.install(monkeypatch)
+    _testmon(repo, [(MODULE, "tests/test_broken.py::test_x"), (MODULE, "tests/test_broken.py::test_y")])
+    _stage(repo, "tests/test_broken.py", "def test_x(:\n")
+    _stage(repo, MODULE, ORIGINAL.replace("value * 2", "value * 3"))
+    assert mutation.main([]) == 0
+    assert _selection(fake.pyproject) == ["tests/test_broken.py", SAMPLE_TEST]
+
+
+def test_only_pytest_test_modules_are_selected(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = FakeMutmut()
+    fake.install(monkeypatch)
+    importing = "from clearml_yolo.core import sample\n"
+    for helper in ("tests/conftest.py", "tests/env_isolation.py", "tests/ddp_cpu_harness.py", "tests/sample_worker.py"):
+        _stage(repo, helper, importing)
+    _stage(repo, "tests/core/sample_test.py", importing)
+    _stage(repo, MODULE, ORIGINAL.replace("value * 2", "value * 3"))
+    assert mutation.main([]) == 0
+    assert _selection(fake.pyproject) == ["tests/core/sample_test.py", SAMPLE_TEST]
 
 
 def test_unreadable_testmon_data_falls_back_to_imports(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -427,8 +500,155 @@ def test_descendants_follow_the_parent_chain_across_sessions(tmp_path: Path) -> 
         13: ("unrelated", 1, "103"),
         14: ("grandchild", 12, "104"),
     })  # fmt: skip
-    assert mutation.descendants(10, proc) == {11: "101", 12: "102", 14: "104"}
-    assert mutation.descendants(14, proc) == {}
+    assert mutation.proc_descendants(10, proc) == {11: "101", 12: "102", 14: "104"}
+    assert mutation.proc_descendants(14, proc) == {}
+
+
+class FakePsutilProcess:
+    """psutil.Process over a fixed table: pid -> (parent pid, create time)."""
+
+    table: ClassVar[dict[int, tuple[int, float]]] = {}
+
+    def __init__(self, pid: int) -> None:
+        if pid not in self.table:
+            raise FakePsutilError(pid)
+        self.pid = pid
+
+    def create_time(self) -> float:
+        return self.table[self.pid][1]
+
+    def children(self, *, recursive: bool) -> list["FakePsutilProcess"]:
+        direct = [type(self)(pid) for pid, (parent, _) in self.table.items() if parent == self.pid]
+        if not recursive:
+            return direct
+        return [*direct, *(grandchild for child in direct for grandchild in child.children(recursive=True))]
+
+
+class FakePsutilError(Exception):
+    """psutil.Error stand-in (NoSuchProcess)."""
+
+
+def _install_psutil(monkeypatch: pytest.MonkeyPatch, table: dict[int, tuple[int, float]] | None) -> None:
+    """Install a fake ``psutil`` module; None makes every Process lookup fail."""
+    module = types.ModuleType("psutil")
+
+    class Process(FakePsutilProcess):
+        pass
+
+    Process.table = table if table is not None else {}
+    module.Process = Process  # type: ignore[attr-defined]
+    module.Error = FakePsutilError  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "psutil", module)
+
+
+def test_descendants_come_from_psutil_and_are_killed_by_start_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    _install_psutil(monkeypatch, {10: (1, 1.0), 11: (10, 2.0), 12: (11, 3.0), 13: (1, 4.0)})
+    tree = mutation.descendants(10)
+    assert tree == {11: "psutil:2.0", 12: "psutil:3.0"}
+    killed: list[int] = []
+    monkeypatch.setattr(os, "kill", lambda pid, _sig: killed.append(pid))
+    _install_psutil(monkeypatch, {11: (1, 2.0), 12: (1, 9.0)})  # 12's pid was reused
+    mutation._kill_known(tree)
+    assert killed == [11]
+
+
+def test_descendants_fall_back_to_proc_then_to_nothing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _install_psutil(monkeypatch, None)
+    proc = _fake_proc(tmp_path / "proc", {10: ("mutmut", 1, "100"), 11: ("child", 10, "101")})
+    assert mutation.descendants(10, proc) == {11: "proc:101"}
+    killed: list[int] = []
+    monkeypatch.setattr(os, "kill", lambda pid, _sig: killed.append(pid))
+    mutation._kill_known({11: "proc:101", 10: "proc:999"}, proc)
+    assert killed == [11]
+    assert mutation.descendants(10, tmp_path / "missing") == {}
+
+
+class FakeGroupProcess:
+    """The Popen surface _stop_group uses, for a process that exits on SIGINT."""
+
+    pid = 424242
+
+    def __init__(self) -> None:
+        self.waited = False
+
+    def wait(self, timeout: float) -> int:
+        self.waited = timeout > 0
+        return 0
+
+    def poll(self) -> int | None:
+        return 0
+
+
+def test_failed_descendant_discovery_still_signals_the_group(monkeypatch: pytest.MonkeyPatch) -> None:
+    def broken(*_: object) -> dict[int, str]:
+        msg = "process table unavailable"
+        raise RuntimeError(msg)
+
+    monkeypatch.setattr(mutation, "psutil_descendants", broken)
+    monkeypatch.setattr(mutation, "proc_descendants", broken)
+    signals: list[tuple[int, int]] = []
+    monkeypatch.setattr(os, "killpg", lambda pid, sig: signals.append((pid, sig)))
+    monkeypatch.setattr(os, "kill", lambda *_: pytest.fail("no descendant was recorded"))
+    process = FakeGroupProcess()
+    spent = threading.Event()
+    mutation._stop_group(process, spent)  # type: ignore[arg-type]
+    assert signals == [(process.pid, signal.SIGINT), (process.pid, signal.SIGKILL)]
+    assert process.waited
+    assert spent.is_set()
+
+
+def test_interrupted_grace_wait_still_kills_the_group(monkeypatch: pytest.MonkeyPatch) -> None:
+    class ImpatientProcess:
+        pid = 454545
+
+        def wait(self, timeout: float) -> int:
+            raise KeyboardInterrupt(timeout)  # a second Ctrl-C during the grace period
+
+        def poll(self) -> int | None:
+            return None
+
+    monkeypatch.setattr(mutation, "descendants", lambda _pid: {77: "proc:1"})
+    signals: list[tuple[int, int]] = []
+    killed: list[set[int]] = []
+    monkeypatch.setattr(os, "killpg", lambda pid, sig: signals.append((pid, sig)))
+    monkeypatch.setattr(mutation, "_kill_known", lambda tree: killed.append(set(tree)))
+    process = ImpatientProcess()
+    with pytest.raises(KeyboardInterrupt):
+        mutation._stop_group(process, threading.Event())  # type: ignore[arg-type]
+    assert signals == [(process.pid, signal.SIGINT), (process.pid, signal.SIGKILL)]
+    assert killed == [{77}]
+
+
+class InterruptedPopen:
+    """A Popen stand-in whose output stream is interrupted after one line."""
+
+    def __init__(self, *_: object, **__: object) -> None:
+        self.pid = 434343
+        self.returncode: int | None = None
+        self.stdout = self._lines()
+
+    @staticmethod
+    def _lines() -> Iterator[bytes]:
+        yield b"mutating\n"
+        raise KeyboardInterrupt
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        return None
+
+
+def test_interrupted_run_stops_the_mutmut_group(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    stopped: list[int] = []
+    monkeypatch.setattr(subprocess, "Popen", InterruptedPopen)
+    monkeypatch.setattr(mutation, "_stop_group", lambda process, _spent: stopped.append(process.pid))
+    with pytest.raises(KeyboardInterrupt):
+        mutation.run_mutmut(Path("/fake/mutmut"), tmp_path, {}, [], 60.0)
+    assert stopped == [434343]
+    assert "mutating" in capsys.readouterr().out
 
 
 FAKE_MUTMUT = """\
