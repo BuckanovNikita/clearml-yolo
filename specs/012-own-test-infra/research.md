@@ -100,6 +100,14 @@ decisions, "Rules for every project", "clearml-yolo — first").
 
 ## R-11 Paired check
 
-- **Decision**: No cy-queue change. Run cy-queue's suite in this worktree's environment
-  (`cd /mnt/wsl/data/nkt/cy-queue && uv run --frozen --no-sync --project <worktree> pytest -q`)
-  on the tip; the full `paired-check` Task stage at release time as documented.
+- **Decision**: No cy-queue change. Run the repository's documented stage on the tip:
+  `CY_QUEUE_DIR=/mnt/wsl/data/nkt/cy-queue uv run --locked task --exit-code paired-check`
+  (a temporary environment with both checkouts installed editable, then cy-queue's suite).
+- **Rationale**: Running cy-queue's `pytest` with `--project <worktree>` uses the worktree's
+  development environment, which does not have cy-queue installed, and fails at collection by
+  construction.
+- **Observed 2026-11-10**: the stage fails at collection because cy-queue `d3627a0` imports
+  `clearml_yolo.adapters.storage.batch_sizes`, which exists only on the unmerged branch
+  `012-editable-batch-sizes`, not on master
+  ([evidence/2026-11-10-paired-check.md](evidence/2026-11-10-paired-check.md)). This is
+  outside this feature; SC-007 depends on it (spec "Dependencies").

@@ -226,7 +226,8 @@ selection before any environment is created.
 **Acceptance Scenarios**:
 
 1. **Given** the migrated tip, **When** cy-queue's suite runs in the paired environment,
-   **Then** it passes with no change to cy-queue.
+   **Then** it passes with no change to cy-queue (subject to the `batch_sizes` dependency in
+   "Dependencies").
 2. **Given** a GPU suite with invalid options, **When** it runs, **Then** it fails validation
    before creating any environment, as it fails before claiming a run tag today.
 
@@ -355,7 +356,7 @@ selection before any environment is created.
 
 - **FR-030**: `src/`, the GPU suites' execution logic, the real-run gate, cy-queue and the
   paired check's procedure MUST NOT change; the paired check MUST pass against the migrated
-  tip with cy-queue unchanged.
+  tip with cy-queue unchanged, once its dependency in "Dependencies" is met.
 - **FR-031**: Development verification MUST still never contact the cluster; live tests MUST
   still run only when `tests/integration` is named or the `integration` marker is selected.
 
@@ -418,7 +419,8 @@ Each current behaviour of the run-tag lifecycle and the environment skill, with 
   budget with margin; the measured value is recorded as dated evidence.
 - **SC-006**: `stop` after an out-of-band namespace deletion succeeds; `up` afterwards creates
   a new environment.
-- **SC-007**: cy-queue's suite passes against the migrated tip with cy-queue unchanged.
+- **SC-007**: cy-queue's suite passes against the migrated tip with cy-queue unchanged
+  (the `paired-check` stage); see "Dependencies" for its current blocker.
 
 ## Assumptions
 
@@ -429,6 +431,16 @@ Each current behaviour of the run-tag lifecycle and the environment skill, with 
 - Host-side GPU processes of the GPU suites reach the environment through the same loopback
   port-forward as the CPU tests.
 - The platform sweeper is not yet armed; when armed it may delete environments as R5 says.
+
+## Dependencies
+
+- **SC-007 and the paired check depend on master gaining
+  `clearml_yolo.adapters.storage.batch_sizes`** (branch `012-editable-batch-sizes`) or on the
+  owner's decision about that dependency. cy-queue `d3627a0` imports that module; on
+  2026-11-10 the `paired-check` stage failed at collection for that reason alone
+  ([evidence/2026-11-10-paired-check.md](evidence/2026-11-10-paired-check.md)). Until the
+  dependency is met, the paired check is reported as failed for a cause outside this feature,
+  never as passed; this feature makes no change to cy-queue or `src/` to work around it.
 
 ## Out of Scope
 
