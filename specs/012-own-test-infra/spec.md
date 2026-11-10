@@ -142,8 +142,8 @@ remains afterwards.
    (the components not ready and their state) is reported, and the session ends as deferred
    (exit 3) under Task verification or skips interactively.
 4. **Given** a test fails after setup, **When** the session ends, **Then** the namespace the
-   session created is still deleted (an adopted one is left, FR-014) and the failure is reported as a test failure, not as an infrastructure
-   outcome.
+   session created is still deleted (an adopted one is left, FR-014) and the failure is
+   reported as a test failure, not as an infrastructure outcome.
 
 ---
 
@@ -375,9 +375,10 @@ selection before any environment is created.
   them to the tests in place of any `CLEARML_*` or `FIFTYONE_DATABASE_URI` value the shell
   holds; from the shell it reads only `INTEGRATION_RUN_TAG`.
 - **FR-012**: A setup failure after setup created the namespace MUST delete that namespace
-  before the failure is reported; a setup failure while adopting deletes nothing (FR-014). Temporary causes (not ready within the budget, lost connectivity) MUST
-  be reported as unavailable (exit 3, deferred); permanent causes (forbidden, invalid
-  manifest, quota rejection) as errors (exit 1).
+  before the failure is reported; a setup failure while adopting deletes nothing (FR-014).
+  Temporary causes (not ready within the budget, lost connectivity) MUST be reported as
+  unavailable (exit 3, deferred); permanent causes (forbidden, invalid manifest, quota
+  rejection) as errors (exit 1).
 - **FR-013**: Teardown MUST stop the environment's port-forwards, delete the namespace and
   prove its absence within a bounded wait; incomplete teardown MUST fail the session and keep
   the record for a retry, as incomplete exact-tag cleanup does today. Every teardown is
@@ -546,7 +547,7 @@ Each current behaviour of the run-tag lifecycle and the environment skill, with 
   environment leaves that namespace and record in place; a session with no live recorded
   environment, whatever is exported, creates a namespace and deletes exactly that one; a
   second `agent_env.sh` against a live recorded environment creates nothing (US3 scenarios
-  5-6, US4 scenarios 8-13).
+  5-6 and 9, US4 scenarios 8-13).
 
 ## Assumptions
 
