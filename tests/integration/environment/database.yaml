@@ -1,0 +1,49 @@
+# The environment's MongoDB server. ClearML's databases and the FiftyOne database
+# (FiftyOne's own database name) live on it; a FiftyOne-only session applies only this
+# file. No authentication: the server is reachable only inside the namespace and through
+# a loopback port-forward, and its data (emptyDir) dies with the namespace.
+apiVersion: v1
+kind: List
+items:
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: mongo
+      namespace: __NAMESPACE__
+      labels:
+        app.kubernetes.io/part-of: clearml-yolo-tests
+        clearml-yolo/environment: __NAMESPACE__
+    spec:
+      selector: {matchLabels: {app: mongo}}
+      template:
+        metadata:
+          labels:
+            app: mongo
+            app.kubernetes.io/part-of: clearml-yolo-tests
+            clearml-yolo/environment: __NAMESPACE__
+        spec:
+          terminationGracePeriodSeconds: 2
+          containers:
+            - name: mongo
+              image: mongo:7.0.22
+              imagePullPolicy: IfNotPresent
+              args: ["--bind_ip_all", "--wiredTigerCacheSizeGB", "0.25"]
+              ports: [{containerPort: 27017}]
+              readinessProbe:
+                exec: {command: ["mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]}
+                periodSeconds: 2
+                timeoutSeconds: 5
+              resources:
+                requests: {cpu: 100m, memory: 256Mi}
+                limits: {cpu: "1", memory: 1Gi}
+              volumeMounts: [{name: data, mountPath: /data/db}]
+          volumes: [{name: data, emptyDir: {}}]
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: mongo
+      namespace: __NAMESPACE__
+      labels:
+        app.kubernetes.io/part-of: clearml-yolo-tests
+        clearml-yolo/environment: __NAMESPACE__
+    spec: {selector: {app: mongo}, ports: [{port: 27017}]}

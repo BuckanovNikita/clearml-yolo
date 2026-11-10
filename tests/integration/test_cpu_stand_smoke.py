@@ -1,10 +1,10 @@
-"""CPU smoke run of the top-level ``ultralytics`` pipeline against the shared ClearML stand.
+"""CPU smoke run of the top-level ``ultralytics`` pipeline against the test environment's ClearML.
 
 A tiny synthetic YOLO dataset (disjoint train/val/test, one empty image per split) becomes
 ground truth through ``cy-ground-truth``; ``cy`` trains one CPU epoch, predicts, calibrates on
 val and evaluates. Both commands publish into the run's tagged project, and the ClearML SDK
 then proves the pipeline task completed with an Output Model and its evaluation artifacts.
-``live_run`` removes every object of the run tag afterwards.
+The session deletes the environment it created, and everything published into it, afterwards.
 
 Weights are explicit and local: ``CY_SMOKE_WEIGHTS``, else ``yolo11n.pt`` in this checkout or
 the main checkout of this repository (``*.pt`` is ignored, so worktrees usually lack it).
@@ -117,13 +117,13 @@ def _run(arguments: list[str], cwd: Path, environment: dict[str, str], log: Path
 
 
 def test_cpu_pipeline_publishes_a_completed_tagged_task(
-    live_run: lifecycle.Run, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    live_run: lifecycle.Environment, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from clearml import Task
 
     project = lifecycle.tagged_project_name(live_run.tag)
     tags = f"clearml.tags=[{live_run.tag}]"
-    # The run's stand variables are applied explicitly, for the children and for the
+    # The environment's variables are applied explicitly, for the children and for the
     # in-process ClearML query below, rather than assumed from an earlier export.
     for key, value in live_run.exported.items():
         monkeypatch.setenv(key, value)

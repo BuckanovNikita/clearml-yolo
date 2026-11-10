@@ -1,6 +1,6 @@
-"""Native result persistence, reload and subset behavior on an isolated FiftyOne database.
+"""Native result persistence, reload and subset behavior on the test environment's FiftyOne database.
 
-Runs only with CY_TEST_FIFTYONE=1 and FIFTYONE_DATABASE_DIR pointing at an isolated database.
+Runs only with CY_TEST_FIFTYONE=1; the database is the session's test environment's.
 """
 
 import json
@@ -18,6 +18,7 @@ from test_fiftyone_evaluation_results import native as source_native
 from test_fiftyone_evaluation_results import payload as source_payload
 
 native = source_native
+pytestmark = pytest.mark.usefixtures("fiftyone_database")
 payload = source_payload
 
 

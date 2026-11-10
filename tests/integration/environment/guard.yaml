@@ -1,0 +1,39 @@
+# Applied right after the namespace and before any workload. The values are derived from
+# the use measured on 2026-11-10 (specs/012-own-test-infra/data-model.md): with every
+# component pods 5, requests 550m / 1184Mi, limits 6500m / 3840Mi. No claim and no GPU
+# request is admitted: data lives in emptyDir and the GPU belongs to host processes.
+# The limit range gives init containers and debug pods requests and limits, which the
+# quota requires of every container.
+apiVersion: v1
+kind: List
+items:
+  - apiVersion: v1
+    kind: ResourceQuota
+    metadata:
+      name: cy-it
+      namespace: __NAMESPACE__
+      labels:
+        app.kubernetes.io/part-of: clearml-yolo-tests
+        clearml-yolo/environment: __NAMESPACE__
+    spec:
+      hard:
+        pods: "8"
+        requests.cpu: "1"
+        requests.memory: 2Gi
+        limits.cpu: "8"
+        limits.memory: 6Gi
+        persistentvolumeclaims: "0"
+        requests.nvidia.com/gpu: "0"
+  - apiVersion: v1
+    kind: LimitRange
+    metadata:
+      name: cy-it
+      namespace: __NAMESPACE__
+      labels:
+        app.kubernetes.io/part-of: clearml-yolo-tests
+        clearml-yolo/environment: __NAMESPACE__
+    spec:
+      limits:
+        - type: Container
+          defaultRequest: {cpu: 50m, memory: 64Mi}
+          default: {cpu: 500m, memory: 256Mi}

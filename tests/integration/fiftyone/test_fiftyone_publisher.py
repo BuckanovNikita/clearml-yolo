@@ -1,4 +1,8 @@
-"""Opt-in persistence checks against a real, explicitly isolated FiftyOne database."""
+"""Opt-in persistence checks against the test environment's FiftyOne database.
+
+Runs only with CY_TEST_FIFTYONE=1; FIFTYONE_DATABASE_DIR names an isolated directory for the
+publisher's locks.
+"""
 
 import os
 import subprocess
@@ -15,16 +19,20 @@ from PIL import Image
 from clearml_yolo.core.publication import FiftyOneConfig, PublicationRequest
 from test_publication_data import write_truth
 
-pytestmark = pytest.mark.skipif(
-    os.environ.get("CY_TEST_FIFTYONE") != "1",
-    reason="Set CY_TEST_FIFTYONE=1 and FIFTYONE_DATABASE_DIR to an isolated database",
-)
+pytestmark = [
+    pytest.mark.skipif(
+        os.environ.get("CY_TEST_FIFTYONE") != "1",
+        reason="Set CY_TEST_FIFTYONE=1 and FIFTYONE_DATABASE_DIR to an isolated lock directory",
+    ),
+    # The database is the test environment's, reached through a port-forward.
+    pytest.mark.usefixtures("fiftyone_database"),
+]
 
 
 @pytest.fixture
 def backend() -> Any:
     if not os.environ.get("FIFTYONE_DATABASE_DIR"):
-        pytest.fail("Real FiftyOne tests require an explicit isolated FIFTYONE_DATABASE_DIR")
+        pytest.fail("Real FiftyOne tests require an explicit isolated FIFTYONE_DATABASE_DIR for the publisher's locks")
     import fiftyone as fo
 
     return fo

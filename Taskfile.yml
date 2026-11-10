@@ -160,12 +160,12 @@ tasks:
 
   # --- stream A begin ---
   infra-check:
-    desc: Read-only bounded stand preflight (0 available, 3 unavailable, 1 error); creates nothing
+    desc: Read-only bounded preflight of the docker-desktop cluster for the test environment (0 available, 3 unavailable, 1 error); creates nothing
     cmds:
       - "{{.RUN}} {{.UV}} python -m tests.integration.lifecycle check"
 
   integration:
-    desc: Preflight, then the non-GPU live tests (stand smoke and FiftyOne) in the serial live group
+    desc: Preflight, then the non-GPU live tests (CPU smoke and FiftyOne) in the serial live group, against a cy-it- test environment the session creates and deletes
     cmds:
       - task: infra-check
       # One process: every live test shares the serial `live` group anyway, and only
@@ -208,7 +208,7 @@ tasks:
       - task: _clean-tip
       - task: check
       - task: properties
-      # Live preflight early, so an unavailable stand defers before the long unit suite.
+      # Live preflight early, so an unavailable cluster defers before the long unit suite.
       - |
         if [ "{{.DOCS_ONLY}}" = 1 ]; then
           echo "NOTICE: every path changed since master is documentation (*.md, docs/, specs/);" >&2
@@ -218,7 +218,7 @@ tasks:
         status=0
         "{{.TASK_EXE}}" --exit-code infra-check || status=$?
         if [ "$status" = 3 ]; then
-          echo "DEFERRED: the shared stand is unavailable (infra-check exit 3); acceptance is blocked until the live part runs." >&2
+          echo "DEFERRED: the cluster is unavailable (infra-check exit 3); acceptance is blocked until the live part runs." >&2
         fi
         exit "$status"
       - "mkdir -p {{.ROOT_DIR | shellQuote}}/.tmp/coverage"
@@ -229,7 +229,7 @@ tasks:
         status=0
         "{{.TASK_EXE}}" --exit-code integration || status=$?
         if [ "$status" = 3 ]; then
-          echo "DEFERRED: the shared stand became unavailable (exit 3); acceptance is blocked until the live part runs." >&2
+          echo "DEFERRED: the test environment became unavailable (exit 3); acceptance is blocked until the live part runs." >&2
         fi
         exit "$status"
       - task: _clean-tip
@@ -350,7 +350,9 @@ tasks:
         mkdir -p {{.ROOT_DIR | shellQuote}}/.tmp
         database="$(mktemp -d {{.ROOT_DIR | shellQuote}}/.tmp/fiftyone-db.XXXXXX)"
         trap 'rm -rf -- "$database"' EXIT
-        CY_TEST_FIFTYONE=1 FIFTYONE_DATABASE_DIR="$database" {{.RUN}} {{.UV}} pytest tests/integration/fiftyone -p no:randomly -n 0
+        # The database is the test environment's (database component only); the
+        # directory holds the publisher's locks.
+        CY_TEST_FIFTYONE=1 CY_TASK_VERIFICATION=1 FIFTYONE_DATABASE_DIR="$database" {{.RUN}} {{.UV}} pytest tests/integration/fiftyone -p no:randomly -n 0
       - task: paired-check
   # --- stream B end ---
   # --- stream C begin ---

@@ -5,7 +5,7 @@ runs during pytest startup, ahead of every conftest and test module. SDKs used b
 project (ClearML, Ultralytics, FiftyOne, Hydra) read configuration and caches from HOME;
 tests must never read or write the developer's real files.
 
-Live tests need some real locations (the k8s-infra skill directory, weights caches). The
+Live tests need some real locations (the kubeconfig kubectl reads, weights caches). The
 original values are kept as JSON in ``CY_REAL_ENV``; read them with ``real_env``.
 """
 

@@ -1,4 +1,4 @@
-"""Panel contracts on a real isolated FiftyOne database (CY_TEST_FIFTYONE=1), without an App."""
+"""Panel contracts on the test environment's FiftyOne database (CY_TEST_FIFTYONE=1), without an App."""
 
 import math
 import os
@@ -13,6 +13,7 @@ from clearml_yolo.core.evaluation.payload import EvaluationReport
 from test_fiftyone_evaluation_results import payload as source_payload
 
 payload = source_payload
+pytestmark = pytest.mark.usefixtures("fiftyone_database")
 
 
 @pytest.mark.skipif(os.environ.get("CY_TEST_FIFTYONE") != "1", reason="Isolated FiftyOne required")
@@ -63,7 +64,7 @@ def test_report_keeps_source_precision_and_marks_subset_unavailable() -> None:
 @pytest.fixture
 def dataset() -> Iterator[Any]:
     if os.environ.get("CY_TEST_FIFTYONE") != "1":
-        pytest.skip("Real FiftyOne views require the isolated test environment")
+        pytest.skip("Real FiftyOne views require CY_TEST_FIFTYONE=1")
     import fiftyone as fo
 
     instance = fo.Dataset("cy-panel-" + uuid4().hex)

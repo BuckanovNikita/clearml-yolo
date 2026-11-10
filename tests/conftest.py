@@ -203,7 +203,7 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     A GPU suite runs when its opt-in flag, its marker expression or its file is named; an
     explicit GPU selection without the opt-in fails in the option fixtures below. Other live
     tests run only when the invocation names ``tests/integration`` (or a path inside it) or
-    selects the ``integration`` marker, so a plain ``pytest`` never contacts the stand.
+    selects the ``integration`` marker, so a plain ``pytest`` never contacts the cluster.
     """
     selected_gpu = {
         marker
@@ -254,7 +254,7 @@ def ddp_gpu_options(request: pytest.FixtureRequest) -> GPUOptions:
 
 @pytest.fixture
 def severstal_options(request: pytest.FixtureRequest) -> "SeverstalOptions":
-    """Require explicit data, evidence and stand ownership before any native run."""
+    """Require explicit data, evidence and project ownership before any native run."""
     from severstal_harness import SeverstalOptions, parse_backbone_options
 
     config = request.config

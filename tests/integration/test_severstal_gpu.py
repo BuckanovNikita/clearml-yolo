@@ -12,7 +12,7 @@ pytestmark = pytest.mark.severstal_gpu
 
 @pytest.fixture
 def stand_options(severstal_options: SeverstalOptions, stand_project: Callable[[str], str]) -> SeverstalOptions:
-    """Publish ``--severstal-clearml-project`` to its run-tagged project on the shared stand."""
+    """Publish ``--severstal-clearml-project`` to its tagged project in the session's test environment."""
     return replace(severstal_options, project=stand_project(severstal_options.project))
 
 

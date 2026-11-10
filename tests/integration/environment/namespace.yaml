@@ -1,0 +1,10 @@
+# The test environment's namespace. tests/integration/lifecycle.py substitutes
+# __NAMESPACE__ with the environment identifier (cy-it-<6 hex>) and creates it with
+# `kubectl create`, so an existing namespace is never taken over.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: __NAMESPACE__
+  labels:
+    app.kubernetes.io/part-of: clearml-yolo-tests
+    clearml-yolo/environment: __NAMESPACE__

@@ -13,7 +13,7 @@ pytestmark = pytest.mark.ddp_gpu
 
 @pytest.fixture
 def stand_options(ddp_gpu_options: GPUOptions, stand_project: Callable[[str], str]) -> GPUOptions:
-    """Publish ``--ddp-clearml-project`` to its run-tagged project on the shared stand."""
+    """Publish ``--ddp-clearml-project`` to its tagged project in the session's test environment."""
     return replace(ddp_gpu_options, project=stand_project(ddp_gpu_options.project))
 
 
