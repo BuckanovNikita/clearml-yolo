@@ -778,9 +778,13 @@ def mutate(workspace: Path, targets: Sequence[Target], options: Options) -> int:
         msg = f"mutmut run exited with status {status} (output above)."
         raise MutationError(msg)
     statuses = parse_results(mutmut_results(binary, workspace, env))
-    escaped = report(statuses, [target.name for target in targets], ShowFn(binary, workspace, env))
+    functions = [target.name for target in targets]
+    escaped = report(statuses, functions, ShowFn(binary, workspace, env))
     if not escaped:
-        return 0
+        unreached = any(
+            status in UNREACHED_STATUSES and _selected(name, functions) for name, status in statuses.items()
+        )
+        return _advisory(options.strict) if unreached else 0
     print()
     print("Advisory: strengthen a test that should observe these mutations,")
     print("or leave them when the mutation cannot change observable behaviour.")

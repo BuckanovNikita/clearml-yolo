@@ -116,4 +116,27 @@ US1 (Phase 3) on top of Phases 1–2.
 
 ## Evidence
 
-_(dated entries added during implementation)_
+### 2026-11-10 — Local consolidation and acceptance corrections
+
+- Audited all 24 local branch tips and 11 auxiliary worktrees. Every tip was an
+  ancestor of `690dfa2`; no uncommitted source or unique result artifacts remained.
+  Removed the auxiliary worktrees and 22 redundant branches, preserving the main
+  checkout, dependency symlink targets, and consolidated feature branch.
+- Baseline `task acceptance` passed on clean `690dfa2`: property exploration and
+  coverage runs each passed 4,269 tests with one skip. Measured coverage was 84.12%;
+  this measurement supplies the configured coverage minimum with two-digit precision.
+- The live CPU smoke passed with tag
+  `clearml-yolo-codex-20261110-integration-46nn`; its lifecycle completed exact-tag
+  cleanup. The live selector reported one pass, 29 skips and 81 deselections; this
+  does not establish FiftyOne or GPU acceptance.
+- `task mutation -- --base master` passed with no changed product functions to
+  mutate. Static checks passed: lock freshness, Ruff, architecture, mypy, Vulture
+  and deptry.
+- Independent review identified the unset coverage minimum and strict mutation's
+  success for mixed killed/unreached results. The latter was reproduced with an
+  in-memory boundary probe. The user authorized correcting both before local
+  integration. The correction passed 39 existing mutation tests and four focused
+  in-memory regression cases (strict/advisory, unrelated results and budget
+  exhaustion). Final committed-input verification and independent review are
+  reported in the consolidation session's completion evidence.
+- Scope is local consolidation, with no push, version release or deployment.

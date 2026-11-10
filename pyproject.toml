@@ -169,7 +169,8 @@ data_file = ".tmp/coverage/.coverage"
 
 [tool.coverage.report]
 show_missing = true
-# fail_under set by integrator from measured floor
+precision = 2
+fail_under = 84.12
 
 [tool.deptry]
 known_first_party = ["clearml_yolo", "tests", "scripts"]
