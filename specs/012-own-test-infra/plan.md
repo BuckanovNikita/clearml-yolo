@@ -2,7 +2,9 @@
 
 **Branch**: `feat/own-test-infra` (feature `012-own-test-infra`) | **Date**: 2026-11-10 | **Spec**: [spec.md](spec.md)
 
-**Input**: Feature specification from `specs/012-own-test-infra/spec.md`
+**Input**: Feature specification from `specs/012-own-test-infra/spec.md`. Feature number 012
+is shared with `specs/012-editable-batch-sizes` on branch `012-editable-batch-sizes`, a
+separate feature.
 
 ## Summary
 
@@ -44,13 +46,15 @@ documentation only.
 Teardown about 11 s with a 2 s termination grace period (43 s with the default 30 s),
 measured.
 
-**Constraints**: R1-R9 of the k8s-infra plan; interim rules (port-forward only; `emptyDir`);
+**Constraints**: R1-R9 of the k8s-infra plan; host access by port-forward only (permanent,
+plan decision 10); `emptyDir` only (naming `hostpath` for a claim is the interim part of R4);
 `check` stays read-only and bounded; credentials never printed or written to repository files;
 `src/` unchanged; cy-queue unchanged.
 
 **Scale/Scope**: One environment per session per worktree; five pods; quota requests 1 CPU and
-2 GiB, limits 8 CPU and 6 GiB (measured use: requests 550m and 1184 MiB, limits 6.5 CPU and
-3840 MiB).
+2 GiB, limits 8 CPU and 6 GiB, derived from the measured use (requests 550m and 1184 MiB,
+limits 6.5 CPU and 3840 MiB); the measurement runs applied a looser quota, so these values are
+first applied by the live acceptance run (T027).
 
 ## Constitution Check
 
@@ -60,7 +64,7 @@ measured.
 | II. Module boundaries | `src/` untouched; `tests/integration` is not imported by product code (existing architecture test). |
 | III. Configuration and run ownership | Live suites keep explicit tagged project names and tags; credentials never uploaded or printed; run directories stay isolated. |
 | IV. Proportional, evidence-based verification | Live evidence is the product's own live suites run against the new environment, plus dated measurements; mocked tests claim nothing about uploads. Tooling unit tests are removed rather than rewritten (owner rule: tests exercise product code). Deferred/waived semantics are unchanged. |
-| V. Collaboration | Russian `README.md` unaffected unless it mentions the stand (it does not); evidence dated in this feature directory. |
+| V. Collaboration | Russian `README.md` mentions the stand once, in the comment on `task --exit-code acceptance` ("включая стенд ClearML"); that comment is reworded in Russian (FR-024, T023). Evidence dated in this feature directory. |
 
 Gate result: PASS. Re-checked after design: unchanged.
 
@@ -94,7 +98,7 @@ scripts/session_status.sh               # reports the recorded environment inste
 .agents/skills/clearml-yolo-environment/{SKILL.md,scripts/*.sh,references/machine-workflow.md}
 .agents/skills/running-integration-tests/SKILL.md
 .agents/skills/running-end-to-end-tests/SKILL.md
-docs/development.md  docs/ddp-testing.md  GLOSSARY.md  TECH_DETAILS.md
+docs/development.md  docs/ddp-testing.md  GLOSSARY.md  TECH_DETAILS.md  README.md (one Russian comment)
 ```
 
 **Structure Decision**: Test infrastructure stays under `tests/integration` beside the lifecycle
@@ -132,6 +136,8 @@ no `src/` change.
    `limits.memory 6Gi`, `persistentvolumeclaims 0`, `requests.nvidia.com/gpu 0`. Limit range
    defaults (50m/64Mi request, 500m/256Mi limit) cover the init containers. Elasticsearch runs
    with a 256 MiB heap, request 512 MiB, limit 1 GiB (measured sufficient for the smoke test).
+   These values are derived from the measured use; the measurement runs applied a looser quota
+   (requests 2 CPU / 4Gi, limits 8 CPU / 8Gi), so T027 is their first application.
 9. **Fast teardown.** Pods declare a 2 s termination grace period (no data to preserve);
    teardown waits for the namespace to disappear, bounded (`CY_TEST_ENV_STOP_TIMEOUT`,
    default 180 s). Measured 11 s. Every delete passes the deletion guard first (spec FR-018,
@@ -142,6 +148,16 @@ no `src/` change.
     evidenced by live runs. Product tests that mention retired names (for example
     `tests/test_clearml_session.py` proving the application ignores `INFRA_RUN_TAG`) stay: they
     test product behaviour, not the retired tooling.
+11. **Environment selection and ownership.** One rule for `up`, `agent_env.sh` and session
+    setup (spec FR-014, contract "Environment selection"): with no live recorded environment,
+    clear a stale or retired record and create; with a live one, only a pytest session whose
+    exported `INTEGRATION_RUN_TAG` equals it adopts it, and everything else is refused with
+    exit 1 naming `stop`. Whoever creates an environment deletes it; an adopting session makes
+    no create or delete call, so automatic teardown never deletes a namespace its process did
+    not create. `agent_env.sh` always performs `up` and never reuses. `up` and `env` ignore the
+    exported identifier, so a stale export never blocks recovery (R5). Chosen as the smallest
+    rule that recreates a missing namespace and keeps a single owner for each deletion; the
+    earlier draft both refused and recreated on a stale export.
 
 ## Complexity Tracking
 

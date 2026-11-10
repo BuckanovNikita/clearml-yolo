@@ -1,6 +1,8 @@
 # Feature Specification: Own Kubernetes Test Infrastructure
 
-**Feature Branch**: `feat/own-test-infra` (feature directory `012-own-test-infra`)
+**Feature Branch**: `feat/own-test-infra` (feature directory `012-own-test-infra`). The feature
+number 012 is shared with `specs/012-editable-batch-sizes` on branch `012-editable-batch-sizes`;
+the two are separate features, told apart by their directory names.
 
 **Created**: 2026-11-10
 
@@ -17,6 +19,11 @@ only; no `storageClassName`, prefer `emptyDir`, and where a claim is unavoidable
 `clearml.py`. Real GPU work execution and cy-queue scheduling are out of scope and do not
 change; cy-queue gets no change, only its paired check against the migrated tip. The
 project's own ClearML requests no GPU."
+
+Since that input the k8s-infra plan settled host access by `kubectl port-forward` as the
+permanent rule (plan decision 10 and rule 9: no wildcard name lookup on this machine); it is no
+longer interim. The storage wording stays interim only in naming `hostpath` while two default
+storage classes exist (plan phase P5).
 
 Terms follow the "Verification and release" section of [GLOSSARY.md](../../GLOSSARY.md); this
 feature adds **test environment** (below). It changes contributor, agent and verification
@@ -47,7 +54,7 @@ The governing rules (numbered as in the k8s-infra plan, "Rules for every project
 | R6 | No use of the dedicated platform ClearML or FiftyOne MongoDB; the project deploys its own ClearML and its own FiftyOne database. |
 | R7 | `nvidia.com/gpu: 1` is requested only where a test needs it; the project's ClearML requests none. |
 | R8 | No `INFRA_RUN_TAG`, `INFRA_PROJECT`, `K8S_INFRA_SKILL_DIR`, `INFRA_REGISTRY`, and no calls to `infra.py`, `clearml.py`, `mongodb.py`, `cvat.py`, `lakefs.py`, `postgres.py` in code, skills or shell profiles. |
-| R9 | Host access by `kubectl port-forward` (interim, until wildcard name lookup is proven by the platform). |
+| R9 | Host access by `kubectl port-forward` only (permanent: plan decision 10); names the project invents do not resolve on the host. |
 
 ## Clarifications
 
@@ -90,8 +97,20 @@ question was asked. Each answer is the smallest decision consistent with the pla
   implementing session is authorised to create and delete on the shared cluster; it is
   distinct from every protected name (R2). Earlier drafts named `clearml-yolo-it-`.
 - Q: May a pytest session use an environment that a manual `up` created? → A: Only when the
-  shell exports `INTEGRATION_RUN_TAG` equal to the recorded identifier, mirroring the
-  retired rule that only an exported tag equal to the record adopted a run (FR-014).
+  shell exports `INTEGRATION_RUN_TAG` equal to the identifier of the live recorded environment,
+  mirroring the retired rule that only an exported tag equal to the record adopted a run
+  (FR-014).
+- Q: (revised 2026-11-10 after verification found the adoption, reuse and recovery rules in
+  conflict) What happens when the exported identifier names no live recorded environment, does
+  `agent_env.sh` reuse an environment, and who removes an adopted one? → A: One selection rule
+  (FR-014): with no live recorded environment, `up`, `agent_env.sh` and session setup clear any
+  stale or retired record and create a new environment, ignoring an exported identifier (R5:
+  tooling recreates a missing namespace); with a live recorded environment, only a pytest
+  session whose exported identifier equals it adopts it, and everything else is refused.
+  `agent_env.sh` never reuses: it always performs `up`. Whoever creates an environment removes
+  it: a session removes only the environment it created; an adopted environment is removed
+  only by `stop` or `agent_cleanup.sh`, so automatic teardown never deletes a namespace its
+  process did not create.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -180,6 +199,24 @@ namespace and directory are gone and no k8s-infra helper was invoked.
 4. **Given** an environment from `agent_env.sh`, **When** `agent_cleanup.sh` runs, **Then** the
    namespace is deleted and proven absent, and the run directory is removed only when it is
    named after the run identifier.
+5. **Given** a live recorded environment in the checkout (for example from an earlier
+   `agent_env.sh` in the same shell, which exports its identifier), **When** `agent_env.sh` is
+   sourced again, **Then** it returns 1 naming the recorded environment and
+   `agent_cleanup.sh`, and creates, deletes and exports nothing (FR-020).
+6. **Given** a recorded environment whose namespace no longer exists, **When** `agent_env.sh`
+   is sourced, **Then** the stale record is cleared without any delete call and a new
+   environment is created and exported under a new identifier (FR-014, R5).
+7. **Given** a shell that exports `FIFTYONE_DATABASE_URI` and `FIFTYONE_DATABASE_NAME` from an
+   earlier session and no `FIFTYONE_DATABASE_DIR`, **When** `agent_env.sh` is sourced, **Then**
+   on success `FIFTYONE_DATABASE_URI` names the new environment's database,
+   `FIFTYONE_DATABASE_NAME` is unset and `FIFTYONE_DATABASE_DIR` is
+   `$HOME/.cache/clearml-yolo/fiftyone`; on failure neither database variable is set.
+8. **Given** `source agent_env.sh <slug>`, **When** it runs, **Then** one line says the slug is
+   ignored and the run proceeds as without it.
+9. **Given** an environment from `agent_env.sh` and a live pytest session started in the same
+   shell, **When** the session ends, **Then** the session adopted that environment, made no
+   create or delete call, and the namespace and record remain until `agent_cleanup.sh` runs
+   (FR-014).
 
 ---
 
@@ -199,11 +236,13 @@ converges; starting again recreates what is missing.
 
 1. **Given** a recorded environment whose namespace no longer exists, **When** `stop` runs,
    **Then** it succeeds, reports that the namespace was already gone, and clears the record.
-2. **Given** a recorded environment whose namespace no longer exists, **When** `up` or a live
-   session starts, **Then** it clears the stale record and creates a new environment instead
-   of refusing.
-3. **Given** a recorded environment that still exists, **When** `up` runs, **Then** it refuses,
-   naming the environment and the `stop` command, as today's active-run refusal does.
+2. **Given** a recorded environment whose namespace no longer exists, with or without
+   `INTEGRATION_RUN_TAG` exported equal to it, **When** `up` or a live session starts, **Then**
+   it clears the stale record without any delete call and creates a new environment instead of
+   refusing; a session that created it deletes it at the end.
+3. **Given** a live recorded environment, **When** `up` runs (whatever `INTEGRATION_RUN_TAG`
+   holds), **Then** it refuses with exit 1, naming the environment and the `stop` command, as
+   today's active-run refusal does.
 4. **Given** `INTEGRATION_KEEP_DATA=1`, **When** the session ends, **Then** the environment is
    kept, the record stays, and the output names the `stop` command and the 48-hour limit.
 5. **Given** a crash while the port-forward children run, **When** `stop` runs later,
@@ -215,6 +254,29 @@ converges; starting again recreates what is missing.
    environment identifier, for example `clearml-yolo-claude-20261105-integration-a1b2`), **When** `stop`, `up` or a live
    session runs, **Then** the record is cleared without any delete call; `stop` exits 0 and
    `up` or the session continues (FR-018).
+8. **Given** a live recorded environment from `up` and `INTEGRATION_RUN_TAG` exported equal to
+   it (`eval "$(L env)"`), **When** a live session runs and ends, including with
+   `INTEGRATION_KEEP_DATA=1` or after a test failure, **Then** the session uses that
+   environment, makes no create or delete call, and afterwards the namespace and record still
+   exist; `stop` then removes them (FR-014).
+9. **Given** a live recorded environment and `INTEGRATION_RUN_TAG` unset or different, **When**
+   a live session starts, **Then** it refuses with exit 1 naming the environment and `stop`,
+   and creates and deletes nothing.
+10. **Given** no live recorded environment and `INTEGRATION_RUN_TAG` exported (for example the
+    identifier of a swept environment), **When** a live session starts, **Then** one line says
+    the exported identifier names no live recorded environment, the session creates its own
+    environment under a new identifier, uses that identifier for the tests, and deletes only
+    that namespace at the end.
+11. **Given** a shell that still exports the identifier of a swept environment, **When** `up`
+    and then `eval "$(L env)"` run, **Then** `up` creates a new environment and `env` exports
+    the new identifier; the old export blocks neither command.
+12. **Given** an adopted environment (as in scenario 8) whose recorded port-forward for a
+    component the session needs is missing or no longer running, **When** the session starts,
+    **Then** it refuses with exit 1 naming the component and `stop`, and creates and deletes
+    nothing.
+13. **Given** a record naming an existing namespace that lacks the project label, **When**
+    `up`, `agent_env.sh` or a live session starts, **Then** it refuses with exit 1, keeps the
+    record, and creates and deletes nothing (FR-018).
 
 ---
 
@@ -278,6 +340,9 @@ selection before any environment is created.
   `LimitRange` before any workload object, and the quota MUST cover the measured set with
   headroom while allowing no `PersistentVolumeClaim` and no `nvidia.com/gpu` request (R3, R4,
   R7). Its values live in the project's manifests with the measurement that justifies them.
+  The designed values were derived from the use measured on 2026-11-10; the measurement runs
+  applied a looser quota, so the designed quota itself is first applied, and its admission of
+  every pod first shown, by the live acceptance run (tasks T027).
 - **FR-003**: The environment MUST provide its own ClearML server (API and file server with
   their MongoDB, Redis and Elasticsearch) and its own FiftyOne database; it MUST NOT contact
   the platform's dedicated ClearML or MongoDB or any retired shared stand (R6).
@@ -297,8 +362,11 @@ selection before any environment is created.
 - **FR-010**: A read-only preflight MUST remain, bounded by `CY_INFRA_CHECK_TIMEOUT` (default
   60 s), creating nothing, with exit statuses 0 available, 3 unavailable (cluster not
   answering, timeout), 1 error (kubectl missing, context missing, permission to create
-  namespaces denied), 130 interrupted. It MUST NOT call any k8s-infra helper.
-- **FR-011**: Session setup MUST create the environment, wait for readiness within a start-up
+  namespaces denied), 130 interrupted. It MUST NOT call any k8s-infra helper. `up` and
+  session setup MUST run the same bounded preflight before they read the record or create
+  anything, so an unavailable cluster ends them with exit 3 and nothing changed.
+- **FR-011**: Session setup MUST adopt or create the environment by the selection rule
+  (FR-014); when it creates one, it MUST wait for readiness within a start-up
   budget configurable through an environment variable (default chosen from the measured cold
   start with room for pulling images), open port-forwards to loopback on kubectl-chosen ports,
   and export the ClearML endpoint, files endpoint and credentials (and the FiftyOne database
@@ -311,16 +379,33 @@ selection before any environment is created.
   prove its absence within a bounded wait; incomplete teardown MUST fail the session and keep
   the record for a retry, as incomplete exact-tag cleanup does today. Every teardown is
   subject to the deletion guard (FR-018).
-- **FR-014**: One worktree MUST have at most one recorded environment. Starting while a
-  recorded environment exists MUST be refused with the `stop` command; a recorded environment
-  whose namespace no longer exists MUST be treated as gone: `stop` succeeds and clears it, and
-  `up` or session setup clears it and creates a new one (R5). A pytest session adopts the
-  recorded environment only when the shell exports `INTEGRATION_RUN_TAG` equal to the
-  recorded identifier (as `eval "$(L env)"` after `up` does); it then uses that environment
-  and leaves its teardown to `stop`. Any other live record is refused, and an exported
-  `INTEGRATION_RUN_TAG` that names no live recorded environment is refused.
-- **FR-015**: `INTEGRATION_KEEP_DATA=1` MUST keep the environment and its record after the
-  session and print the `stop` command and the 48-hour limit.
+- **FR-014**: One worktree MUST have at most one recorded environment. A **live recorded
+  environment** is one whose record identifier matches the identifier pattern and whose
+  namespace exists with the project label. `up`, `agent_env.sh` and session setup MUST select
+  by one rule (contract "Environment selection"):
+  - no record, a retired-format record or a stale record (namespace absent): the record is
+    cleared without any delete call and a new environment is created (R5); an exported
+    `INTEGRATION_RUN_TAG` is ignored, and session setup says so in one line and uses the new
+    identifier;
+  - a live recorded environment and a pytest session whose shell exports `INTEGRATION_RUN_TAG`
+    equal to it (as `eval "$(L env)"` after `up` or `agent_env.sh` does): the session
+    **adopts** it, provided each component it needs has a running recorded port-forward
+    (otherwise exit 1 naming the component and `stop`);
+  - any other live recorded environment, including every case for `up` and `agent_env.sh`:
+    refused with exit 1 naming the environment and the `stop` command;
+  - a record naming an existing namespace without the project label: refused with exit 1,
+    record kept (FR-018).
+
+  Whoever creates an environment removes it: a session deletes only the environment it
+  created (unless `INTEGRATION_KEEP_DATA=1`); an environment created by `up` or `agent_env.sh`,
+  and therefore every adopted one, is deleted only by `stop` or `agent_cleanup.sh`. An adopting
+  session makes no create or delete call, including on setup failure, test failure and under
+  `INTEGRATION_KEEP_DATA=1`. `stop` on a stale record succeeds and clears it. Only session
+  setup reads an exported `INTEGRATION_RUN_TAG`, and only to decide adoption; `up` and `env`
+  ignore it (`env` overwrites it).
+- **FR-015**: `INTEGRATION_KEEP_DATA=1` MUST keep an environment the session created, and its
+  record, after the session and print the `stop` command and the 48-hour limit. An adopted
+  environment is kept in every case (FR-014); the session prints the same lines for it.
 - **FR-016**: The manual commands `check`, `up`, `env` and `stop` of
   `python -m tests.integration.lifecycle` MUST keep their names and exit-status contract;
   `env` MUST keep refusing to print to a terminal.
@@ -342,9 +427,16 @@ selection before any environment is created.
 
 **Environment skill and repository references (R8, R9)**
 
-- **FR-020**: `agent_env.sh` MUST create (or reuse the exported) environment through the same
-  lifecycle, export the run identifier, run directory and ClearML variables without printing
-  credentials, return 3 when unavailable and 1 on refusal, and require no k8s-infra skill.
+- **FR-020**: `agent_env.sh` MUST always create a new environment through the same lifecycle
+  (`up --components all`, then `env`), run in the clearml-yolo checkout that contains the
+  skill, so the environment is that checkout's recorded environment; it never reuses an
+  environment: a live recorded environment is refused with return status 1 naming it and
+  `agent_cleanup.sh`, and a stale or retired record is cleared and replaced (FR-014). It MUST
+  export the run identifier, run directory and ClearML variables and `FIFTYONE_DATABASE_URI`
+  without printing credentials; unset `FIFTYONE_DATABASE_URI` and `FIFTYONE_DATABASE_NAME`
+  before `up`, so a failure leaves neither set; default `FIFTYONE_DATABASE_DIR` to
+  `$HOME/.cache/clearml-yolo/fiftyone`; ignore a `<slug>` argument with a one-line notice;
+  return 3 when unavailable and 1 on refusal or error; and require no k8s-infra skill.
 - **FR-021**: `agent_cleanup.sh` MUST tear the environment down through the same lifecycle,
   passing the identifier from `--tag` (else `CY_RUN_TAG`) as `stop --env <id>`, and keep its
   rule that a run directory is removed only when named after the run identifier; `--dry-run`
@@ -357,10 +449,12 @@ selection before any environment is created.
 - **FR-023**: No tracked file outside dated evidence and historical feature records MUST
   reference `INFRA_RUN_TAG`, `INFRA_PROJECT`, `K8S_INFRA_SKILL_DIR`, `INFRA_REGISTRY`,
   `INFRA_HARNESS`, `INFRA_SCRATCH_DIR`, `CY_INFRA_SKILL_DIR`, `infra.py`, `clearml.py`,
-  `mongodb.py`, or `*.k8s.docker.internal` stand endpoints as current instructions or code.
-  Product tests that set a retired variable to prove the application ignores it, and the
-  mutation driver's scrubbing of `INFRA_*` variables a shell may still export, are guards,
-  not uses, and stay.
+  `mongodb.py`, `*.k8s.docker.internal` stand endpoints, the destroyed shared database
+  `clearml_yolo_tests`, `FIFTYONE_DATABASE_NAME`, or
+  the shared MongoDB host port `27018` as current instructions or code. Product tests that set
+  a retired variable to prove the application ignores it, the mutation driver's scrubbing of
+  `INFRA_*` variables a shell may still export, and `agent_env.sh` unsetting a
+  `FIFTYONE_DATABASE_NAME` a shell may still export (FR-020) are guards, not uses, and stay.
 - **FR-024**: The skills, development procedures, ddp-testing procedure, Taskfile stage
   descriptions, session-start status report, glossary, `TECH_DETAILS.md` and the Russian
   `README.md` command comment MUST describe the project-owned environment instead of the
@@ -381,12 +475,14 @@ Each current behaviour of the run-tag lifecycle and the environment skill, with 
 | Current behaviour | Disposition | New home |
 | --- | --- | --- |
 | `check` bounded read-only preflight, exits 0/3/1/130 | Kept; probes change (cluster, context, permission instead of `room`, Secret, TLS, `whoami`) | FR-010 |
+| `up` (and session setup) run the same bounded check before claiming a tag | Kept: they run `check` within its bound before reading the record or creating anything | FR-010 |
 | `infra.py room` capacity WAIT → exit 3 | Removed (no capacity logic on the platform); node pressure surfaces as start-up timeout → exit 3 | FR-012 |
 | `clearml.py env` credentials + CA trust exports | Changed: generated per environment; no CA exports (plain HTTP over port-forward) | FR-006, FR-011 |
 | TLS failure classified as permanent error with CA remedy | Removed with TLS | FR-022 |
 | `infra.py newtag` run tag minted, `.run-tag` record | Changed: environment identifier is the namespace name; the per-worktree record remains | FR-001, FR-014 |
-| `INFRA_RUN_TAG` adopts a run started elsewhere | Changed: a pytest session adopts the worktree's recorded environment only when `INTEGRATION_RUN_TAG` is exported equal to it; `INFRA_RUN_TAG` is retired (R8) | FR-014, FR-023 |
-| Refuse `up` while another run is recorded | Kept, plus vanished-namespace convergence | FR-014 |
+| `INFRA_RUN_TAG` adopts a run started elsewhere | Changed: a pytest session adopts the worktree's live recorded environment only when `INTEGRATION_RUN_TAG` is exported equal to it; `up` and `agent_env.sh` never adopt; `INFRA_RUN_TAG` is retired (R8) | FR-014, FR-023 |
+| A session with an adopted tag removed that tag's leftovers at start and its objects at the end (unless `INTEGRATION_KEEP_DATA=1`) | Changed: an adopting session makes no create or delete call; the environment is removed by `stop` or `agent_cleanup.sh`, so automatic teardown never deletes a namespace its process did not create | FR-014, FR-015 |
+| Refuse `up` while another run is recorded | Kept, for a live recorded environment whatever is exported; plus vanished-namespace convergence; a recorded namespace without the project label is refused too | FR-014, FR-018 |
 | Tagged project names and `clearml.tags` | Kept; no longer the cleanup selector | FR-017 |
 | Exact-tag cleanup proven by empty `ls --prefix` | Changed: namespace deletion proven by absence | FR-013 |
 | Keep tag file until cleanup is proven | Kept for the environment record | FR-013 |
@@ -394,10 +490,16 @@ Each current behaviour of the run-tag lifecycle and the environment skill, with 
 | `INTEGRATION_KEEP_DATA=1` | Kept; adds the 48-hour note | FR-015 |
 | `env` refuses a terminal | Kept | FR-016 |
 | Children get the real HOME from `CY_REAL_ENV` | Kept (kubectl needs the real kubeconfig) | Edge cases |
-| `INTEGRATION_RUN_TAG` conflict check | Kept for the exported identifier | FR-014 |
+| `INTEGRATION_RUN_TAG` conflict check (`up` and `env` refused when it differed from the resolved tag) | Changed: only session setup reads it, to decide adoption; when it names no live recorded environment the session says so and creates its own; `up` and `env` ignore it (`env` overwrites it), so a stale export never blocks recovery | FR-014 |
 | Interactive skip vs Task exit 3 on unavailability | Kept | FR-012 |
 | FiftyOne suites on a host-local database in `FIFTYONE_DATABASE_DIR` | Changed: database in the environment; the directory stays as the lock location | FR-003, US2 |
-| `agent_env.sh` room/env/mongodb/newtag steps | Changed to the lifecycle | FR-020 |
+| `agent_env.sh` room/env/mongodb/newtag steps | Changed to the lifecycle (`up --components all`, then `env`) | FR-020 |
+| `agent_env.sh` keeps an already exported `INFRA_RUN_TAG` instead of minting | Removed: it always performs `up`; a live recorded environment is refused with 1 naming `agent_cleanup.sh` | FR-014, FR-020 |
+| `agent_env.sh` acts on the shared stand with no worktree record | Changed: it uses the record of the checkout that contains the skill, so agent runs, manual `up` and pytest sessions share the one-environment-per-worktree rule | FR-014, FR-020 |
+| `agent_env.sh [<slug>]` passes the slug to `infra.py newtag` | Removed: the identifier carries no slug; a given argument is ignored with a one-line notice | FR-020 |
+| `agent_env.sh` treats MongoDB as optional (warning, run continues without `FIFTYONE_DATABASE_URI`) | Changed: the database is a component of the environment that `up --components all` starts; its failure fails `up` (3 or 1) like any component | FR-005, FR-020 |
+| `agent_env.sh` unsets `FIFTYONE_DATABASE_URI` and `FIFTYONE_DATABASE_NAME` before refreshing | Kept, before `up`; `env` sets only `FIFTYONE_DATABASE_URI`, so `FIFTYONE_DATABASE_NAME` stays unset | FR-020, FR-023 |
+| `agent_env.sh` defaults `FIFTYONE_DATABASE_DIR` to `$HOME/.cache/clearml-yolo/fiftyone` | Kept (the publisher's lock location) | FR-020 |
 | `agent_cleanup.sh` exact-tag cleanup + directory rule | Changed to teardown; directory rule kept | FR-021 |
 | `--tag` / `.run-tag` accepted any lowercase `[a-z0-9-]` tag as the cleanup selector | Changed: teardown accepts only an environment identifier whose live namespace carries the project label; a retired-format record is cleared without a delete | FR-018 |
 | `check_env.sh` `docker compose` check | Removed | FR-022 |
@@ -413,7 +515,9 @@ Each current behaviour of the run-tag lifecycle and the environment skill, with 
   credentials Secret, components and port-forwards; lives at most until teardown or the
   sweeper.
 - **Environment record**: the worktree's note of its active environment (identifier and
-  port-forward processes); never holds a credential.
+  port-forward processes); never holds a credential. It is live, stale, retired-format or
+  foreign (unlabelled namespace), and that state alone with the exported identifier decides
+  adoption, creation or refusal (FR-014).
 - **Component**: a deployable part of the environment (database server, Redis,
   Elasticsearch, ClearML API server, ClearML file server) with its requests and limits.
 
@@ -435,6 +539,11 @@ Each current behaviour of the run-tag lifecycle and the environment skill, with 
   a new environment.
 - **SC-007**: cy-queue's suite passes against the migrated tip with cy-queue unchanged
   (the `paired-check` stage); see "Dependencies" for its current blocker.
+- **SC-008**: A live session in a shell that exports the identifier of the live recorded
+  environment leaves that namespace and record in place; a session with no live recorded
+  environment, whatever is exported, creates a namespace and deletes exactly that one; a
+  second `agent_env.sh` against a live recorded environment creates nothing (US3 scenarios
+  5-6, US4 scenarios 8-13).
 
 ## Assumptions
 
@@ -460,6 +569,7 @@ Each current behaviour of the run-tag lifecycle and the environment skill, with 
 
 - Real GPU work execution, cy-queue scheduling and any cy-queue change.
 - Running ClearML tasks inside the cluster (agents, queues, the k8s glue) and the ClearML web UI.
-- Wildcard host names, ingress and the platform certificate (R9 interim rule).
+- Wildcard host names, ingress and the platform certificate (R9: host access is by
+  port-forward only).
 - The platform's dedicated ClearML and MongoDB and their credential bundles.
 - Releasing a version; pushing.

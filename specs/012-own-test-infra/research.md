@@ -60,10 +60,13 @@ decisions, "Rules for every project", "clearml-yolo — first").
 
 - **Decision**: `kubectl port-forward svc/<component> :<port>` to loopback, kubectl-chosen
   ports, plain HTTP inside the tunnel.
-- **Rationale**: Interim rule R9; no host names, certificate or hosts entries. Random ports
-  never collide with the user's host ClearML on 8008 or between worktrees.
-- **Alternatives**: Ingress host names (not provable before platform phase P4); NodePorts
-  (fixed ports, collisions).
+- **Rationale**: Rule R9, permanent since the k8s-infra plan settled decision 10 (the
+  wildcard name-lookup probe of 2026-11-10 failed on this machine); no host names, certificate
+  or hosts entries. Random ports never collide with the user's host ClearML on 8008 or between
+  worktrees.
+- **Alternatives**: Ingress host names (names a project invents do not resolve on the host;
+  only the platform's dedicated services get host names); NodePorts (fixed ports,
+  collisions).
 
 ## R-7 Quota and limit range
 
@@ -71,6 +74,9 @@ decisions, "Rules for every project", "clearml-yolo — first").
   limit range defaults 50m/64Mi request, 500m/256Mi limit.
 - **Rationale**: Measured use requests 550m / 1184 MiB, limits 6.5 CPU / 3840 MiB; headroom
   for a debug pod and init containers; PVC 0 and GPU 0 enforce R4 and R7 at admission.
+- **Not yet shown**: the measurement runs applied a looser quota (requests 2 CPU / 4Gi, limits
+  8 CPU / 8Gi); the designed values were derived from the measured use and were not
+  themselves applied. Their first application is the live acceptance run (tasks T027).
 - **Alternatives**: No limits quota (an unlimited pod could starve the node); tighter limits
   (Elasticsearch peaked at 634 MiB with a 1 GiB limit).
 
@@ -111,3 +117,20 @@ decisions, "Rules for every project", "clearml-yolo — first").
   `012-editable-batch-sizes`, not on master
   ([evidence/2026-11-10-paired-check.md](evidence/2026-11-10-paired-check.md)). This is
   outside this feature; SC-007 depends on it (spec "Dependencies").
+
+## R-12 Environment selection and ownership
+
+- **Decision**: One selection rule for `up`, `agent_env.sh` and session setup (spec FR-014,
+  contract "Environment selection"): no live recorded environment → clear any stale or
+  retired record and create; live recorded environment → a pytest session adopts it only when
+  `INTEGRATION_RUN_TAG` equals it, every other caller is refused with exit 1. The creator
+  deletes; an adopting session never deletes. `agent_env.sh` never reuses.
+- **Rationale**: Rule R5 requires tooling to recreate a missing namespace, so a stale record or
+  stale export must lead to creation, not refusal. A single owner per deletion keeps automatic
+  teardown from deleting a namespace its process did not create. Dropping reuse from
+  `agent_env.sh` removes a second adoption path with its own failure cases; a re-sourced shell
+  is refused and names `agent_cleanup.sh`.
+- **Alternatives**: Refusing an exported identifier with no live environment (blocks recovery
+  after a sweep, contradicting R5); letting `agent_env.sh` reuse the exported environment
+  (needs the forward-liveness and component checks of adoption in shell code too); letting an
+  adopting session delete at its end (deletes an environment another shell still uses).

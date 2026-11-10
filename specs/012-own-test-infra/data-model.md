@@ -12,10 +12,21 @@
 | forwards | list | component → loopback port chosen by kubectl, owning process |
 
 State transitions: absent → creating → ready → stopping → absent. Any state → absent when the
-sweeper or a restart removes the namespace; the record is then stale and is cleared by the next
-`up` or `stop`.
+sweeper or a restart removes the namespace; the record is then stale and is cleared, without
+any delete call, by the next `up`, `agent_env.sh`, session setup or `stop`.
 
-## Quota (values from the 2026-11-10 measurement)
+Ownership: the process that creates an environment owns its deletion. A pytest session that
+created it deletes it at the end (unless `INTEGRATION_KEEP_DATA=1`); one created by `up` or
+`agent_env.sh` is deleted by `stop` or `agent_cleanup.sh`. A session that adopts a live recorded
+environment (exported `INTEGRATION_RUN_TAG` equal to the record) neither creates nor deletes
+it. Selection rule: contract "Environment selection" (spec FR-014).
+
+## Quota (designed from the use measured on 2026-11-10)
+
+The hard values were derived from the measured use with headroom; they were not themselves
+applied in the measurement runs, which used a looser quota (requests 2 CPU / 4Gi, limits
+8 CPU / 8Gi; `evidence/measure/stack.yaml`). The live acceptance run (tasks T027) is the first
+application of these values and records that every pod was admitted.
 
 | Resource | Hard | Measured use (all components) |
 | --- | --- | --- |
@@ -40,7 +51,16 @@ sweeper or a restart removes the namespace; the record is then stale and is clea
 ## Environment record (`tests/integration/.run-tag`)
 
 Line 1: identifier. Then zero or more `forward <component> <port> <pid> <start-time>` lines for
-detached port-forwards of a manual `up`. No credentials.
+detached port-forwards of a manual `up` (also through `agent_env.sh`). No credentials. Written
+by whoever creates the environment; an adopting session reads it and writes nothing.
+
+| Record state | Meaning |
+| --- | --- |
+| none | no environment in this worktree |
+| retired format | line 1 is not an identifier; cleared without a delete call |
+| stale | line 1 is an identifier whose namespace is absent; cleared without a delete call |
+| live | line 1 is an identifier whose namespace exists with the project label |
+| foreign | line 1 is an identifier whose namespace exists without the project label; refused, kept |
 
 A record whose line 1 does not match `^cy-it-[0-9a-f]{6}$` (for example `clearml-yolo-claude-20261105-integration-a1b2`,
 left by the retired run-tag lifecycle) is not an environment record: it is cleared without any delete
