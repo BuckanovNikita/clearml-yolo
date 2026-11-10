@@ -27,7 +27,7 @@ stage table; `Taskfile.yml` owns commands and ordering. Invoke each stage as
    fallback when affected selection cannot represent an input.
 4. For code changes, run the `mutation-testing` skill's branch report
    (`mutation -- --base master`). Then run `acceptance` on the clean committed tip; it
-   already runs `check`, `properties`, the stand preflight, the complete unit suite with
+   already runs `check`, `properties`, the cluster preflight, the complete unit suite with
    the coverage floor and the live part, and confirms the tip stayed clean and unchanged.
    Do not precede it with an equivalent affected-unit run. Follow
    `running-integration-tests` for the live part.

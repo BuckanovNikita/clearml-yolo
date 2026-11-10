@@ -17,7 +17,7 @@ uv run --locked task --exit-code acceptance    # change acceptance on a clean co
 ```
 
 `scripts/session_status.sh` runs at Claude and Codex session start and reports the
-branch, uncommitted paths, other worktrees, a held release lock and an active run tag;
+branch, uncommitted paths, other worktrees, a held release lock and a recorded test environment;
 treat changes it lists as possibly another session's.
 
 ## Read when relevant
@@ -32,7 +32,7 @@ for every task. Read guidance instead of copying shared skills into the reposito
 | Plan, implement, fix, resume or accept repository changes | [Workflow policy](docs/agent-workflow.md), including its [module boundaries](docs/agent-workflow.md#module-boundaries) |
 | Run any Spec Kit stage, including planning or bug-source capture | [Agent workflow policy](docs/agent-workflow.md), then the applicable installed skills |
 | Verify changes, commit, or report completion | [verification-workflow](.agents/skills/verification-workflow/SKILL.md) |
-| Run live tests, acceptance, or clean up a run tag | [running-integration-tests](.agents/skills/running-integration-tests/SKILL.md) |
+| Run live tests, acceptance, or remove a test environment | [running-integration-tests](.agents/skills/running-integration-tests/SKILL.md) |
 | Triage mutants or change mutmut settings | [mutation-testing](.agents/skills/mutation-testing/SKILL.md) |
 | Release, or recover a failed release | [release](.agents/skills/release/SKILL.md) |
 | Verify native execution, training, GPU use or ClearML publication | [running-end-to-end-tests](.agents/skills/running-end-to-end-tests/SKILL.md); load the project-local [clearml-yolo-environment](.agents/skills/clearml-yolo-environment/SKILL.md) for this machine |

@@ -73,8 +73,8 @@ Task freshness, timestamps and interrupted runs never establish completion. The
 | `verify` | `check`, then `test`: development verification | no |
 | `properties` | Unit suite under the Hypothesis `explore` profile, fixed order | no |
 | `mutation` | Changed-function [mutation report](#mutation-report) | no |
-| `infra-check` | Read-only, bounded stand preflight | read-only |
-| `integration` | `infra-check`, then the non-GPU live tests, including the CPU stand smoke run | yes |
+| `infra-check` | Read-only, bounded preflight of the cluster the test environment runs in | read-only |
+| `integration` | `infra-check`, then the non-GPU live tests, including the CPU smoke run, against a test environment the run creates and deletes | yes |
 | `acceptance` | [Change acceptance](#acceptance-tiers) on a clean committed tip | yes |
 | `release-acceptance` | [Release acceptance](#acceptance-tiers) | yes |
 | `paired-check` | [Paired CY and queue release check](#paired-cy-and-queue-release-check) | no |
@@ -137,12 +137,13 @@ not run pre-commit hooks; verify combined content explicitly.
 
 1. Clean tip: refuse unstaged, staged or untracked files and record `HEAD`.
 2. `check`, then `properties`.
-3. Preflight: `infra-check`. Exit 3 (stand unavailable) is deferred verification and
+3. Preflight: `infra-check`. Exit 3 (cluster unavailable) is deferred verification and
    stops acceptance; it blocks integration and release until the check runs.
 4. The complete unit suite with coverage held at or above
    `[tool.coverage.report] fail_under` in [pyproject.toml](../pyproject.toml).
-5. The live part: `integration`, including the CPU smoke run against the shared ClearML
-   stand.
+5. The live part: `integration`, including the CPU smoke run against the ClearML server
+   of the project's own test environment (a `cy-it-<id>` namespace the run creates,
+   with a quota, and deletes afterwards).
 6. Clean tip again with `HEAD` unchanged.
 
 When every path changed since `master` is Markdown or lies under `docs/` or `specs/`,
@@ -159,12 +160,14 @@ It runs `acceptance`, then:
   from `CY_SEVERSTAL_ARGS`.
 - Physical multi-GPU DDP only when `CY_DDP_ARGS` is set (its `--run-ddp-gpu` options);
   otherwise the stage reports it as waived.
-- Both GPU suites run with `CY_TASK_VERIFICATION=1`, so an unavailable stand ends the
+- Both GPU suites run with `CY_TASK_VERIFICATION=1`, so an unavailable cluster ends the
   suite with exit 3: deferred verification. Their options are split on spaces, so
-  project names must be space-free; the suites claim the session run tag themselves and
-  prefix the published project name with it.
+  project names must be space-free; the suites join the session's test environment
+  themselves and prefix the published project name with its identifier.
 - The FiftyOne native-database tests in `tests/integration/fiftyone` with
-  `CY_TEST_FIFTYONE=1` and a temporary `FIFTYONE_DATABASE_DIR`, removed afterwards.
+  `CY_TEST_FIFTYONE=1` and `CY_TASK_VERIFICATION=1`, against the FiftyOne database of a
+  test environment that starts only its database server; a temporary
+  `FIFTYONE_DATABASE_DIR` holds the publisher's locks and is removed afterwards.
 - `paired-check`.
 
 Before any GPU work, agents check the GPU through pcboard `pc_status` where available; a
@@ -175,23 +178,25 @@ and a single GPU remains a step of the
 Report each required check as passed, failed, deferred, waived or error:
 
 - **Deferred**: a temporarily unavailable resource, such as `infra-check` exit 3
-  (unreachable stand, timeout or capacity wait) or a GPU busy with the user's workload.
+  (unreachable cluster, timeout, or a test environment not ready within its start-up
+  budget) or a GPU busy with the user's workload.
   Deferred verification blocks acceptance, integration and release; continue independent
   local work and retry at a meaningful milestone.
 - **Waived**: a check the user excused for this environment. Multi-GPU DDP is waived
   by standing decision on this single-GPU host unless `CY_DDP_ARGS` is set; it never
   blocks.
-- **Error**: `infra-check` exit 1, such as missing credentials, TLS trust or
-  configuration. Diagnose it; do not wait or weaken security settings.
+- **Error**: `infra-check` exit 1, such as a missing kubectl, context or permission to
+  create namespaces, or a quota rejection. Diagnose it; do not wait or weaken security
+  settings.
 
 `infra-check` is bounded by `CY_INFRA_CHECK_TIMEOUT` (60 seconds by default) and creates
-no run tag or resources. The `running-integration-tests` skill owns the live-run
-lifecycle, run tags and exact-tag cleanup. Live tests run only when `tests/integration`
-or files in it are named on the pytest command line, or the `integration` marker is
-selected, as the live stages do; a plain `pytest` never contacts the stand. The test environment isolation hides
-`~/clearml.conf`, so every live suite, including the GPU suites, takes its ClearML
-credentials from the lifecycle stand environment of the tagged run, never from the user's
-SDK configuration.
+nothing. The `running-integration-tests` skill owns the test environment's lifecycle:
+creation with a quota, port-forwards, selection and adoption, and guarded deletion. Live
+tests run only when `tests/integration` or files in it are named on the pytest command
+line, or the `integration` marker is selected, as the live stages do; a plain `pytest`
+never contacts the cluster. Test isolation hides `~/clearml.conf`, so every live suite,
+including the GPU suites, takes its ClearML credentials from the session's test
+environment, never from the user's SDK configuration.
 
 Finish environment provisioning before verification, including native SDK
 optional decoders exercised by the selected tests. The installed Ultralytics image

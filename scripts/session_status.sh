@@ -2,7 +2,7 @@
 # Session-start status for agent sessions (Claude and Codex SessionStart hooks).
 # Shows parallel work that a new session should know about before editing:
 # the branch against master, uncommitted changes, other worktrees and unmerged
-# branches, a held release lock and an active live-test run tag. At most about
+# branches, a held release lock and a recorded live-test environment. At most about
 # ten lines; never fails the session.
 set -u
 root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
@@ -40,6 +40,6 @@ if [ -n "$common" ] && [ -e "$lock" ] && command -v flock >/dev/null && ! flock 
 fi
 
 if [ -s tests/integration/.run-tag ]; then
-    echo "  active live run tag: $(head -1 tests/integration/.run-tag) (lifecycle stop when it is yours and done)"
+    echo "  recorded test environment: $(head -1 tests/integration/.run-tag) (python -m tests.integration.lifecycle stop when it is yours and done)"
 fi
 exit 0

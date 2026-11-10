@@ -22,11 +22,13 @@ Terms separate what a check establishes from when it is required.
 
 **Development verification**: Static checks and the tests affected by a change, run on the current working copy. It establishes nothing about native GPU execution, ClearML publication or the queue.
 
-**Change acceptance**: Verification of a clean committed tip, including the complete suite and the live checks run against the shared ClearML stand on CPU. Documentation-only changes need no live part.
+**Change acceptance**: Verification of a clean committed tip, including the complete suite and the live checks run on CPU against a test environment the run deploys itself. Documentation-only changes need no live part.
+
+**Test environment**: One Kubernetes namespace `cy-it-<id>` that the project creates for live tests or an agent run, with its own quota, its own ClearML server and its own FiftyOne database, reached through `kubectl port-forward` and deleted by whoever created it. No shared stand is involved.
 
 **Release acceptance**: Change acceptance plus GPU checks, the real-run gate and the paired release check, required before a version is delivered.
 
-**Deferred verification**: A required check that could not run because a resource was temporarily unavailable, such as an unavailable stand or a busy GPU. It blocks acceptance, integration and release until it runs.
+**Deferred verification**: A required check that could not run because a resource was temporarily unavailable, such as an unavailable cluster or a busy GPU. It blocks acceptance, integration and release until it runs.
 
 **Waived verification**: A check the user explicitly excused for this environment. It never blocks and is reported as waived, not as passed or deferred.
 

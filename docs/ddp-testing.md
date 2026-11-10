@@ -16,7 +16,7 @@ does not probe GPUs or contact ClearML through this harness.
 `CY_DDP_ARGS` holds this procedure's `--run-ddp-gpu` options. Without it, physical
 multi-GPU DDP is waived by standing user decision on this single-GPU host: the stage
 reports it as waived, not as passed or deferred, and it never blocks. Release acceptance
-runs the GPU suites with `CY_TASK_VERIFICATION=1`, so an unavailable stand ends the
+runs the GPU suites with `CY_TASK_VERIFICATION=1`, so an unavailable cluster ends the
 session with exit 3, deferred verification. Check the GPU
 through pcboard `pc_status` where available before starting; a GPU busy with the user's
 workload is deferred verification and blocks delivery.
@@ -25,14 +25,14 @@ Prepare the repository's [development environment](development.md#external-depen
 including its approved external packages and CUDA-enabled detector dependencies.
 Use Linux/WSL with working NVML, NCCL, at least two whole physical GPUs, supported
 pidfd/subreaper supervision and Git. The test environment isolation hides
-`~/clearml.conf`; the suite takes its ClearML endpoint and credentials from the lifecycle
-stand environment of the session's tagged run, never from the user's SDK configuration.
-The CY suite needs no manual run preparation: after validating its options, it claims the
-session run tag itself through the `stand_project` fixture, which joins the `live_run`
-session fixture of the
+`~/clearml.conf`; the suite takes its ClearML endpoint and credentials from the session's
+test environment, never from the user's SDK configuration. The CY suite needs no manual
+preparation: after validating its options, it joins the session's test environment itself
+through the `stand_project` fixture, which requests the `live_run` session fixture of the
 [integration-test skill](../.agents/skills/running-integration-tests/SKILL.md). The
-published ClearML project name is prefixed with that run tag, so it is never a
-production project and the run's exact-tag cleanup removes it after the last test.
+published ClearML project name is prefixed with the environment identifier, so it is
+never a production project, and deleting the environment after the last test removes it.
+The GPU is used by the host processes; the environment's pods request none.
 Required artifacts need an accessible storage backend. Select idle GPUs and run one
 harness invocation at a time; the live tests share the `live` xdist group, so parallel
 workers never run two of them concurrently.
@@ -45,8 +45,8 @@ the production queue's selector semantics. MIG selections are unsupported.
 
 Run the direct physical tests from the CY checkout. Pass a space-free project name:
 release acceptance splits `CY_DDP_ARGS` into separate options. The suite publishes
-under `<run tag> clearml-yolo-ddp`. `CY_TASK_VERIFICATION=1` and `-n 0` match release
-acceptance: an unavailable stand ends the session with exit 3 (deferred) instead of
+under `<environment identifier> clearml-yolo-ddp`. `CY_TASK_VERIFICATION=1` and `-n 0`
+match release acceptance: an unavailable cluster ends the session with exit 3 (deferred) instead of
 skipping the tests:
 
 ```bash
@@ -61,10 +61,10 @@ CY_TASK_VERIFICATION=1 uv run --frozen --no-sync pytest tests/integration -m ddp
 
 Run the complete comparison and queue-failure matrix from the sibling cy-queue
 checkout, using the same prepared environment. That repository's harness does not
-claim a run tag itself: prepare the run from the CY checkout with the lifecycle `up`
-and export its stand environment (`eval "$(L env)"`, as in the integration-test skill),
-then pass a project name that starts with the recorded run tag so exact-tag cleanup
-reaches it, and run the lifecycle `stop` afterwards:
+create a test environment itself: create one from the CY checkout with the lifecycle `up`
+and export its variables (`eval "$(L env)"`, as in the integration-test skill), then pass
+a project name that starts with the recorded environment identifier, and run the
+lifecycle `stop` afterwards:
 
 ```bash
 uv run --frozen --no-sync --project ../clearml-yolo pytest -m ddp_gpu \
@@ -80,10 +80,11 @@ The harness retains its host coordination root and overrides only scenario-owned
 durable metadata. Installing CY alone provides the direct cases without queue imports.
 
 Missing opt-in, required options, devices, capabilities, credentials or services
-fail an explicitly selected test; they never become a successful result. A ClearML stand
-that is unavailable when the CY suite claims its run tag is deferred verification: with
-`CY_TASK_VERIFICATION=1` the session ends with exit 3, and without it the stand tests
-are skipped with an UNAVAILABLE message, which is not acceptance.
+fail an explicitly selected test; they never become a successful result. A cluster that
+is unavailable, or a test environment that is not ready within its start-up budget, when
+the CY suite joins the environment is deferred verification: with
+`CY_TASK_VERIFICATION=1` the session ends with exit 3, and without it the live tests are
+skipped with an UNAVAILABLE message, which is not acceptance.
 A missing artifacts option retains selection-failure evidence in
 `.tmp/ddp-results`. Each scenario otherwise creates a unique directory beneath the
 requested artifacts directory before parsing selection or running preflight.
@@ -136,10 +137,10 @@ receipts. Preflight failures retain the files available at the failure point rat
 than inventing absent rank/publication evidence. Diagnostic configuration and logs
 are redacted, and environment evidence uses a small explicit safe list; credentials
 are never copied from SDK configuration. The harness's own cleanup retains remote
-tasks/models and local evidence under the run tag; the session's exact-tag cleanup
-removes the remote objects after the last test, so the archived local evidence and the
-recorded task/model identities are what remain for review. After a crash that skipped
-that cleanup, run the lifecycle `stop` for the recorded tag, as the integration-test
+tasks/models and local evidence under the environment identifier; deleting the session's
+environment removes the remote objects after the last test, so the archived local evidence
+and the recorded task/model identities are what remain for review. After a crash that
+skipped that deletion, run the lifecycle `stop` for the recorded environment, as the integration-test
 skill describes.
 
 Archive the directory after pytest returns, including failed scenarios:

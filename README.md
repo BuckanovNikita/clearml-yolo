@@ -1025,7 +1025,7 @@ git-ссылке, поэтому пакеты берутся из `external/whee
 ```bash
 uv run --locked task --exit-code fix         # безопасные исправления Ruff и форматирование
 uv run --locked task --exit-code verify      # статические проверки и затронутые тесты
-uv run --locked task --exit-code acceptance  # приёмка чистого коммита, включая стенд ClearML
+uv run --locked task --exit-code acceptance  # приёмка чистого коммита, включая собственное тестовое окружение ClearML в Kubernetes
 ```
 
 Хук pre-commit отклоняет коммит с неиндексированными изменениями или неотслеживаемыми

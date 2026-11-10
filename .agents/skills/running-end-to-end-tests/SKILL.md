@@ -48,7 +48,7 @@ Run the acceptance tier the claim needs through
 `verification-workflow` skill and defined in
 [acceptance tiers](../../../docs/development.md#acceptance-tiers): `acceptance` for
 change acceptance (checks, properties, the complete unit suite with the coverage floor
-and the CPU smoke run on the shared ClearML stand), `release-acceptance` before delivery.
+and the CPU smoke run against the project's own test environment), `release-acceptance` before delivery.
 Neither establishes the GPU, queue or publication outcomes this checklist covers.
 
 Native suites use the pytest markers declared in `pyproject.toml`. `ddp_cpu`
@@ -62,10 +62,10 @@ options that `uv run --frozen --no-sync pytest --help` lists under "native Sever
 acceptance". `release-acceptance` requires the Severstal options in
 `CY_SEVERSTAL_ARGS` and runs multi-GPU DDP only when `CY_DDP_ARGS` is set, otherwise
 reporting it as waived. Check pcboard `pc_status` before GPU work; a GPU busy with the
-user's workload is deferred. These suites take ClearML credentials from the lifecycle
-stand environment of the tagged run, not from `~/clearml.conf`. The
-`running-integration-tests` skill owns run tags and exact-tag cleanup for those
-Task-driven live tests.
+user's workload is deferred. These suites take ClearML credentials from the session's
+test environment (a `cy-it-<id>` namespace the run creates and deletes), not from
+`~/clearml.conf`. The `running-integration-tests` skill owns that environment's
+lifecycle for those Task-driven live tests.
 
 ### 2. Isolated run setup
 

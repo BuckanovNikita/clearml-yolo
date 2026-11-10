@@ -8,7 +8,7 @@ description: Runs and triages clearml-yolo's changed-function mutation report (s
 `scripts/mutation.py` maps changed lines to the top-level functions and methods they
 touch, exports the index into a fresh temporary workspace with `git checkout-index`, and
 runs mutmut there on those functions only. The child environment drops `CLEARML_*`,
-`INFRA_*`, `CY_RUN_*` and `GIT_*` variables, so mutants inherit neither stand credentials
+`INFRA_*`, `CY_RUN_*` and `GIT_*` variables, so mutants inherit neither test-environment or stale shell credentials
 nor this repository's version-control state. Read the script's docstring for the
 mechanics; [development procedures](../../../docs/development.md#mutation-report) own the
 policy.
