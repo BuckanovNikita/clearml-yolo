@@ -16,7 +16,9 @@ session fixtures in `tests/integration/conftest.py`, and by the environment skil
 The pytest session fixtures perform `up` (lazily, by the first test that needs a component) and
 `stop` (after the last test) in-process; their port-forwards are child processes of the pytest
 process. `INTEGRATION_KEEP_DATA=1` skips `stop` and prints the `stop` command and the 48-hour
-limit.
+limit. Exception (spec FR-014): when the shell exports `INTEGRATION_RUN_TAG` equal to the
+recorded identifier of a live environment (as `eval "$(L env)"` after `up` does), the session
+adopts that environment instead of performing `up`, and leaves its teardown to `L stop`.
 
 ## Deletion guard (spec FR-018)
 
@@ -42,7 +44,8 @@ Applied by `stop` (manual, session fixtures, setup-failure cleanup) and therefor
   `forward <component> <local-port> <pid> <start-time>` for detached port-forwards. Never a
   credential.
 - `INTEGRATION_RUN_TAG` exported by the shell must equal the recorded identifier when both are
-  set; otherwise `up`/`env` refuse, as today.
+  set; otherwise `up`/`env` refuse, as today. A pytest session refuses a live record it does
+  not adopt, and an exported `INTEGRATION_RUN_TAG` that names no live recorded environment.
 
 ## Kubernetes objects
 

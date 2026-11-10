@@ -385,7 +385,7 @@ Each current behaviour of the run-tag lifecycle and the environment skill, with 
 | `clearml.py env` credentials + CA trust exports | Changed: generated per environment; no CA exports (plain HTTP over port-forward) | FR-006, FR-011 |
 | TLS failure classified as permanent error with CA remedy | Removed with TLS | FR-022 |
 | `infra.py newtag` run tag minted, `.run-tag` record | Changed: environment identifier is the namespace name; the per-worktree record remains | FR-001, FR-014 |
-| `INFRA_RUN_TAG` adopts a run started elsewhere | Changed: adoption through the worktree record only; the variable is retired (R8) | FR-014, FR-023 |
+| `INFRA_RUN_TAG` adopts a run started elsewhere | Changed: a pytest session adopts the worktree's recorded environment only when `INTEGRATION_RUN_TAG` is exported equal to it; `INFRA_RUN_TAG` is retired (R8) | FR-014, FR-023 |
 | Refuse `up` while another run is recorded | Kept, plus vanished-namespace convergence | FR-014 |
 | Tagged project names and `clearml.tags` | Kept; no longer the cleanup selector | FR-017 |
 | Exact-tag cleanup proven by empty `ls --prefix` | Changed: namespace deletion proven by absence | FR-013 |
