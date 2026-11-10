@@ -73,7 +73,7 @@ in parallel with A once Phase 2 is done; their live checks wait for A.
 - [x] T024 [P] [B] Update docstrings in tests/integration/test_cpu_stand_smoke.py, test_native_ddp_gpu.py, test_severstal_gpu.py, tests/env_isolation.py and tests/conftest.py that name the shared stand or the k8s-infra skill
 - [x] T025 Re-run the T002 inventory; every remaining hit is dated evidence, a historical feature record, `CHANGELOG.md`, `bugs/`, a product guard test, the mutation driver's scrub or `agent_env.sh` unsetting `FIFTYONE_DATABASE_NAME` (spec FR-023, SC-003)
 - [x] T026 Run `uv run --locked task --exit-code verify`, then `uv run --locked prek run --all-files` with `SKIP` cleared after the last commit
-- [ ] T027 Live: `uv run --locked task --exit-code integration` on a clean tip with no shared stand used; record the environment identifier, pass/fail, cold start, the namespace's `ResourceQuota` (hard and used) while it exists, that every pod was admitted under the designed quota (its first application; data-model.md), and that no `cy-it-` namespace remains (SC-001, SC-004, SC-005)
+- [x] T027 Live: `uv run --locked task --exit-code integration` on a clean tip with no shared stand used; record the environment identifier, pass/fail, cold start, the namespace's `ResourceQuota` (hard and used) while it exists, that every pod was admitted under the designed quota (its first application; data-model.md), and that no `cy-it-` namespace remains (SC-001, SC-004, SC-005)
 - [x] T028 Live: the release-acceptance FiftyOne step alone; record pass/fail and namespace absence (SC-002)
 - [x] T029 Live: `lifecycle up`, delete its namespace out of band, `lifecycle stop` (success), `lifecycle up` (new identifier), `lifecycle stop` (SC-006)
 - [x] T029a Live, deletion guard (FR-018, US4 scenarios 6-7): with `kubectl --context docker-desktop get ns` captured before and after, run `agent_cleanup.sh --tag clearml --dry-run` and `agent_cleanup.sh --tag clearml`; both exit 1 with no delete call and an unchanged namespace list. Write a retired-format record (`clearml-yolo-claude-20261105-integration-a1b2` on line 1) into `tests/integration/.run-tag` and run `lifecycle stop`: exit 0, record cleared, namespace list unchanged. Create a namespace `cy-it-<6 hex>` without the project label, run `lifecycle stop --env <it>`: exit 1 and the namespace still exists; then delete that namespace by hand
@@ -93,7 +93,7 @@ Phase 1 → Phase 2 → {A: Phases 3, 4 (T012), 6} ∥ {B: T013, T024} ∥ {C: P
 ## Status (2026-11-10)
 
 T004 was satisfied by real applications of the same manifests rather than a server-side dry
-run. T023: `TECH_DETAILS.md` names no shared stand, so it needed no change. T027 is checked
-once `task acceptance` passes on the clean tip; T032 (independent review) was not done by the
+run. T023: `TECH_DETAILS.md` names no shared stand, so it needed no change. T027 passed
+through `task acceptance` on the clean tip `4c1b879`; T032 (independent review) was not done by the
 implementing session, which may not start sub-agents, and remains open. Live results:
 [evidence/2026-11-10-live-acceptance.md](evidence/2026-11-10-live-acceptance.md).

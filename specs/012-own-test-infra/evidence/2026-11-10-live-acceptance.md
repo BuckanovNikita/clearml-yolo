@@ -73,6 +73,18 @@ these real applications of the same manifests.
 
 After every case: no `cy-it-` namespace other than the one under test, and none at the end.
 
+## Change acceptance on the clean tip (T027, SC-001)
+
+`OMP_NUM_THREADS=4 CY_WEIGHTS_DOWNLOAD_TIMEOUT=3 nice -n19 uv run --locked task --exit-code
+acceptance` on the clean committed tip `4c1b879`, 23:38-23:58: exit 0, "Accepted tip:
+4c1b8794619613275cb5b25e6419c6110888d1be". Stages: checks passed; property exploration 4714
+passed, 1 skipped; `infra-check` AVAILABLE; unit suite with coverage 4714 passed, 1 skipped,
+coverage 84.28% (floor 84.12%); `integration` **1 passed, 29 skipped (FiftyOne without its
+opt-in), 81 deselected** in 154 s; tip clean and unchanged. The session's environment was
+`cy-it-319ba2`; a watcher read its quota while all five pods ran: hard and used identical to
+the table above (pods 5/8, requests 550m/1, 1184Mi/2Gi, limits 6500m/8, 3840Mi/6Gi, claims
+0/0, GPU 0/0). Afterwards no `cy-it-` namespace and no port-forward existed.
+
 ## Not run or deferred
 
 - GPU suites (Severstal single-GPU, multi-GPU DDP) and the real-run gate: **deferred** (the
