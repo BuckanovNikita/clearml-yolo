@@ -1,67 +1,75 @@
-"""Resolve training capacity from prepared dataset evidence and an explicit profile."""
+"""Resolve training batches exclusively from the editable capacity table."""
 
-from typing import Annotated, Literal, Self
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from loguru import logger
+from pydantic import BaseModel, ConfigDict, Field
 
-from clearml_yolo.application.batch_ports import BatchEstimateStore
-from clearml_yolo.application.contracts import PreparedDataset
-from clearml_yolo.core.batch_estimation import (
-    ResolvedRecommendation,
-    SyntheticWorkload,
-    TrainingProfile,
-    select_recommendation,
-)
+from clearml_yolo.adapters.storage.batch_sizes import BatchSizeStore
+from clearml_yolo.core.batch_estimation import GPUHardware, ModelVariant
+from clearml_yolo.core.batch_sizes import BatchSizeSelection
 
 
-class _ImageDensity(BaseModel):
-    model_config = ConfigDict(extra="ignore")
+class TableRecommendation(BaseModel):
+    """Table choices retain their sources without asserting target measurements."""
 
-    split: Literal["train", "val", "test"]
-    boxes: Annotated[int, Field(strict=True, ge=0)]
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
+    table_digest: str
+    model: str
+    image_size: int
+    selections: Annotated[tuple[BatchSizeSelection, ...], Field(min_length=1)]
 
-class _PreparedManifest(BaseModel):
-    """Validate the maintained manifest subset needed for capacity bounds."""
+    @property
+    def per_gpu_batch(self) -> int:
+        return min(selection.per_gpu_batch for selection in self.selections)
 
-    model_config = ConfigDict(extra="ignore")
-
-    class_names: Annotated[dict[int, Annotated[str, Field(strict=True, min_length=1)]], Field(min_length=1)]
-    images: Annotated[tuple[_ImageDensity, ...], Field(min_length=1)]
-
-    @model_validator(mode="after")
-    def class_identifiers(self) -> Self:
-        if set(self.class_names) != set(range(len(self.class_names))):
-            raise ValueError("Prepared class identifiers must be contiguous and zero-based")
-        return self
-
-
-def dataset_workload(prepared: PreparedDataset) -> SyntheticWorkload:
-    manifest = _PreparedManifest.model_validate_json(prepared.manifest.read_bytes())
-    relevant = [image for image in manifest.images if image.split in {"train", "val"}]
-    if not relevant:
-        raise ValueError("Prepared dataset has no training or validation images")
-    # A background-only subset needs no target memory, and safely fits the smallest
-    # positive synthetic workload supported by the estimator.
-    return SyntheticWorkload(
-        classes=len(manifest.class_names),
-        objects_per_image=max(1, *(image.boxes for image in relevant)),
-    )
+    @property
+    def global_batch(self) -> int:
+        return len(self.selections) * self.per_gpu_batch
 
 
 def resolve_batch_estimate(
-    profile: TrainingProfile, prepared: PreparedDataset, store: BatchEstimateStore
-) -> ResolvedRecommendation:
-    workload = dataset_workload(prepared)
-    catalogue = store.read()
+    model: ModelVariant,
+    imgsz: int,
+    gpus: tuple[GPUHardware, ...],
+    store: BatchSizeStore,
+    *,
+    device_indices: tuple[int, ...] | None = None,
+) -> TableRecommendation:
+    table = store.load()
+    command = f"cy-batch-estimate --imgsz {imgsz} --models {model.selection}"
     try:
-        return select_recommendation(catalogue.cases, profile, workload)
+        selections = tuple(table.resolve(gpu, imgsz, model.selection) for gpu in gpus)
     except ValueError as error:
-        size = profile.nominal_size[0]
         raise ValueError(
-            "No compatible validated training batch estimate. Run "
-            f"cy-batch-estimate --imgsz {size} --models {profile.model.selection} "
-            f"--classes {workload.classes} --objects-per-image {workload.objects_per_image} "
-            f"--gpu-counts {profile.world_size} using the assigned GPUs, "
+            f"No training batch table entry: {error}. Run {command} using the assigned GPUs, "
             "or set an explicit training batch."
         ) from error
+    recommendation = TableRecommendation(
+        table_digest=table.digest,
+        model=model.selection,
+        image_size=imgsz,
+        selections=selections,
+    )
+    for index, selection in enumerate(selections):
+        if selection.entry.forced:
+            logger.warning(
+                "Training batch source {} is forced/background-sensitive; "
+                "its capacity reflects the recorded background activity, not an uncontended maximum.",
+                selection.entry.gpu_label,
+            )
+        if selection.fallback:
+            target_command = command
+            if device_indices is not None:
+                target_command += f" --devices {device_indices[index]} --gpu-counts 1"
+            logger.warning(
+                "Training batch fallback for {} uses {}: per-GPU batch {}. "
+                "This is a table value from another GPU, not a measurement on the target. "
+                "Run {} on the current GPU to estimate its capacity.",
+                selection.target_gpu.name,
+                selection.entry.gpu_label,
+                selection.per_gpu_batch,
+                target_command,
+            )
+    return recommendation

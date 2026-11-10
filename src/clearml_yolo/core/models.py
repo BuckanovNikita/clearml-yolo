@@ -188,8 +188,8 @@ class TrainSettings(BaseModel):
     batch: Annotated[int, Field(strict=True, gt=0)] | None = Field(
         default=4,
         description=(
-            "Глобальный положительный размер пакета; null запрашивает подбор из "
-            "совместимых измерений cy-batch-estimate."
+            "Глобальный положительный размер пакета; null выбирает batch для каждого GPU "
+            "из редактируемой таблицы batch-sizes.yaml."
         ),
         examples=[4],
         json_schema_extra={

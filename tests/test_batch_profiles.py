@@ -10,6 +10,7 @@ import pytest
 from clearml_yolo.adapters.integrations import batch_profiles as profiles
 from clearml_yolo.adapters.integrations import batch_resolution as resolution
 from clearml_yolo.adapters.runtime.gpu_inventory import GPUDevice
+from clearml_yolo.adapters.storage.batch_sizes import BatchSizeStore
 from clearml_yolo.application.use_cases.batch_estimate import estimate_batches
 from clearml_yolo.core.batch_estimation import SearchSettings, SyntheticWorkload, select_models
 from clearml_yolo.core.models import ModelConfig, model_preset
@@ -206,15 +207,18 @@ def test_null_lookup_uses_actual_ordered_devices_and_preserves_requested_configu
     model = select_models((selection,))[0]
     profile = profiles.training_profile(model, 960, devices)
     store = MemoryStore()
-    case = estimate_batches(
+    cases = estimate_batches(
         tuple(profile.model_copy(update={"gpus": (gpu,)}) for gpu in profile.gpus),
         SyntheticWorkload(),
         SearchSettings(max_global_batch=8),
         probe=RecordingProbe(),
         store=store,
         now=lambda: "recorded",
-    )[0]
-    monkeypatch.setattr(resolution, "FileBatchEstimateStore", lambda: store)
+    )
+    case = cases[0]
+    table = BatchSizeStore(tmp_path / "batch-sizes.yaml")
+    table.publish(cases)
+    monkeypatch.setattr(resolution, "BatchSizeStore", lambda: table)
     prepared = _dataset(tmp_path)
     if backend == "native":
         config, _ = _prepared_default(model_preset(selection), training=True)
@@ -236,7 +240,7 @@ def test_null_lookup_uses_actual_ordered_devices_and_preserves_requested_configu
         assert resolved_settings["batch"] == 2 * (case.global_batch or 0)
         assert resolved_settings["device"] == [1, 0]
     assert provenance is not None
-    assert provenance["profile"]["gpus"][0]["uuid"] == "GPU-1"
+    assert provenance["selected_entries"][0]["target_gpu"]["uuid"] == "GPU-1"
     assert provenance["global_batch"] == 2 * (case.global_batch or 0)
 
 

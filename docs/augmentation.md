@@ -153,9 +153,10 @@ a fresh invocation without a snapshot reads the file again, and selecting a diff
 file replaces the old snapshot. Keep the JSON under version control with the run
 configuration for reviewable experiments.
 
-Saved [batch estimates](batch-estimation.md) currently describe native augmentation
-profiles. Custom Albumentations mode requires an explicit numeric training batch;
-`batch=null` fails instead of reusing an estimate for a different augmentation recipe.
+Internal [batch measurements](batch-estimation.md) retain their augmentation profiles
+for strict cache reuse. Training `batch=null` uses the editable table without an
+augmentation compatibility gate, including custom Albumentations mode. Operators
+remain responsible for choosing a suitable batch for the actual recipe.
 
 ## Severstal execution checks
 

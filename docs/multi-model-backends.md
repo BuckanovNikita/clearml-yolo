@@ -188,10 +188,10 @@ background offset. These are distinct checkpoint architectures.
 
 Training `batch` means the global microbatch across all ranks and must be divisible
 by GPU count. Accumulation multiplies that value to obtain the effective optimizer
-batch. Explicit `model.train.batch=null` selects a compatible saved estimate; missing
-or incompatible evidence stops training. Numeric defaults stay unchanged. Read
-[batch estimation](batch-estimation.md) for synthetic limits, cache compatibility and
-queue resolution.
+batch. Explicit `model.train.batch=null` resolves the editable batch-size table for
+each selected GPU; an unresolved entry stops training. Numeric defaults stay unchanged.
+Read [batch estimation](batch-estimation.md) for exact/fallback selection, internal
+measurement compatibility and queue resolution.
 
 Explicit `weights` or supported `backbone_weights` are still used when `pretrained=false`.
 To request random initialization, set `pretrained=false` and leave both paths null.

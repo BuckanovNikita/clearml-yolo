@@ -138,23 +138,27 @@ See [augmentation](../../docs/augmentation.md) for geometry, reproducibility and
 
 Capacity estimation measures once per model/resolution/profile and distinct GPU
 name/capacity, with isolated GPU ownership and nonoverlapping trials on each assigned device.
-The aligned search uses an eight-image grid, rounds ceilings down, requires capacity
-at eight and independently confirms its winner. Cache hits need no idle GPU. Failure
-of one case does not kill peers; supervision failure does. Only the invocation owner
-promotes matching results after successful exit and verified cleanup. Forced results
-remain explicitly background-sensitive. Coverage listing is offline and never promises
-compatibility with a future allocation.
+New search starts at eight or a smaller ceiling, discovers integer capacities below
+eight and retains the multiples-of-eight grid above it. Every winner is independently
+confirmed; only capacity failure at one establishes no capacity. Measurements always
+use 150 synthetic classes. Historical strategies and keys retain their replay rules.
+Failure of one case does not kill peers; supervision failure does. Only the invocation
+owner publishes matching results after successful exit and verified cleanup. Forced
+results remain background-sensitive. Coverage listing is offline.
 
-Null training batch requests strict local lookup: prefer exact allocation evidence,
-otherwise use N times the minimum compatible single-GPU capacity across target hardware.
-Unsupported profiles require explicit batch; unaligned old values cannot supply automatic
-lookup. Training OOM fails without hidden retry/reduction. Rank failure terminates its
-owned cooperating group before another trial or allocation contraction. Discovery-time nonfinite computation may
-repeat once from fresh state; repeated numerical failure is not an OOM capacity result.
-Force permits background utilization but never foreign compute ownership or unknown
-telemetry. Exact settings,
-strategies and serialized compatibility: [batch estimation](../../docs/batch-estimation.md)
-and [batch interfaces](../006-batch-training/contracts/interfaces.md).
+Null training batch uses the editable YAML table: exact GPU name/capacity first,
+otherwise the largest capacity no greater than the target, with ties by smallest batch
+then GPU name. Resolve each GPU and use N times the smallest per-GPU value. Recipes,
+classes, density, augmentation and dependencies do not gate table lookup; strict
+measurement-cache compatibility remains separate. Manual edits, table digest and
+fallback source retain explicit provenance. Unsupported devices/models and non-square
+requests require explicit batch. Training OOM fails without hidden retries/reduction.
+Fresh explicit selections replace exact entries only after accepted success; no-capacity
+removes the entry and blocks fallback, with manual exact override. Other failed refreshes
+preserve table values. Exact entries are preserved by default; cross-GPU fallback is not
+exact coverage. Locked atomic publication preserves comments and unrelated entries.
+See [batch estimation](../../docs/batch-estimation.md) for the current contract and
+[feature specification](../012-editable-batch-sizes/spec.md) for acceptance scenarios.
 
 ## Weights and offline operation
 

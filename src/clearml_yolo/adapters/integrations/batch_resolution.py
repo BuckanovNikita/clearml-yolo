@@ -3,13 +3,12 @@
 from pathlib import Path
 from typing import Any
 
-from clearml_yolo.adapters.integrations.batch_lookup import resolve_batch_estimate
-from clearml_yolo.adapters.integrations.batch_profiles import training_profile
+from clearml_yolo.adapters.integrations.batch_lookup import TableRecommendation, resolve_batch_estimate
 from clearml_yolo.adapters.runtime.distributed import selected_gpu_indices
 from clearml_yolo.adapters.runtime.gpu_inventory import GPUDevice, discover_gpus
-from clearml_yolo.adapters.storage.batch_estimates import FileBatchEstimateStore
+from clearml_yolo.adapters.storage.batch_sizes import BatchSizeStore
 from clearml_yolo.application.contracts import PreparedDataset
-from clearml_yolo.core.batch_estimation import ResolvedRecommendation, select_models
+from clearml_yolo.core.batch_estimation import GPUHardware, select_models
 from clearml_yolo.core.models import Device, ModelConfig
 from clearml_yolo.core.transforms import TransformConfig
 
@@ -25,44 +24,37 @@ def _selected(value: Device) -> tuple[GPUDevice, ...]:
     return tuple(lookup[index] for index in indices)
 
 
-def batch_provenance(recommendation: ResolvedRecommendation) -> dict[str, Any]:
-    values: dict[str, Any] = {
-        "origin": recommendation.origin,
+def batch_provenance(recommendation: TableRecommendation) -> dict[str, Any]:
+    return {
+        "origin": "batch_sizes_table",
+        "table_digest": recommendation.table_digest,
+        "model": recommendation.model,
+        "image_size": recommendation.image_size,
         "global_batch": recommendation.global_batch,
         "per_gpu_batch": recommendation.per_gpu_batch,
-        "status": recommendation.status,
-        "profile": recommendation.profile.model_dump(mode="json"),
-        "source_estimate_keys": list(recommendation.source_estimate_keys),
-        "source_statuses": list(recommendation.source_statuses),
-        "sources": [
+        "selected_entries": [
             {
-                "estimate_key": key,
-                "global_batch": source.global_batch,
-                "per_gpu_batch": source.per_gpu_batch,
-                "status": source.status,
-                "diagnostic": source.diagnostic,
-                "created_at": source.created_at,
-                "synthetic_workload": source.workload.model_dump(mode="json"),
-                "profile": source.profile.model_dump(mode="json"),
-                "settings": source.settings.model_dump(mode="json"),
+                "target_gpu": selection.target_gpu.model_dump(mode="json"),
+                "entry": selection.entry.model_dump(mode="json"),
+                "fallback": selection.fallback,
+                "resolved_per_gpu_batch": selection.per_gpu_batch,
             }
-            for key, source in zip(recommendation.source_estimate_keys, recommendation.sources, strict=True)
+            for selection in recommendation.selections
         ],
     }
-    if recommendation.origin == "measured":
-        source = recommendation.sources[0]
-        values.update(
-            estimate_key=recommendation.source_estimate_keys[0],
-            created_at=source.created_at,
-            synthetic_workload=source.workload.model_dump(mode="json"),
-        )
-    return values
+
+
+def _hardware(devices: tuple[GPUDevice, ...]) -> tuple[GPUHardware, ...]:
+    return tuple(
+        GPUHardware(name=device.name, total_memory_bytes=device.total_memory_bytes, uuid=device.uuid)
+        for device in devices
+    )
 
 
 def resolve_native_batch(
     config: ModelConfig,
-    prepared: PreparedDataset,
-    transforms: TransformConfig | None,
+    _prepared: PreparedDataset,
+    _transforms: TransformConfig | None,
 ) -> tuple[ModelConfig, dict[str, Any] | None]:
     if config.train.batch is not None:
         return config, None
@@ -70,14 +62,13 @@ def resolve_native_batch(
         raise TypeError("Non-square training requires an explicit batch")
     selected = _selected(config.train.device)
     model = select_models((f"{config.backend}/{config.preset}",))[0]
-    profile = training_profile(
+    case = resolve_batch_estimate(
         model,
         config.train.imgsz,
-        selected,
-        native=config,
-        transforms=transforms,
+        _hardware(selected),
+        BatchSizeStore(),
+        device_indices=tuple(device.index for device in selected),
     )
-    case = resolve_batch_estimate(profile, prepared, FileBatchEstimateStore())
     resolved = config.model_copy(deep=True)
     resolved.train.batch = case.global_batch
     resolved.train.device = [device.index for device in selected]
@@ -87,8 +78,8 @@ def resolve_native_batch(
 def resolve_yolo_batch(
     architecture: str | Path,
     settings: dict[str, Any],
-    prepared: PreparedDataset,
-    transforms: TransformConfig | None,
+    _prepared: PreparedDataset,
+    _transforms: TransformConfig | None,
 ) -> tuple[dict[str, Any], dict[str, Any] | None]:
     if "batch" not in settings or settings["batch"] is not None:
         return settings, None
@@ -105,8 +96,13 @@ def resolve_yolo_batch(
         model = select_models((str(architecture),))[0]
     except ValueError as error:
         raise ValueError("Custom YOLO architectures require an explicit batch") from error
-    profile = training_profile(model, size, selected, yolo=settings, transforms=transforms)
-    case = resolve_batch_estimate(profile, prepared, FileBatchEstimateStore())
+    case = resolve_batch_estimate(
+        model,
+        size,
+        _hardware(selected),
+        BatchSizeStore(),
+        device_indices=tuple(device.index for device in selected),
+    )
     return settings | {
         "batch": case.global_batch,
         "device": [device.index for device in selected],

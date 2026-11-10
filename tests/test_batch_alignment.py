@@ -1,5 +1,7 @@
 """Automatic search uses an aligned grid without relabelling historical evidence."""
 
+from typing import Final
+
 import pytest
 
 from clearml_yolo.core.batch_estimation import (
@@ -13,11 +15,11 @@ from clearml_yolo.core.batch_estimation import (
 )
 from test_batch_estimation import _case, _profile, _trial
 
-ALIGNED = "memory_guided_aligned_v1"
+ALIGNED: Final = "memory_guided_aligned_v1"
 
 
 def _aligned(capacity: int, *, count: int = 1, ceiling: int = 128) -> BatchSearch:
-    search = BatchSearch.start(_profile(count), SearchSettings(max_global_batch=ceiling))
+    search = BatchSearch.start(_profile(count), SearchSettings(search_strategy=ALIGNED, max_global_batch=ceiling))
     for _ in range(100):
         if search.next_batch is None:
             return search
@@ -29,7 +31,7 @@ def _aligned(capacity: int, *, count: int = 1, ceiling: int = 128) -> BatchSearc
 def test_default_search_starts_at_eight_per_gpu() -> None:
     search = BatchSearch.start(_profile(), SearchSettings())
     assert search.next_batch == 8
-    assert search.settings.search_strategy == ALIGNED
+    assert search.settings.search_strategy == "memory_guided_small_batches_v1"
 
 
 @pytest.mark.parametrize("count", [1, 2, 3, 4])
@@ -62,7 +64,7 @@ def test_all_trials_and_confirmed_capacity_follow_the_per_gpu_grid(
 @pytest.mark.parametrize(("count", "ceiling"), [(1, 7), (2, 15), (3, 23)])
 def test_ceiling_must_cover_eight_per_gpu(count: int, ceiling: int) -> None:
     with pytest.raises(ValueError, match=r"eight|8"):
-        BatchSearch.start(_profile(count), SearchSettings(max_global_batch=ceiling))
+        BatchSearch.start(_profile(count), SearchSettings(search_strategy=ALIGNED, max_global_batch=ceiling))
 
 
 def test_guided_prediction_and_binary_refinement_stay_aligned() -> None:

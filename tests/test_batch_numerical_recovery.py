@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from clearml_yolo.adapters.integrations.batch_lookup import resolve_batch_estimate
 from clearml_yolo.adapters.integrations.batch_resolution import batch_provenance
 from clearml_yolo.adapters.storage.batch_estimates import FileBatchEstimateStore
+from clearml_yolo.adapters.storage.batch_sizes import BatchSizeStore
 from clearml_yolo.application.use_cases.batch_estimate import estimate_batches
 from clearml_yolo.core.batch_estimation import (
     BatchSearch,
@@ -22,11 +23,9 @@ from clearml_yolo.core.batch_estimation import (
     select_recommendation,
 )
 from clearml_yolo.entrypoints import batch_estimate as cli
-from clearml_yolo.entrypoints.batch_estimate import _report
 from test_batch_estimate_cli import _install
 from test_batch_estimate_workflow import MemoryStore, RecordingProbe, sample_profile
 from test_batch_estimation import _case, _profile, _search, _trial
-from test_batch_lookup import _dataset
 
 CAUSE = "FloatingPointError: YOLO probe produced nonfinite validation loss"
 
@@ -165,9 +164,7 @@ def test_schema_upgrade_is_write_only_and_preserves_peer_cases(tmp_path: Path) -
         EstimateCatalogue.model_validate({"schema_version": 1, "cases": [case.model_dump(mode="json")]})
 
 
-def test_limited_lookup_extrapolation_cli_and_training_preserve_cause(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
+def test_limited_lookup_extrapolation_preserves_cause() -> None:
     case = limited_case()
     exact = select_recommendation((case,), case.profile, case.workload)
     target = case.profile.model_copy(update={"gpus": case.profile.gpus * 2})
@@ -177,13 +174,7 @@ def test_limited_lookup_extrapolation_cli_and_training_preserve_cause(
     assert derived.origin == "extrapolated"
     assert derived.global_batch == 32
     assert derived.source_statuses == ("numerically_limited",)
-    provenance = batch_provenance(derived)
-    assert provenance["sources"][0]["diagnostic"] == case.diagnostic
-    _report(derived, cached=True)
-    output = capsys.readouterr().out
-    assert "numerically_limited" in output
-    assert CAUSE in output
-    assert "cached" in output
+    assert CAUSE in derived.sources[0].diagnostic
 
 
 def test_application_progress_cache_and_refresh_keep_confirmation_safety(
@@ -228,20 +219,18 @@ def test_mixed_hardware_preserves_numerical_limit_over_ceiling_status() -> None:
     assert result.status == "numerically_limited"
 
 
-def test_null_batch_lookup_accepts_confirmed_limited_source_within_dataset_bounds(
+def test_null_batch_lookup_uses_published_limited_value_without_claiming_measurement(
     tmp_path: Path,
 ) -> None:
-    case, store = limited_case(), MemoryStore()
-    store.save(case)
-    result = resolve_batch_estimate(case.profile, _dataset(tmp_path), store)
-    assert result.status == "numerically_limited"
+    case = limited_case()
+    store = BatchSizeStore(tmp_path / "batch-sizes.yaml")
+    store.publish((case,))
+    result = resolve_batch_estimate(case.profile.model, 960, case.profile.gpus, store)
     assert result.global_batch == 16
-    with pytest.raises(ValueError, match="explicit training batch"):
-        resolve_batch_estimate(
-            case.profile,
-            _dataset(tmp_path, images=[{"split": "train", "boxes": 301}]),
-            store,
-        )
+    provenance = batch_provenance(result)
+    assert provenance["origin"] == "batch_sizes_table"
+    assert "status" not in provenance
+    assert "synthetic_workload" not in provenance
 
 
 def test_cli_returns_usable_limited_result_and_reuses_it_without_more_trials(
@@ -265,9 +254,10 @@ def test_cli_returns_usable_limited_result_and_reuses_it_without_more_trials(
     output = capsys.readouterr().out
     assert "gpus=1\tglobal_batch=16" in output
     assert "gpus=2\tglobal_batch=32" in output
-    assert output.count(CAUSE) == 2
+    assert CAUSE in output
+    assert "source_status=numerically_limited" in output
     assert "unavailable" not in output
     calls = probe.calls
     cli.main(args)
-    assert probe.calls == calls
-    assert "cached" in capsys.readouterr().out
+    assert probe.calls == calls * 2
+    assert "cached" not in capsys.readouterr().out

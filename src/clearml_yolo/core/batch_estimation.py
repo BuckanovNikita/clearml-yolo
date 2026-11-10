@@ -34,9 +34,12 @@ type TrialStatus = Literal[
 ]
 type UsableStatus = Literal["validated", "ceiling_limited", "numerically_limited"]
 type SearchStatus = Literal["searching", "no_capacity", "failed"] | UsableStatus
-type SearchStrategy = Literal["exponential_binary_v1", "memory_guided_v1", "memory_guided_aligned_v1"]
+type SearchStrategy = Literal[
+    "exponential_binary_v1", "memory_guided_v1", "memory_guided_aligned_v1", "memory_guided_small_batches_v1"
+]
 
 _STRATEGY_SCHEMA_VERSION = 3
+_ALIGNED_BATCH_STEP = 8
 
 
 class _Record(BaseModel):
@@ -162,7 +165,7 @@ class TrainingProfile(_Record):
 
 class SearchSettings(_Record):
     force: StrictBool = False
-    search_strategy: SearchStrategy = "memory_guided_aligned_v1"
+    search_strategy: SearchStrategy = "memory_guided_small_batches_v1"
     memory_fraction: Annotated[float, Field(gt=0, le=1, allow_inf_nan=False)] = 0.9
     max_global_batch: PositiveInt = 1024
     warmup_steps: PositiveInt = 5
@@ -248,8 +251,8 @@ def _trial_observation(
 class BatchSearch(_Record):
     """Versioned capacity search whose only output is the next measured trial.
 
-    Bounds count images per rank. New searches use an eight-image grid per rank;
-    historical strategies retain their original single-image grid for replay.
+    Bounds count images per rank. New searches use integer batches below eight
+    and an eight-image grid above it; historical strategies keep their own grids.
     Successful discovery is followed by a fresh trial at the winner. Numerical
     failure can confirm a smaller candidate, but never implies a capacity boundary.
     """
@@ -272,16 +275,26 @@ class BatchSearch(_Record):
         step = 8 if settings.search_strategy == "memory_guided_aligned_v1" else 1
         if settings.max_global_batch < step * profile.world_size:
             raise ValueError(f"Search ceiling must cover at least {step} images per rank/world size")
+        if settings.search_strategy == "memory_guided_small_batches_v1":
+            step = min(_ALIGNED_BATCH_STEP, settings.max_global_batch // profile.world_size)
         return cls(profile=profile, settings=settings, next_batch=step * profile.world_size)
 
     @property
     def _batch_step(self) -> int:
+        if self.settings.search_strategy == "memory_guided_small_batches_v1":
+            small_range = self._ceiling < _ALIGNED_BATCH_STEP or (
+                self.upper is not None and self.upper <= _ALIGNED_BATCH_STEP
+            )
+            return 1 if small_range else _ALIGNED_BATCH_STEP
         return 8 if self.settings.search_strategy == "memory_guided_aligned_v1" else 1
 
     @property
     def _ceiling(self) -> int:
         per_rank = self.settings.max_global_batch // self.profile.world_size
-        return per_rank // self._batch_step * self._batch_step
+        aligned = self.settings.search_strategy == "memory_guided_aligned_v1" or (
+            self.settings.search_strategy == "memory_guided_small_batches_v1" and per_rank >= _ALIGNED_BATCH_STEP
+        )
+        return per_rank // 8 * 8 if aligned else per_rank
 
     def observe(self, trial: TrialResult) -> Self:
         if self.status != "searching" or trial.global_batch != self.next_batch:
@@ -310,7 +323,8 @@ class BatchSearch(_Record):
         per_rank = trial.global_batch // self.profile.world_size
         if status == "success":
             return BatchSearch._advance(current.model_copy(update={"lower": per_rank}))
-        if per_rank == self._batch_step:
+        minimum = 1 if self.settings.search_strategy == "memory_guided_small_batches_v1" else self._batch_step
+        if per_rank == minimum:
             return BatchSearch._finish(current, "no_capacity")
         return BatchSearch._advance(current.model_copy(update={"upper": per_rank}))
 
@@ -515,7 +529,11 @@ def compatibility_issues(case: EstimateCase, profile: TrainingProfile, workload:
     issues = []
     if not case.usable:
         issues.append(f"estimate status is {case.status}")
-    if case.per_gpu_batch is not None and case.per_gpu_batch % 8:
+    if (
+        case.per_gpu_batch is not None
+        and case.per_gpu_batch % 8
+        and case.settings.search_strategy != "memory_guided_small_batches_v1"
+    ):
         issues.append("automatic per-GPU batch must be divisible by 8; rerun cy-batch-estimate")
     saved, requested = case.profile.compatibility_data(), profile.compatibility_data()
     issues.extend(f"profile {key} differs" for key in saved if saved[key] != requested[key])
