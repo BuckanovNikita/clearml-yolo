@@ -107,6 +107,10 @@ For a focused selector, run `infra-check` first, then pytest on the selected
 - **Explicit names.** Every created ClearML project and task carries the environment
   identifier in its name (`"<id> clearml-yolo"`) and tags; deleting the namespace
   removes them all.
+- **One CPU smoke run per adopted environment.** The smoke test reads the task named
+  `cpu-smoke-pipeline` in the environment's project; an adopted environment keeps earlier
+  runs' tasks, a later run's task gets a suffixed name, and the assertion then reads the
+  earlier task. Start a new environment for each smoke run whose result counts.
 - **Concurrency.** Each worktree creates its own namespace; nothing is shared. Node
   pressure shows as components not ready within the budget (exit 3).
 - GPU suites take their `--run-*` options from the environment: the Severstal
@@ -128,7 +132,9 @@ For a focused selector, run `infra-check` first, then pytest on the selected
 
 Report the environment identifier, the selector, the pytest result and the deletion
 proof (`namespace <id> deleted and proven absent`, and no `cy-it-` namespace of the run
-in the listing above). Distinguish passed tests, failures, deferred, waived and error
+in the listing above). The lifecycle's `==>` lines show only with `pytest -s`; under the
+default capture of the Task stages, take the identifier and the absence from `kubectl`
+listings before and after. Distinguish passed tests, failures, deferred, waived and error
 outcomes and incomplete deletion. When deletion is not proven, the record stays: report
 it with the `L stop --env <id>` retry. A successful preflight without executed live
 tests is not acceptance.

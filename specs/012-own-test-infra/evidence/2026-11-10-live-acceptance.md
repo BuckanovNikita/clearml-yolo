@@ -1,20 +1,39 @@
 # Live acceptance of the own test environment, 2026-11-10
 
-All runs on 2026-11-10 (Moscow time) in the worktree of branch `feat/own-test-infra`, context
-`docker-desktop`, with `kubectl` from the user's kubeconfig. The shared stands had already
-been wiped; the cluster held only the platform namespaces and the owner's dedicated `clearml`
-and `mongodb`, which no run contacted. The storage class was `hostpath` only. Code under test:
-`d09e60b` (lifecycle with the killed-session port-forward fix) unless a row says otherwise.
+All runs on 2026-11-10 and just after midnight (Moscow time) in the worktree of branch
+`feat/own-test-infra`, context `docker-desktop`, with `kubectl` from the user's kubeconfig. The
+shared stands had already been wiped; the cluster held only the platform namespaces and the
+owner's dedicated `clearml` and `mongodb`, which no run contacted. The storage class was
+`hostpath` only. Code under test: `58a466f` for the first `up` (22:16, the quota table below)
+and the four smoke runs listed under "Runs not counted"; `d09e60b` (the killed-session
+port-forward fix) for everything from 22:56 on. Later commits change only `specs/`.
 
 Run conditions, because the user was gaming on the machine: every heavy command ran under
 `nice -n19` with `OMP_NUM_THREADS=4` and `CUDA_VISIBLE_DEVICES=""` (the CPU smoke test needs no
 GPU), one environment at a time. The CPU smoke run's `cy` pipeline prepares the whole model
-catalogue in its temporary `CY_HOME` (docs/model-assets.md "Catalogue and automatic
-execution"); GitHub release downloads ran at about 1.7 MB/s and twice stalled without end, so
-the smoke runs below set `CY_WEIGHTS_DOWNLOAD_TIMEOUT` (20 s, later 3 s). Automatic preparation
-failures warn and continue by design; the selected model is the local `yolo11n.pt`. Two
-earlier smoke runs in an adopted environment were stopped by hand during such a stall; they
-are not counted as results.
+catalogue (about 5 GB of release archives) in its temporary `CY_HOME` (docs/model-assets.md
+"Catalogue and automatic execution"); GitHub release downloads ran at about 1.7 MB/s, and two
+of them stopped making progress for about 8 minutes until stopped by hand. The counted smoke
+runs therefore set `CY_WEIGHTS_DOWNLOAD_TIMEOUT` (20 s, later 3 s): automatic preparation
+failures warn and continue by design, and the selected model is the local `yolo11n.pt`.
+Without that setting the `integration` stage was not shown passing on this machine; that is
+product behaviour outside this feature.
+
+## Runs not counted
+
+All four were CPU smoke runs in the adopted environment `cy-it-0369fd` (code `58a466f`):
+
+| Run | Outcome | Cause |
+| --- | --- | --- |
+| 1 (22:17) | stopped by hand after about 8 minutes without download progress; test failed | stalled GitHub download in catalogue preparation |
+| 2 (22:31, `INTEGRATION_KEEP_DATA=1`) | stopped by hand the same way; test failed | as run 1 |
+| 3 (22:44, `CY_WEIGHTS_DOWNLOAD_TIMEOUT=20`) | pipeline outcome succeeded, test failed: `assert 'failed' in {'completed', 'published'}` | the test looks up the task named `cpu-smoke-pipeline` in the environment's project; runs 1 and 2 had left failed tasks of that name, so this run's task got a suffixed name (`cpu-smoke-pipeline-calm-lark`) and the assertion read run 1's task. An adopting session deletes nothing, so tasks of earlier runs stay in an adopted environment |
+| 4 (22:55, `INTEGRATION_KEEP_DATA=1`) | interrupted by hand (SIGINT) | same pollution as run 3 |
+
+In each run the session adopted the environment and left the namespace and record in place.
+The same lookup means that the `INTEGRATION_KEEP_DATA=1` pass of T029b case 1 below asserted on
+the first pass's task; that case proves adoption and keeping, not a second independent
+publication.
 
 ## Environment start, quota and endpoints (T027 quota part, SC-004, SC-005)
 
@@ -85,11 +104,21 @@ opt-in), 81 deselected** in 154 s; tip clean and unchanged. The session's enviro
 the table above (pods 5/8, requests 550m/1, 1184Mi/2Gi, limits 6500m/8, 3840Mi/6Gi, claims
 0/0, GPU 0/0). Afterwards no `cy-it-` namespace and no port-forward existed.
 
+## Follow-up checks, 2026-11-11 00:02-00:08
+
+| Case | Result |
+| --- | --- |
+| `timeout --preserve-status -s INT 12 lifecycle up`; the same with `TERM` | exit **130** and **143**; no namespace or record left (the earlier rows used `timeout` without `--preserve-status`, which reports 124) |
+| FiftyOne session under pytest's default capture with `INTEGRATION_KEEP_DATA=1` | 29 passed; `cy-it-bac641` and its record kept; the lifecycle's `==>` lines (including the keep notice with `stop` and the 48-hour limit) are not shown under default capture, as with master's lifecycle, which wrote them the same way; `stop` then deleted it and proved it absent |
+| one session that extends its environment: `CY_TEST_FIFTYONE=1 pytest tests/integration -m 'not ddp_gpu and not severstal_gpu' -n 0 -s` | FiftyOne tests first created `cy-it-33938a` with the database only ("database components ready in 2 s"), the CPU smoke test then added the ClearML components; **30 passed, 81 deselected** in 184 s; namespace deleted and proven absent; no record or forward left |
+
 ## Not run or deferred
 
 - GPU suites (Severstal single-GPU, multi-GPU DDP) and the real-run gate: **deferred** (the
   user was gaming; out of scope for this feature's change). Only their option validation ran.
 - `release-acceptance` as a whole: not run (it includes the GPU suites); its FiftyOne step
   ran by hand (T028) and its paired check ran (T031).
+- Simulated or partial: an unavailable cluster was simulated only by a tiny preflight bound;
+  the foreign-record refusal was run for `up` and `stop`, not for session setup.
 - T032 independent review: **not done** by this implementing session (it may not start
   sub-agents); required before integration.
