@@ -141,8 +141,8 @@ remains afterwards.
    session setup gives up, **Then** the partially created namespace is deleted, the reason
    (the components not ready and their state) is reported, and the session ends as deferred
    (exit 3) under Task verification or skips interactively.
-4. **Given** a test fails after setup, **When** the session ends, **Then** the namespace is
-   still deleted and the failure is reported as a test failure, not as an infrastructure
+4. **Given** a test fails after setup, **When** the session ends, **Then** the namespace the
+   session created is still deleted (an adopted one is left, FR-014) and the failure is reported as a test failure, not as an infrastructure
    outcome.
 
 ---
@@ -370,9 +370,12 @@ selection before any environment is created.
   budget configurable through an environment variable (default chosen from the measured cold
   start with room for pulling images), open port-forwards to loopback on kubectl-chosen ports,
   and export the ClearML endpoint, files endpoint and credentials (and the FiftyOne database
-  URI) to the tests.
-- **FR-012**: A setup failure after the namespace exists MUST delete the namespace before the
-  failure is reported. Temporary causes (not ready within the budget, lost connectivity) MUST
+  URI) to the tests. When it adopts one, it MUST take the endpoints from the record's
+  port-forwards and the credentials from the environment's Secret, as `env` does, and export
+  them to the tests in place of any `CLEARML_*` or `FIFTYONE_DATABASE_URI` value the shell
+  holds; from the shell it reads only `INTEGRATION_RUN_TAG`.
+- **FR-012**: A setup failure after setup created the namespace MUST delete that namespace
+  before the failure is reported; a setup failure while adopting deletes nothing (FR-014). Temporary causes (not ready within the budget, lost connectivity) MUST
   be reported as unavailable (exit 3, deferred); permanent causes (forbidden, invalid
   manifest, quota rejection) as errors (exit 1).
 - **FR-013**: Teardown MUST stop the environment's port-forwards, delete the namespace and
@@ -486,7 +489,7 @@ Each current behaviour of the run-tag lifecycle and the environment skill, with 
 | Tagged project names and `clearml.tags` | Kept; no longer the cleanup selector | FR-017 |
 | Exact-tag cleanup proven by empty `ls --prefix` | Changed: namespace deletion proven by absence | FR-013 |
 | Keep tag file until cleanup is proven | Kept for the environment record | FR-013 |
-| Setup failure stops the run | Kept: namespace deleted before reporting | FR-012 |
+| Setup failure stops the run | Kept for a namespace setup created: deleted before reporting; an adopted namespace is left | FR-012, FR-014 |
 | `INTEGRATION_KEEP_DATA=1` | Kept; adds the 48-hour note | FR-015 |
 | `env` refuses a terminal | Kept | FR-016 |
 | Children get the real HOME from `CY_REAL_ENV` | Kept (kubectl needs the real kubeconfig) | Edge cases |
@@ -530,7 +533,7 @@ Each current behaviour of the run-tag lifecycle and the environment skill, with 
 - **SC-002**: The release-acceptance FiftyOne step passes against the environment's database
   and leaves no namespace behind.
 - **SC-003**: `git grep` for the retired names in FR-023 finds nothing outside dated evidence,
-  `CHANGELOG.md`, `bugs/` and earlier feature records.
+  `CHANGELOG.md`, `bugs/` and earlier feature records, except the guards FR-023 lists.
 - **SC-004**: Every namespace the project creates appears with a `ResourceQuota` in the
   sweeper's report (or `kubectl get resourcequota -n <ns>` before the sweeper exists).
 - **SC-005**: Environment cold start with cached images stays within the default start-up

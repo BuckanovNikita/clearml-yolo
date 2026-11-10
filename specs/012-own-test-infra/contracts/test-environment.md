@@ -37,8 +37,11 @@ preflight. A **live recorded environment** is a record whose first line matches
 
 Adoption details:
 
-- The adopting session uses the shell's exported endpoints and credentials (from
-  `eval "$(L env)"`). Each component the session needs must have a `forward` line in the
+- The adopting session reads only `E` from the shell. It takes the endpoints from the record's
+  `forward` lines and the credentials from the environment's Secret, exactly as `env` does, and
+  sets them in its own process in place of any `CLEARML_*` or `FIFTYONE_DATABASE_URI` value the
+  shell holds (the shell may point at another ClearML, such as the user's on port 8008). Each
+  component the session needs must have a `forward` line in the
   record whose PID and start time match a running process; a missing component or a dead
   forward is refused with exit 1 naming the component and `stop` (restart with `stop`, then
   `up`). Nothing is created, signalled or deleted.
