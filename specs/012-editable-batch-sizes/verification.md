@@ -79,3 +79,27 @@ run-tag file was absent after acceptance. No GPU process was created. Paired-che
 virtual environments and retained mutation workspaces were removed after inspection.
 Pre-existing services, datasets and the other worktree remain untouched. Verification
 logs are retained locally as dated diagnostic evidence; no credentials were persisted.
+
+## Addendum, 2026-11-11: acceptance on the project's own test infrastructure
+
+The shared stands this record's earlier live runs used were removed on
+2026-11-10. The branch now carries the own-test-infrastructure migration
+(`specs/012-own-test-infra`), merged as a fast-forward at `d25b8eb`.
+
+- Clean-tip acceptance: passed on clean unchanged commit `d25b8eb` (exit 0,
+  "Accepted tip: d25b8eb583086ef3bb983fdd7fc939314cac1895"), run with two test
+  workers at low priority. The live CPU smoke ran against a ClearML the lifecycle
+  deployed into its own `cy-it-` namespace: one passed, 29 skipped, 81
+  deselected, in 160 s. No `cy-it-` namespace remained afterwards. The run's
+  output was truncated to its tail, so the property and coverage stage counts
+  of this run are not retained here; the gate's exit status covers them.
+- The run set `CY_WEIGHTS_DOWNLOAD_TIMEOUT=3`. At the default setting the
+  integration stage was not shown passing on this machine, because catalogue
+  downloads stalled (see `specs/012-own-test-infra/evidence/`).
+- Paired CY/queue: passed on this branch with the migration (527 queue tests),
+  recorded in `specs/012-own-test-infra/evidence/`.
+- Native bounded estimation and training lookup (T009): still deferred. They
+  need the GPU while the workstation was in interactive use; no GPU job was
+  launched. Mocked tests do not establish native or GPU outcomes.
+- Release: still blocked by T009; no push authorization. No version, tag or push
+  was performed.
