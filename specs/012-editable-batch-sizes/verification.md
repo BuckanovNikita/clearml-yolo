@@ -50,14 +50,19 @@ workload/recipe gates. User-facing schema wording was updated to name the editab
   queue help and 527 queue tests (7 deselected). Versions: CY 0.47.0 and queue 0.1.10.
   The tested source changes are committed in CY `0d1889d` and queue `d3627a0`; subsequent
   changes are test expectations/assertions and dated evidence, not runtime behavior.
-- Clean-tip acceptance: rerun pending. The preceding attempt passed static checks,
+- Clean-tip acceptance: passed on unchanged clean commit `1268846` (exit 0).
+  Static checks, properties (4761 passed, one skipped), coverage (4761 passed, one
+  skipped; 84.29% against 84.12% required), and live CPU stand smoke (one passed,
+  29 skipped, 81 deselected) completed. Log: `/tmp/cy012-acceptance-final.log`.
+  The preceding attempt passed static checks,
   properties (4753 passed, one skipped), coverage (4761 passed, one skipped, 84.30%
   against 84.12% required), and CPU stand smoke (one passed, 29 skipped, 81 deselected).
   The stand had become available after initial UNAVAILABLE/3 preflight. That attempt
   failed its final clean-worktree guard because mutation tests were added while it ran;
   it is not claimed as successful clean-tip acceptance.
-- Final `prek run --all-files` after the final test commit: pending. Earlier full pipeline
-  passed with skips cleared; newly added mutation regressions passed focused checks.
+- Final `prek run --all-files` after the final test commit `1268846`: passed all
+  eight hooks with skips cleared. Log: `/tmp/cy012-prek-final.log`. The evidence-only
+  commit is followed by the same pipeline; its result is reported in the handoff.
 - Native bounded estimation and training lookup: deferred. pcboard could not identify
   this session using either host discovery or its session identifier, so safe GPU
   availability could not be established. No GPU job was launched and no wake-up was
@@ -68,7 +73,9 @@ workload/recipe gates. User-facing schema wording was updated to name the editab
 ## Resource ownership
 
 The CPU smoke run used the integration lifecycle's owned run tag and passed teardown;
-its run-tag file was released. No GPU process was created. Paired-check temporary
+its run-tag file was released. The successful final run owned
+`clearml-yolo-codex-20261110-integration-kn2p`; its child processes exited and the
+run-tag file was absent after acceptance. No GPU process was created. Paired-check temporary
 virtual environments and retained mutation workspaces were removed after inspection.
 Pre-existing services, datasets and the other worktree remain untouched. Verification
 logs are retained locally as dated diagnostic evidence; no credentials were persisted.
