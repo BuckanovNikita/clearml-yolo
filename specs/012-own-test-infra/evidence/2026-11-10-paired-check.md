@@ -10,7 +10,7 @@ CY_QUEUE_DIR=/mnt/wsl/data/nkt/cy-queue uv run --locked task --exit-code paired-
 | --- | --- |
 | clearml-yolo commit | `98a373d` (branch `feat/own-test-infra`; `git diff master -- src tests pyproject.toml uv.lock` empty, so the code under test is master `f1a3755`) |
 | cy-queue commit | `d3627a0` on `main`, `git status --short` empty before and after |
-| Result | **failed**, exit 2 from pytest during collection; the stage stopped before its `cy-queue --help` and version steps |
+| Result | **failed**, exit 2 from pytest during collection. Before pytest, `uv pip check` and the editable-install and version-match check passed; after the failure the stage did not run `cy-queue --help` or its final version report |
 
 Failure (verbatim, abridged to the error):
 
@@ -33,6 +33,9 @@ An independent verifier's run (not repeated here) of the narrower form `cd /mnt/
 --no-sync --project <worktree> pytest -q` failed by construction ("22 errors during
 collection"): the worktree's development environment does not have cy-queue installed. That
 form is not the paired check and is no longer specified (tasks T031, research R-11).
+
+Rerun on the final tip of this fix (`0af13e6`, which changes only `specs/`), cy-queue still
+`d3627a0` and clean: the same collection error, exit 2.
 
 Status: the paired check is reported as **failed for a cause outside this feature**, not as
 passed, until master gains `batch_sizes` or the owner decides otherwise (spec "Dependencies").

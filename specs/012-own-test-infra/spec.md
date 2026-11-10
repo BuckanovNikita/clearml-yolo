@@ -206,8 +206,9 @@ converges; starting again recreates what is missing.
    `agent_cleanup.sh --tag clearml`, with or without `--dry-run`, or `stop --env default`),
    **When** teardown runs, **Then** it refuses with exit 1 and makes no delete call (FR-018).
 7. **Given** a worktree record left by the retired run-tag lifecycle (its first line is not an
-   environment identifier), **When** `stop`, `up` or a live session runs, **Then** the record
-   is cleared without any delete call and the command continues (FR-018).
+   environment identifier, for example `clearml-yolo-claude-20261105-integration-a1b2`), **When** `stop`, `up` or a live
+   session runs, **Then** the record is cleared without any delete call; `stop` exits 0 and
+   `up` or the session continues (FR-018).
 
 ---
 
@@ -249,11 +250,12 @@ selection before any environment is created.
   the real kubeconfig, which is restored from `CY_REAL_ENV` for children as today.
 - **Stale per-worktree namespaces.** Environments of a crashed worktree that nobody stops are
   removed by the sweeper within 48 hours. Teardown deletes only a namespace whose name is an
-  environment identifier and whose live labels mark it as this project's (FR-018); any
-  other name, from a record or from `--tag`, is refused before a delete call.
+  environment identifier and whose live labels mark it as this project's (FR-018); no
+  other name, from a record or from `--tag`, ever reaches a delete call.
 - **Record from the retired lifecycle.** A worktree may still hold a `.run-tag` written by the
-  run-tag lifecycle (a shared-stand run tag such as `clearml-...`). It names no namespace of
-  this project; it is cleared without a delete call (FR-018).
+  run-tag lifecycle (a shared-stand run tag such as `clearml-yolo-claude-20261105-integration-a1b2`, which can never match
+  the identifier pattern because it carries a harness word and a date). It names no namespace
+  of this project; it is cleared without a delete call (FR-018).
 - **User's host ClearML.** The port-forward never binds local port 8008, so the host-stand
   warning keeps meaning "this is the user's own ClearML".
 
@@ -316,15 +318,17 @@ selection before any environment is created.
   carry the environment identifier; the GPU suites keep joining the session environment on
   demand after validating their options.
 - **FR-018**: Teardown (`stop`, the session fixtures, setup-failure cleanup and
-  `agent_cleanup.sh`, including `--dry-run`) MUST refuse with exit 1, making no
-  `kubectl delete` call, any target name that does not match `^clearml-yolo-it-[0-9a-f]{6}$`,
-  and any matching name whose live namespace lacks the label
-  `app.kubernetes.io/part-of=clearml-yolo-tests`. A matching name whose namespace is absent
-  is already stopped (FR-014). The name is checked before any other teardown step, whether it
-  comes from the record, from `stop --env <id>` or from `agent_cleanup.sh --tag`/`CY_RUN_TAG`.
-  A record whose first line does not match (the retired run-tag format or anything else) is
-  cleared without any delete call and reported as a retired record; a refused name given on
-  the command line leaves the record untouched.
+  `agent_cleanup.sh`, including `--dry-run`) MUST make a `kubectl delete` call only for a
+  name that matches `^clearml-yolo-it-[0-9a-f]{6}$` and whose live namespace carries the
+  label `app.kubernetes.io/part-of=clearml-yolo-tests`. The name is checked before any other
+  teardown step. By source:
+  - a name given on the command line (`stop --env <id>`, `agent_cleanup.sh --tag`, or
+    `CY_RUN_TAG`) that does not match is refused with exit 1; the record is left untouched;
+  - a record whose first line does not match (the retired run-tag format or anything else) is
+    not an environment: it is cleared, reported as a retired record, and `stop` exits 0;
+  - a matching name whose live namespace lacks the label is refused with exit 1 and the
+    record is kept;
+  - a matching name whose namespace is absent is already stopped (FR-014).
 
 **Environment skill and repository references (R8, R9)**
 

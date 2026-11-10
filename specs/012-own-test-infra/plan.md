@@ -134,7 +134,10 @@ no `src/` change.
    with a 256 MiB heap, request 512 MiB, limit 1 GiB (measured sufficient for the smoke test).
 9. **Fast teardown.** Pods declare a 2 s termination grace period (no data to preserve);
    teardown waits for the namespace to disappear, bounded (`CY_TEST_ENV_STOP_TIMEOUT`,
-   default 180 s). Measured 11 s.
+   default 180 s). Measured 11 s. Every delete passes the deletion guard first (spec FR-018,
+   contract "Deletion guard"): the name must be an environment identifier and the live
+   namespace must carry the project label; `agent_cleanup.sh` passes its identifier as
+   `stop --env <id>` and has no delete path of its own.
 10. **Tooling tests.** `tests/test_integration_lifecycle.py` is deleted; the lifecycle is
     evidenced by live runs. Product tests that mention retired names (for example
     `tests/test_clearml_session.py` proving the application ignores `INFRA_RUN_TAG`) stay: they
