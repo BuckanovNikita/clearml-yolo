@@ -440,6 +440,37 @@ def _await_forward_port(process: "subprocess.Popen[bytes]", log_path: Path, comp
         time.sleep(0.2)
 
 
+def _forward_prefix(identifier: str) -> list[str]:
+    return ["kubectl", "--context", CONTEXT, "--namespace", identifier, "port-forward"]
+
+
+def unrecorded_forwards(identifier: str) -> list[Forward]:
+    """Find the current user's port-forward processes of one environment by their command line.
+
+    A session's port-forwards are its children and are not recorded; when the session is
+    killed (SIGKILL, a closed terminal) they outlive it. Their command line starts with the
+    exact vector ``start_forward`` uses, which names the environment's namespace, so no
+    other process matches.
+    """
+    prefix = _forward_prefix(identifier)
+    found: list[Forward] = []
+    for entry in Path("/proc").iterdir():
+        if not entry.name.isdigit() or int(entry.name) == os.getpid():
+            continue
+        try:
+            if entry.stat().st_uid != os.getuid():
+                continue
+            words = [word.decode(errors="replace") for word in (entry / "cmdline").read_bytes().split(b"\0") if word]
+        except OSError:
+            continue
+        if len(words) < len(prefix) + 2 or words[: len(prefix)] != prefix:
+            continue
+        start = process_start(int(entry.name))
+        if start is not None:
+            found.append(Forward(words[-2].removeprefix("svc/"), 0, int(entry.name), start))
+    return found
+
+
 def start_forward(identifier: str, component: str) -> Forward:
     """Forward a loopback port chosen by kubectl to the component's Service.
 
@@ -448,12 +479,7 @@ def start_forward(identifier: str, component: str) -> Forward:
     """
     log_path = forward_log(identifier, component)
     command = [
-        "kubectl",
-        "--context",
-        CONTEXT,
-        "--namespace",
-        identifier,
-        "port-forward",
+        *_forward_prefix(identifier),
         "--address",
         "127.0.0.1",
         f"svc/{component}",
@@ -549,6 +575,18 @@ def _await_absence(identifier: str) -> bool:
     return True
 
 
+def _unlisted(identifier: str, forwards: Sequence[Forward]) -> list[Forward]:
+    known = {forward.pid for forward in forwards}
+    return [forward for forward in unrecorded_forwards(identifier) if forward.pid not in known]
+
+
+def stop_unlisted_forwards(identifier: str, forwards: Sequence[Forward] = ()) -> None:
+    """Stop the environment's port-forwards that ``forwards`` does not list (a killed session's)."""
+    for forward in _unlisted(identifier, forwards):
+        log(f"stopping port-forward {forward.pid} to {forward.component} of {identifier} left by an ended session")
+        forward.stop()
+
+
 def remove(root: Path, identifier: str, forwards: Sequence[Forward] = (), *, dry_run: bool = False) -> int:
     """Delete one environment behind the deletion guard and prove it gone.
 
@@ -566,10 +604,12 @@ def remove(root: Path, identifier: str, forwards: Sequence[Forward] = (), *, dry
         )
     if dry_run:
         action = "is already gone" if state == "absent" else "would be deleted"
-        log(f"dry run: {len(forwards)} recorded port-forward(s) would be stopped; namespace {identifier} {action}")
+        count = len(forwards) + len(_unlisted(identifier, forwards))
+        log(f"dry run: {count} port-forward(s) would be stopped; namespace {identifier} {action}")
         return EXIT_AVAILABLE
     for forward in forwards:
         forward.stop()
+    stop_unlisted_forwards(identifier, forwards)
     for component in FORWARD_PORTS:
         forward_log(identifier, component).unlink(missing_ok=True)
     if state == "absent":
@@ -857,6 +897,7 @@ def _clear_unusable(root: Path, kind: str, identifier: str, forwards: Sequence[F
     elif kind == "stale":
         for forward in forwards:
             forward.stop()
+        stop_unlisted_forwards(identifier, forwards)
         log(f"recorded environment {identifier} no longer exists; record cleared, nothing was deleted")
     else:
         return

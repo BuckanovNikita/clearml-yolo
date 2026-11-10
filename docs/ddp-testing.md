@@ -70,7 +70,7 @@ lifecycle `stop` afterwards:
 uv run --frozen --no-sync --project ../clearml-yolo pytest -m ddp_gpu \
   --run-ddp-gpu \
   --ddp-devices=0,1 \
-  --ddp-clearml-project="$(cat ../clearml-yolo/tests/integration/.run-tag) clearml-yolo-ddp" \
+  --ddp-clearml-project="$(head -1 ../clearml-yolo/tests/integration/.run-tag) clearml-yolo-ddp" \
   --ddp-artifacts=.tmp/ddp-results \
   -ra -vv
 ```

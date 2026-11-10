@@ -131,7 +131,9 @@ no `src/` change.
 7. **Port-forward ownership.** Session fixtures own the port-forward children and stop them at
    teardown. Manual `up` starts detached port-forwards and records their process IDs with
    their start times; `stop` signals only processes whose recorded start time matches, so a
-   reused PID is never signalled.
+   reused PID is never signalled. A session killed before its teardown leaves its unrecorded
+   children running; `stop` also stops the current user's processes whose command line is the
+   lifecycle's own forward command for the target namespace, so none survives (US4 scenario 5).
 8. **Quota.** `pods 8`, `requests.cpu 1`, `requests.memory 2Gi`, `limits.cpu 8`,
    `limits.memory 6Gi`, `persistentvolumeclaims 0`, `requests.nvidia.com/gpu 0`. Limit range
    defaults (50m/64Mi request, 500m/256Mi limit) cover the init containers. Elasticsearch runs
