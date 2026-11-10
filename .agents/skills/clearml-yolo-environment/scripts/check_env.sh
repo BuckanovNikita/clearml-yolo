@@ -8,11 +8,13 @@
 #
 # The endpoint and the credentials are read the way the ClearML SDK reads them:
 # CLEARML_API_HOST, CLEARML_API_ACCESS_KEY and CLEARML_API_SECRET_KEY from the
-# environment first (what this skill's `agent_env.sh` exports for the shared
-# cluster stand), the config file for whatever the environment leaves unset. The
-# report names which endpoint it authenticated against and where each value came
-# from, and warns when that endpoint is the user's own host stand on
-# localhost:8008 rather than the shared cluster stand an agent run belongs on.
+# environment first (what this skill's `agent_env.sh` exports for the run's own
+# test environment, reached through a loopback port-forward), the config file for
+# whatever the environment leaves unset. The report names which endpoint it
+# authenticated against and where each value came from, and warns when that
+# endpoint is the user's own host ClearML on localhost:8008 rather than the run's
+# own test ClearML. It also reports whether kubectl reaches the docker-desktop
+# cluster the test environment lives in.
 #
 # Always exits 0. This reports; it never blocks a session or a test run.
 #
@@ -53,21 +55,22 @@ check_gpu() {
     record "OK   GPU $(echo "$gpu" | paste -sd '; ')"
 }
 
-# Docker Desktop leaves a shim on PATH in WSL distros where integration is off.
-# It prints "could not be found in this WSL 2 distro" and exits 0, so a caller
-# that trusts the exit code believes it started the server.
-check_docker() {
-    local output
-    output="$(docker compose version 2>&1)"
-    if [[ "$output" == *"could not be found in this WSL 2 distro"* ]]; then
-        record "WARN docker — Docker Desktop shim only; compose commands do nothing here (and still exit 0)"
+# The test environment lives in the docker-desktop cluster; kubectl is how it is
+# created and reached (port-forward).
+check_kubectl() {
+    if ! command -v kubectl >/dev/null 2>&1; then
+        record "FAIL kubectl — not on PATH; the run's own test environment is created and reached with it"
         return
     fi
-    if [[ -z "$output" || "$output" != *"ompose"* ]]; then
-        record "WARN docker — no working docker compose in this shell"
+    if ! kubectl config get-contexts docker-desktop -o name >/dev/null 2>&1; then
+        record "FAIL kubectl — no docker-desktop context; the test cluster context is missing"
         return
     fi
-    record "OK   $(echo "$output" | head -1)"
+    if ! timeout 10 kubectl --context docker-desktop get --raw=/readyz >/dev/null 2>&1; then
+        record "FAIL kubectl — the docker-desktop cluster does not answer"
+        return
+    fi
+    record "OK   kubectl — docker-desktop cluster reachable"
 }
 
 read_conf_value() {
@@ -78,30 +81,11 @@ read_conf_credential() {
     grep -oP "\"$1\"\s*=\s*\"\K[^\"]+" "$CLEARML_CONF" 2>/dev/null | head -1
 }
 
-# The user's own ClearML runs on the host, API on localhost:8008; the shared cluster
-# stand agents run against answers on https://api.clearml.k8s.docker.internal. An agent
-# that sees the former has not sourced this skill's agent_env.sh and would write into
-# the user's projects.
+# The user's own ClearML runs on the host, API on localhost:8008; a run's own test
+# ClearML answers on a loopback port that kubectl port-forward chose, never 8008. An
+# agent that sees the former has not sourced this skill's agent_env.sh and would write
+# into the user's projects.
 HOST_STAND_API_PATTERN='^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0):8008/?$'
-
-# The cluster stand serves HTTPS with a certificate from the k8s-infra local CA. These
-# curl exit statuses mean the handshake or the certificate check failed: the stand
-# answered and this shell does not trust it, which is not the same as a stand that is down.
-curl_tls_failure() {
-    case "$1" in
-        51|53|54|58|59|60|64|66|77|80|82|83|90|91) return 0 ;;
-    esac
-    return 1
-}
-
-# curl exit 35 is a failed handshake: an untrusted certificate can cause it, but so can
-# a reset connection or a port that answers without TLS (an ingress still starting), so
-# it is reported on its own instead of as a trust problem or as plain unreachable.
-curl_handshake_failure() {
-    [[ "$1" == 35 ]]
-}
-
-TLS_HINT="the certificate is not trusted (k8s-infra local CA), the stand is not known to be down; source $CY_ENV_SCRIPTS_DIR/agent_env.sh so the helper exports SSL_CERT_FILE and REQUESTS_CA_BUNDLE, and check that /usr/local/share/ca-certificates/k8s-infra-local-ca.crt is installed (update-ca-certificates)"
 
 CLEARML_API_IN_USE=""
 
@@ -127,13 +111,7 @@ check_clearml() {
     local status=0
     curl -sf -m 5 "$api/debug.ping" >/dev/null 2>&1 || status=$?
     if (( status != 0 )); then
-        if curl_tls_failure "$status"; then
-            record "FAIL ClearML $api (from $api_source) — TLS verification failed (curl exit $status); $TLS_HINT"
-        elif curl_handshake_failure "$status"; then
-            record "FAIL ClearML $api (from $api_source) — TLS handshake failed (curl exit 35); the stand may be down or not serving TLS yet, or the certificate is not trusted"
-        else
-            record "FAIL ClearML $api (from $api_source) — unreachable"
-        fi
+        record "FAIL ClearML $api (from $api_source) — unreachable (curl exit $status); a stopped port-forward or a deleted environment looks like this"
         return
     fi
 
@@ -152,10 +130,6 @@ check_clearml() {
 
     status=0
     body="$(curl -s -m 10 -u "$key:$secret" "$api/auth.login" 2>/dev/null)" || status=$?
-    if curl_tls_failure "$status"; then
-        record "FAIL ClearML $api (from $api_source) — TLS verification failed for auth.login (curl exit $status); $TLS_HINT"
-        return
-    fi
     # Without -f an HTTP 401 still exits 0, so any other nonzero status is a transport
     # failure (timeout, reset) and says nothing about the credentials.
     if (( status != 0 )); then
@@ -171,15 +145,15 @@ check_clearml() {
 
 warn_if_host_stand() {
     if [[ "$CLEARML_API_IN_USE" =~ $HOST_STAND_API_PATTERN ]]; then
-        record "WARN ClearML $CLEARML_API_IN_USE is the user's host stand, not the shared cluster stand; an agent run sources $CY_ENV_SCRIPTS_DIR/agent_env.sh first"
+        record "WARN ClearML $CLEARML_API_IN_USE is the user's host ClearML, not this run's own test ClearML; an agent run sources $CY_ENV_SCRIPTS_DIR/agent_env.sh first"
     fi
 }
 
 check_uv
 check_clearml
 warn_if_host_stand
+check_kubectl
 check_gpu
-check_docker
 
 if [[ "${1:-}" == "--json" ]]; then
     report="clearml-yolo environment ($CY_PROJECT_ROOT):"

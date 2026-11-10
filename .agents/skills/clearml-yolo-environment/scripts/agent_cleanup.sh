@@ -1,69 +1,60 @@
 #!/usr/bin/env bash
-# Remove what one agent run created: its ClearML project(s) on the shared stand and its
-# run directory. Run it on success and on failure, in the shell that sourced
-# this skill's agent_env.sh (or with the tag and directory named explicitly).
+# Remove what one agent run created: its test environment (the cy-it-<id> namespace with
+# everything published into it) and its run directory. Run it on success and on failure, in
+# the shell that sourced this skill's agent_env.sh (or with the identifier and directory
+# named explicitly).
 #
-#   <skill-dir>/scripts/agent_cleanup.sh                                  # CY_RUN_TAG / INFRA_RUN_TAG and CY_RUN_DIR
-#   <skill-dir>/scripts/agent_cleanup.sh --tag <run-tag> [--run-dir <dir>]
-#   <skill-dir>/scripts/agent_cleanup.sh --dry-run                        # list, delete nothing
+#   <skill-dir>/scripts/agent_cleanup.sh                                 # CY_RUN_TAG and CY_RUN_DIR
+#   <skill-dir>/scripts/agent_cleanup.sh --tag <cy-it-id> [--run-dir <dir>]
+#   <skill-dir>/scripts/agent_cleanup.sh --dry-run                       # report, delete nothing
 #
-# The stand side is `clearml.py --project clearml-yolo cleanup --prefix <tag>`, followed by
-# `ls --prefix <tag>` so the proof of an empty listing is in the output. The directory is
-# removed only when it is named after the tag: the run directory an agent points a run at
-# is <scratch>/<tag>, and anything else is somebody's directory, not this run's.
+# The environment side is `python -m tests.integration.lifecycle stop --env <id>` in the
+# clearml-yolo checkout that contains this skill; this script has no delete path of its own.
+# The lifecycle's deletion guard refuses (exit 1, no delete call) any name that is not
+# cy-it-<6 hex> or whose live namespace lacks the project label, and this script then stops
+# before the run-directory step. The directory is removed only when it is named after the
+# identifier: the run directory an agent points a run at is <scratch>/<id>, and anything else
+# is somebody's directory, not this run's.
 
 set -euo pipefail
 
-CY_INFRA_PROJECT="clearml-yolo"
 environment_scripts_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+project_root="$(cd "$environment_scripts_dir/../../../.." && pwd)"
 
-tag="${CY_RUN_TAG:-${INFRA_RUN_TAG:-}}"
+tag="${CY_RUN_TAG:-}"
 run_dir="${CY_RUN_DIR:-}"
-dry_run=""
+dry_run=()
 
 while (( $# > 0 )); do
     case "$1" in
-        --tag) tag="$2"; shift 2 ;;
-        --run-dir) run_dir="$2"; shift 2 ;;
-        --dry-run) dry_run="--dry-run"; shift ;;
+        --tag) tag="${2:-}"; shift 2 ;;
+        --run-dir) run_dir="${2:-}"; shift 2 ;;
+        --dry-run) dry_run=(--dry-run); shift ;;
         *) echo "agent_cleanup.sh: unknown argument $1" >&2; exit 2 ;;
     esac
 done
 
 if [[ -z "$tag" ]]; then
-    echo "agent_cleanup.sh: no run tag: source $environment_scripts_dir/agent_env.sh first or pass --tag <run-tag>" >&2
+    echo "agent_cleanup.sh: no environment identifier: source $environment_scripts_dir/agent_env.sh first or pass --tag <cy-it-id>" >&2
     exit 2
 fi
 
-resolve_skill_dir() {
-    local candidate
-    for candidate in "${CY_INFRA_SKILL_DIR:-}" "${K8S_INFRA_SKILL_DIR:-}" "$HOME/.agents/skills/k8s-infra" "$HOME/.claude/skills/k8s-infra"; do
-        if [[ -n "$candidate" && -f "$candidate/scripts/clearml.py" ]]; then
-            printf '%s\n' "$candidate"
-            return 0
-        fi
-    done
-    echo "agent_cleanup.sh: no k8s-infra skill found; set K8S_INFRA_SKILL_DIR" >&2
-    return 1
-}
-
-skill_dir="$(resolve_skill_dir)"
-clearml_py="$skill_dir/scripts/clearml.py"
-
-# shellcheck disable=SC2086  # $dry_run is either empty or one flag
-python3 "$clearml_py" --project "$CY_INFRA_PROJECT" cleanup --prefix "$tag" $dry_run
-echo "agent_cleanup.sh: what is left under $tag on the stand:"
-python3 "$clearml_py" --project "$CY_INFRA_PROJECT" ls --prefix "$tag"
+status=0
+(cd "$project_root" && uv run --locked python -m tests.integration.lifecycle stop --env "$tag" "${dry_run[@]}") || status=$?
+if (( status != 0 )); then
+    echo "agent_cleanup.sh: the environment $tag was not removed (status $status, see above); the run directory is left alone" >&2
+    exit "$status"
+fi
 
 if [[ -z "$run_dir" ]]; then
-    echo "agent_cleanup.sh: no run directory named (CY_RUN_DIR unset); only the stand was cleaned"
+    echo "agent_cleanup.sh: no run directory named (CY_RUN_DIR unset); only the environment was removed"
     exit 0
 fi
 if [[ "$(basename "$run_dir")" != "$tag" ]]; then
     echo "agent_cleanup.sh: refusing to remove $run_dir: it is not named after $tag" >&2
     exit 1
 fi
-if [[ -n "$dry_run" ]]; then
+if (( ${#dry_run[@]} > 0 )); then
     echo "agent_cleanup.sh: would remove $run_dir"
 elif [[ -d "$run_dir" ]]; then
     rm -rf "$run_dir"

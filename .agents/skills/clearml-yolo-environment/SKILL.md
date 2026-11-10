@@ -1,33 +1,35 @@
 ---
 name: clearml-yolo-environment
-description: Runs, diagnoses, and cleans up real clearml-yolo pipeline runs on this machine's shared Kubernetes ClearML stand. Sources the project identity and run tag (agent_env.sh), requires explicit tagged project overrides, explains ClearML LoginError 401, TLS trust, and host-versus-stand endpoint mistakes, and removes tagged run objects (agent_cleanup.sh). Use for a live clearml-yolo run, its credentials or endpoint failure, its tagged cleanup, or an explicit environment diagnosis; not for generic library development or Kubernetes stand administration (k8s-infra).
+description: Runs, diagnoses, and cleans up real clearml-yolo pipeline runs on this machine against the project's own test environment (a cy-it-<id> Kubernetes namespace with its own ClearML server and FiftyOne database, reached through kubectl port-forward). Creates the environment and exports its endpoints (agent_env.sh), requires explicit tagged project overrides, explains ClearML LoginError 401 and host-versus-environment endpoint mistakes, and deletes the environment (agent_cleanup.sh). Use for a live clearml-yolo run, its credentials or endpoint failure, its cleanup, or an explicit environment diagnosis; not for generic library development or platform administration of the cluster.
 ---
 
 # ClearML YOLO environment
 
 Use this skill only for a real `clearml-yolo` run, its ClearML credentials or
-endpoint failure, its tagged cleanup, or an explicit environment diagnosis. The
-`k8s-infra` skill owns the shared stand lifecycle and contract; never modify the
-stand through this skill. It does not authorize a live run during planning-only
-or documentation-only work.
+endpoint failure, its cleanup, or an explicit environment diagnosis. A run uses the
+project's own **test environment**: one `cy-it-<6 hex>` namespace on the
+`docker-desktop` cluster with a quota, holding its own ClearML server (API and file
+server with MongoDB, Redis and Elasticsearch) and its own FiftyOne database, every
+volume `emptyDir`, reached through loopback `kubectl port-forward`. The environment is
+created and deleted by `tests/integration/lifecycle.py` of the checkout that contains
+this skill; no shared stand, k8s-infra helper or shared credential is involved. It
+does not authorize a live run during planning-only or documentation-only work.
 
 ## Live run checklist
 
 1. Before the first live run or a 401, read
-   [the machine workflow](references/machine-workflow.md) and the installed
-   k8s-infra `references/run-contract.md` and `references/clearml-stand.md`.
+   [the machine workflow](references/machine-workflow.md).
 2. Run the application from its checkout root (including a Git worktree) and keep
    the run output outside it. This project owns the skill in `.agents/skills/`;
-   `.claude/skills` exposes the same source to Claude.
-3. Use this block. The helpers live beside this file. The k8s-infra tag helper
-   defaults the harness to `claude`; Codex, CI and humans export
-   `INFRA_HARNESS=codex|ci|human` first.
+   `.claude/skills` exposes the same source to Claude. The environment belongs to the
+   checkout that contains the skill (its `tests/integration/.run-tag` records it).
+3. Use this block. The helpers live beside this file.
 
    ```bash
    project_root="$(git rev-parse --show-toplevel)"
    skill_dir="$project_root/.agents/skills/clearml-yolo-environment"
    export CY_PROJECT_ROOT="$project_root"
-   source "$skill_dir/scripts/agent_env.sh" smoke
+   source "$skill_dir/scripts/agent_env.sh"
    uv run cy run_dir=$CY_RUN_DIR/smoke \
      clearml.project_name="$CY_RUN_TAG clearml-yolo" \
      clearml.tags=[$CY_RUN_TAG] \
@@ -38,20 +40,24 @@ or documentation-only work.
    "$skill_dir/scripts/agent_cleanup.sh"
    ```
 
-4. If `source agent_env.sh` returns 3 (WAIT), nothing was minted: retry later.
-   If it returns 1, read its message and stop. It refuses rather than falling
-   back to host credentials.
+4. If `source agent_env.sh` returns 3, the cluster is unavailable or the environment
+   was not ready in time; nothing was left behind: retry later. If it returns 1, read
+   its message and stop: it refuses rather than falling back to host credentials, and
+   it refuses while this checkout already records a live environment (remove that one
+   with `agent_cleanup.sh` first; `agent_env.sh` never reuses an environment).
 5. Every new ClearML command passes
    `clearml.project_name="$CY_RUN_TAG clearml-yolo"` and
-   `clearml.tags=[$CY_RUN_TAG]` explicitly, even after `agent_env.sh` has set
-   the tag. The application no longer rewrites tags from the environment.
+   `clearml.tags=[$CY_RUN_TAG]` explicitly. The application does not derive tags from
+   the environment.
 6. Keep `ultralytics.device=0` and `ultralytics_predict.device=0` only when the
-   run needs the host GPU (see Run shape and GPU in the machine workflow).
+   run needs the host GPU (see Run shape and GPU in the machine workflow). The
+   environment's pods request no GPU.
 7. Run `agent_cleanup.sh` after successful and failed live runs, once you have
    read the outcome, diagnosed any failure and copied the logs or results you need:
-   it deletes the tagged ClearML tasks and the run directory. The helper prints the
-   remaining tag-scoped listing before it removes a directory named for that tag;
-   confirm that listing is empty before reporting the stand clean.
+   it deletes the environment's namespace, with everything published into it, proves
+   the namespace absent, and removes the run directory. Everything in the environment
+   is lost; the platform sweeper deletes a forgotten environment 48 hours after its
+   creation or after a restart.
 
 ## Configuration contract
 
@@ -68,19 +74,18 @@ For an explicit diagnosis, run `"$skill_dir/scripts/check_env.sh"` from the
 application checkout. It reports the endpoint and credential source without
 printing credential values. Environment diagnostics are on demand: the repository's
 session-start hook (`scripts/session_status.sh`) reports only Git, release-lock and
-run-tag status, never the ClearML environment. For a 401, follow
-[Diagnose ClearML 401](references/machine-workflow.md#diagnose-clearml-401-and-missing-tasks)
-and stop if the k8s-infra helper reports an unavailable stand or Secret.
+recorded-environment status, never the ClearML endpoint. For a 401, follow
+[Diagnose ClearML 401](references/machine-workflow.md#diagnose-clearml-401-and-missing-tasks).
 
 ## Scripts
 
 | Script | How to use | Side effects | Exit status |
 | --- | --- | --- | --- |
-| `scripts/agent_env.sh [<slug>]` (slug default `run`) | `source` it; running it directly is refused with exit 1 | runs `infra.py room`; evals `clearml.py --project clearml-yolo env`; unsets `FIFTYONE_DATABASE_URI`/`FIFTYONE_DATABASE_NAME`, then, when available, evals `mongodb.py --project clearml-yolo env` and on success defaults `FIFTYONE_DATABASE_DIR=$HOME/.cache/clearml-yolo/fiftyone` (a MongoDB failure only warns); mints `INFRA_RUN_TAG` unless already exported; exports `CY_RUN_TAG`, `CY_INFRA_SKILL_DIR`, `CY_RUN_DIR=${INFRA_SCRATCH_DIR:-/tmp/clearml-yolo-runs}/<tag>` (created); then runs `check_env.sh` | returns 0; 3 = WAIT, nothing minted; 1 = refusal |
-| `scripts/agent_cleanup.sh [--tag <tag>] [--run-dir <dir>] [--dry-run]` | run in the shell that sourced `agent_env.sh`, or pass the tag explicitly | `clearml.py --project clearml-yolo cleanup --prefix <tag>` then `ls --prefix <tag>`; removes the run directory only when its basename equals the tag; `--dry-run` deletes nothing | 0 = success, including stand-only cleanup when `CY_RUN_DIR` is unset; 2 = no tag or unknown argument (before any stand call); 1 = run directory not named after the tag, or k8s-infra skill not found; any other nonzero = a k8s-infra helper failure passed through (`set -euo pipefail`; it can also be 1 or 2, and `--tag`/`--run-dir` without a value fails on an unbound `$2`), so treat stand cleanup as unproven and read the output |
-| `scripts/check_env.sh [--json]` | run from the application checkout | read-only: checks uv, an authenticated ClearML `auth.login`, the host-stand warning, GPU and docker compose; never prints credential values; missing `uv` and ClearML configuration, reachability and credential problems are `FAIL` lines; GPU and docker problems and the ClearML host-stand endpoint are `WARN` lines; `--json` emits a single `{"report": "<text>"}` object wrapping the same text, with no structured fields to parse | always 0 (reports, never blocks) |
+| `scripts/agent_env.sh` | `source` it; running it directly is refused with exit 1; an argument is ignored with a one-line notice | unsets `FIFTYONE_DATABASE_URI`/`FIFTYONE_DATABASE_NAME`; runs `lifecycle up --components all` in the checkout containing the skill (creates `cy-it-<id>` with quota, limit range, ClearML and the FiftyOne database, starts detached port-forwards, writes `tests/integration/.run-tag`); evals `lifecycle env` (`CLEARML_*`, `FIFTYONE_DATABASE_URI`, `INTEGRATION_RUN_TAG`); exports `CY_RUN_TAG`, `CY_RUN_DIR=${CY_SCRATCH_DIR:-/tmp/clearml-yolo-runs}/<id>` (created) and `FIFTYONE_DATABASE_DIR=${FIFTYONE_DATABASE_DIR:-$HOME/.cache/clearml-yolo/fiftyone}`; then runs `check_env.sh` | returns 0; 3 = cluster unavailable or not ready in time, nothing left behind; 1 = refusal (a live recorded environment, a foreign namespace) or error |
+| `scripts/agent_cleanup.sh [--tag <cy-it-id>] [--run-dir <dir>] [--dry-run]` | run in the shell that sourced `agent_env.sh`, or pass the identifier explicitly | `lifecycle stop --env <id>` (stops the recorded port-forwards, deletes the namespace, proves it absent); then removes the run directory only when its basename equals the identifier; `--dry-run` reports and deletes nothing | 0 = success, including environment-only cleanup when `CY_RUN_DIR` is unset and an environment that was already gone; 2 = no identifier or unknown argument (before any cluster call); 1 = the deletion guard refused (a name that is not `cy-it-<6 hex>`, or a namespace without the project label: nothing deleted, the run directory left alone), the namespace was not proven absent (the record stays for a retry), or the run directory is not named after the identifier |
+| `scripts/check_env.sh [--json]` | run from the application checkout | read-only: checks uv, an authenticated ClearML `auth.login`, the host-ClearML warning, kubectl reaching the `docker-desktop` cluster, and the GPU; never prints credential values; missing `uv`, kubectl and ClearML configuration, reachability and credential problems are `FAIL` lines; GPU problems and the host ClearML endpoint are `WARN` lines; `--json` emits a single `{"report": "<text>"}` object wrapping the same text, with no structured fields to parse | always 0 (reports, never blocks) |
 
 ## References
 
-- [references/machine-workflow.md](references/machine-workflow.md): before any live run, host-GPU use, or ClearML auth or TLS failure.
+- [references/machine-workflow.md](references/machine-workflow.md): before any live run, host-GPU use, or a ClearML authentication failure.
 - [references/evidence-archive.md](references/evidence-archive.md): only when auditing past acceptance. Everything it indexes is dated history, never current instructions.
