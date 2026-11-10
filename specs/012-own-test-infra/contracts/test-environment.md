@@ -23,7 +23,7 @@ limit.
 Applied by `stop` (manual, session fixtures, setup-failure cleanup) and therefore by
 `agent_cleanup.sh`, in dry and real form, before any other teardown step:
 
-1. A target from the command line (`--env`) must match `^clearml-yolo-it-[0-9a-f]{6}$`;
+1. A target from the command line (`--env`) must match `^cy-it-[0-9a-f]{6}$`;
    otherwise exit 1, naming the rejected value, record untouched, with no `kubectl delete` and
    no signal sent. A target from the record that does not match is not an environment: the
    record is cleared with a line saying a retired record was cleared, nothing is signalled or
@@ -36,7 +36,7 @@ Applied by `stop` (manual, session fixtures, setup-failure cleanup) and therefor
 
 ## Identity and record
 
-- Environment identifier = namespace name `clearml-yolo-it-<6 lowercase hex>`; also the run tag
+- Environment identifier = namespace name `cy-it-<6 lowercase hex>`; also the run tag
   used in ClearML project names (`"<id> <project>"`) and `clearml.tags`.
 - Record `tests/integration/.run-tag` (gitignored): first line the identifier; following lines
   `forward <component> <local-port> <pid> <start-time>` for detached port-forwards. Never a
@@ -51,9 +51,9 @@ Labels on the namespace and every object: `app.kubernetes.io/part-of=clearml-yol
 
 | Object | Name | Notes |
 | --- | --- | --- |
-| ResourceQuota | `clearml-yolo-it` | applied before any workload; values in data-model.md |
-| LimitRange | `clearml-yolo-it` | container defaults for init containers and debug pods |
-| Secret | `clearml-yolo-it-credentials` | apiserver pair, token secret, test-user pair; created from stdin |
+| ResourceQuota | `cy-it` | applied before any workload; values in data-model.md |
+| LimitRange | `cy-it` | container defaults for init containers and debug pods |
+| Secret | `cy-it-credentials` | apiserver pair, token secret, test-user pair; created from stdin |
 | Deployment + Service | `mongo` | `mongo:7.0.22`, `emptyDir` |
 | Deployment + Service | `redis` | ClearML component only |
 | Deployment + Service | `elastic` | ClearML component only; single node, 256 MiB heap |

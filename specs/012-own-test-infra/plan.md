@@ -7,7 +7,7 @@
 ## Summary
 
 Replace the shared-stand run-tag lifecycle with a project-owned **test environment**: one
-`clearml-yolo-it-<id>` namespace per session, created with a quota and limit range first,
+`cy-it-<id>` namespace per session, created with a quota and limit range first,
 holding MongoDB, Redis, Elasticsearch and the ClearML API and file servers on `emptyDir`,
 reached through loopback `kubectl port-forward`, and deleted after the session. The manifests
 are project files applied with `kubectl`; no Helm, no ingress, no certificate, no k8s-infra

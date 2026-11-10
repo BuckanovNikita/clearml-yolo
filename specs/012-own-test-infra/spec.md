@@ -86,6 +86,12 @@ question was asked. Each answer is the smallest decision consistent with the pla
 - Q: Does the environment need a GPU, an Ingress or persistent storage? → A: No to all three:
   the GPU is used by host processes of the GPU suites, never by the environment's pods; data
   lives in `emptyDir` and dies with the namespace.
+- Q: Which namespace prefix? → A: `cy-it-` (the project's short name CY), the prefix the
+  implementing session is authorised to create and delete on the shared cluster; it is
+  distinct from every protected name (R2). Earlier drafts named `clearml-yolo-it-`.
+- Q: May a pytest session use an environment that a manual `up` created? → A: Only when the
+  shell exports `INTEGRATION_RUN_TAG` equal to the recorded identifier, mirroring the
+  retired rule that only an exported tag equal to the record adopted a run (FR-014).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -267,7 +273,7 @@ selection before any environment is created.
 
 - **FR-001**: Live tests and agent live runs MUST use a **test environment** that the project
   creates: one Kubernetes namespace on context `docker-desktop`, named
-  `clearml-yolo-it-<id>` with a fresh random `<id>`, never a protected name (R2).
+  `cy-it-<id>` with a fresh random `<id>`, never a protected name (R2).
 - **FR-002**: Creating an environment MUST apply the namespace's `ResourceQuota` and
   `LimitRange` before any workload object, and the quota MUST cover the measured set with
   headroom while allowing no `PersistentVolumeClaim` and no `nvidia.com/gpu` request (R3, R4,
@@ -308,7 +314,11 @@ selection before any environment is created.
 - **FR-014**: One worktree MUST have at most one recorded environment. Starting while a
   recorded environment exists MUST be refused with the `stop` command; a recorded environment
   whose namespace no longer exists MUST be treated as gone: `stop` succeeds and clears it, and
-  `up` or session setup clears it and creates a new one (R5).
+  `up` or session setup clears it and creates a new one (R5). A pytest session adopts the
+  recorded environment only when the shell exports `INTEGRATION_RUN_TAG` equal to the
+  recorded identifier (as `eval "$(L env)"` after `up` does); it then uses that environment
+  and leaves its teardown to `stop`. Any other live record is refused, and an exported
+  `INTEGRATION_RUN_TAG` that names no live recorded environment is refused.
 - **FR-015**: `INTEGRATION_KEEP_DATA=1` MUST keep the environment and its record after the
   session and print the `stop` command and the 48-hour limit.
 - **FR-016**: The manual commands `check`, `up`, `env` and `stop` of
@@ -319,7 +329,7 @@ selection before any environment is created.
   demand after validating their options.
 - **FR-018**: Teardown (`stop`, the session fixtures, setup-failure cleanup and
   `agent_cleanup.sh`, including `--dry-run`) MUST make a `kubectl delete` call only for a
-  name that matches `^clearml-yolo-it-[0-9a-f]{6}$` and whose live namespace carries the
+  name that matches `^cy-it-[0-9a-f]{6}$` and whose live namespace carries the
   label `app.kubernetes.io/part-of=clearml-yolo-tests`. The name is checked before any other
   teardown step. By source:
   - a name given on the command line (`stop --env <id>`, `agent_cleanup.sh --tag`, or

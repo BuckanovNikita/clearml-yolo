@@ -4,7 +4,7 @@ After implementation (not available on this commit):
 
 ```bash
 uv run --locked task --exit-code infra-check   # read-only: cluster, context, permission
-uv run --locked task --exit-code integration   # creates, uses and deletes clearml-yolo-it-<id>
+uv run --locked task --exit-code integration   # creates, uses and deletes cy-it-<id>
 
 L=(uv run --locked python -m tests.integration.lifecycle)
 "${L[@]}" up                     # manual environment; record in tests/integration/.run-tag
