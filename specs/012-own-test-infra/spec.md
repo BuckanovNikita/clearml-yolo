@@ -202,6 +202,12 @@ converges; starting again recreates what is missing.
    kept, the record stays, and the output names the `stop` command and the 48-hour limit.
 5. **Given** a crash while the port-forward children run, **When** `stop` runs later,
    **Then** no port-forward of that environment remains.
+6. **Given** a name that is not this project's environment identifier (for example
+   `agent_cleanup.sh --tag clearml`, with or without `--dry-run`, or `stop --env default`),
+   **When** teardown runs, **Then** it refuses with exit 1 and makes no delete call (FR-018).
+7. **Given** a worktree record left by the retired run-tag lifecycle (its first line is not an
+   environment identifier), **When** `stop`, `up` or a live session runs, **Then** the record
+   is cleared without any delete call and the command continues (FR-018).
 
 ---
 
@@ -241,8 +247,12 @@ selection before any environment is created.
 - **Manual commands under pytest isolation.** The test HOME is replaced; kubectl still needs
   the real kubeconfig, which is restored from `CY_REAL_ENV` for children as today.
 - **Stale per-worktree namespaces.** Environments of a crashed worktree that nobody stops are
-  removed by the sweeper within 48 hours; the project never deletes namespaces it did not
-  record.
+  removed by the sweeper within 48 hours. Teardown deletes only a namespace whose name is an
+  environment identifier and whose live labels mark it as this project's (FR-018); any
+  other name, from a record or from `--tag`, is refused before a delete call.
+- **Record from the retired lifecycle.** A worktree may still hold a `.run-tag` written by the
+  run-tag lifecycle (a shared-stand run tag such as `clearml-...`). It names no namespace of
+  this project; it is cleared without a delete call (FR-018).
 - **User's host ClearML.** The port-forward never binds local port 8008, so the host-stand
   warning keeps meaning "this is the user's own ClearML".
 
@@ -290,7 +300,8 @@ selection before any environment is created.
   manifest, quota rejection) as errors (exit 1).
 - **FR-013**: Teardown MUST stop the environment's port-forwards, delete the namespace and
   prove its absence within a bounded wait; incomplete teardown MUST fail the session and keep
-  the record for a retry, as incomplete exact-tag cleanup does today.
+  the record for a retry, as incomplete exact-tag cleanup does today. Every teardown is
+  subject to the deletion guard (FR-018).
 - **FR-014**: One worktree MUST have at most one recorded environment. Starting while a
   recorded environment exists MUST be refused with the `stop` command; a recorded environment
   whose namespace no longer exists MUST be treated as gone: `stop` succeeds and clears it, and
@@ -303,15 +314,27 @@ selection before any environment is created.
 - **FR-017**: The live suites MUST keep passing explicit ClearML project names and tags that
   carry the environment identifier; the GPU suites keep joining the session environment on
   demand after validating their options.
+- **FR-018**: Teardown (`stop`, the session fixtures, setup-failure cleanup and
+  `agent_cleanup.sh`, including `--dry-run`) MUST refuse with exit 1, making no
+  `kubectl delete` call, any target name that does not match `^clearml-yolo-it-[0-9a-f]{6}$`,
+  and any matching name whose live namespace lacks the label
+  `app.kubernetes.io/part-of=clearml-yolo-tests`. A matching name whose namespace is absent
+  is already stopped (FR-014). The name is checked before any other teardown step, whether it
+  comes from the record, from `stop --env <id>` or from `agent_cleanup.sh --tag`/`CY_RUN_TAG`.
+  A record whose first line does not match (the retired run-tag format or anything else) is
+  cleared without any delete call and reported as a retired record; a refused name given on
+  the command line leaves the record untouched.
 
 **Environment skill and repository references (R8, R9)**
 
 - **FR-020**: `agent_env.sh` MUST create (or reuse the exported) environment through the same
   lifecycle, export the run identifier, run directory and ClearML variables without printing
   credentials, return 3 when unavailable and 1 on refusal, and require no k8s-infra skill.
-- **FR-021**: `agent_cleanup.sh` MUST tear the environment down through the same lifecycle
-  and keep its rule that a run directory is removed only when named after the run identifier;
-  `--dry-run` MUST delete nothing.
+- **FR-021**: `agent_cleanup.sh` MUST tear the environment down through the same lifecycle,
+  passing the identifier from `--tag` (else `CY_RUN_TAG`) as `stop --env <id>`, and keep its
+  rule that a run directory is removed only when named after the run identifier; `--dry-run`
+  MUST delete nothing. A name the deletion guard refuses (FR-018) ends the script with exit 1
+  before the run-directory step, in both the dry and the real form.
 - **FR-022**: `check_env.sh` MUST NOT run or report `docker compose`; it MUST report the
   tools the live path needs (uv, kubectl with a reachable `docker-desktop` context, the GPU
   as today) and the ClearML endpoint check as today, without TLS trust hints for the retired
@@ -361,6 +384,7 @@ Each current behaviour of the run-tag lifecycle and the environment skill, with 
 | FiftyOne suites on a host-local database in `FIFTYONE_DATABASE_DIR` | Changed: database in the environment; the directory stays as the lock location | FR-003, US2 |
 | `agent_env.sh` room/env/mongodb/newtag steps | Changed to the lifecycle | FR-020 |
 | `agent_cleanup.sh` exact-tag cleanup + directory rule | Changed to teardown; directory rule kept | FR-021 |
+| `--tag` / `.run-tag` accepted any lowercase `[a-z0-9-]` tag as the cleanup selector | Changed: teardown accepts only an environment identifier whose live namespace carries the project label; a retired-format record is cleared without a delete | FR-018 |
 | `check_env.sh` `docker compose` check | Removed | FR-022 |
 | `check_env.sh` host-stand (localhost:8008) warning | Kept, reworded for the run's own ClearML | FR-022 |
 | `check_env.sh` authenticated `auth.login` check, exit 0 | Kept | FR-022 |

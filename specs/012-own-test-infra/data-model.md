@@ -41,3 +41,8 @@ sweeper or a restart removes the namespace; the record is then stale and is clea
 
 Line 1: identifier. Then zero or more `forward <component> <port> <pid> <start-time>` lines for
 detached port-forwards of a manual `up`. No credentials.
+
+A record whose line 1 does not match `^clearml-yolo-it-[0-9a-f]{6}$` (for example one left by
+the retired run-tag lifecycle) is not an environment record: it is cleared without any delete
+call. Teardown deletes a namespace only when its name matches that pattern and its live labels
+include `app.kubernetes.io/part-of=clearml-yolo-tests` (spec FR-018).
