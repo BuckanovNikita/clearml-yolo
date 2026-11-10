@@ -1,0 +1,203 @@
+# Measurement-only manifest (2026-11-10), not the implementation. NAMESPACE is
+# substituted by measure.sh. Credentials come from the Secret cy-it-credentials,
+# which measure.sh creates from freshly generated values that never touch disk.
+# Every volume is emptyDir; no PersistentVolumeClaim and no storageClassName.
+# One List document: the repository's check-yaml hook accepts a single document per file.
+apiVersion: v1
+kind: List
+items:
+  - apiVersion: v1
+    kind: ResourceQuota
+    metadata:
+      name: cy-it
+      namespace: NAMESPACE
+    spec:
+      hard:
+        pods: "8"
+        requests.cpu: "2"
+        requests.memory: 4Gi
+        limits.cpu: "8"
+        limits.memory: 8Gi
+        persistentvolumeclaims: "0"
+        requests.nvidia.com/gpu: "0"
+  - apiVersion: v1
+    kind: LimitRange
+    metadata:
+      name: cy-it
+      namespace: NAMESPACE
+    spec:
+      limits:
+        - type: Container
+          defaultRequest: {cpu: 50m, memory: 64Mi}
+          default: {cpu: 500m, memory: 256Mi}
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata: {name: mongo, namespace: NAMESPACE}
+    spec:
+      selector: {matchLabels: {app: mongo}}
+      template:
+        metadata: {labels: {app: mongo}}
+        spec:
+          terminationGracePeriodSeconds: 2
+          containers:
+            - name: mongo
+              image: mongo:7.0.22
+              imagePullPolicy: IfNotPresent
+              args: ["--bind_ip_all", "--wiredTigerCacheSizeGB", "0.25"]
+              ports: [{containerPort: 27017}]
+              readinessProbe:
+                exec: {command: ["mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]}
+                periodSeconds: 2
+                timeoutSeconds: 5
+              resources:
+                requests: {cpu: 100m, memory: 256Mi}
+                limits: {cpu: "1", memory: 1Gi}
+              volumeMounts: [{name: data, mountPath: /data/db}]
+          volumes: [{name: data, emptyDir: {}}]
+  - apiVersion: v1
+    kind: Service
+    metadata: {name: mongo, namespace: NAMESPACE}
+    spec: {selector: {app: mongo}, ports: [{port: 27017}]}
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata: {name: redis, namespace: NAMESPACE}
+    spec:
+      selector: {matchLabels: {app: redis}}
+      template:
+        metadata: {labels: {app: redis}}
+        spec:
+          terminationGracePeriodSeconds: 2
+          containers:
+            - name: redis
+              image: redis:7.2.11-alpine
+              imagePullPolicy: IfNotPresent
+              args: ["--save", "", "--appendonly", "no"]
+              ports: [{containerPort: 6379}]
+              readinessProbe:
+                exec: {command: ["redis-cli", "ping"]}
+                periodSeconds: 2
+              resources:
+                requests: {cpu: 50m, memory: 32Mi}
+                limits: {cpu: 500m, memory: 256Mi}
+  - apiVersion: v1
+    kind: Service
+    metadata: {name: redis, namespace: NAMESPACE}
+    spec: {selector: {app: redis}, ports: [{port: 6379}]}
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata: {name: elastic, namespace: NAMESPACE}
+    spec:
+      selector: {matchLabels: {app: elastic}}
+      template:
+        metadata: {labels: {app: elastic}}
+        spec:
+          terminationGracePeriodSeconds: 2
+          containers:
+            - name: elastic
+              image: docker.elastic.co/elasticsearch/elasticsearch:7.17.28
+              imagePullPolicy: IfNotPresent
+              env:
+                - {name: discovery.type, value: single-node}
+                - {name: xpack.security.enabled, value: "false"}
+                - {name: xpack.monitoring.enabled, value: "false"}
+                - {name: bootstrap.memory_lock, value: "false"}
+                - {name: cluster.routing.allocation.disk.threshold_enabled, value: "false"}
+                - {name: ES_JAVA_OPTS, value: "-Xms__HEAP__ -Xmx__HEAP__"}
+              ports: [{containerPort: 9200}]
+              readinessProbe:
+                httpGet: {path: "/_cluster/health?wait_for_status=yellow&timeout=1s", port: 9200}
+                periodSeconds: 2
+              resources:
+                requests: {cpu: 250m, memory: __ESREQ__}
+                limits: {cpu: "2", memory: __ESLIM__}
+              volumeMounts: [{name: data, mountPath: /usr/share/elasticsearch/data}]
+          volumes: [{name: data, emptyDir: {}}]
+  - apiVersion: v1
+    kind: Service
+    metadata: {name: elastic, namespace: NAMESPACE}
+    spec: {selector: {app: elastic}, ports: [{port: 9200}]}
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata: {name: apiserver, namespace: NAMESPACE}
+    spec:
+      selector: {matchLabels: {app: apiserver}}
+      template:
+        metadata: {labels: {app: apiserver}}
+        spec:
+          terminationGracePeriodSeconds: 2
+          # The apiserver retries an unreachable Elasticsearch only every 30 s; start it after
+          # its dependencies answer instead (measured: removes the 30 s wait).
+          initContainers:
+            - name: wait-dependencies
+              image: allegroai/clearml:2.0.0-613
+              imagePullPolicy: IfNotPresent
+              command: ["sh", "-c", "until curl -sf -m 2 'http://elastic:9200/_cluster/health?wait_for_status=yellow&timeout=1s' >/dev/null; do sleep 1; done"]
+          containers:
+            - name: apiserver
+              image: allegroai/clearml:2.0.0-613
+              imagePullPolicy: IfNotPresent
+              args: ["apiserver"]
+              env:
+                - {name: CLEARML_ELASTIC_SERVICE_HOST, value: elastic}
+                - {name: CLEARML_ELASTIC_SERVICE_PORT, value: "9200"}
+                - {name: CLEARML_MONGODB_SERVICE_HOST, value: mongo}
+                - {name: CLEARML_MONGODB_SERVICE_PORT, value: "27017"}
+                - {name: CLEARML_REDIS_SERVICE_HOST, value: redis}
+                - {name: CLEARML_REDIS_SERVICE_PORT, value: "6379"}
+                - {name: CLEARML__apiserver__pre_populate__enabled, value: "false"}
+                - {name: CLEARML__secure__credentials__apiserver__user_key, valueFrom: {secretKeyRef: {name: cy-it-credentials, key: apiserver_key}}}
+                - {name: CLEARML__secure__credentials__apiserver__user_secret, valueFrom: {secretKeyRef: {name: cy-it-credentials, key: apiserver_secret}}}
+                - {name: CLEARML__secure__auth__token_secret, valueFrom: {secretKeyRef: {name: cy-it-credentials, key: token_secret}}}
+                - {name: CLEARML__SECURE__CREDENTIALS__TESTS__USER_KEY, valueFrom: {secretKeyRef: {name: cy-it-credentials, key: test_key}}}
+                - {name: CLEARML__SECURE__CREDENTIALS__TESTS__USER_SECRET, valueFrom: {secretKeyRef: {name: cy-it-credentials, key: test_secret}}}
+              ports: [{containerPort: 8008}]
+              readinessProbe:
+                httpGet: {path: /debug.ping, port: 8008}
+                periodSeconds: 2
+              resources:
+                requests: {cpu: 100m, memory: 256Mi}
+                limits: {cpu: "2", memory: 1Gi}
+  - apiVersion: v1
+    kind: Service
+    metadata: {name: apiserver, namespace: NAMESPACE}
+    spec: {selector: {app: apiserver}, ports: [{port: 8008}]}
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata: {name: fileserver, namespace: NAMESPACE}
+    spec:
+      selector: {matchLabels: {app: fileserver}}
+      template:
+        metadata: {labels: {app: fileserver}}
+        spec:
+          terminationGracePeriodSeconds: 2
+          # The fileserver exits when the apiserver refuses its login; start it afterwards.
+          initContainers:
+            - name: wait-apiserver
+              image: allegroai/clearml:2.0.0-613
+              imagePullPolicy: IfNotPresent
+              command: ["sh", "-c", "until curl -sf -m 2 http://apiserver:8008/debug.ping >/dev/null; do sleep 1; done"]
+          containers:
+            - name: fileserver
+              image: allegroai/clearml:2.0.0-613
+              imagePullPolicy: IfNotPresent
+              args: ["fileserver"]
+              env:
+                - {name: CLEARML__HOSTS__API_SERVER, value: "http://apiserver:8008"}
+                - {name: CLEARML_REDIS_SERVICE_HOST, value: redis}
+                - {name: CLEARML_REDIS_SERVICE_PORT, value: "6379"}
+                # The fileserver authenticates to the apiserver with the system pair.
+                - {name: USER_KEY, valueFrom: {secretKeyRef: {name: cy-it-credentials, key: apiserver_key}}}
+                - {name: USER_SECRET, valueFrom: {secretKeyRef: {name: cy-it-credentials, key: apiserver_secret}}}
+              ports: [{containerPort: 8081}]
+              readinessProbe:
+                tcpSocket: {port: 8081}
+                periodSeconds: 2
+              resources:
+                requests: {cpu: 50m, memory: 128Mi}
+                limits: {cpu: "1", memory: 512Mi}
+              volumeMounts: [{name: data, mountPath: /mnt/fileserver}]
+          volumes: [{name: data, emptyDir: {}}]
+  - apiVersion: v1
+    kind: Service
+    metadata: {name: fileserver, namespace: NAMESPACE}
+    spec: {selector: {app: fileserver}, ports: [{port: 8081}]}

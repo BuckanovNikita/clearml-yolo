@@ -1,0 +1,415 @@
+# Feature Specification: Own Kubernetes Test Infrastructure
+
+**Feature Branch**: `feat/own-test-infra` (feature directory `012-own-test-infra`)
+
+**Created**: 2026-11-10
+
+**Status**: Draft
+
+**Input**: User description: "One-time migration of clearml-yolo to its own Kubernetes test
+infrastructure, governed by the owner-approved k8s-infra plan
+`docs/plans/2026-11-09-managed-infrastructure-reset.md` (rules for every project, all nine,
+and the clearml-yolo block), with the interim rules: host access by `kubectl port-forward`
+only; no `storageClassName`, prefer `emptyDir`, and where a claim is unavoidable name
+`hostpath` explicitly. Its own ClearML and its own FiftyOne database for tests; remove the
+`docker compose version` prerequisite in the environment skill's `check_env.sh`; rewrite
+`tests/integration/lifecycle.py` and the environment skill scripts off `infra.py` and
+`clearml.py`. Real GPU work execution and cy-queue scheduling are out of scope and do not
+change; cy-queue gets no change, only its paired check against the migrated tip. The
+project's own ClearML requests no GPU."
+
+Terms follow the "Verification and release" section of [GLOSSARY.md](../../GLOSSARY.md); this
+feature adds **test environment** (below). It changes contributor, agent and verification
+infrastructure only; product behavior in the [baseline specification](../000-baseline/spec.md)
+and every `src/` contract are unchanged.
+
+## Context
+
+The machine's shared stands (ClearML, MongoDB and the run-tag, capacity and credential helpers
+`infra.py`, `clearml.py` and `mongodb.py` of the k8s-infra skill) are being wiped without
+backup. After the wipe the platform gives only: a Kubernetes cluster (context
+`docker-desktop`), the default `hostpath` storage class, ingress with a wildcard certificate,
+one exclusive GPU slot, and a sweeper that deletes every unprotected namespace 48 hours after
+its creation or when it was created before the last Docker Desktop or PC restart. Each project
+deploys and removes its own test infrastructure. Until this feature lands, every clearml-yolo
+live check (change acceptance, the CPU stand smoke run, release acceptance, agent live runs)
+depends on helpers that will disappear.
+
+The governing rules (numbered as in the k8s-infra plan, "Rules for every project"):
+
+| Rule | Requirement on this project |
+| --- | --- |
+| R1 | Test infrastructure is deployed into the project's own namespaces with its own manifests and its own teardown. |
+| R2 | Namespace names never reuse a protected name (`clearml`, `mongodb`, `ingress-nginx`, `infra-janitor`, `default`, `kube-*`); they use a distinct prefix such as `<project>-it-<id>`. |
+| R3 | Every namespace the project creates carries a `ResourceQuota` chosen by the project, and a `LimitRange`. |
+| R4 | No `storageClassName` (interim: prefer `emptyDir`; an unavoidable claim names `hostpath`); no `local-path`, no `/mnt/wsl/data/k8s-volumes`. |
+| R5 | A namespace can vanish at 48 hours or after a restart; runs finish inside that window and tooling recreates a missing namespace. |
+| R6 | No use of the dedicated platform ClearML or FiftyOne MongoDB; the project deploys its own ClearML and its own FiftyOne database. |
+| R7 | `nvidia.com/gpu: 1` is requested only where a test needs it; the project's ClearML requests none. |
+| R8 | No `INFRA_RUN_TAG`, `INFRA_PROJECT`, `K8S_INFRA_SKILL_DIR`, `INFRA_REGISTRY`, and no calls to `infra.py`, `clearml.py`, `mongodb.py`, `cvat.py`, `lakefs.py`, `postgres.py` in code, skills or shell profiles. |
+| R9 | Host access by `kubectl port-forward` (interim, until wildcard name lookup is proven by the platform). |
+
+## Clarifications
+
+### Session 2026-11-10
+
+Answered by the implementing agent from the approved k8s-infra plan, as instructed; no user
+question was asked. Each answer is the smallest decision consistent with the plan.
+
+- Q: One namespace per test session, per component, or a long-lived per-worktree namespace? →
+  A: One namespace per **test environment**: created by the first live test of a session (or
+  by `up`), removed after the session (or by `stop`). A long-lived namespace would only die
+  to the sweeper (R5) and would carry data across runs.
+- Q: Does the read-only preflight start the environment? → A: No. The preflight stays bounded
+  and creates nothing; environment start-up belongs to session setup with its own bounded
+  start-up budget. Cold start was measured at about 24 s with cached images (see
+  [research.md](research.md)).
+- Q: Is the FiftyOne database a separate server or a separate database? → A: A separate
+  database (FiftyOne's own database name) on the environment's MongoDB server, which also
+  holds ClearML's databases. A FiftyOne-only session starts only that server. The FiftyOne
+  suite was measured passing unchanged against it.
+- Q: How is host access provided? → A: `kubectl port-forward` to loopback on ports chosen by
+  kubectl, never fixed host ports and never the user's host ClearML port 8008, over plain
+  HTTP inside the tunnel. No ingress, certificate or hosts entry is used (R9).
+- Q: Is the ClearML web UI part of the test environment? → A: No. The measured minimal set
+  for SDK publication is MongoDB, Redis, Elasticsearch, the API server and the file server.
+  The web UI, async-delete service and agent are excluded; a person who wants to look at a
+  kept environment uses the API or a later, separate feature.
+- Q: What replaces exact-tag cleanup? → A: Deleting the environment's namespace removes every
+  object it held; cleanup is proven by the namespace no longer existing. ClearML project
+  names and tags still carry the run identifier, because explicit names and tags are an
+  application contract and the GPU suites rely on the prefix; it no longer drives cleanup.
+- Q: What happens to the unit tests of `lifecycle.py`? → A: They test project tooling, not
+  product code, so they are removed with the behaviour they covered and not replaced by new
+  tooling tests. The lifecycle is evidenced by live runs of the product's live suites
+  against environments it created (owner rule: tests exercise product code only).
+- Q: Does the environment need a GPU, an Ingress or persistent storage? → A: No to all three:
+  the GPU is used by host processes of the GPU suites, never by the environment's pods; data
+  lives in `emptyDir` and dies with the namespace.
+
+## User Scenarios & Testing *(mandatory)*
+
+### User Story 1 - Change acceptance against an environment the run deploys itself (Priority: P1)
+
+A contributor runs change acceptance (or the `integration` stage) on a clean tip. The live
+part creates a namespace of its own with a quota, starts a ClearML server inside it, runs the
+CPU stand smoke test and the other non-GPU live tests against it through a port-forward, and
+deletes the namespace afterwards. Nothing of the shared stands is contacted or needed.
+
+**Why this priority**: Change acceptance is the integration gate into `master`; without it no
+change can be accepted after the wipe.
+
+**Independent Test**: With the shared ClearML stand absent or unreachable, run the
+`integration` stage on a clean tip; the CPU smoke test passes and no namespace of the run
+remains afterwards.
+
+**Acceptance Scenarios**:
+
+1. **Given** a reachable cluster and no shared stand, **When** the live part runs, **Then** a
+   new namespace with the project prefix, a `ResourceQuota` and a `LimitRange` is created
+   before any workload, the CPU stand smoke test passes against the ClearML inside it, and the
+   namespace no longer exists when the stage ends.
+2. **Given** the cluster does not answer, **When** the preflight runs, **Then** it reports
+   unavailable with exit status 3 within its bound, creates nothing, and the live checks are
+   reported as deferred.
+3. **Given** the environment does not become ready within its start-up budget, **When**
+   session setup gives up, **Then** the partially created namespace is deleted, the reason
+   (the components not ready and their state) is reported, and the session ends as deferred
+   (exit 3) under Task verification or skips interactively.
+4. **Given** a test fails after setup, **When** the session ends, **Then** the namespace is
+   still deleted and the failure is reported as a test failure, not as an infrastructure
+   outcome.
+
+---
+
+### User Story 2 - FiftyOne suites against the run's own FiftyOne database (Priority: P1)
+
+Release acceptance runs the FiftyOne native-database tests. The database they write to is a
+FiftyOne database inside the run's own environment, reached through a port-forward, and it is
+destroyed with the environment. A FiftyOne-only session starts only the database server.
+
+**Why this priority**: Release acceptance requires these tests; the plan requires the project's
+own FiftyOne database with a quota.
+
+**Independent Test**: Run the FiftyOne suite through its stage; it passes, the database it used
+was inside a namespace of the run, and that namespace is gone afterwards.
+
+**Acceptance Scenarios**:
+
+1. **Given** `CY_TEST_FIFTYONE=1` under the release-acceptance FiftyOne step, **When** the suite
+   runs, **Then** FiftyOne connects to the environment's database (not to a host database
+   process and not to the platform MongoDB), every test passes, and the namespace is deleted
+   at the end.
+2. **Given** the FiftyOne step, **When** the environment starts, **Then** no ClearML component
+   is started for it.
+3. **Given** the publisher lock location `FIFTYONE_DATABASE_DIR`, **When** the suite runs,
+   **Then** it is still an isolated temporary directory removed afterwards, as today.
+
+---
+
+### User Story 3 - Agent live runs use the project's own environment (Priority: P2)
+
+An agent sources the environment skill's `agent_env.sh` before a real `cy` run. It gets a run
+identifier, a run directory and ClearML (and FiftyOne database) endpoints of an environment
+the project deployed, with credentials in the environment and nothing printed.
+`agent_cleanup.sh` deletes that environment and the run directory. `check_env.sh` reports
+the tools and endpoints the run needs and no longer reports or requires Docker Compose.
+
+**Why this priority**: Agent live runs and the real-run gate depend on the environment skill;
+they break at the wipe like the tests do, but acceptance stages come first.
+
+**Independent Test**: Source `agent_env.sh` in a clean shell, run `check_env.sh`, run a tiny
+CPU `cy` command against the exported endpoint, then run `agent_cleanup.sh`; the run's
+namespace and directory are gone and no k8s-infra helper was invoked.
+
+**Acceptance Scenarios**:
+
+1. **Given** a shell without any k8s-infra skill installed, **When** `agent_env.sh` is sourced,
+   **Then** it succeeds, exports the run identifier, run directory and ClearML variables, and
+   prints no credential value.
+2. **Given** the cluster does not answer, **When** `agent_env.sh` is sourced, **Then** it
+   returns 3 and creates nothing.
+3. **Given** `check_env.sh` on a machine without Docker, **When** it runs, **Then** no line
+   mentions Docker or Compose and the report has no Docker-related warning.
+4. **Given** an environment from `agent_env.sh`, **When** `agent_cleanup.sh` runs, **Then** the
+   namespace is deleted and proven absent, and the run directory is removed only when it is
+   named after the run identifier.
+
+---
+
+### User Story 4 - Recovery from crashes, sweeps and restarts (Priority: P2)
+
+A session crashes, the sweeper deletes an environment after 48 hours, or Docker Desktop
+restarts and the sweeper deletes everything created before it. The worktree's record of the
+active environment then points at a namespace that may or may not exist. Stopping always
+converges; starting again recreates what is missing.
+
+**Why this priority**: R5 makes vanishing namespaces normal, not exceptional.
+
+**Independent Test**: Start an environment with `up`, delete its namespace out of band, run
+`stop` (succeeds, record cleared), run `up` again (creates a fresh namespace).
+
+**Acceptance Scenarios**:
+
+1. **Given** a recorded environment whose namespace no longer exists, **When** `stop` runs,
+   **Then** it succeeds, reports that the namespace was already gone, and clears the record.
+2. **Given** a recorded environment whose namespace no longer exists, **When** `up` or a live
+   session starts, **Then** it clears the stale record and creates a new environment instead
+   of refusing.
+3. **Given** a recorded environment that still exists, **When** `up` runs, **Then** it refuses,
+   naming the environment and the `stop` command, as today's active-run refusal does.
+4. **Given** `INTEGRATION_KEEP_DATA=1`, **When** the session ends, **Then** the environment is
+   kept, the record stays, and the output names the `stop` command and the 48-hour limit.
+5. **Given** a crash while the port-forward children run, **When** `stop` runs later,
+   **Then** no port-forward of that environment remains.
+
+---
+
+### User Story 5 - Paired check and GPU suites keep their behaviour (Priority: P3)
+
+The paired CY and cy-queue check, the GPU suites and the real-run gate keep their behaviour.
+The GPU suites publish into the session's environment instead of the shared stand; cy-queue
+and real GPU execution are untouched.
+
+**Why this priority**: Required for release, but nothing in their own logic changes.
+
+**Independent Test**: Run cy-queue's suite against the migrated tip with cy-queue unchanged;
+run the GPU suite's option validation without a GPU and confirm it still rejects an invalid
+selection before any environment is created.
+
+**Acceptance Scenarios**:
+
+1. **Given** the migrated tip, **When** cy-queue's suite runs in the paired environment,
+   **Then** it passes with no change to cy-queue.
+2. **Given** a GPU suite with invalid options, **When** it runs, **Then** it fails validation
+   before creating any environment, as it fails before claiming a run tag today.
+
+### Edge Cases
+
+- **Namespace swept mid-session.** A session that runs longer than the sweeper allows, or
+  spans a restart, loses its namespace; the remaining tests fail on lost connectivity and
+  teardown still succeeds because the namespace is already gone.
+- **Two worktrees at once.** Each creates its own namespace; nothing is shared. Node pressure
+  shows up as pods that never become ready and is reported as deferred, not as failure.
+- **Uncached images.** The first start on a machine without the pinned images pulls several
+  gigabytes; the preflight reports which pinned images the node lacks (informational) and the
+  start-up budget is configurable.
+- **Quota rejection.** A pod that the quota or limit range rejects is a configuration error
+  (exit 1) with the rejection event quoted, not a timeout.
+- **Port-forward dies.** A pod restart ends kubectl's port-forward; requests then fail as lost
+  connectivity, which the existing classification already reports.
+- **Manual commands under pytest isolation.** The test HOME is replaced; kubectl still needs
+  the real kubeconfig, which is restored from `CY_REAL_ENV` for children as today.
+- **Stale per-worktree namespaces.** Environments of a crashed worktree that nobody stops are
+  removed by the sweeper within 48 hours; the project never deletes namespaces it did not
+  record.
+- **User's host ClearML.** The port-forward never binds local port 8008, so the host-stand
+  warning keeps meaning "this is the user's own ClearML".
+
+## Requirements *(mandatory)*
+
+### Functional Requirements
+
+**Environment ownership (R1-R4, R6, R7)**
+
+- **FR-001**: Live tests and agent live runs MUST use a **test environment** that the project
+  creates: one Kubernetes namespace on context `docker-desktop`, named
+  `clearml-yolo-it-<id>` with a fresh random `<id>`, never a protected name (R2).
+- **FR-002**: Creating an environment MUST apply the namespace's `ResourceQuota` and
+  `LimitRange` before any workload object, and the quota MUST cover the measured set with
+  headroom while allowing no `PersistentVolumeClaim` and no `nvidia.com/gpu` request (R3, R4,
+  R7). Its values live in the project's manifests with the measurement that justifies them.
+- **FR-003**: The environment MUST provide its own ClearML server (API and file server with
+  their MongoDB, Redis and Elasticsearch) and its own FiftyOne database; it MUST NOT contact
+  the platform's dedicated ClearML or MongoDB or any retired shared stand (R6).
+- **FR-004**: Every environment volume MUST be `emptyDir`; manifests MUST NOT name a
+  `storageClassName`, `local-path` or a host path (R4, interim rule).
+- **FR-005**: The environment MUST start only the components its session needs: ClearML
+  components when a test or run needs ClearML; only the database server for a FiftyOne-only
+  session.
+- **FR-006**: Credentials for the environment MUST be generated per environment, held only in
+  the environment's own Secret and the consuming process environment, never printed, logged,
+  committed or written to a repository file.
+- **FR-007**: The environment's namespace and objects MUST carry labels that identify the
+  project and the environment identifier, so leftovers are recognisable.
+
+**Lifecycle (replaces the run-tag lifecycle)**
+
+- **FR-010**: A read-only preflight MUST remain, bounded by `CY_INFRA_CHECK_TIMEOUT` (default
+  60 s), creating nothing, with exit statuses 0 available, 3 unavailable (cluster not
+  answering, timeout), 1 error (kubectl missing, context missing, permission to create
+  namespaces denied), 130 interrupted. It MUST NOT call any k8s-infra helper.
+- **FR-011**: Session setup MUST create the environment, wait for readiness within a start-up
+  budget configurable through an environment variable (default chosen from the measured cold
+  start with room for pulling images), open port-forwards to loopback on kubectl-chosen ports,
+  and export the ClearML endpoint, files endpoint and credentials (and the FiftyOne database
+  URI) to the tests.
+- **FR-012**: A setup failure after the namespace exists MUST delete the namespace before the
+  failure is reported. Temporary causes (not ready within the budget, lost connectivity) MUST
+  be reported as unavailable (exit 3, deferred); permanent causes (forbidden, invalid
+  manifest, quota rejection) as errors (exit 1).
+- **FR-013**: Teardown MUST stop the environment's port-forwards, delete the namespace and
+  prove its absence within a bounded wait; incomplete teardown MUST fail the session and keep
+  the record for a retry, as incomplete exact-tag cleanup does today.
+- **FR-014**: One worktree MUST have at most one recorded environment. Starting while a
+  recorded environment exists MUST be refused with the `stop` command; a recorded environment
+  whose namespace no longer exists MUST be treated as gone: `stop` succeeds and clears it, and
+  `up` or session setup clears it and creates a new one (R5).
+- **FR-015**: `INTEGRATION_KEEP_DATA=1` MUST keep the environment and its record after the
+  session and print the `stop` command and the 48-hour limit.
+- **FR-016**: The manual commands `check`, `up`, `env` and `stop` of
+  `python -m tests.integration.lifecycle` MUST keep their names and exit-status contract;
+  `env` MUST keep refusing to print to a terminal.
+- **FR-017**: The live suites MUST keep passing explicit ClearML project names and tags that
+  carry the environment identifier; the GPU suites keep joining the session environment on
+  demand after validating their options.
+
+**Environment skill and repository references (R8, R9)**
+
+- **FR-020**: `agent_env.sh` MUST create (or reuse the exported) environment through the same
+  lifecycle, export the run identifier, run directory and ClearML variables without printing
+  credentials, return 3 when unavailable and 1 on refusal, and require no k8s-infra skill.
+- **FR-021**: `agent_cleanup.sh` MUST tear the environment down through the same lifecycle
+  and keep its rule that a run directory is removed only when named after the run identifier;
+  `--dry-run` MUST delete nothing.
+- **FR-022**: `check_env.sh` MUST NOT run or report `docker compose`; it MUST report the
+  tools the live path needs (uv, kubectl with a reachable `docker-desktop` context, the GPU
+  as today) and the ClearML endpoint check as today, without TLS trust hints for the retired
+  stand. It MUST keep exiting 0.
+- **FR-023**: No tracked file outside dated evidence and historical feature records MUST
+  reference `INFRA_RUN_TAG`, `INFRA_PROJECT`, `K8S_INFRA_SKILL_DIR`, `INFRA_REGISTRY`,
+  `INFRA_HARNESS`, `INFRA_SCRATCH_DIR`, `CY_INFRA_SKILL_DIR`, `infra.py`, `clearml.py`,
+  `mongodb.py`, or `*.k8s.docker.internal` stand endpoints as current instructions or code.
+  Product tests that set a retired variable to prove the application ignores it, and the
+  mutation driver's scrubbing of `INFRA_*` variables a shell may still export, are guards,
+  not uses, and stay.
+- **FR-024**: The skills, development procedures, ddp-testing procedure, Taskfile stage
+  descriptions, session-start status report, glossary, `TECH_DETAILS.md` and the Russian
+  `README.md` command comment MUST describe the project-owned environment instead of the
+  shared stand.
+
+**Unchanged behaviour**
+
+- **FR-030**: `src/`, the GPU suites' execution logic, the real-run gate, cy-queue and the
+  paired check's procedure MUST NOT change; the paired check MUST pass against the migrated
+  tip with cy-queue unchanged.
+- **FR-031**: Development verification MUST still never contact the cluster; live tests MUST
+  still run only when `tests/integration` is named or the `integration` marker is selected.
+
+### Behaviour map (specification rewrite)
+
+Each current behaviour of the run-tag lifecycle and the environment skill, with its new home.
+
+| Current behaviour | Disposition | New home |
+| --- | --- | --- |
+| `check` bounded read-only preflight, exits 0/3/1/130 | Kept; probes change (cluster, context, permission instead of `room`, Secret, TLS, `whoami`) | FR-010 |
+| `infra.py room` capacity WAIT → exit 3 | Removed (no capacity logic on the platform); node pressure surfaces as start-up timeout → exit 3 | FR-012 |
+| `clearml.py env` credentials + CA trust exports | Changed: generated per environment; no CA exports (plain HTTP over port-forward) | FR-006, FR-011 |
+| TLS failure classified as permanent error with CA remedy | Removed with TLS | FR-022 |
+| `infra.py newtag` run tag minted, `.run-tag` record | Changed: environment identifier is the namespace name; the per-worktree record remains | FR-001, FR-014 |
+| `INFRA_RUN_TAG` adopts a run started elsewhere | Changed: adoption through the worktree record only; the variable is retired (R8) | FR-014, FR-023 |
+| Refuse `up` while another run is recorded | Kept, plus vanished-namespace convergence | FR-014 |
+| Tagged project names and `clearml.tags` | Kept; no longer the cleanup selector | FR-017 |
+| Exact-tag cleanup proven by empty `ls --prefix` | Changed: namespace deletion proven by absence | FR-013 |
+| Keep tag file until cleanup is proven | Kept for the environment record | FR-013 |
+| Setup failure stops the run | Kept: namespace deleted before reporting | FR-012 |
+| `INTEGRATION_KEEP_DATA=1` | Kept; adds the 48-hour note | FR-015 |
+| `env` refuses a terminal | Kept | FR-016 |
+| Children get the real HOME from `CY_REAL_ENV` | Kept (kubectl needs the real kubeconfig) | Edge cases |
+| `INTEGRATION_RUN_TAG` conflict check | Kept for the exported identifier | FR-014 |
+| Interactive skip vs Task exit 3 on unavailability | Kept | FR-012 |
+| FiftyOne suites on a host-local database in `FIFTYONE_DATABASE_DIR` | Changed: database in the environment; the directory stays as the lock location | FR-003, US2 |
+| `agent_env.sh` room/env/mongodb/newtag steps | Changed to the lifecycle | FR-020 |
+| `agent_cleanup.sh` exact-tag cleanup + directory rule | Changed to teardown; directory rule kept | FR-021 |
+| `check_env.sh` `docker compose` check | Removed | FR-022 |
+| `check_env.sh` host-stand (localhost:8008) warning | Kept, reworded for the run's own ClearML | FR-022 |
+| `check_env.sh` authenticated `auth.login` check, exit 0 | Kept | FR-022 |
+| `INFRA_HARNESS` for tag minting | Removed | FR-023 |
+| `INFRA_SCRATCH_DIR` run-directory root | Changed: project-named variable with the same default | FR-020 |
+| Unit tests of `lifecycle.py` (`tests/test_integration_lifecycle.py`) | Removed: tooling tests; lifecycle evidenced by live runs | Clarifications |
+
+### Key Entities
+
+- **Test environment**: one namespace of this project with its identifier, quota, limit range,
+  credentials Secret, components and port-forwards; lives at most until teardown or the
+  sweeper.
+- **Environment record**: the worktree's note of its active environment (identifier and
+  port-forward processes); never holds a credential.
+- **Component**: a deployable part of the environment (database server, Redis,
+  Elasticsearch, ClearML API server, ClearML file server) with its requests and limits.
+
+## Success Criteria *(mandatory)*
+
+### Measurable Outcomes
+
+- **SC-001**: With no shared stand present, the `integration` stage passes on a clean tip and
+  leaves no namespace with the project prefix behind.
+- **SC-002**: The release-acceptance FiftyOne step passes against the environment's database
+  and leaves no namespace behind.
+- **SC-003**: `git grep` for the retired names in FR-023 finds nothing outside dated evidence,
+  `CHANGELOG.md`, `bugs/` and earlier feature records.
+- **SC-004**: Every namespace the project creates appears with a `ResourceQuota` in the
+  sweeper's report (or `kubectl get resourcequota -n <ns>` before the sweeper exists).
+- **SC-005**: Environment cold start with cached images stays within the default start-up
+  budget with margin; the measured value is recorded as dated evidence.
+- **SC-006**: `stop` after an out-of-band namespace deletion succeeds; `up` afterwards creates
+  a new environment.
+- **SC-007**: cy-queue's suite passes against the migrated tip with cy-queue unchanged.
+
+## Assumptions
+
+- The cluster context `docker-desktop` and `kubectl` are available on the developer machine;
+  the user's kubeconfig grants namespace creation.
+- The container images pinned by the manifests stay pullable or cached; the measured images
+  were already cached on this node.
+- Host-side GPU processes of the GPU suites reach the environment through the same loopback
+  port-forward as the CPU tests.
+- The platform sweeper is not yet armed; when armed it may delete environments as R5 says.
+
+## Out of Scope
+
+- Real GPU work execution, cy-queue scheduling and any cy-queue change.
+- Running ClearML tasks inside the cluster (agents, queues, the k8s glue) and the ClearML web UI.
+- Wildcard host names, ingress and the platform certificate (R9 interim rule).
+- The platform's dedicated ClearML and MongoDB and their credential bundles.
+- Releasing a version; pushing.

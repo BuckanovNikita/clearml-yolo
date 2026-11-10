@@ -1,0 +1,105 @@
+# Research: Own Kubernetes Test Infrastructure
+
+Dated measurements: [evidence/2026-11-10-measurements.md](evidence/2026-11-10-measurements.md).
+Governing plan: k8s-infra `docs/plans/2026-11-09-managed-infrastructure-reset.md` (settled
+decisions, "Rules for every project", "clearml-yolo — first").
+
+## R-1 Deployment mechanism
+
+- **Decision**: Plain YAML manifests under `tests/integration/environment/`, applied with
+  `kubectl apply`, credentials Secret created from stdin.
+- **Rationale**: Five small Deployments; no templating beyond namespace and component
+  selection; no Helm dependency or release state that `kubectl delete namespace` would orphan;
+  server-side dry-run can validate them.
+- **Alternatives**: The upstream `clearml` Helm chart (renders web UI, async-delete, agent
+  services and 50 Gi claims by default; needs many overrides and a Helm binary); Docker Compose
+  (forbidden by the platform plan).
+
+## R-2 Minimal ClearML component set
+
+- **Decision**: MongoDB, Redis, Elasticsearch, API server, file server.
+- **Rationale**: Measured sufficient for task creation, artifact upload and download, output
+  model upload, and the real CPU stand smoke test (1 passed). The web UI serves people, not the
+  SDK; async-delete cleans deleted objects, which namespace deletion makes moot; the agent runs
+  queued tasks, which this project's tests never do.
+- **Alternatives**: The full chart set (more pods, more memory, slower start).
+
+## R-3 Start ordering
+
+- **Decision**: Init containers using the ClearML image's `curl` with `-m 2`: the API server
+  waits for Elasticsearch health yellow, the file server waits for `debug.ping`.
+- **Rationale**: Without ordering the API server's fixed 30 s Elasticsearch retry and the file
+  server's crash loop make cold start ~47 s; with ordering ~24 s (m4, m6, m7). Without `-m`, a
+  probe against a Service with no endpoints hung 30 s (m5).
+- **Alternatives**: Readiness gates in the lifecycle (more code, same effect); accepting
+  restarts (slower, noisy).
+
+## R-4 Credentials
+
+- **Decision**: Generate the API server system pair, token secret and the built-in `tests`
+  user pair per environment; the file server uses the system pair; the SDK uses the `tests` pair.
+- **Rationale**: Measured: a separate file-server pair is refused by the API server (m1); the
+  `tests` pair authenticates `auth.login` and SDK writes (m2-m7). No fixed-user configuration
+  file is needed.
+- **Alternatives**: Fixed users with passwords plus `auth.create_credentials` (extra calls, a
+  configuration Secret).
+
+## R-5 FiftyOne database
+
+- **Decision**: FiftyOne's own database on the environment's MongoDB; a FiftyOne-only session
+  starts only MongoDB. Keep a temporary `FIFTYONE_DATABASE_DIR` for the publisher's locks.
+- **Rationale**: The suite passed unchanged with `FIFTYONE_DATABASE_URI` pointed at it, both
+  sharing ClearML's server (m2) and alone (m8, ready in ~3 s). The locked FiftyOne 1.22.0
+  requires MongoDB ≥ 6.0 (`fiftyone.constants.MONGODB_MIN_VERSION`); 7.0.22 satisfies it. The
+  product's publisher keeps its lock directory under `fo.config.database_dir`.
+- **Alternatives**: Today's host-local `mongod` spawned by FiftyOne (not in a namespace, no
+  quota, violates R1/R3); a second MongoDB server (more memory, no isolation benefit inside a
+  disposable namespace).
+
+## R-6 Host access
+
+- **Decision**: `kubectl port-forward svc/<component> :<port>` to loopback, kubectl-chosen
+  ports, plain HTTP inside the tunnel.
+- **Rationale**: Interim rule R9; no host names, certificate or hosts entries. Random ports
+  never collide with the user's host ClearML on 8008 or between worktrees.
+- **Alternatives**: Ingress host names (not provable before platform phase P4); NodePorts
+  (fixed ports, collisions).
+
+## R-7 Quota and limit range
+
+- **Decision**: Quota pods 8, requests 1 CPU / 2 GiB, limits 8 CPU / 6 GiB, PVC 0, GPU 0;
+  limit range defaults 50m/64Mi request, 500m/256Mi limit.
+- **Rationale**: Measured use requests 550m / 1184 MiB, limits 6.5 CPU / 3840 MiB; headroom
+  for a debug pod and init containers; PVC 0 and GPU 0 enforce R4 and R7 at admission.
+- **Alternatives**: No limits quota (an unlimited pod could starve the node); tighter limits
+  (Elasticsearch peaked at 634 MiB with a 1 GiB limit).
+
+## R-8 Preflight versus start-up
+
+- **Decision**: `check` stays read-only (cluster, context, permission, informational image
+  cache line); start-up is part of session setup with `CY_TEST_ENV_START_TIMEOUT` (300 s).
+- **Rationale**: The preflight contract (bounded, creates nothing, 0/3/1/130) is relied on by
+  acceptance and the skills; cold start (~24 s cached, minutes with ~3.7 GB of pulls) does not
+  fit a 60 s read-only check.
+
+## R-9 Teardown
+
+- **Decision**: 2 s termination grace in pod specs; `kubectl delete namespace` and a bounded
+  wait for absence; already-absent counts as stopped.
+- **Rationale**: Measured 11 s versus 43 s; nothing in the environment needs a clean shutdown.
+
+## R-10 Tooling tests
+
+- **Decision**: Delete `tests/test_integration_lifecycle.py`; add no unit tests of the new
+  lifecycle. Evidence for the lifecycle is the product's live suites run through it.
+- **Rationale**: Owner rule: tests exercise product code, never project tooling. The existing
+  tests cover helper-call behaviour that is being removed.
+- **Consequence**: Lifecycle regressions surface only in live runs; the tasks therefore make
+  the live acceptance runs (integration, FiftyOne step, vanished-namespace recovery) explicit
+  acceptance items.
+
+## R-11 Paired check
+
+- **Decision**: No cy-queue change. Run cy-queue's suite in this worktree's environment
+  (`cd /mnt/wsl/data/nkt/cy-queue && uv run --frozen --no-sync --project <worktree> pytest -q`)
+  on the tip; the full `paired-check` Task stage at release time as documented.
