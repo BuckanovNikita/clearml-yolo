@@ -228,7 +228,8 @@ def test_budget_peak_combines_disjoint_memory_without_adding_the_baseline_twice(
     result = adapter.NativeBatchProbe().run(profile, SyntheticWorkload(), settings, 8)
     assert result.peak_memory_bytes == (expected,)
     state = BatchSearch.start(profile, settings).observe(result)
-    assert state.status == ("no_capacity" if expected > 900 else "searching")
+    assert state.status == "searching"
+    assert state.next_batch == (4 if expected > 900 else 16)
     # Owner accounting never rewrites the raw allocator/non-allocator receipt.
     receipt = ProbeRankResult.model_validate_json(
         (workers.requests[0].output / "rank-0.json").read_text(encoding="utf-8")
