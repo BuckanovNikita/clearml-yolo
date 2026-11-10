@@ -46,8 +46,8 @@ with `git status --short` empty before and after: the same collection error on
 cy-queue checkout with `--project <worktree>`, again failed by construction with 22 collection
 errors, exit 2.
 
-Status: the paired check is reported as **failed for a cause outside this feature**, not as
-passed, until master gains `batch_sizes` or the owner decides otherwise (spec "Dependencies").
+Status of the runs above: **failed for a cause outside this feature**, not passed (spec
+"Dependencies").
 
 Correction, 2026-11-10: earlier text here cited `dc2760b`, `266aac8` and `6e1c2cf` as this
 branch's commits after a commit-message rewrite. That rewrite is no longer in this history:
@@ -55,3 +55,16 @@ the branch was put back in line with the merge into `012-editable-batch-sizes`, 
 are `98a373d`, `0af13e6` and `2bb569c`, each with the same tree as the commit the run used
 (checked with `git rev-parse <commit>^{tree}`). The commit message of `47aaabe`, which
 recorded those hashes, still mentions the rewrite; it is left as written.
+
+## Run with the batch-sizes work merged, 2026-11-10 22:56-22:59 (Moscow time)
+
+The owner directed that this feature be built on `012-editable-batch-sizes`, which was merged
+into this branch (merge commit `ca754b7`), so `clearml_yolo.adapters.storage.batch_sizes` is
+present. Same command, run with `nice -n19`, `PYTEST_XDIST_AUTO_NUM_WORKERS=4` and
+`OMP_NUM_THREADS=4` because the user was using the machine.
+
+| Item | Value |
+| --- | --- |
+| clearml-yolo commit | `d09e60b` (branch `feat/own-test-infra`), version 0.47.0 |
+| cy-queue commit | `d3627a0`, version 0.1.10; `git status --short` empty before and after; HEAD unchanged |
+| Result | **passed**, exit 0: `uv pip check` compatible, editable-install and version checks passed, cy-queue's suite **527 passed, 7 deselected** in 116.8 s, `cy-queue --help` ran, final version report printed |

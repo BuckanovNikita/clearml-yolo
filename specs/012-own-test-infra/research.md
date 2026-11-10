@@ -117,6 +117,9 @@ decisions, "Rules for every project", "clearml-yolo — first").
   `012-editable-batch-sizes`, not on master
   ([evidence/2026-11-10-paired-check.md](evidence/2026-11-10-paired-check.md)). This is
   outside this feature; SC-007 depends on it (spec "Dependencies").
+- **Observed later on 2026-11-10**, after `012-editable-batch-sizes` was merged into this
+  branch on the owner's direction: the stage passed (cy-queue's suite 527 passed, 7
+  deselected; evidence file above).
 
 ## R-12 Environment selection and ownership
 

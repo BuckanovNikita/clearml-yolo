@@ -295,7 +295,7 @@ selection before any environment is created.
 **Acceptance Scenarios**:
 
 1. **Given** the migrated tip, **When** cy-queue's suite runs in the paired environment,
-   **Then** it passes with no change to cy-queue (subject to the `batch_sizes` dependency in
+   **Then** it passes with no change to cy-queue (cy-queue needs the `batch_sizes` module; see
    "Dependencies").
 2. **Given** a GPU suite with invalid options, **When** it runs, **Then** it fails validation
    before creating any environment, as it fails before claiming a run tag today.
@@ -468,7 +468,7 @@ selection before any environment is created.
 
 - **FR-030**: `src/`, the GPU suites' execution logic, the real-run gate, cy-queue and the
   paired check's procedure MUST NOT change; the paired check MUST pass against the migrated
-  tip with cy-queue unchanged, once its dependency in "Dependencies" is met.
+  tip with cy-queue unchanged (its dependency is in "Dependencies").
 - **FR-031**: Development verification MUST still never contact the cluster; live tests MUST
   still run only when `tests/integration` is named or the `integration` marker is selected.
 
@@ -542,7 +542,7 @@ Each current behaviour of the run-tag lifecycle and the environment skill, with 
 - **SC-006**: `stop` after an out-of-band namespace deletion succeeds; `up` afterwards creates
   a new environment.
 - **SC-007**: cy-queue's suite passes against the migrated tip with cy-queue unchanged
-  (the `paired-check` stage); see "Dependencies" for its current blocker.
+  (the `paired-check` stage); see "Dependencies".
 - **SC-008**: A live session in a shell that exports the identifier of the live recorded
   environment leaves that namespace and record in place; a session with no live recorded
   environment, whatever is exported, creates a namespace and deletes exactly that one; a
@@ -561,13 +561,14 @@ Each current behaviour of the run-tag lifecycle and the environment skill, with 
 
 ## Dependencies
 
-- **SC-007 and the paired check depend on master gaining
-  `clearml_yolo.adapters.storage.batch_sizes`** (branch `012-editable-batch-sizes`) or on the
-  owner's decision about that dependency. cy-queue `d3627a0` imports that module; on
-  2026-11-10 the `paired-check` stage failed at collection for that reason alone
-  ([evidence/2026-11-10-paired-check.md](evidence/2026-11-10-paired-check.md)). Until the
-  dependency is met, the paired check is reported as failed for a cause outside this feature,
-  never as passed; this feature makes no change to cy-queue or `src/` to work around it.
+- **SC-007 and the paired check need `clearml_yolo.adapters.storage.batch_sizes`**, which
+  cy-queue `d3627a0` imports. The module comes from the separate feature
+  `012-editable-batch-sizes`. On a tip without it the `paired-check` stage fails at collection
+  for that reason alone, which is reported as failed for a cause outside this feature, never
+  as passed. The owner directed that this feature be built on top of that branch, which was
+  merged into `feat/own-test-infra`; with the module present the stage runs cy-queue's suite
+  ([evidence/2026-11-10-paired-check.md](evidence/2026-11-10-paired-check.md)). This feature
+  makes no change to cy-queue, to `src/` or to the batch-sizes work.
 
 ## Out of Scope
 
