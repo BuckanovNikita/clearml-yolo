@@ -202,7 +202,7 @@ namespace and directory are gone and no k8s-infra helper was invoked.
 5. **Given** a live recorded environment in the checkout (for example from an earlier
    `agent_env.sh` in the same shell, which exports its identifier), **When** `agent_env.sh` is
    sourced again, **Then** it returns 1 naming the recorded environment and
-   `agent_cleanup.sh`, and creates, deletes and exports nothing (FR-020).
+   `agent_cleanup.sh`, creates and deletes nothing and exports no new identifier (FR-020).
 6. **Given** a recorded environment whose namespace no longer exists, **When** `agent_env.sh`
    is sourced, **Then** the stale record is cleared without any delete call and a new
    environment is created and exported under a new identifier (FR-014, R5).

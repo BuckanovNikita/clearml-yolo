@@ -60,7 +60,7 @@ first applied by the live acceptance run (T027).
 
 | Principle | Status |
 | --- | --- |
-| I. Typed, explicit Python | `lifecycle.py` stays strict-mypy and Ruff clean; standard library only; specific exception types; no secrets in messages. |
+| I. Typed, explicit Python | `lifecycle.py` stays strict-mypy and Ruff clean; standard library only; specific exception types; no secrets in messages. The rewrite drops its `from __future__ import annotations`, which the constitution forbids (T009). |
 | II. Module boundaries | `src/` untouched; `tests/integration` is not imported by product code (existing architecture test). |
 | III. Configuration and run ownership | Live suites keep explicit tagged project names and tags; credentials never uploaded or printed; run directories stay isolated. |
 | IV. Proportional, evidence-based verification | Live evidence is the product's own live suites run against the new environment, plus dated measurements; mocked tests claim nothing about uploads. Tooling unit tests are removed rather than rewritten (owner rule: tests exercise product code). Deferred/waived semantics are unchanged. |
