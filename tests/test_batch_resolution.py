@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from loguru import logger
 
 from clearml_yolo.adapters.clearml import session
 from clearml_yolo.adapters.integrations import batch_profiles
@@ -171,3 +172,103 @@ def test_replay_null_is_not_replaced_by_previous_effective_general_batch(monkeyp
     finally:
         session._ACTIVE_INVOCATION.reset(token)
     assert values == {"batch": None, "epochs": 9}
+
+
+@pytest.mark.parametrize(
+    ("requested", "expected_devices"),
+    [({"device": "2,0"}, [2, 0]), ({"device": "-1"}, [2]), ({"device": None}, [0]), ({}, [0])],
+)
+def test_yolo_resolves_requested_and_automatic_native_device_selectors(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    requested: dict[str, Any],
+    expected_devices: list[int],
+) -> None:
+    import ultralytics.utils.torch_utils as native_torch
+
+    # Native auto-selection is an external hardware effect. Model its distinct
+    # selector outcomes so dropping the user's selector changes actual execution.
+    def parse_device(value: str) -> str:
+        return {"2,0": "2,0", "-1": "2", "": "0"}[value]
+
+    monkeypatch.setattr(native_torch, "parse_device", parse_device)
+    devices = tuple(
+        GPUDevice(
+            index=index,
+            uuid=f"GPU-{index}",
+            name="GPU",
+            total_memory_bytes=24 * GIB,
+            used_memory_bytes=0,
+            utilization=0,
+        )
+        for index in range(3)
+    )
+    monkeypatch.setattr(resolution, "discover_gpus", lambda: devices)
+    path = tmp_path / "batch-sizes.yaml"
+    path.write_text("GPU [24 GiB]:\n  960:\n    ultralytics/yolo11n: 3\n")
+    monkeypatch.setattr(resolution, "BatchSizeStore", lambda: BatchSizeStore(path))
+    settings = {"batch": None, "imgsz": 960} | requested
+    resolved, provenance = resolution.resolve_yolo_batch("yolo11n.pt", settings, _dataset(tmp_path), None)
+    assert settings == {"batch": None, "imgsz": 960} | requested
+    assert resolved["device"] == expected_devices
+    assert resolved["batch"] == 3 * len(expected_devices)
+    assert provenance is not None
+    assert [entry["target_gpu"]["uuid"] for entry in provenance["selected_entries"]] == [
+        f"GPU-{index}" for index in expected_devices
+    ]
+
+
+@pytest.mark.parametrize("backend", ["native", "yolo"])
+def test_training_fallback_command_targets_the_gpu_that_needs_measurement(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, backend: str
+) -> None:
+    import ultralytics.utils.torch_utils as native_torch
+
+    devices = (
+        GPUDevice(
+            index=0, uuid="GPU-exact", name="GPU", total_memory_bytes=24 * GIB, used_memory_bytes=0, utilization=0
+        ),
+        GPUDevice(
+            index=2,
+            uuid="GPU-fallback",
+            name="New GPU",
+            total_memory_bytes=20 * GIB,
+            used_memory_bytes=0,
+            utilization=0,
+        ),
+    )
+    monkeypatch.setattr(resolution, "discover_gpus", lambda: devices)
+    model = "fcos/resnet50_fpn" if backend == "native" else "ultralytics/yolo11n"
+    path = tmp_path / "batch-sizes.yaml"
+    path.write_text(f"GPU [24 GiB]:\n  960:\n    {model}: 7\nSource [16 GiB]:\n  960:\n    {model}: 3\n")
+    monkeypatch.setattr(resolution, "BatchSizeStore", lambda: BatchSizeStore(path))
+    prepared = _dataset(tmp_path)
+    messages: list[str] = []
+    sink = logger.add(lambda message: messages.append(str(message)))
+    try:
+        if backend == "native":
+            config = ModelConfig.model_validate(
+                {
+                    "backend": "fcos",
+                    "preset": "resnet50_fpn",
+                    "train": {"batch": None, "imgsz": 960, "device": [2, 0]},
+                }
+            )
+            resolved, provenance = resolution.resolve_native_batch(config, prepared, None)
+            assert resolved.train.batch == 6
+            assert resolved.train.device == [2, 0]
+        else:
+            monkeypatch.setattr(native_torch, "parse_device", lambda value: value)
+            settings, provenance = resolution.resolve_yolo_batch(
+                "yolo11n.pt", {"batch": None, "imgsz": 960, "device": "2,0"}, prepared, None
+            )
+            assert settings["batch"] == 6
+            assert settings["device"] == [2, 0]
+    finally:
+        logger.remove(sink)
+    assert len(messages) == 1
+    assert "New GPU" in messages[0]
+    assert "Source [16 GiB]" in messages[0]
+    assert f"cy-batch-estimate --imgsz 960 --models {model} --devices 2 --gpu-counts 1" in messages[0]
+    assert provenance is not None
+    assert [entry["fallback"] for entry in provenance["selected_entries"]] == [True, False]

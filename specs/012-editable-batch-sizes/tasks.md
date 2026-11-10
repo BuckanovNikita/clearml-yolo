@@ -20,10 +20,10 @@
 ## Integration and verification
 
 - [x] T006 Update docs/batch-estimation.md, docs/current-contracts.md and README.md; reconcile specification meaning with final diff.
-- [ ] T007 Run project verification and mutation; record outcomes in specs/012-editable-batch-sizes/verification.md.
+- [x] T007 Run project verification and mutation; record outcomes in specs/012-editable-batch-sizes/verification.md.
 - [ ] T008 Commit coherent changes, run clean-tip acceptance, paired source compatibility and final prek pipeline; record evidence and limitations in specs/012-editable-batch-sizes/verification.md.
 - [ ] T009 Run bounded native estimation and training lookup when hardware permits; record actual outcomes in specs/012-editable-batch-sizes/verification.md.
-- [ ] T010 Obtain fresh independent review after integration/verification; reconcile findings and evaluate authorized release boundary in specs/012-editable-batch-sizes/verification.md.
+- [x] T010 Obtain fresh independent review after integration/verification; reconcile findings and evaluate authorized release boundary in specs/012-editable-batch-sizes/verification.md.
 
 ## Dependencies and execution
 

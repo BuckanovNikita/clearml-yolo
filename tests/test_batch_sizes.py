@@ -301,3 +301,52 @@ def test_forced_evidence_is_visible_but_manual_override_does_not_claim_it(tmp_pa
     assert manual.forced is False
     store.publish((case,))
     assert store.load().resolve(_gpu(), 960, _MODEL).entry.forced is False
+
+
+def test_distinct_rows_retain_their_own_measurement_provenance(tmp_path: Path) -> None:
+    store = BatchSizeStore(tmp_path / "table.yaml")
+    first = _case(8)
+    first = first.model_copy(update={"settings": first.settings.model_copy(update={"force": True})})
+    second = _case(32, gpu=_gpu("Other"))
+    store.publish((first, second))
+
+    table = store.load()
+    first_entry = table.resolve(_gpu(), 960, _MODEL).entry
+    second_entry = table.resolve(_gpu("Other"), 960, _MODEL).entry
+    assert first_entry.per_gpu_batch == 8
+    assert first_entry.origin == "measurement"
+    assert first_entry.forced is True
+    assert first_entry.source_status == "validated"
+    assert second_entry.per_gpu_batch == 32
+    assert second_entry.origin == "measurement"
+    assert second_entry.forced is False
+    assert second_entry.source_status == "ceiling_limited"
+    assert first_entry.source_estimate_key is not None
+    assert second_entry.source_estimate_key is not None
+    assert first_entry.source_estimate_key != second_entry.source_estimate_key
+
+
+def test_saved_v1_compact_metadata_keys_preserve_measurement_provenance(tmp_path: Path) -> None:
+    store = BatchSizeStore(tmp_path / "table.yaml")
+    # A persisted document is intentionally independent of the current writer:
+    # changes to metadata-key encoding must not silently discard saved evidence.
+    payload = (
+        "GPU [24 GiB]:\n  960:\n    ultralytics/yolo11n: 3\n"
+        '# clearml-yolo-batch-metadata: {"schema_version": 1, '
+        '"capacities": {"GPU [24 GiB]": 25769803776}, '
+        r'"measured": {"[\"GPU [24 GiB]\",960,\"ultralytics/yolo11n\"]": 3}, '
+        r'"forced": {"[\"GPU [24 GiB]\",960,\"ultralytics/yolo11n\"]": true}, '
+        r'"sources": {"[\"GPU [24 GiB]\",960,\"ultralytics/yolo11n\"]": '
+        '{"status": "numerically_limited", "diagnostic": "Larger batch produced nonfinite loss", '
+        '"estimate_key": "saved-measurement-key"}}, "failures": []}\n'
+    )
+    store.path.write_text(payload)
+
+    entry = store.load().resolve(_gpu(), 960, _MODEL).entry
+    assert entry.per_gpu_batch == 3
+    assert entry.origin == "measurement"
+    assert entry.forced is True
+    assert entry.source_status == "numerically_limited"
+    assert entry.source_diagnostic == "Larger batch produced nonfinite loss"
+    assert entry.source_estimate_key == "saved-measurement-key"
+    assert store.path.read_text() == payload

@@ -38,16 +38,26 @@ workload/recipe gates. User-facing schema wording was updated to name the editab
 
 ## Required gates
 
-- Development verification: running; final result pending.
-- Branch mutation: first bounded report completed, 8 of 30 changed functions,
-  167 mutants: 119 killed, 48 survived, 0 not reached, 0 not run. Test selection used
-  existing testmon nodes plus import fallback. Source provenance behavioral survivors
-  are being addressed; final report and dispositions pending. Twenty-two functions
-  were outside the default function budget, not claimed mutation-tested.
-- Paired CY/queue: initial failure diagnosed above; final rerun pending.
-- Clean-tip acceptance: pending. Read-only stand preflight returned UNAVAILABLE/3:
-  shared stands at capacity. This defers live verification, not a pass.
-- Final `prek run --all-files` with skips cleared: pending.
+- Development verification: passed through `prek run --all-files`, with skips cleared.
+  The initial full run found four superseded expectations: removed `--classes` in parser
+  defaults/help and immediate no-capacity at batch eight in probe tests. Narrow fixture
+  corrections passed focused reruns (193 compatibility and 73 probe tests). No production
+  change was needed. Subsequent full hook development verification passed.
+- Branch mutation: passed advisory report; final 167 mutants, 153 killed, 14 equivalent
+  or presentation survivors, zero unreached/unrun within eight selected functions.
+  See [complete scope and dispositions](mutation-2026-11-10.md).
+- Paired CY/queue: passed normal resolution, `uv pip check`, source/installed metadata,
+  queue help and 527 queue tests (7 deselected). Versions: CY 0.47.0 and queue 0.1.10.
+  The tested source changes are committed in CY `0d1889d` and queue `d3627a0`; subsequent
+  changes are test expectations/assertions and dated evidence, not runtime behavior.
+- Clean-tip acceptance: rerun pending. The preceding attempt passed static checks,
+  properties (4753 passed, one skipped), coverage (4761 passed, one skipped, 84.30%
+  against 84.12% required), and CPU stand smoke (one passed, 29 skipped, 81 deselected).
+  The stand had become available after initial UNAVAILABLE/3 preflight. That attempt
+  failed its final clean-worktree guard because mutation tests were added while it ran;
+  it is not claimed as successful clean-tip acceptance.
+- Final `prek run --all-files` after the final test commit: pending. Earlier full pipeline
+  passed with skips cleared; newly added mutation regressions passed focused checks.
 - Native bounded estimation and training lookup: deferred. pcboard could not identify
   this session using either host discovery or its session identifier, so safe GPU
   availability could not be established. No GPU job was launched and no wake-up was
@@ -57,6 +67,8 @@ workload/recipe gates. User-facing schema wording was updated to name the editab
 
 ## Resource ownership
 
-No shared stand objects or GPU processes were created. Paired-check uses task-owned
-temporary environments and cleans them on exit. Mutation uses its own temporary
-workspace. Pre-existing services, datasets and the other worktree remain untouched.
+The CPU smoke run used the integration lifecycle's owned run tag and passed teardown;
+its run-tag file was released. No GPU process was created. Paired-check temporary
+virtual environments and retained mutation workspaces were removed after inspection.
+Pre-existing services, datasets and the other worktree remain untouched. Verification
+logs are retained locally as dated diagnostic evidence; no credentials were persisted.
