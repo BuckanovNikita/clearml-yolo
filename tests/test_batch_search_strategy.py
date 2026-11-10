@@ -53,7 +53,7 @@ def _run_curve(
 
 
 def test_new_calls_default_to_guided_search_and_schema_three() -> None:
-    assert SearchSettings().search_strategy == "memory_guided_aligned_v1"
+    assert SearchSettings().search_strategy == "memory_guided_small_batches_v1"
     assert EstimateCatalogue().schema_version == 3
 
 
@@ -229,7 +229,7 @@ def test_legacy_inference_does_not_mutate_supplied_payload() -> None:
     parsed = EstimateCase.model_validate(raw)
     assert parsed.settings.search_strategy == LEGACY
     assert raw == before
-    assert SearchSettings.model_validate(raw["settings"]).search_strategy == "memory_guided_aligned_v1"
+    assert SearchSettings.model_validate(raw["settings"]).search_strategy == "memory_guided_small_batches_v1"
 
 
 @pytest.mark.parametrize("version", [1, 2])
@@ -259,3 +259,101 @@ def test_relabelled_history_and_fabricated_confirmation_are_rejected() -> None:
     raw["trials"] = raw["trials"][:-1]
     with pytest.raises(ValidationError, match="evidence"):
         EstimateCase.model_validate(raw)
+
+
+@pytest.mark.parametrize("count", [1, 2, 3])
+@pytest.mark.parametrize("capacity", range(9))
+@pytest.mark.parametrize("ceiling", [1, 2, 3, 5, 7, 8, 16])
+@pytest.mark.parametrize("failure", ["oom", "memory_limit"])
+def test_small_batch_search_finds_integer_capacity_and_confirms(
+    count: int, capacity: int, ceiling: int, failure: str
+) -> None:
+    search = BatchSearch.start(_profile(count), SearchSettings(max_global_batch=ceiling * count))
+    initial = search.next_batch
+    assert initial == min(8, ceiling) * count
+    for _ in range(20):
+        if search.next_batch is None:
+            break
+        batch = search.next_batch // count
+        search = search.observe(_trial(search, "success" if batch <= capacity else failure))
+    assert search.next_batch is None
+    assert all(trial.global_batch <= ceiling * count for trial in search.trials)
+    assert all(trial.global_batch % count == 0 for trial in search.trials)
+    expected = min(capacity, ceiling)
+    if expected == 0:
+        assert search.status == "no_capacity"
+        assert search.trials[-1].global_batch == count
+        assert search.trials[-1].status == failure
+    else:
+        assert search.per_gpu_batch == expected
+        assert search.global_batch == expected * count
+        assert search.status == ("ceiling_limited" if expected == ceiling else "validated")
+        assert search.trials[-1].global_batch == expected * count
+        assert any(trial.global_batch == expected * count and trial.status == "success" for trial in search.trials[:-1])
+    assert EstimateCase.model_validate_json(_case(search).model_dump_json()) == _case(search)
+
+
+@pytest.mark.parametrize("capacity", [8, 9, 15, 16, 24, 31, 64, 127, 256])
+@pytest.mark.parametrize("ceiling", [8, 9, 15, 32, 99, 128])
+def test_new_strategy_preserves_larger_batch_candidates(capacity: int, ceiling: int) -> None:
+    def memory(batch: int) -> int:
+        return 100 + 10 * batch
+
+    current = _run_curve(memory, budget=memory(capacity), ceiling=ceiling, strategy="memory_guided_small_batches_v1")
+    historical = _run_curve(memory, budget=memory(capacity), ceiling=ceiling, strategy="memory_guided_aligned_v1")
+    assert current.trials == historical.trials
+    assert (current.status, current.global_batch) == (historical.status, historical.global_batch)
+
+
+@pytest.mark.parametrize("failure", ["nonfinite", "timeout", "cancelled", "crash", "error", "contaminated"])
+def test_small_search_noncapacity_failures_never_claim_no_capacity(failure: str) -> None:
+    search = BatchSearch.start(_profile(), SearchSettings())
+    search = search.observe(_trial(search, "oom"))
+    assert search.next_batch == 4
+    search = search.observe(_trial(search, failure))
+    assert search.status == "failed"
+    assert search.global_batch is None
+
+
+def test_small_search_numerical_failure_confirms_prior_success() -> None:
+    search = BatchSearch.start(_profile(), SearchSettings())
+    search = search.observe(_trial(search, "oom"))
+    search = search.observe(_trial(search))
+    assert search.next_batch == 6
+    search = search.observe(_trial(search, "nonfinite"))
+    assert search.confirming
+    assert search.next_batch == 4
+    search = search.observe(_trial(search))
+    assert search.status == "numerically_limited"
+    assert search.global_batch == 4
+    assert _case(search).usable
+
+
+@pytest.mark.parametrize("failure", ["oom", "memory_limit", "nonfinite", "timeout", "cancelled"])
+def test_small_search_requires_independent_confirmation(failure: str) -> None:
+    search = BatchSearch.start(_profile(), SearchSettings(max_global_batch=3))
+    search = search.observe(_trial(search))
+    assert search.confirming
+    search = search.observe(_trial(search, failure))
+    assert search.status == "failed"
+    assert search.global_batch is None
+
+
+def test_small_measurement_cache_reuses_confirmed_values_but_keeps_recipe_checks() -> None:
+    from clearml_yolo.core.batch_estimation import SyntheticWorkload, compatibility_issues, select_estimate
+
+    search = _run_curve(lambda batch: 100 + batch, budget=103, ceiling=16, strategy="memory_guided_small_batches_v1")
+    case = _case(search)
+    assert case.global_batch == 3
+    assert select_estimate((case,), case.profile, SyntheticWorkload()) == case
+    changed = case.profile.model_copy(update={"dependencies": {"torch": "changed"}})
+    assert compatibility_issues(case, changed, SyntheticWorkload())
+    assert compatibility_issues(case, case.profile, SyntheticWorkload(classes=151))
+
+
+def test_small_search_requires_memory_failure_at_one_before_no_capacity() -> None:
+    search = _run_curve(lambda batch: 100 + batch, budget=100, ceiling=16, strategy="memory_guided_small_batches_v1")
+    assert search.status == "no_capacity"
+    assert [trial.global_batch for trial in search.trials] == [8, 4, 2, 1]
+    assert all(trial.status == "success" for trial in search.trials)
+    assert not _case(search).usable

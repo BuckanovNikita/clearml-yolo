@@ -9,7 +9,9 @@ import pytest
 
 from clearml_yolo.adapters.runtime.gpu_inventory import GPUDevice
 from clearml_yolo.adapters.storage.batch_estimates import FileBatchEstimateStore
+from clearml_yolo.adapters.storage.batch_sizes import BatchSizeStore
 from clearml_yolo.application.training_workers import BatchCaseRequest
+from clearml_yolo.core.batch_estimation import select_models
 from clearml_yolo.entrypoints import batch_estimate as cli
 from clearml_yolo.entrypoints import batch_estimate_worker
 from test_batch_estimate_workflow import RecordingProbe
@@ -82,6 +84,17 @@ def _install(monkeypatch: pytest.MonkeyPatch, *, capacity: int = 8) -> tuple[Rec
     return probe, idle_checks
 
 
+def _default_models(monkeypatch: pytest.MonkeyPatch, names: tuple[str, ...]) -> None:
+    monkeypatch.setattr(
+        cli, "select_models", lambda selections=None: select_models(names if selections is None else selections)
+    )
+
+
+def _without_models(arguments: list[str]) -> list[str]:
+    index = arguments.index("--models")
+    return arguments[:index] + arguments[index + 2 :]
+
+
 def test_help_has_no_gpu_or_workspace_effects(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -117,14 +130,14 @@ def test_filters_defaults_resume_and_refresh(
     assert all(case.settings.memory_fraction == 0.9 for case in cases)
     calls = probe.calls
     cli.main(arguments)
-    assert probe.calls == calls
+    assert probe.calls == calls * 2
     output = capsys.readouterr().out
-    assert "cached" in output
+    assert "table" in output
     assert "gpus=2\tglobal_batch=16" in output
-    assert "extrapolated" in output
+    assert "table" in output
     assert all(profile.world_size == 1 for profile in probe.probed_profiles)
     cli.main([*arguments, "--refresh"])
-    assert probe.calls == calls * 2
+    assert probe.calls == calls * 3
 
 
 def test_count_and_workload_controls_are_forwarded(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -137,8 +150,6 @@ def test_count_and_workload_controls_are_forwarded(monkeypatch: pytest.MonkeyPat
             "yolo11n",
             "--gpu-counts",
             "2",
-            "--classes",
-            "5",
             "--objects-per-image",
             "20",
             "--memory-budget",
@@ -152,7 +163,7 @@ def test_count_and_workload_controls_are_forwarded(monkeypatch: pytest.MonkeyPat
     (case,) = FileBatchEstimateStore().read().cases
     assert case.profile.world_size == 1
     assert case.profile.nominal_size == (640, 640)
-    assert (case.workload.classes, case.workload.objects_per_image) == (5, 20)
+    assert (case.workload.classes, case.workload.objects_per_image) == (150, 20)
     assert case.settings.memory_fraction == 0.85
     assert case.settings.trial_timeout_seconds == 17
 
@@ -212,7 +223,7 @@ def test_counts_only_filter_output_and_global_batch_can_exceed_search_limit(
     cli.main(["--imgsz", "640", "--models", "yolo11n", "--gpu-counts", "3", "--search-limit", "8"])
     output = capsys.readouterr().out
     assert "gpus=3\tglobal_batch=24\tper_gpu_batch=8" in output
-    assert "ceiling_limited\textrapolated" in output
+    assert "\ttable\t" in output
     assert "gpus=1" not in output
     assert checks == [(0,)]
     assert all(profile.world_size == 1 for profile in probe.probed_profiles)
@@ -234,7 +245,8 @@ def test_first_idle_identical_device_is_used_and_cached_run_ignores_busy_devices
     assert checks == [(0,), (1,)]
     assert {profile.gpus[0].uuid for profile in probe.probed_profiles} == {"GPU-1"}
     monkeypatch.setattr(cli, "require_idle", lambda _, **_kwargs: pytest.fail("cached run checked idle"))
-    cli.main(args)
+    _default_models(monkeypatch, ("yolo11n",))
+    cli.main(_without_models(args))
 
 
 def test_mixed_hardware_measures_each_group_once(
@@ -351,7 +363,8 @@ def test_next_launch_reuses_verified_models_and_retries_only_failed_cases(
     previous = verified.model_dump_json()
     measured.clear()
     failing = False
-    cli.main([*args, "--jobs", "1"])
+    _default_models(monkeypatch, ("yolo11n", "yolo11s"))
+    cli.main([*_without_models(args), "--jobs", "1"])
     assert set(measured) == {"ultralytics/yolo11s"}
     assert (
         next(
@@ -372,7 +385,8 @@ def test_cache_survives_device_order_report_count_and_jobs_changes(
     calls = probe.calls
     monkeypatch.setattr(cli, "require_idle", lambda _, **_kwargs: pytest.fail("cache hit checked idle GPU"))
     monkeypatch.setattr(cli, "_make_pool", lambda: pytest.fail("cache hit created worker pool"))
-    cli.main([*args, "--devices", "1,0", "--jobs", "2", "--gpu-counts", "2"])
+    _default_models(monkeypatch, ("yolo11n", "yolo11s"))
+    cli.main([*_without_models(args), "--devices", "1,0", "--jobs", "2", "--gpu-counts", "2"])
     assert probe.calls == calls
 
 
@@ -425,6 +439,7 @@ def test_unaccepted_case_receipts_cannot_publish_success_or_fail_peers(
     assert stopped.value.code == 1
     cases = {case.profile.model.selection: case for case in FileBatchEstimateStore().read().cases}
     assert not cases["ultralytics/yolo11n"].usable
+    assert not any(entry.model == "ultralytics/yolo11n" for entry in BatchSizeStore().load().entries)
     assert cases["ultralytics/yolo11s"].usable
     assert cases["ultralytics/yolo11m"].usable
     if damage == "cleanup":
@@ -451,9 +466,94 @@ def test_force_reaches_case_worker_and_reports_cached_and_extrapolated_sources(
     calls = probe.calls
     output = capsys.readouterr().out
     assert "forced/background-sensitive" in output
-    assert "extrapolated" in output
-    cli.main(arguments)
+    assert "table" in output
+    _default_models(monkeypatch, ("yolo11n",))
+    cli.main(_without_models(arguments))
     assert probe.calls == calls
     output = capsys.readouterr().out
     assert "cached" in output
+    assert "measurement" in output
     assert "forced/background-sensitive" in output
+
+
+def test_default_run_preserves_manual_exact_entry_and_refresh_replaces_it(monkeypatch: pytest.MonkeyPatch) -> None:
+    probe, _ = _install(monkeypatch)
+    _default_models(monkeypatch, ("yolo11n",))
+    table = BatchSizeStore()
+    table.path.parent.mkdir(parents=True)
+    table.path.write_text('"GPU [0.000000931322574615478515625 GiB]":\n  640:\n    ultralytics/yolo11n: 3 # manual\n')
+    before = table.path.read_bytes()
+    args = ["--imgsz", "640", "--search-limit", "8"]
+    cli.main(args)
+    assert probe.calls == 0
+    assert table.path.read_bytes() == before
+    cli.main([*args, "--refresh"])
+    assert probe.calls == 2
+    assert table.load().entries[0].per_gpu_batch == 8
+
+
+def test_default_run_populates_missing_table_from_compatible_json(monkeypatch: pytest.MonkeyPatch) -> None:
+    from clearml_yolo.application.use_cases.batch_estimate import estimate_batches
+    from clearml_yolo.core.batch_estimation import SearchSettings, SyntheticWorkload
+
+    probe, _ = _install(monkeypatch)
+    _default_models(monkeypatch, ("yolo11n",))
+    profile = probe.profile(select_models(("yolo11n",))[0], 640, (0,))
+    estimate_batches(
+        (profile,),
+        SyntheticWorkload(),
+        SearchSettings(max_global_batch=8),
+        probe=probe,
+        store=FileBatchEstimateStore(),
+        now=lambda: "2026-11-10",
+    )
+    calls = probe.calls
+    cli.main(["--imgsz", "640", "--search-limit", "8"])
+    assert probe.calls == calls
+    assert BatchSizeStore().load().entries[0].per_gpu_batch == 8
+
+
+@pytest.mark.parametrize("failure", ["timeout", "cancelled", "error"])
+def test_failed_refresh_preserves_published_entry(monkeypatch: pytest.MonkeyPatch, failure: str) -> None:
+    probe, _ = _install(monkeypatch)
+    args = ["--imgsz", "640", "--models", "yolo11n", "--search-limit", "8"]
+    cli.main(args)
+    before = BatchSizeStore().path.read_bytes()
+    original = probe.run
+    monkeypatch.setattr(probe, "run", lambda *args: original(*args).model_copy(update={"status": failure}))
+    with pytest.raises(SystemExit) as stopped:
+        cli.main(args)
+    assert stopped.value.code == 1
+    assert BatchSizeStore().path.read_bytes() == before
+
+
+def test_worker_success_is_not_published_until_parent_accepts_cleanup(monkeypatch: pytest.MonkeyPatch) -> None:
+    _install(monkeypatch)
+    original = RecordingCasePool.poll
+
+    def poll(pool: RecordingCasePool) -> tuple[Any, ...]:
+        assert not BatchSizeStore().load().entries
+        return original(pool)
+
+    monkeypatch.setattr(RecordingCasePool, "poll", poll)
+    cli.main(["--imgsz", "640", "--models", "yolo11n", "--search-limit", "8"])
+    assert BatchSizeStore().load().entries[0].per_gpu_batch == 8
+
+
+def test_known_failure_requires_new_measurement_even_with_stale_usable_json(monkeypatch: pytest.MonkeyPatch) -> None:
+    probe, _ = _install(monkeypatch)
+    args = ["--imgsz", "640", "--models", "yolo11n", "--search-limit", "8"]
+    cli.main(args)
+    (prior,) = FileBatchEstimateStore().read().cases
+    probe.capacity = 0
+    with pytest.raises(SystemExit):
+        cli.main(args)
+    assert BatchSizeStore().load().failures
+    FileBatchEstimateStore().save(prior)
+    probe.capacity = 8
+    calls = probe.calls
+    _default_models(monkeypatch, ("yolo11n",))
+    cli.main(_without_models(args))
+    assert probe.calls > calls
+    assert not BatchSizeStore().load().failures
+    assert BatchSizeStore().load().entries[0].per_gpu_batch == 8

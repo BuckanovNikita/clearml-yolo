@@ -18,7 +18,8 @@ yet exist. Only ordinary measurement mode initializes estimator scratch.
 | Task-owned runs and latest shortcut | `runs/` |
 | Hydra logs and sweeps | `outputs/`, `multirun/` |
 | Shared CSV datasets | `.cache/clearml-yolo/datasets/` |
-| Training batch estimates | `.config/clearml-yolo/batch-estimates.json` |
+| Editable training batch sizes | `.config/clearml-yolo/batch-sizes.yaml` |
+| Internal batch measurement evidence | `.config/clearml-yolo/batch-estimates.json` |
 | Managed DEIM weights and legacy compatible assets | `.cache/clearml-yolo/models/<backend>/<preset>/<asset-id>/<filename>` |
 | Managed DEIM source archive and tree | `.cache/clearml-yolo/sources/DEIMv2/<revision>.tar.gz` and adjacent `<revision>/` |
 | Model preparation receipts and locks | `.cache/clearml-yolo/preparation/` |
@@ -32,10 +33,12 @@ configuration snapshots and temporary destinations must resolve beneath CY_HOME,
 through symlinks. Invalid destinations fail before creation. Existing data is neither migrated nor deleted. Native model asset publication is the
 specific exception described below; it does not relax project destination checks.
 
-The [batch estimator](batch-estimation.md) uses a versioned JSON catalogue
-with a native file lock and atomic replacement beneath `CY_HOME`. It records successful
-and failed cases, diagnostics and provenance without creating a ClearML task. Its
-configuration location is independent of queue configuration discovery.
+The [batch estimator](batch-estimation.md) keeps a versioned JSON evidence catalogue
+and an editable YAML training table beneath `CY_HOME`. Both use native locks and
+atomic replacement. YAML internal metadata shares its atomic snapshot; table updates
+preserve comments and unrelated entries. Measurement records retain successful and
+failed cases, diagnostics and provenance without creating a ClearML task. These
+locations are independent of queue configuration discovery.
 
 Hydra preflight checks generated configuration files and log destinations using each
 run's actual directory, including every sequential sweep member and the sweep manifest.

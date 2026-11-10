@@ -74,7 +74,6 @@ def test_option_declarations_preserve_parsing_types_and_defaults() -> None:
     assert vars(arguments) == {
         "list": False,
         "imgsz": 640,
-        "classes": 150,
         "objects_per_image": 300,
         "models": None,
         "devices": (2, 0),

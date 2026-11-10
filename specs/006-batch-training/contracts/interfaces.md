@@ -1,59 +1,17 @@
 # Interfaces
 
-`cy-batch-estimate --imgsz 960 --classes 150 --objects-per-image 300` selects the default
-catalogue and outputs GPU counts 1 through visible count. `--devices` chooses ordered
-hardware; `--gpu-counts` filters recommendations for the first N selected devices and
-launches no additional searches. Measure once per model/resolution/profile and distinct
-GPU name/capacity, on the first idle unassigned selected representative when evidence
-is needed. Independent cases run in separate processes, each pinned to its GPU for
-the full search. Optional positive `--jobs N` limits concurrent cases; the default
-uses available selected GPUs and `--jobs 1` runs serially. Compatible cache hits need
-no idle device. Candidate/optimizer trials within one case remain sequential.
-Every trial and winner confirmation uses exactly one GPU. `--search-limit` is the
-per-GPU ceiling (default 1024); extrapolated global batches may exceed it. Refresh,
-memory-budget and trial-timeout controls apply to actual single-GPU measurements.
-The trial timeout is not a timeout for the complete search.
+The current estimator and training-lookup interface is maintained in
+[batch estimation](../../../docs/batch-estimation.md). Feature 012 supersedes this
+feature's strict training-cache lookup and eight-image minimum: the editable YAML
+table is authoritative, the workload uses fixed 150 classes, and the versioned search
+supports integer batches below eight. Historical JSON replay and keys remain intact.
 
-`cy-batch-estimate --list [--models SELECTIONS]` is a separate offline read-only
-mode. It requires no resolution or GPU and accepts no explicit measurement flags.
-It lists only registered models with no usable saved estimate under any recorded
-configuration, in catalogue order. Saved failure rows include status, diagnostic
-and resolution/GPU/workload context; absent records say No saved attempt. A usable
-case covers its model even alongside failures, without establishing current-run
-compatibility. Report success exits 0; invalid options or unreadable/corrupt
-evidence exit 2. Measurement mode continues to require positive `--imgsz`.
-
-New `SearchSettings.search_strategy` values default to `memory_guided_aligned_v1`;
-explicit `memory_guided_v1` and `exponential_binary_v1` retain their historical
-transition policies. Aligned search starts at 8 and 16 per GPU, predicts from full successful memory observations with bounded growth,
-falls back to doubling without a positive slope and uses exact binary refinement
-after an observed capacity bound, all on an eight-image per-GPU grid. Ceilings
-round down to multiples of eight and must cover eight per GPU. Failure at eight
-yields `no_capacity`; no unaligned fallback is supplied. Full warm-up/measured steps, all optimizer paths,
-validation and fresh confirmation remain required. Numerical recovery preserves
-the cause and the independently confirmed last good candidate, which can differ
-between strategies.
-
-Catalogues read schemas 1/2/3 and write schema 3 with explicit per-case strategies.
-Missing historical strategies use legacy replay and preserve source keys. Invalid
-schema/strategy combinations and forged trial histories fail without rewriting files.
-Refresh saves pending evidence before case launch. Only the invocation owner promotes
-confirmed evidence after matching the token/key receipt, successful exit and cleanup.
-Ordinary measurement or case-result failures leave peers running. Unrecoverable
-process-supervision failures stop the invocation while preserving accepted results.
-Cancellation cleans only owned process
-trees. Slots with unverifiable cleanup cannot host another case in that invocation.
-
-`cy-train ... ultralytics.batch=null` and native `model.train.batch=null` request strict
-local lookup. Queue snapshots preserve null. Compatibility and actual dataset bounds
-must pass before native execution. Unaligned historical per-GPU results remain
-readable but cannot supply automatic lookup; rerun measurement rather than round
-saved evidence. Explicit numeric training batches retain their existing behavior. Prefer compatible exact-allocation evidence;
-otherwise require compatible single-GPU sources for every target hardware group and
-derive `N × min(per_gpu_capacities)`. Typed recommendations retain measured/extrapolated
-origin, target allocation, source keys and boundary/ceiling status. Stored trials remain
-unchanged. Unsupported/custom profiles require explicit batch. An OOM during training
-keeps normal failure behavior without automatic retry or hidden batch reduction.
+Independent cases run in separate processes pinned to their assigned GPUs. Candidate
+and optimizer trials within a case remain sequential. Every trial and confirmation
+uses one GPU; output counts do not launch distributed probes. Only the parent accepts
+matching receipts after successful exit and owned cleanup. Unverifiable cleanup
+quarantines that GPU for the invocation. Ordinary case failures leave peers running;
+unsafe supervision stops the invocation. Cancellation cleans only owned processes.
 
 Worker requests carry backend configuration, prepared dataset, output, optional
 augmentation and world-size/rank settings. Workers never create ClearML tasks. Typed

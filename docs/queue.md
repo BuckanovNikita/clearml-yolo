@@ -2,8 +2,8 @@
 
 `cy` and stage commands run directly with native device settings. They do not import
 queue implementation, perform admission, reserve GPUs, substitute devices or wait.
-Explicit training `batch=null` checks hardware compatibility for saved
-[batch estimation](batch-estimation.md); this is separate from queue scheduling.
+Explicit training `batch=null` resolves the editable
+[batch-size table](batch-estimation.md); this is separate from queue scheduling.
 `cy -m` uses sequential Hydra execution. Scheduling belongs to the separate
 `cy-queue` distribution and `cy_queue` Python namespace. Dependency direction is
 `cy-queue` → `clearml-yolo`; CY never imports the queue package.
@@ -251,12 +251,10 @@ devices and the first device for inference/comparison, while explicit CPU phases
 `CUDA_VISIBLE_DEVICES` is set before the fresh pipeline process. Compilation, AMP, batch and
 model settings are retained. Submission preserves explicit training `batch=null`;
 the executing worker resolves it after dataset preparation against its assigned GPUs
-and accessible `CY_HOME/.config/clearml-yolo/batch-estimates.json`. Estimate matching
-requires the dataset vocabulary and maximum train/validation image density to fit
-the synthetic bounds. Lookup prefers an exact-allocation measurement; otherwise it
-uses compatible single-GPU sources for every assigned hardware type/capacity and
-extrapolates `N × min(per_gpu_capacities)`. It never extrapolates across unmeasured
-hardware. Origin, target allocation and source keys/status remain in provenance;
+and accessible `CY_HOME/.config/clearml-yolo/batch-sizes.yaml`. Lookup resolves each
+GPU by exact name/capacity or a warned fallback from equal/lower VRAM, then computes
+`N × min(per_gpu_batches)`. Classes, object density, recipe and dependencies do not gate
+lookup. Table digest, selected entries and fallback source remain in provenance;
 the requested null remains in replay. Submission does not estimate capacity or
 replace null with a submit-host batch. A miss fails with instructions to measure
 compatible idle hardware or use an explicit value. Global training batches must be

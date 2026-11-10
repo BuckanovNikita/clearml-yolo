@@ -107,9 +107,9 @@ OPTION_DECLARATIONS: dict[str, tuple[OptionDeclaration, ...]] = {
             ("--list",),
             {
                 "action": "store_true",
-                "help": "list models without any usable saved estimate; no GPU needed",
+                "help": "list editable table coverage and known capacity failures; no GPU needed",
             },
-            "Показать модели без пригодной сохранённой оценки и причины; GPU не требуется.",
+            "Показать покрытие редактируемой таблицы и известные неудачные измерения; GPU не требуется.",
             ("--list", "--list --models yolo11n,rfdetr/small"),
         ),
         OptionDeclaration(
@@ -119,12 +119,6 @@ OPTION_DECLARATIONS: dict[str, tuple[OptionDeclaration, ...]] = {
             ("--imgsz 640",),
         ),
         OptionDeclaration(
-            ("--classes",),
-            {"type": int, "default": 150, "help": "synthetic classes (default: 150)"},
-            "Положительное число классов синтетической нагрузки.",
-            ("--classes 150",),
-        ),
-        OptionDeclaration(
             ("--objects-per-image",),
             {"type": int, "default": 300, "help": "synthetic objects (default: 300)"},
             "Количество синтетических объектов на изображение для измерения памяти.",
@@ -132,8 +126,8 @@ OPTION_DECLARATIONS: dict[str, tuple[OptionDeclaration, ...]] = {
         ),
         OptionDeclaration(
             ("--models",),
-            {"help": "comma-separated model presets or YOLO asset names; default: all"},
-            ("Модели через запятую: зарегистрированные пресеты или имена YOLO; без параметра измеряются все."),
+            {"help": "comma-separated models to measure freshly; default: fill missing entries for all"},
+            ("Модели через запятую для нового измерения; без параметра заполняются пропуски таблицы."),
             ("--models rfdetr/small",),
         ),
         OptionDeclaration(
@@ -172,8 +166,8 @@ OPTION_DECLARATIONS: dict[str, tuple[OptionDeclaration, ...]] = {
         ),
         OptionDeclaration(
             ("--refresh",),
-            {"action": "store_true", "help": "repeat completed compatible cases"},
-            "Повторить уже завершённые совместимые измерения вместо использования кэша.",
+            {"action": "store_true", "help": "remeasure all selected combinations"},
+            "Повторно измерить все выбранные сочетания модели, разрешения и GPU.",
             ("--refresh",),
         ),
         OptionDeclaration(

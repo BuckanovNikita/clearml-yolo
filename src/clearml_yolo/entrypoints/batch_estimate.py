@@ -16,6 +16,7 @@ from clearml_yolo.adapters.runtime.bootstrap import runtime_environment
 from clearml_yolo.adapters.runtime.gpu_inventory import GPUDevice, discover_gpus, require_idle
 from clearml_yolo.adapters.runtime.workers import WorkerCommand
 from clearml_yolo.adapters.storage.batch_estimates import FileBatchEstimateStore
+from clearml_yolo.adapters.storage.batch_sizes import BatchSizeStore
 from clearml_yolo.adapters.storage.filesystem import temporary_root
 from clearml_yolo.application.batch_ports import BatchProbe
 from clearml_yolo.application.training_workers import BatchCaseRequest, BatchCaseResult
@@ -23,16 +24,14 @@ from clearml_yolo.core.batch_estimation import (
     EstimateCase,
     GPUHardware,
     ModelVariant,
-    ResolvedRecommendation,
     SearchSettings,
     SyntheticWorkload,
     TrainingProfile,
     estimate_diagnostic,
     estimate_key,
-    model_coverage,
     select_models,
-    select_recommendation,
 )
+from clearml_yolo.core.batch_sizes import BatchSizeEntry, BatchSizeFailure, BatchSizeTable
 from clearml_yolo.entrypoints.options import OPTION_DECLARATIONS, parser_for
 
 if TYPE_CHECKING:
@@ -64,9 +63,9 @@ def _options(arguments: argparse.Namespace) -> _Options:
         models=select_models(selections),
         devices=arguments.devices,
         gpu_counts=arguments.gpu_counts,
-        refresh=arguments.refresh,
+        refresh=arguments.refresh or selections is not None,
         jobs=arguments.jobs,
-        workload=SyntheticWorkload(classes=arguments.classes, objects_per_image=arguments.objects_per_image),
+        workload=SyntheticWorkload(objects_per_image=arguments.objects_per_image),
         settings=SearchSettings(
             force=arguments.force,
             memory_fraction=arguments.memory_budget,
@@ -103,25 +102,6 @@ def _make_pool() -> "IndependentWorkerPool":
 
 def _timestamp() -> str:
     return datetime.now(UTC).isoformat()
-
-
-def _report(case: ResolvedRecommendation, cached: bool) -> None:
-    message = (
-        f"{case.profile.model.selection}\tgpus={case.profile.world_size}"
-        f"\tglobal_batch={case.global_batch}\tper_gpu_batch={case.per_gpu_batch}"
-        f"\t{case.status}\t{case.origin}"
-        f"\tsources={','.join(case.source_estimate_keys)}"
-        f"\tsource_statuses={','.join(case.source_statuses)}"
-    )
-    if cached:
-        message += "\tcached"
-    if any(source.settings.force for source in case.sources):
-        message += "\tforced/background-sensitive"
-    limitations = dict.fromkeys(source.diagnostic for source in case.sources if source.status == "numerically_limited")
-    if limitations:
-        message += "\tdiagnostic=" + "; ".join(limitations)
-    sys.stdout.write(message + "\n")
-    sys.stdout.flush()
 
 
 def _idle_profile(profile: TrainingProfile, devices: tuple[GPUDevice, ...], *, force: bool = False) -> TrainingProfile:
@@ -185,6 +165,7 @@ class _CaseScheduler:
     devices: tuple[GPUDevice, ...]
     store: FileBatchEstimateStore
     pending: dict[str, TrainingProfile]
+    table_store: BatchSizeStore = field(default_factory=BatchSizeStore)
     results: dict[str, EstimateCase] = field(default_factory=dict)
     cached: set[str] = field(default_factory=set)
     active: dict[str, BatchCaseRequest] = field(default_factory=dict)
@@ -197,11 +178,23 @@ class _CaseScheduler:
             if case.usable
         }
         if not self.options.refresh:
+            table = self.table_store.load()
             for key in tuple(self.pending):
+                profile = self.pending[key]
+                gpu = profile.gpus[0]
+                failure = BatchSizeFailure(
+                    gpu_name=gpu.name,
+                    total_memory_bytes=gpu.total_memory_bytes,
+                    image_size=self.options.imgsz,
+                    model=profile.model.selection,
+                )
+                if failure in table.failures:
+                    continue
                 if key in saved:
                     self.results[key] = saved[key]
                     self.cached.add(key)
                     del self.pending[key]
+            self.table_store.publish(tuple(self.results.values()), replace=False)
         if not self.pending:
             return
         with _make_pool() as pool:
@@ -278,6 +271,7 @@ class _CaseScheduler:
             self._failed(outcome.key, request.profile, f"Incomplete case: {error}")
             return
         self.store.save(case)
+        self.table_store.publish((case,))
         self.results[outcome.key] = case
 
     def _failed(self, key: str, profile: TrainingProfile, diagnostic: str) -> None:
@@ -302,44 +296,81 @@ class _CaseScheduler:
         self.results[key] = case
 
 
+def _source_description(entry: BatchSizeEntry) -> str:
+    details: list[str] = [entry.origin]
+    if entry.source_status is not None:
+        details.append(f"source_status={entry.source_status}")
+    if entry.source_diagnostic:
+        details.append(f"source_diagnostic={entry.source_diagnostic}")
+    if entry.source_estimate_key is not None:
+        details.append(f"source_estimate_key={entry.source_estimate_key}")
+    return f"{entry.gpu_label}: {entry.per_gpu_batch} ({'; '.join(details)})"
+
+
+def _report_table(table: BatchSizeTable, allocation: TrainingProfile, count: int, *, cached: bool) -> None:
+    selected = tuple(
+        table.resolve(gpu, allocation.nominal_size[0], allocation.model.selection) for gpu in allocation.gpus[:count]
+    )
+    batch = min(item.per_gpu_batch for item in selected)
+    for item in selected:
+        if item.fallback:
+            sys.stderr.write(
+                f"Warning: {_cell(item.target_gpu.name)} uses fallback from {_cell(item.entry.gpu_label)}; "
+                f"run cy-batch-estimate --imgsz {allocation.nominal_size[0]} --models {allocation.model.selection} "
+                "--devices <current-device> to measure this GPU.\n"
+            )
+    sources = ", ".join(dict.fromkeys(_source_description(item.entry) for item in selected))
+    message = (
+        f"{allocation.model.selection}\tgpus={count}\tglobal_batch={count * batch}\tper_gpu_batch={batch}"
+        f"\ttable\tdigest={table.digest}\tsources={_cell(sources)}"
+    )
+    if cached:
+        message += "\tcached"
+    if any(item.entry.forced for item in selected):
+        message += "\tforced/background-sensitive"
+    sys.stdout.write(message + "\n")
+
+
 def _execute(options: _Options) -> bool:
     devices, counts = _devices(options)
-    probe, store = _make_probe(), FileBatchEstimateStore()
+    probe, store, table_store = _make_probe(), FileBatchEstimateStore(), BatchSizeStore()
+    table = table_store.load()
     allocations = tuple(
         probe.profile(model, options.imgsz, tuple(device.index for device in devices)) for model in options.models
     )
     profiles = dict[str, TrainingProfile]()
-    model_keys: list[tuple[str, ...]] = []
     for allocation in allocations:
-        keys = []
         for gpu in allocation.gpus:
+            if not options.refresh and table.exact(gpu, options.imgsz, allocation.model.selection) is not None:
+                continue
             profile = allocation.model_copy(update={"gpus": (gpu,)})
             key = estimate_key(profile, options.workload, options.settings)
             profiles.setdefault(key, profile)
-            keys.append(key)
-        model_keys.append(tuple(dict.fromkeys(keys)))
-    scheduler = _CaseScheduler(options, devices, store, profiles)
+    scheduler = _CaseScheduler(options, devices, store, profiles, table_store)
     scheduler.run()
     successful = all(case.usable for case in scheduler.results.values())
-    catalogue = store.read().cases
-    for allocation, case_keys in zip(allocations, model_keys, strict=True):
-        for key in case_keys:
-            case = scheduler.results[key]
-            if not case.usable:
-                sys.stdout.write(f"{case.profile.model.selection}\tgpus=1\t{case.status}\t{case.diagnostic}\n")
+    table = table_store.load()
+    for case in scheduler.results.values():
+        if not case.usable:
+            sys.stdout.write(f"{case.profile.model.selection}\tgpus=1\t{case.status}\t{_cell(case.diagnostic)}\n")
+        elif case.status == "numerically_limited" or case.settings.force:
+            detail = "forced/background-sensitive; " if case.settings.force else ""
+            sys.stdout.write(
+                f"Measurement: {case.profile.model.selection}\t{case.status}\t{detail}{_cell(case.diagnostic)}\n"
+            )
+    for allocation in allocations:
         for count in counts:
-            target = allocation.model_copy(update={"gpus": allocation.gpus[:count]})
             try:
-                recommendation = select_recommendation(catalogue, target, options.workload)
+                keys = (
+                    estimate_key(allocation.model_copy(update={"gpus": (gpu,)}), options.workload, options.settings)
+                    for gpu in allocation.gpus[:count]
+                )
+                cached = all(key in scheduler.cached or key not in scheduler.results for key in keys)
+                _report_table(table, allocation, count, cached=cached)
             except ValueError as error:
                 sys.stdout.write(f"{allocation.model.selection}\tgpus={count}\tunavailable\t{error}\n")
                 successful = False
-                continue
-            _report(
-                recommendation,
-                all(key in scheduler.cached for key in recommendation.source_estimate_keys),
-            )
-    sys.stdout.write(f"Results: {store.path}\n")
+    sys.stdout.write(f"Results: {table_store.path}; evidence: {store.path}\n")
     return successful
 
 
@@ -366,33 +397,37 @@ def _cell(value: str) -> str:
 
 def _list_saved(selections: str | None) -> None:
     models = select_models(tuple(value.strip() for value in selections.split(",")) if selections is not None else None)
-    store = FileBatchEstimateStore()
-    coverage = model_coverage(models, store.read().cases)
-    missing = tuple(item for item in coverage if not item.covered)
+    store = BatchSizeStore()
+    table = store.load()
+    attempts = FileBatchEstimateStore().read().cases
+    covered = 0
     sys.stdout.write(
-        "Saved coverage across recorded configurations; not current training compatibility.\n"
+        "Editable table coverage across recorded GPUs and image sizes; no CUDA required.\n"
         "MODEL\tSTATUS\tREASON\tCONTEXT\n"
     )
-    for item in missing:
-        if not item.attempts:
-            sys.stdout.write(f"{item.model.selection}\tnot_attempted\tNo saved attempt\t-\n")
-        for case in item.attempts:
-            profile = case.profile
-            hardware = ", ".join(f"{gpu.name} ({gpu.total_memory_bytes} bytes)" for gpu in profile.gpus)
+    for model in (model for model in select_models() if model in models):
+        entries = tuple(entry for entry in table.entries if entry.model == model.selection)
+        failures = tuple(failure for failure in table.failures if failure.model == model.selection)
+        unsuccessful = tuple(
+            case for case in attempts if case.profile.model.selection == model.selection and case.status == "failed"
+        )
+        covered += bool(entries)
+        for entry in entries:
             context = (
-                f"imgsz={profile.nominal_size[0]}x{profile.nominal_size[1]}; "
-                f"gpus={profile.world_size}: {hardware}; "
-                f"classes={case.workload.classes}; "
-                f"objects_per_image={case.workload.objects_per_image}"
+                f"{entry.gpu_label}; imgsz={entry.image_size}; per_gpu_batch={entry.per_gpu_batch}; {entry.origin}"
             )
-            sys.stdout.write(
-                f"{item.model.selection}\t{case.status}\t{_cell(estimate_diagnostic(case))}\t{_cell(context)}\n"
-            )
-    if not missing:
-        sys.stdout.write("All selected models have a usable saved estimate.\n")
+            sys.stdout.write(f"{model.selection}\tcovered\tEditable table entry\t{_cell(context)}\n")
+        for failure in failures:
+            context = f"{failure.gpu_name} ({failure.total_memory_bytes} bytes); imgsz={failure.image_size}"
+            sys.stdout.write(f"{model.selection}\tno_capacity\tConfirmed capacity failure\t{_cell(context)}\n")
+        for case in unsuccessful:
+            context = f"imgsz={case.profile.nominal_size[0]}; GPUs={','.join(gpu.name for gpu in case.profile.gpus)}"
+            sys.stdout.write(f"{model.selection}\tfailed\t{_cell(estimate_diagnostic(case))}\t{_cell(context)}\n")
+        if not entries and not failures and not unsuccessful:
+            sys.stdout.write(f"{model.selection}\tnot_attempted\tNo table entry or known capacity failure\t-\n")
     sys.stdout.write(
-        f"Summary: selected={len(coverage)}\tcovered={len(coverage) - len(missing)}"
-        f"\tmissing={len(missing)}\nResults: {_cell(str(store.path))}\n"
+        f"Summary: selected={len(models)}\tcovered={covered}\tmissing={len(models) - covered}"
+        f"\nResults: {_cell(str(store.path))}\n"
     )
 
 

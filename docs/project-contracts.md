@@ -71,11 +71,12 @@ file. Generated training configurations include both profiles and the selected
 model/profile specialization. See the [augmentation contract](augmentation.md).
 Direct `cy` and stage commands execute their configured native devices without queue
 storage, reservations, waiting or automatic substitution. Explicit training `batch=null`
-inspects actual hardware and dataset limits for strict saved-estimate lookup. It
-prefers an exact-allocation measurement, otherwise derives an explicitly extrapolated
-global batch from compatible single-GPU measurements for every hardware type/capacity.
-Requested null remains in replay; chosen values, target allocation and source
-keys, boundary/ceiling/numerical status and diagnostics are recorded separately.
+resolves each actual GPU from the editable batch-size table, preferring exact hardware
+and otherwise the largest eligible equal/lower-memory source. Global batch is GPU
+count times the smallest selected value. Dataset classes, density and training recipe
+do not gate lookup; measurement-cache compatibility stays strict. Requested null remains
+in replay; table digest, selected entries, target hardware and fallback sources are
+recorded separately. See [batch estimation](batch-estimation.md).
 Discovery-time nonfinite computation after a fully successful under-budget candidate
 permits one fresh repeat of that last good batch. Only a full successful repeat
 yields usable `numerically_limited` evidence; every failed confirmation remains

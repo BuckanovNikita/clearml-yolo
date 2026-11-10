@@ -1,67 +1,152 @@
-# Training batch estimation
+# Batch estimation and editable training lookup
 
-Single-GPU capacity measurements and real multi-GPU training are distinct outcomes.
-Configuration examples and CPU tests establish neither. Use the
-[physical DDP procedure](ddp-testing.md) for multi-GPU acceptance and record native
-estimator results with their hardware and workload.
-
-`cy-batch-estimate` measures training capacity locally without creating a ClearML
-task. It tests registered pretrained YOLO variants and all registered DEIMv2,
-RF-DETR, Faster R-CNN and FCOS presets. It searches once per model, resolution,
-training profile and distinct GPU name/total-memory capacity. Identical GPUs share
-one measurement. Independent cases run concurrently on idle selected GPUs, with
-one complete search pinned to each assigned GPU. Each case uses the first idle
-compatible GPU in the selected order that this invocation has not assigned to
-another case. Unrelated workloads remain running. Missing or unidentifiable
-telemetry fails the affected measurement. The opt-in force policy below allows
-unattributed activity while retaining explicit foreign-compute protection.
+`cy-batch-estimate` measures single-GPU capacity locally without a ClearML task.
+Only explicit training `batch=null` requests table lookup; numeric defaults and
+explicit batches retain their existing behavior.
 
 ## Measure selected cases
 
 ```bash
 cy-batch-estimate --imgsz 960
-cy-batch-estimate --imgsz 960 --classes 150 --objects-per-image 300
 cy-batch-estimate --imgsz 960 --models rfdetr/small,fcos/resnet50_fpn --devices 0,1
-cy-batch-estimate --imgsz 960 --models rfdetr/small,fcos/resnet50_fpn --devices 0,1 --jobs 1
+cy-batch-estimate --imgsz 960 --models yolo11n --search-limit 3 --jobs 1
 ```
 
-The default catalogue includes the 44 standard pretrained YOLO detection variants
-and all native presets in the [model guide](multi-model-backends.md). YOLO filters
-accept a catalogue selector such as `ultralytics/yolo11n` or an asset name such as
-`yolo11n.pt`. Custom checkpoints and architectures require an explicit training batch
-when no compatible measurement exists.
+Measurements always use **150 synthetic classes**. `--classes` is not supported.
+The default catalogue contains the 44 standard pretrained YOLO detection variants
+and all native presets in the [model guide](multi-model-backends.md). YOLO aliases
+such as `yolo11n.pt` resolve to canonical `ultralytics/yolo11n`.
 
 | Option | Meaning and default |
 | --- | --- |
-| `--imgsz N` | Required nominal square training resolution |
-| `--classes N` | Synthetic foreground classes; 150 |
-| `--objects-per-image N` | Synthetic target density for every image; 300 |
-| `--models LIST` | Comma-separated catalogue selections; all registered cases |
+| `--imgsz N` | Required positive nominal square resolution, except with `--list` |
+| `--objects-per-image N` | Positive target density for every image; 300 |
+| `--models LIST` | Canonical presets or YOLO aliases; explicit selection always measures afresh |
 | `--devices LIST` | Ordered logical indexes within inherited CUDA visibility; all visible GPUs |
-| `--jobs N` | Positive maximum concurrent independent searches; default uses available selected GPUs; 1 runs serially |
-| `--gpu-counts LIST` | Output counts over the first N selected GPUs; default 1 through selected count; launches no additional searches |
-| `--force` | Allow nonzero utilization and activity without attributable compute PIDs; default false; retains telemetry, identity, foreign-PID and memory checks |
-| `--memory-budget FRACTION` | Fraction of each GPU's total memory; 0.9 |
-| `--search-limit N` | Per-GPU search ceiling; 1024; rounded down to a multiple of 8, minimum 8; extrapolated global batches may exceed it |
-| `--trial-timeout SECONDS` | Deadline for each fresh trial group; 300 |
-| `--refresh` | Replace completed compatible cases with fresh measurements |
+| `--jobs N` | Maximum concurrent independent searches; default uses available selected GPUs |
+| `--gpu-counts LIST` | Report over first N selected GPUs; default 1 through selected count; no extra searches |
+| `--force` | Permit unattributed background activity, retaining telemetry and foreign-compute checks |
+| `--memory-budget FRACTION` | Fraction of GPU total memory; 0.9 |
+| `--search-limit N` | Positive per-GPU ceiling; 1024; ceilings below eight are supported |
+| `--trial-timeout SECONDS` | Deadline per fresh trial group; 300 |
+| `--refresh` | Remeasure every selected combination |
 
-Each output count uses the first N GPUs in the selected order. For example,
-`--devices 2,0,1 --gpu-counts 1,3` reports allocations `(2)` and `(2,0,1)`.
-If those GPUs have identical names and capacities, one single-GPU search supplies
-both recommendations. A heterogeneous selection needs a compatible single-GPU
-measurement for every distinct name/capacity group. No distributed probe or
-multi-GPU confirmation is launched.
+Without explicit `--models` or `--refresh`, preserve exact table entries and measure
+missing model/size/hardware combinations. Compatible internal cached evidence may
+populate missing entries. Cross-GPU fallback never counts as exact coverage.
 
-Parallelism is between model/hardware cases. Two identical idle GPUs can search
-two different models concurrently; a single model on identical GPUs still needs
-only one search. Candidates and optimizer paths within a case remain sequential.
-Cases waiting for a compatible GPU used by this invocation start after its previous
-case has exited and its owned descendants have been cleaned up. Busy unrelated
-GPUs are never reserved, stopped or waited on indefinitely. Ordinary measurement
-or case-result failures do not terminate peers. If process supervision cannot be
-established or recovered safely, the invocation stops while preserving already
-accepted results. Output retains the requested model and GPU-count order.
+Each distinct hardware name/capacity needs one single-GPU search per model. Identical
+GPUs can run different cases concurrently; each GPU belongs to at most one case until
+its worker and owned descendants exit. Candidates and optimizer paths within a case
+remain sequential. Busy unrelated GPUs are neither stopped nor waited on indefinitely.
+Ordinary case failures do not terminate peers; unsafe process supervision stops the
+invocation. Output follows requested model/GPU-count order. Counts use the first N
+GPUs in `--devices` order; they do not launch distributed confirmation.
+
+## Search and evidence
+
+New searches use `memory_guided_small_batches_v1`. Start at eight when the ceiling
+permits, otherwise at the ceiling. If eight exceeds capacity, binary-search integer
+batches one through seven. Above eight retain the multiples-of-eight grid and round
+ceilings down to that grid. Only OOM or memory-budget excess at **batch one** yields
+`no_capacity`. Every winner is independently confirmed in a fresh supervised process.
+
+After the first successful candidates, predict from the last two measured memory
+peaks, cap jumps at four times the last successful batch and at the ceiling, and
+fall back to doubling for flat/decreasing growth. Predictions are candidates, never
+capacity evidence. Only observed CUDA OOM or budget excess bounds the capacity search.
+
+Each trial performs five warm-up and ten measured optimizer updates, native
+loss/backward, optimizer state, configured EMA and bounded validation. Native mixed
+precision and compilation remain part of the measured recipe. Use the largest effective
+training resolution, including multiscale behavior. YOLO `optimizer=auto` measures
+both supported resolved optimizer paths and retains the smaller confirmed capacity.
+The budget includes the idle-device baseline, native CUDA allocations outside the
+tensor allocator, allocator peaks and whole-device telemetry.
+
+Before YOLO workers launch, persist an absolute Ultralytics `weights_dir` and synchronize
+the current process cache constant. Relative paths are anchored to invocation cwd;
+existing absolute paths remain. Workers retain trial directories and discover AMP and
+selected weights in that cache. See [cache recovery](model-assets.md#cache-locations).
+
+Discovery-time nonfinite computation after a successful under-budget candidate
+schedules one independent confirmation of that last good batch. Success yields
+`numerically_limited`, retaining the cause without claiming a capacity maximum.
+Numerical failure before any success, any failed confirmation, timeout, crash, missing
+assets, cancellation and infrastructure failures remain distinct unsuccessful outcomes.
+No failed confirmation is retried. `validated` means a confirmed boundary on the search
+grid; `ceiling_limited` means a confirmed ceiling, not an unconstrained maximum.
+
+Telemetry-query and worker-cleanup failures are errors, never capacity evidence.
+Diagnostics retain grouped causes, surviving descendants and relevant query output.
+The supervisor terminates only owned processes. A GPU-specific idle/ownership rejection
+is contamination. A recommendation cannot guarantee success for arbitrary workloads.
+
+## Editable lookup table
+
+The authoritative training table is `CY_HOME/.config/clearml-yolo/batch-sizes.yaml`;
+`CY_HOME` defaults to the launch directory:
+
+```yaml
+"NVIDIA GeForce RTX 4090 [24 GiB]":
+  960:
+    ultralytics/yolo11n: 32
+    rfdetr/small: 3
+```
+
+Values are **per-GPU batches**, accepting every positive integer. Keys identify
+canonical model, square image size and hardware. Generated labels are readable GiB;
+internal metadata retains precise memory bytes. Manually added capacities without
+metadata are interpreted literally. Metadata is stored in a reserved JSON comment
+so it and the public table change atomically. Preserve that comment when editing values.
+
+Resolve each selected GPU separately:
+
+1. Prefer exact GPU name and capacity for the model/size.
+2. Otherwise choose an entry from any GPU with equal or lower VRAM, taking the
+   largest eligible capacity. Break ties by smallest batch, then GPU name.
+3. Compute global batch as GPU count times the smallest resolved per-GPU batch.
+
+Fallback warns with the source and a command for measuring the current GPU. It is
+not a measurement on that GPU. Class count, object density, training recipe,
+augmentation and dependency versions do **not** gate table lookup.
+
+## Publication, refresh and failure handling
+
+Generated entries are published only after the parent accepts matching worker identity
+and result, successful exit, and owned-process cleanup. Successful fresh measurement
+replaces the selected entry; competing eligible results use the smallest confirmed
+batch. Historical measurements cannot override fresh results.
+
+Confirmed `no_capacity` removes the exact entry and records an internal failure marker
+blocking fallback for that hardware/model/size. Successful remeasurement clears it.
+A valid manually added exact entry overrides the marker. Timeout, cancellation and
+infrastructure failure preserve existing table values and report an unsuccessful refresh.
+
+Updates use native locking and atomic replacement, preserving comments and unrelated
+entries. Malformed YAML, duplicate keys and invalid values fail without overwrite.
+Read-only access does not migrate data.
+
+## Internal measurement cache
+
+Detailed evidence remains in `CY_HOME/.config/clearml-yolo/batch-estimates.json`.
+It is separate from the training table; training never silently falls back to JSON.
+Internal reuse still checks architecture, nominal/effective resolution, hardware,
+workload, dependencies, implementation, precision, compilation, optimizers,
+accumulation, EMA and augmentation. UUIDs retain provenance without gating reuse on
+otherwise identical hardware.
+
+Historical schemas and strategies retain their original trial replay and estimate
+keys, including strategy-less exponential histories. Ordinary saves use schema 3
+with explicit strategies. Unknown strategies, mismatched evidence and missing schema-3
+strategies fail. Upgrade older readers before sharing new-strategy catalogues. Never
+edit history to manufacture confirmation or round old values into unmeasured evidence.
+Malformed JSON is reported without overwrite.
+
+Progress snapshots retain failed status and null batches while confirmation or parent
+acceptance is pending. Interrupted refresh may replace the matching JSON progress
+record, but does not invalidate the existing editable table value. Keep diagnostics
+when investigating failures. Pending status may describe an active or interrupted run.
 
 ## Inspect saved coverage without measuring
 
@@ -70,187 +155,23 @@ cy-batch-estimate --list
 cy-batch-estimate --list --models yolo11n.pt,rfdetr/small
 ```
 
-`--list` reads the existing catalogue and lists only selected models with no usable
-saved estimate. It needs neither `--imgsz` nor CUDA, performs no GPU discovery or
-native probes, and creates no runtime directories, locks or catalogue updates.
-The default selects the full model catalogue; `--models` accepts the usual aliases.
-Rows follow catalogue order and include saved status, reason, nominal resolution,
-GPU hardware and synthetic workload for each unsuccessful saved configuration.
-Control characters in stored text are escaped to keep diagnostics on one row.
-
-`not_attempted` means **No saved attempt**, including when the catalogue is absent.
-It does not prove that the model was never run. Failed or incomplete records retain
-their diagnostics; a pending confirmation may still be running or may have been
-interrupted. When the case has no diagnostic, the latest unsuccessful trial diagnostic
-or trial status is used, then the saved case status. No failure cause is inferred from missing data.
-
-Any `validated`, `ceiling_limited` or `numerically_limited` saved case counts as
-coverage, even if other configurations failed. This is historical coverage across
-recorded configurations, **not current training compatibility**. Resolution,
-hardware, workload, recipe and dependency matching still apply during training.
-The summary prints selected/covered/missing model totals and the catalogue path;
-all-covered output is explicit. Missing estimates exit successfully with code 0.
-Malformed/unreadable catalogues and invalid arguments exit 2, preserving evidence.
-Only `--list`, `--models` and help apply to listing; explicit measurement options,
-including `--imgsz`, `--devices`, `--jobs`, `--refresh` and `--force`, are rejected.
+Listing reports table coverage and known failures, without CUDA discovery or probes.
+It needs no image size and writes no table or runtime state. It does not prove capacity
+on the current GPU. Missing entries are not an error. Malformed/unreadable data and
+invalid arguments exit 2. Only listing, model filters and help are accepted together;
+measurement flags are rejected. Stored control characters are escaped in output.
 
 ## Forced measurement with background activity
 
-```bash
-cy-batch-estimate --imgsz 960 --devices 0 --force
-```
+`--force` permits nonzero utilization and activity without attributable compute PIDs.
+Some drivers omit competing compute processes, so this is not proof of graphics-only
+activity. Explicit foreign compute PIDs and invalid/missing telemetry still reject a
+case. Memory accounting, hardware identity, finite checks and confirmation remain.
+No existing process is stopped. Forced evidence retains `settings.force` and distinct
+keys; ordinary settings omit false to preserve old keys. Forced sources are
+background-sensitive recommendations, not uncontended maxima.
 
-`--force` allows nonzero utilization and activity that the driver cannot attribute
-to compute PIDs. It does not establish that activity is graphics-only: some drivers
-also omit competing compute processes. Explicit foreign compute PIDs and missing or
-invalid telemetry still reject the case. Hardware identity, whole-device memory
-budgets (including the observed background baseline), native finite checks, all
-optimizer paths and independent winner confirmation remain required. No existing
-process is stopped.
-
-The catalogue persists `settings.force` only for forced searches, and measurement
-keys distinguish forced and ordinary searches; ordinary records omit the default
-false policy, preserving historical source keys and readability by earlier CY.
-Every recommendation with a forced source is labelled
-`forced/background-sensitive`, including cached and extrapolated recommendations.
-It describes capacity under the recorded workload and observed background, not an
-uncontended maximum or a guarantee under changing activity. Compatible training
-lookup can reuse it; source settings retain the policy in training provenance.
-Older strict catalogue readers must upgrade before reading a catalogue that contains
-forced records. Omit `--force` to retain the ordinary strict idle policy.
-
-## Search and evidence
-
-Before launching YOLO workers, the estimator persists an absolute Ultralytics
-`weights_dir` and synchronizes the current process's native cache constant.
-Relative directories are anchored to the estimator invocation cwd; existing
-absolute directories are retained. Workers keep their trial directories while
-finding selected and auxiliary AMP weights in that cache. For older prepared
-caches, rerun `cy-download-weights` once from the original preparation directory;
-see [cache setup and recovery](model-assets.md#cache-locations).
-
-The public training batch is the **global microbatch across all training GPUs**.
-Every estimator trial uses exactly one GPU, so its measured global and per-GPU
-batches are equal. New searches use `memory_guided_aligned_v1` and start at batches
-8 and 16, unless a failure or the ceiling ends discovery earlier. Every candidate
-and confirmed recommendation is divisible by 8 per GPU. The ceiling is rounded
-down to that grid; a ceiling below 8 is rejected. If batch 8 exceeds capacity,
-the result is `no_capacity`; smaller batches require explicit training configuration. Subsequent candidates use the measured memory
-growth between the two latest successful, under-budget trials, with jumps capped
-at four times the last successful batch and by the search ceiling. Missing, flat
-or decreasing memory growth falls back to doubling. A predicted batch is only a
-candidate: only observed CUDA OOM or memory-budget excess establishes a capacity
-upper bound. Predictions and binary midpoints round down to the grid, advancing
-by at least 8. The search refines the aligned bound by binary search and confirms
-the winner in a fresh supervised process.
-Each trial performs five warm-up optimizer updates and ten measured updates,
-including native loss/backward, optimizer state, configured EMA and bounded validation.
-Native mixed precision and compilation settings remain part of the measured recipe.
-The memory budget includes the idle device baseline and observed native CUDA
-allocations outside the tensor allocator, alongside allocator peaks and whole-device
-telemetry. It applies separately to every GPU.
-
-Trials use the largest effective training resolution, including native multiscale
-behavior. YOLO `optimizer=auto` measures both supported resolved optimizer paths
-and retains the smaller validated capacity. Multi-GPU recommendations are derived
-without additional trials and explicitly labelled `extrapolated`:
-
-- Identical hardware: `global_batch = N × measured_per_gpu_batch`.
-- Mixed hardware: `global_batch = N × min(compatible_per_gpu_capacities)`.
-
-Both formulas produce a global batch divisible by `8 × N`. Missing compatible evidence
-for any GPU type/capacity prevents extrapolation. These recommendations are not
-measured multi-GPU maxima. Exact lookup and extrapolation preserve source limitations:
-`numerically_limited` takes precedence over `ceiling_limited`, which takes precedence
-over `validated`. Neither lookup nor extrapolation establishes a missing capacity
-boundary; source diagnostics remain part of the recommendation.
-
-Confirmed CUDA allocation failure and exceeding the per-GPU memory budget bound
-capacity. Timeout, rank crash, nonfinite computation, missing assets and interference
-from another workload are distinct failures. The supervisor terminates only its own
-workers. During discovery only, nonfinite computation after a fully successful,
-under-budget candidate schedules one fresh confirmation of that last good batch.
-A complete successful confirmation, including every required optimizer path,
-validation and memory check, yields a usable `numerically_limited` result. The
-failed numerical trial and its diagnostic remain in the evidence. The numerical
-failure is never OOM or a memory upper bound; the result does not establish a
-capacity maximum. A numerical failure before any successful candidate, any failed
-confirmation (including nonfinite, OOM, memory-budget excess or timeout), or another
-failure remains unusable. Recovery does not retry a failed confirmation.
-Because memory-guided search visits different candidates, its last good batch after
-a numerical failure can differ from the older exponential search. Both strategies
-require the same complete independent confirmation and retain the numerical cause.
-
-A failed case has no usable recommendation; a nonzero command status can
-coexist with completed results for other cases.
-
-`validated` records a confirmed boundary on the aligned grid, rather than an
-image-by-image maximum. `ceiling_limited` records a confirmed batch at the rounded-down ceiling and remains usable, but does not claim
-an unconstrained maximum. `numerically_limited` records the independently repeated
-last good batch after discovery stopped numerically, with no capacity maximum claim.
-`no_capacity` and `failed` results retain diagnostics.
-A failed `nvidia-smi` query, a query timeout or a worker-cleanup failure during a
-trial is saved as an `error` trial; it is never capacity evidence and fails the case.
-Failure diagnostics list every grouped failure (for example the telemetry query,
-the cleanup timeout and surviving descendants) and the `nvidia-smi` stdout/stderr,
-where NVML reports its error. A direct telemetry, idle or ownership rejection whose
-message names a GPU remains `contaminated`.
-Even a validated batch is a recommendation for the recorded synthetic workload
-and recipe, not a guarantee for arbitrary datasets or concurrent GPU use.
-
-## Saved results and reuse
-
-Results live in `CY_HOME/.config/clearml-yolo/batch-estimates.json`; `CY_HOME`
-defaults to the launch working directory. The versioned JSON records global and
-per-GPU batches separately, trial outcomes, synthetic limits and provenance.
-Stored trial evidence is unchanged: extrapolations are derived during lookup and
-reporting, never saved as manufactured measurements. Legacy measured allocations
-remain readable. Schemas 1 and 2 remain readable; ordinary saves write schema 3
-with an explicit search strategy for every case. New cases use
-`memory_guided_aligned_v1`. Existing `memory_guided_v1` and `exponential_binary_v1`
-histories retain their original candidate rules and keys. Unaligned historical
-per-GPU results remain readable evidence but cannot supply automatic recommendations;
-rerun the estimator. Old evidence is never rounded into an unmeasured recommendation.
-Historical cases without a strategy replay as `exponential_binary_v1`, preserving
-their trial sequence and source estimate keys. Schema 1 still excludes
-`numerically_limited`; schemas 1/2 cannot contain memory-guided histories. Unknown
-strategies, mismatched histories and schema-3 cases without a strategy are rejected.
-Upgrade older CY readers before sharing a schema-3 catalogue with them. Read-only
-access does not migrate or rewrite existing files.
-Historical failed cases remain intact; inspect the new case matching the current
-implementation and dependency versions after rerunning.
-Updates use a native file lock and atomic replacement. A malformed catalogue is
-reported as corruption and is not silently overwritten or treated as an empty cache.
-
-Rerunning the same request reuses completed compatible cases. Failed or interrupted
-cases are retried. Cache hits require no idle GPU. `--refresh` invalidates each old
-matching success before its case process is launched, so an interrupted refresh
-cannot leave a success that appears fresh.
-Preserve the catalogue when investigating failures. Progress snapshots deliberately
-retain status `failed` and null batch values until independent confirmation succeeds
-and the invocation owner validates the case receipt, successful process exit and
-owned descendant cleanup. The receipt must match the launched case token and
-estimate key. A confirmation-complete snapshot can still be waiting for owner
-cleanup; it remains unusable. Pending diagnostics can mean the search is running
-or was interrupted. Cancellation cleans up only owned processes and retains
-completed peer cases plus the latest unusable progress for unfinished cases.
-
-After upgrading, rerun failed cases. The changed implementation fingerprint makes
-older measurements incompatible with the new recipe; use fresh measurements rather
-than editing catalogue versions, statuses or trial records.
-
-Compatibility covers architecture, nominal/effective resolution, GPU types and
-capacities, relevant dependency and implementation versions, precision, compilation,
-optimizers, accumulation, EMA and augmentation profile. Lookup first prefers a
-compatible existing measurement for the exact ordered allocation and GPU count.
-Otherwise it requires compatible single-GPU evidence for every hardware group and
-derives the recommendation for the target count. Stale, failed and incompatible
-sources cannot supply it. GPU UUIDs retain provenance without preventing reuse on
-otherwise matching hardware.
-
-## Select an estimate during training
-
-Numeric defaults remain unchanged. Only explicit `batch=null` enables saved lookup:
+## Select a table entry during training
 
 ```bash
 cy-train ground_truth=./ground_truth.csv ultralytics.model=yolo11n.pt \
@@ -262,44 +183,15 @@ cy-train model=fcos/resnet50_fpn ground_truth=./ground_truth.csv \
   clearml.project_name=detection clearml.task_name=fcos-estimated 'clearml.tags=[training]'
 ```
 
-Lookup runs after actual device selection and dataset preparation, before native
-training. The dataset's foreground vocabulary and maximum object count on any
-training or validation image must fit inside the saved synthetic bounds. Average
-object density is insufficient. A missing/incompatible result stops with an
-estimator command and the alternative of setting an explicit batch.
+Lookup occurs after device selection and dataset preparation, before training. Null
+remains in canonical replay; effective native arguments contain the chosen global batch.
+`training_batch_estimate` records table digest, target GPUs, selected entries, fallback
+sources and resolved batches. Manual entries and fallback values are never presented
+as measurements on the target. Queue workers resolve null against their assigned GPUs
+and accessible `CY_HOME`; queue submission does not measure capacity.
 
-The requested null stays in canonical replay configuration. The resolved batch and
-recommendation provenance are recorded separately as `training_batch_estimate`:
-measured/extrapolated origin, target allocation, source estimate keys, global and
-per-GPU batches, source boundary/ceiling/numerical status and retained diagnostics.
-Effective native arguments contain the chosen value. Queue submission preserves
-null; the executing worker uses its assigned GPUs and accessible `CY_HOME` catalogue.
-Run estimation on matching idle hardware before submission; queue submission does
-not measure capacity.
-
-Prediction batches retain their existing controls. Explicit positive batches and
-YOLO's existing AutoBatch values retain their behavior. CPU/MPS, custom augmentation,
-non-square lookup requests and unsupported/custom model profiles require an explicit
-batch when the standard estimator cannot supply matching evidence. Training keeps
-its normal failure behavior: an OOM does not trigger an automatic retry or hidden
-batch reduction. Its internal GPU assignments do not reserve devices against other
-programs or replace the [queue](queue.md).
-
-## Numerical-search recovery on older versions
-
-Older versions abort discovery on any nonfinite result, even after smaller batches
-passed. For a workload already observed to pass at batch 24 with YOLOv3u, square
-960 images, 100 classes and 300 objects/image, a bounded retry is:
-
-```bash
-cy-batch-estimate --imgsz 960 --classes 100 --objects-per-image 300 \
-  --models ultralytics/yolov3u --search-limit 24
-```
-
-Use the same `CY_HOME` and selected devices as the intended training run. This
-requests a new search and independent confirmation at the lower ceiling; earlier
-success alone is insufficient. Batch 24 is a workload-specific example, not a
-general hardware recommendation. A confirmed result is `ceiling_limited`. Upgrade
-and rerun failed cases to use numerical recovery. Neither approach fixes or
-identifies the underlying native numerical cause; changing AMP, optimizer paths
-or finite checks to hide it is not part of this recovery.
+CPU/MPS, unsupported/custom model identities and non-square requests require explicit
+batches. Custom augmentation is not a lookup gate. Prediction controls, explicit positive
+training batches and YOLO AutoBatch values retain their behavior. Training OOM fails
+normally with no automatic retry or hidden reduction. Device assignment does not
+reserve hardware against other programs or replace the [queue](queue.md).
