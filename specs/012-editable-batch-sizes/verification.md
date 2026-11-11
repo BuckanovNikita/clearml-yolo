@@ -140,14 +140,15 @@ Estimation:
    `NVIDIA GeForce RTX 5090 [31.816 GiB]` / `640` / `ultralytics/yolo11n: 3` was
    published with its metadata comment (table digest
    `0e267a9ea880bad8b236fb469cc0c98b6e7fe714509963fa01b62f5cbd580cb3`).
-3. `cy-batch-estimate --list --models yolo11n`: exit 0 without CUDA; reported the
-   entry `covered` (per_gpu_batch=3, measurement) and, as a separate known failure,
-   the unforced contaminated case (forced evidence has distinct keys).
+3. `cy-batch-estimate --list --models yolo11n`: exit 0 (run with the GPU visible);
+   reported the entry `covered` (per_gpu_batch=3, measurement) and, as a separate
+   known failure, the unforced contaminated case (forced evidence has distinct keys).
 
 Training lookup: the entry was edited by hand from 3 to 2, keeping the metadata
 comment; `--list --models yolo11n.pt` then reported it `covered`, per_gpu_batch=2,
 `manual`. The ClearML server was the project's own test environment, created and
-deleted through `agent_env.sh` and `agent_cleanup.sh` (ready in 24 s each time).
+deleted through `agent_env.sh` and `agent_cleanup.sh` (ready in 24 s where the
+time was read, attempts 1 and 3).
 
 - Attempt 1 (environment `cy-it-947175`): `cy-train` exited 1 within 1 s with a Hydra
   `ConfigCompositionException` for `run_dir`, which `cy-train` does not accept. Wrong
@@ -171,14 +172,16 @@ deleted through `agent_env.sh` and `agent_cleanup.sh` (ready in 24 s each time).
   per-GPU and global batch 2.
 
 Established: on the real GPU the small-batch search below eight ran with an
-independent confirmation and published an editable entry after worker cleanup; the
-offline listing reported it without CUDA; a manual edit of that entry was honoured by
+independent confirmation; after the command exited 0 the editable entry was present
+and no process of the run remained (the internal ordering of cleanup before
+publication was not observed separately); the listing reported the entry; a manual edit of that entry was honoured by
 `batch=null` training as an exact, non-fallback lookup recording the table digest and
 `manual` provenance, without presenting it as a measurement.
 
 Not established: an unforced (uncontended) measurement on this workstation, because
 the idle check rejected it while the desktop session was active; the forced result
-is a background-sensitive recommendation. Searches above the ceiling 3, the
+is a background-sensitive recommendation. Listing without CUDA was not exercised
+natively (the GPU was visible). Searches above the ceiling 3, the
 batch-one `no_capacity` path, cross-GPU fallback, multi-GPU resolution, queue workers
 and other models were not exercised natively; they remain covered only by the
 controlled CPU tests. The training run is a one-epoch lookup check on a toy dataset,
@@ -188,10 +191,16 @@ Resources: three environments (`cy-it-947175`, `cy-it-873ecc`, `cy-it-56df3e`) w
 created, and each was deleted and proven absent by the lifecycle; their run
 directories were removed. The two Output Model copies the SDK downloaded into its
 global storage cache were removed. The isolated `CY_HOME`, dataset, logs and scripts
-were deleted. The pre-existing torch compile cache and SDK session file were left in
-place.
+were deleted. The runs wrote about 11 000 files (388 MiB in total) into the
+pre-existing per-user torch compile cache in `/tmp`; they were left in place because
+removing files from that shared cache was not authorized. Model weights were read
+from the existing Ultralytics weights directory. The pre-existing ClearML SDK session
+file and the Ultralytics settings lock had their modification times updated and were
+left in place.
 
-Release: T009 no longer blocks acceptance. The tip still needs this evidence commit
+Release: T009 is closed on the forced, background-sensitive measurement above; an
+uncontended rerun needs the workstation without an active desktop GPU session.
+T009 no longer blocks acceptance. The tip still needs this evidence commit
 to pass the final `prek run --all-files` with skips cleared; delivery still needs
 explicit release and push authorization and the paired CY/queue check before release.
 No version, tag, merge or push was performed.
