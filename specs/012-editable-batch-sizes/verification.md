@@ -63,19 +63,20 @@ workload/recipe gates. User-facing schema wording was updated to name the editab
 - Final `prek run --all-files` after the final test commit `1268846`: passed all
   eight hooks with skips cleared. Log: `/tmp/cy012-prek-final.log`. The evidence-only
   commit is followed by the same pipeline; its result is reported in the handoff.
-- Native bounded estimation and training lookup: deferred. pcboard could not identify
-  this session using either host discovery or its session identifier, so safe GPU
-  availability could not be established. No GPU job was launched and no wake-up was
-  registered. Mocked tests do not establish native/GPU outcomes.
-- Release: blocked by deferred required checks; no push authorization. No version,
-  tag, merge or push is performed.
+- Native bounded estimation and training lookup: deferred on 2026-11-10. pcboard could
+  not identify this session using either host discovery or its session identifier, so
+  safe GPU availability could not be established. No GPU job was launched and no
+  wake-up was registered. Mocked tests do not establish native/GPU outcomes. Run on
+  2026-11-11; see the T009 addendum below.
+- Release: blocked on 2026-11-10 by deferred required checks; no push authorization.
+  No version, tag, merge or push is performed.
 
 ## Resource ownership
 
 The CPU smoke run used the integration lifecycle's owned run tag and passed teardown;
 its run-tag file was released. The successful final run owned
 `clearml-yolo-codex-20261110-integration-kn2p`; its child processes exited and the
-run-tag file was absent after acceptance. No GPU process was created. Paired-check temporary
+run-tag file was absent after acceptance. No GPU process was created on 2026-11-10. Paired-check temporary
 virtual environments and retained mutation workspaces were removed after inspection.
 Pre-existing services, datasets and the other worktree remain untouched. Verification
 logs are retained locally as dated diagnostic evidence; no credentials were persisted.
@@ -98,8 +99,99 @@ The shared stands this record's earlier live runs used were removed on
   downloads stalled (see `specs/012-own-test-infra/evidence/`).
 - Paired CY/queue: passed on this branch with the migration (527 queue tests),
   recorded in `specs/012-own-test-infra/evidence/`.
-- Native bounded estimation and training lookup (T009): still deferred. They
-  need the GPU while the workstation was in interactive use; no GPU job was
-  launched. Mocked tests do not establish native or GPU outcomes.
-- Release: still blocked by T009; no push authorization. No version, tag or push
-  was performed.
+- Native bounded estimation and training lookup (T009): not run in this
+  addendum; run later on 2026-11-11, see the next addendum.
+- Release: blocked at this addendum by T009; no push authorization. No version,
+  tag or push was performed.
+
+## Addendum, 2026-11-11: native bounded estimation and training lookup (T009)
+
+Source: clean commit `ef5d906` (branch `012-editable-batch-sizes`) in a worktree with
+its own prepared environment. Device: one NVIDIA GeForce RTX 5090 (32607 MiB;
+34162343936 bytes as recorded), CUDA index 0, Ultralytics 8.4.184,
+torch 2.14.1+cu130, under WSL. The owner reported the GPU free; pcboard reported a
+game session with GPU utilization 0–1 % and 2.3 GiB used by the desktop. One GPU job
+ran at a time, with `nice -n19`. Every command used an isolated, task-owned `CY_HOME`
+outside the checkout (since deleted), so no existing table or evidence was read or
+changed. GPU memory used was 2369 MiB before the first command and 2368–2388 MiB
+after each command; no process of this run remained on the GPU.
+
+Bound chosen from [quickstart](quickstart.md): `yolo11n` at `--imgsz 640`, one GPU,
+`--search-limit 3`, `--jobs 1`, other measurement defaults (150 classes, density 300,
+trial timeout 300 s, memory budget 0.9). Training lookup: the CPU smoke test's tiny
+one-class dataset shape (5 train, 3 val, 3 test images including one empty image per
+split), `ultralytics.model=yolo11n.pt`, `imgsz=640`, `device=0`, `batch=null`,
+`epochs=1`, `workers=0`, `plots=false`, otherwise packaged defaults (compile and AMP on).
+
+Estimation:
+
+1. `cy-batch-estimate --imgsz 640 --models yolo11n --devices 0 --search-limit 3 --jobs 1`:
+   exit 1 after 8 s. Case `failed`: "GPU 0 measurement contaminated: active compute
+   has no PID telemetry" (one 3.7 s trial, status `contaminated`); no table entry was
+   written. This is the documented idle/ownership rejection: under WSL the driver
+   reported activity without attributable compute PIDs while the desktop session was
+   active. It is not capacity evidence.
+2. The same command with the documented `--force`: exit 0 after 178 s. Strategy
+   `memory_guided_small_batches_v1`, workload 150 classes and 300 objects per image,
+   optimizer paths AdamW and MuSGD. The search started at the ceiling 3 (success,
+   118.8 s, peak 5169479680 bytes) and an independent confirmation at 3 succeeded
+   (55.4 s, peak 5132779520 bytes). Status `ceiling_limited`, per-GPU and global batch
+   3, marked forced/background-sensitive. The entry
+   `NVIDIA GeForce RTX 5090 [31.816 GiB]` / `640` / `ultralytics/yolo11n: 3` was
+   published with its metadata comment (table digest
+   `0e267a9ea880bad8b236fb469cc0c98b6e7fe714509963fa01b62f5cbd580cb3`).
+3. `cy-batch-estimate --list --models yolo11n`: exit 0 without CUDA; reported the
+   entry `covered` (per_gpu_batch=3, measurement) and, as a separate known failure,
+   the unforced contaminated case (forced evidence has distinct keys).
+
+Training lookup: the entry was edited by hand from 3 to 2, keeping the metadata
+comment; `--list --models yolo11n.pt` then reported it `covered`, per_gpu_batch=2,
+`manual`. The ClearML server was the project's own test environment, created and
+deleted through `agent_env.sh` and `agent_cleanup.sh` (ready in 24 s each time).
+
+- Attempt 1 (environment `cy-it-947175`): `cy-train` exited 1 within 1 s with a Hydra
+  `ConfigCompositionException` for `run_dir`, which `cy-train` does not accept. Wrong
+  invocation on the verifier's side; no training started.
+- Attempt 2 (environment `cy-it-873ecc`), with `ultralytics.project` instead:
+  `cy-train ground_truth=… ultralytics.model=yolo11n.pt ultralytics.imgsz=640
+  ultralytics.device=0 ultralytics.batch=null ultralytics.epochs=1 ultralytics.workers=0
+  ultralytics.plots=false ultralytics.project=… clearml.project_name=… clearml.task_name=…
+  clearml.tags=[…]` exited 0 after 88 s. Native trainer arguments: `batch=2`,
+  `device=0`, `imgsz=640`; one epoch completed and one Output Model was uploaded. The
+  provenance readback failed because the verifier's script filtered on the bare task
+  name, while the task is named `<task_name>/train`.
+- Attempt 3 (environment `cy-it-56df3e`), the same command with the corrected
+  readback: exit 0 after 36 s (warm compile cache), native `batch=2`, `device=0`.
+  ClearML readback: task `completed`, one Output Model; canonical replay keeps
+  `ultralytics.batch` null; `training_batch_estimate` records origin
+  `batch_sizes_table`, table digest
+  `7a10229806de42ecabac4c37169266323e30607f9199f6524105300fac39536a` (equal to the
+  SHA-256 of the edited file), model `ultralytics/yolo11n`, image size 640, the target
+  RTX 5090 with its exact entry (`origin: manual`, `forced: false`, `fallback: false`),
+  per-GPU and global batch 2.
+
+Established: on the real GPU the small-batch search below eight ran with an
+independent confirmation and published an editable entry after worker cleanup; the
+offline listing reported it without CUDA; a manual edit of that entry was honoured by
+`batch=null` training as an exact, non-fallback lookup recording the table digest and
+`manual` provenance, without presenting it as a measurement.
+
+Not established: an unforced (uncontended) measurement on this workstation, because
+the idle check rejected it while the desktop session was active; the forced result
+is a background-sensitive recommendation. Searches above the ceiling 3, the
+batch-one `no_capacity` path, cross-GPU fallback, multi-GPU resolution, queue workers
+and other models were not exercised natively; they remain covered only by the
+controlled CPU tests. The training run is a one-epoch lookup check on a toy dataset,
+not a training-quality result.
+
+Resources: three environments (`cy-it-947175`, `cy-it-873ecc`, `cy-it-56df3e`) were
+created, and each was deleted and proven absent by the lifecycle; their run
+directories were removed. The two Output Model copies the SDK downloaded into its
+global storage cache were removed. The isolated `CY_HOME`, dataset, logs and scripts
+were deleted. The pre-existing torch compile cache and SDK session file were left in
+place.
+
+Release: T009 no longer blocks acceptance. The tip still needs this evidence commit
+to pass the final `prek run --all-files` with skips cleared; delivery still needs
+explicit release and push authorization and the paired CY/queue check before release.
+No version, tag, merge or push was performed.
