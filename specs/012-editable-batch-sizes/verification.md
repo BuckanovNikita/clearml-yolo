@@ -204,3 +204,7 @@ T009 no longer blocks acceptance. The tip still needs this evidence commit
 to pass the final `prek run --all-files` with skips cleared; delivery still needs
 explicit release and push authorization and the paired CY/queue check before release.
 No version, tag, merge or push was performed.
+
+Final `prek run --all-files` on `9d2f12c` (the tip carrying the T009 evidence),
+2026-11-11, skips cleared: passed all eight hooks, including development
+verification; the tree stayed clean. This evidence-only commit follows that run.
