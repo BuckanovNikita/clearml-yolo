@@ -1,10 +1,11 @@
 # Quickstart: own test environment
 
-After implementation (not available on this commit):
+Development Task commands:
 
 ```bash
 uv run --locked task --exit-code infra-check   # read-only: cluster, context, permission
-uv run --locked task --exit-code integration   # creates, uses and deletes cy-it-<id>
+uv run --locked task --exit-code integration   # Task creates, pytest adopts, Task deletes
+uv run --locked task --exit-code architecture  # static product architecture checks
 
 L=(uv run --locked python -m tests.integration.lifecycle)
 "${L[@]}" up                     # manual environment; record in tests/integration/.run-tag

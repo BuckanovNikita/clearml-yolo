@@ -83,7 +83,7 @@ in parallel with A once Phase 2 is done; their live checks wait for A.
 - [x] T030a Live, agent_env.sh selection and FiftyOne variables (FR-020, SC-008, US3 scenarios 5-9): export dummy `FIFTYONE_DATABASE_URI` and `FIFTYONE_DATABASE_NAME`, unset `FIFTYONE_DATABASE_DIR`, `source agent_env.sh some-slug`: one notice line for the slug, URI names the new environment, NAME unset, DIR the documented default; source it again: return 1 naming `agent_cleanup.sh`, namespace list unchanged, `FIFTYONE_DATABASE_URI` and `FIFTYONE_DATABASE_NAME` unset; run `tests/integration/test_cpu_stand_smoke.py` in that shell: it adopts the environment and leaves it; delete the namespace out of band and source again: a new identifier is created; finish with agent_cleanup.sh and record namespace absence
 - [x] T031 Paired: `CY_QUEUE_DIR=/mnt/wsl/data/nkt/cy-queue uv run --locked task --exit-code paired-check` with cy-queue unchanged (`git -C /mnt/wsl/data/nkt/cy-queue status --short` before and after); record both commit hashes and the result. On a tip without `clearml_yolo.adapters.storage.batch_sizes` (spec "Dependencies"), a collection failure on that import is reported as failed for a cause outside this feature, never as passed; this branch carries the merged batch-sizes work, so the stage must run cy-queue's suite (SC-007)
 - [x] T031a Run a GPU suite with deliberately invalid `--run-*` options and no GPU; it must fail validation before any `cy-it-` namespace is created (US5 scenario 2); confirm `git diff 012-editable-batch-sizes -- src` is empty (FR-030; this branch carries the merged batch-sizes work, so `master` is no longer the baseline for `src/`)
-- [ ] T032 Fresh independent review of the integrated branch (behaviour, security of credential handling, operational policy), comparing the behaviour map in spec.md against `git show master:tests/integration/lifecycle.py` and the original skill scripts
+- [x] T032 Fresh independent review of the integrated branch (behaviour, security of credential handling, operational policy), comparing the behaviour map in spec.md against `git show master:tests/integration/lifecycle.py` and the original skill scripts
 - [x] T033 Record dated evidence for T027-T031 (including T029a, T029b, T029c, T030a and T031a) in this feature directory; report deferred checks (GPU suites, release acceptance) as deferred, never as passed
 
 ## Dependencies
@@ -100,7 +100,9 @@ implementing session, which may not start sub-agents, and remains open. Live res
 
 ## Follow-up: development task ownership (2026-11-12)
 
-- [ ] T034 Move static architecture checks into Task development verification; retain runtime product tests and remove orchestration tests.
-- [ ] T035 Expose Task infrastructure setup/export/teardown and make integration own its environment.
-- [ ] T036 Fix setup-record cleanup, failed-cleanup classification and wait deadline handling.
-- [ ] T037 Verify the Task-owned live flow, final hooks and independent review; record dated evidence before landing.
+- [x] T034 Move static architecture checks into Task development verification; retain runtime product tests and remove orchestration tests.
+- [x] T035 Expose Task infrastructure setup/export/teardown and make integration own its environment.
+- [x] T036 Fix setup-record cleanup, failed-cleanup classification and wait deadline handling.
+- [x] T037 Verify the Task-owned live flow, final hooks and independent review; record dated evidence before landing.
+
+Follow-up results and resolved review findings: [2026-11-12 evidence](evidence/2026-11-12-devtasks.md).
