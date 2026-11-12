@@ -192,7 +192,7 @@ tasks:
     desc: Create a test environment, run the non-GPU live tests, and tear it down
     cmds:
       - |
-        set -eu
+        exec bash -eu <<'BASH'
         owned_environment="$({{.TASK_EXE | shellQuote}} --exit-code infra-up IDENTIFIER_ONLY=1)"
         cleanup() {
           result=$?
@@ -216,6 +216,7 @@ tasks:
         fi
         # Adopt the Task-owned environment; Task remains responsible for teardown.
         CY_TASK_VERIFICATION=1 {{.RUN}} {{.UV}} pytest tests/integration -m 'not ddp_gpu and not severstal_gpu' -n 0
+        BASH
 
   _clean-tip:
     internal: true
