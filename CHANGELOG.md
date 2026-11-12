@@ -1,6 +1,243 @@
 # CHANGELOG
 
 
+## v0.48.0 (2026-11-12)
+
+### Bug Fixes
+
+- **hooks**: Never fail the session-start status hooks
+  ([`8131f58`](https://github.com/BuckanovNikita/clearml-yolo/commit/8131f5858a441aae2e9b7e14fcd667886741e2e9))
+
+- **infra**: Own test environments and architecture checks through Task
+  ([`964579e`](https://github.com/BuckanovNikita/clearml-yolo/commit/964579eb802a8834a1592393ef03281c7e41f4bf))
+
+- **infra**: Run lifecycle signal traps under Bash
+  ([`8c95600`](https://github.com/BuckanovNikita/clearml-yolo/commit/8c95600ec689bb5cf8aa6d100042bb201dda78fb))
+
+- **mutation**: Always add importing tests to the testmon selection
+  ([`90fd22b`](https://github.com/BuckanovNikita/clearml-yolo/commit/90fd22b6a921411ead0765b3c312aa5c0a3b23f4))
+
+- **mutation**: Kill the group after an interrupted grace wait
+  ([`d77ac85`](https://github.com/BuckanovNikita/clearml-yolo/commit/d77ac850dbf5a6e8042050753a7fa86e5f483750))
+
+- **mutation**: Narrow test selection to node ids and harden the stop path
+  ([`fbc06e9`](https://github.com/BuckanovNikita/clearml-yolo/commit/fbc06e9e4fbeb3e412c6a6da71ea228ceb16c064))
+
+- **mutation**: Select tests per change and stop stray descendants
+  ([`cb5ff29`](https://github.com/BuckanovNikita/clearml-yolo/commit/cb5ff29488078f9f3bc1c7d3cd7d5f54a2e96ff1))
+
+- **tests**: Defer on a stopped API server and refuse a foreign active run
+  ([`a25ab61`](https://github.com/BuckanovNikita/clearml-yolo/commit/a25ab61c0cd0b30865cc585c4ab8850c847a19c0))
+
+- **tests**: Give GPU live suites the tagged stand credentials
+  ([`9d96948`](https://github.com/BuckanovNikita/clearml-yolo/commit/9d96948e12b7b04eb4572f7db91ab62811f8e8a2))
+
+- **tests**: Keep kubectl config errors permanent and guide corrupt run tags
+  ([`58cb2f1`](https://github.com/BuckanovNikita/clearml-yolo/commit/58cb2f14b4de853c6446c385eeaa37460f74b7db))
+
+- **verification**: Enforce coverage and strict unreached outcomes
+  ([`f1a3755`](https://github.com/BuckanovNikita/clearml-yolo/commit/f1a3755377ce76e919fe87e65d3a751c1fc9a76f))
+
+### Build System
+
+- Add changed-function mutation driver and Task stage
+  ([`6a15294`](https://github.com/BuckanovNikita/clearml-yolo/commit/6a1529474499cfa373131ddf182c6f66a8bac0e6))
+
+- Add infra-check, integration and acceptance tasks
+  ([`3854e81`](https://github.com/BuckanovNikita/clearml-yolo/commit/3854e81d77dbc508065c9b197d0b02533bfd881e))
+
+- Add Task command owner and verification foundation
+  ([`ba7ee91`](https://github.com/BuckanovNikita/clearml-yolo/commit/ba7ee9181b082ec8f6ad618eeb74b94034cc65b9))
+
+- Derive the mutmut scope from each change
+  ([`13b8301`](https://github.com/BuckanovNikita/clearml-yolo/commit/13b83015de1b1b1d9ef50b590d24448651986559))
+
+- Resolve external packages from a local wheelhouse (R15)
+  ([`b3227a1`](https://github.com/BuckanovNikita/clearml-yolo/commit/b3227a1f232debd5240e8ff10bbec66a7277c9a6))
+
+- **deps**: Declare psutil for the mutation driver
+  ([`690dfa2`](https://github.com/BuckanovNikita/clearml-yolo/commit/690dfa2ba195db74795df65b6fc3b081329c4795))
+
+- **deps**: Lock external packages from a local wheelhouse
+  ([`54a2885`](https://github.com/BuckanovNikita/clearml-yolo/commit/54a2885a5bd3299ca3c7e73b41478ac1fa2833ca))
+
+- **hooks**: Run Task verification through worktree-aware hooks
+  ([`563db02`](https://github.com/BuckanovNikita/clearml-yolo/commit/563db0273394e834d1bbe5633da35be72033d7bc))
+
+- **release**: Version the lockfile and guard release commits
+  ([`554b713`](https://github.com/BuckanovNikita/clearml-yolo/commit/554b71370a0d363604ebda7ae7e1d50e6feea551))
+
+- **task**: Defer GPU outages and stage local-deps builds
+  ([`c68e49c`](https://github.com/BuckanovNikita/clearml-yolo/commit/c68e49cfe65077fe247cd40346408fbe5964256d))
+
+### Chores
+
+- Report parallel work at agent session start
+  ([`c5f5919`](https://github.com/BuckanovNikita/clearml-yolo/commit/c5f591902dcf07dd4b862526120a462b8df58429))
+
+### Documentation
+
+- Align live, mutation and setup guidance with feature 011
+  ([`b62dc05`](https://github.com/BuckanovNikita/clearml-yolo/commit/b62dc058e55a37040169e4feef5d590b5938de27))
+
+- Complete the live evidence and note capture and adopted smoke reruns
+  ([`d25b8eb`](https://github.com/BuckanovNikita/clearml-yolo/commit/d25b8eb583086ef3bb983fdd7fc939314cac1895))
+
+- Describe local wheelhouse setup and final verification stages
+  ([`2fdfde9`](https://github.com/BuckanovNikita/clearml-yolo/commit/2fdfde99dc7dd20691189b7198e342b3b1aeeeab))
+
+- Describe node-level mutation selection and GPU deferral accurately
+  ([`e04cae5`](https://github.com/BuckanovNikita/clearml-yolo/commit/e04cae5fb2fc4e68eda01c60bad3f221d4801094))
+
+- Describe Task stages, acceptance tiers and the flock release
+  ([`b17c046`](https://github.com/BuckanovNikita/clearml-yolo/commit/b17c046c0329be9b87b2b2b2d546b7c877cd4e16))
+
+- Describe the project-owned test environment instead of the shared stand
+  ([`58a466f`](https://github.com/BuckanovNikita/clearml-yolo/commit/58a466f2f4ce62f6834223bbb552e733881048ee))
+
+- Keep the cy-queue DDP matrix on a tagged run
+  ([`1df40ff`](https://github.com/BuckanovNikita/clearml-yolo/commit/1df40ffbf41be9b77c76243de57451e670363d15))
+
+- Point entry guidance at the wheelhouse setup and locked stages
+  ([`ca0c737`](https://github.com/BuckanovNikita/clearml-yolo/commit/ca0c73750b047f795a9a0f20582105211b0e8ea1))
+
+- Read only the environment identifier from the record
+  ([`d09e60b`](https://github.com/BuckanovNikita/clearml-yolo/commit/d09e60b4ec49d43f8eb2dec7fe183f33e146e769))
+
+- Reconcile DDP evidence cleanup and mutation exclusions
+  ([`172bfa8`](https://github.com/BuckanovNikita/clearml-yolo/commit/172bfa8a08a508280e37aad36970d87a94313b5c))
+
+- Record the wheelhouse release decision and moved test links
+  ([`c24e6a8`](https://github.com/BuckanovNikita/clearml-yolo/commit/c24e6a87e063e27085d3db7477464d8571645481))
+
+- Require only a minimum CY version in the queue
+  ([`5def369`](https://github.com/BuckanovNikita/clearml-yolo/commit/5def369c058229bd32e3c476731fa91b2f9eaf7b))
+
+- **batch**: Narrow T009 evidence to what the runs observed
+  ([`9d2f12c`](https://github.com/BuckanovNikita/clearml-yolo/commit/9d2f12ce4c94717c01894f6790f516cea2ff822e))
+
+- **batch**: Record acceptance on the project's own test infrastructure
+  ([`ef5d906`](https://github.com/BuckanovNikita/clearml-yolo/commit/ef5d906c3472084a7fd7ae042268c3a0229fff12))
+
+- **batch**: Record clean-tip acceptance evidence
+  ([`7bb7e2f`](https://github.com/BuckanovNikita/clearml-yolo/commit/7bb7e2fbfcbaf37a8df1a1107c2d8f2c60fdd1ad))
+
+- **batch**: Record native GPU estimation and training lookup (T009)
+  ([`1dc8f8a`](https://github.com/BuckanovNikita/clearml-yolo/commit/1dc8f8a008db60574926f22d6ab3aeae71cd52b4))
+
+- **batch**: Record the final hook pipeline after the native GPU evidence
+  ([`56c0c5a`](https://github.com/BuckanovNikita/clearml-yolo/commit/56c0c5aca8a14b641d9e9fdff16cd9ea09078a1c))
+
+- **constitution**: Amend Principle IV for Task stages (9.0.2)
+  ([`a32bb4a`](https://github.com/BuckanovNikita/clearml-yolo/commit/a32bb4adaa176aad78cdd90c4d4ed89aece6a405))
+
+- **constitution**: Keep the Principle IV amendment wording-only
+  ([`3b7d0a1`](https://github.com/BuckanovNikita/clearml-yolo/commit/3b7d0a15e90b57a7b8e0404b728dd5d98842440d))
+
+- **infra**: Record Task lifecycle acceptance and review
+  ([`160ebd8`](https://github.com/BuckanovNikita/clearml-yolo/commit/160ebd8b91d28ebdaf161f9deed2125ab8661d8d))
+
+- **skills**: Add verification, release, mutation and live-test skills
+  ([`c1694e4`](https://github.com/BuckanovNikita/clearml-yolo/commit/c1694e47b8c4d697421512d82e3ade10b055424a))
+
+- **skills**: Align verification skills with the final workflow
+  ([`9887036`](https://github.com/BuckanovNikita/clearml-yolo/commit/988703672ba201a108775812897af7731391105e))
+
+- **spec**: Add verification and release migration tasks
+  ([`b0724ec`](https://github.com/BuckanovNikita/clearml-yolo/commit/b0724ec4539be5e72f3890c38fc36f76a365a5bc))
+
+- **spec**: Align feature 011 artifacts with the local wheelhouse design
+  ([`d4c03d4`](https://github.com/BuckanovNikita/clearml-yolo/commit/d4c03d4dd0cdd9b6c0e956b07d2613989c0231f7))
+
+- **spec**: Plan verification and release workflow migration
+  ([`aa20a79`](https://github.com/BuckanovNikita/clearml-yolo/commit/aa20a7957e226cd47ae20b6061d128de00e22de4))
+
+- **spec**: Record identity footer GPU and browser acceptance
+  ([`a30e1c1`](https://github.com/BuckanovNikita/clearml-yolo/commit/a30e1c13af8c7e1bba57031b4069e34e5d35840e))
+
+- **spec**: Record override exemption and execution constraints
+  ([`38875d6`](https://github.com/BuckanovNikita/clearml-yolo/commit/38875d6a281ca9c53e0464b506ad79dc1e515dd0))
+
+- **spec**: Specify verification and release workflow migration
+  ([`c182a3e`](https://github.com/BuckanovNikita/clearml-yolo/commit/c182a3ec5e2c44e9b482525d78e34c0d86fdc73a))
+
+- **specs**: Cite this history's commits in the paired-check evidence
+  ([`d4a8c46`](https://github.com/BuckanovNikita/clearml-yolo/commit/d4a8c462de7ae75c05382e582931123f34176724))
+
+- **specs**: Guard environment teardown against foreign namespaces
+  ([`859a788`](https://github.com/BuckanovNikita/clearml-yolo/commit/859a788111224c7096392e94688694cf66a20254))
+
+- **specs**: Keep adoption checks away from the user's ClearML
+  ([`ea85d79`](https://github.com/BuckanovNikita/clearml-yolo/commit/ea85d7943d332df2525cad513a1d97d9b0cea3c9))
+
+- **specs**: Limit setup-failure deletion to created namespaces
+  ([`a2dc07b`](https://github.com/BuckanovNikita/clearml-yolo/commit/a2dc07b8c76da8cf6fe00d3a9f94fc4095e5580a))
+
+- **specs**: Record clean-tip change acceptance on the own environment
+  ([`9bd3fed`](https://github.com/BuckanovNikita/clearml-yolo/commit/9bd3fed5c6d613efea90524ecc08a559d671c31d))
+
+- **specs**: Record the analyze outcome for own test infrastructure
+  ([`89a90de`](https://github.com/BuckanovNikita/clearml-yolo/commit/89a90dea4db2e601bee786935d2b920f58c216a1))
+
+- **specs**: Record the full third analyze pass
+  ([`f01ca4f`](https://github.com/BuckanovNikita/clearml-yolo/commit/f01ca4ff8162c0b42fa4cb35144941da5c2f4bea))
+
+- **specs**: Record the live acceptance and the paired check with batch sizes
+  ([`4c1b879`](https://github.com/BuckanovNikita/clearml-yolo/commit/4c1b8794619613275cb5b25e6419c6110888d1be))
+
+- **specs**: Resolve the analyze findings on constitution and wording
+  ([`007629d`](https://github.com/BuckanovNikita/clearml-yolo/commit/007629d12536785ca0ddaae696396e04033045a8))
+
+- **specs**: Separate record and command-line cases of the teardown guard
+  ([`7c160ee`](https://github.com/BuckanovNikita/clearml-yolo/commit/7c160ee07c18f2fbd4b68181de59b361bb933e89))
+
+- **specs**: Settle environment selection and teardown ownership
+  ([`c4c8822`](https://github.com/BuckanovNikita/clearml-yolo/commit/c4c882258b456cc3246cf1e0fe62508724d9d881))
+
+- **specs**: Specify own Kubernetes test infrastructure
+  ([`98a373d`](https://github.com/BuckanovNikita/clearml-yolo/commit/98a373de0a31839b0b99d0c18e2f388866a9b8a4))
+
+- **specs**: Specify the documented paired check and record its blocker
+  ([`0af13e6`](https://github.com/BuckanovNikita/clearml-yolo/commit/0af13e68a1e3466b3629ea442b8dc449ff678cc6))
+
+- **specs**: Trace SC-003 and SC-008 to their tasks
+  ([`82a225d`](https://github.com/BuckanovNikita/clearml-yolo/commit/82a225d9e95dbd78a5851ad2a4e658de81f67307))
+
+- **specs**: Update paired-check evidence after the message rewrite
+  ([`47aaabe`](https://github.com/BuckanovNikita/clearml-yolo/commit/47aaabe7d308bbbd1dd2337d7568530b04f78ee1))
+
+- **specs**: Use the cy-it- namespace prefix and define session adoption
+  ([`655722d`](https://github.com/BuckanovNikita/clearml-yolo/commit/655722d123d4158bd2e435b1e19467b869e572c5))
+
+- **specs**: Wire session adoption through the contract and tasks
+  ([`2bb569c`](https://github.com/BuckanovNikita/clearml-yolo/commit/2bb569c552b50fc2d862b02018528de42bf72c1c))
+
+### Features
+
+- **batch**: Use editable GPU table and discover small batches
+  ([`0d1889d`](https://github.com/BuckanovNikita/clearml-yolo/commit/0d1889dd1c9198a8827b90754c7eae0b2b9925fe))
+
+- **skills**: Run agent live runs on the project's own test environment
+  ([`fb30a59`](https://github.com/BuckanovNikita/clearml-yolo/commit/fb30a59a52ed600c6dcf580af6fd5ce764e1cb54))
+
+- **tests**: Deploy the live tests' own Kubernetes test environment
+  ([`3030386`](https://github.com/BuckanovNikita/clearml-yolo/commit/3030386a73c370f88fc3f51958d83f1459e7b5fe))
+
+### Testing
+
+- Add live-run lifecycle, tiered live suites and CPU stand smoke
+  ([`6cf9e5b`](https://github.com/BuckanovNikita/clearml-yolo/commit/6cf9e5b183dfc5272ecb4b6164d0db61707284c8))
+
+- Keep path-less GPU selections and run live tests in one process
+  ([`34df417`](https://github.com/BuckanovNikita/clearml-yolo/commit/34df4171e734aa864f3ba968c47c79edcf7c29cc))
+
+- **batch**: Align compatibility fixtures with new estimator contract
+  ([`8b24262`](https://github.com/BuckanovNikita/clearml-yolo/commit/8b2426242c6f316719b55d42a86d7b0548e6c15c))
+
+- **batch**: Harden device and persisted provenance regressions
+  ([`1268846`](https://github.com/BuckanovNikita/clearml-yolo/commit/12688462e6bf931cd623545881f4c231e44dcf17))
+
+
 ## v0.47.0 (2026-11-09)
 
 ### Bug Fixes
