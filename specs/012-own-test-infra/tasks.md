@@ -97,3 +97,10 @@ run. T023: `TECH_DETAILS.md` names no shared stand, so it needed no change. T027
 through `task acceptance` on the clean tip `4c1b879`; T032 (independent review) was not done by the
 implementing session, which may not start sub-agents, and remains open. Live results:
 [evidence/2026-11-10-live-acceptance.md](evidence/2026-11-10-live-acceptance.md).
+
+## Follow-up: development task ownership (2026-11-12)
+
+- [ ] T034 Move static architecture checks into Task development verification; retain runtime product tests and remove orchestration tests.
+- [ ] T035 Expose Task infrastructure setup/export/teardown and make integration own its environment.
+- [ ] T036 Fix setup-record cleanup, failed-cleanup classification and wait deadline handling.
+- [ ] T037 Verify the Task-owned live flow, final hooks and independent review; record dated evidence before landing.

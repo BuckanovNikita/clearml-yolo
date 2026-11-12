@@ -79,6 +79,7 @@ module-name = ["clearml_yolo"]
 [dependency-groups]
 dev = [
     "import-linter>=2.13",
+    "grimp",
     "markdown-it-py==4.2.0",
     "mypy>=1.11",
     "packaging>=26",
@@ -187,28 +188,23 @@ DEP002 = [
 # FiftyOne's plotting backends, imported only on FiftyOne's plotting path and provided
 # by the declared fiftyone dependency.
 DEP003 = ["plotly", "matplotlib"]
-# Development tooling under scripts/ (the mutation driver) uses dev-group packages.
-DEP004 = ["psutil"]
+# Development tooling under scripts/ uses dev-group packages.
+DEP004 = ["grimp", "importlinter", "psutil"]
 
 [tool.mutmut]
 # scripts/mutation.py derives only_mutate and the test selection from each change and
 # runs mutmut in a fresh workspace, so nothing here describes a scope or a cache.
 source_paths = ["src/clearml_yolo"]
-# Tests import scripts/ and read .importlinter relative to the copied repository root.
+# Native acceptance helpers and asset packaging tests use scripts/.
 also_copy = ["scripts/", ".importlinter"]
 # `-n 0` keeps xdist out of each forked mutant; these args are appended last, so they win.
-# The --ignore list drops live suites and suites that check tooling or source text and
-# never execute package functions: they cannot kill a mutant, and the driver never
-# selects them. The -m expression deselects tests that hold host-wide resources (real
-# multi-rank training, process supervision, GPU holds) inside a selected file;
+# The --ignore list drops live suites. The -m expression deselects tests that hold
+# host-wide resources (real multi-rank training, process supervision, GPU holds) inside a selected file;
 # gpu_controls is reserved: no test carries that marker today.
 pytest_add_cli_args = [
     "-n", "0", "-p", "no:cacheprovider", "-p", "no:randomly", "--no-cov",
     "-m", "not ddp_cpu and not process_capabilities and not gpu_controls",
     "--ignore=tests/integration",
-    "--ignore=tests/test_architecture.py",
-    "--ignore=tests/test_tooling_boundaries.py",
-    "--ignore=tests/test_mutation_driver.py",
 ]
 # Fallback for a direct `mutmut run`; scripts/mutation.py replaces it in its copy with the
 # test node ids .testmondata records for the changed files (still defined in the staged tree),

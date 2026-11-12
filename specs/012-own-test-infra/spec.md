@@ -578,3 +578,17 @@ Each current behaviour of the run-tag lifecycle and the environment skill, with 
   port-forward only).
 - The platform's dedicated ClearML and MongoDB and their credential bundles.
 - Releasing a version; pushing.
+
+## Development task ownership
+
+The development tasks expose explicit setup, environment export and teardown. The
+integration task creates its own environment, exports it for pytest adoption and
+performs teardown of its captured identifier after success, failure or interruption,
+even if the record changes. It refuses an existing live
+record rather than taking ownership of it. Explicit keep-data mode retains the
+environment with a cleanup command. A cleanup failure is an error even when setup
+originally failed with temporary unavailability. Failure to persist a newly created
+namespace's record must still trigger cleanup of that namespace.
+
+Static architecture rules belong to the development check stage. Unit tests exercise
+product behavior; tests of mutation and release orchestration are removed.

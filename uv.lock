@@ -630,6 +630,7 @@ dependencies = [
 dev = [
     { name = "deptry" },
     { name = "go-task-bin" },
+    { name = "grimp" },
     { name = "hypothesis" },
     { name = "import-linter" },
     { name = "markdown-it-py" },
@@ -699,6 +700,7 @@ requires-dist = [
 dev = [
     { name = "deptry", specifier = ">=0.23" },
     { name = "go-task-bin", specifier = ">=3.54.0" },
+    { name = "grimp" },
     { name = "hypothesis", specifier = ">=6.169.1" },
     { name = "import-linter", specifier = ">=2.13" },
     { name = "markdown-it-py", specifier = "==4.2.0" },

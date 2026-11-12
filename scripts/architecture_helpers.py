@@ -1,4 +1,4 @@
-"""Static architecture checks shared by positive and injected negative tests."""
+"""Static product architecture inspection for the development task runner."""
 
 import ast
 import configparser
@@ -327,7 +327,7 @@ class _EffectVisitor(ast.NodeVisitor):
             return self.qualified(node.func)
         return "@local"
 
-    def report(self, node: ast.expr, name: str) -> None:
+    def _report(self, node: ast.expr, name: str) -> None:
         owner = "direct application effect" if self.application else "effectful core call"
         self.findings.append(f"{owner} at line {node.lineno}: {name}")
 
@@ -379,20 +379,20 @@ class _EffectVisitor(ast.NodeVisitor):
             name.startswith("deps.storage.") or name == "deps.ground_truth_repository.resolve"
         )
         if explicit and not port_effect:
-            self.report(node, name)
+            self._report(node, name)
         self.generic_visit(node)
 
     @override
     def visit_Attribute(self, node: ast.Attribute) -> None:
         name = self.qualified(node)
         if name == "os.environ":
-            self.report(node, name)
+            self._report(node, name)
         self.generic_visit(node)
 
     @override
     def visit_Name(self, node: ast.Name) -> None:
         if isinstance(node.ctx, ast.Load) and self.qualified(node) == "os.environ":
-            self.report(node, "os.environ")
+            self._report(node, "os.environ")
 
     def function_scope(self, node: ast.FunctionDef | ast.AsyncFunctionDef | ast.Lambda) -> None:
         for expression in _definition_expressions(node):
@@ -578,21 +578,6 @@ def initializer_dependency_findings(source_root: Path) -> list[str]:
         if path.name == "__init__.py":
             visit(module, ())
     return findings
-
-
-def config_targets(value: object) -> set[str]:
-    """Collect dynamically generated Hydra targets without instantiating them."""
-    targets: set[str] = set()
-    if isinstance(value, Mapping):
-        target = value.get("_target_")
-        if isinstance(target, str) and target.startswith(PROJECT_ROOTS):
-            targets.add(target)
-        for child in value.values():
-            targets.update(config_targets(child))
-    elif isinstance(value, list | tuple):
-        for child in value:
-            targets.update(config_targets(child))
-    return targets
 
 
 def initializer_findings(tree: ast.Module) -> list[str]:

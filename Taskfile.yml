@@ -76,10 +76,16 @@ tasks:
     cmds:
       - task: _lock
       - task: _ruff
-      - "{{.RUN}} {{.UV}} lint-imports"
+      - task: architecture
       - "{{.RUN}} {{.UV}} mypy ."
       - "{{.RUN}} {{.UV}} vulture"
       - "{{.RUN}} {{.UV}} deptry ."
+
+  architecture:
+    desc: Check product imports, effects, runtime targets and tooling boundaries
+    dir: '{{.ROOT_DIR}}'
+    cmds:
+      - "{{.RUN}} {{.UV}} python -m scripts.architecture"
 
   _lock:
     internal: true
@@ -158,19 +164,58 @@ tasks:
     cmds:
       - "HYPOTHESIS_PROFILE=explore {{.RUN}} {{.UV}} pytest --ignore=tests/integration -p no:randomly -n {{.TEST_WORKERS}} --dist loadgroup"
 
-  # --- stream A begin ---
   infra-check:
-    desc: Read-only bounded preflight of the docker-desktop cluster for the test environment (0 available, 3 unavailable, 1 error); creates nothing
+    desc: Read-only bounded preflight of the test cluster (0 available, 3 unavailable, 1 error)
     cmds:
       - "{{.RUN}} {{.UV}} python -m tests.integration.lifecycle check"
 
-  integration:
-    desc: Preflight, then the non-GPU live tests (CPU smoke and FiftyOne) in the serial live group, against a cy-it- test environment the session creates and deletes
+  infra-up:
+    desc: Create this worktree's test environment (COMPONENTS=all, clearml or fiftyone)
+    vars:
+      COMPONENTS: '{{default "all" .COMPONENTS}}'
+      IDENTIFIER_ONLY: '{{default "0" .IDENTIFIER_ONLY}}'
     cmds:
-      - task: infra-check
-      # One process: every live test shares the serial `live` group anyway, and only
-      # without xdist workers does a setup-time outage end the session with status 3.
-      - "CY_TASK_VERIFICATION=1 {{.RUN}} {{.UV}} pytest tests/integration -m 'not ddp_gpu and not severstal_gpu' -n 0"
+      - "{{.RUN}} {{.UV}} python -m tests.integration.lifecycle up --components {{.COMPONENTS | shellQuote}} {{if eq .IDENTIFIER_ONLY \"1\"}}--identifier-only{{end}}"
+
+  infra-env:
+    desc: Export the recorded environment for eval; includes credentials, never print or log
+    silent: true
+    cmds:
+      - "{{.RUN}} {{.UV}} python -m tests.integration.lifecycle env"
+
+  infra-down:
+    desc: Delete the recorded test environment, or ENV, and prove it absent
+    cmds:
+      - "{{.RUN}} {{.UV}} python -m tests.integration.lifecycle stop {{if .ENV}}--env {{.ENV | shellQuote}}{{end}}"
+
+  integration:
+    desc: Create a test environment, run the non-GPU live tests, and tear it down
+    cmds:
+      - |
+        set -eu
+        owned_environment="$({{.TASK_EXE | shellQuote}} --exit-code infra-up IDENTIFIER_ONLY=1)"
+        cleanup() {
+          result=$?
+          trap - EXIT INT TERM
+          if [ "${INTEGRATION_KEEP_DATA:-0}" = 1 ]; then
+            echo "Test environment retained; run task infra-down ENV=$owned_environment within its 48-hour lifetime." >&2
+          elif ! {{.TASK_EXE | shellQuote}} --exit-code infra-down "ENV=$owned_environment"; then
+            echo "Test environment cleanup failed; retry task infra-down ENV=$owned_environment." >&2
+            result=1
+          fi
+          exit "$result"
+        }
+        trap cleanup EXIT
+        trap 'exit 130' INT
+        trap 'exit 143' TERM
+        exports="$({{.TASK_EXE | shellQuote}} --exit-code infra-env)"
+        eval "$exports"
+        if [ "$INTEGRATION_RUN_TAG" != "$owned_environment" ]; then
+          echo 'The environment record changed during setup; refusing to adopt it.' >&2
+          exit 1
+        fi
+        # Adopt the Task-owned environment; Task remains responsible for teardown.
+        CY_TASK_VERIFICATION=1 {{.RUN}} {{.UV}} pytest tests/integration -m 'not ddp_gpu and not severstal_gpu' -n 0
 
   _clean-tip:
     internal: true

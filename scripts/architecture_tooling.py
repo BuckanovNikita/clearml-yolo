@@ -7,7 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def _test_dependency_imports(source: str) -> set[str]:
+def test_dependency_imports(source: str) -> set[str]:
     """Recognize project test helpers, including literal dynamic imports."""
     helpers = {path.stem for path in (ROOT / "tests").glob("*.py")}
     imports: set[str] = set()
@@ -33,11 +33,6 @@ def _test_dependency_imports(source: str) -> set[str]:
         for name in imports
         if name.split(".")[0] in helpers | {"tests", "hypothesis", "pytest_cov", "coverage", "pytest"}
     }
-
-
-def test_production_has_no_test_tool_or_helper_imports() -> None:
-    for path in (ROOT / "src").rglob("*.py"):
-        assert not _test_dependency_imports(path.read_text(encoding="utf-8")), str(path)
 
 
 WEIGHT_PACKAGER_IMPORTS = {
@@ -88,7 +83,3 @@ def weight_packager_import_findings(source: str) -> set[str]:
         ):
             findings.add("dynamic import facility")
     return findings
-
-
-def test_weight_packager_uses_only_standard_library_and_approved_asset_interfaces() -> None:
-    assert not weight_packager_import_findings((ROOT / "scripts/package_weights.py").read_text(encoding="utf-8"))

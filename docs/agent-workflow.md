@@ -17,7 +17,7 @@ Each normative rule has one authoritative topic location and a linked executable
 check, or an explicit verification limitation. The [contract index](current-contracts.md)
 is navigation, not a duplicate specification. Contract changes reconcile specification,
 implementation, tests, examples and portable usage guidance together. Architecture
-gates include negative tests proving prohibited behavior is rejected.
+gates inspect the actual product graph and source; unit tests exercise product behavior.
 
 Keep installed Spec Kit skills, extension commands, templates and other `.specify/`
 files unchanged unless the user explicitly requests a change to those files. Put
@@ -54,17 +54,17 @@ rule takes precedence over shared skills' generic packaging checklists.
 ### Module boundaries
 
 For affected Python modules, inspect the contracts in [.importlinter](../.importlinter),
-[architecture tests](../tests/test_architecture.py) and the
+[architecture task](../scripts/architecture.py) and the
 [architecture guidance](development.md#python-integration-and-architecture).
 Preserve responsibilities, interfaces, dependency direction and effect ownership.
 Account for type-only and dynamic imports and justified exact-edge exceptions.
-When boundary coverage is missing, add scoped executable checks, including a negative
-case demonstrating that a prohibited dependency fails. Keep existing rules intact and
+When boundary coverage is missing, extend the architecture task to inspect the affected
+product boundary. Keep existing rules intact and
 avoid unrelated repository refactors.
 
 Run the applicable [verification stages](development.md#verification); the
-`verification-workflow` skill selects them. The unit suite already includes architecture
-negative cases and CPU-DDP; avoid repeating those checks merely to claim another gate.
+`verification-workflow` skill selects them. The development check stage includes architecture checks; the unit suite includes
+CPU-DDP. Reuse their results while the checked inputs remain unchanged.
 Report deferred and waived checks as such, never as passed. Reconcile the final
 task-owned diff with contract coverage and record actual results in dated evidence.
 

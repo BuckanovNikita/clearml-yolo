@@ -62,7 +62,7 @@ import sys
 import tempfile
 import time
 from collections.abc import Callable, Iterable, Sequence
-from contextlib import suppress
+from contextlib import redirect_stdout, suppress
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import FrameType
@@ -549,9 +549,9 @@ class Record:
 type NamespaceState = Literal["absent", "foreign", "live"]
 
 
-def namespace_state(identifier: str) -> NamespaceState:
+def namespace_state(identifier: str, *, timeout: float = KUBECTL_TIMEOUT_SECONDS) -> NamespaceState:
     """Absent only on an explicit NotFound; a connectivity error never counts as absent."""
-    result = kubectl("get", "namespace", identifier, "-o", "json")
+    result = kubectl("get", "namespace", identifier, "-o", "json", timeout=timeout)
     if result.returncode == 0:
         try:
             labels = json.loads(result.stdout).get("metadata", {}).get("labels", {}) or {}
@@ -568,11 +568,13 @@ def namespace_state(identifier: str) -> NamespaceState:
 
 def _await_absence(identifier: str) -> bool:
     deadline = time.monotonic() + positive_seconds(STOP_TIMEOUT_VARIABLE, DEFAULT_STOP_TIMEOUT_SECONDS)
-    while namespace_state(identifier) != "absent":
-        if time.monotonic() >= deadline:
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
             return False
-        time.sleep(POLL_SECONDS)
-    return True
+        if namespace_state(identifier, timeout=min(KUBECTL_TIMEOUT_SECONDS, remaining)) == "absent":
+            return True
+        time.sleep(min(POLL_SECONDS, max(0.0, deadline - time.monotonic())))
 
 
 def _unlisted(identifier: str, forwards: Sequence[Forward]) -> list[Forward]:
@@ -776,8 +778,8 @@ class Environment:
         if result.returncode != 0:
             classify_failure(result, f"applying {description} in {self.identifier}", quote=quote)
 
-    def _components(self) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]]]:
-        result = kubectl("get", "deployments,pods", "--namespace", self.identifier, "-o", "json")
+    def _components(self, *, timeout: float) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]]]:
+        result = kubectl("get", "deployments,pods", "--namespace", self.identifier, "-o", "json", timeout=timeout)
         if result.returncode != 0:
             classify_failure(result, f"reading the components of {self.identifier}")
         items: list[dict[str, Any]] = json.loads(result.stdout).get("items", [])
@@ -788,8 +790,13 @@ class Environment:
         """Wait until every deployment has a ready pod, within the start-up budget."""
         budget = positive_seconds(START_TIMEOUT_VARIABLE, DEFAULT_START_TIMEOUT_SECONDS)
         deadline = time.monotonic() + budget
+        pending = list(names)
+        pods: list[dict[str, Any]] = []
         while names:
-            deployments, pods = self._components()
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            deployments, pods = self._components(timeout=min(KUBECTL_TIMEOUT_SECONDS, remaining))
             for name in names:
                 problem = _deployment_problem(deployments.get(name, {}))
                 if problem is not None:
@@ -797,20 +804,17 @@ class Environment:
             pending = [name for name in names if not deployments.get(name, {}).get("status", {}).get("readyReplicas")]
             if not pending:
                 return
-            if time.monotonic() >= deadline:
-                reasons = _pod_reasons(pods)
-                details = ", ".join(f"{name}: {reasons.get(name, 'no pod')}" for name in pending)
-                raise StandUnavailableError(f"{self.identifier} was not ready within {budget:g} s ({details})")
-            time.sleep(POLL_SECONDS)
+            time.sleep(min(POLL_SECONDS, max(0.0, deadline - time.monotonic())))
+        if pending:
+            reasons = _pod_reasons(pods)
+            details = ", ".join(f"{name}: {reasons.get(name, 'no pod')}" for name in pending)
+            raise StandUnavailableError(f"{self.identifier} was not ready within {budget:g} s ({details})")
 
     def _create_namespace(self) -> None:
         for _attempt in range(NAMESPACE_ATTEMPTS):
             self.identifier = IDENTIFIER_PREFIX + secrets.token_hex(3)
             result = kubectl("create", "-f", "-", stdin=_render("namespace.yaml", self.identifier))
             if result.returncode == 0:
-                # Recorded at once, so an interrupt at any later point leaves a record to stop.
-                self.record.write(self.identifier)
-                log(f"created namespace {self.identifier}")
                 return
             if "alreadyexists" not in (result.stderr or "").lower().replace(" ", ""):
                 classify_failure(result, "creating the environment namespace")
@@ -823,6 +827,10 @@ class Environment:
         """
         self._create_namespace()
         try:
+            # Recording is part of setup: even a failed record write must clean up
+            # the namespace whose successful creation we have already observed.
+            self.record.write(self.identifier)
+            log(f"created namespace {self.identifier}")
             self._apply(_render("guard.yaml", self.identifier), "the quota and limit range")
             self.credentials = generate_credentials()
             self._apply(_secret_manifest(self.identifier, self.credentials), "the credentials Secret", quote=False)
@@ -850,14 +858,20 @@ class Environment:
 
     def discard(self) -> None:
         """Setup-failure cleanup: guarded delete of the namespace this process created."""
+        recovery = f"retry: {MODULE} stop --env {self.identifier}"
         try:
             status = remove(self.root, self.identifier, list(self.forwards.values()))
-        except LifecycleError as error:
-            report(error)
-            status = EXIT_ERROR
+        except (LifecycleError, OSError) as error:
+            details = error.lines if isinstance(error, LifecycleError) else (type(error).__name__,)
+            raise LifecycleError(
+                f"setup cleanup of {self.identifier} is incomplete; the environment is not proven deleted",
+                *details,
+                recovery,
+            ) from error
         if status != EXIT_AVAILABLE:
-            warn(
-                f"ERROR: setup cleanup of {self.identifier} is incomplete; retry: {MODULE} stop --env {self.identifier}"
+            fail(
+                f"setup cleanup of {self.identifier} is incomplete; the environment is not proven deleted",
+                recovery,
             )
 
     # -- adoption ------------------------------------------------------------
@@ -1046,11 +1060,14 @@ def _dispatch(args: argparse.Namespace, root: Path) -> int:
         log("AVAILABLE: infrastructure preflight passed; no resources created")
         return EXIT_AVAILABLE
     if args.command == "up":
-        environment = up(root, args.components)
-        log(f"environment {environment.identifier} is ready: {environment.endpoints()}")
-        log(f'Use it:    eval "$({MODULE} env)"  (a pytest session in that shell adopts it)')
-        log(f"Tear down: {MODULE} stop")
-        log(f"Note:      {SWEEPER_NOTE}")
+        with redirect_stdout(sys.stderr if args.identifier_only else sys.stdout):
+            environment = up(root, args.components)
+            log(f"environment {environment.identifier} is ready: {environment.endpoints()}")
+            log(f'Use it:    eval "$({MODULE} env)"  (a pytest session in that shell adopts it)')
+            log(f"Tear down: {MODULE} stop --env {environment.identifier}")
+            log(f"Note:      {SWEEPER_NOTE}")
+        if args.identifier_only:
+            sys.stdout.write(f"{environment.identifier}\n")
         return EXIT_AVAILABLE
     if args.command == "env":
         _print_env(root)
@@ -1075,6 +1092,11 @@ def main(argv: Sequence[str] | None = None, *, on_signal: Callable[..., object] 
     commands.add_parser("env", help="print the recorded environment's variables as shell exports")
     starting = commands.add_parser("up", help="create an environment with detached port-forwards")
     starting.add_argument("--components", choices=sorted(SELECTIONS), default="all")
+    starting.add_argument(
+        "--identifier-only",
+        action="store_true",
+        help="print only the created identifier to stdout; progress goes to stderr",
+    )
     stopping = commands.add_parser("stop", help="delete the recorded (or named) environment and prove it gone")
     stopping.add_argument("--env", default=None, help="environment identifier cy-it-<6 hex>")
     stopping.add_argument("--dry-run", action="store_true", help="apply the guard and report; change nothing")

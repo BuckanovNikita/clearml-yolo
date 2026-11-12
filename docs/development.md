@@ -67,14 +67,16 @@ Task freshness, timestamps and interrupted runs never establish completion. The
 | --- | --- | --- |
 | `local-deps` | Build the [local wheelhouse](#external-dependencies) and create `uv.toml` when absent | no |
 | `fix` | Safe Ruff fixes and `ruff format`; never stages files | no |
-| `check` | Lock freshness (`uv lock --check`), Ruff check and format check, import-linter, mypy, Vulture, deptry | no |
+| `check` | Lock freshness (`uv lock --check`), Ruff check and format check, architecture, mypy, Vulture, deptry | no |
+| `architecture` | Import contracts, dynamic imports, effects, initializers, runtime targets and maintainer boundaries | no |
+| `infra-up` / `infra-env` / `infra-down` | Create, export or delete the worktree test environment (`COMPONENTS`, optional teardown `ENV`) | yes |
 | `test` | Affected unit tests (testmon), excluding `tests/integration` | no |
 | `test-full` | Every unit test; refreshes testmon history | no |
 | `verify` | `check`, then `test`: development verification | no |
 | `properties` | Unit suite under the Hypothesis `explore` profile, fixed order | no |
 | `mutation` | Changed-function [mutation report](#mutation-report) | no |
 | `infra-check` | Read-only, bounded preflight of the cluster the test environment runs in | read-only |
-| `integration` | `infra-check`, then the non-GPU live tests, including the CPU smoke run, against a test environment the run creates and deletes | yes |
+| `integration` | Task-owned setup, then the non-GPU live tests, including CPU smoke, followed by teardown | yes |
 | `acceptance` | [Change acceptance](#acceptance-tiers) on a clean committed tip | yes |
 | `release-acceptance` | [Release acceptance](#acceptance-tiers) | yes |
 | `paired-check` | [Paired CY and queue release check](#paired-cy-and-queue-release-check) | no |
@@ -330,7 +332,10 @@ code may use NumPy, pandas, SciPy, Pydantic and Pandera, but owns no SDK calls, 
 configuration, rendering or filesystem effects. Keep the pinned `digital-metrics`
 algorithms in evaluation adapters and copy exact values into core evaluation records.
 
-Run `lint-imports` and the complete ordinary suite, which contains the architecture tests, when changing imports, package initializers, composition or subprocess/plugin targets. Updating a dependency boundary also requires
+Run `uv run --locked task --exit-code architecture` and the complete ordinary suite when
+changing imports, package initializers, composition or subprocess/plugin targets. Static
+architecture rules run in the development check stage; runtime import and Hydra
+composition checks remain product tests. Updating a dependency boundary also requires
 regenerated YAML checks and installed command helps, including DDP callback and
 FiftyOne extension targets. Check CY source installs include its bounded console
 publisher, terminal mirror and FiftyOne worker; the queue source install must include
@@ -338,7 +343,7 @@ its guardian, snapshot runner and GPU probe. Verify CY has no cy_queue/Textual/N
 imports, direct Hydra sweeps stay sequential, and queue tests preserve atomic batch
 validation, deferred UI imports and owner-only jobs. Run the queue repository tests,
 Ruff, strict mypy and import contracts in the combined environment when changing
-the shared interfaces. Include negative import cases and both-package identity checks.
+the shared interfaces. Include both-package identity checks.
 Check selected config export for every command/model selection, ordinary SDK configuration
 with unchanged external selectors and project-contained application destinations, and retained project scratch after success, failure and
 cancellation. Verify explicit project temp paths without changing global SDK temp defaults.

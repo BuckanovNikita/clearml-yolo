@@ -52,7 +52,7 @@ cy_agent_env() {
             echo "agent_env.sh: the cluster is unavailable; nothing was left behind, try again later" >&2
             return 3
         fi
-        echo "agent_env.sh: no environment was created (see above); if one is active, remove it with $environment_skill_dir/scripts/agent_cleanup.sh" >&2
+        echo "agent_env.sh: environment setup failed; follow any recovery command above or use $environment_skill_dir/scripts/agent_cleanup.sh" >&2
         return 1
     fi
 

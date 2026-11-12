@@ -27,6 +27,10 @@ through `stand_project` after validating their options. The first of them select
 session's environment; at the end of the session an environment the session created is
 deleted and proven absent, and the session fails when that is not proven.
 
+The `integration` Task creates the environment before pytest, exports it for adoption,
+and tears it down on exit. `infra-up`, `infra-env` and `infra-down` expose the same
+lifecycle for manual use. Direct pytest invocations retain lazy fixture ownership.
+
 Tests run under an isolated HOME that hides `~/clearml.conf`. Every live suite takes its
 ClearML endpoint and credentials from the session's environment, never from the user's
 SDK configuration. HOME-dependent locations (the kubeconfig kubectl reads, weights
@@ -34,7 +38,7 @@ cache, fonts) come from the real environment saved in `CY_REAL_ENV`.
 
 ```bash
 uv run --locked task --exit-code infra-check         # read-only preflight
-uv run --locked task --exit-code integration         # non-GPU live tests, CPU smoke
+uv run --locked task --exit-code integration         # Task-owned setup, non-GPU tests, teardown
 uv run --locked task --exit-code acceptance          # change acceptance
 uv run --locked task --exit-code release-acceptance  # + GPU, FiftyOne, paired check
 ```

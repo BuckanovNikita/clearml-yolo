@@ -3,6 +3,13 @@
 Owner: `tests/integration/lifecycle.py`, invoked as
 `uv run --locked python -m tests.integration.lifecycle <command>` (abbreviated `L`), by the
 session fixtures in `tests/integration/conftest.py`, and by the environment skill scripts.
+`Taskfile.yml` exposes `infra-up` (`COMPONENTS=all|clearml|fiftyone`), `infra-env` and `infra-down` (`ENV=<id>` optional); `integration` creates
+an environment and tears down that captured identifier after its adopting pytest process
+exits, even if the record changes. It refuses to adopt an export naming another environment.
+`L up --identifier-only` writes only the successfully created identifier to stdout and
+progress to stderr; `infra-up IDENTIFIER_ONLY=1` exposes it to Task orchestration. A failed
+setup never authorizes deletion of a pre-existing environment. `INTEGRATION_KEEP_DATA=1`
+retains the Task-created environment with an explicit cleanup instruction.
 
 ## Commands
 

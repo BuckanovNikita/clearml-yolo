@@ -9,16 +9,16 @@ Import-linter's exhaustive container contracts classify every root child, adapte
 responsibility and application component. A new unclassified child such as
 `clearml_yolo.misc` fails `lint-imports` even when it has no imports. Adapter
 responsibilities share one classification level; the peer contracts below govern
-their permitted edges. The graph tests supplement these contracts with `graphlib` whole-graph cycle detection,
+their permitted edges. The architecture task supplements these contracts with `graphlib` whole-graph cycle detection,
 core/adapter dependency allowlists, explicit-effect and runtime-target checks.
 
-`uv run lint-imports --no-cache` enforces the configured contracts in
-[.importlinter](../.importlinter). `uv run pytest tests/test_architecture.py` checks
-project-specific graph rules, cycles, core dependency allowlists, explicit effects,
-initializers and runtime targets. It also applies the configured import contracts
-to the actual product graph augmented with literal dynamic imports; `lint-imports`
-checks the static graph. The
-[verification commands](development.md#verification) cover both without a separate architecture pytest run.
+`uv run --locked task --exit-code architecture` enforces the configured contracts in
+[.importlinter](../.importlinter), plus graph cycles, core dependency allowlists,
+explicit effects, initializers, runtime targets and maintainer boundaries. It applies
+contracts to the actual product graph augmented with literal dynamic imports.
+The development `check` and `verify` tasks include it. Runtime import and generated
+Hydra composition checks remain in `tests/test_architecture.py` because they execute
+product code.
 
 ## Layers and effects
 
