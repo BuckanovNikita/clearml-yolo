@@ -201,7 +201,7 @@ def test_match_table_larger_than_an_excel_sheet_is_saved_as_csv(
     assert len(matches) == rows
     assert matches.iloc[0].to_dict() == {"pred_index": 0}
     assert matches.iloc[-1].to_dict() == {"pred_index": rows - 1}
-    assert set(pd.ExcelFile(workbook).sheet_names) == {"summary", "per_class", "confusion_matrix"}
+    assert set(pd.ExcelFile(workbook).sheet_names) == {"summary", "per_class", "confusion_matrix", "Dataset counts"}
 
 
 def test_test_only_evaluation_still_requires_validation_membership(

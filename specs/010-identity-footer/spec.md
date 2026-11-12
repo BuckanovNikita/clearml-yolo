@@ -148,6 +148,22 @@ text, and check that no repeated print-title rows are defined for the footer con
 - **FR-012**: The shared workbook-annotation dependency MUST offer the footer
   placement, hyperlink lines and page footer as an opt-in addition, without changing
   the behavior of existing callers that prepend banners.
+- **FR-013**: Reports MUST retain the model's original per-class annotation counts
+  for every prepared dataset split, excluding background rows and preserving lexical
+  class labels. Training eligibility on every evaluated split MUST use that model's
+  original `train` population, never the current evaluation population.
+- **FR-014**: Evaluation and comparison workbooks MUST include a `Dataset counts`
+  worksheet distinguishing original dataset counts from current evaluation counts
+  and identifying baseline and candidate separately where applicable.
+- **FR-015**: Count recovery MUST work in a fresh invocation for models trained with
+  CY 0.25.0 onward using the original training task's `gt_csv`, after verifying that
+  the selected checkpoint belongs to that task and matches the claimed hash. New
+  training MUST associate counts with the final checkpoint bytes after metadata
+  binding. Recovery MUST NOT modify historical ClearML records.
+- **FR-016**: Missing, malformed, unreadable or unverifiable count evidence MUST
+  remain explicitly unknown, with a diagnostic. A missing class may mean zero only
+  within a verified complete split population. Existing exclusion and issues-sheet
+  behavior MUST remain intact when counts are unknown.
 
 ### Key Entities
 

@@ -248,6 +248,12 @@ class EvaluationWriter(Protocol):
 
 
 class ReportRenderer(Protocol):
+    def annotate_population_counts(
+        self,
+        path: Path,
+        populations: Mapping[str, tuple[ModelIdentity | None, dict[str, dict[str, int]] | None]],
+    ) -> None: ...
+
     def write_candidate_workbook(self, path: Path, per_class: pd.DataFrame, summary: dict[str, float]) -> None: ...
 
     def annotate_workbook(
@@ -372,6 +378,8 @@ class ExecutionResources(Protocol):
 
 # One invocation owns this tracking lifecycle; preserve the published port as a whole.
 class TrackingSession(Protocol):  # noqa: PLR0904
+    def population_counts(self, identity: ModelIdentity | None) -> dict[str, dict[str, int]] | None: ...
+
     def training_counts(self, identity: ModelIdentity | None) -> dict[str, int] | None: ...
 
     def preserve_training_success(self, task: TaskHandle | None, checkpoint: Path, outcome_path: Path) -> None: ...

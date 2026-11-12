@@ -106,6 +106,32 @@ commits before the CY revision bump.
 
 ## Ledger
 
+### Training population compatibility correction
+
+- [X] T022 Add typed original per-class annotation populations for all prepared
+  dataset splits and retain the original training projection on every evaluation.
+- [X] T023 Bind fresh count registration to final checkpoint bytes; recover counts
+  in fresh invocations from the original training task's `gt_csv`, including
+  CY 0.25.0, with ownership/hash verification and no historical-record mutation.
+- [X] T024 Add evaluation and comparison `Dataset counts` worksheets, keeping
+  original populations, current evaluation populations and model roles distinct.
+- [X] T025 Verify product paths for newly bound checkpoints and historical recovery;
+  cover lexical labels, background rows, multiple splits, zero versus unknown,
+  absent/unreadable/malformed sources and provenance mismatches.
+- [ ] T026 Reconcile the integrated diff with FR-013–FR-016, run applicable native
+  verification, obtain fresh independent review, and record acceptance evidence.
+
+T022 precedes T023/T024; T025 exercises the integrated paths; T026 follows their
+verification. This correction does not reopen completed footer implementation tasks.
+
+- 2026-11-12: User authorized the training-count compatibility correction. Static
+  investigation found that historical count lookup only used invocation memory,
+  and non-Ultralytics registration hashed checkpoints before metadata binding
+  changed their bytes. CY v0.25.0 already published prepared training populations
+  as the original task's `gt_csv`. Implementation, product regression checks,
+  native verification and independent review are pending; this entry claims no
+  acceptance or live outcome.
+
 - 2026-11-09: spec, plan and tasks created.
 - 2026-11-09 T001 baseline: upstream `tests/test_v2_workbook.py` 12 passed; CY workbook identity + compatibility 29 passed.
 - 2026-11-09 T005/T009/T014 landed together as report-generator `9199c4f` (cohesive single API change); review fix `d1a14aa` widens only the final print area to the merged footer width; `f3dff38` restores fit-to-width printing (full-suite regression in `test_report_class_availability`). Both commits are local and unpushed: fresh clones cannot fetch the approved revision until report-generator is pushed (needs separate authorization).
@@ -119,3 +145,37 @@ commits before the CY revision bump.
 - 2026-11-09 delivery (user-authorized push and report-generator release): report-generator `chore(release): 0.2.0` `7339ef8` fast-forwarded `main` from `d10aa39` with annotated tag `v0.2.0` and GitHub release; upstream suite 184 passed, ruff clean. This supersedes the local-only notes above. CY pins `report-generator>=0.2.0`, the lock records 0.2.0 and the approved revision is `7339ef8`. Paired check: CY 0.46.2 (master, this commit series) with cy-queue 0.1.9 `cd85a0c` (origin/main, fetched): editable install of report-generator, CY and queue, `uv pip check` compatible, installed report-generator 0.2.0, queue suite 528 passed (7 deselected), `cy-queue --help`, queue lint-imports (2 kept), ruff and mypy clean. No CY version tag: the `feat` would release 0.47.0, outside cy-queue's `clearml-yolo>=0.38,<0.47`.
 - 2026-11-09 release (user-authorized): CY `v0.47.0` (`c9ac311`, local release workflow) with cy-queue 0.1.10 (`e938967`, requirement now minimum-only `clearml-yolo>=0.38` per user policy): uv pip check compatible, installed clearml-yolo 0.47.0 / cy-queue 0.1.10 / report-generator 0.2.0, queue suite 527 passed (7 deselected), `cy-queue --help`, queue lint-imports (2 kept), ruff, ruff format and mypy clean.
 - 2026-11-09 T019 live GPU acceptance (CY 0.47.0, report-generator 0.2.0, RTX 5090, tag clearml-yolo-claude-20261109-footer-e2e-253g, FiftyOne disabled): coco8-derived train/val/test CSV; baseline pipeline (3 epochs) succeeded; candidate pipeline (4 epochs) against the baseline task finished `completed_with_warnings` only for expected unknown training-count report issues. Every inspected workbook (evaluation, dashboard, DTRK, matrix, baseline/candidate dashboards, paired comparison, dev and business reports) kept its original row 1, had the identity footer two rows below the last used row, no print titles and the expected page footer. Model lines linked `<host>/projects/*/models/<id>`; the baseline training task linked `<host>/projects/*/experiments/<id>/output/log`; the candidate's own pipeline task stayed plain text. Headless Chrome, authenticated with the project's API token and trusting only the stand CA/leaf keys, opened both model links on the matching model General pages and the task link, which the UI redirected to `/tasks/<id>/output/log` on the baseline task console. Tagged cleanup left 0 projects/tasks and no run models. Gap: an earlier `cy-ground-truth` call without explicit project/tags created an untagged `clearml-yolo/yolo-run/ground_truth` task outside the tag cleanup; its deletion awaits user approval.
+
+- 2026-11-12 implementation evidence: original split populations are registered after
+  checkpoint binding and recovered from the verified original task's `gt_csv`.
+  Evaluation dashboards, the main evaluation workbook and comparison workbooks
+  include original Dataset counts. Focused comparison/recovery/report tests passed
+  (102 cases), final checkpoint registration passed for all four non-YOLO backend
+  families, and the updated metrics suite passed (22 cases). These use mocked SDK
+  boundaries and local files; they do not establish live ClearML outcomes. Static
+  checks passed. Independent review found and verified fixes for missing main-workbook
+  counts and incomplete split provenance; no further concrete findings remained.
+  Full unit verification and mutation evidence are still pending. Clean-tip acceptance,
+  final committed hooks and release are deferred: the pre-existing untracked
+  `docs/docker-resource-checks.md` prevents a clean committed tip and is preserved.
+
+- 2026-11-12 mutation report: native `mutation -- --base master` exited 0 under
+  its default advisory budget. Eight of sixteen changed functions were selected:
+  recovery, original-task validation, registration/projection/cache, detector training
+  and YOLO training. Testmon selected 366 tests in 62 files. The 300-second budget
+  expired during stats (682 tests passed): 520 mutants not run, zero judged,
+  zero killed/survived/not-reached. Eight remaining functions were outside the
+  function budget. This is incomplete mutation evidence, not mutation effectiveness.
+  The earlier attempt failed on the superseded three-sheet workbook assertion;
+  that assertion now includes Dataset counts and the 22-test metrics suite passed.
+
+- 2026-11-12 final development verification: `uv run --locked task --exit-code verify`
+  passed on the final product/test content: lock, Ruff, architecture, mypy, Vulture,
+  dependency checks and 4,673 unit tests passed; one test skipped. The preceding
+  complete run had only the now-corrected workbook-sheet expectation failure.
+  Native live acceptance and final committed hooks remain deferred; no commit,
+  integration, version tag or push was performed. The unrelated untracked file
+  remains untouched. Mutation remains budget-limited as described above.
+- 2026-11-12 final independent review after verification found no concrete remaining
+  defects in the staged implementation. Both earlier findings remain closed. No
+  task-owned test or mutation processes remained after verification.

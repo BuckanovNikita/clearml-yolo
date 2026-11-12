@@ -1,10 +1,12 @@
 """Evaluation computation returns neutral values without producing artifacts."""
 
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 import pytest
+from openpyxl import load_workbook  # type: ignore[import-untyped]
 
 from clearml_yolo.adapters.evaluation import scoring
 
@@ -49,6 +51,8 @@ def test_rendered_metrics_preserve_every_backend_value(tmp_path: Path) -> None:
     from digital_metrics.scoring import compute_map, slice_by_conf
 
     from clearml_yolo.adapters.reporting.evaluation import render_evaluation, summarize_evaluation
+    from clearml_yolo.adapters.reporting.evaluation_workbook import write_evaluation_workbook
+    from clearml_yolo.adapters.reporting.workbook_identity import deannotated_workbook
     from clearml_yolo.core.evaluation.models import EvaluatedSplit
 
     columns = ["image_name", "instance_label", "bbox_x_tl", "bbox_y_tl", "bbox_x_br", "bbox_y_br"]
@@ -76,8 +80,28 @@ def test_rendered_metrics_preserve_every_backend_value(tmp_path: Path) -> None:
     )
     compute_map(gt, predictions, upstream_metrics, ["a"], method="interp", strategy="iou_prior")
     assert computed.metrics["cat"].model_dump() == upstream_metrics["cat"].model_dump()
+    computed = replace(
+        computed,
+        training_counts={"cat": 12},
+        population_counts={"train": {"cat": 12}, "val": {"cat": 4}, "test": {"cat": 2}},
+    )
     artifacts = render_evaluation(computed, output_dir=tmp_path, suffix="test")
+    for path in (artifacts.dashboard_path, artifacts.dtrk_dashboard_path):
+        with deannotated_workbook(path) as source:
+            workbook = load_workbook(source)
+        rows = list(workbook["Dataset counts"].values)
+        assert ("model", "NA", "NA", "train", "cat", 12) in rows
+        assert ("model", "NA", "NA", "test", "cat", 2) in rows
+        workbook.close()
+    assert artifacts.dashboard.loc["cat", "Количество примеров train"] == 12
     evaluated = EvaluatedSplit.from_parts(computed, artifacts)
+    publication = tmp_path / "metrics_evaluation_test.xlsx"
+    write_evaluation_workbook(publication, evaluated, methodology={})
+    with deannotated_workbook(publication) as source:
+        workbook = load_workbook(source)
+    assert ("model", "NA", "NA", "train", "cat", 12) in list(workbook["Dataset counts"].values)
+    assert ("model", "NA", "NA", "test", "cat", 2) in list(workbook["Dataset counts"].values)
+    workbook.close()
     assert evaluated.metrics is computed.metrics
     assert evaluated.result_rows is computed.result_rows
     assert evaluated.dashboard_path.is_file()
@@ -131,7 +155,6 @@ def test_opaque_evaluation_classes_are_readable_without_changing_machine_values(
     from zipfile import ZipFile
 
     from digital_metrics.reporting import render_evaluation as shared
-    from openpyxl import load_workbook  # type: ignore[import-untyped]
 
     from clearml_yolo.adapters.reporting import evaluation
     from clearml_yolo.adapters.reporting.evaluation_workbook import write_candidate_workbook

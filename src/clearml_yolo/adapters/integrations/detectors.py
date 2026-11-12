@@ -457,20 +457,18 @@ class DetectorRunner:
             )
         from clearml_yolo.adapters.clearml.session import (
             preserve_training_success,
-            register_training_counts,
+            register_population_counts,
         )
-        from clearml_yolo.adapters.integrations.training import (
-            training_population_counts,
-            training_publication,
-        )
+        from clearml_yolo.adapters.integrations.training import training_publication
+        from clearml_yolo.adapters.storage.population import population_counts
 
         preserve_training_success(task, result.weights, output.parent.parent / "pipeline_outcome.json")
         effective = settings | result.effective_args
         with training_publication(task):
-            register_training_counts(task, result.weights, training_population_counts(prepared.ground_truth))
             self.write_native_yaml(output / "native_train.yaml", effective, "train")
             record_detector_arguments(task, effective)
             descriptor = bind_checkpoint(result.weights, result.metadata)
+            register_population_counts(task, result.weights, population_counts(prepared.ground_truth))
             publish_detector_model(task, result.weights, descriptor, str(settings["name"]))
         return TrainResult(
             weights=result.weights,

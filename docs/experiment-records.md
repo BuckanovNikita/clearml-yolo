@@ -104,6 +104,22 @@ Verify unchanged model ID, task, project, URL and downloaded hash, plus exact me
 
 Training counts must be finite nonnegative integers from the model's verified training population. Generated dashboards never substitute the evaluation population. Unknown or malformed counts remain NA; valid zero remains zero. Reports retain affected metrics in an `Unknown training count` worksheet, exclude those classes from eligibility-dependent aggregates, and open on the issues worksheet when warnings exist. Diagnostics must not become class rows on subsequent machine reads. All-unknown input produces explicit unavailable summaries. Legacy valid declared dashboard counts remain accepted.
 
+The original prepared dataset supplies per-class annotation counts for each of its
+splits. These count object rows, excluding background rows, and preserve lexical
+class labels. A model's original `train` counts supply training eligibility on every
+evaluated split. Evaluation and comparison workbooks expose the original split
+counts in a `Dataset counts` worksheet, distinguishing baseline and candidate and
+keeping current evaluation counts separate.
+
+Count provenance follows the final checkpoint bytes after metadata binding. Fresh
+invocations recover it from the original training task, including tasks produced
+with CY 0.25.0 onward: verify checkpoint ownership and hash before reading that
+task's immutable `gt_csv` prepared population. Never substitute the comparison
+task's ground truth, another model's population, or test dashboard counts. Missing,
+unreadable or unverifiable evidence stays unknown with an explained diagnostic;
+absence of a class means zero only within a verified complete split population.
+Historical ClearML records are read without modification.
+
 The [readable-output guide](readable-output.md) governs human text across CLI/TUI, diagnostics, consoles, workbooks and plots. Readable names/roles and distinct aliases replace opaque identifiers in visible labels. Exact IDs/hashes remain in machine provenance, explicit JSON where permitted, hidden identity, raw captures and link targets. Formatting cannot change source bytes, metric values or acknowledgements.
 
 Each current-model split has one `Confusion matrix` chart selecting Counts, Row %, Column %, Overall % from identical post-threshold integer counts. Counts is initially visible and exactly one heatmap remains visible after selection. Percentage views share a fixed 0–100 scale; hover retains the original integer count and applicable denominator. True rows/predicted columns preserve class order/background; zero denominators show finite zero and `no observations`. One test-only `Precision-recall` chart combines all classes at IoU .50 from the authoritative geometry-valid AP population, preserving ordering/ties, AP method and confidence/cumulative TP/FP hover. GT without predictions has AP50 zero; absent GT has unavailable recall/AP. Null-gap legend traces do not invent observations. No baseline charts or comparison tables appear in Plots; baseline rows/dashboards, paired reports and headline values remain. Filter native validation PR callbacks only within owner scope and restore state, including DDP owner replay.

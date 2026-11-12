@@ -317,6 +317,12 @@ Selected executable inputs remain distinct from observed normalization and resul
 Generated dashboards use training counts tied to the exact trained checkpoint. Evaluation
 annotations are not training provenance. Unknown counts remain unavailable; confirmed zero
 remains zero. Legacy dashboard inputs with valid declared counts remain supported.
+Original per-class annotation counts for all prepared dataset splits remain distinct
+from current evaluation counts in evaluation and comparison `Dataset counts` worksheets.
+Every evaluated split uses the model's original training split for training eligibility.
+Fresh invocations recover the original training task's `gt_csv` after checkpoint
+ownership and hash verification, including models trained with CY 0.25.0 onward;
+historical records remain unchanged. See the [count provenance contract](experiment-records.md#reports-and-readable-visualization).
 Reports preserve metrics for classes with unavailable counts in an `Unknown training count`
 worksheet, exclude them from eligibility-dependent aggregates, and explain the exclusions
 in an issues worksheet. An entirely unknown population produces unavailable summaries,

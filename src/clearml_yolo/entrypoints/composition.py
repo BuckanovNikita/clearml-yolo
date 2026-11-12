@@ -22,6 +22,9 @@ from clearml_yolo.adapters.reporting import (
     workbook_identity,
 )
 from clearml_yolo.adapters.reporting import evaluation as reporting_evaluation
+from clearml_yolo.adapters.reporting import (
+    population_counts as population_reporting,
+)
 from clearml_yolo.adapters.runtime import execution_lifecycle
 from clearml_yolo.adapters.storage import (
     dataset,
@@ -134,6 +137,7 @@ class _EvaluationWriter:
 
 
 class _ReportRenderer:
+    annotate_population_counts = staticmethod(population_reporting.annotate_population_counts)
     write_candidate_workbook = staticmethod(evaluation_workbook.write_candidate_workbook)
     annotate_workbook = staticmethod(workbook_identity.annotate_workbook)
     read_dashboard = staticmethod(workbook_identity.read_dashboard)
@@ -181,6 +185,7 @@ class _ExecutionResources:
 
 
 class _TrackingSession:
+    population_counts = staticmethod(clearml_session.population_counts)
     training_counts = staticmethod(clearml_session.training_counts)
     preserve_training_success = staticmethod(clearml_session.preserve_training_success)
     record_pipeline_outcome = staticmethod(clearml_session.record_pipeline_outcome)

@@ -6,12 +6,39 @@
 
 ## Summary
 
+The training population compatibility correction extends this feature's report
+provenance: retain original per-class annotation counts for all dataset splits,
+recover them for historical models, and display them independently from current
+evaluation counts. The existing identity-footer behavior remains required.
+
 Move visible model identity and the class-alias notice from prepended banner rows to an
 identity footer below each worksheet's content. Model and training-task lines link to
 ClearML web pages built at render time. A plain-text page footer replaces repeated print
 titles. The generic OOXML mechanics come from an additive bottom-placement mode in
 report-generator. clearml-yolo resolves links through a tracking port and passes plain
 URLs to the reporting adapters ([research](research.md)).
+
+## Training population compatibility correction
+
+- Carry a typed original dataset population through the existing tracking and
+  evaluation boundaries. Preserve split names and lexical class names; project the
+  original `train` mapping for eligibility on every evaluated split.
+- Register fresh training counts only after checkpoint metadata binding finalizes
+  the bytes. Resolve historical populations through the recorded original training
+  task, verify checkpoint ownership and digest, then read its `gt_csv`. This artifact
+  was already published by CY 0.25.0. Keep remote records unchanged and cache only
+  within the owning invocation.
+- Add `Dataset counts` worksheets to evaluation and comparison workbooks, with
+  model roles and original split counts separate from current evaluation counts.
+  Preserve first-row headers, identity footers and machine-readable metrics.
+- Keep unknown evidence explicit, including missing or malformed artifacts and
+  provenance mismatches. Infer zero only for a missing class within a verified
+  complete split; never borrow another model's population.
+- Verify the actual registration-to-evaluation path for newly bound native
+  checkpoints and fresh-invocation recovery from a v0.25.0-shaped source task.
+  Cover multiple splits, background rows, repeated annotations, lexical labels,
+  absent classes, unavailable sources and ownership/hash mismatches. Run the native
+  verification stages and independent review before accepting the correction.
 
 ## Technical Context
 

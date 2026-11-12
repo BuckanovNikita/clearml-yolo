@@ -8,6 +8,7 @@ import pandas as pd
 
 from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.reporting.evaluation import summarize_evaluation as summarize_metrics
+from clearml_yolo.adapters.reporting.population_counts import annotate_population_counts
 from clearml_yolo.adapters.reporting.workbook_identity import (
     annotate_workbook,
     humanize_workbook,
@@ -65,6 +66,7 @@ def write_evaluation_workbook(
         summary_frame.to_excel(writer, sheet_name="summary", index=False)
         per_class_frame.to_excel(writer, sheet_name="per_class", index=False)
         confusion.to_excel(writer, sheet_name="confusion_matrix")
+    annotate_population_counts(path, {"model": (evaluated.model_identity, evaluated.population_counts)})
     if evaluated.model_identity is not None:
         annotate_workbook(path, {"model": evaluated.model_identity}, links=None if links is None else {"model": links})
     else:

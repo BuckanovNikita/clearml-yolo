@@ -53,9 +53,11 @@ def evaluate_split(
             source_predictions=source_predictions,
             model_identity=model_identity,
         )
+        populations = deps.tracking.population_counts(model_identity)
         computed = replace(
             computed,
-            training_counts=deps.tracking.training_counts(model_identity),
+            training_counts=populations.get("train") if populations is not None else None,
+            population_counts=populations,
         )
         artifacts = deps.evaluation_writer.render_evaluation(
             computed,

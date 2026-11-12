@@ -228,6 +228,7 @@ class ComputedEvaluation:
     result_rows: pd.DataFrame
     model_identity: ModelIdentity | None = None
     training_counts: dict[str, int] | None = None
+    population_counts: dict[str, dict[str, int]] | None = None
 
 
 @dataclass(frozen=True)
@@ -264,6 +265,7 @@ class EvaluatedSplit:
     pr_curves: list[PRCurve]
     result_rows: pd.DataFrame
     model_identity: ModelIdentity | None = None
+    population_counts: dict[str, dict[str, int]] | None = None
 
     @classmethod
     def from_parts(
@@ -285,6 +287,7 @@ class EvaluatedSplit:
             pr_curves=computed.pr_curves,
             result_rows=computed.result_rows,
             model_identity=computed.model_identity,
+            population_counts=computed.population_counts,
             dashboard=artifacts.dashboard,
             dtrk_dashboard=artifacts.dtrk_dashboard,
             dashboard_path=artifacts.dashboard_path,

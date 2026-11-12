@@ -209,6 +209,7 @@ ignore_imports =
     clearml_yolo.entrypoints.hydra.transforms -> omegaconf
     clearml_yolo.entrypoints.hydra.declarations -> omegaconf
     clearml_yolo.adapters.reporting.count_issues -> openpyxl
+    clearml_yolo.adapters.reporting.population_counts -> openpyxl
     clearml_yolo.adapters.assets.validation -> safetensors
     clearml_yolo.adapters.deim.hf_weights -> safetensors
 

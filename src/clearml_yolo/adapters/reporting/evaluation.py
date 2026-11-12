@@ -12,6 +12,7 @@ from digital_metrics.types import Metrics
 
 from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.reporting.count_issues import apply_training_counts
+from clearml_yolo.adapters.reporting.population_counts import annotate_population_counts
 from clearml_yolo.adapters.reporting.workbook_identity import annotate_workbook, humanize_workbook
 from clearml_yolo.adapters.storage.filesystem import write_path
 from clearml_yolo.core.artifact_names import PLOT_METRICS, split_component
@@ -120,6 +121,7 @@ def render_evaluation(
         if not path.is_file():
             raise FileNotFoundError(f"Required confidence interval plot is missing: {path}")
     for workbook in (dashboard_path, dtrk_path, confusion_matrix_path):
+        annotate_population_counts(workbook, {"model": (identity, computed.population_counts)})
         if identity is not None:
             annotate_workbook(workbook, {"model": identity}, links=None if links is None else {"model": links})
         else:

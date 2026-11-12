@@ -1,6 +1,7 @@
 """Native detector outputs retain the shared prediction and checkpoint contracts."""
 
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 from zipfile import ZipFile
 
@@ -234,3 +235,68 @@ def test_native_programmatic_prediction_accepts_matching_explicit_checkpoint() -
         "best.pth",
     )
     assert settings["model"] == "best.pth"
+
+
+@pytest.mark.parametrize("preset", ["rfdetr/small", "deimv2/s", "fasterrcnn/resnet50_fpn", "fcos/resnet50_fpn"])
+def test_training_population_follows_final_bound_checkpoint(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, preset: str
+) -> None:
+    import importlib
+
+    from clearml_yolo.adapters.clearml import detectors, session
+    from clearml_yolo.adapters.storage.checkpoint import read_checkpoint_descriptor
+    from clearml_yolo.adapters.storage.identity import checkpoint_sha256
+    from clearml_yolo.application.contracts import PreparedDataset
+    from clearml_yolo.core.identity import ModelIdentity
+    from clearml_yolo.core.models import BackendTrainResult
+
+    config = model_preset(preset)
+    backend = importlib.import_module(
+        f"clearml_yolo.adapters.{config.backend if config.backend != 'deimv2' else 'deim'}.backend"
+    )
+    original_hashes: list[str] = []
+
+    def native_train(*args: Any, **kwargs: Any) -> BackendTrainResult:
+        weights = Path(args[2]) / "best.pth"
+        with ZipFile(weights, "w") as archive:
+            archive.writestr("best/data.pkl", b"native checkpoint fixture")
+        original_hashes.append(checkpoint_sha256(weights))
+        return BackendTrainResult(
+            weights=weights,
+            metadata=CheckpointMetadata(
+                backend=config.backend,
+                preset=config.preset,
+                class_names=("0001", "NA"),
+                preprocessing=Preprocessing(resize="stretch", size=64),
+            ),
+            effective_args={},
+        )
+
+    monkeypatch.setattr(backend, "train", native_train)
+    monkeypatch.setattr(detectors, "record_detector_arguments", lambda *args: None)
+    monkeypatch.setattr(detectors, "publish_detector_model", lambda *args: None)
+    truth = tmp_path / "prepared.csv"
+    truth.write_text("instance_label,split\n0001,train\n0001,train\nNA,val\n0001,test\n", encoding="utf-8")
+    prepared = PreparedDataset(
+        data=tmp_path / "dataset.yaml",
+        ground_truth=truth,
+        manifest=tmp_path / "manifest.json",
+        dataset_format="ndjson",
+        artifacts=[],
+    )
+    task: Any = SimpleNamespace(id="training")
+    state = session._InvocationState(task=task, stages=["train"], current_stage="train")
+    token = session._ACTIVE_INVOCATION.set(state)
+    try:
+        runner = DetectorRunner(config, build_dependencies().model)
+        result = runner.train(
+            task, preset, {"project": str(tmp_path), "name": "run", "device": "cpu", "batch": 1}, prepared
+        )
+        descriptor = read_checkpoint_descriptor(result.weights)
+        assert descriptor is not None
+        assert descriptor.checkpoint_sha256 != original_hashes[0]
+        identity = ModelIdentity(model_name="model", checkpoint_sha256=descriptor.checkpoint_sha256)
+        assert session.population_counts(identity) == {"train": {"0001": 2}, "val": {"NA": 1}, "test": {"0001": 1}}
+        assert session.training_counts(identity) == {"0001": 2}
+    finally:
+        session._ACTIVE_INVOCATION.reset(token)

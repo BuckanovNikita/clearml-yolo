@@ -483,6 +483,9 @@ def _skip_without_baseline(
         workbook = destination / f"compare_evaluation_candidate_{artifact_names.split_component(split)}.xlsx"
         per_class, summary = deps.evaluation_writer.summarize_metrics(evaluated.metrics)
         deps.renderer.write_candidate_workbook(workbook, per_class, summary)
+        deps.renderer.annotate_population_counts(
+            workbook, {"candidate": (candidate.identity, deps.tracking.population_counts(candidate.identity))}
+        )
         if candidate.identity is not None:
             identities = {"candidate": candidate.identity}
             deps.renderer.annotate_workbook(workbook, identities, links=identity_links(task, identities, deps=deps))
@@ -568,6 +571,13 @@ def _publish_comparison_workbook(
         for role, model in (("baseline", baseline), ("candidate", candidate))
         if model.identity is not None
     }
+    deps.renderer.annotate_population_counts(
+        workbook,
+        {
+            role: (model.identity, deps.tracking.population_counts(model.identity))
+            for role, model in (("baseline", baseline), ("candidate", candidate))
+        },
+    )
     deps.renderer.annotate_workbook(workbook, identities, links=identity_links(task, identities, deps=deps))
     if task is not None:
         name = artifact_names.per_split(artifact_names.COMPARISON_WORKBOOK_PREFIX, split)

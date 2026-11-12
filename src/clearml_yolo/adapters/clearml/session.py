@@ -221,6 +221,10 @@ class _InvocationState:
     pipeline_outcome: PipelineOutcome | None = None
     outcome_path: Path | None = None
     checkpoint_training_counts: dict[str, dict[str, int]] = field(default_factory=dict)
+    checkpoint_population_counts: dict[str, dict[str, dict[str, int]]] = field(default_factory=dict)
+    recovered_population_counts: dict[tuple[str, str, str | None], dict[str, dict[str, int]] | None] = field(
+        default_factory=dict
+    )
 
     def enter_stage(self, stage: str) -> None:
         self.current_stage = stage
@@ -327,6 +331,11 @@ def _active_state(task: Any, operation: str) -> _InvocationState:
 
 def register_training_counts(task: Any, checkpoint: Path, counts: dict[str, int] | None) -> None:
     """Bind verified training-population counts to the exact produced checkpoint."""
+    register_population_counts(task, checkpoint, {"train": counts} if counts is not None else None)
+
+
+def register_population_counts(task: Any, checkpoint: Path, counts: dict[str, dict[str, int]] | None) -> None:
+    """Bind all prepared split counts to the final produced checkpoint bytes."""
     if task is None or counts is None:
         return
     state = _ACTIVE_INVOCATION.get()
@@ -334,18 +343,35 @@ def register_training_counts(task: Any, checkpoint: Path, counts: dict[str, int]
         return
     with checkpoint.open("rb") as stream:
         digest = hashlib.file_digest(stream, "sha256").hexdigest()
-    state.checkpoint_training_counts[digest] = dict(counts)
+    state.checkpoint_population_counts[digest] = copy.deepcopy(counts)
+    if "train" in counts:
+        state.checkpoint_training_counts[digest] = dict(counts["train"])
 
 
 def training_counts(identity: ModelIdentity | None) -> dict[str, int] | None:
-    """Return counts only for a locally registered, identical model checkpoint."""
+    """Project original training counts consistently across evaluated splits."""
+    counts = population_counts(identity)
+    return counts.get("train") if counts is not None else None
+
+
+def population_counts(identity: ModelIdentity | None) -> dict[str, dict[str, int]] | None:
+    """Return copied counts from this checkpoint or its verified original task."""
     state = _ACTIVE_INVOCATION.get()
-    if state is None or identity is None or identity.checkpoint_sha256 is None:
+    if identity is None or identity.checkpoint_sha256 is None:
         return None
-    counts = state.checkpoint_training_counts.get(
-        identity.checkpoint_sha256,
-    )
-    return dict(counts) if counts is not None else None
+    if state is not None and identity.checkpoint_sha256 in state.checkpoint_population_counts:
+        return copy.deepcopy(state.checkpoint_population_counts[identity.checkpoint_sha256])
+    if identity.training_task_id is None:
+        return None
+    key = identity.training_task_id, identity.checkpoint_sha256, identity.model_id
+    if state is not None and key in state.recovered_population_counts:
+        return copy.deepcopy(state.recovered_population_counts[key])
+    from clearml_yolo.adapters.clearml.population import recover_population_counts
+
+    counts = recover_population_counts(identity)
+    if state is not None:
+        state.recovered_population_counts[key] = copy.deepcopy(counts)
+    return counts
 
 
 def preserve_training_success(task: Any, checkpoint: Path, outcome_path: Path) -> None:

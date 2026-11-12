@@ -12,12 +12,12 @@ from clearml_yolo.adapters.clearml.session import (
     preserve_training_success,
     record_run_configuration,
     record_training_publication_failure,
-    register_training_counts,
+    register_population_counts,
 )
 from clearml_yolo.adapters.integrations.native_ddp import native_ddp_relay
 from clearml_yolo.adapters.observability.tracing import trace_operation
-from clearml_yolo.adapters.storage.file_io import read_detection_csv
 from clearml_yolo.adapters.storage.filesystem import model_weights_path
+from clearml_yolo.adapters.storage.population import population_counts
 from clearml_yolo.adapters.yolo.config import requested_settings, write_native_yaml
 from clearml_yolo.application.contracts import PreparedDataset, TrainResult
 from clearml_yolo.core.transforms import TransformConfig
@@ -72,8 +72,8 @@ def execute_training(
                 dataset_reference=prepared.data,
             )
             try:
-                counts = training_population_counts(prepared.ground_truth)
-                register_training_counts(task, best, counts)
+                counts = population_counts(prepared.ground_truth)
+                register_population_counts(task, best, counts)
                 relay.replay(trainer)
                 # Replay restores worker-normalized arguments into the owner trainer.
                 effective = dict(vars(trainer.args))
@@ -106,12 +106,8 @@ def execute_training(
 
 def training_population_counts(ground_truth: Path) -> dict[str, int] | None:
     """Count prepared training annotations, preserving exact lexical class identity."""
-    frame = read_detection_csv(ground_truth)
-    if "split" not in frame or "instance_label" not in frame:
-        logger.warning("Prepared training population lacks split/class provenance; counts unavailable")
-        return None
-    training = frame.loc[frame["split"] == "train", "instance_label"].dropna()
-    return {str(label): int(count) for label, count in training.value_counts().items()}
+    counts = population_counts(ground_truth)
+    return counts.get("train") if counts is not None else None
 
 
 @contextmanager
