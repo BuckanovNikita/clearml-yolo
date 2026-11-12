@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.48.1 (2026-11-13)
+
+### Bug Fixes
+
+- Recover original model population counts across splits
+  ([`8526f60`](https://github.com/BuckanovNikita/clearml-yolo/commit/8526f60d9de86783158a49ad072854430a45c081))
+
+
 ## v0.48.0 (2026-11-12)
 
 ### Bug Fixes
