@@ -151,7 +151,7 @@ testpaths = ["tests"]
 # The repository root makes the `tests` namespace importable for `-p tests.env_isolation`;
 # test modules keep their prepend-mode imports (helpers, `integration.lifecycle`).
 pythonpath = ["."]
-addopts = ["--strict-markers", "--strict-config", "-p", "tests.env_isolation"]
+addopts = ["--strict-markers", "--strict-config", "-p", "tests.env_isolation", "--dist=loadgroup"]
 markers = [
     "integration: live test under tests/integration; excluded from development verification by directory",
     "severstal_gpu: opt-in native all-model Severstal training and ClearML acceptance",

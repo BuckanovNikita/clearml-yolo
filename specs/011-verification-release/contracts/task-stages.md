@@ -1,6 +1,7 @@
 # Contract: Task stages
 
-Invocation: `uv run --locked task --exit-code <stage>`. All stages use this worktree's tool state.
+Invocation: `uv run --locked task --exit-code <stage>`. All stages use this worktree's tool state. Development commands live in the root
+Taskfile; `Taskfile.ops.yml` supplies the operational stages through a flattened include.
 
 | Stage | Runs | Live | Notes |
 |---|---|---|---|
@@ -8,6 +9,7 @@ Invocation: `uv run --locked task --exit-code <stage>`. All stages use this work
 | `fix` | safe Ruff fixes, `ruff format` | no | never stages |
 | `check` | `uv lock --check`, Ruff check+format check, import-linter, mypy, vulture, deptry | no | |
 | `test` / `test-full` | unit suite (testmon affected / all), `--ignore=tests/integration`, xdist | no | |
+| `coverage` | complete unit suite with branch coverage and configured floor | no | |
 | `verify` | `check` → `test` | no | pre-commit hook; development verification |
 | `properties` | unit suite, Hypothesis `explore` profile, `-p no:randomly` | no | |
 | `mutation` | `scripts/mutation.py {{.CLI_ARGS}}` | no | exit 0 ok / 1 strict survivors / 2 tool error |

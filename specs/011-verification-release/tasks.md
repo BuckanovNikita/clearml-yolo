@@ -140,3 +140,11 @@ US1 (Phase 3) on top of Phases 1–2.
   exhaustion). Final committed-input verification and independent review are
   reported in the consolidation session's completion evidence.
 - Scope is local consolidation, with no push, version release or deployment.
+
+### 2026-11-13 — Readable tool inventory maintenance
+
+- [x] Keep named tool commands and sequential development stages in the root Taskfile.
+- [x] Move operational stages into a flattened include, preserving public task names.
+- [x] Extract the testmon fingerprint, including both Taskfiles; centralize pytest scheduling.
+- [ ] Verify command wiring, test selection, final hooks, acceptance and paired check.
+- [ ] Obtain fresh independent review and record final evidence.

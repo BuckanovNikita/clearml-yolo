@@ -47,7 +47,10 @@ checkouts and files remain authoritative. Dependency installation is always exte
 
 ## Verification
 
-[Taskfile.yml](../Taskfile.yml) owns verification commands and their order; prek owns
+[Taskfile.yml](../Taskfile.yml) lists each development tool and its command, followed by
+the sequential verification stages. [Taskfile.ops.yml](../Taskfile.ops.yml) contains
+bootstrap, infrastructure, acceptance and release orchestration; it is included with
+unchanged public task names. Tool policy stays in native configuration. prek owns
 Git hooks and commit-message validation. Invoke every stage as:
 
 ```bash
@@ -70,6 +73,7 @@ Task freshness, timestamps and interrupted runs never establish completion. The
 | `check` | Lock freshness (`uv lock --check`), Ruff check and format check, architecture, mypy, Vulture, deptry | no |
 | `architecture` | Import contracts, dynamic imports, effects, initializers, runtime targets and maintainer boundaries | no |
 | `infra-up` / `infra-env` / `infra-down` | Create, export or delete the worktree test environment (`COMPONENTS`, optional teardown `ENV`) | yes |
+| `coverage` | Full unit suite with branch coverage and the configured floor | no |
 | `test` | Affected unit tests (testmon), excluding `tests/integration` | no |
 | `test-full` | Every unit test; refreshes testmon history | no |
 | `verify` | `check`, then `test`: development verification | no |
