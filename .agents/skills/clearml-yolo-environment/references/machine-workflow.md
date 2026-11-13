@@ -1,8 +1,8 @@
 # Machine workflow for live CY runs
 
-The [test-environment contract](../../../../specs/012-own-test-infra/contracts/test-environment.md)
-owns lifecycle and [helpers](../scripts/) implement it. This reference retains only
-machine-specific precautions and diagnosis.
+Paths start at the repository root. Lifecycle rules live in
+`specs/012-own-test-infra/contracts/test-environment.md`; helpers live in
+`.agents/skills/clearml-yolo-environment/scripts/`.
 
 ## The run's own test environment
 
@@ -49,7 +49,8 @@ for broad namespace or process cleanup.
 ## Diagnose ClearML 401 and missing tasks
 
 1. Inspect this checkout's `.run-tag` and that namespace's pods in `docker-desktop`.
-2. Run `scripts/check_env.sh` beside the skill. It authenticates with the effective
+2. Run `bash .agents/skills/clearml-yolo-environment/scripts/check_env.sh`.
+   It authenticates with the effective
    endpoint/credentials and names their source; unauthenticated `debug.ping` alone
    proves no usable credentials. The helper's exit zero is only successful reporting.
 3. An unreachable loopback endpoint usually means a stopped port-forward or vanished

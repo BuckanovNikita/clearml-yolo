@@ -1,7 +1,7 @@
 # Detector and export verification
 
-Select the affected rows of the [model acceptance matrix](../../../../docs/multi-model-backends.md)
-and [deployment contract](../../../../docs/tensorrt-deployment.md). These contracts own
+Paths start at the repository root. Select affected matrix rows in
+`docs/multi-model-backends.md` and `docs/tensorrt-deployment.md`. These contracts own
 presets, numerical tolerances, execution cases and target compatibility.
 
 - For native detector changes, exercise affected advertised presets with short real

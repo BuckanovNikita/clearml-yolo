@@ -1,20 +1,19 @@
 ---
 name: clearml-yolo-environment
-description: Prepare and clean a task-owned live CY environment, or diagnose ClearML authentication/endpoints on this machine. Excludes generic development and cluster administration.
+description: Use when preparing or cleaning a live CY environment, or diagnosing this machine's ClearML authentication or endpoints.
 ---
 
 # Operate the owned environment
 
-Before a live run or authentication diagnosis, read
-[machine workflow](references/machine-workflow.md). The
-[test-environment contract](../../../specs/012-own-test-infra/contracts/test-environment.md)
-and [lifecycle](../../../tests/integration/lifecycle.py) own creation, adoption and
-safe deletion. An invocation of this skill does not authorize live work during a
-planning-only task.
+Paths start at the repository root. Before live work or authentication diagnosis,
+read `.agents/skills/clearml-yolo-environment/references/machine-workflow.md`.
+`specs/012-own-test-infra/contracts/test-environment.md` owns lifecycle rules;
+`tests/integration/lifecycle.py` implements them. Planning-only tasks remain read-only.
 
 1. Work from the intended checkout; its record owns the environment. Inspect an
    existing live record before setup and preserve another session's resources.
-2. Source `scripts/agent_env.sh` beside this skill. It creates a fresh environment and
+2. Run `source .agents/skills/clearml-yolo-environment/scripts/agent_env.sh`.
+   It creates a fresh environment and
    exports its endpoints, `CY_RUN_TAG` and `CY_RUN_DIR`. A live recorded environment is
    refused; do not replace it without ownership. Exit 3 defers setup, exit 1 needs
    diagnosis/recovery. Never fall back to host credentials.
@@ -22,8 +21,9 @@ planning-only task.
    `clearml.project_name="$CY_RUN_TAG clearml-yolo"` and
    `clearml.tags=[$CY_RUN_TAG]` explicitly. Select CPU or an available GPU according to
    the requested claim and current host capacity. Use current generated YAML and the
-   [configuration contract](../../../docs/experiment-records.md#configuration-resolution-and-replay).
-4. Inspect outcomes and preserve evidence before running `scripts/agent_cleanup.sh`.
+   `docs/experiment-records.md` (Configuration resolution and replay).
+4. Preserve evidence, then run
+   `bash .agents/skills/clearml-yolo-environment/scripts/agent_cleanup.sh`.
    It removes published data with the environment and deletes the identified run
    directory only after environment deletion succeeds. `--dry-run` previews cleanup;
    `--tag` and `--run-dir` support recovery after losing the original shell. Confirm
@@ -32,10 +32,10 @@ planning-only task.
    Keep failed cleanup records for retry; never describe setup availability as a test
    pass. Forgotten environments have the lifetime defined by the environment contract.
 
-For a 401, missing tasks or a suspected endpoint mix-up, run `scripts/check_env.sh`
-from the checkout and follow [diagnosis](references/machine-workflow.md#diagnose-clearml-401-and-missing-tasks).
+For a 401, missing tasks or an endpoint mix-up, follow Machine workflow's diagnosis
+and run `bash .agents/skills/clearml-yolo-environment/scripts/check_env.sh`.
 The helper reports without printing credentials and always exits zero; its FAIL/WARN
 lines need interpretation. It is an on-demand diagnostic, not an acceptance gate.
 
-[Historical evidence](references/evidence-archive.md) is consulted only for an audit;
-it does not supply current commands or current verification.
+For historical audits only, read
+`.agents/skills/clearml-yolo-environment/references/evidence-archive.md`.

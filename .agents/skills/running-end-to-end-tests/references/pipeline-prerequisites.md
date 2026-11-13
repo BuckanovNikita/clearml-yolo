@@ -1,18 +1,18 @@
 # Select native-run inputs
 
-Read only the contracts affected by the intended claim. Package versions, command
-options and defaults belong to project configuration and command help.
+Paths start at the repository root. Read contracts affected by the intended claim;
+versions, options and defaults belong to configuration and command help.
 
 | Decision before execution | Authoritative guidance |
 | --- | --- |
-| Prepare CY, optional queue and backend dependencies | [Development setup](../../../../docs/development.md#external-dependencies), [paired compatibility](../../../../docs/development.md#paired-cy-and-queue-release-check) |
-| Choose an invocation workspace and preserve SDK/user state | [Filesystem policy](../../../../docs/filesystem-policy.md) |
-| Select local CSV or finalized CSV-only ClearML dataset; resolve media and literal IDs | [Ground-truth sources](../../../../docs/input-provenance.md#ground-truth-sources) |
-| Generate editable YAML for the selected command/model and choose explicit native devices | [Configuration/replay](../../../../docs/experiment-records.md#configuration-resolution-and-replay), `cy-init-config --help` |
-| Select native backend, pretrained assets or export runtime | [Model guide](../../../../docs/multi-model-backends.md), [asset recovery](../../../../docs/model-assets.md), [deployment guide](../../../../docs/tensorrt-deployment.md) |
-| Choose direct or queued execution, isolated metadata and recovery ownership | [Queue contract](../../../../docs/queue.md), `cy-queue --help` |
-| Prepare baseline/candidate inputs, exact validation thresholds and identity sidecars | [Evaluation/recovery](../../../../docs/experiment-records.md#evaluation-comparison-and-historical-model-recovery), [input provenance](../../../../docs/input-provenance.md) |
-| Enable FiftyOne with a shared lock directory for publishers using the same owned database | [Runtime isolation](../../../../docs/runtime-isolation.md#fiftyone-evaluation-publication), [environment skill](../../clearml-yolo-environment/SKILL.md) |
+| Prepare CY, optional queue and backend dependencies | `docs/development.md` (External dependencies; Paired CY and queue release check) |
+| Choose an invocation workspace and preserve SDK/user state | `docs/filesystem-policy.md` |
+| Select local CSV or finalized CSV-only ClearML dataset; resolve media and literal IDs | `docs/input-provenance.md` (ground truth sources) |
+| Generate editable YAML for the selected command/model and choose explicit native devices | `docs/experiment-records.md` (configuration resolution and replay), `cy-init-config --help` |
+| Select native backend, pretrained assets or export runtime | `docs/multi-model-backends.md`, `docs/model-assets.md`, `docs/tensorrt-deployment.md` |
+| Choose direct or queued execution, isolated metadata and recovery ownership | `docs/queue.md`, `cy-queue --help` |
+| Prepare baseline/candidate inputs, exact validation thresholds and identity sidecars | `docs/experiment-records.md` (evaluation comparison and historical model recovery), `docs/input-provenance.md` |
+| Enable FiftyOne with a shared lock directory for publishers using the same owned database | `docs/runtime-isolation.md` (fiftyone evaluation publication), `clearml-yolo-environment` |
 
 Before live work, establish available hardware and preserve unrelated compute. Use the
 owned environment's endpoints and explicit tagged project overrides; never adapt an

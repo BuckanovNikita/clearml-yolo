@@ -1,45 +1,38 @@
 ---
 name: release
-description: Select local integration or publishing, check review and native evidence, and recover failed clearml-yolo release attempts. Use for releases, held locks, moved refs or prepared version changes.
+description: Use when releasing clearml-yolo or recovering held locks, moved refs, prepared version changes or failed publishing.
 ---
 
 # Release clearml-yolo
 
-[Local releases](../../../docs/development.md#local-releases) own policy;
-[Task operations](../../../Taskfile.ops.yml) and
-[semantic-release configuration](../../../pyproject.toml) own commands and versions.
+Read `docs/development.md` (Local releases and External dependencies).
+`Taskfile.ops.yml` and `pyproject.toml` own commands and versions.
+Paths start at the repository root.
 
-1. Establish authorization for the intended operation. `release-local` permits local
-   fast-forward integration and version/tag creation; publishing requires separate
-   authorization, either `--publish` on that invocation or `release-publish` later.
-   An implementation request alone does not authorize a real release.
-2. Inspect the clean proposed tip and current CY/cy-queue sources. Resolve missing
-   prerequisites through [setup](../../../docs/development.md#external-dependencies).
-   Confirm fresh independent review and the CPU/single-GPU, direct/queued and
-   publication observations selected by
-   [end-to-end acceptance](../running-end-to-end-tests/SKILL.md). Automated stages do
-   not establish manual observations. Check host capacity before GPU execution.
-3. Invoke the selected Task entrypoint with the full immutable `--expected-tip` SHA.
-   Let it own automated stages, locking, fast-forward integration, semantic-release,
-   final-version pairing and exact-ref publication. Do not precede it with equivalent
-   acceptance or paired stages. The invocation reuses its stages; later publication
-   deliberately checks the existing version afresh without re-versioning.
-4. Report actual check outcomes, review/native evidence, accepted and final SHAs,
-   final pair versions, version/no-version outcome and any remotely confirmed refs.
-   A deferred supported gate blocks completion; follow
-   [verification workflow](../verification-workflow/SKILL.md).
+1. Establish authorization: `release-local` integrates locally and creates versions/tags;
+   `--publish` or later `release-publish` needs separate publishing authorization.
+   An implementation request alone authorizes neither a release nor publishing.
+2. Inspect the clean proposed tip and current CY/cy-queue sources; resolve prerequisites.
+   Confirm fresh independent review and `running-end-to-end-tests` evidence for CPU/single-GPU,
+   direct/queued and publication outcomes. Automated stages do not prove manual
+   observations. Check host capacity before GPU work.
+3. Invoke Task with the full immutable `--expected-tip` SHA. Task owns gates, locking,
+   fast-forward integration, semantic-release, final-version pairing and exact-ref
+   publication. Avoid equivalent preceding acceptance/pairing runs. Immediate publishing
+   reuses the invocation's stages; later publishing verifies afresh without re-versioning.
+4. Report checks, review/native evidence, accepted/final SHAs, final pair versions,
+   version/no-version outcome and remotely confirmed refs. Use `verification-workflow`
+   for deferred gates, which block completion.
 
-## Diagnosis and recovery
+## Recover by failure
 
-- A held lock is a blocker: do not wait on or remove it. A busy master worktree,
-  divergent history, dirty inputs or moved expected tip needs owner resolution.
-- Final-pair or build failure leaves prepared files for inspection and creates no
-  release commit/tag. Inspect the staged diff, actual refs and logs before recovery;
-  restore only this attempt's changes when authorized, fix the cause and verify the
-  new tip. Never hand-edit versions/tags or widen the release exception.
-- Publishing failure does not erase a valid local release. Inspect remote refs first;
-  retry through `release-publish` with the existing expected SHA/tag, retaining the
-  separate push authorization. Do not run version creation again.
-- Keep unrelated files, workloads and the independent model-weight release process
-  intact. Use [weight releases](../../../docs/development.md#model-weight-releases)
-  only for explicitly requested model assets.
+- **Held lock:** stop; neither wait on nor remove it. Busy master, divergence, dirty
+  inputs or moved tips need owner resolution.
+- **Final-pair/build failure:** inspect prepared files, staged diff, refs and logs.
+  No release commit/tag is created. Restore only this attempt's changes when authorized,
+  fix the cause and verify the new tip. Keep version/tag creation with semantic-release
+  and preserve the release exception's scope.
+- **Publishing failure:** inspect remote refs; retain the valid local release and retry
+  `release-publish` with its expected SHA/tag and separate push authorization.
+- **Model assets:** preserve their independent process and unrelated workloads/files.
+  Read Development procedures (Model-weight releases) only for explicitly requested assets.
