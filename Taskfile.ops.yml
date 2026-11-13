@@ -22,18 +22,7 @@ tasks:
         fi
         # Never overwrite an existing uv.toml: it may hold other local settings.
         if [ -e uv.toml ]; then
-          uv run --no-project --no-config python - <<'PY'
-        import sys
-        import tomllib
-        from pathlib import Path
-
-        try:
-            links = tomllib.loads(Path("uv.toml").read_text()).get("find-links", [])
-        except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
-            sys.exit(f"local-deps: cannot read uv.toml: {exc}")
-        if "external/wheelhouse" not in links:
-            sys.exit('local-deps: uv.toml exists without find-links = ["external/wheelhouse"]; add that entry by hand.')
-        PY
+          uv run --no-project --no-config python scripts/check_local_uv.py
         fi
         mkdir -p external/wheelhouse
         # Build both archives aside first: a failed build keeps the previous wheelhouse intact.
@@ -222,36 +211,11 @@ tasks:
         # Both distributions must match their source versions and be the editable
         # installs of these checkouts (cy-queue's minimum-only CY bound must not have
         # replaced the locked CY with an index build).
-        "$python" - "$root" "$queue" <<'PY'
-        import importlib.metadata
-        import json
-        import sys
-        import tomllib
-        from pathlib import Path
-        from urllib.parse import unquote, urlparse
-
-        for directory in map(Path, sys.argv[1:]):
-            project = tomllib.loads((directory / "pyproject.toml").read_text())["project"]
-            distribution = importlib.metadata.distribution(project["name"])
-            if distribution.version != project["version"]:
-                sys.exit(f"paired-check: {project['name']} source {project['version']} != installed {distribution.version}")
-            direct = json.loads(distribution.read_text("direct_url.json") or "{}")
-            location = Path(unquote(urlparse(direct.get("url", "")).path))
-            editable = direct.get("dir_info", {}).get("editable", False)
-            if not editable or location.resolve() != directory.resolve():
-                sys.exit(f"paired-check: {project['name']} is not the editable install of {directory}: {direct}")
-        PY
+        "$python" "$root/scripts/paired_metadata.py" check "$root" "$queue"
         (cd "$queue" && "$python" -m pytest -q)
         "$venv/bin/cy-queue" --help >/dev/null
         for project in "$root" "$queue"; do
-          "$python" - "$project" "$(git -C "$project" rev-parse HEAD)" <<'PY'
-        import sys
-        import tomllib
-        from pathlib import Path
-
-        project = tomllib.loads((Path(sys.argv[1]) / "pyproject.toml").read_text())["project"]
-        print(f"paired-check: {project['name']} {project['version']} {sys.argv[2]} {sys.argv[1]}")
-        PY
+          "$python" "$root/scripts/paired_metadata.py" report "$project" "$(git -C "$project" rev-parse HEAD)"
         done
 
   release-acceptance:
