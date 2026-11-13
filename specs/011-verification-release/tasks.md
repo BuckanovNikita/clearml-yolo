@@ -146,5 +146,28 @@ US1 (Phase 3) on top of Phases 1–2.
 - [x] Keep named tool commands and sequential development stages in the root Taskfile.
 - [x] Move operational stages into a flattened include, preserving public task names.
 - [x] Extract the testmon fingerprint, including both Taskfiles; centralize pytest scheduling.
-- [ ] Verify command wiring, test selection, final hooks, acceptance and paired check.
-- [ ] Obtain fresh independent review and record final evidence.
+- [x] Verify command wiring, test selection, final hooks, acceptance and paired check.
+- [x] Obtain fresh independent review and record final evidence.
+
+Verification of implementation commit `40ee215`:
+
+- Passed: static Task checks (lock, Ruff, architecture, mypy, Vulture, deptry).
+- Passed: unchanged unit collection (4,674 node IDs); path-less GPU selection
+  collected 18 tests; integration marker and explicit directory each selected 30.
+- Passed: full testmon baseline, 4,673 passed and one skipped.
+- Passed: clean-tip acceptance, including property exploration (4,673 passed,
+  one skipped), coverage (4,673 passed, one skipped; 84.36% against 84.12%), and
+  live CPU smoke (one passed, 29 skipped, 81 deselected).
+- Passed: Task-owned namespace `cy-it-e99f2e` deleted and proven absent.
+- Passed: paired CY 0.48.1 / cy-queue 0.1.10 check, 527 passed and seven deselected;
+  source/installed metadata matched and the temporary environment was removed.
+- Passed: mutation reports against master and the implementation parent; no changed
+  product functions to mutate (no mutation-strength claim).
+- Passed: all-files prek pipeline without skip overrides or hook edits.
+- Independent review found no blocking issues and confirmed root-file tool visibility,
+  fingerprint semantics, flattened task references and repository-root execution from
+  a subdirectory. Operational task bodies were unchanged except named-check and
+  coverage delegation.
+- GPU and opt-in FiftyOne execution were not required or established. No push or
+  version release was performed. This evidence-only follow-up does not alter the
+  implementation inputs checked on `40ee215`.
