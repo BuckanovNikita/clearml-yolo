@@ -15,7 +15,7 @@ Python compatibility and tool versions remain in pyproject.toml; Bash, Task, pre
 pytest/testmon and semantic-release remain the owning tools. Existing ignored local
 external packages and environment are reused. Tests are disposable command-level
 scenarios, static gates and retained product collection/acceptance. No new tooling tests.
-The target is the existing Linux developer/release workflow; no product source changes.
+The target is the existing Linux developer/release workflow; product import simplification is included in the approved architecture reduction.
 
 ## Constitution Check
 
@@ -48,3 +48,14 @@ empty selections and release failures. Static checks run after automatic correct
 Explicit product collection proves retained tests remain collectable; applicable explicit
 acceptance remains full, preflight first. No real release/publish. Record measured line/test
 reductions, exact checks, review and any deferred external outcomes in dated evidence.
+
+## Architecture reduction implementation
+
+Convert fixed dynamic imports while preserving guards and lazy timing; retain computed
+DEIM targets. Adapt product mocks and add actual import/target coverage. Replace custom
+architecture scripts with native import-linter contracts and Ruff restrictions, removing
+unused direct tooling dependencies. Reconcile authoritative documentation with explicit
+retired enforcement. Root owns shared configuration, integration and commits; bounded
+agents own source/matching tests and independent runtime tests. Verify focused paths,
+full ordinary suite and applicable live gates, then canonical committed-tip hooks and
+fresh independent review. No scanner implementation migrates into tests.

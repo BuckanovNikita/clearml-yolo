@@ -42,7 +42,7 @@ Maintainers have one verification policy and concise decision-oriented skills.
 1. Hygiene covers tracked eligible files, preserves automatic whitespace/newline fixes,
    exclusions and the 512 KB limit; edits fail for inspection. Ruff fixes stay explicit.
 2. One staging check runs before the hook dispatcher can stash. Conventional Commits,
-   worktree awareness, import/dynamic-import boundaries, initializers, runtime targets,
+   worktree awareness, declarative import boundaries, runtime import and target behavior,
    mutation selection and process cleanup remain enforced.
 3. Custom static effect checks and tooling/packaging/metadata/infrastructure-only tests
    are removed. Purity guidance and the reduced automated coverage remain explicit.
@@ -111,3 +111,19 @@ interrupted cleanup, no-version outcomes and validation failures are explicit ca
 The supplied plan authorizes implementation and local task commits, but no real release
 or publishing. Existing supported live gates may be deferred only with reported evidence.
 Project native Spec Kit owns artifacts; the implementation does not alter installed tooling.
+
+## Approved architecture reduction
+
+Remove custom architecture scanners without adding tools or moving source scanners into
+product tests. Fixed-name dynamic imports become ordinary local imports at the same
+execution point; computed DEIM loading remains a narrow exception. Ruff and import-linter
+own explicit dependency restrictions. Product tests exercise initializer behavior,
+configuration targets, console metadata, worker destinations, plugin registration and
+resources. No public runtime interface or supported behavior changes.
+
+Retire global cycle prohibition, initializer call/decorator syntax bans, blanket core
+and pure-helper dependency allowlists, packager member/external-library allowlists,
+and scanning of all dotted source strings. Preserve explicit layers, SDK ownership,
+adapter and queue boundaries, product/test separation and packager module restrictions.
+Tests establish exercised behavior, not every possible import order or unexecuted branch.
+No new tool, release, push, upstream revision change or installed Spec Kit edit is authorized.

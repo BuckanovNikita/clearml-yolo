@@ -1,6 +1,5 @@
 """Native tensor boundaries around project-owned RGB detection samples."""
 
-import importlib
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -24,7 +23,8 @@ def training_pipeline(config: TransformConfig | None, seed: int) -> "TrainingPip
 
 def worker_seed(seed: int) -> int:
     """Use distinct Torch worker streams without replacing the configured owner seed."""
-    torch = importlib.import_module("torch")
+    import torch
+
     worker = torch.utils.data.get_worker_info()
     return seed if worker is None else int(worker.seed)
 
@@ -46,10 +46,12 @@ def tensor_target(
     sample: "DetectionSample", original: dict[str, Any], *, bounding_boxes: bool = False
 ) -> dict[str, Any]:
     """Keep image identity while rebuilding every detection-aligned target field."""
-    torch = importlib.import_module("torch")
+    import torch
+
     boxes = torch.from_numpy(sample.boxes.copy())
     if bounding_boxes:
-        tensors = importlib.import_module("torchvision.tv_tensors")
+        import torchvision.tv_tensors as tensors
+
         boxes = tensors.BoundingBoxes(boxes, format="XYXY", canvas_size=sample.image.shape[:2])
     target = original | {
         "boxes": boxes,

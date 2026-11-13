@@ -5,7 +5,6 @@ across IoU 0.50:0.95 and all annotated categories. Missing-GT categories have re
 """
 
 import hashlib
-import importlib
 import importlib.metadata
 import io
 import math
@@ -13,7 +12,7 @@ from collections.abc import Mapping, Sequence
 from contextlib import redirect_stdout
 from pathlib import Path
 from types import ModuleType
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -25,10 +24,11 @@ COCO_MAX_DETECTIONS = 100
 
 
 def _actual_evaluator() -> ModuleType:
-    evaluation = importlib.import_module("pycocotools.cocoeval")
+    import pycocotools.cocoeval as evaluation
+
     if evaluation.COCOeval.__module__ != "pycocotools.cocoeval":
         raise ValueError("Export quality requires actual pycocotools COCOeval, not an aliased evaluator")
-    return evaluation
+    return cast("ModuleType", evaluation)
 
 
 def evaluator_identity() -> dict[str, str]:
@@ -142,7 +142,8 @@ def evaluate_detections(
     labels = _population(images, class_names, detections)
     dataset = _truth(images, labels)
     records = _prediction_rows(images, len(labels), detections)
-    coco = importlib.import_module("pycocotools.coco")
+    from pycocotools import coco
+
     evaluation = _actual_evaluator()
     # COCO progress tables are noisy library stdout; failures still propagate.
     with redirect_stdout(io.StringIO()):

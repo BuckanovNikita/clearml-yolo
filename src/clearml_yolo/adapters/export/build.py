@@ -1,6 +1,5 @@
 """TensorRT build boundary. Optional SDKs are loaded only when building."""
 
-import importlib
 import math
 from dataclasses import dataclass
 from pathlib import Path
@@ -22,7 +21,8 @@ class EngineBuildResult:
 
 
 def _plugin_graph(path: Path, precision: Literal["fp32", "fp16"] = "fp32") -> bytes:
-    onnx = importlib.import_module("onnx")
+    import onnx
+
     model = onnx.load(str(path))
     if precision == "fp16":
         fp16_weighted_graph(model, onnx)
@@ -73,7 +73,8 @@ def build_engine(
         raise ValueError("Unsupported TensorRT precision")
     if type(device) is not int or device < 0:
         raise ValueError("CUDA device must be a nonnegative integer index")
-    trt: Any = importlib.import_module("tensorrt")
+    import tensorrt as trt
+
     if not trt.__version__.startswith("10.13.0."):
         raise RuntimeError(f"TensorRT 10.13.0 is required, got {trt.__version__}")
     cuda = initialize_cuda(device)

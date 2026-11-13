@@ -3,7 +3,6 @@
 import ctypes
 import ctypes.util
 import hashlib
-import importlib
 import importlib.util
 import sys
 from pathlib import Path
@@ -91,7 +90,9 @@ class TensorRTRunner:
             raise ValueError("Engine SHA256 does not match export metadata")
         self.metadata = metadata
         self.device = device
-        self.trt: Any = importlib.import_module("tensorrt")
+        import tensorrt
+
+        self.trt: Any = tensorrt
         expected_version = metadata.runtime_versions.get("tensorrt")
         if not self.trt.__version__.startswith("10.13.0.") or expected_version != self.trt.__version__:
             raise RuntimeError("TensorRT version does not match the metadata's 10.13.0 runtime")

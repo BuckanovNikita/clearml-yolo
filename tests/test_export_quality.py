@@ -171,7 +171,10 @@ def test_evaluator_alias_contamination_fails_before_quality_evaluation(
         {"__module__": "faster_coco_eval.core.faster_eval_api"},
     )
     replacement.COCOeval = replacement_type  # type: ignore[attr-defined]
+    import pycocotools
+
     monkeypatch.setitem(sys.modules, "pycocotools.cocoeval", replacement)
+    monkeypatch.setattr(pycocotools, "cocoeval", replacement)
     with pytest.raises(ValueError, match="actual pycocotools"):
         evaluator_identity()
     with pytest.raises(ValueError, match="actual pycocotools"):

@@ -1,0 +1,7 @@
+# Product imports use ordinary local imports; runtime DEIM loading has exact exceptions.
+extend = "../ruff.toml"
+
+[lint.flake8-tidy-imports.banned-api]
+"logging".msg = "Use loguru's logger."
+"importlib.import_module".msg = "Use an ordinary local import; only computed DEIM loaders are exempt."
+"builtins.__import__".msg = "Use an ordinary local import."

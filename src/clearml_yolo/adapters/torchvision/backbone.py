@@ -1,6 +1,5 @@
 """Pretrained hierarchical and patch-token backbones with explicit detector pyramids."""
 
-import importlib
 from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Literal, cast, override
@@ -30,7 +29,8 @@ class FeaturePyramid(nn.Module):
         first_level: Literal[2, 3] = 2,
     ) -> None:
         super().__init__()
-        timm = importlib.import_module("timm")
+        import timm
+
         self.preset = preset
         self.strides = _STRIDES if first_level == _P2 else _STRIDES[1:]
         self.intermediate_indices = [2, 5, 8, 11] if first_level == _P2 else [5, 8, 11]
@@ -51,13 +51,15 @@ class FeaturePyramid(nn.Module):
             options["pretrained_cfg_overlay"] = {"file": str(weights.absolute())}
         # A native file override retains checkpoint filtering, key remapping and
         # positional interpolation before timm wraps the feature extractor.
-        self.body = timm.create_model(TIMM_MODELS[preset], pretrained=weights is not None, **options)
+        # Native backbones expose preset-specific attributes beyond nn.Module.
+        self.body = cast("Any", timm.create_model(TIMM_MODELS[preset], pretrained=weights is not None, **options))
         channels = (
             [int(self.body.num_features)] * len(self.strides)
             if self.patch_features
             else self.body.feature_info.channels()
         )
-        pyramid = importlib.import_module("torchvision.ops.feature_pyramid_network")
+        import torchvision.ops.feature_pyramid_network as pyramid
+
         self.fpn = pyramid.FeaturePyramidNetwork(
             channels,
             self.out_channels,
@@ -102,13 +104,15 @@ def _resnet_backbone(
     weights: Path | None,
     first_level: Literal[2, 3] = 2,
 ) -> Any:
-    utilities = importlib.import_module("torchvision.models.detection.backbone_utils")
+    import torchvision.models.detection.backbone_utils as utilities
+
     name = preset.removesuffix("_fpn")
     if pretrained and weights is None:
         raise ValueError("Prepare the pretrained backbone asset before native construction")
     options: dict[str, Any] = {}
     if first_level == _P3:
-        pyramid = importlib.import_module("torchvision.ops.feature_pyramid_network")
+        import torchvision.ops.feature_pyramid_network as pyramid
+
         options.update(returned_layers=[2, 3, 4], extra_blocks=pyramid.LastLevelP6P7(256, 256))
     backbone = utilities.resnet_fpn_backbone(
         backbone_name=name,

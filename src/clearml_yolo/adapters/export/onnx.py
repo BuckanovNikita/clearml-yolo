@@ -1,7 +1,6 @@
 """Dynamic detector ONNX export with optional SDK imports at execution only."""
 
 import copy
-import importlib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -42,16 +41,23 @@ def export_onnx(
         raise ValueError("Export requires batch 1-4, three RGB channels and dimensions >=32")
     if height % _STRIDE or width % _STRIDE:
         raise ValueError("Export canvas height and width must be divisible by 32")
-    torch = importlib.import_module("torch")
-    onnx = importlib.import_module("onnx")
-    tensor_adapter = importlib.import_module("clearml_yolo.adapters.export.tensors")
+    import torch
+
+    # isort: split
+    import onnx
+
+    import clearml_yolo.adapters.export.tensors as tensor_adapter
+
     source = copy.deepcopy(model).cpu().float().eval()
-    native_models = importlib.import_module("clearml_yolo.adapters.fasterrcnn.model")
+    import clearml_yolo.adapters.fasterrcnn.model as native_models
+
     if isinstance(source.backbone, native_models.FeaturePyramid) and source.backbone.preset == "dinov2_small":
-        positions = importlib.import_module("clearml_yolo.adapters.export.positions")
+        from clearml_yolo.adapters.export import positions
+
         source.backbone.body = positions.ExportViTIntermediates(source.backbone.body)
     elif isinstance(source.backbone, native_models.FeaturePyramid) and source.backbone.preset == "dinov3_small":
-        positions = importlib.import_module("clearml_yolo.adapters.export.positions")
+        from clearml_yolo.adapters.export import positions
+
         if tuple(source.backbone.body.patch_embed.patch_size) != (16, 16):
             raise ValueError("DINOv3 export requires its native patch16 embedding")
         # Every admitted canvas is stride32, hence also patch16 divisible. Native
@@ -60,7 +66,8 @@ def export_onnx(
         source.backbone.body.patch_embed.dynamic_img_pad = False
         source.backbone.body.rope = positions.ExportDinoRotary(source.backbone.body.rope)
     elif isinstance(source.backbone, native_models.FeaturePyramid) and source.backbone.preset == "swin_tiny":
-        swin = importlib.import_module("clearml_yolo.adapters.export.swin")
+        from clearml_yolo.adapters.export import swin
+
         swin.adapt_swin_blocks(source.backbone.body)
     adapter = tensor_adapter.TensorizedDetector(source).eval()
     images = torch.zeros(sample_shape, dtype=torch.float32)

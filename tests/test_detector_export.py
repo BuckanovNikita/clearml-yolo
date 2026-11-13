@@ -1,5 +1,6 @@
 """Inference export contracts: class separation, padding and native interpolation."""
 
+import builtins
 import ctypes
 import importlib
 import json
@@ -161,10 +162,14 @@ def test_metadata_roundtrip_and_hash_binding(tmp_path: Path, monkeypatch: pytest
     assert helpers.read_metadata(sidecar) == metadata
     path.write_bytes(b"altered")
 
-    def unexpected_import(_name: str) -> Any:
-        raise AssertionError("Hash mismatch must fail before importing the SDK")
+    original_import = builtins.__import__
 
-    monkeypatch.setattr(runtime.importlib, "import_module", unexpected_import)
+    def unexpected_import(name: str, *args: Any, **kwargs: Any) -> Any:
+        if name == "tensorrt":
+            raise AssertionError("Hash mismatch must fail before importing the SDK")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", unexpected_import)
     with pytest.raises(ValueError, match="SHA256"):
         runtime.TensorRTRunner(path, metadata)
 
@@ -305,10 +310,14 @@ def test_build_invalid_controls_fail_before_sdk(
 ) -> None:
     build = importlib.import_module("clearml_yolo.adapters.export.build")
 
-    def unexpected_import(_name: str) -> Any:
-        raise AssertionError("Invalid controls must fail before SDK import")
+    original_import = builtins.__import__
 
-    monkeypatch.setattr(build.importlib, "import_module", unexpected_import)
+    def unexpected_import(name: str, *args: Any, **kwargs: Any) -> Any:
+        if name in {"tensorrt", "onnx"}:
+            raise AssertionError("Invalid controls must fail before SDK import")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", unexpected_import)
     with pytest.raises(ValueError, match=r"workspace|profile|device"):
         build.build_engine(tmp_path / "graph.onnx", tmp_path / "engine.bin", **kwargs)
 

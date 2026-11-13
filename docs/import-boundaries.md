@@ -9,16 +9,12 @@ Import-linter's exhaustive container contracts classify every root child, adapte
 responsibility and application component. A new unclassified child such as
 `clearml_yolo.misc` fails `lint-imports` even when it has no imports. Adapter
 responsibilities share one classification level; the peer contracts below govern
-their permitted edges. The architecture task supplements these contracts with `graphlib` whole-graph cycle detection,
-core/adapter dependency allowlists, initializer and runtime-target checks.
+their permitted edges.
 
-`uv run --locked task --exit-code architecture` enforces the configured contracts in
-[.importlinter](../.importlinter), plus graph cycles, core dependency allowlists,
-initializers, runtime targets and maintainer boundaries. It applies
-contracts to the actual product graph augmented with literal dynamic imports.
-The development `check` and `verify` tasks include it. Runtime import and generated
-Hydra composition checks remain in `tests/test_architecture.py` because they execute
-product code.
+`uv run --locked task --exit-code architecture` runs the declarative contracts in
+[.importlinter](../.importlinter). The development `check` and `verify` tasks include
+this stage and the product import restrictions in [Ruff configuration](../src/ruff.toml).
+Product tests exercise imports, generated configuration and supported runtime targets.
 
 ## Layers and effects
 
@@ -33,9 +29,13 @@ Adapters cannot import application use cases, application evaluation orchestrati
 or entrypoints. Application cannot import adapters, entrypoints or protected SDKs.
 Each command entrypoint remains independent of the other commands;
 shared composition and Hydra helpers provide their common infrastructure.
-All project helper and core imports form an acyclic graph.
+Import and execution tests catch circular imports that break supported behavior;
+there is no separate whole-graph or sibling-cycle prohibition. Layer and dependency-
+direction contracts still apply.
 
-Core permits the standard library, Pydantic, Pandera, pandas, NumPy and SciPy.
+Core uses explicit dependency restrictions rather than a blanket dependency allowlist.
+Scientific dependencies such as Pydantic, Pandera, pandas, NumPy and SciPy remain
+supported; newly introduced dependencies require review.
 It performs no filesystem, network, process or environment access and imports no
 SDK, rendering library or Loguru. Paths in data records describe values; adapters
 resolve, inspect and open them. Application effects go through typed ports such as
@@ -66,11 +66,16 @@ dependencies are forbidden in both application and core.
 
 The exact imports listed in `ignore_imports` are the permitted ownership edges,
 including imports used only for type checking. New SDK imports require a matching
-owner and an explicit contract entry. Ordinary unmatched exceptions fail; optional
-backend/export contracts explicitly permit absent imports. Import-linter checks
-static imports; literal dynamic imports participate in the project-specific graph
-checks but are not checked against import-linter ownership contracts. Indirect SDK use through an approved adapter is normal;
-the layer rules still prevent a core or application module from reaching that adapter.
+owner and an explicit contract entry. Import-linter checks ordinary imports, including
+function-local imports. Fixed-name imports use that form at the point of use so
+lazy loading remains visible to the dependency checker. Ruff restricts dynamic import
+facilities in product source; computed DEIM namespace loading retains documented
+call-site exceptions. The installed rule detects `import_module` aliases and
+`builtins.__import__`, but not bare `__import__`; review must catch that unsupported
+spelling rather than relying on the lint result.
+Those computed targets are runtime behavior and are not statically resolved.
+Indirect SDK use through an approved adapter is normal; the layer rules still prevent
+a core or application module from reaching that adapter.
 
 Queue admission and its disposable visibility probe belong to `cy_queue`; its
 architecture contracts own their SDK edges. CY's local estimator separately owns
@@ -141,39 +146,42 @@ and updates to the contracts.
 
 ## Initializers and runtime targets
 
-Package initializers may define lazy factories, protocols and plugin registration
-functions or re-export pure records. They cannot eagerly load protected SDKs or
-execute startup operations. The public root is also imported in a fresh interpreter
-to verify that no scientific library, framework or SDK is pulled in by that import.
+Package initialization remains inert: imports must not eagerly load protected SDKs
+or perform prohibited startup effects. Fresh-process product tests exercise this
+behavior, including the public root's stronger requirement to avoid scientific
+libraries, frameworks and SDKs. Calls and decorators are not forbidden merely by
+syntax; their observed import behavior and effect ownership matter.
 
-CY architecture checks inventory its console scripts and literal console, native
-worker and FiftyOne targets. The separate queue checks its guardian, snapshot runner
-and CUDA metadata-probe targets; the retired project Hydra launcher must not remain.
-They also export and compose the generated Hydra examples to inspect targets created by `hydra_zen.builds`. Target modules and named
-attributes must exist in the shipped source tree; legacy aliases and missing targets
-fail. These static checks complement command-help and installed-package verification
-described in [development procedures](development.md).
+Product tests cover console entrypoints from metadata, exported and composed Hydra
+configuration, destinations emitted by worker launch paths, plugin registration,
+configuration field references and resource consumers. Supported modules and named
+attributes must resolve; retired Python aliases and unsupported queue launch behavior
+remain rejected. The separate queue owns tests for its guardian, snapshot runner and
+GPU probe. Command-help and installed-package verification follow
+[development procedures](development.md#python-integration-and-architecture).
 
-See the [module and effect diagram](module-architecture.md) for interfaces and failure
-behavior. Static checks validate visible syntax and supported re-exports; they cannot
-prove arbitrary runtime attribute construction, monkeypatching or third-party effects.
-Use disposable command-level probes for architecture rejection behavior; product
-tests remain focused on runtime imports and composition.
+Tests execute product paths rather than inventory every dotted source string or
+reimplement Python name resolution. They establish behavior for exercised paths,
+import orders and environments, not all unexecuted branches or reflective constructs.
+Review effect ownership explicitly; neither import-linter nor runtime tests establish
+that arbitrary effects are absent from every allowed module.
 
-Target checks resolve every module/class segment, simple aliases and explicit project
-re-exports. Function-local, nested-function, annotation-only and `TYPE_CHECKING`-only
-bindings are not runtime module attributes. Initializer checks inspect definition-time
-decorators, defaults, annotations, class bases/metaclass expressions and class bodies;
-deferred function/lambda bodies are excluded. Arbitrary effects inside those callable
-bodies are a review obligation, including calls reached through aliases or wrappers.
+## Tooling boundaries and enforcement limits
 
-Nested class bodies do not inherit outer class namespaces. Class target aliases may
-refer to prior class or module bindings. Deferred callable bodies use final enclosing
-bindings; definition-time expressions retain their immediate scope. Calls made during
-module initialization and arbitrary later rebinding are outside that static model.
+Product code remains independent of test packages and dependencies. The weight packager
+uses approved product-module boundaries and explicit dependency restrictions; individual
+imported members and every possible external dependency are not allowlisted. Pure
+ClearML projection helpers remain SDK-free and use explicit dependency restrictions
+and inert behavior tests rather than blanket dependency allowlists.
 
-These checks do not execute inspected modules or provide complete control-flow,
-interprocedural or reflective analysis. Computed imports/attributes, generated or
-inherited attributes, branch-dependent rebinding and unknown wrappers remain review
-obligations. Historical effect-enforcement probes describe the former coverage; see the
-[negative-fixture evidence](https://github.com/BuckanovNikita/clearml-yolo/blob/d74945c83dc24094c599388bbcfd5e987daeb9bf/.specify/bugs/architecture-check-blindspots/test.md).
+The custom architecture scanners are retired. Their whole-graph cycle prohibition,
+initializer syntax restrictions, core/pure-helper dependency allowlists, packager
+member/external-library allowlists and all-dotted-string inventory are not replacement
+test requirements. New dependencies and unexercised behavior require review. The
+[module and effect diagram](module-architecture.md) describes preserved responsibilities.
+Historical static-effect probes describe former coverage, not current guarantees.
+
+Standalone pytest module names are listed explicitly in `.importlinter` because pytest
+prepends the test directory. Extend that contract when adding standalone test modules
+or helpers; it does not discover new filenames automatically. The weight packager may
+not import `importlib`; reflective imports via bare builtins remain a review limitation.

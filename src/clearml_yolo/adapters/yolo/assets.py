@@ -1,9 +1,9 @@
 """Describe native assets and explicitly configure persistent YOLO weight discovery."""
 
-import importlib
 import inspect
 import json
 from pathlib import Path
+from typing import Any
 
 from filelock import FileLock
 
@@ -35,8 +35,9 @@ def configure_weights_directory() -> Path:
     SDK settings must coordinate separately. Relative paths retain native literal
     semantics and are anchored to this invocation's working directory.
     """
-    utilities = importlib.import_module("ultralytics.utils")
-    settings = utilities.SETTINGS
+    import ultralytics.utils as utilities
+
+    settings: Any = utilities.SETTINGS
     path = Path(settings.file_path).resolve()
     try:
         with FileLock(str(path.with_name(path.name + ".cy-weights.lock")), timeout=30):
@@ -72,9 +73,14 @@ def configure_weights_directory() -> Path:
 
 
 def pretrained_asset(filename: str) -> AssetSpec:
-    downloads = importlib.import_module("ultralytics.utils.downloads")
-    checks = importlib.import_module("ultralytics.utils.checks")
-    utilities = importlib.import_module("ultralytics.utils")
+    from ultralytics.utils import downloads
+
+    # isort: split
+    from ultralytics.utils import checks
+
+    # isort: split
+    import ultralytics.utils as utilities
+
     name = str(checks.check_yolov5u_filename(filename, verbose=False))
     if name not in downloads.GITHUB_ASSETS_NAMES:
         raise ValueError(f"Unknown native Ultralytics detection asset: {name}")

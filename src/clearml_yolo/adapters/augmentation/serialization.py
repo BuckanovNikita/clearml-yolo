@@ -1,6 +1,5 @@
 """Checked Albumentations construction without arbitrary executable deserialization."""
 
-import importlib
 import inspect
 import math
 import warnings
@@ -191,8 +190,9 @@ def _build_pipeline(document: dict[str, JsonValue], *, seed: int) -> CompiledPip
     if not isinstance(name, str) or name.rsplit(".", maxsplit=1)[-1] != "Compose":
         raise ValueError("transform must be a root Albumentations Compose saved with A.save")
     _check_tree(root, "transform", root=True)
-    sdk = importlib.import_module("albumentations")
-    serialization = importlib.import_module("albumentations.core.serialization")
+    import albumentations as sdk
+    from albumentations.core import serialization
+
     # Registry entries are SDK classes, inspected before construction; no user imports execute.
     registry = cast(dict[str, Any], serialization.SERIALIZABLE_REGISTRY)
     _supported_class(name, registry, "transform")

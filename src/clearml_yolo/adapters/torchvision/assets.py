@@ -1,10 +1,9 @@
 """Describe the selected Torchvision/timm pretrained backbone assets and read-only caches."""
 
-import importlib
 import importlib.metadata
 import re
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 from urllib.parse import urlsplit
 
 from clearml_yolo.core.assets import AssetCache, AssetSpec, HubAsset
@@ -18,38 +17,47 @@ TIMM_MODELS = {
 
 
 def _torch_cache(filename: str) -> Path:
-    hub = importlib.import_module("torch.hub")
+    from torch import hub
+
     return Path(hub.get_dir()) / "checkpoints" / filename
 
 
 def _hf_cache(hub: HubAsset, filename: str) -> tuple[Path, ...]:
-    sdk = importlib.import_module("huggingface_hub")
+    import huggingface_hub as sdk
+
     path = sdk.try_to_load_from_cache(hub.repository, filename, cache_dir=hub.cache_dir, revision=hub.revision)
     return (Path(path),) if isinstance(path, str) else ()
 
 
 def _description(preset: str) -> tuple[str, str, tuple[AssetCache, ...], HubAsset | None]:
     if preset in {"resnet50_fpn", "resnet101_fpn"}:
-        models = importlib.import_module("torchvision.models")
+        from torchvision import models
+
         weights = models.ResNet50_Weights.DEFAULT if preset == "resnet50_fpn" else models.ResNet101_Weights.DEFAULT
         return str(weights.url), importlib.metadata.version("torchvision"), (), None
-    timm = importlib.import_module("timm")
-    native = timm.get_pretrained_cfg(TIMM_MODELS[preset])
+    import timm
+
+    native: Any = timm.get_pretrained_cfg(TIMM_MODELS[preset])
     if native is None:
         raise ValueError(f"No native pretrained asset configuration for {preset}")
     version = importlib.metadata.version("timm") + ":" + TIMM_MODELS[preset]
     # Source precedence is SDK policy (including TIMM_USE_OLD_CACHE). Keep its
     # discovery in this adapter so preparation follows normal create_model calls.
-    builder = importlib.import_module("timm.models._builder")
+    import timm.models._builder as builder  # noqa: PLC2701 - approved native integration interface
+
+    # The private SDK resolver supports both repository strings and filename tuples.
+    location: Any
     source, location = builder._resolve_pretrained_source(native.to_dict())  # noqa: SLF001
     if source == "url":
         return str(location), version, (), None
     if source != "hf-hub":
         raise ValueError(f"Unsupported native pretrained source for {preset}: {source}")
-    native_hub = importlib.import_module("timm.models._hub")
+    import timm.models._hub as native_hub  # noqa: PLC2701 - approved native integration interface
+
     repository, revision = native_hub.hf_split(location[0] if isinstance(location, tuple) else location)
     filename = location[1] if isinstance(location, tuple) else "pytorch_model.bin"
-    constants = importlib.import_module("huggingface_hub.constants")
+    from huggingface_hub import constants
+
     hub = HubAsset(
         repository=repository,
         revision=revision or "main",

@@ -26,18 +26,20 @@ _MODEL_NAMES = {"l": "dinov3_vits16", "x": "dinov3_vits16plus"}
 
 
 def _native_model(preset: str, source_dir: Path) -> "nn.Module":
-    torch = importlib.import_module("torch")
+    import torch
+
     core, _solver = load_source(source_dir)
-    backbone = importlib.import_module(core.__name__.removesuffix(".core") + ".backbone.dinov3")
+    backbone = importlib.import_module(core.__name__.removesuffix(".core") + ".backbone.dinov3")  # noqa: TID251 - verified DEIM runtime namespace
     # Conversion must neither initialize CUDA nor consume the training RNG stream.
     with torch.random.fork_rng(devices=[]), torch.device("cpu"):
-        torch.random.default_generator.manual_seed(0)
+        torch.random.default_generator.manual_seed(0)  # type: ignore[attr-defined]  # CPU-only generator is a runtime Torch export.
         return cast("nn.Module", backbone.DinoVisionTransformer(name=_MODEL_NAMES[preset]).eval())
 
 
 def native_state(source: Mapping[str, "Tensor"], preset: str, native: "nn.Module") -> dict[str, "Tensor"]:
     """Map every source tensor once; restore only architecture-defined nonlearned state."""
-    torch = importlib.import_module("torch")
+    import torch
+
     remaining = dict(source)
     result: dict[str, Tensor] = {}
 
@@ -113,7 +115,8 @@ def _sha256(path: Path) -> str:
 
 
 def _reload(path: Path, expected: Mapping[str, "Tensor"], native: "nn.Module") -> None:
-    torch = importlib.import_module("torch")
+    import torch
+
     try:
         loaded = torch.load(path, map_location="cpu", weights_only=True)
     except Exception as error:
@@ -165,7 +168,9 @@ def _publish(
 ) -> ResolvedAsset:
     from safetensors.torch import load_file
 
-    torch = importlib.import_module("torch")
+    # isort: split
+    import torch
+
     spec = huggingface_backbone_asset(preset)
     # Generic Hub requests also serve alternate representations. This conversion
     # has one frozen source representation and therefore rechecks its full pin.

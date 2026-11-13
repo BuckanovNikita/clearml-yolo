@@ -195,9 +195,10 @@ def validate(solver: Any, module_name: str, request: BatchProbeRequest, per_rank
     """Run the native bounded validation/evaluator while optimizer and EMA stay resident."""
     import torch
 
-    engine = importlib.import_module(f"{module_name}.solver.det_engine")
-    data = importlib.import_module(f"{module_name}.data")
-    coco_module = importlib.import_module("faster_coco_eval")
+    engine = importlib.import_module(f"{module_name}.solver.det_engine")  # noqa: TID251 - verified DEIM runtime namespace
+    data = importlib.import_module(f"{module_name}.data")  # noqa: TID251 - verified DEIM runtime namespace
+    import faster_coco_eval as coco_module
+
     images, targets = synthetic_batch(
         per_rank,
         request.profile.nominal_size,

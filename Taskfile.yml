@@ -55,9 +55,9 @@ tasks:
       - "{{.RUN}} {{.UV}} ruff format --check ."
 
   architecture:
-    desc: Import-linter and custom product architecture checks
+    desc: Declarative product import contracts
     cmds:
-      - "{{.RUN}} {{.UV}} python -m scripts.architecture"
+      - "{{.RUN}} {{.UV}} lint-imports"
 
   mypy:
     desc: mypy strict type checks

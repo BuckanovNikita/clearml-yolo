@@ -47,13 +47,21 @@ def native_coco_modules() -> Iterator[None]:
     use separate processes because Python's module registry is process-global.
     """
     with _preserve_coco_modules():
-        modules = {
-            "pycocotools": "faster_coco_eval",
-            "pycocotools.coco": "faster_coco_eval.core.coco",
-            "pycocotools.cocoeval": "faster_coco_eval.core.faster_eval_api",
-            "pycocotools.mask": "faster_coco_eval.core.mask",
-        }
-        sys.modules.update({name: importlib.import_module(source) for name, source in modules.items()})
+        import faster_coco_eval
+        from faster_coco_eval.core import coco
+
+        # isort: split
+        import faster_coco_eval.core.faster_eval_api as cocoeval
+        from faster_coco_eval.core import mask
+
+        sys.modules.update(
+            {
+                "pycocotools": faster_coco_eval,
+                "pycocotools.coco": coco,
+                "pycocotools.cocoeval": cocoeval,
+                "pycocotools.mask": mask,
+            }
+        )
         yield
 
 
@@ -125,7 +133,7 @@ def load_source(source: Path | None) -> tuple[Any, Any]:
     namespace = "_clearml_yolo_deimv2_" + hashlib.sha256(str(source).encode()).hexdigest()[:16]
     if namespace not in sys.modules:
         _load_package(namespace, source / "engine", verified=source == managed)
-    return importlib.import_module(f"{namespace}.core"), importlib.import_module(f"{namespace}.solver")
+    return importlib.import_module(f"{namespace}.core"), importlib.import_module(f"{namespace}.solver")  # noqa: TID251 - verified DEIM runtime namespace
 
 
 class _VerifiedSourceLoader(importlib.machinery.SourceFileLoader):

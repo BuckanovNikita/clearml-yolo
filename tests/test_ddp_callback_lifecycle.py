@@ -4,6 +4,7 @@ import importlib
 import json
 import os
 import subprocess
+import sys
 import time
 from pathlib import Path
 from threading import Event
@@ -126,20 +127,54 @@ def test_owner_callback_deadline_cannot_restore_logger_over_later_state(
     assert task.get_logger is later_logger
 
 
-def test_native_scalar_callbacks_remain_serializable_for_ddp() -> None:
+def test_native_scalar_callbacks_reconstruct_in_fresh_ddp_process(tmp_path: Path) -> None:
     from ultralytics.utils.callbacks import clearml as integration
 
     # The installed serializer exposes no typing metadata.
     cloudpickle = importlib.import_module("cloudpickle")
+    serialized = tmp_path / "callbacks.pkl"
     with native_runtime():
-        restored = cloudpickle.loads(cloudpickle.dumps(integration.callbacks))
-    assert set(restored) == {
-        "on_pretrain_routine_start",
-        "on_train_epoch_end",
-        "on_fit_epoch_end",
-        "on_val_end",
-        "on_train_end",
-    }
+        serialized.write_bytes(cloudpickle.dumps(integration.callbacks))
+    source = """
+import sys
+from pathlib import Path
+import cloudpickle
+from ultralytics.utils import SETTINGS
+from ultralytics.utils.callbacks import clearml as integration
+
+settings_path = Path(SETTINGS.file)
+before = settings_path.read_bytes()
+settings_values = dict(SETTINGS)
+original_callbacks = integration.callbacks
+with Path(sys.argv[1]).open("rb") as stream:
+    restored = cloudpickle.load(stream)
+assert set(restored) == {
+    "on_pretrain_routine_start", "on_train_epoch_end", "on_fit_epoch_end",
+    "on_val_end", "on_train_end",
+}
+assert all(callable(callback) for callback in restored.values())
+assert settings_path.read_bytes() == before
+assert dict(SETTINGS) == settings_values
+assert integration.callbacks is original_callbacks
+"""
+    result = subprocess.run(  # noqa: S603 - test-owned serialized callbacks and worker environment
+        [sys.executable, "-B", "-c", source, str(serialized)],
+        capture_output=True,
+        text=True,
+        env=dict(
+            os.environ,
+            CY_HOME=str(tmp_path / "worker"),
+            LOCAL_RANK="0",
+            CY_CLEARML_OWNER_PID=str(os.getpid()),
+            CY_CLEARML_OWNER_TASK_ID="owner",
+            YOLO_CONFIG_DIR=str(tmp_path / "worker-settings"),
+            CUDA_VISIBLE_DEVICES="",
+            OMP_NUM_THREADS="1",
+        ),
+        timeout=45,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 @pytest.mark.parametrize("fail_callback", [False, True])

@@ -1,6 +1,5 @@
 """Approved DEIM source and matching native backbone selections."""
 
-import importlib
 from pathlib import Path
 
 from clearml_yolo.core.assets import DEIM_REVISION, AssetSpec, HubAsset
@@ -28,7 +27,8 @@ def huggingface_backbone_asset(preset: str) -> AssetSpec:
     name, _ = _DINO[preset]
     revision, checksum = _HUB_DINO[preset]
     repository = f"facebook/dinov3-{name}-pretrain-lvd1689m"
-    constants = importlib.import_module("huggingface_hub.constants")
+    from huggingface_hub import constants
+
     return AssetSpec(
         backend="deimv2",
         preset=preset,

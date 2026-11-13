@@ -1,8 +1,9 @@
 """Project adapter writes fail before touching external files or native runtimes."""
 
-import importlib
+import builtins
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import pytest
@@ -46,11 +47,15 @@ def test_adapter_outputs_reject_external_routes_before_effects(
     output.parent.mkdir()
     output.write_bytes(b"preserve external file")
 
-    def reject_native_import(name: str) -> None:
-        raise AssertionError(f"Native import before output validation: {name}")
+    original_import = builtins.__import__
+
+    def reject_native_import(name: str, *args: Any, **kwargs: Any) -> Any:
+        if name in {"tensorrt", "onnx", "torch"}:
+            raise AssertionError(f"Native import before output validation: {name}")
+        return original_import(name, *args, **kwargs)
 
     if operation in {"engine", "onnx"}:
-        monkeypatch.setattr(importlib, "import_module", reject_native_import)
+        monkeypatch.setattr(builtins, "__import__", reject_native_import)
     model_metadata = ExportMetadata.model_validate(
         {
             "descriptor": {

@@ -100,7 +100,7 @@ without first running an equivalent `verify`. No separate documentation checker 
 | `local-deps` | Prepare the ignored external wheelhouse and local resolver configuration |
 | `fix` | Safe Ruff fixes and formatting; never stages files |
 | `check` | Hygiene/early input checks, lock freshness, Ruff, architecture, mypy, Vulture, deptry |
-| `architecture` | Import contracts, dynamic imports, initializers, runtime targets and tooling boundaries |
+| `architecture` | Declarative import-linter dependency contracts |
 | `verify` | Automatic change-aware static and selected product verification |
 | `test` / `test-full` | Explicit affected unit tests / full unit suite with refreshed testmon history |
 | `coverage` / `properties` | Explicit full unit coverage / Hypothesis exploration |
@@ -299,11 +299,14 @@ code may use NumPy, pandas, SciPy, Pydantic and Pandera, but owns no SDK calls, 
 configuration, rendering or filesystem effects. Keep the pinned `digital-metrics`
 algorithms in evaluation adapters and copy exact values into core evaluation records.
 
-Purity and effect ownership remain design/review obligations. Custom static effect
-enforcement has been removed, so architecture success no longer proves absence of
-filesystem, environment, process or SDK effects inside otherwise allowed modules.
-Import boundaries, dynamic imports, initializer restrictions and runtime-target
-resolution remain automated; reviewers must inspect effect ownership explicitly.
+Purity and effect ownership remain design/review obligations. The architecture task
+runs import-linter directly; product Ruff configuration restricts dynamic import
+facilities with the documented detection limits. Product tests exercise initializer
+behavior and actual runtime targets. The
+[import-boundary contract](import-boundaries.md#tooling-boundaries-and-enforcement-limits)
+records the retired custom checks and the limits of runtime evidence. Passing these
+checks does not prove absence of arbitrary filesystem, environment, process or SDK
+effects inside otherwise allowed modules.
 
 Run `uv run --locked task --exit-code architecture` and the complete ordinary suite when
 changing imports, package initializers, composition or subprocess/plugin targets. Static

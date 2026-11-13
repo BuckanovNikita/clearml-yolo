@@ -1,6 +1,5 @@
 """Export-only Swin blocks with tensor-derived shifted-window masks."""
 
-import importlib
 from typing import Any, cast, override
 
 import torch
@@ -93,10 +92,11 @@ class ExportSwinBlock(nn.Module):
 
 def adapt_swin_blocks(body: nn.Module) -> None:
     """Replace blocks in the caller-owned model copy; never mutate installed SDK code."""
-    native_type = importlib.import_module("timm.models.swin_transformer").SwinTransformerBlock
+    from timm.models.swin_transformer import SwinTransformerBlock
+
     replaced = 0
     for path, module in list(body.named_modules()):
-        if isinstance(module, native_type):
+        if isinstance(module, SwinTransformerBlock):
             parent_path, _, name = path.rpartition(".")
             parent = body.get_submodule(parent_path)
             setattr(parent, name, ExportSwinBlock(module))

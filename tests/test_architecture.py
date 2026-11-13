@@ -1,9 +1,12 @@
 """Execute product imports and generated configuration targets."""
 
+import json
 import subprocess
 import sys
 from collections.abc import Mapping
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -116,3 +119,103 @@ def test_generated_hydra_targets_resolve_after_export_and_composition(
     assert "clearml_yolo.core.evaluation.models.EvaluationConfig" in targets
     for target in targets:
         assert callable(get_object(target)), target
+
+
+@pytest.mark.parametrize(
+    "package",
+    sorted(
+        ".".join(path.parent.relative_to(ROOT / "src").parts)
+        for path in (ROOT / "src" / "clearml_yolo").rglob("__init__.py")
+    ),
+)
+def test_package_import_has_no_sdk_or_startup_effects(package: str, tmp_path: Path) -> None:
+    source = """
+import importlib
+import os
+import sys
+import tempfile
+from pathlib import Path
+
+protected = {
+    "torch", "torchvision", "ultralytics", "clearml", "fiftyone", "rfdetr",
+    "timm", "tensorrt", "onnx", "pytorch_lightning", "lightning_fabric",
+    "albumentations", "pycocotools", "faster_coco_eval", "huggingface_hub",
+    "digital_metrics", "report_generator", "openpyxl", "hydra", "hydra_zen",
+    "omegaconf", "cy_queue", "textual", "pynvml",
+}
+class DenySdk:
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname.split(".")[0] in protected:
+            raise AssertionError("Package imported protected SDK: " + fullname)
+
+def audit(event, args):
+    if event.startswith(("socket.", "subprocess.")) or event in {
+        "os.system", "os.mkdir", "os.remove", "os.rename", "os.rmdir",
+        "os.putenv", "os.unsetenv", "os.chdir",
+    }:
+        raise AssertionError("Package startup effect: " + event)
+    if event == "open":
+        mode, flags = args[1:3]
+        if (mode and any(char in mode for char in "wax+")) or (
+            flags & (os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_TRUNC)
+        ):
+            raise AssertionError("Package wrote a file")
+
+sys.meta_path.insert(0, DenySdk())
+# Scientific dependencies own their startup initialization; isolate the product
+# initializer's effects after warming the dependencies of its public records.
+if sys.argv[1] == "clearml_yolo.core.validation":
+    import numpy
+    import pandas
+    import pandera.pandas
+before = dict(os.environ)
+workspace = Path.cwd()
+temporary = tempfile.tempdir
+bytecode = sys.pycache_prefix
+sys.addaudithook(audit)
+importlib.import_module(sys.argv[1])
+assert not protected.intersection(sys.modules)
+assert dict(os.environ) == before
+assert Path.cwd() == workspace
+assert tempfile.tempdir == temporary
+assert sys.pycache_prefix == bytecode
+assert not list(workspace.iterdir())
+"""
+    result = subprocess.run(  # noqa: S603 - fixed interpreter, actual product package argument
+        [sys.executable, "-B", "-c", source, package],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=20,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_removed_python_paths_have_no_executable_legacy_modules() -> None:
+    legacy = json.loads((ROOT / "tests" / "fixtures" / "legacy-module-map.json").read_text())
+    source = """
+import importlib
+import json
+import sys
+
+for name in json.loads(sys.argv[1]):
+    try:
+        module = importlib.import_module(name)
+    except ModuleNotFoundError as error:
+        assert error.name == name or name.startswith(error.name + "."), (name, error)
+    else:
+        # Empty directories left in an editable checkout are namespace packages,
+        # not shipped compatibility modules. A real legacy implementation fails.
+        assert module.__spec__.origin is None, name
+        assert not getattr(module, "__file__", None), name
+"""
+    result = subprocess.run(  # noqa: S603 - fixed interpreter and migration contract names
+        [sys.executable, "-B", "-c", source, json.dumps(list(legacy))],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        timeout=20,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr

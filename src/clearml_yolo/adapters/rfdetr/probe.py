@@ -5,7 +5,6 @@ native module owns loss, AdamW, AMP, clipping, accumulation and EMA; only the
 synthetic input source, spatial envelope and stopping counters differ from fit.
 """
 
-import importlib
 import math
 import os
 from typing import Any, override
@@ -198,10 +197,15 @@ def _attempt_steps(steps: int, scaler: Any) -> int:
 
 
 def _fit(request: BatchProbeRequest, config: ModelConfig, progress: _ProbeProgress) -> None:
-    training = importlib.import_module("rfdetr.training")
-    callbacks = importlib.import_module("rfdetr.training.callbacks")
-    scales = importlib.import_module("rfdetr.datasets.coco")
-    lightning = importlib.import_module("pytorch_lightning")
+    from rfdetr import training
+    from rfdetr.training import callbacks
+
+    # isort: split
+    import rfdetr.datasets.coco as scales
+
+    # isort: split
+    import pytorch_lightning as lightning
+
     lightning.seed_everything(config.train.seed, workers=True)
     device = f"cuda:{config.train.device}"
     names = tuple(str(index) for index in range(request.workload.classes))
@@ -270,7 +274,8 @@ def probe(request: BatchProbeRequest) -> ProbeRankResult:
     torch.cuda.set_device(local_rank)
     torch.cuda.reset_peak_memory_stats(local_rank)
     memory = GPUMemory(local_rank)
-    lightning = importlib.import_module("pytorch_lightning")
+    import pytorch_lightning as lightning
+
     callback_type = type("ProbeProgress", (_ProbeProgress, lightning.Callback), {})
     progress = callback_type(per_rank, request.profile.effective_size, memory=memory)
     status: TrialStatus = "success"

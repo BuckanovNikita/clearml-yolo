@@ -250,11 +250,10 @@ def test_rfdetr_pretrained_backbone_was_actually_loaded(
     native_torch = SimpleNamespace(equal=lambda left, right: left == right)
     native_io = SimpleNamespace(_safe_torch_load=lambda _: {"model": {key: value}})
 
-    def native_module(name: str) -> Any:
-        assert name in {"torch", "rfdetr.utilities.io"}
-        return native_torch if name == "torch" else native_io
-
-    monkeypatch.setattr("clearml_yolo.adapters.rfdetr.backend.importlib.import_module", native_module)
+    monkeypatch.setitem(sys.modules, "torch", native_torch)
+    monkeypatch.setitem(sys.modules, "rfdetr", SimpleNamespace(utilities=SimpleNamespace(io=native_io)))
+    monkeypatch.setitem(sys.modules, "rfdetr.utilities", SimpleNamespace(io=native_io))
+    monkeypatch.setitem(sys.modules, "rfdetr.utilities.io", native_io)
     model = SimpleNamespace(model=SimpleNamespace(model=SimpleNamespace(state_dict=lambda: {key: actual})))
     if matches:
         backend._verify_pretrained(model, checkpoint)

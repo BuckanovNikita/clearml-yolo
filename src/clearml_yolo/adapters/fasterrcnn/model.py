@@ -1,6 +1,5 @@
 """Faster R-CNN head and ROI geometry on shared pretrained backbone machinery."""
 
-import importlib
 from pathlib import Path
 from typing import Any
 
@@ -37,7 +36,8 @@ def build_model(
         backbone = FeaturePyramid(preset, pretrained=pretrained, weights=backbone_weights)
     else:
         raise ValueError(f"Unsupported Faster R-CNN preset: {preset}")
-    detection = importlib.import_module("torchvision.models.detection")
+    from torchvision.models import detection
+
     model = detection.FasterRCNN(
         backbone,
         num_classes=num_classes + 1,
@@ -48,7 +48,8 @@ def build_model(
     model.transform = LetterboxTransform(image_size)
     # Valid image heights can be much smaller than the padded feature canvas.
     # Torchvision's inferred scales would then pool the wrong spatial locations.
-    pooling = importlib.import_module("torchvision.ops.poolers")
+    import torchvision.ops.poolers as pooling
+
     model.roi_heads.box_roi_pool.scales = [1.0 / stride for stride in _STRIDES]
     model.roi_heads.box_roi_pool.map_levels = pooling.LevelMapper(2, 5)
     return model

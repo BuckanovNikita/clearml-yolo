@@ -79,7 +79,6 @@ module-name = ["clearml_yolo"]
 [dependency-groups]
 dev = [
     "import-linter>=2.13",
-    "grimp",
     "markdown-it-py==4.2.0",
     "mypy>=1.11",
     "packaging>=26",
@@ -133,6 +132,10 @@ exclude = ["^external/", "^(outputs|runs|multirun|build|dist|mutants)/"]
 # Keep this list narrow; missing project imports must remain errors.
 module = [
     "albumentations.*",
+    "torchvision.*",
+    "pycocotools.*",
+    "faster_coco_eval.*",
+    "tensorrt",
     "digital_metrics.*",
     "report_generator.*",
     "fiftyone.*",
@@ -177,6 +180,8 @@ known_first_party = ["clearml_yolo", "tests", "scripts"]
 extend_exclude = ["external", "outputs", "runs", "multirun", "mutants", "weights", "examples"]
 
 [tool.deptry.per_rule_ignores]
+# TensorRT is provisioned externally for the target NVIDIA runtime.
+DEP001 = ["tensorrt"]
 # Runtime packages loaded by model families, exporters and third-party trainers rather
 # than imported by clearml_yolo itself; removing them breaks native execution.
 DEP002 = [
@@ -188,7 +193,7 @@ DEP002 = [
 # by the declared fiftyone dependency.
 DEP003 = ["plotly", "matplotlib"]
 # Development tooling under scripts/ uses dev-group packages.
-DEP004 = ["grimp", "importlinter", "psutil", "pytest"]
+DEP004 = ["psutil", "pytest"]
 
 [tool.mutmut]
 # scripts/mutation.py derives only_mutate and the test selection from each change and

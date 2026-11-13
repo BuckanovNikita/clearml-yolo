@@ -3,7 +3,6 @@
 Torchvision objects and ONNX symbolic graphs are opaque SDK boundaries.
 """
 
-import importlib
 from collections.abc import Callable
 from typing import Any, cast, override
 
@@ -19,7 +18,8 @@ class _ClassNMSMask(torch.autograd.Function):
     @staticmethod
     @override
     def forward(_ctx: Any, boxes: Tensor, scores: Tensor, threshold: float) -> Tensor:
-        nms = importlib.import_module("torchvision.ops").nms
+        from torchvision.ops import nms
+
         # CPU/native reference. ONNX symbolic below contains no Python batch loop.
         b, c, _n = scores.shape
         result = torch.zeros_like(scores, dtype=torch.bool)
@@ -114,15 +114,16 @@ class TensorizedDetector(nn.Module):
 
     @override
     def forward(self, x: Tensor, image_sizes: Tensor) -> tuple[Tensor, Tensor]:
-        detection_utils = importlib.import_module("torchvision.models.detection._utils")
-        image_list_type = importlib.import_module("torchvision.models.detection.image_list").ImageList
+        import torchvision.models.detection._utils as detection_utils  # noqa: PLC2701 - approved native integration interface
+        from torchvision.models.detection.image_list import ImageList
+
         b = x.shape[0]
         height = x.shape[2]
         width = x.shape[3]
         features = self.model.backbone(x)
         levels = list(features.values())
         objectness, deltas = self.model.rpn.head(levels)
-        anchor_list = self.model.rpn.anchor_generator(image_list_type(x[:1], [(height, width)]), levels)
+        anchor_list = self.model.rpn.anchor_generator(ImageList(x[:1], [(height, width)]), levels)
         anchors = anchor_list[0]
         offset = 0
         level_boxes = []
@@ -182,7 +183,8 @@ class TensorizedDetector(nn.Module):
         return result, out_count
 
     def _pool(self, levels: list[Tensor], proposals: Tensor) -> Tensor:
-        roi_align = importlib.import_module("torchvision.ops").roi_align
+        from torchvision.ops import roi_align
+
         pooler = self.model.roi_heads.box_roi_pool
         output_size = tuple(pooler.output_size)
         sampling_ratio = int(pooler.sampling_ratio)

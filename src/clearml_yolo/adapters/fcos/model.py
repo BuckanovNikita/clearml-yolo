@@ -1,6 +1,5 @@
 """FCOS heads on pretrained P3-P7 backbones with zero-based foreground labels."""
 
-import importlib
 from pathlib import Path
 from typing import Any
 
@@ -31,8 +30,11 @@ def build_model(
         backbone = FeaturePyramid(preset, pretrained=pretrained, weights=backbone_weights, first_level=3)
     else:
         raise ValueError(f"Unsupported FCOS preset: {preset}")
-    detection = importlib.import_module("torchvision.models.detection")
-    anchors = importlib.import_module("torchvision.models.detection.anchor_utils")
+    from torchvision.models import detection
+
+    # isort: split
+    import torchvision.models.detection.anchor_utils as anchors
+
     model = detection.FCOS(
         backbone,
         num_classes=num_classes,

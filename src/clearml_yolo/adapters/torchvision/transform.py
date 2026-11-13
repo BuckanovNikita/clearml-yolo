@@ -1,6 +1,5 @@
 """Shared RGB normalization, aspect-preserving canvas resize and box restoration."""
 
-import importlib
 from collections.abc import Sequence
 from typing import Any, override
 
@@ -80,7 +79,8 @@ class LetterboxTransform(nn.Module):
             sizes.append(size)
             if transformed is not None:
                 transformed[index]["boxes"] = scale_boxes(transformed[index]["boxes"], original, size)
-        image_list = importlib.import_module("torchvision.models.detection.image_list")
+        from torchvision.models.detection import image_list
+
         return image_list.ImageList(torch.stack(resized), sizes), transformed
 
     def postprocess(

@@ -416,7 +416,7 @@ def test_deim_full_pretrained_checkpoint_requires_compatible_backbone(
     expected = {} if case == "empty" else {"backbone.patch.weight": SimpleNamespace(shape=(2, 2))}
     actual = {"backbone.patch.weight": SimpleNamespace(shape=(3, 3) if case == "wrong_shape" else (2, 2))}
     native_torch = SimpleNamespace(load=lambda *_args, **_kwargs: {"model": expected})
-    monkeypatch.setattr("clearml_yolo.adapters.deim.backend.importlib.import_module", lambda _: native_torch)
+    monkeypatch.setitem(sys.modules, "torch", native_torch)
     model = SimpleNamespace(state_dict=lambda: actual)
     if case == "compatible":
         backend._validate_tuning(model, tmp_path / "weights.pth")
@@ -514,10 +514,15 @@ def test_deim_native_dataset_alias_scope_preserves_original_modules(
             "faster_coco_eval.core.mask",
         )
     }
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.deim.source.importlib.import_module",
-        lambda name: native_modules[name],
+    core = SimpleNamespace(
+        coco=native_modules["faster_coco_eval.core.coco"],
+        faster_eval_api=native_modules["faster_coco_eval.core.faster_eval_api"],
+        mask=native_modules["faster_coco_eval.core.mask"],
     )
+    monkeypatch.setattr(native_modules["faster_coco_eval"], "core", core, raising=False)
+    monkeypatch.setitem(sys.modules, "faster_coco_eval.core", core)
+    for name, module in native_modules.items():
+        monkeypatch.setitem(sys.modules, name, module)
     original = {
         name: module for name, module in sys.modules.items() if name == "pycocotools" or name.startswith("pycocotools.")
     }
@@ -592,10 +597,15 @@ def test_deim_native_postprocessor_receives_original_width_then_height(
         ),
         "PIL.Image": SimpleNamespace(open=lambda _: nullcontext(image)),
     }
-    monkeypatch.setattr(
-        "clearml_yolo.adapters.deim.backend.importlib.import_module",
-        lambda name: native_modules[name],
-    )
+    functional = native_modules["torchvision.transforms.v2.functional"]
+    v2 = SimpleNamespace(functional=functional)
+    transforms = SimpleNamespace(v2=v2)
+    monkeypatch.setitem(sys.modules, "torchvision", SimpleNamespace(transforms=transforms))
+    monkeypatch.setitem(sys.modules, "torchvision.transforms", transforms)
+    monkeypatch.setitem(sys.modules, "torchvision.transforms.v2", v2)
+    monkeypatch.setitem(sys.modules, "PIL", SimpleNamespace(Image=native_modules["PIL.Image"]))
+    for name, module in native_modules.items():
+        monkeypatch.setitem(sys.modules, name, module)
     monkeypatch.setattr(backend, "_load_weights", lambda *_args: None)
     descriptor = CheckpointMetadata(
         backend="deimv2",

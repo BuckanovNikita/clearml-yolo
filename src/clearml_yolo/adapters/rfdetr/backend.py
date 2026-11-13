@@ -4,7 +4,6 @@ The optional SDK is imported only when execution needs it. Its evolving model an
 Lightning objects are intentionally opaque at this boundary; project records remain typed.
 """
 
-import importlib
 import importlib.metadata
 import math
 import os
@@ -47,7 +46,9 @@ def _sdk() -> Any:
         raise ImportError('RF-DETR requires the default "rfdetr[train]==1.11.2" dependency') from exc
     if actual != VERSION:
         raise RuntimeError(f"RF-DETR requires version {VERSION}; installed version is {actual}")
-    return importlib.import_module("rfdetr")
+    import rfdetr
+
+    return rfdetr
 
 
 def _device(value: Device) -> str:
@@ -58,7 +59,8 @@ def _device(value: Device) -> str:
     if isinstance(value, int) or (isinstance(value, str) and value.isdecimal()):
         return f"cuda:{value}"
     if value is None:
-        torch = importlib.import_module("torch")
+        import torch
+
         return "cuda" if torch.cuda.is_available() else "cpu"
     if "," in value:
         raise ValueError("RF-DETR multi-device execution is unsupported by this adapter")
@@ -74,9 +76,12 @@ def _names(prepared: PreparedDataset) -> tuple[str, ...]:
 
 
 def _verify_pretrained(model: Any, weights: Path) -> None:
-    torch = importlib.import_module("torch")
+    import torch
+
+    # isort: split
     # Use the pinned SDK's safe allowlist for its published checkpoint args.
-    native_io = importlib.import_module("rfdetr.utilities.io")
+    import rfdetr.utilities.io as native_io
+
     payload = native_io._safe_torch_load(str(weights))  # noqa: SLF001
     expected = payload["model"]
     actual = model.model.model.state_dict()
@@ -131,10 +136,11 @@ def trainer_devices(device: str) -> dict[str, Any]:
     local_rank = int(os.environ["LOCAL_RANK"])
     if not 0 <= local_rank < world or device != f"cuda:{local_rank}":
         raise ValueError("RF-DETR rank device disagrees with the supervised worker environment")
-    environments = importlib.import_module("lightning_fabric.plugins.environments")
+    from lightning_fabric.plugins.environments.torchelastic import TorchElasticEnvironment
+
     return {
         "devices": list(range(world)),
-        "plugins": [environments.TorchElasticEnvironment()],
+        "plugins": [TorchElasticEnvironment()],
     }
 
 
@@ -263,8 +269,11 @@ def train(
     device = _device(settings.device)
     devices = trainer_devices(device)
     output.mkdir(parents=True, exist_ok=True)
-    training = importlib.import_module("rfdetr.training")
-    lightning = importlib.import_module("pytorch_lightning")
+    from rfdetr import training
+
+    # isort: split
+    import pytorch_lightning as lightning
+
     lightning.seed_everything(settings.seed, workers=True)
     custom = transforms is not None and transforms.mode == "albumentations"
     model_config, native_config = training_configuration(
@@ -288,7 +297,8 @@ def train(
 
         datamodule.setup("fit")
         install_training_transforms(datamodule, transforms, seed=settings.seed)
-    trainer = training.build_trainer(native_config, model_config, **devices)
+    # RF-DETR returns a Lightning trainer with runtime callback registration.
+    trainer: Any = training.build_trainer(native_config, model_config, **devices)
     callback_type = type("OwnerMetrics", (_OwnerMetrics, lightning.Callback), {})
     callback = callback_type(report)
     trainer.callbacks.append(callback)

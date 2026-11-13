@@ -7,6 +7,7 @@
 [importlinter]
 root_packages =
     clearml_yolo
+    scripts
 include_external_packages = true
 
 [importlinter:contract:clean-architecture-inward-layers]
@@ -78,7 +79,7 @@ forbidden_modules =
     torchvision
     ultralytics
 allow_indirect_imports = true
-# Lazy imports are absent from import-linter's static graph.
+# Optional backend edges may be absent; ordinary local imports are checked.
 unmatched_ignore_imports_alerting = none
 ignore_imports =
     clearml_yolo.adapters.integrations.native_ddp -> ultralytics
@@ -145,6 +146,7 @@ ignore_imports =
     clearml_yolo.adapters.augmentation.serialization -> albumentations
     clearml_yolo.adapters.rfdetr.backend -> lightning_fabric
     clearml_yolo.adapters.deim.probe -> faster_coco_eval
+    clearml_yolo.adapters.deim.source -> faster_coco_eval
     clearml_yolo.adapters.assets.hub -> huggingface_hub
     clearml_yolo.adapters.torchvision.assets -> huggingface_hub
     clearml_yolo.adapters.deim.assets -> huggingface_hub
@@ -445,7 +447,7 @@ forbidden_modules =
     clearml_yolo.adapters.torchvision
     clearml_yolo.adapters.yolo
 allow_indirect_imports = true
-# Lazy imports are absent from import-linter's static graph.
+# Optional backend edges may be absent; ordinary local imports are checked.
 unmatched_ignore_imports_alerting = none
 ignore_imports =
     clearml_yolo.adapters.export.build -> clearml_yolo.adapters.storage.filesystem
@@ -510,3 +512,271 @@ containers =
 layers =
     options:batch_estimate:batch_estimate_worker:compare:composition:config_tree:dedup:download_weights:export:ground_truth:hydra:metrics:pipeline:predict:report:train:val
 exhaustive = true
+
+[importlinter:contract:product-no-test-dependencies]
+name = Product never imports test dependencies or developer scripts
+type = forbidden
+source_modules =
+    clearml_yolo
+forbidden_modules =
+    tests
+    scripts
+    pytest
+    hypothesis
+    pytest_cov
+    coverage
+    workflow_dependencies
+    severstal_harness
+    severstal_helpers
+    env_isolation
+    ddp_cpu_recording
+    ddp_cpu_harness
+    ddp_cpu_worker
+    ddp_cpu_trainer
+    ddp_cpu_launcher
+    native_config_helpers
+    conftest
+allow_indirect_imports = true
+
+[importlinter:contract:packager-product-boundaries]
+name = Weight packager uses approved asset interfaces
+type = forbidden
+source_modules =
+    scripts.package_weights
+forbidden_modules =
+    clearml_yolo
+allow_indirect_imports = true
+ignore_imports =
+    scripts.package_weights -> clearml_yolo.adapters.assets.hub
+    scripts.package_weights -> clearml_yolo.adapters.assets.preparation
+    scripts.package_weights -> clearml_yolo.adapters.assets.resolver
+    scripts.package_weights -> clearml_yolo.adapters.assets.validation
+    scripts.package_weights -> clearml_yolo.core.assets
+    scripts.package_weights -> clearml_yolo.core.weight_bundles
+
+[importlinter:contract:packager-no-runtime-sdks]
+name = Weight packager does not execute native or tracking SDKs
+type = forbidden
+source_modules =
+    scripts.package_weights
+forbidden_modules =
+    importlib
+    torch
+    torchvision
+    ultralytics
+    clearml
+    fiftyone
+    rfdetr
+    tensorrt
+    onnx
+    pytest
+    cy_queue
+allow_indirect_imports = true
+
+[importlinter:contract:projection-no-sdks]
+name = Pure ClearML projections do not import execution SDKs
+type = forbidden
+source_modules =
+    clearml_yolo.adapters.clearml.parameters
+    clearml_yolo.adapters.clearml.cache
+forbidden_modules =
+    clearml
+    torch
+    ultralytics
+    fiftyone
+    cy_queue
+allow_indirect_imports = false
+
+# Pytest prepend-mode exposes these modules without the tests namespace.
+# Add new standalone test modules here when introducing them.
+[importlinter:contract:product-no-standalone-tests]
+name = Product never imports standalone pytest modules
+type = forbidden
+source_modules =
+    clearml_yolo
+forbidden_modules =
+    test_agent_replay
+    test_application_ports
+    test_architecture
+    test_artifactory_assets
+    test_asset_execution
+    test_augmentation
+    test_batch_alignment
+    test_batch_case_worker
+    test_batch_estimate_cli
+    test_batch_estimate_list
+    test_batch_estimate_store
+    test_batch_estimate_workflow
+    test_batch_estimation
+    test_batch_lookup
+    test_batch_numerical_recovery
+    test_batch_probe
+    test_batch_profiles
+    test_batch_resolution
+    test_batch_search_strategy
+    test_batch_sizes
+    test_bounded_fiftyone
+    test_calibration_metadata
+    test_campaign_numerics
+    test_checkpoint_descriptor
+    test_clearml_cache
+    test_clearml_configuration
+    test_clearml_models
+    test_clearml_naming
+    test_clearml_native
+    test_clearml_parameters
+    test_clearml_report
+    test_clearml_results
+    test_clearml_script
+    test_clearml_session
+    test_coco_dataset
+    test_comparison_assemble
+    test_comparison_identity_cache
+    test_comparison_observability
+    test_comparison_recovery
+    test_comparison_reinfer
+    test_comparison_scoring
+    test_comparison_significance
+    test_comparison_workbook
+    test_config_resolution
+    test_config_self_containment
+    test_config_tree
+    test_config_upload_commands
+    test_configs
+    test_configuration_compatibility
+    test_configuration_publication
+    test_console_capture
+    test_console_deadline
+    test_dataframe_validation
+    test_dataset
+    test_dataset_cache
+    test_dataset_export
+    test_dataset_records
+    test_ddp_callback_lifecycle
+    test_dedup
+    test_dedup_cli
+    test_deim_assets
+    test_deim_backend
+    test_deim_probe
+    test_detector_augmentation
+    test_detector_export
+    test_detector_integration
+    test_detector_publication
+    test_detector_recovery
+    test_detector_workflows
+    test_diagnostics
+    test_dinov3_hf_weights
+    test_direct_descendants
+    test_direct_execution
+    test_distributed_configuration
+    test_distributed_training
+    test_early_export_publication
+    test_early_publication
+    test_entrypoint_composition
+    test_evaluation_identity
+    test_evaluation_payload
+    test_evaluation_report_payload
+    test_evaluation_separation
+    test_execution_controls
+    test_execution_lifecycle
+    test_export
+    test_export_attention_precision
+    test_export_precision
+    test_export_quality
+    test_export_workflow
+    test_fasterrcnn_backend
+    test_fcos_backend
+    test_fiftyone_compatibility
+    test_fiftyone_evaluation_results
+    test_fiftyone_panel
+    test_filesystem
+    test_git_workspace
+    test_gpu_cancellation
+    test_gpu_force
+    test_gpu_inventory
+    test_gpu_memory
+    test_ground_truth
+    test_ground_truth_sources
+    test_hub_assets
+    test_hub_weight_bundles
+    test_hydra_sweep_configuration
+    test_hydra_transforms
+    test_identity_flows
+    test_identity_links
+    test_inference
+    test_input_correctness
+    test_interactive_evaluation
+    test_invalid_prediction_workflows
+    test_metrics
+    test_model_assets
+    test_model_assets_loading
+    test_model_configs
+    test_model_identity_sources
+    test_model_replay
+    test_model_selection
+    test_multirun_tags
+    test_native_assets
+    test_native_config
+    test_native_ddp
+    test_native_ddp_cpu
+    test_native_output_containment
+    test_native_runtime
+    test_native_settings_validation
+    test_native_tracking_contract
+    test_native_training_outcomes
+    test_native_yaml_compatibility
+    test_pipeline
+    test_pipeline_outcomes
+    test_policy_mutation
+    test_population_count_workbooks
+    test_population_recovery
+    test_pr_curves
+    test_predict
+    test_prediction_geometry
+    test_process_capabilities
+    test_project_output_containment
+    test_publication_commands
+    test_publication_data
+    test_publishing
+    test_quality_properties
+    test_quiet_prediction
+    test_readable_output
+    test_release_config
+    test_report
+    test_report_class_availability
+    test_report_count_issues
+    test_result_export
+    test_result_lifecycle
+    test_review_regressions
+    test_rfdetr_backend
+    test_rfdetr_probe
+    test_run_identity
+    test_runtime_bootstrap
+    test_runtime_entrypoints
+    test_scoring_evidence
+    test_severstal
+    test_shared_comparison
+    test_shared_extraction_compatibility
+    test_subreaper_process_tree
+    test_torchvision_distributed
+    test_trace_clearml
+    test_trace_compute
+    test_trace_fiftyone
+    test_trace_runtime
+    test_trace_storage
+    test_trace_subprocess
+    test_tracing
+    test_train
+    test_training_count_provenance
+    test_training_success_finalization
+    test_training_workers
+    test_transform_config
+    test_weight_bundles
+    test_weight_preparation
+    test_workbook_identity
+    test_worker_pool
+    test_worker_targets
+    test_workflow_quality
+    test_yolo_augmentation
+    test_yolo_weights_settings
+allow_indirect_imports = true

@@ -54,19 +54,20 @@ rule takes precedence over shared skills' generic packaging checklists.
 ### Module boundaries
 
 For affected Python modules, inspect the contracts in [.importlinter](../.importlinter),
-[architecture task](../scripts/architecture.py) and the
+[Ruff import restrictions](../src/ruff.toml) and the
 [architecture guidance](development.md#python-integration-and-architecture).
 Preserve responsibilities, interfaces, dependency direction and effect ownership.
-Account for type-only and dynamic imports and justified exact-edge exceptions.
-When boundary coverage is missing, extend the architecture task to inspect the affected
-product boundary. Keep existing rules intact and
-avoid unrelated repository refactors.
+Account for type-only imports, function-local imports and justified exact-edge
+exceptions. Use ordinary local imports for fixed targets and documented exceptions
+for computed loading. Extend declarative contracts or product behavior tests when
+coverage is missing; preserve the approved enforcement limits in the import guidance.
 
 Run the applicable [verification stages](development.md#verification); the
-`verification-workflow` skill selects them. The development check stage includes import/initializer/runtime-target architecture
-checks; effect ownership remains a review obligation after removal of custom effect
-enforcement. Automatic routing follows the staged/latest-commit classifier in Task;
-explicit acceptance keeps its full scope. The full unit suite includes CPU-DDP. Reuse their results while the checked inputs remain unchanged.
+`verification-workflow` skill selects them. The development check stage runs declarative
+import contracts and Ruff restrictions; product tests exercise imports and runtime
+targets. Effect ownership remains a review obligation. Automatic routing follows the
+staged/latest-commit classifier in Task; explicit acceptance keeps its full scope. The
+full unit suite includes CPU-DDP. Reuse results while checked inputs remain unchanged.
 Report deferred and waived checks as such, never as passed. Reconcile the final
 task-owned diff with contract coverage and record actual results in dated evidence.
 

@@ -1,6 +1,5 @@
 """Native COCO validation for actual best-checkpoint selection."""
 
-import importlib
 import io
 import math
 from collections.abc import Iterator
@@ -65,8 +64,11 @@ def _score(
     if sorted(population.image_ids) != expected:
         raise ValueError("Validation must evaluate every image exactly once across all ranks")
     records = population.detections
-    coco = importlib.import_module("pycocotools.coco")
-    evaluation = importlib.import_module("pycocotools.cocoeval")
+    from pycocotools import coco
+
+    # isort: split
+    import pycocotools.cocoeval as evaluation
+
     # COCO writes progress tables directly to stdout; metrics flow only through the
     # invocation's callback. Exceptions still propagate with their original traceback.
     with redirect_stdout(io.StringIO()):

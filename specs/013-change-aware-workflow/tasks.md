@@ -52,3 +52,29 @@ actual checks and their limits. Independent review closed all six findings at `4
 Full acceptance and paired compatibility pass; product evidence is reused after the
 narrow tooling fixes, which have their own successful command-level regressions and
 canonical hooks. No real release/publishing was authorized or performed.
+
+## Architecture reduction follow-up
+
+- [x] T016 Record approved policy changes and implementation ownership in native artifacts.
+- [x] T017 [P] Convert fixed dynamic imports and adapt affected product tests.
+- [x] T018 [P] Extend product imports, entrypoints and target-producer coverage.
+- [x] T019 Replace scanners with declarative checks and remove unused dependencies.
+- [x] T020 Reconcile authoritative guidance and native consistency analysis.
+- [ ] T021 Verify integrated product/static checks and final committed inputs.
+- [ ] T022 Complete fresh independent review and record acceptance gaps and evidence.
+
+T016 precedes T017–T020; T021 follows integration; T022 follows verification.
+Approved retirements are explicit specification changes, not assertions of equivalent
+static coverage. Historical completion evidence above applies to the earlier scope.
+
+### Follow-up native consistency analysis
+
+The explicit user-approved reduction supersedes Principle II's blanket acyclic-helper
+and closed core-dependency enforcement for this task. Existing dependency directions
+and effect ownership remain. Installed `.specify/` sources are intentionally unchanged;
+this records the user instruction precedence rather than silently amending tooling.
+T017 covers lazy import compatibility; T018 covers exercised runtime contracts; T019
+covers retained declarative rules; T020 records approved retirements; T021–T022 own
+verification and independent comparison. No new tooling tests or custom scanners.
+Ruff's installed TID251 rejects import_module aliases and qualified builtins.__import__,
+but bare __import__ is outside its enforcement and remains a review obligation.

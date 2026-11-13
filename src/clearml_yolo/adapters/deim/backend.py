@@ -58,7 +58,8 @@ def _device(value: Device) -> str:
     if isinstance(value, int) or (isinstance(value, str) and value.isdecimal()):
         return f"cuda:{value}"
     if value is None:
-        torch = importlib.import_module("torch")
+        import torch
+
         return "cuda" if torch.cuda.is_available() else "cpu"
     if "," in value:
         raise ValueError("DEIMv2 multi-device execution is unsupported by this adapter")
@@ -86,7 +87,8 @@ class _OwnerWriter:
 
 
 def _native_writer(report: Callable[[str, float, int], None]) -> _OwnerWriter:
-    tensorboard = importlib.import_module("torch.utils.tensorboard")
+    from torch.utils import tensorboard
+
     # BaseConfig's public writer setter requires an actual SummaryWriter instance.
     # Our mixin handles every native call and owns no TensorBoard resources.
     writer_type = type("OwnerWriter", (_OwnerWriter, tensorboard.SummaryWriter), {})
@@ -286,7 +288,8 @@ class _DistributedSolver:
 
 
 def _validate_tuning(model: Any, weights: Path) -> None:
-    torch = importlib.import_module("torch")
+    import torch
+
     payload = torch.load(weights, map_location="cpu", weights_only=True)
     expected = payload["ema"]["module"] if "ema" in payload else payload["model"]
     backbone = {key: value for key, value in model.state_dict().items() if key.startswith("backbone.")}
@@ -314,7 +317,7 @@ def training_configuration(config: ModelConfig, names: tuple[str, ...], output: 
     device = _device(config.train.device)
     cfg = _config(config, names, size)
     _, solver_module = load_source(config.source_dir)
-    native_misc = importlib.import_module(solver_module.__package__.rsplit(".", 1)[0] + ".misc.dist_utils")
+    native_misc = importlib.import_module(solver_module.__package__.rsplit(".", 1)[0] + ".misc.dist_utils")  # noqa: TID251 - verified DEIM runtime namespace
     native_misc.setup_seed(config.train.seed)
     cfg.yaml_cfg.update(
         device=device,
@@ -403,7 +406,8 @@ def train(
 
 
 def _load_weights(model: Any, weights: Path) -> None:
-    torch = importlib.import_module("torch")
+    import torch
+
     payload = torch.load(weights, map_location="cpu", weights_only=True)
     state = payload["ema"]["module"] if "ema" in payload else payload["model"]
     model.load_state_dict(state)
@@ -417,9 +421,12 @@ def _native_predict(
     settings: PredictSettings,
     size: tuple[int, int],
 ) -> list[dict[str, Any]]:
-    torch = importlib.import_module("torch")
-    functional = importlib.import_module("torchvision.transforms.v2.functional")
-    image_module = importlib.import_module("PIL.Image")
+    import torch
+    from torchvision.transforms.v2 import functional
+
+    # isort: split
+    from PIL import Image
+
     device = _device(settings.device)
     model = cfg.model.to(device).eval()
     _load_weights(model, weights)
@@ -430,7 +437,7 @@ def _native_predict(
             paths = image_paths[offset : offset + settings.batch]
             tensors, originals = [], []
             for path in paths:
-                with image_module.open(path) as source:
+                with Image.open(path) as source:
                     image = source.convert("RGB")
                     # Native xyxy scaling repeats [width, height], unlike many DETR APIs.
                     originals.append([image.width, image.height])
@@ -439,7 +446,7 @@ def _native_predict(
                 tensors.append(
                     functional.normalize(tensor, descriptor.preprocessing.mean, descriptor.preprocessing.std)
                 )
-            outputs = model(torch.stack(tensors).to(device))  # noqa: PD013 -- Torch, not pandas
+            outputs = model(torch.stack(tensors).to(device))
             predictions = postprocessor(outputs, torch.tensor(originals, device=device))
             for path, prediction in zip(paths, predictions, strict=True):
                 rows.extend(_rows(path, prediction, descriptor.class_names, settings))
