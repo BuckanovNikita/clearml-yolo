@@ -261,7 +261,8 @@ compatible idle hardware or use an explicit value. Global training batches must 
 divisible by the allocated GPU count. OOM keeps normal training failure behavior;
 there is no automatic retry or hidden batch reduction.
 These batch-estimation/native multi-GPU interfaces shipped with feature 006.
-Real multi-GPU acceptance requires physical-topology evidence; see the
+A physical multi-GPU claim requires physical-topology evidence, outside the mandatory
+acceptance gate; see the
 [acceptance boundaries](implementation-status.md). Release does not establish it.
 
 Training holds the full allocation. After native training
@@ -590,8 +591,8 @@ arguments. Manual freeing clears only that GPU's existing reservations and holds
 memory/process checks, signals, original queue access or changing the job outcome.
 Per-device generations fence earlier guardians and preserve sibling reservations; the
 next job still needs fresh memory admission. Keep capability preflight, hold/claim
-transactions and remote
-[GPU DDP acceptance](ddp-testing.md) aligned with these rules.
+transactions, simulated regressions and [single-GPU acceptance](development.md#acceptance-tiers)
+aligned with these rules.
 
 Feature 029 replaces the historical four-mode execution policy with direct commands and
 `cy-queue`. Old switches fail with migration guidance. Training holds the complete

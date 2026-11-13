@@ -33,150 +33,6 @@ QUEUE_ROOTS = set(
     IMPORT_CONTRACTS["importlinter:contract:cy-never-imports-extracted-queue"]["forbidden_modules"].split()
 )
 SDK_ROOTS |= QUEUE_ROOTS
-EFFECTFUL_CALLS = {
-    "open",
-    "read_text",
-    "read_bytes",
-    "write_text",
-    "write_bytes",
-    "read_csv",
-    "read_excel",
-    "to_csv",
-    "to_excel",
-    "savefig",
-    "mkdir",
-    "unlink",
-    "rmdir",
-    "rename",
-    "glob",
-    "rglob",
-    "stat",
-    "lstat",
-    "exists",
-    "is_file",
-    "is_dir",
-    "resolve",
-    "iterdir",
-    "import_module",
-    "__import__",
-    "system",
-    "popen",
-    "Popen",
-    "run",
-    "check_call",
-    "check_output",
-    "urlopen",
-    "urlretrieve",
-    "connect",
-    "send",
-    "recv",
-    "getenv",
-    "ExcelWriter",
-    "Workbook",
-    "load_workbook",
-    "touch",
-}
-QUALIFIED_EFFECTS = {
-    "requests": {"get", "post", "put", "patch", "delete", "head", "options", "request", "send"},
-    "httpx": {
-        "get",
-        "post",
-        "put",
-        "patch",
-        "delete",
-        "head",
-        "options",
-        "request",
-        "send",
-        "stream",
-    },
-    "socket": {
-        "socket",
-        "socketpair",
-        "create_connection",
-        "create_server",
-        "getaddrinfo",
-        "gethostbyname",
-        "gethostbyname_ex",
-        "gethostbyaddr",
-        "bind",
-        "listen",
-        "accept",
-        "connect",
-        "connect_ex",
-        "send",
-        "sendall",
-        "sendto",
-        "recv",
-        "recvfrom",
-        "shutdown",
-    },
-    "subprocess": {
-        "run",
-        "Popen",
-        "call",
-        "check_call",
-        "check_output",
-        "getoutput",
-        "getstatusoutput",
-    },
-    "shutil": {
-        "copy",
-        "copy2",
-        "copyfile",
-        "copytree",
-        "copystat",
-        "copymode",
-        "rmtree",
-        "move",
-        "disk_usage",
-        "which",
-        "chown",
-        "make_archive",
-        "unpack_archive",
-    },
-    "tempfile": {
-        "TemporaryFile",
-        "NamedTemporaryFile",
-        "TemporaryDirectory",
-        "mkdtemp",
-        "mkstemp",
-        "gettempdir",
-        "gettempdirb",
-    },
-    "os": {
-        "environ",
-        "getenv",
-        "putenv",
-        "unsetenv",
-        "listdir",
-        "scandir",
-        "walk",
-        "chdir",
-        "getcwd",
-        "mkdir",
-        "makedirs",
-        "remove",
-        "unlink",
-        "rename",
-        "replace",
-        "rmdir",
-        "removedirs",
-        "stat",
-        "lstat",
-        "open",
-        "read",
-        "write",
-        "system",
-        "popen",
-        "fork",
-        "kill",
-        "execv",
-        "execve",
-        "spawnv",
-        "spawnve",
-    },
-}
 
 
 def within(module: str, prefix: str) -> bool:
@@ -284,18 +140,16 @@ def _function_locals(statements: list[ast.stmt], arguments: ast.arguments) -> di
         *([arguments.vararg] if arguments.vararg else []),
         *([arguments.kwarg] if arguments.kwarg else []),
     ):
-        local[argument.arg] = "deps" if argument.arg == "deps" else "@local"
+        local[argument.arg] = "@local"
     return local
 
 
-class _EffectVisitor(ast.NodeVisitor):
+class _DynamicImportVisitor(ast.NodeVisitor):
     """Resolve explicit imports/aliases lexically, without evaluating inspected code."""
 
-    def __init__(self, *, application: bool) -> None:
-        self.application = application
+    def __init__(self) -> None:
         self.scopes: list[dict[str, str]] = [{}]
         self.class_scopes: list[dict[str, str]] = []
-        self.findings: list[str] = []
         self.dynamic_imports: set[str] = set()
         self.deferred: list[tuple[ast.FunctionDef | ast.AsyncFunctionDef | ast.Lambda, list[dict[str, str]]]] = []
 
@@ -320,16 +174,12 @@ class _EffectVisitor(ast.NodeVisitor):
             for scope in reversed(self.scopes):
                 if node.id in scope:
                     return scope[node.id]
-            return node.id if node.id in {"open", "__import__", "deps"} else "@unbound." + node.id
+            return node.id if node.id == "__import__" else "@unbound." + node.id
         if isinstance(node, ast.Attribute):
             return self.qualified(node.value) + "." + node.attr
         if isinstance(node, ast.Call):
             return self.qualified(node.func)
         return "@local"
-
-    def _report(self, node: ast.expr, name: str) -> None:
-        owner = "direct application effect" if self.application else "effectful core call"
-        self.findings.append(f"{owner} at line {node.lineno}: {name}")
 
     @override
     def visit_Import(self, node: ast.Import) -> None:
@@ -366,33 +216,7 @@ class _EffectVisitor(ast.NodeVisitor):
             and isinstance(node.args[0].value, str)
         ):
             self.dynamic_imports.add(node.args[0].value)
-        root = name.split(".")[0]
-        method = name.rsplit(".", 1)[-1]
-        ambiguous = {"run", "connect", "send", "recv", "getenv", "system", "popen", "Popen"}
-        explicit = (
-            name in {"open", "__import__", "builtins.open", "builtins.__import__"}
-            or method in QUALIFIED_EFFECTS.get(root, set())
-            or name.startswith(("urllib.request.", "http.client.", "multiprocessing."))
-            or method in EFFECTFUL_CALLS - ambiguous
-        )
-        port_effect = self.application and (
-            name.startswith("deps.storage.") or name == "deps.ground_truth_repository.resolve"
-        )
-        if explicit and not port_effect:
-            self._report(node, name)
         self.generic_visit(node)
-
-    @override
-    def visit_Attribute(self, node: ast.Attribute) -> None:
-        name = self.qualified(node)
-        if name == "os.environ":
-            self._report(node, name)
-        self.generic_visit(node)
-
-    @override
-    def visit_Name(self, node: ast.Name) -> None:
-        if isinstance(node.ctx, ast.Load) and self.qualified(node) == "os.environ":
-            self._report(node, "os.environ")
 
     def function_scope(self, node: ast.FunctionDef | ast.AsyncFunctionDef | ast.Lambda) -> None:
         for expression in _definition_expressions(node):
@@ -470,25 +294,6 @@ class _EffectVisitor(ast.NodeVisitor):
         self.comprehension_scope(node)
 
 
-def core_effect_findings(tree: ast.Module) -> list[str]:
-    """Find covered filesystem/network/process/environment effects in lexical scopes."""
-    visitor = _EffectVisitor(application=False)
-    visitor.visit(tree)
-    return visitor.findings
-
-
-def application_effect_findings(tree: ast.Module) -> list[str]:
-    """Applications route effects through explicit injected storage ports."""
-    visitor = _EffectVisitor(application=True)
-    visitor.visit(tree)
-    return visitor.findings
-
-
-def pure_adapter_effect_findings(module: str, tree: ast.Module) -> list[str]:
-    """Apply the established no-effects scanner only to declared pure adapters."""
-    return core_effect_findings(tree) if module in PURE_ADAPTERS else []
-
-
 def _module_name(path: Path, source_root: Path) -> str:
     parts = path.relative_to(source_root).with_suffix("").parts
     return ".".join(parts[:-1] if parts[-1] == "__init__" else parts)
@@ -498,7 +303,7 @@ def add_dynamic_imports(graph: grimp.ImportGraph, source_root: Path) -> None:
     """Literal import_module calls obey the same ownership as ordinary imports."""
     for path in source_root.rglob("*.py"):
         importer = _module_name(path, source_root)
-        visitor = _EffectVisitor(application=False)
+        visitor = _DynamicImportVisitor()
         visitor.visit(ast.parse(path.read_text()))
         for target in visitor.dynamic_imports:
             imported = target if target.startswith(PROJECT_ROOTS) else target.split(".")[0]

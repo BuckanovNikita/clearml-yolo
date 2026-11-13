@@ -237,7 +237,9 @@ JSON examples, generated configuration files and frozen snapshot replay behavior
 
 Since 0.41.0, native training accepts CPU, one CUDA device, or a
 CUDA device list such as `model.train.device=[0,1]` for DEIMv2, RF-DETR, Faster R-CNN
-and FCOS. Real multi-GPU acceptance remains pending. The invocation owner supervises
+and FCOS. Physical multi-GPU scenarios are outside the
+[maintained acceptance gate](development.md#acceptance-tiers); CPU/simulated results
+do not establish their native outcomes. The invocation owner supervises
 one process per GPU and exclusively publishes to ClearML; rank zero writes aggregate
 metrics and checkpoints. DEIMv2 uses its native DDP, RF-DETR uses Lightning DDP, and
 the Torchvision families use distributed sampling, accumulation-aware synchronization,

@@ -17,11 +17,12 @@ from typing import Any, assert_never, override
 from uuid import uuid4
 
 from clearml_yolo.core.models import PRESETS, model_preset
-from ddp_gpu_harness import redact, redact_data
 from severstal_helpers import (
     OptimizerObservation,
     file_sha256,
     loss_values,
+    redact,
+    redact_data,
     validate_observation,
     write_json,
     write_pipeline,

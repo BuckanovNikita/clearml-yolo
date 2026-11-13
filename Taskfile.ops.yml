@@ -91,7 +91,7 @@ tasks:
           exit 1
         fi
         # Adopt the Task-owned environment; Task remains responsible for teardown.
-        CY_TASK_VERIFICATION=1 {{.RUN}} {{.UV}} pytest tests/integration -m 'not ddp_gpu and not severstal_gpu' -n 0
+        CY_TASK_VERIFICATION=1 {{.RUN}} {{.UV}} pytest tests/integration -m 'not severstal_gpu' -n 0
         BASH
 
   _clean-tip:
@@ -105,47 +105,31 @@ tasks:
         }
 
   acceptance:
-    desc: Clean tip, checks, properties, early live preflight, unit suite with coverage, live part, clean unchanged tip
+    desc: Explicit full acceptance on a clean unchanged committed tip
     vars:
       # Recorded before any stage runs; the final command compares a fresh rev-parse.
       START_HEAD:
         sh: git rev-parse HEAD
-      # 1 when every path changed since master is documentation; no commits since
-      # master runs the live part.
-      DOCS_ONLY:
-        sh: |
-          bash -eu -o pipefail -c '
-            base=$(git merge-base master HEAD)
-            changed=$(git diff --name-only "$base"..HEAD)
-            if [ -z "$changed" ]; then echo 0; exit 0; fi
-            while IFS= read -r path; do
-              case "$path" in
-                *.md|docs/*|specs/*) ;;
-                *) echo 0; exit 0 ;;
-              esac
-            done <<< "$changed"
-            echo 1
-          '
     cmds:
       - task: _clean-tip
       - task: check
-      - task: properties
-      # Live preflight early, so an unavailable cluster defers before the long unit suite.
+      # Hardware and infrastructure preflight precede every expensive test stage.
       - |
-        if [ "{{.DOCS_ONLY}}" = 1 ]; then
-          echo "NOTICE: every path changed since master is documentation (*.md, docs/, specs/);" >&2
-          echo "NOTICE: the live part (infra-check, integration) is SKIPPED and not verified." >&2
-          exit 0
-        fi
+        {{if .RELEASE_GPU}}
+        {{.RUN}} {{.UV}} python -c 'import sys, torch; available = torch.cuda.is_available(); print("GPU preflight: available" if available else "DEFERRED: CUDA GPU unavailable"); sys.exit(0 if available else 3)'
+        {{else}}
+        true
+        {{end}}
+      - |
         status=0
         "{{.TASK_EXE}}" --exit-code infra-check || status=$?
         if [ "$status" = 3 ]; then
           echo "DEFERRED: the cluster is unavailable (infra-check exit 3); acceptance is blocked until the live part runs." >&2
         fi
         exit "$status"
+      - task: properties
       - task: coverage
       - |
-        if [ "{{.DOCS_ONLY}}" = 1 ]; then exit 0; fi
         status=0
         "{{.TASK_EXE}}" --exit-code integration || status=$?
         if [ "$status" = 3 ]; then
@@ -162,28 +146,13 @@ tasks:
   release-commit-check:
     desc: Release exception checks; runs only inside the semantic-release build_command
     cmds:
-      - |
-        bash -eu -c '
-          if ! git diff --quiet --ignore-submodules=none; then
-            echo "Release-commit check requires no unstaged tracked changes." >&2
-            exit 1
-          fi
-          if IFS= read -r -d "" path < <(git ls-files --others --exclude-standard -z); then
-            echo "Release-commit check requires no untracked files: $path" >&2
-            exit 1
-          fi
-          while IFS= read -r -d "" path; do
-            case "$path" in
-              pyproject.toml|uv.lock|CHANGELOG.md) ;;
-              *) echo "Outside release exception: $path" >&2; exit 1 ;;
-            esac
-          done < <(git diff --cached --name-only -z)
-        '
-      - "{{.RUN}} {{.UV}} python scripts/release_lock_guard.py"
+      - '{{.RUN}} {{.UV}} python scripts/release.py check-prepared --expected-tip "$CY_RELEASE_EXPECTED_TIP"'
       - task: lock
       - task: ruff
       - task: format-check
       - task: deptry
+      - task: paired-check
+      - '{{.RUN}} {{.UV}} python scripts/release.py check-prepared --expected-tip "$CY_RELEASE_EXPECTED_TIP"'
 
   paired-check:
     desc: Paired CY and cy-queue release check in a temporary environment (CY_QUEUE_DIR, default ../cy-queue)
@@ -198,6 +167,20 @@ tasks:
           exit 1
         fi
         queue="$(cd "$queue" && pwd -P)"
+        if [ -n "$(git -C "$queue" status --porcelain --untracked-files=all)" ]; then
+          echo 'paired-check: cy-queue must be a clean committed source checkout.' >&2
+          exit 1
+        fi
+        queue_tip="$(git -C "$queue" rev-parse HEAD)"
+        # Read the remote default branch and tags, including repositories without origin/HEAD.
+        git -C "$queue" fetch origin --tags HEAD
+        git -C "$queue" merge-base --is-ancestor FETCH_HEAD "$queue_tip" || {
+          echo 'paired-check: cy-queue does not contain the latest remote default branch.' >&2
+          exit 1
+        }
+        cy_tip="$(git rev-parse HEAD)"
+        cy_inputs="$(git diff --binary HEAD | git hash-object --stdin)"
+        cy_status="$(git status --porcelain -z --untracked-files=all | git hash-object --stdin)"
         # The worktree .venv stays untouched: the pair is installed into a temporary
         # environment on the same filesystem (ignored .tmp/), removed on exit.
         mkdir -p "$root/.tmp"
@@ -212,14 +195,23 @@ tasks:
         # installs of these checkouts (cy-queue's minimum-only CY bound must not have
         # replaced the locked CY with an index build).
         "$python" "$root/scripts/paired_metadata.py" check "$root" "$queue"
-        (cd "$queue" && "$python" -m pytest -q)
+        (cd "$queue" && "$venv/bin/ruff" check . && "$venv/bin/ruff" format --check . && \
+          "$venv/bin/mypy" . && "$venv/bin/lint-imports" && "$python" -m pytest -q)
         "$venv/bin/cy-queue" --help >/dev/null
+        if [ "$(git rev-parse HEAD)" != "$cy_tip" ] || \
+           [ "$(git diff --binary HEAD | git hash-object --stdin)" != "$cy_inputs" ] || \
+           [ "$(git status --porcelain -z --untracked-files=all | git hash-object --stdin)" != "$cy_status" ] || \
+           [ "$(git -C "$queue" rev-parse HEAD)" != "$queue_tip" ] || \
+           [ -n "$(git -C "$queue" status --porcelain --untracked-files=all)" ]; then
+          echo 'paired-check: source inputs changed during verification.' >&2
+          exit 1
+        fi
         for project in "$root" "$queue"; do
           "$python" "$root/scripts/paired_metadata.py" report "$project" "$(git -C "$project" rev-parse HEAD)"
         done
 
-  release-acceptance:
-    desc: Release acceptance (acceptance, single-GPU severstal, multi-GPU DDP unless waived, FiftyOne, paired-check)
+  release-validation:
+    desc: Shared release stages (acceptance, single-GPU Severstal and FiftyOne); pair checked at final versions
     # The real-run gate of the running-end-to-end-tests skill remains a separate step. A GPU
     # busy with the user's workload is deferred verification, checked by the agent or
     # operator before starting (verification-workflow skill); it is not automated here.
@@ -230,15 +222,10 @@ tasks:
           exit 1
         fi
       - task: acceptance
+        vars:
+          RELEASE_GPU: "1"
       # The arguments are split into pytest options on purpose (unquoted).
       - "CY_TASK_VERIFICATION=1 {{.RUN}} {{.UV}} pytest tests/integration -m severstal_gpu -p no:randomly -n 0 $CY_SEVERSTAL_ARGS"
-      # Multi-GPU DDP is waived on single-GPU hosts (FR-015): reported, never blocking.
-      - |
-        if [ -z "${CY_DDP_ARGS:-}" ]; then
-          echo "multi-GPU DDP: waived (CY_DDP_ARGS unset)"
-          exit 0
-        fi
-        CY_TASK_VERIFICATION=1 {{.RUN}} {{.UV}} pytest tests/integration -m ddp_gpu -p no:randomly -n 0 $CY_DDP_ARGS
       - |
         set -eu
         mkdir -p {{.ROOT_DIR | shellQuote}}/.tmp
@@ -247,4 +234,20 @@ tasks:
         # The database is the test environment's (database component only); the
         # directory holds the publisher's locks.
         CY_TEST_FIFTYONE=1 CY_TASK_VERIFICATION=1 FIFTYONE_DATABASE_DIR="$database" {{.RUN}} {{.UV}} pytest tests/integration/fiftyone -p no:randomly -n 0
+      - "{{.RUN}} {{.UV}} python scripts/mutation.py --base refs/remotes/origin/master"
+
+  release-acceptance:
+    desc: Explicit full release acceptance including the current CY/cy-queue pair
+    cmds:
+      - task: release-validation
       - task: paired-check
+
+  release-local:
+    desc: Integrate and version an expected tip locally; publishing needs explicit --publish
+    cmds:
+      - "{{.RUN}} {{.UV}} python scripts/release.py local {{.CLI_ARGS}}"
+
+  release-publish:
+    desc: Freshly verify and publish exact existing refs without re-versioning
+    cmds:
+      - "{{.RUN}} {{.UV}} python scripts/release.py publish {{.CLI_ARGS}}"

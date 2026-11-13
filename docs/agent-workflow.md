@@ -63,15 +63,18 @@ product boundary. Keep existing rules intact and
 avoid unrelated repository refactors.
 
 Run the applicable [verification stages](development.md#verification); the
-`verification-workflow` skill selects them. The development check stage includes architecture checks; the unit suite includes
-CPU-DDP. Reuse their results while the checked inputs remain unchanged.
+`verification-workflow` skill selects them. The development check stage includes import/initializer/runtime-target architecture
+checks; effect ownership remains a review obligation after removal of custom effect
+enforcement. Automatic routing follows the staged/latest-commit classifier in Task;
+explicit acceptance keeps its full scope. The full unit suite includes CPU-DDP. Reuse their results while the checked inputs remain unchanged.
 Report deferred and waived checks as such, never as passed. Reconcile the final
 task-owned diff with contract coverage and record actual results in dated evidence.
 
 ### Documentation
 
-Update affected user guidance with behavior changes. Use only documentation checks
-native to Spec Kit or OpenSpec; no separate documentation stage or custom gate applies.
+Update affected user guidance with behavior changes. Complete applicable native Spec Kit
+analysis and consistency review as soon as inputs exist, before expensive checks. Use
+only documentation checks native to Spec Kit or OpenSpec; no separate checker applies.
 
 ### Workflow safeguards
 

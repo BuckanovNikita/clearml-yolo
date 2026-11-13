@@ -5,6 +5,11 @@ date: 2026-11-09
 
 # semantic-release with a guarded lock refresh, under flock, after two acceptance tiers
 
+The original decision below is retained as history. Its verification routing, physical
+DDP gate and release orchestration are superseded by
+[change-aware workflow](../../specs/013-change-aware-workflow/spec.md) and the current
+[development procedures](../development.md#verification).
+
 ## Context
 
 Releases used a bespoke script (`scripts/local_release.py`) that evaluated Conventional

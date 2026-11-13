@@ -1,61 +1,42 @@
 ---
 name: verification-workflow
-description: Select clearml-yolo Task stages for explicit fixes, development verification, commits, change and release acceptance, deferred or waived checks, and completion reports. Use before verifying changes or claiming completion, and when infrastructure or a busy GPU defers required verification.
+description: Select verification for a change, final commit, acceptance or release; diagnose deferred checks and report completion evidence.
 ---
 
-# Verification workflow
+# Select verification
 
-[Development procedures](../../../docs/development.md#verification) own policy and the
-stage table; `Taskfile.yml` owns commands and ordering. Invoke each stage as
-`uv run --locked task --exit-code <stage>` and keep its exit status.
+[Development procedures](../../../docs/development.md#verification) own the routing
+policy; [Taskfile.yml](../../../Taskfile.yml) owns commands and ordering.
 
-1. Read the session status that `scripts/session_status.sh` prints at session start
-   (branch against `master`, uncommitted paths, other worktrees, release lock, active run
-   tag); rerun it when unsure. Inspect worktree ownership and the host's reported load
-   (pcboard where available); choose `CY_TEST_WORKERS` (default 2) and postpone heavy
-   stages while the user's workload needs the machine. Stop concurrent editing in this
-   worktree. Clear an inherited `UV_PROJECT_ENVIRONMENT` before the outer `uv run`. A new
-   worktree first needs its local external packages (`external/`, the wheelhouse and
-   `uv.toml`; see [setup](../../../docs/development.md#external-dependencies)) and runs
-   `bash scripts/install-hooks.sh` once.
-2. Run `fix`, inspect its changes and stage exact task-owned paths. Commit inputs must
-   be fully staged: the staging guard refuses every unstaged tracked change and every
-   nonignored untracked file, without exemption.
-3. Use `verify` for development verification; the pre-commit hook runs it. Reuse that
-   success while inputs remain unchanged. After an intermediate `SKIP=verify` commit,
-   clear `SKIP` and run `verify` on the final content. `test-full` is the conservative
-   fallback when affected selection cannot represent an input.
-4. For code changes, run the `mutation-testing` skill's branch report
-   (`mutation -- --base master`). Then run `acceptance` on the clean committed tip; it
-   already runs `check`, `properties`, the cluster preflight, the complete unit suite with
-   the coverage floor and the live part, and confirms the tip stayed clean and unchanged.
-   Do not precede it with an equivalent affected-unit run. Follow
-   `running-integration-tests` for the live part.
-5. Before delivering a version, run `release-acceptance` and the real-run gate of
-   `running-end-to-end-tests` (CPU and a single GPU); the `release` skill owns delivery.
-   Check the GPU through pcboard `pc_status` before any GPU work.
-6. Report the checks actually executed or selected, each as passed, failed, deferred,
-   waived or error, plus cleanup leftovers. A deselected test is not a fresh execution;
-   an interruption is not success; Task freshness is never proof.
+1. Inspect the session status, task-owned diff and host capacity. Prepare the
+   worktree's [dependencies](../../../docs/development.md#external-dependencies),
+   clear inherited `UV_PROJECT_ENVIRONMENT`, and stop concurrent edits before checking.
+2. Complete applicable native Spec Kit analysis and documentation consistency review
+   as soon as their inputs exist. Resolve prose corrections and safe formatting before
+   committed-tip verification; add no separate documentation gate.
+3. Select the automatic route from the staged diff for hooks or latest commit after
+   committing: static-only for non-product inputs, bounded selection for test-only
+   inputs, ordinary product verification for product source/runtime inputs. Mixed
+   changes take the strongest route. Do not broaden a missing test-dependency history
+   to the full suite; report its targeted-verification gap.
+4. Follow the [commit procedure](../../../docs/development.md#commit-procedure).
+   Schedule `prek run --all-files` with hook overrides cleared as the final automatic
+   pass; do not first run an equivalent `verify`. Reuse successful evidence while its
+   relevant inputs remain unchanged. A prose correction does not invalidate product
+   evidence; review fixes rerun affected checks.
+5. Explicit test and acceptance commands execute their requested scope regardless of
+   classification. For product changes, select the branch mutation report with
+   [mutation-testing](../mutation-testing/SKILL.md). Use
+   [running-integration-tests](../running-integration-tests/SKILL.md) for live gates;
+   [release](../release/SKILL.md) owns local integration and publishing.
+6. Report selected checks as passed, failed, deferred, waived or error, with actual
+   selectors, source identity and cleanup evidence. Deselection, interruption and
+   Task freshness do not establish execution. Record independent review after
+   integration and verification for behavior, interface, dependency or policy changes.
 
-## Deferral and waivers
-
-`infra-check` returns AVAILABLE/0, UNAVAILABLE/3 or ERROR/1; inside `acceptance`, exit 3
-stops the stage as deferred verification. Unavailability, capacity wait and a GPU busy
-with the user's workload defer the affected checks: keep the task incomplete, continue
-independent local work and retry at a meaningful milestone or after restored
-availability, without polling. Deferred verification blocks acceptance, integration and
-release. When only blocked verification remains, report the reason and ask for the
-user's decision. Errors (credentials, TLS, configuration) need diagnosis with
-`clearml-yolo-environment`; assertions remain test failures.
-
-Multi-GPU DDP is waived by standing user decision on this single-GPU host unless
-`CY_DDP_ARGS` is set: `release-acceptance` reports it as waived, never as passed or
-deferred, and it does not block. The Severstal single-GPU suite (`CY_SEVERSTAL_ARGS`) is
-required.
-
-Use `properties`, `integration`, `mutation` or `paired-check` separately when the change
-needs them. None is cached. Live acceptance is reusable only within the same release
-attempt on the unchanged clean tip. Documentation-only changes use native Spec Kit
-checks; `acceptance` skips both its preflight and its live part for them, says so,
-and they are reported as not verified.
+Temporary infrastructure or hardware unavailability defers supported checks and blocks
+acceptance/integration/release. Continue independent work and retry after availability
+changes, without polling. Diagnose configuration, permission and credential errors
+with [clearml-yolo-environment](../clearml-yolo-environment/SKILL.md); keep assertion
+failures distinct. When only blocked checks remain, report the reason for the user's
+decision. A waiver requires user authorization and never counts as a pass.

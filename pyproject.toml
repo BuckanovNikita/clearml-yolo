@@ -156,7 +156,6 @@ markers = [
     "integration: live test under tests/integration; excluded from development verification by directory",
     "severstal_gpu: opt-in native all-model Severstal training and ClearML acceptance",
     "ddp_cpu: real multi-rank CPU YOLO training and native relay integration",
-    "ddp_gpu: opt-in real multi-GPU direct/queued native pipeline acceptance",
     "process_capabilities: Linux supervision preflight regression tests",
     "gpu_controls: host-wide GPU holds and manual reservation recovery",
     # Registered here too so --strict-markers holds when the xdist plugin is disabled.
@@ -189,13 +188,13 @@ DEP002 = [
 # by the declared fiftyone dependency.
 DEP003 = ["plotly", "matplotlib"]
 # Development tooling under scripts/ uses dev-group packages.
-DEP004 = ["grimp", "importlinter", "psutil"]
+DEP004 = ["grimp", "importlinter", "psutil", "pytest"]
 
 [tool.mutmut]
 # scripts/mutation.py derives only_mutate and the test selection from each change and
 # runs mutmut in a fresh workspace, so nothing here describes a scope or a cache.
 source_paths = ["src/clearml_yolo"]
-# Native acceptance helpers and asset packaging tests use scripts/.
+# Native acceptance helpers use scripts/.
 also_copy = ["scripts/", ".importlinter"]
 # `-n 0` keeps xdist out of each forked mutant; these args are appended last, so they win.
 # The --ignore list drops live suites. The -m expression deselects tests that hold
@@ -229,7 +228,7 @@ commit_message = "chore(release): {version}"
 no_git_verify = false
 # semantic-release runs the build command with a restricted environment; forward the
 # explicit release-check selector so the required check cannot silently disappear.
-build_command_env = ["CY_RELEASE_CHECK"]
+build_command_env = ["CY_RELEASE_CHECK", "CY_RELEASE_EXPECTED_TIP", "CY_QUEUE_DIR", "CY_TEST_WORKERS"]
 # A release builds no artifact. The command refreshes only the root entry of uv.lock to the
 # rewritten project.version and stages it into the release commit. semantic-release
 # forwards only PATH, HOME, VIRTUAL_ENV, CI variables, build_command_env, NEW_VERSION and

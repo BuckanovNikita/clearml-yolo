@@ -35,7 +35,7 @@ ignore = [
     "PLC1901",
     # Native adapters/workflows have structured state and protocol methods. Review cohesion
     # individually; extra count thresholds would force unrelated signature/control-flow churn.
-    # Existing C901, PLR0911/0912/0915 and effect-boundary checks remain enabled.
+    # Existing C901, PLR0911/0912/0915 and import-boundary checks remain enabled.
     "PLR0914", "PLR0916", "PLR1702", "PLR6301", "PLW0717",
     # In-place operators can alter aliasing/array semantics; explicit reassignment is allowed.
     "PLR6104",

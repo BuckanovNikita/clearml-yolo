@@ -10,11 +10,11 @@ responsibility and application component. A new unclassified child such as
 `clearml_yolo.misc` fails `lint-imports` even when it has no imports. Adapter
 responsibilities share one classification level; the peer contracts below govern
 their permitted edges. The architecture task supplements these contracts with `graphlib` whole-graph cycle detection,
-core/adapter dependency allowlists, explicit-effect and runtime-target checks.
+core/adapter dependency allowlists, initializer and runtime-target checks.
 
 `uv run --locked task --exit-code architecture` enforces the configured contracts in
 [.importlinter](../.importlinter), plus graph cycles, core dependency allowlists,
-explicit effects, initializers, runtime targets and maintainer boundaries. It applies
+initializers, runtime targets and maintainer boundaries. It applies
 contracts to the actual product graph augmented with literal dynamic imports.
 The development `check` and `verify` tasks include it. Runtime import and generated
 Hydra composition checks remain in `tests/test_architecture.py` because they execute
@@ -39,8 +39,9 @@ Core permits the standard library, Pydantic, Pandera, pandas, NumPy and SciPy.
 It performs no filesystem, network, process or environment access and imports no
 SDK, rendering library or Loguru. Paths in data records describe values; adapters
 resolve, inspect and open them. Application effects go through typed ports such as
-`deps.storage`; direct `Path` reads, pandas file readers and workbook writes are
-rejected by the architecture checks.
+`deps.storage`; direct `Path` reads, pandas file readers and workbook writes violate
+the design contract and require review. Custom static effect enforcement has been
+removed: passing architecture checks does not prove these operations are absent.
 Application logging likewise uses `deps.resources.log` through the
 `ExecutionResources` port. Direct Loguru, rendering, HTTP client and file-lock
 dependencies are forbidden in both application and core.
@@ -156,17 +157,15 @@ described in [development procedures](development.md).
 See the [module and effect diagram](module-architecture.md) for interfaces and failure
 behavior. Static checks validate visible syntax and supported re-exports; they cannot
 prove arbitrary runtime attribute construction, monkeypatching or third-party effects.
-Negative fixtures must demonstrate rejection of each enforced prohibition, while
-positive fixtures protect legitimate pure operations and injected-port calls.
+Use disposable command-level probes for architecture rejection behavior; product
+tests remain focused on runtime imports and composition.
 
 Target checks resolve every module/class segment, simple aliases and explicit project
 re-exports. Function-local, nested-function, annotation-only and `TYPE_CHECKING`-only
 bindings are not runtime module attributes. Initializer checks inspect definition-time
 decorators, defaults, annotations, class bases/metaclass expressions and class bodies;
-deferred function/lambda bodies are excluded. Effect checks resolve imported and simple
-assigned aliases within function, lambda, class and comprehension scopes, including
-network/process calls and environment access. Explicit application port calls such as
-`deps.storage` remain permitted.
+deferred function/lambda bodies are excluded. Arbitrary effects inside those callable
+bodies are a review obligation, including calls reached through aliases or wrappers.
 
 Nested class bodies do not inherit outer class namespaces. Class target aliases may
 refer to prior class or module bindings. Deferred callable bodies use final enclosing
@@ -176,5 +175,5 @@ module initialization and arbitrary later rebinding are outside that static mode
 These checks do not execute inspected modules or provide complete control-flow,
 interprocedural or reflective analysis. Computed imports/attributes, generated or
 inherited attributes, branch-dependent rebinding and unknown wrappers remain review
-obligations. Generic filesystem method-name checks are conservative. See the
+obligations. Historical effect-enforcement probes describe the former coverage; see the
 [negative-fixture evidence](https://github.com/BuckanovNikita/clearml-yolo/blob/d74945c83dc24094c599388bbcfd5e987daeb9bf/.specify/bugs/architecture-check-blindspots/test.md).

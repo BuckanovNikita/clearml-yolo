@@ -40,14 +40,14 @@ This table adds the relevant contracts and examples.
 | `PLC2701` (Hydra sweeps/validation and tests only) | Hydra sweep/parser functionality uses private upstream modules. Regression tests and import architecture contracts govern these boundaries. |
 | `PLC1901` | CSV/config parsing distinguishes an empty string from other falsey values; explicit lexical comparisons preserve intent. |
 | `PLC2801` (native runtime adapter, core ResourceRequest and tests only) | Native settings bypass persistent SDK setters using `dict.__setitem__`; frozen ResourceRequest validation normalizes its default with `object.__setattr__`. Tests call context-manager dunders to exercise entry/failure paths. Ordinary assignment or a whole `with` block is not equivalent. |
-| `PLR0914`, `PLR0916`, `PLR1702`, `PLR6301`, `PLW0717` | Native adapters/workflows have protocol methods and structured state/error handling. These extra heuristic thresholds need individual design review, not unrelated extraction to satisfy counts. Existing `C901`, `PLR0911/0912/0915` and effect boundaries remain active; this is not blanket approval of complex helpers. |
+| `PLR0914`, `PLR0916`, `PLR1702`, `PLR6301`, `PLW0717` | Native adapters/workflows have protocol methods and structured state/error handling. These extra heuristic thresholds need individual design review, not unrelated extraction to satisfy counts. Existing `C901`, `PLR0911/0912/0915` and import boundaries remain active; effect ownership requires review; this is not blanket approval of complex helpers. |
 | `PLR6104` | Augmented assignment can change aliasing or array semantics. Explicit reassignment is permitted. |
 | `PLR6201` | Small ordered membership literals support unhashable inputs; a set is not universally interchangeable. |
 | `FURB113`, `FURB140` | Sequential list assembly and readable generators need not become bulk extension or `starmap`. The ONNX attribute generator in export/build.py illustrates the tradeoff. |
 | `RUF027` (tests only) | Literal Hydra interpolation, generated-code templates and Git revision braces are not missing f-strings. |
 | `RUF031` | Parentheses can clarify tuple-valued keys in scientific indexing. |
 | `RUF056` | An explicit `False` fallback communicates a boolean protocol default even in a condition, as in native distributed rank parsing. |
-| `RUF067` (FiftyOne plugin initializer only) | FiftyOne discovers `register()` in the plugin initializer; that executable entrypoint is required. Other initializer effects remain constrained by architecture tests. |
+| `RUF067` (FiftyOne plugin initializer only) | FiftyOne discovers `register()` in the plugin initializer; that executable entrypoint is required. Other initializer effects remain constrained by the architecture Task. |
 | `RUF069` (ClearML report adapter and tests only) | Exact integral/fixture float comparisons must not become approximate assertions. Numerical tolerance decisions belong to individual scientific contracts. |
 | `RUF075` | Successful task finalization and failure cleanup have distinct owners. Context-manager exception behavior needs lifecycle review. |
 | `RUF105` | Rule-specific `noqa` is allowed for documented boundaries; `RUF100` rejects unused suppressions. |

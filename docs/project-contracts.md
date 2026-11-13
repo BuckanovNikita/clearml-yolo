@@ -124,7 +124,8 @@ See the [backend contract](../specs/000-baseline/spec.md) and
 Native multi-GPU training uses one supervised rank per GPU, with global microbatches
 divisible by world size and one invocation-owned ClearML task. FCOS uses zero-based
 foreground labels and P3–P7 features; Faster R-CNN retains its label offset. Native
-GPU and real multi-GPU acceptance for these additions remain pending.
+GPU claims require workload-specific executed evidence; physical multi-GPU scenarios
+are outside the [maintained acceptance gate](development.md#acceptance-tiers).
 
 Comparisons resolve each checkpoint independently, including YOLO/native pairs. Raw native
 references require explicit backend, preset, foreground labels and preprocessing; assertions

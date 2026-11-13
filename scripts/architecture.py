@@ -46,18 +46,6 @@ def dependency_findings(graph: grimp.ImportGraph) -> list[str]:
 
 def source_findings() -> list[str]:
     findings: list[str] = []
-    for layer, check in (
-        ("core", architecture.core_effect_findings),
-        ("application", architecture.application_effect_findings),
-    ):
-        for path in (SRC / "clearml_yolo" / layer).rglob("*.py"):
-            findings.extend(f"{path.relative_to(ROOT)}: {item}" for item in check(ast.parse(path.read_text())))
-    for module in architecture.PURE_ADAPTERS:
-        path = SRC.joinpath(*module.split(".")).with_suffix(".py")
-        findings.extend(
-            f"{module}: {item}"
-            for item in architecture.pure_adapter_effect_findings(module, ast.parse(path.read_text()))
-        )
     for path in SRC.rglob("__init__.py"):
         findings.extend(
             f"{path.relative_to(ROOT)}: {item}"
@@ -103,7 +91,7 @@ def main() -> int:
     if findings:
         print(f"Architecture checks failed: {len(findings)} finding(s)")
         return 1
-    print("Architecture checks passed: imports, effects, initializers, runtime targets and tooling boundaries")
+    print("Architecture checks passed: imports, initializers, runtime targets and tooling boundaries")
     return 0
 
 

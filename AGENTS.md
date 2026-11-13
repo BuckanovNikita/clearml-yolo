@@ -12,8 +12,8 @@ Authoritative details and prerequisites: [development procedures](docs/developme
 ```bash
 uv sync --locked --dev                         # after external/, wheelhouse and uv.toml (docs/development.md#external-dependencies)
 bash scripts/install-hooks.sh                  # once per worktree: staging guard, verify, commit-msg
-uv run --locked task --exit-code verify        # development verification (also the pre-commit hook)
-uv run --locked task --exit-code acceptance    # change acceptance on a clean committed tip
+env -u SKIP -u PRE_COMMIT_ALLOW_NO_CONFIG uv run --locked prek run --all-files # final automatic pass
+uv run --locked task --exit-code acceptance    # explicit full acceptance on a clean tip
 ```
 
 `scripts/session_status.sh` runs at Claude and Codex session start and reports the
@@ -58,6 +58,9 @@ for every task. Read guidance instead of copying shared skills into the reposito
   acceptance; then evaluate the native release workflow within authorization.
   Documentation-only changes may produce no new version. Missing or failed required
   checks remain acceptance gaps.
+- Task classifies staged inputs in hooks and the latest commit after committing.
+  Use the [automatic route](docs/development.md#automatic-routing); explicit test,
+  acceptance and release commands retain their requested scope.
 - Mocked tests do not establish native/GPU/upload outcomes.
 - Report each required check as passed, failed, deferred, waived or error. Deferred
   verification blocks acceptance, integration and release; waived checks never block.

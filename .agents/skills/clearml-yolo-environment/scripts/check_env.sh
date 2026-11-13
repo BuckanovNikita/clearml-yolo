@@ -1,25 +1,6 @@
 #!/usr/bin/env bash
-# Report whether everything an end-to-end `cy` run needs is actually usable.
-#
-# Reachable is not the same as usable: the ClearML server answers `debug.ping`
-# without any credentials at all, so this makes a real authenticated call. A
-# stale ~/clearml.conf is the failure this script exists to catch — it looks
-# healthy right up to the moment `Task.init()` raises LoginError 401.
-#
-# The endpoint and the credentials are read the way the ClearML SDK reads them:
-# CLEARML_API_HOST, CLEARML_API_ACCESS_KEY and CLEARML_API_SECRET_KEY from the
-# environment first (what this skill's `agent_env.sh` exports for the run's own
-# test environment, reached through a loopback port-forward), the config file for
-# whatever the environment leaves unset. The report names which endpoint it
-# authenticated against and where each value came from, and warns when that
-# endpoint is the user's own host ClearML on localhost:8008 rather than the run's
-# own test ClearML. It also reports whether kubectl reaches the docker-desktop
-# cluster the test environment lives in.
-#
-# Always exits 0. This reports; it never blocks a session or a test run.
-#
-#   <skill-dir>/scripts/check_env.sh          human-readable, on-demand report
-#   <skill-dir>/scripts/check_env.sh --json   one JSON object for an explicit caller
+# On-demand authenticated endpoint diagnosis; reports never contain credential values.
+# Always exits zero: interpret FAIL/WARN lines; see ../references/machine-workflow.md.
 
 set -uo pipefail
 

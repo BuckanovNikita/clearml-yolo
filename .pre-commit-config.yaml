@@ -1,37 +1,14 @@
-# Task owns every verification command; prek only selects stages. Install the
-# worktree-aware dispatchers with scripts/install-hooks.sh. Cheap hygiene hooks run
-# before the serial Task development verification.
-minimum_prek_version: "0.5.10"
+# Task owns hygiene, routing and verification; prek dispatches serially.
+# scripts/git-hook.sh runs Task staging-check before prek can stash.
 default_install_hook_types: [pre-commit, commit-msg]
 default_stages: [pre-commit]
 fail_fast: true
 
 repos:
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v6.0.0
-    hooks:
-      - id: check-added-large-files
-        args: [--maxkb=512]
-      - id: check-merge-conflict
-      - id: check-toml
-      - id: check-yaml
-      - id: end-of-file-fixer
-      - id: trailing-whitespace
-
   - repo: local
     hooks:
-      - id: untracked-sources
-        name: No untracked files under src, tests or scripts
-        entry: >-
-          sh -c 'files=$(git ls-files --others --exclude-standard -- src tests scripts);
-          test -z "$files" || { printf "Stage or remove:\n%s\n" "$files"; exit 1; }'
-        language: system
-        files: '^((src|tests|scripts)/|\.pre-commit-config\.yaml$)'
-        include_deleted: true
-        pass_filenames: false
-
       - id: verify
-        name: Task development verification
+        name: Task change-aware verification
         entry: uv run --locked task --exit-code verify
         language: system
         pass_filenames: false
@@ -45,6 +22,7 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [manual]
+        require_serial: true
 
       - id: acceptance-tests
         name: Task clean-tip acceptance
@@ -53,6 +31,7 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [manual]
+        require_serial: true
 
       - id: property-exploration
         name: Task property exploration
@@ -61,6 +40,7 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [manual]
+        require_serial: true
 
       - id: mutmut
         name: Task changed-function mutation (advisory)
@@ -69,6 +49,7 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [manual]
+        require_serial: true
         verbose: true
 
   - repo: https://github.com/compilerla/conventional-pre-commit

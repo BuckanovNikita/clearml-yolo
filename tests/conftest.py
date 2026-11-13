@@ -12,7 +12,6 @@ import pytest
 from hypothesis import HealthCheck, settings
 
 from clearml_yolo.adapters.runtime import bootstrap
-from ddp_gpu_harness import GPUOptions
 
 if TYPE_CHECKING:
     from severstal_harness import SeverstalOptions
@@ -81,27 +80,6 @@ def restore_runtime_configuration(tmp_path: Path) -> Iterator[None]:
 
 def pytest_addoption(parser: pytest.Parser) -> None:
     """The physical acceptance suite never starts implicitly."""
-    group = parser.getgroup("physical DDP acceptance")
-    group.addoption(
-        "--run-ddp-gpu",
-        action="store_true",
-        help="Authorize the marked physical multi-GPU/ClearML suite",
-    )
-    group.addoption("--ddp-devices", default="", help="Physical nvidia-smi/NVML indexes, e.g. 0,1")
-    group.addoption("--ddp-clearml-project", default="", help="Explicit test-owned ClearML project")
-    group.addoption("--ddp-artifacts", default="", help="Retained evidence directory")
-    group.addoption(
-        "--ddp-timeout",
-        type=float,
-        default=1200,
-        help="Per-scenario native execution deadline in seconds",
-    )
-    group.addoption(
-        "--ddp-cleanup-timeout",
-        type=float,
-        default=150,
-        help="Production cleanup deadline; minimum 120 seconds, plus 15-second fallback",
-    )
     severstal = parser.getgroup("native Severstal acceptance")
     severstal.addoption("--run-severstal-gpu", action="store_true")
     severstal.addoption("--severstal-dataset", default="")
@@ -154,51 +132,22 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     tests run only when the invocation names ``tests/integration`` (or a path inside it) or
     selects the ``integration`` marker, so a plain ``pytest`` never contacts the cluster.
     """
-    selected_gpu = {
-        marker
-        for marker, flag, filename in (
-            ("ddp_gpu", "--run-ddp-gpu", "test_native_ddp_gpu.py"),
-            ("severstal_gpu", "--run-severstal-gpu", "test_severstal_gpu.py"),
-        )
-        if config.getoption(flag) or marker in config.option.markexpr or any(filename in value for value in config.args)
-    }
+    selected_gpu = (
+        config.getoption("--run-severstal-gpu")
+        or "severstal_gpu" in config.option.markexpr
+        or any("test_severstal_gpu.py" in value for value in config.args)
+    )
     live = _selects_integration(config)
 
     def keep(item: pytest.Item) -> bool:
-        gpu = [marker for marker in ("ddp_gpu", "severstal_gpu") if item.get_closest_marker(marker) is not None]
-        if gpu:
-            return any(marker in selected_gpu for marker in gpu)
+        if item.get_closest_marker("severstal_gpu") is not None:
+            return bool(selected_gpu)
         return live or item.get_closest_marker("integration") is None
 
     removed = [item for item in items if not keep(item)]
     if removed:
         items[:] = [item for item in items if keep(item)]
         config.hook.pytest_deselected(items=removed)
-
-
-@pytest.fixture
-def ddp_gpu_options(request: pytest.FixtureRequest) -> GPUOptions:
-    """Retain evidence for explicit selections that omit authorization or required options."""
-    from ddp_gpu_harness import Evidence, GPUOptions
-
-    config = request.config
-    options = GPUOptions(
-        devices=config.getoption("--ddp-devices"),
-        project=config.getoption("--ddp-clearml-project"),
-        artifacts=Path(config.getoption("--ddp-artifacts") or ".tmp/ddp-results"),
-        timeout=config.getoption("--ddp-timeout"),
-        cleanup_timeout=config.getoption("--ddp-cleanup-timeout"),
-    )
-    missing = [
-        name for name in ("--ddp-devices", "--ddp-clearml-project", "--ddp-artifacts") if not config.getoption(name)
-    ]
-    if not config.getoption("--run-ddp-gpu"):
-        missing.insert(0, "--run-ddp-gpu")
-    if missing:
-        evidence = Evidence(options, "selection-error")
-        with evidence.retained():
-            raise ValueError(f"Physical DDP selection requires {' '.join(missing)}; evidence: {evidence.root}")
-    return options
 
 
 @pytest.fixture

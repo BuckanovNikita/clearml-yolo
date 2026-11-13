@@ -1,97 +1,45 @@
 ---
 name: release
-description: Integrate an accepted clearml-yolo tip into master by fast-forward and evaluate semantic-release under the shared release lock. Use for code releases, blocked acceptance before release, release-commit-check failures, a held release lock, or recovery of staged version, changelog or lockfile changes.
+description: Select local integration or publishing, check review and native evidence, and recover failed clearml-yolo release attempts. Use for releases, held locks, moved refs or prepared version changes.
 ---
 
-# Merge and release clearml-yolo
+# Release clearml-yolo
 
-[Local releases](../../../docs/development.md#local-releases) own policy. semantic-release
-alone owns versions, changelog and `v{version}` tags. Publish Git version tags only: no
-GitHub Releases, wheels or source archives for code. Model-weight releases follow
-[their own procedure](../../../docs/development.md#model-weight-releases) unchanged.
-`BRANCH` below names the branch to land; push authorization is separate.
+[Local releases](../../../docs/development.md#local-releases) own policy;
+[Task operations](../../../Taskfile.ops.yml) and
+[semantic-release configuration](../../../pyproject.toml) own commands and versions.
 
-## 1. Accept the clean branch tip
+1. Establish authorization for the intended operation. `release-local` permits local
+   fast-forward integration and version/tag creation; publishing requires separate
+   authorization, either `--publish` on that invocation or `release-publish` later.
+   An implementation request alone does not authorize a real release.
+2. Inspect the clean proposed tip and current CY/cy-queue sources. Resolve missing
+   prerequisites through [setup](../../../docs/development.md#external-dependencies).
+   Confirm fresh independent review and the CPU/single-GPU, direct/queued and
+   publication observations selected by
+   [end-to-end acceptance](../running-end-to-end-tests/SKILL.md). Automated stages do
+   not establish manual observations. Check host capacity before GPU execution.
+3. Invoke the selected Task entrypoint with the full immutable `--expected-tip` SHA.
+   Let it own automated stages, locking, fast-forward integration, semantic-release,
+   final-version pairing and exact-ref publication. Do not precede it with equivalent
+   acceptance or paired stages. The invocation reuses its stages; later publication
+   deliberately checks the existing version afresh without re-versioning.
+4. Report actual check outcomes, review/native evidence, accepted and final SHAs,
+   final pair versions, version/no-version outcome and any remotely confirmed refs.
+   A deferred supported gate blocks completion; follow
+   [verification workflow](../verification-workflow/SKILL.md).
 
-Work from a clean prepared checkout of `BRANCH` with its own `.venv`, `external/`
-copies, built wheelhouse and `uv.toml`
-([setup](../../../docs/development.md#external-dependencies)). Inspect host load, choose
-`CY_TEST_WORKERS` and, with `SKIP` cleared:
+## Diagnosis and recovery
 
-```bash
-git fetch origin
-git rebase origin/master                                  # only when needed
-uv run --locked task --exit-code acceptance
-uv run --locked task --exit-code mutation -- --base master   # code changes
-uv run --locked task --exit-code release-acceptance          # before delivery
-```
-
-Code changes also need fresh independent review after integration and verification.
-`release-acceptance` includes the paired release check (`CY_QUEUE_DIR`, default
-`../cy-queue`, run in a temporary environment); also run the real-run gate of
-`running-end-to-end-tests` on CPU and a single GPU. Use `running-integration-tests` for
-the live part: UNAVAILABLE/3 or a GPU busy with the user's workload (check pcboard
-`pc_status` first) is deferred verification, ERROR/1 needs diagnosis. Multi-GPU DDP is
-waived unless `CY_DDP_ARGS` is set and does not block; the Severstal single-GPU suite
-(`CY_SEVERSTAL_ARGS`) is required. Every other required check must pass. Record the accepted tip and outcomes; a changed tip needs fresh
-acceptance.
-
-## 2. Merge, release and push under the lock
-
-Proceed only with separate authorization to push `master` and the release tag;
-otherwise stop after reporting acceptance. Set `ACCEPTED_TIP` to the commit just
-accepted; never infer acceptance from a branch name or an old run.
-
-```bash
-git switch master
-flock -n "$(git rev-parse --git-common-dir)/clearml-yolo-release.lock" bash -c '
-  set -e
-  test "$(git rev-parse "$1")" = "$2"
-  test -z "$(git status --porcelain)"
-  git fetch origin
-  git merge --ff-only origin/master
-  git merge --ff-only "$1"
-  test "$(git rev-parse HEAD)" = "$2"
-  uv run --locked semantic-release version --print
-  CY_RELEASE_CHECK=1 SKIP=verify uv run --locked semantic-release version --no-push --no-vcs-release
-  git push origin master --follow-tags
-' _ "$BRANCH" "$ACCEPTED_TIP"
-git ls-remote origin refs/heads/master 'refs/tags/v*'
-```
-
-The lock covers fast-forward through push. Report these as blockers rather than working
-around them:
-
-- `flock` fails: another release holds the lock; never wait on or break it.
-- `git switch master` fails because `master` is checked out in another worktree, or the
-  clean-tree test fails.
-- A fast-forward fails or the tip moved: return to step 1; never tag a different tip.
-
-No releasable commits means no version: a successful outcome that pushes only `master`
-when authorized.
-
-semantic-release's build command runs `uv lock --upgrade-package clearml-yolo` to refresh
-the root version entry in `uv.lock`; with `CY_RELEASE_CHECK=1` it then runs
-`release-commit-check` before committing. The check permits only staged
-`pyproject.toml`, `uv.lock` and `CHANGELOG.md` with no unstaged or untracked inputs,
-requires the staged project to differ from `HEAD` only in its version and to declare no
-`[tool.uv.sources]`, requires every lock package except the `clearml-yolo` version to
-equal `HEAD` (`scripts/release_lock_guard.py`), and reruns lock freshness, read-only Ruff
-and deptry. Any other lock change lands first as an ordinary reviewed commit.
-`SKIP=verify` is the documented exception for this version commit only; message
-validation and the staging guard stay active.
-
-## Failed release recovery
-
-A failed build command or check may leave this attempt's version, changelog and lockfile
-changes staged without a commit or tag. Inspect `git status`, the staged diff and actual
-tags; establish which changes this attempt created. Restore only those, fix the cause on
-the branch and accept the new tip again. Never hand-edit a
-version or tag, widen the exception, discard unrelated work or claim a partial release
-passed.
-
-## Report
-
-Report the accepted and merged tips, required check outcomes (passed, failed, deferred,
-waived), mutation findings, the paired check's SHAs and versions, the version or
-no-release decision, and the actual release commit and tag. Confirm pushed refs remotely.
+- A held lock is a blocker: do not wait on or remove it. A busy master worktree,
+  divergent history, dirty inputs or moved expected tip needs owner resolution.
+- Final-pair or build failure leaves prepared files for inspection and creates no
+  release commit/tag. Inspect the staged diff, actual refs and logs before recovery;
+  restore only this attempt's changes when authorized, fix the cause and verify the
+  new tip. Never hand-edit versions/tags or widen the release exception.
+- Publishing failure does not erase a valid local release. Inspect remote refs first;
+  retry through `release-publish` with the existing expected SHA/tag, retaining the
+  separate push authorization. Do not run version creation again.
+- Keep unrelated files, workloads and the independent model-weight release process
+  intact. Use [weight releases](../../../docs/development.md#model-weight-releases)
+  only for explicitly requested model assets.

@@ -1,0 +1,50 @@
+# Implementation Plan: Change-aware workflow
+
+**Branch**: `013-change-aware-workflow` | **Date**: 2026-11-13 | **Spec**: [spec.md](spec.md)
+
+## Summary
+
+Implement the approved workflow simplification in existing Task/prek tooling. One
+classifier chooses staged or latest-commit paths. A bounded selector collects only
+candidate unit files, validates cached node IDs, excludes heavy markers and executes
+explicit IDs with testmon selection disabled. Separate explicit commands keep full scope.
+
+## Technical Context
+
+Python compatibility and tool versions remain in pyproject.toml; Bash, Task, prek,
+pytest/testmon and semantic-release remain the owning tools. Existing ignored local
+external packages and environment are reused. Tests are disposable command-level
+scenarios, static gates and retained product collection/acceptance. No new tooling tests.
+The target is the existing Linux developer/release workflow; no product source changes.
+
+## Constitution Check
+
+Pass before and after design: preserve typed Python, product module boundaries and effect
+ownership guidance, dependency pins, user authorization and task-owned cleanup. Removing
+custom effect detection reduces automation, not the purity rule. Task scripts own checks;
+Spec Kit owns documentation analysis. No installed Spec Kit edits or package builds.
+
+## Project Structure
+
+- `scripts/verification.py`, `scripts/hygiene.py`: classifier, bounded selection and hygiene.
+- `Taskfile.yml`, `.pre-commit-config.yaml`, `scripts/git-hook.sh`: ordered dispatch/staging.
+- `Taskfile.ops.yml`, `scripts/release.py`, release build configuration: explicit release.
+- `scripts/architecture*.py`, `tests/`: remove requested machinery/coverage, preserve product.
+- `docs/`, six maintained `.agents/skills/`: authoritative procedures and decision guidance.
+- This feature directory: native specification, design, task ledger and dated evidence.
+
+## Implementation Order and Ownership
+
+Root owns routing/hygiene and shared configuration. Release agent owns operations/release
+helper and release skill. Coverage agent owns architecture/tests. Documentation agent
+owns guidance/five other skills. No child delegation or commits. Root integrates and
+verifies, then assigns fresh independent review. Release build/config edits are sequential
+through root. All task commits precede the canonical automatic hook pass.
+
+## Verification
+
+Disposable repos exercise route/refusal behavior, bounded fresh/stale/missing history,
+empty selections and release failures. Static checks run after automatic corrections.
+Explicit product collection proves retained tests remain collectable; applicable explicit
+acceptance remains full, preflight first. No real release/publish. Record measured line/test
+reductions, exact checks, review and any deferred external outcomes in dated evidence.

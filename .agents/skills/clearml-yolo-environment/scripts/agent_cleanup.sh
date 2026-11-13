@@ -1,20 +1,6 @@
 #!/usr/bin/env bash
-# Remove what one agent run created: its test environment (the cy-it-<id> namespace with
-# everything published into it) and its run directory. Run it on success and on failure, in
-# the shell that sourced this skill's agent_env.sh (or with the identifier and directory
-# named explicitly).
-#
-#   <skill-dir>/scripts/agent_cleanup.sh                                 # CY_RUN_TAG and CY_RUN_DIR
-#   <skill-dir>/scripts/agent_cleanup.sh --tag <cy-it-id> [--run-dir <dir>]
-#   <skill-dir>/scripts/agent_cleanup.sh --dry-run                       # report, delete nothing
-#
-# The environment side is `python -m tests.integration.lifecycle stop --env <id>` in the
-# clearml-yolo checkout that contains this skill; this script has no delete path of its own.
-# The lifecycle's deletion guard refuses (exit 1, no delete call) any name that is not
-# cy-it-<6 hex> or whose live namespace lacks the project label, and this script then stops
-# before the run-directory step. The directory is removed only when it is named after the
-# identifier: the run directory an agent points a run at is <scratch>/<id>, and anything else
-# is somebody's directory, not this run's.
+# Delete the owned environment before its identifier-named output directory.
+# See ../SKILL.md for evidence preservation and recovery.
 
 set -euo pipefail
 

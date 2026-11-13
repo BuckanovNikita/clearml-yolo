@@ -3,10 +3,62 @@
 import hashlib
 import json
 import math
+import re
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
+_SECRET_KEY = re.compile(
+    r"(?i)(secret(?:[_ -]?key)?|access[_ -]?key(?:[_ -]?id)?|"
+    r"api[_ -]?key|token|password|authorization)"
+)
+
+
+def _redact_url(match: re.Match[str]) -> str:
+    try:
+        url = urlsplit(match.group())
+    except ValueError:
+        # Malformed endpoints are failure evidence too; never hide the original error.
+        return "<redacted-invalid-url>"
+    query = [
+        (
+            key,
+            "<redacted>" if re.search(r"(?i)(sig|token|key|secret|credential|auth|password)", key) else value,
+        )
+        for key, value in parse_qsl(url.query, keep_blank_values=True)
+    ]
+    host = url.netloc.rsplit("@", 1)[-1]
+    return urlunsplit((url.scheme, host, url.path, urlencode(query), url.fragment))
+
+
+def redact(value: str) -> str:
+    value = re.sub(r"https?://[^\s<>\"']+", _redact_url, value)
+    value = re.sub(
+        r"(?i)(authorization[\"']?\s*[:=]\s*[\"']?(?:bearer|basic)\s+)[^\s\"',}]+",
+        r"\1<redacted>",
+        value,
+    )
+    return re.sub(
+        r"(?i)((?:secret(?:[_ -]?key)?|access[_ -]?key(?:[_ -]?id)?|"
+        r"api[_ -]?key|token|password)[\"']?\s*[:=]\s*)[^\s,}\n]+",
+        r"\1<redacted>",
+        value,
+    )
+
+
+def redact_data(value: Any) -> Any:
+    """Redact structured evidence without damaging JSON strings or delimiters."""
+    if isinstance(value, dict):
+        return {
+            key: "<redacted>" if _SECRET_KEY.fullmatch(str(key)) else redact_data(item) for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [redact_data(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(redact_data(item) for item in value)
+    return redact(value) if isinstance(value, str) else value
 
 
 def file_sha256(path: Path) -> str:

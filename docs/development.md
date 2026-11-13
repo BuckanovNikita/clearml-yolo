@@ -47,175 +47,138 @@ checkouts and files remain authoritative. Dependency installation is always exte
 
 ## Verification
 
-[Taskfile.yml](../Taskfile.yml) lists each development tool and its command, followed by
-the sequential verification stages. [Taskfile.ops.yml](../Taskfile.ops.yml) contains
-bootstrap, infrastructure, acceptance and release orchestration; it is included with
-unchanged public task names. Tool policy stays in native configuration. prek owns
-Git hooks and commit-message validation. Invoke every stage as:
+[Taskfile.yml](../Taskfile.yml) owns verification commands, ordering and change routing;
+[Taskfile.ops.yml](../Taskfile.ops.yml) owns infrastructure and release stages. prek is a
+serial dispatcher with Conventional Commits validation. Invoke explicit stages with
+`uv run --locked task --exit-code <stage>` after preparing the
+[local external packages](#external-dependencies). Clear inherited
+`UV_PROJECT_ENVIRONMENT` before the outer command; Task isolates child environments
+and caches per worktree. Never treat Task freshness or an interrupted run as evidence.
 
-```bash
-uv run --locked task --exit-code <stage>
-```
+### Automatic routing
 
-`--locked` fails when `uv.lock` no longer matches `pyproject.toml` instead of
-re-resolving it, then runs Task in this worktree's environment; the worktree needs its
-[local external packages](#external-dependencies) prepared. `--exit-code` keeps each child
-command's exit status. Clear an inherited `UV_PROJECT_ENVIRONMENT` before the outer
-`uv run`; Task then pins the environment, testmon history, coverage data and Ruff/mypy
-caches of its child commands to this worktree. Do not share these between worktrees.
-Task freshness, timestamps and interrupted runs never establish completion. The
-`verification-workflow` skill selects stages for a change and its completion report.
+| Changed inputs | Automatic scope |
+| --- | --- |
+| Documentation, instructions/skills, tooling, dependencies or infrastructure only | Hygiene, applicable native documentation checks, static checks and commit safeguards; no product tests or live infrastructure |
+| Test code only | Static checks, changed eligible unit-test files, valid cached failed IDs and known testmon dependents of changed shared fixtures/helpers |
+| Product source or shipped runtime configuration/assets under `src/` | Ordinary product verification |
+| Mixed changes | Strongest relevant route |
 
-| Stage | Runs | Live |
-| --- | --- | --- |
-| `local-deps` | Build the [local wheelhouse](#external-dependencies) and create `uv.toml` when absent | no |
-| `fix` | Safe Ruff fixes and `ruff format`; never stages files | no |
-| `check` | Lock freshness (`uv lock --check`), Ruff check and format check, architecture, mypy, Vulture, deptry | no |
-| `architecture` | Import contracts, dynamic imports, effects, initializers, runtime targets and maintainer boundaries | no |
-| `infra-up` / `infra-env` / `infra-down` | Create, export or delete the worktree test environment (`COMPONENTS`, optional teardown `ENV`) | yes |
-| `coverage` | Full unit suite with branch coverage and the configured floor | no |
-| `test` | Affected unit tests (testmon), excluding `tests/integration` | no |
-| `test-full` | Every unit test; refreshes testmon history | no |
-| `verify` | `check`, then `test`: development verification | no |
-| `properties` | Unit suite under the Hypothesis `explore` profile, fixed order | no |
-| `mutation` | Changed-function [mutation report](#mutation-report) | no |
-| `infra-check` | Read-only, bounded preflight of the cluster the test environment runs in | read-only |
-| `integration` | Task-owned setup, then the non-GPU live tests, including CPU smoke, followed by teardown | yes |
-| `acceptance` | [Change acceptance](#acceptance-tiers) on a clean committed tip | yes |
-| `release-acceptance` | [Release acceptance](#acceptance-tiers) | yes |
-| `paired-check` | [Paired CY and queue release check](#paired-cy-and-queue-release-check) | no |
-| `release-commit-check` | Checks of the version commit, run only by the [release tool](#local-releases) | no |
+Prose-only files under `src/` remain non-code. Renames/deletions consider old and new
+paths. Hooks classify the staged diff; post-commit automatic checks classify the latest
+commit. Earlier product changes do not retrigger tests for a prose-only follow-up.
+Static-only work does not rerun cached failed tests. Infrastructure manifests under
+`tests/integration/environment/` and the environment lifecycle remain infrastructure
+inputs even though they live beneath `tests/`.
 
-Unit stages run in parallel with `CY_TEST_WORKERS` workers (default 2) and
-`--dist loadgroup`. Before heavy stages, inspect the host's reported load (for example
-pcboard, where available) and lower the worker count or postpone the stage while the
-user's workload needs the machine. No verification or release stage builds
-distributions; `local-deps` builds development-only sdists of the external packages,
-never release deliverables. Development verification never contacts live services.
+Test-only selection excludes live tests and heavy markers (including CPU-DDP and
+process-capability scenarios). Cached IDs are checked against current collection;
+deleted/stale IDs are discarded. Shared-test changes without dependency history report
+a targeted-verification gap instead of falling back to the full suite. Selectors are
+explicitly bounded. Collection runs inside the verifier; an empty final selection
+launches no pytest process. Explicit `test`,
+`test-full`, `coverage`, `properties`, `integration`, acceptance and release commands
+execute their requested scope regardless of change classification.
 
-`test` uses testmon affected selection under a history namespace derived from the
-interpreter, the lockfile, verification configuration, test fixtures, package data and
-tracked file membership; an unseen namespace starts a full baseline. Use `test-full`
-when affected selection cannot represent a changed input. A deselected test is not a
-fresh execution; report the actual selection.
+### Order and evidence reuse
+
+Complete applicable native Spec Kit documentation analysis and consistency review as
+soon as inputs exist. Then run hygiene/safe fixes, syntax and required-input checks,
+lock freshness, remaining static checks, and resource preflight before expensive
+execution. Early failures and automatic edits stop later stages; inspect and stage
+edits before retrying. Ruff correction remains an explicit `fix` operation.
+
+Reuse successful checks while relevant inputs remain unchanged. Prose corrections do
+not invalidate product evidence; review fixes rerun affected checks. Schedule the final
+`prek run --all-files` with hook overrides cleared as the canonical automatic pass,
+without first running an equivalent `verify`. No separate documentation checker applies.
+
+| Stage | Purpose |
+| --- | --- |
+| `local-deps` | Prepare the ignored external wheelhouse and local resolver configuration |
+| `fix` | Safe Ruff fixes and formatting; never stages files |
+| `check` | Hygiene/early input checks, lock freshness, Ruff, architecture, mypy, Vulture, deptry |
+| `architecture` | Import contracts, dynamic imports, initializers, runtime targets and tooling boundaries |
+| `verify` | Automatic change-aware static and selected product verification |
+| `test` / `test-full` | Explicit affected unit tests / full unit suite with refreshed testmon history |
+| `coverage` / `properties` | Explicit full unit coverage / Hypothesis exploration |
+| `mutation` | Scoped [changed-function mutation report](#mutation-report) |
+| `infra-check` | Bounded read-only infrastructure preflight |
+| `infra-up` / `infra-env` / `infra-down` | Owned environment creation, exports and guarded deletion |
+| `integration` | Non-GPU live product tests, including CPU smoke, with owned setup/teardown |
+| `acceptance` | Explicit complete change acceptance on a clean committed tip |
+| `release-acceptance` | Explicit release automated gates and paired check |
+| `paired-check` | [Final CY/queue source compatibility](#paired-cy-and-queue-release-check) |
+| `release-local` / `release-publish` | [Local integration/versioning / authorized publishing](#local-releases) |
+
+Inspect current host load before heavy stages and select the configured worker count
+accordingly. Verification never builds CY distributions. `local-deps` builds only
+approved external development inputs. The explicit `test` stage may start a full
+baseline for an unseen testmon namespace; automatic test-only routing does not use
+that expanding mode. A deselected test is not fresh execution.
 
 ### Lock freshness
 
-`check` runs `uv lock --check` directly in the worktree. The committed `pyproject.toml`
-declares `digital-metrics` and `report-generator` by version only and has no
-`[tool.uv.sources]`; the committed `uv.lock` records both as
-`source = { registry = "external/wheelhouse" }`. Locking therefore needs the worktree's
-gitignored `uv.toml` and the source distributions in `external/wheelhouse`
-([setup](#external-dependencies)); without them uv would look the packages up on the
-index. The check never rewrites `uv.lock`.
+The lock check never rewrites `uv.lock`. The approved external packages resolve through
+the ignored `uv.toml` and `external/wheelhouse`; prepare them before verification.
+Never commit `[tool.uv.sources]` or change approved dependency revisions to repair setup.
 
 ### Hooks and staging guard
 
-Install the hooks once per worktree; the installer keeps the previous hooks for rollback:
+Install worktree-aware hooks with `bash scripts/install-hooks.sh`; the installer keeps
+previous hooks for rollback. Before prek can stash files, the pre-commit dispatcher
+runs Task `staging-check`. It refuses every unstaged tracked change and
+nonignored untracked file without staging, stashing or deleting anything.
 
-```bash
-bash scripts/install-hooks.sh
-```
+Task `hygiene` checks all tracked regular text files, excluding symlinks and binary
+content from text fixes. The existing 512 KB added-file limit and Git LFS exclusion
+remain; on a committed-tip pass it checks files added by that commit. Existing large
+tracked inputs such as the lockfile retain their prior size eligibility. Whitespace/final-newline fixes fail the invocation for inspection and staging.
+prek dispatches Task serially and validates Conventional Commits; explicit live,
+acceptance, property and mutation stages stay outside ordinary commits.
 
-The pre-commit entry first runs the staging guard, `scripts/git-hook.sh`. It refuses the
-commit when tracked changes are unstaged or nonignored untracked files exist, before prek
-could stash anything; it never stages, stashes or deletes files. It has no exemptions:
-every unstaged tracked change and every nonignored untracked file is refused. The local
-package configuration (`uv.toml`, `external/`) is ignored and never committed.
-
-prek then runs [.pre-commit-config.yaml](../.pre-commit-config.yaml): cheap hygiene hooks
-(large files, merge conflicts, TOML/YAML syntax, end of file, whitespace,
-`untracked-sources`) followed by one serial, always-run `verify` hook. The commit-msg
-hook runs `conventional-pre-commit` with the allowed types `build`, `chore`, `ci`,
-`docs`, `feat`, `fix`, `perf`, `refactor`, `style` and `test`. Heavy stages (live
-integration, acceptance, property exploration, mutation) never run on commit.
-
-Run `fix` explicitly before staging and inspect its changes. Intermediate commits may
-defer development verification with `SKIP=verify`; the final committed content needs
-`verify` with `SKIP` cleared. Reuse a passing commit-hook run while its inputs remain
-unchanged. `uv run --locked prek run --all-files` remains the full hook check;
-it runs the hygiene hooks over all files and `verify`. Rebase, cherry-pick and merge do
-not run pre-commit hooks; verify combined content explicitly.
+Run `fix` before staging, inspect its changes and follow the
+[commit procedure](#commit-procedure). Rebase/cherry-pick/merge do not run pre-commit
+hooks; verify the combined content explicitly.
 
 ### Acceptance tiers
 
-**Change acceptance** (`acceptance`) runs on a clean committed branch tip, in this order:
+Explicit **change acceptance** (`acceptance`) requires a clean committed tip, static
+checks, bounded infrastructure preflight before expensive execution, property
+exploration, the full unit suite with its configured coverage floor, non-GPU live
+integration including CPU smoke, and a final clean/unchanged-tip check. Classification
+does not skip requested checks. Product changes additionally need a branch mutation
+report and fresh independent review; operational-policy changes also need independent
+review after integrated verification.
 
-1. Clean tip: refuse unstaged, staged or untracked files and record `HEAD`.
-2. `check`, then `properties`.
-3. Preflight: `infra-check`. Exit 3 (cluster unavailable) is deferred verification and
-   stops acceptance; it blocks integration and release until the check runs.
-4. The complete unit suite with coverage held at or above
-   `[tool.coverage.report] fail_under` in [pyproject.toml](../pyproject.toml).
-5. The live part: `integration`, including the CPU smoke run against the ClearML server
-   of the project's own test environment (a `cy-it-<id>` namespace the run creates,
-   with a quota, and deletes afterwards).
-6. Clean tip again with `HEAD` unchanged.
-
-When every path changed since `master` is Markdown or lies under `docs/` or `specs/`,
-both the preflight (step 3) and the live part (step 5) are skipped; the stage says so,
-and they are reported as not verified.
-
-Code changes also need a mutation report against `master` (`task mutation -- --base
-master`) and fresh independent review.
-
-**Release acceptance** (`release-acceptance`) is required before a version is delivered.
-It runs `acceptance`, then:
-
-- The Severstal single-GPU suite, required, with its `--run-severstal-gpu` options taken
-  from `CY_SEVERSTAL_ARGS`.
-- Physical multi-GPU DDP only when `CY_DDP_ARGS` is set (its `--run-ddp-gpu` options);
-  otherwise the stage reports it as waived.
-- Both GPU suites run with `CY_TASK_VERIFICATION=1`, so an unavailable cluster ends the
-  suite with exit 3: deferred verification. Their options are split on spaces, so
-  project names must be space-free; the suites join the session's test environment
-  themselves and prefix the published project name with its identifier.
-- The FiftyOne native-database tests in `tests/integration/fiftyone` with
-  `CY_TEST_FIFTYONE=1` and `CY_TASK_VERIFICATION=1`, against the FiftyOne database of a
-  test environment that starts only its database server; a temporary
-  `FIFTYONE_DATABASE_DIR` holds the publisher's locks and is removed afterwards.
-- `paired-check`.
-
-Before any GPU work, agents check the GPU through pcboard `pc_status` where available; a
-GPU busy with the user's workload makes the GPU checks deferred. The real-run gate on CPU
-and a single GPU remains a step of the
+**Release acceptance** adds the required single-GPU Severstal suite, FiftyOne native
+database tests and final paired compatibility. Task owns their command options and
+cleanup. Select required GPU options from pytest help and
+[Severstal execution checks](augmentation.md#severstal-execution-checks). Check current
+pcboard capacity before GPU work. Native direct/queued runs, API publication readback
+and standalone rendered-chart observations follow the
 [end-to-end skill](../.agents/skills/running-end-to-end-tests/SKILL.md).
 
-Report each required check as passed, failed, deferred, waived or error:
+Physical multi-GPU, external multi-user, two-host NFS and unavailable ClearML web-UI
+scenarios are outside maintained mandatory acceptance. Product capabilities remain
+supported; CPU DDP, simulated regressions, single-GPU direct/queued execution,
+publication/readback, FiftyOne, standalone charts and paired integration remain covered.
+Do not claim physical topology or embedded UI evidence from simulations or API payloads.
 
-- **Deferred**: a temporarily unavailable resource, such as `infra-check` exit 3
-  (unreachable cluster, timeout, or a test environment not ready within its start-up
-  budget) or a GPU busy with the user's workload.
-  Deferred verification blocks acceptance, integration and release; continue independent
-  local work and retry at a meaningful milestone.
-- **Waived**: a check the user excused for this environment. Multi-GPU DDP is waived
-  by standing decision on this single-GPU host unless `CY_DDP_ARGS` is set; it never
-  blocks.
-- **Error**: `infra-check` exit 1, such as a missing kubectl, context or permission to
-  create namespaces, or a quota rejection. Diagnose it; do not wait or weaken security
-  settings.
+Report every selected required check as **passed**, **failed**, **deferred**, **waived**
+or **error**. Temporary resource unavailability (including `infra-check` exit 3 or a
+busy GPU) defers supported checks and blocks acceptance/integration/release. Continue
+independent work and retry when availability changes. A user-authorized waiver is not
+a pass. Configuration/permission errors (`infra-check` exit 1) need diagnosis;
+assertion failures after successful setup remain test failures.
 
-`infra-check` is bounded by `CY_INFRA_CHECK_TIMEOUT` (60 seconds by default) and creates
-nothing. The `running-integration-tests` skill owns the test environment's lifecycle:
-creation with a quota, port-forwards, selection and adoption, and guarded deletion. Live
-tests run only when `tests/integration` or files in it are named on the pytest command
-line, or the `integration` marker is selected, as the live stages do; a plain `pytest`
-never contacts the cluster. Test isolation hides `~/clearml.conf`, so every live suite,
-including the GPU suites, takes its ClearML credentials from the session's test
-environment, never from the user's SDK configuration.
-
-Finish environment provisioning before verification, including native SDK
-optional decoders exercised by the selected tests. The installed Ultralytics image
-fallback can request `pi-heif` for an unidentified image; provision that verification
-prerequisite deliberately rather than relying on a mid-suite installation. Do not
-install or update packages during a check. See the [static analysis policy](static-analysis.md)
-for Ruff selections and exclusions, mypy boundary exceptions and Vulture's confidence
-threshold.
-
-Documentation-only work uses only native Spec Kit or OpenSpec documentation checks.
-The mocked suite cannot prove native training, a GPU or ClearML uploads; those require
-dated real-run evidence and the
-[end-to-end skill](../.agents/skills/running-end-to-end-tests/SKILL.md).
+The [integration skill](../.agents/skills/running-integration-tests/SKILL.md) owns
+selection and recovery decisions for the isolated environment. Live tests are selected
+explicitly and use session-owned credentials, never the user's SDK configuration.
+Provision required optional SDK decoders before execution; no package installation or
+update belongs in a check. See [static analysis policy](static-analysis.md) for native
+checker configuration and exclusions. Mocked results cannot establish native training,
+GPU access or uploads; record those outcomes in dated evidence.
 
 ### Native CPU distributed regression tests
 
@@ -249,9 +212,8 @@ graceful shutdown before terminating only the owned process tree.
 Test-only trainer adaptations retain installed native loops and do not add a
 production CPU distributed launcher. Local task recordings establish callback
 behavior and model association. Accelerator launch, NCCL, AMP and actual ClearML
-uploads/downloads require separate acceptance; physical multi-GPU acceptance follows the
-[DDP procedure](ddp-testing.md). Record observed results with their environment and
-limitations.
+uploads/downloads require separate evidence. Physical multi-GPU execution is outside
+the maintained mandatory gate; record observed results with their environment and limitations.
 
 ### Generated and composed regressions
 
@@ -274,10 +236,9 @@ failure with `--randomly-seed=<seed>`, or disable shuffling with `-p no:randomly
 local `.hypothesis/` example database is ignored by Git. Keep mutation/fault
 observations and run counts in dated feature evidence.
 
-Physical multi-GPU/NCCL and remote ClearML checks are opt-in under `ddp_gpu`; they and the
-other GPU and FiftyOne live suites live in `tests/integration`, outside development
-verification. Follow the [GPU DDP guide](ddp-testing.md) for exact selection,
-prerequisites, deadlines and the evidence archive to return.
+Single-GPU and FiftyOne live suites live in `tests/integration`, outside automatic
+verification. Follow the [integration skill](../.agents/skills/running-integration-tests/SKILL.md)
+for selection, prerequisites and cleanup evidence.
 
 ### Mutation report
 
@@ -335,6 +296,12 @@ one dependency bundle per invocation; tests inject their own ports. Scientific c
 code may use NumPy, pandas, SciPy, Pydantic and Pandera, but owns no SDK calls, logging
 configuration, rendering or filesystem effects. Keep the pinned `digital-metrics`
 algorithms in evaluation adapters and copy exact values into core evaluation records.
+
+Purity and effect ownership remain design/review obligations. Custom static effect
+enforcement has been removed, so architecture success no longer proves absence of
+filesystem, environment, process or SDK effects inside otherwise allowed modules.
+Import boundaries, dynamic imports, initializer restrictions and runtime-target
+resolution remain automated; reviewers must inspect effect ownership explicitly.
 
 Run `uv run --locked task --exit-code architecture` and the complete ordinary suite when
 changing imports, package initializers, composition or subprocess/plugin targets. Static
@@ -443,9 +410,12 @@ Commits and inspect hook-generated changes before retrying.
 Split work into coherent task-owned commits. Intermediate commits may use `SKIP=verify`
 with final verification still outstanding; message validation and the staging guard stay
 active. Keep mechanical formatting fixes in a separate commit. Do not use `--no-verify`
-or blanket skips to hide failures. Run `verify` with `SKIP` cleared on the final content
-(see [hooks](#hooks-and-staging-guard)); relevant subsequent changes invalidate affected
-evidence.
+or blanket skips to hide failures. After the final task commit, run
+`env -u SKIP -u PREK_SKIP -u CY_VERIFY_SCOPE -u PRE_COMMIT_ALLOW_NO_CONFIG uv run --locked prek run --all-files`
+as the canonical automatic pass, without an equivalent preceding `verify`. If hooks
+edit files, inspect and commit those mechanical fixes separately, then rerun affected
+checks and the final pipeline until committed content passes without outstanding edits.
+Relevant subsequent changes invalidate only affected evidence.
 
 Change acceptance needs a clean committed tip. Each worktree uses its own prepared
 environment ([setup](#external-dependencies)): Task pins each stage to the worktree's
@@ -455,80 +425,53 @@ during verification; dependency changes land as ordinary reviewed commits that u
 
 ## Paired CY and queue release check
 
-Before every release or delivery of either repository, verify the latest CY and
-[cy-queue](https://github.com/BuckanovNikita/cy-queue) together. Fetch both remotes
-and inspect their latest default branches/tags, preserving unrelated local changes.
-Use the intended release versions, including the version the release tool will
-produce. A stale sibling checkout or editable installation is not current evidence.
+Before delivery of either package, inspect the latest CY and cy-queue source/default
+branch/tag state, preserving unrelated work. Use the intended final versions, never
+stale installed metadata as evidence. Task `paired-check` resolves both source checkouts
+normally in a temporary environment, checks dependency consistency and source/installed
+identity, runs the queue suite/help, reports identities and removes its environment.
+`CY_QUEUE_DIR` selects the sibling source location when needed. Run relevant queue
+static/import checks too when shared interfaces change.
 
-With the approved external packages prepared ([setup](#external-dependencies)):
-
-```bash
-CY_QUEUE_DIR=../cy-queue uv run --locked task --exit-code paired-check
-```
-
-`CY_QUEUE_DIR` defaults to the sibling `../cy-queue` checkout. The stage fails when the
-checkout is missing. It installs both packages into a temporary virtual environment,
-leaving the worktree's `.venv` untouched, runs `uv pip check`, compares both source
-versions with the installed metadata, runs the queue suite and `cy-queue --help`, prints
-both commit SHAs and versions and removes the temporary environment. Normal
-resolution must succeed without `--no-deps`. Run the queue's configured static/import
-checks too. Record both source SHAs, versions and actual results in dated task evidence.
-If the release changes a version, rerun `paired-check` on the final pair before pushing. Incompatibility, stale metadata, missing current sources or
-unavailable/failed checks block delivery. The queue declares only a minimum compatible
-CY version, never an upper bound; raise that minimum when the queue starts using a newer
-CY interface. CY remains independent of the queue at runtime. `release-acceptance` runs
-this stage; it is mandatory before delivering either package.
+Within local release, pairing runs once against the final versions inside the
+semantic-release build step. A no-version outcome checks the unchanged pair once.
+Immediate authorized publishing reuses that invocation's checks; later publishing
+performs a fresh pass without re-versioning. Explicit `release-acceptance` includes
+its own paired check. Missing/incompatible sources, stale metadata or failed/unavailable
+checks block delivery. CY stays independent of the queue at runtime; the queue raises
+its minimum CY version when it adopts a newer interface.
 
 ## Local releases
 
-Code releases contain Git commits and annotated version tags only. Do not build,
-upload or offer project `.whl` wheels or `.tar.gz` source archives as release
-deliverables. Distribution builds and isolated archive installs are allowed only
-for a concrete debugging purpose; they are not routine release acceptance gates.
-Run release verification from the source checkout. Generic packaging guidance in
-shared skills does not override this project rule. There is no CI.
+Code releases contain Git commits and annotated version tags only. Build project
+wheels/source archives only for a concrete packaging investigation, never as routine
+release checks or deliverables. The model-assets exception below remains separate.
 
-python-semantic-release alone determines versions, changelog entries and annotated
-`v{version}` tags from Conventional Commits: `fix` and `perf` produce a patch, `feat` a
-minor, and breaking changes a minor below 1.0. Other types alone produce no version,
-which is a successful outcome. Configuration lives in `[tool.semantic_release]` in
-[pyproject.toml](../pyproject.toml). The [release skill](../.agents/skills/release/SKILL.md)
-owns the procedure:
+python-semantic-release owns version selection, changelog, release commits and annotated
+tags using [pyproject.toml](../pyproject.toml). No-version outcomes are successful.
+Task supplies orchestration through:
 
-1. Accept the clean branch tip: `acceptance`, a mutation report against `master` for
-   code changes, fresh independent review, and `release-acceptance` before delivery.
-   Without push authorization, stop after reporting acceptance.
-2. Under `flock -n "$(git rev-parse --git-common-dir)/clearml-yolo-release.lock"`:
-   confirm the accepted tip and a clean tree, `git fetch origin`, switch to `master`,
-   fast-forward to `origin/master` and then to the accepted tip, print the next version,
-   run semantic-release with `CY_RELEASE_CHECK=1 SKIP=verify` and `--no-push
-   --no-vcs-release`, and push `master` with `--follow-tags`. Confirm the refs with
-   `git ls-remote`. A held lock is a reported blocker, never waited on or broken.
+- `release-local -- --expected-tip SHA [--branch NAME] [--publish]`: validate and
+  fast-forward local integration, then semantic versioning. Local integration/tagging
+  requires release authorization but does not require push authorization. `--publish`
+  additionally requires explicit publishing authorization.
+- `release-publish -- --expected-tip SHA [--tag vX]`: publish an existing accepted tip
+  after fresh automated gates, without creating a new version.
 
-The version commit may change only `pyproject.toml`, `uv.lock` and `CHANGELOG.md`.
-semantic-release's build command runs `uv lock --upgrade-package clearml-yolo`, which
-refreshes the root `clearml-yolo` version entry in `uv.lock`; the release checkout needs
-the [local external packages](#external-dependencies). With `CY_RELEASE_CHECK=1` it then
-runs `release-commit-check`, which enforces:
+The [release skill](../.agents/skills/release/SKILL.md) owns authorization, independent
+review, native observations and recovery decisions. Both routes retain a nonblocking
+Git-common-directory release lock, clean-tree and expected-commit checks, fast-forward
+integration and checks that refs have not moved. Never wait on or break another run's
+lock. Publishing pushes only intended refs and confirms them remotely.
 
-- staged paths limited to `pyproject.toml`, `uv.lock` and `CHANGELOG.md`, with no
-  unstaged or untracked inputs;
-- a staged `pyproject.toml` that differs from `HEAD` only in the project version and
-  declares no `[tool.uv.sources]`;
-- a staged `uv.lock` whose packages are identical to `HEAD` except the `clearml-yolo`
-  version ([scripts/release_lock_guard.py](../scripts/release_lock_guard.py));
-- lock freshness, read-only Ruff and deptry.
-
-`SKIP=verify` applies only to this version commit; message validation and the staging
-guard remain active.
-
-A failed attempt may leave this attempt's version, changelog and lockfile changes staged
-without a commit or tag. Restore only those changes, fix the cause on the branch and
-accept the new tip again. Never hand-edit versions or tags, and never tag a tip other
-than the accepted one. Publish Git tags only for code: no code GitHub Releases, project
-distribution assets or registry packages. The separate
-[model-weight procedure](#model-weight-releases) is the only model-assets exception.
+Shared automated stages prevent duplicate execution. The semantic-release build step
+refreshes the lock's root version, restricts prepared changes to `pyproject.toml`,
+`uv.lock` and `CHANGELOG.md`, validates version-only project/lock changes, and runs the
+paired check against final source versions before any release commit/tag. The version
+commit alone may skip the ordinary verify hook; staging and message safeguards remain.
+A failed validation creates no release commit/tag and leaves prepared changes for
+explicit recovery. Inspect and recover only this attempt's changes; never hand-edit
+versions/tags or reset unrelated work. No persistent verification receipt is created.
 
 ## Model-weight releases
 

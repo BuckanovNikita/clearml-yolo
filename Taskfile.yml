@@ -26,6 +26,19 @@ includes:
 
 tasks:
   # Individual tools: commands and policy live here and in their native configs.
+  staging-check:
+    desc: Refuse unstaged tracked or nonignored untracked inputs before prek can stash
+    cmds:
+      - "{{.RUN}} {{.UV}} python -m scripts.hygiene staging"
+
+  hygiene:
+    desc: Tracked file size, conflict, syntax and required-input checks plus safe whitespace fixes
+    cmds:
+      - >-
+        {{.RUN}} {{.UV}} python -m scripts.hygiene check --max-kb 512
+        --required Taskfile.yml Taskfile.ops.yml pyproject.toml uv.lock .importlinter
+        .pre-commit-config.yaml scripts/git-hook.sh scripts/verification.py
+
   lock:
     desc: uv lock freshness
     cmds:
@@ -102,8 +115,9 @@ tasks:
 
   # Aggregate stages execute sequentially; Task freshness never skips verification.
   check:
-    desc: Lock, lint, architecture, type, unused-code and dependency checks
+    desc: Hygiene and syntax, lock freshness, lint, architecture, types and dependencies
     cmds:
+      - task: hygiene
       - task: lock
       - task: ruff
       - task: format-check
@@ -113,7 +127,11 @@ tasks:
       - task: deptry
 
   verify:
-    desc: Development verification (static checks and affected unit tests)
+    desc: Change-aware automatic verification (staged, otherwise latest committed inputs)
+    vars:
+      VERIFY_SCOPE: '{{default "auto" .CY_VERIFY_SCOPE}}'
     cmds:
       - task: check
-      - task: test
+      - >-
+        {{.RUN}} {{.UV}} python -m scripts.verification run
+        --scope {{.VERIFY_SCOPE | shellQuote}} --task {{.TASK_EXE | shellQuote}}
