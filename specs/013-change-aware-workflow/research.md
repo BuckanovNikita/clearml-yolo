@@ -17,4 +17,5 @@
 - Review selects affected checks and applicability of prior evidence; no new selection engine
   or receipt parser. Release verifies file existence, not the truth of prose.
 - Lifecycle owns environment operations; retain outputs and remove wrapper-only diagnosis.
-- Unique smoke invocation names remove the need to recreate infrastructure between runs.
+- Stable smoke invocation tags remove the need to recreate infrastructure between runs;
+  display names may change during native publication.

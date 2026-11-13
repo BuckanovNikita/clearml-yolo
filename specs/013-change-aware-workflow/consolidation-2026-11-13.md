@@ -101,3 +101,16 @@ Reuse the initial canonical run's 4,667 successful tests and static evidence whe
 remain unchanged. The fixture repair reruns its affected module; lifecycle/tag changes
 have fresh strict static and live evidence. Final committed inputs receive the canonical
 pipeline again, and independent review follows that outcome.
+
+## Closing verification
+
+Passed: canonical `prek run --all-files` at `4aebcb7`, with VIRTUAL_ENV,
+UV_PROJECT_ENVIRONMENT, SKIP, PREK_SKIP, CY_VERIFY_SCOPE and PRE_COMMIT_ALLOW_NO_CONFIG
+cleared; no hook edits. The preceding pipeline failure remains recorded above, with
+its reproduced cause and successful targeted repair. The historical selected-test skip
+was localized to native reflink; an explicit rerun reported filesystem FICLONE unsupported
+(errno 95), 1 skipped in 0.29 seconds. No native reflink success is claimed.
+
+Passed: fresh independent review of `4aebcb7` against `5044d23`, including actual
+canonical, preimport, live-repeat and cleanup logs; no important unresolved issues.
+The final evidence-only commit receives the canonical pass before completion.

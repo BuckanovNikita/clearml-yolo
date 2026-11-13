@@ -91,8 +91,8 @@ independent review. No required selected check remains deferred or failed.
 - [x] T025 [P] Retire environment helpers, preserve lifecycle exports and fix smoke identity.
 - [x] T026 [P] Consolidate four skills and reconcile current policies/contracts.
 - [x] T027 Remove exploration-only hook/profile and verify deterministic product properties.
-- [ ] T028 Integrate, run selected static/disposable/live checks and committed-tip pipeline.
-- [ ] T029 Independent post-verification review, cleanup and dated evidence.
+- [x] T028 Integrate, run selected static/disposable/live checks and committed-tip pipeline.
+- [x] T029 Independent post-verification review, cleanup and dated evidence.
 
 T023 precedes T024–T027; T028 follows integration; T029 follows verification.
 Selection: compare 5044d23 with task tip for this bounded follow-up, accounting for the
@@ -102,3 +102,8 @@ Lifecycle/smoke live checks and release command scenarios are required. No new
 machine-readable receipt or documentation checker. Native extension hooks are empty;
 existing requirements checklist has no unchecked items. Earlier implementation records
 remain historical; the approved consolidation intentionally reduces automatic enforcement.
+
+Consolidation completion: `consolidation-2026-11-13.md` records the initial failures,
+reproduced causes, repairs, passing final pipeline, fresh independent review and owned
+cleanup. No selected required check remains failed or deferred. Native reflink was
+skipped on an unsupported filesystem, not counted as a successful native check.
