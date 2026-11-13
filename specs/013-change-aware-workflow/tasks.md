@@ -24,9 +24,9 @@
 
 ## Phase 5: Integration and acceptance
 
-- [ ] T011 Integrate all task-owned changes, apply safe fixes, run static gates and canonical committed-tip prek pass.
-- [ ] T012 Complete applicable explicit acceptance and independent review; reconcile final diff with documentation and tasks.
-- [ ] T013 Record measured reductions, executed outcomes and gaps in verification-2026-11-13.md; commit task-owned changes without releasing/publishing.
+- [x] T011 Integrate all task-owned changes, apply safe fixes, run static gates and canonical committed-tip prek pass.
+- [x] T012 Complete applicable explicit acceptance and independent review; reconcile final diff with documentation and tasks.
+- [x] T013 Record measured reductions, executed outcomes and gaps in verification-2026-11-13.md; commit task-owned changes without releasing/publishing.
 
 ## Dependencies and parallel execution
 
@@ -42,3 +42,11 @@ FR-004→T009-T010; FR-005→T005/T008/T010-T013. No uncovered requirement or
 constitution conflict. No separate documentation checker. Preserve product purity
 requirements while explicitly reducing static effect automation. Native extension
 hooks are empty. No unresolved specification clarification. Requirement checklist passes.
+
+## Completion evidence
+
+[Verification, review and coverage reductions](verification-2026-11-13.md) records the
+actual checks and their limits. Independent review closed all six findings at `4ef5d96`.
+Full acceptance and paired compatibility pass; product evidence is reused after the
+narrow tooling fixes, which have their own successful command-level regressions and
+canonical hooks. No real release/publishing was authorized or performed.
