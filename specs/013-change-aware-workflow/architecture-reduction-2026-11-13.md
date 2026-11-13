@@ -31,7 +31,7 @@ this isolates product effects, not upstream scientific-library initialization.
 - Full ordinary suite: 4,676 passed, one skipped, 13 failed. All failures were confined
   to test_yolo_weights_settings.py and exposed sys.modules-only test doubles that did
   not wire parent package attributes for ordinary imports. Targeted repair and final
-  verification are recorded below when complete; this initial run was not a pass.
+  verification are recorded below; this initial run was not a pass.
 - Passed: live CPU integration (one passed, 29 skipped, 63 deselected). The normal task
   leaves FiftyOne opt-in; those tests were subsequently run explicitly.
 - Passed: all 29 live FiftyOne tests, including installed plugin registration/resources.
@@ -56,4 +56,10 @@ was claimed; this was the ordinary product verification and applicable CPU/Fifty
 The targeted fixture repair passed all 14 tests in test_yolo_weights_settings.py,
 including all 13 original failures and the unchanged real-SDK process scenario. Ruff
 and mypy passed for that file. Other full-suite passing evidence is reused because only
-this file's isolated fixtures changed. Final committed-content hooks and review are pending.
+this file's isolated fixtures changed. The canonical committed-content prek pipeline
+passed on `e2c83e5` with hook overrides cleared. Fresh independent follow-up review found
+no remaining blockers and verified that product/config/dependency inputs match the
+paired-tested `14b3740`. The final evidence-only commit preserves those results and
+receives its own canonical static hook pass. No selected required verification is deferred.
+The full suite was not rerun after the isolated fixture repair; unaffected successes
+were reused under the project verification policy.

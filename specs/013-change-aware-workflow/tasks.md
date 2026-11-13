@@ -60,8 +60,8 @@ canonical hooks. No real release/publishing was authorized or performed.
 - [x] T018 [P] Extend product imports, entrypoints and target-producer coverage.
 - [x] T019 Replace scanners with declarative checks and remove unused dependencies.
 - [x] T020 Reconcile authoritative guidance and native consistency analysis.
-- [ ] T021 Verify integrated product/static checks and final committed inputs.
-- [ ] T022 Complete fresh independent review and record acceptance gaps and evidence.
+- [x] T021 Verify integrated product/static checks and final committed inputs.
+- [x] T022 Complete fresh independent review and record acceptance gaps and evidence.
 
 T016 precedes T017–T020; T021 follows integration; T022 follows verification.
 Approved retirements are explicit specification changes, not assertions of equivalent
@@ -78,3 +78,8 @@ covers retained declarative rules; T020 records approved retirements; T021–T02
 verification and independent comparison. No new tooling tests or custom scanners.
 Ruff's installed TID251 rejects import_module aliases and qualified builtins.__import__,
 but bare __import__ is outside its enforcement and remains a review obligation.
+
+Follow-up completion: [architecture reduction evidence](architecture-reduction-2026-11-13.md)
+records the full-suite fixture failures, successful targeted repair, reused unaffected
+results, live CPU/FiftyOne outcomes, paired compatibility, passing final hooks and fresh
+independent review. No required selected check remains deferred or failed.
