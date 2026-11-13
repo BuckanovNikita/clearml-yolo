@@ -124,6 +124,7 @@ def test_cpu_pipeline_publishes_a_completed_tagged_task(
     project = lifecycle.tagged_project_name(live_run.tag)
     invocation = uuid4().hex
     pipeline_task = f"cpu-smoke-pipeline-{invocation}"
+    invocation_tag = f"cpu-smoke-invocation-{invocation}"
     tags = f"clearml.tags=[{live_run.tag}]"
     # The environment's variables are applied explicitly, for the children and for the
     # in-process ClearML query below, rather than assumed from an earlier export.
@@ -167,15 +168,20 @@ def test_cpu_pipeline_publishes_a_completed_tagged_task(
             f"run_dir={tmp_path / 'run'}",
             f"clearml.project_name={project}",
             f"clearml.task_name={pipeline_task}",
-            tags,
+            f"clearml.tags=[{live_run.tag},{invocation_tag}]",
         ],
         tmp_path,
         environment,
         tmp_path / "pipeline.log",
     )
 
-    candidates: list[Task] = Task.get_tasks(project_name=project, task_name=pipeline_task, tags=[live_run.tag])
-    found = [candidate for candidate in candidates if candidate.name == pipeline_task]
+    # Model-name collisions may rename the task; the invocation tag remains stable.
+    candidates: list[Task] = Task.get_tasks(project_name=project, tags=[live_run.tag, invocation_tag])
+    found = [
+        candidate
+        for candidate in candidates
+        if {live_run.tag, invocation_tag} <= set(candidate.get_tags()) and candidate.get_project_name() == project
+    ]
     assert len(found) == 1, [candidate.id for candidate in found]
     task = found[0]
     assert task.get_status() in {"completed", "published"}

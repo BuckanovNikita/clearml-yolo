@@ -738,7 +738,7 @@ class Environment:
     detached: bool = False
     groups: set[str] = field(default_factory=set)
     forwards: dict[str, Forward] = field(default_factory=dict)
-    credentials: dict[str, str] = field(default_factory=dict)
+    credentials: dict[str, str] = field(default_factory=dict, repr=False)
 
     @property
     def tag(self) -> str:

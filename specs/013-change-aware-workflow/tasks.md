@@ -87,10 +87,10 @@ independent review. No required selected check remains deferred or failed.
 ## Skill and verification consolidation
 
 - [x] T023 Record approved behavior changes, evidence scope and write ownership.
-- [ ] T024 [P] Consolidate release inputs, conditional pairing and Task stages.
-- [ ] T025 [P] Retire environment helpers, preserve lifecycle exports and fix smoke identity.
-- [ ] T026 [P] Consolidate four skills and reconcile current policies/contracts.
-- [ ] T027 Remove exploration-only hook/profile and verify deterministic product properties.
+- [x] T024 [P] Consolidate release inputs, conditional pairing and Task stages.
+- [x] T025 [P] Retire environment helpers, preserve lifecycle exports and fix smoke identity.
+- [x] T026 [P] Consolidate four skills and reconcile current policies/contracts.
+- [x] T027 Remove exploration-only hook/profile and verify deterministic product properties.
 - [ ] T028 Integrate, run selected static/disposable/live checks and committed-tip pipeline.
 - [ ] T029 Independent post-verification review, cleanup and dated evidence.
 

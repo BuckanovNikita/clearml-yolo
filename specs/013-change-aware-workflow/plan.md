@@ -71,3 +71,7 @@ verification/skill-count requirements under explicit user authority; preserve in
 .specify files. Verify with disposable release scenarios (no tooling tests), two live
 CPU smoke runs in one adopted owned environment, focused product tests, static gates
 and committed-tip prek. Report deferred checks honestly. No packaging or publishing.
+
+Live verification refinement: native model-display collision handling can rename a task.
+Use a pipeline-only unique invocation tag with environment/project identity for exact
+readback, retaining unique requested names. Verify repeats after observed name mutation.

@@ -136,4 +136,7 @@ or use `$HOME/.cache/clearml-yolo/fiftyone`. Publishers sharing a database use t
 lock directory. This directory is not removed by lifecycle teardown.
 
 CPU smoke runs use unique per-invocation ground-truth and pipeline task names. They can
-repeat in one adopted environment; readback must match the exact current invocation.
+repeat in one adopted environment. A pipeline-only unique invocation tag identifies
+readback together with the environment tag and exact project, even when model-name
+collision handling changes the task display name. Environment object representations
+exclude credentials, including pytest failure output.

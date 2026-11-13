@@ -175,6 +175,8 @@ def test_rfdetr_owner_callback_failure_aborts_native_execution(validation: bool)
 def test_rfdetr_missing_native_best_never_falls_back_to_last_checkpoint(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    import rfdetr
+
     from clearml_yolo.adapters.rfdetr import backend
 
     data = tmp_path / "data.yaml"
@@ -193,14 +195,16 @@ def test_rfdetr_missing_native_best_never_falls_back_to_last_checkpoint(
     def fit(_module: Any, _data: Any) -> None:
         (output / "checkpoint_last.pth").write_bytes(b"unselected native checkpoint")
 
-    monkeypatch.setitem(
-        sys.modules,
-        "rfdetr.training",
+    # The adapter imports the package attribute, which may already hold the native module.
+    monkeypatch.setattr(
+        rfdetr,
+        "training",
         SimpleNamespace(
             RFDETRModelModule=lambda *_: object(),
             RFDETRDataModule=lambda *_: object(),
             build_trainer=lambda *_, **__: SimpleNamespace(callbacks=[], fit=fit),
         ),
+        raising=False,
     )
     monkeypatch.setitem(
         sys.modules,
