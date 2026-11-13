@@ -171,3 +171,19 @@ Verification of implementation commit `40ee215`:
 - GPU and opt-in FiftyOne execution were not required or established. No push or
   version release was performed. This evidence-only follow-up does not alter the
   implementation inputs checked on `40ee215`.
+
+### 2026-11-13 — Persistent operational Python helpers
+
+- Extracted all three remaining Taskfile Python heredocs into
+  `scripts/check_local_uv.py` and `scripts/paired_metadata.py` in `0e44ec5`.
+  Bootstrap remains independent of the project environment; paired metadata uses
+  the temporary paired interpreter. Shell sequencing and cleanup are unchanged.
+- Passed: static Task checks, bootstrap valid/missing-link/malformed-TOML probes,
+  paired CY/queue validation (527 passed, seven deselected; temporary environment
+  removed), and final all-files prek pipeline with skip overrides cleared.
+- Passed: mutation report against the parent; no changed product functions to mutate.
+- Fresh independent review found no blocking issues in interpreter selection,
+  working directories, validation failures, output or cleanup behavior.
+- Reused the preceding property, coverage and live-smoke evidence for unchanged
+  product/integration code; these outcomes were not freshly rerun for this extraction.
+  The affected paired path was rerun. No GPU claim, push or release.
