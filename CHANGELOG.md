@@ -1,6 +1,65 @@
 # CHANGELOG
 
 
+## v0.48.2 (2026-11-13)
+
+### Bug Fixes
+
+- **tests**: Use stable live identity and patch the native import seam
+  ([`4aebcb7`](https://github.com/BuckanovNikita/clearml-yolo/commit/4aebcb7adb6f4ae106cbb5fc265eeb701cc0c509))
+
+- **workflow**: Preserve test history and release identities
+  ([`4ef5d96`](https://github.com/BuckanovNikita/clearml-yolo/commit/4ef5d9628ce025192b7234930d48157d0019d317))
+
+### Documentation
+
+- Record architecture reduction verification
+  ([`5044d23`](https://github.com/BuckanovNikita/clearml-yolo/commit/5044d236cf2377db071614b1432d69c7f9b8497a))
+
+- Record consolidation verification and review
+  ([`ec1a4c8`](https://github.com/BuckanovNikita/clearml-yolo/commit/ec1a4c8a806f35e6dccd95231222a4bfa36672dd))
+
+- Record custom skill review and verification
+  ([`863c688`](https://github.com/BuckanovNikita/clearml-yolo/commit/863c68828e6edfddb1f147da3f7f2435335b2469))
+
+- Record integrated release verification
+  ([`25d2414`](https://github.com/BuckanovNikita/clearml-yolo/commit/25d2414fa75486ed93e3fb404483c7df0f8af1c3))
+
+- Record persistent helper verification
+  ([`05f107c`](https://github.com/BuckanovNikita/clearml-yolo/commit/05f107c3effe940ce70ea856c882365c7ce42668))
+
+- Record workflow cleanup verification
+  ([`d81e29e`](https://github.com/BuckanovNikita/clearml-yolo/commit/d81e29ebc99bdb9d839244271e75a6aa4b7d3569))
+
+- Record workflow simplification verification
+  ([`505f48d`](https://github.com/BuckanovNikita/clearml-yolo/commit/505f48df1c10d371c5105bec2c661042eccc0ed2))
+
+- Simplify custom skills and remove relative links
+  ([`cf5ede0`](https://github.com/BuckanovNikita/clearml-yolo/commit/cf5ede069d35346ab6ddccbff16cff35d66b237a))
+
+### Refactoring
+
+- Replace architecture scanners with native checks and product tests
+  ([`14b3740`](https://github.com/BuckanovNikita/clearml-yolo/commit/14b3740dccea1d7f266f6cc954dd06eef1cfaa22))
+
+- **tooling**: Expose development tools in the root Taskfile
+  ([`40ee215`](https://github.com/BuckanovNikita/clearml-yolo/commit/40ee215a200de70fb9c08de1d626b9e873c19519))
+
+- **tooling**: Extract inline Python into persistent scripts
+  ([`0e44ec5`](https://github.com/BuckanovNikita/clearml-yolo/commit/0e44ec5a14f4271ed8c044f1efb8805a9e5cfb56))
+
+- **workflow**: Consolidate skills and reviewed verification
+  ([`7b3ce9f`](https://github.com/BuckanovNikita/clearml-yolo/commit/7b3ce9fc64a649e3eecbbdf947b132a416f137a3))
+
+- **workflow**: Route verification by changes and automate release mechanics
+  ([`ab61cb2`](https://github.com/BuckanovNikita/clearml-yolo/commit/ab61cb2466947f9e3e54bae5813b4d8acfa3b02d))
+
+### Testing
+
+- Adapt weight settings fixtures to ordinary imports
+  ([`e2c83e5`](https://github.com/BuckanovNikita/clearml-yolo/commit/e2c83e5ee390e70b2f23755999a1d2507419c286))
+
+
 ## v0.48.1 (2026-11-13)
 
 ### Bug Fixes
