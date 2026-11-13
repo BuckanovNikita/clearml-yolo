@@ -127,7 +127,6 @@ tasks:
           echo "DEFERRED: the cluster is unavailable (infra-check exit 3); acceptance is blocked until the live part runs." >&2
         fi
         exit "$status"
-      - task: properties
       - task: coverage
       - |
         status=0
@@ -146,13 +145,18 @@ tasks:
   release-commit-check:
     desc: Release exception checks; runs only inside the semantic-release build_command
     cmds:
-      - '{{.RUN}} {{.UV}} python scripts/release.py check-prepared --expected-tip "$CY_RELEASE_EXPECTED_TIP"'
+      - '{{.RUN}} {{.UV}} python scripts/release.py check-prepared --expected-tip "$CY_RELEASE_EXPECTED_TIP" --pairing "$CY_RELEASE_PAIRING"'
       - task: lock
       - task: ruff
       - task: format-check
       - task: deptry
-      - task: paired-check
-      - '{{.RUN}} {{.UV}} python scripts/release.py check-prepared --expected-tip "$CY_RELEASE_EXPECTED_TIP"'
+      - |
+        case "$CY_RELEASE_PAIRING" in
+          required) "{{.TASK_EXE}}" --exit-code paired-check ;;
+          not-required) echo 'Pairing not required by the reviewed verification record' ;;
+          *) echo 'Missing or invalid release pairing decision' >&2; exit 1 ;;
+        esac
+      - '{{.RUN}} {{.UV}} python scripts/release.py check-prepared --expected-tip "$CY_RELEASE_EXPECTED_TIP" --pairing "$CY_RELEASE_PAIRING"'
 
   paired-check:
     desc: Paired CY and cy-queue release check in a temporary environment (CY_QUEUE_DIR, default ../cy-queue)
@@ -212,7 +216,7 @@ tasks:
 
   release-validation:
     desc: Shared release stages (acceptance, single-GPU Severstal and FiftyOne); pair checked at final versions
-    # The real-run gate of the running-end-to-end-tests skill remains a separate step. A GPU
+    # Manual observations in the running-integration-tests skill remain separate. A GPU
     # busy with the user's workload is deferred verification, checked by the agent or
     # operator before starting (verification-workflow skill); it is not automated here.
     cmds:
@@ -248,6 +252,6 @@ tasks:
       - "{{.RUN}} {{.UV}} python scripts/release.py local {{.CLI_ARGS}}"
 
   release-publish:
-    desc: Freshly verify and publish exact existing refs without re-versioning
+    desc: Publish reviewed existing refs with explicit evidence and pairing decision
     cmds:
       - "{{.RUN}} {{.UV}} python scripts/release.py publish {{.CLI_ARGS}}"

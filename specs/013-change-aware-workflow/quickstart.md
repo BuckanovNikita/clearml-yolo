@@ -14,3 +14,13 @@ and command stubs for workflow/refusal scenarios; never release the actual repos
    disposable repository. Record gates and verify absence of release commit/tag on failure.
 6. After integration, run the canonical complete hook pass with overrides cleared and
    applicable explicit acceptance. Obtain independent review and record outcomes/gaps.
+
+## Consolidation verification
+
+Require release CLI evidence and pairing inputs in disposable repositories. Exercise
+required/not-required pairing, final-version failure, no-version and publication recovery
+without a real push. Run CPU smoke twice in one owned adopted environment with old-name
+collisions present; prove distinct published tasks and teardown with local outputs retained.
+Run deterministic property and composed-workflow tests after exploration retirement.
+Review active skill pointers and policy consistency within native analysis. Record executed
+checks, selection reasons and reusable whole-branch evidence in the dated native ledger.

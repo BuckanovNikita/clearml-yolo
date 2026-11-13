@@ -10,3 +10,11 @@
   performing pairing before version preparation could validate the wrong metadata.
 - Preserve supported live product gates; remove hardware-only obligations explicitly
   named in the approved plan. Temporary outages cannot silently waive supported gates.
+
+## Consolidation decisions
+
+- Keep normal deterministic property tests; retire the ineffective separate exploration stage.
+- Review selects affected checks and applicability of prior evidence; no new selection engine
+  or receipt parser. Release verifies file existence, not the truth of prose.
+- Lifecycle owns environment operations; retain outputs and remove wrapper-only diagnosis.
+- Unique smoke invocation names remove the need to recreate infrastructure between runs.

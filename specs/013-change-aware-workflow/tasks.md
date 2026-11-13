@@ -83,3 +83,22 @@ Follow-up completion: [architecture reduction evidence](architecture-reduction-2
 records the full-suite fixture failures, successful targeted repair, reused unaffected
 results, live CPU/FiftyOne outcomes, paired compatibility, passing final hooks and fresh
 independent review. No required selected check remains deferred or failed.
+
+## Skill and verification consolidation
+
+- [x] T023 Record approved behavior changes, evidence scope and write ownership.
+- [ ] T024 [P] Consolidate release inputs, conditional pairing and Task stages.
+- [ ] T025 [P] Retire environment helpers, preserve lifecycle exports and fix smoke identity.
+- [ ] T026 [P] Consolidate four skills and reconcile current policies/contracts.
+- [ ] T027 Remove exploration-only hook/profile and verify deterministic product properties.
+- [ ] T028 Integrate, run selected static/disposable/live checks and committed-tip pipeline.
+- [ ] T029 Independent post-verification review, cleanup and dated evidence.
+
+T023 precedes T024–T027; T028 follows integration; T029 follows verification.
+Selection: compare 5044d23 with task tip for this bounded follow-up, accounting for the
+whole branch's prior dated evidence. No product/runtime/dependency source changes are
+planned, so full coverage, GPU, chart rendering and CY/queue pairing are unselected.
+Lifecycle/smoke live checks and release command scenarios are required. No new
+machine-readable receipt or documentation checker. Native extension hooks are empty;
+existing requirements checklist has no unchecked items. Earlier implementation records
+remain historical; the approved consolidation intentionally reduces automatic enforcement.

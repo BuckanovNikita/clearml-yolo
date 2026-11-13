@@ -67,7 +67,9 @@ Run the applicable [verification stages](development.md#verification); the
 import contracts and Ruff restrictions; product tests exercise imports and runtime
 targets. Effect ownership remains a review obligation. Automatic routing follows the
 staged/latest-commit classifier in Task; explicit acceptance keeps its full scope. The
-full unit suite includes CPU-DDP. Reuse results while checked inputs remain unchanged.
+full unit suite includes CPU-DDP. Ordinary completion selects affected stages through
+the reviewed native checklist in Development procedures; explicit comprehensive commands
+retain full scope. Reuse results while checked inputs remain unchanged.
 Report deferred and waived checks as such, never as passed. Reconcile the final
 task-owned diff with contract coverage and record actual results in dated evidence.
 

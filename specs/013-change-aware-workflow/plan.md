@@ -59,3 +59,15 @@ retired enforcement. Root owns shared configuration, integration and commits; bo
 agents own source/matching tests and independent runtime tests. Verify focused paths,
 full ordinary suite and applicable live gates, then canonical committed-tip hooks and
 fresh independent review. No scanner implementation migrates into tests.
+
+## Approved consolidation implementation
+
+Use an isolated worktree based on 5044d23. Root owns native artifacts, property-stage
+removal outside Taskfiles, integration, checks and commits. Bounded agents own:
+(1) scripts/release.py and Taskfiles, (2) lifecycle/smoke/helpers/environment contract,
+(3) skills and active documentation. No child delegation or commits. Integrate before
+fresh independent review. Native policy overrides the older blanket constitutional
+verification/skill-count requirements under explicit user authority; preserve installed
+.specify files. Verify with disposable release scenarios (no tooling tests), two live
+CPU smoke runs in one adopted owned environment, focused product tests, static gates
+and committed-tip prek. Report deferred checks honestly. No packaging or publishing.

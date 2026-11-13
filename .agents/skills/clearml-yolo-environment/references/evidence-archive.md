@@ -2,8 +2,8 @@
 
 Everything indexed here is dated history. Commands, paths, endpoints, task IDs,
 and hardware counts in these files are past observations, never current
-instructions. Current guidance is the `clearml-yolo-environment` skill and its
-Machine workflow reference. Archived files
+instructions. Current guidance is the `running-integration-tests` skill and its
+Machine workflow reference. Retired helper commands in archives are not executable recipes. Archived files
 are preserved byte-for-byte within this project-local package. Keep their relative
 layout and checksum manifests intact. Absolute paths in archived observations refer
 to their original locations and are not current invocation instructions.

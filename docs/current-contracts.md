@@ -15,7 +15,7 @@ configuration, output, tracking and evaluation rules formerly listed in `AGENTS.
 | Topic | Maintained contract | Implementation evidence | Check / limitation |
 | --- | --- | --- | --- |
 | Python installation compatibility | [Supported interpreter range](development.md#python-compatibility), [compatibility contract](../specs/000-baseline/spec.md) | [Package metadata](../pyproject.toml), [lockfile](../uv.lock), [supervision preflight](../src/clearml_yolo/adapters/runtime/process_tree.py) | [Linux capability preflight](../tests/test_process_capabilities.py), [executed matrix and limits](https://github.com/BuckanovNikita/clearml-yolo/blob/d74945c83dc24094c599388bbcfd5e987daeb9bf/specs/032-python-compatibility/verification.md) |
-| Complete default runtime and dependency floors | [Dependency compatibility](development.md#runtime-dependency-compatibility), [default-installation specification](../specs/000-baseline/spec.md) | [Package metadata](../pyproject.toml), [normal lockfile](../uv.lock) | [Dependency declarations](../tests/test_default_dependencies.py); minimum-version runtime compatibility requires dated executed evidence |
+| Complete default runtime and dependency floors | [Dependency compatibility](development.md#runtime-dependency-compatibility), [default-installation specification](../specs/000-baseline/spec.md) | [Package metadata](../pyproject.toml), [normal lockfile](../uv.lock) | Dependency declarations are inspected in package configuration; minimum-version runtime compatibility requires dated executed evidence |
 | Shared scientific and workbook capabilities | [Shared evaluation and reporting](shared-evaluation-reporting.md) | [Evaluation adapters](../src/clearml_yolo/adapters/evaluation), [reporting adapters](../src/clearml_yolo/adapters/reporting), [frozen compatibility tests](../tests/test_shared_extraction_compatibility.py) | [Frozen compatibility](../tests/test_shared_extraction_compatibility.py), [shared comparison](../tests/test_shared_comparison.py) |
 | Python architecture and target migration | [Import boundaries](import-boundaries.md), [module/effect diagram](module-architecture.md), [Python import migration](python-import-migration.md) | [Executable import contracts](../.importlinter), [Ruff import restrictions](../src/ruff.toml), [workflow ports](../src/clearml_yolo/application/ports.py), [composition](../src/clearml_yolo/entrypoints/composition.py) | [Runtime import and composition tests](../tests/test_architecture.py); [enforcement limits](import-boundaries.md#tooling-boundaries-and-enforcement-limits) |
 | Commands and output routing | [CLI](../specs/000-baseline/spec.md) | [Entrypoints and checks](../pyproject.toml), [output identity](../src/clearml_yolo/adapters/storage/run_identity.py), [pipeline](../src/clearml_yolo/application/use_cases/pipeline.py) | [Command configuration](../tests/test_release_config.py), [output containment](../tests/test_project_output_containment.py) |
@@ -86,9 +86,9 @@ or separate project hooks. Feature specifications in
 `specs/` remain maintained project documentation. Upstream regeneration must not erase
 separate project policy or treat historical requirements as current authority.
 
-Machine-specific setup and evidence stay in the applicable global environment skill.
-The repository's [end-to-end skill](../.agents/skills/running-end-to-end-tests/SKILL.md)
-defines portable acceptance. Historical releases and dated evidence describe
+Machine-specific operations stay in the reference of the project's
+[live-verification skill](../.agents/skills/running-integration-tests/SKILL.md).
+The reviewed native checklist selects affected acceptance claims. Historical releases and dated evidence describe
 observations then; they are not current execution recipes.
 
 The historical force/admission controls are superseded by direct native execution and

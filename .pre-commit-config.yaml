@@ -33,15 +33,6 @@ repos:
         stages: [manual]
         require_serial: true
 
-      - id: property-exploration
-        name: Task property exploration
-        entry: uv run --locked task --exit-code properties
-        language: system
-        pass_filenames: false
-        always_run: true
-        stages: [manual]
-        require_serial: true
-
       - id: mutmut
         name: Task changed-function mutation (advisory)
         entry: uv run --locked task --exit-code mutation

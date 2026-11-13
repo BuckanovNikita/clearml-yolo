@@ -1,50 +1,45 @@
 ---
 name: running-integration-tests
-description: Use when running live integration or acceptance, selecting GPU/FiftyOne checks, or recovering a recorded test environment.
+description: Use when running live tests or manual native checks, managing an owned test environment, or investigating its failures.
 ---
 
-# Run live verification
+# Verify live outcomes
 
-Read `docs/development.md` (Acceptance tiers) for scope and
-`specs/012-own-test-infra/contracts/test-environment.md` for lifecycle rules.
-`Taskfile.ops.yml` owns invocation; `tests/integration/lifecycle.py` implements
-ownership and deletion. Paths start at the repository root. Use
-`clearml-yolo-environment` for manual runs and authentication diagnosis.
+Paths start at the repository root. Read `docs/development.md` (Acceptance tiers)
+and `specs/012-own-test-infra/contracts/test-environment.md` before live work.
+For this machine, read `.agents/skills/running-integration-tests/references/machine-workflow.md`.
+Use `docs/current-contracts.md` to select assertions for the affected claim.
 
-1. Inspect the recorded environment and ownership before live actions. Run bounded
-   `infra-check` before expensive checks; inspect pcboard capacity where available
-   before GPU work and preserve unrelated workloads.
-2. Select Task `integration`, `acceptance` or `release-acceptance`; explicit commands
-   retain full scope. Focused diagnosis requires preflight, concrete `tests/integration`
-   selectors and configured loadgroup distribution; its evidence covers only those checks.
-3. Supply single-GPU Severstal options from pytest help and `docs/augmentation.md`
-   (Severstal execution checks). Task owns FiftyOne database selection and temporary
-   lock-directory cleanup.
-4. Preserve logs before deletion removes published data. Record environment identity,
-   selectors, results and deletion proof. For native direct/queued execution,
-   publication/readback and standalone charts, also use `running-end-to-end-tests`.
+## Execute selected checks
 
-## Ownership and recovery
+1. Check host capacity and the recorded environment's ownership. Select Task
+   `integration` for its automated lifecycle, or explicit comprehensive `acceptance`
+   / `release-acceptance`. Focused runs establish only their selected checks.
+2. For manual work, use Task `infra-up`, then capture `infra-env` output and check its
+   success before evaluating it. Keep credential exports out of logs. Use
+   `INTEGRATION_RUN_TAG` explicitly in project names/tags and choose a local workspace.
+   The creator later runs `infra-down`; adopters leave deletion to their owner.
+3. Preserve failure evidence before teardown. Require infrastructure deletion proof;
+   local run outputs remain until deliberately cleaned. Diagnose through lifecycle
+   errors and the owned record. Use `verification-workflow` for blocked checks.
 
-- Create an owned environment or explicitly adopt its owner's exports. A live record
-  without matching adoption refuses replacement. Inspect lifecycle recovery commands;
-  deletion must target the owned identity, never a broad namespace selector.
-- The creator deletes; adopters leave deletion to that owner. Deliberate
-  `INTEGRATION_KEEP_DATA=1` retention must record cleanup command and contract deadline.
-- Use Task `infra-up`, `infra-env`, `infra-down` for manual operations. Keep credentials
-  in the process environment, out of logs. Prove deletion; failed guards/incomplete
-  deletion retain the recovery record. Preserve unrelated services and host credentials.
-- Use a fresh environment for each CPU smoke result: repeated adoption can make
-  name-based readback select an earlier task. Test sessions hide user SDK configuration;
-  live credentials come exclusively from the owned environment.
+## Observe claims automation does not prove
 
-## Interpret outcomes
+Select only affected observations, comparing actual results with their topic contracts:
 
-`infra-check`: AVAILABLE/0 means availability, UNAVAILABLE/3 defers setup, ERROR/1
-needs diagnosis. A busy GPU also defers supported checks. Assertions after setup remain
-failures; interruption proves no success. Preserve permissions and ownership guards.
+- Native execution: CPU/GPU runs with disjoint validation/test inputs and empty images;
+  compare direct/queued runs with identical settings when queue integration is affected.
+- Publication: independent API readback, forced artifact/model downloads, checkpoint
+  loading and identity/threshold comparison; command completion alone proves no upload.
+- Charts: render standalone HTML and exercise every affected normalization, legend,
+  empty/unknown case, hover, caption and slot identity. API payloads and browser rendering
+  establish different layers; embedded ClearML UI is outside the maintained gate.
+- FiftyOne App: install its plugin explicitly and inspect affected native views alongside
+  database/panel and containment checks.
+- Detector/export: select affected matrices in `docs/multi-model-backends.md` and
+  `docs/tensorrt-deployment.md`; real export execution and target compatibility remain
+  separate from numerical quality or random-weight smoke.
 
-Use `verification-workflow` for deferred checks: they block acceptance, integration and
-release. Continue independent work and retry after availability changes without polling;
-report the unresolved decision when only blocked checks remain. Report cleanup failures
-with the owned identifier and recovery command.
+Record source identities, commands, task/model IDs, observations, limitations and cleanup
+in native evidence. Simulations do not establish physical multi-GPU, multi-user or NFS
+execution. Retain source data and user SDK settings throughout.

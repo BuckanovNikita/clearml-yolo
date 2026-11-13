@@ -14,6 +14,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 from PIL import Image, ImageDraw
@@ -27,7 +28,6 @@ COMMAND_TIMEOUT_SECONDS = 1800
 IMAGE_SIZE = 96
 # Images per split with one box each; every split also gets one empty image.
 SPLITS = {"train": 4, "val": 2, "test": 2}
-PIPELINE_TASK = "cpu-smoke-pipeline"
 REQUIRED_ARTIFACTS = frozenset(
     {
         "gt_csv",
@@ -122,6 +122,8 @@ def test_cpu_pipeline_publishes_a_completed_tagged_task(
     from clearml import Task
 
     project = lifecycle.tagged_project_name(live_run.tag)
+    invocation = uuid4().hex
+    pipeline_task = f"cpu-smoke-pipeline-{invocation}"
     tags = f"clearml.tags=[{live_run.tag}]"
     # The environment's variables are applied explicitly, for the children and for the
     # in-process ClearML query below, rather than assumed from an earlier export.
@@ -139,7 +141,7 @@ def test_cpu_pipeline_publishes_a_completed_tagged_task(
             f"data_yaml={data}",
             f"output={truth}",
             f"clearml.project_name={project}",
-            "clearml.task_name=cpu-smoke-ground-truth",
+            f"clearml.task_name=cpu-smoke-ground-truth-{invocation}",
             tags,
         ],
         tmp_path,
@@ -164,7 +166,7 @@ def test_cpu_pipeline_publishes_a_completed_tagged_task(
             "fiftyone.enabled=false",
             f"run_dir={tmp_path / 'run'}",
             f"clearml.project_name={project}",
-            f"clearml.task_name={PIPELINE_TASK}",
+            f"clearml.task_name={pipeline_task}",
             tags,
         ],
         tmp_path,
@@ -172,8 +174,8 @@ def test_cpu_pipeline_publishes_a_completed_tagged_task(
         tmp_path / "pipeline.log",
     )
 
-    candidates: list[Task] = Task.get_tasks(project_name=project, task_name=PIPELINE_TASK, tags=[live_run.tag])
-    found = [candidate for candidate in candidates if candidate.name == PIPELINE_TASK]
+    candidates: list[Task] = Task.get_tasks(project_name=project, task_name=pipeline_task, tags=[live_run.tag])
+    found = [candidate for candidate in candidates if candidate.name == pipeline_task]
     assert len(found) == 1, [candidate.id for candidate in found]
     task = found[0]
     assert task.get_status() in {"completed", "published"}

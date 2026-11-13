@@ -97,11 +97,6 @@ tasks:
     cmds:
       - "{{.RUN}} {{.UV}} pytest --testmon-noselect --testmon-env={{.TESTMON_ENV}} {{.UNIT_SCOPE}} -n {{.TEST_WORKERS}}"
 
-  properties:
-    desc: pytest randomized Hypothesis property exploration
-    cmds:
-      - "HYPOTHESIS_PROFILE=explore {{.RUN}} {{.UV}} pytest {{.UNIT_SCOPE}} -p no:randomly -n {{.TEST_WORKERS}}"
-
   coverage:
     desc: pytest full unit suite with coverage.py branch coverage and floor
     cmds:

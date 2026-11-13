@@ -233,7 +233,7 @@ commit_message = "chore(release): {version}"
 no_git_verify = false
 # semantic-release runs the build command with a restricted environment; forward the
 # explicit release-check selector so the required check cannot silently disappear.
-build_command_env = ["CY_RELEASE_CHECK", "CY_RELEASE_EXPECTED_TIP", "CY_QUEUE_DIR", "CY_TEST_WORKERS"]
+build_command_env = ["CY_RELEASE_CHECK", "CY_RELEASE_EXPECTED_TIP", "CY_RELEASE_PAIRING", "CY_QUEUE_DIR", "CY_TEST_WORKERS"]
 # A release builds no artifact. The command refreshes only the root entry of uv.lock to the
 # rewritten project.version and stages it into the release commit. semantic-release
 # forwards only PATH, HOME, VIRTUAL_ENV, CI variables, build_command_env, NEW_VERSION and

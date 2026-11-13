@@ -127,3 +127,27 @@ and scanning of all dotted source strings. Preserve explicit layers, SDK ownersh
 adapter and queue boundaries, product/test separation and packager module restrictions.
 Tests establish exercised behavior, not every possible import order or unexecuted branch.
 No new tool, release, push, upstream revision change or installed Spec Kit edit is authorized.
+
+## Approved skill and verification consolidation
+
+The user's reviewed consolidation plan supersedes earlier requirements to retain six
+skills, blanket acceptance/pairing and property exploration. Retain four skills:
+verification-workflow, mutation-testing, release and running-integration-tests.
+Retire the environment/end-to-end skills and their three shell helpers without shims.
+Lifecycle/Task is the single environment interface; local outputs survive teardown.
+Smoke invocations require unique task identity and may share an adopted environment.
+
+Verification is selected in reviewed native evidence over the whole development branch
+or all changes since the previous release. Uncertain/broad impact requires full coverage;
+localized behavior uses focused tests. Live/manual evidence is required for affected
+unautomated claims. Pairing is required for dependencies, installation, queue interfaces
+or uncertain compatibility, not version bumps alone. Missing release baseline requires
+comprehensive selection. Unavailable selected checks block completion absent explicit
+user waiver. Reuse evidence only while relevant inputs/environment remain applicable.
+Explicit acceptance commands remain comprehensive, but property exploration is retired;
+deterministic property tests remain. No new selector engine or evidence receipt format.
+
+Release requires --verification-record PATH and --pairing required|not-required.
+The record is reviewed evidence, not machine-validated proof. Git/ref/version safeguards
+remain executable; selected pairing runs once against final versions before commit/tag.
+Immediate publication reuses it. No actual release or push is authorized by this task.

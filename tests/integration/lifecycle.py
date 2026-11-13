@@ -13,7 +13,7 @@ select the environment lazily through ``Session``. The same steps by hand:
 
     uv run --locked python -m tests.integration.lifecycle check   # read-only preflight
     uv run --locked python -m tests.integration.lifecycle up      # create an environment
-    eval "$(uv run --locked python -m tests.integration.lifecycle env)"
+    exports="$(uv run --locked python -m tests.integration.lifecycle env)" && eval "$exports"
     uv run --locked python -m tests.integration.lifecycle stop    # delete it, prove it gone
 
 Environment selection (one rule for ``up`` and session setup). The worktree's record
@@ -764,6 +764,9 @@ class Environment:
             }
         if "mongo" in self.forwards:
             values["FIFTYONE_DATABASE_URI"] = f"mongodb://127.0.0.1:{self.forwards['mongo'].port}/"
+            values["FIFTYONE_DATABASE_DIR"] = os.environ.get("FIFTYONE_DATABASE_DIR") or str(
+                Path.home() / ".cache" / "clearml-yolo" / "fiftyone"
+            )
         return values
 
     def endpoints(self) -> str:
@@ -929,7 +932,7 @@ def _refuse_foreign(root: Path, identifier: str) -> NoReturn:
 def _refuse_live(root: Path, identifier: str, reason: str) -> NoReturn:
     fail(
         f"environment {identifier} is active in this worktree ({root / RECORD_PATH}); {reason}",
-        f'use it from this shell with: eval "$({MODULE} env)"; or delete it with: {MODULE} stop',
+        f'use it: exports="$({MODULE} env)" && eval "$exports"; or delete it: {MODULE} stop',
     )
 
 
@@ -1048,7 +1051,7 @@ def _print_env(root: Path) -> None:
     if sys.stdout.isatty():
         fail(
             "env prints the environment's credentials; evaluate it instead of reading it:",
-            f'eval "$({MODULE} env)"',
+            f'exports="$({MODULE} env)" && eval "$exports"',
         )
     for key, value in recorded_environment(root).exported.items():
         sys.stdout.write(f"export {key}={shlex.quote(value)}\n")
@@ -1063,7 +1066,7 @@ def _dispatch(args: argparse.Namespace, root: Path) -> int:
         with redirect_stdout(sys.stderr if args.identifier_only else sys.stdout):
             environment = up(root, args.components)
             log(f"environment {environment.identifier} is ready: {environment.endpoints()}")
-            log(f'Use it:    eval "$({MODULE} env)"  (a pytest session in that shell adopts it)')
+            log(f'Use it:    exports="$({MODULE} env)" && eval "$exports"  (pytest in that shell adopts it)')
             log(f"Tear down: {MODULE} stop --env {environment.identifier}")
             log(f"Note:      {SWEEPER_NOTE}")
         if args.identifier_only:

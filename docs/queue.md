@@ -43,8 +43,9 @@ managed ClearML Agents require neither queue installation nor queue configuratio
 
 Installing both sources in one command refreshes editable version metadata and checks
 the pair without resolving CY from an index. Before upgrading an existing shared queue,
-follow the coordinated procedure below. Every release of either package requires the
-[latest-pair release check](development.md#paired-cy-and-queue-release-check).
+follow the coordinated procedure below. Dependency, installation and queue-interface changes require the
+[paired check](development.md#paired-cy-and-queue-release-check); the native verification
+record selects it conservatively when compatibility impact is uncertain.
 
 ### Coordinated package upgrade
 

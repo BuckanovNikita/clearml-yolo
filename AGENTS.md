@@ -35,7 +35,7 @@ for every task. Read guidance instead of copying shared skills into the reposito
 | Run live tests, acceptance, or remove a test environment | [running-integration-tests](.agents/skills/running-integration-tests/SKILL.md) |
 | Triage mutants or change mutmut settings | [mutation-testing](.agents/skills/mutation-testing/SKILL.md) |
 | Release, or recover a failed release | [release](.agents/skills/release/SKILL.md) |
-| Verify native execution, training, GPU use or ClearML publication | [running-end-to-end-tests](.agents/skills/running-end-to-end-tests/SKILL.md); load the project-local [clearml-yolo-environment](.agents/skills/clearml-yolo-environment/SKILL.md) for this machine |
+| Verify native execution, training, GPU use or ClearML publication | [running-integration-tests](.agents/skills/running-integration-tests/SKILL.md) |
 | Change contracts or their documentation | [Current contract index](docs/current-contracts.md#maintaining-consistency) and the [documentation guidance](docs/agent-workflow.md#documentation) |
 
 ## Workflow and completion
@@ -79,11 +79,9 @@ for every task. Read guidance instead of copying shared skills into the reposito
   source, checkout, dependency reference or locked revision without explicit user intent;
   general cleanup or dependency maintenance does not authorize this. Adapt this project's
   integration; report upstream issues rather than patching or monkeypatching the dependency.
-- Before releasing or delivering either CY or cy-queue, verify the latest source versions
-  of both together, including the proposed release versions. Follow the
-  [paired release check](docs/development.md#paired-cy-and-queue-release-check): normal
-  dependency resolution, matching source/installed metadata and the queue integration
-  suite are mandatory. Incompatible or unavailable evidence blocks delivery.
+- Select verification and pairing through the reviewed native checklist in
+  [development procedures](docs/development.md#acceptance-tiers). Release consumes that
+  evidence with an explicit pairing decision; it does not replay blanket acceptance.
 - Use Conventional Commits and complete the native release workflow when user or standing
   authorization covers delivery; explicit no-commit/no-release limits and the active host
   mode take precedence. Preserve unrelated changes and stage only task-owned hunks;

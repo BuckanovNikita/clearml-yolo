@@ -6,7 +6,8 @@ date: 2026-11-09
 # semantic-release with a guarded lock refresh, under flock, after two acceptance tiers
 
 The original decision below is retained as history. Its verification routing, physical
-DDP gate and release orchestration are superseded by
+DDP gate and release orchestration, including mandatory property exploration and
+blanket release acceptance, are superseded by
 [change-aware workflow](../../specs/013-change-aware-workflow/spec.md) and the current
 [development procedures](../development.md#verification).
 

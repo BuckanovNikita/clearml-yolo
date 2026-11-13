@@ -16,9 +16,7 @@ from clearml_yolo.adapters.runtime import bootstrap
 if TYPE_CHECKING:
     from severstal_harness import SeverstalOptions
 
-# Default runs are deterministic; `HYPOTHESIS_PROFILE=explore` (the `properties` Task stage)
-# searches randomly and wider. Tests that pin their own `@settings` keep those values.
-# A failure found while exploring is stored in .hypothesis/ and replayed by later runs.
+# Property tests use the deterministic project profile.
 settings.register_profile(
     "clearml-yolo",
     deadline=None,
@@ -26,14 +24,7 @@ settings.register_profile(
     max_examples=50,
     suppress_health_check=[HealthCheck.too_slow],
 )
-settings.register_profile(
-    "explore",
-    deadline=None,
-    derandomize=False,
-    max_examples=1000,
-    suppress_health_check=[HealthCheck.too_slow],
-)
-settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "clearml-yolo"))
+settings.load_profile("clearml-yolo")
 
 INTEGRATION_DIR = Path(__file__).resolve().parent / "integration"
 # Linux process-supervision modules: they own process groups, subreapers, signals and

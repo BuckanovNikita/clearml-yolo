@@ -69,6 +69,16 @@ def task(name: str) -> None:
     run("uv", "run", "--locked", "task", "--exit-code", name, environment=environment)
 
 
+def check_pair(pairing: str) -> None:
+    """Execute only the explicitly selected final-source compatibility check."""
+    if pairing == "required":
+        task("paired-check")
+    elif pairing == "not-required":
+        print("Pairing not required by the reviewed verification record")
+    else:
+        raise ReleaseError("pairing decision must be required or not-required")
+
+
 def prepared(expected: str) -> None:
     """Recheck mutable release inputs immediately around final paired verification."""
     require_master(expected, clean=False)
@@ -141,8 +151,6 @@ def validate_and_integrate(expected: str, branch: str | None) -> None:
     require_ancestor(master_tip, expected)
     tag_refs = output("git", "for-each-ref", "--format=%(refname) %(objectname)", "refs/tags/v*")
     require_tip(expected)
-    task("release-validation")
-    require_tip(expected)
     if output("git", "symbolic-ref", "--short", "HEAD") != checked_out:
         raise ReleaseError("checked-out branch changed during validation")
     if commit(f"refs/heads/{selected}") != expected:
@@ -157,7 +165,7 @@ def validate_and_integrate(expected: str, branch: str | None) -> None:
     require_master(expected)
 
 
-def local_release(expected: str, branch: str | None, *, push: bool) -> None:
+def local_release(expected: str, branch: str | None, *, push: bool, pairing: str) -> None:
     """Integrate the accepted tip and let semantic-release alone create a version."""
     validate_and_integrate(expected, branch)
     predicted = output("uv", "run", "--locked", "semantic-release", "version", "--print-tag")
@@ -168,14 +176,20 @@ def local_release(expected: str, branch: str | None, *, push: bool) -> None:
     ).returncode
     if exists == 0:
         identity = tag_object(predicted, expected, allow_ancestor=True)
-        task("paired-check")
+        check_pair(pairing)
         require_master(expected)
         if tag_object(predicted, expected, allow_ancestor=True) != identity:
             raise ReleaseError(f"tag {predicted} moved during paired verification")
-        print(f"No new version; accepted unchanged pair at {expected}")
+        print(f"No new version; accepted tip {expected}")
         released_tag = (predicted, identity)
     elif exists == 1:
-        environment = {**os.environ, "CY_RELEASE_CHECK": "1", "CY_RELEASE_EXPECTED_TIP": expected, "SKIP": "verify"}
+        environment = {
+            **os.environ,
+            "CY_RELEASE_CHECK": "1",
+            "CY_RELEASE_EXPECTED_TIP": expected,
+            "CY_RELEASE_PAIRING": pairing,
+            "SKIP": "verify",
+        }
         environment.pop("PREK_SKIP", None)
         run(
             "uv",
@@ -200,8 +214,8 @@ def local_release(expected: str, branch: str | None, *, push: bool) -> None:
         publish(commit("HEAD"), released_tag)
 
 
-def publish_existing(expected: str, tag: str | None) -> None:
-    """Freshly validate an existing version without asking semantic-release to version it."""
+def publish_existing(expected: str, tag: str | None, *, pairing: str) -> None:
+    """Publish an existing version with reviewed evidence and the selected pairing check."""
     require_tip(expected)
     if output("git", "symbolic-ref", "--short", "HEAD") != "master":
         raise ReleaseError("later publication requires the expected tip checked out on master")
@@ -211,7 +225,7 @@ def publish_existing(expected: str, tag: str | None) -> None:
     selected_tag = (tag, tag_object(tag, expected, allow_ancestor=True))
     run("git", "fetch", "origin", "--tags", "refs/heads/master:refs/remotes/origin/master")
     require_ancestor("refs/remotes/origin/master", expected)
-    task("release-acceptance")
+    check_pair(pairing)
     require_tip(expected)
     publish(expected, selected_tag)
 
@@ -221,6 +235,15 @@ def expected_commit(value: str) -> str:
     if not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", value):
         raise ReleaseError("--expected-tip must be a full immutable commit SHA")
     return commit(value)
+
+
+def verification_record(path: Path, pairing: str) -> None:
+    """Require an evidence file without pretending to validate its reviewed contents."""
+    record = path.resolve()
+    if not record.is_file():
+        raise ReleaseError(f"verification record must be an existing regular file: {record}")
+    print(f"Reviewed verification record: {record} (attestation, not machine-validated proof)")
+    print(f"Pairing decision: {pairing}")
 
 
 def main() -> int:
@@ -236,8 +259,19 @@ def main() -> int:
     publishing.add_argument("--tag")
     check = commands.add_parser("check-prepared")
     check.add_argument("--expected-tip", required=True)
+    for operation in (local, publishing):
+        operation.add_argument(
+            "--verification-record",
+            type=Path,
+            required=True,
+            help="existing reviewed evidence file; its contents are not validated as proof",
+        )
+        operation.add_argument("--pairing", choices=("required", "not-required"), required=True)
+    check.add_argument("--pairing", choices=("required", "not-required"), required=True)
     arguments = parser.parse_args()
     try:
+        if arguments.command != "check-prepared":
+            verification_record(arguments.verification_record, arguments.pairing)
         os.chdir(output("git", "rev-parse", "--show-toplevel"))
         expected = expected_commit(arguments.expected_tip)
         if arguments.command == "check-prepared":
@@ -245,9 +279,9 @@ def main() -> int:
             return 0
         with release_lock():
             if arguments.command == "local":
-                local_release(expected, arguments.branch, push=arguments.publish)
+                local_release(expected, arguments.branch, push=arguments.publish, pairing=arguments.pairing)
             else:
-                publish_existing(expected, arguments.tag)
+                publish_existing(expected, arguments.tag, pairing=arguments.pairing)
     except (ReleaseError, OSError, subprocess.CalledProcessError) as exc:
         print(f"release: {exc}", file=sys.stderr)
         return exc.returncode if isinstance(exc, subprocess.CalledProcessError) else 1

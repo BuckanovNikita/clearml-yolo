@@ -79,7 +79,7 @@ include their recorded dependents. Shared-test changes without dependency histor
 a targeted-verification gap instead of falling back to the full suite. Selectors are
 explicitly bounded. Collection runs inside the verifier; an empty final selection
 launches no pytest process. Explicit `test`,
-`test-full`, `coverage`, `properties`, `integration`, acceptance and release commands
+`test-full`, `coverage`, `integration`, acceptance and release commands
 execute their requested scope regardless of change classification.
 
 ### Order and evidence reuse
@@ -103,7 +103,7 @@ without first running an equivalent `verify`. No separate documentation checker 
 | `architecture` | Declarative import-linter dependency contracts |
 | `verify` | Automatic change-aware static and selected product verification |
 | `test` / `test-full` | Explicit affected unit tests / full unit suite with refreshed testmon history |
-| `coverage` / `properties` | Explicit full unit coverage / Hypothesis exploration |
+| `coverage` | Explicit full unit coverage, including deterministic property tests |
 | `mutation` | Scoped [changed-function mutation report](#mutation-report) |
 | `infra-check` | Bounded read-only infrastructure preflight |
 | `infra-up` / `infra-env` / `infra-down` | Owned environment creation, exports and guarded deletion |
@@ -137,7 +137,7 @@ content from text fixes. The existing 512 KB added-file limit and Git LFS exclus
 remain; on a committed-tip pass it checks files added by that commit. Existing large
 tracked inputs such as the lockfile retain their prior size eligibility. Whitespace/final-newline fixes fail the invocation for inspection and staging.
 prek dispatches Task serially and validates Conventional Commits; explicit live,
-acceptance, property and mutation stages stay outside ordinary commits.
+acceptance and mutation stages stay outside ordinary commits.
 
 Run `fix` before staging, inspect its changes and follow the
 [commit procedure](#commit-procedure). Rebase/cherry-pick/merge do not run pre-commit
@@ -145,21 +145,32 @@ hooks; verify the combined content explicitly.
 
 ### Acceptance tiers
 
-Explicit **change acceptance** (`acceptance`) requires a clean committed tip, static
-checks, bounded infrastructure preflight before expensive execution, property
-exploration, the full unit suite with its configured coverage floor, non-GPU live
-integration including CPU smoke, and a final clean/unchanged-tip check. Classification
-does not skip requested checks. Product changes additionally need a branch mutation
-report and fresh independent review; operational-policy changes also need independent
-review after integrated verification.
+Ordinary completion uses a reviewed native evidence checklist, not a blanket suite.
+Record the comparison base/tip, affected contracts, selected checks, exclusions, prior
+source/environment identities, reuse reasons and remaining gaps. For development,
+inspect the whole branch against its integration-base merge ancestor. For release,
+inspect every change since the previous release; an unreliable/missing release baseline
+requires comprehensive selection. A final documentation commit cannot hide earlier code.
 
-**Release acceptance** adds the required single-GPU Severstal suite, FiftyOne native
-database tests and final paired compatibility. Task owns their command options and
-cleanup. Select required GPU options from pytest help and
-[Severstal execution checks](augmentation.md#severstal-execution-checks). Check current
-pcboard capacity before GPU work. Native direct/queued runs, API publication readback
-and standalone rendered-chart observations follow the
-[end-to-end skill](../.agents/skills/running-end-to-end-tests/SKILL.md).
+Localized product changes use focused product tests. Shared runtime/configuration,
+broad refactors or uncertain impact require full offline coverage. Claim the configured
+global coverage floor only when that complete run executes. Product changes retain
+mutation review. Live/manual checks are required for affected claims automated checks
+do not establish; use the integration skill for actual execution/readback/rendering.
+Dependency/installation changes, queue-consumed interfaces or uncertain compatibility
+require pairing. Version-number changes alone do not. Fresh independent review follows
+integrated verification for behavior, interface, dependency or policy changes.
+
+Explicit **change acceptance** (`acceptance`) remains comprehensive: clean committed tip,
+static checks, early infrastructure preflight, one full unit coverage run (including
+normal deterministic property tests), non-GPU live integration and unchanged-tip proof.
+Explicit **release acceptance** adds single-GPU Severstal, FiftyOne native database tests
+and pairing. These commands execute their full requested scope; ordinary completion
+instead invokes the selected existing stages. No separate exploration stage remains.
+Task owns command options and cleanup. Select GPU options from pytest help and
+[Severstal execution checks](augmentation.md#severstal-execution-checks), checking host
+capacity before GPU work. The [live-verification skill](../.agents/skills/running-integration-tests/SKILL.md)
+owns conditional native direct/queued observations, API readback and standalone rendering.
 
 Physical multi-GPU, external multi-user, two-host NFS and unavailable ClearML web-UI
 scenarios are outside maintained mandatory acceptance. Product capabilities remain
@@ -222,9 +233,8 @@ the maintained mandatory gate; record observed results with their environment an
 Hypothesis and pytest-cov are development dependencies. The routine suite stays offline;
 generated CY cases exercise lexical CSV identity, prediction-cache provenance and
 frozen validation thresholds. Queue state-transition cases live in cy-queue. Composed workflow tests join saved Hydra
-configuration, real storage, evaluation and report boundaries. `HYPOTHESIS_PROFILE`
-selects the deterministic default profile `clearml-yolo` or the larger `explore`
-profile that the `properties` stage uses. To run these tests with branch coverage:
+configuration, real storage, evaluation and report boundaries. Deterministic property
+tests run in the ordinary suite; there is no separate exploration stage or profile. To run these tests with branch coverage:
 
 ```bash
 uv run --frozen --no-sync pytest tests/test_quality_properties.py tests/test_workflow_quality.py --cov=clearml_yolo --cov-branch --cov-report=term-missing --cov-report=html:.tmp/coverage/html
@@ -430,56 +440,55 @@ during verification; dependency changes land as ordinary reviewed commits that u
 
 ## Paired CY and queue release check
 
-Before delivery of either package, inspect the latest CY and cy-queue source/default
-branch/tag state, preserving unrelated work. Use the intended final versions, never
-stale installed metadata as evidence. Task `paired-check` resolves both source checkouts
-normally in a temporary environment, checks dependency consistency and source/installed
-identity, runs the queue suite/help, reports identities and removes its environment.
-`CY_QUEUE_DIR` selects the sibling source location when needed. Run relevant queue
-static/import checks too when shared interfaces change.
+Select pairing in the native verification record for dependency/installation changes,
+interfaces consumed by cy-queue, or uncertain compatibility impact. A version bump alone
+does not require it. Inspect current CY/cy-queue source state and intended versions when
+selected; stale installed metadata is not evidence. Task `paired-check` normally resolves
+both sources in a temporary environment, checks dependencies and installed/source identity,
+runs queue static checks, its suite and help, then removes the environment.
+`CY_QUEUE_DIR` selects the sibling checkout.
 
-Within local release, pairing runs once against the final versions inside the
-semantic-release build step. A no-version outcome checks the unchanged pair once.
-Immediate authorized publishing reuses that invocation's checks; later publishing
-performs a fresh pass without re-versioning. Explicit `release-acceptance` includes
-its own paired check. Missing/incompatible sources, stale metadata or failed/unavailable
-checks block delivery. CY stays independent of the queue at runtime; the queue raises
-its minimum CY version when it adopts a newer interface.
+Required pairing executes once against final proposed versions before release commit/tag
+creation, or against the unchanged pair for a no-version result. Immediate publishing
+reuses that result. Later publication reassesses the reviewed record and executes selected
+pairing against the published versions. Explicit `release-acceptance` always includes
+pairing. Failed/unavailable selected pairing blocks delivery. CY remains independent of
+the queue at runtime; the queue raises its CY minimum when it adopts a newer interface.
 
 ## Local releases
 
-Code releases contain Git commits and annotated version tags only. Build project
-wheels/source archives only for a concrete packaging investigation, never as routine
-release checks or deliverables. The model-assets exception below remains separate.
+Code releases contain Git commits and annotated version tags only. Project distributions
+are debugging tools, not routine release artifacts. semantic-release owns versions,
+changelog, commits and annotated tags; no-version outcomes are successful.
 
-python-semantic-release owns version selection, changelog, release commits and annotated
-tags using [pyproject.toml](../pyproject.toml). No-version outcomes are successful.
-Task supplies orchestration through:
+Both Task entrypoints require `--expected-tip SHA`, `--verification-record PATH` and
+`--pairing required|not-required`:
 
-- `release-local -- --expected-tip SHA [--branch NAME] [--publish]`: validate and
-  fast-forward local integration, then semantic versioning. Local integration/tagging
-  requires release authorization but does not require push authorization. `--publish`
-  additionally requires explicit publishing authorization.
-- `release-publish -- --expected-tip SHA [--tag vX]`: publish an existing accepted tip
-  after fresh automated gates, without creating a new version.
+- `release-local`: locally integrate by fast-forward and version; optional `--branch NAME`
+  selects the source branch. `--publish` additionally requires publishing authorization.
+- `release-publish`: publish existing accepted source without re-versioning; optional
+  `--tag vX` identifies the intended annotated tag.
 
-The [release skill](../.agents/skills/release/SKILL.md) owns authorization, independent
-review, native observations and recovery decisions. Both routes retain a nonblocking
-Git-common-directory release lock, clean-tree and expected-commit checks, fast-forward
-integration and checks that refs have not moved. Never wait on or break another run's
-lock. Required shared gates run before advancing master; a failed or deferred gate
-leaves it unchanged. Publishing pushes master and the pinned annotated tag for the
-current source version, including an unpublished ancestor tag after prose-only
-follow-ups, and confirms both remotely. The tagged commit must declare that same version.
+The evidence file must exist. Supplying it attests that its native checklist was reviewed
+and required checks passed or were explicitly waived. The tool does not parse prose as
+proof or replay full acceptance. Review must cover source/environment applicability,
+affected manual observations, pairing selection and any reused results. This is an
+explicit review obligation, not machine verification of completeness. The release skill
+owns authorization and recovery; an implementation request alone does not authorize release.
 
-Shared automated stages prevent duplicate execution. The semantic-release build step
-refreshes the lock's root version, restricts prepared changes to `pyproject.toml`,
-`uv.lock` and `CHANGELOG.md`, validates version-only project/lock changes, and runs the
-paired check against final source versions before any release commit/tag. The version
-commit alone may skip the ordinary verify hook; staging and message safeguards remain.
-A failed validation creates no release commit/tag and leaves prepared changes for
-explicit recovery. Inspect and recover only this attempt's changes; never hand-edit
-versions/tags or reset unrelated work. No persistent verification receipt is created.
+Both routes retain clean-tree/expected-tip checks, a nonblocking Git-common-directory lock,
+fast-forward-only integration and ref-stability checks. Never break another run's lock.
+Publishing pushes only master and the pinned annotated version tag, including an unpublished
+ancestor tag after prose-only changes, and confirms remote refs. The tag must declare the
+same source version. No persistent verification receipt system is introduced.
+
+The semantic-release build step refreshes the lock's root version, restricts prepared
+changes to `pyproject.toml`, `uv.lock` and `CHANGELOG.md`, validates version-only changes
+and runs pairing when selected. Failed validation creates no release commit/tag and leaves
+prepared files for inspection. Recover only this attempt's changes; keep version/tag
+creation with semantic-release. Version commits may skip only ordinary verification;
+staging and commit-message safeguards remain. A failed publication retains the local
+release: inspect remote refs and retry publication without creating another version.
 
 ## Model-weight releases
 
