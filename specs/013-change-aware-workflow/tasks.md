@@ -28,7 +28,7 @@
 - [x] T012 Complete applicable explicit acceptance and independent review; reconcile final diff with documentation and tasks.
 - [x] T013 Record measured reductions, executed outcomes and gaps in verification-2026-11-13.md; commit task-owned changes without releasing/publishing.
 - [x] T014 Simplify the six custom skills and remove relative Markdown links from active skill guidance; preserve historical archives and installed Spec Kit files.
-- [ ] T015 Verify the documentation follow-up on the committed tip and complete independent meaning-preservation review.
+- [x] T015 Verify the documentation follow-up on the committed tip and complete independent meaning-preservation review.
 
 ## Dependencies and parallel execution
 

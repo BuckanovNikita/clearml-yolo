@@ -111,3 +111,26 @@ The owned live namespace/port-forwards and paired virtual environment were remov
 Disposable Git repositories, command spies, scratch patches and temporary scenario
 scripts are removed after recording this report. Native incremental caches remain for
 normal reuse. Pre-existing services, other worktrees and user data were left intact.
+
+## Custom-skill wording follow-up
+
+At `cf5ede0`, the six custom skills contain 1,956 whitespace-delimited words versus
+2,380 at `505f48d`, an approximately 18% reduction. Active skill/reference guidance
+uses skill names and plain paths with explicit bases instead of relative Markdown
+links. Historical archive payloads, installed Spec Kit skills, executable scripts,
+product sources and dependencies are unchanged.
+
+- **Passed:** native documentation consistency review against the original meanings,
+  including conditions and exceptions. Review restored explicit actual direct/queued
+  run comparison, exhaustive chart normalization/legend coverage and fresh release review.
+- **Passed:** canonical committed-tip automatic verification at `cf5ede0`, with
+  `UV_PROJECT_ENVIRONMENT`, `SKIP`, `PREK_SKIP`, `CY_VERIFY_SCOPE` and
+  `PRE_COMMIT_ALLOW_NO_CONFIG` cleared. No hook edits remained.
+- **Passed:** independent post-verification comparison against `505f48d`; no important
+  unresolved findings. T014-T015 are complete.
+
+This is documentation-only evidence. Product/live tests were not selected, and no
+new native, GPU or publication outcome is claimed. The project's native consistency
+review was used without adding documentation-test machinery. No live environment or
+temporary resource was created; no release or push was authorized or performed.
+The evidence-only closing commit receives the canonical automatic pass before delivery.
