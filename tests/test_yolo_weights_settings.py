@@ -6,7 +6,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 from typing import Any, override
 
 import pytest
@@ -39,6 +39,10 @@ def native_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SimpleNa
         encoding="utf-8",
     )
     utilities = SimpleNamespace(SETTINGS=_Settings(path), WEIGHTS_DIR=Path("stale"))
+    package = ModuleType("ultralytics")
+    monkeypatch.setattr(package, "__path__", [], raising=False)
+    monkeypatch.setattr(package, "utils", utilities, raising=False)
+    monkeypatch.setitem(sys.modules, "ultralytics", package)
     monkeypatch.setitem(sys.modules, "ultralytics.utils", utilities)
     monkeypatch.chdir(tmp_path)
     return utilities
@@ -210,7 +214,9 @@ class Settings(dict):
         self.file_path.write_text(json.dumps(self))
 settings = Settings({initial!r})
 settings.file_path = Path({str(path)!r})
-sys.modules['ultralytics.utils'] = SimpleNamespace(SETTINGS=settings, WEIGHTS_DIR=Path('old'))
+utilities = SimpleNamespace(SETTINGS=settings, WEIGHTS_DIR=Path('old'))
+sys.modules['ultralytics'] = SimpleNamespace(__path__=[], utils=utilities)
+sys.modules['ultralytics.utils'] = utilities
 Path(sys.argv[1]).touch()
 assert configure_weights_directory() == Path({str(tmp_path / "weights")!r})
 """
@@ -254,13 +260,17 @@ from clearml_yolo.adapters.yolo import assets
 def forbidden(*args, **kwargs):
     raise AssertionError('inspection configured settings')
 assets.configure_weights_directory = forbidden
-sys.modules['ultralytics.utils'] = SimpleNamespace(SETTINGS={'weights_dir': 'relative'})
+utilities = SimpleNamespace(__path__=[], SETTINGS={'weights_dir': 'relative'})
+sys.modules['ultralytics'] = SimpleNamespace(__path__=[], utils=utilities)
+sys.modules['ultralytics.utils'] = utilities
 def download(file, repo='ultralytics/assets', release='fixture'):
     raise AssertionError('discovery downloaded weights')
-sys.modules['ultralytics.utils.downloads'] = SimpleNamespace(
+utilities.downloads = SimpleNamespace(
     GITHUB_ASSETS_NAMES={'yolo11n.pt'}, attempt_download_asset=download)
-sys.modules['ultralytics.utils.checks'] = SimpleNamespace(
+utilities.checks = SimpleNamespace(
     check_yolov5u_filename=lambda filename, verbose=False: filename)
+sys.modules['ultralytics.utils.downloads'] = utilities.downloads
+sys.modules['ultralytics.utils.checks'] = utilities.checks
 assert assets.pretrained_asset('yolo11n.pt').native_cache.name == 'relative'
 """
     result = _subprocess(script, tmp_path, tmp_path / "config")
