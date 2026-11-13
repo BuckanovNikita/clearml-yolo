@@ -1,5 +1,9 @@
 # Contract: Release
 
+> Historical workflow: automatic verification, acceptance coverage and release mechanics
+> below are superseded by [feature 013](../../013-change-aware-workflow/spec.md) and
+> [current procedures](../../../docs/development.md#verification). The original intent is retained for history.
+
 1. Accept: clean branch tip, `task acceptance` (plus `release-acceptance` before delivery),
    mutation report against `master` for code changes, independent review. Record `ACCEPTED_TIP`.
 2. Without push authorization: stop.

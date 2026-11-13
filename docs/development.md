@@ -73,7 +73,9 @@ inputs even though they live beneath `tests/`.
 
 Test-only selection excludes live tests and heavy markers (including CPU-DDP and
 process-capability scenarios). Cached IDs are checked against current collection;
-deleted/stale IDs are discarded. Shared-test changes without dependency history report
+deleted/stale IDs are discarded. Test execution records new failures and clears successful
+retries in the normal pytest cache. Shared helpers defined inside test modules also
+include their recorded dependents. Shared-test changes without dependency history report
 a targeted-verification gap instead of falling back to the full suite. Selectors are
 explicitly bounded. Collection runs inside the verifier; an empty final selection
 launches no pytest process. Explicit `test`,
@@ -462,7 +464,10 @@ The [release skill](../.agents/skills/release/SKILL.md) owns authorization, inde
 review, native observations and recovery decisions. Both routes retain a nonblocking
 Git-common-directory release lock, clean-tree and expected-commit checks, fast-forward
 integration and checks that refs have not moved. Never wait on or break another run's
-lock. Publishing pushes only intended refs and confirms them remotely.
+lock. Required shared gates run before advancing master; a failed or deferred gate
+leaves it unchanged. Publishing pushes master and the pinned annotated tag for the
+current source version, including an unpublished ancestor tag after prose-only
+follow-ups, and confirms both remotely. The tagged commit must declare that same version.
 
 Shared automated stages prevent duplicate execution. The semantic-release build step
 refreshes the lock's root version, restricts prepared changes to `pyproject.toml`,

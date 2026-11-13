@@ -1,6 +1,7 @@
 """Classify one change set and execute an explicitly bounded test-only selection."""
 
 import argparse
+import ast
 import io
 import json
 import os
@@ -8,6 +9,7 @@ import sqlite3
 import subprocess
 import sys
 from contextlib import redirect_stdout
+from importlib.util import resolve_name
 from pathlib import Path
 
 PROSE = {".md", ".rst", ".txt", ".adoc"}
@@ -82,7 +84,38 @@ def failed_ids() -> set[str]:
     return {node for node, failed in value.items() if failed and isinstance(node, str) and "::" in node}
 
 
-def dependents(paths: set[str]) -> tuple[dict[str, set[str]], list[str]]:
+def shared_test_modules(paths: set[str]) -> set[str]:
+    """Find changed test modules used as helpers; imports never select tests by themselves."""
+    if not paths:
+        return set()
+    modules = {
+        alias: name
+        for name in paths
+        for parts in [Path(name).with_suffix("").parts]
+        for alias in (".".join(parts), ".".join(parts[1:]))
+    }
+    shared: set[str] = set()
+    for path in Path("tests").rglob("*.py"):
+        if path.is_symlink() or path.is_relative_to("tests/integration"):
+            continue
+        package = ".".join(path.parent.parts)
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"), filename=str(path))):
+            names: set[str] = set()
+            if isinstance(node, ast.Import):
+                names.update(alias.name for alias in node.names)
+            elif isinstance(node, ast.ImportFrom):
+                base = node.module or ""
+                if node.level:
+                    base = resolve_name("." * node.level + base, package)
+                names.add(base)
+                names.update(f"{base}.{alias.name}" for alias in node.names)
+            for name in names | {f"{package}.{name}" for name in names}:
+                if name in modules and modules[name] != path.as_posix():
+                    shared.add(modules[name])
+    return shared
+
+
+def dependents(paths: set[str], required: set[str]) -> tuple[dict[str, set[str]], list[str]]:
     if not paths:
         return {}, []
     database = Path(os.environ.get("TESTMON_DATAFILE", ".testmondata"))
@@ -99,26 +132,26 @@ def dependents(paths: set[str]) -> tuple[dict[str, set[str]], list[str]]:
             for path in sorted(paths):
                 nodes = {str(row[0]) for row in connection.execute(query, (path,))}
                 selected[path] = nodes
-                if not nodes:
+                if not nodes and path in required:
                     gaps.append(f"no recorded dependents for {path}")
         finally:
             connection.close()
     except sqlite3.Error as exc:
-        gaps.append(f"dependency history unavailable: {exc}")
+        if required:
+            gaps.append(f"dependency history unavailable: {exc}")
     return selected, gaps
 
 
 def pytest_command() -> list[str]:
     # Override selection-capable inherited options. testmon remains entirely disabled:
     # every execution argument below is a validated current node ID, never an implicit root.
+    # Execution retains pytest's failed-test cache; collection disables that plugin below.
     return [
         sys.executable,
         "-m",
         "pytest",
         "-p",
         "no:testmon",
-        "-p",
-        "no:cacheprovider",
         "-o",
         "addopts=--strict-markers --strict-config -p tests.env_isolation",
         "-n",
@@ -145,7 +178,10 @@ def collect(files: set[str], environment: dict[str, str]) -> tuple[set[str], set
         os.environ.clear()
         os.environ.update(environment)
         with redirect_stdout(captured):
-            result = pytest.main([*pytest_command()[3:], "--collect-only", "-q", *sorted(files)], plugins=[collector])
+            result = pytest.main(
+                [*pytest_command()[3:], "-p", "no:cacheprovider", "--collect-only", "-q", *sorted(files)],
+                plugins=[collector],
+            )
     finally:
         os.environ.clear()
         os.environ.update(original_environment)
@@ -167,7 +203,16 @@ def test_selection(paths: set[str]) -> int:
         and not Path(name).name.startswith("test_")
         and not name.startswith("tests/integration/")
     }
-    recorded, gaps = dependents(helpers)
+    test_modules = {
+        name
+        for name in paths
+        if name.startswith("tests/")
+        and not name.startswith("tests/integration/")
+        and Path(name).name.startswith("test_")
+        and Path(name).suffix == ".py"
+    }
+    required = helpers | shared_test_modules(test_modules)
+    recorded, gaps = dependents(helpers | test_modules, required)
     candidates = set().union(*recorded.values()) | failed_ids()
     candidates = {node for node in candidates if eligible_file(node.split("::", 1)[0])}
     files = changed | {node.split("::", 1)[0] for node in candidates}
@@ -175,7 +220,7 @@ def test_selection(paths: set[str]) -> int:
     current, collected = collect(files, environment) if files else (set(), set())
     for source, nodes in recorded.items():
         unit_nodes = {node for node in nodes if not node.startswith("tests/integration/")}
-        if unit_nodes and not unit_nodes.intersection(collected):
+        if source in required and unit_nodes and not unit_nodes.intersection(collected):
             gaps.append(f"no current unit dependents remain for {source}")
     for gap in gaps:
         print(f"TARGETED VERIFICATION GAP: {gap}", file=sys.stderr)

@@ -1,5 +1,9 @@
 # Contract: Task stages
 
+> Historical workflow: automatic verification, acceptance coverage and release mechanics
+> below are superseded by [feature 013](../../013-change-aware-workflow/spec.md) and
+> [current procedures](../../../docs/development.md#verification). The original intent is retained for history.
+
 Invocation: `uv run --locked task --exit-code <stage>`. All stages use this worktree's tool state. Development commands live in the root
 Taskfile; `Taskfile.ops.yml` supplies the operational stages through a flattened include.
 

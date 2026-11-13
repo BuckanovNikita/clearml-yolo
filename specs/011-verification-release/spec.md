@@ -1,5 +1,9 @@
 # Feature Specification: Verification and Release Workflow
 
+> Historical workflow: automatic verification, acceptance coverage and release mechanics
+> below are superseded by [feature 013](../013-change-aware-workflow/spec.md) and
+> [current procedures](../../docs/development.md#verification). The original intent is retained for history.
+
 **Feature Branch**: `011-verification-release`
 
 **Created**: 2026-11-09

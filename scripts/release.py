@@ -79,17 +79,26 @@ def prepared(expected: str) -> None:
     run("uv", "run", "--locked", "python", "scripts/release_lock_guard.py")
 
 
-def tag_object(tag: str, expected: str) -> str:
-    """Only an annotated code-version tag at the exact accepted tip may be pushed."""
+def tag_object(tag: str, expected: str, *, allow_ancestor: bool = False) -> str:
+    """Validate the source-version tag at the accepted tip or its release ancestor."""
     if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?", tag):
         raise ReleaseError(f"invalid code release tag: {tag}")
     reference = f"refs/tags/{tag}"
-    if output("git", "cat-file", "-t", reference) != "tag" or commit(reference) != expected:
-        raise ReleaseError(f"{tag} must be an annotated tag at {expected}")
+    identity = output("git", "rev-parse", "--verify", reference)
+    if output("git", "cat-file", "-t", identity) != "tag":
+        raise ReleaseError(f"{tag} must be an annotated release tag")
+    target = commit(identity)
+    if allow_ancestor:
+        require_ancestor(target, expected)
+    elif target != expected:
+        raise ReleaseError(f"{tag} must point at {expected}")
     version = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
     if tag != f"v{version}":
         raise ReleaseError(f"tag {tag} differs from source version {version}")
-    return output("git", "rev-parse", "--verify", reference)
+    tagged_version = tomllib.loads(output("git", "show", f"{target}:pyproject.toml"))["project"]["version"]
+    if tagged_version != version:
+        raise ReleaseError(f"tag {tag} has tagged source version {tagged_version}, expected {version}")
+    return identity
 
 
 def require_master(expected: str, *, clean: bool = True) -> None:
@@ -99,19 +108,18 @@ def require_master(expected: str, *, clean: bool = True) -> None:
         raise ReleaseError("master moved or is no longer checked out")
 
 
-def publish(expected: str, tag: tuple[str, str] | None) -> None:
+def publish(expected: str, tag: tuple[str, str]) -> None:
     """Push exact intended refs atomically and verify their remote identities."""
     require_master(expected)
     require_ancestor("refs/remotes/origin/master", expected)
     refs = {"refs/heads/master": expected}
     refspecs = [f"{expected}:refs/heads/master"]
-    if tag:
-        name, identity = tag
-        reference = f"refs/tags/{name}"
-        if tag_object(name, expected) != identity:
-            raise ReleaseError(f"tag {name} moved after validation")
-        refs[reference] = identity
-        refspecs.append(f"{identity}:{reference}")
+    name, identity = tag
+    reference = f"refs/tags/{name}"
+    if tag_object(name, expected, allow_ancestor=True) != identity:
+        raise ReleaseError(f"tag {name} moved after validation")
+    refs[reference] = identity
+    refspecs.append(f"{identity}:{reference}")
     run("git", "push", "--atomic", "origin", *refspecs)
     remote = output("git", "ls-remote", "origin", *refs)
     observed = dict(line.split("\t", 1)[::-1] for line in remote.splitlines())
@@ -120,23 +128,38 @@ def publish(expected: str, tag: tuple[str, str] | None) -> None:
     print(f"Confirmed remote refs: {', '.join(refs)}")
 
 
-def local_release(expected: str, branch: str | None, *, push: bool) -> None:
-    """Integrate the expected tip and let semantic-release alone create a version."""
+def validate_and_integrate(expected: str, branch: str | None) -> None:
+    """Accept unchanged branch inputs before advancing the unchanged master ref."""
     require_tip(expected)
-    selected = branch or output("git", "symbolic-ref", "--short", "HEAD")
+    checked_out = output("git", "symbolic-ref", "--short", "HEAD")
+    selected = branch or checked_out
     if commit(f"refs/heads/{selected}") != expected:
         raise ReleaseError(f"branch {selected} moved from {expected}")
     run("git", "fetch", "origin", "--tags", "refs/heads/master:refs/remotes/origin/master")
     require_ancestor("refs/remotes/origin/master", expected)
-    require_ancestor("refs/heads/master", expected)
-    require_tip(expected)
-    run("git", "switch", "master")
-    run("git", "merge", "--ff-only", expected)
+    master_tip = commit("refs/heads/master")
+    require_ancestor(master_tip, expected)
+    tag_refs = output("git", "for-each-ref", "--format=%(refname) %(objectname)", "refs/tags/v*")
     require_tip(expected)
     task("release-validation")
-    require_master(expected)
+    require_tip(expected)
+    if output("git", "symbolic-ref", "--short", "HEAD") != checked_out:
+        raise ReleaseError("checked-out branch changed during validation")
     if commit(f"refs/heads/{selected}") != expected:
         raise ReleaseError(f"branch {selected} moved during validation")
+    if commit("refs/heads/master") != master_tip:
+        raise ReleaseError("master moved during validation")
+    if output("git", "for-each-ref", "--format=%(refname) %(objectname)", "refs/tags/v*") != tag_refs:
+        raise ReleaseError("version tags changed during validation")
+    run("git", "switch", "master")
+    require_master(master_tip)
+    run("git", "merge", "--ff-only", expected)
+    require_master(expected)
+
+
+def local_release(expected: str, branch: str | None, *, push: bool) -> None:
+    """Integrate the accepted tip and let semantic-release alone create a version."""
+    validate_and_integrate(expected, branch)
     predicted = output("uv", "run", "--locked", "semantic-release", "version", "--print-tag")
     if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?", predicted):
         raise ReleaseError(f"unexpected semantic-release tag output: {predicted!r}")
@@ -144,12 +167,13 @@ def local_release(expected: str, branch: str | None, *, push: bool) -> None:
         ["git", "show-ref", "--verify", "--quiet", f"refs/tags/{predicted}"], check=False
     ).returncode
     if exists == 0:
-        tag_object(predicted, commit(f"refs/tags/{predicted}"))
-        require_ancestor(f"refs/tags/{predicted}", expected)
+        identity = tag_object(predicted, expected, allow_ancestor=True)
         task("paired-check")
         require_master(expected)
+        if tag_object(predicted, expected, allow_ancestor=True) != identity:
+            raise ReleaseError(f"tag {predicted} moved during paired verification")
         print(f"No new version; accepted unchanged pair at {expected}")
-        released_tag = None
+        released_tag = (predicted, identity)
     elif exists == 1:
         environment = {**os.environ, "CY_RELEASE_CHECK": "1", "CY_RELEASE_EXPECTED_TIP": expected, "SKIP": "verify"}
         environment.pop("PREK_SKIP", None)
@@ -182,17 +206,9 @@ def publish_existing(expected: str, tag: str | None) -> None:
     if output("git", "symbolic-ref", "--short", "HEAD") != "master":
         raise ReleaseError("later publication requires the expected tip checked out on master")
     if tag is None:
-        candidates = output("git", "tag", "--points-at", expected, "--list", "v*").splitlines()
-        if len(candidates) > 1:
-            raise ReleaseError("multiple version tags at HEAD; select the intended --tag")
-        tag = candidates[0] if candidates else None
-    selected_tag = (tag, tag_object(tag, expected)) if tag else None
-    if tag is None:
         version = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
-        previous = f"refs/tags/v{version}"
-        if output("git", "cat-file", "-t", previous) != "tag":
-            raise ReleaseError("source version has no annotated release tag; recover the local release first")
-        require_ancestor(previous, expected)
+        tag = f"v{version}"
+    selected_tag = (tag, tag_object(tag, expected, allow_ancestor=True))
     run("git", "fetch", "origin", "--tags", "refs/heads/master:refs/remotes/origin/master")
     require_ancestor("refs/remotes/origin/master", expected)
     task("release-acceptance")
