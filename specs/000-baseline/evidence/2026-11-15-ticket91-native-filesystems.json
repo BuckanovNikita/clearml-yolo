@@ -1,0 +1,273 @@
+{
+  "commit": "bce7df823f85f4c52ad7785ca2800dce691e20c1",
+  "python": "3.12.13 (main, Jul 18 2026, 17:02:19) [Clang 22.1.3 ]",
+  "kernel": "6.18.58.1-microsoft-standard-WSL2",
+  "source_sha256": "98d2332b733f1c62977297bed21c227f14012ec03c674b980f11b09752240027",
+  "probes": [
+    {
+      "base": "/mnt/wsl/data/nkt/clearml-yolo",
+      "mount": "/mnt/wsl/data /dev/sde1 ext4",
+      "dry_run": {
+        "scanned": 2,
+        "duplicates": 1,
+        "reflinked": 0,
+        "skipped": 0,
+        "failures": 0,
+        "issues": []
+      },
+      "native": {
+        "scanned": 2,
+        "duplicates": 1,
+        "reflinked": 0,
+        "skipped": 1,
+        "failures": 0,
+        "issues": [
+          "Skipped unsupported reflink /mnt/wsl/data/nkt/clearml-yolo/cy-ticket91-a35wom8j/b/image.jpg: [Errno 95] filesystem does not support FICLONE"
+        ]
+      },
+      "no_copy_fallback_original_preserved": true,
+      "before": {
+        "dev": 2113,
+        "inode": 29230787,
+        "mode": 416,
+        "uid": 1001,
+        "gid": 1001,
+        "mtime_ns": 1610000000000000000,
+        "nlink": 1,
+        "size": 61440,
+        "sha256": "19dabd08eccede3906bca2d0aaf9c9f382d1d2e9748ec03fef1b9beb7f021e0e",
+        "xattrs": {
+          "user.cy-ticket91": "707265736572766564"
+        }
+      },
+      "temporary_siblings_cleaned": true,
+      "owned_fixture_removed": true
+    },
+    {
+      "base": "/var/tmp",
+      "mount": "/ /dev/sdd ext4",
+      "dry_run": {
+        "scanned": 2,
+        "duplicates": 1,
+        "reflinked": 0,
+        "skipped": 0,
+        "failures": 0,
+        "issues": []
+      },
+      "native": {
+        "scanned": 2,
+        "duplicates": 1,
+        "reflinked": 0,
+        "skipped": 1,
+        "failures": 0,
+        "issues": [
+          "Skipped unsupported reflink /var/tmp/cy-ticket91-8ywptold/b/image.jpg: [Errno 95] filesystem does not support FICLONE"
+        ]
+      },
+      "no_copy_fallback_original_preserved": true,
+      "before": {
+        "dev": 2096,
+        "inode": 2798,
+        "mode": 416,
+        "uid": 1001,
+        "gid": 1001,
+        "mtime_ns": 1610000000000000000,
+        "nlink": 1,
+        "size": 61440,
+        "sha256": "19dabd08eccede3906bca2d0aaf9c9f382d1d2e9748ec03fef1b9beb7f021e0e",
+        "xattrs": {
+          "user.cy-ticket91": "707265736572766564"
+        }
+      },
+      "temporary_siblings_cleaned": true,
+      "owned_fixture_removed": true
+    },
+    {
+      "base": "/tmp",
+      "mount": "/tmp tmpfs tmpfs",
+      "dry_run": {
+        "scanned": 2,
+        "duplicates": 1,
+        "reflinked": 0,
+        "skipped": 0,
+        "failures": 0,
+        "issues": []
+      },
+      "native": {
+        "scanned": 2,
+        "duplicates": 1,
+        "reflinked": 0,
+        "skipped": 1,
+        "failures": 0,
+        "issues": [
+          "Skipped unsupported reflink /tmp/cy-ticket91-geo9pr73/b/image.jpg: [Errno 95] filesystem does not support FICLONE"
+        ]
+      },
+      "no_copy_fallback_original_preserved": true,
+      "before": {
+        "dev": 76,
+        "inode": 959101,
+        "mode": 416,
+        "uid": 1001,
+        "gid": 1001,
+        "mtime_ns": 1610000000000000000,
+        "nlink": 1,
+        "size": 61440,
+        "sha256": "19dabd08eccede3906bca2d0aaf9c9f382d1d2e9748ec03fef1b9beb7f021e0e",
+        "xattrs": {
+          "user.cy-ticket91": "707265736572766564"
+        }
+      },
+      "temporary_siblings_cleaned": true,
+      "owned_fixture_removed": true
+    },
+    {
+      "base": "/mnt/c",
+      "mount": "/mnt/c C:\\ 9p",
+      "dry_run": {
+        "scanned": 2,
+        "duplicates": 1,
+        "reflinked": 0,
+        "skipped": 0,
+        "failures": 0,
+        "issues": []
+      },
+      "native": {
+        "scanned": 2,
+        "duplicates": 1,
+        "reflinked": 0,
+        "skipped": 1,
+        "failures": 0,
+        "issues": [
+          "Skipped unsupported reflink /mnt/c/cy-ticket91-8u4x_mlk/b/image.jpg: [Errno 95] filesystem does not support FICLONE"
+        ]
+      },
+      "no_copy_fallback_original_preserved": true,
+      "before": {
+        "dev": 71,
+        "inode": 12103423998968997,
+        "mode": 511,
+        "uid": 1001,
+        "gid": 1001,
+        "mtime_ns": 1610000000000000000,
+        "nlink": 1,
+        "size": 61440,
+        "sha256": "19dabd08eccede3906bca2d0aaf9c9f382d1d2e9748ec03fef1b9beb7f021e0e",
+        "xattrs": {
+          "user.cy-ticket91": "707265736572766564"
+        }
+      },
+      "temporary_siblings_cleaned": true,
+      "owned_fixture_removed": true
+    },
+    {
+      "base": "/mnt/e",
+      "mount": "/mnt/e E:\\ 9p",
+      "dry_run": {
+        "scanned": 2,
+        "duplicates": 1,
+        "reflinked": 0,
+        "skipped": 0,
+        "failures": 0,
+        "issues": []
+      },
+      "native": {
+        "scanned": 2,
+        "duplicates": 1,
+        "reflinked": 0,
+        "skipped": 1,
+        "failures": 0,
+        "issues": [
+          "Skipped unsupported reflink /mnt/e/cy-ticket91-0ctciwr4/b/image.jpg: [Errno 95] filesystem does not support FICLONE"
+        ]
+      },
+      "no_copy_fallback_original_preserved": true,
+      "before": {
+        "dev": 72,
+        "inode": 281474976867892,
+        "mode": 511,
+        "uid": 1001,
+        "gid": 1001,
+        "mtime_ns": 1610000000000000000,
+        "nlink": 1,
+        "size": 61440,
+        "sha256": "19dabd08eccede3906bca2d0aaf9c9f382d1d2e9748ec03fef1b9beb7f021e0e",
+        "xattrs": {
+          "user.cy-ticket91": "707265736572766564"
+        }
+      },
+      "temporary_siblings_cleaned": true,
+      "owned_fixture_removed": true
+    },
+    {
+      "base": "/mnt/f",
+      "mount": "/mnt/f F:\\ 9p",
+      "dry_run": {
+        "scanned": 2,
+        "duplicates": 1,
+        "reflinked": 0,
+        "skipped": 0,
+        "failures": 0,
+        "issues": []
+      },
+      "native": {
+        "scanned": 2,
+        "duplicates": 1,
+        "reflinked": 0,
+        "skipped": 1,
+        "failures": 0,
+        "issues": [
+          "Skipped unsupported reflink /mnt/f/cy-ticket91-hlkip5er/b/image.jpg: [Errno 95] filesystem does not support FICLONE"
+        ]
+      },
+      "no_copy_fallback_original_preserved": true,
+      "before": {
+        "dev": 73,
+        "inode": 562949953444518,
+        "mode": 511,
+        "uid": 1001,
+        "gid": 1001,
+        "mtime_ns": 1610000000000000000,
+        "nlink": 1,
+        "size": 61440,
+        "sha256": "19dabd08eccede3906bca2d0aaf9c9f382d1d2e9748ec03fef1b9beb7f021e0e",
+        "xattrs": {
+          "user.cy-ticket91": "707265736572766564"
+        }
+      },
+      "temporary_siblings_cleaned": true,
+      "owned_fixture_removed": true
+    }
+  ],
+  "hardlink_symlink_exclusion": {
+    "scanned": 2,
+    "duplicates": 1,
+    "reflinked": 0,
+    "skipped": 1,
+    "failures": 0,
+    "issues": [
+      "Skipped existing hardlink: /mnt/wsl/data/nkt/clearml-yolo/cy-ticket91-e8l54eta/b/image.jpg"
+    ]
+  },
+  "write_containment": "Project write destination /tmp/cy-ticket91-external-ibt97vqg must be contained beneath CY_HOME=/mnt/wsl/data/nkt/clearml-yolo/cy-ticket91-e8l54eta; choose a destination inside CY_HOME or select the intended project workspace. External input and library configuration paths remain supported.",
+  "cross_device": {
+    "result": {
+      "scanned": 2,
+      "duplicates": 1,
+      "reflinked": 0,
+      "skipped": 1,
+      "failures": 0,
+      "issues": [
+        "Skipped cross-device duplicate: /mnt/wsl/data/nkt/clearml-yolo/cy-ticket91-3tq4konb/b/image.jpg"
+      ]
+    },
+    "source_dev": 2113,
+    "destination_dev": 76,
+    "private_mount_removed": true
+  },
+  "cleanup": {
+    "all_owned_directories_removed": true,
+    "owned_directory_count": 10,
+    "retained_fixture_bytes": 0
+  }
+}

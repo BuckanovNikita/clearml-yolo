@@ -57,8 +57,8 @@ they establish no live model execution, remote service outcome, or publication.
   interrupted and discarded (exit 130); the fresh report used refreshed
   dependency evidence as recorded above.
 - **Passed: fresh independent review.** Read-only source/test/evidence review found no critical, important, or minor issues; both assembly paths supply the methodology integer and the public schema/workbook behavior are preserved.
-- **Pending: final automatic verification and commit.**
-  The parent implementation session owns integrated verification and commit.
+- **Passed: final automatic verification and commit.** Commit `31e2733dd79f82f1b7d5a9166dbe3b90a8c73b47` passed the canonical `prek run --all-files` with overrides cleared in a clean, separately prepared managed checkout. The native route ran static checks and established a fresh full unit baseline. A fresh immutable-commit review passed afterward, and the exact commit fast-forwarded onto local `master`. No global coverage floor or release is claimed.
+- An earlier automatic attempt in the shared working checkout stopped at Ruff on in-progress ticket03 profile complexity. It ran no product tests and supplies no count-fix acceptance evidence; the clean-checkout pass above isolates this ticket.
 
 Selection is focused because only an existing result field's source changes;
 there is no shared runtime, configuration, dependency, or queue interface change.
