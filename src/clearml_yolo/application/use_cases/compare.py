@@ -829,7 +829,7 @@ def compare(
             baseline_predictions=baseline_predictions,
             candidate_predictions=candidate_predictions,
             manifest=manifest,
-            classes_compared=len(tables.rows) - 1,
+            classes_compared=cast(int, tables.methodology["classes_compared"]),
             classes_excluded=len(tables.excluded),
             degraded_classes=degraded,
         )

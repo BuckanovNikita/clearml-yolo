@@ -280,3 +280,100 @@ def test_comparison_cache_checkpoint_replacement_and_real_reports_preserve_sourc
             "candidate": candidate_identity,
         }
         assert not read_dashboard(output).empty
+
+
+@pytest.mark.parametrize(
+    (
+        "truth_labels",
+        "baseline_labels",
+        "candidate_labels",
+        "predicted_labels",
+        "expected_compared",
+        "expected_excluded",
+    ),
+    [
+        pytest.param(["cat"], ["cat"], ["cat"], [], 0, 1, id="no-predictions"),
+        pytest.param(["cat"], ["cat"], ["dog"], ["cat"], 0, 2, id="missing-vocabulary"),
+        pytest.param([], ["cat"], ["cat"], ["cat"], 0, 1, id="no-ground-truth"),
+        pytest.param(
+            ["cat", "unpredicted", "unshared"],
+            ["cat", "unpredicted", "unshared", "unannotated"],
+            ["cat", "unpredicted", "unannotated"],
+            ["cat", "unshared", "unannotated"],
+            1,
+            3,
+            id="mixed-eligibility",
+        ),
+        pytest.param(["cat"], ["cat"], ["cat"], ["cat"], 1, 0, id="all-eligible"),
+    ],
+)
+def test_comparison_counts_only_statistically_eligible_classes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    workflow_dependencies: WorkflowDependencies,
+    truth_labels: list[str],
+    baseline_labels: list[str],
+    candidate_labels: list[str],
+    predicted_labels: list[str],
+    expected_compared: int,
+    expected_excluded: int,
+) -> None:
+    image = tmp_path / "image.png"
+    Image.new("RGB", (40, 40)).save(image)
+    truth = tmp_path / "truth.csv"
+    truth_rows: list[tuple[object, ...]] = [
+        (image.name, str(image), label, 0, 0, 10, 10, "test") for label in truth_labels
+    ]
+    pd.DataFrame(
+        truth_rows or [(image.name, str(image), None, None, None, None, None, "test")],
+        columns=[
+            "image_name",
+            "image_path",
+            "instance_label",
+            "bbox_x_tl",
+            "bbox_y_tl",
+            "bbox_x_br",
+            "bbox_y_br",
+            "split",
+        ],
+    ).to_csv(truth, index=False)
+    baseline, _ = _checkpoint(tmp_path, "baseline", b"baseline")
+    candidate, _ = _checkpoint(tmp_path, "candidate", b"candidate")
+
+    def class_names(weights: str | Path) -> dict[int, str]:
+        return dict(enumerate(baseline_labels if Path(weights) == baseline else candidate_labels))
+
+    def predictor(weights: Path, _paths: list[str], **_kwargs: Any) -> pd.DataFrame:
+        return pd.DataFrame(
+            [
+                (image.name, label, 0, 0, 10, 10, 0.9)
+                for label in predicted_labels
+                if label in class_names(weights).values()
+            ],
+            columns=_PRED_COLUMNS,
+        )
+
+    monkeypatch.setattr(workflow_dependencies.tracking, "init_task", lambda *_a, **_kw: None)
+    monkeypatch.setattr("clearml_yolo.adapters.yolo.inference.trained_imgsz", lambda _: 64)
+    monkeypatch.setattr(workflow_dependencies.model, "trained_imgsz", lambda _: 64)
+    monkeypatch.setattr(
+        workflow_dependencies.model,
+        "reinfer_split",
+        partial(reinfer_split, predictor=predictor, class_names=class_names),
+    )
+    result = compare(
+        ModelRef(source="local", weights=baseline, thresholds=dict.fromkeys(baseline_labels, 0.5)),
+        ModelRef(source="local", weights=candidate, thresholds=dict.fromkeys(candidate_labels, 0.5)),
+        truth,
+        tmp_path / "comparison",
+        ClearMLConfig(),
+        InferenceConfig(conf=0.001, iou=0.7, imgsz=64, batch=1, device="cpu"),
+        bootstrap_iterations=20,
+        deps=workflow_dependencies,
+    )
+
+    assert result is not None
+    assert result.classes_compared == expected_compared
+    assert result.classes_excluded == expected_excluded
+    methodology = pd.read_csv(result.workbook.with_name(f"{result.workbook.stem}_methodology.csv"), index_col=0)
+    assert methodology.loc["classes_compared", "Значение"] == str(expected_compared)
