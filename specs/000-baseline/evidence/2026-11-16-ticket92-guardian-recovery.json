@@ -1,0 +1,481 @@
+{
+  "schema_version": 1,
+  "ticket": 92,
+  "scenario": "guardian_loss",
+  "status": "accepted_native_guardian_recovery_scope",
+  "delivery_gate": "Coordinator combined review, canonical gate and integration pending; overall ticket92 not closed by this record",
+  "case": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-guardian-loss-v1-de6fe9be2e",
+  "source_commit": "b8417c2ccbeb01a3411901325ed9f9cc5a425ef7",
+  "queue_source_commit": "d3627a0da85968429ddeaff4920c05825e6e05e2",
+  "environment": "cy-it-ded7c4",
+  "job_id": "9ea0d242-0ad4-4a1d-a996-c8e570cea986",
+  "fault": {
+    "pid": 203918,
+    "born": 1182606,
+    "method": "owned_guardian_pidfd_SIGKILL",
+    "death_observed": true
+  },
+  "claim_and_recovery": {
+    "stable_claim": {
+      "marker": "daccb752ab27479fbbd5e282d59d2a3f",
+      "guardian_pid": 203918,
+      "guardian_born": 1182606,
+      "child_pid": 203995,
+      "child_born": 1182621,
+      "generations": [
+        [
+          "GPU-7459c4c9-b94d-ca31-17b0-fc63140c4dc1",
+          4
+        ]
+      ]
+    },
+    "private_claim_retained": true,
+    "pre_recovery_OS_allocation": [],
+    "live_observed_descendants": [
+      [
+        203995,
+        1182621
+      ],
+      [
+        206784,
+        1183125
+      ],
+      [
+        207284,
+        1183223
+      ],
+      [
+        207329,
+        1183229
+      ],
+      [
+        210718,
+        1183831
+      ],
+      [
+        210723,
+        1183832
+      ]
+    ],
+    "native_recovery_calls": 1,
+    "terminal_state": "cancelled",
+    "diagnostic": "Owner recovered abandoned execution after verified descendant cleanup",
+    "same_worker": {
+      "pid": 203084,
+      "born": 1182441,
+      "heartbeat_before_recovery_after": [
+        1794869267.0122058,
+        1794869268.0295126,
+        1794869271.0939262
+      ]
+    },
+    "fault_before_to_cleanup_seconds": 4.048811435699463
+  },
+  "capacity": {
+    "fresh_admission_free_mib": 29352,
+    "trials": [
+      8,
+      16,
+      56,
+      64,
+      72,
+      72
+    ],
+    "independent72_confirmation_trial_ids": [
+      "66278a0e5ad9495f9579b4da32126c1f",
+      "5b57142bc34442c38b2ae9cbf0080386"
+    ],
+    "scope": "Fresh ceiling72, not maximum GPU capacity"
+  },
+  "scientific": {
+    "trigger_updates": 1,
+    "final_updates": 3,
+    "expected_full_updates": 6,
+    "parameter_changed": true,
+    "recipe_observation_valid": false,
+    "meaning": "Intentional interrupted native recipe; child finish failure retained, no completed training/publication acceptance",
+    "configured_epochs": 2,
+    "batch": 72,
+    "seed": 0,
+    "precision": "fp32",
+    "nominal_size": 640,
+    "populations": [
+      160,
+      40,
+      40
+    ]
+  },
+  "telemetry": {
+    "admission-telemetry.jsonl": {
+      "samples": 375,
+      "minimum_free_bytes": 8655994880,
+      "minimum_free_mib": 8255.0,
+      "maximum_observed_gap_seconds": 1.049980878829956,
+      "gap_clock": "at",
+      "errors": []
+    },
+    "external-memory.jsonl": {
+      "samples": 66,
+      "minimum_free_bytes": 10332667904,
+      "minimum_free_mib": 9854.0,
+      "maximum_observed_gap_seconds": 0.5033318229998258,
+      "gap_clock": "monotonic",
+      "errors": []
+    },
+    "child-memory.jsonl": {
+      "samples": 39,
+      "minimum_free_bytes": 9663676416,
+      "minimum_free_mib": 9216.0,
+      "maximum_observed_gap_seconds": 0.6142706871032715,
+      "gap_clock": "at",
+      "errors": []
+    }
+  },
+  "ownership": {
+    "job_identities": 40,
+    "helpers": [
+      {
+        "pid": 202881,
+        "born": 1182400,
+        "exit_code": 0
+      },
+      {
+        "pid": 202941,
+        "born": 1182411,
+        "exit_code": 0
+      },
+      {
+        "pid": 203084,
+        "born": 1182441,
+        "exit_code": 0
+      }
+    ],
+    "controller": {
+      "pid": 160408,
+      "born": 1165209,
+      "identity": {
+        "protocol": 1,
+        "owner_uid": 1001,
+        "host_id": "bdbeb55250c47aa7cdca355ca029747da371aa90729d61ad2909b2850e9087ea",
+        "boot_id": "5e9f68d1-63db-4188-9995-e686745fda8c"
+      },
+      "started_at": 1794869078.77723
+    },
+    "total_birth_identities_absent": 45,
+    "sentinel_sequences": [
+      187,
+      231
+    ],
+    "durable_matching_claim_files": [],
+    "launch_session": 23153,
+    "launch_exit_code": 0,
+    "controller_exit_observation": "Detached controller exit code not directly observed; final result and exact birth absence establish completion"
+  },
+  "commands": {
+    "list": 68,
+    "submit": 1,
+    "recover": 1
+  },
+  "queue_state_samples": {
+    "pending": 5,
+    "starting": 1,
+    "running": 55,
+    "recovery_required": 2,
+    "cancelled": 1
+  },
+  "preservation": {
+    "prelaunch_files": 36,
+    "manifest_files": 32,
+    "current_source_files_rehashed": 351,
+    "current_snapshot_delta": "Hydra metadata only",
+    "controller_preparation_delta": "Source head c0b6065 to dated-evidence-only b8417c2",
+    "predecessor_gate_sha256": "ca0330251831247cabc8f73d4fa02120b2e3c875936317c38d172c5db64157d7"
+  },
+  "cleanup": {
+    "status": "passed",
+    "finished_utc": "2026-11-16T22:52:42.988255+00:00",
+    "removed_logical_bytes": 24466704,
+    "protected_files_verified_before_after": 125,
+    "before_snapshot_path": "/mnt/wsl/data/nkt/clearml-yolo/.tmp/verification-gap-closure/queue-guardian-cleanup-before.json",
+    "before_snapshot_sha256": "d645d3ae93e7cdef58fac34a5e80a325dc8fdc6131a8025b97cfae83a4338ba6",
+    "known_pids_absent": [
+      160408,
+      163081,
+      202881,
+      202941,
+      203084,
+      203918,
+      203995,
+      204700,
+      205389,
+      205433,
+      206038,
+      206238,
+      206414,
+      206602,
+      206699,
+      206784,
+      206911,
+      207051,
+      207284,
+      207329,
+      207423,
+      207720,
+      208408,
+      208584,
+      208887,
+      209074,
+      209433,
+      210178,
+      210588,
+      210718,
+      210723,
+      210747,
+      210949,
+      211177,
+      211332,
+      211471,
+      211701,
+      211904,
+      212073,
+      212235,
+      212411,
+      212583,
+      212664,
+      212802,
+      212967
+    ],
+    "exact_case_process_and_cache_handles": "empty",
+    "excluded_unrelated_user_systemd_pids": [
+      340,
+      344
+    ],
+    "scope": "Only the reviewed guardian-recovery dataset cache; queue history, durable coordination, shared runtime, assets, all failures and protected artifacts retained",
+    "physical_reclaim": "Logical bytes only; physical reclaim not measured",
+    "directories_removed": [
+      {
+        "path": "/mnt/wsl/data/nkt/clearml-yolo/runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-guardian-loss-v1-de6fe9be2e/dataset-cache",
+        "kind": "current_case_dataset_cache_only",
+        "file_count": 489,
+        "logical_bytes": 24466704
+      }
+    ]
+  },
+  "checks": {
+    "preparation_review": "passed",
+    "accepted_worker_predecessor": "passed",
+    "fresh_capacity": "passed",
+    "guardian_pidfd_fault": "passed",
+    "native_recovery_transition": "passed",
+    "native_owner_recovery": "passed",
+    "live_descendant_cleanup": "passed",
+    "unrelated_sentinel_survival": "passed",
+    "sampled_reserve": "passed",
+    "independent_acceptance": "passed",
+    "protected_cache_cleanup": "passed"
+  },
+  "ticket92_reconciliation": {
+    "criteria": [
+      {
+        "criterion": "Run maintained paired CY/cy-queue check; record source/version identities and preserve unrelated changes",
+        "status": "passed_reused_accepted_evidence",
+        "evidence": "2026-11-16-ticket92-paired-check.md and accepted ticket102 follow-up actual runtime/native pairing",
+        "scope": "527 passed/7 deselected in each recorded runtime pairing; no queue product/dependency change claimed"
+      },
+      {
+        "criterion": "Actual single-GPU direct/queued jobs with matching frozen settings; scientific/lifecycle/publication comparison",
+        "status": "passed_reused_accepted_evidence",
+        "evidence": "2026-11-16-ticket100-queue-parity.md",
+        "scope": "Fresh v4 completion, forced readback and exact supplemental Decimal relationships; original strict needs_review and true v2 divergence preserved"
+      },
+      {
+        "criterion": "Exercise cancellation, worker failure, cleanup/recovery, diagnostics and reservation lifecycle",
+        "status": "passed_selected_native_cases_delivery_pending",
+        "evidence": [
+          "2026-11-16-ticket92-native-cancellation.md",
+          "2026-11-16-ticket92-worker-loss.md",
+          "2026-11-16-ticket92-guardian-recovery.md"
+        ],
+        "scope": "Distinct native cancellation, worker continuity/replacement and guardian owner recovery; intentionally interrupted science"
+      },
+      {
+        "criterion": "Owned descendants terminate, unrelated processes survive, uncertainty retains documented recovery evidence/reservations",
+        "status": "passed_selected_native_cases_delivery_pending",
+        "evidence": "Native cancellation/worker/guardian receipts and independent process checks",
+        "scope": "Dead guardian retained private claim despite empty current OS allocation; native owner recovery cleaned six observed live descendants; 45 identities absent and unrelated same-UID sentinel survived. No inaccessible-evidence or multi-user claim"
+      },
+      {
+        "criterion": "Separate cy-queue from ClearML Agent scheduling evidence; serialize competing GPU cases",
+        "status": "passed_reused_historical_Agent_and_current_queue_evidence",
+        "evidence": [
+          "specs/012-own-test-infra/evidence/2026-11-15-campaign-services.md",
+          "fresh per-case coordinator admissions and predecessor gates"
+        ],
+        "scope": "Historical accepted local CPU Agent scheduling/remote readback stays separate from fresh cy-queue GPU/fault evidence; no current-environment Agent rerun or remote-host reconstruction claim"
+      }
+    ],
+    "remaining_scoped_live_verification_gaps": [],
+    "remaining_delivery_requirements": [
+      "Coordinator combined review",
+      "Canonical verification gate",
+      "Integration/delivery before tracker closure"
+    ],
+    "basis": "Exact existing local ticket criteria; no expansion to hypothetical inaccessible-evidence, multi-user or remote-host verification"
+  },
+  "historical_ClearML_Agent_evidence": {
+    "date": "2026-11-15",
+    "accepted_in": "specs/012-own-test-infra/evidence/2026-11-15-campaign-services.md after independent review corrections",
+    "source_commit": "bce7df823f85f4c52ad7785ca2800dce691e20c1",
+    "agent_version": "4.0.17",
+    "tasks": [
+      {
+        "environment": "cy-it-37fa32",
+        "task_id": "2aa8651b064c406da50f346f8e20104b",
+        "queue": "verification-gap-closure-cy-it-37fa32",
+        "status": "completed",
+        "artifact_sha256": "ef5f67757fd1615ebcb674db6f5c1a14d525e6fd9116f6afb226ce85497cff11",
+        "payload": {
+          "expected": "remote-value",
+          "remote": true,
+          "task_id": "2aa8651b064c406da50f346f8e20104b"
+        }
+      },
+      {
+        "environment": "cy-it-e3dd8d",
+        "task_id": "2f01144dd1864e1fb400d79278ce5868",
+        "queue": "verification-gap-closure-cy-it-e3dd8d",
+        "status": "completed",
+        "artifact_sha256": "2190925ea01e6f223cff6be5c8bd48b2687635b776fdada500490b5d51e00f83",
+        "payload": {
+          "expected": "remote-value",
+          "remote": true,
+          "task_id": "2f01144dd1864e1fb400d79278ce5868"
+        }
+      }
+    ],
+    "durable_bundle_files_rehashed": 18,
+    "scope": "Historical local CPU scheduling and remote parameter/artifact readback. Separate from cy-queue; neither current-service Agent execution nor remote-host reconstruction is claimed."
+  },
+  "bindings": [
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-guardian-loss-v1-de6fe9be2e/lifecycle-result.json",
+      "sha256": "7a1c3d05a9381866ad97c120bd61e53ccb136da094a645755a93febfe375dfc9"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-guardian-loss-v1-de6fe9be2e/independent-acceptance-review.json",
+      "sha256": "ba24684eb56fa31df8585c37c27a1b60a9a17d97c6f296ff46163571b612074d"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-guardian-loss-v1-de6fe9be2e/coordinator-postcheck.json",
+      "sha256": "606026efcf06b9c6401b66a84a85bed35a995c4d3d4a472d472a0513e24169d0"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-guardian-loss-v1-de6fe9be2e/cleanup-plan.json",
+      "sha256": "4274da29a551e5002c7ee71b363bf510902fa9552e65ec16fbfd088f60e6bc71"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-guardian-loss-v1-de6fe9be2e/cleanup.json",
+      "sha256": "20bc60dd1e0e4fa105fd88cd3d096961177be44f90fb142b667c51bcbaf90490"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-guardian-loss-v1-de6fe9be2e/fault-action.json",
+      "sha256": "2e3527f9b7c69f71d948862047da6079d206a4d48a03729ee0a8a964f4b2c56a"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-guardian-loss-v1-de6fe9be2e/recovery-before.json",
+      "sha256": "9ba5752756884c0c7f0b05790030e4ddcc98df21531ad8c9bc023a89cbc6b0fd"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-guardian-loss-v1-de6fe9be2e/native-recovery-reply.json",
+      "sha256": "f40782c558a1634ab35a3c8054001f805fbac3235bd8c68bc6ef2dfa6135b6f2"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-guardian-loss-v1-de6fe9be2e/fault-after.json",
+      "sha256": "a657e5fe29f7688c6b101ac91f48cb2be5a2bae83998e32faedff6d43d912c55"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-guardian-loss-v1-de6fe9be2e/monitor-receipt.json",
+      "sha256": "841b4a1579796297af6952c8fa81a06b20b846e60251faedae448458e165c8ad"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-guardian-loss-v1-de6fe9be2e/independent-process-cleanup.json",
+      "sha256": "986ddab9764b12f295ec9f2260350f79f294dcda2cb1ec11f936978b6d550c3a"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-guardian-loss-v1-de6fe9be2e/optimizer.json",
+      "sha256": "d3c33b0932590859db0803a3e19dd2b18986157655fbc5e8fafd997196fabf74"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-guardian-loss-v1-de6fe9be2e/child-finish-failure.json",
+      "sha256": "f6c75d99987d31576bcd9ca94486bab1cf85b3f9b9577f59af5fe2a719ccbffa"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket92-guardian-loss-v1-20261116/preparation-manifest.json",
+      "sha256": "5730efa7116208e14be5ddfd3afedf8fc6911eb9de9a251bd992bf8908ac9b2c"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket92-guardian-loss-v1-20261116/independent-review.json",
+      "sha256": "ddd74ac95c928a3828d48bb6c2a6524adc0397ef4edfc314c2f413547c65eb3e"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket92-guardian-loss-v1-20261116/worker-loss-acceptance.json",
+      "sha256": "ca0330251831247cabc8f73d4fa02120b2e3c875936317c38d172c5db64157d7"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket92-guardian-loss-v1-20261116/fresh-admission.json",
+      "sha256": "43b6e1d3b5172bb5d79a7ae89cf778055836d2f7cedc3a8570c7b4fcee7a6296"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket92-guardian-loss-v1-20261116/controller-launch.json",
+      "sha256": "572d8a1a36a93d1fe99223f9a9f83b8a6388effb095a3a0abfefd96ac3ac11fd"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/queue-guardian-cleanup-before.json",
+      "sha256": "d645d3ae93e7cdef58fac34a5e80a325dc8fdc6131a8025b97cfae83a4338ba6"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket92-guardian-prelaunch-20261116T224429Z/preserved-inventory.json",
+      "sha256": "44c4153ce0067947cce4c24c8a03722be26a5eb312a681fb339947027cf8d77c"
+    },
+    {
+      "path": "specs/012-own-test-infra/evidence/2026-11-15-campaign-services.md",
+      "sha256": "6fb8e777a2909bf004a6eaba4212d50d33c6092cf567cbf542a4d8dc0dfc90d8"
+    },
+    {
+      "path": "runs/verification-gap-closure/service-handoffs/cy-it-37fa32/sha256.json",
+      "sha256": "1774307e331eae3bc6bb7868c74f1feda15460f89f6b834281e9a7ff14529604"
+    },
+    {
+      "path": "runs/verification-gap-closure/service-handoffs/cy-it-37fa32/cy-it-37fa32-handoff.json",
+      "sha256": "b52230c1d03e101e316b1093ef87090a175e637e0b42b614ee9a943549863da2"
+    },
+    {
+      "path": "runs/verification-gap-closure/service-handoffs/cy-it-e3dd8d/sha256.json",
+      "sha256": "28127a9aa564f92832a9f618fca110cd243cb6eca792f163deba3df02f6563c1"
+    },
+    {
+      "path": "runs/verification-gap-closure/service-handoffs/cy-it-e3dd8d/cy-it-e3dd8d-handoff.json",
+      "sha256": "46c316969ae3920bb5dc0cc24baf1b55aa7995590fd2e83246f9463434d0d4e6"
+    },
+    {
+      "path": "runs/verification-gap-closure/service-handoffs/renewal-correction/sha256.json",
+      "sha256": "7c8b7822d3631c309318d364f40cfe1f1faf86c0523cb7c84200d7a946c7e68e"
+    },
+    {
+      "path": "runs/verification-gap-closure/service-handoffs/renewal-correction/receipt.json",
+      "sha256": "45b67070d7363cde0e840b6ac84a530a22192db7d5c4a9581e635b8e1a17df5a"
+    }
+  ],
+  "limitations": [
+    "Sampled reserve and ownership observations, not continuous proof",
+    "One same-user sibling sentinel; no multi-user or physical multi-GPU claim",
+    "No inaccessible-evidence recovery or full forced cancellation-grace claim",
+    "No completed training/publication or numerical accuracy claim from this interrupted case",
+    "Detached controller exit not directly observed",
+    "Historical WSL root cause remains unknown",
+    "No GPU/service/queue calls, signals or deletion by reviewer",
+    "Protected cleanup records logical bytes only",
+    "Whole-ticket acceptance remains pending combined delivery gates",
+    "No new live calls, tests, signals or deletion during dated-record preparation"
+  ]
+}

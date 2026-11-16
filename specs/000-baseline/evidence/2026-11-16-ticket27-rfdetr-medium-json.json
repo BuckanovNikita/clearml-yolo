@@ -1,0 +1,301 @@
+{
+  "schema_version": 1,
+  "ticket": 27,
+  "selection": "rfdetr/medium",
+  "variant": "json",
+  "status": "accepted_native_scope",
+  "delivery_gate": "Coordinator review, commit and native documentation route pending",
+  "case": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-medium-json-a60b8ab774",
+  "source_commit": "c0b6065572ac6e1b92147acd58f667a72bc5eac6",
+  "environment": "cy-it-ded7c4",
+  "project": "cy-it-ded7c4 ticket27",
+  "task_id": "f52c862f7f6e4a6bb5b25bd741ecb3bb",
+  "output_model_id": "75b5d349b12a44c19bdafec82c9df31f",
+  "checkpoint_sha256": "7d4656845e6af3c82a3eabe208c5a6ebd1daf2dea2b8c03d47ff1e41449850e7",
+  "source_applicability": {
+    "launch_source_map_identical": 459,
+    "readback_source_map_identical": 238,
+    "shared_inputs_identical": true,
+    "scope": "All 459 current launch sources rehashed at independent acceptance; 238 readback product inputs matched. Actual-input bindings and corrected helper rehashed. Documentation HEAD is a dated-evidence-only successor of execution HEAD."
+  },
+  "Medium_baseline": {
+    "initial_optimizer_parameters_sha256": "e282f644c541e9ebb098790eac437d2a50de446590250afb7434efd01a801544",
+    "initialization_comparisons": 1,
+    "scope": "Initializer compared with accepted ticket26 Medium native baseline; no smaller-family initialization and no native-capacity reuse.",
+    "initial_asset_sha256": "749ff6071828aaffac63e204c4f4135ed3d6cdae4d702e086c360edc3b5768c8",
+    "initial_asset_md5": "7223f764a87b863f02eb8d52bf0ce2ee",
+    "initial_asset_url": "https://storage.googleapis.com/rfdetr/medium_coco/checkpoint_best_regular.pth",
+    "native_revision": "1.11.2"
+  },
+  "fixture": {
+    "canonical_manifest_sha256": "356d4c02883226678e4ae474d54f21a8820fb31fc8f3eefe13ac177684396a33",
+    "train_images": 160,
+    "val_images": 40,
+    "test_images": 40,
+    "seed": 0,
+    "heldout_images": 80,
+    "heldout_backgrounds": 34,
+    "pixel_leakage": false
+  },
+  "training": {
+    "status": "passed",
+    "epochs": [
+      0,
+      1
+    ],
+    "batch": 16,
+    "optimizer_steps": 20,
+    "skipped_steps": 0,
+    "parameter_changed": true,
+    "step_derivation": "2 epochs * (160 / 16) = 20 optimizer updates",
+    "seed": 0,
+    "precision": "fp32",
+    "precision_evidence": "Native amp_dtype is null from CY amp=false; unchanged reviewed adapter/Lightning resolution.",
+    "ema": true,
+    "accumulation": 1,
+    "native_loss_count": 46,
+    "remote_scalar_loss_count": 54,
+    "native_seconds": 201.22297833300036,
+    "launcher_seconds": 203.8323522190003
+  },
+  "augmentation": {
+    "mode": "albumentations",
+    "canonical_snapshot_sha256": "bfdd9c00d36be4d222068553563e91dcde506316a6b78751cfe45e769f975e09",
+    "multi_scale": "off",
+    "expanded_scales": true,
+    "scale_jitter": false,
+    "scope": "Custom JSON pipeline and recorded configuration; native scale jitter/multiscale disabled. No per-image transform trace claim."
+  },
+  "estimator": {
+    "chosen_batch": 16,
+    "status": "validated",
+    "fresh_forced": true,
+    "nominal_size": [
+      576,
+      576
+    ],
+    "effective_size": [
+      576,
+      576
+    ],
+    "successful_trial_steps": {
+      "warmup": 5,
+      "measured": 10,
+      "validation": 1
+    },
+    "trials": [
+      {
+        "batch": 8,
+        "status": "success",
+        "peak_memory_bytes": [
+          14251982848
+        ]
+      },
+      {
+        "batch": 16,
+        "status": "success",
+        "peak_memory_bytes": [
+          23306436608
+        ]
+      },
+      {
+        "batch": 24,
+        "status": "oom",
+        "peak_memory_bytes": []
+      },
+      {
+        "batch": 16,
+        "status": "success",
+        "peak_memory_bytes": [
+          23224647680
+        ]
+      }
+    ],
+    "scope": "Confirmed backend-valid batch16 after24 OOM under the exact fixed576 custom-JSON profile and current memory; no training fallback or capacity reuse."
+  },
+  "reserve": {
+    "sample_count": 192,
+    "minimum_free_MiB": 10411,
+    "required_free_MiB": 10240,
+    "maximum_observed_gap_seconds": 1.5540325970014237,
+    "query_timeout_seconds": 5,
+    "scenario_timeout_seconds": 1800,
+    "owner_timeout_seconds": 2040,
+    "errors": [],
+    "scope": "Sampled evidence only; not continuous reserve or playback-quality proof"
+  },
+  "publication": {
+    "status": "passed",
+    "fresh_downloaded_artifacts": 8,
+    "fresh_downloaded_checkpoint": true,
+    "downloaded_hashes_rechecked": true,
+    "native_checkpoint_hash_matches": true,
+    "native_checkpoint_reloaded": true,
+    "configuration_population_epoch_workbook_checks": "passed"
+  },
+  "cpu_validation": {
+    "status": "passed",
+    "helper_sha256": "10505a719da3729707dbf96c1b0efaa6b948f254c5d01567575711731d579752",
+    "preset": "medium",
+    "size": 576,
+    "images": 40,
+    "background_images": 15,
+    "raw_rows": 11086,
+    "evaluation_rows": 11086,
+    "excluded_rows": 0,
+    "raw_and_evaluation_sha256": "bc6b8ca808e566b0ae24b3c7530553d95dfd6d4529096943eefd25eb7bf1adcb",
+    "counts": {
+      "tp": 11,
+      "fp": 75,
+      "fn": 53
+    },
+    "scope": "Native CY detector prediction and fixed-threshold scoring; not upstream solver validation or accuracy qualification"
+  },
+  "execution_sessions": {
+    "GPU": {
+      "session": 42660,
+      "exit_code": 0
+    },
+    "CPU_local": {
+      "session": 90439,
+      "exit_code": 0
+    },
+    "CPU_remote": {
+      "session": 13280,
+      "exit_code": 0
+    },
+    "cleanup": {
+      "session": 74765,
+      "exit_code": 0
+    }
+  },
+  "ownership": {
+    "native_cleanup_complete": true,
+    "native_worker_cleanup_complete": true,
+    "known_pids_absent": [
+      17498,
+      21879,
+      24006,
+      109476,
+      114029
+    ],
+    "CPU_parent_birth": 1156749,
+    "CPU_child_birth": 1157522,
+    "CPU_parent_and_child_CUDA_hidden_observed": true
+  },
+  "cleanup": {
+    "status": "passed",
+    "finished_utc": "2026-11-16T22:51:10.770320+00:00",
+    "directories_removed": [
+      {
+        "relative_to_case": "dataset-cache",
+        "files": 249,
+        "logical_bytes": 24345802
+      },
+      {
+        "relative_to_case": "readback/20261116T224316Z-1fcc11a9/cache",
+        "files": 9,
+        "logical_bytes": 150022348
+      }
+    ],
+    "removed_logical_bytes": 174368150,
+    "protected_files_verified_before_after": 123,
+    "known_pids_absent": [
+      17498,
+      21879,
+      24006,
+      109476,
+      114029
+    ],
+    "exact_case_process_scan": "empty",
+    "cache_open_handle_scan": "empty",
+    "acceptance_review_sha256": "1313ad20ec4f51d2c29750e0f7d70776fb5a6c8df67baa13c2c24678324aa016",
+    "scope": "Exact case only; other ticket workloads may run; no global compute-empty claim",
+    "physical_reclaim": "Logical bytes only; physical reclaim not separately measured",
+    "excluded_unrelated_user_systemd_pids": [
+      340,
+      344
+    ]
+  },
+  "checks": {
+    "CPU_preparation": "passed",
+    "actual_input_review": "passed",
+    "native_GPU": "passed",
+    "remote_publication": "passed",
+    "CPU_checkpoint_prediction_and_scoring": "passed",
+    "independent_acceptance": "passed",
+    "exact_owned_cache_cleanup": "passed",
+    "documentation_delivery": "pending_coordinator_native_route"
+  },
+  "evidence": [
+    {
+      "path": ".tmp/verification-gap-closure/backend-preparation/ticket27-20261116T223000Z-5c568f59/independent-preparation-review.json",
+      "sha256": "6c05aafde51b300933f21ab467880eadafbcc5a58d83b0d8b97422cf113caf0a"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/backend-preparation/ticket27-20261116T223851Z-587edd53/actual-preparation-review.json",
+      "sha256": "5c281c6642d4f9a0a6a437de3c36908fb02a16f86cfb8ecddb88d8b1ab7511c1"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/backend-preparation/ticket27-20261116T223851Z-587edd53/result.json",
+      "sha256": "6021a6fbe4bd65188024e6c74e23aa912e2257455e993ace067e13f28d8a26e5"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/backend-preparation/ticket27-20261116T223851Z-587edd53/gpu-telemetry.jsonl",
+      "sha256": "0a841fa66da2c8c99f2115cc39fab129c26ca75bb3fc4a7daf0212d0849c0a5b"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-medium-json-a60b8ab774/summary.json",
+      "sha256": "1e1380479b6d31524ba75b5f87a683a1107893b3c00559ce0ebcefd1dd0f3272"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-medium-json-a60b8ab774/optimizer.json",
+      "sha256": "53e85c6993326be204cee5aaf6d0a9182c4d79a40123e4cb50dcfc9845b8bd27"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-medium-json-a60b8ab774/training-inputs.json",
+      "sha256": "4d1848397d807a319e353178cddb75649be403819a358da4026a83600f0cd488"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-medium-json-a60b8ab774/pipeline.json",
+      "sha256": "b0d0b2f134143ff8775916d397c87f9511c94096318556f6e3e6e943423b3674"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-medium-json-a60b8ab774/readback/20261116T224316Z-1fcc11a9/receipt.json",
+      "sha256": "3c0c568fa23d8d3e4478a4eaaf6bb54d7fc07d96f079040058197a982f03948f"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-medium-json-a60b8ab774/readback/20261116T224316Z-1fcc11a9/executor-receipt.json",
+      "sha256": "10dacf323627f64483de14b943c3c02a786c7906240b0d3cd6259c9a9953e156"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-medium-json-a60b8ab774/readback/20261116T224316Z-1fcc11a9/independent-acceptance-review.json",
+      "sha256": "1313ad20ec4f51d2c29750e0f7d70776fb5a6c8df67baa13c2c24678324aa016"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-medium-json-a60b8ab774/readback/20261116T224316Z-1fcc11a9/cpu-validation.json",
+      "sha256": "eabb119ae554113e9c6c1c7c4420d08ae5b4d8e4c62b83e3f232a28827518cbe"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-medium-json-a60b8ab774/readback/20261116T224316Z-1fcc11a9/cpu-geometry.json",
+      "sha256": "a6619920433b4a4624a5d28fc6773fee39b45d0d91617d37d7d3133c25b46873"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-medium-json-a60b8ab774/readback/20261116T224316Z-1fcc11a9/cleanup-plan.json",
+      "sha256": "fcaa145636f01028029deb228689fc20582da1328264966a2973b80e9b99cca4"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-medium-json-a60b8ab774/readback/20261116T224316Z-1fcc11a9/cleanup.json",
+      "sha256": "dc980860cdc029248a766d86d804cfba49dc991666a3cd50da283fe5464edf49"
+    }
+  ],
+  "limitations": [
+    "No accuracy or convergence qualification",
+    "No CPU/GPU or export/runtime numerical parity",
+    "No upstream solver validation or physical multi-GPU claim",
+    "Sampled reserve does not prove continuous reserve or playback quality",
+    "Historical WSL hang causality remains unproven",
+    "Logical cleanup bytes; physical reclaim not separately measured"
+  ],
+  "documentation_source_commit": "b8417c2ccbeb01a3411901325ed9f9cc5a425ef7"
+}
