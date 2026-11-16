@@ -1,0 +1,21 @@
+# Ticket 29 — RF-DETR Large native verification
+
+The bounded `rfdetr/large` native case passed native GPU execution, remote publication/readback, independent acceptance and exact owned-cache cleanup. Coordinator review and the native documentation delivery route remain pending for this dated pair.
+
+The run used the Large2026 asset `0f4e20e19a99c0f8a62b5685f57f6c8b5c371c59081feda6752a0561a79ccf38`, native revision 1.11.2, nominal resolution 704, decoder depth 4, patch size 16, two windows and positional size 44. It trained two FP32 epochs with seed 0 over 160 training images, with 40/40 validation/test images. Native expanded scales and scale jitter remained enabled.
+
+Fresh capacity estimation used maximum expanded input 864×864. Batch 8 succeeded, 16 exhausted the constrained allocator, and 8 passed confirmation. Training completed 40 optimizer updates without skips and changed parameters. Its own Large initial optimizer parameter hash is `8eacdaa2ce5ea20ee108d227865c3e21857872047a22631ba5db999885113420`, with zero previous initialization comparisons. No smaller-family initializer or capacity was reused. Later Large variants must compare with this eligible baseline.
+
+Native execution took 177.718 seconds; the launcher took 181.090 seconds. Telemetry contains 161 samples, minimum 10,670 MiB free and no query errors. The maximum inter-sample gap was **5.761034 seconds**. The unchanged guard requires 10,240 MiB free, a five-second query timeout, a 1,800-second scenario limit and a 2,040-second owner limit. Query timeout is not a sampling-cadence guarantee; these observations do not establish continuous reserve or playback quality.
+
+ClearML task `d1c47e03278a46b28d8cc4b459a347c6` published model `0632f028c2ce4d13905755a2cc5763cd`. The native and freshly downloaded checkpoint hashes match `64e82c1d4e8d39a7f9b7af9b999f7a42b198de80788c8e8faf9df47fbca17f15`. Eight downloaded publication artifacts were rehashed; configuration, population, epoch and workbook checks passed. All 54 remote scalar loss values and 46 native CSV loss values were finite.
+
+CUDA-hidden CPU validation loaded that checkpoint and predicted 40 images including 15 backgrounds. Raw and evaluation CSVs each contain 11,560 rows with no geometry exclusions and share hash `0d7d94646cd339a142800a48d97554138b915316ab84e3c40ace1b41e19880af`. Fixed-threshold scoring produced TP 17, FP 155 and FN 47. This exercises CY prediction and scoring, not upstream solver validation, accuracy qualification or numerical CPU/GPU parity.
+
+Independent acceptance rehashed 459 launch sources, matched 238 readback product inputs, and verified actual-preparation bindings, the own Large asset and checkpoint/publication identities. Native session 91702 and CPU sessions 43457/29982 exited 0. Native cleanup flags were true. The executor observed both CPU processes CUDA-hidden; all six recorded launcher/pytest/worker/probe/CPU identities were absent.
+
+Cleanup session 3178 exited 0 at 2026-11-16T23:07:41.432874+00:00, removing the exact dataset cache (249 files, 24,346,284 bytes) and readback cache (9 files, 151,777,144 bytes): **176,123,428 logical bytes**. All 119 protected files were verified before and after removal. The Markdown plan was in the protected inventory, and the coordinator additionally protected the JSON plan. Exact-case process and cache-handle scans were empty. Original/downloaded checkpoints, predictions, receipts and shared resources remain protected. The documentation author rehashed all protected files and confirmed both caches absent; physical reclaim was not separately measured.
+
+The [JSON evidence](2026-11-16-ticket29-rfdetr-large-native.json) binds preparation, native, readback, independent review and cleanup receipts. Execution HEAD was `b8417c2ccbeb01a3411901325ed9f9cc5a425ef7`; the documentation worktree is `98d7dc455d8653fec705e122a3edd7ee072235d2`, equal to local master, without fetching remote references.
+
+The coordinator subsequently reported ticket 30's GPU query timing out after five seconds and paused GPU dispatch under ticket 101's recurrence rule. That later failure does not invalidate ticket 29's earlier scoped result. This record makes no host-fix, full-campaign-completion, export/runtime parity, physical multi-GPU, accuracy/convergence or historical WSL-hang-causality claim.
