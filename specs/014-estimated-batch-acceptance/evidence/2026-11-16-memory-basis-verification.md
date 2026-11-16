@@ -66,6 +66,13 @@ fault proofs remain applicable because the method bytes and all three relevant
 test ASTs (seven cases) are unchanged. No tooling policy or source transformation
 was introduced to claim native mutation coverage of this excluded method.
 
+Native hygiene removed trailing whitespace in two captured manual-fault logs in
+the separate mechanical commit `6560160`. The unchanged JSON reports' original
+`log_sha256` values bind raw blobs retained in `d665668`; current normalized hashes
+and exact Git object names are recorded in
+`2026-11-16-memory-basis-log-normalization.json`. All other mutation artifacts remain
+byte-identical. No failure text or outcome was altered.
+
 ## Queue compatibility and reusable evidence
 
 Read-only inspection of clean cy-queue revision
