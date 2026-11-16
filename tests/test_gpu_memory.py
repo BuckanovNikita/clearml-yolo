@@ -257,7 +257,8 @@ def test_allocator_fraction_caps_racing_free_and_reserved_snapshots(monkeypatch:
     monkeypatch.setattr(torch.cuda, "memory_reserved", reserved)
     monkeypatch.setattr(torch.cuda, "get_device_properties", lambda device: SimpleNamespace(uuid="selected"))
     monkeypatch.setattr(
-        gpu_inventory, "gpu_states",
+        gpu_inventory,
+        "gpu_states",
         lambda: {"GPU-selected": gpu_inventory.GPUState(4 * gib, 0, frozenset(), free_bytes=20 * gib)},
     )
     monkeypatch.setattr(

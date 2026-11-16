@@ -266,17 +266,29 @@ def test_discovery_executes_isolated_metadata_script_and_joins_visible_uuid_orde
     )
     _fake_nvidia_smi(
         tmp_path / "bin",
-        "case \"$1\" in\n"
+        'case "$1" in\n'
         "  --query-gpu=*) printf 'GPU-first, 120, 50, 0\\nGPU-second, 210, 150, 7\\n' ;;\n"
         "  --query-compute-apps=*) exit 0 ;;\n"
         "  *) exit 2 ;;\nesac",
     )
     monkeypatch.setenv("PATH", str(tmp_path / "bin"))
     assert [device.model_dump() for device in gpu.discover_gpus()] == [
-        {"index": 0, "uuid": "GPU-second", "name": "Second CUDA device", "total_memory_bytes": 209715200,
-         "used_memory_bytes": 52428800, "utilization": 7},
-        {"index": 1, "uuid": "GPU-first", "name": "First CUDA device", "total_memory_bytes": 104857600,
-         "used_memory_bytes": 52428800, "utilization": 0},
+        {
+            "index": 0,
+            "uuid": "GPU-second",
+            "name": "Second CUDA device",
+            "total_memory_bytes": 209715200,
+            "used_memory_bytes": 52428800,
+            "utilization": 7,
+        },
+        {
+            "index": 1,
+            "uuid": "GPU-first",
+            "name": "First CUDA device",
+            "total_memory_bytes": 104857600,
+            "used_memory_bytes": 52428800,
+            "utilization": 0,
+        },
     ]
     assert capfd.readouterr() == ("", "")
 
@@ -285,7 +297,8 @@ def test_discovery_preserves_metadata_child_exit_and_captured_diagnostics(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     _metadata_child(
-        monkeypatch, tmp_path,
+        monkeypatch,
+        tmp_path,
         "import sys\nprint('metadata context')\n"
         "print('CUDA metadata unavailable', file=sys.stderr)\nraise SystemExit(23)\n",
     )
@@ -301,7 +314,8 @@ def test_discovery_explains_absent_visible_devices_or_nvml_identity(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, device_count: int, message: str
 ) -> None:
     _metadata_child(
-        monkeypatch, tmp_path,
+        monkeypatch,
+        tmp_path,
         "from types import SimpleNamespace\n"
         f"cuda = SimpleNamespace(device_count=lambda: {device_count}, "
         "get_device_properties=lambda index: SimpleNamespace(uuid='missing', name='test', total_memory=104857600))\n",
@@ -312,12 +326,11 @@ def test_discovery_explains_absent_visible_devices_or_nvml_identity(
         gpu.discover_gpus()
 
 
-def test_discovery_bounds_and_reaps_stalled_metadata_child(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_discovery_bounds_and_reaps_stalled_metadata_child(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     pid_file = tmp_path / "metadata.pid"
     _metadata_child(
-        monkeypatch, tmp_path,
+        monkeypatch,
+        tmp_path,
         "import os, time\nfrom pathlib import Path\n"
         f"Path({str(pid_file)!r}).write_text(str(os.getpid()))\ntime.sleep(60)\n",
     )
@@ -326,7 +339,8 @@ def test_discovery_bounds_and_reaps_stalled_metadata_child(
     def bounded(command: list[str], *, timeout: float, **kwargs: Any) -> subprocess.CompletedProcess[str]:
         # Assert a bounded external-process policy, then accelerate only the clock
         # for this real sleeping child. Do not replace execution or termination.
-        assert timeout is not None and 0 < timeout <= 60
+        assert timeout is not None
+        assert 0 < timeout <= 60
         return run(command, timeout=0.5, **kwargs)
 
     monkeypatch.setattr(subprocess, "run", bounded)
