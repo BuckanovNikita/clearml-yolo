@@ -99,7 +99,7 @@ def test_optional_allocator_reserve_leaves_driver_headroom(monkeypatch: pytest.M
     )
     assert reserve_cuda_memory(0, 0) is None
     assert not limits
-    fraction = reserve_cuda_memory(8 * gib, 0)
+    fraction = reserve_cuda_memory(8 * gib)
     assert fraction == pytest.approx(4.75 / 24)
     assert limits == [(fraction, 0)]
     with pytest.raises(RuntimeError, match="reserve"):
@@ -122,8 +122,16 @@ def test_allocator_reserve_uses_lower_free_reading_for_visible_device(
         assert device == 1
         return SimpleNamespace(uuid="visible-selected", total_memory=24 * gib)
 
-    monkeypatch.setattr(torch.cuda, "mem_get_info", lambda device: (cuda_free_gib * gib, 24 * gib))
-    monkeypatch.setattr(torch.cuda, "memory_reserved", lambda device: 0)
+    def memory_info(device: int) -> tuple[int, int]:
+        assert device == 1
+        return cuda_free_gib * gib, 24 * gib
+
+    def reserved(device: int) -> int:
+        assert device == 1
+        return 0
+
+    monkeypatch.setattr(torch.cuda, "mem_get_info", memory_info)
+    monkeypatch.setattr(torch.cuda, "memory_reserved", reserved)
     monkeypatch.setattr(torch.cuda, "get_device_properties", properties)
     monkeypatch.setattr(
         gpu_inventory,
@@ -141,9 +149,9 @@ def test_allocator_reserve_uses_lower_free_reading_for_visible_device(
     assert limits == [(fraction, 1)]
 
 
-@pytest.mark.parametrize("whole_used_gib", [None, 23])
+@pytest.mark.parametrize("whole_used_gib", [None, 23, 15.75])
 def test_allocator_reserve_refuses_missing_or_insufficient_whole_device_memory(
-    monkeypatch: pytest.MonkeyPatch, whole_used_gib: int | None
+    monkeypatch: pytest.MonkeyPatch, whole_used_gib: float | None
 ) -> None:
     import torch
 
@@ -158,7 +166,9 @@ def test_allocator_reserve_refuses_missing_or_insufficient_whole_device_memory(
         torch.cuda, "get_device_properties", lambda device: SimpleNamespace(uuid="selected", total_memory=24 * gib)
     )
     states = (
-        {} if whole_used_gib is None else {"GPU-selected": gpu_inventory.GPUState(whole_used_gib * gib, 0, frozenset())}
+        {}
+        if whole_used_gib is None
+        else {"GPU-selected": gpu_inventory.GPUState(int(whole_used_gib * gib), 0, frozenset())}
     )
     monkeypatch.setattr(gpu_inventory, "gpu_states", lambda: states)
     monkeypatch.setattr(torch.cuda, "set_per_process_memory_fraction", lambda fraction, device: limits.append(fraction))
